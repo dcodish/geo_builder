@@ -12,7 +12,7 @@
  */
 
 import type { AnyCommand } from '@/engine';
-import { parse, type ParseContext } from './parse';
+import { parse, restoreStatedSequences, type ParseContext } from './parse';
 
 /** One canonical step the LLM produced that the parser turned into engine commands. */
 export interface BuiltStep {
@@ -32,6 +32,9 @@ export interface LlmOutcome {
   /** Set when the proxy THROTTLED instead of parsing (`built`/`dropped` empty) — the caller shows a
    *  "service busy" message and tags the analytics so the operator can track how often the ceiling is hit. */
   busy?: LlmBusy;
+  /** #536 — stated point-runs whose LLM respelling was restored to the student's sequence (`ABD→ADB`),
+   *  for the analytics log: a `source:llm` submit must be reconstructable, corrections included. */
+  restored?: string[];
 }
 
 /** Fold the points/circles a built step introduced into the running parse context, so a LATER
@@ -179,6 +182,13 @@ export async function llmParse(
     return null;
   }
 
+  // #536 — the SEQUENCE honesty gate: a stated point-run is an ORDERED statement («ADB» = D between
+  // A and B), and the model can respell it (prod: alphabetized to «ישר ABD», committing the negation
+  // of the stated betweenness with a green ✓). Restore the student's own letter order on the canonical
+  // lines BEFORE the re-parse, so the tested grammar derives the semantics from the student's spelling.
+  const seq = restoreStatedSequences(utterance, steps);
+  steps = seq.lines;
+
   // Re-parse each canonical line with the deterministic grammar — only lines that
   // parse become commands; the rest are reported so a partial build is honest. The
   // FULL figure context is threaded (the caller's buildParseCtx hints — neighbors /
@@ -228,5 +238,5 @@ export async function llmParse(
       }
     } else dropped.push(step);
   }
-  return { built, dropped };
+  return { built, dropped, ...(seq.restored.length ? { restored: seq.restored } : {}) };
 }

@@ -9,6 +9,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { buildLlmRequest, extractSteps, LLM_MODEL, STEPS_TOOL } from '../llmShared';
 import { llmParse } from '../llm';
+import { restoreStatedSequences } from '../parse';
 
 describe('buildLlmRequest', () => {
   it('targets Haiku with a forced single tool call and a bounded token budget', () => {
@@ -123,6 +124,17 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
     expect(r!.built[1].commands.some((c) => c.type === 'segment' && r!.built[1].commands.length === 1)).toBe(false);
   });
 
+  it('restores a stated point sequence the model respelled — the #536 prod P1, end to end', async () => {
+    // Prod session s0cr31nw: the student typed «ADB» (D between A and B); Haiku alphabetized it to
+    // «ישר ABD» — the NEGATION of the stated betweenness — and the seam committed it green. The
+    // sequence gate restores the student's spelling before the re-parse.
+    mockFetch(['ישר ABD']);
+    const r = await llmParse('ADB', '', { points: ['A', 'B', 'D'] });
+    expect(r!.built.map((b) => b.step)).toEqual(['ישר ADB']);
+    expect(r!.built[0].commands).toEqual([{ type: 'set-line', points: ['A', 'D', 'B'] }]);
+    expect(r!.restored).toEqual(['ABD→ADB']);
+  });
+
   it('an LLM that returns nothing buildable yields empty built (caller shows "couldn\'t read")', async () => {
     mockFetch(['utter nonsense']);
     const r = await llmParse('???', '');
@@ -194,5 +206,52 @@ describe('security — the API key and SDK never reach the browser bundle', () =
         return src.includes('@anthropic-ai/sdk') || src.includes('ANTHROPIC_API_KEY');
       });
     expect(offenders, `client code must stay key-free: ${offenders.join(', ')}`).toEqual([]);
+  });
+});
+
+describe('restoreStatedSequences — the #536 SEQUENCE gate (pure)', () => {
+  it('restores the prod instance: «ADB» alphabetized to «ישר ABD» comes back as «ישר ADB»', () => {
+    const r = restoreStatedSequences('ADB', ['ישר ABD']);
+    expect(r.lines).toEqual(['ישר ADB']);
+    expect(r.restored).toEqual(['ABD→ADB']);
+  });
+
+  it('leaves an equivalent respelling alone: the REVERSED run names the same statement', () => {
+    expect(restoreStatedSequences('ADB', ['ישר BDA']).restored).toEqual([]);
+    expect(restoreStatedSequences('ADB', ['ישר ADB']).restored).toEqual([]);
+  });
+
+  it('handles subscripted labels as whole tokens (AO1E ≠ A,O,1,E)', () => {
+    const r = restoreStatedSequences('AO1E', ['ישר AEO1']);
+    expect(r.lines).toEqual(['ישר AO1E']);
+    expect(r.restored).toEqual(['AEO1→AO1E']);
+  });
+
+  it('works in English canonical lines too', () => {
+    expect(restoreStatedSequences('ADB', ['line ABD']).lines).toEqual(['line ADB']);
+  });
+
+  it('never touches a run the model kept — the semantic-derivation guard (vertex named by ב-X)', () => {
+    // «במשולש ABD» is a TRIANGLE name; the grammar derives the vertex from «ב-D», not from the run.
+    // The gate keys on the TEXT: the line spells ABD exactly as the student did → nothing to restore.
+    const line = 'הזווית ב-D במשולש ABD היא 30';
+    const r = restoreStatedSequences('הזווית ב-D במשולש ABD היא 30', [line]);
+    expect(r.lines).toEqual([line]);
+    expect(r.restored).toEqual([]);
+  });
+
+  it('a multiset the student stated with two different sequences restores nothing (ambiguous)', () => {
+    expect(restoreStatedSequences('ADB או DAB', ['ישר ABD']).restored).toEqual([]);
+  });
+
+  it('pairs and non-matching multisets are exempt', () => {
+    expect(restoreStatedSequences('ADB', ['קטע AB']).restored).toEqual([]); // a pair carries no order
+    expect(restoreStatedSequences('ADB', ['ישר ABDE']).restored).toEqual([]); // superset — different statement
+  });
+
+  it('restores every occurrence across lines, and only the mismatched run in a mixed line', () => {
+    const r = restoreStatedSequences('ADB וגם EFG', ['ישר ABD', 'משולש EFG']);
+    expect(r.lines).toEqual(['ישר ADB', 'משולש EFG']);
+    expect(r.restored).toEqual(['ABD→ADB']);
   });
 });

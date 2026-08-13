@@ -312,6 +312,14 @@ function stepAccepted(c: Construction, positions: Map<Id, Vec>, newCons: Constra
  */
 function describeNewStatement(newCons: Constraint[], violated?: Constraint[]): Constraint {
   const real = newCons.filter((k) => !isOrderConstraint(k));
+  // #536: when every violated NEW member is an ORDER (the collinear triple of «ישר ADB» builds fine;
+  // the stated SEQUENCE is what cannot hold), naming the collinear member accuses a given that is
+  // satisfied — misdirecting the student at a relation that holds. Name the order statement itself.
+  const inNew = (v: Constraint) => newCons.some((k) => constraintKey(k) === constraintKey(v));
+  if (violated?.length) {
+    const newViolated = violated.filter(inNew);
+    if (newViolated.length && newViolated.every(isOrderConstraint)) return newViolated[0];
+  }
   if (real.length <= 1) return real[0] ?? newCons[0];
   return (
     newCons.find((k) => k.type === 'collinear-order') ??

@@ -20,7 +20,7 @@
  */
 
 import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
-import { NUM, LABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx } from './lexicon';
+import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx } from './lexicon';
 
 export type ParseResult =
   | { ok: true; commands: AnyCommand[] }
@@ -9603,6 +9603,71 @@ export function introducedNewLabels(utterance: string, canonicalLines: string[],
     for (const L of labelsOf(line)) if (!stated.has(L) && !have.has(L)) out.add(L);
   }
   return [...out];
+}
+
+/**
+ * #536 — the SEQUENCE honesty gate, the third MIRROR half of the family (sibling of
+ * {@link introducedNewLabels}). Every `dropped*` gate asks what the decomposition LOST; #255 asks what
+ * it ADDED. Neither asks whether what survived was REORDERED — yet for a stated point-run the sequence
+ * IS the statement: «ADB» states D between A and B (ADR-050 Am.3), «זווית ADB» puts the vertex at D,
+ * «מרובע ABDC» is a different quadrilateral from ABCD. The evidence (prod session s0cr31nw, 2026-08-11,
+ * the #536 P1): «ADB» escalated and the LLM emitted «ישר ABD» — alphabetized — which BLESSED the
+ * drawn-but-not-yet-constrained arrangement A–B–D with a green ✓ instead of flexing D between A and B.
+ * The student's stated betweenness was replaced by its negation, silently.
+ *
+ * Unlike its refusing siblings this gate RESTORES, because the student's own text carries the intended
+ * sequence — a refusal would be one the student cannot act on («I reordered your letters» is our fault,
+ * not theirs). And like #255 it works on the CANONICAL LINES, not the parsed commands: the grammar
+ * legitimately derives order-bearing tuples from OTHER words in a line («הזווית ב-D במשולש ABD» puts
+ * the vertex at D although the run spells ABD), so a command-level comparison cannot tell a semantic
+ * derivation from an LLM rewrite. The LLM's own text settles it: a line-run that uses EXACTLY the
+ * labels of a run the student wrote (same multiset), in a different sequence, is the LLM respelling
+ * the student's token — restore the student's spelling and let the tested grammar re-derive the
+ * semantics. A REVERSED run is left alone (BDA names the ADB line/angle unchanged), and a multiset the
+ * student stated twice with genuinely different sequences restores nothing (ambiguous). Runs shorter
+ * than 3 labels carry no order a pair doesn't (AB ≡ BA), so pairs are exempt.
+ */
+export function restoreStatedSequences(
+  utterance: string,
+  lines: string[],
+): { lines: string[]; restored: string[] } {
+  const sameSeq = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+  const rev = (a: readonly string[]) => [...a].reverse();
+  // The ADR-118 area marker is masked exactly as in `droppedNewLabels` — the `S` of a glued `SABC`
+  // is notation, not a point — on the student side AND the line side. The mask swaps single chars for
+  // spaces, so it PRESERVES LENGTH (the line-side replacement below relies on stable match indices);
+  // only the student side gets the full length-changing `normalizeUtterance` first (indices unused).
+  const maskS = (s: string) => s.replace(rx(String.raw`(?<![A-Za-z])S(?=(?:${ULABEL}){3,4}(?![A-Za-z\d]))`, 'g'), ' ');
+  const RUN = () => rx(String.raw`(?<![A-Za-z])(?:${ULABEL}){3,}(?![a-z\d])`, 'g');
+  const split = (run: string): string[] => run.match(rx(ULABEL, 'g')) ?? [];
+  // Stated runs, keyed by label multiset; a key stated with two inequivalent sequences → ambiguous (null).
+  const stated = new Map<string, string[] | null>();
+  for (const m of maskS(normalizeUtterance(utterance)).matchAll(RUN())) {
+    const labels = split(m[0]);
+    const key = [...labels].sort().join(',');
+    const prev = stated.get(key);
+    if (prev === undefined) stated.set(key, labels);
+    else if (prev !== null && !sameSeq(prev, labels) && !sameSeq(prev, rev(labels))) stated.set(key, null);
+  }
+  if (stated.size === 0) return { lines, restored: [] };
+  const restored: string[] = [];
+  const out = lines.map((line) => {
+    // Match over the S-MASKED text so an area-marker S never reads as a run member; the mask is
+    // length-preserving, so match indices line up with the original string.
+    const masked = maskS(line);
+    let result = '';
+    let last = 0;
+    for (const m of masked.matchAll(RUN())) {
+      const labels = split(m[0]);
+      const want = stated.get([...labels].sort().join(','));
+      if (!want || sameSeq(labels, want) || sameSeq(labels, rev(want))) continue;
+      restored.push(`${labels.join('')}→${want.join('')}`);
+      result += line.slice(last, m.index) + want.join('');
+      last = m.index + m[0].length;
+    }
+    return result ? result + line.slice(last) : line;
+  });
+  return { lines: out, restored };
 }
 
 /**

@@ -72,6 +72,9 @@ export const PROMPT_EXAMPLES: PromptExample[] = [
   // A named shape the deterministic parser already knows — keep it as ONE canonical line (do NOT hand-expand
   // it into constraints; the app decomposes it). Only fall back to primitives for a shape with NO canonical
   // form (e.g. an irregular n>4 polygon → a loop of segments).
+  // #536: a bare point run is an ORDER statement (ADR-050 Am.3) — the model must keep the student's
+  // letter sequence verbatim (the prod failure alphabetized ADB into ABD, negating the betweenness).
+  { freeform: 'ADB', steps: ['ישר ADB'], note: 'a bare point run = the points lie on one line IN THAT ORDER (D between A and B) — never alphabetize or reorder', ctx: { points: ['A', 'D', 'B'] } },
   { freeform: 'a kite ABCD', steps: ['kite ABCD'] },
   { freeform: 'דלתון ABCD', steps: ['דלתון ABCD'] },
   { freeform: 'an isosceles triangle ABC', steps: ['isosceles triangle ABC'] },
@@ -119,6 +122,12 @@ export function buildSystemPrompt(): string {
     '  the unstated parts free.',
     '- NEVER drop a property the student DID state: a stated shape word, size, angle or relation must survive',
     '  into the steps. If you cannot express it, return an empty list rather than emitting a weaker figure.',
+    // #536: the prod P1 — Haiku alphabetized a stated betweenness («ADB» → «ישר ABD»), committing the
+    // NEGATION of the student's given. The client-side sequence gate now restores the stated order
+    // regardless; this rule exists so the model gets it right in the first place.
+    '- NEVER reorder the letters of a point sequence the student wrote — the sequence IS the statement:',
+    '  "ADB" means D lies between A and B (emit "ישר ADB", never "ישר ABD"), "זווית ADB" has its vertex at D,',
+    '  and quadrilateral ABCD is a different shape from ABDC. Copy every letter run exactly as typed.',
     '- Decompose a multi-part request into several lines, in build order.',
     '- If you cannot express the request with the supported forms, return an empty list.',
     '',

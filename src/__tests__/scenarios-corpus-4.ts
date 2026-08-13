@@ -2090,4 +2090,33 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs(dot(C, O2, B)), 'BC tangent at C (O2C ⟂ CB)').toBeLessThan(1e-2);
     },
   },
+  {
+    id: 'stated-betweenness-adb-holds-through-the-llm-lane',
+    title: 'issue #536: «ADB» — the stated betweenness (D between A and B) is drawn, not its negation',
+    guards:
+      "operator session s0cr31nw (2026-08-11), the same bagrut Q11 figure, step «ADB»: the utterance escalated to the LLM, which ALPHABETIZED the stated run to «ישר ABD» — asserting B between A and D, the NEGATION of the student's given — and the seam committed it green over a drawn arrangement it happened to bless (the figure had legitimately wandered to A–B–D before the order was stated; the six config-cycles in the log). Root cause: every LLM-seam honesty gate asked what the decomposition LOST (labels/numbers/relations/verbs) or ADDED (#255), none asked whether it REORDERED — yet for a point-run the sequence IS the statement (ADR-050 Am.3). The sequence gate (`restoreStatedSequences`) now restores the student's letter order on the canonical lines before the re-parse; this scenario locks the corrected lane end-to-end: the LLM line carries the stated sequence and the figure draws D strictly between A and B. The engine side needed NO change — a delivered order is enforced at every accept gate (`isSatisfied` in `evaluateCore`) and flexes free carriers to the stated side (verified while diagnosing; the wrong order refuses, locked in issue-536-order-blame.test.ts).",
+    steps: [
+      'שני מעגלים משיקים מבחוץ',
+      'היקף מעגל O1 הוא 6π',
+      'שטח מעגל O2 הוא 81π',
+      'A על מעגל O1',
+      'AD משיק למעגל O2 בנקודה D',
+      'B על המשך AD',
+      'BC משיק למעגל O2 בנקודה C',
+      'מנקודה B יוצאים שני משיקים למעגל O2 בנקודות D ו C',
+      { llm: ['ישר ADB'] }, // «ADB» — the canonical line the fixed lane emits (the raw LLM wrote ישר ABD; the #536 gate restores the stated sequence)
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A');
+      const B = at(fig, 'B');
+      const D = at(fig, 'D');
+      // collinear, and D STRICTLY between A and B — the betweenness the student stated
+      const cross = (B.x - A.x) * (D.y - A.y) - (B.y - A.y) * (D.x - A.x);
+      expect(Math.abs(cross) / dist(A, B), 'A, D, B collinear').toBeLessThan(1e-2);
+      const t = ((D.x - A.x) * (B.x - A.x) + (D.y - A.y) * (B.y - A.y)) / (dist(A, B) * dist(A, B));
+      expect(t, 'D strictly after A').toBeGreaterThan(0.02);
+      expect(t, 'D strictly before B').toBeLessThan(0.98);
+    },
+  },
 ];

@@ -603,7 +603,9 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   store().executeMany(llmCmds, utterance); // one batch → one step row AND one undo entry (E4)
   // `commands` carries the LLM's committed canonical commands into the PROD analytics event too (issue
   // #84) — a `source:llm, result:ok` submit is otherwise opaque and a reported session can't reconstruct.
-  logDebug({ kind: 'input', utterance, locale, source: 'llm', built: out!.built.map((g) => g.step), dropped: out!.dropped, commands: llmCmds });
+  // `restored` (#536): stated point-runs whose LLM respelling the sequence gate corrected («ABD→ADB») —
+  // logged so a `source:llm` submit stays reconstructable, corrections included.
+  logDebug({ kind: 'input', utterance, locale, source: 'llm', built: out!.built.map((g) => g.step), dropped: out!.dropped, commands: llmCmds, ...(out!.restored ? { restored: out!.restored } : {}) });
   ui.setLlmDropped(out!.dropped);
   ui.clearText();
   deps.resolveAfterCommit();

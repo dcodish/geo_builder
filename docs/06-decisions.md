@@ -6911,3 +6911,53 @@ harness, the log-triage mirror — the ADR-346 obligation), through the new pure
 already fixed on its own lane; the 3-D parser mints no visible auto point labels outside that marker
 family. Locks: `parser/__tests__/point-name-binding.test.ts` (He+En bind, the student-named-touch
 negative, the internal-tangency negative, the end-slot negative, the pure decision) + the Q11 scenario.
+
+## ADR-441 — The SEQUENCE honesty gate: the LLM lane may not respell a stated point run (#536, the P1)
+
+Prod session s0cr31nw, step «ADB»: the utterance escalated (bare runs are out of grammar), and Haiku
+emitted «ישר ABD» — the stated run ALPHABETIZED — asserting B between A and D, the NEGATION of the
+student's betweenness. The seam committed it green: the figure had legitimately wandered to A–B–D
+(nothing constrained the order yet; the log shows six config-cycles just before), so the reordered
+command BLESSED the wrong arrangement instead of flexing D between A and B. Honesty breach of the
+first order: a stated given replaced by its negation, ✓ row, no notice.
+
+Class: **a statement whose point-letter SEQUENCE is its semantics, escalated through the LLM lane, is
+committed with whatever sequence the model emitted** — the seam's gate battery asks what a
+decomposition LOST (labels ADR-089, numbers ADR-250, relations ADR-264, verbs ADR-292, words ADR-360,
+comparisons ADR-390, constructs ADR-430) and what it ADDED (#255), never whether it REORDERED. Yet for
+a point-run the sequence IS the statement: «ADB» states D between A and B (ADR-050 Am.3), «זווית ADB»
+puts the vertex at D, «מרובע ABDC» is a different quadrilateral from ABCD.
+
+Mechanism — `restoreStatedSequences` (parse.ts), applied in `llmParse` to the canonical LINES before
+the re-parse. It RESTORES rather than refuses: the student's own text carries the intended sequence,
+so the deterministic repair is to re-impose it (a refusal would blame the student for our model's
+rewrite). It keys on the TEXT, not the parsed commands — the #255 lesson verbatim: the grammar
+legitimately derives order-bearing tuples from other words in a line («הזווית ב-D במשולש ABD» puts
+the vertex at D although the run spells ABD), so a command-level comparison cannot tell a semantic
+derivation from an LLM rewrite, and a first draft doing exactly that was discarded for this false
+positive. The model's own line settles it: a run spelling EXACTLY the labels of a student run (same
+multiset) in a different sequence is the model respelling the student's token. Reversed runs are
+equivalent (BDA names the ADB line unchanged); a multiset the student stated with two inequivalent
+sequences restores nothing; pairs are exempt (AB ≡ BA). Corrections are logged (`restored`,
+threaded into the prod analytics event) so an LLM submit stays reconstructable. The prompt gains the
+never-reorder rule + an «ADB» example (contract-tested); the gate guarantees the invariant either way.
+
+The engine needed NO change — the issue's provisional plan (split `collinear-order` from the
+preference family; verify it; make it selectable) was written before the log settled the instance, and
+its premise did not survive contact: a DELIVERED order is already enforced at every accept event
+(`isSatisfied` over `c.constraints` in `evaluateCore` — a reversed set-line refuses over-constrained,
+verified at HEAD and at the prod release 876d742), already steers root choice (`evaluate`'s
+order-sorted roots), and already flexes free carriers to the stated side (verified: a reversed free
+arrangement at seed 2 flexed to t(D)=0.12 on stating the order). ADR-276's zero-cost-inside-tolerance
+stands untouched. The one engine defect was BLAME: `describeNewStatement`'s single-member shortcut
+never consulted `violated`, so an infeasible order refused as «A, B, E collinear cannot hold» — naming
+a member that HOLDS. When every violated new member is an order, the refusal now names the order.
+
+**Sibling audit:** `src3d/` has the same gate family with no sequence gate — filed #555 (3-D lane;
+`collinear3` is order-free but angle/face runs need their own diagnosis). Also surfaced while
+reproducing: the two-tangents-from-a-free-point construction can yield NO touch points at some seeds
+and a later set-line silently re-creates the missing label as a rider — filed #556 (separate class).
+Perf: the gate is pure string work at the seam, no replay cost. Locks: `llm.test.ts` (gate unit family
++ the end-to-end mocked-fetch prod instance), `issue-536-order-blame.test.ts` (refusal names the order;
+feasible mirror stays green), scenario `stated-betweenness-adb-holds-through-the-llm-lane` (the
+operator's exact sequence with the corrected lane).
