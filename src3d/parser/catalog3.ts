@@ -139,6 +139,10 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // student never has to name a point the question does not give them.
   { category: 'planesLines', he: 'גובה הפירמידה מנקודה D', en: 'height of the pyramid from D' },
   { category: 'planesLines', he: 'גובה מנקודה D לבסיס ABC', en: 'height from D to base ABC' },
+  // #503 (ADR-3D-142): the APEX-LESS height — the apex is the pyramid's own, derived at apply — and
+  // the imperative + relative-clause phrasing the prod session actually typed.
+  { category: 'planesLines', he: 'גובה הפירמידה', en: 'the height of the pyramid' },
+  { category: 'planesLines', he: 'שרטט גובה לפירמידה שיוצא מהקודקוד D לבסיס הפירמידה', en: 'draw a height of the pyramid that goes from vertex D to the base of the pyramid' },
   { category: 'planesLines', he: 'E על המישור ABC', en: 'E is on plane ABC' },
   { category: 'planesLines', he: 'E מעל המישור ABC', en: 'E is above plane ABC' },
   { category: 'planesLines', he: 'E מתחת למישור ABC', en: 'E is below plane ABC' },

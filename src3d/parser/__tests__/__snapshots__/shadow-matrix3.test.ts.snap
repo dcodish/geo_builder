@@ -985,6 +985,26 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "the height of the pyramid",
+    "winner": "perpToBase",
+  },
+  {
+    "lang": "he",
+    "text": "גובה הפירמידה",
+    "winner": "perpToBase",
+  },
+  {
+    "lang": "en",
+    "text": "draw a height of the pyramid that goes from vertex D to the base of the pyramid",
+    "winner": "perpToBase",
+  },
+  {
+    "lang": "he",
+    "text": "שרטט גובה לפירמידה שיוצא מהקודקוד D לבסיס הפירמידה",
+    "winner": "perpToBase",
+  },
+  {
+    "lang": "en",
     "text": "E is on plane ABC",
     "winner": "pointRelPlane",
   },

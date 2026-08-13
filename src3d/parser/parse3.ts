@@ -1507,28 +1507,48 @@ const perpToBase: Rule = (s) => {
  * must keep falling through to the guidance register rather than being silently resolved here. That is
  * the one thing this rule must not over-reach on, and it is why the two optional groups are checked
  * rather than merely allowed.
+ *
+ * #503 ([ADR-3D-142](../../docs/06b-decisions-3d.md)) — the #448 remainder, orphaned by PR #469's
+ * auto-close and re-filed by triage:
+ *  - the APEX-LESS «גובה הפירמידה» / "the height of the pyramid": no FROM at all — the apex is the
+ *    solid's, derived at apply (base ids first, apex last). Gated to the PYRAMID noun: a prism has no
+ *    apex to derive, so its bare height stays out (apply refuses `bad-solid` even if reached).
+ *  - the IMPERATIVE + relative clause «שרטט גובה לפירמידה שיוצא מהקודקוד D לבסיס הפירמידה»: an optional
+ *    leading imperative, «שיוצא מ…» as a FROM variant, and the base clause may carry the solid noun
+ *    («לבסיס הפירמידה») — each a stated-in-more-than-one-FRAME gap, not a new construct.
+ * Named groups per the src3d convention — the positional read broke the first time a pattern grew.
  */
 const heightFromApex: Rule = (s) => {
-  const L = String.raw`([A-Z]\d*'?)`;
-  const FROM = String.raw`מ-?\s*(?:נקודה\s+|ה?קודקוד\s+)?`;
   const SOLID = String.raw`(?:ה|ל|של\s+ה)?(?:פירמידה|מנסרה|חרוט|גוף)`;
+  const IMP = String.raw`(?:(?:שרטטו?|ציירו?|העבירו?|נעביר|הוסיפו?)\s+(?:את\s+)?)?`;
+  const FROM = String.raw`(?:ש?יוצא\s+)?מ-?\s*(?:נקודה\s+|ה?קודקוד\s+)?`;
   const m =
-    s.match(new RegExp(`^ה?גובה(\\s+${SOLID})?\\s+${FROM}${L}(?:\\s+ל-?\\s*ה?בסיס(?:\\s+${L}${L}${L})?)?\\s*$`)) ??
     s.match(
       new RegExp(
-        `^(?:the\\s+)?(?:height|altitude)(\\s+(?:of|to)\\s+(?:the\\s+)?(?:pyramid|prism|cone|solid))?` +
-          `\\s+from\\s+(?:point\\s+|vertex\\s+)?${L}(?:\\s+to\\s+(?:the\\s+)?base(?:\\s+${L}${L}${L})?)?\\s*$`,
+        `^${IMP}ה?גובה(?<solid>\\s+${SOLID})?` +
+          `(?:\\s+${FROM}(?<from>[A-Z]\\d*'?))?` +
+          `(?:\\s+ל-?\\s*ה?בסיס(?<baseSolid>\\s+ה?(?:פירמידה|מנסרה|חרוט|גוף))?(?:\\s+(?<b1>[A-Z]\\d*'?)(?<b2>[A-Z]\\d*'?)(?<b3>[A-Z]\\d*'?))?)?\\s*$`,
+      ),
+    ) ??
+    s.match(
+      new RegExp(
+        `^(?:draw\\s+)?(?:a\\s+|the\\s+)?(?:height|altitude)(?<solid>\\s+(?:of|to)\\s+(?:the\\s+)?(?:pyramid|prism|cone|solid))?` +
+          `(?:\\s+(?:that\\s+goes\\s+)?from\\s+(?:point\\s+|(?:the\\s+)?vertex\\s+)?(?<from>[A-Z]\\d*'?))?` +
+          `(?:\\s+to\\s+(?:the\\s+)?base(?<baseSolid>\\s+of\\s+the\\s+(?:pyramid|prism|cone|solid))?(?:\\s+(?<b1>[A-Z]\\d*'?)(?<b2>[A-Z]\\d*'?)(?<b3>[A-Z]\\d*'?))?)?\\s*$`,
         'i',
       ),
     );
-  if (!m) return null;
-  const [, solid, from, b1, b2, b3] = m;
+  if (!m?.groups) return null;
+  const { solid, from, b1, b2, b3 } = m.groups;
   const face = b1 && b2 && b3 ? [b1, b2, b3] : undefined;
   // the base clause is present iff the utterance said בסיס/base at all — a named face implies it
   const saidBase = /ל-?\s*ה?בסיס|to\s+(?:the\s+)?base/i.test(s);
   if (!solid && !saidBase) return null; // the #467 bare form — guidance, never a guess
   if (face && new Set(face).size !== 3) return null;
-  return [{ type: 'perp-to-base', from, ...(face ? { face } : {}) }];
+  // #503 apex-less: only the pyramid's height names a derivable apex — «גובה המנסרה» is not a
+  // vertex-to-base perpendicular and must keep escalating rather than guess a vertex (ADR-052).
+  if (!from && !/פירמידה|pyramid/i.test(solid ?? '')) return null;
+  return [{ type: 'perp-to-base', ...(from ? { from } : {}), ...(face ? { face } : {}) }];
 };
 
 /** A bare auxiliary segment: `AM` / `קטע AM` / `segment CA'` — plus the #72 prod forms: the

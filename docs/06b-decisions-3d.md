@@ -3368,3 +3368,33 @@ never the reverse. The rider placement routines moved from pass-local closures t
 (`seatOnPlaneRider` / `seatOnLineRider`) so the re-seat is the SAME code, not a copy. Locked by the
 #557 pivot tests in `free-line.test.ts` (verified red without the fix) and the plane twin in
 `free-plane.test.ts`.
+
+## ADR-3D-142 — The pyramid height: apex-less «גובה הפירמידה» + the imperative/relative-clause frame (#503)
+
+The #448 remainder, orphaned by PR #469's auto-close and re-filed by triage; scope operator-approved
+(the 2026-08-08 F1 item, 2 users, one row LLM-defeating). Two pieces, no new geometry:
+
+1. **Apex-less.** «גובה הפירמידה» / "the height of the pyramid" emits `perp-to-base` with **no
+   `from`**; apply derives the apex from the figure's single solid by the engine-wide layout
+   convention — base ids first, apex LAST (exactly when `baseRingOf` covers all-but-one id). Several
+   solids keep the honest ambiguity refusal; a solid with NO derivable apex (prism/box) refuses
+   `bad-solid` — and the parser gates the apex-less form to the PYRAMID noun anyway, so «גובה
+   המנסרה» keeps escalating rather than guessing a vertex (ADR-052).
+2. **The imperative + relative-clause frame.** «שרטט גובה לפירמידה שיוצא מהקודקוד D לבסיס הפירמידה»
+   (the prod utterance, verbatim): an optional leading imperative (`שרטטו?|ציירו?|העבירו?|נעביר|הוסיפו?`
+   / draw), «ש?יוצא מ…» as a FROM variant, and the base clause may carry the solid noun («לבסיס
+   הפירמידה» — today only bare «לבסיס» or «לבסיס ABC» matched). Each is the recurring
+   stated-in-more-than-one-FRAME gap, not a construct.
+
+The rule moved to NAMED capture groups (the src3d convention — its positional read was one
+alternation away from the `π1`-reads-as-point-"1" trap). Boundaries held: the #467 bare «גובה
+מנקודה D» (no solid, no base) still falls to guidance; the ADR-3D-115 apex-stated forms and the
+segment-named owners are byte-identical (locked).
+
+Locks: `height-from-apex.test.ts` — the apex-less trio (He definite/של + En) geometric
+(foot-in-base-plane + apex→foot along the normal), the prod imperative row, the exact prod SESSION
+pair («פירמידה עם בסיס משולש ישר זווית» → «גובה הפירמידה»), «גובה המנסרה» refused, two-solids
+ambiguity refused, and the #448/#467 suites unchanged. Catalog: the two new rows (He + En).
+
+The shadow-matrix snapshot moved ADDITIVELY only — the four new catalog rows won by `perpToBase`,
+their intended owner; no existing row changed hands (the ADR-3D-137 no-theft evidence).
