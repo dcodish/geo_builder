@@ -363,6 +363,29 @@ function tailChoice(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides
   return runTail(fold, facts, seed, radiusOverrides);
 }
 
+/** #566 (ADR-445): the vertices an enabled EXPLICIT 90° statement names — the right-triangle seat's
+ *  PIN set. The ADR-163 reseat pre-scan and the ADR-445 config-search dimension consult this SAME set,
+ *  so the yield channel and the search can never disagree about which seats are the student's. */
+export function explicitRightAngleVerts(facts: Fact[], symtab?: ReturnType<typeof buildSymTab>): Set<Id> {
+  const st = symtab ?? buildSymTab(facts.filter((f) => f.enabled).map((f) => f.cmd));
+  return new Set<Id>(
+    facts
+      .filter((f) => f.enabled)
+      .flatMap((f) => lowerOne(f.cmd, st))
+      .filter((c): c is Extract<Command, { type: 'set-angle' }> => c.type === 'set-angle' && Math.abs(c.value - 90) < 1e-6)
+      .map((c) => c.vertex),
+  );
+}
+
+/** #566 (ADR-445): a right-triangle's EFFECTIVE ids — the explicit-90° reseat (ADR-163) always wins;
+ *  else the solve-chosen `rot` seats the right angle on the flipped vertex (last position). ONE helper
+ *  for the lowering and the knee mark, so the built angle and the drawn knee cannot disagree. */
+function rtEffectiveIds(cmd: Extract<AnyCommand, { type: 'right-triangle' }>, reseat?: [Id, Id, Id]): [Id, Id, Id] {
+  if (reseat) return reseat;
+  const [a, b, c] = cmd.ids;
+  return cmd.rot === 1 ? [b, c, a] : cmd.rot === 2 ? [a, c, b] : cmd.ids;
+}
+
 function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
   // Symbol table over the ENABLED facts, so a value given later (`x = 4`) resolves an
   // earlier `AB = 3x`, and two segments sharing a variable become a proportion (ADR-031).
@@ -394,13 +417,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
   // after the triangle): if an enabled explicit 90° set-angle names one of a right-triangle's vertices,
   // reorder its ids so that vertex is LAST (the structural right-angle vertex); the explicit angle then holds
   // as a passing check, not a conflict.
-  const rightAngleVerts = new Set<Id>(
-    facts
-      .filter((f) => f.enabled)
-      .flatMap((f) => lowerOne(f.cmd, symtab))
-      .filter((c): c is Extract<Command, { type: 'set-angle' }> => c.type === 'set-angle' && Math.abs(c.value - 90) < 1e-6)
-      .map((c) => c.vertex),
-  );
+  const rightAngleVerts = explicitRightAngleVerts(facts, symtab);
   const rtReorder = new Map<string, [Id, Id, Id]>();
   for (const f of facts) {
     if (!f.enabled || f.cmd.type !== 'right-triangle') continue;
@@ -680,9 +697,11 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
           expandShapeVariant(msSvMove.has(f.id) ? { ...f.cmd, ids: msSvMove.get(f.id)! } : f.cmd, explicitEqs, explicitOnSegs)
         : f.cmd.type === 'inscribe' ? expandInscribe(f.cmd, explicitOnSegs)
         : lowerOne(f.cmd, symtab);
-      // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see pre-scan).
+      // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see
+      // pre-scan), or — #566 (ADR-445) — onto the SOLVE-CHOSEN `rot` seat; the explicit pin always wins.
       const reseat = rtReorder.get(f.id);
-      if (reseat) engineCmds = engineCmds.map((ec) => (ec.type === 'right-triangle' ? { ...ec, ids: reseat } : ec));
+      if (reseat || (f.cmd.type === 'right-triangle' && f.cmd.rot))
+        engineCmds = engineCmds.map((ec) => (ec.type === 'right-triangle' ? { ...ec, ids: rtEffectiveIds(ec, reseat) } : ec));
       // Re-seat a midsegment default rider onto the side the student explicitly stated (ADR-412 pre-scan).
       const riderMove = msRiderMove.get(f.id);
       if (riderMove) engineCmds = engineCmds.map((ec) => (ec.type === 'point-on-segment' ? { ...ec, a: riderMove[0], b: riderMove[1] } : ec));
@@ -1085,7 +1104,7 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
     // Mark from the RESEATED right-triangle (ADR-163), so the right-angle knee is drawn at the vertex the
     // figure actually built the right angle at — not the original last id. Without this the knee sits on a
     // now-acute vertex (e.g. a leftover knee at C while ∠B is the real 90°).
-    const markCmd = rtReorder.has(f.id) && f.cmd.type === 'right-triangle' ? { ...f.cmd, ids: rtReorder.get(f.id)! } : f.cmd;
+    const markCmd = f.cmd.type === 'right-triangle' ? { ...f.cmd, ids: rtEffectiveIds(f.cmd, rtReorder.get(f.id)) } : f.cmd;
     const m = angleMarkFor(markCmd);
     if (!m || ![m.vertex, m.ray1, m.ray2].every((id) => e.ok && e.positions.has(id))) continue;
     // HONESTY GATE (ADR-223 Am.): a right-angle SQUARE (the "knee") is placed by the COMMAND'S INTENT
@@ -1543,6 +1562,33 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
         if (Date.now() > deadline) return null;
         const sm = withReflectMask(m, s);
         if (meetsRequirements(facts, sm)) return { facts, seed: sm };
+      }
+    }
+    // #566 (ADR-445): the RIGHT-ANGLE-SEAT dimension. «משולש ישר זווית ABC» leaves WHICH vertex is
+    // right unstated — the lowering defaults to the last id, and ADR-163 yields it only to an explicit
+    // 90° statement. A later constraint can leave the DEFAULT seat satisfiable only DEGENERATELY (the
+    // #566 figure: with ∠C=90 the hypotenuse AB is a diameter, so «קשת AB = קשת BC» forces C onto A —
+    // every seed fails pointsDistinct) while another seat admits a real figure. An unstated choice is a
+    // discrete config dimension (ADR-052; the ADR-426 reflection precedent): try the alternative seats
+    // via the solve-chosen `rot` field, returning REWRITTEN facts exactly like the branch tier below.
+    // A seat pinned by an explicit 90° (the ADR-163 channel, same pin set) is never flipped.
+    const pinnedRA = explicitRightAngleVerts(facts);
+    const rtFacts = facts
+      .map((f, i) => ({ f, i }))
+      .filter(({ f }) => f.enabled && f.cmd.type === 'right-triangle' && !f.cmd.ids.some((id) => pinnedRA.has(id)))
+      .slice(0, 2); // bound the combinatorics, like the branch tier
+    for (const { f, i } of rtFacts) {
+      const cur = (f.cmd as { rot?: 1 | 2 }).rot ?? 0;
+      for (const rot of ([1, 2, 0] as const).filter((r) => r !== cur)) {
+        const fc = facts.map((g, idx) => {
+          if (idx !== i) return g;
+          const { rot: _prev, ...rest } = g.cmd as Extract<typeof g.cmd, { type: 'right-triangle' }>;
+          return { ...g, cmd: rot === 0 ? rest : { ...rest, rot } } as Fact;
+        });
+        for (let s = 0; s < 6; s++) {
+          if (Date.now() > deadline) return null;
+          if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
+        }
       }
     }
     // Discrete branch alternatives — vary which intersection/side each branchable point takes.

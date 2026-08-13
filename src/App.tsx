@@ -518,6 +518,12 @@ export default function App() {
         } finally {
           temporal.resume();
         }
+      } else if (r === null) {
+        // #566 (ADR-445): the search EXHAUSTED with the kept view still short of its requirements —
+        // never leave that silent. The collapse class drew two named points as one, every status green,
+        // «נקבע במלואו» — the student had no signal anything was wrong. The figure stays (keep-prior
+        // would erase a committed given); the note says the drawing could not honour everything at once.
+        setInputNote(t('figure.noValidConfig'));
       }
     } catch (err) {
       if (!isCancelled(err)) throw err;
