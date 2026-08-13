@@ -513,3 +513,35 @@ comment preserves the paper trail ADR-W-013 noted cannot be enforced by actor id
 is now readable on the issue itself. Touchpoints: docs/22 §2d, CLAUDE.md label glossary,
 `.claude/skills/status-update/SKILL.md` (the arming line), `.claude/skills/fix-round/SKILL.md`
 (Step 1 validity rule + Step 6 digest).
+
+## ADR-W-015 — exercise-sequence agent: textbook exercise → VERIFIED utterance sequence (#567)
+
+**Status:** accepted, 2026-08-13
+
+**Context.** The validation work is corpus-driven (CLAUDE.md → Documentation): a real bagrut exercise
+is reproduced as a *figure* and compared against the official image. Transcribing an exercise into app
+input was manual — author a sequence, play it in the dev server, eyeball the result — and nothing
+proved that a written-down sequence still builds on HEAD. The LLM lane cannot help autonomously
+(standing rule 2), and the one existing headless replayer (log-triage's `triage.mjs`) is welded to
+prod-log sessions.
+
+**Decision.** A project subagent, **`.claude/agents/exercise-sequence.md`**, accepts an exercise
+(text / image / PDF page), extracts only the **stated** figure givens (never solves, ADR-052 — no
+invented magnitudes), routes 2-D vs 3-D, authors a Hebrew line-per-fact sequence in catalog phrasing,
+and must verify it before reporting via **`.claude/skills/exercise-sequence/run-sequence.mjs`**
+(vite-node). The verifier is **not a new mirror of the submit path** (the ADR-346 drift class): the
+2-D lane calls the scenario harness's own `factsOf`/`replayFacts`, whose pure core moved **verbatim**
+to `src/__tests__/scenario-pipeline.ts` (the harness re-exports it, every test import site unchanged)
+because the harness's top-level `import { expect } from 'vitest'` refuses to load outside the test
+runner. The 3-D lane is the `parse3` → `derive3` shape triage.mjs already established. Per-line
+verdicts (`built` / `applied` / `no-change` / `error-now` / `parse-fail`) + a FINAL judgement with
+the givens verifier; exit 0 ⇔ every line parses deterministically and the figure is verifier-clean.
+Agent obligations: given-by-given accounting (an inexpressible given is reported, never dropped),
+expected-differences notes for unstated free DOFs, grammar gaps reported as **candidate** feature
+issues only (filing needs operator approval, docs/22), no live LLM calls, no repo writes.
+
+**Consequences.** A textbook exercise becomes a proven, copy-pasteable sequence in one agent run, and
+the same sequences are one step from fixture/scenario locks (standing rule 4). The `scenario-pipeline`
+split gives ANY future headless tool the exact app path without vitest, keeping the implementation
+count at one. Verdicts are HEAD-truth, so a sequence that stops building is caught the next time it
+is verified, not when the operator plays it.
