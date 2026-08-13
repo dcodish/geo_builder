@@ -26,7 +26,9 @@ gh issue list --state open --limit 200 --json number,body
 Classify each issue from its labels: priority `P1`/`P2`/`P3` (an unlabeled priority is a triage bug —
 report it in a "mislabeled" line rather than guessing), type `bug`/`feature`/`debt`, product
 `2d`/`3d`/`server`/`workspace`, and the attention labels: `needs-operator` (blocked on a decision),
-`auto-ok` (plan approved for `/fix-round`), `awaiting-play` (fix-round output not yet validated).
+`auto-ok` (plan approved for `/fix-round`), `in-round` (a fix round executing NOW — or, with no
+session running one, crashed mid-flight; ADR-W-013), `awaiting-play` (fix-round output not yet
+validated).
 
 ## Step 2 — grade each issue
 
@@ -58,7 +60,7 @@ section is information, not clutter):
 # Issue queue — YYYY-MM-DD
 
 Open: N (P1: n / P2: n / P3: n) · bugs n · features n · debt n
-Attention: needs-operator n · plans awaiting auto-ok n · PRs awaiting play n · rounds awaiting play n
+Attention: needs-operator n · plans awaiting auto-ok n · PRs awaiting play n · rounds in flight n · rounds awaiting play n
 Prod: <current prod tag> · undeployed on main: <none | short list>
 
 ## P1 — drop everything
@@ -98,7 +100,9 @@ reason the report exists as a habit. Its four sub-lists:
    (ADR-W-007). One row: PR#, what it delivers, which issues it closes.
 4. **Fix-round output awaiting validation** — open issues labeled `awaiting-play`: each is a
    round's play sheet the operator has not yet worked through (closing it is the validation
-   signal — see the fix-round skill).
+   signal — see the fix-round skill). An open **`in-round`** issue also lands here, flagged
+   loudly: unless a round is running right now, it is a round that died mid-flight — its
+   ledger body says which items landed before the crash and which never resolved.
 
 **The recommendation** is a concrete next-round composition, not a restatement of the tables:
 - Every open P1 goes first, always, each with one line on why it can't wait.

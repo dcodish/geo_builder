@@ -28,7 +28,7 @@ gh issue view <NN> --json body -q '.body' | head -3   # ← never skip: confirm 
 
 A heredoc into `--body "$(cat <<'EOF' … EOF)"` also works. The verify step is the part that matters — a filing failure here is silent and costs the whole diagnosis.
 
-**Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3`; one *app* — `2d` | `3d` | `server`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the operator has approved the issue's fix plan for autonomous execution (§2d — operator-applied ONLY), and `awaiting-play` on a fix-round's round issue until the operator validates the batch (§2d).
+**Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3`; one *app* — `2d` | `3d` | `server`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the operator has approved the issue's fix plan for autonomous execution (§2d — operator-applied ONLY), `in-round` on a fix-round's round issue while the round executes (an open `in-round` issue with no session running it = a round died mid-flight — [ADR-W-013](06w-decisions-workspace.md)), and `awaiting-play` on the same issue from round-finish until the operator validates the batch (§2d).
 
 **"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. (The historical backlog in [14-backlog.md](14-backlog.md) and ADR prose was partially migrated at adoption; sweep opportunistically.)
 
@@ -94,15 +94,24 @@ The operator-invoked batch loop that replaces one-at-a-time fix dispatch. Full p
 
 A round picks **3–5 work items** (a bundle of issues sharing one root cause counts as one item) from
 the open issues labeled **`auto-ok`** — the label only the operator applies, after reading the issue's
-fix plan; `needs-operator` disqualifies. Each item is fixed **at the root, per its plan**, in its own
-worktree under the full gates (ADR + rule-4 regression lock + full suite + `tsc` + build). Bugs land
-on `main` (`Fixes #NN`, §3), features become PRs the round **never merges** (§4). A plan that fails
-contact with the code is **escalated, never patched**: the docs/17 escalation template goes on the
-issue, `auto-ok` → `needs-operator`, and the round moves on. The round ends with ONE round issue
-labeled **`awaiting-play`** carrying the batch play sheet (Hebrew utterances per item); the operator
-plays the batch in one sitting and **closes the round issue as the validation signal**. Open P1s stop
-a round before it starts — a P1 is never taken silently. `/status-update`'s "Waiting on you" section
-surfaces the whole loop: plans awaiting `auto-ok`, PRs awaiting play, rounds awaiting validation.
+fix plan; `needs-operator` disqualifies. The round's ONE durable artifact, the **round issue**, is
+opened **at composition time** (label `in-round` — [ADR-W-013](06w-decisions-workspace.md)) carrying
+the announced composition plus the eligible-but-not-picked list, and is updated as each item resolves —
+a live ledger, so a crashed session leaves a discoverable round rather than orphaned commits. Each item
+is fixed **at the root, per its plan**, in its own worktree under the full gates (ADR + rule-4
+regression lock + full suite + `tsc` + build). Bugs land on `main` (`Fixes #NN` + `round #RR`, §3)
+after a fetch confirms `origin/main` has not moved externally mid-round; features become PRs the round
+**never merges** (§4). A plan that fails contact with the code is **escalated, never patched**: the
+docs/17 escalation template goes on the issue, `auto-ok` → `needs-operator`, and the round moves on.
+The round finishes by finalizing the round issue — per-item evidence (commit, ADR ids, gate record, a
+required *deviations-from-plan* line), landed/PR'd/escalated/**skipped** sections, the batch play sheet
+(Hebrew utterances per item), and a machine-greppable
+`stats: picked= landed= prs= escalated= skipped=` line (the Phase-2 data, aggregated by listing round
+issues) — and swapping **`in-round` → `awaiting-play`**; the operator plays the batch in one sitting
+and **closes the round issue as the validation signal**. Open P1s or a stale `in-round` issue stop a
+round before it starts — a P1 is never taken silently, and there is never a second live round.
+`/status-update`'s "Waiting on you" section surfaces the whole loop: plans awaiting `auto-ok`, PRs
+awaiting play, rounds in flight, rounds awaiting validation.
 
 **Phase 2 (not yet built, not yet decided):** scheduled unattended rounds and their landing policy
 (bugs direct-to-main vs one-PR-per-round) wait on Phase 1's measured escalation rate ([ADR-W-012](06w-decisions-workspace.md)).

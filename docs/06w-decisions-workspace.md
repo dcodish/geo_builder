@@ -441,3 +441,42 @@ PRs awaiting play-and-approve, rounds awaiting validation — so one report feed
 **Deliberately deferred (Phase 2):** scheduled/unattended runs, and their landing policy (bugs
 direct-to-main vs one-PR-per-round) — undecided until Phase 1's measured escalation rate provides the
 data. First live round only after the operator's home-PC work in flight on 2026-08-12 has landed.
+
+## ADR-W-013 — The round issue is a live ledger opened at composition, not an end-of-round report (#547)
+
+**Status:** accepted, 2026-08-13 · **Amends:** [ADR-W-012](#adr-w-012--fix-round-autonomous-execution-of-operator-approved-fix-plans-543-544)
+
+**Context.** Reviewing ADR-W-012's `/fix-round` before its first live run, six traceability gaps shared
+one root cause: **the round's only durable artifact was written at the END, free-form.** Everything
+before Step 5 lived in session chat, which evaporates — the announced composition (the round's
+contract), which eligible items were left out and why, skips, and in-flight state. A session dying
+after item 2 of 4 would leave pushed commits with nothing recording that a round was in flight. The
+end-of-round body spec ("landed / in PRs / escalated" one-liners) also omitted the evidence a later
+reader needs — ADR ids, gate results, and where the executed fix deviated from the plan the operator's
+`auto-ok` actually approved — and Step 4's "track the escalation rate in the summary" had no
+accumulation mechanism: per-round prose cannot be aggregated, so the Phase-2 landing-policy input
+(#543) was being collected in a form that cannot answer it.
+
+**Decision.** The round issue opens **at composition time** (new label **`in-round`**, swapped to
+`awaiting-play` at finish) with the composition plus the not-picked list as its initial body, and is
+**updated as each item resolves** — a live ledger. Item commits carry `round #RR` alongside
+`Fixes #NN` (bidirectional git ↔ round traceability). The final body carries per-item evidence
+(commit SHA, ADR ids, a one-line gate record, and a **required deviations-from-plan line** — `none`
+or one justified sentence; a deviation that resists one honest sentence was an escalation), a
+**skipped** section, and a fixed machine-greppable
+`stats: picked= landed= prs= escalated= skipped=` line, so Phase 2 aggregates rounds by listing
+their issues, never by re-reading prose. Two guardrails ride along: a **stale-round gate** in the
+preconditions (an open `in-round` issue stops a new round — never two live rounds), and a
+**mid-round origin guard** (fetch before every landing; external `origin/main` movement stops
+landing for reconciliation instead of a silent rebase). `/status-update` surfaces `in-round` in the
+attention section as "executing now or crashed mid-flight".
+
+**Explicitly not done:** verifying *who* applied `auto-ok` — Claude sessions authenticate as the
+operator's own `gh` account, so an actor check cannot distinguish operator from session; the
+"operator-applied ONLY" rule stays procedural, which is worth stating so nobody later mistakes it
+for mechanically enforced.
+
+**Consequences.** Validation semantics are unchanged (closing the round issue remains the signal);
+the round pays one extra `gh issue create` at start and one `gh issue edit` per item. What it buys:
+plan-vs-outcome readable without the session chat, crash-safe rounds, one-hop evidence per landing,
+and an escalation-rate record that accumulates by construction.
