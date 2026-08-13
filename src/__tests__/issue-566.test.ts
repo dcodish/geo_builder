@@ -68,4 +68,26 @@ describe('#566 — the unstated right-angle seat yields to a later constraint (A
     const facts = factsOf(['משולש ישר זווית ABC', 'משולש ABC חסום במעגל']);
     expect(meetsRequirements(facts, 0), 'nothing to search — the default view is valid').toBe(true);
   });
+
+  it("the operator's EXACT round-#561 play sequence (two circles, ADR-443 binds): rescued, not collapsed", () => {
+    // The full play-sheet figure — circumcircle + incircle + tangent-at-B — reaches the same latent
+    // defect through the #546 anonymous-reference binds; the seat rescue must hold there too.
+    const facts = factsOf([
+      'משולש ישר זווית ABC',
+      'משולש ABC חסום במעגל',
+      'מעגל חסום במשולש ABC',
+      'משיק למעגל בנקודה B',
+      'קשת AB = קשת BC',
+    ]);
+    const found = findValidConfig(facts, 0);
+    expect(found, 'a real configuration exists at the seat B — must be found').not.toBeNull();
+    const fig = replay(found!.facts, found!.seed);
+    const [A, B, C] = ['A', 'B', 'C'].map((id) => at(fig, id));
+    const span = Math.max(d(A, B), d(B, C), d(A, C));
+    expect(d(A, C) / span, 'no collapse').toBeGreaterThan(0.1);
+    const dot = (B.x - A.x) * (B.x - C.x) + (B.y - A.y) * (B.y - C.y);
+    expect(Math.abs(dot) / (d(A, B) * d(B, C)), 'right angle at B').toBeLessThan(1e-4);
+    expect(Math.abs(d(A, B) - d(B, C)) / span, 'equal arcs ⇒ |AB| = |BC|').toBeLessThan(1e-4);
+    expect(meetsRequirements(found!.facts, found!.seed)).toBe(true);
+  });
 });

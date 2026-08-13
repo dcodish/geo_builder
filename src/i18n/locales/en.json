@@ -62,6 +62,7 @@
     "reservedSymbol": "The letter {{symbol}} denotes the circle's radius, not a point. Pick another letter for a point on the circle.",
     "ambiguousCircle": "There are two circles around {{center}}, so I can't tell which one you mean. Say \"the outer circle\" or \"the inner circle\".",
     "ambiguousContainer": "The figure has several circles ({{circles}}), so which one contains it cannot be told. Name it — e.g. \"a circle contained in circle O\".",
+    "ambiguousCircleRef": "The figure has several circles ({{circles}}), so I can't tell which one you mean. Name the circle — e.g. \"circle {{first}}\".",
     "unknownCircle": "There is no circle named {{center}}. More than one unnamed circle is drawn — name one first, e.g.: the centre of the right circle is {{center}}.",
     "partial": "Couldn't draw this part",
     "labelsDropped": "I only partly understood — I couldn't place {{labels}}. Rephrase the step (e.g. split it in two).",

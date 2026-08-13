@@ -2120,6 +2120,39 @@ export const SCENARIOS_4: Scenario[] = [
     },
   },
   {
+    id: 'anonymous-circle-binds-by-membership-beside-second-circle',
+    title: '#546: triangle + circumcircle + incircle — «משיק למעגל בנקודה B» and «קשת AB = קשת BC» bind the circumcircle',
+    guards:
+      "prod session fmpqvpwr (log-triage 2026-08-11/13): with TWO circles drawn (the most common bagrut figure family — a triangle with its circumcircle and incircle), the anonymous references «משיק למעגל בנקודה B» and the arc family went not-handled and burned paid LLM calls on constructs the grammar owns — the resolver tails ended `circles.length === 1 ? circles[0] : null` (the idiom lived in THREE helpers: existingCircleRef, resolveCenter, resolveMentionedCircle). ADR-443: the membership TIE-BREAK — the utterance's named points vote by intersection of their on-circle memberships, a unique host binds (ADR-119/233 membership-over-position; the #221 commonHostCentre idea generalised to the seam). Genuinely ambiguous now ASKS (`ambiguous-circle-ref`, locked in circle-ref-tiebreak.test.ts) instead of escalating.",
+    steps: [
+      'משולש ישר זווית ABC',
+      'משולש ABC חסום במעגל',
+      'מעגל חסום במשולש ABC',
+      'משיק למעגל בנקודה B',
+      'קשת AB = קשת BC',
+      'מיתר AB',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const circles = fig.construction.objects.filter(
+        (o): o is Extract<typeof o, { kind: 'circle' }> => o.kind === 'circle',
+      );
+      expect(circles.length, 'the circumcircle and the incircle — and NOTHING minted beside them').toBe(2);
+      const A = at(fig, 'A');
+      const B = at(fig, 'B');
+      const C = at(fig, 'C');
+      // The circumcircle is the circle equidistant from all three vertices — identify it geometrically.
+      const isCircum = (centre: Vec) => {
+        const [ra, rb, rc] = [dist(centre, A), dist(centre, B), dist(centre, C)];
+        return Math.abs(ra - rb) < 1e-4 && Math.abs(rb - rc) < 1e-4;
+      };
+      const centres = circles.map((c) => at(fig, c.center));
+      expect(centres.some(isCircum), 'one of the two circles IS the circumcircle').toBe(true);
+      // «קשת AB = קשת BC» bound the circumcircle and DROVE the figure: equal arcs ⇒ equal chords.
+      expect(Math.abs(dist(A, B) - dist(B, C)), 'equal arcs ⇒ |AB| = |BC|').toBeLessThan(1e-4);
+    },
+  },
+  {
     id: 'bagrut-gchf-cyclic-tangent-parallel',
     title: 'bagrut: right △ABC (∠ACB=90°) + GCHF cyclic + AB tangent at F + AB∥GH + diameter from F cuts AC at E (#567)',
     guards:

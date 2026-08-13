@@ -6987,6 +6987,43 @@ deferral machinery (statements apply or refuse), class not present. Locks: `defe
 (the impossible order refuses; the ADR-104 ⟂ control and the #420 metric pair stay), plus the
 ADR-441 locks unchanged.
 
+## ADR-443 — The anonymous circle reference beside SEVERAL circles: membership tie-break, then ASK (#546)
+
+Prod (session `fmpqvpwr`, log-triage REC-1, operator-approved 2026-08-13): on a triangle with its
+circumcircle and incircle — the most common bagrut circle family — «משיק למעגל בנקודה B» and
+«קשת AD = קשת BC» were `not-handled` and burned paid LLM calls on constructs the grammar fully owns.
+Root cause: ADR-029's "with one circle you needn't name it" was implemented as *exactly one circle or
+nothing* — and the `circles.length === 1 ? circles[0] : null` tail lived in **three** resolver
+helpers (`existingCircleRef`, `resolveCenter`, `resolveMentionedCircle`), not the one the triage
+named; the moment a second circle existed, every routed rule family escalated.
+
+Decision, two halves at the resolver seam:
+
+1. **The membership TIE-BREAK** (`anonymousCircleTieBreak`, the shared tail of all three helpers):
+   the utterance's named points vote by INTERSECTION of their on-circle memberships — a point on no
+   circle says nothing (a fresh touch/crossing), a unique surviving host BINDS. This is ADR-119/233's
+   membership-over-position principle, and the #221 `commonHostCentre` chord fix generalised to the
+   seam, so tangent-at-a-point, the arc family, memberships and every other routed rule inherit at
+   once. With one circle, behaviour is byte-identical to ADR-029.
+2. **The ASK** (`ambiguousCircleAsk`, a VERY-LAST rule + the `ambiguous-circle-ref` clarify/reason):
+   a circle-CONSTRUCT statement (tangent/chord/diameter/arc/on-the-circle nouns) whose anonymous
+   reference still cannot be bound asks the student to name the circle, listing the candidates —
+   never `not-handled`, never a silent pick (ADR-052). Deliberately narrow: registered after every
+   rule (steals nothing), OFF for bare circle mentions (area/radius talk keeps its LLM path), OFF
+   when a size/side/concentric/circum/contained qualifier names another resolver's channel, OFF when
+   a centre is named, and it yields to the ADR-264 clause split (a compound splits first; the ask
+   stands only when no split parses).
+
+Deviation from the filed plan, for the record: the plan placed both halves inside `existingCircleRef`
+alone; the tie-break landed in all three tails (same class, same idiom — the tangent/arc rules
+resolve through the siblings), and the clarify surfaces from a last-resort rule rather than the
+resolver's return path (same observable, but it cannot steal from the leftover-guarded bare-construct
+rules that call the resolver before their own guards).
+
+Locks: `circle-ref-tiebreak.test.ts` (bind by membership per family, the vote picking the OTHER
+circle, the ask with its candidates, the one-circle/named/qualifier/bare-mention no-theft cases);
+scenario `anonymous-circle-binds-by-membership-beside-second-circle` (the prod figure end-to-end).
+
 ## ADR-445 — The unstated right-angle SEAT yields: a config-search dimension, and an exhausted search is never silent (#566)
 
 Operator, playing round #561 (P1 — prod-reachable on the single-circle prefix): «משולש ישר זווית
