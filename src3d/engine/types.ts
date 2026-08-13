@@ -777,7 +777,10 @@ export type Command3 =
   // point onto a base plane; the foot is auto-minted at apply (parse3 is context-free). `face` is the
   // STATED base when the student named one — without it apply resolves the figure's single solid, and
   // honouring a named base is what keeps «לבסיס ABC» from silently using a different face (ADR-3D-115).
-  | { type: 'perp-to-base'; from: Id; face?: Id[] }
+  // #503 (ADR-3D-142): `from` is optional — the APEX-LESS «גובה הפירמידה» derives the apex at apply
+  // from the single solid's vertex layout (base ids first, apex LAST — the baseRingOf convention);
+  // a solid with no derivable apex (prism/box) refuses `bad-solid`, never a guess.
+  | { type: 'perp-to-base'; from?: Id; face?: Id[] }
   // V8-f (G6): cos of the angle between two operands = a value. `cos∠ACB = 3/4`
   // (vertex ⇒ pairs) · `קוסינוס הזווית בין הוקטורים w ו-u הוא √35/10` (named vectors).
   | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number; soft?: boolean }
