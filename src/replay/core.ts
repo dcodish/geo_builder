@@ -1524,14 +1524,24 @@ export function meetsRequirements(facts: Fact[], seed = 0, relaxExtensions = fal
  * CURRENT branch assignment is tried first and most widely; the combinatorics of alternative branches are
  * bounded. Deterministic.
  */
+/** #566 (ADR-445 Am. 1) — dev instrumentation, the S0.2 `lastLadderStage` pattern: WHICH tier of
+ *  `findValidConfig` produced the last returned config. Lets a test assert the tier ORDERING
+ *  deterministically — a wall-clock assertion on the real worker budget flaked at 28 s under the
+ *  suite's CPU contention (5 s solo), which is exactly why `SEARCH_BUDGET_MS` is Infinity in tests. */
+export let lastConfigTier: 'current' | 'relaxed' | 'sweep' | 'seat' | 'reflect' | 'branch' | null = null;
+
 export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_BUDGET_MS): { facts: Fact[]; seed: number } | null {
+  lastConfigTier = null;
   const deadline = Date.now() + budgetMs;
   const timeLeft = () => Math.max(0, deadline - Date.now());
   // First the targeted extension/reflection search (ADR-098/ADR-166): it explores the discrete apex
   // REFLECTION DOF (high seed bits) that the plain seed sweep below can't reach, so a segment-meet whose
   // apex points the wrong way is brought onto the segments in a handful of tries instead of by luck.
   const s0 = firstSatisfyingSeed(facts, fromSeed, 120, timeLeft());
-  if (meetsRequirements(facts, s0)) return { facts, seed: s0 };
+  if (meetsRequirements(facts, s0)) {
+    lastConfigTier = 'current';
+    return { facts, seed: s0 };
+  }
   // ADR-142 acceptance (issue #19 / ADR-267): `firstSatisfyingSeed` may have returned its shared-endpoint
   // FALLBACK — every seed it examined failed the strict extension direction, so the RELAXED bar is the right
   // validity test for s0. Checked BEFORE the strict sweep/branch tiers: when s0 is a fallback those tiers are
@@ -1539,39 +1549,38 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
   // and their cold replays would burn the remaining budget and bail to null past the very config in hand —
   // the exact starvation this ADR removes. When s0 simply failed OTHER requirement dimensions (violations,
   // convexity, distinctness), the relaxed check fails identically and the tiers below run as before.
-  if (meetsRequirements(facts, s0, true)) return { facts, seed: s0 };
+  if (meetsRequirements(facts, s0, true)) {
+    lastConfigTier = 'relaxed';
+    return { facts, seed: s0 };
+  }
   // The deadline is also ARMED inside the solve ladder (engine/solveBudget.ts, issue #59): the branch
   // tier below builds NEW fact content (branch rewrites), whose folds can hit the expensive recruit
   // ladder — the between-replay checks alone couldn't stop a single 30 s candidate.
   return withSolveBudget(deadline, () => {
     for (let s = fromSeed; s < fromSeed + 40; s++) {
       if (Date.now() > deadline) return null; // out of budget — caller keeps the current figure, amber
-      if (meetsRequirements(facts, s)) return { facts, seed: s };
-    }
-    // Discrete REFLECTION alternatives (#441). The sweep above varies only the CONTINUOUS jitter — the
-    // base seed — while the reflection mask lives in the seed's HIGH bits (`REFLECT_STRIDE`). So a
-    // requirement that needs a MIRROR configuration is unreachable by that sweep however many seeds it
-    // burns: a stated-concave kite has ~2% of raw seeds satisfying it (measured), purely the ones whose
-    // high bits happen to be set. `firstSatisfyingSeed` does explore masks, but it judges only the
-    // extension/segment bars, not the full requirement set — so nothing was searching this dimension
-    // against `meetsRequirements`. General, not convexity-specific: the ADR-166 apex-side family gains
-    // the same coverage.
-    const reflectable = reflectableFreePoints(replay(facts).construction).length;
-    for (let m = 1; m < 1 << Math.min(reflectable, REFLECT_MAX); m++) {
-      for (let s = fromSeed; s < fromSeed + 6; s++) {
-        if (Date.now() > deadline) return null;
-        const sm = withReflectMask(m, s);
-        if (meetsRequirements(facts, sm)) return { facts, seed: sm };
+      if (meetsRequirements(facts, s)) {
+        lastConfigTier = 'sweep';
+        return { facts, seed: s };
       }
     }
-    // #566 (ADR-445): the RIGHT-ANGLE-SEAT dimension. «משולש ישר זווית ABC» leaves WHICH vertex is
-    // right unstated — the lowering defaults to the last id, and ADR-163 yields it only to an explicit
-    // 90° statement. A later constraint can leave the DEFAULT seat satisfiable only DEGENERATELY (the
-    // #566 figure: with ∠C=90 the hypotenuse AB is a diameter, so «קשת AB = קשת BC» forces C onto A —
-    // every seed fails pointsDistinct) while another seat admits a real figure. An unstated choice is a
-    // discrete config dimension (ADR-052; the ADR-426 reflection precedent): try the alternative seats
-    // via the solve-chosen `rot` field, returning REWRITTEN facts exactly like the branch tier below.
-    // A seat pinned by an explicit 90° (the ADR-163 channel, same pin set) is never flipped.
+    // #566 (ADR-445, ordering per Am. 1): the RIGHT-ANGLE-SEAT dimension. «משולש ישר זווית ABC»
+    // leaves WHICH vertex is right unstated — the lowering defaults to the last id, and ADR-163
+    // yields it only to an explicit 90° statement. A later constraint can leave the DEFAULT seat
+    // satisfiable only DEGENERATELY (the #566 figure: with ∠C=90 the hypotenuse AB is a diameter, so
+    // «קשת AB = קשת BC» forces C onto A — every seed fails pointsDistinct) while another seat admits
+    // a real figure. An unstated choice is a discrete config dimension (ADR-052; the ADR-426
+    // reflection precedent): try the alternative seats via the solve-chosen `rot` field, returning
+    // REWRITTEN facts exactly like the branch tier below. A seat pinned by an explicit 90° (the
+    // ADR-163 channel, same pin set) is never flipped.
+    //
+    // This tier runs BEFORE the reflection tier (ADR-445 Am. 1): a seat-caused failure is
+    // seed/mask-INVARIANT (the #566 collapse fails at every seed and every mask), so the mask×seed
+    // product — the budget hog on multi-free-point figures — can never rescue it and would eat the
+    // worker's 12 s before this tier ran (measured: the rescue arrived at ~13.4 s ordered after,
+    // ~5 s ordered here; the suite's Infinity budget masked exactly this, which is why the
+    // production-budget lock in scenarios-props-budget.test.ts carries the figure). Cost when no
+    // unpinned right-triangle exists: zero (the list is empty).
     const pinnedRA = explicitRightAngleVerts(facts);
     const rtFacts = facts
       .map((f, i) => ({ f, i }))
@@ -1587,7 +1596,29 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
         });
         for (let s = 0; s < 6; s++) {
           if (Date.now() > deadline) return null;
-          if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
+          if (meetsRequirements(fc, s)) {
+            lastConfigTier = 'seat';
+            return { facts: fc, seed: s };
+          }
+        }
+      }
+    }
+    // Discrete REFLECTION alternatives (#441). The sweep above varies only the CONTINUOUS jitter — the
+    // base seed — while the reflection mask lives in the seed's HIGH bits (`REFLECT_STRIDE`). So a
+    // requirement that needs a MIRROR configuration is unreachable by that sweep however many seeds it
+    // burns: a stated-concave kite has ~2% of raw seeds satisfying it (measured), purely the ones whose
+    // high bits happen to be set. `firstSatisfyingSeed` does explore masks, but it judges only the
+    // extension/segment bars, not the full requirement set — so nothing was searching this dimension
+    // against `meetsRequirements`. General, not convexity-specific: the ADR-166 apex-side family gains
+    // the same coverage.
+    const reflectable = reflectableFreePoints(replay(facts).construction).length;
+    for (let m = 1; m < 1 << Math.min(reflectable, REFLECT_MAX); m++) {
+      for (let s = fromSeed; s < fromSeed + 6; s++) {
+        if (Date.now() > deadline) return null;
+        const sm = withReflectMask(m, s);
+        if (meetsRequirements(facts, sm)) {
+          lastConfigTier = 'reflect';
+          return { facts, seed: sm };
         }
       }
     }
@@ -1609,7 +1640,11 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
         const k = branchy.findIndex((x) => x.i === idx);
         return k >= 0 ? ({ ...f, cmd: { ...f.cmd, branch: combo[k] } } as Fact) : f;
       });
-      for (let s = 0; s < 6; s++) if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
+      for (let s = 0; s < 6; s++)
+        if (meetsRequirements(fc, s)) {
+          lastConfigTier = 'branch';
+          return { facts: fc, seed: s };
+        }
     }
     return null;
   });
