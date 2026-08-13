@@ -105,6 +105,22 @@ const freePlanesOf = (claim: unknown): string[] => {
   return out;
 };
 
+/** #552 — every NAMED line a claim mentions: the {@link freePlanesOf} walk, line edition, guarding the
+ *  same class (a claim judged against a still-sampled free line is a false accusation, not a refutation). */
+const linesOf = (claim: unknown): string[] => {
+  const out: string[] = [];
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) return v.forEach(walk);
+    if (!v || typeof v !== 'object') return;
+    const o = v as Record<string, unknown>;
+    if (o.kind === 'line' && typeof o.name === 'string') out.push(o.name);
+    if (typeof o.line === 'string') out.push(o.line);
+    for (const val of Object.values(o)) walk(val);
+  };
+  walk(claim);
+  return out;
+};
+
 /**
  * #512 — does this claim relate the figure to the ABSOLUTE FRAME (a coordinate plane or axis)? Such a
  * claim is a statement about where the figure SITS, so it can only be judged once the placement is
@@ -273,6 +289,8 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
           // so a constraint kind it does not yet pin degrades to an honest "pin this plane first"
           // instead of blaming the student. Named plane first, so the message can say which.
           const undetermined = freePlanesOf(claim).find((p) => (resolved.freePlaneDofs.get(p) ?? 0) > 0);
+          // #552 — the same guard, line edition: a free LINE whose DOFs are still sampled.
+          const undeterminedLine = linesOf(claim).find((l) => (resolved.freeLineDofs.get(l) ?? 0) > 0);
           // #512 — the same argument one step out: a claim against the COORDINATE FRAME is a claim
           // about where the figure sits, and the landing funnel SAMPLED that placement (nothing the
           // student stated fixed it). «BD' ⊥ מישור [xy]» is perfectly satisfiable — rotate the box
@@ -280,6 +298,7 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
           // strength of an arbitrary choice the tool made. Say what is actually missing instead.
           status[owner.factId] =
             undetermined ? { code: 'plane-not-determined', id: undetermined }
+            : undeterminedLine ? { code: 'line-not-determined', id: undeterminedLine }
             : resolved.placementSampled && refsCoordFrame(claim) ? { code: 'placement-not-fixed' }
             : { code: 'claim-refuted' };
           break;

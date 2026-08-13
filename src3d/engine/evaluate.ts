@@ -28,6 +28,7 @@ import { applyGauge, scalePinned, solvePivot, type MemberPin, type PivotResult }
 import { decompose3 } from './vecExpr';
 import { absolutePointCount, pinSymsOf } from './types';
 import { resolveFreePlane } from './freePlane';
+import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3} from './vec3';
@@ -374,6 +375,9 @@ export interface Resolved3 {
   /** #487 (ADR-3D-124) — per FREE plane, how many of its 3 DOFs stayed SAMPLED this resolution. Derived
    *  by the same code that did the pinning, so the DOF cue can never disagree with the sampler. */
   freePlaneDofs: Map<string, number>;
+  /** #552 — per FREE line, how many of its 4 DOFs (direction 2 + anchor 2) stayed SAMPLED this
+   *  resolution. Same discipline as `freePlaneDofs`: one source for the count and the sampling. */
+  freeLineDofs: Map<string, number>;
   /** #512 — did the landing funnel SAMPLE the figure's placement (translation or rotation)? Published
    *  for the same reason `freePlaneDofs` is: a claim stated against the ABSOLUTE frame is a claim about
    *  where the figure SITS, so refuting it on a placement the tool invented is a false accusation
@@ -404,6 +408,8 @@ export function lineAtParam(c: Construction3, name: string, a: number): Resolved
   }
   // through / common-perp / line-projection all depend on other resolved lines/planes → resolved later
   if (def.kind === 'through' || def.kind === 'common-perp' || def.kind === 'line-projection') return null;
+  // #552: a FREE line has no equation to read — resolved per seed by `resolveFreeLines3`, never here
+  if (def.kind === 'free') return null;
   if (!c.planes.has(def.p1) || !c.planes.has(def.p2)) return null;
   // #487: a FREE plane's placeholder must never feed a line — defer to the second line pass,
   // which reads the RESOLVED planes map (the free plane is resolved by then).
@@ -509,6 +515,9 @@ function paramPinningLineRels(c: Construction3): Construction3['lineRels'] {
     // parameter — even when the line side carries it. «l(m) ∥ π2» leaves m free and turns π2 to l;
     // rooting over the placeholder here would fabricate a pin on a plane that has no equation.
     if (r.op.kind === 'plane-named' && c.planes.get(r.op.name)?.free) return false;
+    // #552: the same routing with the LINE side free — the relation pins the free line, never the
+    // parameter (and a free line's def carries nothing for `lineAtParam` to read).
+    if (isFreeLine3(c, r.line) || (r.op.kind === 'line' && isFreeLine3(c, r.op.name))) return false;
     const opCarries = r.op.kind === 'line' ? lineDirCarriesParam(c, r.op.name) : r.op.kind === 'plane-named' && planeNormalCarriesParam(c, r.op.name);
     return lineDirCarriesParam(c, r.line) || opCarries;
   });
@@ -558,9 +567,11 @@ function satisfiesAllPins(c: Construction3, a: number): boolean {
 
 /** #487 (ADR-3D-124): «ℓ ⊥ π2» on a FREE plane pins the PLANE (its normal ∥ the line), never the
  *  parameter — the free plane's placeholder carries no parameter and must not enter the root-finds,
- *  where `planeAt` would read `z = 0`. One filter, shared by every parameter-machinery consumer. */
+ *  where `planeAt` would read `z = 0`. One filter, shared by every parameter-machinery consumer.
+ *  #552 extends it symmetrically: a FREE line's relation pins the LINE (`resolveFreeLine`), and its
+ *  placeholder-less def has no direction for the residual to read. */
 const paramLinePerps = (c: Construction3): Construction3['linePerps'] =>
-  c.linePerps.filter((g) => !c.planes.get(g.plane)?.free);
+  c.linePerps.filter((g) => !c.planes.get(g.plane)?.free && !isFreeLine3(c, g.line));
 
 /** How many givens pin the parameter (none ⇒ it is a free sampled DOF). */
 export const pinningGivens = (c: Construction3): number =>
@@ -734,6 +745,8 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   // #487 (ADR-3D-124): a FREE plane's remaining sampled DOFs, reported by the resolution itself —
   // the count and the sampling share one source, so neither can drift from the other (ADR-052).
   for (const dof of resolved.freePlaneDofs.values()) freeT += dof;
+  // #552: a FREE line's remaining sampled DOFs, same discipline.
+  for (const dof of resolved.freeLineDofs.values()) freeT += dof;
   if (resolved.pivot && resolved.pivot.solutions > 0) {
     let pinCount = c.vectorPins.length * 3;
     // #325: a symbolic component (`B(2t,t,k)`) constrains like a numeric one, and each distinct
@@ -744,11 +757,12 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     for (const cp of c.coordPlanePins)
       pinCount += cp.mode === 'share' ? cp.ids.length - 1 : cp.mode === 'zero' ? cp.ids.length : cp.mode === 'perp' ? 1 : 2;
     // #375: aligning a figure-derived plane with an absolute direction removes TWO rotational DOFs
-    // (the spin about that direction stays free)
-    pinCount += 2 * c.planeLinePerps.length;
+    // (the spin about that direction stays free). #552: an entry whose line is FREE pins the LINE,
+    // not the figure — the filtered sets are the figure-driving ones.
+    pinCount += 2 * figurePlaneLinePerps(c).length;
     // S2 (#378): a gauge operand related to an absolute line — full alignment (a direction made ∥,
     // a plane made ⟂) removes two rotational DOFs; a single ⟂ or a stated angle removes one.
-    for (const r of c.lineRels) {
+    for (const r of figureLineRels(c)) {
       if (isAbsolute(r.op)) continue; // absolute×absolute never touches the figure
       const directional = r.op.kind !== 'plane-run';
       pinCount += (directional ? r.rel === 'parallel' : r.rel === 'perp') ? 2 : 1;
@@ -1047,7 +1061,8 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   }
 
   const freePlaneDofs = new Map<string, number>();
-  evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs);
+  const freeLineDofs = new Map<string, number>();
+  evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs, freeLineDofs);
   // #487: a free plane pinned by a member that was itself only placed DURING the pass (a midpoint, a
   // rider of another carrier) resolves against stale positions the first time — re-run the point pass
   // so riders and derived points read the pinned plane.
@@ -1060,8 +1075,13 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   // on `moved === false` is what guarantees planes and positions agree; the cap only bounds a figure
   // that will not settle, where the behaviour is exactly today's. Every step is deterministic, so the
   // whole loop is, and in practice it settles in two.
-  for (let pass = 0; pass < 3 && resolveFreePlanes3(c, seed, pos, planes, lines, freePlaneDofs); pass++) {
-    evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs);
+  // #552: free LINES join the same fixpoint — both resolvers must RUN each pass (no short-circuit),
+  // and either one moving re-runs the point pass, for exactly the #508 reason.
+  for (let pass = 0; pass < 3; pass++) {
+    const movedP = resolveFreePlanes3(c, seed, pos, planes, lines, freePlaneDofs);
+    const movedL = resolveFreeLines3(c, seed, pos, planes, lines, freeLineDofs);
+    if (!movedP && !movedL) break;
+    evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs, freeLineDofs);
   }
 
   // ---- ADR-3D-032: a given referencing a coord-sym point pins the parameter — a
@@ -1139,15 +1159,17 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
 
   // S2 (#378, ADR-3D-103): the gauge-lane line relations (a figure operand against an absolute
   // named line) — they drive the pivot exactly like planeLinePerps. Absolute-lane entries never
-  // involve the figure (parameter root-find / claim lanes).
-  const gaugeLineRels = c.lineRels.filter((r) => !isAbsolute(r.op));
+  // involve the figure (parameter root-find / claim lanes). #552: an entry whose LINE is free pins
+  // the line (`resolveFreeLine`), never the figure — the figure-side sets are the filtered ones.
+  const gaugeLineRels = figureLineRels(c).filter((r) => !isAbsolute(r.op));
+  const figPlanePerps = figurePlaneLinePerps(c);
 
   // ---- the V4 pivot: injected coordinates pin the gauge (ADR-3D-007)
   let pivot: Resolved3['pivot'] = null;
   const warm: { x?: number[] } = {}; // the applied solution's vector — the drive's warm start (ADR-3D-033)
   if (
     (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0 ||
-      c.planePins.length > 0 || c.coordPlanePins.length > 0 || c.planeLinePerps.length > 0 ||
+      c.planePins.length > 0 || c.coordPlanePins.length > 0 || figPlanePerps.length > 0 ||
       gaugeLineRels.length > 0 || drivableMemberships.length > 0) &&
     c.solids.length > 0
   ) {
@@ -1254,9 +1276,9 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     //     relation is then the only thing orienting it) or when the pinned solve leaves it unmet. If
     //     the joint solve finds nothing, the prior figure stands and the recorded claim refuses
     //     honestly (`claim-refuted`) rather than a silently wrong drawing.
-    if (c.planeLinePerps.length > 0 || gaugeLineRels.length > 0) {
+    if (figPlanePerps.length > 0 || gaugeLineRels.length > 0) {
       const unmet =
-        c.planeLinePerps.some((pin) => {
+        figPlanePerps.some((pin) => {
           const ring = pin.ids.map((id) => pos.get(id));
           const ln = lines.get(pin.line);
           if (ring.some((p) => !p) || !ln) return true;
@@ -1435,7 +1457,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     c.pins.length === 0 &&
     c.vectorPins.length === 0 &&
     c.pairPins.length === 0 &&
-    c.planeLinePerps.length === 0 &&
+    figPlanePerps.length === 0 &&
     gaugeLineRels.length === 0 && // S2 (#378): a driven line relation pinned the orientation
     c.planePins.length === 0 &&
     c.memberships.length === 0 &&
@@ -1472,7 +1494,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       c.memberships.length > 0 || freePlaneFigurePinned || freePlaneOffsetPinned ||
       c.coordPlanePins.some((cp) => cp.mode === 'share' || cp.mode === 'perp' || cp.mode === 'contains' || cp.mode === 'zero');
     if (rotPinnedElsewhere) return null;
-    const names = [...gaugeLineRels.map((r) => r.line), ...c.planeLinePerps.map((g) => g.line)];
+    const names = [...gaugeLineRels.map((r) => r.line), ...figPlanePerps.map((g) => g.line)];
     if (names.length === 0) return null;
     let axis: Vec3 | null = null;
     for (const n of names) {
@@ -1776,6 +1798,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     revolutions,
     circles3,
     freePlaneDofs,
+    freeLineDofs,
     placementSampled,
   };
 }
@@ -1795,6 +1818,7 @@ function evaluateSolidsAndPoints(
   cheapSymbols?: boolean,
   symbolOverride?: Map<number, number>, // V8-c: def index → jointly-solved symbol value
   freePlaneDofs?: Map<string, number>, // #487: out-param — per-free-plane SAMPLED DOF count (the cue's number)
+  freeLineDofs?: Map<string, number>, // #552: the free-line twin
 ): void {
   let dimCursor = 0;
   c.solids.forEach((solid, i) => {
@@ -1818,6 +1842,10 @@ function evaluateSolidsAndPoints(
   // A pinning member that is itself placed later in this loop is the reason resolve3 re-runs this
   // whole pass once when a free plane moves.
   resolveFreePlanes3(c, seed, pos, planes, lines, freePlaneDofs);
+  // #552: free LINES resolve right after — after the planes (a free line related to a free plane
+  // reads the plane's real resolution; when both are free the plane LEADS and the line follows,
+  // deterministically) and before the point pass (an on-line rider must read the real line).
+  resolveFreeLines3(c, seed, pos, planes, lines, freeLineDofs);
 
   // ADR-3D-056 (#286): vec-defined points whose seg-perp/seg-par pin references a point placed LATER in
   // insertion order (the reference segment, or O) — deferred here, placed in a 2nd pass once it exists.
@@ -2166,7 +2194,12 @@ function resolveFreePlanes3(
   const resolvedNormals = new Map<string, Vec3>();
   for (const [pname, rp] of planes) resolvedNormals.set(pname, rp.n);
   const lineDirs = new Map<string, Vec3>();
-  for (const [lname, ln] of lines) lineDirs.set(lname, ln.dir);
+  // #552: a FREE line's direction is NOT a pin for a free plane — when both are free the plane
+  // LEADS and the line follows (`resolveFreeLines3` runs after this), which is what keeps the
+  // mutual read from oscillating: exactly one of the pair ever reads the other.
+  for (const [lname, ln] of lines) {
+    if (!isFreeLine3(c, lname)) lineDirs.set(lname, ln.dir);
+  }
   let moved = false;
   for (const [pname, pdef] of c.planes) {
     if (!pdef.free) continue;
@@ -2176,6 +2209,36 @@ function resolveFreePlanes3(
     planes.set(pname, { n: r.n, d: r.d });
     resolvedNormals.set(pname, r.n);
     freePlaneDofs?.set(pname, r.dof);
+  }
+  return moved;
+}
+
+/**
+ * #552 — resolve every FREE line from the current state (the `resolveFreePlanes3` twin): whatever
+ * the figure pins (members, «l ⊥ BCK», stated ∥/⟂/angle) is honoured exactly, the rest sampled per
+ * seed. Insertion order, so a relation between two free lines reads the earlier one resolved.
+ * Returns whether any line MOVED — folded into the same re-evaluation fixpoint, because a pinning
+ * member placed mid-loop is only positioned after the first pass (the #508 pattern).
+ */
+function resolveFreeLines3(
+  c: Construction3,
+  seed: number,
+  pos: Positions3,
+  planes: Map<string, ResolvedPlane>,
+  lines: Map<string, ResolvedLine>,
+  freeLineDofs?: Map<string, number>,
+): boolean {
+  const lineDirs = new Map<string, Vec3>();
+  for (const [lname, ln] of lines) lineDirs.set(lname, ln.dir);
+  let moved = false;
+  for (const [lname, ldef] of c.lines) {
+    if (ldef.kind !== 'free') continue;
+    const r = resolveFreeLine(c, lname, seed, pos, planes, lineDirs);
+    const prev = lines.get(lname);
+    if (!prev || dist3(prev.anchor, r.anchor) > 1e-9 || dist3(prev.dir, r.dir) > 1e-9) moved = true;
+    lines.set(lname, { anchor: r.anchor, dir: r.dir });
+    lineDirs.set(lname, r.dir);
+    freeLineDofs?.set(lname, r.dof);
   }
   return moved;
 }

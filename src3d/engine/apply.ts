@@ -7,6 +7,7 @@ import { exprPointIds, exprVectorNames } from './vecExpr';
 import { isAbsolute, lineDirCarriesParam, planeNormalCarriesParam, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
+import { FREE_LINE_TOKEN } from './freeLine';
 import { isQuadPyramid, quadPyramidDimCount } from './baseShapes';
 import { pinSymsOf } from './types';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, Operand3, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
@@ -312,6 +313,19 @@ function lineRelRefsError(c: Construction3, op: Operand3, line: string): EngineE
   const opErr = operandRefsError(c, op);
   if (opErr) return opErr;
   return c.lines.has(line) || c.pointLines.has(line) ? null : { code: 'unknown-line', id: line };
+}
+
+/** #552 (the on-planes ruling-1 mirror): a relation or membership naming an UNDECLARED line CREATES
+ *  it as a free line — bounded to the CONVENTION token (canonical `ℓ<digits?>`), which cannot collide
+ *  with a point (uppercase), a plane (π…) or a vector (`[a-w]`), so no bare-symbol ambiguity exists.
+ *  A non-convention name («k») still means "declare it first" — its kind is only ever stated by the
+ *  noun, and a mistyped name must refuse, not conjure. Returns `c` untouched when nothing is created. */
+function withFreeLines(c: Construction3, names: string[]): Construction3 {
+  const create = [...new Set(names)].filter((n) => FREE_LINE_TOKEN.test(n) && !c.lines.has(n) && !c.pointLines.has(n));
+  if (create.length === 0) return c;
+  const next = clone(c);
+  for (const n of create) next.lines.set(n, { kind: 'free' });
+  return next;
 }
 
 /** #393/#335 (ADR-3D-107): a vector EXPRESSION's references — pair points + named vectors. */
@@ -932,8 +946,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const missing = missingPoint(c, cmd.ids);
       if (missing) return { ok: false, error: missing };
       if (cmd.ids.length < 3) return { ok: false, error: { code: 'unknown-point', id: cmd.ids[0] ?? '?' } };
-      if (!c.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
-      const next = clone(c);
+      const c2 = withFreeLines(c, [cmd.line]); // #552: «l ⊥ BCK» on an undeclared convention line creates it
+      if (!c2.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
+      const next = clone(c2);
       // #383 (ADR-3D-109): the stated relation's point-run CARRIER is drawn (the ADR-3D-015 /
       // S3 rule) — without a drawn plane, the ADR-3D-097 patch-growth sweep has nothing to grow
       // to the crossing and the relation leaves no visible trace where the objects meet.
@@ -952,9 +967,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     // root-find); the recorded claim is always the final arbiter, so no instance can escape
     // verification whatever lane it solves in.
     case 'line-rel': {
-      const err = lineRelRefsError(c, cmd.op, cmd.line);
+      // #552: BOTH sides may be undeclared convention lines («l1 ∥ l2» cold) — the subject and a
+      // line-kind operand each auto-create; a later free line reads the earlier one's resolution.
+      const c2 = withFreeLines(c, [cmd.line, ...(cmd.op.kind === 'line' ? [cmd.op.name] : [])]);
+      const err = lineRelRefsError(c2, cmd.op, cmd.line);
       if (err) return { ok: false, error: err };
-      const next = clone(c);
+      const next = clone(c2);
       // a stated relation draws its operand (the ADR-3D-035 rule — the statement must leave ink)
       if (cmd.op.kind === 'segment') drawAtom(next, { kind: 'pair', from: cmd.op.a, to: cmd.op.b });
       // #383 (ADR-3D-109): a POINT-RUN operand is materialised as a drawn plane (the S3 rule,
@@ -1122,6 +1140,19 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    case 'free-line': {
+      // #552 — «ישר k» / bare «l1»: a named line with NOTHING yet known about it (the free-plane
+      // case, line edition). Idempotent on an existing FREE line; a name taken by a defined line, a
+      // through-line, a plane of any lane or a named VECTOR (a line named `u` beside vector `u`
+      // would make every later mention ambiguous) is refused — it is not free to be told about later.
+      if (c.lines.get(cmd.name)?.kind === 'free') return { ok: true, next: c };
+      if (c.lines.has(cmd.name) || c.pointLines.has(cmd.name) || c.planes.has(cmd.name) || c.pointPlanes.has(cmd.name) || c.vectors.has(cmd.name))
+        return { ok: false, error: { code: 'already-defined', id: cmd.name } };
+      const next = clone(c);
+      next.lines.set(cmd.name, { kind: 'free' });
+      return { ok: true, next };
+    }
+
     case 'plane-angle': {
       for (const p of [cmd.p1, cmd.p2]) {
         if (!c.planes.has(p)) return { ok: false, error: { code: 'unknown-plane', id: p } };
@@ -1229,9 +1260,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'line-perp-plane': {
-      if (!c.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
-      if (!c.planes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
-      const next = clone(c);
+      const c2 = withFreeLines(c, [cmd.line]); // #552: «l ⊥ π» on an undeclared convention line creates it
+      if (!c2.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
+      if (!c2.planes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
+      const next = clone(c2);
       next.linePerps.push(cmd);
       // S2 (#378): when NEITHER direction carries the figure parameter there is nothing to pin —
       // the statement is a pure claim, so record it (M1 duality): a false numeric ⟂ now refuses
@@ -1253,7 +1285,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'on-line': {
-      if (!c.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
+      // #552 (the on-planes shape exactly): a membership naming an undeclared convention line creates it
+      const c0 = withFreeLines(c, [cmd.line]);
+      if (!c0.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
+      c = c0;
       if (!c.points.has(cmd.id)) {
         // M1 dual (ADR-3D-031, the on-planes shape): a NEW id stated onto a named line is
         // CREATED as a free rider (1 sampled DOF); the store's status pass still checks

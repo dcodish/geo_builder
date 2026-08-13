@@ -39,6 +39,15 @@ const SEEDED: Record<string, string[]> = {
     'CE = -1/3u - 1/3v + 1/3w',
     "E, C, A' על ישר אחד",
   ],
+  // #552 — the operator's free-line request, exact notation: bare/⊥-created convention names,
+  // a noun-declared arbitrary name, and both ∥ and membership pins on one figure.
+  'free-line-552.geo3.json': [
+    'פירמידה BCKS',
+    'l⊥BCK',
+    'ישר k',
+    'הישר k מקביל למישור BCK',
+    'S על הישר k',
+  ],
   'planes-2022-q2.geo3.json': [
     'המישור π1: z - 3 = 0',
     'המישור π2: ay + z - 8 = 0',

@@ -1573,6 +1573,9 @@ const canonicalLine = (s: string): string =>
     .filter((ch) => /[\d₀-₉]/.test(ch))
     .map((ch) => (/\d/.test(ch) ? ch : String.fromCharCode(ch.charCodeAt(0) - 0x2080 + 48)))
     .join('')}`;
+/** #552: canonicalise ONLY convention names (`l1` → `ℓ1`); a noun-declared arbitrary name (`k`)
+ *  passes through — `canonicalLine` would strip its letters. Use at every operand-fed site. */
+const canonLineName = (s: string): string => (LINE_NAME_ONLY.test(s) ? canonicalLine(s) : s);
 
 /**
  * One term of a parameter expression, in the RATIONAL forms a coefficient
@@ -1701,6 +1704,21 @@ const freePlaneDecl: Rule = (s) => {
   return [{ type: 'free-plane', name: canonicalPlane(m[1]) }];
 };
 
+/** #552 (the #487 shape, line edition): «ישר l1» / «נתון ישר k» / «line k» — and bare «l» / «l1»,
+ *  the ℓ-convention being to lines exactly what the π-prefix is to planes (#487 Am. 1: "anything
+ *  that starts with pi is commonly referred to as a plane" — the l/ℓ names carry the same signal).
+ *  A NON-convention single-letter name has no shape signal at all (it reads as a vector everywhere
+ *  else), so the NOUN is what states its kind — REQUIRED for «ישר k», and a bare «k» stays
+ *  not-handled rather than guessed. The utterance must END at the name — a trailing `:`/equation
+ *  belongs to `parametricLine`, a trailing relation to the relation rules. */
+const freeLineDecl: Rule = (s) => {
+  const conv = s.match(new RegExp(`^(?:נתון\\s+)?(?:(?:${HE_LINE}|(?:the\\s+)?line)\\s+)?(${LINE_NAME.source})$`));
+  if (conv) return [{ type: 'free-line', name: canonicalLine(conv[1]) }];
+  const named = s.match(new RegExp(`^(?:נתון\\s+)?(?:${HE_LINE}|(?:the\\s+)?line)\\s+([a-w])$`));
+  if (named) return [{ type: 'free-line', name: named[1] }];
+  return null;
+};
+
 const NUM = String.raw`-?${UNUM}`;
 
 /**
@@ -1799,11 +1817,11 @@ const coordPoint: Rule = (s) => {
     rest = '';
   }
   if (rest) {
-    const onLine = rest.match(new RegExp(`^${IS_AT}(?:על\\s+${HE_LINE}|on\\s+(?:the\\s+)?line)\\s+(${LINE_NAME.source})$`));
+    const onLine = rest.match(new RegExp(`^${IS_AT}(?:על\\s+${HE_LINE}|on\\s+(?:the\\s+)?line)\\s+(${LINE_NAME.source}|[a-w])$`));
     if (/^(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?(?:על אחד המישורים|on one of the planes)$/.test(rest)) {
       cmds.push({ type: 'on-planes', id, plane: 'any' });
     } else if (onLine) {
-      cmds.push({ type: 'on-line', id, line: canonicalLine(onLine[1]) });
+      cmds.push({ type: 'on-line', id, line: canonLineName(onLine[1]) });
     } else {
       const named = rest.match(new RegExp(`^${IS_AT}(?:על\\s+${HE_PLANE}|on\\s+(?:the\\s+)?plane)\\s+(${PLANE_NAME.source})$`));
       if (!named) return null; // trailing text we don't understand — refuse the whole utterance
@@ -2170,7 +2188,7 @@ const planeLinePerp: Rule = (s0) => {
     {
       type: 'plane-line-perp',
       ids: plane.op.ids,
-      line: canonicalLine(line.op.name),
+      line: canonLineName(line.op.name),
       // the student attached a PLANE noun to the line — build it, and say so
       ...(line.noun === 'plane' ? { statedAsPlane: true as const } : {}),
     },
@@ -2256,13 +2274,14 @@ const neverParallelClaim: Rule = (s) => {
  *  `נקודה B נמצאת על ישר l1`, `point B on l1` all reach the built on-line capability; the
  *  LINE_NAME token after על/on is what keeps `B על AC` (a segment rider) with onSegment. */
 const onLineMembership: Rule = (s) => {
-  const m = s.match(
-    new RegExp(
-      `^(?:ה?נקודה\\s+|(?:the\\s+)?point\\s+)?([A-Z]\\d*'?)\\s+(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על\\s+ה?ישר|on\\s+(?:the\\s+)?line|על|on)\\s+(${LINE_NAME.source})$`,
-    ),
-  );
+  const HEAD = `^(?:ה?נקודה\\s+|(?:the\\s+)?point\\s+)?([A-Z]\\d*'?)\\s+(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?`;
+  const m =
+    // #552: the NOUN form also admits a noun-declared arbitrary name — «B על הישר k»
+    s.match(new RegExp(`${HEAD}(?:על\\s+ה?ישר|on\\s+(?:the\\s+)?line)\\s+(${LINE_NAME.source}|[a-w])$`)) ??
+    // the noun-less form stays convention-only: a bare «B על k» carries no kind signal
+    s.match(new RegExp(`${HEAD}(?:על|on)\\s+(${LINE_NAME.source})$`));
   if (!m) return null;
-  return [{ type: 'on-line', id: m[1], line: canonicalLine(m[2]) }];
+  return [{ type: 'on-line', id: m[1], line: canonLineName(m[2]) }];
 };
 
 /**
@@ -2294,11 +2313,11 @@ const lineRelGiven: Rule = (s0) => {
     if (rel === 'perp') {
       // line ⟂ named plane is the FROZEN line-perp-plane lowering (linePerpPlane owns the
       // line-first order; the plane-first order lands here and lowers identically)
-      if (op.kind === 'plane-named') return [{ type: 'line-perp-plane', line: canonicalLine(line.op.name), plane: canonicalPlane(op.name) }];
+      if (op.kind === 'plane-named') return [{ type: 'line-perp-plane', line: canonLineName(line.op.name), plane: canonicalPlane(op.name) }];
       if (op.kind === 'plane-run') return null; // planeLinePerp's cell (it runs earlier — defensive)
     }
     const canonical: Operand3 =
-      op.kind === 'line' ? { kind: 'line', name: canonicalLine(op.name) }
+      op.kind === 'line' ? { kind: 'line', name: canonLineName(op.name) }
       : op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) }
       : op;
     return [
@@ -2306,7 +2325,7 @@ const lineRelGiven: Rule = (s0) => {
         type: 'line-rel',
         rel,
         op: canonical,
-        line: canonicalLine(line.op.name),
+        line: canonLineName(line.op.name),
         // the student attached a PLANE noun to the line — build it, and say so (ADR-3D-100)
         ...(line.noun === 'plane' ? { statedAsPlane: true as const } : {}),
       },
@@ -2337,7 +2356,7 @@ const lineRelAngle: Rule = (s) => {
   if (op.kind === 'point') return null;
   if (op.kind === 'line' && op.name === line.op.name) return null;
   const canonical: Operand3 =
-    op.kind === 'line' ? { kind: 'line', name: canonicalLine(op.name) }
+    op.kind === 'line' ? { kind: 'line', name: canonLineName(op.name) }
     : op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) }
     : op;
   return [
@@ -2347,7 +2366,7 @@ const lineRelAngle: Rule = (s) => {
       // #523: a Greek NAME states which measure the question is about, not a value — mark, never drive
       ...(ANGLE_LABEL_RE.test(m[3]) ? { label: m[3] } : { deg: +m[3] }),
       op: canonical,
-      line: canonicalLine(line.op.name),
+      line: canonLineName(line.op.name),
       ...(line.noun === 'plane' ? { statedAsPlane: true as const } : {}),
     },
   ];
@@ -3016,7 +3035,7 @@ const mutualPositionClaim: Rule = (s0) => {
     // a mutual POSITION needs located objects; ∥ is a direction relation, so a free vector qualifies
     const ok = rel === 'parallel' ? directional(x) && directional(y) : located(x) && located(y);
     if (!ok) continue;
-    const canon = (op: Operand3): Operand3 => (op.kind === 'line' ? { kind: 'line', name: canonicalLine(op.name) } : op);
+    const canon = (op: Operand3): Operand3 => (op.kind === 'line' ? { kind: 'line', name: canonLineName(op.name) } : op);
     return [
       // the statement leaves ink (the ADR-3D-035 rule); apply draws it too, so this is belt-and-braces
       // for the pair RECORD (ADR-3D-030 Am.) that a bare solid edge would otherwise not get
@@ -3444,7 +3463,7 @@ const distanceGiven: Rule = (s) => {
   if (a.op.kind === 'point' && b.op.kind === 'point') return null;
   const canon = (op: Operand3): Operand3 =>
     op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) }
-    : op.kind === 'line' ? { kind: 'line', name: canonicalLine(op.name) }
+    : op.kind === 'line' ? { kind: 'line', name: canonLineName(op.name) }
     : op;
   return [{ type: 'distance-rel', a: canon(a.op), b: canon(b.op), value: +m[3] }];
 };
@@ -3473,6 +3492,7 @@ export const RULES: Rule[] = [
   parametricLine, // before planeByEquation: both carry `:`, but ℓ ≠ π so either order is safe — kept explicit
   planeByEquation,
   freePlaneDecl, // #487: AFTER planeByEquation — a name followed by an equation is never stolen (this rule demands END after the name)
+  freeLineDecl, // #552: the line twin — after parametricLine for the same reason (demands END after the name)
   planeEqClaim, // plane named by POINTS + an equation — a claim, not a definition
   relPlaneRule, // `מישור π דרך F וניצב ל-SC` — before planeThroughBare (which is bare points)
   planeCut, // `המישור π חותך את SA בנקודה E` — before onSegment/coordPoint grab the tokens

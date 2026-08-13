@@ -18,6 +18,7 @@
 
 import type { Construction3, Id, Positions3, ScalarPin } from './types';
 import { distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
+import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, cross3, dist3, dot3, newellNormal, norm3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 export interface GaugeParams {
@@ -246,11 +247,14 @@ export function solvePivot(
   // S2 (#378, ADR-3D-103): the GAUGE-lane line relations — a segment/vector/point-run-plane operand
   // against an absolute named line. Absolute-lane entries (line×line, line×π) never involve the
   // figure, so they contribute nothing here (they live in the parameter root-find / claim lanes).
-  const gaugeLineRels = c.lineRels.filter((r) => !isAbsolute(r.op));
+  // #552: an entry whose LINE is FREE pins the line (`resolveFreeLine`), never the figure — the
+  // figure-side sets are the filtered ones, here and in every gate below.
+  const gaugeLineRels = figureLineRels(c).filter((r) => !isAbsolute(r.op));
+  const figPlanePerps = figurePlaneLinePerps(c);
   if (
     pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 && c.scalarPins.length === 0 &&
     c.planePins.length === 0 && memberPins.length === 0 && c.coordPlanePins.length === 0 &&
-    c.planeLinePerps.length === 0 && gaugeLineRels.length === 0
+    figPlanePerps.length === 0 && gaugeLineRels.length === 0
   )
     return [];
 
@@ -301,7 +305,7 @@ export function solvePivot(
     c.coordPlanePins.length === 0 &&
     // #375: same reason — one operand is figure-derived and the other is an absolute line, so
     // satisfying it ROTATES the figure. Frozen to identity, the residual could never reach zero.
-    c.planeLinePerps.length === 0 &&
+    figPlanePerps.length === 0 &&
     // S2 (#378): a gauge-lane line relation is the same absolute-frame class
     gaugeLineRels.length === 0 &&
     // an all-gauge run-carrier membership is similarity-invariant (extent-normalized);
@@ -410,7 +414,7 @@ export function solvePivot(
     // residual is what rotates the figure into place. Normalized by both magnitudes: a direction
     // vector's scale is arbitrary and a shrinking figure must not zero it for free (the
     // collapse-basin class, ADR-3D-079).
-    for (const pin of c.planeLinePerps) {
+    for (const pin of figPlanePerps) {
       const pts = pin.ids.map(at);
       const ln = lines?.get(pin.line);
       if (pts.some((p) => !p) || !ln) {
@@ -843,7 +847,7 @@ export function solvePivot(
   // exact solutions are never rejected for carrying the anchor's pull, and (c) filtered:
   // a candidate whose solid has two coincident vertices is not a figure at all.
   const planeDrive =
-    c.planePins.length > 0 || memberPins.length > 0 || c.coordPlanePins.length > 0 || c.planeLinePerps.length > 0 ||
+    c.planePins.length > 0 || memberPins.length > 0 || c.coordPlanePins.length > 0 || figPlanePerps.length > 0 ||
     gaugeLineRels.length > 0; // S2: same absolute-frame drive class (anchored, degeneracy-filtered, Stage A)
   // ...and when NOTHING pins an absolute length (no point/vector/pair injection, no
   // length/dot scalar), placement alone can satisfy the equations — Stage A below.

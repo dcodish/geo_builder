@@ -755,6 +755,76 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "line l1",
+    "winner": "freeLineDecl",
+  },
+  {
+    "lang": "he",
+    "text": "ישר l1",
+    "winner": "freeLineDecl",
+  },
+  {
+    "lang": "en",
+    "text": "l1",
+    "winner": "freeLineDecl",
+  },
+  {
+    "lang": "he",
+    "text": "l1",
+    "winner": "freeLineDecl",
+  },
+  {
+    "lang": "en",
+    "text": "line k",
+    "winner": "freeLineDecl",
+  },
+  {
+    "lang": "he",
+    "text": "ישר k",
+    "winner": "freeLineDecl",
+  },
+  {
+    "lang": "en",
+    "text": "l ⊥ BCK",
+    "winner": "planeLinePerp",
+  },
+  {
+    "lang": "he",
+    "text": "l ⊥ BCK",
+    "winner": "planeLinePerp",
+  },
+  {
+    "lang": "en",
+    "text": "l ∥ BCK",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "he",
+    "text": "l ∥ BCK",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "en",
+    "text": "line k is perpendicular to plane BCK",
+    "winner": "planeLinePerp",
+  },
+  {
+    "lang": "he",
+    "text": "הישר k מאונך למישור BCK",
+    "winner": "planeLinePerp",
+  },
+  {
+    "lang": "en",
+    "text": "B is on line l1",
+    "winner": "onLineMembership",
+  },
+  {
+    "lang": "he",
+    "text": "B על הישר l1",
+    "winner": "onLineMembership",
+  },
+  {
+    "lang": "en",
     "text": "line ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)",
     "winner": "parametricLine",
   },

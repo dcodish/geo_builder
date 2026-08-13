@@ -67,11 +67,14 @@ export const isPlanar = (op: Operand3): boolean =>
  *    precisely what `resolveFreePlane` pins it with (engine/freePlane.ts).
  *
  * Ask this one whenever the question is "did this statement add information"; ask `isAbsolute` when the
- * question is "must the figure move to satisfy it". Free planes are today's only absolute-but-not-self-
- * determined kind — a typed line has no free variant, so `line` needs no exception.
+ * question is "must the figure move to satisfy it". #552 gave `line` its free variant too, so it now
+ * carries the same exception a free plane does — a relation stated about a FREE line is precisely what
+ * `resolveFreeLine` pins it with, never redundant.
  */
 export const isSelfDetermined = (c: Construction3, op: Operand3): boolean =>
-  isAbsolute(op) && !(op.kind === 'plane-named' && c.planes.get(op.name)?.free);
+  isAbsolute(op) &&
+  !(op.kind === 'plane-named' && c.planes.get(op.name)?.free) &&
+  !(op.kind === 'line' && c.lines.get(op.name)?.kind === 'free');
 
 /** #384/#396 (ADR-3D-108): the display label of an operand — the one spelling every panel row,
  *  notice and witness label shares, so an operand can never be named two ways. */

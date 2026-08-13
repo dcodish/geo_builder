@@ -106,6 +106,15 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'מישור π2', en: 'plane π2' },
   { category: 'planesLines', he: 'π2', en: 'π2' }, // Am. 1: the bare notation declares too — deterministic, no LLM call
   { category: 'planesLines', he: 'B על המישור π2', en: 'B on plane π2' },
+  // #552: a FREE line — the #487 idea, line edition. Convention names may stand bare (ℓ-prefix = line,
+  // exactly as π-prefix = plane); any other single-letter name takes the NOUN, which states its kind.
+  { category: 'planesLines', he: 'ישר l1', en: 'line l1' },
+  { category: 'planesLines', he: 'l1', en: 'l1' }, // the bare convention notation declares too
+  { category: 'planesLines', he: 'ישר k', en: 'line k' }, // noun-declared arbitrary name
+  { category: 'planesLines', he: 'l ⊥ BCK', en: 'l ⊥ BCK' }, // creates l free when undeclared, ⊥ pins its direction
+  { category: 'planesLines', he: 'l ∥ BCK', en: 'l ∥ BCK' },
+  { category: 'planesLines', he: 'הישר k מאונך למישור BCK', en: 'line k is perpendicular to plane BCK' },
+  { category: 'planesLines', he: 'B על הישר l1', en: 'B is on line l1' },
   { category: 'planesLines', he: 'הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)', en: 'line ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)' },
   {
     // ADR-3D-031: a pair-named parametric line also puts A,B ON the line (riders / verified givens)

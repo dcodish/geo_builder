@@ -109,6 +109,12 @@ export function readOperand(raw: string): ReadOperand | null {
   const seg = t.match(SEG);
   if (seg) return seg[1] === seg[2] ? null : { op: { kind: 'segment', a: seg[1], b: seg[2] }, noun };
   if (POINT.test(t)) return { op: { kind: 'point', id: t }, noun };
+  // #552 — a NOUN-declared arbitrary line name («הישר k»). A single lowercase letter is the one token
+  // the closed set cannot classify by shape alone (it is both a vector name and a free line's name),
+  // so here — and ONLY here — the stated noun breaks the tie. This does not touch the ADR-3D-100
+  // mechanism: a noun still never OVERRIDES a decisive shape (l1, π2, ACD, AB…); it decides only
+  // where shape is genuinely ambiguous, which is the student stating the kind, not the tool guessing.
+  if (noun === 'line' && VECTOR.test(t)) return { op: { kind: 'line', name: t }, noun };
   if (VECTOR.test(t)) return { op: { kind: 'vector', name: t }, noun };
   // #512 — the absolute-frame operands, LAST so nothing above changes hands: a point label is
   // uppercase and a named vector is `[a-w]`, so neither can be read as an axis (`x`/`y`/`z` are

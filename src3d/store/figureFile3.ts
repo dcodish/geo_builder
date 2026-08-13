@@ -56,6 +56,7 @@ const COMMAND_SAVEABLE: Record<Command3['type'], boolean> = {
   'plane-rel': true, // S3 (#378): likewise a stated plane relation
   'distance-rel': true, // S5 (#378): a stated distance is a given
   'free-plane': true, // #487 (ADR-3D-124): a declared free plane is a given — the figure's planes must survive a round-trip
+  'free-line': true, // #552: a declared free line is a given — same round-trip argument
   solid: true,
   'point-on-segment3': true,
   'name-vector': true,

@@ -93,7 +93,8 @@
     "droppedGiven": "The statement was not added to the figure, because we could not draw: {{items}}. Try splitting it into shorter givens or rephrasing",
     "noPrismToMakeRight": "there is no prism in the figure to make right — build a prism or a parallelepiped first",
     "ambiguousPrism": "there is more than one prism in the figure — it's unclear which one you mean",
-    "planeNotDetermined": "Plane {{id}} has no stated equation or orientation yet — this statement needs a determined plane. Pin it with an equation, three points on it, or a ∥/⊥ relation"
+    "planeNotDetermined": "Plane {{id}} has no stated equation or orientation yet — this statement needs a determined plane. Pin it with an equation, three points on it, or a ∥/⊥ relation",
+    "lineNotDetermined": "Line {{id}} has no determined direction or position yet — this statement needs a determined line. Pin it with two points on it, a parametric form, or a ∥/⊥ relation"
   },
   "examples": {
     "title": "Examples",

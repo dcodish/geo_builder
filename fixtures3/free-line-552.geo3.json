@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "app": "3d-builder",
+  "savedAt": "2026-08-13T09:28:31.307Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "פירמידה BCKS",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "tetra",
+          "ids": [
+            "B",
+            "C",
+            "K",
+            "S"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "l⊥BCK",
+      "cmds": [
+        {
+          "type": "plane-line-perp",
+          "ids": [
+            "B",
+            "C",
+            "K"
+          ],
+          "line": "ℓ"
+        }
+      ]
+    },
+    {
+      "utterance": "ישר k",
+      "cmds": [
+        {
+          "type": "free-line",
+          "name": "k"
+        }
+      ]
+    },
+    {
+      "utterance": "הישר k מקביל למישור BCK",
+      "cmds": [
+        {
+          "type": "line-rel",
+          "rel": "parallel",
+          "op": {
+            "kind": "plane-run",
+            "ids": [
+              "B",
+              "C",
+              "K"
+            ]
+          },
+          "line": "k"
+        }
+      ]
+    },
+    {
+      "utterance": "S על הישר k",
+      "cmds": [
+        {
+          "type": "on-line",
+          "id": "S",
+          "line": "k"
+        }
+      ]
+    }
+  ]
+}
