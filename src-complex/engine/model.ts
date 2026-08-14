@@ -23,9 +23,35 @@ export type Expr =
   | { t: 'conj'; e: Expr };
 
 export type Fact =
-  | { id: string; kind: 'free'; name: string; src: string }
+  | { id: string; kind: 'free'; name: string; src: string; implicit?: boolean }
   | { id: string; kind: 'def'; name: string; expr: Expr; src: string }
   | { id: string; kind: 'roots'; varName: string; n: number; rhs: Expr; src: string };
+
+/** The exam's naming convention (ADR-CX-004): z- and w-family names ARE complex numbers — first
+ * reference auto-creates a free number. Other letters stay explicit (a,d,m,n,r are real params). */
+export const IMPLICIT_COMPLEX_RE = /^[zw]\d*$/;
+
+export const collectRefs = (e: Expr, out: string[] = []): string[] => {
+  switch (e.t) {
+    case 'ref':
+      out.push(e.name);
+      break;
+    case 'bin':
+      collectRefs(e.l, out);
+      collectRefs(e.r, out);
+      break;
+    case 'pow':
+      collectRefs(e.base, out);
+      break;
+    case 'neg':
+    case 'conj':
+      collectRefs(e.e, out);
+      break;
+    case 'lit':
+      break;
+  }
+  return out;
+};
 
 /** Distributive Omit — plain Omit collapses the union and loses the discriminant's payload. */
 type FactBody = Fact extends infer F ? (F extends Fact ? Omit<F, 'id'> : never) : never;
@@ -131,6 +157,7 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>): Scene => {
         const roots = nthRoots(w, f.n);
         circles.push({ r: absC(roots[0]), factId: f.id });
         roots.forEach((z, k) => {
+          env.set(`${f.varName}${k + 1}`, z); // solutions are named points; later facts may reference them
           points.push({
             key: `${f.id}-${k}`,
             label: prettyName(`${f.varName}${k + 1}`),

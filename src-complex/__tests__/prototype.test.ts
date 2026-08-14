@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { absC, argDeg, cisDeg, cx, formatCart, formatPolar, mul } from '../engine/complex';
-import { defaultFree, derive, type Fact } from '../engine/model';
+import { defaultFree, derive, factNames, type Fact } from '../engine/model';
 import { parseLine } from '../parser/parse';
 import { useComplexStore } from '../store/useComplexStore';
 
@@ -106,6 +106,60 @@ describe('engine', () => {
     expect(formatCart(cx(0, 1))).toBe('i');
     expect(formatCart(cx(3, -1))).toBe('3-i');
     expect(formatPolar(cisDeg(2, 150))).toBe('2·cis 150°');
+  });
+});
+
+describe('implicit complex names (ADR-CX-004: z*/w* are complex by convention)', () => {
+  it('referencing undefined z-family names auto-creates visible draggable frees', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    expect(st.addLine('w = z1*z2')).toBe(true);
+    const { facts } = useComplexStore.getState();
+    expect(facts.map((f) => f.id)).toEqual(['free-z1', 'free-z2', 'def-w']);
+    expect(facts[0]).toMatchObject({ kind: 'free', implicit: true });
+    const s = derive(facts, {});
+    expect(s.errors).toEqual({});
+    expect(s.points.filter((p) => p.freeName)).toHaveLength(2);
+    useComplexStore.getState().clearAll();
+  });
+
+  it('an explicit definition UPGRADES an implicit free instead of refusing', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('w = z1*i');
+    expect(st.addLine('z1 = 3+4i')).toBe(true);
+    const { facts } = useComplexStore.getState();
+    expect(facts.filter((f) => factNames(f).includes('z1'))).toHaveLength(1);
+    expect(facts.find((f) => f.id === 'def-z1')).toBeDefined();
+    // w now follows the explicit value: (3+4i)·i = -4+3i
+    const s = derive(facts, {});
+    const w = s.points.find((p) => p.label === 'w')!;
+    expect(w.z.re).toBeCloseTo(-4);
+    expect(w.z.im).toBeCloseTo(3);
+    useComplexStore.getState().clearAll();
+  });
+
+  it('non-z/w names stay explicit: unknown ref still errors honestly', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('u = q*2');
+    const s = derive(useComplexStore.getState().facts, {});
+    expect(s.errors['def-u']).toEqual({ key: 'unknown-ref', detail: 'q' });
+    useComplexStore.getState().clearAll();
+  });
+
+  it('solutions of an equation are referencable named points', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z^3 = 8');
+    st.addLine('w = z2*z3');
+    const s = derive(useComplexStore.getState().facts, {});
+    expect(s.errors).toEqual({});
+    // z2·z3 = (2cis120)(2cis240) = 4cis0
+    const w = s.points.find((p) => p.label === 'w')!;
+    expect(w.z.re).toBeCloseTo(4);
+    expect(w.z.im).toBeCloseTo(0);
+    useComplexStore.getState().clearAll();
   });
 });
 

@@ -21,6 +21,7 @@ const he = {
   errUnknownRef: 'המשפט מפנה לשם שלא הוגדר: {{detail}}',
   errRootsOfZero: 'לא ניתן לחלץ שורשים של אפס: "{{detail}}"',
   freeLabel: 'מספר חופשי (ניתן לגרירה)',
+  implicitLabel: 'נוצר מעצם האזכור — חופשי, ניתן לגרירה',
   factCount: '{{count}} משפטים',
 };
 
@@ -41,6 +42,7 @@ const en = {
   errUnknownRef: 'The statement refers to an undefined name: {{detail}}',
   errRootsOfZero: 'Cannot extract roots of zero: "{{detail}}"',
   freeLabel: 'free number (draggable)',
+  implicitLabel: 'created by reference — free, draggable',
   factCount: '{{count}} statements',
 };
 

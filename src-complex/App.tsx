@@ -73,7 +73,9 @@ export function App() {
             {facts.map((f) => (
               <li key={f.id} className={scene.errors[f.id] ? 'fact err' : 'fact'}>
                 <code dir="ltr">{f.src}</code>
-                {f.kind === 'free' && <span className="badge">{t('freeLabel')}</span>}
+                {f.kind === 'free' && (
+                  <span className="badge">{t(f.implicit ? 'implicitLabel' : 'freeLabel')}</span>
+                )}
                 {scene.errors[f.id] && (
                   <span className="fact-error">
                     {t(
