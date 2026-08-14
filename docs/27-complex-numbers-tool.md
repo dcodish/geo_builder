@@ -270,6 +270,49 @@ slice*, never as a separate phase.
 Build route per the workflow: each slice is a feature branch + PR with the operator's
 play-and-approve; corpus gates become permanent fixtures/scenarios in the product's test lane.
 
+## 10. The input language — generic sentence families ([ADR-CX-003](06d-decisions-complex.md#adr-cx-003))
+
+Operator directive (2026-08-14): the language must support the §2b exemplar **and every family it
+belongs to — "not only these specific formats but all families of them."** This section is the
+generic grammar contract the per-slice catalogs are authored from. Two cross-cutting principles
+collapse most of the surface area:
+
+- **P1 — one sentence form, driveOrCheck decides.** `שטח OZ₁Z₂Z₃ הוא 150r²` is a *given* (pins a
+  DOF) in one question and a *verifiable claim* in another. The grammar defines ONE form per
+  relation; whether it drives or checks is the engine's DOF decision, never a second phrasing.
+  (The 2-D driveOrCheck principle, verbatim.)
+- **P2 — display typography normalizes at the parse seam.** Students paste from exam PDFs:
+  Unicode subscripts (`Z₁`), superscripts (`Z₂³`), `°`, `−`, `·`, invisible bidi controls all
+  normalize before the grammar sees them (ADR-448/ADR-3D-144). `Z₁Z₂³Z₄` and `z1*z2^3*z4` are the
+  same utterance.
+
+| # | Family (generic form) | Canonical He (one witness form) | Corpus witnesses | Slice |
+|---|---|---|---|---|
+| F1 | **Declarations**: k names as complex numbers; real parameters with domain (`≠ 0`, `> 0`, `טבעי`, an interval) | `Z1 ו-Z2 מספרים מרוכבים` · `r ≠ 0` · `π/2 < α < π` | §2b, 2020, 2022, 2023 | C0/C2 |
+| F2 | **Value definitions**: `name = expr` — literals cart/polar, components/angles may be expressions in real parameters; six ops, conjugate, integer & symbolic `kn+c` powers | `w = (z1/2)^(4n)` · `z1 = (2a²+5a+4) + (2a²+3a+2)i` | §2b, 2018, 2020, 2022 | C0/C1, C5 |
+| F3 | **Modulus relations**: `\|A\| ⟨cmp⟩ rhs`, rhs = number · param-expr · `k·\|B\|`; chained equalities; cmp ∈ {=, <, >, ≤, ≥, ≠} | `\|Z1\| = 9r` · `\|z1\| = \|z2\| = r` · `2\|z_A\| = \|z_M\|` | §2b, 2018, 2024 | C2 |
+| F4 | **Argument relations**: signed sums/integer multiples of `arg` terms vs an angle or each other, any comparator — inequalities are BRANCH SELECTORS | `arg Z1 − arg Z2 = 90` · `arg Z2 < 45` · `לשניהם אותו ארגומנט` | §2b, 2018, 2024 | C2 |
+| F5 | **Location givens**: quadrant; on an axis/half-axis; on a stated line/ray; on a circle; inside/on/outside a region | `Z2 ברביע הראשון` · `C על הישר y=x` · `על ישר העובר דרך ראשית הצירים` | §2b, 2011, 2018, 2023 | C2/C4 |
+| F6 | **Objects**: segment between numbers; polygon of any arity over represented points (the origin `O` is always available); circle by center+radius or circumscribed (`מעגל חוסם`) | `הקטע Z1Z2` · `המרובע OZ1Z2Z3` · `המעגל החוסם את המשולש ABC` | §2b, 2015, 2023 | C2/C3 |
+| F7 | **Measures** (given OR claim, P1): length/distance, perimeter, area, modulus, argument — rhs number or param-expr | `אורך Z1Z2 = 15r` · `שטח OZ1Z2Z3 הוא 150r²` · `היקף … = 60r` | §2b, 2018, 2023 | C2 |
+| F8 | **Equations & solution sets**: `X^n = expr` creates the solution SET; solutions referenced collectively (`הפתרונות`), selected by quadrant / argument-range / ordinal — selection avoids naming collisions (the §2b `Z` vs `Z₁` case); enumeration asks (`כל האפשרויות`) are the branch surface | `Z^5 = Z1·Z2³·Z4` · `הפתרון שברביע הרביעי` · `(z3)² = 2i — שתי האפשרויות` | §2b, 2018, 2020, 2023, 2024 | C3 |
+| F9 | **Sequences**: geometric/arithmetic over ℂ; term-position givens in any positions (`בהתאמה`); a term defined by the others; the ratio/difference as a derived (multi-branch) value; sums of consecutive terms incl. symbolic count `kn` | `Z1 ו-Z2 הם שני האיברים הראשונים בסדרה הנדסית שבה האיבר השלישי הוא Z4` · `מנת הסדרה — כל האפשרויות` · `w + w² + … + w^(4n)` | §2b, 2015, 2024 | C5 |
+| F10 | **Number-type claims**: real, pure imaginary, conjugates of each other | `w מדומה טהור` · `z1 ו-z2 צמודים זה לזה` | 2018, 2020, 2022 | C2 |
+| F11 | **Classification claims**: triangle types (שווה-שוקיים, שווה-צלעות, ישר-זווית), quadrilateral types (the 2-D He lexicon: מקבילית, מלבן, ריבוע, מעוין, טרפז, דלתון), regular n-gon — incl. over a solution set | `OZ2Z3Z4 מקבילית` · `הפתרונות קדקודים של משושה משוכלל` | §2b, 2015, 2018, 2020 | C3 |
+| F12 | **Quantified claims**: `לכל n טבעי`, minimal/existential n, and COUNT claims over a set vs a region (`כמה … בתוך / על / מחוץ`) | `לכל n, w1 ממשי` · `ה-n המינימלי שעבורו…` · `פתרון אחד על המרובע, אחד בתוכו, שלושה מחוצה לו` | §2b, 2013, 2022, 2023 | C5 |
+| F13 | **Loci**: `המקום הגאומטרי` of points satisfying an equation in z (and z̄) from the closed §5.3 list; locus-type claims (`הוא מעגל`) | `\|z − p\| = m` · `המקום הגאומטרי … הוא מעגל` | 2022, 2024 | C4 |
+
+**Deliberately deferred, restated** (D2): linear systems over ℂ as givens (`z₁+z₂ = 7+7i` with
+`z₁−z₂ = 1−i`, 2018) and mixed-modulus equations (`\|z\|·i + 2z = √3`, 2013/2015). Both are
+*representable* later as constraint facts; nothing in the family table forecloses them.
+
+**Coverage check (both directions).** Every statement in the §2b exemplar maps to a family
+(setup → F1 F3 F4 F5 · א → F6 F7 · ב → F1 F3 F4 F6 F7 · ג → F9 F11 · ד → F8 F12), and every
+statement in the eight sampled exams maps to a family or a named deferral. Conversely every family
+carries at least two corpus witnesses — no speculative grammar. A catalog entry is authored
+per-slice from this table; the table, not any single question's phrasing, is what "supported"
+means.
+
 ---
 
 **Summary:** the fourth sibling at its own URL; the smallest engine core of the four products; the
