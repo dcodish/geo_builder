@@ -91,10 +91,12 @@ reason the report exists as a habit. Its four sub-lists:
    explicitly pose an unanswered operator question (a ruling, an A/B choice, a scope decision) —
    the label lags reality, so scan for the questions, and add the label where it's missing
    (`gh issue edit N --add-label needs-operator`) so the queue converges on the truth.
-2. **Plans awaiting your `auto-ok`** — open issues that carry a concrete fix plan (root cause +
-   mechanism + files, per docs/22 §2b), are not `needs-operator`, and are not yet `auto-ok`'d:
-   the candidates that feed `/fix-round`. One row each: #, the plan's gist, complexity grade.
-   Blessing a plan is a 30-second read — surface it so the round never starves silently. An
+2. **Plans awaiting your `auto-ok`** — since ADR-W-014 Am. 1 ("a clear plan is itself the
+   approval") this list should normally be EMPTY: an open issue with a concrete, self-contained
+   fix plan (root cause + mechanism + files, per docs/22 §2b), no `needs-operator`, and no open
+   ruling/scope question gets ARMED during this report (apply `auto-ok` + the audit comment citing
+   the ruling), not listed for a blessing. List here only the borderline ones you deliberately did
+   NOT arm — a plan that is a sketch with open options — each with one line on what's missing. An
    issue with NO plan is not a candidate; it belongs in the tables, flagged per the honesty rule.
 3. **PRs awaiting play-and-approve** — every open PR (`gh pr list`): finished, unplayed work
    (ADR-W-007). One row: PR#, what it delivers, which issues it closes.

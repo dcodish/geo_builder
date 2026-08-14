@@ -35,11 +35,12 @@ Eligible = `auto-ok` AND a concrete fix plan in the body/comments AND not `needs
 An `auto-ok` issue with no real plan is a labeling error: record it in the ledger's Skipped
 section, leave a comment asking for triage, skip it — never invent the plan inline.
 
-`auto-ok` is valid two ways only (ADR-W-014, docs/22 §2d): applied by the operator's own hand,
-or applied by a session **transcribing an explicit operator batch approval**, in which case the
-issue MUST carry an audit comment quoting the approval. A label with no audit comment that the
-operator does not recognize is a labeling error → Skipped + a comment asking. The round itself
-NEVER applies `auto-ok` — composing and approving stay separate acts.
+`auto-ok` is valid three ways (ADR-W-014 + Am. 1, docs/22 §2d): applied by the operator's own
+hand; applied by a session transcribing an explicit operator batch approval; or applied under the
+standing "clear plan ⇒ auto-ok" ruling — in the latter two cases the issue MUST carry an audit
+comment quoting the approval/ruling. A label with no audit comment that the operator does not
+recognize is a labeling error → Skipped + a comment asking. The round itself NEVER applies
+`auto-ok` — composing and arming stay separate acts.
 
 - **Bundle** issues sharing one root cause or mechanism into a single work item (the plans say
   so when it's true — same class, same chokepoint). Bundling is encouraged when it is the right

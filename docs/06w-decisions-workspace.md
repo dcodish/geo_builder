@@ -550,3 +550,15 @@ the same sequences are one step from fixture/scenario locks (standing rule 4). T
 split gives ANY future headless tool the exact app path without vitest, keeping the implementation
 count at one. Verdicts are HEAD-truth, so a sequence that stops building is caught the next time it
 is verified, not when the operator plays it.
+
+**ADR-W-014 Amendment 1 (2026-08-13, operator ruling): a CLEAR PLAN is itself the approval.** After one
+day of batch-approval practice the operator ruled: *"If an issue has a clear plan, it should be
+auto-ok."* The default inverts — an issue whose body carries a concrete, self-contained fix plan and no
+open operator question is ARMED (`auto-ok` + an audit comment citing this ruling) as part of triage or
+the status pass, without a per-batch okay. What still gates: `needs-operator` and any unanswered
+ruling/scope question in the body disqualify; a plan that is a sketch with open options ("needs a scope
+call", "two directions worth measuring", diagnosis incomplete) is NOT a clear plan; P1s never enter
+rounds silently; and the round's escalation exit remains the safety valve — a plan that fails contact
+with the code goes back to `needs-operator` with the template. Batch approval (the original ADR-W-014
+flow) remains for compositions and anything a session is unsure about. Applied retroactively to the
+open queue the same day: 41 planned issues armed, each with the audit comment.

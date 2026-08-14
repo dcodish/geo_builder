@@ -98,10 +98,14 @@ plan; `needs-operator` disqualifies. The approval is the operator's alone, but i
 transcription ([ADR-W-014](06w-decisions-workspace.md)): when a session has presented a concrete batch
 (e.g. `/status-update`'s recommended round) and the operator replies with an explicit batch approval
 ("approved", "okay, fix 1/2/3", including swaps), the session applies `auto-ok` to exactly the named
-issues and posts an **audit comment on each** quoting the approval and its date. A session never infers
-approval — not from silence, not from old prose in an issue body, only from an explicit operator
-statement naming or accepting a presented batch; and a bare `auto-ok` with neither an audit comment nor
-the operator's own hand behind it is a labeling error, not an eligibility. The round's ONE durable artifact, the **round issue**, is
+issues and posts an **audit comment on each** quoting the approval and its date. **And since
+[ADR-W-014 Am. 1](06w-decisions-workspace.md) (operator ruling 2026-08-13, "if an issue has a clear
+plan, it should be auto-ok"): a CLEAR PLAN is itself the approval** — an issue whose body carries a
+concrete, self-contained fix plan and no open operator question is armed at triage/status time with an
+audit comment citing the ruling. What still disqualifies: `needs-operator`, any unanswered
+ruling/scope question, and a plan that is a sketch with open options ("needs a scope call", "two
+directions worth measuring", incomplete diagnosis). A bare `auto-ok` with neither an audit comment nor
+the operator's own hand behind it remains a labeling error, not an eligibility. The round's ONE durable artifact, the **round issue**, is
 opened **at composition time** (label `in-round` — [ADR-W-013](06w-decisions-workspace.md)) carrying
 the announced composition plus the eligible-but-not-picked list, and is updated as each item resolves —
 a live ledger, so a crashed session leaves a discoverable round rather than orphaned commits. Each item
