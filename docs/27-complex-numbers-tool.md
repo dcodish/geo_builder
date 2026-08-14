@@ -71,6 +71,55 @@ parameter algebra (2022).
 `מעגל חוסם`, `משולש שווה־שוקיים`, `מצולע/משושה משוכלל`, `קדקוד`, `פתרונות המשוואה`,
 `מצא את כל האפשרויות`, `ראשית הצירים`, `הישר y=x`, `סדרה הנדסית`, `n מספר טבעי`.
 
+## 2b. The operator's pedagogical exemplar (2026-08-14) — the capstone gate
+
+While resolving the prototype-vs-define question the operator supplied one exam question with the
+ruling: *"from a pedagogy POV, I would like the user to be able to enter the inputs from this
+question and have the tool visualize the location of points and calculations."* Transcription
+(operator-supplied image, [ADR-CX-002](06d-decisions-complex.md#adr-cx-002)):
+
+> המספרים המרוכבים Z₁ ו-Z₂ נמצאים על מישור גאוס ומקיימים: arg Z₁ − arg Z₂ = 90°,
+> |Z₁| = 9r, |Z₂| = 12r (r ≠ 0). המספר Z₂ נמצא ברביע הראשון ונתון: arg Z₂ < 45°.
+> **א.** הביעו באמצעות r את אורך הקטע Z₁Z₂.
+> **ב.** המספר המרוכב Z₃ מקיים: |Z₃| = 20r, arg Z₃ + arg Z₂ = 0°. ראשית הצירים בנקודה O.
+> נתון ששטח המרובע OZ₁Z₂Z₃ הוא 150r². הביעו באמצעות r את היקף המרובע OZ₁Z₂Z₃.
+> **ג.** המספרים Z₁ ו-Z₂ הם בהתאמה שני האיברים הראשונים בסדרה הנדסית שבה האיבר השלישי הוא Z₄.
+> קבעו איזה סוג מרובע הוא המרובע OZ₂Z₃Z₄.
+> **ד.** נתונה המשוואה: Z⁵ = Z₁·Z₂³·Z₄. קבעו כמה מפתרונות המשוואה נמצאים בתוך המרובע OZ₂Z₃Z₄,
+> כמה נמצאים על המרובע וכמה נמצאים מחוץ לו.
+
+**Why it is the capstone: it exercises all six §2 archetypes in one question.** Constraint-defined
+numbers with parameter r (archetype 6) · the free angular DOF pinned by the area relation, with the
+`arg Z₂ < 45°` **inequality acting as a branch selector** — sin 2θ = 0.8 has two roots in the
+quadrant; the inequality prunes θ ≈ 63.4°, leaving θ = arctan ½ (archetypes 4, 2) · a
+sequence-DEFINED number Z₄ = Z₂²/Z₁ (archetype 5 / D4) · quadrilateral geometry with
+classification (archetype 3) · a `z⁵ = w` root constellation judged against a region (archetypes
+2, 3). The designed collapse Z₁·Z₂³·Z₄ = Z₂⁵ means the five solutions are Z₂ · (fifth roots of
+unity) — the plotted picture answers ד at a glance: **one solution on the quadrilateral (Z₂
+itself), one inside, three outside.** That is the operator's pedagogy ruling made concrete: the
+locations ARE the calculation.
+
+**Expected figure (gate assertions):** θ = arctan ½ ≈ 26.57°; |Z₁Z₂| = 15r (the 9-12-15
+triangle); perimeter of OZ₁Z₂Z₃ = 60r (sides 9r, 15r, 16r, 20r); OZ₂Z₃Z₄ is a **parallelogram**
+(side vectors O→Z₂ and Z₄→Z₃ equal; sides 12r, 16r); the Z⁵ solutions lie on |Z| = 12r at 72°
+spacing, counted 1 on / 1 inside / 3 outside. All linear-in-r claims verify across sampled r
+(r stays a free DOF end to end — ADR-052).
+
+**Grammar deltas this adds to the D2 v1 list** ([ADR-CX-002](06d-decisions-complex.md#adr-cx-002)):
+argument **inequalities/ranges** as givens (branch selectors; quadrant givens are the special
+case) · **measure claims as expressions in a parameter** (`אורך Z₁Z₂ = 15r`, `היקף … = 60r`; the
+area form as a *pinning given*) · **polygon objects over represented points** including the named
+origin O, with perimeter/area measures · **quadrilateral-type classification claims** (`מקבילית` —
+the 2-D product's He quadrilateral lexicon reuses) · **sequence-defined numbers** (first/second/
+third-term phrasing defines Z₄) · **root-vs-region counting claims** (inside / on / outside a
+stated polygon).
+
+**D1 refinement the exemplar forces:** the pinned angle arctan ½ is *not* a rational multiple of
+π — so the exact-argument type is **symbolic-base-plus-rational-π-offset** (`θ₀ + k·72°` stays
+exact even when θ₀ is only numeric), with the numeric fallback carrying θ₀ itself and
+parameter-expression claims verified across sampled r. The rational-π family still covers the
+roots-of-unity corpus; this exemplar's Pythagorean-triple family rides the fallback by design.
+
 ## 3. The formula-sheet contract (and why it is good news)
 
 The official 5-unit formula sheet (`5-MATH-Formula_NEW.pdf`, p. 4 — מספרים מרוכבים) contains **exactly
@@ -166,7 +215,10 @@ call, not a decision this note makes.**
   coefficients), the six operations + conjugate + |·| + integer powers, `zⁿ = w` equations, the
   locus list of §5.3, quadrant/membership givens, symbolic exponents `kn+c`. **Deferred past v1:**
   linear systems over ℂ as givens (2018's `z₁+z₂ = 7+7i` pair), mixed-modulus equations
-  (`|z|i + 2z = √3`) — representable later as constraint facts.
+  (`|z|i + 2z = √3`) — representable later as constraint facts. **Extended same day by the
+  operator exemplar (§2b, ADR-CX-002):** argument inequalities/ranges, parameter-expression
+  measure claims, polygon objects incl. O, classification claims, sequence-defined numbers,
+  root-vs-region counting claims.
 - **D3 — a standing product rule: ALWAYS VISUALIZE.** The operator's ruling is stronger than the
   recommended option: *"the rule should be (always) to visualize the problem — whenever possible,
   we draw the points."* Everything representable is drawn, immediately, with exact-value labels
@@ -207,6 +259,13 @@ slice*, never as a separate phase.
 - **C5 — symbolic exponents + series.** `w^{kn+c}` as its finite value-cycle, for-all-n and
   minimal-n verification over argument congruences, claimed-sum verification (D4). **Gates:** 2022ב,
   2023ד, 2015ב, 2013ב(2), 2024ד.
+
+- **CX capstone — the operator exemplar (§2b).** Once C2–C5 have landed, the full §2b utterance
+  sequence reproduces end-to-end: r free throughout, θ pinned by the area given with the
+  inequality pruning the second branch, Z₄ sequence-derived, the parallelogram classification
+  verified, the five Z⁵ solutions plotted and counted **1 on / 1 inside / 3 outside**. This gate
+  is the product's definition of "the pedagogy works": the student typed only the exam's givens,
+  and the figure answered the question.
 
 Build route per the workflow: each slice is a feature branch + PR with the operator's
 play-and-approve; corpus gates become permanent fixtures/scenarios in the product's test lane.

@@ -42,3 +42,44 @@ operator resolved all five the same day (issue
 opens the `06d` log; the `complex` GitHub label exists; build slices go the feature/PR route with
 per-slice exam gates becoming permanent fixtures. Entry point: C0 (product tree + Gauss plane +
 literals + the polar↔cartesian toggle).
+
+---
+
+## ADR-CX-002 — The pedagogy ruling and the capstone exemplar (2026-08-14)
+
+**Status:** Accepted (operator, same session as ADR-CX-001)
+
+**Context.** Debating prototype-now vs define-first, the operator supplied one exam question
+(image; transcribed in [docs/27 §2b](27-complex-numbers-tool.md)) with the ruling: *"from a
+pedagogy POV, I would like the user to be able to enter the inputs from this question and have the
+tool visualize the location of points and calculations."* The question turns out to exercise all
+six corpus archetypes at once, ending with five roots of `Z⁵ = Z₁·Z₂³·Z₄` (= Z₂⁵ by construction)
+judged against a parallelogram — the plotted constellation *is* the exam's answer (1 on / 1 inside
+/ 3 outside).
+
+**Decisions.**
+
+1. **The pedagogical charter, stated by the operator:** the student enters a real exam question's
+   givens; the tool visualizes the *locations* of the numbers and the *calculations* (derived
+   numbers, measures, root constellations) as geometry. This is the complex edition of the
+   reproduce-and-verify charter — the figure, not a printed answer, is what teaches.
+2. **The exemplar is the CX capstone gate** (docs/27 §9): after C2–C5 it must reproduce
+   end-to-end from typed Hebrew givens, r staying a free DOF throughout, with the expected figure
+   pinned in docs/27 §2b (θ = arctan ½ via the area given, the `arg Z₂ < 45°` inequality pruning
+   the second branch; perimeter 60r; parallelogram; roots 1 on / 1 inside / 3 outside).
+3. **D2 grammar extended** (v1): argument inequalities/ranges as branch-selecting givens ·
+   measure claims as expressions in a parameter (`= 15r`, `= 60r`), verified across sampled r ·
+   polygon objects over represented points incl. the named origin O, with perimeter/area ·
+   quadrilateral-classification claims (reusing the 2-D He lexicon) · sequence-defined numbers
+   (geometric-sequence phrasing defines Z₄ = Z₂²/Z₁) · root-vs-region counting claims
+   (inside/on/outside a stated polygon).
+4. **D1 refined:** the exact-argument representation is **symbolic base + rational multiple of
+   π** — the exemplar's pinned θ = arctan ½ is not rational-π, yet the root spacing θ + k·72°
+   must stay exact; the numeric fallback carries the base, the offsets stay symbolic. The
+   rational-π family alone would have silently failed this whole question family
+   (Pythagorean-triple exams), which is why the refinement is recorded now, before C1 exists.
+
+**Consequences.** docs/27 §2b holds the transcription, target utterance shape, gate assertions,
+and grammar deltas; C1's exact core is specified as two-layer (symbolic-base arguments, sampled
+parameters) from the start; the 2-D quadrilateral vocabulary becomes a deliberate cross-product
+*pattern* reuse (copied lexicon, never a code import — the isolation rule stands).
