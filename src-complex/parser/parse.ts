@@ -15,6 +15,12 @@ const SUPERSCRIPTS: Record<string, string> = {
   '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9',
 };
 
+// Exam PDFs paste names with Unicode subscripts: Z₁ ≡ z1 (ADR-CX-003 P2).
+const SUBSCRIPTS: Record<string, string> = {
+  '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4',
+  '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9',
+};
+
 const normalize = (raw: string): string =>
   raw
     .replace(/[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]/g, '')
@@ -23,6 +29,9 @@ const normalize = (raw: string): string =>
     .replace(/−/g, '-')
     .replace(/÷/g, '/')
     .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, (s) => `^${s.split('').map((c) => SUPERSCRIPTS[c]).join('')}`)
+    // a subscript run ENDS a name: Z₁Z₄ is two names (→ z1*z4), never the identifier z1z4
+    .replace(/([₀₁₂₃₄₅₆₇₈₉]+)(?=[A-Za-z(])/g, (s) => `${s.split('').map((c) => SUBSCRIPTS[c]).join('')}*`)
+    .replace(/[₀₁₂₃₄₅₆₇₈₉]/g, (c) => SUBSCRIPTS[c])
     .replace(/°/g, '')
     .replace(/\s+/g, ' ')
     .trim();

@@ -48,6 +48,21 @@ describe('parser', () => {
     expect(s.points[1].z.im).toBeCloseTo(2);
   });
 
+  it('exam typography: the §2b exemplar equation pastes verbatim (ADR-CX-003 P2)', () => {
+    // Z⁵ = Z₁Z₂³Z₄ with real subscripts/superscripts ≡ z^5 = z1*z2^3*z4
+    const f = fact('Z⁵ = Z₁Z₂³Z₄');
+    expect(f.kind).toBe('roots');
+    const s = derive(
+      [fact('z1 = 2cis100'), fact('z2 = 1cis50'), fact('z4 = 3cis10'), f],
+      {},
+    );
+    // rhs = z1·z2³·z4 = 2·1·3 cis(100+150+10) → roots on circle r=6^(1/5), five of them
+    const roots = s.points.filter((p) => p.kind === 'root');
+    expect(roots).toHaveLength(5);
+    expect(absC(roots[0].z)).toBeCloseTo(Math.pow(6, 1 / 5));
+    expect(argDeg(roots[0].z)).toBeCloseTo(52); // 260/5
+  });
+
   it('rejects nonsense with not-handled (the LLM-fallback seam)', () => {
     const r = parseLine('שלום עולם');
     expect(r.ok).toBe(false);
