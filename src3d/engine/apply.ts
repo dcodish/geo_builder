@@ -428,6 +428,16 @@ const dedupDeep = <T>(arr: T[]): T[] => {
   return arr.filter((x) => { const k = JSON.stringify(x); return seen.has(k) ? false : (seen.add(k), true); });
 };
 
+/** #584 (ADR-3D-148, the #383/ADR-3D-109 rule made ONE rule): a statement that references an
+ *  EXPLICIT point-run plane materialises it as a drawn plane — the patch then exists, grows, and
+ *  carries the full/face/hidden display cycle like any stated «מישור XYZ». Idempotent; a same-named
+ *  equation plane wins (never shadow a `planes` entry). Mutates `next` (call on a clone). */
+function materializePlaneRun(next: Construction3, ids: Id[]): void {
+  if (ids.length < 3) return;
+  const name = ids.join('');
+  if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...ids]);
+}
+
 /** The public reducer (#322): run the case reducer, then idempotently dedup the ScalarPin list so a
  *  re-typed macro utterance is a true no-op (mirrors ADR-3D-047's solid re-declare). Claims are left
  *  untouched — derive3 attributes them by COUNT-DELTA, and a re-verify of the same claim is harmless. */
@@ -870,6 +880,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (cmd.claim.type === 'plane-eq' && c.solids.length > 0) {
         next.planePins.push({ ids: [...cmd.claim.ids], cx: cmd.claim.cx, cy: cmd.claim.cy, cz: cmd.claim.cz, d: cmd.claim.d });
       }
+      // #584 (ADR-3D-148): a claim naming an explicit plane RUN («המישור ABS: x=0») references a
+      // plane the student stated — materialise it so the patch draws and carries the display cycle.
+      if (cmd.claim.type === 'plane-eq' || cmd.claim.type === 'coord-plane-rel') materializePlaneRun(next, cmd.claim.ids);
       next.claims.push(cmd.claim); // recorded — derive3 verifies EVERY recorded claim (fact-attributed)
       return { ok: true, next };
     }
@@ -949,6 +962,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (missing) return { ok: false, error: missing };
       if (ids.length < 3) return { ok: false, error: { code: 'unknown-point', id: ids[0] ?? '?' } };
       const next = clone(c);
+      // #584 (ADR-3D-148): a STATED run materialises its plane (patch + display toggle); the bare
+      // «הבסיס» form named no plane and the solid's base is already visible as its face — excluded.
+      if (cmd.ids.length > 0) materializePlaneRun(next, ids);
       next.coordPlanePins.push({ ids, axis: cmd.axis, mode: cmd.mode });
       next.claims.push({ type: 'coord-plane-rel', ids, axis: cmd.axis, mode: cmd.mode });
       return { ok: true, next };
@@ -967,10 +983,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // #383 (ADR-3D-109): the stated relation's point-run CARRIER is drawn (the ADR-3D-015 /
       // S3 rule) — without a drawn plane, the ADR-3D-097 patch-growth sweep has nothing to grow
       // to the crossing and the relation leaves no visible trace where the objects meet.
-      {
-        const name = cmd.ids.join('');
-        if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...cmd.ids]);
-      }
+      materializePlaneRun(next, cmd.ids);
       next.planeLinePerps.push({ ids: [...cmd.ids], line: cmd.line, ...(cmd.statedAsPlane ? { statedAsPlane: true as const } : {}) });
       next.claims.push({ type: 'plane-line-perp', ids: [...cmd.ids], line: cmd.line });
       return { ok: true, next };
@@ -992,10 +1005,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (cmd.op.kind === 'segment') drawAtom(next, { kind: 'pair', from: cmd.op.a, to: cmd.op.b });
       // #383 (ADR-3D-109): a POINT-RUN operand is materialised as a drawn plane (the S3 rule,
       // plane-rel's exact block) — so the patch exists and grows to the line's crossing.
-      if (cmd.op.kind === 'plane-run') {
-        const name = cmd.op.ids.join('');
-        if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...cmd.op.ids]);
-      }
+      if (cmd.op.kind === 'plane-run') materializePlaneRun(next, cmd.op.ids);
       // #523: a LABELLED angle NAMES the measure the question is about — «…היא α» states no value, so
       // it must not drive and must not be verified as a claim; it marks, and the panel derives its
       // degrees when the angle is seed-stable. Same semantics #319 gave the (segment × point-run)
@@ -1022,8 +1032,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // a relation between an object and ITSELF says nothing — refuse rather than record a vacuous truth
       if (sameOperand(cmd.a, cmd.b)) return { ok: false, error: { code: 'vacuous-relation' } };
       const next = clone(c);
-      // a stated relation draws its operands (the ADR-3D-035 rule — the statement must leave ink)
-      for (const op of [cmd.a, cmd.b]) if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
+      // a stated relation draws its operands (the ADR-3D-035 rule — the statement must leave ink);
+      // #584: a point-run operand materialises its plane like the sibling relation cases (the App3
+      // display toggle already enumerated mutual-rel runs — the toggle now has a patch behind it)
+      for (const op of [cmd.a, cmd.b]) {
+        if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
+        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids);
+      }
 
       // (1) the REQUIREMENT — always. It carries `skew` entirely, and the open half (really meeting,
       // and meeting WITHIN the segments) of the closed relations. Sample-and-gate, never least-squares.
@@ -1050,10 +1065,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // exists to grow toward the other operand (#383 — a stated relation must leave a visible trace)
       for (const op of [cmd.a, cmd.b]) {
         if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
-        if (op.kind === 'plane-run') {
-          const name = op.ids.join('');
-          if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...op.ids]);
-        }
+        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids);
       }
       // #523: a LABELLED angle NAMES the measure rather than stating one — it marks, never drives or
       // verifies (the #319 semantics, now reachable from every operand pairing).
@@ -1078,10 +1090,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const next = clone(c);
       for (const op of [cmd.a, cmd.b]) {
         if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
-        if (op.kind === 'plane-run') {
-          const name = op.ids.join('');
-          if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...op.ids]);
-        }
+        if (op.kind === 'plane-run') materializePlaneRun(next, op.ids);
       }
       // A distance carries UNITS, so it is meaningful against an absolute object too — but the
       // gauge×absolute DRIVE is the pivot's lane (#386); those instances stay claim-verified.
@@ -1835,6 +1844,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (missing) return { ok: false, error: missing };
       const next = clone(c);
       if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]); // draw the line
+      materializePlaneRun(next, cmd.plane); // #584: the stated plane leaves ink + gets the toggle
       // #319: a LABELED angle («… היא α») NAMES the measure — a pedagogical mark, never a driver;
       // the panel derives `α = X°` when the angle is seed-stable.
       if (cmd.label !== undefined) {

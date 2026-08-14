@@ -556,6 +556,11 @@ export default function App3() {
                   : cm.type === 'plane-rel' || cm.type === 'mutual-rel' || cm.type === 'distance-rel'
                     ? [cm.a, cm.b].flatMap((op) => (op.kind === 'plane-run' ? [op.ids.join('')] : []))
                     : cm.type === 'line-rel' && cm.op.kind === 'plane-run' ? [cm.op.ids.join('')]
+                    // #584 (ADR-3D-148): the CLAIM carriers materialise their stated run too —
+                    // «המישור ABS: x=0», the coord-frame relation, the line↔plane angle
+                    : cm.type === 'claim' && (cm.claim.type === 'plane-eq' || cm.claim.type === 'coord-plane-rel') ? [cm.claim.ids.join('')]
+                    : cm.type === 'coord-plane-rel' && cm.ids.length > 0 ? [cm.ids.join('')]
+                    : cm.type === 'line-plane-angle' ? [cm.plane.join('')]
                     : [],
                 ))].map((name) => (
                   <button

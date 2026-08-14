@@ -3508,3 +3508,27 @@ parse must refuse `dropped-given` keep-prior on BOTH a lost label and a lost num
 stays green) plus a fixtures-wide false-positive net replaying every stored session's gate calls
 with true prior context; `honesty3.test.ts` gains the standard-form-zero row (exempt RHS zero,
 still-accounted coefficients).
+
+## ADR-3D-148 — plane-run materialisation is ONE rule; the claim carriers join it (#584)
+
+Operator, playing round #582 on the ADR-3D-147 chain: «המישור ABS: x=0» built green but drew no
+plane and offered no show/hide tick — *"whenever we reference a plane … we need to apply the logic
+of showing the plane and having the tick."* The rule already existed (#383/ADR-3D-109: a statement
+referencing an explicit point-run plane materialises it into `pointPlanes`, giving it the patch,
+the fold/extent/seam logic and the full/face/hidden cycle) — but it lived as a hand-copied block in
+five command cases, and the CLAIM carriers never got a copy: `claim: plane-eq` (the reported case),
+`coord-plane-rel`, `line-plane-angle`, and `mutual-rel`'s plane-run operands (which the App3 toggle
+already enumerated — a toggle with no patch behind it). The `src3d/CLAUDE.md` trap by the book: an
+enumeration is not a rule.
+
+Decision: one helper (`materializePlaneRun` in apply.ts — idempotent, an equation plane of the same
+name wins) replaces the five copies and is called from every carrier of an explicit stated run.
+Boundaries kept deliberately: the bare «הבסיס» coord-frame form names no plane and the solid's base
+is already visible as its face — not materialised; `seg-plane-rel` («CA' מאונך למישור BC'D») stays
+ring-edges-only per #380's existing choice (its plane is typically a solid's face; the same helper
+is one line away if the operator ever wants patches there). The App3 fact-row toggle enumeration
+gains the same carriers.
+
+Locks: `plane-run-materialize.test.ts` — the operator's exact chain end-to-end (green + `ABS` in
+`pointPlanes` + a resolved plane to draw), the coord-frame and line-plane-angle siblings, the
+bare-base exclusion, and idempotency beside a prior «המישור ABS» plane-through.
