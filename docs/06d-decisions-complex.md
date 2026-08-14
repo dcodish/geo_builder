@@ -119,3 +119,32 @@ this product.
 **Consequences.** Per-slice catalogs are authored from the family table; scenario gates cite
 families, not phrasings; the `not-handled` seam (→ LLM fallback) is defined as "outside every
 family" rather than "outside the tested strings".
+
+---
+
+## ADR-CX-004 — Implicit typing by the exam's naming convention (2026-08-14)
+
+**Status:** Accepted (operator ruling, same day)
+
+**Context.** Operator: *"z and w are complex numbers — so if I just write z or z2 or z10 or w1 it
+should be a complex number without having to specify it."* The bagrut's naming convention is
+strong and two-sided: z- and w-family names denote complex numbers, while a, b, d, m, n, p, r, t
+denote real parameters — which is exactly why implicit typing must be scoped to the z/w family and
+not every identifier (`|z₁| = 9r` must keep r a real parameter, never auto-create a complex r).
+
+**Decision.**
+
+1. **A z/w-family name (`/^[zw]\d*$/`) referenced before definition auto-creates a free complex
+   number** — visible in the fact list (badged as implicitly created), draggable, placed by the
+   deterministic name-keyed default. The ADR-3D-146 auto-creation idiom: naming an object in a
+   statement is enough to bring it into existence.
+2. **An explicit definition of that name later UPGRADES the implicit fact in place** — same
+   position in the ordered fact list, so facts that already consume the name still evaluate
+   (order-dependence bug caught by the test the same day). Explicit-vs-explicit conflicts still
+   refuse, naming the conflicting statement.
+3. **Non-z/w names stay explicit** and unknown references to them error honestly; they are the
+   real-parameter namespace (F1 domains).
+4. **Solutions of an equation are referencable named points** (`z^3 = 8` defines z1, z2, z3 for
+   later expressions) — pending the F8 set-reference design for the collision case.
+
+Implemented in the C0 prototype with four locking tests; docs/27 §10 F1 updated.

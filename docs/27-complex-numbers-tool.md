@@ -288,7 +288,7 @@ collapse most of the surface area:
 
 | # | Family (generic form) | Canonical He (one witness form) | Corpus witnesses | Slice |
 |---|---|---|---|---|
-| F1 | **Declarations**: k names as complex numbers; real parameters with domain (`≠ 0`, `> 0`, `טבעי`, an interval) | `Z1 ו-Z2 מספרים מרוכבים` · `r ≠ 0` · `π/2 < α < π` | §2b, 2020, 2022, 2023 | C0/C2 |
+| F1 | **Declarations**: k names as complex numbers; real parameters with domain (`≠ 0`, `> 0`, `טבעי`, an interval). **Implicit typing ([ADR-CX-004](06d-decisions-complex.md#adr-cx-004)): z- and w-family names (`z`, `z2`, `z10`, `w1`…) are complex WITHOUT declaration — first reference auto-creates a visible free number; other letters (a, d, m, n, r, t…) are real parameters by the same exam convention** | `Z1 ו-Z2 מספרים מרוכבים` (optional for z/w) · `r ≠ 0` · `π/2 < α < π` | §2b, 2020, 2022, 2023 | C0/C2 |
 | F2 | **Value definitions**: `name = expr` — literals cart/polar, components/angles may be expressions in real parameters; six ops, conjugate, integer & symbolic `kn+c` powers | `w = (z1/2)^(4n)` · `z1 = (2a²+5a+4) + (2a²+3a+2)i` | §2b, 2018, 2020, 2022 | C0/C1, C5 |
 | F3 | **Modulus relations**: `\|A\| ⟨cmp⟩ rhs`, rhs = number · param-expr · `k·\|B\|`; chained equalities; cmp ∈ {=, <, >, ≤, ≥, ≠} | `\|Z1\| = 9r` · `\|z1\| = \|z2\| = r` · `2\|z_A\| = \|z_M\|` | §2b, 2018, 2024 | C2 |
 | F4 | **Argument relations**: signed sums/integer multiples of `arg` terms vs an angle or each other, any comparator — inequalities are BRANCH SELECTORS | `arg Z1 − arg Z2 = 90` · `arg Z2 < 45` · `לשניהם אותו ארגומנט` | §2b, 2018, 2024 | C2 |
