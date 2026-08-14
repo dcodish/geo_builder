@@ -1,0 +1,183 @@
+# 27 — Complex-numbers tool (a sibling app): corpus reading, chassis fit, open decisions
+
+_Drafted 2026-08-14 from an operator request: "I want to start thinking what a tool for complex numbers
+would look like." The product is already **registered** as the fourth sibling
+([docs/22 §9](22-workflow.md)): `src-complex/`, ADR log `06d-decisions-complex.md`, ids `ADR-CX-NNN`,
+label `complex` — but until this note it had no corpus reading and no plan. Grounded in a fresh corpus
+reading of **eight** 572 exams (§2) and the official formula sheet (§3), in the mold of
+[19-analytic-geometry-tool.md](19-analytic-geometry-tool.md) (analytic, still PROPOSED) and
+[20-space-vectors-tool.md](20-space-vectors-tool.md) (3-D, shipped). Status: **PROPOSED — decisions
+D1–D5 open (§8). No code yet.**_
+
+Same charter as every sibling: **the student types the givens, the tool reproduces the figure and
+verifies claims — it never solves the exam question.**
+
+---
+
+## 1. Positioning — the Gauss plane is a drawing the exam never prints
+
+In the modern 572/035582 format the complex-numbers question is **Q3, the closer of פרק ראשון**,
+worth 33⅓ points. The [572 coverage audit](21-572-coverage-audit.md) explicitly left it out of scope
+for both existing tools. The single strongest finding of the corpus reading: **no sampled exam prints a
+figure for the complex question, yet almost every one requires reasoning about the Gauss plane** —
+loci that turn out to be circles, roots that form regular polygons, quadrant selection, circumscribed
+circles, multiplication that rotates. The exam leaves the sketch entirely to the student. A tool that
+*renders* the plane as the student types the givens fills exactly the gap the exam leaves open — the
+same value proposition as the 2-D builder, aimed at a question where the official paper gives the
+student nothing to look at.
+
+## 2. Corpus reading — what a complex-numbers Q3 actually is
+
+Sampled: 2024 חורף, 2023 קיץ א, 2022 חורף, 2020 קיץ (modern 035582); 2018 קיץ (035582),
+2015 חורף + 2013 קיץ (035807), 2011 חורף (035007 — older format, complex sat in פרק שני). Q3 in every
+modern exam; the anatomy (givens → 3–4 chained sub-items of increasing depth) is stable across formats.
+
+| Exam | Setup (what the student is GIVEN) | The asks |
+|---|---|---|
+| **2024 חורף** | `z = x+yi`; locus equation `\|6 − z̄ − 8i\|² − \|10i\| = \|9+12i\|`; then A, M (= the locus circle's center) with equal argument and `2\|z_A\| = \|z_M\|`; then a **geometric sequence** of complex numbers with `z₁ ↔ A`, `z₅ ↔ M` | show the locus is a **circle**; coordinates of A; the ratio q — **כל האפשרויות** (q⁴ = 2, all four roots); `Σ z_k·z̄_k` |
+| **2023 קיץ א** | `z³ = 1/z³` (⇔ z⁶=1); z₀ the solution **ברביע הרביעי**; A,B,C represent `d·z₀`, `di·z₀`, `d·z₀⁴` (d>0 a **parameter**); area △ABC = 5d+6; `w = (z₀² − z₀⁻²)(1+i)` | pick the root by quadrant; **pin d** from the area; `\|w\|`, arg w; **minimal n** with wⁿ pure imaginary AND outside the circumscribed circle |
+| **2022 חורף** | `z₁, z₂` in cartesian form with **quadratic-in-parameter** components; then `w₁ = (z₁/√2)^{4n}`, `w₂ = (z₂/√2)^{4n+2}`; locus `\|z−p\| = m` | pin a so z₁,z₂ are **conjugates**; prove **for all n**: w₁ real, w₂ pure imaginary; find p,m so the circle carries w₁,w₂ for every n (unit circle) |
+| **2020 קיץ** | `z₁ = cis α`, `z₂ = cis(7α/3)`, `π/2<α<π`, quotient real; `w = z₁/z₂ + z₁z₂`; equation `z³ = w⁶` | pin α; prove product imaginary; **all** solutions of z³=w⁶; can the 3 roots be vertices of a **משושה משוכלל**? find the rest; an n>6 with the roots on a regular n-gon |
+| **2018 קיץ** | `\|z₁\|=\|z₂\|=r`, `arg z₁ + arg z₂ = 90°` (constraint-defined, r a parameter); C on the line `y=x`; `z₁±z₂` given; `z₃² = 2i`; D = `z₃·(z₁z₂)²` | prove z₁z₂ pure imaginary; explain △ABC isosceles; coordinates of C and D — **שתי האפשרויות**; area of quadrilateral BDAC for the C **ברביע הראשון** |
+| **2015 חורף** | the mixed-modulus equation `\|z\|·i + 2z = √3`; the solution = apex of an isosceles triangle inscribed in an **origin-centered circle**; `z₂ = 1`; `w = z₁z₂z₃` | solve; deduce z₃ from the symmetry; the sum `w + w² + … + w^{4n}` |
+| **2013 קיץ** | the **same** equation `\|z\|·i + 2z = √3` (verbatim repeat of 2015) | solve; prove `z^{6n}` takes only **two values** over all natural n |
+| **2011 חורף** | z₁,z₂,z₃ **on one line through the origin**, quadrant placement given, `z₁ = r₁(cos α + i sin α)` — fully symbolic | express `(z₁−z₃)/(z₂−z₃)` via the moduli |
+
+**The archetypes** (each appears in ≥ 2 exams):
+
+1. **Locus → recognizable curve.** `|expr(z, z̄)| = const` is a circle; membership of a line (`y=x`,
+   a line through the origin); quadrant conditions. (2024, 2022, 2018, 2011)
+2. **Multi-valued roots, enumerated.** `zⁿ = w`, `z₃² = 2i`, `q⁴ = 2` — with the ask phrased
+   **"מצא את שתי האפשרויות / כל האפשרויות"**, and a follow-up that *selects a branch by quadrant*.
+   (2018, 2020, 2023, 2024)
+3. **Roots as geometry.** The solution set forms a regular polygon / inscribed triangle; asks about
+   the circumscribed circle, remaining vertices, areas. (2020, 2023, 2015, 2018)
+4. **A real parameter pinned by a condition.** r, a, d, α, p, m — pinned by conjugacy, an area, a
+   reality condition, an argument relation. (all four modern exams)
+5. **Powers with symbolic exponent n.** `w^{4n}` real **for all n**; `z^{6n}` takes two values;
+   **minimal n** under argument-congruence + modulus conditions. (2022, 2023, 2015, 2013)
+6. **Constraint-defined numbers.** A number given not by a value but by relations
+   (`|z₁|=|z₂|=r`, arg sum, collinearity, mixed-modulus equations). (2018, 2015, 2013, 2011)
+
+**Operation frequency:** modulus & argument 8/8 · polar↔cartesian conversion ~all · De Moivre
+powers 6/8 · root extraction 4/8 · conjugate 2/8 · multiplication-by-i-as-rotation, polar quotient,
+linear systems over ℂ — once each. **Fusion with neighboring topics is the norm, not the exception:**
+geometric sequences (2024), triangle/quadrilateral area (2023, 2018), trig identities (2020),
+parameter algebra (2022).
+
+**Stable vocabulary** (for the parser): `מספר מרוכב`, `מישור גאוס`, `ערך מוחלט`, `ארגומנט (זווית)`,
+`צמוד / צמודים זה לזה`, `מדומה טהור`, `ממשי`, `רביע ראשון/…/רביעי`, `המקום הגאומטרי`, `מעגל שמרכזו…`,
+`מעגל חוסם`, `משולש שווה־שוקיים`, `מצולע/משושה משוכלל`, `קדקוד`, `פתרונות המשוואה`,
+`מצא את כל האפשרויות`, `ראשית הצירים`, `הישר y=x`, `סדרה הנדסית`, `n מספר טבעי`.
+
+## 3. The formula-sheet contract (and why it is good news)
+
+The official 5-unit formula sheet (`5-MATH-Formula_NEW.pdf`, p. 4 — מספרים מרוכבים) contains **exactly
+three formulas**: polar multiplication, De Moivre, and the n-th-roots formula
+(`z_k = ⁿ√R[cos(φ/n + 2kπ/n) + i sin(φ/n + 2kπ/n)]`, k = 0…n−1). No conjugate, no division, no |z| —
+those are assumed understanding. The examinable machinery is a **small, closed operation set**: this
+tool's engine core is the *smallest* of the four products. There is no conic zoo (analytic), no solid
+family + projection renderer (3-D). The domain is: points in ℝ², polar coordinates, and six arithmetic
+operations.
+
+## 4. The chassis fit — three exact matches
+
+The constructive engine's three central ideas each map onto a corpus archetype **without stretching**:
+
+- **Branch index ↔ multi-valued roots.** `z³ = w` stores `branchCount = 3`; the existing
+  "show another configuration" button *is* the exam's "מצא את כל האפשרויות". A quadrant given
+  ("ברביע הרביעי") is a branch-selection fact — precisely the 3-D tool's "שיעור ה-z חיובי" idiom.
+- **Free DOF ↔ the unstated parameter.** `|z₁| = |z₂| = r` with r unstated is a free DOF
+  ([ADR-052](06-decisions.md#adr-052) verbatim: sampled, resampled on cycle, pinned the moment a
+  relation arrives — `שטח המשולש הוא 5d+6` pins d exactly like a 2-D length given pins a side).
+  A number constrained by `arg z₁ + arg z₂ = 90°` is a point with 1 remaining DOF — the
+  point-on-object idiom on the ray/circle.
+- **Dependency graph ↔ derived numbers.** `w = z₁·z₂`, `di·z₀`, `z₀⁴`, `z₃·(z₁z₂)²` are derived
+  points (0 DOF) computed by complex arithmetic — topological evaluate verbatim. Adding `w = z₁·z₂`
+  to the figure and *watching it move* as z₁ slides is the incremental-building interaction, unchanged.
+
+Also transfering as-is: the SVG renderer + `transform.ts` (the Gauss plane is a 2-D plane; axes/grid
+are the same small addition doc 19 §3 lists) · the bilingual RTL parser front-end + catalog + LLM
+fallback (`tool: 'complex'` on the shared server, never a fork) · the app shell (fact list, undo/redo,
+save/load, export, i18n) · the givens verifier — `w מדומה טהור`, `z₁ ו-z₂ צמודים`, `הפתרונות יוצרים
+משושה משוכלל` are green/amber claims in the ADR-053 idiom.
+
+## 5. What is genuinely new (the core of the build)
+
+1. **An exact polar core.** Corpus numbers live almost entirely in the ring of "nice" polar values:
+   arguments are rational multiples of π, moduli are radicals (√2, ⁿ√R). Two archetypes *cannot* be
+   verified by numeric sampling: **for-all-n claims** (`w^{4n}` real for every natural n) and
+   **minimal-n asks** — but both are trivial over exact arguments (`arg w = k·π/m` ⇒ the power's
+   argument is a congruence class). Recommendation (D1): represent arguments exactly as rational
+   multiples of π with a numeric fallback for non-nice values; moduli as `(rational · √rational)`
+   with numeric fallback. This is the same *bounded, no-CAS* discipline as the 3-D symbolic vector
+   layer (doc 20: "bounded symbolic layer — NO CAS").
+2. **An expression grammar.** The 2-D parser parses relation *sentences*; here the givens are
+   *expressions*: `w = (z₁/√2)^{4n}`, `z₃·(z₁z₂)²`, `|6 − z̄ − 8i|² = 25`. The parser needs a small
+   expression sub-grammar (literals a+bi and r·cis θ, the six operations, conjugate bar, |·|, powers
+   with integer or `kn+c` symbolic exponents). Bounded: no general algebra, just the corpus forms.
+3. **The locus layer (small).** `|z − p| = m` → circle; `|z − a| = |z − b|` → perpendicular
+   bisector; `arg(z − a) = θ` → ray; membership of a stated line. Unlike analytic geometry, the
+   corpus loci resolve to a *closed list* of recognizable curves — first-class objects, not swept
+   traces, so the analytic tool's open CAS question (doc 19 §6) does **not** block this tool.
+4. **Symbolic exponent n.** Powers `w^{kn+c}` rendered as the finite cycle of values they generate
+   (periodicity over exact arguments), enabling the two-values-of-`z^{6n}` and minimal-n asks.
+5. **Axes + quadrants substrate.** Drawn axes, origin, quadrant naming, the line y=x — shared ground
+   with the future analytic tool (see §7).
+
+**Deliberately out of scope** (the tool renders and verifies figures; it does not do exam arithmetic):
+evaluating series sums (`w + w² + … + w^{4n}`, `Σ z_k z̄_k`) as a *printed answer* — though the tool
+happily *plots* the powers of w (the periodic cycle on the unit circle is exactly the picture that
+makes those sums obvious), and a student-claimed value of a sum could be verified (D4).
+
+## 6. Product definition — what the student does, per ask type
+
+| Exam ask | Tool behavior |
+|---|---|
+| "z₀ הפתרון ברביע הרביעי של z⁶=1" | The equation is a fact → 6 points appear (regular hexagon); the quadrant given selects the branch; the student can toggle exact-value labels (D3) |
+| "מצא את שתי האפשרויות" | The existing branch-cycling button; both configurations printable/exportable |
+| "הראו כי המקום הגאומטרי הוא מעגל" | The locus equation is a fact → the tool draws the resolved curve; the student's claimed center/radius is a verifiable claim |
+| "מצאו את d" (area = 5d+6) | d is a free DOF; the area relation pins it (driveOrCheck); or the student types their d → verified |
+| "הוכח כי w₁ ממשי לכל n" | Claim → verified exactly over the polar core (argument congruence), never by sampling |
+| "מצאו את ה-n המינימלי…" | The student types their n → the claim (`wⁿ מדומה טהור`, `מחוץ למעגל החוסם`) verifies; the power-cycle plot shows *why* |
+| "האם הפתרונות קדקודים של משושה משוכלל" | A polygon-membership claim → verified; the completing vertices drawable as derived points |
+| "חשב את השטח" | Measure labels on demand, the 3-D tool's idiom — the figure is the answer check |
+
+## 7. Strategic observation — complex may deserve to come **before** analytic
+
+The registry lists analytic (doc 19) ahead of complex, but the corpus reading inverts the effort
+estimate: analytic is blocked on a real open decision (locus deliverable, doc 19 §6) and needs an
+equation/CAS-lite layer plus a conic family; complex needs **three formula-sheet formulas, a closed
+locus list, and a bounded exact-polar core** — while reusing the 2-D renderer *directly* (it is a
+plane, not a projection). Building complex first would also land the **axes/coordinate substrate**
+that analytic needs anyway, as a smaller, decision-complete project. **This is D5 — the operator's
+call, not a decision this note makes.**
+
+## 8. Open decisions (operator)
+
+- **D1 — verification substrate.** Exact polar core (rational-multiple-of-π arguments + bounded
+  radical moduli, numeric fallback) vs pure numeric sampling. Exact is recommended: for-all-n and
+  minimal-n asks — present in 4 of 8 exams — are unverifiable numerically. Consequence: ~the size of
+  the 3-D symbolic vector layer.
+- **D2 — v1 given-forms.** Proposed v1 grammar: cartesian/polar literals (incl. parameter
+  coefficients), the six operations + conjugate + |·| + integer powers, `zⁿ = w` equations, the locus
+  list of §5.3, quadrant/membership givens, symbolic exponents `kn+c`. Deferred: linear systems over
+  ℂ as givens (2018's `z₁+z₂ = 7+7i` pair), mixed-modulus equations (`|z|i + 2z = √3`) — both
+  representable later as constraint facts; ruling wanted on whether v1 needs them.
+- **D3 — how much the figure reveals.** The roots of `z⁶ = 1` drawn on screen *are* the answer to
+  "מצאו את הפתרונות". Options: (a) plot always, exact labels toggleable (3-D measure-label idiom —
+  recommended); (b) plot only after the student states a candidate. This is the complex edition of
+  doc 19 §6's draw-vs-derive question, but much smaller.
+- **D4 — fusion scope.** Sequences/series asks (2024, 2015): out of v1 entirely, or verify a
+  student-claimed sum value? (The *plot* of the power cycle is in scope regardless.)
+- **D5 — build order.** Does complex jump the queue ahead of analytic (§7)?
+
+---
+
+**Summary:** the fourth sibling at its own URL; the smallest engine core of the four products; the
+2-D chassis (renderer, parser front-end, shell, verifier) reuses directly, and the engine's three
+central ideas — branch index, free DOF, dependency graph — each land on a corpus archetype exactly.
+The genuinely new work is a bounded exact-polar arithmetic core, an expression sub-grammar, a closed
+locus list, and symbolic exponents. **Next step: operator resolves D1–D5; then this becomes a phased
+build plan with per-slice corpus gates in the doc-20 style, and accepted decisions open
+`06d-decisions-complex.md` as ADR-CX-001.**
