@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:3d": "tsc -b && vite build --config vite.config.3d.ts",
+    "build:complex": "tsc -b && vite build --config vite.config.complex.ts",
     "build:proxy": "node server/build.mjs",
     "preview": "vite preview",
     "test": "vitest",
@@ -15,6 +16,8 @@
     "test:3d": "vitest src3d/ server/",
     "test:run:2d": "vitest run src/ server/",
     "test:run:3d": "vitest run src3d/ server/",
+    "test:complex": "vitest src-complex/ server/",
+    "test:run:complex": "vitest run src-complex/ server/",
     "test:full": "node scripts/test-tiers.mjs full",
     "test:fast": "node scripts/test-tiers.mjs fast",
     "test:tiers": "node scripts/test-tiers.mjs report"

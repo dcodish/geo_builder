@@ -33,13 +33,13 @@
   "trees": {
     "src": { "product": "2d", "label": "2d", "adrLog": "docs/06-decisions.md" },
     "src3d": { "product": "3d", "label": "3d", "adrLog": "docs/06b-decisions-3d.md" },
+    "src-complex": { "product": "complex", "label": "complex", "adrLog": "docs/06d-decisions-complex.md" },
     "server": { "product": "server", "label": "server", "adrLog": "docs/06-decisions.md" }
   },
 
   "plannedTrees": {
     "$comment": "Registered in docs/22 §9, not yet on disk. Moving one into 'trees' + classifying its directories is all that is needed to guard it on arrival.",
-    "src-analytic": { "product": "analytic", "label": "analytic", "adrLog": "docs/06c-decisions-analytic.md" },
-    "src-complex": { "product": "complex", "label": "complex", "adrLog": "docs/06d-decisions-complex.md" }
+    "src-analytic": { "product": "analytic", "label": "analytic", "adrLog": "docs/06c-decisions-analytic.md" }
   },
 
   "aliases": {
@@ -119,7 +119,14 @@
     "src3d/render": "engine",
     "src3d/store": "engine",
 
-    "server": "shell"
+    "server": "shell",
+
+    "src-complex": "shell",
+    "src-complex/engine": "engine",
+    "src-complex/parser": "engine",
+    "src-complex/render": "engine",
+    "src-complex/store": "engine",
+    "src-complex/i18n": "shell"
   },
 
   "classificationNotes": {
