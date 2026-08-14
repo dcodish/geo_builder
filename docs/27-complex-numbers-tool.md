@@ -6,8 +6,9 @@ would look like." The product is already **registered** as the fourth sibling
 label `complex` — but until this note it had no corpus reading and no plan. Grounded in a fresh corpus
 reading of **eight** 572 exams (§2) and the official formula sheet (§3), in the mold of
 [19-analytic-geometry-tool.md](19-analytic-geometry-tool.md) (analytic, still PROPOSED) and
-[20-space-vectors-tool.md](20-space-vectors-tool.md) (3-D, shipped). Status: **PROPOSED — decisions
-D1–D5 open (§8). No code yet.**_
+[20-space-vectors-tool.md](20-space-vectors-tool.md) (3-D, shipped). Status: **ACCEPTED,
+decision-complete — D1–D5 resolved by the operator (2026-08-14, §8;
+[ADR-CX-001](06d-decisions-complex.md#adr-cx-001)). No code yet; C0 (§9) is the entry point.**_
 
 Same charter as every sibling: **the student types the givens, the tool reproduces the figure and
 verifies claims — it never solves the exam question.**
@@ -125,10 +126,11 @@ save/load, export, i18n) · the givens verifier — `w מדומה טהור`, `z�
 5. **Axes + quadrants substrate.** Drawn axes, origin, quadrant naming, the line y=x — shared ground
    with the future analytic tool (see §7).
 
-**Deliberately out of scope** (the tool renders and verifies figures; it does not do exam arithmetic):
-evaluating series sums (`w + w² + … + w^{4n}`, `Σ z_k z̄_k`) as a *printed answer* — though the tool
-happily *plots* the powers of w (the periodic cycle on the unit circle is exactly the picture that
-makes those sums obvious), and a student-claimed value of a sum could be verified (D4).
+**Series are IN scope** (D4 resolved — "series are many times part of the questions"): the tool
+*plots* the powers of w (the periodic cycle on the unit circle is exactly the picture that makes
+those sums obvious) and **verifies a student-claimed sum value** (`w + w² + … + w^{4n}`,
+`Σ z_k·z̄_k`) over the exact core. Charter intact: it never *prints* the sum unprompted — the
+student claims, the tool checks.
 
 ## 6. Product definition — what the student does, per ask type
 
@@ -142,6 +144,7 @@ makes those sums obvious), and a student-claimed value of a sum could be verifie
 | "מצאו את ה-n המינימלי…" | The student types their n → the claim (`wⁿ מדומה טהור`, `מחוץ למעגל החוסם`) verifies; the power-cycle plot shows *why* |
 | "האם הפתרונות קדקודים של משושה משוכלל" | A polygon-membership claim → verified; the completing vertices drawable as derived points |
 | "חשב את השטח" | Measure labels on demand, the 3-D tool's idiom — the figure is the answer check |
+| "חשב את הסכום w + w² + … + w^{4n}" | The power cycle is plotted (periodicity made visible); the student types their claimed value → verified exactly (D4) |
 
 ## 7. Strategic observation — complex may deserve to come **before** analytic
 
@@ -153,24 +156,60 @@ plane, not a projection). Building complex first would also land the **axes/coor
 that analytic needs anyway, as a smaller, decision-complete project. **This is D5 — the operator's
 call, not a decision this note makes.**
 
-## 8. Open decisions (operator)
+## 8. Decisions — RESOLVED by the operator (2026-08-14, [ADR-CX-001](06d-decisions-complex.md#adr-cx-001))
 
-- **D1 — verification substrate.** Exact polar core (rational-multiple-of-π arguments + bounded
-  radical moduli, numeric fallback) vs pure numeric sampling. Exact is recommended: for-all-n and
-  minimal-n asks — present in 4 of 8 exams — are unverifiable numerically. Consequence: ~the size of
-  the 3-D symbolic vector layer.
-- **D2 — v1 given-forms.** Proposed v1 grammar: cartesian/polar literals (incl. parameter
-  coefficients), the six operations + conjugate + |·| + integer powers, `zⁿ = w` equations, the locus
-  list of §5.3, quadrant/membership givens, symbolic exponents `kn+c`. Deferred: linear systems over
-  ℂ as givens (2018's `z₁+z₂ = 7+7i` pair), mixed-modulus equations (`|z|i + 2z = √3`) — both
-  representable later as constraint facts; ruling wanted on whether v1 needs them.
-- **D3 — how much the figure reveals.** The roots of `z⁶ = 1` drawn on screen *are* the answer to
-  "מצאו את הפתרונות". Options: (a) plot always, exact labels toggleable (3-D measure-label idiom —
-  recommended); (b) plot only after the student states a candidate. This is the complex edition of
-  doc 19 §6's draw-vs-derive question, but much smaller.
-- **D4 — fusion scope.** Sequences/series asks (2024, 2015): out of v1 entirely, or verify a
-  student-claimed sum value? (The *plot* of the power cycle is in scope regardless.)
-- **D5 — build order.** Does complex jump the queue ahead of analytic (§7)?
+- **D1 — verification substrate: EXACT polar core.** Arguments as rational multiples of π, moduli as
+  bounded radicals (`rational · √rational`), numeric fallback for non-nice values. For-all-n and
+  minimal-n asks — present in 4 of 8 sampled exams — are unverifiable numerically. Bounded, **no
+  CAS** — the 3-D symbolic-vector-layer discipline.
+- **D2 — v1 given-forms: the proposed grammar.** Cartesian/polar literals (incl. parameter
+  coefficients), the six operations + conjugate + |·| + integer powers, `zⁿ = w` equations, the
+  locus list of §5.3, quadrant/membership givens, symbolic exponents `kn+c`. **Deferred past v1:**
+  linear systems over ℂ as givens (2018's `z₁+z₂ = 7+7i` pair), mixed-modulus equations
+  (`|z|i + 2z = √3`) — representable later as constraint facts.
+- **D3 — a standing product rule: ALWAYS VISUALIZE.** The operator's ruling is stronger than the
+  recommended option: *"the rule should be (always) to visualize the problem — whenever possible,
+  we draw the points."* Everything representable is drawn, immediately, with exact-value labels
+  toggleable; there is no plot-after-candidate mode. Corollary, same ruling: **wherever possible the
+  student can switch a number's displayed form between polar and cartesian views** — the toggle is a
+  display transform only and never reaches the engine or parser (the ADR-448/ADR-3D-144 seam rule).
+- **D4 — series are IN scope.** "Series are many times part of the questions" — power-cycle plots
+  and verification of student-claimed sum values ship in v1 (see §5/§6).
+- **D5 — build order: complex BEFORE analytic.** "We will leave analytic to the end." The queue is
+  now: complex next, analytic last. Registry updated ([docs/22 §9](22-workflow.md)).
+
+## 9. Phased build plan — corpus-gated slices (doc-20 style)
+
+Every slice ends with an exam question reproducing **end-to-end through the real parse → replay
+path** with claims verified — the same gate discipline as the 3-D V-slices. Parser coverage
+(bilingual, catalog-driven) and the `tool: 'complex'` server parameterization grow *with each
+slice*, never as a separate phase.
+
+- **C0 — the plane and the number.** New product tree `src-complex/` (own entry + build config, no
+  `@/` alias, isolation-guard coverage), Gauss-plane renderer on the 2-D SVG chassis (axes, grid,
+  origin, quadrants), store/replay instantiation, cartesian + polar literals as plotted points,
+  free/draggable numbers, the **polar↔cartesian display toggle** (D3), fact list + undo + i18n.
+  **Gate:** `z₁ = 3+4i` and `z₂ = 2·cis 150°` render labeled; toggle switches both displayed forms.
+- **C1 — exact arithmetic + derived numbers.** The exact polar core (D1); the six operations,
+  conjugate, |·|, integer powers as **derived points** in the dependency graph; deterministic ids;
+  derived points move live as their inputs drag. **Gate:** 2011's symbolic quotient scene builds;
+  `w = z₁·z₂` follows z₁ live.
+- **C2 — constraints, parameters, branches.** Unstated magnitudes as free DOFs (ADR-052); relations
+  driveOrCheck (modulus equality/ratio, argument relations, conjugacy, quadrant, line membership);
+  branch cycling wired to "show another configuration". **Gate:** 2018 reproduces — constraint-defined
+  z₁, z₂, both options for C, area claim verified.
+- **C3 — equations and root geometry.** `zⁿ = w` producing the n-root constellation
+  (branch-indexed), quadrant selection of a root, regular-polygon and circumscribed-circle claims,
+  parameter pinning through a metric relation. **Gates:** 2020 (z³ = w⁶ + the hexagon asks) and
+  2023 (z⁶ = 1, quadrant pick, d pinned by the area) reproduce.
+- **C4 — loci.** The closed list: `|z − p| = m` → circle, `|z−a| = |z−b|` → perpendicular bisector,
+  `arg(z − a) = θ` → ray, stated lines; locus-shape claims verified. **Gates:** 2024א and 2022ג.
+- **C5 — symbolic exponents + series.** `w^{kn+c}` as its finite value-cycle, for-all-n and
+  minimal-n verification over argument congruences, claimed-sum verification (D4). **Gates:** 2022ב,
+  2023ד, 2015ב, 2013ב(2), 2024ד.
+
+Build route per the workflow: each slice is a feature branch + PR with the operator's
+play-and-approve; corpus gates become permanent fixtures/scenarios in the product's test lane.
 
 ---
 
@@ -178,6 +217,6 @@ call, not a decision this note makes.**
 2-D chassis (renderer, parser front-end, shell, verifier) reuses directly, and the engine's three
 central ideas — branch index, free DOF, dependency graph — each land on a corpus archetype exactly.
 The genuinely new work is a bounded exact-polar arithmetic core, an expression sub-grammar, a closed
-locus list, and symbolic exponents. **Next step: operator resolves D1–D5; then this becomes a phased
-build plan with per-slice corpus gates in the doc-20 style, and accepted decisions open
-`06d-decisions-complex.md` as ADR-CX-001.**
+locus list, and symbolic exponents. **D1–D5 are resolved (§8): exact core, proposed v1 grammar,
+always-visualize + polar↔cartesian toggle, series in scope, complex before analytic. Next step: C0,
+via the feature/PR route.**
