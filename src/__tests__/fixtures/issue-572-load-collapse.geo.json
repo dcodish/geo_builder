@@ -1,0 +1,98 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-08-13T19:06:40.345Z",
+  "name": "6",
+  "seed": 0,
+  "radiusOverrides": {},
+  "facts": [
+    {
+      "id": "dj-Hg8sTmNnkVRtR3JOgp",
+      "utterance": "משולש ישר זווית ABC",
+      "cmd": { "type": "right-triangle", "ids": ["A", "B", "C"] },
+      "enabled": true
+    },
+    {
+      "id": "jfVrqKBX3bE7oEy22j-lA",
+      "utterance": "משולש ABC חסום במעגל",
+      "cmd": { "type": "circumcircle", "id": "circle-O", "center": "O", "a": "A", "b": "B", "c": "C" },
+      "enabled": true
+    },
+    {
+      "id": "oS907RWekefGxjy21E6DX",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "W8SReLKTJYVdh7Ui75ZHE",
+      "cmd": { "type": "triangle", "ids": ["A", "B", "C"] },
+      "enabled": true
+    },
+    {
+      "id": "qSUj26ViNr5imZlc3S_Jg",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "W8SReLKTJYVdh7Ui75ZHE",
+      "cmd": { "type": "bisector", "id": "bis-CAB", "vertex": "A", "p": "C", "q": "B" },
+      "enabled": true
+    },
+    {
+      "id": "eKFAZKbCJgDzkiWsbfFkd",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "W8SReLKTJYVdh7Ui75ZHE",
+      "cmd": { "type": "bisector", "id": "bis-ABC", "vertex": "B", "p": "A", "q": "C" },
+      "enabled": true
+    },
+    {
+      "id": "60HGnwXzIgaQlTLH-V1Zc",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "W8SReLKTJYVdh7Ui75ZHE",
+      "cmd": { "type": "line-intersection", "id": "@ctr-P", "line1": "bis-CAB", "line2": "bis-ABC" },
+      "enabled": true
+    },
+    {
+      "id": "SNHE9rxFSpMFcKf2mDP8E",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "W8SReLKTJYVdh7Ui75ZHE",
+      "cmd": { "type": "foot", "id": "@f-AB", "from": "@ctr-P", "a": "A", "b": "B" },
+      "enabled": true
+    },
+    {
+      "id": "rutjRruVYXUQl3DzxCZHv",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "W8SReLKTJYVdh7Ui75ZHE",
+      "cmd": { "type": "circle-through", "id": "circle-P", "center": "@ctr-P", "through": "@f-AB", "autoCenter": true },
+      "enabled": true
+    },
+    {
+      "id": "ZV62s-ZnlX50VHO0vr11m",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "W8SReLKTJYVdh7Ui75ZHE",
+      "cmd": { "type": "foot", "id": "@f-BC", "from": "@ctr-P", "a": "B", "b": "C" },
+      "enabled": true
+    },
+    {
+      "id": "bBHq7f9_jFeLxP9RTKoiC",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "W8SReLKTJYVdh7Ui75ZHE",
+      "cmd": { "type": "foot", "id": "@f-CA", "from": "@ctr-P", "a": "C", "b": "A" },
+      "enabled": true
+    },
+    {
+      "id": "jJJOTEELQA86T_V2ePkao",
+      "utterance": "משיק למעגל בנקודה B",
+      "cmd": { "type": "tangent", "id": "tan-B", "circle": "circle-O", "at": "B", "visible": true },
+      "enabled": true
+    },
+    {
+      "id": "ia19wuL-fREneUdYU_u7w",
+      "utterance": "קשת AB = קשת BC",
+      "cmd": { "type": "set-angle-ratio", "v1": "O", "a1": "A", "b1": "B", "v2": "O", "a2": "B", "b2": "C", "k": 1 },
+      "enabled": true
+    }
+  ],
+  "display": {
+    "hidden": [],
+    "segStyle": {},
+    "hiddenCircles": [],
+    "showMeasures": true,
+    "showCenters": false
+  }
+}

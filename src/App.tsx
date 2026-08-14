@@ -37,6 +37,7 @@ import { auditLoadedFigure, liveAuditFindings, refreshLoadedFigure } from '@/sto
 import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { runSubmit } from '@/app/submitPipeline';
+import { runViewResolve } from '@/app/resolveView';
 import { humanizeError, translateParams } from '@/i18n/humanizeError';
 /**
  * Resolve AFTER the browser has had a chance to paint. A just-set React state (e.g. a "thinking"
@@ -476,6 +477,12 @@ export default function App() {
     // exactly as saved — but the student is told which rows to re-read (✎ edit re-parses the step
     // against its prefix context, ADR-241). Persistent note (no 6 s auto-clear): it names a truth
     // problem, not a file-handling hiccup.
+    // #572 (ADR-446): a LOADED figure that fails its requirements gets the SAME rescue the submit
+    // path has — the search + the ADR-445 note were bound to the submit code path, not to the
+    // "requirements-failing figure about to display" event, so the operator's saved collapse file
+    // re-drew C-on-A on every load, silently. One undo still restores the pre-load session: the
+    // resolve's applyView merges into the load's own history entry (temporal paused there).
+    void resolveAfterCommit();
     const audit = auditLoadedFigure(r.file.facts);
     if (audit.findings.length > 0) {
       setFileAudit(audit.findings); // note is DERIVED from these against live facts (issue #24) — self-clears
@@ -488,45 +495,39 @@ export default function App() {
     }
   };
 
-  // After a step commits, VERIFY the figure meets every requirement; if not, auto-search alternative
-  // configurations (seeds + branches) for one that does (ADR-106). The search is synchronous and can be
-  // slow on a heavy figure, so it runs behind a "thinking" state painted first (double rAF). Only fires
-  // when the figure is actually short of its requirements — a clean (or under-determined PENDING) figure
-  // pays nothing.
+  // After a step commits OR a file loads, VERIFY the figure meets every requirement; if not,
+  // auto-search alternative configurations (seeds + branches + the ADR-445 seat) for one that does
+  // (ADR-106). The flow itself lives in src/app/resolveView.ts (#572/#573, ADR-446 — extracted per the
+  // S0.4 testability precedent, and so the LOAD path runs the same rescue the submit path always had);
+  // this wrapper binds the App's real deps. While the search is pending, `resolvePending` keeps the
+  // LAST GOOD view on canvas (#573 — the ADR-293 keep-prior slot) instead of painting the failing one.
+  const [resolvePending, setResolvePending] = useState(false);
   const resolveAfterCommit = async () => {
-    const st = useGeoStore.getState();
-    // `submit` has already painted the spinner; if the figure already meets its requirements there's no
-    // search to run, so just clear it (the commit itself was the answer). (The fold for the committed
-    // content is warm — the commit path just computed or worker-primed it — so this check is cheap.)
-    if (meetsRequirements(st.facts, st.seed)) {
-      setBusy(false);
-      return;
-    }
     setBusy(true);
     try {
-      // #41 (ADR-290): the config search runs in the geometry WORKER — the main thread stays free, so
-      // the tab can never hit the page-unresponsive dialog here (was a synchronous findValidConfig).
-      const r = await geoWork.autoResolve(st.facts, st.seed);
-      if (r && r !== 'ok') {
-        if (r.fold) primeFoldFor(r.facts, r.fold); // transplant the worker's fold — main replays at tail speed
-        // the branch/seed rewrite belongs to the SAME user action as the commit it follows — pause
-        // history so it merges into that entry (E4/STO-4; one undo removes the whole action).
-        const temporal = useGeoStore.temporal.getState();
-        temporal.pause();
-        try {
-          useGeoStore.getState().applyView({ facts: r.facts, seed: r.seed });
-        } finally {
-          temporal.resume();
-        }
-      } else if (r === null) {
-        // #566 (ADR-445): the search EXHAUSTED with the kept view still short of its requirements —
-        // never leave that silent. The collapse class drew two named points as one, every status green,
-        // «נקבע במלואו» — the student had no signal anything was wrong. The figure stays (keep-prior
-        // would erase a committed given); the note says the drawing could not honour everything at once.
-        setInputNote(t('figure.noValidConfig'));
-      }
-    } catch (err) {
-      if (!isCancelled(err)) throw err;
+      await runViewResolve({
+        getState: () => useGeoStore.getState(),
+        meetsRequirements,
+        // #41 (ADR-290): the config search runs in the geometry WORKER — the main thread stays free.
+        autoResolve: (facts, seed) => geoWork.autoResolve(facts, seed),
+        applyView: (found) => {
+          if (found.fold) primeFoldFor(found.facts, found.fold); // transplant — main replays at tail speed
+          // the rewrite belongs to the SAME user action as the commit/load it follows — pause history
+          // so it merges into that entry (E4/STO-4; one undo removes the whole action).
+          const temporal = useGeoStore.temporal.getState();
+          temporal.pause();
+          try {
+            useGeoStore.getState().applyView({ facts: found.facts, seed: found.seed });
+          } finally {
+            temporal.resume();
+          }
+        },
+        setPending: setResolvePending,
+        // #566 (ADR-445): an EXHAUSTED search is never silent — the figure stays (keep-prior forever
+        // would hide a committed given); the note says the drawing could not honour everything at once.
+        onExhausted: () => setInputNote(t('figure.noValidConfig')),
+        isCancelled,
+      });
     } finally {
       setBusy(false);
     }
@@ -565,10 +566,16 @@ export default function App() {
   // legitimately empty and resets the fallback, so a ghost figure never outlives its facts.
   const lastGoodViewRef = useRef<ReturnType<typeof replay> | null>(null);
   const usable = viewUsable(derivedRaw);
-  if (usable) lastGoodViewRef.current = derivedRaw;
+  // #573 (ADR-446): while a config search is PENDING the freshly-derived view is known to fail its
+  // requirements — do not paint it (the operator watched the C-on-A collapse for the whole ~5 s
+  // search) and do not let it overwrite the keep-prior slot; the search's answer (the rescued view,
+  // or the failing one WITH the ADR-445 note) is what paints. With no prior view (a load into a
+  // fresh session) the raw view shows — there is nothing better to keep.
+  if (usable && !resolvePending) lastGoodViewRef.current = derivedRaw;
   else if (derivedRaw.positions.size === 0 && derivedRaw.lastError === null) lastGoodViewRef.current = null;
   const viewStale = !usable && lastGoodViewRef.current !== null;
-  const display = viewStale ? lastGoodViewRef.current! : derivedRaw;
+  const searchHold = resolvePending && lastGoodViewRef.current !== null;
+  const display = searchHold || viewStale ? lastGoodViewRef.current! : derivedRaw;
   // GEOMETRY from the displayable state; STATUS/ERROR from the real current state (the step list and the
   // error banner must tell the truth about what just happened).
   const { construction, positions, circles, labels, angleMarks, violations, radiusDofs, coincidences } = display;
@@ -857,13 +864,13 @@ export default function App() {
       </header>
 
       <div style={main}>
-        <div ref={canvasRef} style={{ ...canvasWrap, ...(viewStale ? { opacity: 0.55 } : {}) }}>
-          {viewStale && (
+        <div ref={canvasRef} style={{ ...canvasWrap, ...(viewStale || searchHold ? { opacity: 0.55 } : {}) }}>
+          {(viewStale || searchHold) && (
             <div
               role="note"
               style={{ position: 'absolute', top: 8, insetInlineStart: 8, zIndex: 5, background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: '4px 10px', fontSize: 12, color: '#92400e' }}
             >
-              {t('view.stale')}
+              {t(searchHold ? 'view.searching' : 'view.stale')}
             </div>
           )}
           <Figure

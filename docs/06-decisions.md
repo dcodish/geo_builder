@@ -7114,3 +7114,30 @@ asserts the rescue is produced by the **'seat' tier** — a wall-clock assertion
 worker budget was tried first and flaked at 28 s under the suite's CPU contention (5 s solo),
 which is the same reason `SEARCH_BUDGET_MS` is Infinity in tests. The heavier two-circle edition
 of the lock rides the #546/#562 branch, whose grammar it needs.
+
+## ADR-446 — The rescue binds to the display EVENT, and a pending search keeps the prior view (#572, #573)
+
+Operator, validating ADR-445 (2026-08-13): loading the saved collapse figure re-drew C-on-A with no
+search and no note — and when the search DID run (post-commit), the failing view itself painted for
+the whole ~5 s until the rescue landed. One root cause, two symptoms: the config-search + honest-note
+flow was an App CLOSURE on the submit path (`resolveAfterCommit`), i.e. a guard bound to a code path
+rather than to the event it guards — *a requirements-failing figure is about to display* — which
+submit, file-load and the search-pending interval all reach (docs/17; there is no session-restore
+path — the store resets on refresh — so those are the event's only reach-points).
+
+Decision: the flow is EXTRACTED to `src/app/resolveView.ts` (`runViewResolve`, injected deps — the
+S0.4 testability precedent) and called from both reach-points: the submit wrapper as before, and the
+FILE-LOAD path after `loadFigure` (the resolve's `applyView` merges into the load's own history entry
+— one undo still restores the pre-load session, ADR-232). While a search is pending (#573) the App
+keeps rendering the LAST GOOD view through the ADR-293 keep-prior slot — dimmed, with a new
+`view.searching` notice — instead of painting the known-failing view under the student's eyes; the
+search's answer paints (the rescued view, or the failing one WITH the ADR-445 note on exhaustion —
+keep-prior forever would hide a committed given). A load into a fresh session has no prior view and
+shows the raw one — there is nothing better to keep. The #364 ruling (accept the brief seed-advance
+flash) is untouched; this covers the long-search member of that family, per the operator's report.
+
+Locks: `resolve-view.test.ts` — the pending state machine (no-op on a requirements-meeting figure;
+true→false around apply/exhaust/cancel/error — a stuck flag would freeze the canvas), and the
+OPERATOR'S EXACT saved file (`fixtures/issue-572-load-collapse.geo.json`) through
+`deserializeFigure` + the real search: the load-path rescue applies a valid view with the seat at B
+and no collapse. The fixture also joins the fixtures net (replays green + parser drift).
