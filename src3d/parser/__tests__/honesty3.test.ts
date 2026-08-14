@@ -119,6 +119,16 @@ describe('droppedGivenNumbers3 — a stated magnitude must land in the committed
     expect(droppedGivenNumbers3('E על AC כך ש-AE:EC = 2:1', cmds('קטע AC'))).toEqual(['2:1']);
   });
 
+  it('the RHS zero of a STANDARD-FORM equation is notation, not a magnitude (#535 measurement)', () => {
+    const eq = 'המישור ENB: 3x+2y-z-24=0';
+    expect(droppedGivenNumbers3(eq, cmds(eq))).toEqual([]);
+    // …while the coefficients themselves still demand accounting (control command chosen with no
+    // digit anywhere in its payload — «קטע AB» would pay a stated 3 out of its own type string)
+    const out = droppedGivenNumbers3(eq, cmds('קובייה ABCD'));
+    expect(out).toContain('3');
+    expect(out).toContain('24');
+  });
+
   it('NAME SUBSCRIPTS (π1, ℓ2, O1) are names, not magnitudes', () => {
     const line = 'הזווית בין המישורים π1 ו-π2 היא 45';
     expect(droppedGivenNumbers3(line, cmds(line))).toEqual([]); // 1/2 subscripts don't demand accounting

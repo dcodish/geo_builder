@@ -296,6 +296,12 @@ export function droppedGivenNumbers3(utterance: string, commands: Command3[]): s
   // a comparison to ZERO is sign notation (`t > 0` / `k < 0`, ADR-3D-079 Am. 1), not a magnitude;
   // a non-zero bound (`> 0.5`, `< 90`) stays a real number the commands must account for
   s = s.replace(/[<>]\s*0(?![.\d])/g, ' ');
+  // the RHS zero of a STANDARD-FORM equation («3x+2y-z-24=0») is the form's notation, never a stated
+  // magnitude — the given's content is its coefficients, which still demand accounting. Guarded on a
+  // coordinate variable actually appearing in an expression, so a zero equated to anything else
+  // (a bare «AB = 0») stays a real magnitude. (#535 measurement: only payload-coincidence — a plane
+  // whose normal happens to carry 0 components — kept this from flagging on the catalog rows.)
+  if (/[xyz]\s*[-+=]/.test(s) || /[-+]\s*\d*\s*[xyz](?![A-Za-z])/.test(s)) s = s.replace(/=\s*0(?![.\d])/g, ' ');
   // name subscripts are names, not numbers: ℓ1/ℓ2 line names (typed l1 too), π1/π2 plane names
   s = s.replace(/[ℓπ]\d+/g, ' ').replace(/(?<![A-Za-z])l\d+(?![A-Za-z])/g, ' ');
   // label-glued digits are subscripts (O1, A2), and blanking every latin letter also removes words

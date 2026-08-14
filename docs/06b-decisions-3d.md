@@ -3481,3 +3481,30 @@ Locks: `height-from-apex.test.ts` #579 block — the operator pair «פירמי�
 «SO גובה הפירמידה» asserted geometrically (O exists, not E; foot-face from S; foot in base plane;
 S→O along the base normal; SO drawn), the He/En mirrors and the reversed «OS», the preserved refusals,
 and the unchanged E-mint; fixture `fixtures3/named-foot-579.geo3.json` (full verifier + drift net).
+
+## ADR-3D-147 — the label/number honesty gates run on the DETERMINISTIC submit path too (#535)
+
+The `submitSteps` comment reasoned that the deterministic path needs no label/number gate ("the rules
+parse the utterance itself; the LLM round-trip is where meaning can leak"). #530 falsified it: a rule
+CAN match an utterance and still drop part of it — an optional label capture that goes unfilled
+(«מעגל שמרכזו O משיק לישר AB בנקודהK», the K glued to the noun) committed a partial figure with a
+green ✓, and `droppedNewLabels3` returned the dropped K when asked — nobody asked it on that path.
+The specific instance was fixed (ADR-3D-139); this closes the generator.
+
+Decision: `store3.submit` now runs `droppedNewLabels3` + `droppedGivenNumbers3` (prior label context
+from `derive3(facts, seed).construction`, the same call `submitSteps` already makes) beside the
+event-bound `droppedTriShape3`/`droppedConstructNoun3` it already ran. Measurement-first per the
+ADR-430 pattern: the gates ran over the catalog corpus (asserted clean in `honesty3.test.ts`, both
+locales, strictest empty-prior setting), every stored fixture session, and the full 3-D suite. ONE
+false positive surfaced and was fixed at ITS root in the gate: the RHS zero of a standard-form
+equation («המישור ENB: 3x+2y-z-24=0») is the form's notation, never a stated magnitude — it had only
+ever passed by payload coincidence (a normal with 0-components paying for it), which is why the
+catalog rows never flagged. The 2-D twin was checked and needs NO change: `submitPipeline` runs
+`droppedNewLabels`/`droppedGivenNumbers` (+ six sibling gates) on the deterministic route before
+every commit (ADR-089/ADR-250) — the issue's premise of a 2-D split was stale.
+
+Locks: `store/__tests__/deterministic-honesty-gate.test.ts` — the wiring lock (a mocked dropping
+parse must refuse `dropped-given` keep-prior on BOTH a lost label and a lost number; M1 context
+stays green) plus a fixtures-wide false-positive net replaying every stored session's gate calls
+with true prior context; `honesty3.test.ts` gains the standard-form-zero row (exempt RHS zero,
+still-accounted coefficients).

@@ -556,16 +556,22 @@ export const useGeo3 = create<Geo3State>()(
           return;
         }
         const { facts, seed } = get();
-        // #424 / #438 / #440: the honesty gates that also guard the DETERMINISTIC path. A grammar rule
-        // that reads a shape noun and ignores the REST of the sentence loses a stated given exactly as an
-        // LLM decomposition can, and no path-bound gate can see it (see droppedTriShape3 /
-        // droppedConstructNoun3). Both are bound to the EVENT, not to a commit path.
-        const lostShape = [
+        // #424 / #438 / #440 / #535: the honesty gates guard the DETERMINISTIC path too — bound to the
+        // EVENT, not to a commit path. The old reasoning ("the rules parse the utterance itself, so
+        // nothing can leak") was falsified by #530: a rule CAN match an utterance and still drop part
+        // of it — an optional label capture that quietly goes unfilled commits a partial figure with a
+        // green ✓, and the label/number gates knew but were only ever asked on the LLM seam
+        // (ADR-3D-147). The catalog corpus is asserted gate-clean in honesty3.test.ts, so the canonical
+        // phrasings never pay this check with a false refusal.
+        const prior3 = derive3(facts, seed).construction;
+        const lostDet = [
+          ...droppedNewLabels3(utterance, parsed.commands, [...prior3.points.keys()], [...prior3.vectors.keys()]),
+          ...droppedGivenNumbers3(utterance, parsed.commands),
           ...droppedTriShape3(utterance, parsed.commands),
           ...droppedConstructNoun3(utterance, parsed.commands),
         ];
-        if (lostShape.length > 0) {
-          set({ lastError: { code: 'dropped-given', items: lostShape.join(', ') } });
+        if (lostDet.length > 0) {
+          set({ lastError: { code: 'dropped-given', items: lostDet.join(', ') } });
           return;
         }
         const fact: Fact3 = { id: nanoid(8), utterance: utterance.trim(), cmds: parsed.commands, enabled: true };
@@ -605,8 +611,8 @@ export const useGeo3 = create<Geo3State>()(
         // docs/20 §12): the decomposition must account for every NEW label and every stated magnitude
         // of the student's ORIGINAL utterance, or the commit refuses NAMING what was lost — a
         // silently-partial figure must never sit on the canvas with a green row. The deterministic
-        // path needs no gate here (the rules parse the utterance itself; the catalog corpus is
-        // asserted gate-clean in honesty3.test.ts) — the LLM round-trip is where meaning can leak.
+        // path runs the same label/number gates in `submit` (#535, ADR-3D-147) — a rule that matches
+        // and still drops part of the sentence leaks exactly as an LLM decomposition can (#530).
         const prior = derive3(facts, seed).construction;
         const lost = [
           ...droppedNewLabels3(utterance, all, [...prior.points.keys()], [...prior.vectors.keys()]),
