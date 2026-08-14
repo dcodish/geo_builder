@@ -7141,3 +7141,26 @@ true→false around apply/exhaust/cancel/error — a stuck flag would freeze the
 OPERATOR'S EXACT saved file (`fixtures/issue-572-load-collapse.geo.json`) through
 `deserializeFigure` + the real search: the load-path rescue applies a valid view with the seat at B
 and no collapse. The fixture also joins the fixtures net (replays green + parser drift).
+
+## ADR-447 — Anonymous ids never reach a rendered string: the point-description seam (#574)
+
+Operator, #566 play validation: «ⓘ O ו-@f-CA נפלו על אותה נקודה» — the ADR-123 coincidence notice
+leaked the incircle machinery's internal foot id. The coincidence itself is genuine and stays (in the
+isosceles right triangle the incircle's touch on the hypotenuse IS its midpoint = the circumcentre —
+the notice explains a visibly surprising drawing); the defect is the WORDING, which violates the
+honesty rule that messages name the student's objects, never internal state.
+
+Decision: ONE seam — `src/render/pointDescriptions.ts` (`anonPointDescriptor`) — derives a
+student-facing description from an anonymous id's DEFINING OBJECT, returned as i18n key+params (the
+display layer owns words). The load-bearing derivation: a `foot` dropped FROM a circle's CENTRE onto
+a segment is that circle's TOUCH POINT on it (tangency = the perpendicular from the centre) — which
+covers all three incircle feet; an anonymous circle centre describes as «מרכז המעגל», a
+line-intersection as «נקודת חיתוך», and an UNKNOWN anonymous kind still never leaks — the
+«נקודת עזר» fallback is total over `@…`/`~…`. Consumers adopt at their render sites; the coincidence
+notice adopts now (the reported leak); other id-rendering surfaces (violations, converge siblings,
+the values panel) adopt the same seam as leaks are found — the seam existing is what makes each
+adoption a one-line change.
+
+Locks: `point-descriptions.test.ts` over the OPERATOR'S fixture (`issue-572-load-collapse.geo.json`):
+the three feet describe as touch-on-{CA,AB,BC}, the anonymous incentre as the circle centre, named
+ids pass through untouched, and the unknown-anonymous fallback holds.

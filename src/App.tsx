@@ -38,6 +38,7 @@ import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { runSubmit } from '@/app/submitPipeline';
 import { runViewResolve } from '@/app/resolveView';
+import { anonPointDescriptor } from '@/render/pointDescriptions';
 import { humanizeError, translateParams } from '@/i18n/humanizeError';
 /**
  * Resolve AFTER the browser has had a chance to paint. A just-set React state (e.g. a "thinking"
@@ -580,6 +581,11 @@ export default function App() {
   // error banner must tell the truth about what just happened).
   const { construction, positions, circles, labels, angleMarks, violations, radiusDofs, coincidences } = display;
   const { status, lastError, pending } = derivedRaw;
+  // #574 (ADR-447): the one seam turning an anonymous id into words the student can act on.
+  const describePoint = (id: string): string => {
+    const d = anonPointDescriptor(id, construction);
+    return d ? (t(d.key, d.params) as string) : id;
+  };
 
   // The "view relations" layer is shown only while its cached result still matches the CURRENT facts —
   // any fact change makes a new `facts` array (≠ the cached ref), so the layer auto-clears (ADR-134). Ground
@@ -1114,7 +1120,10 @@ export default function App() {
 
           {coincidences.length > 0 && (
             <div style={infoBanner}>
-              ⓘ {coincidences.map(([a, b]) => t('figure.converge', { a, b })).join(' ')}
+              {/* #574 (ADR-447): an ANONYMOUS id renders as its student-facing description («נקודת
+                  ההשקה על CA»), never the raw @-id — messages name the student's objects, not
+                  internal state. The coincidence itself is genuine and stays. */}
+              ⓘ {coincidences.map(([a, b]) => t('figure.converge', { a: describePoint(a), b: describePoint(b) })).join(' ')}
             </div>
           )}
 
