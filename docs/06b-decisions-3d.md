@@ -3417,3 +3417,25 @@ spelled-out «מנסרה משולשת ABCA'B'C'» (locked), and the shadow-matri
 Locks: `prism-label-arity.test.ts` (the He/En 6- and 8-label runs → kind/ids/oblique; the tilt
 genuinely FREE across seeds; «המנסרה ישרה» composing; four mismatch refusals; byte-identity to the
 stated-base form). Catalog: the bare-run row (He + En).
+
+## ADR-3D-144 — Invisible bidi controls strip at the ONE parse seam: display transforms can never reach the parser (#531)
+
+Prod (session `rsqkx2`, twice in one day): a leading U+2066 — injected by the app's OWN display
+transform (`isolateLtrRuns3`, ADR-3D-116/121) into the fact list the student selects and copies, a
+workflow the tool itself teaches (#525) — made the fully-supported «מישור x+2y-2z+28=0» refuse and
+burn a paid LLM call, with nothing visible for the student to act on. `parse3` normalized the prime
+at its seam and nothing else; the 2-D seam already stripped these controls, so the class was a 3-D
+gap (checked, not assumed — per the issue's own instruction).
+
+Decision: `normalize3` — the one boundary every rule, honesty gate, scope register and LLM lane
+reads — strips U+200B–U+200F, U+202A–U+202E, U+2066–U+2069, ALM and BOM, folds NBSP → space, and
+collapses doubled spaces (the same paste paths carry both; the prod log's «מישור  x+…»). Never
+per-rule and never in the UI: paste from a PDF or another RTL editor carries the same controls. The
+stored fact stays RAW and re-parses through the same seam, so save/load round-trips to one parse.
+The restored invariant, stated in `isolateLtrRuns3`'s own byte-reversibility contract and now
+consumed for the first time: **display-layer transforms can never reach the parser.** The 2-D half
+(NBSP was its one gap) is ADR-448 in the 2-D log.
+
+Locks (`bidi3.test.ts`): the assertion that would have caught it — the ROUND-TRIP property
+`parse3(isolateLtrRuns3(u)) ≡ parse3(u)` over the whole catalog, He + En — plus the exact prod rows
+under a leading isolate and the NBSP/double-space row.

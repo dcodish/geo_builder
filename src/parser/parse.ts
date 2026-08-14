@@ -8909,6 +8909,10 @@ export function normalizeUtterance(raw: string): string {
   const orth = raw
     .replace(/־/g, '-')
     .replace(/[؜​-‏‪-‮⁦-⁩﻿]/g, '')
+    // #531 (ADR-3D-144's 2-D half): NBSP → space — the isolates above were already stripped here
+    // (the 3-D seam was the gap), but an NBSP from the same paste paths still broke literal-space
+    // gates. Folded at this one boundary like everything else.
+    .replace(/ /g, ' ')
     .replace(/עיגול/g, 'מעגל')
     // Spelling folds (#389, ADR-405): a plene/defective (מלא/חסר) spelling VARIANT of a known noun used
     // to miss every rule at once, because each rule hard-codes the one canonical spelling (~20 sites for

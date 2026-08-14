@@ -61,11 +61,27 @@ function upliftLowercaseLabels(s: string): string {
     .replace(new RegExp(String.raw`(\b(?:angle|points?|vert(?:ex|ices))\s+)(${LIST})`, 'gi'), (_m, pre: string, list: string) => `${pre}${upTokens(list, true)}`);
 }
 
-/** Normalise an utterance: unify primes to `'`, strip vector arrows (AB→ ≡ AB),
- *  unify minus/maqaf to `-`, collapse whitespace, uplift anchored lowercase labels (#181). */
+/** Normalise an utterance: strip invisible bidi/format controls, unify primes to `'`, strip vector
+ *  arrows (AB→ ≡ AB), unify minus/maqaf to `-`, collapse whitespace, uplift anchored lowercase
+ *  labels (#181). */
 export function normalize3(s: string): string {
   return upliftLowercaseLabels(
     s
+      // #531 ([ADR-3D-144](../../docs/06b-decisions-3d.md)): INVISIBLE bidi/format controls are not
+      // something the student typed — the APP injects them (`isolateLtrRuns3` isolates LTR runs for
+      // display, ADR-3D-116/121), and the rendered fact list is text the student SELECTS AND COPIES
+      // (the tool itself teaches that workflow, #525). Prod hit twice in one day: a leading U+2066
+      // made the fully-supported «מישור x+2y-2z+28=0» refuse and burn a paid LLM call, with nothing
+      // visible to act on. Stripped HERE — the one boundary every rule, honesty gate, scope register
+      // and LLM lane reads (the prime's seam) — never per-rule and never in the UI: paste from a PDF
+      // or another RTL editor carries the same controls. The stored fact stays RAW and re-parses
+      // through this same seam, so save/load round-trips to the same parse. The invariant this
+      // restores: display-layer transforms can never reach the parser.
+      .replace(/[​-‏‪-‮⁦-⁩؜﻿]/g, '')
+      // NBSP → space + collapse doubled spaces — the same paste paths carry both (the prod log's
+      // «מישור  x+…» double space), and a literal-space gate must not care which space arrived.
+      .replace(/ /g, ' ')
+      .replace(/ {2,}/g, ' ')
       .replace(/[′’‘`]/g, "'")
       .replace(/[→⃗⟶]/g, '')
       .replace(/[−־]/g, '-')

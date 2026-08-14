@@ -15,6 +15,8 @@
 import { describe, expect, it } from 'vitest';
 import { inputPreview3, isolateLtrRuns3, RUN_CORE, RUN_DELIMS, textDir3 } from '../i18n/bidi';
 import { SYMBOL_PALETTE_3 } from '../ui/symbols3';
+import { parse3 } from '../parser/parse3';
+import { COMMAND_CATALOG_3D } from '../parser/catalog3';
 import he from '../i18n/locales/he.json';
 import en from '../i18n/locales/en.json';
 
@@ -354,5 +356,38 @@ describe('#482 Am. 3 — a declaration’s NAME hugs the noun; its equation is t
   it('byte-exactness survives the split (two pairs of zero-width marks, nothing else)', () => {
     const s = 'הישר l: x=(1,2,3)+t(m-2,m,m+2)';
     expect(isolateLtrRuns3(s).split(LRI).join('').split(PDI).join('')).toBe(s);
+  });
+});
+
+describe('#531 (ADR-3D-144) — display-layer transforms can never reach the parser', () => {
+  // THE assertion that would have caught it: the display transform and the parser, tested against
+  // each other for the first time. `isolateLtrRuns3` is what the app itself injects into the fact
+  // list the student copies from — its output must parse exactly like the raw utterance.
+  it('round-trip: parse3(isolateLtrRuns3(u)) ≡ parse3(u) over the whole catalog, He + En', () => {
+    for (const e of COMMAND_CATALOG_3D) {
+      for (const u of [e.he, e.en]) {
+        const a = parse3(u);
+        const b = parse3(isolateLtrRuns3(u));
+        expect(b.ok, `wrapped «${u}» must parse iff raw does`).toBe(a.ok);
+        if (a.ok && b.ok) expect(JSON.stringify(b.commands), `wrapped «${u}» lowers identically`).toBe(JSON.stringify(a.commands));
+      }
+    }
+  });
+
+  it('the prod rows: a leading U+2066 (pasted from the fact list) no longer refuses supported input', () => {
+    for (const u of ['מישור x+2y-2z+28=0', 'A(-8,3,1)', 'מישור π1: x+(m-2)y+(m-1)z-5=0']) {
+      const raw = parse3(u);
+      const wrapped = parse3('⁦' + u + '⁩');
+      expect(raw.ok, `raw «${u}»`).toBe(true);
+      expect(wrapped.ok, `isolate-wrapped «${u}»`).toBe(true);
+      if (raw.ok && wrapped.ok) expect(JSON.stringify(wrapped.commands)).toBe(JSON.stringify(raw.commands));
+    }
+  });
+
+  it('NBSP and doubled spaces from the same paste paths normalize away (the «מישור  x+…» log row)', () => {
+    const raw = parse3('מישור x+2y-2z+28=0');
+    const pasted = parse3('מישור  x+2y-2z+28=0');
+    expect(raw.ok && pasted.ok).toBe(true);
+    if (raw.ok && pasted.ok) expect(JSON.stringify(pasted.commands)).toBe(JSON.stringify(raw.commands));
   });
 });

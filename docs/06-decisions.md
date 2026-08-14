@@ -7164,3 +7164,12 @@ adoption a one-line change.
 Locks: `point-descriptions.test.ts` over the OPERATOR'S fixture (`issue-572-load-collapse.geo.json`):
 the three feet describe as touch-on-{CA,AB,BC}, the anonymous incentre as the circle centre, named
 ids pass through untouched, and the unknown-anonymous fallback holds.
+
+## ADR-448 — NBSP folds at the 2-D parse boundary (#531's 2-D half)
+
+The #531 class (invisible characters from copy/paste breaking supported input) was closed on the 2-D
+side long ago for the bidi controls — `normalizeUtterance` strips isolates/embeddings/marks — but an
+NBSP (U+00A0) from the same paste paths still broke literal-space gates. Folded to a plain space at
+the same one boundary. The 3-D side, where the whole class was open, is ADR-3D-144. Lock:
+`nbsp-normalize.test.ts` (NBSP-carrying givens parse identically; the existing isolate strip
+re-asserted — the property-level round-trip lock lives with the 3-D fix).
