@@ -871,14 +871,25 @@ export default function App() {
 
       <div style={main}>
         <div ref={canvasRef} style={{ ...canvasWrap, ...(viewStale || searchHold ? { opacity: 0.55 } : {}) }}>
-          {(viewStale || searchHold) && (
+          {/* #580 (ADR-449): the two notices split by purpose. SEARCHING is a transient state that
+              explains why the whole canvas is dimmed and about to change — a centred banner the
+              student cannot miss. STALE is a persistent warning and deliberately keeps the quiet
+              ADR-293 corner slot. `left` (physical) centres identically in RTL and LTR. */}
+          {searchHold ? (
+            <div
+              role="note"
+              style={{ position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)', zIndex: 5, maxWidth: '85%', textAlign: 'center', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 10, padding: '10px 18px', fontSize: 15, fontWeight: 600, color: '#92400e' }}
+            >
+              {t('view.searching')}
+            </div>
+          ) : viewStale ? (
             <div
               role="note"
               style={{ position: 'absolute', top: 8, insetInlineStart: 8, zIndex: 5, background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: '4px 10px', fontSize: 12, color: '#92400e' }}
             >
-              {t(searchHold ? 'view.searching' : 'view.stale')}
+              {t('view.stale')}
             </div>
-          )}
+          ) : null}
           <Figure
             construction={construction}
             positions={positions}

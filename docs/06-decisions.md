@@ -7191,3 +7191,20 @@ allows the coincidence, and the `anonPointDescriptor` seam STAYS for the other c
 
 Locks: `point-descriptions.test.ts` #581 block — the predicate (either member anonymous → hidden,
 named-named stays), and the #566 figure end-to-end (the coincidence is detected AND nothing renders).
+
+## ADR-449 — the SEARCHING notice is a centred canvas banner; the stale chip keeps its corner (#580)
+
+Operator, playing round #576 (on #572/#573): *"I want the message to be located more in central of
+the screen so user understands it."* The «מחפשים תצורה…» searching notice reused the ADR-293
+stale-notice slot — a small corner chip — which is right for the persistent stale warning but too
+quiet for a transient state that explains why the entire figure is dimmed and about to change.
+
+Decision: the SEARCHING state gets its own placement — a horizontally-centred banner in the canvas's
+upper third (physical `left: 50%` + `translateX(-50%)`, centring identically in RTL and LTR), larger
+type, same amber palette. The `view.stale` corner chip is deliberately NOT moved (persistent state,
+different purpose). Pure display change in App.tsx; ADR-446's `searchHold` flag already
+distinguishes the two states, and `resolve-view.test.ts` keeps owning the state logic.
+
+Lock: visual — validated by the operator's play of round #582 (per the issue's own scope:
+style/position only; the state machine is already locked).
+
