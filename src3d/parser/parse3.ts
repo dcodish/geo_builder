@@ -3507,8 +3507,15 @@ const planeRelAngle: Rule = (s) => {
  * UNITS, so unlike every other relation here it pins the figure's scale.
  */
 const distanceGiven: Rule = (s) => {
+  // #529 ([ADR-3D-145](../../docs/06b-decisions-3d.md)): the SUBJECT framing comes in two spellings —
+  // «המרחק בין X ל-Y» AND «המרחק מ X ל-Y» — and only the first was read, so the second (at least as
+  // natural, and the one matching the imperative forms «אנך יורד מ-M ל…», «גובה מ A ל…») burned a paid
+  // LLM call per use. The #494 clitic fold glues «מ A» to «מA» before rules run, so the branch reads
+  // both the glued and the dashed spellings; the En side already had from/to. (The sibling measure
+  // rules were checked once per the plan: the angle family's «בין» is not stated «מ…ל» in natural
+  // Hebrew — no change there.)
   const m =
-    s.match(new RegExp(`^ה?מרחק\\s+(?:ש)?בין\\s+(.+?)\\s+(?:[לו]בין\\s+|ל-?\\s*|ו-?\\s*)(.+?)\\s*(?:הוא|היא|=|שווה\\s+ל?-?)\\s*(${NUM})\\s*$`)) ??
+    s.match(new RegExp(`^ה?מרחק\\s+(?:(?:ש)?בין\\s+|מ-?\\s*(?:ה?נקודה\\s+)?)(.+?)\\s+(?:[לו]בין\\s+|ל-?\\s*|ו-?\\s*)(.+?)\\s*(?:הוא|היא|=|שווה\\s+ל?-?)\\s*(${NUM})\\s*$`)) ??
     s.match(new RegExp(`^(?:the\\s+)?distance\\s+(?:from|between)\\s+(.+?)\\s+(?:and|to)\\s+(.+?)\\s*(?:is|=)\\s*(${NUM})\\s*$`, 'i'));
   if (!m) return null;
   const a = readOperand(m[1]);

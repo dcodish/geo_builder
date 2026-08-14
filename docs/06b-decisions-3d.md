@@ -3439,3 +3439,21 @@ consumed for the first time: **display-layer transforms can never reach the pars
 Locks (`bidi3.test.ts`): the assertion that would have caught it — the ROUND-TRIP property
 `parse3(isolateLtrRuns3(u)) ≡ parse3(u)` over the whole catalog, He + En — plus the exact prod rows
 under a leading isolate and the NBSP/double-space row.
+
+## ADR-3D-145 — «המרחק מ X ל-Y» joins «המרחק בין X ל-Y» at the distance rule (#529)
+
+Found while fixing #508 and filed rather than bundled: «המרחק מ A למישור π2 הוא 5» was `not-handled`
+— a paid LLM escalation per use, on the framing that MATCHES the imperative forms the tool already
+accepts («אנך יורד מ-M ל…», «גובה מ A ל…») — while «המרחק בין …» parsed. The #494/#513 class: a rule
+spells ONE form of a subject students write in several, and the cost is silent.
+
+Decision: the S5 distance rule's subject framing gains the «מ» branch (glued «מA» per the #494 clitic
+fold, dashed «מ-A», and the optional «מהנקודה» noun) beside «(ש)בין»; the En side already carried
+from/to and is now LOCKED against the He pair. Sibling measure rules checked once per the plan: the
+angle family's «בין» has no natural «מ…ל» spelling — no change there, recorded so the check is not
+re-done. Catalog gains the «מ» row (He + En); the shadow-matrix snapshot moved additively only (both
+new rows won by `distanceGiven`).
+
+Locks: `distance-framing.test.ts` — byte-identical lowering across the framings for point→named-plane
+(the prod row), point→point-run-plane, point→line, segment→segment, the dashed spelling, and the
+En pair.

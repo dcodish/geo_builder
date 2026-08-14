@@ -216,6 +216,9 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'u מאונך למישור ABC', en: 'u is perpendicular to plane ABC' },
   // S5 (#378, ADR-3D-106): the DISTANCE family — the one relation carrying units
   { category: 'planesLines', he: 'המרחק בין D למישור ABC הוא 6', en: 'the distance between D and plane ABC is 6' },
+  // #529 (ADR-3D-145): the «מ…ל» framing — the same fact as the בין row, in the spelling that matches
+  // the imperative forms («אנך יורד מ-M ל…»).
+  { category: 'planesLines', he: 'המרחק מ D למישור ABC הוא 6', en: 'the distance from D to plane ABC is 6' },
   { category: 'planesLines', he: 'המרחק בין D לישר AB הוא 5', en: 'the distance between D and line AB is 5' },
   { category: 'planesLines', he: 'המרחק בין AB לבין CD הוא 3', en: 'the distance between AB and CD is 3' },
   // --- V8-f: vector-relation givens ---

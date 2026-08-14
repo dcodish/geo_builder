@@ -1615,6 +1615,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "the distance from D to plane ABC is 6",
+    "winner": "distanceGiven",
+  },
+  {
+    "lang": "he",
+    "text": "המרחק מ D למישור ABC הוא 6",
+    "winner": "distanceGiven",
+  },
+  {
+    "lang": "en",
     "text": "the distance between D and line AB is 5",
     "winner": "distanceGiven",
   },
