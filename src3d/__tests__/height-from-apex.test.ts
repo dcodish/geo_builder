@@ -144,6 +144,52 @@ describe('#503 (ADR-3D-142) — the apex-less form and the imperative/relative-c
   });
 });
 
+describe('#579 (ADR-3D-146) — the NAMED new foot: «SO גובה הפירמידה» creates O', () => {
+  // The class: a ⟂-to-plane statement naming its segment where exactly ONE endpoint is a
+  // not-yet-defined label uniquely determines the foot — creation, not a reference error.
+  it.each([
+    ['the operator utterance', 'SO גובה הפירמידה'],
+    ['bare אנך', 'SO אנך'],
+    ['מאונך לבסיס', 'SO מאונך לבסיס'],
+    ['מאונך למישור, 4-point run', 'SO מאונך למישור ABCD'],
+    ['English', 'SO is the height of the pyramid'],
+    ['reversed letters — ⟂ is symmetric', 'OS גובה הפירמידה'],
+  ])('%s: «%s»', (_label, line) => {
+    const { st, pos, c } = build(['פירמידה ABCDS שבסיסה ריבוע', line]);
+    expect(st.lastError, `«${line}» must build`).toBeNull();
+    expect(pos.has('O'), "the student's letter O exists").toBe(true);
+    expect(pos.has('E'), 'no auto-minted E rides along').toBe(false);
+    expect(c.points.get('O'), 'O is the height foot from S').toMatchObject({ kind: 'foot-face', from: 'S' });
+    isHeightOnto(pos, 'S', 'O', ['A', 'B', 'C']);
+    expect(
+      c.segments.some(([a, b]) => (a === 'S' && b === 'O') || (a === 'O' && b === 'S')),
+      'SO is drawn'
+    ).toBe(true);
+  });
+
+  it('the apex-less mint is unchanged — bare «גובה הפירמידה» still mints E', () => {
+    const { st, pos } = build(['פירמידה ABCDS שבסיסה ריבוע', 'גובה הפירמידה']);
+    expect(st.lastError).toBeNull();
+    expect(autoFoot(pos, ['A', 'B', 'C', 'D', 'S'])).toBe('E');
+  });
+
+  it('refusal preserved: BOTH letters unknown determines nothing', () => {
+    const { st } = build(['פירמידה ABCDS שבסיסה ריבוע', 'XY גובה הפירמידה']);
+    expect(st.lastError, 'two unknown letters must refuse').not.toBeNull();
+  });
+
+  it('refusal preserved: ∥ with a new letter does not invent a point', () => {
+    const { st } = build(['פירמידה ABCDS שבסיסה ריבוע', 'SQ מקביל לבסיס']);
+    expect(st.lastError, 'a whole plane of points satisfies ∥ — no unique Q').not.toBeNull();
+  });
+
+  it('both-exist keeps its existing routing — nothing minted, nothing re-created', () => {
+    const { st, pos } = build(['פירמידה ABCDS שבסיסה ריבוע', 'SA גובה הפירמידה']);
+    expect(st.lastError).toBeNull();
+    expect([...pos.keys()].sort()).toEqual(['A', 'B', 'C', 'D', 'S']);
+  });
+});
+
 describe('#448 — a STATED base is honoured, never quietly swapped', () => {
   it('«לבסיס ABC» drops onto ABC even when it is not the solid\'s first face', () => {
     // The apex here is A and the named base is BCD — if apply resolved `solids[0].ids.slice(0,3)` it

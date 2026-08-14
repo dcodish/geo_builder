@@ -1438,7 +1438,20 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       }
       // otherwise: ⟂ is the existing claim; ∥-to-plane as a claim is not yet demanded
       const missing = missingPoint(c, [cmd.a, cmd.b]);
-      if (missing) return { ok: false, error: missing };
+      if (missing) {
+        // #579 (ADR-3D-146): a ⟂-to-plane statement naming its segment where exactly ONE endpoint
+        // is a not-yet-defined label («SO גובה הפירמידה», O new) uniquely determines the foot — it
+        // is a creation, not a reference error. Delegate to the height-to-face funnel, the same
+        // convergence the named-face, tetra-altitude and 2-D ADR-263 branches already made; the
+        // unknown letter is the foot regardless of position (⟂ is symmetric, covers SO and OS).
+        // ∥ with a new letter and both-unknown stay honest refusals — neither determines a point.
+        const known = c.points.has(cmd.a) ? cmd.a : c.points.has(cmd.b) ? cmd.b : null;
+        if (cmd.rel === 'perp' && known !== null && plane.length >= 3) {
+          const foot = known === cmd.a ? cmd.b : cmd.a;
+          return applyCommand3(c, { type: 'height-to-face', id: foot, from: known, face: plane });
+        }
+        return { ok: false, error: missing };
+      }
       // V7 T2: on a figure with FREE dims the relation is a DRIVING given (M1)
       if (freeDims(c) > 0) {
         const next = clone(c);

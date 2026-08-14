@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "app": "3d-builder",
+  "savedAt": "2026-08-14T18:11:56.576Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "פירמידה ABCDS שבסיסה ריבוע",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramid4g",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "S"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "SO גובה הפירמידה",
+      "cmds": [
+        {
+          "type": "seg-plane-rel",
+          "rel": "perp",
+          "a": "S",
+          "b": "O",
+          "plane": []
+        }
+      ]
+    }
+  ]
+}

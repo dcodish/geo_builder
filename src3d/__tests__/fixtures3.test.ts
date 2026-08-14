@@ -72,6 +72,9 @@ const SEEDED: Record<string, string[]> = {
     'l',
     'l⊥BCK',
   ],
+  // #579 (ADR-3D-146) — the operator's prod figure: «SO גובה הפירמידה» names the NEW foot O,
+  // and the ⟂-to-base disposition must create it (not refuse it as an unknown reference).
+  'named-foot-579.geo3.json': ['פירמידה ABCDS שבסיסה ריבוע', 'SO גובה הפירמידה'],
   'planes-2022-q2.geo3.json': [
     'המישור π1: z - 3 = 0',
     'המישור π2: ay + z - 8 = 0',

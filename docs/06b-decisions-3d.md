@@ -3457,3 +3457,27 @@ new rows won by `distanceGiven`).
 Locks: `distance-framing.test.ts` — byte-identical lowering across the framings for point→named-plane
 (the prod row), point→point-run-plane, point→line, segment→segment, the dashed spelling, and the
 En pair.
+
+## ADR-3D-146 — the NAMED new foot: a ⟂-to-plane statement with exactly one new letter CREATES the foot (#579)
+
+Prod (2026-08-14): «SO גובה הפירמידה» refused «O not recognized» — apply's `seg-plane-rel` disposition
+ran `missingPoint` over both endpoints and treated the student's named NEW foot as a missing reference,
+while every sibling height rule (`height-to-face` «SF גובה הפירמידה לפאה BDC», `tetra-altitude»
+«DE גובה בטטראדר», 2-D's ADR-263 «CD גובה לצלע AB») creates the named foot. The class: a ⟂-to-plane
+statement naming its segment, where exactly ONE endpoint is a not-yet-defined label, is uniquely
+determined — refusing it as a reference error executes a creation as a lookup (mirror image of the
+canonical M1 class).
+
+Decision: one branch at the existing chokepoint — in `case 'seg-plane-rel'`, when `rel === 'perp'`,
+exactly one endpoint unknown, the other defined, and the (already-resolved) plane has ≥3 points, the
+command delegates to the `height-to-face` funnel with the unknown letter as the foot id (⟂ is symmetric,
+so SO and OS both work). No parser change; foot, drawn segment and verification come free through the
+funnel the unnamed «גובה הפירמידה» mint (ADR-3D-142) already uses — named and unnamed converge on one
+mechanism. Honest refusals preserved: ∥ with a new letter and both-letters-unknown determine nothing and
+still refuse; both-exist paths (symbol pin / driving pin / claim) are byte-unchanged. 2-D checked in the
+triage: the class is not present there (ADR-263 + freeLabel discipline already create named feet).
+
+Locks: `height-from-apex.test.ts` #579 block — the operator pair «פירמידה ABCDS שבסיסה ריבוע» +
+«SO גובה הפירמידה» asserted geometrically (O exists, not E; foot-face from S; foot in base plane;
+S→O along the base normal; SO drawn), the He/En mirrors and the reversed «OS», the preserved refusals,
+and the unchanged E-mint; fixture `fixtures3/named-foot-579.geo3.json` (full verifier + drift net).

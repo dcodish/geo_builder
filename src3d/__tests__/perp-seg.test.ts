@@ -121,11 +121,17 @@ describe('issue #14 — the exact prod sequence (session 4wmcbqbl): SM ⊥ DB DR
 describe('issue #14 — the sibling prod sequence (session tgsnh4do): MO ⊥ABCD', () => {
   beforeEach(reset);
 
-  it('with O undefined the refusal is an honest unknown-point (was not-understood)', () => {
+  it('with O undefined the statement CREATES the foot O (ADR-3D-146; was an honest unknown-point, before that not-understood)', () => {
+    // #579 reclassified this exact shape: a ⟂-to-plane statement with exactly ONE new letter
+    // uniquely determines the foot, so the prod user's «MO ⊥ABCD» now builds O — the drop of the
+    // cube's centre onto the base — instead of refusing the letter they chose for it.
     submit('קובייה ABCD');
     submit("M אמצע AC'");
     submit('MO ⊥ABCD'); // prod exact — O was never defined in that session
-    expect(state().lastError).toMatchObject({ code: 'unknown-point', id: 'O' });
+    expect(state().lastError).toBeNull();
+    const d = derived();
+    for (const f of state().facts) expect(d.status[f.id], f.utterance).toBe('ok');
+    expect(d.construction.points.get('O')).toMatchObject({ kind: 'foot-face', from: 'M', face: ['A', 'B', 'C', 'D'] });
   });
 
   it('with O defined it verifies on the cube (M = cube centre, MO vertical)', () => {
