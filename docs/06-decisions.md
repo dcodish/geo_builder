@@ -7173,3 +7173,21 @@ NBSP (U+00A0) from the same paste paths still broke literal-space gates. Folded 
 the same one boundary. The 3-D side, where the whole class was open, is ADR-3D-144. Lock:
 `nbsp-normalize.test.ts` (NBSP-carrying givens parse identically; the existing isolate strip
 re-asserted — the property-level round-trip lock lives with the 3-D fix).
+
+## ADR-447 Amendment 1 — a coincidence notice with an ANONYMOUS member is not shown at all (#581)
+
+Operator ruling, playing round #576: on the ADR-447 wording («O ונקודת ההשקה על CA נפלו על אותה
+נקודה»), *"the wording should not be shown at all — no point bothering the user with an issue that no
+longer exists."* The ruling supersedes the wording improvement FOR THIS SURFACE: the coincidence
+notice exists (ADR-123) to explain why two points the STUDENT KNOWS merged; a point the machinery
+minted (`@…`/`~…` — an incircle touch foot, an auto centre) is not the student's business, and a
+student-named pair keeps the notice.
+
+Decision: `visibleCoincidences` in `pointDescriptions.ts` (beside the ADR-447 seam, one home for the
+anonymous-id policy) filters out any pair with a machinery-minted member; App renders only what
+survives, and an empty filtered list renders nothing. Display-only — the engine still detects and
+allows the coincidence, and the `anonPointDescriptor` seam STAYS for the other consumers
+(violations, future leaks); this amendment covers the coincidence notice only.
+
+Locks: `point-descriptions.test.ts` #581 block — the predicate (either member anonymous → hidden,
+named-named stays), and the #566 figure end-to-end (the coincidence is detected AND nothing renders).

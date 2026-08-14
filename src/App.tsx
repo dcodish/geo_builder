@@ -38,7 +38,7 @@ import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { runSubmit } from '@/app/submitPipeline';
 import { runViewResolve } from '@/app/resolveView';
-import { anonPointDescriptor } from '@/render/pointDescriptions';
+import { anonPointDescriptor, visibleCoincidences } from '@/render/pointDescriptions';
 import { humanizeError, translateParams } from '@/i18n/humanizeError';
 /**
  * Resolve AFTER the browser has had a chance to paint. A just-set React state (e.g. a "thinking"
@@ -1118,12 +1118,13 @@ export default function App() {
 
           {pending && <div role="status" aria-live="polite" style={infoBanner}>ⓘ {t('figure.pending')}</div>}
 
-          {coincidences.length > 0 && (
+          {visibleCoincidences(coincidences).length > 0 && (
             <div style={infoBanner}>
-              {/* #574 (ADR-447): an ANONYMOUS id renders as its student-facing description («נקודת
-                  ההשקה על CA»), never the raw @-id — messages name the student's objects, not
-                  internal state. The coincidence itself is genuine and stays. */}
-              ⓘ {coincidences.map(([a, b]) => t('figure.converge', { a: describePoint(a), b: describePoint(b) })).join(' ')}
+              {/* #581 (ADR-447 Am. 1, operator ruling): a pair with a machinery-minted member is not
+                  shown at all — the notice explains why two points the STUDENT KNOWS merged. What
+                  remains is student-named, so `describePoint` is a no-op here today; it stays as the
+                  ADR-447 seam should a described anonymous pair ever be ruled back in. */}
+              ⓘ {visibleCoincidences(coincidences).map(([a, b]) => t('figure.converge', { a: describePoint(a), b: describePoint(b) })).join(' ')}
             </div>
           )}
 

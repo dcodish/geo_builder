@@ -20,6 +20,19 @@
  */
 import type { Construction, Id } from '@/engine';
 
+/** `@…` are the FR-RN-8 hidden-until-used anonymous ids, `~…` the hidden helpers — machinery-minted either way. */
+export const isAnonymousId = (id: Id): boolean => id.startsWith('@') || id.startsWith('~');
+
+/**
+ * #581 (ADR-447 Am. 1, operator ruling): a coincidence notice where EITHER member is a point the
+ * MACHINERY minted is not shown at all — the notice exists (ADR-123) to explain why two points the
+ * STUDENT KNOWS merged, and only a student-named pair keeps it. Display-only: the geometric
+ * allowance is untouched, and the `anonPointDescriptor` seam below stays for the other consumers
+ * (violations, future leaks).
+ */
+export const visibleCoincidences = <T extends [Id, Id]>(pairs: T[]): T[] =>
+  pairs.filter(([a, b]) => !isAnonymousId(a) && !isAnonymousId(b));
+
 export function anonPointDescriptor(id: Id, c: Construction): { key: string; params?: Record<string, string> } | null {
   if (!id.startsWith('@') && !id.startsWith('~')) return null;
   const o = c.objects.find((x) => x.id === id);

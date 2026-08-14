@@ -4,7 +4,7 @@
  * `@ctr-P` / `@f-XY` ids are exactly what leaked into the coincidence notice.
  */
 import { describe, expect, it } from 'vitest';
-import { anonPointDescriptor } from '../pointDescriptions';
+import { anonPointDescriptor, isAnonymousId, visibleCoincidences } from '../pointDescriptions';
 import { deserializeFigure } from '@/store/figureFile';
 import { replay } from '@/store/geoStore';
 import raw from '../../__tests__/fixtures/issue-572-load-collapse.geo.json?raw';
@@ -37,5 +37,24 @@ describe('#574 — anonPointDescriptor', () => {
   it('an unknown anonymous id still never leaks — the helper-point fallback', () => {
     expect(anonPointDescriptor('@zz-unknown', construction)).toEqual({ key: 'describe.helperPoint' });
     expect(anonPointDescriptor('~hidden', construction)).toEqual({ key: 'describe.helperPoint' });
+  });
+});
+
+describe('#581 (ADR-447 Am. 1) — a coincidence with an ANONYMOUS member is not shown at all', () => {
+  it("the operator ruling's case — the #566 pair O + @f-CA renders NOTHING", () => {
+    expect(visibleCoincidences([['O', '@f-CA']])).toEqual([]);
+  });
+
+  it('the predicate: any machinery-minted member hides the pair; a student-named pair stays', () => {
+    expect(visibleCoincidences([['~helper', 'B']])).toEqual([]);
+    expect(
+      visibleCoincidences([
+        ['O', 'M'],
+        ['A', '@ctr-P'],
+      ])
+    ).toEqual([['O', 'M']]);
+    expect(isAnonymousId('O')).toBe(false);
+    expect(isAnonymousId('@f-CA')).toBe(true);
+    expect(isAnonymousId('~h')).toBe(true);
   });
 });
