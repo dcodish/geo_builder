@@ -53,6 +53,14 @@ export type BuildNotice3 =
       kind: 'redundant-relation';
       a: string;
       b: string;
+    }
+  | {
+      /** #612 (ADR-3D-158): a shape statement that was TRUE and already known — «ABCD ריבוע» on a base
+       *  the figure already holds as a square. It changed nothing, and the operator's ruling is that
+       *  the student must be told so rather than shown a ✓ that suggests something happened. */
+      kind: 'shape-redundant';
+      base: QuadBase;
+      ids: Id[];
     };
 
 /**
@@ -69,6 +77,8 @@ export function buildNotices3(c: Construction3): BuildNotice3[] {
   for (const r of c.lineRels) {
     if (r.statedAsPlane) out.push({ kind: 'line-rel-noun', line: r.line });
   }
+  // #612 (ADR-3D-158): shape statements that added nothing
+  for (const r of c.redundantShapes) out.push({ kind: 'shape-redundant', base: r.base, ids: [...r.ids] });
   for (const s of c.solids) {
     const spec = (QUAD_PYRAMIDS as Partial<Record<SolidKind, { base: QuadBase; right: boolean }>>)[s.kind];
     if (!spec?.right) continue;

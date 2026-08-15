@@ -51,6 +51,7 @@
   },
   "err": {
     "notUnderstood": "I couldn't understand that given (this version: solids, points on segments, vector naming, and claims to verify)",
+    "shapeLessSpecific": "The figure is already known to be a {{actual}}, so it is not called a {{stated}}. Remove the earlier given if you meant {{stated}}.",
     "alreadyDefined": "'{{id}}' is already defined in the figure",
     "unknownPoint": "Point '{{id}}' is not defined yet",
     "unknownVector": "Vector '{{id}}' is not declared — name it first (denote AB = u)",
@@ -146,6 +147,7 @@
   "load.unbuildable": "The file opened, but no step could be rebuilt in this version ({{count}} steps) — it may have been saved by a newer build. The steps are kept exactly as saved.",
   "load.partial": "The file opened, but {{count}} step(s) could not be rebuilt (step {{steps}}) — they are flagged in the list. The steps are kept exactly as saved.",
   "notice": {
+    "shapeRedundant": "{{ids}} is already a {{shape}} from an earlier given — the statement is true and adds no new information.",
     "baseConstrained": "For the pyramid to be right, the base ({{ids}}) was constrained from a {{from}} to a {{to}}.",
     "shape": {
       "square": "square",

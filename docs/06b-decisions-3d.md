@@ -3833,3 +3833,70 @@ as measured GEOMETRY at four seeds, non-degeneracy asserted first; the DOF table
 three arms including completion for a non-מלבן noun and the ADR-052 refusal for an underdetermined one;
 `rect-complete`'s three frozen phrasings byte-identical to each other and to the general rule's output;
 the legacy command still applying for old saves. Catalog + shadow-matrix snapshot additive.
+## ADR-3D-158 — a shape is what it says, and ONLY what it says (#612, #615)
+
+Two halves of one rule, found together while the operator played PR #604.
+
+**#612 — the student's side.** On «פירמידה ABCDS שבסיסה ריבוע» every following quad noun committed
+green: «ריבוע ABCD» twice, then «מלבן ABCD», then «מעוין ABCD». Measured: 9 scalarPins, 1 claim,
+`notices: []`. The statements were absorbed as DRIVES on a base whose ring is generated structurally
+with `QUAD_BASE_DIMS.square = 0` — so they could drive nothing and verify nothing. Inert, with a ✓ that
+told the student something had happened.
+
+The cause is that M1's routing question — `freeDims(next) > 0`, *does the figure have free dims* — is
+not the question that matters here, which is *can this constraint change anything*. On a structurally
+square base the first is yes (the apex still has dims) and the second is no.
+
+**Operator ruling (2026-08-15): "naming error".** So arm 3 asks first what the ring is ALREADY KNOWN to
+be, and splits three ways:
+
+| the ring is known to be | the student says | outcome |
+| --- | --- | --- |
+| square | «ריבוע» | **redundant** — a notice, and the figure is returned untouched |
+| square | «מלבן» / «מעוין» / «דלתון» | **naming error** (`shape-less-specific`), naming both shapes |
+| rectangle (aspect still free) | «ריבוע» | **drives**, unchanged — the statement ADDS information |
+
+The third row is the one that had to be got right: refusing it too would mean a student could never
+SPECIALISE a shape they had drawn, which is ADR-052 upside down. "Naming error" is about a statement
+LESS specific than the figure, never one that is more.
+
+"Known" is **structural, never measured** — a solid's base kind (the ADR-3D-090 registry answers it) or
+a shape stated earlier and recorded on the construction. A ring that happens to be square at the current
+seed is deliberately NOT known: refusing a student on the strength of one sampled configuration is the
+class of dishonesty this whole tree is built to avoid.
+
+The hierarchy lives in ONE table, `QUAD_IMPLIES`, including the **exclusive TRAPEZOID** reading the
+Israeli curriculum uses — a parallelogram is deliberately not a trapezoid. That table is the entire
+content of the ruling, so the two questions ("is this redundant?", "is this a mis-naming?") cannot drift
+apart.
+
+**#615 — the tool's side, found while building the above.** ADR-3D-152 lowered the flat quad shapes to
+constraint sets ONLY, so the ring's remaining dims came from `polygon4`'s generic sampling and the solver
+stopped wherever the residual hit zero. Measured over five seeds: **«מקבילית ABCD» drew at 89.4° — a
+rectangle — and «טרפז ABCD» drew right-angled, both at seed 0**, the drawing every student sees first.
+ADR-052 forbids precisely those renderings, in as many words, and `quadBaseDims` implements the rule
+carefully for the SOLID lane. The two realisations had agreed on DOF arithmetic (asserted) and diverged
+on appearance (not asserted).
+
+Shipping #612's refusal without this would have held the student to a rule the tool breaks itself.
+
+`quadDrawnDegenerate` is the flat lane's version of that discipline, and it is deliberately **not** just
+"some more specific shape holds": a RIGHT TRAPEZOID is not a narrower `QuadBase` at all — there is no
+such member — yet `quadBaseDims` names it explicitly. The lattice alone would have missed exactly the
+case the screenshot showed, so each row mirrors that function's own comments.
+
+**It is a PREFERENCE, not a requirement, and that distinction is load-bearing.** The first implementation
+made it a hard `requirement`, and an existing lock caught it immediately: «מקבילית ABCD» + «ריבוע ABCE»
+(a square sharing three corners) became `bound-unsatisfiable`. The student had said something perfectly
+consistent — the givens FORCE the parallelogram to be right-angled — and the tool refused the figure. So
+the seed search now runs **two tiers in one sweep** (the ADR-267 lesson: never a second full pass): a
+seed that also draws every stated shape visibly as itself wins outright; otherwise the first merely-valid
+seed is remembered and returned when the sweep ends. A forced figure draws at exactly the seed it always
+would have.
+
+Locks (`issue-612-615-shape-naming.test.ts`, 20): the operator's exact sequence — redundancy notice with
+the figure provably untouched (no pins accumulated, no point moved), and the naming error for מלבן /
+מעוין / דלתון naming both shapes; the ADD-information direction still driving, and becoming a naming
+error only afterwards; `QUAD_IMPLIES` asserted as a table including the exclusive trapezoid; each of five
+nouns drawing visibly as itself at the store's own chosen seed and across three resamples; the
+right-trapezoid sibling specifically; and the preference yielding for both forced-givens cases.

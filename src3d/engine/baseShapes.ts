@@ -24,7 +24,7 @@
  */
 
 import { sample } from './rng';
-import { ringCircumcentre2 } from './vec3';
+import { dist3, dot3, norm3, ringCircumcentre2, sub3, type Vec3 } from './vec3';
 import type { Command3, Id, SolidKind } from './types';
 
 /** The quadrilateral base shapes a solid can stand on. */
@@ -94,6 +94,129 @@ export function quadShapeConstraints(base: QuadBase, ring: Id[]): Command3[] {
       return [par(d, c, a, b)];
     case 'quad':
       return []; // a general quadrilateral states nothing beyond being one
+  }
+}
+
+/**
+ * #612 / #615 (ADR-3D-158): which quad shapes a shape IMPLIES — the inclusive hierarchy, stated once.
+ *
+ * `QUAD_IMPLIES[x]` is every shape a genuine `x` also is. A square IS a rectangle, a rhombus, a
+ * parallelogram and a kite; a rectangle IS a parallelogram; and everything is a quadrilateral. The
+ * TRAPEZOID rows follow the Israeli-curriculum EXCLUSIVE reading — exactly one parallel pair — so a
+ * parallelogram is deliberately NOT a trapezoid here, and neither is a square.
+ *
+ * This is the whole content of the operator's "naming error" ruling (2026-08-15): a statement naming a
+ * shape the ring already IMPLIES adds nothing and is a mis-naming; a statement naming something the
+ * ring does not yet imply is new information and drives. Keeping it as one table, rather than as tests
+ * scattered through the apply arms, is what stops the two questions drifting apart.
+ */
+export const QUAD_IMPLIES: Record<QuadBase, QuadBase[]> = {
+  square: ['square', 'rectangle', 'rhombus', 'parallelogram', 'kite', 'quad'],
+  rectangle: ['rectangle', 'parallelogram', 'quad'],
+  rhombus: ['rhombus', 'parallelogram', 'kite', 'quad'],
+  parallelogram: ['parallelogram', 'quad'],
+  kite: ['kite', 'quad'],
+  trapezoid: ['trapezoid', 'quad'],
+  quad: ['quad'],
+};
+
+/** Does a genuine `have` also count as a `want`? (`quad` is implied by everything.) */
+export const quadImplies = (have: QuadBase, want: QuadBase): boolean => QUAD_IMPLIES[have].includes(want);
+
+/**
+ * #615 (ADR-3D-158): does a DRAWN ring actually have this shape? Measured from positions — the same
+ * question `quadShapeConstraints` asks the solver, asked of the finished drawing instead.
+ *
+ * `tol` is a RELATIVE, generous tolerance because this decides what a drawing LOOKS like, not whether
+ * a given holds: at 0.06 a parallelogram counts as "rectangular" from about 86.6°, which is the point —
+ * a 89.4° parallelogram is a rectangle to a student's eye long before it is one to the solver.
+ */
+export function quadShapeDrawn(base: QuadBase, ring: Vec3[], tol = 0.06): boolean {
+  const [a, b, c, d] = ring;
+  if (ring.length !== 4) return false;
+  const side = [dist3(a, b), dist3(b, c), dist3(c, d), dist3(d, a)];
+  const scale = Math.max(...side);
+  if (scale < 1e-9) return false;
+  const eq = (p: number, q: number) => Math.abs(p - q) <= tol * scale;
+  /** |cos| at vertex `v` between arms to `p` and `q` — 0 when the corner is square. */
+  const cosAt = (v: Vec3, p: Vec3, q: Vec3) => {
+    const u = sub3(p, v);
+    const w = sub3(q, v);
+    const den = norm3(u) * norm3(w);
+    return den < 1e-12 ? 1 : Math.abs(dot3(u, w) / den);
+  };
+  /** |sin| between segments — 0 when they are parallel. */
+  const par = (p1: Vec3, p2: Vec3, q1: Vec3, q2: Vec3) => {
+    const u = sub3(p2, p1);
+    const w = sub3(q2, q1);
+    const den = norm3(u) * norm3(w);
+    if (den < 1e-12) return false;
+    const cos = Math.abs(dot3(u, w) / den);
+    return Math.sqrt(Math.max(0, 1 - cos * cos)) <= tol;
+  };
+  const right = (v: Vec3, p: Vec3, q: Vec3) => cosAt(v, p, q) <= tol;
+  switch (base) {
+    case 'square':
+      return eq(side[0], side[1]) && eq(side[1], side[2]) && eq(side[2], side[3]) && right(b, a, c);
+    case 'rectangle':
+      return right(a, d, b) && right(b, a, c) && right(c, b, d);
+    case 'rhombus':
+      return eq(side[0], side[1]) && eq(side[1], side[2]) && eq(side[2], side[3]);
+    case 'parallelogram':
+      return par(a, b, d, c) && par(a, d, b, c);
+    case 'kite':
+      return eq(dist3(a, b), dist3(a, d)) && eq(dist3(c, b), dist3(c, d));
+    case 'trapezoid':
+      // EXCLUSIVE (the curriculum reading QUAD_IMPLIES encodes): exactly ONE parallel pair
+      return par(d, c, a, b) !== par(a, d, b, c);
+    case 'quad':
+      return true;
+  }
+}
+
+/**
+ * The shapes STRICTLY MORE SPECIFIC than `base` — the ones its default drawing must not look like
+ * (#615). A `מקבילית` drawn at 89.4° is a rectangle to the eye, which ADR-052 forbids in as many words.
+ */
+export const quadSpecialisations = (base: QuadBase): QuadBase[] =>
+  (Object.keys(QUAD_IMPLIES) as QuadBase[]).filter((k) => k !== base && quadImplies(k, base));
+
+/**
+ * #615 (ADR-3D-158): does this DRAWING of a `base` look like a special case of itself?
+ *
+ * The rule ADR-052 states and `quadBaseDims` implements for the solid lane, made available to the flat
+ * one. It is deliberately NOT just "some more specific shape holds": a RIGHT TRAPEZOID is not a
+ * narrower `QuadBase` at all — there is no such member — yet `quadBaseDims` calls it out by name
+ * (*"dx > 0 keeps it off a RIGHT trapezoid"*), so the lattice alone would have missed exactly the case
+ * the operator's screenshot showed. Each row below mirrors that function's own comments.
+ */
+export function quadDrawnDegenerate(base: QuadBase, ring: Vec3[], tol = 0.06): boolean {
+  if (ring.length !== 4) return false;
+  const [a, b, c, d] = ring;
+  const rightAt = (v: Vec3, p: Vec3, q: Vec3) => {
+    const u = sub3(p, v);
+    const w = sub3(q, v);
+    const den = norm3(u) * norm3(w);
+    return den > 1e-12 && Math.abs(dot3(u, w) / den) <= tol;
+  };
+  const anyRight = rightAt(a, d, b) || rightAt(b, a, c) || rightAt(c, b, d) || rightAt(d, c, a);
+  // every strictly-more-specific shape this drawing already satisfies
+  if (quadSpecialisations(base).some((sp) => quadShapeDrawn(sp, ring, tol))) return true;
+  switch (base) {
+    case 'trapezoid':
+      // must be neither a parallelogram (both pairs ∥ — not a trapezoid at all under the exclusive
+      // reading) nor RIGHT-angled, which is the sibling `quadBaseDims` names explicitly
+      return quadShapeDrawn('parallelogram', ring, tol) || anyRight;
+    case 'parallelogram':
+      // a right-angled parallelogram IS a rectangle; caught above, but stated for the kite/rhombus
+      // sibling too — a parallelogram must not read as either
+      return anyRight;
+    case 'kite':
+      // "c ≥ 1.2 keeps it visibly a kite, never a rhombus" — the rhombus case is in the lattice; a
+      // right-angled kite reads as a square-ish corner and is just as misleading
+      return anyRight;
+    default:
+      return false;
   }
 }
 

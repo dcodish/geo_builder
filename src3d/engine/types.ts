@@ -904,6 +904,12 @@ export interface Construction3 {
   relMarks: { a: Operand3; b: Operand3; label: string }[];
   /** Stated inequalities the DISPLAYED configuration must satisfy (ADR-3D-053) — see {@link Requirement3}. */
   requirements: Requirement3[];
+  /** #612 (ADR-3D-158): the quad shapes the figure is KNOWN to have, as stated — the structural
+   *  record the naming-error check reads. Never a measurement of one drawing. */
+  quadShapes: { base: QuadBase; ids: Id[] }[];
+  /** #612: shape statements that were TRUE and already known, so they changed nothing. Recorded so
+   *  the notice is DERIVED from the construction like every other one, surviving reload and undo. */
+  redundantShapes: { base: QuadBase; ids: Id[] }[];
   /** V2 — planes by equation, name → def (insertion-ordered). */
   planes: Map<string, PlaneDef>;
   /** V2 — named lines (plane∩plane), name → def. */
@@ -996,6 +1002,8 @@ export const emptyConstruction3 = (): Construction3 => ({
   linePlaneMarks: [],
   relMarks: [],
   requirements: [],
+  quadShapes: [],
+  redundantShapes: [],
   planes: new Map(),
   lines: new Map(),
   planeAngles: [],
@@ -1090,10 +1098,20 @@ export type Requirement3 =
   // the ONLY mechanism for `skew` (an inequality: not parallel AND not meeting), and it carries the
   // open half of the closed relations too — that `intersecting` really crosses WITHIN both segments
   // rather than out on their continuations, which no least-squares residual can express.
-  | { kind: 'mutual'; rel: MutualRel3; a: Operand3; b: Operand3 };
+  | { kind: 'mutual'; rel: MutualRel3; a: Operand3; b: Operand3 }
+  // #615 (ADR-3D-158): a declared quad shape must not DRAW as a special case of itself — ADR-052's
+  // "a מקבילית must not render as a rectangle" applied to the flat lane. An inequality, so it belongs
+  // here (sample-and-gate) and never in the solver: the shape's own dims keep their freedom and
+  // «show another configuration» varies them, but the seeds that look like a MORE SPECIFIC shape are
+  // not shown while a general one is reachable.
+  | { kind: 'quad-general'; base: QuadBase; ids: [Id, Id, Id, Id] };
 
 export type EngineError3 =
   | { code: 'already-defined'; id: Id }
+  // #612 (ADR-3D-158): the ring is already known to be a MORE SPECIFIC shape than the noun stated —
+  // «ABCD מלבן» on a base the figure knows is a square. Operator ruling: a naming error, not a
+  // redundancy. Carries both shapes so the message can name them.
+  | { code: 'shape-less-specific'; stated: QuadBase; actual: QuadBase }
   | { code: 'unknown-point'; id: Id }
   | { code: 'unknown-vector'; id: string }
   | { code: 'unknown-plane'; id: string }

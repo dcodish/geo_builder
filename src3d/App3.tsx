@@ -50,6 +50,10 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.newerSchema');
     case 'already-defined':
       return t('err.alreadyDefined', { id: err.id });
+    // #612 (ADR-3D-158): name BOTH shapes — the honesty invariant is that a refusal names the
+    // student's own statement and what the figure actually holds, never internal state.
+    case 'shape-less-specific':
+      return t('err.shapeLessSpecific', { stated: t(`notice.shape.${err.stated}`), actual: t(`notice.shape.${err.actual}`) });
     case 'unknown-point':
       return t('err.unknownPoint', { id: err.id });
     case 'unknown-symbol':
@@ -493,6 +497,8 @@ export default function App3() {
             <div key={`notice-${i}`} role="note" className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
               {n.kind === 'base-constrained'
                 ? t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
+                : n.kind === 'shape-redundant'
+                  ? t('notice.shapeRedundant', { ids: n.ids.join(''), shape: t(`notice.shape.${n.base}`) })
                 : n.kind === 'line-rel-noun'
                   ? t('notice.lineRelNoun', { line: n.line })
                   : n.kind === 'redundant-relation'

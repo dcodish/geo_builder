@@ -32,7 +32,7 @@ import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } fr
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3} from './vec3';
-import { quadPyramidDims, quadPyramidLayout } from './baseShapes';
+import { quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -2397,9 +2397,10 @@ export function checkInSpan(
  * configuration" varies it inside the bound (see {@link firstSatisfyingSeed3}).
  */
 export function meetsRequirements3(c: Construction3, seed: number): boolean {
-  if (c.requirements.length === 0) return true;
+  const hard = c.requirements.filter((req) => req.kind !== 'quad-general');
+  if (hard.length === 0) return true;
   const r = resolve3(c, seed);
-  return c.requirements.every((req) => {
+  return hard.every((req) => {
     if (req.kind === 'mutual') {
       // S4 (#378): the drawn configuration must actually SHOW the stated position. For `skew` this
       // is the whole mechanism (an inequality has no residual); for the closed relations it is the
@@ -2421,12 +2422,43 @@ export function meetsRequirements3(c: Construction3, seed: number): boolean {
   });
 }
 
-/** The first seed from `from` whose configuration meets every requirement, or null within `budget`
- *  tries. Deterministic — the same figure always lands on the same drawing (ADR-3D-053). */
+/**
+ * #615 (ADR-3D-158) — the PREFERRED tier: does this configuration draw each declared quad shape
+ * VISIBLY as itself, rather than as a special case of itself (ADR-052)?
+ *
+ * A preference, never a requirement, and the distinction is load-bearing. A student who states
+ * «מקבילית ABCD» and then forces a right angle onto it has said something consistent, and the figure
+ * must still draw — so this gates WHICH valid drawing is shown, and yields the moment no drawing
+ * satisfies it. Made a hard requirement instead, it refused that figure outright.
+ */
+export function meetsShapePreferences3(c: Construction3, seed: number): boolean {
+  const prefs = c.requirements.filter((req) => req.kind === 'quad-general');
+  if (prefs.length === 0) return true;
+  const r = resolve3(c, seed);
+  return prefs.every((req) => {
+    if (req.kind !== 'quad-general') return true;
+    const ring = req.ids.map((id) => r.positions.get(id));
+    if (ring.some((p) => !p)) return true; // unresolvable: nothing to judge, never a veto
+    return !quadDrawnDegenerate(req.base, ring as Vec3[]);
+  });
+}
+
+/**
+ * The first seed from `from` whose configuration meets every requirement, or null within `budget`
+ * tries. Deterministic — the same figure always lands on the same drawing (ADR-3D-053).
+ *
+ * #615: TWO TIERS in ONE sweep (the ADR-267 lesson — never a second full pass): a seed that also draws
+ * every stated shape visibly as itself wins outright; otherwise the first merely-valid seed is
+ * remembered and returned when the sweep ends. So a figure whose givens FORCE a special case still
+ * draws, at exactly the seed it would have drawn at before.
+ */
 export function firstSatisfyingSeed3(c: Construction3, from = 0, budget = 200): number | null {
+  let fallback: number | null = null;
   for (let i = 0; i < budget; i++) {
     const seed = from + i;
-    if (meetsRequirements3(c, seed)) return seed;
+    if (!meetsRequirements3(c, seed)) continue;
+    if (meetsShapePreferences3(c, seed)) return seed;
+    if (fallback === null) fallback = seed;
   }
-  return null;
+  return fallback;
 }

@@ -8,7 +8,7 @@ import { isAbsolute, lineDirCarriesParam, planeNormalCarriesParam, sameOperand }
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
-import { isQuadPyramid, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
+import { isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { pinSymsOf } from './types';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, Operand3, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
 
@@ -140,6 +140,8 @@ function clone(c: Construction3): Construction3 {
     arrows: c.arrows.map(([f, t]) => [f, t] as [Id, Id]),
     segments: [...c.segments],
     requirements: [...c.requirements],
+    quadShapes: c.quadShapes.map((q) => ({ base: q.base, ids: [...q.ids] })),
+    redundantShapes: c.redundantShapes.map((q) => ({ base: q.base, ids: [...q.ids] })),
     angleMarks: [...c.angleMarks],
     planes: new Map(c.planes),
     lines: new Map(c.lines),
@@ -214,6 +216,40 @@ const samePair = (p: [Id, Id], a: Id, b: Id): boolean => (p[0] === a && p[1] ===
 function hasSegment(c: Construction3, a: Id, b: Id): boolean {
   if (c.segments.some((s) => samePair(s, a, b))) return true;
   return c.solids.some((solid) => solid.edges.some((e) => samePair(e, a, b)));
+}
+
+/** #612: two rings are the same ring whatever order they were named in. */
+const sameRing = (x: Id[], y: Id[]): boolean => x.length === y.length && [...x].sort().join() === [...y].sort().join();
+
+/**
+ * #612 (ADR-3D-158): what shape is this ring ALREADY KNOWN to be — structurally, never by measurement.
+ *
+ * Two sources, both of them facts the figure carries rather than properties of one drawing: a SOLID's
+ * base kind (the ADR-3D-090 registry answers it), and a `quad-shape` statement recorded earlier. A ring
+ * that merely happens to be a square at the current seed is deliberately NOT known — refusing a student
+ * on the strength of one sampled configuration is the class of dishonesty this tree exists to avoid.
+ */
+function knownQuadShape(c: Construction3, ids: Id[]): QuadBase | null {
+  for (const s of c.quadShapes) if (sameRing(s.ids, ids)) return s.base;
+  for (const sld of c.solids) {
+    const spec = (QUAD_PYRAMIDS as Partial<Record<SolidKind, { base: QuadBase; right: boolean }>>)[sld.kind];
+    if (!spec) continue;
+    const ring = sld.ids.slice(0, 4);
+    if (ring.length === 4 && sameRing(ring, ids)) return spec.base;
+  }
+  return null;
+}
+
+/** #612/#615: remember the stated shape, and require its drawing to stay visibly general. */
+function recordShape(c: Construction3, base: QuadBase, ids: [Id, Id, Id, Id]): Construction3 {
+  const next = clone(c);
+  if (!next.quadShapes.some((s) => sameRing(s.ids, ids))) next.quadShapes.push({ base, ids: [...ids] });
+  // #615: only a shape with room to be drawn wrongly needs the gate — a square has no freedom left,
+  // and a general `quad` has no more-specific sibling it is obliged to avoid looking like.
+  if (QUAD_BASE_DIMS[base] > 0 &&
+      !next.requirements.some((r) => r.kind === 'quad-general' && sameRing(r.ids, ids)))
+    next.requirements.push({ kind: 'quad-general', base, ids: [...ids] });
+  return next;
 }
 
 /** First missing point among ids, as an error — or null when all exist. */
@@ -1584,8 +1620,31 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // ריבוע» on a pyramid's square base). The constraints M1-route to claims on a determined
       // figure, so a FALSE statement is refused by claim verification rather than drawn.
       if (unknowns.length === 0) {
+        // #612 (ADR-3D-158), operator ruling 2026-08-15 — "naming error". Before lowering anything,
+        // ask what the ring is ALREADY KNOWN to be. Structural knowledge only (a solid's base kind, or
+        // a shape stated earlier) — never a measurement, so this can only fire on a shape the figure
+        // demonstrably has, and a ring that is a square by coincidence is left alone.
+        const known = knownQuadShape(c, cmd.ids);
+        if (known) {
+          // the ring already IMPLIES what was said. Two different situations, and the difference is
+          // the whole ruling: the same name adds nothing, a LESS SPECIFIC name is a mis-naming.
+          if (quadImplies(known, cmd.base)) {
+            if (known === cmd.base) {
+              // redundant — true, already known, changes nothing. Recorded so `buildNotices3` can say
+              // so; the figure is returned untouched rather than accumulating inert pins.
+              const next = clone(c);
+              if (!next.redundantShapes.some((r) => r.base === cmd.base && sameRing(r.ids, cmd.ids)))
+                next.redundantShapes.push({ base: cmd.base, ids: [...cmd.ids] });
+              return { ok: true, next };
+            }
+            return { ok: false, error: { code: 'shape-less-specific', stated: cmd.base, actual: known } };
+          }
+          // NOT implied ⇒ the statement is new information (a rectangle told it is a square). It
+          // drives, exactly as before — refusing here would mean a student could never SPECIALISE a
+          // shape they had already drawn, which is ADR-052 upside down.
+        }
         const r = lower(c);
-        return r.ok ? { ok: true, next: drawRing(r.next) } : r;
+        return r.ok ? { ok: true, next: recordShape(drawRing(r.next), cmd.base, cmd.ids) } : r;
       }
 
       // ARM 2 — exactly one unknown corner, completed FROM THE FAMILY'S OWN DEFINITION.
@@ -1617,7 +1676,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // a ring that isn't the stated shape refuses it honestly (today's rectangle behaviour, now
         // for four nouns instead of one).
         const r = lower(asDef.next);
-        return r.ok ? { ok: true, next: drawRing(r.next) } : r;
+        return r.ok ? { ok: true, next: recordShape(drawRing(r.next), cmd.base, cmd.ids) } : r;
       }
 
       // ARM 1 — two or more unknown corners: a DECLARATION. The flat `polygon4` is itself the
@@ -1626,7 +1685,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const declared = applyCommand3(c, { type: 'solid', kind: 'polygon4', ids: cmd.ids });
       if (!declared.ok) return declared;
       const r = lower(declared.next);
-      return r.ok ? { ok: true, next: drawRing(r.next) } : r;
+      return r.ok ? { ok: true, next: recordShape(drawRing(r.next), cmd.base, cmd.ids) } : r;
     }
 
     case 'dot-given': {
