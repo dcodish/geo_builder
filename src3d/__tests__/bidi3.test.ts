@@ -19,6 +19,10 @@ import { parse3 } from '../parser/parse3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
 import he from '../i18n/locales/he.json';
 import en from '../i18n/locales/en.json';
+// #559: the defect IS the markup (a list-wide `dir` and the per-row choices under it), and this tree
+// has no DOM harness — so the source is what gets asserted.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const LRI = '⁦';
 const PDI = '⁩';
@@ -389,5 +393,60 @@ describe('#531 (ADR-3D-144) — display-layer transforms can never reach the par
     const pasted = parse3('מישור  x+2y-2z+28=0');
     expect(raw.ok && pasted.ok).toBe(true);
     if (raw.ok && pasted.ok) expect(JSON.stringify(pasted.commands)).toBe(JSON.stringify(raw.commands));
+  });
+});
+
+/**
+ * #559 (ADR-3D-156) — the DATA PANEL is bidi.
+ *
+ * Operator, playing PR #557: *"The panel is not bidi — Hebrew text should be RTL and aligned to the
+ * right."* The whole list carried `dir="ltr"`, so in the RTL Hebrew app the math-only rows hugged the
+ * LEFT edge while the Hebrew `mutual` rows — which already carried their own per-row `dir` from #398 —
+ * hugged the right. One panel, two edges. The query list directly above it had already been fixed this
+ * way (#398/ADR-3D-108); the data panel predates that fix and kept the list-wide override.
+ *
+ * The source is asserted rather than a rendered DOM: this tree has no jsdom, and the defect IS the
+ * markup — a list-wide `dir` and the per-row choices under it.
+ */
+describe('#559 — the data panel follows the app direction, per-row', () => {
+  const app = readFileSync(join(__dirname, '..', 'App3.tsx'), 'utf8');
+  /** The data-panel <ul> and everything under it, up to its close. */
+  const panelBlock = (() => {
+    const start = app.indexOf('{showData && dataPanel && (');
+    expect(start, 'the data panel block must be findable').toBeGreaterThan(0);
+    return app.slice(start, app.indexOf('</ul>', start));
+  })();
+  /** The same block with JSX comments removed — assertions about MARKUP must not read prose. */
+  const panelMarkup = panelBlock.replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+
+  it('the list carries NO list-wide dir — the whole panel follows the app (the actual bug)', () => {
+    const ul = panelBlock.slice(panelBlock.indexOf('<ul'), panelBlock.indexOf('>', panelBlock.indexOf('<ul')));
+    expect(ul).not.toContain('dir=');
+  });
+
+  it('the Hebrew `mutual` rows use textDir3, NOT dir="auto" (the ADR-312 first-strong trap)', () => {
+    // «AB ו-CD מצטלבים» STARTS with a Latin label, so `auto` would give the Hebrew sentence an LTR
+    // base and reorder it into garbage — the exact 2-D #118 lesson this tree copied as `textDir3`
+    expect(panelMarkup).toContain('dir={textDir3(line)}');
+    expect(panelMarkup, 'no row may fall back to auto').not.toContain('dir="auto"');
+  });
+
+  it('math-only rows are wrapped in MathRun, so their row still aligns with the app', () => {
+    for (const rows of ['dataPanel.relations', 'dataPanel.points', 'dataPanel.planes', 'dataPanel.params']) {
+      const i = panelBlock.indexOf(rows);
+      expect(i, `${rows} must be in the panel`).toBeGreaterThan(0);
+      expect(panelBlock.slice(i, i + 400), `${rows} rows lay their math out LTR`).toContain('<MathRun>');
+    }
+  });
+
+  it('MathRun sets the direction on the CONTENT, never on the row', () => {
+    // setting `dir` on the <li> would also reset its text-align to that direction's start — which is
+    // precisely how the panel ended up with math on one edge and Hebrew on the other
+    const helper = app.slice(app.indexOf('function MathRun'), app.indexOf('const EXAMPLE_KEYS'));
+    expect(helper).toContain('<span dir="ltr"');
+  });
+
+  it('no PHYSICAL margin survives in the panel — a left margin is wrong in an RTL list', () => {
+    expect(panelBlock).not.toMatch(/className="[^"]*\bm[lr]-\d/);
   });
 });

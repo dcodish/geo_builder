@@ -3654,3 +3654,40 @@ undetermined refusals (a bare cube's vertex, an unanchored plane), a non-point l
 `notUnderstood`, the vector lane unaffected, asking not mutating the figure, and — the load-bearing
 one — **panel-vs-query agreement asserted directly**: every point the panel prints must equal its own
 query answer, and a declared plane's panel row must equal its query answer.
+
+## ADR-3D-156 — the data panel is bidi: no list-wide `dir`, direction per row (#559)
+
+Operator, playing PR #557: *"The panel is not bidi — Hebrew text should be RTL and aligned to the
+right."*
+
+The «ארגון נתונים» list carried `dir="ltr"` on the whole `<ul>`. In the RTL Hebrew app that made the
+math-only rows (relations, points, planes, params) hug the LEFT edge, while the Hebrew `mutual` rows —
+which already carried their own per-row direction from #398 — hugged the right. **One panel, two
+edges.** The query list immediately above it had been fixed exactly this way (#398/ADR-3D-108); the
+data panel predates that fix and kept the override it removed.
+
+**Decision — the #398 shape, applied to the list that never got it.** The `<ul>` carries no `dir` at
+all and follows the app. Direction is decided per row, by what the row contains:
+
+- **Hebrew-bearing rows** (`mutual`) take `textDir3(line)` — **not** `dir="auto"`. That distinction is
+  the whole point: these rows routinely START with a Latin point label («AB ו-CD מצטלבים»), and `auto`
+  keys off the FIRST strong character, so the Hebrew sentence would take an LTR base and reorder into
+  garbage. This is the 2-D ADR-312/#118 trap, and `textDir3` (any Hebrew letter ⇒ RTL) is the answer
+  this tree already copied for it.
+- **Math-only rows** are wrapped in a `MathRun` span carrying `dir="ltr"`, so the MATH lays out LTR —
+  that is how mathematics is written in either locale — while the ROW keeps the app's direction and
+  therefore sits on the same edge as every other row.
+
+Putting the direction on the CONTENT rather than the row is the load-bearing detail: setting `dir` on
+the `<li>` would also reset its `text-align` to that direction's start, which is precisely how the
+panel ended up with math on one edge and Hebrew on the other. The two facts — "the math reads LTR" and
+"the row sits on the app's edge" — have to be independent, and the inner span is what makes them so.
+
+The `params` hint also loses its physical `mr-1` (a LEFT margin, wrong in an RTL list) for the logical
+`ms-1`, and its now-redundant `dir="rtl"`.
+
+Locks (`bidi3.test.ts`, 6): the `<ul>` carries no `dir` (the defect itself); the mutual rows use
+`textDir3` and **no** row falls back to `dir="auto"`; each math-only row family is wrapped in
+`MathRun`; `MathRun` sets `dir` on a span and not on the row; and no physical `ml-`/`mr-` margin
+survives in the panel. The assertions read the MARKUP with JSX comments stripped — this tree has no DOM
+harness, and the defect *is* the markup, so the source is the honest thing to assert.

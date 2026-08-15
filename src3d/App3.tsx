@@ -128,6 +128,23 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
   }
 }
 
+/**
+ * #559 (ADR-3D-156): a MATH-ONLY data-panel row — `|u| = |v| = 2`, `N(6, 6, 6)`, a plane equation.
+ *
+ * Its CONTENT is laid out LTR (that is how mathematics is written, in either locale), while the ROW
+ * itself follows the app's own direction, so every row in the panel sits on the same edge. The inner
+ * `dir="ltr"` span is what makes those two facts independent: setting `dir` on the `<li>` would also
+ * reset its `text-align` to that direction's start, which is exactly how the panel ended up with
+ * math hugging one edge and Hebrew hugging the other.
+ */
+function MathRun({ children }: { children: React.ReactNode }) {
+  return (
+    <span dir="ltr" className="inline-block">
+      {children}
+    </span>
+  );
+}
+
 const EXAMPLE_KEYS = ['ex1', 'ex2', 'ex3', 'ex4', 'ex5', 'ex6', 'ex7', 'ex8'] as const;
 
 export default function App3() {
@@ -740,20 +757,31 @@ export default function App3() {
               {panelIsEmpty(dataPanel) ? (
                 <p className="text-slate-400">{t('dataPanel.empty')}</p>
               ) : (
-                <ul className="flex flex-col gap-1" dir="ltr">
+                <ul className="flex flex-col gap-1">
+                  {/* #559 (ADR-3D-156): the list carries NO `dir` — it follows the app, which is RTL
+                      by default. It used to be `dir="ltr"` list-wide, so in the Hebrew app the
+                      math-only rows hugged the LEFT edge while the Hebrew `mutual` rows (which
+                      carried their own per-row dir) hugged the right: one panel, two edges. This is
+                      the #398/ADR-3D-108 fix the query list above already got, applied to the list
+                      that predates it. */}
                   {dataPanel.relations.map((r) => (
                     <li key={r} className="border-b border-slate-100 pb-1 font-medium">
-                      {r}
+                      <MathRun>{r}</MathRun>
                     </li>
                   ))}
                   {/* S4 (#378): mutual positions read as WORDS in the reader's language — there is no
-                      standard symbol for skew lines. `dir="auto"` keeps the Latin labels LTR while the
-                      Hebrew predicate lays out correctly. */}
-                  {dataPanel.mutual.map((m) => (
-                    <li key={`${m.rel}-${m.a}-${m.b}`} dir="auto" className="border-b border-slate-100 pb-1 font-medium">
-                      {t(`dataPanel.mutual.${m.rel}`, { a: m.a, b: m.b })}
-                    </li>
-                  ))}
+                      standard symbol for skew lines. #559: the direction comes from `textDir3`, NOT
+                      `dir="auto"` — these rows routinely START with a Latin point label («AB ו-CD
+                      מצטלבים»), and auto keys off the FIRST strong character, so the Hebrew sentence
+                      would take an LTR base and reorder into garbage (the ADR-312/#118 trap). */}
+                  {dataPanel.mutual.map((m) => {
+                    const line = t(`dataPanel.mutual.${m.rel}`, { a: m.a, b: m.b });
+                    return (
+                      <li key={`${m.rel}-${m.a}-${m.b}`} dir={textDir3(line)} className="border-b border-slate-100 pb-1 font-medium">
+                        {line}
+                      </li>
+                    );
+                  })}
                   {dataPanel.vectors.map((v) => (
                     <li key={v.label} className="border-b border-slate-100 pb-1 last:border-0">
                       {v.decomp && (
@@ -768,25 +796,30 @@ export default function App3() {
                       )}
                       {v.mag && (
                         <div>
-                          {v.mag}{v.sq ? ' \u00A0·\u00A0 ' + v.sq : ''}
+                          <MathRun>{v.mag}{v.sq ? ' \u00A0·\u00A0 ' + v.sq : ''}</MathRun>
                         </div>
                       )}
                     </li>
                   ))}
                   {dataPanel.points.map((p) => (
-                    <li key={p}>{p}</li>
+                    <li key={p}>
+                      <MathRun>{p}</MathRun>
+                    </li>
                   ))}
                   {/* #325 (ADR-3D-079 Am. 2): the open symbols of B(2t,t,k) — a determined value
                       prints, a free one reads open with a hint, so the given visibly registered */}
                   {dataPanel.params.map((p) => (
                     <li key={p.sym} className={p.open ? 'text-slate-500' : undefined}>
-                      {p.text}
-                      {p.open && <span dir="rtl" className="mr-1 text-xs text-slate-400"> — {t('dataPanel.openParam')}</span>}
+                      <MathRun>{p.text}</MathRun>
+                      {/* #559: the hint is Hebrew and now sits in a row that follows the app's own
+                          direction, so it needs no `dir` of its own; the logical `ms-1` replaces
+                          `mr-1`, which was a physical LEFT margin in an RTL list. */}
+                      {p.open && <span className="ms-1 text-xs text-slate-400">— {t('dataPanel.openParam')}</span>}
                     </li>
                   ))}
                   {dataPanel.planes.map((p) => (
                     <li key={p} className="border-t border-slate-100 pt-1">
-                      {p}
+                      <MathRun>{p}</MathRun>
                     </li>
                   ))}
                 </ul>
