@@ -8,7 +8,7 @@ import { isAbsolute, lineDirCarriesParam, planeNormalCarriesParam, sameOperand }
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
-import { isQuadPyramid, quadPyramidDimCount } from './baseShapes';
+import { isQuadPyramid, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { pinSymsOf } from './types';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, Operand3, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
 
@@ -1550,41 +1550,83 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
-    case 'rect-complete': {
-      // `WXYZ מלבן`: exactly ONE unknown corner completes as the parallelogram point
-      // (opposite + both neighbours), then the corner right angle is VERIFIED — a base
-      // that isn't right-angled refuses the "rectangle" honestly.
+    // #587 (ADR-3D-152): `ABEC מלבן` is the RECTANGLE instance of the general stated-quad-shape
+    // command — one vocabulary, one semantics. Kept as its own command type so saved `.geo3.json`
+    // files written before this land, and the three frozen phrasings, keep working unchanged.
+    case 'rect-complete':
+      return applyCommand3(c, { type: 'quad-shape', base: 'rectangle', ids: cmd.ids });
+
+    case 'quad-shape': {
+      // The three arms of a stated flat quad shape, dispatched on how many corners already exist —
+      // HERE and not in the parser, because `parse3` is context-free and cannot know.
       const unknowns = cmd.ids.filter((id) => !c.points.has(id));
-      if (unknowns.length !== 1) {
-        return unknowns.length === 0
-          ? { ok: false, error: { code: 'already-defined', id: cmd.ids[0] } }
-          : { ok: false, error: { code: 'two-unknowns', id: unknowns[1] } };
+      const constraints = quadShapeConstraints(cmd.base, cmd.ids);
+      /** Lower the family's constraint set; M1 routes each command to a drive or a verification. */
+      const lower = (from: Construction3): ApplyResult3 => {
+        let r: ApplyResult3 = { ok: true, next: from };
+        for (const k of constraints) {
+          if (!r.ok) return r;
+          r = applyCommand3(r.next, k);
+        }
+        return r;
+      };
+      /** The ring's ink — a stated shape must leave a visible trace (the ADR-3D-035 rule). */
+      const drawRing = (from: Construction3): Construction3 => {
+        const next = clone(from);
+        for (let j = 0; j < 4; j++) {
+          const [a, b] = [cmd.ids[j], cmd.ids[(j + 1) % 4]];
+          if (!hasSegment(next, a, b)) next.segments.push([a, b]);
+        }
+        return next;
+      };
+
+      // ARM 3 — all four known: a STATEMENT about existing points (the operator's own case, «ABCD
+      // ריבוע» on a pyramid's square base). The constraints M1-route to claims on a determined
+      // figure, so a FALSE statement is refused by claim verification rather than drawn.
+      if (unknowns.length === 0) {
+        const r = lower(c);
+        return r.ok ? { ok: true, next: drawRing(r.next) } : r;
       }
-      const i = cmd.ids.indexOf(unknowns[0]);
-      const opp = cmd.ids[(i + 2) % 4];
-      const n1 = cmd.ids[(i + 1) % 4];
-      const n2 = cmd.ids[(i + 3) % 4];
-      const asDef = applyCommand3(c, {
-        type: 'vec-rel',
-        from: opp,
-        to: unknowns[0],
-        terms: [
-          { coeff: { k: 1, p: 0 }, atom: { kind: 'pair', from: opp, to: n1 } },
-          { coeff: { k: 1, p: 0 }, atom: { kind: 'pair', from: opp, to: n2 } },
-        ],
-      });
-      if (!asDef.ok) return asDef;
-      const withAngle = applyCommand3(asDef.next, {
-        type: 'claim',
-        claim: { type: 'angle-seg-eq', a1: n1, b1: opp, a2: n1, b2: unknowns[0], deg: 90 },
-      });
-      if (!withAngle.ok) return withAngle;
-      const next = clone(withAngle.next);
-      for (let j = 0; j < 4; j++) {
-        const [a, b] = [cmd.ids[j], cmd.ids[(j + 1) % 4]];
-        if (!hasSegment(next, a, b)) next.segments.push([a, b]);
+
+      // ARM 2 — exactly one unknown corner, completed FROM THE FAMILY'S OWN DEFINITION.
+      // Only the parallelogram family determines the fourth corner as the parallelogram point; a
+      // KITE determines it differently (the reflection of `b` across the axis `ac`, #601) and a
+      // TRAPEZOID/general QUAD does not determine it at all — one free DOF the student never
+      // stated. Completing those anyway would assert an unstated given, the ADR-052 cardinal sin,
+      // so they refuse honestly and name the corner instead.
+      if (unknowns.length === 1) {
+        const PARALLELOGRAM_FAMILY: QuadBase[] = ['square', 'rectangle', 'rhombus', 'parallelogram'];
+        if (!PARALLELOGRAM_FAMILY.includes(cmd.base)) {
+          return { ok: false, error: { code: 'unknown-point', id: unknowns[0] } };
+        }
+        const i = cmd.ids.indexOf(unknowns[0]);
+        const opp = cmd.ids[(i + 2) % 4];
+        const n1 = cmd.ids[(i + 1) % 4];
+        const n2 = cmd.ids[(i + 3) % 4];
+        const asDef = applyCommand3(c, {
+          type: 'vec-rel',
+          from: opp,
+          to: unknowns[0],
+          terms: [
+            { coeff: { k: 1, p: 0 }, atom: { kind: 'pair', from: opp, to: n1 } },
+            { coeff: { k: 1, p: 0 }, atom: { kind: 'pair', from: opp, to: n2 } },
+          ],
+        });
+        if (!asDef.ok) return asDef;
+        // the corner is now DERIVED, so every constraint lands on a determined ring and verifies —
+        // a ring that isn't the stated shape refuses it honestly (today's rectangle behaviour, now
+        // for four nouns instead of one).
+        const r = lower(asDef.next);
+        return r.ok ? { ok: true, next: drawRing(r.next) } : r;
       }
-      return { ok: true, next };
+
+      // ARM 1 — two or more unknown corners: a DECLARATION. The flat `polygon4` is itself the
+      // carrier of the four free dims, so declare it and let the constraint set take them away;
+      // whatever the family does not state stays free and sampled (ADR-052).
+      const declared = applyCommand3(c, { type: 'solid', kind: 'polygon4', ids: cmd.ids });
+      if (!declared.ok) return declared;
+      const r = lower(declared.next);
+      return r.ok ? { ok: true, next: drawRing(r.next) } : r;
     }
 
     case 'dot-given': {

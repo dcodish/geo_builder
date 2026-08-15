@@ -19,6 +19,9 @@
  */
 
 import type { Vec3 } from './vec3';
+// #587: the quad-base vocabulary is defined ONCE, in the base registry — the flat `quad-shape` command
+// names the same seven families the solid lane's bases do. Type-only, so the cycle is erased at compile.
+import type { QuadBase } from './baseShapes';
 
 export type Id = string;
 
@@ -766,7 +769,13 @@ export type Command3 =
   | RevolutionCommand
   | VecRelCommand
   | SegPlaneRelCommand
-  | { type: 'rect-complete'; ids: [Id, Id, Id, Id] } // `ABEC מלבן` — completes the single unknown corner (V7 T3)
+  | { type: 'rect-complete'; ids: [Id, Id, Id, Id] } // `ABEC מלבן` — the rectangle instance of `quad-shape` (V7 T3)
+  // #587 (ADR-3D-152): a stated FLAT quad SHAPE on a ring — `ABCD ריבוע`, `המרובע ABCD הוא ריבוע`.
+  // Applied in three arms dispatched on how many of `ids` already exist, because the parse is
+  // context-free and only apply knows: all-new ⇒ declare + lower `quadShapeConstraints`; exactly one
+  // unknown ⇒ complete that corner from the family's definition, then lower; all known ⇒ a STATEMENT
+  // about existing points, lowered the same way and M1-routed to verification.
+  | { type: 'quad-shape'; base: QuadBase; ids: [Id, Id, Id, Id] }
   | { type: 'dot-given'; v1: string; v2: string; value: number } // u·v = 24 (V7 T2)
   | { type: 'inject-pair'; a: Id; b: Id; x: number; y: number; z: number } // BD = (-4,5,12) — a pair-vector injection (V7 T2)
   | { type: 'rel-plane'; name: string; rel: 'perp' | 'par'; through: Id[]; a: Id; b: Id } // V8-b (G1): plane ⟂/∥ edge a–b

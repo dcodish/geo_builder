@@ -3750,3 +3750,86 @@ that no line form carries a digit on any under-determined figure, with a counter
 empty; and the four regressions this must not cause — a numeric parametric line echoing verbatim, a
 symbolic one still echoing its `src`, a determined absolute figure DOES print its derived line's numbers,
 and a free line still showing only its name.
+## ADR-3D-152 — a stated flat QUAD SHAPE is ONE command with three apply arms (#587)
+
+Operator, playing round #582/#584: on «פירמידה ABCDS שבסיסה ריבוע», *"«ABCD ריבוע» also fails (in
+this case ABCD is already a square — but the error message says it doesn't recognize it)."*
+
+The flat-quad lane had **no shape semantics**. `planarPolygon` detected its kind from משולש/מרובע/מחומש
+alone, so «ריבוע ABCD», «ABCD ריבוע» and «ABCD הוא ריבוע» were `not-handled` — an LLM burn on a
+construct the engine already has — while the one form that *did* parse, «המרובע ABCD הוא ריבוע»,
+read the ring and **discarded the qualifier**, drawing an arbitrary quadrilateral with a green ✓. The
+#424/ADR-3D-084 silent-drop class, quad edition. [ADR-3D-149](#adr-3d-149) closed the silent half by
+making the honesty gate refuse; this ADR is the capability half it was standing in for, and it
+**supersedes that interim refusal** — the two utterances now build.
+
+An earlier fix-round escalated rather than shipping the issue's original plan, which rested on a false
+premise: it said to *"mirror the constraint sets the solid base-shape macro already emits"*, and the
+solid lane emits none — a stated quad base selects a KIND whose ring `quadBaseRing` generates
+**structurally** (`QUAD_BASE_DIMS.square = 0`). The escalation also found the real blocker: `rect-complete`
+already owned «ABCD מלבן» with *corner-completion* semantics, so shipping a lowering beside it would
+leave מלבן behaving unlike its five siblings. **Operator ruling (2026-08-15): option (a)** — one command,
+three arms, `rect-complete` absorbed. *"option a is the correct way to go as it fixed the base issue."*
+
+**Decision.** `{ type: 'quad-shape', base, ids }`, applied in three arms dispatched on how many of `ids`
+already exist. The dispatch lives at **apply**, never in the parser, because `parse3` is context-free and
+only apply knows which corners are on the figure:
+
+- **two or more unknown** → a DECLARATION: declare the `polygon4` (itself the carrier of the four free
+  dims) and lower the family's constraint set, which takes away exactly the dims the family fixes.
+- **exactly one unknown** → complete that corner from the family's own definition, then lower — today's
+  `rect-complete` behaviour, now for four nouns rather than one.
+- **all four known** → a STATEMENT about existing points, lowered identically and M1-routed to
+  verification. This is the operator's own case, which previously refused `already-defined`.
+
+`rect-complete` survives as a command type so `.geo3.json` files written before this still load; it
+delegates to `{ base: 'rectangle' }`. **The grammar no longer emits it** — its rule lowers to the general
+command, which is what keeps `planarPolygon` (which now claims the same three phrasings) from registering
+as a divergent shadow. One semantics, reached by two rules.
+
+**The constraint sets** are authored fresh against `quadBaseRing`'s definitions, using only proven M1
+drivers, and their arithmetic is the evidence they are right: the flat `polygon4` carries 4 free dims
+(A, B are the gauge), so each family's constraint count must be `4 − QUAD_BASE_DIMS[base]` — and it is,
+in every row. That agreement is asserted as a test, not checked by hand.
+
+| base | constraints | count | free dims left | `QUAD_BASE_DIMS` |
+|---|---|---|---|---|
+| square | \|ab\|=\|bc\|, \|bc\|=\|cd\|, \|cd\|=\|da\|, ∠abc = 90° | 4 | 0 | 0 ✓ |
+| rectangle | ∠dab = ∠abc = ∠bcd = 90° | 3 | 1 | 1 ✓ |
+| rhombus | \|ab\|=\|bc\|, \|bc\|=\|cd\|, \|cd\|=\|da\| | 3 | 1 | 1 ✓ |
+| parallelogram | ab ∥ dc, ad ∥ bc | 2 | 2 | 2 ✓ |
+| kite | \|ab\|=\|ad\|, \|cb\|=\|cd\| | 2 | 2 | 2 ✓ |
+| trapezoid | dc ∥ ab | 1 | 3 | 3 ✓ |
+| quad | — | 0 | 4 | 4 ✓ |
+
+The two ∥ families use `mutual-rel` + `parallel`, never `cos-angle` with `cos = 1`: at cos = 1 the
+residual sits at a maximum, its derivative vanishes, and the descent stalls — the ADR-3D-006 lesson.
+
+**Two deliberate narrowings, each honest rather than convenient:**
+
+1. **The generic `מרובע` keeps its old path.** It states nothing beyond four-sidedness, which the plain
+   `polygon4` declaration already says; routing it through the new command would have swapped the
+   declaring command — and with it #586's bare-run byte-identity lock — for no semantic gain. The six
+   SHAPE nouns lower; the generic noun does not.
+2. **Corner completion covers the parallelogram family only** (square, rectangle, rhombus,
+   parallelogram). The issue's plan said to complete every family "as the parallelogram point", but that
+   is only the fourth vertex for those four: a KITE's is the reflection of `b` across the axis `ac`
+   (a different closed form — filed as #601), and a TRAPEZOID or general QUAD **does not determine the
+   corner at all** (one free DOF the student never stated). Completing those anyway would assert an
+   unstated given, which is the ADR-052 cardinal sin, so they refuse and name the corner. The refusal is
+   the correct answer there, not a shortfall.
+
+**The honesty gate needed one change, and the plan predicted none.** That prediction assumed the
+family's constraints would be visible in the parsed command list; the option-(a) ruling moved the
+lowering to apply, so they are not. `droppedShapeNoun3` therefore accounts the **carrier** — a
+`quad-shape` command whose base is the stated noun — which is the same question asked of the command
+that actually answers it, and squarely inside the gate's "command side is GENEROUS" doctrine.
+
+**Locks** (`issue-587-quad-shape.test.ts`, plus `fixtures3/quad-shape-587.geo3.json`): the operator's
+exact pair green with nothing re-created and nothing moved; every framing (noun-first, labels-first,
+copular, definite-copular, He + En) parsing to the same command; each family's constraint set holding
+as measured GEOMETRY at four seeds, non-degeneracy asserted first; the DOF table above against
+`QUAD_BASE_DIMS`; a false statement on a coordinate-pinned ring refused and its true twin green; all
+three arms including completion for a non-מלבן noun and the ADR-052 refusal for an underdetermined one;
+`rect-complete`'s three frozen phrasings byte-identical to each other and to the general rule's output;
+the legacy command still applying for old saves. Catalog + shadow-matrix snapshot additive.

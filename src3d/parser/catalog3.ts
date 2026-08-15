@@ -238,6 +238,14 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: 'פירמידה ישרה שבסיסה טרפז שווה שוקיים', en: 'right pyramid with an isosceles trapezoid base' },
   { category: 'solids', he: 'מרובע MKNL', en: 'quadrilateral MKNL' },
   { category: 'solids', he: 'מחומש ABCDE', en: 'pentagon ABCDE' },
+  // #587 (ADR-3D-152): the flat QUAD shapes — the quad half of the #424 triangle qualifiers above.
+  { category: 'solids', he: 'ריבוע ABCD', en: 'square ABCD' },
+  { category: 'solids', he: 'ABCD ריבוע', en: 'ABCD is a square' },
+  { category: 'solids', he: 'מלבן ABCD', en: 'rectangle ABCD' },
+  { category: 'solids', he: 'מעוין ABCD', en: 'rhombus ABCD' },
+  { category: 'solids', he: 'מקבילית ABCD', en: 'parallelogram ABCD' },
+  { category: 'solids', he: 'דלתון ABCD', en: 'kite ABCD' },
+  { category: 'solids', he: 'טרפז ABCD', en: 'trapezoid ABCD' },
   { category: 'points', he: 'גובה המשולש לצלע AB הוא CD', en: 'CD is the altitude to AB' },
   // --- triage 3-D (ADR-3D-026): prod-log gaps ---
   { category: 'solids', he: 'כדור', en: 'sphere' },

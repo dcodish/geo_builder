@@ -110,6 +110,7 @@ const COMMAND_SAVEABLE: Record<Command3['type'], boolean> = {
   'plane-cut': true,
   'point-on-circle3': true,
   'rect-complete': true,
+  'quad-shape': true, // #587 (ADR-3D-152): a stated flat quad shape — `rect-complete`'s general form
   'rel-plane': true,
   'right-pyramid-point': true,
   'tetra-altitude': true,

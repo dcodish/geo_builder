@@ -3104,14 +3104,36 @@ const mutualPositionClaim: Rule = (s0) => {
   return null;
 };
 
-/** `ABEC מלבן` / `ABEC is a rectangle` — completes the single unknown corner (verified right-angled). */
+/**
+ * #587 (ADR-3D-152): the constraint-carrying command a stated FLAT quad noun lowers to, on the ring it
+ * names. The quad sibling of {@link triShapeCommands} — and, like it, the ONE place the reading lives,
+ * so a rule that RECOGNISES a quad noun is exactly a rule that can LOWER it.
+ *
+ * Unlike the triangle case the lowering is an ENGINE command rather than a macro of relations: which of
+ * the three arms applies (declare / complete a corner / verify a statement) depends on which corners
+ * already exist, and `parse3` is context-free — only apply knows.
+ */
+function quadShapeCommand(base: QuadBase | null, ids: Id[]): Command3[] {
+  // `quad` is the generic noun (`מרובע`) — it states NOTHING beyond four-sidedness, which the plain
+  // `polygon4` declaration already says. Lowering it too would only swap the declaring command (and
+  // with it #586's bare-run byte-identity) for no semantic gain, so the six SHAPE nouns route here
+  // and the generic one keeps the path it has always taken.
+  if (!base || base === 'quad' || ids.length !== 4) return [];
+  return [{ type: 'quad-shape', base, ids: ids as [Id, Id, Id, Id] }];
+}
+
+/** `ABEC מלבן` / `ABEC is a rectangle` — the RECTANGLE instance of `quad-shape` (#587). */
 const rectComplete: Rule = (s) => {
   const m =
     s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?מלבן$/) ??
     s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s+is\s+a\s+rectangle$/) ??
     s.match(/^מלבן\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)$/);
   if (!m) return null;
-  return [{ type: 'rect-complete', ids: [m[1], m[2], m[3], m[4]] }];
+  // #587: lowered to the GENERAL command, not the legacy `rect-complete` — `planarPolygon` now claims
+  // these same three phrasings too, and emitting the identical command is what keeps that overlap from
+  // being a divergent shadow (shadow-matrix3). The `rect-complete` command type stays in the engine so
+  // `.geo3.json` files saved before ADR-3D-152 still load; nothing in the grammar emits it any more.
+  return quadShapeCommand('rectangle', [m[1], m[2], m[3], m[4]]);
 };
 
 /** `A = (2, 0, -10)` — a coordinates CLAIM (the student's answer for a derived point). */
@@ -3305,7 +3327,15 @@ const polygonCircle3: Rule = (s) => {
   // #424's ONE vocabulary: a qualifier the parser recognises must be one it can lower, on every rule
   // that declares a polygon — `משולש שווה שוקיים ABC חסום במעגל` states the equal pair too.
   const shape: TriSpec = polyKind === 'polygon3' ? statedTriShape(s) : { equal: null, right: false };
-  return [{ type: 'solid', kind: polyKind, ids: ring }, ...triShapeCommands(shape, ring), { type: 'circle3', id, def }];
+  // #587: the quad half — `מעגל חוסם את ריבוע ABCD` states the square too, and `quad-shape` declares
+  // the ring itself (its arm 1), exactly as it does on the bare-declaration rule. ADR-3D-149 already
+  // made this rule's arity come from the ring, so the quad nouns reach here; they stopped at the
+  // honesty gate only because nothing lowered them.
+  const lowered = quadShapeCommand(polyKind === 'polygon4' ? statedQuadBase(s) : null, ring);
+  const poly: Command3[] = lowered.length
+    ? lowered
+    : [{ type: 'solid', kind: polyKind, ids: ring }, ...triShapeCommands(shape, ring)];
+  return [...poly, { type: 'circle3', id, def }];
 };
 
 const planarPolygon: Rule = (s) => {
@@ -3319,9 +3349,15 @@ const planarPolygon: Rule = (s) => {
   // rule owns it, and if that rule misses a phrasing this must ESCALATE, never silently drop the derived
   // point by building a bare triangle (the #330 silent-wrong-build class).
   if (/תיכונ|חוצ|גובה|אלכסו[ןנ]|\b(median|centroid|bisect|altitude|diagonal)\b/i.test(s)) return null;
+  // #587: the quad nouns are read through `statedQuadBase` — the ONE quad vocabulary — so every noun
+  // this rule RECOGNISES is one it can LOWER. Before this the kind test spelled `מרובע` alone, so
+  // `ריבוע ABCD` / `ABCD ריבוע` were `not-handled` (an LLM burn on a construct the engine has), while
+  // the one form that did parse (`המרובע ABCD הוא ריבוע`) dropped the qualifier and drew an arbitrary
+  // quadrilateral — the #424/ADR-3D-084 silent-drop class, quad edition.
+  const quadBase = statedQuadBase(s);
   const kind: 'polygon3' | 'polygon4' | 'polygon5' | null =
     /משולש/.test(s) || /\btriangle\b/i.test(s) ? 'polygon3' :
-    /מרובע/.test(s) || /\b(quadrilateral|quad)\b/i.test(s) ? 'polygon4' :
+    quadBase || /\bquad\b/i.test(s) ? 'polygon4' :
     /מחומש/.test(s) || /\bpentagon\b/i.test(s) ? 'polygon5' : null;
   if (!kind) return null;
   const n = kind === 'polygon3' ? 3 : kind === 'polygon4' ? 4 : 5;
@@ -3332,6 +3368,12 @@ const planarPolygon: Rule = (s) => {
   // polygons and never got the macro treatment, so `ABC משולש שווה צלעות` silently drew a scalene
   // triangle — byte-identical to the plain `משולש ABC` — and reported ✓).
   const shape: TriSpec = kind === 'polygon3' ? statedTriShape(s) : { equal: null, right: false };
+  // #587: a stated quad noun is lowered by `quad-shape` ALONE — it owns the declaration too (its arm 1),
+  // because only apply knows how many corners already exist. Emitting the bare `solid` first would fix
+  // the answer to "declare" before that is known, and a ring with ONE new corner (`ריבוע ABCE` over an
+  // existing ABC) would refuse `already-defined` instead of completing it.
+  const lowered = quadShapeCommand(kind === 'polygon4' ? quadBase : null, ids);
+  if (lowered.length) return lowered;
   return [{ type: 'solid', kind, ids }, ...triShapeCommands(shape, ids)];
 };
 

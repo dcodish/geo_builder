@@ -16,7 +16,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
-import { cross3, norm3, sub3, type Vec3 } from '../engine/vec3';
+import { cross3, dist3, norm3, sub3, type Vec3 } from '../engine/vec3';
 import { parse3 } from '../parser/parse3';
 
 function build(lines: string[], seed = 0) {
@@ -110,16 +110,28 @@ describe('#586 — the arity-map half-drop', () => {
   });
 });
 
-describe('#587 (silent-drop half) — a stated quad shape the flat lane cannot lower REFUSES', () => {
-  it('«המרובע ABCD הוא ריבוע» refuses naming ריבוע — never a green arbitrary quad', () => {
+describe('#587 — a stated quad shape LOWERS (ADR-3D-152 supersedes ADR-3D-149\'s interim refusal)', () => {
+  // ADR-3D-149 closed the silent-drop half by REFUSING these two utterances: a stated quad noun the
+  // flat lane could not lower had to name itself rather than commit a green arbitrary quadrilateral.
+  // That was explicitly the interim («the honest interim is nothing special — the forms stay refusals»).
+  // ADR-3D-152 built the lowering the refusal was standing in for, so the honest answer is now the
+  // FIGURE: what must never happen — a green ✓ on a quadrilateral that is not the stated shape — is
+  // asserted here as geometry, which is the stronger form of the same lock.
+  it('«המרובע ABCD הוא ריבוע» builds a TRUE square — never a green arbitrary quad', () => {
     const { st, d } = build(['המרובע ABCD הוא ריבוע']);
-    expect(st.lastError).toEqual({ code: 'dropped-given', items: 'ריבוע' });
-    expect(d.construction.solids).toHaveLength(0);
+    expect(st.lastError).toBeNull();
+    expect(d.construction.solids.map((s: { kind: string }) => s.kind)).toEqual(['polygon4']);
+    const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((p) => d.positions.get(p)!);
+    const sides = [dist3(A, B), dist3(B, C), dist3(C, D), dist3(D, A)];
+    expect(sides[0]).toBeGreaterThan(1e-6);
+    sides.forEach((x) => expect(x).toBeCloseTo(sides[0], 5));
   });
 
-  it('the same holds for the inscription lane — a quad noun with no lowering cannot ride in', () => {
-    const { st } = build(['מעגל חוסם את ריבוע ABCD']);
-    expect(st.lastError).toEqual({ code: 'dropped-given', items: 'ריבוע' });
+  it('the same holds for the inscription lane — the quad noun rides in and lowers', () => {
+    const { st, d } = build(['מעגל חוסם את ריבוע ABCD']);
+    expect(st.lastError).toBeNull();
+    const [A, B, C] = ['A', 'B', 'C'].map((p) => d.positions.get(p)!);
+    expect(dist3(A, B)).toBeCloseTo(dist3(B, C), 5);
   });
 
   it('a GENERIC quad noun still builds — the gate watches defining properties, not nouns', () => {

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "app": "3d-builder",
+  "savedAt": "2026-08-15T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "פירמידה ABCDS שבסיסה ריבוע",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramid4g",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "S"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "ABCD ריבוע",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "square",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    }
+  ]
+}

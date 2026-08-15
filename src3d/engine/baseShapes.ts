@@ -25,7 +25,7 @@
 
 import { sample } from './rng';
 import { ringCircumcentre2 } from './vec3';
-import type { SolidKind } from './types';
+import type { Command3, Id, SolidKind } from './types';
 
 /** The quadrilateral base shapes a solid can stand on. */
 export type QuadBase = 'square' | 'rectangle' | 'rhombus' | 'parallelogram' | 'kite' | 'trapezoid' | 'quad';
@@ -48,6 +48,54 @@ export const QUAD_BASE_DIMS: Record<QuadBase, number> = {
   trapezoid: 3,
   quad: 4,
 };
+
+/**
+ * #587 (ADR-3D-152): the constraint set a stated FLAT quad shape lowers to, on the ring `[a,b,c,d]`.
+ *
+ * The flat lane's ring is four FREE points, so — unlike the solid lane, where a stated base selects a
+ * KIND whose ring {@link quadBaseRing} generates structurally — the shape has to be stated as ordinary
+ * relations. These are authored against `quadBaseRing`'s own definitions above, so the two realisations
+ * of "square" cannot drift: each row's constraint count is exactly `4 − QUAD_BASE_DIMS[base]` (the flat
+ * `polygon4` carries 4 free dims, A and B being the gauge), and `issue-587-quad-shape.test.ts` asserts
+ * that agreement rather than leaving it to inspection.
+ *
+ * Only proven M1 drivers are used — `length-rel`, `cos-angle`, and `mutual-rel`+`parallel` — so every
+ * set DRIVES a free figure and VERIFIES a determined one with no new solver work.
+ *
+ * The two ∥ families use `mutual-rel` rather than `cos-angle` with `cos = 1`: at cos = 1 the residual
+ * sits at a maximum, so its derivative vanishes and the least-squares descent stalls (the ADR-3D-006
+ * "signed component, never a magnitude" lesson; `mutualRels` emits signed components). `mutual-rel`
+ * DRAWS its operands, which for a polygon's own sides is a no-op — asserted, not assumed.
+ */
+export function quadShapeConstraints(base: QuadBase, ring: Id[]): Command3[] {
+  const [a, b, c, d] = ring;
+  /** |xy| = |zw| — the equal-side driver. */
+  const eq = (x: Id, y: Id, z: Id, w: Id): Command3 => ({ type: 'length-rel', a1: x, b1: y, rhs: { pair: [z, w] }, c: 1 });
+  /** ∠xyz = 90°, stated at the MIDDLE letter like every other angle in this tree. */
+  const right = (x: Id, y: Id, z: Id): Command3 => ({
+    type: 'cos-angle', u: { kind: 'pair', from: y, to: x }, v: { kind: 'pair', from: y, to: z }, cos: 0,
+  });
+  /** xy ∥ zw. */
+  const par = (x: Id, y: Id, z: Id, w: Id): Command3 => ({
+    type: 'mutual-rel', rel: 'parallel', a: { kind: 'segment', a: x, b: y }, b: { kind: 'segment', a: z, b: w },
+  });
+  switch (base) {
+    case 'square':
+      return [eq(a, b, b, c), eq(b, c, c, d), eq(c, d, d, a), right(a, b, c)];
+    case 'rectangle':
+      return [right(d, a, b), right(a, b, c), right(b, c, d)];
+    case 'rhombus':
+      return [eq(a, b, b, c), eq(b, c, c, d), eq(c, d, d, a)];
+    case 'parallelogram':
+      return [par(a, b, d, c), par(a, d, b, c)];
+    case 'kite':
+      return [eq(a, b, a, d), eq(c, b, c, d)];
+    case 'trapezoid':
+      return [par(d, c, a, b)];
+    case 'quad':
+      return []; // a general quadrilateral states nothing beyond being one
+  }
+}
 
 /**
  * A base's free dims, sampled per (seed, stable key) — the canonical sampling every

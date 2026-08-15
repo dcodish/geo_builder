@@ -63,7 +63,13 @@ export function droppedShapeNoun3(utterance: string, commands: Command3[]): stri
   // this gate watched solid BASES exclusively. The drop is identical in kind to the solid one it already
   // catches, so it is the same question asked in one more context, never a second gate.
   const solidCtx = /מנסרה|פירמידה|\bprism\b|\bpyramid\b/i.test(s);
-  const flatCtx = commands.some((c) => c.type === 'solid' && (c.kind === 'polygon3' || c.kind === 'polygon4' || c.kind === 'polygon5'));
+  const flatCtx = commands.some(
+    (c) =>
+      (c.type === 'solid' && (c.kind === 'polygon3' || c.kind === 'polygon4' || c.kind === 'polygon5')) ||
+      // #587 (ADR-3D-152): `quad-shape` reaches apply WITHOUT a sibling `solid` when the rule is a
+      // corner completion (`ABEC מלבן`) — still a flat quad-noun statement, so still this gate's event.
+      c.type === 'quad-shape',
+  );
   if (!solidCtx && !flatCtx) return [];
   // #305 (ADR-3D-090): which base a KIND stands on comes from the ONE registry, so this gate can
   // never drift behind the parser again (it used to keep its own kind lists and marked kite /
@@ -87,6 +93,15 @@ export function droppedShapeNoun3(utterance: string, commands: Command3[]): stri
         built.add(b);
         for (const pr of BASE_PROPS[b] ?? []) props.add(pr);
       }
+    } else if (c.type === 'quad-shape') {
+      // #587 (ADR-3D-152): the command that CARRIES the stated noun is the strongest account there is
+      // — apply lowers `quadShapeConstraints(base)` from it. The issue's plan predicted no gate change
+      // would be needed because the family's constraints would sit in the command list; the operator's
+      // option-(a) ruling then moved the lowering to APPLY (the dispatch needs to know which corners
+      // exist, and `parse3` is context-free), so the constraints are no longer visible here. Accounting
+      // the carrier is the same question asked of the command that actually answers it.
+      built.add(c.base);
+      for (const pr of BASE_PROPS[c.base] ?? []) props.add(pr);
     } else if (c.type === 'length-rel' && c.c === 1) props.add('eqAdj');
     else if (c.type === 'cos-angle' && c.cos === 0) props.add('right');
   }

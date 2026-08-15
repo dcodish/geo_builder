@@ -1785,6 +1785,76 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "square ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "ריבוע ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "ABCD is a square",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "ABCD ריבוע",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "rectangle ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "מלבן ABCD",
+    "winner": "rectComplete",
+  },
+  {
+    "lang": "en",
+    "text": "rhombus ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "מעוין ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "parallelogram ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "מקבילית ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "kite ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "דלתון ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "trapezoid ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "טרפז ABCD",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "en",
     "text": "CD is the altitude to AB",
     "winner": "altitudeFoot",
   },
