@@ -7,11 +7,12 @@ import { useComplexStore } from '../store/useComplexStore';
 const wrap360 = (d: number): number => ((d % 360) + 360) % 360;
 const angDist = (d: number): number => Math.min(wrap360(d), 360 - wrap360(d));
 
-const fact = (line: string): Fact => {
+const facts = (line: string): Fact[] => {
   const r = parseLine(line);
   if (!r.ok) throw new Error(`did not parse: ${line} (${r.key})`);
-  return r.fact;
+  return r.facts;
 };
+const fact = (line: string): Fact => facts(line)[0];
 
 describe('parser', () => {
   it('cartesian literal', () => {
@@ -325,6 +326,26 @@ describe('generic forms, re/im, configurations', () => {
     expect(im.valueOverride).toMatchObject({ re: 4, im: 0 }); // the value itself is real 4
     const re = s.points.find((p) => p.label === 're(z₁)')!;
     expect(re.z).toMatchObject({ re: 3, im: 0 }); // already on the Re axis
+  });
+
+  it('mixed polar declarations lower to free + relation (nothing stated is dropped)', () => {
+    // z = 2cis(θ): free with modulus pinned to 2
+    const st = useComplexStore.getState();
+    st.clearAll();
+    expect(st.addLine('z = 2cis(θ)')).toBe(true);
+    let s = derive(useComplexStore.getState().facts, {});
+    expect(absC(s.points.find((p) => p.label === 'z')!.z)).toBeCloseTo(2);
+    expect(Object.values(s.checks)).toEqual([{ ok: true, driven: true }]);
+    st.clearAll();
+    // w = r·cis(45): free with argument pinned to 45°
+    expect(useComplexStore.getState().addLine('w = r cis 45')).toBe(true);
+    s = derive(useComplexStore.getState().facts, {});
+    expect(argDeg(s.points.find((p) => p.label === 'w')!.z)).toBeCloseTo(45);
+    useComplexStore.getState().clearAll();
+  });
+
+  it('β normalizes like θ and α', () => {
+    expect(fact('z = rcis(β)')).toMatchObject({ kind: 'free', name: 'z' });
   });
 
   it('hebrew re/im forms parse', () => {

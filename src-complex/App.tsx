@@ -19,6 +19,9 @@ const SYMBOLS: { label: string; titleKey: string; before: string; after?: string
   { label: '°', titleKey: 'symDeg', before: '°' },
   { label: 'xⁿ', titleKey: 'symPow', before: '^' },
   { label: '·', titleKey: 'symMul', before: '*' },
+  { label: 'θ', titleKey: 'symTheta', before: 'θ' },
+  { label: 'α', titleKey: 'symAlpha', before: 'α' },
+  { label: 'β', titleKey: 'symBeta', before: 'β' },
 ];
 
 const ERROR_KEY: Record<InputError['key'], string> = {

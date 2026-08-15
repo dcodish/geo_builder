@@ -38,47 +38,54 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
       set({ lastError: { key: res.key, detail: res.detail ?? raw.trim() } });
       return false;
     }
-    let { facts } = get();
-    const existing = facts.find((f) => f.id === res.fact.id);
-    if (existing) {
-      // idempotent re-issue; for anonymous shows the id IS the normalized expression
-      if (existing.src === res.fact.src || existing.kind === 'show') return true;
-      set({ lastError: { key: 'duplicate-name', detail: existing.src } });
-      return false;
-    }
-    // ADR-CX-004: an implicitly-created free number yields to an explicit definition of its
-    // name — replaced IN PLACE, so the name keeps its position in the evaluation order
-    // (its consumers come later in the list and must still see it defined).
-    let insertAt = facts.length;
-    if (res.fact.kind === 'def' || res.fact.kind === 'free') {
-      const name = res.fact.name;
-      const idx = facts.findIndex((f) => f.kind === 'free' && f.implicit && f.name === name);
-      if (idx >= 0) {
-        facts = facts.filter((_, i) => i !== idx);
-        insertAt = idx;
+    // One utterance may lower to several facts; stage them ALL, commit only if all pass —
+    // a refused half would otherwise silently drop part of what the student stated.
+    let working = get().facts;
+    for (const fact of res.facts) {
+      const existing = working.find((f) => f.id === fact.id);
+      if (existing) {
+        // idempotent re-issue; show/rel ids ARE their normalized statements
+        if (existing.src === fact.src || existing.kind === 'show' || existing.kind === 'rel')
+          continue;
+        set({ lastError: { key: 'duplicate-name', detail: existing.src } });
+        return false;
       }
-    }
-    // Honesty: a name may be introduced exactly once — the error names the CONFLICTING statement.
-    const taken = new Set(facts.flatMap(factNames));
-    const clash = factNames(res.fact).find((n) => taken.has(n));
-    if (clash) {
-      const holder = facts.find((f) => factNames(f).includes(clash));
-      set({ lastError: { key: 'duplicate-name', detail: holder?.src ?? clash } });
-      return false;
-    }
-    // ADR-CX-004: z*/w* names are complex numbers by convention — an unknown reference
-    // auto-creates a visible, draggable free number (the ADR-3D-146 auto-creation idiom).
-    const implicitFrees: Fact[] = [];
-    const seen = new Set<string>(factNames(res.fact)); // never implicit-create the fact's own name
-    for (const ref of factRefs(res.fact)) {
-      if (!taken.has(ref) && !seen.has(ref) && IMPLICIT_COMPLEX_RE.test(ref)) {
-        seen.add(ref);
-        implicitFrees.push({ id: `free-${ref}`, kind: 'free', name: ref, src: ref, implicit: true });
+      // ADR-CX-004: an implicitly-created free number yields to an explicit definition of its
+      // name — replaced IN PLACE, so the name keeps its position in the evaluation order
+      // (its consumers come later in the list and must still see it defined).
+      let insertAt = working.length;
+      if (fact.kind === 'def' || fact.kind === 'free') {
+        const idx = working.findIndex(
+          (f) => f.kind === 'free' && f.implicit && f.name === fact.name,
+        );
+        if (idx >= 0) {
+          working = working.filter((_, i) => i !== idx);
+          insertAt = idx;
+        }
       }
+      // Honesty: a name may be introduced exactly once — the error names the CONFLICTING statement.
+      const taken = new Set(working.flatMap(factNames));
+      const clash = factNames(fact).find((n) => taken.has(n));
+      if (clash) {
+        const holder = working.find((f) => factNames(f).includes(clash));
+        set({ lastError: { key: 'duplicate-name', detail: holder?.src ?? clash } });
+        return false;
+      }
+      // ADR-CX-004: z*/w* names are complex numbers by convention — an unknown reference
+      // auto-creates a visible, draggable free number (the ADR-3D-146 auto-creation idiom).
+      const implicitFrees: Fact[] = [];
+      const seen = new Set<string>(factNames(fact)); // never implicit-create the fact's own name
+      for (const ref of factRefs(fact)) {
+        if (!taken.has(ref) && !seen.has(ref) && IMPLICIT_COMPLEX_RE.test(ref)) {
+          seen.add(ref);
+          implicitFrees.push({ id: `free-${ref}`, kind: 'free', name: ref, src: ref, implicit: true });
+        }
+      }
+      const next = working.slice();
+      next.splice(insertAt, 0, ...implicitFrees, fact);
+      working = next;
     }
-    const next = facts.slice();
-    next.splice(insertAt, 0, ...implicitFrees, res.fact);
-    set({ facts: next, lastError: null });
+    set({ facts: working, lastError: null });
     return true;
   },
 

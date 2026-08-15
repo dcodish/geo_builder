@@ -4,8 +4,11 @@
 import { cisDeg, cx } from '../engine/complex';
 import { factId, IMPLICIT_COMPLEX_RE, type ArgTerm, type Expr, type Fact } from '../engine/model';
 
+/** One utterance may LOWER to several facts (the sibling macro-lowering idiom, FR-IN-7):
+ * e.g. `z = 2cis(θ)` states freeness AND a modulus — both must survive (honesty: no stated
+ * magnitude is ever silently dropped). */
 export type ParseResult =
-  | { ok: true; fact: Fact }
+  | { ok: true; facts: Fact[] }
   | { ok: false; key: 'not-handled' | 'parse-error'; detail?: string };
 
 // Display transforms must never reach the parser (ADR-448 / ADR-3D-144): strip invisible
@@ -249,6 +252,7 @@ export const parseLine = (raw: string): ParseResult => {
     .replace(/החלק\s+הממשי(?:\s+של)?/g, 're')
     .replace(/החלק\s+המדומה(?:\s+של)?/g, 'im')
     .replace(/θ/g, 'theta')
+    .replace(/β/g, 'beta')
     .replace(/[αφ]/g, (c) => (c === 'α' ? 'alpha' : 'phi'));
   if (line === '') return { ok: false, key: 'not-handled' };
 
@@ -256,7 +260,7 @@ export const parseLine = (raw: string): ParseResult => {
   if (free) {
     const name = (free[1] ?? free[2]).toLowerCase();
     const f = { kind: 'free' as const, name, src: raw.trim() };
-    return { ok: true, fact: { ...f, id: factId(f) } };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 
   const roots = ROOTS_RE.exec(line);
@@ -266,7 +270,7 @@ export const parseLine = (raw: string): ParseResult => {
     const rhs = parseExpr(roots[3]);
     if (!rhs) return { ok: false, key: 'parse-error', detail: raw.trim() };
     const f = { kind: 'roots' as const, varName: roots[1].toLowerCase(), n, rhs, src: raw.trim() };
-    return { ok: true, fact: { ...f, id: factId(f) } };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 
   const argrel = ARGREL_RE.exec(line);
@@ -281,7 +285,7 @@ export const parseLine = (raw: string): ParseResult => {
       src: raw.trim(),
       norm: line,
     };
-    return { ok: true, fact: { ...f, id: factId(f) } };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 
   const modrel = MODREL_RE.exec(line);
@@ -297,7 +301,7 @@ export const parseLine = (raw: string): ParseResult => {
       src: raw.trim(),
       norm: line,
     };
-    return { ok: true, fact: { ...f, id: factId(f) } };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 
   // Generic declaration forms — the exam's way of saying "this number is FREE":
@@ -305,13 +309,46 @@ export const parseLine = (raw: string): ParseResult => {
   const genPolar = /^([a-zA-Z]\w*)\s*=\s*([a-zA-Z]\w*?)\s*\*?\s*cis\b\s*\(?\s*([a-zA-Z]\w*)\s*\)?$/.exec(line);
   if (genPolar) {
     const f = { kind: 'free' as const, name: genPolar[1].toLowerCase(), src: raw.trim() };
-    return { ok: true, fact: { ...f, id: factId(f) } };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
   const genCart =
     /^([a-zA-Z]\w*)\s*=\s*([a-zA-Z])\s*\+\s*(?:i\s*\*?\s*([a-zA-Z])|([a-zA-Z])\s*\*?\s*i)$/.exec(line);
   if (genCart) {
     const f = { kind: 'free' as const, name: genCart[1].toLowerCase(), src: raw.trim() };
-    return { ok: true, fact: { ...f, id: factId(f) } };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
+  }
+
+  // Mixed polar declarations LOWER to two facts (honesty: the stated half must survive):
+  // z = 2·cis(θ) → free z + |z| = 2 ; z = r·cis(45) → free z + arg z = 45
+  const mixedMod =
+    /^([a-zA-Z]\w*)\s*=\s*(\d+(?:\.\d+)?)\s*\*?\s*cis\b\s*\(?\s*[a-zA-Z]\w*\s*\)?$/.exec(line);
+  if (mixedMod) {
+    const name = mixedMod[1].toLowerCase();
+    const free = { kind: 'free' as const, name, src: raw.trim() };
+    const rel = {
+      kind: 'rel' as const,
+      rel: { type: 'mod' as const, name, k: Number(mixedMod[2]) },
+      src: raw.trim(),
+      norm: `|${name}| = ${mixedMod[2]}`,
+    };
+    return { ok: true, facts: [{ ...free, id: factId(free) }, { ...rel, id: factId(rel) }] };
+  }
+  const mixedArg =
+    /^([a-zA-Z]\w*)\s*=\s*[a-zA-Z]\w*?\s*\*?\s*cis\b\s*\(?\s*(-?\d+(?:\.\d+)?)\s*\)?$/.exec(line);
+  if (mixedArg) {
+    const name = mixedArg[1].toLowerCase();
+    const free = { kind: 'free' as const, name, src: raw.trim() };
+    const rel = {
+      kind: 'rel' as const,
+      rel: {
+        type: 'arg' as const,
+        terms: [{ sign: 1 as const, name }],
+        rhsDeg: Number(mixedArg[2]),
+      },
+      src: raw.trim(),
+      norm: `arg ${name} = ${mixedArg[2]}`,
+    };
+    return { ok: true, facts: [{ ...free, id: factId(free) }, { ...rel, id: factId(rel) }] };
   }
 
   const def = DEF_RE.exec(line);
@@ -319,7 +356,7 @@ export const parseLine = (raw: string): ParseResult => {
     const expr = parseExpr(def[2]);
     if (!expr) return { ok: false, key: 'parse-error', detail: raw.trim() };
     const f = { kind: 'def' as const, name: def[1].toLowerCase(), expr, src: raw.trim() };
-    return { ok: true, fact: { ...f, id: factId(f) } };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 
   // a bare z/w-family name IS its free declaration (ADR-CX-004: "if I just write z or z2…")
@@ -328,7 +365,7 @@ export const parseLine = (raw: string): ParseResult => {
     const name = bareName[1].toLowerCase();
     if (!IMPLICIT_COMPLEX_RE.test(name)) return { ok: false, key: 'not-handled' };
     const f = { kind: 'free' as const, name, src: raw.trim() };
-    return { ok: true, fact: { ...f, id: factId(f) } };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 
   // a bare expression line ("|z1|", "z1^5") plots as an anonymous point labeled by itself —
@@ -336,7 +373,7 @@ export const parseLine = (raw: string): ParseResult => {
   const bare = parseExpr(line);
   if (bare) {
     const f = { kind: 'show' as const, expr: bare, src: raw.trim(), norm: line };
-    return { ok: true, fact: { ...f, id: factId(f) } };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 
   return { ok: false, key: 'not-handled' };
