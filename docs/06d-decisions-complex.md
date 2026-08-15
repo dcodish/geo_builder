@@ -148,3 +148,33 @@ not every identifier (`|z₁| = 9r` must keep r a real parameter, never auto-cre
    later expressions) — pending the F8 set-reference design for the collision case.
 
 Implemented in the C0 prototype with four locking tests; docs/27 §10 F1 updated.
+
+---
+
+## ADR-CX-005 — An equation is ABOUT its letter (2026-08-15)
+
+**Status:** Accepted (operator ruling, during prototype play)
+
+**Context.** The prototype treated `z^3 = w` as "enumerate the cube roots of w, named z1..z3" even
+when `z` already existed as a number — leaving z disconnected from z₁..z₃. Operator: a letter z
+must be related to its indexed letters; and when the equation involves an existing number "it has
+a solvable meaning that should be represented."
+
+**Decision — three modes, decided by whether the letter already exists** (stamped at entry, F8):
+
+1. **Fresh letter → enumerate.** The exam's `פתרו את המשוואה` idiom: the n solutions plot as
+   X₁..Xₙ, and the **bare letter is reserved** — a later independent `X = …` refuses (naming the
+   equation), and X is never implicit-created as a disconnected free point.
+2. **Existing FREE letter → constrain.** driveOrCheck: X snaps to a solution (fixed-point on the
+   nearest n-th root, prefix replayed per iteration so a **self-referential** rhs like
+   `z³ = w, w = z·z` solves); the candidate set draws display-only; the fact row carries the
+   check. "Show another configuration" resamples → X can land on a different solution — branch
+   cycling falls out organically.
+3. **Existing DETERMINED letter → verify.** The equation is a claim, ✓/✗ (`z1² = −4` after
+   `z1 = 2i` verifies; `z1² = 4` refutes).
+
+**Consequences.** Roots-fact identity includes the whole normalized equation (two equations about
+one letter are distinct facts; conflicting ones surface as a failed check, never silent). Engine
+note recorded from the fix: a projected iterate is *always* an exact root of the previous rhs —
+convergence must be judged by step size + a self-consistent final residual, never by residual
+against the pre-projection rhs. The real C3 build inherits these semantics.
