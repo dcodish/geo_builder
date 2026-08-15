@@ -26,7 +26,10 @@ export type Expr =
 export type Fact =
   | { id: string; kind: 'free'; name: string; src: string; implicit?: boolean }
   | { id: string; kind: 'def'; name: string; expr: Expr; src: string }
-  | { id: string; kind: 'roots'; varName: string; n: number; rhs: Expr; src: string };
+  | { id: string; kind: 'roots'; varName: string; n: number; rhs: Expr; src: string }
+  /** an unnamed expression line — plotted, labeled by the expression itself, never referencable
+   *  (ADR-447: anonymous ids never reach a rendered string; the label is the student's text) */
+  | { id: string; kind: 'show'; expr: Expr; src: string; norm: string };
 
 /** The exam's naming convention (ADR-CX-004): z- and w-family names ARE complex numbers — first
  * reference auto-creates a free number. Other letters stay explicit (a,d,m,n,r are real params). */
@@ -60,7 +63,11 @@ type FactBody = Fact extends infer F ? (F extends Fact ? Omit<F, 'id'> : never) 
 
 /** Deterministic ids (the sibling convention): re-adding the same statement is idempotent. */
 export const factId = (f: FactBody): string =>
-  f.kind === 'roots' ? `roots-${f.varName}-${f.n}` : `${f.kind}-${f.name}`;
+  f.kind === 'roots'
+    ? `roots-${f.varName}-${f.n}`
+    : f.kind === 'show'
+      ? `show-${f.norm.replace(/ /g, '')}`
+      : `${f.kind}-${f.name}`;
 
 export interface ScenePoint {
   key: string;
@@ -136,6 +143,12 @@ const SUB_DIGITS: Record<string, string> = {
 export const prettyName = (name: string): string =>
   name.replace(/(\d+)$/, (d) => d.split('').map((c) => SUB_DIGITS[c] ?? c).join(''));
 
+/** Prettify digits inside an expression string: z1^5 → z₁^5 (label duty only). */
+export const prettyExpr = (s: string): string =>
+  s.replace(/([a-zA-Z])(\d+)/g, (_, a: string, d: string) =>
+    a + d.split('').map((c) => SUB_DIGITS[c] ?? c).join(''),
+  );
+
 export const derive = (facts: Fact[], freePos: Record<string, Cx>): Scene => {
   const env = new Map<string, Cx>();
   const points: ScenePoint[] = [];
@@ -152,6 +165,9 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>): Scene => {
         const z = evalExpr(f.expr, env);
         env.set(f.name, z);
         points.push({ key: f.id, label: prettyName(f.name), z, kind: 'def', factId: f.id });
+      } else if (f.kind === 'show') {
+        const z = evalExpr(f.expr, env);
+        points.push({ key: f.id, label: prettyExpr(f.norm), z, kind: 'def', factId: f.id });
       } else {
         const w = evalExpr(f.rhs, env);
         if (absC(w) === 0) {
@@ -184,4 +200,8 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>): Scene => {
 
 /** Names a fact introduces — used by the store's duplicate-name honesty check. */
 export const factNames = (f: Fact): string[] =>
-  f.kind === 'roots' ? Array.from({ length: f.n }, (_, k) => `${f.varName}${k + 1}`) : [f.name];
+  f.kind === 'roots'
+    ? Array.from({ length: f.n }, (_, k) => `${f.varName}${k + 1}`)
+    : f.kind === 'show'
+      ? []
+      : [f.name];

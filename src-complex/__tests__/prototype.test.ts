@@ -105,6 +105,44 @@ describe('parser', () => {
     expect(w.im).toBeCloseTo(3);
   });
 
+  it('bare expression lines plot as anonymous points labeled by themselves', () => {
+    const s = derive([fact('z1 = 3+4i'), fact('|z1|'), fact('z1^2')], {});
+    expect(s.errors).toEqual({});
+    const abs = s.points.find((p) => p.label === '|z₁|')!;
+    expect(abs.z).toMatchObject({ re: 5, im: 0 });
+    const sq = s.points.find((p) => p.label === 'z₁^2')!;
+    expect(sq.z.re).toBeCloseTo(-7);
+    expect(sq.z.im).toBeCloseTo(24);
+  });
+
+  it('a bare expression auto-creates its z/w references too', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    expect(st.addLine('z1^5')).toBe(true);
+    const { facts } = useComplexStore.getState();
+    expect(facts.map((f) => f.kind)).toEqual(['free', 'show']);
+    expect(derive(facts, {}).errors).toEqual({});
+    useComplexStore.getState().clearAll();
+  });
+
+  it('a bare z/w name IS its free declaration; a bare other word stays not-handled', () => {
+    const f = fact('z10');
+    expect(f).toMatchObject({ kind: 'free', name: 'z10' });
+    const r = parseLine('hello');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.key).toBe('not-handled');
+  });
+
+  it('re-issuing the same bare expression is idempotent', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z1 = 3+4i');
+    st.addLine('|z1|');
+    expect(st.addLine('| z1 |')).toBe(true); // same normalized expression
+    expect(useComplexStore.getState().facts).toHaveLength(2);
+    useComplexStore.getState().clearAll();
+  });
+
   it('rejects nonsense with not-handled (the LLM-fallback seam)', () => {
     const r = parseLine('שלום עולם');
     expect(r.ok).toBe(false);

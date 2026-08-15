@@ -37,7 +37,8 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
     let { facts } = get();
     const existing = facts.find((f) => f.id === res.fact.id);
     if (existing) {
-      if (existing.src === res.fact.src) return true; // idempotent re-issue
+      // idempotent re-issue; for anonymous shows the id IS the normalized expression
+      if (existing.src === res.fact.src || existing.kind === 'show') return true;
       set({ lastError: { key: 'duplicate-name', detail: existing.src } });
       return false;
     }
@@ -64,7 +65,11 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
     // ADR-CX-004: z*/w* names are complex numbers by convention — an unknown reference
     // auto-creates a visible, draggable free number (the ADR-3D-146 auto-creation idiom).
     const expr =
-      res.fact.kind === 'def' ? res.fact.expr : res.fact.kind === 'roots' ? res.fact.rhs : null;
+      res.fact.kind === 'def' || res.fact.kind === 'show'
+        ? res.fact.expr
+        : res.fact.kind === 'roots'
+          ? res.fact.rhs
+          : null;
     const implicitFrees: Fact[] = [];
     if (expr) {
       const seen = new Set<string>(factNames(res.fact)); // never implicit-create the fact's own name

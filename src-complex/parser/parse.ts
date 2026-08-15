@@ -2,7 +2,7 @@
 // (docs/27 §5.2 subset): literals a+bi and r·cis θ, + - * / ^int, conj, parens.
 // Unmatched input returns { ok: false, key: 'not-handled' } — the sibling seam.
 import { cisDeg, cx } from '../engine/complex';
-import { factId, type Expr, type Fact } from '../engine/model';
+import { factId, IMPLICIT_COMPLEX_RE, type Expr, type Fact } from '../engine/model';
 
 export type ParseResult =
   | { ok: true; fact: Fact }
@@ -260,6 +260,23 @@ export const parseLine = (raw: string): ParseResult => {
     const expr = parseExpr(def[2]);
     if (!expr) return { ok: false, key: 'parse-error', detail: raw.trim() };
     const f = { kind: 'def' as const, name: def[1].toLowerCase(), expr, src: raw.trim() };
+    return { ok: true, fact: { ...f, id: factId(f) } };
+  }
+
+  // a bare z/w-family name IS its free declaration (ADR-CX-004: "if I just write z or z2…")
+  const bareName = /^([a-zA-Z]\w*)$/.exec(line);
+  if (bareName) {
+    const name = bareName[1].toLowerCase();
+    if (!IMPLICIT_COMPLEX_RE.test(name)) return { ok: false, key: 'not-handled' };
+    const f = { kind: 'free' as const, name, src: raw.trim() };
+    return { ok: true, fact: { ...f, id: factId(f) } };
+  }
+
+  // a bare expression line ("|z1|", "z1^5") plots as an anonymous point labeled by itself —
+  // the D3 always-visualize rule; deterministic id from the NORMALIZED text (idempotent).
+  const bare = parseExpr(line);
+  if (bare) {
+    const f = { kind: 'show' as const, expr: bare, src: raw.trim(), norm: line };
     return { ok: true, fact: { ...f, id: factId(f) } };
   }
 
