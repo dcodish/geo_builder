@@ -126,6 +126,16 @@ export function App() {
             <button onClick={clearAll}>{t('clearAll')}</button>
             <span className="count">{t('factCount', { count: facts.length })}</span>
           </div>
+          {scene.measures.length > 0 && (
+            <div className="measures">
+              <div className="measures-title">{t('calcsLabel')}</div>
+              {scene.measures.map((m) => (
+                <div key={m.key} className="measure-row" dir="ltr">
+                  {m.label} = {fmtNum(m.value)}
+                </div>
+              ))}
+            </div>
+          )}
           {Object.keys(scene.params).length > 0 && (
             <div className="params" dir="ltr" title={t('paramsLabel')}>
               {Object.entries(scene.params)

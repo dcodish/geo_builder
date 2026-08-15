@@ -109,11 +109,15 @@ describe('parser', () => {
     expect(w.im).toBeCloseTo(3);
   });
 
-  it('bare expression lines plot as anonymous points labeled by themselves', () => {
+  it('bare expressions: complex ones plot; scalar calcs go to the DATA PANEL', () => {
     const s = derive([fact('z1 = 3+4i'), fact('|z1|'), fact('z1^2')], {});
     expect(s.errors).toEqual({});
-    const abs = s.points.find((p) => p.label === '|z₁|')!;
-    expect(abs.z).toMatchObject({ re: 5, im: 0 });
+    // |z1| is a calc: measures panel only, never a point on the plane
+    expect(s.points.find((p) => p.label === '|z₁|')).toBeUndefined();
+    expect(s.measures).toEqual([
+      { key: 'show-|z1|', label: '|z₁|', value: 5, factId: 'show-|z1|' },
+    ]);
+    // z1^2 is a point: stays on the plane
     const sq = s.points.find((p) => p.label === 'z₁^2')!;
     expect(sq.z.re).toBeCloseTo(-7);
     expect(sq.z.im).toBeCloseTo(24);
@@ -258,8 +262,8 @@ describe('relations: driveOrCheck-lite (F3 modulus / F4 argument)', () => {
     const s = derive(useComplexStore.getState().facts, {});
     expect(s.errors).toEqual({});
     expect(Object.values(s.checks).every((c) => c.ok)).toBe(true);
-    const dist = s.points.find((p) => p.label === '|z₁ - z₂|')!;
-    expect(dist.z.re).toBeCloseTo(15); // the 9-12-15 right triangle
+    const dist = s.measures.find((m) => m.label === '|z₁ - z₂|')!;
+    expect(dist.value).toBeCloseTo(15); // the 9-12-15 right triangle
     useComplexStore.getState().clearAll();
   });
 
@@ -319,13 +323,17 @@ describe('generic forms, re/im, configurations', () => {
     expect(w.im).toBeCloseTo(4);
   });
 
-  it('a bare im(...) plots ON the imaginary axis, labeled with the true scalar', () => {
+  it('a bare im(...) plots ON the imaginary axis AND lists in the data panel', () => {
     const s = derive([fact('z1 = 3+4i'), fact('im(z1)'), fact('re(z1)')], {});
     const im = s.points.find((p) => p.label === 'im(z₁)')!;
     expect(im.z).toMatchObject({ re: 0, im: 4 }); // projection onto Im axis
     expect(im.valueOverride).toMatchObject({ re: 4, im: 0 }); // the value itself is real 4
     const re = s.points.find((p) => p.label === 're(z₁)')!;
     expect(re.z).toMatchObject({ re: 3, im: 0 }); // already on the Re axis
+    expect(s.measures.map((m) => [m.label, m.value])).toEqual([
+      ['im(z₁)', 4],
+      ['re(z₁)', 3],
+    ]);
   });
 
   it('mixed polar declarations lower to free + relation (nothing stated is dropped)', () => {
@@ -445,7 +453,7 @@ describe('shared parameters and inequalities (operator: |z1|=9r, arg(z2)<45)', (
       expect(Object.values(s.checks).every((c) => c.ok)).toBe(true);
       const r = s.params.r;
       expect(r).toBeGreaterThan(0);
-      const dist = s.points.find((p) => p.label === '|z₁ - z₂|')!.z.re;
+      const dist = s.measures.find((m) => m.label === '|z₁ - z₂|')!.value;
       expect(dist / r).toBeCloseTo(15); // linear in the SHARED r, any sample
       expect(s.params.r).not.toBe(derive(factList, {}, seed + 10).params.r); // r resamples
     }
@@ -541,7 +549,7 @@ describe('quadrant givens (F5: רביע)', () => {
       const z2 = s.points.find((p) => p.label === 'z₂')!.z;
       expect(argDeg(z2)).toBeGreaterThan(0);
       expect(argDeg(z2)).toBeLessThan(45);
-      const dist = s.points.find((p) => p.label === '|z₁ - z₂|')!.z.re;
+      const dist = s.measures.find((m) => m.label === '|z₁ - z₂|')!.value;
       expect(dist / s.params.r).toBeCloseTo(15);
     }
     useComplexStore.getState().clearAll();

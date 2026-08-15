@@ -135,9 +135,37 @@ export interface SceneCircle {
 
 export type EvalError = { key: 'unknown-ref'; detail: string } | { key: 'roots-of-zero'; detail: string };
 
+/** Static scalarness: is this expression a MEASURE (a real calc) rather than a point?
+ * abs/re/im produce scalars; arithmetic containing a scalar stays scalar. */
+export const isScalarExpr = (e: Expr): boolean => {
+  switch (e.t) {
+    case 'abs':
+    case 're':
+    case 'im':
+      return true;
+    case 'neg':
+      return isScalarExpr(e.e);
+    case 'pow':
+      return isScalarExpr(e.base);
+    case 'bin':
+      return isScalarExpr(e.l) || isScalarExpr(e.r);
+    default:
+      return false;
+  }
+};
+
+export interface SceneMeasure {
+  key: string;
+  label: string;
+  value: number;
+  factId: string;
+}
+
 export interface Scene {
   points: ScenePoint[];
   circles: SceneCircle[];
+  /** scalar calcs (|z1−z2|, |z1|·2, …) — the DATA PANEL, not the plane (operator ruling) */
+  measures: SceneMeasure[];
   /** factId -> error; an erroring fact contributes nothing, later facts still evaluate */
   errors: Record<string, EvalError>;
   /** relation facts: did the relation hold in the final figure (✓/✗), and did it drive a DOF */
@@ -368,6 +396,7 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Sc
   const errors: Record<string, EvalError> = {};
   const checks: Record<string, { ok: boolean; driven: boolean }> = {};
   const params: Record<string, number> = {};
+  const measures: SceneMeasure[] = [];
 
   for (const f of facts) {
     try {
@@ -409,17 +438,24 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Sc
         points.push({ key: f.id, label: prettyName(f.name), z, kind: 'def', factId: f.id });
       } else if (f.kind === 'show') {
         const v = evalExpr(f.expr, env);
-        // im(z) is a real scalar, but its PICTURE is the projection onto the imaginary axis —
-        // a top-level im(...) show plots at (0, v); everywhere else the value stays the scalar.
-        const z = f.expr.t === 'im' ? { re: 0, im: v.re } : v;
-        points.push({
-          key: f.id,
-          label: prettyExpr(f.norm),
-          z,
-          kind: 'def',
-          factId: f.id,
-          valueOverride: f.expr.t === 'im' ? v : undefined,
-        });
+        if (isScalarExpr(f.expr)) {
+          // a scalar calc lives in the data panel, not on the plane (operator ruling) —
+          // except re/im, whose axis PROJECTIONS were explicitly requested and stay drawn
+          measures.push({ key: f.id, label: prettyExpr(f.norm), value: v.re, factId: f.id });
+          if (f.expr.t === 're' || f.expr.t === 'im') {
+            const z = f.expr.t === 'im' ? { re: 0, im: v.re } : v;
+            points.push({
+              key: f.id,
+              label: prettyExpr(f.norm),
+              z,
+              kind: 'def',
+              factId: f.id,
+              valueOverride: f.expr.t === 'im' ? v : undefined,
+            });
+          }
+        } else {
+          points.push({ key: f.id, label: prettyExpr(f.norm), z: v, kind: 'def', factId: f.id });
+        }
       } else {
         const w = evalExpr(f.rhs, env);
         if (f.constrains) {
@@ -473,7 +509,7 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Sc
       }
     }
   }
-  return { points, circles, errors, checks, params };
+  return { points, circles, errors, checks, params, measures };
 };
 
 /** Names a fact introduces — used by the store's duplicate-name honesty check.
