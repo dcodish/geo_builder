@@ -37,7 +37,14 @@ export default defineConfig(({ command }) => ({
   // The debug log (logs/debug-log.jsonl) is written constantly while the app runs;
   // exclude it from the dev watcher or every write triggers a reload → write loop.
   server: { watch: { ignored: ['**/logs/**'] } },
-  cacheDir: path.resolve(process.env.LOCALAPPDATA || '', 'vite-cache/geo-builder'),
+  // #593: NO `cacheDir` override — Vite's default `node_modules/.vite` is per-checkout, and that is
+  // exactly the property this needs. A fixed absolute cache (`LOCALAPPDATA/vite-cache/geo-builder`)
+  // lived here from the initial commit as a DROPBOX-era workaround: the tree was inside Dropbox until
+  // 2026-07-23, and Dropbox kept corrupting `node_modules`. Since the move it solved nothing and cost
+  // real damage — every worktree shared ONE dep-optimization cache, so two dev servers (the normal
+  // state when playing a PR from a worktree) overwrote each other's optimized deps and browsers got
+  // stale `?v=<hash>` fingerprints. Individual module requests still return 200, which is why it
+  // survives casual verification.
   test: {
     // archive/ holds the old implementation for reference only — never run or typecheck its tests.
     // _node_modules_dropbox_old/ is a parked copy of node_modules (Dropbox-cloud-managed; node_modules

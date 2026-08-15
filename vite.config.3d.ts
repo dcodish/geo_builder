@@ -32,5 +32,6 @@ export default defineConfig({
     outDir: 'dist-3d',
     rollupOptions: { input: path.resolve(__dirname, '3d.html') },
   },
-  cacheDir: path.resolve(process.env.LOCALAPPDATA || '', 'vite-cache/geo-builder-3d'),
+  // #593: no `cacheDir` override — see the note in `vite.config.ts`. Vite's per-checkout default is
+  // what makes concurrent worktree dev servers safe.
 });
