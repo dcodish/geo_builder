@@ -979,6 +979,34 @@ describe('general equations (#605: -2z1 = conj(z3), one-unknown Newton)', () => 
   });
 });
 
+describe('acceptance gate (#606: a new statement never breaks earlier ones)', () => {
+  it("the operator's session: the incompatible-as-solved equation is REFUSED, earlier facts stay green", () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('סדרה הנדסית z1,z2,z3');
+    st.addLine('z1 ברביע הראשון');
+    st.addLine('z1^3 = z3');
+    const factCount = useComplexStore.getState().facts.length;
+    expect(st.addLine('-2z1 = conj(z3)')).toBe(false); // blame lands on the NEWEST statement
+    const after = useComplexStore.getState();
+    expect(after.lastError).toEqual({ key: 'incompatible', detail: 'z1^3 = z3' });
+    expect(after.facts).toHaveLength(factCount); // nothing landed, nothing harmed
+    const s = derive(after.facts, after.freePos, after.seed);
+    expect(Object.values(s.checks).every((c) => c.ok)).toBe(true);
+    useComplexStore.getState().clearAll();
+  });
+
+  it('a refuted pure CLAIM about determined values still lands (feedback, not damage)', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z1 = 1+i');
+    expect(st.addLine('arg(z1) < 30')).toBe(true); // its own X is the answer to the claim
+    const s = derive(useComplexStore.getState().facts, {});
+    expect(Object.values(s.checks)[0].ok).toBe(false);
+    useComplexStore.getState().clearAll();
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();

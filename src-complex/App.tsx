@@ -29,6 +29,7 @@ const ERROR_KEY: Record<InputError['key'], string> = {
   'not-handled': 'errNotHandled',
   'parse-error': 'errParse',
   'duplicate-name': 'errDuplicate',
+  incompatible: 'errIncompatible',
 };
 
 export function App() {

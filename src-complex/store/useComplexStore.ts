@@ -2,12 +2,14 @@
 // the scene is derived in the component (no cached derived state — the ADR-3D-001 §8 idiom).
 import { create } from 'zustand';
 import type { Cx } from '../engine/complex';
-import { factNames, factRefs, IMPLICIT_COMPLEX_RE, type Fact } from '../engine/model';
+import { derive, factNames, factRefs, IMPLICIT_COMPLEX_RE, type Fact } from '../engine/model';
 import { parseLine } from '../parser/parse';
 
 export type InputError =
   | { key: 'not-handled' | 'parse-error'; detail: string }
-  | { key: 'duplicate-name'; detail: string };
+  | { key: 'duplicate-name'; detail: string }
+  /** the new statement cannot hold together with the named earlier statement (#606) */
+  | { key: 'incompatible'; detail: string };
 
 /** Save format (suffix `-complex.json`, the per-product convention): the SOURCE LINES in
  * order — loading replays them through the real parse path, so a saved session doubles as
@@ -123,8 +125,31 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
       next.splice(insertAt, 0, ...implicitFrees, fact);
       working = next;
     }
-    set({ facts: working, lastError: null });
-    return true;
+    // Acceptance gate (#606, the ADR-276 doctrine): a new statement must never break an
+    // earlier one. If a previously-green check breaks (or an earlier fact newly errors),
+    // retry a few configurations (mini config-search); if none satisfies everything, the
+    // NEWEST statement is refused, naming the earlier statement it cannot hold with.
+    const { facts: oldFacts, freePos, seed } = get();
+    const before = derive(oldFacts, freePos, seed);
+    const okBefore = Object.entries(before.checks)
+      .filter(([, c]) => c.ok)
+      .map(([id]) => id);
+    const errBefore = new Set(Object.keys(before.errors));
+    const oldIds = new Set(oldFacts.map((fc) => fc.id));
+    let brokenFirst: string | undefined;
+    for (let ds = 0; ds < 8; ds++) {
+      const after = derive(working, freePos, seed + ds);
+      const broken =
+        okBefore.find((id) => after.checks[id] && !after.checks[id].ok) ??
+        Object.keys(after.errors).find((id) => oldIds.has(id) && !errBefore.has(id));
+      if (!broken) {
+        set({ facts: working, seed: seed + ds, lastError: null });
+        return true;
+      }
+      if (ds === 0) brokenFirst = oldFacts.find((fc) => fc.id === broken)?.src;
+    }
+    set({ lastError: { key: 'incompatible', detail: brokenFirst ?? '' } });
+    return false;
   },
 
   removeFact: (id) => set(({ facts }) => ({ facts: facts.filter((f) => f.id !== id) })),
