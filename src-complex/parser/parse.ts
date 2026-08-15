@@ -47,6 +47,7 @@ type Tok =
   | { t: 'cis' }
   | { t: 'conj' }
   | { t: 'inv' }
+  | { t: 'fn'; v: 're' | 'im' }
   | { t: 'op'; v: '+' | '-' | '*' | '/' | '^' | '(' | ')' | '|' };
 
 const tokenize = (s: string): Tok[] | null => {
@@ -70,6 +71,7 @@ const tokenize = (s: string): Tok[] | null => {
         toks.push({ t: 'num', v: Number(cisGlued[1]) });
       } else if (w === 'conj') toks.push({ t: 'conj' });
       else if (w === 'inv') toks.push({ t: 'inv' });
+      else if (w === 're' || w === 'im') toks.push({ t: 'fn', v: w });
       else toks.push({ t: 'ident', v: w });
     } else toks.push({ t: 'op', v: m[3] as '+' });
   }
@@ -175,7 +177,7 @@ class P {
       this.pos++;
       return { t: 'lit', v: cx(0, 1) };
     }
-    if (t.t === 'conj' || t.t === 'inv') {
+    if (t.t === 'conj' || t.t === 'inv' || t.t === 'fn') {
       this.pos++;
       let inner: Expr;
       if (this.isOp('(')) {
@@ -186,6 +188,7 @@ class P {
       } else {
         inner = this.primary();
       }
+      if (t.t === 'fn') return { t: t.v, e: inner };
       return t.t === 'conj'
         ? { t: 'conj', e: inner }
         : { t: 'bin', op: '/', l: { t: 'lit', v: cx(1) }, r: inner };
@@ -242,7 +245,11 @@ export const parseLine = (raw: string): ParseResult => {
   const line = normalize(raw)
     .replace(/הצמוד\s+של\s+/g, 'conj ')
     .replace(/ההופכי\s+של\s+/g, 'inv ')
-    .replace(/ה?ארגומנט(?:\s+של)?/g, 'arg');
+    .replace(/ה?ארגומנט(?:\s+של)?/g, 'arg')
+    .replace(/החלק\s+הממשי(?:\s+של)?/g, 're')
+    .replace(/החלק\s+המדומה(?:\s+של)?/g, 'im')
+    .replace(/θ/g, 'theta')
+    .replace(/[αφ]/g, (c) => (c === 'α' ? 'alpha' : 'phi'));
   if (line === '') return { ok: false, key: 'not-handled' };
 
   const free = FREE_RE.exec(line);
@@ -290,6 +297,20 @@ export const parseLine = (raw: string): ParseResult => {
       src: raw.trim(),
       norm: line,
     };
+    return { ok: true, fact: { ...f, id: factId(f) } };
+  }
+
+  // Generic declaration forms — the exam's way of saying "this number is FREE":
+  // z = r·cis(θ) (symbolic modulus+angle) and z = x+iy / x+yi (symbolic components).
+  const genPolar = /^([a-zA-Z]\w*)\s*=\s*([a-zA-Z]\w*?)\s*\*?\s*cis\b\s*\(?\s*([a-zA-Z]\w*)\s*\)?$/.exec(line);
+  if (genPolar) {
+    const f = { kind: 'free' as const, name: genPolar[1].toLowerCase(), src: raw.trim() };
+    return { ok: true, fact: { ...f, id: factId(f) } };
+  }
+  const genCart =
+    /^([a-zA-Z]\w*)\s*=\s*([a-zA-Z])\s*\+\s*(?:i\s*\*?\s*([a-zA-Z])|([a-zA-Z])\s*\*?\s*i)$/.exec(line);
+  if (genCart) {
+    const f = { kind: 'free' as const, name: genCart[1].toLowerCase(), src: raw.trim() };
     return { ok: true, fact: { ...f, id: factId(f) } };
   }
 

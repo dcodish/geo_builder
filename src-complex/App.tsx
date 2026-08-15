@@ -12,6 +12,8 @@ const SYMBOLS: { label: string; titleKey: string; before: string; after?: string
   { label: 'z̄', titleKey: 'symConj', before: 'conj(', after: ')' },
   { label: '|z|', titleKey: 'symAbs', before: '|', after: '|' },
   { label: '1/z', titleKey: 'symInv', before: '1/(', after: ')' },
+  { label: 'Re', titleKey: 'symRe', before: 're(', after: ')' },
+  { label: 'Im', titleKey: 'symIm', before: 'im(', after: ')' },
   { label: 'cis', titleKey: 'symCis', before: 'cis ' },
   { label: 'i', titleKey: 'symI', before: 'i' },
   { label: '°', titleKey: 'symDeg', before: '°' },
@@ -27,8 +29,19 @@ const ERROR_KEY: Record<InputError['key'], string> = {
 
 export function App() {
   const { t, i18n } = useTranslation();
-  const { facts, freePos, view, lastError, addLine, removeFact, setFree, setView, clearAll } =
-    useComplexStore();
+  const {
+    facts,
+    freePos,
+    seed,
+    view,
+    lastError,
+    addLine,
+    removeFact,
+    setFree,
+    setView,
+    nextConfig,
+    clearAll,
+  } = useComplexStore();
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -50,7 +63,7 @@ export function App() {
     document.documentElement.dir = i18n.language === 'he' ? 'rtl' : 'ltr';
   }, [i18n.language]);
 
-  const scene = useMemo(() => derive(facts, freePos), [facts, freePos]);
+  const scene = useMemo(() => derive(facts, freePos, seed), [facts, freePos, seed]);
 
   const submit = () => {
     if (input.trim() === '') return;
@@ -65,6 +78,7 @@ export function App() {
           <p className="subtitle">{t('subtitle')}</p>
         </div>
         <div className="header-actions">
+          <button onClick={nextConfig}>{t('anotherConfig')}</button>
           <button onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
             {view === 'cart' ? t('viewPolar') : t('viewCart')}
           </button>

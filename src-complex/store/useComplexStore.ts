@@ -12,12 +12,15 @@ export type InputError =
 interface ComplexState {
   facts: Fact[];
   freePos: Record<string, Cx>;
+  /** configuration seed — "show another configuration" bumps it and releases drag overrides */
+  seed: number;
   view: 'cart' | 'polar';
   lastError: InputError | null;
   addLine: (raw: string) => boolean;
   removeFact: (id: string) => void;
   setFree: (name: string, z: Cx) => void;
   setView: (v: 'cart' | 'polar') => void;
+  nextConfig: () => void;
   clearAll: () => void;
   clearError: () => void;
 }
@@ -25,6 +28,7 @@ interface ComplexState {
 export const useComplexStore = create<ComplexState>((set, get) => ({
   facts: [],
   freePos: {},
+  seed: 0,
   view: 'cart',
   lastError: null,
 
@@ -81,6 +85,9 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
   removeFact: (id) => set(({ facts }) => ({ facts: facts.filter((f) => f.id !== id) })),
   setFree: (name, z) => set(({ freePos }) => ({ freePos: { ...freePos, [name]: z } })),
   setView: (view) => set({ view }),
-  clearAll: () => set({ facts: [], freePos: {}, lastError: null }),
+  // a new configuration = fresh samples for every free DOF; drag overrides are part of the
+  // OLD configuration and are released (the sibling "show another configuration" semantics)
+  nextConfig: () => set(({ seed }) => ({ seed: seed + 1, freePos: {} })),
+  clearAll: () => set({ facts: [], freePos: {}, seed: 0, lastError: null }),
   clearError: () => set({ lastError: null }),
 }));

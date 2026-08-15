@@ -302,6 +302,63 @@ describe('relations: driveOrCheck-lite (F3 modulus / F4 argument)', () => {
   });
 });
 
+describe('generic forms, re/im, configurations', () => {
+  it('z = rcis(theta) and z2 = x+iy declare FREE numbers (the generic exam forms)', () => {
+    expect(fact('z = rcis(theta)')).toMatchObject({ kind: 'free', name: 'z' });
+    expect(fact('z1 = r cis θ')).toMatchObject({ kind: 'free', name: 'z1' });
+    expect(fact('z2 = x+iy')).toMatchObject({ kind: 'free', name: 'z2' });
+    expect(fact('w = a+bi')).toMatchObject({ kind: 'free', name: 'w' });
+  });
+
+  it('re/im are scalar functions; re(z)+i·im(z) rebuilds z', () => {
+    const s = derive([fact('z1 = 3+4i'), fact('w = re(z1) + i*im(z1)')], {});
+    expect(s.errors).toEqual({});
+    const w = s.points.find((p) => p.label === 'w')!.z;
+    expect(w.re).toBeCloseTo(3);
+    expect(w.im).toBeCloseTo(4);
+  });
+
+  it('a bare im(...) plots ON the imaginary axis, labeled with the true scalar', () => {
+    const s = derive([fact('z1 = 3+4i'), fact('im(z1)'), fact('re(z1)')], {});
+    const im = s.points.find((p) => p.label === 'im(z₁)')!;
+    expect(im.z).toMatchObject({ re: 0, im: 4 }); // projection onto Im axis
+    expect(im.valueOverride).toMatchObject({ re: 4, im: 0 }); // the value itself is real 4
+    const re = s.points.find((p) => p.label === 're(z₁)')!;
+    expect(re.z).toMatchObject({ re: 3, im: 0 }); // already on the Re axis
+  });
+
+  it('hebrew re/im forms parse', () => {
+    const s = derive([fact('z1 = 3+4i'), fact('w = החלק הממשי של z1')], {});
+    expect(s.points.find((p) => p.label === 'w')!.z).toMatchObject({ re: 3, im: 0 });
+  });
+
+  it('another configuration resamples frees deterministically per seed', () => {
+    const facts = [fact('z1 מספר מרוכב')];
+    const a = derive(facts, {}, 0);
+    const b = derive(facts, {}, 1);
+    const a2 = derive(facts, {}, 0);
+    expect(a.points[0].z).toEqual(a2.points[0].z); // same seed → same figure
+    expect(a.points[0].z).not.toEqual(b.points[0].z); // new seed → new sample
+  });
+
+  it('constraints survive a configuration change', () => {
+    const facts = [
+      fact('arg(z1)-arg(z2)=90'),
+      fact('z1 מספר מרוכב'),
+      fact('z2 מספר מרוכב'),
+    ];
+    // note: rel first references frees declared later — store order normally prevents this;
+    // here we mimic the store layout: frees before rel
+    const ordered = [facts[1], facts[2], facts[0]];
+    for (const seed of [0, 1, 2]) {
+      const s = derive(ordered, {}, seed);
+      const z1 = s.points.find((p) => p.label === 'z₁')!.z;
+      const z2 = s.points.find((p) => p.label === 'z₂')!.z;
+      expect(wrap360(argDeg(z1) - argDeg(z2))).toBeCloseTo(90);
+    }
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();

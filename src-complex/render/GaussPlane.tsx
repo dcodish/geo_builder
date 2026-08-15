@@ -150,7 +150,7 @@ export function GaussPlane({ scene, view, onDragFree }: Props) {
               textAnchor={labelLeft ? 'end' : 'start'}
               style={{ userSelect: 'none', pointerEvents: 'none' }}
             >
-              {p.label} = {fmt(p.z)}
+              {p.label} = {fmt(p.valueOverride ?? p.z)}
             </text>
           </g>
         );

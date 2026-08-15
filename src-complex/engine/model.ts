@@ -22,7 +22,9 @@ export type Expr =
   | { t: 'pow'; base: Expr; exp: number }
   | { t: 'neg'; e: Expr }
   | { t: 'conj'; e: Expr }
-  | { t: 'abs'; e: Expr };
+  | { t: 'abs'; e: Expr }
+  | { t: 're'; e: Expr }
+  | { t: 'im'; e: Expr };
 
 export type Fact =
   | { id: string; kind: 'free'; name: string; src: string; implicit?: boolean }
@@ -68,6 +70,8 @@ export const collectRefs = (e: Expr, out: string[] = []): string[] => {
     case 'neg':
     case 'conj':
     case 'abs':
+    case 're':
+    case 'im':
       collectRefs(e.e, out);
       break;
     case 'lit':
@@ -96,6 +100,8 @@ export interface ScenePoint {
   factId: string;
   /** free points are draggable by their fact name */
   freeName?: string;
+  /** label prints this value when it differs from the plotted position (im-axis projection) */
+  valueOverride?: Cx;
 }
 
 export interface SceneCircle {
@@ -142,14 +148,19 @@ const evalExpr = (e: Expr, env: Map<string, Cx>): Cx => {
       return conj(evalExpr(e.e, env));
     case 'abs':
       return { re: absC(evalExpr(e.e, env)), im: 0 };
+    case 're':
+      return { re: evalExpr(e.e, env).re, im: 0 };
+    case 'im':
+      return { re: evalExpr(e.e, env).im, im: 0 };
   }
 };
 
-/** Deterministic default position for a free number, keyed by NAME (never insertion order) —
- * the stability discipline: adding another fact cannot move an existing free point. */
-export const defaultFree = (name: string): Cx => {
+/** Deterministic default position for a free number, keyed by NAME + configuration seed
+ * (never insertion order) — the stability discipline: adding another fact cannot move an
+ * existing free point; "show another configuration" bumps the seed and resamples them all. */
+export const defaultFree = (name: string, seed = 0): Cx => {
   let h = 0;
-  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  for (const ch of `${name}#${seed}`) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   const angle = 15 + (h % 8) * 45 + ((h >> 5) % 15); // spread, avoiding axis-hugging
   const r = 1.5 + ((h >> 3) % 20) / 10; // 1.5 .. 3.4
   return cisDeg(r, angle);
@@ -177,6 +188,7 @@ const wrapDeg = (d: number): number => ((d % 360) + 360) % 360;
 const projectConstraints = (
   facts: Fact[],
   freePos: Record<string, Cx>,
+  seed: number,
 ): { adjusted: Record<string, Cx>; drove: Record<string, boolean> } => {
   const adjusted: Record<string, Cx> = {};
   const drove: Record<string, boolean> = {};
@@ -185,7 +197,7 @@ const projectConstraints = (
   for (const f of facts) {
     try {
       if (f.kind === 'free') {
-        env.set(f.name, freePos[f.name] ?? defaultFree(f.name));
+        env.set(f.name, freePos[f.name] ?? defaultFree(f.name, seed));
         freeNames.add(f.name);
       } else if (f.kind === 'def') {
         env.set(f.name, evalExpr(f.expr, env));
@@ -229,8 +241,8 @@ const projectConstraints = (
   return { adjusted, drove };
 };
 
-export const derive = (facts: Fact[], freePos: Record<string, Cx>): Scene => {
-  const { adjusted, drove } = projectConstraints(facts, freePos);
+export const derive = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Scene => {
+  const { adjusted, drove } = projectConstraints(facts, freePos, seed);
   const effFreePos = { ...freePos, ...adjusted };
   const env = new Map<string, Cx>();
   const points: ScenePoint[] = [];
@@ -241,7 +253,7 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>): Scene => {
   for (const f of facts) {
     try {
       if (f.kind === 'free') {
-        const z = effFreePos[f.name] ?? defaultFree(f.name);
+        const z = effFreePos[f.name] ?? defaultFree(f.name, seed);
         env.set(f.name, z);
         points.push({ key: f.id, label: prettyName(f.name), z, kind: 'free', factId: f.id, freeName: f.name });
       } else if (f.kind === 'rel') {
@@ -268,8 +280,18 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>): Scene => {
         env.set(f.name, z);
         points.push({ key: f.id, label: prettyName(f.name), z, kind: 'def', factId: f.id });
       } else if (f.kind === 'show') {
-        const z = evalExpr(f.expr, env);
-        points.push({ key: f.id, label: prettyExpr(f.norm), z, kind: 'def', factId: f.id });
+        const v = evalExpr(f.expr, env);
+        // im(z) is a real scalar, but its PICTURE is the projection onto the imaginary axis —
+        // a top-level im(...) show plots at (0, v); everywhere else the value stays the scalar.
+        const z = f.expr.t === 'im' ? { re: 0, im: v.re } : v;
+        points.push({
+          key: f.id,
+          label: prettyExpr(f.norm),
+          z,
+          kind: 'def',
+          factId: f.id,
+          valueOverride: f.expr.t === 'im' ? v : undefined,
+        });
       } else {
         const w = evalExpr(f.rhs, env);
         if (absC(w) === 0) {
