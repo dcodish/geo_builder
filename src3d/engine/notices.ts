@@ -61,6 +61,15 @@ export type BuildNotice3 =
       kind: 'shape-redundant';
       base: QuadBase;
       ids: Id[];
+    }
+  | {
+      /** #333 (ADR-3D-153): the student named an intersection line `ℓ` while `ℓ` was already another
+       *  line, so it was auto-indexed. Operator ruling 2026-07-25: auto-index and SAY SO, rather than
+       *  refuse with a bare `already-defined` the student cannot act on. Derived from the line's
+       *  stored `requested`, so it survives reload and undo like every other notice here. */
+      kind: 'line-auto-named';
+      requested: string;
+      assigned: string;
     };
 
 /**
@@ -79,7 +88,12 @@ export function buildNotices3(c: Construction3): BuildNotice3[] {
   }
   // #612 (ADR-3D-158): shape statements that added nothing
   for (const r of c.redundantShapes) out.push({ kind: 'shape-redundant', base: r.base, ids: [...r.ids] });
-  for (const s of c.solids) {
+  // #333 (ADR-3D-153): an intersection line that did not get the name the student wrote
+  for (const [name, def] of c.lines) {
+    if (def.kind === 'plane-plane' && def.requested && def.requested !== name) {
+      out.push({ kind: 'line-auto-named', requested: def.requested, assigned: name });
+    }
+  }  for (const s of c.solids) {
     const spec = (QUAD_PYRAMIDS as Partial<Record<SolidKind, { base: QuadBase; right: boolean }>>)[s.kind];
     if (!spec?.right) continue;
     const entry = CYCLIC_MEMBER[spec.base];

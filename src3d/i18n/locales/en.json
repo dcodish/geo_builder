@@ -163,7 +163,8 @@
     },
     "lineCalledPlane": "Note: {{line}} is a line, not a plane. Read as \"plane {{ids}} is perpendicular to line {{line}}\".",
     "lineRelNoun": "Note: {{line}} is a line, not a plane — the relation was built against line {{line}}.",
-    "redundantRelation": "The relation between {{a}} and {{b}} was verified ✓ — but it already follows from their definitions, so this given adds no new information."
+    "redundantRelation": "The relation between {{a}} and {{b}} was verified ✓ — but it already follows from their definitions, so this given adds no new information.",
+    "lineAutoNamed": "The name {{requested}} is already taken, so the intersection line was named {{assigned}}."
   },
   "display": {
     "witnesses": "Show the distance witness segment (the height)"

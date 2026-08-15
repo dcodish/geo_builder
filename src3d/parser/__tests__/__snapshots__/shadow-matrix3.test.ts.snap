@@ -916,12 +916,42 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   {
     "lang": "en",
     "text": "ℓ is the intersection line of plane BC'D and plane BCC'B'",
-    "winner": "pointPlanesLine",
+    "winner": "intersectionLine",
   },
   {
     "lang": "he",
     "text": "ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'",
-    "winner": "pointPlanesLine",
+    "winner": "intersectionLine",
+  },
+  {
+    "lang": "en",
+    "text": "ℓ is the line of intersection of planes ABC and SBC",
+    "winner": "intersectionLine",
+  },
+  {
+    "lang": "he",
+    "text": "ℓ ישר החיתוך של המישורים ABC ו-SBC",
+    "winner": "intersectionLine",
+  },
+  {
+    "lang": "en",
+    "text": "ℓ is the intersection line of plane ABC and plane SBC",
+    "winner": "intersectionLine",
+  },
+  {
+    "lang": "he",
+    "text": "ℓ קו החיתוך בין המישור ABC למישור SBC",
+    "winner": "intersectionLine",
+  },
+  {
+    "lang": "en",
+    "text": "the intersection line of plane ABC and plane SBC",
+    "winner": "intersectionLine",
+  },
+  {
+    "lang": "he",
+    "text": "ישר החיתוך בין מישור ABC ומישור SBC",
+    "winner": "intersectionLine",
   },
   {
     "lang": "en",

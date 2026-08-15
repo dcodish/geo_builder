@@ -194,7 +194,10 @@ export interface PlaneDef {
 }
 
 export type Line3Def =
-  | { kind: 'plane-plane'; p1: string; p2: string }
+  // #333: `requested` is the name the STUDENT wrote when it differed from the one the line got
+  // (a bare `ℓ` already taken by another intersection line). Stored so the auto-naming notice is
+  // DERIVED from the construction like every other notice, never a one-shot event the reload loses.
+  | { kind: 'plane-plane'; p1: string; p2: string; requested?: string }
   | {
       /** A TYPED parametric line (V3, 2024-Q2): x = anchor + t·dir — components may carry the parameter. */
       kind: 'parametric';
@@ -611,7 +614,10 @@ export interface FootOnPlaneCommand {
 /** `ℓ ישר החיתוך בין π1 ל-π2` — the planes' intersection line (drawn; echoed in parametric form). */
 export interface PlanePlaneLineCommand {
   type: 'plane-plane-line';
-  name: string;
+  /** #333 (ADR-3D-153): OPTIONAL — students name the RELATION, not the result («ישר החיתוך בין …»).
+   *  Absent, or taken by a differently-defined line, and apply auto-indexes to the next free `ℓN`
+   *  (operator ruling 2026-07-25) — resolved there because `parse3` cannot know which names are taken. */
+  name?: string;
   p1: string;
   p2: string;
 }

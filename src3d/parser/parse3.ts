@@ -2087,15 +2087,61 @@ const onCircle3: Rule = (s) => {
   return [{ type: 'point-on-circle3', point: m[1], circle: m[2] ? `circle-${m[2]}` : '' }];
 };
 
-/** `ℓ ישר החיתוך בין המישורים π1 ו-π2` / `ℓ is the intersection line of π1 and π2`. */
+/**
+ * #333 (ADR-3D-153): `ישר החיתוך` — the line where two planes meet. ONE rule for the whole phrasing
+ * space, replacing the two sibling rules (named-π at the old L1388, point-run at the old L1800) that
+ * each carried their own hand-rolled connective grammar and between them left four independent
+ * narrownesses: the `ומישור`/`למישור`/`עם`/`של` connectives, the plural `המישורים` with point-run
+ * planes, an uppercase `L2` line name, and no line name at all. The ADR-3D-103 precedent
+ * (`PERP_SPLIT`/`PAR_SPLIT` extracted, and the registry SHRANK) applied to the same shape of defect.
+ *
+ * The tail reader is deliberately TOTAL rather than an enumeration of connectives: once the head has
+ * committed the sentence to "this is an intersection line", the operands are the only Latin/Greek
+ * tokens left, so stripping the Hebrew words (a different script entirely) and the English function
+ * words leaves exactly them. A connective nobody thought to list can no longer cost a student the
+ * construct — the enumeration-one-member-short class `src3d/CLAUDE.md` warns about.
+ *
+ * Line name: OPTIONAL (students name the relation, not the result) and uppercase `L2` is accepted here
+ * — the sentence itself declares the token a line, so the `O1` point-label convention is not in play
+ * (operator ruling 2026-08-13). Naming and collisions are settled at APPLY.
+ */
+const INTERSECTION_HEAD = new RegExp(
+  `^(?:([ℓlL][\\d₀-₉]*)\\s+)?(?:הוא\\s+|is\\s+)?(?:the\\s+)?` +
+    `(?:(?:ישר|קו)\\s+ה?חיתוך|intersection\\s+line|line\\s+of\\s+intersection)\\s+(.+)$`,
+  'i',
+);
+/** A plane operand: a π name, or a run of 3–5 point labels (a point-run plane or a solid's face). */
+const PLANE_OPERAND = new RegExp(`(?:${PLANE_NAME.source})|(?:[A-Z]\\d*'?){3,5}`, 'g');
+
 const intersectionLine: Rule = (s) => {
-  const m = s.match(
-    new RegExp(
-      `^(${LINE_NAME.source})\\s+(?:הוא\\s+)?(?:ישר\\s+החיתוך|is the (?:intersection line|line of intersection))\\s+(?:בין\\s+)?(?:המישורים\\s+|of\\s+(?:the\\s+)?(?:planes\\s+)?)?(${PLANE_NAME.source})\\s*(?:ל|ו|and)-?\\s*(${PLANE_NAME.source})$`,
-    ),
-  );
-  if (!m) return null;
-  return [{ type: 'plane-plane-line', name: canonicalLine(m[1]), p1: canonicalPlane(m[2]), p2: canonicalPlane(m[4]) }];
+  const head = s.match(INTERSECTION_HEAD);
+  if (!head) return null;
+  const [, lname, tail] = head;
+  const operands = (
+    tail
+      // every Hebrew word — markers (מישור/פאה, singular, plural, definite) AND connectives
+      // (בין/ובין/של/עם/ו/ל) are Hebrew, and no operand ever is
+      .replace(/[֐-׿]+/g, ' ')
+      .replace(/\b(?:of|and|between|with|the|planes?|faces?)\b/gi, ' ')
+      .replace(/[-־]/g, ' ')
+      .match(PLANE_OPERAND) ?? []
+  ).map((t) => t.trim());
+  if (operands.length !== 2) return null; // exactly two planes meet in a line
+  const NAMED = new RegExp(`^(?:${PLANE_NAME.source})$`);
+  const cmds: Command3[] = [];
+  const resolve = (op: string): string => {
+    if (NAMED.test(op)) return canonicalPlane(op);
+    // a point-run names its plane and DECLARES it (the L1800 rule's own behaviour, kept)
+    const ids = op.match(/[A-Z]\d*'?/g)!;
+    cmds.push({ type: 'plane-through', name: op, ids });
+    return op;
+  };
+  const p1 = resolve(operands[0]);
+  const p2 = resolve(operands[1]);
+  if (p1 === p2) return null; // a plane does not cut itself — let it escalate rather than build nothing
+  // an uppercase `L2` canonicalises like its lowercase twin; a missing name is left to apply
+  cmds.push({ type: 'plane-plane-line', ...(lname ? { name: canonicalLine(lname) } : {}), p1, p2 });
+  return cmds;
 };
 
 /** `מ-B מעבירים אנך לישר ℓ החותך אותו בנקודה C` / `from B drop a perpendicular to line ℓ, it cuts it at C`. */
@@ -2578,28 +2624,12 @@ const signGiven: Rule = (s) => {
   return [{ type: 'sign-given', id: m[2], axis: m[1] as 'x' | 'y' | 'z', positive: m[3] === 'חיובי' || m[3] === 'positive' }];
 };
 
-/** `ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'` — planes THROUGH POINTS, then their line. */
-const pointPlanesLine: Rule = (s) => {
-  const RUN = `(?:[A-Z]\\d*'?){3,4}`;
-  const m =
-    s.match(
-      new RegExp(
-        `^(${LINE_NAME.source})\\s+(?:הוא\\s+)?ישר\\s+החיתוך\\s+(?:בין\\s+)?המישור\\s+(${RUN})\\s+(?:ל|ו)-?(?:בין\\s+)?המישור\\s+(${RUN})$`,
-      ),
-    ) ??
-    s.match(
-      new RegExp(
-        `^(${LINE_NAME.source})\\s+is\\s+the\\s+intersection\\s+line\\s+of\\s+(?:the\\s+)?plane\\s+(${RUN})\\s+and\\s+(?:the\\s+)?plane\\s+(${RUN})$`,
-      ),
-    );
-  if (!m) return null;
-  const idsOf = (run: string) => run.match(/[A-Z]\d*'?/g)!;
-  return [
-    { type: 'plane-through', name: m[2], ids: idsOf(m[2]) },
-    { type: 'plane-through', name: m[3], ids: idsOf(m[3]) },
-    { type: 'plane-plane-line', name: canonicalLine(m[1]), p1: m[2], p2: m[3] },
-  ];
-};
+// #333 (ADR-3D-153): `pointPlanesLine` — the POINT-RUN sibling of `intersectionLine` — is gone.
+// Two rules for one relation, each with its own hand-rolled connective grammar, IS the overfit this
+// issue reported: the named-π rule took `בין המישורים π1 ו-π2` while the point-run rule took only
+// `בין המישור X ו/ל בין המישור Y`, so which phrasings worked was an accident of which rule you hit.
+// `intersectionLine` above now reads both operand kinds through one tail reader, and the registry
+// shrank by a rule (the ADR-3D-103 outcome, repeated).
 
 /** `המישור KBC: x + 2y + 3z - 26 = 0` / `מישור A'B'C'D' הוא x-4y-8z-142=0` — a
  *  plane-EQUATION claim on a plane through points; separator `:` or the copula `הוא`/`is`. */
@@ -3618,7 +3648,10 @@ export const RULES: Rule[] = [
   planeThroughBare, // bare `מישור ABC` — after the `:`-carrying plane rules
   injectionList,
   signGiven,
-  pointPlanesLine, // point-run planes before the π-name intersection rule
+  // #333 (ADR-3D-153): ONE intersection-line rule, at the slot its point-run half used to hold —
+  // it must precede `segLineCutsPointPlane`, which would otherwise read the second plane's run as
+  // the crossing target. Its head is specific (`ישר/קו החיתוך`), so it can claim nothing else.
+  intersectionLine,
   segLineCutsPointPlane, // `הישר A'C חותך את המישור BC'D בנקודה K` — before the ℓ-name cut rule
   coordPoint,
   paramSign, // ADR-3D-032: `k הוא פרמטר חיובי` — before generic rules can misread the letter
@@ -3646,7 +3679,6 @@ export const RULES: Rule[] = [
   commonPerp, // V8-h: common perpendicular of two lines — before the ⟂-to-a-line rules; tight two-line-target regex
   lineProjection, // V8-h: `היטל הישר TB על המישור ABCD`
   circleTangentLine, // V8-i: `מעגל O משיק לישר AB בנקודה B`
-  intersectionLine,
   dropPerpToLine,
   lineRelGiven, // S2 (#378): ∥/⟂ with a NAMED-LINE side — after the line⟂π / plane-run⟂line / common-perp owners
   distanceGiven, // S5 (#378): a stated distance between two operands
