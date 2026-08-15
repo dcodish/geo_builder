@@ -32,6 +32,7 @@ reports/*
 # out of git is preserved while the "was this already put in front of the operator" answer travels.
 !reports/triage-surfaced.json
 dist-3d
+dist-complex
 
 # Assistant worktrees (stale copies can hold unreadable Dropbox placeholders;
 # ignoring the dir also stops git status descending into it)
