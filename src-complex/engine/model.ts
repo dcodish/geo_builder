@@ -11,6 +11,7 @@ import {
   absC,
   argDeg,
   cisDeg,
+  cx,
   fmtNum,
   ipow,
   nthRoots,
@@ -41,7 +42,24 @@ export type Fact =
   | { id: string; kind: 'show'; expr: Expr; src: string; norm: string }
   /** a relation (F3 modulus / F4 argument): DRIVES a free number when one is available,
    *  VERIFIES (✓/✗) when everything is determined — driveOrCheck-lite */
-  | { id: string; kind: 'rel'; rel: RelSpec; src: string; norm: string };
+  | { id: string; kind: 'rel'; rel: RelSpec; src: string; norm: string }
+  /** F6: a segment (2 pts) or polygon (3+ pts) over named points; 'o' is always the origin */
+  | { id: string; kind: 'shape'; pts: string[]; src: string; norm: string }
+  /** F7 measure: area/perimeter of a polygon, length of a segment — a calc-panel entry */
+  | { id: string; kind: 'smeasure'; mtype: 'area' | 'perim' | 'len'; pts: string[]; src: string; norm: string }
+  /** F7 given/claim: area/perimeter = k·param^pow — drives a free angular DOF (1-D root
+   *  find over the constraint replay) or verifies when nothing is free */
+  | {
+      id: string;
+      kind: 'srel';
+      mtype: 'area' | 'perim';
+      pts: string[];
+      k: number;
+      param?: string;
+      pow?: 1 | 2;
+      src: string;
+      norm: string;
+    };
 
 export interface ArgTerm {
   sign: 1 | -1;
@@ -66,6 +84,87 @@ export const paramValue = (name: string, seed = 0): number => {
   let h = 0;
   for (const ch of `${name}@${seed}`) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return 0.6 + (h % 181) / 100;
+};
+
+/** area (shoelace), perimeter (closed), or segment length over named vertices; 'o' is O. */
+const shapeMeasure = (mtype: 'area' | 'perim' | 'len', pts: string[], env: Map<string, Cx>): number => {
+  const vs = pts.map((p) => {
+    const v = env.get(p);
+    if (v === undefined) throw new UnknownRef(p);
+    return v;
+  });
+  if (mtype === 'len') return absC(sub(vs[0], vs[1]));
+  if (mtype === 'perim') return vs.reduce((s, v, i) => s + absC(sub(v, vs[(i + 1) % vs.length])), 0);
+  let a = 0;
+  for (let i = 0; i < vs.length; i++) {
+    const b = vs[(i + 1) % vs.length];
+    a += vs[i].re * b.im - b.re * vs[i].im;
+  }
+  return Math.abs(a) / 2;
+};
+
+/** clamp a fold target strictly INSIDE (lo, hi) with a margin — a fold that parks on a
+ * boundary (quad midpoint vs `< 45`) turns later comparisons into float coin-flips */
+const interior = (v: number, lo: number, hi: number): number => {
+  const m = Math.max((hi - lo) * 0.02, 1e-6);
+  return Math.min(Math.max(v, lo + m), hi - m);
+};
+
+/** apply one relation against an env (shared by the pass-1 sweep and the srel replay);
+ * returns the changed free number, or null. */
+const applyRel = (
+  r: RelSpec,
+  env: Map<string, Cx>,
+  freeNames: Set<string>,
+  P: (n: string) => number,
+): { name: string; nv: Cx } | null => {
+  const setF = (name: string, nv: Cx): { name: string; nv: Cx } => {
+    env.set(name, nv);
+    return { name, nv };
+  };
+  if (r.type === 'arg') {
+    if (r.terms.some((t) => !env.has(t.name))) return null;
+    const cmp = r.cmp ?? '=';
+    if (cmp === '=') {
+      const target = r.terms.find((t) => freeNames.has(t.name));
+      if (!target) return null;
+      const sumOther = r.terms
+        .filter((t) => t !== target)
+        .reduce((s, t) => s + t.sign * argDeg(env.get(t.name)!), 0);
+      const v = env.get(target.name)!;
+      return setF(target.name, cisDeg(absC(v), (r.rhsDeg - sumOther) * target.sign));
+    }
+    const t0 = r.terms[0];
+    if (r.terms.length !== 1 || t0.sign !== 1 || !freeNames.has(t0.name)) return null;
+    const v = env.get(t0.name)!;
+    const a = argDeg(v);
+    if (cmpHolds(cmp, a, r.rhsDeg, 0)) return null;
+    const na =
+      cmp === '<' || cmp === '<='
+        ? r.rhsDeg > 0
+          ? interior(a % r.rhsDeg, 0, r.rhsDeg)
+          : 0
+        : interior(r.rhsDeg + (a % Math.max(1, 360 - r.rhsDeg)), r.rhsDeg, 360);
+    return setF(t0.name, cisDeg(absC(v), na));
+  }
+  if (r.type === 'quad') {
+    if (!env.has(r.name) || !freeNames.has(r.name)) return null;
+    const v = env.get(r.name)!;
+    const a = argDeg(v);
+    const lo = (r.q - 1) * 90;
+    if (a > lo && a < lo + 90) return null;
+    return setF(r.name, cisDeg(absC(v), interior(lo + (a % 90), lo, lo + 90)));
+  }
+  if ((r.cmp ?? '=') !== '=') return null;
+  if (!env.has(r.name) || (r.other && !env.has(r.other))) return null;
+  const targetMod = r.k * (r.param ? P(r.param) : r.other ? absC(env.get(r.other)!) : 1);
+  if (freeNames.has(r.name)) {
+    return setF(r.name, cisDeg(targetMod, argDeg(env.get(r.name)!)));
+  }
+  if (r.other && !r.param && freeNames.has(r.other)) {
+    return setF(r.other, cisDeg(absC(env.get(r.name)!) / r.k, argDeg(env.get(r.other)!)));
+  }
+  return null;
 };
 
 const cmpHolds = (cmp: Cmp, lhs: number, rhs: number, tol: number): boolean =>
@@ -112,9 +211,9 @@ type FactBody = Fact extends infer F ? (F extends Fact ? Omit<F, 'id'> : never) 
 
 /** Deterministic ids (the sibling convention): re-adding the same statement is idempotent. */
 export const factId = (f: FactBody): string =>
-  f.kind === 'roots' || f.kind === 'show' || f.kind === 'rel'
-    ? `${f.kind}-${f.norm.replace(/ /g, '')}`
-    : `${f.kind}-${f.name}`;
+  f.kind === 'free' || f.kind === 'def'
+    ? `${f.kind}-${f.name}`
+    : `${f.kind}-${f.norm.replace(/ /g, '')}`;
 
 export interface ScenePoint {
   key: string;
@@ -131,6 +230,13 @@ export interface ScenePoint {
 
 export interface SceneCircle {
   r: number;
+  factId: string;
+}
+
+export interface SceneSegment {
+  key: string;
+  a: Cx;
+  b: Cx;
   factId: string;
 }
 
@@ -168,6 +274,8 @@ export interface SceneMeasure {
 export interface Scene {
   points: ScenePoint[];
   circles: SceneCircle[];
+  /** drawn edges: segments and polygon boundaries (F6) */
+  segments: SceneSegment[];
   /** scalar calcs (|z1−z2|, |z1|·2, …) — the DATA PANEL, not the plane (operator ruling) */
   measures: SceneMeasure[];
   /** factId -> error; an erroring fact contributes nothing, later facts still evaluate */
@@ -255,7 +363,7 @@ const projectConstraints = (
   // three sweeps: a later constraint that moves a number re-feeds the earlier ones
   // (arg(z1)-arg(z2)=90 stays true after arg(z2)<45 folds z2)
   for (let sweep = 0; sweep < 3; sweep++) {
-  const env = new Map<string, Cx>();
+  const env = new Map<string, Cx>([['o', cx(0)]]);
   const freeNames = new Set<string>();
   for (const f of facts) {
     try {
@@ -322,66 +430,75 @@ const projectConstraints = (
           if (absC(w) > 0) nthRoots(w, f.n).forEach((z, k) => env.set(`${f.varName}${k + 1}`, z));
         }
       } else if (f.kind === 'rel') {
-        const r = f.rel;
-        if (r.type === 'arg') {
-          if (r.terms.some((t) => !env.has(t.name))) continue;
-          const cmp = r.cmp ?? '=';
-          if (cmp === '=') {
-            const target = r.terms.find((t) => freeNames.has(t.name));
-            if (!target) continue;
-            const sumOther = r.terms
-              .filter((t) => t !== target)
-              .reduce((s, t) => s + t.sign * argDeg(env.get(t.name)!), 0);
-            const v = env.get(target.name)!;
-            const nv = cisDeg(absC(v), (r.rhsDeg - sumOther) * target.sign);
-            env.set(target.name, nv);
-            adjusted[target.name] = nv;
-            drove[f.id] = true;
-          } else {
-            // inequality: fold a violating single-term FREE argument into range (branch selector)
-            const t0 = r.terms[0];
-            if (r.terms.length !== 1 || t0.sign !== 1 || !freeNames.has(t0.name)) continue;
-            const v = env.get(t0.name)!;
-            const a = argDeg(v);
-            if (cmpHolds(cmp, a, r.rhsDeg, 0)) continue;
-            const na =
-              cmp === '<' || cmp === '<='
-                ? r.rhsDeg > 0
-                  ? a % r.rhsDeg
-                  : 0
-                : r.rhsDeg + (a % Math.max(1, 360 - r.rhsDeg));
-            const nv = cisDeg(absC(v), na);
-            env.set(t0.name, nv);
-            adjusted[t0.name] = nv;
-            drove[f.id] = true;
-          }
-        } else if (r.type === 'quad') {
-          if (!env.has(r.name) || !freeNames.has(r.name)) continue;
-          const v = env.get(r.name)!;
-          const a = argDeg(v);
-          const lo = (r.q - 1) * 90;
-          if (a > lo && a < lo + 90) continue;
-          let na = lo + (a % 90);
-          if (na === lo) na = lo + 45; // never park on the axis
-          const nv = cisDeg(absC(v), na);
-          env.set(r.name, nv);
-          adjusted[r.name] = nv;
+        const changed = applyRel(f.rel, env, freeNames, P);
+        if (changed) {
+          adjusted[changed.name] = changed.nv;
           drove[f.id] = true;
-        } else {
-          if ((r.cmp ?? '=') !== '=') continue; // modulus inequalities verify in pass 2 only
-          if (!env.has(r.name) || (r.other && !env.has(r.other))) continue;
-          const targetMod =
-            r.k * (r.param ? P(r.param) : r.other ? absC(env.get(r.other)!) : 1);
-          if (freeNames.has(r.name)) {
-            const nv = cisDeg(targetMod, argDeg(env.get(r.name)!));
-            env.set(r.name, nv);
-            adjusted[r.name] = nv;
-            drove[f.id] = true;
-          } else if (r.other && !r.param && freeNames.has(r.other)) {
-            const nv = cisDeg(absC(env.get(r.name)!) / r.k, argDeg(env.get(r.other)!));
-            env.set(r.other, nv);
-            adjusted[r.other] = nv;
-            drove[f.id] = true;
+        }
+      } else if (f.kind === 'srel') {
+        // area/perimeter GIVEN: 1-D root find over one free number's argument, replaying the
+        // whole prefix (rels included) per candidate — so equality rels track the candidate
+        // and inequality/quadrant folds alias out-of-range angles (branch pruning for free)
+        const idx = facts.indexOf(f);
+        const target = f.k * (f.param ? P(f.param) ** (f.pow ?? 1) : 1);
+        const baseOf = (name: string): Cx =>
+          adjusted[name] ?? freePos[name] ?? defaultFree(name, seed);
+        const measureAt = (fname: string, aDeg: number): number | null => {
+          const e2 = new Map<string, Cx>([['o', cx(0)]]);
+          const fn2 = new Set<string>();
+          try {
+            for (const g of facts.slice(0, idx)) {
+              if (g.kind === 'free') {
+                const b = baseOf(g.name);
+                e2.set(g.name, g.name === fname ? cisDeg(absC(b), aDeg) : b);
+                fn2.add(g.name);
+              } else if (g.kind === 'def') e2.set(g.name, evalExpr(g.expr, e2));
+              else if (g.kind === 'roots' && !g.constrains) {
+                const w = evalExpr(g.rhs, e2);
+                if (absC(w) > 0)
+                  nthRoots(w, g.n).forEach((z, k) => e2.set(`${g.varName}${k + 1}`, z));
+              } else if (g.kind === 'rel') applyRel(g.rel, e2, fn2, P);
+            }
+            return shapeMeasure(f.mtype, f.pts, e2);
+          } catch {
+            return null;
+          }
+        };
+        const freeDecls = facts
+          .slice(0, idx)
+          .filter((g): g is Extract<Fact, { kind: 'free' }> => g.kind === 'free');
+        outer: for (const fd of freeDecls) {
+          // half-offset samples: never probe exact fold boundaries (0°, 45°, 90°…) where
+          // float coin-flips make the measure discontinuous
+          const N = 72;
+          const at = (i: number): number => ((i + 0.5) * 360) / N;
+          const vals: number[] = [];
+          for (let i = 0; i < N; i++) {
+            const v = measureAt(fd.name, at(i));
+            if (v === null) continue outer;
+            vals.push(v);
+          }
+          const span = Math.max(...vals) - Math.min(...vals);
+          if (span <= 1e-9 * Math.max(1, Math.abs(target))) continue; // DOF doesn't move it
+          for (let i = 0; i < N - 1; i++) {
+            const r0 = vals[i] - target;
+            const r1 = vals[i + 1] - target;
+            if (r0 === 0 || r0 * r1 < 0) {
+              let a = at(i);
+              let b = at(i + 1);
+              for (let it = 0; it < 60; it++) {
+                const mid = (a + b) / 2;
+                const rm = (measureAt(fd.name, mid) ?? target) - target;
+                if (r0 * rm <= 0) b = mid;
+                else a = mid;
+              }
+              const bv = baseOf(fd.name);
+              const nv = cisDeg(absC(bv), (a + b) / 2);
+              env.set(fd.name, nv);
+              adjusted[fd.name] = nv;
+              drove[f.id] = true;
+              break outer;
+            }
           }
         }
       }
@@ -401,7 +518,8 @@ export const derive = (
 ): Scene => {
   const { adjusted, drove } = projectConstraints(facts, freePos, seed, paramScale);
   const effFreePos = { ...freePos, ...adjusted };
-  const env = new Map<string, Cx>();
+  const env = new Map<string, Cx>([['o', cx(0)]]);
+  const segments: SceneSegment[] = [];
   const points: ScenePoint[] = [];
   const circles: SceneCircle[] = [];
   const errors: Record<string, EvalError> = {};
@@ -447,6 +565,33 @@ export const derive = (
         const z = evalExpr(f.expr, env);
         env.set(f.name, z);
         points.push({ key: f.id, label: prettyName(f.name), z, kind: 'def', factId: f.id });
+      } else if (f.kind === 'shape') {
+        const miss = f.pts.find((p) => !env.has(p));
+        if (miss) {
+          errors[f.id] = { key: 'unknown-ref', detail: miss };
+          continue;
+        }
+        const vs = f.pts.map((p) => env.get(p)!);
+        const closed = vs.length > 2;
+        for (let i = 0; i < (closed ? vs.length : vs.length - 1); i++) {
+          segments.push({ key: `${f.id}-${i}`, a: vs[i], b: vs[(i + 1) % vs.length], factId: f.id });
+        }
+      } else if (f.kind === 'smeasure') {
+        measures.push({
+          key: f.id,
+          label: prettyExpr(f.norm),
+          value: shapeMeasure(f.mtype, f.pts, env),
+          factId: f.id,
+        });
+      } else if (f.kind === 'srel') {
+        const P2 = (n: string): number => paramValue(n, seed) * (paramScale?.[n] ?? 1);
+        if (f.param) params[f.param] = P2(f.param);
+        const target = f.k * (f.param ? P2(f.param) ** (f.pow ?? 1) : 1);
+        const v = shapeMeasure(f.mtype, f.pts, env);
+        checks[f.id] = {
+          ok: Math.abs(v - target) <= 1e-6 * Math.max(1, Math.abs(target)),
+          driven: !!drove[f.id],
+        };
       } else if (f.kind === 'show') {
         const v = evalExpr(f.expr, env);
         if (isScalarExpr(f.expr)) {
@@ -520,7 +665,7 @@ export const derive = (
       }
     }
   }
-  return { points, circles, errors, checks, params, measures };
+  return { points, circles, segments, errors, checks, params, measures };
 };
 
 /** Names a fact introduces — used by the store's duplicate-name honesty check.
@@ -531,9 +676,9 @@ export const factNames = (f: Fact): string[] =>
     ? f.constrains
       ? [] // constraint/claim mode: the candidates are display-only, no names introduced
       : [f.varName, ...Array.from({ length: f.n }, (_, k) => `${f.varName}${k + 1}`)]
-    : f.kind === 'show' || f.kind === 'rel'
-      ? []
-      : [f.name];
+    : f.kind === 'free' || f.kind === 'def'
+      ? [f.name]
+      : [];
 
 const near = (a: number, b: number): boolean => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(b));
 
@@ -574,4 +719,6 @@ export const factRefs = (f: Fact): string[] =>
       ? collectRefs(f.rhs)
       : f.kind === 'rel'
         ? relNames(f.rel)
-        : [];
+        : f.kind === 'shape' || f.kind === 'smeasure' || f.kind === 'srel'
+          ? f.pts.filter((p) => p !== 'o') // O always exists; never implicit-created
+          : [];

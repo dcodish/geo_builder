@@ -68,6 +68,11 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
           insertAt = idx;
         }
       }
+      // (0,0) is always O — no statement may claim the name.
+      if (factNames(fact).includes('o')) {
+        set({ lastError: { key: 'duplicate-name', detail: 'O = (0,0)' } });
+        return false;
+      }
       // Honesty: a name may be introduced exactly once — the error names the CONFLICTING statement.
       const taken = new Set(working.flatMap(factNames));
       const clash = factNames(fact).find((n) => taken.has(n));

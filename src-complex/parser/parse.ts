@@ -249,6 +249,25 @@ const QUADRANTS: Record<string, 1 | 2 | 3 | 4> = {
   'ראשון': 1, 'שני': 2, 'שלישי': 3, 'רביעי': 4,
   first: 1, second: 2, third: 3, fourth: 4, '1': 1, '2': 2, '3': 3, '4': 4,
 };
+// F6/F7 name-run forms — a run is 2+ atoms of (o | z/w-family name)
+const RUN = '((?:o|[zw]\\d*){2,})';
+const splitRun = (s: string): string[] => s.toLowerCase().match(/o|[zw]\d*/g)!;
+const SHAPE_ARITY: Record<string, number> = {
+  'קטע': 2, 'משולש': 3, 'מרובע': 4, segment: 2, triangle: 3, quadrilateral: 4,
+};
+const SHAPE_RE = new RegExp(
+  `^(?:ה?(קטע|משולש|מרובע|segment|triangle|quadrilateral)\\s+)?${RUN}$`,
+  'i',
+);
+const SMEASURE_RE = new RegExp(
+  `^(שטח|היקף|אורך|area|perimeter|length)\\s+(?:ה?(?:קטע|משולש|מרובע)\\s+|(?:the\\s+)?(?:segment|triangle|quadrilateral)\\s+)?${RUN}$`,
+  'i',
+);
+const SREL_RE = new RegExp(
+  `^(שטח|היקף|area|perimeter)\\s+(?:ה?(?:משולש|מרובע)\\s+|(?:the\\s+)?(?:triangle|quadrilateral)\\s+)?${RUN}\\s*(?:=|הוא|is)\\s*(.+)$`,
+  'i',
+);
+const SREL_RHS = /^(\d+(?:\.\d+)?)?\s*\*?\s*([a-zA-Z]\w*)?\s*(\^\s*2)?$/;
 const QUAD_RE =
   /^([a-zA-Z]\w*)\s+(?:נמצא\s+)?ברביע\s+ה(ראשון|שני|שלישי|רביעי)$|^([a-zA-Z]\w*)\s+(?:is\s+)?(?:in\s+)?(?:the\s+)?(?:(first|second|third|fourth)\s+quadrant|quadrant\s+([1-4]))$/;
 // F4: ±arg(A) [± arg(B)] ⟨cmp⟩ degrees — parens optional (arg z1 also accepted);
@@ -377,6 +396,53 @@ export const parseLine = (raw: string): ParseResult => {
       norm: `arg ${name} = ${mixedArg[2]}`,
     };
     return { ok: true, facts: [{ ...free, id: factId(free) }, { ...rel, id: factId(rel) }] };
+  }
+
+  // F6/F7 — name-runs over the always-present origin O: segments/polygons, their measures,
+  // and area/perimeter givens. Z₁Z₂ pasted from an exam normalizes to z1*z2 (a product);
+  // a hand-typed run like z1z2 or Oz1 is a SHAPE (the operator's drawing convention).
+  const srel = SREL_RE.exec(line);
+  if (srel) {
+    const pts = splitRun(srel[2]);
+    const rhs = SREL_RHS.exec(srel[3].trim());
+    if (!rhs || (rhs[1] === undefined && rhs[2] === undefined) || pts.length < 3)
+      return { ok: false, key: 'parse-error', detail: raw.trim() };
+    const param = rhs[2]?.toLowerCase();
+    if (param !== undefined && IMPLICIT_COMPLEX_RE.test(param))
+      return { ok: false, key: 'parse-error', detail: raw.trim() };
+    const f = {
+      kind: 'srel' as const,
+      mtype: /שטח|area/i.test(srel[1]) ? ('area' as const) : ('perim' as const),
+      pts,
+      k: rhs[1] !== undefined ? Number(rhs[1]) : 1,
+      param,
+      pow: rhs[3] ? (2 as const) : (1 as const),
+      src: raw.trim(),
+      norm: line,
+    };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
+  }
+  const smeas = SMEASURE_RE.exec(line);
+  if (smeas) {
+    const pts = splitRun(smeas[2]);
+    const mtype = /אורך|length/i.test(smeas[1])
+      ? ('len' as const)
+      : /שטח|area/i.test(smeas[1])
+        ? ('area' as const)
+        : ('perim' as const);
+    if ((mtype === 'len' && pts.length !== 2) || (mtype !== 'len' && pts.length < 3))
+      return { ok: false, key: 'parse-error', detail: raw.trim() };
+    const f = { kind: 'smeasure' as const, mtype, pts, src: raw.trim(), norm: line };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
+  }
+  const shape = SHAPE_RE.exec(line);
+  if (shape) {
+    const pts = splitRun(shape[2]);
+    const want = shape[1] ? SHAPE_ARITY[shape[1].toLowerCase()] : undefined;
+    if (want !== undefined && pts.length !== want)
+      return { ok: false, key: 'parse-error', detail: raw.trim() };
+    const f = { kind: 'shape' as const, pts, src: raw.trim(), norm: line };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 
   const quad = QUAD_RE.exec(line);

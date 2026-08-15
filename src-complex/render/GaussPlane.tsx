@@ -94,6 +94,19 @@ export function GaussPlane({ scene, view, onDragFree }: Props) {
             <text x={toX(0) + 5} y={toY(-v) + 4}>-{v}</text>
           </g>
         ))}
+      {/* shape edges: segments and polygon boundaries */}
+      {scene.segments.map((s) => (
+        <line
+          key={s.key}
+          x1={toX(s.a.re)}
+          y1={toY(s.a.im)}
+          x2={toX(s.b.re)}
+          y2={toY(s.b.im)}
+          stroke="#475569"
+          strokeWidth={1.6}
+          strokeOpacity={0.85}
+        />
+      ))}
       {/* root circles */}
       {scene.circles.map((c) => (
         <circle

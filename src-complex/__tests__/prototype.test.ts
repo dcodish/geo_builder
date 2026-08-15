@@ -593,6 +593,61 @@ describe('symbolic parameter forms in the calc panel (הביעו באמצעות 
   });
 });
 
+describe('shapes over O, and area/perimeter driveOrCheck (F6/F7)', () => {
+  it('name-runs draw: Oz1 is a segment, מרובע oz1z2z3 a closed polygon; vertices auto-create', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    expect(st.addLine('Oz1')).toBe(true);
+    expect(st.addLine('z1z2')).toBe(true);
+    expect(st.addLine('מרובע oz1z2z3')).toBe(true);
+    const s = derive(useComplexStore.getState().facts, {});
+    expect(s.errors).toEqual({});
+    // 1 + 1 open edges + 4 closed polygon edges
+    expect(s.segments).toHaveLength(6);
+    // z1,z2,z3 implicit-created; O is never a point row
+    expect(s.points.map((p) => p.label).sort()).toEqual(['z₁', 'z₂', 'z₃']);
+    useComplexStore.getState().clearAll();
+  });
+
+  it('arity honesty: משולש with four vertices refuses; O is unclaimable', () => {
+    expect(parseLine('משולש oz1z2z3').ok).toBe(false);
+    const st = useComplexStore.getState();
+    st.clearAll();
+    expect(st.addLine('o = 5')).toBe(false);
+    expect(useComplexStore.getState().lastError).toEqual({
+      key: 'duplicate-name',
+      detail: 'O = (0,0)',
+    });
+    st.clearAll();
+  });
+
+  it('the exemplar part ב END-TO-END: the area given pins θ, the perimeter answers 60r', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('arg(z1)-arg(z2)=90');
+    st.addLine('|z1| = 9r');
+    st.addLine('|z2| = 12r');
+    st.addLine('z2 ברביע הראשון');
+    st.addLine('arg(z2) < 45');
+    st.addLine('|z3| = 20r');
+    st.addLine('arg(z3) + arg(z2) = 0');
+    st.addLine('מרובע oz1z2z3');
+    st.addLine('שטח המרובע oz1z2z3 הוא 150r²');
+    st.addLine('היקף oz1z2z3');
+    for (const seed of [0, 1]) {
+      const s = deriveScene(useComplexStore.getState().facts, {}, seed);
+      expect(s.errors).toEqual({});
+      expect(Object.values(s.checks).every((c) => c.ok)).toBe(true);
+      // the area given DROVE the free angle to θ = arctan ½ ≈ 26.565°
+      const z2 = s.points.find((p) => p.label === 'z₂')!.z;
+      expect(argDeg(z2)).toBeCloseTo(26.565, 1);
+      // and the perimeter reads 60r — part ב's answer, in r as the exam demands
+      expect(s.measures.find((m) => m.label.includes('היקף'))!.form).toBe('60r');
+    }
+    useComplexStore.getState().clearAll();
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();
