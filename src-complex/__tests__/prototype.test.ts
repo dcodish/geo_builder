@@ -882,6 +882,30 @@ describe('drive-target fairness (#599: sequence vs a later constraint on one ter
   });
 });
 
+describe('equation-direction fairness (#600: z1^3=z3 drives z3 when z1 is claimed)', () => {
+  it("the operator's session: sequence + z1-in-Q1 + z1^3=z3 — everything holds", () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('סדרה הנדסית z1,z2,z3');
+    st.addLine('z1 ברביע הראשון');
+    st.addLine('z1^3 = z3');
+    for (const seed of [0, 1, 2]) {
+      const s = derive(useComplexStore.getState().facts, {}, seed);
+      expect(s.errors).toEqual({});
+      const vals = Object.values(s.checks);
+      expect(vals).toHaveLength(3);
+      expect(vals.every((c) => c.ok)).toBe(true);
+      const z1 = s.points.find((p) => p.label === 'z₁')!.z;
+      const z3 = s.points.find((p) => p.label === 'z₃')!.z;
+      expect(argDeg(z1)).toBeGreaterThan(0);
+      expect(argDeg(z1)).toBeLessThan(90); // the quadrant kept its claim
+      const cube = mul(mul(z1, z1), z1);
+      expect(absC(sub(cube, z3))).toBeLessThan(1e-6 * Math.max(1, absC(z3))); // z3 absorbed the equation
+    }
+    useComplexStore.getState().clearAll();
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();

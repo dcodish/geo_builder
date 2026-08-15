@@ -447,6 +447,28 @@ const projectConstraints = (
         env.set(f.name, evalExpr(f.expr, env));
       } else if (f.kind === 'roots') {
         if (f.constrains && freeNames.has(f.varName)) {
+          // fairness, equation edition (#600): if the LETTER is hard-claimed by another
+          // constraint and the rhs is a bare FREE unclaimed ref, drive the rhs FORWARD
+          // (z3 = z1³) instead of fighting over the letter
+          const hard = new Set<string>();
+          for (const g of facts) {
+            if (g === f) continue;
+            if (g.kind === 'rel') for (const n of relNames(g.rel)) hard.add(n);
+            else if (g.kind === 'roots' && g.constrains) hard.add(g.varName);
+          }
+          if (
+            hard.has(f.varName) &&
+            f.rhs.t === 'ref' &&
+            freeNames.has(f.rhs.name) &&
+            !hard.has(f.rhs.name) &&
+            env.has(f.varName)
+          ) {
+            const v = ipow(env.get(f.varName)!, f.n);
+            env.set(f.rhs.name, v);
+            adjusted[f.rhs.name] = v;
+            drove[f.id] = true;
+            continue;
+          }
           // the equation CONSTRAINS the existing free X — fixed-point on the nearest nth root,
           // replaying the prefix each iteration so a self-referential rhs (z^3 = w, w = z·z)
           // sees the candidate X
