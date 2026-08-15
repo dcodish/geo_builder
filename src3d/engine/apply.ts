@@ -10,7 +10,7 @@ import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
 import { isQuadPyramid, quadPyramidDimCount } from './baseShapes';
 import { pinSymsOf } from './types';
-import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, Operand3, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
+import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
   // #305 (ADR-3D-090): every quad pyramid is a 4-ring + apex, whatever its base or top
@@ -1232,12 +1232,35 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'plane-plane-line': {
-      if (c.lines.has(cmd.name)) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
       for (const p of [cmd.p1, cmd.p2]) {
         if (!c.planes.has(p) && !c.pointPlanes.has(p)) return { ok: false, error: { code: 'unknown-plane', id: p } };
       }
+      // #333 (ADR-3D-153), operator ruling 2026-07-25: students name both intersection lines `ℓ` —
+      // the generic line symbol. A collision is resolved by AUTO-INDEXING to the next free `ℓN` with
+      // a notice, never by a bare `already-defined` the student cannot act on. Resolved HERE because
+      // only apply knows which names are taken (`parse3` is context-free) — the ADR-3D-048 pattern.
+      const samePair = (d: Line3Def | undefined): boolean =>
+        !!d && d.kind === 'plane-plane' && ((d.p1 === cmd.p1 && d.p2 === cmd.p2) || (d.p1 === cmd.p2 && d.p2 === cmd.p1));
+      // an IDENTICAL restatement is an M1 no-op — the same line, said twice, is one line
+      if (cmd.name !== undefined && samePair(c.lines.get(cmd.name))) return { ok: true, next: c };
+      const taken = (n: string): boolean => c.lines.has(n) || c.pointLines.has(n);
+      let name = cmd.name;
+      if (name === undefined || taken(name)) {
+        // the pool is the line-naming convention itself: ℓ, then ℓ1, ℓ2, … (ADR-3D-038)
+        let free: string | undefined;
+        for (let i = 0; i <= c.lines.size + c.pointLines.size + 1; i++) {
+          const cand = i === 0 ? 'ℓ' : `ℓ${i}`;
+          if (!taken(cand)) { free = cand; break; }
+        }
+        if (!free) return { ok: false, error: { code: 'already-defined', id: name ?? 'ℓ' } };
+        // the student's own name is kept only when it differs — that difference IS the notice
+        const requested = name !== undefined && name !== free ? name : undefined;
+        const next = clone(c);
+        next.lines.set(free, { kind: 'plane-plane', p1: cmd.p1, p2: cmd.p2, ...(requested ? { requested } : {}) });
+        return { ok: true, next };
+      }
       const next = clone(c);
-      next.lines.set(cmd.name, { kind: 'plane-plane', p1: cmd.p1, p2: cmd.p2 });
+      next.lines.set(name, { kind: 'plane-plane', p1: cmd.p1, p2: cmd.p2 });
       return { ok: true, next };
     }
 

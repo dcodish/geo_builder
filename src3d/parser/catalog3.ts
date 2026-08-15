@@ -132,6 +132,11 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'מ-B מעבירים אנך לישר ℓ החותך אותו בנקודה C', en: 'from B drop a perpendicular to line ℓ, it cuts it at C' },
   { category: 'planesLines', he: 'ℓ ישר החיתוך בין המישורים π1 ו-π2', en: 'ℓ is the intersection line of π1 and π2' },
   { category: 'planesLines', he: "ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'", en: "ℓ is the intersection line of plane BC'D and plane BCC'B'" },
+  // #333 (ADR-3D-153): one rule, so the catalog can finally show the phrasings students actually
+  // write — the `של`/`עם`/`ל` connectives, the plural over point-runs, and no line name at all.
+  { category: 'planesLines', he: 'ℓ ישר החיתוך של המישורים ABC ו-SBC', en: 'ℓ is the line of intersection of planes ABC and SBC' },
+  { category: 'planesLines', he: 'ℓ קו החיתוך בין המישור ABC למישור SBC', en: 'ℓ is the intersection line of plane ABC and plane SBC' },
+  { category: 'planesLines', he: 'ישר החיתוך בין מישור ABC ומישור SBC', en: 'the intersection line of plane ABC and plane SBC' },
   { category: 'planesLines', he: "המישור BC'D", en: "plane BC'D" },
   { category: 'planesLines', he: 'מישור π דרך F וניצב ל-SC', en: 'plane π through F perpendicular to SC' },
   { category: 'planesLines', he: 'מישור π דרך K ו-P ומקביל ל-CD', en: 'plane π through K and P parallel to CD' },

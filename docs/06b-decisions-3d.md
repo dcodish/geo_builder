@@ -3654,3 +3654,59 @@ undetermined refusals (a bare cube's vertex, an unanchored plane), a non-point l
 `notUnderstood`, the vector lane unaffected, asking not mutating the figure, and — the load-bearing
 one — **panel-vs-query agreement asserted directly**: every point the panel prints must equal its own
 query answer, and a declared plane's panel row must equal its query answer.
+
+## ADR-3D-153 — `ישר החיתוך` is ONE rule, and a colliding line name auto-indexes (#333)
+
+Operator: *"I think we dont have a solution for `ישר החיתוך`. we need this construct."* and *"I cannot
+create 2 such lines. on the second line i get `'ℓ' כבר מוגדר בציור`."*
+
+The construct was **fully built end-to-end** — engine `plane-plane-line`, `planePlaneLine` in evaluate,
+the parametric echo, two catalog entries. What failed was the grammar around it, and the failure had a
+recognisable shape: **two sibling rules carried one relation**, each with its own hand-rolled connective
+grammar. The named-π rule accepted `בין המישורים π1 ו-π2`; the point-run rule accepted only
+`בין המישור X ו/ל בין המישור Y`. Which natural phrasing worked was therefore an accident of which rule
+the sentence happened to hit, and four independent narrownesses fell out of that one cause — measured
+live from the report and two prod sessions (log-triage 2026-07-28, one user typing the same sentence
+three times hunting for the syntax): the `ומישור`/`למישור`/`עם`/`של` connectives, the plural
+`המישורים` over point-runs, an uppercase `L2` name, and **no line name at all**, which is what that user
+typed twice. The same "enumeration one member short" class as ADR-3D-095/097/100, with the fix precedent
+already in the tree: ADR-3D-103 extracted the shared connectives and the registry *shrank*.
+
+**Decision (Part A).** One rule. `pointPlanesLine` is deleted; `intersectionLine` reads both operand
+kinds. The registry is one rule smaller than before, which is the outcome that tells you the
+generalisation was real.
+
+Its tail reader is deliberately **total rather than enumerated**. Once the head has committed the
+sentence to "this is an intersection line", the operands are the only Latin/Greek tokens left — so
+stripping the Hebrew words (a different script entirely) and the English function words leaves exactly
+the two plane operands, in order. A connective nobody thought to list can no longer cost a student the
+construct. A run of 3–5 labels is a point-run plane (a `פאה` face included, since a face is just a run);
+a π name is a named plane; a sentence yielding anything other than exactly two operands, or the same
+plane twice, escalates rather than building something the student did not say.
+
+Uppercase `L2` is accepted **inside this rule** (operator ruling 2026-08-13): the sentence itself
+declares the token a line, so the uppercase+digit point-label convention (`O1`) is not in play here and
+stays authoritative everywhere else — asserted as a lock, not left to reading.
+
+**Decision (Part B) — naming, per the operator ruling of 2026-07-25.** The line name is now OPTIONAL on
+the command, and collisions auto-index instead of refusing:
+
+- no name stated → the next free `ℓN` (students name the RELATION, not the result — the ADR-3D-048
+  `midpoint-auto` pattern);
+- name stated and free → it is used;
+- name stated, taken, **same plane pair** → an idempotent M1 no-op: one line, said twice;
+- name stated, taken, different pair → the next free `ℓN`, **with a notice naming both names**.
+
+All of it at APPLY, never in the parser: only apply knows which names are taken, and `parse3` is
+context-free. The notice is derived from a `requested` field stored on the line def rather than emitted
+as an event, so it survives reload and undo like every other notice in `buildNotices3` — the notices
+doctrine, kept.
+
+Locks (`issue-333-intersection-line.test.ts`, 32): the full phrasing battery from the issue AND the three
+prod utterances, He + En; every connective reaching byte-identical commands (the phrasing carries no
+meaning); π operands emitting no `plane-through` while point-runs emit two; uppercase `L2` and lowercase
+`l2` canonicalising alike; the uppercase ruling NOT leaking (a bare `L על AB` is still a point); the
+operator's exact two-`ℓ` sequence coexisting as `ℓ` + `ℓ1` with the notice; the idempotent restatement,
+including with the operands in the other order; the nameless form building with NO rename notice; explicit
+`ℓ1`/`ℓ2` unchanged; an undeclared π still refusing honestly. Catalog gains three phrasings; the shadow
+snapshot's only deletions are the retired rule's name.

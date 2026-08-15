@@ -53,6 +53,15 @@ export type BuildNotice3 =
       kind: 'redundant-relation';
       a: string;
       b: string;
+    }
+  | {
+      /** #333 (ADR-3D-153): the student named an intersection line `ℓ` while `ℓ` was already another
+       *  line, so it was auto-indexed. Operator ruling 2026-07-25: auto-index and SAY SO, rather than
+       *  refuse with a bare `already-defined` the student cannot act on. Derived from the line's
+       *  stored `requested`, so it survives reload and undo like every other notice here. */
+      kind: 'line-auto-named';
+      requested: string;
+      assigned: string;
     };
 
 /**
@@ -68,6 +77,12 @@ export function buildNotices3(c: Construction3): BuildNotice3[] {
   // S2 (#378): the same flag on the general line-relation family
   for (const r of c.lineRels) {
     if (r.statedAsPlane) out.push({ kind: 'line-rel-noun', line: r.line });
+  }
+  // #333 (ADR-3D-153): an intersection line that did not get the name the student wrote
+  for (const [name, def] of c.lines) {
+    if (def.kind === 'plane-plane' && def.requested && def.requested !== name) {
+      out.push({ kind: 'line-auto-named', requested: def.requested, assigned: name });
+    }
   }
   for (const s of c.solids) {
     const spec = (QUAD_PYRAMIDS as Partial<Record<SolidKind, { base: QuadBase; right: boolean }>>)[s.kind];

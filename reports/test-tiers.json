@@ -5,92 +5,92 @@
     "share": 0.75,
     "minMeanMult": 3
   },
-  "measuredCutoffMs": 36350,
+  "measuredCutoffMs": 36293,
   "updatedAt": "2026-08-15",
   "slow": [
     {
       "file": "src3d/__tests__/adr-3d-032.test.ts",
-      "ms": 216342
+      "ms": 215459
     },
     {
       "file": "src3d/__tests__/right-apex.test.ts",
-      "ms": 212277
+      "ms": 211969
     },
     {
       "file": "src/__tests__/scenarios-e2e-6.test.ts",
-      "ms": 169857
+      "ms": 167494
     },
     {
       "file": "src3d/__tests__/book-coordinate-givens.test.ts",
-      "ms": 121379
+      "ms": 120260
     },
     {
       "file": "src3d/__tests__/member-drive.test.ts",
-      "ms": 111143
+      "ms": 111901
     },
     {
       "file": "src/__tests__/scenarios-e2e-1.test.ts",
-      "ms": 90910
+      "ms": 90289
     },
     {
       "file": "src/theorems/__tests__/b-corpus.test.ts",
-      "ms": 80490
+      "ms": 78218
     },
     {
       "file": "src3d/__tests__/named-parametric-line.test.ts",
-      "ms": 73543
+      "ms": 73886
     },
     {
       "file": "src/engine/__tests__/membership-conversion.test.ts",
-      "ms": 68995
+      "ms": 68899
     },
     {
       "file": "src/__tests__/scenarios-e2e-5.test.ts",
-      "ms": 68437
+      "ms": 67309
     },
     {
       "file": "src/__tests__/scenarios-props-budget.test.ts",
-      "ms": 66079
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-4.test.ts",
-      "ms": 53924
+      "ms": 65183
     },
     {
       "file": "src/__tests__/scenarios-props-submit-gate.test.ts",
-      "ms": 53279
+      "ms": 53535
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-4.test.ts",
+      "ms": 52644
     },
     {
       "file": "src/__tests__/issue-566.test.ts",
-      "ms": 51319
+      "ms": 51007
     },
     {
       "file": "src/__tests__/scenarios-e2e-8.test.ts",
-      "ms": 49508
+      "ms": 47822
     },
     {
       "file": "src3d/__tests__/exam-2026-2.test.ts",
-      "ms": 48605
+      "ms": 47771
     },
     {
       "file": "src3d/__tests__/plane-eq-drive.test.ts",
-      "ms": 46062
+      "ms": 44590
     },
     {
       "file": "src/__tests__/scenarios-e2e-7.test.ts",
-      "ms": 42633
+      "ms": 42333
     },
     {
       "file": "src/replay/__tests__/basin-ownership.test.ts",
-      "ms": 40327
+      "ms": 40307
     },
     {
       "file": "src/engine/__tests__/obligation-preservation.test.ts",
-      "ms": 37468
+      "ms": 38018
     },
     {
       "file": "src/__tests__/scenarios-props-resample.test.ts",
-      "ms": 36350
+      "ms": 36293
     }
   ]
 }

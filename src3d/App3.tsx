@@ -480,7 +480,9 @@ export default function App3() {
                   ? t('notice.lineRelNoun', { line: n.line })
                   : n.kind === 'redundant-relation'
                     ? t('notice.redundantRelation', { a: n.a, b: n.b })
-                    : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
+                    : n.kind === 'line-auto-named'
+                      ? t('notice.lineAutoNamed', { requested: n.requested, assigned: n.assigned })
+                      : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
             </div>
           ))}
           {guidanceNote && !lastError && !busy && (
