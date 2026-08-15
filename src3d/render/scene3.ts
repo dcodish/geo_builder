@@ -13,7 +13,7 @@
 
 import { openCrossings3 } from '../engine/crossings3';
 import { cleanMag } from '../engine/dataView';
-import { hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
+import { freeDofCount3, hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
 import { distanceWitness, resolveOperand } from '../engine/operands';
 import type { Construction3, Id, Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
@@ -554,6 +554,26 @@ export function buildScene3(
   // a single root; the operator's `ℓ ∥ π1` pins m to ±√2, whereupon the echo printed one branch's numbers
   // and CHANGED them on "show another configuration".
   const paramUnforced = !!c.param && !paramIsKnowledge(resolved.param);
+  // #611 (ADR-3D-157): the rule the two branches above were each a special case of.
+  //
+  // Both were added by a report — #552 for free lines, #371/#479 for symbolic ones — and each was
+  // bound to a line KIND. Every kind nobody wrote a branch for therefore printed sampled numbers
+  // unconditionally, which is how a `plane-plane` line on a 5-DOF pyramid came to echo
+  // «ℓ: x = (0.678, 0.467, 0) + t·(-0.568, 0.823, 0)»: one configuration's line, shown as the given.
+  // An enumeration is not a rule, and a guard bound to a code path rather than to the EVENT it guards
+  // gets bypassed (docs/17). The event is "are these numbers knowledge?", and nothing was asking it.
+  //
+  // Asked of the engine, never re-derived here (the #479 lesson): numbers are knowledge only when the
+  // figure is in the ABSOLUTE lane — otherwise placement and scale are a gauge, so coordinates are
+  // arbitrary even for a fully determined shape — AND nothing is left free to resample. The DOF count
+  // is the very number the UI shows the student, so the canvas and «דרגות חופש שטרם נקבעו» cannot
+  // contradict each other.
+  //
+  // Deliberately conservative: this is a whole-figure test, so a free DOF that does not actually touch
+  // a given line withholds numbers that would have been true. For DISPLAY that is the correct
+  // asymmetry — withholding a true number costs a little information, printing a false one is the
+  // honesty violation (and it is what the `free`-line branch already did unconditionally).
+  const numbersAreKnowledge = laneA && freeDofCount3(c, resolved) === 0;
   const wLines: { name: string; a: Vec3; b: Vec3; form: string }[] = [];
   for (const [name, ln] of resolved.lines) {
     const mid = projectOntoLine(center, ln);
@@ -573,16 +593,17 @@ export function buildScene3(
       a: sub3(mid, scale3(dir, reach)),
       b: add3(mid, scale3(dir, reach)),
       form:
-        // #552: a FREE line's anchor/direction are SAMPLED, never knowledge — a printed equation
-        // would assert numbers the student never stated (the ADR-052 canvas rule), so the echo is
-        // the bare name. The free PLANE precedent: its patch carries a name, never an equation.
-        def?.kind === 'free'
-          ? name
-          : carriesParam && paramUnforced && def?.kind === 'parametric'
+        // #611: a STATED line is the student's own given, printed back — it echoes verbatim whatever
+        // the figure's DOF, because those numbers came from them, not from a sample. Everything else
+        // is DERIVED and echoes numbers only when they are forced; otherwise the bare name, which is
+        // what #552 already did for free lines and what the free PLANE precedent does with its patch.
+        carriesParam && paramUnforced && def?.kind === 'parametric'
           ? `${name}: ${def.src}`
+          : def?.kind === 'parametric' || numbersAreKnowledge
           // #422: the student's own running letter, when they chose one — the numeric echo used to
           // rewrite «m» back to «t», telling them their line in a notation they did not use.
-          : `${name}: x = (${fmt(ln.anchor.x)}, ${fmt(ln.anchor.y)}, ${fmt(ln.anchor.z)}) + ${def?.kind === 'parametric' ? (def.runner ?? 't') : 't'}·(${fmt(ln.dir.x)}, ${fmt(ln.dir.y)}, ${fmt(ln.dir.z)})`,
+          ? `${name}: x = (${fmt(ln.anchor.x)}, ${fmt(ln.anchor.y)}, ${fmt(ln.anchor.z)}) + ${def?.kind === 'parametric' ? (def.runner ?? 't') : 't'}·(${fmt(ln.dir.x)}, ${fmt(ln.dir.y)}, ${fmt(ln.dir.z)})`
+          : name,
     });
   }
 

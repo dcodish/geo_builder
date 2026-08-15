@@ -3691,3 +3691,62 @@ Locks (`bidi3.test.ts`, 6): the `<ul>` carries no `dir` (the defect itself); the
 `MathRun`; `MathRun` sets `dir` on a span and not on the row; and no physical `ml-`/`mr-` margin
 survives in the panel. The assertions read the MARKUP with JSX comments stripped — this tree has no DOM
 harness, and the defect *is* the markup, so the source is the honest thing to assert.
+
+## ADR-3D-157 — a derived line echoes numbers only when they are KNOWLEDGE (#611, P1)
+
+Operator, playing round #596: on a pyramid `SABC` with planes `ABC` and `SBC` and their intersection
+line, the canvas printed «ℓ: x = (0.678, 0.467, 0) + t·(-0.568, 0.823, 0)» — while the app's own status
+line read **«דרגות חופש שטרם נקבעו: 5»**. One sample of an under-determined figure, shown as the given.
+*"the guideline is never show values unless they are fixed."*
+
+This is the canvas honesty rule inverted — the figure asserting a given the student never stated, which
+is the same cardinal sin as drawing a figure that violates the givens. P1.
+
+**Root cause: the honesty gate was an ENUMERATION OF LINE KINDS, not a rule.** `scene3.ts` decided the
+echo by `def.kind`, with two suppressing branches — free lines (#552) and symbolic parametric lines
+(#371/#479) — **each added by a report, each bound to a code path**. Every kind nobody had written a
+branch for fell through to the unconditional numeric echo: `plane-plane` (the one reported),
+`through`, `common-perp`, `line-projection`. Two of the tree's standing lessons at once — *"an
+enumeration is not a rule"* (src3d/CLAUDE.md) and *"a guard bound to a code path rather than to the
+event it guards will be bypassed"* (docs/17). The event is **"are these numbers knowledge?"**, and
+nothing was asking it. Three reports, one missing rule.
+
+**Decision — one predicate, asked of the engine, that both special cases were instances of:**
+
+```ts
+const numbersAreKnowledge = laneA && freeDofCount3(c, resolved) === 0;
+```
+
+`laneA` (`hasAbsoluteFrameObject`, already computed here) because without an absolute frame the
+figure's placement and scale are a GAUGE, so printed coordinates are arbitrary even for a fully
+determined shape; zero free DOF because anything still free will resample. Both are read from the
+engine rather than re-derived in the renderer — the #479 lesson.
+
+That the DOF term is *the same number the UI already shows the student* is the property worth having:
+the canvas and «דרגות חופש שטרם נקבעו» can no longer contradict each other.
+
+**A STATED given is not a derivation.** The rule turns on provenance, not on kind:
+
+| line | echo |
+| --- | --- |
+| `parametric`, all-numeric — the student typed it | **always** the numbers: their own given, printed back |
+| `parametric` carrying an unforced symbol | the symbolic `src` (unchanged, #371/#479) |
+| `through` / `plane-plane` / `common-perp` / `line-projection` / `free` — DERIVED | numbers only when forced; otherwise the bare **name** |
+
+The `free`-line branch stops being a special case and becomes this rule's default; a derived line that
+later becomes determined gets its numbers back on its own, which is #371's "once the givens determine
+the parameter the numbers ARE knowledge" generalised from one kind to all of them.
+
+**Deliberately conservative.** `freeDofCount3 === 0` is a whole-figure test, so a free DOF that does not
+actually touch a given line withholds numbers that would have been true. For DISPLAY that is the
+correct asymmetry — withholding a true number costs a little information; printing a false one is the
+honesty violation. It is also exactly what the `free`-line branch already did unconditionally.
+
+Locks (`issue-611-echo-knowledge.test.ts`, 12): the operator's exact figure echoing the bare «ℓ» at four
+seeds, with its under-determination asserted as a precondition and the planes/line still drawn; one case
+per derived kind (`plane-plane`, `through` + `line-projection`, `common-perp`), each asserting the lines
+actually EXIST first — an empty list would pass vacuously, which is how a class test lies; the **property**
+that no line form carries a digit on any under-determined figure, with a counter proving the sweep was not
+empty; and the four regressions this must not cause — a numeric parametric line echoing verbatim, a
+symbolic one still echoing its `src`, a determined absolute figure DOES print its derived line's numbers,
+and a free line still showing only its name.
