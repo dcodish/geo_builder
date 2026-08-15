@@ -15,5 +15,9 @@ export default defineConfig({
     outDir: 'dist-complex',
     rollupOptions: { input: path.resolve(__dirname, 'complex.html') },
   },
-  cacheDir: path.resolve(process.env.LOCALAPPDATA || '', 'vite-cache/geo-builder-complex'),
+  // #593: NO `cacheDir` override. This branch was cut before that fix and carried one, copying the
+  // sibling configs' fixed absolute path — the very thing #593 removed from both of them. A cache
+  // pinned outside the checkout is shared by every worktree, so two dev servers (the normal state when
+  // playing a PR) overwrite each other's optimized deps and the browser boots on stale `?v=` hashes.
+  // Vite's default `node_modules/.vite` is per-checkout, which is exactly the property needed.
 });
