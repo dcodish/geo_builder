@@ -7208,3 +7208,48 @@ distinguishes the two states, and `resolve-view.test.ts` keeps owning the state 
 Lock: visual — validated by the operator's play of round #582 (per the issue's own scope:
 style/position only; the state machine is already locked).
 
+
+## ADR-450 — the DIMENSIONS phrasing is read by the shape MACRO, and scoped to quads (#458)
+
+`מידות` appeared **nowhere** in `src/parser/parse.ts`, in either locale. «ריבוע במידות 4*4» is a live
+prod utterance (log-triage 2026-08-08, session `vgrm5pjb`) — it escalated to the LLM on every use.
+
+This is the capability half of #437, split out as that issue's own diagnosis proposed. #437 fixed the
+bug (a repeated stated magnitude accounted twice, so the given vanished with a green ✓); what it
+uncovered was that before it, the *dishonest* phrasing committed while the honest one refused — and
+after it, all of them were honest and **none of them built**.
+
+Decision: read the dimensions phrase in `shapeMacro`, not in each shape rule. The phrasing modifies the
+noun and every quad can carry it, so one reader gives all of them the forms at once — «במידות a*b»,
+«a על b», «a×b», En «a by b» / «with dimensions a by b». A per-rule copy is exactly how «שווה שוקיים»
+ended up readable in one position and not another (#424). The phrase is consumed BEFORE the
+`shapeLeftover` gate, which is what used to reject these utterances: it saw the magnitudes as "a number
+this rule cannot express" and escalated the whole sentence.
+
+The magnitudes lower to ordinary `set-distance` givens on the ring's leading edges (the ADR-110 macro
+pattern — no new engine construct). **Order convention:** the first number is the base edge |v0v1|, the
+second the adjacent edge |v1v2|; for a rectangle that is the drawn base, which is what a student reading
+«4 על 6» off a textbook figure means (the decision #458 asked for).
+
+Two scoping choices, both ADR-052:
+
+- **Quads only** (`n === 4`). «במידות a×b» has a settled textbook meaning on a quadrilateral and none on
+  a triangle — *which* two edges would they be? Inventing a convention there would be an unstated pick,
+  so a triangle's dimensions phrase still escalates rather than being guessed.
+- **The single-side form stays with its existing owner.** `normalizeShapeSide` already reads «שצלעו»,
+  deliberately scoped to shapes whose sides are all equal by definition (square / rhombus / equilateral
+  triangle), because on a rectangle "its side" is an unstated pick. Adding a second reader here would
+  have been the optional parallel path a chokepoint must never have (docs/17 §3) — and a laxer one,
+  since it would have applied to any shape. Left alone; its label-less gap («ריבוע שצלעו 4» with no
+  letters, which `normalizeShapeSide` cannot rewrite because the auto-labels are not known until the
+  macro assigns them) is filed separately rather than papered over here.
+
+A square receives BOTH constraints like any other quad: equal numbers are a consistent redundancy the
+solver absorbs, and unequal ones («ריבוע במידות 4*6») refuse as an honest over-constraint — the student
+wrote a contradiction, and picking one number to believe is the silent-wrong-build class.
+
+Locks: `issue-458-dimensions.test.ts` — the built figure's real edge lengths for each form (never "a
+command was emitted"), the bare-separator form lowering byte-identically to the «במידות» one, En
+mirrors, named labels carrying the dimensions, the square contradiction refusing with BOTH magnitudes
+still in the parse, the triangle staying out, «על» as a membership word not read as a separator, and
+`מלבן ABCD שצלעו` still escalating so the ADR-052 scoping of the existing owner is not silently widened.

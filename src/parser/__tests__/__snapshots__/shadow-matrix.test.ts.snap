@@ -625,6 +625,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "rectangle 4 by 6",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "מלבן במידות 4*6",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
     "text": "equilateral triangle ABC",
     "winner": "(anon)",
   },

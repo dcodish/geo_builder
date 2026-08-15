@@ -1460,6 +1460,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "segment",
     ],
   },
+  "rectangle 4 by 6": {
+    "en": [
+      "rectangle",
+      "set-distance",
+      "set-distance",
+    ],
+    "he": [
+      "rectangle",
+      "set-distance",
+      "set-distance",
+    ],
+  },
   "rectangle ABCD": {
     "en": [
       "rectangle",

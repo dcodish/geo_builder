@@ -38,12 +38,21 @@ function gate(utterances: string[]): { ok: boolean; dropped: number[] } {
 }
 
 describe('#437 — a REPEATED stated magnitude cannot be accounted twice by one payload', () => {
-  it("the prod utterance: «ריבוע במידות 4*4» now escalates at the PARSE (#497) — never a size-less square", () => {
-    // The fail-closed leftover gate stops the square rule on the surviving «במידות 4*4», so the
-    // whole line goes to the LLM instead of committing a size-less square with a green ✓.
-    expect(gate(['ריבוע במידות 4*4']).ok).toBe(false);
-    expect(gate(['מלבן במידות 4*6']).ok).toBe(false);
-    expect(gate(['מלבן 4 על 4']).ok).toBe(false);
+  it("the prod utterance: «ריבוע במידות 4*4» now BUILDS, with every magnitude accounted (#458/ADR-450)", () => {
+    // SUPERSEDES the #497 escalation this line used to assert. Then, the fail-closed leftover gate saw
+    // «במידות 4*4» as a magnitude the rule could not express and sent the whole line to the LLM — the
+    // honest response while `מידות` existed nowhere in the parser. #458 gave it a lowering, so the
+    // numbers become real `set-distance` givens before the leftover gate ever sees them.
+    //
+    // The HONESTY property is unchanged, and is what this now asserts: nothing stated goes
+    // unaccounted, and a size-less square with a green ✓ is still impossible. Only the route changed —
+    // from "refuse, because we cannot express it" to "express it". The multiset gate itself is
+    // exercised directly, on hand-built payloads, in the very next case.
+    for (const u of ['ריבוע במידות 4*4', 'מלבן במידות 4*6', 'מלבן 4 על 4']) {
+      const r = gate([u]);
+      expect(r.ok, u).toBe(true);
+      expect(r.dropped, `${u} — a stated magnitude went unaccounted`).toEqual([]);
+    }
   });
 
   it('the gate itself stays a MULTISET on the LLM-commit path: one payload cannot vouch for both 4s', () => {

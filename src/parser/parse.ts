@@ -722,23 +722,72 @@ export const shapeLeftover = (s: string): boolean => {
  * `shapeLeftover` (#497 fail-closed) and runs AFTER label extraction — the order matters: a lowercase
  * label run («ריבוע abcd») is indistinguishable from an unknown word until `labelRun` has claimed it.
  */
+/**
+ * #458 — the DIMENSIONS a quad phrase states about itself: «מלבן במידות 4*6», «מלבן 4 על 6»,
+ * «ריבוע במידות 4*4», «a rectangle 4 by 6». `מידות` appeared NOWHERE in the parser before this, in
+ * either locale, and «ריבוע במידות 4*4» is a live prod utterance (log-triage 2026-08-08).
+ *
+ * Read HERE, in the shape macro, rather than in each shape rule: the phrasing modifies the noun, and
+ * every quad can carry it, so one reader gives all of them the forms at once. A per-rule copy is how
+ * «שווה שוקיים» ended up readable in one position and not another (#424) — the same trap.
+ *
+ * The magnitudes lower to ordinary `set-distance` givens on the ring's leading edges (ADR-110's macro
+ * pattern: no new engine construct, the solver does the work). Order convention: the FIRST number is
+ * the base edge |v0v1|, the second the adjacent edge |v1v2| — for a rectangle that is the drawn base,
+ * which is what a student reading «4 על 6» off a textbook figure means.
+ *
+ * Scoped to QUADS (n === 4), where «במידות a×b» is the textbook phrasing with a settled meaning.
+ * A triangle's "dimensions" would be an invented convention about WHICH edges — an unstated pick
+ * (ADR-052) — so it stays out rather than being guessed.
+ *
+ * A shape whose own definition already forces the two equal (a square) receives both constraints all
+ * the same: equal numbers are a consistent redundancy the solver absorbs, and UNEQUAL ones refuse as
+ * an honest over-constraint — the student wrote a contradiction, and picking one number to believe
+ * would be the silent-wrong-build class.
+ *
+ * The SINGLE-side form («שצלעו 4») is deliberately NOT read here: `normalizeShapeSide` already owns
+ * it, scoped to shapes whose sides are all equal by definition, because on a rectangle "its side" is
+ * an unstated pick. A second reader here would be the optional parallel path a chokepoint must never
+ * have (docs/17 §3) — and a laxer one. Its label-less gap is tracked separately.
+ */
+const DIM_SEP = String.raw`(?:\*|×|✕|x|X|\s+על\s+|\s+by\s+)`;
+const DIM_LEAD = String.raw`(?:ב?מידות\s*|with\s+dimensions?\s+|dimensions?\s+)?`;
+const DIM_PAIR = String.raw`${DIM_LEAD}(${NUM})\s*${DIM_SEP}\s*(${NUM})`;
+function statedDims(s: string): { values: number[]; strip: RegExp } | null {
+  const m = s.match(new RegExp(DIM_PAIR, 'i'));
+  if (!m) return null;
+  return { values: [Number(m[1]), Number(m[2])], strip: new RegExp(DIM_PAIR, 'gi') };
+}
+
+/** The stated dimensions as ordinary distance givens on the ring's leading edges. */
+const dimCommands = (ids: Id[], values: number[]): AnyCommand[] =>
+  values
+    .slice(0, Math.min(values.length, ids.length - 1))
+    .map((value, i) => ({ type: 'set-distance', a: ids[i], b: ids[i + 1], value }) as AnyCommand);
+
 const shapeMacro =
   (trigger: RegExp, strip: RegExp, n: number, make: (ids: Id[]) => AnyCommand[], defer?: (s: string) => boolean): Rule =>
   (s, ctx) => {
     if (defer?.(s)) return null; // a downstream rule owns this phrasing (e.g. a triangle through/around a circle)
     if (!trigger.test(s)) return null;
-    const bare = s.replace(strip, ' ');
+    // #458: the dimensions phrase is part of the shape statement, so it is consumed here — before the
+    // leftover gate, which would otherwise see the magnitudes as "a number this rule cannot express"
+    // and escalate the whole utterance (which is exactly what it did: «ריבוע במידות 4*4» is a live
+    // prod utterance that reached the LLM every time).
+    const dims = n === 4 ? statedDims(s) : null;
+    const bare = (dims ? s.replace(dims.strip, ' ') : s).replace(strip, ' ');
+    const withDims = (ids: Id[]): AnyCommand[] => [...make(ids), ...(dims ? dimCommands(ids, dims.values) : [])];
     const ids = labelRun(bare, n);
     if (!ids) {
       // No label run. Auto-name a bare named shape ("דלתון" → A,B,C,D) when the student named NO labels and
       // nothing geometry-significant remains; a partial run / leftover defers or escalates exactly as before.
       if (namesVertices(bare) || shapeLeftover(bare)) return null;
-      return make(autoVertexLabels(n, ctx.points ?? []));
+      return withDims(autoVertexLabels(n, ctx.points ?? []));
     }
     // After keyword + labels are consumed, nothing geometry-significant should remain — a constraint/extra
     // construct ("kite ABCD with AB = 6") means a compound → escalate, don't half-parse (mirrors inscribedPolygon).
     if (shapeLeftover(removeClaimed(bare, ids))) return 'stop';
-    return make(ids);
+    return withDims(ids);
   };
 
 /** A triangle phrasing that names a circle it is THROUGH / circumscribes belongs to the circumcircle/incircle
