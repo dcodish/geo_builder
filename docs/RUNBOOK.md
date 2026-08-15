@@ -8,6 +8,7 @@ The single ops entry point. Deep 2-D proxy detail (one-time setup, env file, sec
 | --- | --- | --- | --- |
 | 2-D static app (`dist/`) | `npm run build` | `/var/www/vhosts/themathbible.com/httpdocs/geo-builder/` | `https://themathbible.com/geo-builder/` (Apache static) |
 | 3-D static app (`dist-3d/`) | `npm run build:3d` | `…/httpdocs/3d-builder/` (**rename `3d.html` → `index.html`**) | `https://themathbible.com/3d-builder/` (Apache static) |
+| Complex-numbers app (`dist-complex/`) | `npm run build:complex` | `…/httpdocs/complex-builder/` (**rename `complex.html` → `index.html`**) | `https://themathbible.com/complex-builder/` (Apache static) |
 | Shared Node proxy (`dist-server/proxy.mjs`) | `npm run build:proxy` | `/var/www/geo-proxy/proxy.mjs` | `geo-proxy.service` on loopback **:8788**, reverse-proxied by Apache |
 | Proxy env (key, admin creds, log paths) | — (hand-edited) | `/var/www/geo-proxy/geo-proxy.env` (mode 600) | read by the service |
 
@@ -27,6 +28,7 @@ Deploy **only committed state on `main`** ([docs/22 §5](22-workflow.md)). Decis
 npx vitest run           # full suite green
 npm run build            # 2-D (tsc -b + vite)   — skip if 2-D unchanged
 npm run build:3d         # 3-D                    — skip if 3-D unchanged
+npm run build:complex    # complex                — skip if src-complex/ unchanged
 npm run build:proxy      # only if server/ changed
 
 # 1. 2-D static
@@ -36,8 +38,13 @@ scp -r dist/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/ge
 scp -r dist-3d/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/3d-builder/
 ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/3d-builder && mv -f 3d.html index.html'
 
+# 2b. complex static (same rename pattern). The directory was created at the prod/2026-08-15-2
+#     deploy: mkdir + chown root:root + chmod 755, matching its siblings.
+scp -r dist-complex/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/complex-builder/
+ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/complex-builder && mv -f complex.html index.html'
+
 # 3. perms (static files should be 644 root:root — scp usually preserves this; verify)
-ssh root@themathbible.com 'chmod -R a+rX /var/www/vhosts/themathbible.com/httpdocs/geo-builder /var/www/vhosts/themathbible.com/httpdocs/3d-builder'
+ssh root@themathbible.com 'chmod -R a+rX /var/www/vhosts/themathbible.com/httpdocs/geo-builder /var/www/vhosts/themathbible.com/httpdocs/3d-builder /var/www/vhosts/themathbible.com/httpdocs/complex-builder'
 
 # 4. proxy — ONLY when server/ changed
 scp dist-server/proxy.mjs root@themathbible.com:/var/www/geo-proxy/
