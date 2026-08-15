@@ -4016,3 +4016,63 @@ order; segment⟂plane; `contained` distinguished from `parallel`; the multi-see
 tetra earns no row); all three flood-control rules including edge×edge silence; the #558 cell on an
 UNDRAWN edge plus the pre-#558 drawn-edge workaround agreeing; and the S4 and plane×plane columns
 asserted unchanged, the plane pair sharing two points among them.
+## ADR-3D-155 — the view gauge has THREE components: orbit, zoom, and pan (#533)
+
+Operator (prod): with a box carrying `AC=(10,0,0)`, the solid renders in the top third of the canvas
+and the lower half is empty — *"when the shape is positioned in such a place, it is not possible to
+see the shape - i need a drag option to drag the shape as is"*.
+
+**Root cause: the view had no translation term at all.** `Figure3` owned exactly two gauges, and
+`scene3.ts` hard-pins the content bounding-box centre to the viewport centre — so **where the solid
+lands is a function of the content bbox, not of anything the student controls.** Whenever something
+else dominates that union the solid is squeezed into a corner: the coordinate axes above all, which
+are anchored at the ORIGIN and stretch from `min(0,…)` to `max(0,…)`, so a solid placed away from the
+origin roughly doubles the framed extent for free — which is exactly what `AC=(10,0,0)` does. A
+growing plane patch or a long parametric line does the same.
+
+And the one framing gesture that existed made it worse: `zoom` multiplies `k` while the centre stays
+the bbox centre, so **zooming in magnifies about a point that may be nowhere near the solid** and
+drives it further off-canvas. There was no lever that recovered the frame. A missing capability, not
+a broken one.
+
+**Decision.** Pan is a screen-space TRANSLATION under an orthographic camera, so nothing is pushed
+into the projection: `scene3.ts` stays pure and **untouched**, and every coordinate `buildScene3`
+emits is unchanged — including the #483 crossing hit targets, which translate with their marks for
+free. `pan: {x,y}` joins `cam` and `zoom` as the third component of one view gauge, on the same tier:
+local component state, outside the store and outside undo (docs/20 §6.4). The figure never moves; only
+the frame does.
+
+Gestures, per the operator's ruling (2026-08-11) — modifier + secondary drag, no new on-canvas UI:
+**left-drag stays orbit and does not move**, because a student who has learned the primary gesture
+must not find it repurposed; right- or middle-button drag pans; Shift+left-drag pans (the keyboard
+path for a one-button pointer); on touch — where there are neither buttons nor modifiers — a
+two-pointer drag pans while one finger still orbits. The canvas suppresses its context menu, or a
+right-drag would end in a popup.
+
+**Zoom now zooms about the pointer** (`pan' = q − (q − pan)·r`), which is what turns zoom from the
+gesture that loses the figure into a framing tool. The ratio read is the ACTUAL `next/prev`, so at the
+zoom clamp it is 1 and a clamped step correctly pans nothing.
+
+**`↺` clears pan too.** One button always returns to a known-good frame — that is what makes free
+panning safe to hand a student, and the button lives outside the pan group so a lost frame stays
+recoverable by construction.
+
+**Deliberately NOT done:** re-weighting the fit so the solid rather than the union bbox is centred.
+The axes must stay visible — showing where the origin sits is the point of drawing them — so the union
+fit is a legitimate default. The defect was the absence of a recovery lever, and this supplies it.
+
+**Testing note, and a deviation from the issue's plan worth recording.** The plan asked for gesture
+tests (a pan gesture translates the group, `↺` clears pan, a two-pointer drag pans). This tree has no
+DOM test harness at all — React is tested DOM-free via `renderToStaticMarkup`, and neither jsdom nor
+testing-library is a dependency anywhere in the repo — so a handler-internal decision is one no test
+can reach. Rather than introduce a new dependency and a second testing paradigm inside a fix round,
+the two decisions worth locking were extracted into `render/viewGauge.ts` as pure functions
+(`dragModeFor`, `panForZoom`) and are asserted directly, with the render side asserted structurally.
+That is stronger than a gesture test for the arithmetic and weaker for the wiring; the wiring is four
+lines and visible in one screen.
+
+Locks (`issue-533-pan.test.tsx`): the full gesture map including left-drag staying orbit; the
+zoom-about-pointer invariant asserted as "the point under the cursor maps to itself", the clamped-ratio
+no-op, and in/out being exact inverses; exactly one pan group wrapping ALL figure content; the reset
+button outside it; and the load-bearing one — `buildScene3` takes no pan parameter and emits identical
+scenes, so nothing derived from the scene can drift when the frame moves.

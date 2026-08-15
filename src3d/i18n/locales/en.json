@@ -34,7 +34,7 @@
     "saveImage": "Save image"
   },
   "hint": {
-    "orbit": "Drag the figure to orbit · scroll to zoom"
+    "orbit": "Drag the figure to orbit · Shift-drag or right-drag to pan · scroll to zoom"
   },
   "facts": {
     "empty": "No givens yet — type one or click an example",
