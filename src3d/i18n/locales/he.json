@@ -136,7 +136,7 @@
     "add": "חשב",
     "remove": "הסר",
     "note": {
-      "notUnderstood": "לא זוהה — נסו w·v, |AB|, ∠SAB, שטח ABC, נפח SABCD",
+      "notUnderstood": "לא זוהה — נסו A, מישור ABC, w·v, |AB|, ∠SAB, שטח ABC, נפח SABCD",
       "unavailable": "הנקודות האלו אינן בציור",
       "undetermined": "לא נקבע על ידי הנתונים",
       "scale": "תלוי בקנה המידה (קבעו גודל)",

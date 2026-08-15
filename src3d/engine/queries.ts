@@ -12,8 +12,8 @@
  * WHY it can't be answered — never a sampled number dressed as a fact (ADR-052).
  */
 
-import { resolve3, scaleKnown3, vectorFramePinned3 } from './evaluate';
-import { basisDecompose, cleanNum, coordStr, decompStr, formatBranches, linePlaneAngleAt, newellNormal, parametricDecomp } from './dataView';
+import { resolve3, scaleKnown3, translationPinned3, vectorFramePinned3 } from './evaluate';
+import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, decompStr, formatBranches, linePlaneAngleAt, newellNormal, parametricDecomp, planeEqStr } from './dataView';
 import { centroid3, cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
 import { distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
 import { readOperand } from '../parser/operandToken';
@@ -36,7 +36,14 @@ type Query =
   | { kind: 'volume'; ids: Id[] }
   // S5 (#378): «המרחק בין D למישור ABC» — the distance itself, no value stated. NOT scale-free:
   // it is reported only when the figure's scale is pinned (the ADR-3D-054 discipline).
-  | { kind: 'distance'; a: Operand3; b: Operand3 };
+  | { kind: 'distance'; a: Operand3; b: Operand3 }
+  // #496: a bare POINT label «A» — its coordinates, when they are knowledge. The lane could already
+  // answer «m» (a lowercase figure symbol, ADR-3D-119) but not «A», on figures where A is the more
+  // natural question.
+  | { kind: 'point'; id: Id }
+  // #317: «מישור ABC» / «plane ABC» / a named plane — its canonical equation, when it is forced.
+  // The exam's «מצאו את משוואת המישור» asked as a QUESTION instead of entered as a figure-changing fact.
+  | { kind: 'plane'; name: string | null; ids: Id[] | null };
 
 export interface QueryResult {
   /** The student's query text, verbatim. */
@@ -159,6 +166,31 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
     if (matches.length === 1) return { kind: 'volume', ids: [...matches[0].ids] };
   }
 
+  // #317 — PLANE: «מישור ABC» / «plane ABC» / «משוואת המישור ABC» / a named plane «π1». The panel
+  // already prints a forced plane's equation; the only route to it as a QUESTION was to enter the
+  // plane as a FACT, which changes the figure to ask about it. A point RUN needs no declaration — the
+  // ring's own plane is derived; a NAME must be one the figure carries.
+  {
+    const m =
+      s.match(new RegExp(`^(?:ה?משוואת\\s+)?ה?מישור\\s+((?:${PT}){3,4})$`)) ??
+      s.match(new RegExp(`^(?:the\\s+)?(?:equation\\s+of\\s+(?:the\\s+)?)?plane\\s+((?:${PT}){3,4})$`, 'i'));
+    if (m) return { kind: 'plane', name: null, ids: m[1].match(new RegExp(PT, 'g'))! };
+    const named =
+      s.match(/^(?:ה?משוואת\s+)?ה?מישור\s+(\S+)$/) ??
+      s.match(/^(?:the\s+)?(?:equation\s+of\s+(?:the\s+)?)?plane\s+(\S+)$/i);
+    const nm = named?.[1] ?? s;
+    if (c.planes.has(nm) || c.pointPlanes.has(nm) || c.relPlanes.has(nm)) return { kind: 'plane', name: nm, ids: null };
+  }
+
+  // #496 — POINT: a bare label «A», or «שיעורי A» / «coordinates of A» / «A = ?». The label must BE a
+  // point of THIS construction, so a stray letter in the query box is never treated as one. No tie with
+  // the vector lane is possible: `atomOf` reads a named vector only from a LOWERCASE letter, and a pair
+  // needs two labels — an uppercase single letter can only be a point.
+  {
+    const m = s.match(new RegExp(`^(?:ה?שיעורי(?:ם)?\\s+(?:של\\s+)?|ה?קואורדינ[טת]\\w*\\s+(?:של\\s+)?|coordinates\\s+of\\s+)?(${PT})\\s*(?:=\\s*\\?)?$`, 'i'));
+    if (m && c.points.has(m[1])) return { kind: 'point', id: m[1] };
+  }
+
   // VECTOR (last): a bare pair «AE» or a bare declared vector «w» — the vector itself, not its length.
   const bare = s.replace(/^(?:ה?ו?וקטור|vector)\s+/i, '').replace(/[⃗→]/g, '').trim();
   const va = atomOf(c, bare);
@@ -237,6 +269,12 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCt
     return n < 1e-12 ? null : (Math.acos(Math.max(-1, Math.min(1, dot3(u, v) / n))) * 180) / Math.PI;
   };
   switch (q.kind) {
+    // #496/#317: a point's coordinates and a plane's equation are not single numbers — `answerQuery`
+    // answers both before the numeric path. Listed explicitly so the switch stays exhaustive and a
+    // future kind cannot slip through as a silent `undefined`.
+    case 'point':
+    case 'plane':
+      return null;
     case 'distance': {
       const ctx = abs ?? { lines: new Map(), planes: new Map() };
       const at = (id: Id) => pos.get(id) ?? null;
@@ -398,6 +436,39 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
     }
     return { text, answer: null, note: 'undetermined' };
   }
+  // #496 — a POINT's coordinates, answered from the PANEL'S OWN per-component stability machinery.
+  // `dataView.pointCoords` already decides what is knowledge (a coordinate identical in every sampled
+  // configuration), prints the partial form when only some components are forced, and upgrades a free
+  // component to «+?»/«−?» under a stated sign given. Calling it is the point: a private formatter here
+  // would be free to disagree with the ארגון נתונים panel about the same point (the #481 lesson), and
+  // the #315 translation anchor would have to be remembered twice.
+  if (q.kind === 'point') {
+    const entry = dataView(c, seed).pointCoords[q.id];
+    return entry ? { text, answer: `${q.id}${entry.text}` } : { text, answer: null, note: 'undetermined' };
+  }
+
+  // #317 — a PLANE's canonical equation, through the derivation the panel's planes block shares
+  // (`canonicalPlaneEq`). A NAMED plane is read from the resolve; a bare point RUN needs no
+  // declaration — the ring's own plane is derived from its positions, which is what makes «מישור ABC»
+  // answerable as a QUESTION instead of only as a figure-changing fact.
+  if (q.kind === 'plane') {
+    // #315: the d-term is translation-dependent, so an equation is gauge until a real point injection
+    // anchors the frame. The panel carries this same explicit gate — cross-sample agreement alone does
+    // not catch it, because an unanchored figure can still be placed identically at every seed.
+    if (!translationPinned3(c)) return { text, answer: null, note: 'undetermined' };
+    const per = seeds.map((sd) => {
+      const r = resolve3(c, sd);
+      if (q.name) return r.planes.get(q.name);
+      const pts = q.ids!.map((id) => r.positions.get(id));
+      if (pts.some((p) => !p)) return undefined;
+      const ring = pts as Vec3[];
+      const n = newellNormal(ring);
+      return norm3(n) < 1e-9 ? undefined : { n, d: -dot3(n, ring[0]) };
+    });
+    const eq = canonicalPlaneEq(per);
+    return eq ? { text, answer: planeEqStr(eq) } : { text, answer: null, note: 'undetermined' };
+  }
+
   const vals = seeds.map((s) => {
     const r = resolve3(c, s);
     return evalQuery(c, q, r.positions, { lines: r.lines, planes: r.planes });

@@ -179,6 +179,34 @@ export function planeEqStr(u: { x: number; y: number; z: number; d: number }): s
   return `${parts.join(' ')} = 0`;
 }
 
+/**
+ * #317 — the CANONICAL equation of a plane sampled across configurations, or null when it is not
+ * knowledge. THE shared derivation: the panel's planes block and the query lane both call this, so a
+ * «מישור ABC» question and the panel row for the same plane can never disagree (the #481 lesson —
+ * one formatting seam, never a private formatter).
+ *
+ * Canonical = unit normal with a POSITIVE leading coefficient, which is what makes cross-sample
+ * comparison meaningful (the same plane resolves with an arbitrary normal sign and length per solve).
+ * The agreement gate across the samples is the honesty half: an equation that varies with the seed is
+ * a sampled drawing, not a forced consequence of the givens, and never prints (the #371/#481 rule).
+ */
+export function canonicalPlaneEq(
+  per: ({ n: Vec3; d: number } | undefined)[],
+): { x: number; y: number; z: number; d: number } | null {
+  if (per.length === 0 || per.some((p) => !p)) return null;
+  const canon = per.map((p) => {
+    const n = Math.hypot(p!.n.x, p!.n.y, p!.n.z);
+    if (n < EPS) return null;
+    const u = { x: p!.n.x / n, y: p!.n.y / n, z: p!.n.z / n, d: p!.d / n };
+    const lead = [u.x, u.y, u.z].find((v) => Math.abs(v) > 1e-6) ?? 1;
+    return lead < 0 ? { x: -u.x, y: -u.y, z: -u.z, d: -u.d } : u;
+  });
+  if (canon.some((v) => !v)) return null;
+  const keys = ['x', 'y', 'z', 'd'] as const;
+  if (!canon.every((v) => keys.every((k) => Math.abs(v![k] - canon[0]![k]) < 1e-4))) return null;
+  return canon[0]!;
+}
+
 /** Solve M·x = t for 3×3 M given by columns u,v,w; null when singular. */
 /** Newell normal of a point ring (3–4 points) — THE shared plane-normal for display derivations
  *  (#319: the panel's labeled line↔plane angles and the query lane share it, so they can't diverge). */
@@ -803,17 +831,9 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     for (const name of [...c.pointPlanes.keys(), ...c.relPlanes.keys(), ...freeNames]) {
       const per = resolved.map((r) => r.planes.get(name));
       if (per.some((p) => !p)) continue;
-      const canon = per.map((p) => {
-        const n = Math.hypot(p!.n.x, p!.n.y, p!.n.z);
-        if (n < EPS) return null;
-        const u = { x: p!.n.x / n, y: p!.n.y / n, z: p!.n.z / n, d: p!.d / n };
-        const lead = [u.x, u.y, u.z].find((v) => Math.abs(v) > 1e-6) ?? 1;
-        return lead < 0 ? { x: -u.x, y: -u.y, z: -u.z, d: -u.d } : u;
-      });
-      if (canon.some((v) => !v)) continue;
-      const keys = ['x', 'y', 'z', 'd'] as const;
-      if (!canon.every((v) => keys.every((k) => Math.abs(v![k] - canon[0]![k]) < 1e-4))) continue;
-      planes.push(`${name}: ${planeEqStr(canon[0]!)}`);
+      const eq = canonicalPlaneEq(per);
+      if (!eq) continue;
+      planes.push(`${name}: ${planeEqStr(eq)}`);
       // the parametric form rides when the run's anchor point and spanning edges are stable
       const run = c.pointPlanes.get(name);
       if (run && run.length >= 3) {

@@ -136,7 +136,7 @@
     "add": "Calc",
     "remove": "remove",
     "note": {
-      "notUnderstood": "not recognised — try w·v, |AB|, ∠SAB, area ABC, volume SABCD",
+      "notUnderstood": "not recognised — try A, plane ABC, w·v, |AB|, ∠SAB, area ABC, volume SABCD",
       "unavailable": "those points aren't in the figure",
       "undetermined": "not determined by the givens",
       "scale": "depends on the figure's scale (pin a size)",

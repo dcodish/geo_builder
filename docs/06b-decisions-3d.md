@@ -3604,3 +3604,42 @@ stay — harmless and still correct under an LTR base — so nothing regresses o
 Locks: `render3.test.tsx` — the root `<svg>` tag itself carries `direction:ltr` (asserted on the root
 tag, not anywhere in the markup), the operator's primed prism renders `A′ B′ C′`, and the absence of
 `bidi-override` is asserted so the stronger property is never quietly added.
+
+## ADR-3D-151 — the query lane's missing kinds: a bare POINT and a PLANE, answered through the panel's own derivations (#496, #317)
+
+Two operator reports, one gap. #496 (2026-08-10): *"when A is declared, I would expect to see its
+values … when I enter A, it should understand what I want."* #317 (2026-07-25, exam part ב.2
+«מצאו את משוואת המישור שעליו מונח הבסיס ABC»): the only route to a plane's equation was to enter
+«מישור ABC» as a FACT — changing the figure in order to ask a question about it.
+
+`parseQuery` carried ten kinds and neither of these. The asymmetry in #496 is the sharp part: a bare
+LOWERCASE letter was already answerable (`symbol`, ADR-3D-119/#480), so the student could ask for «m»
+but not for «A» on a figure where A is the more natural question.
+
+Decision: both kinds answer through the derivation the ארגון נתונים panel ALREADY uses, never a
+private formatter (the #481 lesson, restated). Concretely:
+
+- **point** → `dataView(c, seed).pointCoords[id]`. Not a copy of its logic — the call itself. That
+  brings the per-component stability judgement for free (a coordinate prints only when identical in
+  every sampled configuration), the partial form when only some components are forced, the stated-sign
+  upgrade to «+?»/«−?», and the #315 translation anchor, none of which can now drift out of step with
+  the panel.
+- **plane** → `canonicalPlaneEq`, extracted from the panel's planes block and now called by both. A
+  NAMED plane is read from the resolve; a bare point RUN is derived from the ring's own positions
+  (Newell normal), so «מישור ABC» needs no declaration and asking changes nothing. The #315
+  translation gate is applied explicitly here, because cross-sample agreement alone does not catch it —
+  an unanchored figure can still be placed identically at every seed.
+
+The guidance register gains both forms (ADR-428's spirit: the lane must teach what it accepts).
+`evalQuery`'s switch lists them explicitly as non-numeric rather than letting a future kind fall
+through as a silent `undefined`.
+
+Not done here, deliberately: whether the data panel should be OPEN by default when the figure has
+stable values to show (#496's other half). That is a UX call for the operator, and it is orthogonal —
+the query lane now answers the question either way.
+
+Locks: `query-point-plane.test.ts` — the phrasing family for each kind, English mirrors, the
+undetermined refusals (a bare cube's vertex, an unanchored plane), a non-point letter still reading
+`notUnderstood`, the vector lane unaffected, asking not mutating the figure, and — the load-bearing
+one — **panel-vs-query agreement asserted directly**: every point the panel prints must equal its own
+query answer, and a declared plane's panel row must equal its query answer.
