@@ -42,6 +42,9 @@ const he = {
   relDriven: 'היחס כיוון את הציור (הוריד דרגת חופש)',
   paramsLabel: 'פרמטרים משותפים — נדגמים מחדש בכל "אפשרות נוספת"',
   calcsLabel: 'חישובים',
+  calc: 'חשב',
+  calcPlaceholder: 'הקלידו ביטוי לחישוב, למשל |z1-z2|',
+  calcCurrent: 'בדגימה הנוכחית: {{value}}',
 };
 
 const en = {
@@ -82,6 +85,9 @@ const en = {
   relDriven: 'the relation drove the figure (consumed a degree of freedom)',
   paramsLabel: 'shared parameters — resampled on every "another configuration"',
   calcsLabel: 'Calculations',
+  calc: 'Calc',
+  calcPlaceholder: 'type an expression to calculate, e.g. |z1-z2|',
+  calcCurrent: 'at the current sample: {{value}}',
 };
 
 complexI18n.use(initReactI18next).init({

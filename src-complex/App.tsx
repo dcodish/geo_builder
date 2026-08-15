@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fmtNum } from './engine/complex';
-import { derive } from './engine/model';
+import { deriveScene } from './engine/model';
 import { GaussPlane } from './render/GaussPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
 
@@ -67,7 +67,12 @@ export function App() {
     document.documentElement.dir = i18n.language === 'he' ? 'rtl' : 'ltr';
   }, [i18n.language]);
 
-  const scene = useMemo(() => derive(facts, freePos, seed), [facts, freePos, seed]);
+  const scene = useMemo(() => deriveScene(facts, freePos, seed), [facts, freePos, seed]);
+  const [calcInput, setCalcInput] = useState('');
+  const submitCalc = () => {
+    if (calcInput.trim() === '') return;
+    if (addLine(calcInput)) setCalcInput('');
+  };
 
   const submit = () => {
     if (input.trim() === '') return;
@@ -126,16 +131,29 @@ export function App() {
             <button onClick={clearAll}>{t('clearAll')}</button>
             <span className="count">{t('factCount', { count: facts.length })}</span>
           </div>
-          {scene.measures.length > 0 && (
-            <div className="measures">
-              <div className="measures-title">{t('calcsLabel')}</div>
-              {scene.measures.map((m) => (
-                <div key={m.key} className="measure-row" dir="ltr">
-                  {m.label} = {fmtNum(m.value)}
-                </div>
-              ))}
+          <div className="measures">
+            <div className="measures-title">{t('calcsLabel')}</div>
+            {scene.measures.map((m) => (
+              <div key={m.key} className="measure-row" dir="ltr">
+                <span title={m.form ? t('calcCurrent', { value: fmtNum(m.value) }) : undefined}>
+                  {m.label} = {m.form ?? fmtNum(m.value)}
+                </span>
+                <button className="del" onClick={() => removeFact(m.factId)} aria-label="delete">
+                  ✕
+                </button>
+              </div>
+            ))}
+            <div className="input-row calc-input">
+              <input
+                value={calcInput}
+                onChange={(e) => setCalcInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submitCalc()}
+                placeholder={t('calcPlaceholder')}
+                dir="ltr"
+              />
+              <button onClick={submitCalc}>{t('calc')}</button>
             </div>
-          )}
+          </div>
           {Object.keys(scene.params).length > 0 && (
             <div className="params" dir="ltr" title={t('paramsLabel')}>
               {Object.entries(scene.params)

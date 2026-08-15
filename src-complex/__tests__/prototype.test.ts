@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { absC, argDeg, cisDeg, cx, formatCart, formatPolar, mul } from '../engine/complex';
-import { defaultFree, derive, factNames, type Fact } from '../engine/model';
+import { defaultFree, derive, deriveScene, factNames, type Fact } from '../engine/model';
 import { parseLine } from '../parser/parse';
 import { useComplexStore } from '../store/useComplexStore';
 
@@ -553,6 +553,43 @@ describe('quadrant givens (F5: רביע)', () => {
       expect(dist / s.params.r).toBeCloseTo(15);
     }
     useComplexStore.getState().clearAll();
+  });
+});
+
+describe('symbolic parameter forms in the calc panel (הביעו באמצעות r)', () => {
+  it('|z1-z2| displays as 15r while r is undetermined — every seed', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('arg(z1)-arg(z2)=90');
+    st.addLine('|z1| = 9r');
+    st.addLine('|z2| = 12r');
+    st.addLine('|z1 - z2|');
+    for (const seed of [0, 1, 2]) {
+      const s = deriveScene(useComplexStore.getState().facts, {}, seed);
+      expect(s.measures[0].form).toBe('15r');
+    }
+    useComplexStore.getState().clearAll();
+  });
+
+  it('quadratic dependence reads r², parameter-independent stays numeric', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('|z1| = 3r');
+    st.addLine('|z1|*|z1|'); // 9r²
+    st.addLine('z2 = 3+4i');
+    st.addLine('|z2|'); // 5, no r in it
+    const s = deriveScene(useComplexStore.getState().facts, {});
+    expect(s.measures.find((m) => m.label === '|z₁|*|z₁|')!.form).toBe('9r²');
+    const plain = s.measures.find((m) => m.label === '|z₂|')!;
+    expect(plain.form).toBeUndefined();
+    expect(plain.value).toBeCloseTo(5);
+    useComplexStore.getState().clearAll();
+  });
+
+  it('without parameters, deriveScene is plain derive', () => {
+    const s = deriveScene([fact('z1 = 3+4i'), fact('|z1|')], {});
+    expect(s.measures[0].form).toBeUndefined();
+    expect(s.measures[0].value).toBe(5);
   });
 });
 

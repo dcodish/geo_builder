@@ -11,6 +11,7 @@ import {
   absC,
   argDeg,
   cisDeg,
+  fmtNum,
   ipow,
   nthRoots,
 } from './complex';
@@ -159,6 +160,9 @@ export interface SceneMeasure {
   label: string;
   value: number;
   factId: string;
+  /** symbolic display when the value depends on an UNDETERMINED parameter: "15r", "2r²" —
+   * the honest answer while r cannot be calculated (the exam's הביעו-באמצעות-r ask) */
+  form?: string;
 }
 
 export interface Scene {
@@ -243,7 +247,9 @@ const projectConstraints = (
   facts: Fact[],
   freePos: Record<string, Cx>,
   seed: number,
+  paramScale?: Record<string, number>,
 ): { adjusted: Record<string, Cx>; drove: Record<string, boolean> } => {
+  const P = (name: string): number => paramValue(name, seed) * (paramScale?.[name] ?? 1);
   const adjusted: Record<string, Cx> = {};
   const drove: Record<string, boolean> = {};
   // three sweeps: a later constraint that moves a number re-feeds the earlier ones
@@ -365,7 +371,7 @@ const projectConstraints = (
           if ((r.cmp ?? '=') !== '=') continue; // modulus inequalities verify in pass 2 only
           if (!env.has(r.name) || (r.other && !env.has(r.other))) continue;
           const targetMod =
-            r.k * (r.param ? paramValue(r.param, seed) : r.other ? absC(env.get(r.other)!) : 1);
+            r.k * (r.param ? P(r.param) : r.other ? absC(env.get(r.other)!) : 1);
           if (freeNames.has(r.name)) {
             const nv = cisDeg(targetMod, argDeg(env.get(r.name)!));
             env.set(r.name, nv);
@@ -387,8 +393,13 @@ const projectConstraints = (
   return { adjusted, drove };
 };
 
-export const derive = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Scene => {
-  const { adjusted, drove } = projectConstraints(facts, freePos, seed);
+export const derive = (
+  facts: Fact[],
+  freePos: Record<string, Cx>,
+  seed = 0,
+  paramScale?: Record<string, number>,
+): Scene => {
+  const { adjusted, drove } = projectConstraints(facts, freePos, seed, paramScale);
   const effFreePos = { ...freePos, ...adjusted };
   const env = new Map<string, Cx>();
   const points: ScenePoint[] = [];
@@ -426,9 +437,9 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Sc
           const lo = (r.q - 1) * 90;
           ok = a > lo && a < lo + 90;
         } else {
-          if (r.param) params[r.param] = paramValue(r.param, seed);
-          const target =
-            r.k * (r.param ? paramValue(r.param, seed) : r.other ? absC(env.get(r.other)!) : 1);
+          const P = (n: string): number => paramValue(n, seed) * (paramScale?.[n] ?? 1);
+          if (r.param) params[r.param] = P(r.param);
+          const target = r.k * (r.param ? P(r.param) : r.other ? absC(env.get(r.other)!) : 1);
           ok = cmpHolds(r.cmp ?? '=', absC(env.get(r.name)!), target, 1e-9 * Math.max(1, target));
         }
         checks[f.id] = { ok, driven: !!drove[f.id] };
@@ -523,6 +534,37 @@ export const factNames = (f: Fact): string[] =>
     : f.kind === 'show' || f.kind === 'rel'
       ? []
       : [f.name];
+
+const near = (a: number, b: number): boolean => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(b));
+
+/** derive + symbolic parameter forms for measures: re-derives with each parameter scaled
+ * ×2 and ×3 and reads off the power — constant, k·p (linear), or k·p² (quadratic). A measure
+ * that is none of these stays numeric. Multi-parameter scenes stay numeric (v1 boundary). */
+export const deriveScene = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Scene => {
+  const base = derive(facts, freePos, seed);
+  const pnames = Object.keys(base.params);
+  if (pnames.length !== 1 || base.measures.length === 0) return base;
+  const p = pnames[0];
+  const s2 = derive(facts, freePos, seed, { [p]: 2 });
+  const s3 = derive(facts, freePos, seed, { [p]: 3 });
+  const pv = base.params[p];
+  base.measures = base.measures.map((m) => {
+    if (Math.abs(m.value) < 1e-12) return m;
+    const v2 = s2.measures.find((x) => x.key === m.key)?.value;
+    const v3 = s3.measures.find((x) => x.key === m.key)?.value;
+    if (v2 === undefined || v3 === undefined) return m;
+    for (const pow of [0, 1, 2] as const) {
+      if (near(v2, m.value * 2 ** pow) && near(v3, m.value * 3 ** pow)) {
+        if (pow === 0) return m; // parameter-independent → plain numeric
+        const k = m.value / pv ** pow;
+        const coeff = Math.abs(k - 1) < 1e-9 ? '' : fmtNum(k);
+        return { ...m, form: `${coeff}${p}${pow === 2 ? '²' : ''}` };
+      }
+    }
+    return m; // not a clean power of the parameter → numeric (never fake a form)
+  });
+  return base;
+};
 
 /** Names a fact CONSUMES — drives the store's implicit z/w auto-creation (ADR-CX-004). */
 export const factRefs = (f: Fact): string[] =>
