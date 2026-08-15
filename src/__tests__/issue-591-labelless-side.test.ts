@@ -33,6 +33,12 @@ const side = (fig: ReturnType<typeof replay>, a: string, b: string) => {
 };
 
 describe('#591 — the LABELLED forms are unchanged (the retired rewrite reproduced exactly)', () => {
+  // The baseline below was MEASURED on `main` before the change. It covers both value shapes on
+  // purpose: «AB = <value>» is not one lowering — a plain number becomes `segment` + `set-distance`,
+  // a radical or quotient becomes a `measure-length` carrying `expr.text`. An earlier draft of this
+  // fix hand-built `set-distance` and passed a byte-identical check that only used an INTEGER, while
+  // silently regressing «ריבוע ABCD שצלעו √2» from «√2» to «1.41» on the canvas. Both shapes are
+  // pinned here so that hole cannot reopen.
   it.each([
     [
       'ריבוע ABCD שצלעו הוא 4',
@@ -40,6 +46,20 @@ describe('#591 — the LABELLED forms are unchanged (the retired rewrite reprodu
         { type: 'square', ids: ['A', 'B', 'C', 'D'] },
         { type: 'segment', a: 'A', b: 'B' },
         { type: 'set-distance', a: 'A', b: 'B', value: 4 },
+      ],
+    ],
+    [
+      'ריבוע ABCD שצלעו √2',
+      [
+        { type: 'square', ids: ['A', 'B', 'C', 'D'] },
+        { type: 'measure-length', a: 'A', b: 'B', expr: { value: Math.SQRT2, text: '√2' } },
+      ],
+    ],
+    [
+      'ריבוע ABCD שצלעו 35/√32',
+      [
+        { type: 'square', ids: ['A', 'B', 'C', 'D'] },
+        { type: 'measure-length', a: 'A', b: 'B', expr: { value: 35 / Math.sqrt(32), text: '35/√32' } },
       ],
     ],
     [
@@ -52,15 +72,31 @@ describe('#591 — the LABELLED forms are unchanged (the retired rewrite reprodu
         { type: 'set-distance', a: 'A', b: 'B', value: 4 },
       ],
     ],
+    [
+      'משולש שווה צלעות ABC שצלעו √2',
+      [
+        { type: 'triangle', ids: ['A', 'B', 'C'] },
+        { type: 'set-equal', a: 'A', b: 'B', c: 'B', d: 'C' },
+        { type: 'set-equal', a: 'B', b: 'C', c: 'C', d: 'A' },
+        { type: 'measure-length', a: 'A', b: 'B', expr: { value: Math.SQRT2, text: '√2' } },
+      ],
+    ],
   ])('%s', (utterance, expected) => {
     expect(cmds(utterance as string)).toEqual(expected);
   });
+});
 
-  it('a RADICAL side survives the move — the shared NUMEXPR atom, not a plain-number reader', () => {
-    const c = cmds('ריבוע ABCD שצלעו √2');
-    expect(c).not.toBeNull();
-    const d = c!.find((x) => x.type === 'set-distance') as { value: number } | undefined;
-    expect(d?.value).toBeCloseTo(Math.SQRT2, 12);
+describe('#591 — the EXACT value reaches the canvas (operator: show √2, not 1.41)', () => {
+  it.each([
+    ['ריבוע שצלעו √2', '√2'],
+    ['משולש שווה צלעות שצלעו √2', '√2'],
+    ['ריבוע ABCD שצלעו √2', '√2'],
+    ['ריבוע שצלעו 35/√32', '35/√32'],
+    ['ריבוע שצלעו 4', '4'],
+  ])('%s → the length label reads %s', (utterance, expected) => {
+    const fig = figOf([utterance]);
+    const lens = (fig as unknown as { labels?: { lengths?: { a: string; b: string; text: string }[] } }).labels?.lengths ?? [];
+    expect(lens.map((l) => l.text)).toContain(expected);
   });
 });
 

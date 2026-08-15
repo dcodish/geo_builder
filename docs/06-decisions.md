@@ -7295,3 +7295,42 @@ lists; the label-less forms building the same figure at real measured edge lengt
 labelled modulo the minted letters; auto labels still avoiding existing points; the radical value; and
 the ADR-052 refusals («מלבן … שצלעו», both with and without letters) plus a #458 non-interference row.
 Catalog gains the label-less example so the commands panel teaches it.
+
+## ADR-451 Amendment 1 — the side value is LOWERED BY DELEGATION, so the exact form survives (#591)
+
+Operator, playing the PR: *"for ריבוע ABCD שצלעו √2 i want the √2 to show on the canvas and not 1.41."*
+
+Correct, and it was a REGRESSION the first draft introduced — «שצלעו √2» printed «√2» on `main` and
+«1.41» on the branch. The cause is that «AB = <value>» is **not one lowering**: a plain number becomes
+`segment` + `set-distance`, while a radical or a quotient becomes a `measure-length` carrying
+`expr.text` — and that text is exactly what the canvas label prints. Hand-building `set-distance` in
+the macro reproduced only the first shape.
+
+The first draft's byte-identical check did not catch it because it used an INTEGER side, where the two
+shapes agree. That is the lesson worth keeping: an equivalence asserted on one representative is not an
+equivalence, and the representative chosen happened to be the one that could not fail.
+
+Decision: the macro reads the clause and captures the value VERBATIM, then **delegates the lowering**
+by re-parsing `<v0><v1> = <value>` once the ring's ids exist. Every value form — present and future —
+is therefore lowered by whoever already owns «AB = …», with no dispatch duplicated here. This is
+precisely what the retired `normalizeShapeSide` rewrite achieved textually; deferring it to the macro
+is what makes it work with no letters, since the ids exist only once the macro has minted them. The
+rewrite's real virtue was delegation, and the first draft threw it away while keeping only its output
+shape.
+
+Re-entry is bounded: the sub-utterance carries no shape noun, so no shape rule can fire on it. A
+sub-parse that fails escalates the whole utterance rather than building the shape with the student's
+magnitude silently dropped.
+
+Locks: the baseline table now pins BOTH value shapes (integer → `set-distance`; `√2` and `35/√32` →
+`measure-length` with `expr.text`) for square and equilateral triangle; and a canvas-label group
+asserts the rendered length text directly — «√2», «35/√32», «4» — which is the property the operator
+actually sees and the one no command-level assertion had been covering.
+
+**Shadow-matrix note.** The two new catalog rows read `(escalate)` in the winner snapshot, not the shape
+rule. That is not a parse failure: the matrix probes with a deliberately SATURATED context (`points:
+A..Z`), where `autoVertexLabels` — which caps at 26 with no fallback and returns a SHORT array — yields
+no usable letters. Delegation then has no ids to build `<v0><v1> = <value>` from and escalates, which is
+the honest answer. The pre-existing path did not escalate; it committed `{type:'square', ids:[undefined
+×4]}`. That latent silent-wrong-build is filed as **#595** rather than widened into this change, since
+it belongs to `autoVertexLabels` and affects every shape rule.

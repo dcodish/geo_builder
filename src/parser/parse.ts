@@ -779,12 +779,12 @@ const dimCommands = (ids: Id[], values: number[]): AnyCommand[] =>
  * forms from one rule; keeping the rewrite as well would have split ownership by label-presence, the
  * optional parallel path docs/17 §3 forbids.
  *
- * The value rides the shared radical-aware {@link NUMEXPR} atom, so «שצלעו √2» and the √() toolbar
- * form keep working — a plain-number reader here would have silently narrowed the labelled form.
+ * The value is captured VERBATIM (the shared {@link NUMEXPR} atom's `all` group) and lowered by
+ * delegation — see {@link lowerSideLength}.
  */
 let sideShapeRe: RegExp | null = null;
 let sideClauseRe: RegExp | null = null;
-function statedSideLength(s: string): { value: number; strip: RegExp } | null {
+function statedSideLength(s: string): { text: string; strip: RegExp } | null {
   // Lazily compiled: this module defines NUMEXPR/SIDE_CLAUSE below, and these regexes are built on
   // first PARSE (well after module init) rather than at definition time.
   sideShapeRe ??= new RegExp(`(?:${SIDE_SHAPES})`, 'i');
@@ -792,18 +792,32 @@ function statedSideLength(s: string): { value: number; strip: RegExp } | null {
   sideClauseRe ??= new RegExp(`${SIDE_CLAUSE}${NUMEXPR('sd')}`, 'i');
   const m = s.match(sideClauseRe);
   if (!m?.groups) return null;
-  const v = numexprVal(m.groups, 'sd');
-  if (!v) return null;
-  return { value: v.value, strip: new RegExp(`${SIDE_CLAUSE}${NUMEXPR('sd')}`, 'gi') };
+  const v = numexprVal(m.groups, 'sd'); // validates it is a real value; `text` is the verbatim form
+  return v ? { text: v.text, strip: new RegExp(`${SIDE_CLAUSE}${NUMEXPR('sd')}`, 'gi') } : null;
 }
 
-/** The stated side as an ordinary distance given on the ring's FIRST edge (all sides being equal by
- *  the shape's own definition, the remaining edges follow from the macro's own constraints). The
- *  segment is emitted too, matching what the retired rewrite produced through the clause split. */
-const sideCommands = (ids: Id[], value: number): AnyCommand[] => [
-  { type: 'segment', a: ids[0], b: ids[1] } as AnyCommand,
-  { type: 'set-distance', a: ids[0], b: ids[1], value } as AnyCommand,
-];
+/**
+ * The stated side, lowered by DELEGATING to the owner of «AB = <value>» — re-parsing
+ * `<v0><v1> = <verbatim value>` now that the ring's ids exist.
+ *
+ * Not hand-built commands, and that is the whole point. «AB = <value>» is not one lowering: a plain
+ * number becomes `segment` + `set-distance`, while a radical or a quotient becomes a `measure-length`
+ * carrying `expr.text` — which is what puts «√2» on the canvas instead of «1.41». Re-implementing that
+ * dispatch here would be the enumeration-not-a-rule trap, and it silently loses every value form the
+ * list forgets (measured: a hand-rolled `set-distance` regressed «ריבוע ABCD שצלעו √2» from √2 to 1.41,
+ * because the two shapes agree only for integers).
+ *
+ * This is what the retired `normalizeShapeSide` rewrite achieved by textual substitution; deferring it
+ * to here is what makes it work with no letters, since the ids exist only once the macro has minted
+ * them. Re-entry is bounded: the sub-utterance carries no shape noun, so no shape rule can fire on it.
+ *
+ * A sub-parse that fails returns null, and the caller ESCALATES the whole utterance rather than build
+ * the shape with the student's magnitude silently dropped.
+ */
+const lowerSideLength = (ids: Id[], text: string, ctx: ParseContext): AnyCommand[] | null => {
+  const sub = parse(`${ids[0]}${ids[1]} = ${text}`, ctx);
+  return sub.ok ? sub.commands : null;
+};
 
 const shapeMacro =
   (trigger: RegExp, strip: RegExp, n: number, make: (ids: Id[]) => AnyCommand[], defer?: (s: string) => boolean): Rule =>
@@ -821,11 +835,14 @@ const shapeMacro =
     const side = dims ? null : statedSideLength(s);
     const own = dims ?? side;
     const bare = (own ? s.replace(own.strip, ' ') : s).replace(strip, ' ');
-    const withGivens = (ids: Id[]): AnyCommand[] => [
-      ...make(ids),
-      ...(dims ? dimCommands(ids, dims.values) : []),
-      ...(side ? sideCommands(ids, side.value) : []),
-    ];
+    /** `'stop'` when a stated side cannot be lowered — escalate rather than drop the magnitude. */
+    const withGivens = (ids: Id[]): AnyCommand[] | 'stop' => {
+      const base = make(ids);
+      if (dims) return [...base, ...dimCommands(ids, dims.values)];
+      if (!side) return base;
+      const lowered = lowerSideLength(ids, side.text, ctx);
+      return lowered ? [...base, ...lowered] : 'stop';
+    };
     const ids = labelRun(bare, n);
     if (!ids) {
       // No label run. Auto-name a bare named shape ("דלתון" → A,B,C,D) when the student named NO labels and
