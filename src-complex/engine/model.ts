@@ -20,7 +20,8 @@ export type Expr =
   | { t: 'bin'; op: '+' | '-' | '*' | '/'; l: Expr; r: Expr }
   | { t: 'pow'; base: Expr; exp: number }
   | { t: 'neg'; e: Expr }
-  | { t: 'conj'; e: Expr };
+  | { t: 'conj'; e: Expr }
+  | { t: 'abs'; e: Expr };
 
 export type Fact =
   | { id: string; kind: 'free'; name: string; src: string; implicit?: boolean }
@@ -45,6 +46,7 @@ export const collectRefs = (e: Expr, out: string[] = []): string[] => {
       break;
     case 'neg':
     case 'conj':
+    case 'abs':
       collectRefs(e.e, out);
       break;
     case 'lit':
@@ -111,6 +113,8 @@ const evalExpr = (e: Expr, env: Map<string, Cx>): Cx => {
       return neg(evalExpr(e.e, env));
     case 'conj':
       return conj(evalExpr(e.e, env));
+    case 'abs':
+      return { re: absC(evalExpr(e.e, env)), im: 0 };
   }
 };
 

@@ -1,10 +1,23 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { derive } from './engine/model';
 import { GaussPlane } from './render/GaussPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
 
 const EXAMPLE_LINES = ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2', 'z^5 = w^2'];
+
+// The symbol palette (operator request 2026-08-15): wrapping symbols enclose the current
+// selection; plain symbols insert at the cursor. Everything inserted parses (locked by tests).
+const SYMBOLS: { label: string; titleKey: string; before: string; after?: string }[] = [
+  { label: 'z̄', titleKey: 'symConj', before: 'conj(', after: ')' },
+  { label: '|z|', titleKey: 'symAbs', before: '|', after: '|' },
+  { label: '1/z', titleKey: 'symInv', before: '1/(', after: ')' },
+  { label: 'cis', titleKey: 'symCis', before: 'cis ' },
+  { label: 'i', titleKey: 'symI', before: 'i' },
+  { label: '°', titleKey: 'symDeg', before: '°' },
+  { label: 'xⁿ', titleKey: 'symPow', before: '^' },
+  { label: '·', titleKey: 'symMul', before: '*' },
+];
 
 const ERROR_KEY: Record<InputError['key'], string> = {
   'not-handled': 'errNotHandled',
@@ -17,6 +30,20 @@ export function App() {
   const { facts, freePos, view, lastError, addLine, removeFact, setFree, setView, clearAll } =
     useComplexStore();
   const [input, setInput] = useState('');
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const insertSymbol = (before: string, after = '') => {
+    const el = inputRef.current;
+    const start = el?.selectionStart ?? input.length;
+    const end = el?.selectionEnd ?? start;
+    const sel = input.slice(start, end);
+    setInput(input.slice(0, start) + before + sel + after + input.slice(end));
+    const caret = start + before.length + sel.length;
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(caret, caret);
+    });
+  };
 
   useEffect(() => {
     document.documentElement.lang = i18n.language;
@@ -50,6 +77,7 @@ export function App() {
         <section className="panel">
           <div className="input-row">
             <input
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submit()}
@@ -57,6 +85,18 @@ export function App() {
               dir="ltr"
             />
             <button onClick={submit}>{t('add')}</button>
+          </div>
+          <div className="symbols" dir="ltr">
+            {SYMBOLS.map((s) => (
+              <button
+                key={s.titleKey}
+                className="sym"
+                title={t(s.titleKey)}
+                onClick={() => insertSymbol(s.before, s.after)}
+              >
+                {s.label}
+              </button>
+            ))}
           </div>
           {lastError && (
             <p className="error" role="alert">

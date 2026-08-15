@@ -25,6 +25,8 @@ const normalize = (raw: string): string =>
   raw
     .replace(/[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]/g, '')
     .replace(/\u00a0/g, ' ')
+    // z-bar: a combining overline/macron after a name is the conjugate (2024 locus notation)
+    .replace(/([a-zA-Z])[\u0304\u0305](\w*)/g, 'conj($1$2)')
     .replace(/[·×]/g, '*')
     .replace(/−/g, '-')
     .replace(/÷/g, '/')
@@ -44,12 +46,13 @@ type Tok =
   | { t: 'i' }
   | { t: 'cis' }
   | { t: 'conj' }
-  | { t: 'op'; v: '+' | '-' | '*' | '/' | '^' | '(' | ')' };
+  | { t: 'inv' }
+  | { t: 'op'; v: '+' | '-' | '*' | '/' | '^' | '(' | ')' | '|' };
 
 const tokenize = (s: string): Tok[] | null => {
   const toks: Tok[] = [];
   let m: RegExpExecArray | null;
-  const re = /\s*(?:(\d+(?:\.\d+)?)|([a-zA-Z]\w*)|([-+*/^()]))/y;
+  const re = /\s*(?:(\d+(?:\.\d+)?)|([a-zA-Z]\w*)|([-+*/^()|]))/y;
   let pos = 0;
   while (pos < s.length) {
     re.lastIndex = pos;
@@ -66,6 +69,7 @@ const tokenize = (s: string): Tok[] | null => {
         toks.push({ t: 'cis' });
         toks.push({ t: 'num', v: Number(cisGlued[1]) });
       } else if (w === 'conj') toks.push({ t: 'conj' });
+      else if (w === 'inv') toks.push({ t: 'inv' });
       else toks.push({ t: 'ident', v: w });
     } else toks.push({ t: 'op', v: m[3] as '+' });
   }
@@ -171,16 +175,28 @@ class P {
       this.pos++;
       return { t: 'lit', v: cx(0, 1) };
     }
-    if (t.t === 'conj') {
+    if (t.t === 'conj' || t.t === 'inv') {
       this.pos++;
+      let inner: Expr;
       if (this.isOp('(')) {
         this.pos++;
-        const e = this.expr();
+        inner = this.expr();
         if (!this.isOp(')')) throw new Error('missing )');
         this.pos++;
-        return { t: 'conj', e };
+      } else {
+        inner = this.primary();
       }
-      return { t: 'conj', e: this.primary() };
+      return t.t === 'conj'
+        ? { t: 'conj', e: inner }
+        : { t: 'bin', op: '/', l: { t: 'lit', v: cx(1) }, r: inner };
+    }
+    if (t.t === 'op' && t.v === '|') {
+      // non-nested absolute-value bars: |expr|
+      this.pos++;
+      const e = this.expr();
+      if (!this.isOp('|')) throw new Error('missing |');
+      this.pos++;
+      return { t: 'abs', e };
     }
     if (t.t === 'ident') {
       this.pos++;
@@ -217,7 +233,9 @@ const ROOTS_RE = /^(?:הפתרונות\s+של\s+|solutions\s+of\s+)?([a-zA-Z]\w*
 const DEF_RE = /^([a-zA-Z]\w*)\s*=\s*(.+)$/;
 
 export const parseLine = (raw: string): ParseResult => {
-  const line = normalize(raw).replace(/הצמוד\s+של\s+/g, 'conj ');
+  const line = normalize(raw)
+    .replace(/הצמוד\s+של\s+/g, 'conj ')
+    .replace(/ההופכי\s+של\s+/g, 'inv ');
   if (line === '') return { ok: false, key: 'not-handled' };
 
   const free = FREE_RE.exec(line);

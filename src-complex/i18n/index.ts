@@ -23,6 +23,14 @@ const he = {
   freeLabel: 'מספר חופשי (ניתן לגרירה)',
   implicitLabel: 'נוצר מעצם האזכור — חופשי, ניתן לגרירה',
   factCount: '{{count}} משפטים',
+  symConj: 'צמוד',
+  symAbs: 'ערך מוחלט',
+  symInv: 'הופכי',
+  symCis: 'הצגה קוטבית (cis)',
+  symI: 'היחידה המדומה i',
+  symDeg: 'מעלות',
+  symPow: 'חזקה',
+  symMul: 'כפל',
 };
 
 const en = {
@@ -44,6 +52,14 @@ const en = {
   freeLabel: 'free number (draggable)',
   implicitLabel: 'created by reference — free, draggable',
   factCount: '{{count}} statements',
+  symConj: 'conjugate',
+  symAbs: 'absolute value',
+  symInv: 'reciprocal',
+  symCis: 'polar form (cis)',
+  symI: 'imaginary unit i',
+  symDeg: 'degrees',
+  symPow: 'power',
+  symMul: 'multiply',
 };
 
 complexI18n.use(initReactI18next).init({

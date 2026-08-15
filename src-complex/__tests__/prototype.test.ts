@@ -63,6 +63,48 @@ describe('parser', () => {
     expect(argDeg(roots[0].z)).toBeCloseTo(52); // 260/5
   });
 
+  it('symbol-palette forms all parse: |z|, 1/(z), conj(z), cis, ^, ·, °', () => {
+    const s = derive(
+      [
+        fact('z1 = 3+4i'),
+        fact('w1 = |z1|'), // abs → real 5
+        fact('w2 = 1/(z1)'), // reciprocal
+        fact('w3 = conj(z1)*z1'), // z·z̄ = |z|²
+        fact('w4 = 2·z1^2'),
+        fact('w5 = 1cis90°'),
+      ],
+      {},
+    );
+    expect(s.errors).toEqual({});
+    const by = (l: string) => s.points.find((p) => p.label === l)!.z;
+    expect(by('w₁')).toMatchObject({ re: 5, im: 0 });
+    expect(by('w₂').re).toBeCloseTo(3 / 25);
+    expect(by('w₂').im).toBeCloseTo(-4 / 25);
+    expect(by('w₃').re).toBeCloseTo(25);
+    expect(by('w₃').im).toBeCloseTo(0);
+    expect(by('w₄').re).toBeCloseTo(-14);
+    expect(by('w₄').im).toBeCloseTo(48);
+    expect(by('w₅').re).toBeCloseTo(0);
+    expect(by('w₅').im).toBeCloseTo(1);
+  });
+
+  it('hebrew reciprocal form: ההופכי של', () => {
+    const s = derive([fact('z1 = 2i'), fact('w = ההופכי של z1')], {});
+    expect(s.errors).toEqual({});
+    const w = s.points.find((p) => p.label === 'w')!.z;
+    expect(w.re).toBeCloseTo(0);
+    expect(w.im).toBeCloseTo(-0.5);
+  });
+
+  it('exam z-bar overbar notation is the conjugate (2024 locus typography)', () => {
+    const s = derive([fact('z1 = 3+4i'), fact('w = z̅1 * i')], {});
+    expect(s.errors).toEqual({});
+    // conj(z1)·i = (3-4i)i = 4+3i
+    const w = s.points.find((p) => p.label === 'w')!.z;
+    expect(w.re).toBeCloseTo(4);
+    expect(w.im).toBeCloseTo(3);
+  });
+
   it('rejects nonsense with not-handled (the LLM-fallback seam)', () => {
     const r = parseLine('שלום עולם');
     expect(r.ok).toBe(false);
