@@ -40,6 +40,7 @@ const he = {
   relOk: 'היחס מתקיים בציור',
   relBad: 'היחס אינו מתקיים בציור',
   relDriven: 'היחס כיוון את הציור (הוריד דרגת חופש)',
+  paramsLabel: 'פרמטרים משותפים — נדגמים מחדש בכל "אפשרות נוספת"',
 };
 
 const en = {
@@ -78,6 +79,7 @@ const en = {
   relOk: 'the relation holds in the figure',
   relBad: 'the relation does NOT hold in the figure',
   relDriven: 'the relation drove the figure (consumed a degree of freedom)',
+  paramsLabel: 'shared parameters — resampled on every "another configuration"',
 };
 
 complexI18n.use(initReactI18next).init({

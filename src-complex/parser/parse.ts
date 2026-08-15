@@ -2,7 +2,14 @@
 // (docs/27 §5.2 subset): literals a+bi and r·cis θ, + - * / ^int, conj, parens.
 // Unmatched input returns { ok: false, key: 'not-handled' } — the sibling seam.
 import { cisDeg, cx } from '../engine/complex';
-import { factId, IMPLICIT_COMPLEX_RE, type ArgTerm, type Expr, type Fact } from '../engine/model';
+import {
+  factId,
+  IMPLICIT_COMPLEX_RE,
+  type ArgTerm,
+  type Cmp,
+  type Expr,
+  type Fact,
+} from '../engine/model';
 
 /** One utterance may LOWER to several facts (the sibling macro-lowering idiom, FR-IN-7):
  * e.g. `z = 2cis(θ)` states freeness AND a modulus — both must survive (honesty: no stated
@@ -237,12 +244,14 @@ const FREE_RE =
   /^([a-zA-Z]\w*)\s+(?:הוא\s+)?מספר\s+מרוכב$|^([a-zA-Z]\w*)\s+(?:is\s+)?(?:a\s+)?complex(?:\s+number)?$/;
 const ROOTS_RE = /^(?:הפתרונות\s+של\s+|solutions\s+of\s+)?([a-zA-Z]\w*)\s*\^\s*(\d+)\s*=\s*(.+)$/;
 const DEF_RE = /^([a-zA-Z]\w*)\s*=\s*(.+)$/;
-// F4: ±arg(A) [± arg(B)] = degrees — parens optional (arg z1 also accepted)
+// F4: ±arg(A) [± arg(B)] ⟨cmp⟩ degrees — parens optional (arg z1 also accepted);
+// inequalities are branch selectors (arg z2 < 45)
 const ARGREL_RE =
-  /^(-?)\s*arg\b\s*\(?\s*([a-zA-Z]\w*)\s*\)?\s*(?:([+-])\s*arg\b\s*\(?\s*([a-zA-Z]\w*)\s*\)?)?\s*=\s*(-?\d+(?:\.\d+)?)$/;
-// F3: |A| = c  |  |A| = c·|B|  |  |A| = |B|
+  /^(-?)\s*arg\b\s*\(?\s*([a-zA-Z]\w*)\s*\)?\s*(?:([+-])\s*arg\b\s*\(?\s*([a-zA-Z]\w*)\s*\)?)?\s*(=|[<>]=?)\s*(-?\d+(?:\.\d+)?)$/;
+// F3: |A| ⟨cmp⟩ c | c·param | param | c·|B| | |B| — a bare non-z/w identifier is a shared
+// real PARAMETER (|z1| = 9r); a z/w identifier there is a type error, refused
 const MODREL_RE =
-  /^\|\s*([a-zA-Z]\w*)\s*\|\s*=\s*(?:(\d+(?:\.\d+)?)\s*\*?\s*)?(?:\|\s*([a-zA-Z]\w*)\s*\|)?$/;
+  /^\|\s*([a-zA-Z]\w*)\s*\|\s*(=|[<>]=?)\s*(?:(\d+(?:\.\d+)?)\s*\*?\s*)?(?:\|\s*([a-zA-Z]\w*)\s*\||([a-zA-Z]\w*))?$/;
 
 export const parseLine = (raw: string): ParseResult => {
   const line = normalize(raw)
@@ -288,7 +297,7 @@ export const parseLine = (raw: string): ParseResult => {
     if (argrel[4]) terms.push({ sign: argrel[3] === '-' ? -1 : 1, name: argrel[4].toLowerCase() });
     const f = {
       kind: 'rel' as const,
-      rel: { type: 'arg' as const, terms, rhsDeg: Number(argrel[5]) },
+      rel: { type: 'arg' as const, terms, rhsDeg: Number(argrel[6]), cmp: argrel[5] as Cmp },
       src: raw.trim(),
       norm: line,
     };
@@ -296,14 +305,19 @@ export const parseLine = (raw: string): ParseResult => {
   }
 
   const modrel = MODREL_RE.exec(line);
-  if (modrel && (modrel[2] !== undefined || modrel[3] !== undefined)) {
+  if (modrel && (modrel[3] !== undefined || modrel[4] !== undefined || modrel[5] !== undefined)) {
+    const param = modrel[5]?.toLowerCase();
+    if (param !== undefined && IMPLICIT_COMPLEX_RE.test(param))
+      return { ok: false, key: 'parse-error', detail: raw.trim() }; // a modulus can't equal a complex number
     const f = {
       kind: 'rel' as const,
       rel: {
         type: 'mod' as const,
         name: modrel[1].toLowerCase(),
-        k: modrel[2] !== undefined ? Number(modrel[2]) : 1,
-        other: modrel[3]?.toLowerCase(),
+        k: modrel[3] !== undefined ? Number(modrel[3]) : 1,
+        other: modrel[4]?.toLowerCase(),
+        param,
+        cmp: modrel[2] as Cmp,
       },
       src: raw.trim(),
       norm: line,

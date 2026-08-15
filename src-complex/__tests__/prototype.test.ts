@@ -430,6 +430,70 @@ describe('roots equations relate to their letter (operator ruling 2026-08-15)', 
   });
 });
 
+describe('shared parameters and inequalities (operator: |z1|=9r, arg(z2)<45)', () => {
+  it('the r-generic exemplar: |z1|=9r, |z2|=12r, right angle → |z1-z2| = 15r for EVERY r', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('arg(z1)-arg(z2)=90');
+    st.addLine('|z1| = 9r');
+    st.addLine('|z2| = 12r');
+    st.addLine('|z1 - z2|');
+    const factList = useComplexStore.getState().facts;
+    for (const seed of [0, 1, 2, 3]) {
+      const s = derive(factList, {}, seed);
+      expect(s.errors).toEqual({});
+      expect(Object.values(s.checks).every((c) => c.ok)).toBe(true);
+      const r = s.params.r;
+      expect(r).toBeGreaterThan(0);
+      const dist = s.points.find((p) => p.label === '|z₁ - z₂|')!.z.re;
+      expect(dist / r).toBeCloseTo(15); // linear in the SHARED r, any sample
+      expect(s.params.r).not.toBe(derive(factList, {}, seed + 10).params.r); // r resamples
+    }
+    useComplexStore.getState().clearAll();
+  });
+
+  it('arg(z2) < 45 folds a violating free number into range and verifies', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('arg(z2) > 100'); // put it far outside first
+    st.clearAll();
+    st.addLine('arg(z2) < 45');
+    const s = derive(useComplexStore.getState().facts, {});
+    const a = argDeg(s.points.find((p) => p.label === 'z₂')!.z);
+    expect(a).toBeLessThan(45);
+    expect(Object.values(s.checks)[0].ok).toBe(true);
+  });
+
+  it('inequalities over determined numbers are pure checks', () => {
+    const s = derive([fact('z1 = 1+i'), fact('arg(z1) < 30'), fact('arg z1 < 60'), fact('|z1| < 2')], {});
+    const vals = Object.values(s.checks);
+    expect(vals.map((c) => c.ok)).toEqual([false, true, true]);
+    expect(vals.map((c) => c.driven)).toEqual([false, false, false]);
+  });
+
+  it('a z/w name in the parameter slot is refused (a modulus cannot equal a complex number)', () => {
+    const r = parseLine('|z1| = 9w');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.key).toBe('parse-error');
+  });
+
+  it('constraints hold jointly across sweeps: equality then inequality', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('arg(z1)-arg(z2)=90');
+    st.addLine('arg(z2) < 45');
+    for (const seed of [0, 1, 2]) {
+      const s = derive(useComplexStore.getState().facts, {}, seed);
+      expect(Object.values(s.checks).every((c) => c.ok)).toBe(true);
+      const z1 = s.points.find((p) => p.label === 'z₁')!.z;
+      const z2 = s.points.find((p) => p.label === 'z₂')!.z;
+      expect(argDeg(z2)).toBeLessThan(45);
+      expect(wrap360(argDeg(z1) - argDeg(z2))).toBeCloseTo(90);
+    }
+    useComplexStore.getState().clearAll();
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();

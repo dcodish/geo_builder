@@ -41,6 +41,11 @@ button:hover { background: #f5f5f4; }
 .fact code { font-size: 0.92rem; }
 .fact-error { color: #b91c1c; font-size: 0.8rem; }
 .badge { font-size: 0.72rem; color: #9a3412; background: #ffedd5; border-radius: 999px; padding: 2px 8px; }
+.params {
+  margin-top: 8px; padding: 5px 10px; font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.88rem; color: #6d28d9; background: #f5f3ff; border: 1px solid #ddd6fe;
+  border-radius: 6px;
+}
 .check { font-weight: 700; font-size: 0.95rem; }
 .check.ok { color: #15803d; }
 .check.bad { color: #b91c1c; }

@@ -47,11 +47,25 @@ export interface ArgTerm {
   name: string;
 }
 
+export type Cmp = '=' | '<' | '>' | '<=' | '>=';
+
 export type RelSpec =
-  /** Σ sign·arg(name) = rhsDeg */
-  | { type: 'arg'; terms: ArgTerm[]; rhsDeg: number }
-  /** |name| = k  or  |name| = k·|other| */
-  | { type: 'mod'; name: string; k: number; other?: string };
+  /** Σ sign·arg(name) ⟨cmp⟩ rhsDeg — '=' drives; inequalities verify, folding a free number
+   *  into range (the branch-selector reading of `arg z2 < 45`) */
+  | { type: 'arg'; terms: ArgTerm[]; rhsDeg: number; cmp?: Cmp }
+  /** |name| ⟨cmp⟩ k · (param | |other| | 1) — a PARAM is a shared real DOF sampled per seed:
+   *  `|z1| = 9r` and `|z2| = 12r` share the same r (the exam's parameter convention) */
+  | { type: 'mod'; name: string; k: number; other?: string; param?: string; cmp?: Cmp };
+
+/** Deterministic positive sample for a real parameter, per (name, seed) — 0.6 .. 2.4. */
+export const paramValue = (name: string, seed = 0): number => {
+  let h = 0;
+  for (const ch of `${name}@${seed}`) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return 0.6 + (h % 181) / 100;
+};
+
+const cmpHolds = (cmp: Cmp, lhs: number, rhs: number, tol: number): boolean =>
+  cmp === '<' ? lhs < rhs : cmp === '>' ? lhs > rhs : cmp === '<=' ? lhs <= rhs : cmp === '>=' ? lhs >= rhs : Math.abs(lhs - rhs) <= tol;
 
 const relNames = (r: RelSpec): string[] =>
   r.type === 'arg' ? r.terms.map((t) => t.name) : r.other ? [r.name, r.other] : [r.name];
@@ -121,6 +135,8 @@ export interface Scene {
   errors: Record<string, EvalError>;
   /** relation facts: did the relation hold in the final figure (✓/✗), and did it drive a DOF */
   checks: Record<string, { ok: boolean; driven: boolean }>;
+  /** shared real parameters in play (r, d, …) and their current sampled values */
+  params: Record<string, number>;
 }
 
 class UnknownRef extends Error {
@@ -195,12 +211,15 @@ const projectConstraints = (
 ): { adjusted: Record<string, Cx>; drove: Record<string, boolean> } => {
   const adjusted: Record<string, Cx> = {};
   const drove: Record<string, boolean> = {};
+  // three sweeps: a later constraint that moves a number re-feeds the earlier ones
+  // (arg(z1)-arg(z2)=90 stays true after arg(z2)<45 folds z2)
+  for (let sweep = 0; sweep < 3; sweep++) {
   const env = new Map<string, Cx>();
   const freeNames = new Set<string>();
   for (const f of facts) {
     try {
       if (f.kind === 'free') {
-        env.set(f.name, freePos[f.name] ?? defaultFree(f.name, seed));
+        env.set(f.name, adjusted[f.name] ?? freePos[f.name] ?? defaultFree(f.name, seed));
         freeNames.add(f.name);
       } else if (f.kind === 'def') {
         env.set(f.name, evalExpr(f.expr, env));
@@ -265,25 +284,47 @@ const projectConstraints = (
         const r = f.rel;
         if (r.type === 'arg') {
           if (r.terms.some((t) => !env.has(t.name))) continue;
-          const target = r.terms.find((t) => freeNames.has(t.name));
-          if (!target) continue;
-          const sumOther = r.terms
-            .filter((t) => t !== target)
-            .reduce((s, t) => s + t.sign * argDeg(env.get(t.name)!), 0);
-          const v = env.get(target.name)!;
-          const nv = cisDeg(absC(v), (r.rhsDeg - sumOther) * target.sign);
-          env.set(target.name, nv);
-          adjusted[target.name] = nv;
-          drove[f.id] = true;
+          const cmp = r.cmp ?? '=';
+          if (cmp === '=') {
+            const target = r.terms.find((t) => freeNames.has(t.name));
+            if (!target) continue;
+            const sumOther = r.terms
+              .filter((t) => t !== target)
+              .reduce((s, t) => s + t.sign * argDeg(env.get(t.name)!), 0);
+            const v = env.get(target.name)!;
+            const nv = cisDeg(absC(v), (r.rhsDeg - sumOther) * target.sign);
+            env.set(target.name, nv);
+            adjusted[target.name] = nv;
+            drove[f.id] = true;
+          } else {
+            // inequality: fold a violating single-term FREE argument into range (branch selector)
+            const t0 = r.terms[0];
+            if (r.terms.length !== 1 || t0.sign !== 1 || !freeNames.has(t0.name)) continue;
+            const v = env.get(t0.name)!;
+            const a = argDeg(v);
+            if (cmpHolds(cmp, a, r.rhsDeg, 0)) continue;
+            const na =
+              cmp === '<' || cmp === '<='
+                ? r.rhsDeg > 0
+                  ? a % r.rhsDeg
+                  : 0
+                : r.rhsDeg + (a % Math.max(1, 360 - r.rhsDeg));
+            const nv = cisDeg(absC(v), na);
+            env.set(t0.name, nv);
+            adjusted[t0.name] = nv;
+            drove[f.id] = true;
+          }
         } else {
+          if ((r.cmp ?? '=') !== '=') continue; // modulus inequalities verify in pass 2 only
           if (!env.has(r.name) || (r.other && !env.has(r.other))) continue;
-          const targetMod = r.k * (r.other ? absC(env.get(r.other)!) : 1);
+          const targetMod =
+            r.k * (r.param ? paramValue(r.param, seed) : r.other ? absC(env.get(r.other)!) : 1);
           if (freeNames.has(r.name)) {
             const nv = cisDeg(targetMod, argDeg(env.get(r.name)!));
             env.set(r.name, nv);
             adjusted[r.name] = nv;
             drove[f.id] = true;
-          } else if (r.other && freeNames.has(r.other)) {
+          } else if (r.other && !r.param && freeNames.has(r.other)) {
             const nv = cisDeg(absC(env.get(r.name)!) / r.k, argDeg(env.get(r.other)!));
             env.set(r.other, nv);
             adjusted[r.other] = nv;
@@ -294,6 +335,7 @@ const projectConstraints = (
     } catch {
       // evaluation problems are reported by pass 2
     }
+  }
   }
   return { adjusted, drove };
 };
@@ -306,6 +348,7 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Sc
   const circles: SceneCircle[] = [];
   const errors: Record<string, EvalError> = {};
   const checks: Record<string, { ok: boolean; driven: boolean }> = {};
+  const params: Record<string, number> = {};
 
   for (const f of facts) {
     try {
@@ -323,13 +366,20 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Sc
           continue;
         }
         let ok: boolean;
+        const cmp = r.cmp ?? '=';
         if (r.type === 'arg') {
-          const lhs = r.terms.reduce((s, t) => s + t.sign * argDeg(env.get(t.name)!), 0);
-          const d = wrapDeg(lhs - r.rhsDeg);
-          ok = d < 1e-6 || d > 360 - 1e-6;
+          const lhs = wrapDeg(r.terms.reduce((s, t) => s + t.sign * argDeg(env.get(t.name)!), 0));
+          if (cmp === '=') {
+            const d = wrapDeg(lhs - r.rhsDeg);
+            ok = d < 1e-6 || d > 360 - 1e-6;
+          } else {
+            ok = cmpHolds(cmp, lhs, r.rhsDeg, 0);
+          }
         } else {
-          const target = r.k * (r.other ? absC(env.get(r.other)!) : 1);
-          ok = Math.abs(absC(env.get(r.name)!) - target) <= 1e-9 * Math.max(1, target);
+          if (r.param) params[r.param] = paramValue(r.param, seed);
+          const target =
+            r.k * (r.param ? paramValue(r.param, seed) : r.other ? absC(env.get(r.other)!) : 1);
+          ok = cmpHolds(cmp, absC(env.get(r.name)!), target, 1e-9 * Math.max(1, target));
         }
         checks[f.id] = { ok, driven: !!drove[f.id] };
       } else if (f.kind === 'def') {
@@ -402,7 +452,7 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Sc
       }
     }
   }
-  return { points, circles, errors, checks };
+  return { points, circles, errors, checks, params };
 };
 
 /** Names a fact introduces — used by the store's duplicate-name honesty check.

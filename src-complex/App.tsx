@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { fmtNum } from './engine/complex';
 import { derive } from './engine/model';
 import { GaussPlane } from './render/GaussPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
@@ -125,6 +126,13 @@ export function App() {
             <button onClick={clearAll}>{t('clearAll')}</button>
             <span className="count">{t('factCount', { count: facts.length })}</span>
           </div>
+          {Object.keys(scene.params).length > 0 && (
+            <div className="params" dir="ltr" title={t('paramsLabel')}>
+              {Object.entries(scene.params)
+                .map(([n, v]) => `${n} = ${fmtNum(v)}`)
+                .join('   ·   ')}
+            </div>
+          )}
           <ul className="facts">
             {facts.length === 0 && <li className="hint">{t('emptyHint')}</li>}
             {facts.map((f) => (
