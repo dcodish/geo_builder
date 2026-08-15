@@ -12,6 +12,7 @@ import type { Construction3 } from '../engine/types';
 import { HOME_CAMERA, MAX_PITCH, type Camera3 } from './camera';
 import { faceOnView, planarNormal } from '../engine/defaultView';
 import { buildScene3, type SceneCrossing3 } from './scene3';
+import { dragModeFor, panForZoom } from './viewGauge';
 
 export interface Figure3Props {
   construction: Construction3;
@@ -89,7 +90,18 @@ export default function Figure3({ construction, resolved, width = 640, height = 
 
   const [cam, setCam] = useState<Camera3 | null>(null); // null = "follow home" (never orbited yet)
   const [zoom, setZoom] = useState(1);
+  // #533 (ADR-3D-155): PAN, in screen pixels — the third component of the view gauge, beside orbit and
+  // zoom, and on exactly the same tier: local state, outside the store, outside undo (docs/20 §6.4).
+  // The figure never moves; only the frame does. Under an orthographic camera a pan is a screen-space
+  // TRANSLATION, so it needs nothing from the projection: `scene3.ts` stays pure and untouched, every
+  // coordinate `buildScene3` emits is unchanged, and the #483 crossing hit targets translate with
+  // their marks for free.
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const drag = useRef<{ x: number; y: number } | null>(null);
+  /** #533: which gesture the current drag is — orbit (the primary, unmoved) or pan. */
+  const dragMode = useRef<'orbit' | 'pan'>('orbit');
+  /** #533: live pointers, so a TWO-pointer touch drag can pan while one finger still orbits. */
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
   // An UNTOUCHED camera follows the figure: build a flat triangle and it is face-on immediately, not
   // after pressing reset. Once the student orbits, the camera is theirs and the figure never moves it.
   const view = cam ?? home;
@@ -100,7 +112,9 @@ export default function Figure3({ construction, resolved, width = 640, height = 
   );
 
   const onPointerDown = (e: RPointerEvent<SVGSVGElement>) => {
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     drag.current = { x: e.clientX, y: e.clientY };
+    dragMode.current = dragModeFor({ button: e.button, shiftKey: e.shiftKey, pointerCount: pointers.current.size });
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: RPointerEvent<SVGSVGElement>) => {
@@ -108,6 +122,13 @@ export default function Figure3({ construction, resolved, width = 640, height = 
     const dx = e.clientX - drag.current.x;
     const dy = e.clientY - drag.current.y;
     drag.current = { x: e.clientX, y: e.clientY };
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    // a second finger landing mid-drag turns it into a pan, without needing a fresh gesture
+    if (pointers.current.size > 1) dragMode.current = 'pan';
+    if (dragMode.current === 'pan') {
+      setPan((p) => ({ x: p.x + dx, y: p.y + dy }));
+      return;
+    }
     // The first drag ADOPTS the current home view and makes it the student's (#5): orbiting from
     // `null` must start where they can see the figure, not snap back to the ¾ view.
     setCam((c) => {
@@ -118,11 +139,25 @@ export default function Figure3({ construction, resolved, width = 640, height = 
       };
     });
   };
-  const onPointerUp = () => {
+  const onPointerUp = (e?: RPointerEvent<SVGSVGElement>) => {
+    if (e) pointers.current.delete(e.pointerId);
+    else pointers.current.clear();
     drag.current = null;
+    if (pointers.current.size === 0) dragMode.current = 'orbit';
   };
   const onWheel = (e: RWheelEvent<SVGSVGElement>) => {
-    setZoom((z) => Math.max(0.3, Math.min(4, z * (e.deltaY < 0 ? 1.12 : 1 / 1.12))));
+    // #533: zoom ABOUT THE POINTER. Without this, `k` grows while the fit stays centred on the content
+    // bbox, so zooming in magnifies about a point that may be nowhere near the solid and drives it
+    // further off-canvas — the gesture that LOSES the figure. Keeping whatever is under the cursor
+    // under the cursor is what turns zoom into a framing tool: q = (q − pan)·r + pan' ⇒ pan' = q − (q − pan)·r.
+    const rect = e.currentTarget.getBoundingClientRect();
+    const q = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    setZoom((z) => {
+      const next = Math.max(0.3, Math.min(4, z * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+      const r = next / z; // the ACTUAL ratio — at the clamp it is 1, so a clamped zoom pans nothing
+      setPan((p) => panForZoom(q, p, r));
+      return next;
+    });
   };
 
   return (
@@ -137,8 +172,16 @@ export default function Figure3({ construction, resolved, width = 640, height = 
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
+        onPointerCancel={onPointerUp}
         onWheel={onWheel}
+        // #533: a right-button drag must not end in the browser's context menu
+        onContextMenu={(e) => e.preventDefault()}
       >
+        {/* #533 (ADR-3D-155): the PAN gauge, applied as ONE screen-space translation of the whole
+            scene. Every child keeps the coordinates `buildScene3` emitted — including the #483
+            crossing hit targets, which move with their marks for free — so panning cannot alter the
+            figure, the scene, or anything derived from them. */}
+        <g data-testid="pan-group" transform={`translate(${pan.x} ${pan.y})`}>
         {scene.axes.map((a) => (
           <g key={a.axis} data-testid={`axis-${a.axis}`}>
             <line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="#cbd5e1" strokeWidth={1.1} />
@@ -371,6 +414,7 @@ export default function Figure3({ construction, resolved, width = 640, height = 
             )}
           </g>
         ))}
+        </g>
       </svg>
       <button
         type="button"
@@ -380,7 +424,8 @@ export default function Figure3({ construction, resolved, width = 640, height = 
         onClick={() => {
           setCam(null); // back to following the figure's own home view (#5)
           setZoom(1);
-        }}
+          setPan({ x: 0, y: 0 }); // #533: ONE button returns to a known-good frame — this is what
+        }} //            makes free panning safe to hand a student
       >
         ↺
       </button>
