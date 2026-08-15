@@ -282,6 +282,8 @@ const SEQ_KW_RE = new RegExp(
 );
 const QUAD_RE =
   /^([a-zA-Z]\w*)\s+(?:נמצא\s+)?ברביע\s+ה(ראשון|שני|שלישי|רביעי)$|^([a-zA-Z]\w*)\s+(?:is\s+)?(?:in\s+)?(?:the\s+)?(?:(first|second|third|fourth)\s+quadrant|quadrant\s+([1-4]))$/;
+// keyword-first order (the #598 class — RTL typing makes the order genuinely ambiguous)
+const QUAD_KW_RE = /^ברביע\s+ה(ראשון|שני|שלישי|רביעי)\s*:?\s+([a-zA-Z]\w*)$/;
 // F4: ±arg(A) [± arg(B)] ⟨cmp⟩ degrees — parens optional (arg z1 also accepted);
 // inequalities are branch selectors (arg z2 < 45)
 const ARGREL_RE =
@@ -472,12 +474,13 @@ export const parseLine = (raw: string): ParseResult => {
     return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 
-  const quad = QUAD_RE.exec(line);
-  if (quad) {
-    const q = QUADRANTS[(quad[2] ?? quad[4] ?? quad[5]).toLowerCase()];
+  const quadKw = QUAD_KW_RE.exec(line);
+  const quad = quadKw ? null : QUAD_RE.exec(line);
+  if (quad || quadKw) {
+    const q = QUADRANTS[(quadKw ? quadKw[1] : (quad![2] ?? quad![4] ?? quad![5])).toLowerCase()];
     const f = {
       kind: 'rel' as const,
-      rel: { type: 'quad' as const, name: (quad[1] ?? quad[3]).toLowerCase(), q },
+      rel: { type: 'quad' as const, name: (quadKw ? quadKw[2] : (quad![1] ?? quad![3])).toLowerCase(), q },
       src: raw.trim(),
       norm: line,
     };

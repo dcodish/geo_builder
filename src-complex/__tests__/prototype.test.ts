@@ -861,6 +861,27 @@ describe('sequence word orders (#598: keyword-first)', () => {
   });
 });
 
+describe('drive-target fairness (#599: sequence vs a later constraint on one term)', () => {
+  it("the operator's exact session: sequence over three frees, then z1 pinned to Q1 — both hold", () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('סדרה הנדסית z1,z2,z3');
+    st.addLine('z1 ברביע הראשון'); // the operator's form; keyword-first also parses now:
+    expect(parseLine('ברביע הראשון z2').ok).toBe(true);
+    for (const seed of [0, 1, 2]) {
+      const s = derive(useComplexStore.getState().facts, {}, seed);
+      expect(s.errors).toEqual({});
+      const vals = Object.values(s.checks);
+      expect(vals).toHaveLength(2);
+      expect(vals.every((c) => c.ok)).toBe(true); // a valid figure EXISTS — the tool must find it
+      const a = argDeg(s.points.find((p) => p.label === 'z₁')!.z);
+      expect(a).toBeGreaterThan(0);
+      expect(a).toBeLessThan(90);
+    }
+    useComplexStore.getState().clearAll();
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();

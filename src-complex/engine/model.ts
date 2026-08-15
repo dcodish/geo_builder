@@ -513,7 +513,18 @@ const projectConstraints = (
           const v = seqSolve(f, f.defines, env, seed);
           if (v) env.set(f.defines, v); // derived term — later facts may use it
         } else {
-          const freeTarget = f.names.find((n) => freeNames.has(n));
+          // drive-target fairness (#599): prefer a free term NO OTHER constraint claims —
+          // driving a term that a quadrant/relation also targets makes the two facts fight
+          // over one number while a term nobody else wants could satisfy both
+          const claimed = new Set<string>();
+          for (const g of facts) {
+            if (g === f) continue;
+            if (g.kind === 'rel') for (const n of relNames(g.rel)) claimed.add(n);
+            else if (g.kind === 'roots' && g.constrains) claimed.add(g.varName);
+            else if (g.kind === 'seq') for (const n of g.names) claimed.add(n);
+          }
+          const candidates = f.names.filter((n) => freeNames.has(n));
+          const freeTarget = candidates.find((n) => !claimed.has(n)) ?? candidates[0];
           if (freeTarget) {
             const v = seqSolve(f, freeTarget, env, seed);
             if (v) {
