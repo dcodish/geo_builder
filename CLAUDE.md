@@ -38,6 +38,7 @@ The layering `engine ← replay ← store` is mechanically enforced by
 | `src/validation/` | Differential coordinate check against an **independent closed-form oracle**. Dev/CI only | **the engine** — the oracle's independence is the whole point |
 | `src/ui/`, `src/i18n/`, `src/export/` | Chrome: theme + modal, i18n bootstrap and locales, image/`.docx` export | engine |
 | `src3d/` | The 3-D Space Builder — a second product. See [`src3d/CLAUDE.md`](src3d/CLAUDE.md) | **`src/` (anything)** |
+| `src-complex/` | The complex-numbers Builder — a third product. See [`src-complex/CLAUDE.md`](src-complex/CLAUDE.md) | **`src/`, `src3d/`** |
 | `server/` | The shared LLM proxy + admin dashboard, parameterized by `tool:` — never forked per product | product trees |
 | `archive/` | The old template-based implementation. Not compiled, not bundled, excluded from tests. Reference only | — |
 
@@ -138,9 +139,9 @@ never silently built under a bug's banner.
 [ADR-266](docs/06-decisions.md#adr-266); registry and the adding-product-N+1 recipe: [docs/22-workflow.md §9](docs/22-workflow.md).
 
 One workspace, several sibling products: the **2-D Geo Builder** (`src/`, log 06, label `2d`), the **3-D Space
-Builder** (`src3d/`, log 06b, ids `ADR-3D-NNN`, label `3d`), the **shared server** (`server/`, label `server`),
-and planned **analytic geometry** (`src-analytic/`, `ADR-AG-NNN` in 06c, label `analytic`) and **complex
-numbers** (`src-complex/`, `ADR-CX-NNN` in 06d, label `complex`). Cross-product decisions go in
+Builder** (`src3d/`, log 06b, ids `ADR-3D-NNN`, label `3d`), the **complex-numbers Builder** (`src-complex/`,
+log 06d, ids `ADR-CX-NNN`, label `complex`), the **shared server** (`server/`, label `server`), and planned
+**analytic geometry** (`src-analytic/`, `ADR-AG-NNN` in 06c, label `analytic`). Cross-product decisions go in
 `docs/06w-decisions-workspace.md` as `ADR-W-nnn`.
 
 Every workflow artifact is per-product — issue label, ADR log, CI lane, deploy path — so **identify which

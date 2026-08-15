@@ -178,3 +178,254 @@ one letter are distinct facts; conflicting ones surface as a failed check, never
 note recorded from the fix: a projected iterate is *always* an exact root of the previous rhs —
 convergence must be judged by step size + a self-consistent final residual, never by residual
 against the pre-projection rhs. The real C3 build inherits these semantics.
+
+---
+
+## ADR-CX-006 — The engine is a LOG-POLAR constraint system: an exact linear tier, then a numeric residue (2026-08-15)
+
+**Status:** Accepted (operator plan approval, 2026-08-15) · **Closes the class behind
+[#607](https://github.com/dcodish/geo_builder/issues/607)** · **Supersedes** the C0 prototype's
+per-fact sweep solver
+
+**Context.** The prototype solves fact by fact: each relation picks a target number and iterates it
+toward satisfaction. #607 is where that ends. The operator typed 2023 קיץ מועד ב Q3 — a geometric
+sequence over ℂ with `z1^3 = z3`, `-2z1 = conj(z3)`, `z1` in the first quadrant. The system is
+satisfiable (`z1 = √2·cis 45°`), but the composed map `z1 ← conj(z1³)/(−2)` has a **repelling
+fixpoint**, so every sweep diverges and the acceptance gate honestly refuses a question the exam
+expects a student to answer. This is not a missing rule. It is the 2-D `driveOrCheck` class — a greedy
+per-constraint carrier claim over a scalar iteration — arriving in the third tree in its first week,
+alongside #599 and #600, which are the same class in the target-selection direction.
+
+**Decision.** Every number is represented in **log-polar coordinates** `(u, θ) = (ln|z|, arg z)`, and
+the constraint system is split by a structural test on the expression AST.
+
+A constraint is **monomial** when both sides are single terms built only from literals, references,
+multiplication, division, integer powers, roots and conjugation — no addition. In log-polar every
+monomial constraint is **linear**:
+
+| operation | log-polar | |
+|---|---|---|
+| `z·w` | `(u_z + u_w, θ_z + θ_w)` | linear |
+| `z^n` | `(n·u, n·θ)` | linear |
+| n-th root of `z` | `(u/n, θ/n + k/n)` | linear + an **integer unknown k** |
+| conjugate of `z` | `(u, −θ)` | linear |
+| `\|z\| = k·\|w\|`, `arg z − arg w = 90°`, geometric sequences, quadrant givens | linear equations / inequalities | |
+
+So the multiplicative core of the corpus — which is most of it — is a **linear system over ℚ**, solved
+by exact Gaussian elimination, not by iteration. Three properties fall out rather than being built:
+
+1. **Branches are the integer unknowns.** The `k` in each angle equation *is* the exam's
+   «מצא את כל האפשרויות». Solving modulo one turn enumerates the configuration set.
+2. **Free DOF is the nullspace dimension.** [ADR-052](06-decisions.md#adr-052) conformance becomes
+   **structural** instead of audited — the one class on the 2-D scoreboard that never converged,
+   because there `rawMovableDof` and the samplable `freeDofs` are two hand-maintained answers to one
+   question.
+3. **"Which DOF does this constraint drive" is the pivot choice in elimination**, so the six-case
+   recruiter ladder [docs/LADDER.md](LADDER.md) stage 3 needs in 2-D has no analogue here.
+
+Everything else — sums, distances, areas, perimeters, series values, cartesian components, non-linear
+loci — is the **numeric residue**, solved as residuals over the (usually 0–3 dimensional) free basis
+the exact tier leaves, with all 1-D roots enumerated as further branches.
+
+**Verification, run before the decision was taken.** The #607 system, by hand through the rule above:
+
+```
+z3 = z1^3            ->  u3 = 3·u1         ;  t3 = 3·t1
+-2·z1 = conj(z3)     ->  ln2 + u1 = u3     ;  t1 + 1/2 = -t3 + k      (turns)
+=> u1 = ln2/2  =>  |z1| = √2 exactly
+=> 4·t1 = k - 1/2  =>  t1 in {315°, 45°, 135°, 225°}
+=> the quadrant given prunes to 45°   =>   z1 = √2·cis45°
+```
+
+Closed form, zero iterations, and the four candidate configurations are the branch set the
+"show another configuration" button already promises.
+
+**The exact carriers** (refining [ADR-CX-002](#adr-cx-002)'s D1, which said *symbolic base + rational
+multiple of π* without naming a representation):
+
+- **Modulus** = a rational exponent vector over atoms (primes, and real-parameter symbols). `√2` is
+  `{2: 1/2}`; `9r` is `{3: 2, r: 1}`; an n-th root divides every exponent. Radicals are exact and
+  closed under the whole multiplicative core, including `2^(1/3)`, which a `p/q·√n` recognizer cannot
+  express.
+- **Argument** = a rational number of **turns** plus a ℚ-combination of symbolic angle atoms. `45°` is
+  `1/8`; the §2b exemplar's `arctan(1/2) + k·72°` keeps an exact offset over a numeric base.
+
+Both were exercised against corpus asks before adoption: `|z4| = 2^4·r = 16r` reproduces the §2b gate,
+and 2023 קיץ ב sub-item ג (`z_{4n}` real for all n, `z_{4n−2}` pure imaginary for all n) is decided by
+integer arithmetic on turns — a question no amount of float sampling can answer.
+
+**Scope, explicitly.** This is bounded linear algebra over ℚ on two vector spaces. **No CAS** — the
+[ADR-3D-002](06b-decisions-3d.md) symbolic-layer discipline. A number that can be zero, or that is
+defined additively, has no logarithm: those nodes carry a numeric value only and their constraints
+fall to the numeric tier. **A node is exact iff its whole derivation is multiplicative over exact
+atoms** — exactness is opportunistic, but the rule for when it holds is structural, not a heuristic.
+
+**Consequences.** The solve ladder is three tiers instead of a stage-3 case ladder, and it is written
+down as `docs/LADDER-CX.md` **before** the stages exist rather than after fifteen rungs accumulated
+(the docs/23 R6 finding). Each tier is transactional and every accept passes one `stepAccepted`
+predicate ([ADR-413](06-decisions.md#adr-413)'s shape). Inequalities are **filters on the branch and
+parameter set, never drivers** — the 3-D `Requirement3` rule. `engine/model.ts` is retired
+([ADR-CX-008](#adr-cx-008)).
+
+---
+
+## ADR-CX-007 — The grammar contract is re-derived from ELEVEN exams; nine sentence families were missing (2026-08-15)
+
+**Status:** Accepted (operator plan approval, 2026-08-15) · **Extends** [ADR-CX-003](#adr-cx-003) ·
+**Plan of record:** [docs/27 §10](27-complex-numbers-tool.md)
+
+**Context.** ADR-CX-003 made the input language a contract of generic sentence families F1–F13, each
+carrying at least two corpus witnesses, with the anti-patch rule that *a new question fitting no
+family is a family-level addition, never a one-off parser rule*. The contract was authored from
+**eight** exams.
+
+The operator supplied the 2026 מיקוד for שאלון 572 (יואל גבע, 2026 edition), which confirms **all 28
+exams of the booklet (2020–2025) are in scope, every question** — so Q3 is complex numbers in ~22 real
+papers, not eight. Re-reading eleven of them (2020 קיץ א/ב, 2020 חורף, 2021 חורף א, 2021 חורף ב,
+2021 קיץ ב, 2022 חורף, 2022 נבצרים, 2023 קיץ א, 2023 מיוחד, 2024 חורף) against the F1–F13 table gives
+the measurement that matters: **only two questions map end to end. Nine contain at least one statement
+with no family**, and the gaps are not exotic — five of them carry three or four independent witnesses
+each. The families were not wrong; the sample was too small to reveal them.
+
+**Decision.** [docs/27 §10](27-complex-numbers-tool.md) gains nine families and names three deferrals,
+each with its witness count and its build slice:
+
+| id | family | witnesses |
+|---|---|---|
+| G1 | polynomial equations over ℂ beyond `X^n = expr` — quadratic/quartic, complex or parametric coefficients, factored form, affine base `(z+c)^n = e`, leading coefficient | 4 |
+| G2 | generative point-set asks — complete the polygon, list the vertices, sample a witness on a locus | 4 |
+| G3 | intersection as constructor — line∩circle, line∩locus, locus∩circumscribed circle, selected by quadrant / ordinal / exclusion | 3 |
+| G4 | transform over a point set — multiply a whole set by `w`, constrain the image, solve for the multiplier | 3 |
+| G5 | incidence on a regular n-gon — stated vertices driving the integer `n` | 3 |
+| G6 | equation synthesis (inverse-F8) — "write an equation whose solutions are these" | 2 |
+| G7 | sums over sets, and of expressions in the terms (`Σ z_k·conj(z_k)`, `Σ over a solution set = 0`) | 2 |
+| G8 | real-parameter algebra — sign claims, parameter ratios, measure ratios, symbolic answers | 2 |
+| G9 | non-linear loci — a locus in `z^2` (hyperbola), conjugates with a squared modulus | 2 |
+| G10–G12 | **deferred, named:** Re/Im extraction into ordered real parameters · symbolic degree (`z^n = 2^n` with `n` unknown, pinned by an area equation in `n`) · locus fitting (inverse-F13) | 1 each |
+
+G1 is satisfied by Durand–Kerner over degree ≤ 4 (all roots at once, ~40 LOC, no CAS), with the exact
+recognizer lifting nice roots back into [ADR-CX-006](#adr-cx-006)'s carriers.
+
+**A stated non-goal, recorded rather than chased.** 2021 קיץ מועד ב Q3 is essentially un-visualizable:
+a quartic, a factored polynomial in two real parameters, «הוכיחו כי a·b > 0», and answers demanded
+«באמצעות a ו-b». Of the eleven questions it is the only one a picture barely helps. The product's
+thesis is *the figure answers the question*; this exam is the honest counterexample and is recorded as
+a limitation instead of driving a parameter-algebra subsystem nothing else needs.
+
+**Consequences.** Per-slice catalogs are authored from the extended table. The completeness audit runs
+in both directions as before — every corpus statement maps to a family or a *named* deferral, every
+family carries witnesses — but the corpus is now the booklet, not a sample of it. The un-family'd
+statements found in the sweep are the reason the parser is rebuilt rather than extended
+([ADR-CX-008](#adr-cx-008)): G1, G2 and G3 change what the equation and object layers must be, and
+retrofitting them onto a grammar shaped by `X^n = expr` is the patch route standing rule 1 forbids.
+
+---
+
+## ADR-CX-008 — The foundation is rebuilt behind an engine switch; the prototype's TESTS are what survive (2026-08-15)
+
+**Status:** Accepted (operator ruling, 2026-08-15)
+
+**Context.** The C0 prototype (PR #588) shipped to production on 2026-08-15 and absorbed most of C1–C4
+in place. In its first week it reproduced **five** defect classes already diagnosed in the sibling
+products — #599/#600 (carrier ownership), #602 (multi-root display honesty), #603 (drag versus
+constraint), #606 (acceptance gate), #607 (joint solve). It also lacks capabilities the shared charter
+treats as settled: no undo/redo (**FR-HS-2 is a *Must***), no fact enable/disable (the
+[ADR-010](06-decisions.md#adr-010) "experiment and see the impact" move — delete-only is destructive
+experimentation), no DOF cue (FR-ALT-4), no in-app privacy note (**NFR-SE-3**, in a product the
+homepage links publicly), no build stamp, no usage logging, no LLM fallback, no image export, no
+catalog panel.
+
+Operator ruling: *"the objective is to have a solid tool and not a patched tool — so if needed, we
+throw away, and if something helps, we keep it."*
+
+**Decision.** The engine is replaced, not extended, and the decision is taken per artifact on merit.
+
+**Thrown away:** `engine/model.ts` (978 lines holding the fact model, evaluation, solving and
+presentation glyphs at once — its per-fact drives are the #607 ceiling) · `engine/complex.ts`'s
+float-only `Cx` · `render/GaussPlane.tsx` (cartesian-only, React-coupled, no scene seam) ·
+`styles.css`'s third palette.
+
+**Kept and ported:** the exam-typography normalization and bidi-control stripping in `parser/parse.ts`
+— hard-won, tested, and independent of the solver ([ADR-CX-003](#adr-cx-003) P2); it becomes the one
+orthography chokepoint. The working Hebrew and English sentence forms are content, re-authored as
+catalog specimens.
+
+**Kept as the acceptance corpus:** the ~85 tests in `__tests__/prototype.test.ts`. They encode
+operator-validated semantics — [ADR-CX-004](#adr-cx-004) implicit typing, [ADR-CX-005](#adr-cx-005)
+an-equation-is-about-its-letter, and the whole §2b capstone — and are the strongest artifact the
+prototype produced. They are rewritten to drive the **store's submit path** rather than `derive()`
+directly, because a test that calls the engine cannot catch a pipeline that stops calling it.
+
+**Kept unchanged:** the tree, the URL, `complex.html`, the vite config, the save-file format, the store
+shape, and the localStorage persistence — which is FR-HS-4, and the one surface where this product is
+*ahead* of both siblings.
+
+**Cutover.** v2 grows beside the prototype behind an `?engine=v2` switch, so `main` stays deployable
+and both engines are playable side by side; the final PR flips the default and deletes the old engine.
+Slices are foundation-first (operator ruling) — value core, solver, replay, parser, then the
+visualization layer — so the invisible work lands before the visible work sits on top of it.
+
+**Consequences.** The C0–C5 slice plan in [docs/27 §9](27-complex-numbers-tool.md) is replaced by
+S0–S7. The prototype's issues stay closed: they were correctly fixed for the architecture that existed,
+and the rebuild is not a claim that those fixes were wrong. #607 is closed by the tier-1 solver rather
+than by the joint-Newton follow-up its own body proposed.
+
+---
+
+## ADR-CX-009 — The four deferrals the siblings paid for are built on day one (2026-08-15)
+
+**Status:** Accepted (operator plan approval, 2026-08-15) · **Sibling audit:** this entry IS the audit
+— the classes are imported from `src/` and `src3d/` deliberately, per
+[ADR-W-004](06w-decisions-workspace.md#adr-w-004)
+
+**Context.** A sweep of the 2-D record (452 ADRs), the 3-D record (157), the four systemic reviews and
+the live queue produces one summary: the 2-D foundation was right, and nearly all of its cost came
+from four mechanisms that were **correctly identified early and deferred because they were expensive
+on an existing tree.** Each is cheap on a young one. They are the reason this planning pass happened at
+all, so they are decided before the first commit rather than discovered again.
+
+**Decision — all four ship in the slice that first needs them, and none may be deferred.**
+
+1. **A second mention of a name is a GIVEN, not a redefinition.**
+   [ADR-009](06-decisions.md#adr-009) imported compiler semantics (`commandConflict` = redefinition
+   error), which docs/23 calls *"the single largest bug class in the project's history"* — ~24 members
+   across two products, five sessions each closing one, before M1 retreated from it one object-kind at
+   a time. The input language here is **accumulating assertions about one object system**. Existing-name
+   lowering lives at **one apply-boundary seam**, never in a parser rule, and rules *ask* a single
+   `existingRef()` resolver rather than each deciding. [ADR-CX-005](#adr-cx-005) already states this for
+   equations — it becomes the seam, not a habit.
+2. **Total span accounting instead of a `dropped*` gate family.** 2-D grew ~18 honesty gates, each added
+   after a silent-drop P1, each an enumeration, the family eventually producing defects of its own; 33
+   closed bugs sit in that theme. The complete mechanism was named in
+   [ADR-250](06-decisions.md#adr-250) and is **still not enforcing**. Here it is the only mechanism:
+   every non-filler token span must be **claimed** by the winning parse or the parse refuses and
+   escalates. Accounting is a **multiset** ([ADR-429](06-decisions.md#adr-429)) and it **fails closed** —
+   an unknown word is content, not filler ([ADR-435](06-decisions.md#adr-435)). **No `dropped*` gate is
+   ever added**: reaching for gate #2 means the 18-member path was chosen.
+3. **Constraint-to-DOF binding decided once, jointly.** The greedy apply-time pick plus a rescue ladder
+   is generator G2, still open in 2-D after two months (#416, #4, #64, #174, #281) and already present
+   here as #607/#599/#600. [ADR-CX-006](#adr-cx-006)'s elimination *is* the joint binding. A preference
+   ladder survives only as a **tie-break** — docs/13 R7 refuted deleting it, because tier order encodes
+   same-residual disambiguation a joint solver cannot recover. Constraints carry a typed
+   `strength: required | preference | visual` before the second constraint type exists (2-D's #64).
+4. **A lexical layer from rule one.** `parse.ts` spells the point-label fragment **342 times**; the
+   Hebrew final-kaf trap fired at least three times *after being recorded as a trap*; and the atoms that
+   fix it shipped in 2-D with #361 still open because **nothing consumes them**. Every rule composes
+   from `lexicon.ts` atoms, with the ratchet ceiling set at zero inline fragments on the first commit
+   and a generative stem x morphology matrix test.
+
+Two further mechanisms cost P1s in 2-D and are free here, so they land with the solver:
+
+- **The obligation-preservation gate** ([ADR-402](06-decisions.md#adr-402)): a rescue may never lose a
+  given. Its root cause is worth restating because it is structural — *"dropping a constraint makes the
+  remaining system EASIER, so a destructive rescue is MORE likely to pass"*: the machinery was
+  **rewarded** for destroying givens, for ~2.5 weeks in production, caught by nothing but the verifier.
+- **One storage shape per obligation.** ADR-402 was only possible because a constraint could live either
+  in a list or embedded in a solved carrier, and the restore law knew one shape. Every obligation is
+  listed in exactly one place.
+
+**Consequences.** These are acceptance criteria on the slices, not aspirations: the import-direction
+test, the ratchet, the span accountant and the `strength` field are each part of the slice that
+introduces their layer, and a slice that would grow a chokepoint list is mis-scoped (docs/24 §0).
+[docs/17](17-design-rules.md) applies to this tree **as-is** rather than as a per-product copy, and the
+sibling audit it mandates now spans three trees.

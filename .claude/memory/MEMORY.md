@@ -12,4 +12,3 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Tool denials are observations](tool-denials-are-observations.md) — never report "I can't do X" from a denial without checking the permission config and retrying the canonical minimal command form
 - [Work PC / cross-machine](work-pc-cross-machine.md) — David switches work/home PCs; project syncs via git/GitHub (moved out of Dropbox 2026-07-23) — pick up cross-machine progress via git + the ADR-log tails at session start
 - [Shared-tree branch races](shared-tree-branch-races.md) — re-verify the shared tree's branch in the SAME compound as any write git op there; a parallel session can switch it mid-flight (2026-08-13 near-miss)
-- [Complex tool out of scope](complex-tool-out-of-scope.md) — ignore the `complex` label / `src-complex/` / `ADR-CX-*` entirely (parallel effort) until the operator revokes it — filter it out of reports, rounds, and the attention digest

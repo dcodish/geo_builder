@@ -30,6 +30,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const ORIENTATION_FILES = [
   { file: 'CLAUDE.md', ceiling: 20_000 },
   { file: 'src3d/CLAUDE.md', ceiling: 10_000 },
+  { file: 'src-complex/CLAUDE.md', ceiling: 10_000 },
 ] as const;
 
 /** The ADR logs an orientation file may reference. */
@@ -37,7 +38,15 @@ const ADR_LOGS = [
   'docs/06-decisions.md',
   'docs/06b-decisions-3d.md',
   'docs/06w-decisions-workspace.md',
+  'docs/06d-decisions-complex.md',
 ];
+
+/**
+ * An ADR id in any product's scheme. The prefix alternation must cover every log in ADR_LOGS —
+ * an id whose prefix is missing here is not "allowed", it is INVISIBLE to the resolution test,
+ * which is the enumeration failure mode this suite exists to catch.
+ */
+const ADR_ID = String.raw`ADR-(?:3D-|W-|CX-)?\d+`;
 
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
@@ -74,7 +83,7 @@ describe('orientation files stay orientation files (ADR-W-002)', () => {
   it('every ADR id referenced by an orientation file resolves in a log', () => {
     const declared = new Set<string>();
     for (const log of ADR_LOGS) {
-      for (const heading of read(log).match(/^#+\s*ADR-(?:3D-|W-)?\d+/gm) ?? []) {
+      for (const heading of read(log).match(new RegExp(String.raw`^#+\s*${ADR_ID}`, 'gm')) ?? []) {
         declared.add(heading.replace(/^#+\s*/, ''));
       }
     }
@@ -83,7 +92,7 @@ describe('orientation files stay orientation files (ADR-W-002)', () => {
     const dangling: string[] = [];
     for (const { file } of ORIENTATION_FILES) {
       // The trailing \b keeps the `ADR-3D-NNN` placeholder from matching as `ADR-3`.
-      for (const id of new Set(read(file).match(/ADR-(?:3D-|W-)?\d+\b/g) ?? [])) {
+      for (const id of new Set(read(file).match(new RegExp(String.raw`${ADR_ID}\b`, 'g')) ?? [])) {
         if (!declared.has(id)) dangling.push(`${file} -> ${id}`);
       }
     }

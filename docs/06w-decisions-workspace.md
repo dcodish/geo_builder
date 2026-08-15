@@ -562,3 +562,67 @@ rounds silently; and the round's escalation exit remains the safety valve — a 
 with the code goes back to `needs-operator` with the template. Batch approval (the original ADR-W-014
 flow) remains for compositions and anything a session is unsure about. Applied retroactively to the
 open queue the same day: 41 planned issues armed, each with the audit comment.
+
+## ADR-W-016 — The shell layer becomes physically shared, seeded by evidence and consumed by the third product first
+
+**Status:** accepted, 2026-08-15 · **Amends:** [ADR-W-003](#adr-w-003) · **Operator ruling**
+
+**Context.** ADR-W-003 deferred whether a non-`engine` layer may be physically shared, with a named
+trigger: *"when `src-analytic/` starts. That is when there are genuinely three products, the shell
+duplication triples, and the boundary can be drawn against real demand instead of two files."* The
+literal trigger has not fired — [ADR-CX-001](06d-decisions-complex.md#adr-cx-001) D5 moved analytic to
+last. **Every condition it was written to detect has.** `src-complex/` is on disk, classified in
+`BOUNDARIES.json`, and live in production, so there are three product trees today; and all four
+measurements ADR-W-003 used to argue *against* sharing have moved against it:
+
+| ADR-W-003's measurement (2026-08-08) | Measured 2026-08-15 |
+|---|---|
+| *"`src3d/` has **no** modal, dialog, or overlay UI at all — it does not duplicate `src/ui`, it lacks it."* | Still true, and `src-complex/` lacks it too — **two** products missing the same thing reads as a gap, not as absent demand |
+| *"`src/ui` is imported by exactly **one** file… a two-file, single-consumer directory."* | Still one consumer; a second and third are now the question |
+| *"`src/App.tsx` carries **105 inline hex colours** despite importing `theme.ts` — the 2-D theme is not a settled abstraction."* | **194** inline hex colours. `src3d/App3.tsx` carries 42 with no token module; `src-complex/styles.css` adds a **third palette** (warm stone against the siblings' slate) on a third styling stack |
+| *"The `i18n` bootstrap dedup totals ~25 lines."* | Still ~25 lines — now written **three** times, and complex skipped locale *files* entirely so key parity cannot be diffed |
+
+The stronger evidence is behavioural. The shell honesty behaviours are the ones that keep failing to
+cross a product boundary: ADR-065's "this is the only configuration" report (2-D only), the load audit
+(ADR-242 / ADR-3D-087 — complex has neither), save naming (ADR-274/286 — complex's own store comment
+claims a convention its code does not implement), the in-app privacy note (NFR-SE-3 — absent in a
+publicly linked product), the build stamp, usage logging, and the palette-as-assertable-module, whose
+whole point (#482: *"a module can be asserted"*) `src-complex` reversed on day one by re-inlining it.
+Each has now been implemented-or-forgotten three times. [ADR-W-004](#adr-w-004) explains why copying is
+right for **engine** classes — *"Every class above lives in the `engine` layer, which ADR-W-003 keeps
+copied on purpose. The check *is* the mechanism."* — and that reasoning does not extend to these.
+
+**Operator constraint (2026-08-15):** *"i cannot afford impacting the 2d and 3d in prod… i will later
+have this unification discussion."*
+
+**Decision.** A `shell/` tree is created and **only `src-complex/` imports it**. `src/` and `src3d/`
+are not migrated: zero lines of either change, and the unification of the two shipped products stays
+the operator's later decision. The mechanical cost to shared files is one entry in `tsconfig.json`'s
+`include` and the `BOUNDARIES.json` edges — the sibling builds are the acceptance evidence.
+
+Three rules bound it:
+
+1. **Seeded by evidence, never by anticipation.** A surface may enter `shell/` only if it is already
+   implemented **≥ 2 times** across the existing trees and is settled. That is the direct answer to
+   ADR-W-003's speculative-generality objection, which was correct and is preserved as a constraint
+   rather than overturned. The opening set: design tokens (from `src/ui/theme.ts`, a documented design
+   system), bidi isolation, the i18n bootstrap, the save-file envelope + naming + load audit, the
+   symbol palette module, and the app frame (header, error/notice banners, DOF cue, About/privacy
+   modal, product switcher).
+2. **Parameterized by the caller.** ADR-W-003's rule stands verbatim: *"branching on product identity
+   inside a shared module is a fork wearing a shared file's name."* No `if (product === …)` in
+   `shell/`. `shell/` may not import any product tree — a forbidden edge in the manifest.
+3. **`engine` is untouched by this.** Value core, model, solver, replay, scene, parser rules and
+   catalogs stay **copied-never-shared**. ADR-W-003's `engine` doctrine and ADR-W-004's sibling audit
+   are unchanged, and the audit now spans three trees.
+
+**Reversibility, stated because the decision was taken while the operator slept.** Nothing consumes
+`shell/` but the product being rebuilt, so backing it out is moving files into `src-complex/ui/` and
+deleting two manifest edges. The cost of the alternative is not symmetric: a third copy re-drifts on
+the first divergent edit — which already happened — and turns the later unification into a three-way
+reconciliation.
+
+**Consequences.** The `shell` layer's `sharing` field moves from `undecided` to
+`shared-parameterized`; `lexicon` stays `undecided` (its carriers exist now — `src/parser/lexicon.ts`
+and the morphology constants in `parse3.ts` — but #361 records that even the 2-D atoms have one
+consumer, so demand is unproven). ADR-W-003's trigger is spent and is replaced by this entry.

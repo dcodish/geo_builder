@@ -6,9 +6,12 @@ would look like." The product is already **registered** as the fourth sibling
 label `complex` — but until this note it had no corpus reading and no plan. Grounded in a fresh corpus
 reading of **eight** 572 exams (§2) and the official formula sheet (§3), in the mold of
 [19-analytic-geometry-tool.md](19-analytic-geometry-tool.md) (analytic, still PROPOSED) and
-[20-space-vectors-tool.md](20-space-vectors-tool.md) (3-D, shipped). Status: **ACCEPTED,
-decision-complete — D1–D5 resolved by the operator (2026-08-14, §8;
-[ADR-CX-001](06d-decisions-complex.md#adr-cx-001)). No code yet; C0 (§9) is the entry point.**_
+[20-space-vectors-tool.md](20-space-vectors-tool.md) (3-D, shipped). Status: **ACCEPTED and BUILDING.**
+_D1–D5 resolved 2026-08-14 (§8, [ADR-CX-001](06d-decisions-complex.md#adr-cx-001)); the C0 prototype
+shipped and hit its solver ceiling; the foundation was re-designed 2026-08-15 over a log-polar engine
+([ADR-CX-006](06d-decisions-complex.md#adr-cx-006)) with the grammar contract re-derived from eleven
+exams ([ADR-CX-007](06d-decisions-complex.md#adr-cx-007)). **The live plan is §9b (S0–S7); §10 + §10b
+is the grammar contract.**_
 
 Same charter as every sibling: **the student types the givens, the tool reproduces the figure and
 verifies claims — it never solves the exam question.**
@@ -232,6 +235,13 @@ call, not a decision this note makes.**
 
 ## 9. Phased build plan — corpus-gated slices (doc-20 style)
 
+> **Superseded 2026-08-15 ([ADR-CX-008](06d-decisions-complex.md#adr-cx-008)).** The C0–C5 plan below
+> was written before the C0 prototype shipped and hit its solver ceiling
+> ([#607](https://github.com/dcodish/geo_builder/issues/607)). It is kept for provenance — the corpus
+> gates it names are still the gates — but **the live plan is §9b**, which is foundation-first over the
+> log-polar engine ([ADR-CX-006](06d-decisions-complex.md#adr-cx-006)) rather than feature-first over
+> the prototype.
+
 Every slice ends with an exam question reproducing **end-to-end through the real parse → replay
 path** with claims verified — the same gate discipline as the 3-D V-slices. Parser coverage
 (bilingual, catalog-driven) and the `tool: 'complex'` server parameterization grow *with each
@@ -269,6 +279,24 @@ slice*, never as a separate phase.
 
 Build route per the workflow: each slice is a feature branch + PR with the operator's
 play-and-approve; corpus gates become permanent fixtures/scenarios in the product's test lane.
+
+## 9b. The live plan — foundation-first slices S0–S7 (2026-08-15)
+
+_Decided with the operator: **foundation first** — the value core, the solver and replay land before
+the visualization sits on top of them. v2 grows beside the prototype behind an `?engine=v2` switch, so
+`main` stays deployable and both engines are playable side by side; the last slice flips the default
+and deletes the old engine ([ADR-CX-008](06d-decisions-complex.md#adr-cx-008))._
+
+| # | slice | gate |
+|---|---|---|
+| **S0** | **shell + registration** — the `shell/` tree ([ADR-W-016](06w-decisions-workspace.md#adr-w-016)); `BOUNDARIES.json` edges; the CI `changes` classifier + a `test-complex` lane; `src-complex/CLAUDE.md`; [LADDER-CX.md](LADDER-CX.md); `deploy/apache-complex-builder.conf` | isolation + docs-hygiene green; **2-D and 3-D bytes unchanged** |
+| **S1** | **value layer** — ℚ arithmetic, exponent-vector moduli, turns + symbolic angle atoms, the six operations, the exact-form recognizer, polar and cartesian formatting | the exact-value corpus of the sampled exams round-trips: `√2`, `2^(3/2)`, `16r`, `2^(1/3)`, `3π/4`, `arctan(1/2) + k·72°` |
+| **S2** | **model + tier-1 solver** — facts, the `Expr` AST, monomial-vs-general classification, the two ℚ-linear systems, nullspace DOF, branch enumeration, inequality filters, typed `strength` | **#607 solves in closed form**, four branches, the quadrant given pruning to `√2·cis45°`; 2024 חורף `q⁴ = 2` → four branches; 2020 חורף `a_{n+4} = 16·a_n` for all n decided exactly |
+| **S3** | **tier-2 + replay + verifier** — numeric residuals over the free basis, LM + multi-start, root enumeration, the fold/tail memo, the packed configuration index, `isDisplayable`, budgeted config search, the independent givens verifier | the §2b capstone: θ pinned by the area given, `arg Z₂ < 45°` pruning the second branch, perimeter `60r`; **stability** — adding a fact never moves settled numbers |
+| **S4** | **parser v2 + app** — the catalog, lexicon atoms + ratchet, the orthography chokepoint, ordered rules with a shadow matrix, **span accounting enforcing**, `submitPipeline`, the LLM seam with `tool: 'complex'`, the guidance register, canonical-form teaching | every catalog specimen parses in both locales and passes every gate empty; the sampled Q3 setups parse or refuse honestly, naming what was unclaimed |
+| **S5** | **scene + render + shell adoption** — the polar substrate, the sequence spiral and partial-sum chain, multiplication-as-rotation, the value cycle + `n` stepper; `AppFrame`, the DOF cue, undo/redo, fact enable/disable, the privacy note, image export, the product switcher | each picture type renders for its corpus witness; the polar↔cartesian toggle proven display-only over the catalog |
+| **S6** | **claims + knowledge panel + formula surfacing** — exact claim verification, on-request knowledge rows, parameter-expression rows (`15r`), families G4–G9, the formula table + its integrity test | 2023 קיץ א ד (minimal n, outside the circumscribed circle) and 2023 קיץ ב ג/ד verify exactly |
+| **S7** | **corpus gates + cutover** — every booklet Q3 as a saved fixture, the scenario corpus for bespoke assertions, tier membership; delete the old engine and the switch | the booklet's Q3s build green and verify; the prototype's ~85 tests pass on v2; `npm run test:full` green |
 
 ## 10. The input language — generic sentence families ([ADR-CX-003](06d-decisions-complex.md#adr-cx-003))
 
@@ -313,6 +341,38 @@ carries at least two corpus witnesses — no speculative grammar. A catalog entr
 per-slice from this table; the table, not any single question's phrasing, is what "supported"
 means.
 
+## 10b. Nine more families — the eleven-exam re-reading ([ADR-CX-007](06d-decisions-complex.md#adr-cx-007))
+
+The F1–F13 contract was authored from **eight** exams. The operator's 2026 מיקוד confirms the whole
+יואל גבע 572 booklet (2020–2025) is in scope — Q3 is complex numbers in ~22 papers. Re-reading
+**eleven** of them against F1–F13 gives the measurement that matters: **only two map end to end; nine
+contain at least one statement with no family.** The families were not wrong; the sample was too small
+to reveal these. Five of the nine carry three or four independent witnesses each, so none is a one-off.
+
+| # | Family (generic form) | Canonical He (one witness form) | Corpus witnesses | Slice |
+|---|---|---|---|---|
+| G1 | **Polynomial equations over ℂ** beyond `X^n = expr`: quadratic and quartic, complex or real-parameter coefficients, **factored** form, **affine base** `(z+c)^n = e`, a **leading coefficient** `c·z^n = rhs` | `z² − (1+i)z + 2i + 2 = 0` · `z⁴ − 2z² + 4 = 0` · `(z+i)² = 2 + 2√3i` · `i·z⁶ = 1/64` | 2021 חורף ב, 2021 קיץ ב, 2022 נבצרים, 2021 חורף א — **4** | S4 |
+| G2 | **Generative point-set asks**: complete the polygon from its known vertices, list the numbers representing a vertex set, sample a witness on a locus | `מצאו את שיעוריהם של שאר קדקודי המשושה` · `רשמו את המספרים המרוכבים המתאימים לקדקודי המצולע` · `תנו דוגמה למספר הנמצא על המקום הגאומטרי` | 2020 קיץ, 2021 חורף ב, 2023 מיוחד ×2 — **4** | S4/S5 |
+| G3 | **Intersection as a constructor**: line ∩ circle, line ∩ locus, locus ∩ circumscribed circle — naming new points, **selected** by quadrant, ordinal, or exclusion (`בשתי נקודות אחרות`) | `הישר AO חותך את המעגל בנקודות C ו-D` · `הישר y = x חותך את המקומות הגאומטריים` | 2021 חורף ב, 2022 נבצרים, 2023 מיוחד — **3** | S4 |
+| G4 | **Transform over a point SET**: multiply every element of a set by `w`; constrain the image (orientation, coincidence with another set); **solve for the multiplier** | `כופלים כל אחד מהפתרונות במספר מרוכב קבוע w` · `מתקבל מלבן שצלעותיו מקבילות לצירים` · `קדקודי I מתלכדים עם קדקודי II — מצאו את w` | 2020 קיץ ב, 2021 חורף א, 2023 מיוחד — **3** | S6 |
+| G5 | **Incidence on a regular n-gon**: stated points ARE vertices, driving the integer `n`; per-vertex existence-uniqueness; vertex-count equality between two polygons | `נתון כי D, C, B הן קדקודים של המצולע` · `לכל קדקוד קיים קודקוד אחד בדיוק ש…` · `מספר הקדקודים של II שווה למספר הקדקודים של I` | 2021 חורף ב, 2021 חורף א, 2023 מיוחד — **3** | S6 |
+| G6 | **Equation synthesis (inverse-F8)**: emit an equation whose solution set is a given point set | `כתבו משוואה שפתרונותיה הם 12 המספרים` | 2021 חורף א, 2021 חורף ב — **2** | S6 |
+| G7 | **Sums over a SET, and of an expression in the terms** — not only consecutive sequence terms | `z₁·z̄₁ + z₂·z̄₂ + … + z₁₀·z̄₁₀` · `סכום המספרים שהתקבלו הוא אפס` | 2024 חורף, 2021 חורף א — **2** | S3/S5 |
+| G8 | **Real-parameter algebra**: sign claims, parameter ratios, ratios of two measures, answers demanded symbolically | `הוכיחו כי a·b > 0` · `מצאו את היחס b/a` · `מצאו את היחס בין השטחים` · `הביעו באמצעות a ו-b` | 2021 קיץ ב ×3, 2020 חורף — **2 exams, 4 statements** | S6 |
+| G9 | **Non-linear loci**: a locus in `z²` resolving outside the closed §5.3 list; `z̄` with a squared modulus and moduli-of-constants on both sides | `\|z² − i\| = \|z² + 3i\|` → `y = −1/(2x)` · `\|6 − z̄ − 8i\|² − \|10i\| = \|9+12i\|` | 2023 מיוחד, 2024 חורף — **2** | S6 |
+
+**Deferred, and named** (the §10 discipline — a deferral is recorded, never silent): **G10** Re/Im
+extraction of a solution set into *ordered* real parameters (`נסמן את החלקים הממשיים … a₁ < a₂`,
+2022 נבצרים) · **G11** symbolic degree — `z^n = 2^n` with `n` itself the unknown, pinned by an area
+equation *in n* (2020 קיץ ב) · **G12** locus fitting, the inverse of F13 — solve for `p, m` so an
+infinite point family lies on `|z − p| = m` (2022 חורף).
+
+**A stated non-goal.** 2021 קיץ מועד ב Q3 is the one sampled question a picture barely helps: a
+quartic, a factored polynomial in two real parameters, `הוכיחו כי a·b > 0`, and every answer demanded
+`באמצעות a ו-b`. The product's thesis is *the figure answers the question*; this exam is the honest
+counterexample, recorded as a limitation rather than driving a parameter-algebra subsystem nothing
+else needs.
+
 ---
 
 **Summary:** the fourth sibling at its own URL; the smallest engine core of the four products; the
@@ -320,5 +380,15 @@ means.
 central ideas — branch index, free DOF, dependency graph — each land on a corpus archetype exactly.
 The genuinely new work is a bounded exact-polar arithmetic core, an expression sub-grammar, a closed
 locus list, and symbolic exponents. **D1–D5 are resolved (§8): exact core, proposed v1 grammar,
-always-visualize + polar↔cartesian toggle, series in scope, complex before analytic. Next step: C0,
-via the feature/PR route.**
+always-visualize + polar↔cartesian toggle, series in scope, complex before analytic.**
+
+**Where this stands after the 2026-08-15 foundation pass.** The chassis-fit reading in §4 survives
+intact, but two things it assumed did not. The 2-D *solver* does not transfer — per-fact drives cannot
+reach the corpus's chained equation systems (#607), so the engine is a **log-polar constraint system**
+whose multiplicative core is an exact ℚ-linear solve and whose branches are the integer unknowns in
+its angle equations ([ADR-CX-006](06d-decisions-complex.md#adr-cx-006)). And the grammar was authored
+from too small a sample — nine more sentence families, five with 3–4 witnesses each, came out of
+re-reading eleven exams (§10b, [ADR-CX-007](06d-decisions-complex.md#adr-cx-007)). **The live build
+plan is §9b (S0–S7), foundation-first, behind an `?engine=v2` switch
+([ADR-CX-008](06d-decisions-complex.md#adr-cx-008)); the four mechanisms the sibling products deferred
+and paid for are built on day one ([ADR-CX-009](06d-decisions-complex.md#adr-cx-009)).**
