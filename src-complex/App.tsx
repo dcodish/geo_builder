@@ -116,6 +116,20 @@ export function App() {
                 {f.kind === 'free' && (
                   <span className="badge">{t(f.implicit ? 'implicitLabel' : 'freeLabel')}</span>
                 )}
+                {scene.checks[f.id] && (
+                  <span
+                    className={scene.checks[f.id].ok ? 'check ok' : 'check bad'}
+                    title={t(
+                      scene.checks[f.id].driven
+                        ? 'relDriven'
+                        : scene.checks[f.id].ok
+                          ? 'relOk'
+                          : 'relBad',
+                    )}
+                  >
+                    {scene.checks[f.id].ok ? '✓' : '✗'}
+                  </span>
+                )}
                 {scene.errors[f.id] && (
                   <span className="fact-error">
                     {t(

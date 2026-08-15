@@ -2,7 +2,7 @@
 // (docs/27 §5.2 subset): literals a+bi and r·cis θ, + - * / ^int, conj, parens.
 // Unmatched input returns { ok: false, key: 'not-handled' } — the sibling seam.
 import { cisDeg, cx } from '../engine/complex';
-import { factId, IMPLICIT_COMPLEX_RE, type Expr, type Fact } from '../engine/model';
+import { factId, IMPLICIT_COMPLEX_RE, type ArgTerm, type Expr, type Fact } from '../engine/model';
 
 export type ParseResult =
   | { ok: true; fact: Fact }
@@ -231,11 +231,18 @@ const FREE_RE =
   /^([a-zA-Z]\w*)\s+(?:הוא\s+)?מספר\s+מרוכב$|^([a-zA-Z]\w*)\s+(?:is\s+)?(?:a\s+)?complex(?:\s+number)?$/;
 const ROOTS_RE = /^(?:הפתרונות\s+של\s+|solutions\s+of\s+)?([a-zA-Z]\w*)\s*\^\s*(\d+)\s*=\s*(.+)$/;
 const DEF_RE = /^([a-zA-Z]\w*)\s*=\s*(.+)$/;
+// F4: ±arg(A) [± arg(B)] = degrees — parens optional (arg z1 also accepted)
+const ARGREL_RE =
+  /^(-?)\s*arg\b\s*\(?\s*([a-zA-Z]\w*)\s*\)?\s*(?:([+-])\s*arg\b\s*\(?\s*([a-zA-Z]\w*)\s*\)?)?\s*=\s*(-?\d+(?:\.\d+)?)$/;
+// F3: |A| = c  |  |A| = c·|B|  |  |A| = |B|
+const MODREL_RE =
+  /^\|\s*([a-zA-Z]\w*)\s*\|\s*=\s*(?:(\d+(?:\.\d+)?)\s*\*?\s*)?(?:\|\s*([a-zA-Z]\w*)\s*\|)?$/;
 
 export const parseLine = (raw: string): ParseResult => {
   const line = normalize(raw)
     .replace(/הצמוד\s+של\s+/g, 'conj ')
-    .replace(/ההופכי\s+של\s+/g, 'inv ');
+    .replace(/ההופכי\s+של\s+/g, 'inv ')
+    .replace(/ה?ארגומנט(?:\s+של)?/g, 'arg');
   if (line === '') return { ok: false, key: 'not-handled' };
 
   const free = FREE_RE.exec(line);
@@ -252,6 +259,37 @@ export const parseLine = (raw: string): ParseResult => {
     const rhs = parseExpr(roots[3]);
     if (!rhs) return { ok: false, key: 'parse-error', detail: raw.trim() };
     const f = { kind: 'roots' as const, varName: roots[1].toLowerCase(), n, rhs, src: raw.trim() };
+    return { ok: true, fact: { ...f, id: factId(f) } };
+  }
+
+  const argrel = ARGREL_RE.exec(line);
+  if (argrel) {
+    const terms: ArgTerm[] = [
+      { sign: argrel[1] === '-' ? -1 : 1, name: argrel[2].toLowerCase() },
+    ];
+    if (argrel[4]) terms.push({ sign: argrel[3] === '-' ? -1 : 1, name: argrel[4].toLowerCase() });
+    const f = {
+      kind: 'rel' as const,
+      rel: { type: 'arg' as const, terms, rhsDeg: Number(argrel[5]) },
+      src: raw.trim(),
+      norm: line,
+    };
+    return { ok: true, fact: { ...f, id: factId(f) } };
+  }
+
+  const modrel = MODREL_RE.exec(line);
+  if (modrel && (modrel[2] !== undefined || modrel[3] !== undefined)) {
+    const f = {
+      kind: 'rel' as const,
+      rel: {
+        type: 'mod' as const,
+        name: modrel[1].toLowerCase(),
+        k: modrel[2] !== undefined ? Number(modrel[2]) : 1,
+        other: modrel[3]?.toLowerCase(),
+      },
+      src: raw.trim(),
+      norm: line,
+    };
     return { ok: true, fact: { ...f, id: factId(f) } };
   }
 

@@ -41,6 +41,9 @@ button:hover { background: #f5f5f4; }
 .fact code { font-size: 0.92rem; }
 .fact-error { color: #b91c1c; font-size: 0.8rem; }
 .badge { font-size: 0.72rem; color: #9a3412; background: #ffedd5; border-radius: 999px; padding: 2px 8px; }
+.check { font-weight: 700; font-size: 0.95rem; }
+.check.ok { color: #15803d; }
+.check.bad { color: #b91c1c; }
 .del { border: none; background: none; color: #a8a29e; margin-inline-start: auto; padding: 2px 6px; }
 .del:hover { color: #b91c1c; background: none; }
 .hint { color: #a8a29e; font-size: 0.9rem; padding: 8px 2px; }

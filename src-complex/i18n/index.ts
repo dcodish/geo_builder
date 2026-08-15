@@ -31,6 +31,9 @@ const he = {
   symDeg: 'מעלות',
   symPow: 'חזקה',
   symMul: 'כפל',
+  relOk: 'היחס מתקיים בציור',
+  relBad: 'היחס אינו מתקיים בציור',
+  relDriven: 'היחס כיוון את הציור (הוריד דרגת חופש)',
 };
 
 const en = {
@@ -60,6 +63,9 @@ const en = {
   symDeg: 'degrees',
   symPow: 'power',
   symMul: 'multiply',
+  relOk: 'the relation holds in the figure',
+  relBad: 'the relation does NOT hold in the figure',
+  relDriven: 'the relation drove the figure (consumed a degree of freedom)',
 };
 
 complexI18n.use(initReactI18next).init({

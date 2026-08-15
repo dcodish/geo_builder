@@ -9,6 +9,7 @@ import {
   neg,
   conj,
   absC,
+  argDeg,
   cisDeg,
   ipow,
   nthRoots,
@@ -29,7 +30,24 @@ export type Fact =
   | { id: string; kind: 'roots'; varName: string; n: number; rhs: Expr; src: string }
   /** an unnamed expression line — plotted, labeled by the expression itself, never referencable
    *  (ADR-447: anonymous ids never reach a rendered string; the label is the student's text) */
-  | { id: string; kind: 'show'; expr: Expr; src: string; norm: string };
+  | { id: string; kind: 'show'; expr: Expr; src: string; norm: string }
+  /** a relation (F3 modulus / F4 argument): DRIVES a free number when one is available,
+   *  VERIFIES (✓/✗) when everything is determined — driveOrCheck-lite */
+  | { id: string; kind: 'rel'; rel: RelSpec; src: string; norm: string };
+
+export interface ArgTerm {
+  sign: 1 | -1;
+  name: string;
+}
+
+export type RelSpec =
+  /** Σ sign·arg(name) = rhsDeg */
+  | { type: 'arg'; terms: ArgTerm[]; rhsDeg: number }
+  /** |name| = k  or  |name| = k·|other| */
+  | { type: 'mod'; name: string; k: number; other?: string };
+
+const relNames = (r: RelSpec): string[] =>
+  r.type === 'arg' ? r.terms.map((t) => t.name) : r.other ? [r.name, r.other] : [r.name];
 
 /** The exam's naming convention (ADR-CX-004): z- and w-family names ARE complex numbers — first
  * reference auto-creates a free number. Other letters stay explicit (a,d,m,n,r are real params). */
@@ -65,8 +83,8 @@ type FactBody = Fact extends infer F ? (F extends Fact ? Omit<F, 'id'> : never) 
 export const factId = (f: FactBody): string =>
   f.kind === 'roots'
     ? `roots-${f.varName}-${f.n}`
-    : f.kind === 'show'
-      ? `show-${f.norm.replace(/ /g, '')}`
+    : f.kind === 'show' || f.kind === 'rel'
+      ? `${f.kind}-${f.norm.replace(/ /g, '')}`
       : `${f.kind}-${f.name}`;
 
 export interface ScenePoint {
@@ -92,6 +110,8 @@ export interface Scene {
   circles: SceneCircle[];
   /** factId -> error; an erroring fact contributes nothing, later facts still evaluate */
   errors: Record<string, EvalError>;
+  /** relation facts: did the relation hold in the final figure (✓/✗), and did it drive a DOF */
+  checks: Record<string, { ok: boolean; driven: boolean }>;
 }
 
 class UnknownRef extends Error {
@@ -149,18 +169,100 @@ export const prettyExpr = (s: string): string =>
     a + d.split('').map((c) => SUB_DIGITS[c] ?? c).join(''),
   );
 
+const wrapDeg = (d: number): number => ((d % 360) + 360) % 360;
+
+/** Pass 1 — driveOrCheck-lite: each relation, in fact order, projects ONE free number
+ * (argument relations pin an argument, modulus relations pin a modulus). Returns the
+ * adjusted free positions and which relation facts actually drove. */
+const projectConstraints = (
+  facts: Fact[],
+  freePos: Record<string, Cx>,
+): { adjusted: Record<string, Cx>; drove: Record<string, boolean> } => {
+  const adjusted: Record<string, Cx> = {};
+  const drove: Record<string, boolean> = {};
+  const env = new Map<string, Cx>();
+  const freeNames = new Set<string>();
+  for (const f of facts) {
+    try {
+      if (f.kind === 'free') {
+        env.set(f.name, freePos[f.name] ?? defaultFree(f.name));
+        freeNames.add(f.name);
+      } else if (f.kind === 'def') {
+        env.set(f.name, evalExpr(f.expr, env));
+      } else if (f.kind === 'roots') {
+        const w = evalExpr(f.rhs, env);
+        if (absC(w) > 0) nthRoots(w, f.n).forEach((z, k) => env.set(`${f.varName}${k + 1}`, z));
+      } else if (f.kind === 'rel') {
+        const r = f.rel;
+        if (r.type === 'arg') {
+          if (r.terms.some((t) => !env.has(t.name))) continue;
+          const target = r.terms.find((t) => freeNames.has(t.name));
+          if (!target) continue;
+          const sumOther = r.terms
+            .filter((t) => t !== target)
+            .reduce((s, t) => s + t.sign * argDeg(env.get(t.name)!), 0);
+          const v = env.get(target.name)!;
+          const nv = cisDeg(absC(v), (r.rhsDeg - sumOther) * target.sign);
+          env.set(target.name, nv);
+          adjusted[target.name] = nv;
+          drove[f.id] = true;
+        } else {
+          if (!env.has(r.name) || (r.other && !env.has(r.other))) continue;
+          const targetMod = r.k * (r.other ? absC(env.get(r.other)!) : 1);
+          if (freeNames.has(r.name)) {
+            const nv = cisDeg(targetMod, argDeg(env.get(r.name)!));
+            env.set(r.name, nv);
+            adjusted[r.name] = nv;
+            drove[f.id] = true;
+          } else if (r.other && freeNames.has(r.other)) {
+            const nv = cisDeg(absC(env.get(r.name)!) / r.k, argDeg(env.get(r.other)!));
+            env.set(r.other, nv);
+            adjusted[r.other] = nv;
+            drove[f.id] = true;
+          }
+        }
+      }
+    } catch {
+      // evaluation problems are reported by pass 2
+    }
+  }
+  return { adjusted, drove };
+};
+
 export const derive = (facts: Fact[], freePos: Record<string, Cx>): Scene => {
+  const { adjusted, drove } = projectConstraints(facts, freePos);
+  const effFreePos = { ...freePos, ...adjusted };
   const env = new Map<string, Cx>();
   const points: ScenePoint[] = [];
   const circles: SceneCircle[] = [];
   const errors: Record<string, EvalError> = {};
+  const checks: Record<string, { ok: boolean; driven: boolean }> = {};
 
   for (const f of facts) {
     try {
       if (f.kind === 'free') {
-        const z = freePos[f.name] ?? defaultFree(f.name);
+        const z = effFreePos[f.name] ?? defaultFree(f.name);
         env.set(f.name, z);
         points.push({ key: f.id, label: prettyName(f.name), z, kind: 'free', factId: f.id, freeName: f.name });
+      } else if (f.kind === 'rel') {
+        const r = f.rel;
+        const missing = (r.type === 'arg' ? r.terms.map((t) => t.name) : r.other ? [r.name, r.other] : [r.name]).find(
+          (n) => !env.has(n),
+        );
+        if (missing) {
+          errors[f.id] = { key: 'unknown-ref', detail: missing };
+          continue;
+        }
+        let ok: boolean;
+        if (r.type === 'arg') {
+          const lhs = r.terms.reduce((s, t) => s + t.sign * argDeg(env.get(t.name)!), 0);
+          const d = wrapDeg(lhs - r.rhsDeg);
+          ok = d < 1e-6 || d > 360 - 1e-6;
+        } else {
+          const target = r.k * (r.other ? absC(env.get(r.other)!) : 1);
+          ok = Math.abs(absC(env.get(r.name)!) - target) <= 1e-9 * Math.max(1, target);
+        }
+        checks[f.id] = { ok, driven: !!drove[f.id] };
       } else if (f.kind === 'def') {
         const z = evalExpr(f.expr, env);
         env.set(f.name, z);
@@ -195,13 +297,23 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>): Scene => {
       }
     }
   }
-  return { points, circles, errors };
+  return { points, circles, errors, checks };
 };
 
 /** Names a fact introduces — used by the store's duplicate-name honesty check. */
 export const factNames = (f: Fact): string[] =>
   f.kind === 'roots'
     ? Array.from({ length: f.n }, (_, k) => `${f.varName}${k + 1}`)
-    : f.kind === 'show'
+    : f.kind === 'show' || f.kind === 'rel'
       ? []
       : [f.name];
+
+/** Names a fact CONSUMES — drives the store's implicit z/w auto-creation (ADR-CX-004). */
+export const factRefs = (f: Fact): string[] =>
+  f.kind === 'def' || f.kind === 'show'
+    ? collectRefs(f.expr)
+    : f.kind === 'roots'
+      ? collectRefs(f.rhs)
+      : f.kind === 'rel'
+        ? relNames(f.rel)
+        : [];

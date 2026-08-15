@@ -4,6 +4,9 @@ import { defaultFree, derive, factNames, type Fact } from '../engine/model';
 import { parseLine } from '../parser/parse';
 import { useComplexStore } from '../store/useComplexStore';
 
+const wrap360 = (d: number): number => ((d % 360) + 360) % 360;
+const angDist = (d: number): number => Math.min(wrap360(d), 360 - wrap360(d));
+
 const fact = (line: string): Fact => {
   const r = parseLine(line);
   if (!r.ok) throw new Error(`did not parse: ${line} (${r.key})`);
@@ -239,6 +242,62 @@ describe('implicit complex names (ADR-CX-004: z*/w* are complex by convention)',
     const w = s.points.find((p) => p.label === 'w')!;
     expect(w.z.re).toBeCloseTo(4);
     expect(w.z.im).toBeCloseTo(0);
+    useComplexStore.getState().clearAll();
+  });
+});
+
+describe('relations: driveOrCheck-lite (F3 modulus / F4 argument)', () => {
+  it('the exemplar setup with r=1: arg(z1)-arg(z2)=90, |z1|=9, |z2|=12 → |z1-z2| = 15', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('arg(z1)-arg(z2)=90'); // implicit-creates z1, z2; drives arg(z1)
+    st.addLine('|z1| = 9');
+    st.addLine('|z2| = 12');
+    st.addLine('|z1 - z2|');
+    const s = derive(useComplexStore.getState().facts, {});
+    expect(s.errors).toEqual({});
+    expect(Object.values(s.checks).every((c) => c.ok)).toBe(true);
+    const dist = s.points.find((p) => p.label === '|z₁ - z₂|')!;
+    expect(dist.z.re).toBeCloseTo(15); // the 9-12-15 right triangle
+    useComplexStore.getState().clearAll();
+  });
+
+  it('check mode: a relation over determined numbers verifies ✓ or refutes ✗', () => {
+    const s = derive(
+      [fact('z1 = 1+i'), fact('arg(z1) = 45'), fact('arg z1 = 44')],
+      {},
+    );
+    const ids = Object.keys(s.checks);
+    expect(ids).toHaveLength(2);
+    expect(s.checks[ids[0]]).toEqual({ ok: true, driven: false });
+    expect(s.checks[ids[1]]).toEqual({ ok: false, driven: false });
+  });
+
+  it('modulus ratio drives: |z1| = 2|z2|', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('|z1| = 2|z2|');
+    const s = derive(useComplexStore.getState().facts, {});
+    const z1 = s.points.find((p) => p.label === 'z₁')!.z;
+    const z2 = s.points.find((p) => p.label === 'z₂')!.z;
+    expect(absC(z1)).toBeCloseTo(2 * absC(z2));
+    useComplexStore.getState().clearAll();
+  });
+
+  it('a derived number typed BEFORE the constraint still reflects it (two-pass)', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('w = z1*z2');
+    st.addLine('arg(z1)-arg(z2)=90');
+    st.addLine('|z1| = 2');
+    st.addLine('|z2| = 3');
+    const s = derive(useComplexStore.getState().facts, {});
+    const w = s.points.find((p) => p.label === 'w')!.z;
+    const z1 = s.points.find((p) => p.label === 'z₁')!.z;
+    const z2 = s.points.find((p) => p.label === 'z₂')!.z;
+    expect(absC(w)).toBeCloseTo(6);
+    expect(wrap360(argDeg(z1) - argDeg(z2))).toBeCloseTo(90);
+    expect(angDist(argDeg(w) - argDeg(z1) - argDeg(z2))).toBeCloseTo(0);
     useComplexStore.getState().clearAll();
   });
 });
