@@ -10,6 +10,7 @@ The single ops entry point. Deep 2-D proxy detail (one-time setup, env file, sec
 | 3-D static app (`dist-3d/`) | `npm run build:3d` | `…/httpdocs/3d-builder/` (**rename `3d.html` → `index.html`**) | `https://themathbible.com/3d-builder/` (Apache static) |
 | Complex-numbers app (`dist-complex/`) | `npm run build:complex` | `…/httpdocs/complex-builder/` (**rename `complex.html` → `index.html`**) | `https://themathbible.com/complex-builder/` (Apache static) |
 | Shared Node proxy (`dist-server/proxy.mjs`) | `npm run build:proxy` | `/var/www/geo-proxy/proxy.mjs` | `geo-proxy.service` on loopback **:8788**, reverse-proxied by Apache |
+| **Site homepage** (tool links) | — hand-edited; **canonical copy: [`deploy/homepage/index.html`](../deploy/homepage/index.html)** | `…/httpdocs/index.html` | `https://themathbible.com/` (Apache static) |
 | Proxy env (key, admin creds, log paths) | — (hand-edited) | `/var/www/geo-proxy/geo-proxy.env` (mode 600) | read by the service |
 
 - **Server:** `ssh root@themathbible.com` (74.208.61.39). Plesk on Ubuntu 22.04. **Apache serves everything; nginx is OFF** — never touch `vhost_nginx.conf`.
@@ -42,6 +43,11 @@ ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/3d-build
 #     deploy: mkdir + chown root:root + chmod 755, matching its siblings.
 scp -r dist-complex/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/complex-builder/
 ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/complex-builder && mv -f complex.html index.html'
+
+# 2b. homepage — ONLY when the tool links / landing page changed. EDIT THE TRACKED COPY
+#     (deploy/homepage/index.html), commit, then upload it — never hand-edit on the server,
+#     or the repo copy silently stops being canonical (adopted 2026-08-15, complex-card link):
+scp deploy/homepage/index.html root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/index.html
 
 # 3. perms (static files should be 644 root:root — scp usually preserves this; verify)
 ssh root@themathbible.com 'chmod -R a+rX /var/www/vhosts/themathbible.com/httpdocs/geo-builder /var/www/vhosts/themathbible.com/httpdocs/3d-builder /var/www/vhosts/themathbible.com/httpdocs/complex-builder'
