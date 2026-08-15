@@ -3573,3 +3573,34 @@ Locks: `issue-586-bare-run-circle.test.ts` — the operator's exact pair on the 
 the apex off it), bare-run circum/incircle with En mirrors, byte-identical lowering against the noun
 forms, the opening-move arity sibling, the noun/run contradiction refusal, and the silent-drop
 refusals with the generic-noun and triangle-lane controls proving the gate did not over-reach.
+
+## ADR-3D-150 — the 3-D canvas declares its base direction at the SVG root (#549)
+
+Operator, on a triangular-prism screenshot: *"note the C' is not written correctly"*. It rendered `′C`
+— and the screenshot shows `′A` and `′B` too: **every** primed label was mirrored, not one letter.
+
+Cause: the app shell is RTL Hebrew (`documentElement.dir = 'rtl'`), SVG `<text>` INHERITS the
+document's CSS `direction`, and `displayLabel` maps `A'` → `A′` with U+2032 PRIME — a bidi-NEUTRAL
+character (class ET). As the trailing character of an LTR run under an RTL base direction it resolves
+to the paragraph level and is placed visually BEFORE the letter.
+
+The interesting part is not the bug but why the existing bidi work missed it. #468/#482 fixed this
+class by wrapping individual text nodes in a local `ltr()` isolate (LRI…PDI) — witness values, line
+forms, coordinate labels. That is an OPT-IN pattern: every new `<text>` has to remember. The point
+label — the most common primed run on the canvas — never did.
+
+Decision: declare `direction: 'ltr'` once on the `<svg>` ROOT. The canvas is technical LTR content
+throughout (Latin labels, Greek names, digits, math), so one declaration covers every current and
+future text node, and the failure mode "a new node forgot to opt in" stops existing. This is 2-D's
+`mathSvg.tsx` rule (`direction: 'ltr'` on its SVG text, locked by `mathSvg.test.tsx:47`), **copied
+rather than imported** — the product trees never share code (boundary rule 1), so the pattern travels
+and the code does not.
+
+Deliberately NOT `unicode-bidi: bidi-override` (which 2-D uses on its own text runs): at a ROOT that
+would force a strong-RTL run to lay out character-by-character LTR. `direction` alone sets the base
+level and leaves the bidi algorithm to handle any Hebrew run correctly. The per-node `ltr()` isolates
+stay — harmless and still correct under an LTR base — so nothing regresses on the nodes that had it.
+
+Locks: `render3.test.tsx` — the root `<svg>` tag itself carries `direction:ltr` (asserted on the root
+tag, not anywhere in the markup), the operator's primed prism renders `A′ B′ C′`, and the absence of
+`bidi-override` is asserted so the stronger property is never quietly added.

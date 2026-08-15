@@ -90,3 +90,48 @@ describe('Figure3 (static, DOM-free)', () => {
     expect(html).toContain('<svg');
   });
 });
+
+/**
+ * #549 (ADR-3D-150) — the canvas's BASE DIRECTION.
+ *
+ * Operator, on a triangular-prism screenshot: *"note the C' is not written correctly"*. It rendered
+ * `′C`, and so did `′A` and `′B` — EVERY primed label, because SVG `<text>` inherits the RTL shell's
+ * CSS `direction` and U+2032 PRIME is bidi-neutral (class ET), so as a trailing character it took the
+ * paragraph level and jumped in front of its letter.
+ *
+ * Locked at the ROOT, which is the whole point: the per-node `ltr()` isolates (#468/#482) require every
+ * new text node to opt in, and the most common primed run on the canvas never did.
+ */
+describe('#549 — the SVG root forces LTR (mirror of 2-D mathSvg.test.tsx:47)', () => {
+  const primedPrism = () => {
+    const r = applyCommand3(emptyConstruction3(), {
+      type: 'solid',
+      kind: 'prism3',
+      ids: ['A', 'B', 'C', "A'", "B'", "C'"],
+    });
+    if (!r.ok) throw new Error('apply failed');
+    return r.next;
+  };
+
+  it('the root <svg> carries direction:ltr — one declaration covering every text node', () => {
+    const c = primedPrism();
+    const html = renderToStaticMarkup(<Figure3 construction={c} resolved={resolve3(c, 0)} resetLabel="reset" />);
+    const rootTag = html.slice(html.indexOf('<svg'), html.indexOf('>', html.indexOf('<svg')) + 1);
+    expect(rootTag).toMatch(/direction:\s*ltr/i);
+  });
+
+  it('the operator prism: every primed label carries its prime AFTER the letter', () => {
+    const c = primedPrism();
+    const html = renderToStaticMarkup(<Figure3 construction={c} resolved={resolve3(c, 0)} resetLabel="reset" />);
+    for (const label of ['A′', 'B′', 'C′']) {
+      expect(html).toContain(label);
+      expect(html).not.toContain(`′${label[0]}`); // the reported rendering, in source order
+    }
+  });
+
+  it('the base direction is NOT bidi-override — a strong-RTL run must still lay out RTL', () => {
+    const c = primedPrism();
+    const html = renderToStaticMarkup(<Figure3 construction={c} resolved={resolve3(c, 0)} resetLabel="reset" />);
+    expect(html).not.toMatch(/bidi-override/i);
+  });
+});

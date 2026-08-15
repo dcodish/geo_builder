@@ -48,6 +48,27 @@ const VECTOR_COLOR = '#0d9488';
  *  reorder it — `(0, 7, 6)` used to render as `(6 ,7 ,0)` on the canvas (LRI…PDI). */
 const ltr = (s: string) => `⁦${s}⁩`;
 
+/**
+ * #549 — the canvas's BASE DIRECTION, set once at the `<svg>` root.
+ *
+ * The drawing is technical LTR content throughout: Latin point labels, Greek names, digits, math. SVG
+ * `<text>` INHERITS the document's CSS `direction`, and the app shell is RTL Hebrew — so a trailing
+ * bidi-NEUTRAL character resolved to the paragraph level and was placed visually BEFORE its letter.
+ * `displayLabel` maps `A'` → `A′` (U+2032 PRIME, bidi class ET), so **every primed label** drew
+ * mirrored: `′A`, `′B`, `′C` on the operator's prism.
+ *
+ * Set at the ROOT rather than per node, because per-node is the pattern that failed: #468/#482 wrapped
+ * witnesses, line forms and coordinate labels in {@link ltr}, and each new text node has to REMEMBER to
+ * opt in — which is exactly how the most common primed run on the canvas slipped through. One
+ * declaration covers every current and future `<text>`. This is 2-D's `mathSvg.tsx` rule (`direction:
+ * 'ltr'` on its SVG text), COPIED rather than imported — the products never share code (boundary rule 1).
+ *
+ * `direction` only, never `unicode-bidi: bidi-override`: a strong-RTL run (a Hebrew name, should one
+ * ever be drawn) must still lay out RTL inside the LTR paragraph. The existing `ltr()` isolates stay —
+ * harmless and still correct under an LTR base.
+ */
+const CANVAS_DIR = { direction: 'ltr' } as const;
+
 export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay, showWitnesses = true, onNameCrossing, crossingLabel }: Figure3Props) {
   /**
    * #5 — the HOME camera for THIS figure. A purely planar figure is read face-on (`planarNormal` /
@@ -111,6 +132,7 @@ export default function Figure3({ construction, resolved, width = 640, height = 
         height={height}
         viewBox={`0 0 ${width} ${height}`}
         className="rounded-xl border border-slate-200 bg-white touch-none cursor-grab active:cursor-grabbing select-none"
+        style={CANVAS_DIR}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
