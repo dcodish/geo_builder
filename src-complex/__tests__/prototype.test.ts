@@ -937,6 +937,48 @@ describe('drag policy (#603: constraint-adjusted numbers are not draggable)', ()
   });
 });
 
+describe('general equations (#605: -2z1 = conj(z3), one-unknown Newton)', () => {
+  it("the operator's line alone: both numbers implicit-created, the equation drives and holds", () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    expect(st.addLine('-2z1=conj(z3)')).toBe(true);
+    for (const seed of [0, 1]) {
+      const s = derive(useComplexStore.getState().facts, {}, seed);
+      expect(s.errors).toEqual({});
+      const check = Object.values(s.checks)[0];
+      expect(check).toEqual({ ok: true, driven: true });
+      const z1 = s.points.find((p) => p.label === 'z₁')!.z;
+      const z3 = s.points.find((p) => p.label === 'z₃')!.z;
+      expect(mul(cx(-2), z1).re).toBeCloseTo(z3.re); // conj: re equal
+      expect(mul(cx(-2), z1).im).toBeCloseTo(-z3.im); // conj: im negated
+    }
+    useComplexStore.getState().clearAll();
+  });
+
+  it('with a determined side, the unknown solves exactly', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z3 = 4+2i');
+    st.addLine('-2z1 = conj(z3)');
+    const s = derive(useComplexStore.getState().facts, {});
+    const z1 = s.points.find((p) => p.label === 'z₁')!.z;
+    expect(z1.re).toBeCloseTo(-2); // conj(4+2i)/(-2) = -2+i
+    expect(z1.im).toBeCloseTo(1);
+    expect(Object.values(s.checks)[0].ok).toBe(true);
+    useComplexStore.getState().clearAll();
+  });
+
+  it('fully determined equations verify or refute', () => {
+    const s = derive(
+      [fact('z1 = 1'), fact('z3 = -2'), fact('-2z1 = conj(z3)'), fact('-2z1 = conj(z3)+1')],
+      {},
+    );
+    const vals = Object.values(s.checks);
+    expect(vals[0]).toEqual({ ok: true, driven: false });
+    expect(vals[1]).toEqual({ ok: false, driven: false });
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();

@@ -227,7 +227,7 @@ class P {
 }
 
 const parseExpr = (s: string): Expr | null => {
-  const toks = tokenize(s);
+  const toks = tokenize(s.trim()); // the tokenizer's sticky regex chokes on trailing whitespace
   if (!toks || toks.length === 0) return null;
   try {
     const p = new P(toks);
@@ -493,6 +493,18 @@ export const parseLine = (raw: string): ParseResult => {
     if (!expr) return { ok: false, key: 'parse-error', detail: raw.trim() };
     const f = { kind: 'def' as const, name: def[1].toLowerCase(), expr, src: raw.trim() };
     return { ok: true, facts: [{ ...f, id: factId(f) }] };
+  }
+
+  // general equation between expressions (#605): expr = expr, tried after every specialized
+  // '='-form — one free unknown gets solved numerically, determined sides verify
+  const eqSplit = line.indexOf('=');
+  if (eqSplit > 0 && !line.includes('=', eqSplit + 1)) {
+    const lhs = parseExpr(line.slice(0, eqSplit));
+    const rhs = parseExpr(line.slice(eqSplit + 1));
+    if (lhs && rhs) {
+      const f = { kind: 'eq' as const, lhs, rhs, src: raw.trim(), norm: line };
+      return { ok: true, facts: [{ ...f, id: factId(f) }] };
+    }
   }
 
   // a bare z/w-family name IS its free declaration (ADR-CX-004: "if I just write z or z2…")

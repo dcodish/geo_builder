@@ -68,6 +68,9 @@ export type Fact =
       src: string;
       norm: string;
     }
+  /** general equation between expressions (#605): driveOrCheck — one free unclaimed unknown
+   *  is solved numerically (2-D Newton, verified residual); determined sides verify */
+  | { id: string; kind: 'eq'; lhs: Expr; rhs: Expr; src: string; norm: string }
   /** F6: a segment (2 pts) or polygon (3+ pts) over named points; 'o' is always the origin */
   | { id: string; kind: 'shape'; pts: string[]; src: string; norm: string }
   /** F7 measure: area/perimeter of a polygon, length of a segment — a calc-panel entry */
@@ -172,6 +175,53 @@ const seqHolds = (f: Extract<Fact, { kind: 'seq' }>, env: Map<string, Cx>): bool
   }
   const scale = Math.max(1, ...steps.map(absC));
   return steps.every((s) => absC(sub(s, steps[0])) <= 1e-6 * scale);
+};
+
+/** 2-D Newton with numeric Jacobian for F(X) = lhs(X) − rhs(X) over one unknown — real
+ * Jacobian, so non-holomorphic pieces (conj, re, im, |·|) are handled. Returns a solution
+ * with a VERIFIED residual, or null (never an unverified guess). */
+const solveEq = (
+  lhs: Expr,
+  rhs: Expr,
+  unknown: string,
+  env: Map<string, Cx>,
+  start: Cx,
+): Cx | null => {
+  const F = (X: Cx): Cx | null => {
+    try {
+      const e2 = new Map(env);
+      e2.set(unknown, X);
+      return sub(evalExpr(lhs, e2), evalExpr(rhs, e2));
+    } catch {
+      return null;
+    }
+  };
+  const scale0 = Math.max(1, absC(start));
+  const starts: Cx[] = [start];
+  for (let k = 0; k < 4; k++) starts.push(cisDeg(scale0, 37 + 83 * k)); // deterministic multi-start
+  for (const s0 of starts) {
+    let X = s0;
+    for (let it = 0; it < 60; it++) {
+      const f0 = F(X);
+      if (!f0) break;
+      const fs = Math.max(1, absC(X));
+      if (absC(f0) <= 1e-9 * fs) return X;
+      const h = 1e-6 * fs;
+      const fx = F({ re: X.re + h, im: X.im });
+      const fy = F({ re: X.re, im: X.im + h });
+      if (!fx || !fy) break;
+      const a = (fx.re - f0.re) / h;
+      const c = (fx.im - f0.im) / h;
+      const b = (fy.re - f0.re) / h;
+      const d = (fy.im - f0.im) / h;
+      const det = a * d - b * c;
+      if (Math.abs(det) < 1e-14) break;
+      X = { re: X.re - (d * f0.re - b * f0.im) / det, im: X.im - (a * f0.im - c * f0.re) / det };
+    }
+    const fEnd = F(X);
+    if (fEnd && absC(fEnd) <= 1e-9 * Math.max(1, absC(X))) return X;
+  }
+  return null;
 };
 
 /** clamp a fold target strictly INSIDE (lo, hi) with a margin — a fold that parks on a
@@ -532,6 +582,26 @@ const projectConstraints = (
           adjusted[changed.name] = changed.nv;
           drove[f.id] = true;
         }
+      } else if (f.kind === 'eq') {
+        const refs = [...new Set([...collectRefs(f.lhs), ...collectRefs(f.rhs)])];
+        if (refs.some((n) => !env.has(n))) continue; // pass 2 reports
+        const frees = refs.filter((n) => freeNames.has(n));
+        if (frees.length === 0) continue; // determined → pass-2 check
+        const hard = new Set<string>();
+        for (const g of facts) {
+          if (g === f) continue;
+          if (g.kind === 'rel') for (const n of relNames(g.rel)) hard.add(n);
+          else if (g.kind === 'roots' && g.constrains) hard.add(g.varName);
+          else if (g.kind === 'eq')
+            for (const n of [...collectRefs(g.lhs), ...collectRefs(g.rhs)]) hard.add(n);
+        }
+        const target = frees.find((n) => !hard.has(n)) ?? frees[0];
+        const sol = solveEq(f.lhs, f.rhs, target, env, env.get(target)!);
+        if (sol) {
+          env.set(target, sol);
+          adjusted[target] = sol;
+          drove[f.id] = true;
+        }
       } else if (f.kind === 'seq') {
         if (f.defines) {
           const v = seqSolve(f, f.defines, env, seed);
@@ -697,6 +767,18 @@ export const derive = (
         const z = evalExpr(f.expr, env);
         env.set(f.name, z);
         points.push({ key: f.id, label: prettyName(f.name), z, kind: 'def', factId: f.id });
+      } else if (f.kind === 'eq') {
+        const miss = [...new Set([...collectRefs(f.lhs), ...collectRefs(f.rhs)])].find(
+          (n) => !env.has(n),
+        );
+        if (miss) {
+          errors[f.id] = { key: 'unknown-ref', detail: miss };
+          continue;
+        }
+        const l = evalExpr(f.lhs, env);
+        const r2 = evalExpr(f.rhs, env);
+        const scale = Math.max(1, absC(l), absC(r2));
+        checks[f.id] = { ok: absC(sub(l, r2)) <= 1e-6 * scale, driven: !!drove[f.id] };
       } else if (f.kind === 'seq') {
         if (f.defines) {
           const v = seqSolve(f, f.defines, env, seed);
@@ -883,7 +965,9 @@ export const deriveScene = (facts: Fact[], freePos: Record<string, Cx>, seed = 0
 export const factRefs = (f: Fact): string[] =>
   f.kind === 'def' || f.kind === 'show'
     ? collectRefs(f.expr)
-    : f.kind === 'roots'
+    : f.kind === 'eq'
+      ? [...collectRefs(f.lhs), ...collectRefs(f.rhs)]
+      : f.kind === 'roots'
       ? collectRefs(f.rhs)
       : f.kind === 'rel'
         ? relNames(f.rel)
