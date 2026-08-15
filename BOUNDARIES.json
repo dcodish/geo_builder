@@ -80,6 +80,31 @@
         "from": "src3d",
         "to": "server",
         "why": "Same as src -> server: the 3-D app posts to the proxy over HTTP (/geo-builder/api/parse with tool:'3d'). Importing server code would pull the key-handling path into a browser bundle."
+      },
+      {
+        "from": "src-complex",
+        "to": "src",
+        "why": "Product trees never import each other (ADR-266). This tree was registered with a classification but NO edges, so nothing stopped it — the guard was vacuous for the third product exactly as it had been for the second before ADR-W-003."
+      },
+      {
+        "from": "src-complex",
+        "to": "src3d",
+        "why": "Same rule, the other sibling."
+      },
+      {
+        "from": "src",
+        "to": "src-complex",
+        "why": "Same rule, stated in both directions so a 2-D session cannot reach into the complex tree either."
+      },
+      {
+        "from": "src3d",
+        "to": "src-complex",
+        "why": "Same rule, the other direction."
+      },
+      {
+        "from": "src-complex",
+        "to": "server",
+        "why": "Same as the siblings: the complex app will post to the proxy over HTTP (tool:'complex'), never by import, so the key-handling path cannot reach a browser bundle."
       }
     ]
   },
@@ -126,6 +151,7 @@
     "src-complex/parser": "engine",
     "src-complex/render": "engine",
     "src-complex/store": "engine",
+    "src-complex/value": "engine",
     "src-complex/i18n": "shell"
   },
 
