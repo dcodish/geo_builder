@@ -244,6 +244,13 @@ const FREE_RE =
   /^([a-zA-Z]\w*)\s+(?:הוא\s+)?מספר\s+מרוכב$|^([a-zA-Z]\w*)\s+(?:is\s+)?(?:a\s+)?complex(?:\s+number)?$/;
 const ROOTS_RE = /^(?:הפתרונות\s+של\s+|solutions\s+of\s+)?([a-zA-Z]\w*)\s*\^\s*(\d+)\s*=\s*(.+)$/;
 const DEF_RE = /^([a-zA-Z]\w*)\s*=\s*(.+)$/;
+// F5: quadrant membership — `z2 נמצא ברביע הראשון` / `z2 in the first quadrant` / `z2 quadrant 3`
+const QUADRANTS: Record<string, 1 | 2 | 3 | 4> = {
+  'ראשון': 1, 'שני': 2, 'שלישי': 3, 'רביעי': 4,
+  first: 1, second: 2, third: 3, fourth: 4, '1': 1, '2': 2, '3': 3, '4': 4,
+};
+const QUAD_RE =
+  /^([a-zA-Z]\w*)\s+(?:נמצא\s+)?ברביע\s+ה(ראשון|שני|שלישי|רביעי)$|^([a-zA-Z]\w*)\s+(?:is\s+)?(?:in\s+)?(?:the\s+)?(?:(first|second|third|fourth)\s+quadrant|quadrant\s+([1-4]))$/;
 // F4: ±arg(A) [± arg(B)] ⟨cmp⟩ degrees — parens optional (arg z1 also accepted);
 // inequalities are branch selectors (arg z2 < 45)
 const ARGREL_RE =
@@ -370,6 +377,18 @@ export const parseLine = (raw: string): ParseResult => {
       norm: `arg ${name} = ${mixedArg[2]}`,
     };
     return { ok: true, facts: [{ ...free, id: factId(free) }, { ...rel, id: factId(rel) }] };
+  }
+
+  const quad = QUAD_RE.exec(line);
+  if (quad) {
+    const q = QUADRANTS[(quad[2] ?? quad[4] ?? quad[5]).toLowerCase()];
+    const f = {
+      kind: 'rel' as const,
+      rel: { type: 'quad' as const, name: (quad[1] ?? quad[3]).toLowerCase(), q },
+      src: raw.trim(),
+      norm: line,
+    };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 
   const def = DEF_RE.exec(line);

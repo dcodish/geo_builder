@@ -55,7 +55,10 @@ export type RelSpec =
   | { type: 'arg'; terms: ArgTerm[]; rhsDeg: number; cmp?: Cmp }
   /** |name| ⟨cmp⟩ k · (param | |other| | 1) — a PARAM is a shared real DOF sampled per seed:
    *  `|z1| = 9r` and `|z2| = 12r` share the same r (the exam's parameter convention) */
-  | { type: 'mod'; name: string; k: number; other?: string; param?: string; cmp?: Cmp };
+  | { type: 'mod'; name: string; k: number; other?: string; param?: string; cmp?: Cmp }
+  /** quadrant membership (F5): strict interior of quadrant q — verifies when determined,
+   *  folds a free number's argument into the quadrant when violated */
+  | { type: 'quad'; name: string; q: 1 | 2 | 3 | 4 };
 
 /** Deterministic positive sample for a real parameter, per (name, seed) — 0.6 .. 2.4. */
 export const paramValue = (name: string, seed = 0): number => {
@@ -68,7 +71,11 @@ const cmpHolds = (cmp: Cmp, lhs: number, rhs: number, tol: number): boolean =>
   cmp === '<' ? lhs < rhs : cmp === '>' ? lhs > rhs : cmp === '<=' ? lhs <= rhs : cmp === '>=' ? lhs >= rhs : Math.abs(lhs - rhs) <= tol;
 
 const relNames = (r: RelSpec): string[] =>
-  r.type === 'arg' ? r.terms.map((t) => t.name) : r.other ? [r.name, r.other] : [r.name];
+  r.type === 'arg'
+    ? r.terms.map((t) => t.name)
+    : r.type === 'mod' && r.other
+      ? [r.name, r.other]
+      : [r.name];
 
 /** The exam's naming convention (ADR-CX-004): z- and w-family names ARE complex numbers — first
  * reference auto-creates a free number. Other letters stay explicit (a,d,m,n,r are real params). */
@@ -314,6 +321,18 @@ const projectConstraints = (
             adjusted[t0.name] = nv;
             drove[f.id] = true;
           }
+        } else if (r.type === 'quad') {
+          if (!env.has(r.name) || !freeNames.has(r.name)) continue;
+          const v = env.get(r.name)!;
+          const a = argDeg(v);
+          const lo = (r.q - 1) * 90;
+          if (a > lo && a < lo + 90) continue;
+          let na = lo + (a % 90);
+          if (na === lo) na = lo + 45; // never park on the axis
+          const nv = cisDeg(absC(v), na);
+          env.set(r.name, nv);
+          adjusted[r.name] = nv;
+          drove[f.id] = true;
         } else {
           if ((r.cmp ?? '=') !== '=') continue; // modulus inequalities verify in pass 2 only
           if (!env.has(r.name) || (r.other && !env.has(r.other))) continue;
@@ -358,16 +377,14 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Sc
         points.push({ key: f.id, label: prettyName(f.name), z, kind: 'free', factId: f.id, freeName: f.name });
       } else if (f.kind === 'rel') {
         const r = f.rel;
-        const missing = (r.type === 'arg' ? r.terms.map((t) => t.name) : r.other ? [r.name, r.other] : [r.name]).find(
-          (n) => !env.has(n),
-        );
+        const missing = relNames(r).find((n) => !env.has(n));
         if (missing) {
           errors[f.id] = { key: 'unknown-ref', detail: missing };
           continue;
         }
         let ok: boolean;
-        const cmp = r.cmp ?? '=';
         if (r.type === 'arg') {
+          const cmp = r.cmp ?? '=';
           const lhs = wrapDeg(r.terms.reduce((s, t) => s + t.sign * argDeg(env.get(t.name)!), 0));
           if (cmp === '=') {
             const d = wrapDeg(lhs - r.rhsDeg);
@@ -375,11 +392,15 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Sc
           } else {
             ok = cmpHolds(cmp, lhs, r.rhsDeg, 0);
           }
+        } else if (r.type === 'quad') {
+          const a = argDeg(env.get(r.name)!);
+          const lo = (r.q - 1) * 90;
+          ok = a > lo && a < lo + 90;
         } else {
           if (r.param) params[r.param] = paramValue(r.param, seed);
           const target =
             r.k * (r.param ? paramValue(r.param, seed) : r.other ? absC(env.get(r.other)!) : 1);
-          ok = cmpHolds(cmp, absC(env.get(r.name)!), target, 1e-9 * Math.max(1, target));
+          ok = cmpHolds(r.cmp ?? '=', absC(env.get(r.name)!), target, 1e-9 * Math.max(1, target));
         }
         checks[f.id] = { ok, driven: !!drove[f.id] };
       } else if (f.kind === 'def') {

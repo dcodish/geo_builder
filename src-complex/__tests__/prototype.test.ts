@@ -494,6 +494,60 @@ describe('shared parameters and inequalities (operator: |z1|=9r, arg(z2)<45)', (
   });
 });
 
+describe('quadrant givens (F5: רביע)', () => {
+  it('folds a free number into the stated quadrant, both languages', () => {
+    const cases: Array<[string, number, number]> = [
+      ['z1 ברביע הראשון', 0, 90],
+      ['z2 נמצא ברביע השלישי', 180, 270],
+      ['z3 in the second quadrant', 90, 180],
+      ['z4 quadrant 4', 270, 360],
+    ];
+    for (const [line, lo, hi] of cases) {
+      const st = useComplexStore.getState();
+      st.clearAll();
+      expect(st.addLine(line)).toBe(true);
+      for (const seed of [0, 1, 2]) {
+        const s = derive(useComplexStore.getState().facts, {}, seed);
+        const p = s.points[0];
+        const a = argDeg(p.z);
+        expect(a).toBeGreaterThan(lo);
+        expect(a).toBeLessThan(hi);
+        expect(Object.values(s.checks)[0].ok).toBe(true);
+      }
+      st.clearAll();
+    }
+  });
+
+  it('verifies (not drives) over a determined number', () => {
+    const s = derive([fact('z1 = 1+i'), fact('z1 ברביע הראשון'), fact('z1 ברביע השני')], {});
+    const vals = Object.values(s.checks);
+    expect(vals[0]).toEqual({ ok: true, driven: false });
+    expect(vals[1]).toEqual({ ok: false, driven: false });
+  });
+
+  it('the FULL exemplar setup paragraph holds jointly across seeds', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('arg(z1)-arg(z2)=90');
+    st.addLine('|z1| = 9r');
+    st.addLine('|z2| = 12r');
+    st.addLine('z2 ברביע הראשון');
+    st.addLine('arg(z2) < 45');
+    st.addLine('|z1 - z2|');
+    for (const seed of [0, 1, 2, 3, 4]) {
+      const s = derive(useComplexStore.getState().facts, {}, seed);
+      expect(s.errors).toEqual({});
+      expect(Object.values(s.checks).every((c) => c.ok)).toBe(true);
+      const z2 = s.points.find((p) => p.label === 'z₂')!.z;
+      expect(argDeg(z2)).toBeGreaterThan(0);
+      expect(argDeg(z2)).toBeLessThan(45);
+      const dist = s.points.find((p) => p.label === '|z₁ - z₂|')!.z.re;
+      expect(dist / s.params.r).toBeCloseTo(15);
+    }
+    useComplexStore.getState().clearAll();
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();
