@@ -843,6 +843,24 @@ describe('part ד: anonymous solution sets and count claims (F8 collision + F12)
   });
 });
 
+describe('sequence word orders (#598: keyword-first)', () => {
+  it('the operator phrasing סדרה הנדסית z1,z2,z3 parses like the list-first form', () => {
+    for (const line of [
+      'סדרה הנדסית z1,z2,z3',
+      'סדרה חשבונית: z1, z2, z3',
+      'הסדרה ההנדסית z1,z2,z3',
+      'geometric sequence z1,z2,z3',
+      'z1, z2, z3 סדרה הנדסית',
+    ]) {
+      const f = fact(line);
+      expect(f.kind).toBe('seq');
+      if (f.kind === 'seq') expect(f.names).toEqual(['z1', 'z2', 'z3']);
+    }
+    expect(fact('סדרה הנדסית z1,z2,z3')).toMatchObject({ stype: 'geo' });
+    expect(fact('סדרה חשבונית: z1, z2, z3')).toMatchObject({ stype: 'ari' });
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();

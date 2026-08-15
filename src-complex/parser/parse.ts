@@ -268,9 +268,16 @@ const SREL_RE = new RegExp(
   'i',
 );
 const SREL_RHS = /^(\d+(?:\.\d+)?)?\s*\*?\s*([a-zA-Z]\w*)?\s*(\^\s*2)?$/;
-// F9 list form: comma-separated names are CONSECUTIVE terms of one sequence
+// F9 list form: comma-separated names are CONSECUTIVE terms of one sequence.
+// Both word orders (list-first and keyword-first) — the keyword-carrying sentences all accept
+// keyword-first (מרובע, שטח); the sequence sentence must too (#598).
+const SEQ_LIST = '((?:o|[zw]\\d*)(?:\\s*,\\s*(?:o|[zw]\\d*)){2,})';
 const SEQ_RE = new RegExp(
-  `^((?:o|[zw]\\d*)(?:\\s*,\\s*(?:o|[zw]\\d*)){2,})\\s+(?:היא\\s+|הם\\s+)?(?:סדרה\\s+(הנדסית|חשבונית)|(?:is\\s+)?(?:an?\\s+)?(geometric|arithmetic)\\s+sequence)$`,
+  `^${SEQ_LIST}\\s+(?:היא\\s+|הם\\s+)?(?:סדרה\\s+(הנדסית|חשבונית)|(?:is\\s+)?(?:an?\\s+)?(geometric|arithmetic)\\s+sequence)$`,
+  'i',
+);
+const SEQ_KW_RE = new RegExp(
+  `^(?:ה?סדרה\\s+ה?(הנדסית|חשבונית)|(geometric|arithmetic)\\s+sequence)(?:\\s*:\\s*|\\s+)${SEQ_LIST}$`,
   'i',
 );
 const QUAD_RE =
@@ -450,10 +457,11 @@ export const parseLine = (raw: string): ParseResult => {
     return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 
-  const seq = SEQ_RE.exec(line);
-  if (seq) {
-    const names = seq[1].split(',').map((s) => s.trim().toLowerCase());
-    const word = (seq[2] ?? seq[3]).toLowerCase();
+  const seqKw = SEQ_KW_RE.exec(line);
+  const seq = seqKw ? null : SEQ_RE.exec(line);
+  if (seq || seqKw) {
+    const names = (seqKw ? seqKw[3] : seq![1]).split(',').map((s) => s.trim().toLowerCase());
+    const word = (seqKw ? (seqKw[1] ?? seqKw[2]) : (seq![2] ?? seq![3])).toLowerCase();
     const f = {
       kind: 'seq' as const,
       stype: word === 'הנדסית' || word === 'geometric' ? ('geo' as const) : ('ari' as const),
