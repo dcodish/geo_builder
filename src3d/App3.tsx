@@ -749,9 +749,17 @@ export default function App3() {
                   {/* S4 (#378): mutual positions read as WORDS in the reader's language — there is no
                       standard symbol for skew lines. `dir="auto"` keeps the Latin labels LTR while the
                       Hebrew predicate lays out correctly. */}
+                  {/* #577 (ADR-3D-154): a LINEAR×PLANAR row words asymmetrically — «FG מקביל למישור
+                      ABCD», never the symmetric «מקבילים», which misreads for a plane. The row says
+                      which kind it is, so the key is picked, never guessed from the labels. */}
                   {dataPanel.mutual.map((m) => (
                     <li key={`${m.rel}-${m.a}-${m.b}`} dir="auto" className="border-b border-slate-100 pb-1 font-medium">
-                      {t(`dataPanel.mutual.${m.rel}`, { a: m.a, b: m.b })}
+                      {t(
+                        m.mixed && (m.rel === 'parallel' || m.rel === 'perpendicular')
+                          ? `dataPanel.mutual.${m.rel === 'parallel' ? 'parallelPlane' : 'perpendicularPlane'}`
+                          : `dataPanel.mutual.${m.rel}`,
+                        { a: m.a, b: m.b },
+                      )}
                     </li>
                   ))}
                   {dataPanel.vectors.map((v) => (

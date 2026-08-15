@@ -118,7 +118,10 @@
       "parallel": "{{a}} and {{b}} are parallel",
       "intersecting": "{{a}} and {{b}} intersect",
       "coincident": "{{a}} and {{b}} coincide",
-      "perpendicular": "{{a}} is perpendicular to {{b}}"
+      "perpendicular": "{{a}} is perpendicular to {{b}}",
+      "contained": "{{a}} lies in plane {{b}}",
+      "parallelPlane": "{{a}} is parallel to plane {{b}}",
+      "perpendicularPlane": "{{a}} is perpendicular to plane {{b}}"
     }
   },
   "scope": {

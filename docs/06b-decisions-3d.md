@@ -3654,3 +3654,65 @@ undetermined refusals (a bare cube's vertex, an unanchored plane), a non-point l
 `notUnderstood`, the vector lane unaffected, asking not mutating the figure, and — the load-bearing
 one — **panel-vs-query agreement asserted directly**: every point the panel prints must equal its own
 query answer, and a declared plane's panel row must equal its query answer.
+
+## ADR-3D-154 — the panel's relation scan is ONE universe, ONE loop (#577, #558)
+
+Operator (prod, 2026-08-14): a figure holds a plane ABCD and a vector FG that are geometrically
+parallel, and the data panel shows no parallelism row. Operator (2026-08-13, playing PR #557): *"the
+book says that if l is perpendicular to BCK it is perpendicular to B'C', but the data panel doesn't
+show this."*
+
+Two reports, one cause. The panel's derived-relation detection was **two hand-built loops** — an S4
+block over drawn segments + named lines (ADR-3D-104), and a #384 block over planes (ADR-3D-108) — so
+**a pair whose two sides sat in different loops could never be asked about**. That is an enumeration,
+not a rule, which is the trap `src3d/CLAUDE.md` names.
+
+Three live cells fell out of that one cause: **linear × plane** had no code path at all (`mutualSides`
+requires both sides linear, so a plane could never enter S4); **declared vectors and ink arrows** were
+in no universe whatsoever; and a named line could not meet a solid's **undrawn edge** (#558).
+
+The irony that proves these are capability, not breakage: the STATEMENT lane already supports the mixed
+cell completely — `relDeviation` implements the dir×plane reading (ADR-3D-105) and a typed «FG מקביל
+למישור ABCD» verifies and drives correctly. Only the panel's passive detection never asked the mixed
+question. The ADR-3D-108 theme again: the engine understood more than the UI communicated.
+
+**Decision: not a third loop.** The universe is built ONCE and PARTITIONED into linear and planar
+sides, and a single double loop dispatches on the two sides' kinds — linear×linear to the unchanged S4
+path, planar×planar to the unchanged plane path, linear×planar to the new `relDeviation` reading. A
+future operand kind is then an entry in the universe, not another loop. The mixed math is not
+re-derived: it is the same `relDeviation` the verifier uses, so a typed relation and a passive row can
+never disagree about the same pair.
+
+**Flood control, three rules, because the universe grew:**
+
+- an undrawn SOLID EDGE earns a row only against a **named line** (#558's gate) — one line × ~12 edges,
+  never the 66 edge×edge pairs a cube would otherwise produce;
+- an edge pair reports only the informative relations (∥ / ⟂ / coincident); a `skew`/`intersecting` row
+  on every undrawn edge is noise, the #384 precedent;
+- a linear object whose endpoints all lie in a plane's **own defining run** is contained by
+  construction — the linear×planar twin of the shared-endpoint skip.
+
+**`contained` is its own row.** A segment with |cos(dir, normal)| = 0 and zero offset lies IN the plane;
+reporting that as plain 'parallel' would be a false statement. This also delivers the `contains` cell
+ADR-3D-105 left planned. Decided at arming, operator free to override at play.
+
+**Wording.** A mixed row is asymmetric — «FG מקביל למישור ABCD», never the symmetric «מקבילים», which
+misreads for a plane — so `MutualRow` carries `mixed` and the linear side leads. The App picks the key;
+it never re-derives the kind from the labels.
+
+**A regression this nearly introduced, caught by an existing lock and worth recording:** unifying the
+loops made it tempting to hoist the shared-endpoint skip to the top. That skip is a LINEAR notion — two
+segments from one vertex obviously meet there — while two PLANES sharing two points do not meet
+trivially at all, and hoisting it silently dropped «המישור ABC מאונך למישור ABD» (planes sharing A and
+B). It is scoped to the linear×linear branch, with a lock of its own.
+
+**Deduplication.** One physical object gets one row: a declared vector and the segment over the same
+endpoints are the same object, kept under the name that was typed. In practice a declared vector always
+HAS a drawn twin, because declaring it leaves ink — the vector's entry in the universe is what makes the
+two agree rather than race.
+
+Locks (`issue-577-panel-scan.test.ts`, 15): the reported vector∥plane cell; the mixed flag and side
+order; segment⟂plane; `contained` distinguished from `parallel`; the multi-seed knowledge gate (a free
+tetra earns no row); all three flood-control rules including edge×edge silence; the #558 cell on an
+UNDRAWN edge plus the pre-#558 drawn-edge workaround agreeing; and the S4 and plane×plane columns
+asserted unchanged, the plane pair sharing two points among them.

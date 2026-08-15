@@ -118,7 +118,10 @@
       "parallel": "{{a}} ו-{{b}} מקבילים",
       "intersecting": "{{a}} ו-{{b}} נחתכים",
       "coincident": "{{a}} ו-{{b}} מתלכדים",
-      "perpendicular": "{{a}} מאונך ל-{{b}}"
+      "perpendicular": "{{a}} מאונך ל-{{b}}",
+      "contained": "{{a}} מוכל במישור {{b}}",
+      "parallelPlane": "{{a}} מקביל למישור {{b}}",
+      "perpendicularPlane": "{{a}} מאונך למישור {{b}}"
     }
   },
   "scope": {
