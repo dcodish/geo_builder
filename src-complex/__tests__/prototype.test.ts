@@ -788,6 +788,73 @@ describe('sequences — the list form (F9, operator ruling)', () => {
   });
 });
 
+describe('part ד: anonymous solution sets and count claims (F8 collision + F12)', () => {
+  it('an equation whose indexed names are taken enumerates ANONYMOUSLY instead of refusing', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z1 = 2');
+    st.addLine('z2 = 2i');
+    expect(st.addLine('z^4 = z1*z2')).toBe(true); // z1..z4 would collide → anonymous set
+    const s = derive(useComplexStore.getState().facts, {});
+    expect(s.errors).toEqual({});
+    const roots = s.points.filter((p) => p.kind === 'root');
+    expect(roots).toHaveLength(4);
+    expect(roots.every((p) => p.bare)).toBe(true);
+    expect(roots.map((p) => p.label)).toEqual(['①', '②', '③', '④']);
+    // the letter itself stays reserved
+    expect(st.addLine('z = 5')).toBe(false);
+    useComplexStore.getState().clearAll();
+  });
+
+  it('counts solutions inside / on / outside a polygon', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z1 = 1');
+    st.addLine('z2 = i');
+    st.addLine('z3 = -1');
+    st.addLine('z4 = -i');
+    st.addLine('w^4 = 0.0625'); // ±0.5, ±0.5i — all inside the unit diamond
+    st.addLine('פתרונות במרובע z1z2z3z4');
+    const s = derive(useComplexStore.getState().facts, {});
+    expect(s.errors).toEqual({});
+    const row = s.measures.find((m) => m.form?.startsWith('בתוך'))!;
+    expect(row.form).toBe('בתוך 4 · על 0 · מחוץ 0');
+    useComplexStore.getState().clearAll();
+  });
+
+  it('THE FULL EXEMPLAR, parts setup+א+ב+ג+ד: counts 1 on, 1 inside, 3 outside', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    for (const l of [
+      'arg(z1)-arg(z2)=90',
+      '|z1| = 9r',
+      '|z2| = 12r',
+      'z2 ברביע הראשון',
+      'arg(z2) < 45',
+      '|z1 - z2|', // א
+      '|z3| = 20r',
+      'arg(z3) + arg(z2) = 0',
+      'שטח המרובע oz1z2z3 הוא 150r²', // ב given
+      'היקף oz1z2z3', // ב ask
+      'z1, z2, z4 סדרה הנדסית', // ג
+      'מרובע oz2z3z4',
+      'z^5 = z1*z2^3*z4', // ד equation (RHS collapses to z2^5)
+      'פתרונות במרובע oz2z3z4', // ד ask
+    ])
+      st.addLine(l);
+    for (const seed of [0, 1]) {
+      const s = deriveScene(useComplexStore.getState().facts, {}, seed);
+      expect(s.errors).toEqual({});
+      expect(Object.values(s.checks).every((c) => c.ok)).toBe(true);
+      expect(s.measures.find((m) => m.label === '|z₁ - z₂|')!.form).toBe('15r'); // א
+      expect(s.measures.find((m) => m.label.includes('היקף'))!.form).toBe('60r'); // ב
+      const count = s.measures.find((m) => m.form?.startsWith('בתוך'))!;
+      expect(count.form).toBe('בתוך 1 · על 1 · מחוץ 3'); // ד
+    }
+    useComplexStore.getState().clearAll();
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();

@@ -56,10 +56,18 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
     // a refused half would otherwise silently drop part of what the student stated.
     let working = get().facts;
     for (let fact of res.facts) {
-      // stamp the roots mode: an already-existing letter means the equation CONSTRAINS it
+      // stamp the roots mode: an already-existing letter means the equation CONSTRAINS it;
+      // an enumeration whose indexed names are taken becomes an ANONYMOUS solution set
       if (fact.kind === 'roots') {
+        const rf = fact;
         const names = new Set(working.flatMap(factNames));
-        fact = { ...fact, constrains: names.has(fact.varName) };
+        const constrains = names.has(rf.varName);
+        const anon =
+          !constrains &&
+          Array.from({ length: rf.n }, (_, k) => `${rf.varName}${k + 1}`).some((n) =>
+            names.has(n),
+          );
+        fact = { ...rf, constrains, anon: anon || undefined };
       }
       // stamp the sequence mode: exactly ONE unknown listed name becomes the DEFINED term
       if (fact.kind === 'seq') {
