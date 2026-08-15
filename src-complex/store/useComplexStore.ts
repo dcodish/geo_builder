@@ -41,7 +41,12 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
     // One utterance may lower to several facts; stage them ALL, commit only if all pass —
     // a refused half would otherwise silently drop part of what the student stated.
     let working = get().facts;
-    for (const fact of res.facts) {
+    for (let fact of res.facts) {
+      // stamp the roots mode: an already-existing letter means the equation CONSTRAINS it
+      if (fact.kind === 'roots') {
+        const names = new Set(working.flatMap(factNames));
+        fact = { ...fact, constrains: names.has(fact.varName) };
+      }
       const existing = working.find((f) => f.id === fact.id);
       if (existing) {
         // idempotent re-issue; show/rel ids ARE their normalized statements

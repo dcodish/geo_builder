@@ -380,6 +380,56 @@ describe('generic forms, re/im, configurations', () => {
   });
 });
 
+describe('roots equations relate to their letter (operator ruling 2026-08-15)', () => {
+  it('a fresh letter enumerates solutions AND reserves the bare letter', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z^3 = 8');
+    // z is now related to z1..z3 — an unrelated z must refuse, naming the equation
+    expect(st.addLine('z = 5')).toBe(false);
+    expect(useComplexStore.getState().lastError).toMatchObject({ key: 'duplicate-name' });
+    // and z is never implicit-created as a disconnected free point
+    st.clearError();
+    st.addLine('w = z*i');
+    const s = derive(useComplexStore.getState().facts, {});
+    expect(s.errors['def-w']).toEqual({ key: 'unknown-ref', detail: 'z' });
+    useComplexStore.getState().clearAll();
+  });
+
+  it('an existing FREE letter is CONSTRAINED by its equation — even self-referentially', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z מספר מרוכב');
+    st.addLine('w = z*z');
+    st.addLine('z^3 = w'); // z³ = z² → z snaps to 1
+    const s = derive(useComplexStore.getState().facts, {});
+    const z = s.points.find((p) => p.label === 'z')!.z;
+    expect(z.re).toBeCloseTo(1);
+    expect(z.im).toBeCloseTo(0);
+    const check = Object.values(s.checks)[0];
+    expect(check).toEqual({ ok: true, driven: true });
+    // the candidate set is represented: cube roots of w = 1
+    const roots = s.points.filter((p) => p.kind === 'root');
+    expect(roots).toHaveLength(3);
+    expect(roots.map((p) => p.label)).toEqual(['z₁', 'z₂', 'z₃']);
+    useComplexStore.getState().clearAll();
+  });
+
+  it('an existing DETERMINED letter turns the equation into a verified claim', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z1 = 2i');
+    st.addLine('z1^2 = -4');
+    st.addLine('z1^2 = 4');
+    const s = derive(useComplexStore.getState().facts, {});
+    const ids = Object.keys(s.checks);
+    expect(ids).toHaveLength(2); // distinct equations about z1 are distinct facts
+    expect(s.checks[ids[0]]).toEqual({ ok: true, driven: false });
+    expect(s.checks[ids[1]]).toEqual({ ok: false, driven: false });
+    useComplexStore.getState().clearAll();
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();

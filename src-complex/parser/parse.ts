@@ -269,7 +269,14 @@ export const parseLine = (raw: string): ParseResult => {
     if (n < 2 || n > 12) return { ok: false, key: 'parse-error', detail: raw.trim() };
     const rhs = parseExpr(roots[3]);
     if (!rhs) return { ok: false, key: 'parse-error', detail: raw.trim() };
-    const f = { kind: 'roots' as const, varName: roots[1].toLowerCase(), n, rhs, src: raw.trim() };
+    const f = {
+      kind: 'roots' as const,
+      varName: roots[1].toLowerCase(),
+      n,
+      rhs,
+      src: raw.trim(),
+      norm: line,
+    };
     return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 

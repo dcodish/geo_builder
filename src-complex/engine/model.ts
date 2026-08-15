@@ -29,7 +29,12 @@ export type Expr =
 export type Fact =
   | { id: string; kind: 'free'; name: string; src: string; implicit?: boolean }
   | { id: string; kind: 'def'; name: string; expr: Expr; src: string }
-  | { id: string; kind: 'roots'; varName: string; n: number; rhs: Expr; src: string }
+  /** X^n = expr. Three modes (operator ruling 2026-08-15): X fresh → enumerate the solution
+   *  set X1..Xn and RESERVE the bare letter (X is related to its indexed letters); X an
+   *  existing free number → the equation CONSTRAINS it (snap to the nearest solution, show
+   *  the candidates); X determined → the equation VERIFIES (✓/✗). `constrains` is stamped
+   *  by the store from whether X already existed. */
+  | { id: string; kind: 'roots'; varName: string; n: number; rhs: Expr; src: string; norm: string; constrains?: boolean }
   /** an unnamed expression line — plotted, labeled by the expression itself, never referencable
    *  (ADR-447: anonymous ids never reach a rendered string; the label is the student's text) */
   | { id: string; kind: 'show'; expr: Expr; src: string; norm: string }
@@ -85,11 +90,9 @@ type FactBody = Fact extends infer F ? (F extends Fact ? Omit<F, 'id'> : never) 
 
 /** Deterministic ids (the sibling convention): re-adding the same statement is idempotent. */
 export const factId = (f: FactBody): string =>
-  f.kind === 'roots'
-    ? `roots-${f.varName}-${f.n}`
-    : f.kind === 'show' || f.kind === 'rel'
-      ? `${f.kind}-${f.norm.replace(/ /g, '')}`
-      : `${f.kind}-${f.name}`;
+  f.kind === 'roots' || f.kind === 'show' || f.kind === 'rel'
+    ? `${f.kind}-${f.norm.replace(/ /g, '')}`
+    : `${f.kind}-${f.name}`;
 
 export interface ScenePoint {
   key: string;
@@ -202,8 +205,62 @@ const projectConstraints = (
       } else if (f.kind === 'def') {
         env.set(f.name, evalExpr(f.expr, env));
       } else if (f.kind === 'roots') {
-        const w = evalExpr(f.rhs, env);
-        if (absC(w) > 0) nthRoots(w, f.n).forEach((z, k) => env.set(`${f.varName}${k + 1}`, z));
+        if (f.constrains && freeNames.has(f.varName)) {
+          // the equation CONSTRAINS the existing free X — fixed-point on the nearest nth root,
+          // replaying the prefix each iteration so a self-referential rhs (z^3 = w, w = z·z)
+          // sees the candidate X
+          const idx = facts.indexOf(f);
+          const rhsAt = (X: Cx): Cx | null => {
+            const e2 = new Map<string, Cx>();
+            try {
+              for (const g of facts.slice(0, idx)) {
+                if (g.kind === 'free')
+                  e2.set(
+                    g.name,
+                    g.name === f.varName
+                      ? X
+                      : (adjusted[g.name] ?? freePos[g.name] ?? defaultFree(g.name, seed)),
+                  );
+                else if (g.kind === 'def') e2.set(g.name, evalExpr(g.expr, e2));
+                else if (g.kind === 'roots' && !g.constrains) {
+                  const w = evalExpr(g.rhs, e2);
+                  if (absC(w) > 0)
+                    nthRoots(w, g.n).forEach((z, k) => e2.set(`${g.varName}${k + 1}`, z));
+                }
+              }
+              return evalExpr(f.rhs, e2);
+            } catch {
+              return null;
+            }
+          };
+          // step-size convergence: the projected X is ALWAYS an exact root of c(X_old), so a
+          // residual against the old c is vacuous — the fixpoint is where X stops moving,
+          // and acceptance is the SELF-consistent residual |X^n − rhs(X)|
+          let X = env.get(f.varName)!;
+          for (let it = 0; it < 200; it++) {
+            const c = rhsAt(X);
+            if (!c || absC(c) === 0) break;
+            const next = nthRoots(c, f.n).reduce((best, cand) =>
+              absC(sub(cand, X)) < absC(sub(best, X)) ? cand : best,
+            );
+            const step = absC(sub(next, X));
+            X = next;
+            if (step <= 1e-10 * Math.max(1, absC(X))) break;
+          }
+          const cFinal = rhsAt(X);
+          if (
+            cFinal &&
+            absC(cFinal) > 0 &&
+            absC(sub(ipow(X, f.n), cFinal)) <= 1e-6 * Math.max(1, absC(cFinal))
+          ) {
+            env.set(f.varName, X);
+            adjusted[f.varName] = X;
+            drove[f.id] = true;
+          }
+        } else if (!f.constrains) {
+          const w = evalExpr(f.rhs, env);
+          if (absC(w) > 0) nthRoots(w, f.n).forEach((z, k) => env.set(`${f.varName}${k + 1}`, z));
+        }
       } else if (f.kind === 'rel') {
         const r = f.rel;
         if (r.type === 'arg') {
@@ -294,6 +351,32 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Sc
         });
       } else {
         const w = evalExpr(f.rhs, env);
+        if (f.constrains) {
+          // the equation is ABOUT the existing X: driven → verified snap; determined → claim
+          const X = env.get(f.varName);
+          if (X === undefined) {
+            errors[f.id] = { key: 'unknown-ref', detail: f.varName };
+            continue;
+          }
+          const ok = absC(sub(ipow(X, f.n), w)) <= 1e-6 * Math.max(1, absC(w));
+          checks[f.id] = { ok, driven: !!drove[f.id] };
+          if (drove[f.id] && absC(w) > 0) {
+            // represent the solvable meaning: the full candidate set, X sitting on one of them
+            const roots = nthRoots(w, f.n);
+            circles.push({ r: absC(roots[0]), factId: f.id });
+            // display-only candidates — no env registration (factNames introduces nothing here)
+            roots.forEach((z, k) => {
+              points.push({
+                key: `${f.id}-${k}`,
+                label: prettyName(`${f.varName}${k + 1}`),
+                z,
+                kind: 'root',
+                factId: f.id,
+              });
+            });
+          }
+          continue;
+        }
         if (absC(w) === 0) {
           errors[f.id] = { key: 'roots-of-zero', detail: f.src };
           continue;
@@ -322,10 +405,14 @@ export const derive = (facts: Fact[], freePos: Record<string, Cx>, seed = 0): Sc
   return { points, circles, errors, checks };
 };
 
-/** Names a fact introduces — used by the store's duplicate-name honesty check. */
+/** Names a fact introduces — used by the store's duplicate-name honesty check.
+ * A solution-enumerating roots fact also RESERVES its bare letter: z is related to z1..zn,
+ * so a later independent `z = …` (or implicit creation of z) must refuse, naming this fact. */
 export const factNames = (f: Fact): string[] =>
   f.kind === 'roots'
-    ? Array.from({ length: f.n }, (_, k) => `${f.varName}${k + 1}`)
+    ? f.constrains
+      ? [] // constraint/claim mode: the candidates are display-only, no names introduced
+      : [f.varName, ...Array.from({ length: f.n }, (_, k) => `${f.varName}${k + 1}`)]
     : f.kind === 'show' || f.kind === 'rel'
       ? []
       : [f.name];
