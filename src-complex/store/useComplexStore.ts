@@ -9,6 +9,18 @@ export type InputError =
   | { key: 'not-handled' | 'parse-error'; detail: string }
   | { key: 'duplicate-name'; detail: string };
 
+/** Save format (suffix `-complex.json`, the per-product convention): the SOURCE LINES in
+ * order — loading replays them through the real parse path, so a saved session doubles as
+ * a parser-drift net (the fixtures-first idea). */
+export interface SavedSession {
+  app: 'complex-builder';
+  version: 1;
+  lines: string[];
+  freePos: Record<string, Cx>;
+  seed: number;
+  view: 'cart' | 'polar';
+}
+
 interface ComplexState {
   facts: Fact[];
   freePos: Record<string, Cx>;
@@ -23,6 +35,8 @@ interface ComplexState {
   nextConfig: () => void;
   clearAll: () => void;
   clearError: () => void;
+  serialize: () => SavedSession;
+  hydrate: (data: unknown) => boolean;
 }
 
 export const useComplexStore = create<ComplexState>((set, get) => ({
@@ -107,4 +121,47 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
   nextConfig: () => set(({ seed }) => ({ seed: seed + 1, freePos: {} })),
   clearAll: () => set({ facts: [], freePos: {}, seed: 0, lastError: null }),
   clearError: () => set({ lastError: null }),
+
+  serialize: () => {
+    const { facts, freePos, seed, view } = get();
+    const lines: string[] = [];
+    for (const f of facts) {
+      // a lowered multi-fact line shares one src — collapse consecutive duplicates
+      if (lines[lines.length - 1] !== f.src) lines.push(f.src);
+    }
+    return { app: 'complex-builder', version: 1, lines, freePos, seed, view };
+  },
+
+  hydrate: (data) => {
+    const d = data as SavedSession;
+    if (!d || d.app !== 'complex-builder' || !Array.isArray(d.lines)) return false;
+    set({ facts: [], freePos: {}, seed: 0, lastError: null });
+    for (const line of d.lines) get().addLine(String(line));
+    set({
+      freePos: d.freePos ?? {},
+      seed: typeof d.seed === 'number' ? d.seed : 0,
+      view: d.view === 'polar' ? 'polar' : 'cart',
+      lastError: null,
+    });
+    return true;
+  },
 }));
+
+// Session survival across reloads (the operator's "don't re-enter each time"): auto-persist
+// to localStorage; the explicit save/load buttons handle files for durability and sharing.
+const LS_KEY = 'complex-proto-session';
+if (typeof localStorage !== 'undefined') {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) useComplexStore.getState().hydrate(JSON.parse(raw));
+  } catch {
+    // a corrupt stored session must never wedge the app
+  }
+  useComplexStore.subscribe(() => {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(useComplexStore.getState().serialize()));
+    } catch {
+      // quota/serialization problems only cost persistence, never the session
+    }
+  });
+}

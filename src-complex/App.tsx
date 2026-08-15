@@ -45,7 +45,36 @@ export function App() {
     setView,
     nextConfig,
     clearAll,
+    serialize,
+    hydrate,
   } = useComplexStore();
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const saveFile = () => {
+    const blob = new Blob([JSON.stringify(serialize(), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'figure-complex.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const onLoadFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    void file.text().then((txt) => {
+      let ok = false;
+      try {
+        ok = hydrate(JSON.parse(txt));
+      } catch {
+        ok = false;
+      }
+      if (!ok)
+        useComplexStore.setState({ lastError: { key: 'parse-error', detail: file.name } });
+    });
+  };
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -87,6 +116,15 @@ export function App() {
           <p className="subtitle">{t('subtitle')}</p>
         </div>
         <div className="header-actions">
+          <button onClick={saveFile}>{t('save')}</button>
+          <button onClick={() => fileRef.current?.click()}>{t('load')}</button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".json,application/json"
+            style={{ display: 'none' }}
+            onChange={onLoadFile}
+          />
           <button onClick={nextConfig}>{t('anotherConfig')}</button>
           <button onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
             {view === 'cart' ? t('viewPolar') : t('viewCart')}

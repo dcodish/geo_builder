@@ -648,6 +648,63 @@ describe('shapes over O, and area/perimeter driveOrCheck (F6/F7)', () => {
   });
 });
 
+describe('save/load (suffix -complex.json: source lines replayed through the real parse path)', () => {
+  it('round-trips the exemplar: same facts, same figure, freePos/seed/view restored', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    const lines = [
+      'arg(z1)-arg(z2)=90',
+      '|z1| = 9r',
+      '|z2| = 12r',
+      'z2 ברביע הראשון',
+      'מרובע oz1z2z3',
+      '|z3| = 20r',
+      'היקף oz1z2z3',
+    ];
+    for (const l of lines) st.addLine(l);
+    st.nextConfig();
+    st.setFree('z9', { re: 1, im: 2 }); // a stray drag override survives too
+    const saved = st.serialize();
+    expect(saved.app).toBe('complex-builder');
+    const before = derive(useComplexStore.getState().facts, saved.freePos, saved.seed);
+
+    st.clearAll();
+    expect(useComplexStore.getState().facts).toHaveLength(0);
+    expect(useComplexStore.getState().hydrate(JSON.parse(JSON.stringify(saved)))).toBe(true);
+    const after = useComplexStore.getState();
+    expect(after.seed).toBe(saved.seed);
+    expect(after.freePos).toEqual(saved.freePos);
+    const replayed = derive(after.facts, after.freePos, after.seed);
+    expect(replayed.points.map((p) => [p.label, p.z])).toEqual(
+      before.points.map((p) => [p.label, p.z]),
+    );
+    expect(replayed.measures).toEqual(before.measures);
+    useComplexStore.getState().clearAll();
+  });
+
+  it('a lowered line saves ONCE and re-lowers on load', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z = 2cis(θ)'); // lowers to free + |z|=2
+    const saved = st.serialize();
+    expect(saved.lines).toEqual(['z = 2cis(θ)']);
+    st.clearAll();
+    st.hydrate(saved);
+    expect(useComplexStore.getState().facts.map((f) => f.kind)).toEqual(['free', 'rel']);
+    useComplexStore.getState().clearAll();
+  });
+
+  it('refuses foreign or corrupt data without touching the session', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z1 = 3+4i');
+    expect(st.hydrate({ app: 'geo-builder', lines: [] })).toBe(false);
+    expect(st.hydrate('garbage')).toBe(false);
+    expect(useComplexStore.getState().facts).toHaveLength(1);
+    useComplexStore.getState().clearAll();
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();
