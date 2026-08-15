@@ -17,7 +17,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
 import { answerQuery } from '../engine/queries';
-import { dataView } from '../engine/dataView';
+import { dataView, parametricPlaneForm } from '../engine/dataView';
 
 const reset = () => {
   useGeo3.setState({ facts: [], seed: 0, queries: [], lastError: null });
@@ -85,12 +85,41 @@ describe('#496 — a bare POINT label answers its coordinates', () => {
 describe('#317 — a PLANE answers its canonical equation', () => {
   beforeEach(reset);
 
-  it('«מישור ABC» on an anchored figure answers the forced equation', () => {
+  it('«מישור ABC» on an anchored figure answers BOTH representations', () => {
+    // operator, 2026-08-15: "whenever giving a plane, always give both representations if possible" —
+    // a plane has two standard forms and the panel has always printed both.
     const r = ans(TRIANGLE, 'מישור ABC');
-    expect(r.answer).toBe('z = 0');
+    expect(r.answer).toContain('z = 0');
+    expect(r.answer).toContain('x = (0, 0, 0) + t·(4, 0, 0) + s·(0, 2, 0)');
   });
 
-  it('the exam phrasing and the English mirror agree with it', () => {
+  it("the parametric half is the PANEL's own, not a second derivation", () => {
+    const { c, seed } = build([...TRIANGLE, 'המישור ABC']);
+    const panelPar = dataView(c, seed).planes.find((p) => p.startsWith('ABC: x ='));
+    expect(panelPar).toBeDefined();
+    expect(answerQuery(c, 'מישור ABC', seed).answer).toContain(panelPar!.replace('ABC: ', ''));
+  });
+
+  it('"if possible" is honest — no run, or an unstable one, yields NO parametric form', () => {
+    // The rule tested at its own seam rather than through an utterance that happens to exercise it:
+    // a plane given by EQUATION has no run at all, and a run whose anchor or spanning edge moves with
+    // the seed is a drawing, not knowledge. Neither may be filled in with a sampled parametrisation.
+    const v = (x: number, y: number, z: number) => ({ x, y, z });
+    const stable: Map<string, { x: number; y: number; z: number }>[] = [
+      new Map([['A', v(0, 0, 0)], ['B', v(1, 0, 0)], ['C', v(0, 1, 0)]]),
+      new Map([['A', v(0, 0, 0)], ['B', v(1, 0, 0)], ['C', v(0, 1, 0)]]),
+    ];
+    expect(parametricPlaneForm(['A', 'B', 'C'], stable)).toBe('x = (0, 0, 0) + t·(1, 0, 0) + s·(0, 1, 0)');
+    expect(parametricPlaneForm(undefined, stable), 'no run (an equation-given plane)').toBeNull();
+
+    const slidingAnchor = [stable[0], new Map([['A', v(9, 9, 9)], ['B', v(1, 0, 0)], ['C', v(0, 1, 0)]])];
+    expect(parametricPlaneForm(['A', 'B', 'C'], slidingAnchor), 'anchor varies by seed').toBeNull();
+
+    const slidingEdge = [stable[0], new Map([['A', v(0, 0, 0)], ['B', v(5, 0, 0)], ['C', v(0, 1, 0)]])];
+    expect(parametricPlaneForm(['A', 'B', 'C'], slidingEdge), 'spanning edge varies by seed').toBeNull();
+  });
+
+  it('the exam phrasing and the English mirror agree with it (both forms)', () => {
     const { c, seed } = build(TRIANGLE);
     const expected = answerQuery(c, 'מישור ABC', seed).answer;
     for (const q of ['משוואת המישור ABC', 'plane ABC', 'equation of plane ABC']) {
@@ -109,7 +138,7 @@ describe('#317 — a PLANE answers its canonical equation', () => {
     const { c, seed } = build([...TRIANGLE, 'המישור ABC']);
     const row = dataView(c, seed).planes.find((p) => p.startsWith('ABC: ') && !p.includes('x ='));
     expect(row).toBeDefined();
-    expect(`ABC: ${answerQuery(c, 'מישור ABC', seed).answer}`).toBe(row);
+    expect(answerQuery(c, 'מישור ABC', seed).answer).toContain(row!.replace('ABC: ', ''));
   });
 
   it('an UNANCHORED figure refuses — a plane equation is gauge until translation is pinned (#315)', () => {

@@ -13,7 +13,7 @@
  */
 
 import { resolve3, scaleKnown3, translationPinned3, vectorFramePinned3 } from './evaluate';
-import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, decompStr, formatBranches, linePlaneAngleAt, newellNormal, parametricDecomp, planeEqStr } from './dataView';
+import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, decompStr, formatBranches, linePlaneAngleAt, newellNormal, parametricDecomp, parametricPlaneForm, planeEqStr } from './dataView';
 import { centroid3, cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
 import { distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
 import { readOperand } from '../parser/operandToken';
@@ -456,8 +456,8 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
     // anchors the frame. The panel carries this same explicit gate — cross-sample agreement alone does
     // not catch it, because an unanchored figure can still be placed identically at every seed.
     if (!translationPinned3(c)) return { text, answer: null, note: 'undetermined' };
-    const per = seeds.map((sd) => {
-      const r = resolve3(c, sd);
+    const resolvedPer = seeds.map((sd) => resolve3(c, sd));
+    const per = resolvedPer.map((r) => {
       if (q.name) return r.planes.get(q.name);
       const pts = q.ids!.map((id) => r.positions.get(id));
       if (pts.some((p) => !p)) return undefined;
@@ -466,7 +466,16 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
       return norm3(n) < 1e-9 ? undefined : { n, d: -dot3(n, ring[0]) };
     });
     const eq = canonicalPlaneEq(per);
-    return eq ? { text, answer: planeEqStr(eq) } : { text, answer: null, note: 'undetermined' };
+    if (!eq) return { text, answer: null, note: 'undetermined' };
+    // A plane has TWO standard representations and the panel has always printed both (operator,
+    // 2026-08-15: "whenever giving a plane, always give both representations if possible"). Derived by
+    // the SAME helper the panel calls, so the two forms can never describe different planes. "If
+    // possible" is the honesty half: the parametric form needs a stable anchor and stable spanning
+    // edges, and an equation-given plane has no run at all — in those cases the standard form stands
+    // alone rather than a sampled parametrisation being invented to fill the slot.
+    const run = q.ids ?? c.pointPlanes.get(q.name!);
+    const par = parametricPlaneForm(run, resolvedPer.map((r) => r.positions));
+    return { text, answer: par ? `${planeEqStr(eq)}  |  ${par}` : planeEqStr(eq) };
   }
 
   const vals = seeds.map((s) => {

@@ -3630,6 +3630,17 @@ private formatter (the #481 lesson, restated). Concretely:
   translation gate is applied explicitly here, because cross-sample agreement alone does not catch it —
   an unanchored figure can still be placed identically at every seed.
 
+**Amendment 1 (operator, 2026-08-15, playing the PR):** *"whenever giving a plane, always give both
+representations if possible."* Correct, and it exposed the first version as an incomplete reading of
+this ADR's own rule: a plane has TWO standard representations, the panel has always printed both rows,
+and answering with only the equation meant the query and the panel still disagreed about the same
+plane — the exact divergence the shared-derivation decision exists to prevent. The parametric half is
+therefore extracted too (`parametricPlaneForm`), and the panel's block now calls it rather than
+spelling it inline; the query appends it to the equation. *"If possible"* is the honesty half and is
+load-bearing: the parametric form requires a stable ANCHOR and stable spanning edges, and an
+equation-given plane has no run at all — in those cases the equation stands alone rather than a sampled
+parametrisation being invented to fill the slot.
+
 The guidance register gains both forms (ADR-428's spirit: the lane must teach what it accepts).
 `evalQuery`'s switch lists them explicitly as non-numeric rather than letting a future kind fall
 through as a silent `undefined`.

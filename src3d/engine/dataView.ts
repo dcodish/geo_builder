@@ -207,6 +207,38 @@ export function canonicalPlaneEq(
   return canon[0]!;
 }
 
+/**
+ * #317 — the PARAMETRIC form of a plane named by a point RUN, or null when it is not knowledge.
+ *
+ * The second half of the shared plane seam beside {@link canonicalPlaneEq}: a plane has two standard
+ * representations and the panel has always printed both, so the query lane must give both too, from the
+ * same derivation (operator, 2026-08-15: *"whenever giving a plane, always give both representations if
+ * possible"*). Two callers, one definition — a plane's two forms can never describe different planes.
+ *
+ * Knowledge here means the ANCHOR and both spanning edges are identical in EVERY sampled configuration.
+ * An anchor that slides or an edge that changes with the seed is a drawing, not a consequence of the
+ * givens, and prints nothing (the #371/#481 rule) — which is what "if possible" resolves to.
+ */
+export function parametricPlaneForm(run: Id[] | undefined, positions: Positions3[]): string | null {
+  if (!run || run.length < 3 || positions.length < 2) return null;
+  const anchors = positions.map((pos) => pos.get(run[0]));
+  if (!anchors.every((p): p is Vec3 => !!p)) return null;
+  if (!anchors.every((p) => sameVec(p, anchors[0]))) return null;
+  const stableEdge = (a: Id, b: Id): Vec3 | null => {
+    const ds = positions.map((pos) => {
+      const p = pos.get(a);
+      const q = pos.get(b);
+      return p && q ? sub3(q, p) : null;
+    });
+    if (!ds.every((d): d is Vec3 => !!d)) return null;
+    return ds.every((d) => sameVec(d, ds[0])) ? ds[0] : null;
+  };
+  const e1 = stableEdge(run[0], run[1]);
+  const e2 = stableEdge(run[0], run[run.length - 1]);
+  if (!e1 || !e2) return null;
+  return `x = ${coordStr(anchors[0])} + t·${coordStr(e1)} + s·${coordStr(e2)}`;
+}
+
 /** Solve M·x = t for 3×3 M given by columns u,v,w; null when singular. */
 /** Newell normal of a point ring (3–4 points) — THE shared plane-normal for display derivations
  *  (#319: the panel's labeled line↔plane angles and the query lane share it, so they can't diverge). */
@@ -834,17 +866,10 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       const eq = canonicalPlaneEq(per);
       if (!eq) continue;
       planes.push(`${name}: ${planeEqStr(eq)}`);
-      // the parametric form rides when the run's anchor point and spanning edges are stable
-      const run = c.pointPlanes.get(name);
-      if (run && run.length >= 3) {
-        const p0s = positions.map((pos) => pos.get(run[0]));
-        const anchorStable = p0s.every((p): p is Vec3 => !!p) && sameVec(p0s[0]!, p0s[1]!) && sameVec(p0s[0]!, p0s[2]!);
-        const e1 = stablePair(run[0], run[1]);
-        const e2 = stablePair(run[0], run[run.length - 1]);
-        if (anchorStable && e1 && e2) {
-          planes.push(`${name}: x = ${coordStr(p0s[0]!)} + t·${coordStr(e1)} + s·${coordStr(e2)}`);
-        }
-      }
+      // the parametric form rides when the run's anchor point and spanning edges are stable. Shared
+      // with the query lane (#317) so a plane's two representations are derived once, never twice.
+      const par = parametricPlaneForm(c.pointPlanes.get(name), positions);
+      if (par) planes.push(`${name}: ${par}`);
     }
   }
 
