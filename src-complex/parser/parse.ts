@@ -268,6 +268,11 @@ const SREL_RE = new RegExp(
   'i',
 );
 const SREL_RHS = /^(\d+(?:\.\d+)?)?\s*\*?\s*([a-zA-Z]\w*)?\s*(\^\s*2)?$/;
+// F9 list form: comma-separated names are CONSECUTIVE terms of one sequence
+const SEQ_RE = new RegExp(
+  `^((?:o|[zw]\\d*)(?:\\s*,\\s*(?:o|[zw]\\d*)){2,})\\s+(?:היא\\s+|הם\\s+)?(?:סדרה\\s+(הנדסית|חשבונית)|(?:is\\s+)?(?:an?\\s+)?(geometric|arithmetic)\\s+sequence)$`,
+  'i',
+);
 const QUAD_RE =
   /^([a-zA-Z]\w*)\s+(?:נמצא\s+)?ברביע\s+ה(ראשון|שני|שלישי|רביעי)$|^([a-zA-Z]\w*)\s+(?:is\s+)?(?:in\s+)?(?:the\s+)?(?:(first|second|third|fourth)\s+quadrant|quadrant\s+([1-4]))$/;
 // F4: ±arg(A) [± arg(B)] ⟨cmp⟩ degrees — parens optional (arg z1 also accepted);
@@ -442,6 +447,20 @@ export const parseLine = (raw: string): ParseResult => {
     if (want !== undefined && pts.length !== want)
       return { ok: false, key: 'parse-error', detail: raw.trim() };
     const f = { kind: 'shape' as const, pts, src: raw.trim(), norm: line };
+    return { ok: true, facts: [{ ...f, id: factId(f) }] };
+  }
+
+  const seq = SEQ_RE.exec(line);
+  if (seq) {
+    const names = seq[1].split(',').map((s) => s.trim().toLowerCase());
+    const word = (seq[2] ?? seq[3]).toLowerCase();
+    const f = {
+      kind: 'seq' as const,
+      stype: word === 'הנדסית' || word === 'geometric' ? ('geo' as const) : ('ari' as const),
+      names,
+      src: raw.trim(),
+      norm: line,
+    };
     return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 

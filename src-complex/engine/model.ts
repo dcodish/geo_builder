@@ -43,6 +43,19 @@ export type Fact =
   /** a relation (F3 modulus / F4 argument): DRIVES a free number when one is available,
    *  VERIFIES (✓/✗) when everything is determined — driveOrCheck-lite */
   | { id: string; kind: 'rel'; rel: RelSpec; src: string; norm: string }
+  /** F9 list form (ADR-CX-003; operator 2026-08-15 — "the list form is correct for now"):
+   *  the named numbers are CONSECUTIVE terms of one sequence. driveOrCheck: all determined →
+   *  verify; `defines` (stamped by the store: exactly one unknown name) → that term is DERIVED
+   *  from the others; one FREE term among determined ones → driven. */
+  | {
+      id: string;
+      kind: 'seq';
+      stype: 'geo' | 'ari';
+      names: string[];
+      defines?: string;
+      src: string;
+      norm: string;
+    }
   /** F6: a segment (2 pts) or polygon (3+ pts) over named points; 'o' is always the origin */
   | { id: string; kind: 'shape'; pts: string[]; src: string; norm: string }
   /** F7 measure: area/perimeter of a polygon, length of a segment — a calc-panel entry */
@@ -101,6 +114,50 @@ const shapeMeasure = (mtype: 'area' | 'perim' | 'len', pts: string[], env: Map<s
     a += vs[i].re * b.im - b.re * vs[i].im;
   }
   return Math.abs(a) / 2;
+};
+
+/** solve ONE sequence term (at `target`) from the other, determined terms. Geometric
+ * middle-term has two square roots — `seed` parity picks the branch (configuration cycling). */
+const seqSolve = (
+  f: Extract<Fact, { kind: 'seq' }>,
+  target: string,
+  env: Map<string, Cx>,
+  seed: number,
+): Cx | null => {
+  const p = f.names.indexOf(target);
+  const vals = f.names.map((n) => (n === target ? null : (env.get(n) ?? null)));
+  if (vals.some((v, i) => v === null && i !== p)) return null;
+  const at = (i: number): Cx => vals[i]!;
+  const last = f.names.length - 1;
+  if (f.stype === 'geo') {
+    if (p > 0 && p < last) {
+      const prod = mul(at(p - 1), at(p + 1));
+      const branch = seed % 2;
+      return cisDeg(Math.sqrt(absC(prod)), argDeg(prod) / 2 + branch * 180);
+    }
+    if (p === last) return mul(at(last - 1), div(at(1), at(0)));
+    return div(at(1), div(at(2), at(1)));
+  }
+  if (p > 0 && p < last) return { re: (at(p - 1).re + at(p + 1).re) / 2, im: (at(p - 1).im + at(p + 1).im) / 2 };
+  if (p === last) return add(at(last - 1), sub(at(1), at(0)));
+  return sub(at(1), sub(at(2), at(1)));
+};
+
+/** consecutive-terms consistency: equal adjacent ratios (geo) / differences (ari) */
+const seqHolds = (f: Extract<Fact, { kind: 'seq' }>, env: Map<string, Cx>): boolean => {
+  const vs = f.names.map((n) => env.get(n));
+  if (vs.some((v) => v === undefined)) return false;
+  const steps: Cx[] = [];
+  for (let i = 0; i + 1 < vs.length; i++) {
+    if (f.stype === 'geo') {
+      if (absC(vs[i]!) === 0) return false;
+      steps.push(div(vs[i + 1]!, vs[i]!));
+    } else {
+      steps.push(sub(vs[i + 1]!, vs[i]!));
+    }
+  }
+  const scale = Math.max(1, ...steps.map(absC));
+  return steps.every((s) => absC(sub(s, steps[0])) <= 1e-6 * scale);
 };
 
 /** clamp a fold target strictly INSIDE (lo, hi) with a margin — a fold that parks on a
@@ -435,6 +492,21 @@ const projectConstraints = (
           adjusted[changed.name] = changed.nv;
           drove[f.id] = true;
         }
+      } else if (f.kind === 'seq') {
+        if (f.defines) {
+          const v = seqSolve(f, f.defines, env, seed);
+          if (v) env.set(f.defines, v); // derived term — later facts may use it
+        } else {
+          const freeTarget = f.names.find((n) => freeNames.has(n));
+          if (freeTarget) {
+            const v = seqSolve(f, freeTarget, env, seed);
+            if (v) {
+              env.set(freeTarget, v);
+              adjusted[freeTarget] = v;
+              drove[f.id] = true;
+            }
+          }
+        }
       } else if (f.kind === 'srel') {
         // area/perimeter GIVEN: 1-D root find over one free number's argument, replaying the
         // whole prefix (rels included) per candidate — so equality rels track the candidate
@@ -565,6 +637,32 @@ export const derive = (
         const z = evalExpr(f.expr, env);
         env.set(f.name, z);
         points.push({ key: f.id, label: prettyName(f.name), z, kind: 'def', factId: f.id });
+      } else if (f.kind === 'seq') {
+        if (f.defines) {
+          const v = seqSolve(f, f.defines, env, seed);
+          if (!v) {
+            const miss = f.names.find((n) => n !== f.defines && !env.has(n));
+            errors[f.id] = { key: 'unknown-ref', detail: miss ?? f.defines };
+            continue;
+          }
+          env.set(f.defines, v);
+          points.push({ key: f.id, label: prettyName(f.defines), z: v, kind: 'def', factId: f.id });
+        }
+        const miss = f.names.find((n) => !env.has(n));
+        if (miss) {
+          errors[f.id] = { key: 'unknown-ref', detail: miss };
+          continue;
+        }
+        // the progression chain, drawn — arithmetic reads as a line, geometric as a spiral
+        for (let i = 0; i + 1 < f.names.length; i++) {
+          segments.push({
+            key: `${f.id}-${i}`,
+            a: env.get(f.names[i])!,
+            b: env.get(f.names[i + 1])!,
+            factId: f.id,
+          });
+        }
+        checks[f.id] = { ok: seqHolds(f, env), driven: !!drove[f.id] || !!f.defines };
       } else if (f.kind === 'shape') {
         const miss = f.pts.find((p) => !env.has(p));
         if (miss) {
@@ -678,7 +776,9 @@ export const factNames = (f: Fact): string[] =>
       : [f.varName, ...Array.from({ length: f.n }, (_, k) => `${f.varName}${k + 1}`)]
     : f.kind === 'free' || f.kind === 'def'
       ? [f.name]
-      : [];
+      : f.kind === 'seq' && f.defines
+        ? [f.defines]
+        : [];
 
 const near = (a: number, b: number): boolean => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(b));
 
@@ -721,4 +821,6 @@ export const factRefs = (f: Fact): string[] =>
         ? relNames(f.rel)
         : f.kind === 'shape' || f.kind === 'smeasure' || f.kind === 'srel'
           ? f.pts.filter((p) => p !== 'o') // O always exists; never implicit-created
-          : [];
+          : f.kind === 'seq'
+            ? f.names.filter((n) => n !== 'o' && n !== f.defines)
+            : [];

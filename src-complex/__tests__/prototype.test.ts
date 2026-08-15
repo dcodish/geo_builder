@@ -705,6 +705,89 @@ describe('save/load (suffix -complex.json: source lines replayed through the rea
   });
 });
 
+describe('sequences — the list form (F9, operator ruling)', () => {
+  it('exemplar ג: one unknown listed name is DEFINED by the others (z4 = z2²/z1)', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z1 = 2');
+    st.addLine('z2 = 2i');
+    st.addLine('z1, z2, z4 סדרה הנדסית');
+    const s = derive(useComplexStore.getState().facts, {});
+    expect(s.errors).toEqual({});
+    const z4 = s.points.find((p) => p.label === 'z₄')!.z;
+    expect(z4.re).toBeCloseTo(-2); // (2i)²/2
+    expect(z4.im).toBeCloseTo(0);
+    expect(Object.values(s.checks)[0]).toEqual({ ok: true, driven: true });
+    expect(s.segments).toHaveLength(2); // the progression chain
+    useComplexStore.getState().clearAll();
+  });
+
+  it('all determined → verify: geometric ✓/✗, arithmetic ✓ (English too)', () => {
+    const s = derive(
+      [
+        fact('z1 = 1'), fact('z2 = 2'), fact('z3 = 4'), fact('z5 = 5'),
+        fact('z1, z2, z3 סדרה הנדסית'),
+        fact('z1, z2, z5 סדרה הנדסית'),
+        fact('z1, z2, z3 is an arithmetic sequence'),
+      ],
+      {},
+    );
+    const vals = Object.values(s.checks);
+    expect(vals.map((c) => c.ok)).toEqual([true, false, false]);
+    const s2 = derive([fact('z1 = 1'), fact('z2 = 1+i'), fact('z3 = 1+2i'), fact('z1, z2, z3 סדרה חשבונית')], {});
+    expect(Object.values(s2.checks)[0].ok).toBe(true);
+  });
+
+  it('a middle geometric unknown has two branches — cycled by configuration', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z1 = 1');
+    st.addLine('z3 = 4');
+    st.addLine('z1, z2, z3 סדרה הנדסית');
+    const a = derive(useComplexStore.getState().facts, {}, 0);
+    const b = derive(useComplexStore.getState().facts, {}, 1);
+    const za = a.points.find((p) => p.label === 'z₂')!.z;
+    const zb = b.points.find((p) => p.label === 'z₂')!.z;
+    expect(za.re).toBeCloseTo(2);
+    expect(zb.re).toBeCloseTo(-2); // the other square root
+    expect(Object.values(a.checks)[0].ok).toBe(true);
+    expect(Object.values(b.checks)[0].ok).toBe(true);
+    useComplexStore.getState().clearAll();
+  });
+
+  it('a FREE listed term is driven to fit', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('z3 מספר מרוכב');
+    st.addLine('z1 = 1');
+    st.addLine('z2 = 2i');
+    st.addLine('z1, z2, z3 סדרה הנדסית');
+    const s = derive(useComplexStore.getState().facts, {});
+    const z3 = s.points.find((p) => p.label === 'z₃')!.z;
+    expect(z3.re).toBeCloseTo(-4); // (2i)²/1
+    expect(z3.im).toBeCloseTo(0);
+    expect(Object.values(s.checks)[0]).toEqual({ ok: true, driven: true });
+    useComplexStore.getState().clearAll();
+  });
+
+  it('the full exemplar through ג: z4 rides the r-parameter — |z4| = 16r', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    for (const l of [
+      'arg(z1)-arg(z2)=90', '|z1| = 9r', '|z2| = 12r', 'z2 ברביע הראשון', 'arg(z2) < 45',
+      '|z3| = 20r', 'arg(z3) + arg(z2) = 0', 'שטח המרובע oz1z2z3 הוא 150r²',
+      'z1, z2, z4 סדרה הנדסית', '|z4|',
+    ])
+      st.addLine(l);
+    const s = deriveScene(useComplexStore.getState().facts, {}, 0);
+    expect(s.errors).toEqual({});
+    expect(Object.values(s.checks).every((c) => c.ok)).toBe(true);
+    // |z4| = |z2|²/|z1| = 144r²/9r = 16r — expressed in r, as the exam demands
+    expect(s.measures.find((m) => m.label === '|z₄|')!.form).toBe('16r');
+    useComplexStore.getState().clearAll();
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();

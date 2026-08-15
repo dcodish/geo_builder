@@ -61,6 +61,12 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
         const names = new Set(working.flatMap(factNames));
         fact = { ...fact, constrains: names.has(fact.varName) };
       }
+      // stamp the sequence mode: exactly ONE unknown listed name becomes the DEFINED term
+      if (fact.kind === 'seq') {
+        const names = new Set(working.flatMap(factNames));
+        const missing = fact.names.filter((n) => n !== 'o' && !names.has(n));
+        fact = { ...fact, defines: missing.length === 1 ? missing[0] : undefined };
+      }
       const existing = working.find((f) => f.id === fact.id);
       if (existing) {
         // idempotent re-issue; show/rel ids ARE their normalized statements
