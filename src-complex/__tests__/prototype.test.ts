@@ -909,6 +909,34 @@ describe('equation-direction fairness (#600: z1^3=z3 drives z3 when z1 is claime
   });
 });
 
+describe('drag policy (#603: constraint-adjusted numbers are not draggable)', () => {
+  it('driven numbers lose the drag handle; untouched frees keep it', () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('q מספר מרוכב'); // explicit declaration, fully unconstrained
+    st.addLine('z9 מספר מרוכב'); // fully unconstrained
+    st.addLine('|z1| = 2'); // implicit-creates z1, then pins its modulus
+    const s = derive(useComplexStore.getState().facts, {});
+    const by = (l: string) => s.points.find((p) => p.label === l)!;
+    expect(by('q').freeName).toBe('q');
+    expect(by('z₉').freeName).toBe('z9');
+    expect(by('z₁').freeName).toBeUndefined(); // modulus-driven → button territory
+    useComplexStore.getState().clearAll();
+  });
+
+  it("the operator's session: every constrained number is undraggable, checks stay green", () => {
+    const st = useComplexStore.getState();
+    st.clearAll();
+    st.addLine('סדרה הנדסית z1,z2,z3');
+    st.addLine('z1 ברביע הראשון');
+    st.addLine('z1^3 = z3');
+    const s = derive(useComplexStore.getState().facts, {});
+    expect(Object.values(s.checks).every((c) => c.ok)).toBe(true);
+    for (const l of ['z₂', 'z₃']) expect(s.points.find((p) => p.label === l)!.freeName).toBeUndefined();
+    useComplexStore.getState().clearAll();
+  });
+});
+
 describe('store honesty', () => {
   it('duplicate name refuses and names the CONFLICTING statement', () => {
     const st = useComplexStore.getState();

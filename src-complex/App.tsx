@@ -205,7 +205,15 @@ export function App() {
               <li key={f.id} className={scene.errors[f.id] ? 'fact err' : 'fact'}>
                 <code dir="ltr">{f.src}</code>
                 {f.kind === 'free' && (
-                  <span className="badge">{t(f.implicit ? 'implicitLabel' : 'freeLabel')}</span>
+                  <span className="badge">
+                    {t(
+                      scene.points.find((p) => p.factId === f.id)?.freeName
+                        ? f.implicit
+                          ? 'implicitLabel'
+                          : 'freeLabel'
+                        : 'drivenLabel',
+                    )}
+                  </span>
                 )}
                 {scene.checks[f.id] && (
                   <span

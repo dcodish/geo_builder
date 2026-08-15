@@ -655,7 +655,16 @@ export const derive = (
       if (f.kind === 'free') {
         const z = effFreePos[f.name] ?? defaultFree(f.name, seed);
         env.set(f.name, z);
-        points.push({ key: f.id, label: prettyName(f.name), z, kind: 'free', factId: f.id, freeName: f.name });
+        points.push({
+          key: f.id,
+          label: prettyName(f.name),
+          z,
+          kind: 'free',
+          factId: f.id,
+          // #603 (operator ruling): a constraint-ADJUSTED number is not draggable — a drag
+          // would fight the drive; its remaining freedom belongs to "another configuration"
+          freeName: adjusted[f.name] ? undefined : f.name,
+        });
       } else if (f.kind === 'rel') {
         const r = f.rel;
         const missing = relNames(r).find((n) => !env.has(n));
