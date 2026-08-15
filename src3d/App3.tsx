@@ -782,8 +782,16 @@ export default function App3() {
                       `dir="auto"` — these rows routinely START with a Latin point label («AB ו-CD
                       מצטלבים»), and auto keys off the FIRST strong character, so the Hebrew sentence
                       would take an LTR base and reorder into garbage (the ADR-312/#118 trap). */}
+                  {/* #577 (ADR-3D-154): a LINEAR×PLANAR row words asymmetrically — «FG מקביל למישור
+                      ABCD», never the symmetric «מקבילים», which misreads for a plane. The row says
+                      which kind it is, so the key is picked, never guessed from the labels. */}
                   {dataPanel.mutual.map((m) => {
-                    const line = t(`dataPanel.mutual.${m.rel}`, { a: m.a, b: m.b });
+                    const line = t(
+                      m.mixed && (m.rel === 'parallel' || m.rel === 'perpendicular')
+                        ? `dataPanel.mutual.${m.rel === 'parallel' ? 'parallelPlane' : 'perpendicularPlane'}`
+                        : `dataPanel.mutual.${m.rel}`,
+                      { a: m.a, b: m.b },
+                    );
                     return (
                       <li key={`${m.rel}-${m.a}-${m.b}`} dir={textDir3(line)} className="border-b border-slate-100 pb-1 font-medium">
                         {line}

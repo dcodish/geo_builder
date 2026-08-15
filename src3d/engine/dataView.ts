@@ -17,7 +17,7 @@
 import { resolve3, scaleKnown3, translationPinned3, vectorFramePinned3 } from './evaluate';
 import { cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
 import { figureSymbolsOf } from './types';
-import { angleBetweenOperands, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, resolveOperand } from './operands';
+import { angleBetweenOperands, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import type { Construction3, Id, MutualRel3, Operand3, Positions3 } from './types';
 
 /** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
@@ -42,7 +42,13 @@ export interface VecEntry {
 export interface MutualRow {
   a: string;
   b: string;
-  rel: MutualRel3 | 'perpendicular';
+  /** #577: `contained` is the linear×planar cell's own answer — a segment lying IN a plane is not
+   *  'parallel' to it, and saying so would be a false statement. */
+  rel: MutualRel3 | 'perpendicular' | 'contained';
+  /** #577: a LINEAR×PLANAR pair, with `a` the linear side. The wording is asymmetric here — «FG
+   *  מקביל למישור ABCD», never the symmetric «מקבילים», which misreads for a plane — so the row
+   *  carries its own kind rather than the App re-deriving it from the labels. */
+  mixed?: true;
 }
 
 export interface DataPanel {
@@ -645,72 +651,151 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   //
   // Emitted STRUCTURED, not as a formatted string: there is no standard symbol for skew lines (the
   // textbook writes «מצטלבים» in words), so rendering is the App's job, in the reader's language.
+  // #577 + #558 (ADR-3D-154): ONE universe, ONE loop.
+  //
+  // This used to be TWO hand-built loops — an S4 block over `c.segments` + named lines, and a #384
+  // block over planes — and the shape of that is the defect: a pair whose two sides sat in different
+  // loops could never be asked about. So «FG ∥ מישור ABCD» produced no row even though the STATEMENT
+  // lane already verifies and drives it (`relDeviation`, ADR-3D-105 — the engine understood more than
+  // the UI communicated, the ADR-3D-108 theme again), declared vectors were in no universe at all, and
+  // a named line could not be compared against a solid's undrawn edge (#558).
+  //
+  // A third loop would have recommitted the class error. Instead the universe is built once and
+  // PARTITIONED (linear / planar), and one double loop dispatches on the two sides' kinds. Adding a
+  // future operand kind is then an entry in the universe, not a new loop.
   {
-    const named: { op: Operand3; label: string; ids: Id[] }[] = [
-      ...c.segments.map(([a, b]) => ({ op: { kind: 'segment', a, b } as Operand3, label: `${a}${b}`, ids: [a, b] })),
-      ...[...c.lines.keys(), ...c.pointLines.keys()].map((n) => ({ op: { kind: 'line', name: n } as Operand3, label: n, ids: [] as Id[] })),
-    ];
-    const REL_ORDER: MutualRel3[] = ['coincident', 'parallel', 'intersecting', 'skew'];
-    for (let i = 0; i < named.length; i++) {
-      for (let j = i + 1; j < named.length; j++) {
-        const A = named[i];
-        const B = named[j];
-        if (A.ids.some((id) => B.ids.includes(id))) continue; // shared endpoint: the meeting is trivial
-        const sidesAt = resolved.map((res) =>
-          mutualSides(A.op, B.op, c, { lines: res.lines, planes: res.planes }, (id) => res.positions.get(id) ?? null),
-        );
-        if (sidesAt.some((s) => !s)) continue;
-        // the SAME relation must hold in every sampled configuration — one drawing is not knowledge
-        const rel = REL_ORDER.find((r) => sidesAt.every((s) => mutualHolds(r, s![0], s![1], MUTUAL_VERIFY_TOL)));
-        if (rel) mutual.push({ a: A.label, b: B.label, rel });
-        // ⟂ is a DIRECTION relation, independent of position: two skew lines can be perpendicular,
-        // so it is reported alongside rather than instead of the mutual position.
-        const perp = sidesAt.every((s) => {
-          const d1 = s![0].geom.dir!;
-          const d2 = s![1].geom.dir!;
-          const den = Math.hypot(d1.x, d1.y, d1.z) * Math.hypot(d2.x, d2.y, d2.z);
-          return den > EPS && Math.abs(dot3(d1, d2)) / den < 1e-4;
-        });
-        if (perp) mutual.push({ a: A.label, b: B.label, rel: 'perpendicular' });
+    type Side = {
+      op: Operand3;
+      label: string;
+      /** Endpoints, when the object has them — the shared-endpoint and own-edge skips read these. */
+      ids: Id[];
+      planar: boolean;
+      /** #558: a SOLID EDGE, admitted only against a named line (see the flood control below). */
+      edge?: true;
+    };
+    const linear: Side[] = [];
+    const planar: Side[] = [];
+    const seenPair = new Set<string>();
+    const addLinear = (s: Side, key?: string) => {
+      if (key) {
+        if (seenPair.has(key)) return; // the same physical object, named twice, is one row not three
+        seenPair.add(key);
       }
+      linear.push(s);
+    };
+    for (const [a, b] of c.segments) addLinear({ op: { kind: 'segment', a, b }, label: `${a}${b}`, ids: [a, b], planar: false }, pairKey(a, b));
+    for (const n of [...c.lines.keys(), ...c.pointLines.keys()]) linear.push({ op: { kind: 'line', name: n }, label: n, ids: [], planar: false });
+    // #577: declared vectors and ink arrows were outside the universe entirely — the reported figure's
+    // FG is a declared vector, which is why it could not appear even against another linear object.
+    for (const [n, d] of c.vectors) addLinear({ op: { kind: 'vector', name: n }, label: n, ids: [d.from, d.to], planar: false }, pairKey(d.from, d.to));
+    for (const [a, b] of c.arrows) addLinear({ op: { kind: 'segment', a, b }, label: `${a}${b}`, ids: [a, b], planar: false }, pairKey(a, b));
+    // #558: SOLID EDGES. The flood control that makes this affordable is the `edge` flag, enforced in
+    // the loop: an edge pairs ONLY with a named line (one line × ~12 edges), never with another edge
+    // (a cube's 12 edges would be 66 mostly-noise pairs — the ADR-3D-104 scope ruling).
+    for (const s of c.solids) {
+      for (const [a, b] of s.edges) addLinear({ op: { kind: 'segment', a, b }, label: `${a}${b}`, ids: [a, b], planar: false, edge: true }, pairKey(a, b));
     }
-  }
+    for (const [n, ids] of c.pointPlanes) planar.push({ op: { kind: 'plane-run', ids: [...ids] }, label: n, ids: [...ids], planar: true });
+    for (const n of c.planes.keys()) planar.push({ op: { kind: 'plane-named', name: n }, label: n, ids: [], planar: true });
+    for (const n of c.relPlanes.keys()) planar.push({ op: { kind: 'plane-named', name: n }, label: n, ids: [], planar: true });
 
-  // #384 (ADR-3D-108): the PLANE pairs — the S3 column's panel presence (operator play, test 3:
-  // «המישור ABC מקביל למישור A'B'C'» verified and the panel said nothing). Same scope rule as the
-  // S4 block above (a patch exists only for a plane the student NAMED), same multi-sample gate.
-  // Only the INFORMATIVE relations: two generic planes always intersect, so a plain 'intersecting'
-  // row would be noise — parallel / perpendicular / coincident are knowledge.
-  {
-    const planeOps: { op: Operand3; label: string }[] = [
-      ...[...c.pointPlanes.entries()].map(([n, ids]) => ({ op: { kind: 'plane-run', ids: [...ids] } as Operand3, label: n })),
-      ...[...c.planes.keys()].map((n) => ({ op: { kind: 'plane-named', name: n } as Operand3, label: n })),
-      ...[...c.relPlanes.keys()].map((n) => ({ op: { kind: 'plane-named', name: n } as Operand3, label: n })),
-    ];
+    const universe = [...linear, ...planar];
+    const REL_ORDER: MutualRel3[] = ['coincident', 'parallel', 'intersecting', 'skew'];
     const TOL = 1e-4;
-    for (let i = 0; i < planeOps.length; i++) {
-      for (let j = i + 1; j < planeOps.length; j++) {
+    for (let i = 0; i < universe.length; i++) {
+      for (let j = i + 1; j < universe.length; j++) {
+        const A = universe[i];
+        const B = universe[j];
+        // #558's gate: an undrawn solid edge earns a row only against a NAMED LINE — the book's
+        // «ℓ ⟂ BCK ⇒ ℓ ⟂ B'C'» class, and nothing wider.
+        if (A.edge || B.edge) {
+          const other = A.edge ? B : A;
+          const both = A.edge && B.edge;
+          if (both || other.op.kind !== 'line') continue;
+        }
+        if (!A.planar && !B.planar) {
+          // linear × linear — unchanged from the S4 block.
+          // The shared-endpoint skip is a LINEAR notion and stays scoped to this branch: two segments
+          // from one vertex obviously meet there. Two PLANES sharing two points do not meet trivially
+          // at all — hoisting this test out of here silently dropped «ABC ⟂ ABD».
+          if (A.ids.some((id) => B.ids.includes(id))) continue;
+          const sidesAt = resolved.map((res) =>
+            mutualSides(A.op, B.op, c, { lines: res.lines, planes: res.planes }, (id) => res.positions.get(id) ?? null),
+          );
+          if (sidesAt.some((s) => !s)) continue;
+          // the SAME relation must hold in every sampled configuration — one drawing is not knowledge
+          const rel = REL_ORDER.find((r) => sidesAt.every((s) => mutualHolds(r, s![0], s![1], MUTUAL_VERIFY_TOL)));
+          // an EDGE pair reports only the informative relations: a 'skew'/'intersecting' row on every
+          // undrawn edge of a solid is exactly the noise the scope rule exists to keep out
+          const informative = !(A.edge || B.edge) || rel === 'parallel' || rel === 'coincident';
+          if (rel && informative) mutual.push({ a: A.label, b: B.label, rel });
+          // ⟂ is a DIRECTION relation, independent of position: two skew lines can be perpendicular,
+          // so it is reported alongside rather than instead of the mutual position.
+          const perp = sidesAt.every((s) => {
+            const d1 = s![0].geom.dir!;
+            const d2 = s![1].geom.dir!;
+            const den = Math.hypot(d1.x, d1.y, d1.z) * Math.hypot(d2.x, d2.y, d2.z);
+            return den > EPS && Math.abs(dot3(d1, d2)) / den < 1e-4;
+          });
+          if (perp) mutual.push({ a: A.label, b: B.label, rel: 'perpendicular' });
+          continue;
+        }
+
         const geoms = resolved.map((res) => {
           const at = (id: Id) => res.positions.get(id) ?? null;
           const abs = { lines: res.lines, planes: res.planes };
-          return [resolveOperand(planeOps[i].op, c, abs)(at), resolveOperand(planeOps[j].op, c, abs)(at)] as const;
+          return [resolveOperand(A.op, c, abs)(at), resolveOperand(B.op, c, abs)(at)] as const;
         });
-        if (geoms.some(([a, b]) => !a?.normal || !b?.normal)) continue;
-        const meas = geoms.map(([a, b]) => {
-          const na = a!.normal!;
-          const nb = b!.normal!;
-          const den = Math.max(norm3(na) * norm3(nb), 1e-12);
-          return { cos: dot3(na, nb) / den, cross: norm3(cross3(na, nb)) / den };
-        });
-        if (meas.every((x) => x.cross < TOL)) {
-          const coin = geoms.every(([a, b], k) => {
-            const dev = planeCoincidenceDeviation(a!, b!, figureExtent(positions[k]));
-            return dev !== null && Math.abs(dev) < TOL;
+
+        if (A.planar && B.planar) {
+          // plane × plane — unchanged from the #384 block. Only the INFORMATIVE relations: two generic
+          // planes always intersect, so a plain 'intersecting' row would be noise.
+          if (geoms.some(([a, b]) => !a?.normal || !b?.normal)) continue;
+          const meas = geoms.map(([a, b]) => {
+            const na = a!.normal!;
+            const nb = b!.normal!;
+            const den = Math.max(norm3(na) * norm3(nb), 1e-12);
+            return { cos: dot3(na, nb) / den, cross: norm3(cross3(na, nb)) / den };
           });
-          mutual.push({ a: planeOps[i].label, b: planeOps[j].label, rel: coin ? 'coincident' : 'parallel' });
-        } else if (meas.every((x) => Math.abs(x.cos) < TOL)) {
-          mutual.push({ a: planeOps[i].label, b: planeOps[j].label, rel: 'perpendicular' });
+          if (meas.every((x) => x.cross < TOL)) {
+            const coin = geoms.every(([a, b], k) => {
+              const dev = planeCoincidenceDeviation(a!, b!, figureExtent(positions[k]));
+              return dev !== null && Math.abs(dev) < TOL;
+            });
+            mutual.push({ a: A.label, b: B.label, rel: coin ? 'coincident' : 'parallel' });
+          } else if (meas.every((x) => Math.abs(x.cos) < TOL)) {
+            mutual.push({ a: A.label, b: B.label, rel: 'perpendicular' });
+          }
+          continue;
         }
+
+        // linear × planar (#577) — the cell that had no code path at all. The math is NOT re-derived:
+        // `relDeviation` is the same reading the STATEMENT lane verifies and drives with (ADR-3D-105),
+        // so a typed «FG מקביל למישור ABCD» and this passive row can never disagree.
+        const [lin, pln] = A.planar ? [B, A] : [A, B];
+        // flood control, the linear×planar twin of the shared-endpoint skip: a segment that is an edge
+        // or a diagonal of the plane's OWN defining run is contained in it by construction — saying so
+        // is noise, not knowledge.
+        if (pln.ids.length > 0 && lin.ids.length > 0 && lin.ids.every((id) => pln.ids.includes(id))) continue;
+        if (geoms.some(([a, b]) => !a || !b)) continue;
+        const devs = geoms.map(([a, b]) => ({
+          par: relDeviation('parallel', undefined, a!, b!),
+          perp: relDeviation('perp', undefined, a!, b!),
+        }));
+        if (devs.some((d) => d.par === null || d.perp === null)) continue;
+        if (devs.every((d) => d.par! < TOL)) {
+          // a line with |cos(dir, normal)| = 0 AND no offset LIES IN the plane — reporting that as
+          // plain 'parallel' would be a false statement, so it gets its own row (which also delivers
+          // the `contains` cell ADR-3D-105 left planned). Operator-decided at arming.
+          const contained = geoms.every(([a, b], k) => {
+            const gap = distanceBetween(a!, b!);
+            return gap !== null && Math.abs(gap) < TOL * Math.max(1, figureExtent(positions[k]));
+          });
+          mutual.push({ a: lin.label, b: pln.label, rel: contained ? 'contained' : 'parallel', mixed: true });
+        } else if (devs.every((d) => d.perp! < TOL)) {
+          mutual.push({ a: lin.label, b: pln.label, rel: 'perpendicular', mixed: true });
+        }
+        // a generic crossing is noise — the #384 precedent, applied to the mixed column too
       }
     }
   }
