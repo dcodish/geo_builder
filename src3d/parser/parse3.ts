@@ -3253,26 +3253,34 @@ const polygonCircle3: Rule = (s) => {
   if (!/חסומ?|חוסמ?|inscrib\w*|circumscrib\w*/i.test(s)) return null;
   if (!/מעגל|\bcircle\b/i.test(s)) return null;
   const polyRe = new RegExp(`${POLY_WORDS_HE3}|${POLY_WORDS_EN3}`, 'i');
-  if (!polyRe.test(s)) return null;
-  // which noun carries the "in" marker — the CONTAINER
-  const polyContainer = new RegExp(
-    String.raw`(?:ב|בתוך\s+ה?)(?:${POLY_WORDS_HE3})|\bin(?:side)?\s+(?:an?\s+|the\s+)?(?:${POLY_WORDS_EN3})`,
-    'i',
-  ).test(s);
+  const ring = firstLabelRun(s);
+  if (ring.length < 3 || ring.length > 5) return null; // the polygon must be NAMED — an unnamed one has no ring to fit
+  // #586: the polygon NOUN is OPTIONAL. The ring is what identifies the polygon, and students write it
+  // bare — «מעגל חוסם את ABCD». Requiring the noun made this the #494/#513/#529 framing gap (a rule
+  // spelling one form of a subject written several ways); everything downstream already worked.
+  const nounIdx = s.search(polyRe);
+  const runIdx = s.indexOf(ring.join(''));
+  // which side carries the "in" marker — the CONTAINER. With no noun, the marker rides the RUN itself
+  // («מעגל חסום ב-ABCD»), which is the bare-run twin of `בתוך ה?<noun>`.
+  const polyContainer =
+    new RegExp(
+      String.raw`(?:ב|בתוך\s+ה?)(?:${POLY_WORDS_HE3})|\bin(?:side)?\s+(?:an?\s+|the\s+)?(?:${POLY_WORDS_EN3})`,
+      'i',
+    ).test(s) ||
+    (nounIdx < 0 &&
+      new RegExp(String.raw`(?:(?:ב|בתוך\s+ה?)-?\s*|\bin(?:side)?\s+(?:the\s+)?)${ring.join('')}\b`, 'i').test(s));
   const circContainer = /(?:ב|בתוך\s+ה?)מעגל|\bin(?:side)?\s+(?:an?\s+|the\s+)?circle/i.test(s);
   let circleIsContainer: boolean;
   if (polyContainer !== circContainer) circleIsContainer = circContainer;
   else {
     // neither (or both) marked — fall back to the VERB: «חוסם» names what CONTAINS.
     const circIdx = s.search(/מעגל|\bcircle\b/i);
-    const polyIdx = s.search(polyRe);
+    const polyIdx = nounIdx >= 0 ? nounIdx : runIdx;
     if (circIdx < 0 || polyIdx < 0) return null;
     circleIsContainer = /חוסמ?\s*(?:את\s*)?(?:ה?מעגל)|circumscrib\w*\s+(?:about|around)/i.test(s)
       ? false
       : circIdx < polyIdx;
   }
-  const ring = firstLabelRun(s);
-  if (ring.length < 3) return null; // the polygon must be NAMED — an unnamed one has no ring to fit
   // an explicitly named circle keeps its letter; otherwise the id is derived from the ring, so the
   // implicit-reference lane (`c.circles3.length === 1`) still resolves «המעגל»
   const named = s.match(/(?:מעגל|circle)\s+([A-Z]\d*)/);
@@ -3285,9 +3293,15 @@ const polygonCircle3: Rule = (s) => {
   // context-free — M1 owns existence: a flat polygon whose ids ALL exist is a statement ABOUT those
   // points, an idempotent no-op (apply.ts, #116), which is exactly the operator's pyramid-base case
   // («ABC» already a face) and why this cannot re-declare anything.
-  const arity = /משולש|\btriangle\b/i.test(s) ? 3 : /מרובע|\b(quadrilateral|quad)\b/i.test(s) ? 4 : /מחומש|\bpentagon\b/i.test(s) ? 5 : 0;
-  const polyKind = arity === 3 ? 'polygon3' : arity === 4 ? 'polygon4' : arity === 5 ? 'polygon5' : null;
-  if (!polyKind || ring.length !== arity) return [{ type: 'circle3', id, def }];
+  // #586: the RING'S LENGTH names the polygon kind. The old three-noun arity map was an enumeration,
+  // not a rule — it forgot every quad noun `POLY_WORDS_HE3` admits, so `מעגל חוסם את ריבוע ABCD` passed
+  // the noun gate, emitted the circle ALONE, and refused `unknown-point A` as an opening move: the #440
+  // half-drop re-opened on the nouns the map happened to miss. A STATED noun still has to agree with the
+  // run it names (`statedQuadBase` is the one quad vocabulary, #305/ADR-3D-090) — a mismatch is a
+  // contradiction the student wrote, and refusing is honest where guessing which half to believe is not.
+  const statedArity = /משולש|\btriangle\b/i.test(s) ? 3 : statedQuadBase(s) ? 4 : /מחומש|\bpentagon\b/i.test(s) ? 5 : null;
+  if (statedArity !== null && statedArity !== ring.length) return null;
+  const polyKind = ring.length === 3 ? 'polygon3' : ring.length === 4 ? 'polygon4' : 'polygon5';
   // #424's ONE vocabulary: a qualifier the parser recognises must be one it can lower, on every rule
   // that declares a polygon — `משולש שווה שוקיים ABC חסום במעגל` states the equal pair too.
   const shape: TriSpec = polyKind === 'polygon3' ? statedTriShape(s) : { equal: null, right: false };

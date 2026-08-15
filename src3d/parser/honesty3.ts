@@ -58,7 +58,13 @@ import { CONSTRUCT_NOUNS, labelTokens, normalize3 } from './parse3';
  */
 export function droppedShapeNoun3(utterance: string, commands: Command3[]): string[] {
   const s = normalize3(utterance);
-  if (!/מנסרה|פירמידה|\bprism\b|\bpyramid\b/i.test(s)) return []; // only a solid-base context
+  // #587: the FLAT lane is the same event. A stated quad noun on a bare polygon — `המרובע ABCD הוא
+  // ריבוע` — committed a green ARBITRARY quadrilateral, because the flat rules carry `TriSpec` only and
+  // this gate watched solid BASES exclusively. The drop is identical in kind to the solid one it already
+  // catches, so it is the same question asked in one more context, never a second gate.
+  const solidCtx = /מנסרה|פירמידה|\bprism\b|\bpyramid\b/i.test(s);
+  const flatCtx = commands.some((c) => c.type === 'solid' && (c.kind === 'polygon3' || c.kind === 'polygon4' || c.kind === 'polygon5'));
+  if (!solidCtx && !flatCtx) return [];
   // #305 (ADR-3D-090): which base a KIND stands on comes from the ONE registry, so this gate can
   // never drift behind the parser again (it used to keep its own kind lists and marked kite /
   // trapezoid permanently `unsupported` — both are real bases now).
@@ -93,6 +99,10 @@ export function droppedShapeNoun3(utterance: string, commands: Command3[]): stri
     [/ריבוע|\bsquare\b/i, ['eqAdj', 'right']],
     [/דלתון|\bkite\b/i, 'kite'],
     [/טרפז\w*|\btrapez\w*/i, 'trapezoid'],
+    // #587: a parallelogram IS defined by a property (parallel opposite sides) — it was left out only
+    // because every SOLID whose base it names carries it structurally, which `built.has` still answers
+    // true for. In the flat lane nothing carries it, so the same membership test catches the drop.
+    [/מקבילית|\bparallelogram\b/i, 'parallelogram'],
   ];
   const lost: string[] = [];
   for (const [re, req] of need) {

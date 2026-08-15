@@ -3532,3 +3532,44 @@ gains the same carriers.
 Locks: `plane-run-materialize.test.ts` — the operator's exact chain end-to-end (green + `ABS` in
 `pointPlanes` + a resolved plane to draw), the coord-frame and line-plane-angle siblings, the
 bare-base exclusion, and idempotency beside a prior «המישור ABS» plane-through.
+
+## ADR-3D-149 — the inscription ring names itself; the flat lane's quad nouns face the honesty gate (#586, #587 part)
+
+Operator, playing round #582/#584: *"we should have add the option of writing «מעגל חוסם את ABCD»"*,
+and separately *"«ABCD ריבוע» also fails … but the error message says it doesn't recognize it."* Two
+reports, one lane — the flat polygon rules and their vocabulary.
+
+**The framing half (#586).** `polygonCircle3` hard-required a polygon NOUN before it would read the
+ring, so the bare-run form died at the gate while «מעגל חוסם את ריבוע ABCD» worked. The ring is what
+identifies the polygon; the noun is decoration. The noun is now OPTIONAL, and its container marker
+(ב / "in") is read off the RUN when no noun carries it — the bare-run twin of `בתוך ה?<noun>`.
+
+**The arity half (#586, latent).** The rule's arity map enumerated משולש/מרובע/מחומש, so any other
+noun `POLY_WORDS_HE3` admits (ריבוע, מלבן, …) passed the gate and emitted the circle ALONE — the #440
+half-drop re-opened on the nouns the map forgot, refusing `unknown-point A` as an opening move. The
+kind now comes from the RING'S LENGTH; a stated noun only has to AGREE with it, and a contradiction
+(«מעגל חוסם את משולש ABCD») refuses rather than picking a half to believe. *An enumeration is not a
+rule* (`src3d/CLAUDE.md`), applied for the third time in this file's history.
+
+**The silent-drop half (#587's "must not survive").** The flat lane carries `TriSpec` only, so
+«המרובע ABCD הוא ריבוע» parsed to a bare `polygon4` with ריבוע DISCARDED and drew an arbitrary
+quadrilateral with a green ✓ — the #424/#330 class, quad edition, invisible to every gate
+(`droppedTriShape3` is triangles-only; `droppedShapeNoun3` scoped itself to solid BASES). Decision:
+`droppedShapeNoun3` is bound to the EVENT, not to the solid context — a stated quad noun whose
+defining property no committed command carries is a dropped given wherever it was written. It now
+also runs on the DETERMINISTIC path (the ADR-3D-147/#530 doctrine: a grammar rule drops exactly as
+an LLM decomposition can), and `מקבילית` joins the watched nouns — it was omitted only because every
+solid whose base it names carries it structurally, which the same `built.has` test still answers.
+
+Consequence, stated plainly: the quad shape nouns still do not BUILD on the flat lane. They now
+refuse honestly, naming the qualifier they could not lower, instead of committing a wrong figure —
+the interim #587's own plan called for. The capability half (lowering each family to its constraint
+set) is escalated on #587: it needs constraint sets authored fresh (the solid lane realises quad
+bases *structurally* via `quadBaseRing`/solid kinds, so there is no macro to mirror) and a ruling on
+`rect-complete`, which owns «ABCD מלבן» today with corner-completion semantics no other quad noun has.
+
+Locks: `issue-586-bare-run-circle.test.ts` — the operator's exact pair on the pyramid figure
+(«פירמידה ABCDS שבסיסה ריבוע» → «מעגל חוסם את ABCD», every base vertex on the circle at four seeds,
+the apex off it), bare-run circum/incircle with En mirrors, byte-identical lowering against the noun
+forms, the opening-move arity sibling, the noun/run contradiction refusal, and the silent-drop
+refusals with the generic-noun and triangle-lane controls proving the gate did not over-reach.

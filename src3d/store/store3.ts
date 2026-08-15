@@ -567,6 +567,7 @@ export const useGeo3 = create<Geo3State>()(
         const lostDet = [
           ...droppedNewLabels3(utterance, parsed.commands, [...prior3.points.keys()], [...prior3.vectors.keys()]),
           ...droppedGivenNumbers3(utterance, parsed.commands),
+          ...droppedShapeNoun3(utterance, parsed.commands), // #587: a stated QUAD noun the flat lane cannot lower
           ...droppedTriShape3(utterance, parsed.commands),
           ...droppedConstructNoun3(utterance, parsed.commands),
         ];
