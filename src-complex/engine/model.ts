@@ -429,10 +429,11 @@ const projectConstraints = (
   freePos: Record<string, Cx>,
   seed: number,
   paramScale?: Record<string, number>,
-): { adjusted: Record<string, Cx>; drove: Record<string, boolean> } => {
+): { adjusted: Record<string, Cx>; drove: Record<string, boolean>; fwd: Record<string, boolean> } => {
   const P = (name: string): number => paramValue(name, seed) * (paramScale?.[name] ?? 1);
   const adjusted: Record<string, Cx> = {};
   const drove: Record<string, boolean> = {};
+  const fwd: Record<string, boolean> = {}; // equations that drove their RHS forward (#602)
   // three sweeps: a later constraint that moves a number re-feeds the earlier ones
   // (arg(z1)-arg(z2)=90 stays true after arg(z2)<45 folds z2)
   for (let sweep = 0; sweep < 3; sweep++) {
@@ -467,6 +468,7 @@ const projectConstraints = (
             env.set(f.rhs.name, v);
             adjusted[f.rhs.name] = v;
             drove[f.id] = true;
+            fwd[f.id] = true;
             continue;
           }
           // the equation CONSTRAINS the existing free X — fixed-point on the nearest nth root,
@@ -628,7 +630,7 @@ const projectConstraints = (
     }
   }
   }
-  return { adjusted, drove };
+  return { adjusted, drove, fwd };
 };
 
 export const derive = (
@@ -637,7 +639,7 @@ export const derive = (
   seed = 0,
   paramScale?: Record<string, number>,
 ): Scene => {
-  const { adjusted, drove } = projectConstraints(facts, freePos, seed, paramScale);
+  const { adjusted, drove, fwd } = projectConstraints(facts, freePos, seed, paramScale);
   const effFreePos = { ...freePos, ...adjusted };
   const env = new Map<string, Cx>([['o', cx(0)]]);
   const segments: SceneSegment[] = [];
@@ -770,8 +772,9 @@ export const derive = (
           }
           const ok = absC(sub(ipow(X, f.n), w)) <= 1e-6 * Math.max(1, absC(w));
           checks[f.id] = { ok, driven: !!drove[f.id] };
-          if (drove[f.id] && absC(w) > 0) {
-            // represent the solvable meaning: the full candidate set, X sitting on one of them
+          if (drove[f.id] && !fwd[f.id] && absC(w) > 0) {
+            // the LETTER was snapped to one of n roots — show the alternatives it was chosen
+            // from; a FORWARD drive (rhs positioned from the letter) has no choice to show (#602)
             const roots = nthRoots(w, f.n);
             circles.push({ r: absC(roots[0]), factId: f.id });
             // display-only candidates — no env registration (factNames introduces nothing here)

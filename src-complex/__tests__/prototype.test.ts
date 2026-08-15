@@ -901,6 +901,9 @@ describe('equation-direction fairness (#600: z1^3=z3 drives z3 when z1 is claime
       expect(argDeg(z1)).toBeLessThan(90); // the quadrant kept its claim
       const cube = mul(mul(z1, z1), z1);
       expect(absC(sub(cube, z3))).toBeLessThan(1e-6 * Math.max(1, absC(z3))); // z3 absorbed the equation
+      // a forward drive shows NO candidate constellation (#602) — there was no choice to show
+      expect(s.points.filter((p) => p.kind === 'root')).toHaveLength(0);
+      expect(s.circles).toHaveLength(0);
     }
     useComplexStore.getState().clearAll();
   });
