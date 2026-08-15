@@ -7253,3 +7253,45 @@ command was emitted"), the bare-separator form lowering byte-identically to the 
 mirrors, named labels carrying the dimensions, the square contradiction refusing with BOTH magnitudes
 still in the parse, the triangle staying out, «על» as a membership word not read as a separator, and
 `מלבן ABCD שצלעו` still escalating so the ADR-052 scoping of the existing owner is not silently widened.
+
+## ADR-451 — the side-length clause is read at the shape MACRO, not rewritten at the utterance boundary (#591)
+
+Operator, 2026-08-15: *"we need to support this. for a square and for a משולש שווה צלעות it is possible
+that students will enter it like this. just like we can write ריבוע with no letters."* The bare shape
+(«ריבוע») already auto-names its vertices; only the side-length variant did not.
+
+The gap was structural, and it is why #458 deliberately left it alone rather than absorbing it.
+`normalizeShapeSide` owned the phrasing as an utterance **REWRITE** — `<shape> <ids>` + «שצלעו N» →
+the appositive `<shape> <ids>, <first-edge> = N` that the ADR-264 clause split already reads. A rewrite
+has to NAME the edge, so it needed two letters; and for a label-less shape those letters do not exist
+yet — `shapeMacro` mints them via `autoVertexLabels`, whose answer is context-dependent (it avoids
+collisions with points already in the figure). No amount of regex work at the normalization boundary
+can reach that, because the information is not there yet.
+
+Decision: move the reading to `shapeMacro`, where the ring's ids are resolved, and **retire the
+rewrite**. `statedSideLength` sits beside #458's `statedDims` at the same seam, consumes the clause
+before the `shapeLeftover` gate (that gate is what escalated these lines), and appends
+`segment(v0,v1)` + `set-distance(v0,v1,N)` — the ADR-110 macro pattern, no new engine construct.
+
+Retiring the rewrite is the point, not a side effect. Keeping both would have split ownership of one
+phrasing by **label-presence** — the optional parallel path docs/17 §3 says a chokepoint must never
+have, and the specific reason this was filed separately instead of folded into #458.
+
+Scope unchanged and deliberately so: `SIDE_SHAPES` (square / rhombus / equilateral triangle) — shapes
+whose sides are all equal *by definition*, where "its side" names one length unambiguously. A
+rectangle's «שצלעו» remains an unstated pick of WHICH side (ADR-052) and still escalates. The value
+rides the shared radical-aware `NUMEXPR` atom, so «שצלעו √2» and the √() toolbar form keep working — a
+plain-number reader here would have silently narrowed the form that already worked.
+
+Evidence the move is behaviour-preserving, which is the load-bearing claim: every LABELLED form lowers
+**byte-identically** to what the rewrite produced (asserted against the measured pre-change baseline),
+and the `llm-contract` {example → command types} snapshot moved by **additions only — zero deletions**,
+so no existing catalog example changed what it builds. The `shadow-matrix` winner for the labelled
+examples does move (`(escalate)` → the shape rule) — that IS the ownership transfer, recorded rather
+than hidden.
+
+Locks: `issue-591-labelless-side.test.ts` — the labelled forms pinned to the exact baseline command
+lists; the label-less forms building the same figure at real measured edge lengths; label-less ≡
+labelled modulo the minted letters; auto labels still avoiding existing points; the radical value; and
+the ADR-052 refusals («מלבן … שצלעו», both with and without letters) plus a #458 non-interference row.
+Catalog gains the label-less example so the commands panel teaches it.

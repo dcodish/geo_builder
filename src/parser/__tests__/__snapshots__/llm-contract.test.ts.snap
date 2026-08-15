@@ -1652,6 +1652,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "inscribe",
     ],
   },
+  "square whose side is 4": {
+    "en": [
+      "square",
+      "segment",
+      "set-distance",
+    ],
+    "he": [
+      "square",
+      "segment",
+      "set-distance",
+    ],
+  },
   "tangent to circle O at A": {
     "en": [
       "circle",

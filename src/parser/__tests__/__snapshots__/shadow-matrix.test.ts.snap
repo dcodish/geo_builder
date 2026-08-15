@@ -616,12 +616,22 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   {
     "lang": "en",
     "text": "square ABCD whose side is 1",
-    "winner": "(escalate)",
+    "winner": "(anon)",
   },
   {
     "lang": "he",
     "text": "ריבוע ABCD שצלעו הוא 1",
-    "winner": "(escalate)",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "text": "square whose side is 4",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "ריבוע שצלעו 4",
+    "winner": "(anon)",
   },
   {
     "lang": "en",

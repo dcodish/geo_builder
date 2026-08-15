@@ -745,10 +745,8 @@ export const shapeLeftover = (s: string): boolean => {
  * an honest over-constraint — the student wrote a contradiction, and picking one number to believe
  * would be the silent-wrong-build class.
  *
- * The SINGLE-side form («שצלעו 4») is deliberately NOT read here: `normalizeShapeSide` already owns
- * it, scoped to shapes whose sides are all equal by definition, because on a rectangle "its side" is
- * an unstated pick. A second reader here would be the optional parallel path a chokepoint must never
- * have (docs/17 §3) — and a laxer one. Its label-less gap is tracked separately.
+ * The SINGLE-side form («שצלעו 4») is read by {@link statedSideLength} just below — same seam, same
+ * discipline, different phrasing.
  */
 const DIM_SEP = String.raw`(?:\*|×|✕|x|X|\s+על\s+|\s+by\s+)`;
 const DIM_LEAD = String.raw`(?:ב?מידות\s*|with\s+dimensions?\s+|dimensions?\s+)?`;
@@ -765,6 +763,48 @@ const dimCommands = (ids: Id[], values: number[]): AnyCommand[] =>
     .slice(0, Math.min(values.length, ids.length - 1))
     .map((value, i) => ({ type: 'set-distance', a: ids[i], b: ids[i + 1], value }) as AnyCommand);
 
+/**
+ * #591 — a shape declared WITH its side length and no letters: «ריבוע שצלעו 4»,
+ * «משולש שווה צלעות שצלעו 4», «מעוין שצלעו 4», «square whose side is 4».
+ *
+ * Scoped to shapes whose sides are ALL EQUAL BY DEFINITION ({@link SIDE_SHAPES}): on those "its side"
+ * names one length unambiguously, while a rectangle's «שצלעו» would be an unstated pick of WHICH side
+ * (ADR-052) — so `מלבן ABCD שצלעו 4` still escalates rather than guessing.
+ *
+ * This is now the ONE owner of the phrasing. It used to be an utterance REWRITE
+ * (`normalizeShapeSide`: `<shape> <ids>` + clause → `<shape> <ids>, <first-edge> = <value>`), which
+ * could only work when the student wrote letters — the rewrite has to name the edge, and for a
+ * label-less shape the letters do not exist until `shapeMacro` calls `autoVertexLabels`, whose answer
+ * depends on which points already exist. Reading it HERE, where the ids are resolved, serves both
+ * forms from one rule; keeping the rewrite as well would have split ownership by label-presence, the
+ * optional parallel path docs/17 §3 forbids.
+ *
+ * The value rides the shared radical-aware {@link NUMEXPR} atom, so «שצלעו √2» and the √() toolbar
+ * form keep working — a plain-number reader here would have silently narrowed the labelled form.
+ */
+let sideShapeRe: RegExp | null = null;
+let sideClauseRe: RegExp | null = null;
+function statedSideLength(s: string): { value: number; strip: RegExp } | null {
+  // Lazily compiled: this module defines NUMEXPR/SIDE_CLAUSE below, and these regexes are built on
+  // first PARSE (well after module init) rather than at definition time.
+  sideShapeRe ??= new RegExp(`(?:${SIDE_SHAPES})`, 'i');
+  if (!sideShapeRe.test(s)) return null;
+  sideClauseRe ??= new RegExp(`${SIDE_CLAUSE}${NUMEXPR('sd')}`, 'i');
+  const m = s.match(sideClauseRe);
+  if (!m?.groups) return null;
+  const v = numexprVal(m.groups, 'sd');
+  if (!v) return null;
+  return { value: v.value, strip: new RegExp(`${SIDE_CLAUSE}${NUMEXPR('sd')}`, 'gi') };
+}
+
+/** The stated side as an ordinary distance given on the ring's FIRST edge (all sides being equal by
+ *  the shape's own definition, the remaining edges follow from the macro's own constraints). The
+ *  segment is emitted too, matching what the retired rewrite produced through the clause split. */
+const sideCommands = (ids: Id[], value: number): AnyCommand[] => [
+  { type: 'segment', a: ids[0], b: ids[1] } as AnyCommand,
+  { type: 'set-distance', a: ids[0], b: ids[1], value } as AnyCommand,
+];
+
 const shapeMacro =
   (trigger: RegExp, strip: RegExp, n: number, make: (ids: Id[]) => AnyCommand[], defer?: (s: string) => boolean): Rule =>
   (s, ctx) => {
@@ -774,20 +814,29 @@ const shapeMacro =
     // leftover gate, which would otherwise see the magnitudes as "a number this rule cannot express"
     // and escalate the whole utterance (which is exactly what it did: «ריבוע במידות 4*4» is a live
     // prod utterance that reached the LLM every time).
+    // #591: the SINGLE-side clause is the same kind of self-description, read at the same seam. The two
+    // are mutually exclusive by grammar (a dimensions PAIR needs two numbers around a separator), so a
+    // sentence can only carry one; `dims` is tried first purely to keep that order deterministic.
     const dims = n === 4 ? statedDims(s) : null;
-    const bare = (dims ? s.replace(dims.strip, ' ') : s).replace(strip, ' ');
-    const withDims = (ids: Id[]): AnyCommand[] => [...make(ids), ...(dims ? dimCommands(ids, dims.values) : [])];
+    const side = dims ? null : statedSideLength(s);
+    const own = dims ?? side;
+    const bare = (own ? s.replace(own.strip, ' ') : s).replace(strip, ' ');
+    const withGivens = (ids: Id[]): AnyCommand[] => [
+      ...make(ids),
+      ...(dims ? dimCommands(ids, dims.values) : []),
+      ...(side ? sideCommands(ids, side.value) : []),
+    ];
     const ids = labelRun(bare, n);
     if (!ids) {
       // No label run. Auto-name a bare named shape ("דלתון" → A,B,C,D) when the student named NO labels and
       // nothing geometry-significant remains; a partial run / leftover defers or escalates exactly as before.
       if (namesVertices(bare) || shapeLeftover(bare)) return null;
-      return withDims(autoVertexLabels(n, ctx.points ?? []));
+      return withGivens(autoVertexLabels(n, ctx.points ?? []));
     }
     // After keyword + labels are consumed, nothing geometry-significant should remain — a constraint/extra
     // construct ("kite ABCD with AB = 6") means a compound → escalate, don't half-parse (mirrors inscribedPolygon).
     if (shapeLeftover(removeClaimed(bare, ids))) return 'stop';
-    return withDims(ids);
+    return withGivens(ids);
   };
 
 /** A triangle phrasing that names a circle it is THROUGH / circumscribes belongs to the circumcircle/incircle
@@ -8928,26 +8977,21 @@ const normalizeWordEquality = (s: string): string =>
     .replace(/\b(?:equals|is\s+equal\s+to)\s+(?=-?\d+(?:\.\d+)?\s*(?:°|degrees?))/gi, '= ');
 
 /**
- * An equilateral-sided shape declared WITH its side length in one utterance — «ריבוע ABCD שצלעו הוא 1» /
- * "square ABCD whose side is 1" (#185 row 7, the ADR-228 size-given seam) — rewritten to the appositive
- * `<shape> <ids>, <first-edge> = <value>` the ADR-264 clause split already reads. Scoped to shapes whose
- * sides are all equal by definition (square / rhombus / equilateral triangle): on those "its side" is
- * unambiguous; a rectangle's «שצלעו» stays out (WHICH side would be an unstated pick, ADR-052).
+ * The vocabulary for "a shape declared WITH its side length" — «ריבוע ABCD שצלעו הוא 1» /
+ * "square ABCD whose side is 1" (#185 row 7, the ADR-228 size-given seam).
+ *
+ * Scoped to shapes whose sides are all equal BY DEFINITION (square / rhombus / equilateral triangle):
+ * on those "its side" names one length unambiguously, while a rectangle's «שצלעו» would be an
+ * unstated pick of WHICH side (ADR-052), so it stays out and escalates.
+ *
+ * #591: these two atoms are all that remains here. The rule that consumed them — a REWRITE to the
+ * appositive `<shape> <ids>, <first-edge> = <value>` — is retired, because it could only fire when the
+ * student wrote letters: the rewrite must name the edge, and a label-less shape has no letters until
+ * `shapeMacro` mints them. {@link statedSideLength} now owns the phrasing at that seam, where the ids
+ * are resolved, and serves both forms from one rule.
  */
 const SIDE_CLAUSE = String.raw`\s*(?:שצלעו|שאורך\s+צלעו|שכל\s+צלע\s+שלו|whose\s+side(?:\s+length)?|with\s+side(?:\s+length)?)\s*(?:הוא|היא|שווה(?:\s+ל-?)?|is|=)?\s*(?=[√\d(])`;
 const SIDE_SHAPES = String.raw`ריבוע|מעוין|square|rhombus|(?:משולש\s+)?שווה[\s-]?צלעות|equilateral(?:\s+triangle)?`;
-const sideRewrite = (head: string, run: string, fallback: string): string => {
-  const [l1, l2] = run.match(/[A-Za-z]\d*/g) ?? [];
-  return l1 && l2 ? `${head.trim()}, ${up(l1)}${up(l2)} = ` : fallback;
-};
-const normalizeShapeSide = (s: string): string =>
-  s
-    .replace(new RegExp(String.raw`((?:${SIDE_SHAPES})\s+((?:[A-Za-z]\d*\s*){3,4}?))${SIDE_CLAUSE}`, 'gi'), (m, head: string, run: string) =>
-      sideRewrite(head, run, m),
-    )
-    .replace(new RegExp(String.raw`(((?:[A-Za-z]\d*\s*){3,4}?)\s*(?:${SIDE_SHAPES}))${SIDE_CLAUSE}`, 'gi'), (m, head: string, run: string) =>
-      sideRewrite(head, run, m),
-    );
 
 export function normalizeUtterance(raw: string): string {
   // maqaf U+05BE → ASCII hyphen (so the ל-?/ב-?/מ-? suffix groups match); then strip invisible format
@@ -9021,7 +9065,9 @@ export function normalizeUtterance(raw: string): string {
   // #185: number words before a degree word → digits, THEN the angle/arc word-equality → `=` (its value
   // lookahead needs the digits), THEN the shape-with-side appositive rewrite. All three are scoped (a
   // degree suffix / an angle-arc operand / an equilateral-sided shape), so nothing else is touched.
-  const words = normalizeShapeSide(normalizeWordEquality(normalizeWordDegrees(orth)));
+  // #591: `normalizeShapeSide` used to wrap this — the side clause is now read at the shape macro
+  // (`statedSideLength`), where the ring's ids exist, so no rewrite happens at the utterance boundary.
+  const words = normalizeWordEquality(normalizeWordDegrees(orth));
   return normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(words.trim().replace(/\s+/g, ' ')))));
 }
 
