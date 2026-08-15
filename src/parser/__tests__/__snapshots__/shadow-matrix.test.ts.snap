@@ -488,6 +488,22 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "text": "circle with center O",
     "winner": "nameCenter",
   },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "tangentsFromExternal",
+    ],
+    "text": "from point A two tangents to both circles",
+    "winner": "commonTangent",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "tangentsFromExternal",
+    ],
+    "text": "מנקודה A יוצאים שני משיקים לשני המעגלים",
+    "winner": "commonTangent",
+  },
 ]
 `;
 
@@ -626,12 +642,12 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   {
     "lang": "en",
     "text": "square whose side is 4",
-    "winner": "(escalate)",
+    "winner": "(anon)",
   },
   {
     "lang": "he",
     "text": "ריבוע שצלעו 4",
-    "winner": "(escalate)",
+    "winner": "(anon)",
   },
   {
     "lang": "en",
@@ -1986,12 +2002,12 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   {
     "lang": "en",
     "text": "from point A two tangents to both circles",
-    "winner": "tangentsFromExternal",
+    "winner": "commonTangent",
   },
   {
     "lang": "he",
     "text": "מנקודה A יוצאים שני משיקים לשני המעגלים",
-    "winner": "tangentsFromExternal",
+    "winner": "commonTangent",
   },
 ]
 `;

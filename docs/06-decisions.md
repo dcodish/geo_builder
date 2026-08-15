@@ -7334,3 +7334,48 @@ no usable letters. Delegation then has no ids to build `<v0><v1> = <value>` from
 the honest answer. The pre-existing path did not escalate; it committed `{type:'square', ids:[undefined
 ×4]}`. That latent silent-wrong-build is filed as **#595** rather than widened into this change, since
 it belongs to `autoVertexLabels` and affects every shape rule.
+
+## ADR-452 — `autoVertexLabels` is TOTAL; the alphabet is not a ceiling (#595)
+
+When a student names no vertices — «ריבוע» — the parser mints them. `autoVertexLabels(n, used)` walked
+A–Z once, skipping taken letters, and **returned a SHORT array when the alphabet ran out**, silently.
+Its **13 call sites** all assume length `n` and destructure positionally, so with 23 points already
+placed the square rule committed `{type:'square', ids:['X','Y','Z',undefined]}` and reported `ok` — a
+figure referencing a vertex nothing had created. Measured: 22 points → fine; 23 → one undefined; 26 →
+four.
+
+Two defects in one function. The truncation is an **honesty** failure (a silent wrong build where a
+refusal was owed); the `c < 26` bound is a **capability** ceiling — the tool could not name a 27th
+point although its own LABEL grammar (`[A-Za-z]\d*`) already accepts indexed ids, verified end-to-end
+(«משולש A1B1C1» parses and replays).
+
+Decision: fix the CONTRACT, not the call sites. Past Z the sequence continues `A1…Z1, A2…Z2, …`, so the
+generator always returns exactly `n` distinct fresh ids. Every caller's existing assumption thereby
+becomes *true* and the truncation class is retired **by construction — with no call-site edits at all**.
+The alternative (a length check at each of the 13 sites) spreads one function's broken promise across 13
+places and leaves site 14 to forget it; that is the shape docs/17 warns against, and it would have left
+the ceiling standing besides.
+
+Honest scope: **not prod-reachable.** It needs 23+ named points in one figure; real bagrut figures run
+~10–15 including auto-named crossings and feet. Fixed for the shape of the failure, not its frequency
+(operator, 2026-08-15: *"a very rare case that in reality should not happen but good to guard against.
+I like the idea of going into the A1, B1, C1 realm when letters are all used."*).
+
+**Two shadow-matrix movements, both artifacts the fix EXPOSED rather than caused.** That harness probes
+with a saturated `points: A..Z` context, which is exactly the exhaustion condition:
+
+- #591's two catalog rows revert `(escalate)` → `(anon)`. This was predicted in the fix plan before the
+  work as a completeness check — under exhaustion #591's delegation had no ids to build its
+  sub-utterance from and escalated honestly; with ids available it builds again.
+- «מנקודה A יוצאים שני משיקים לשני המעגלים» moves `tangentsFromExternal` → `commonTangent`, adding the
+  divergent pair `commonTangent → tangentsFromExternal` to the reviewed allowlist (its hard gate
+  deliberately refuses `vitest -u`). Verified against `main` in a REAL context (two circles, one point):
+  `commonTangent` **already** wins there and emits the identical commands. So production behaviour is
+  unchanged — the harness simply could not see this pair before, because exhaustion made `commonTangent`
+  bail. The allowlist entry records a pre-existing reality now visible, and joins two sibling
+  `commonTangent → …` pairs already reviewed.
+
+Locks: `issue-595-auto-labels.test.ts` — the PROPERTY (for `n` in 1..6 against figure sizes 0…30 the
+result is length `n`, distinct, and disjoint from `used`), which *is* the contract the 13 untouched
+callers rely on and therefore the load-bearing assertion; plus the reported cases at 23 and 26 points,
+a second exhausted cycle reaching `A2`, and the ordinary small-figure cases pinned unchanged.

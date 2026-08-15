@@ -619,9 +619,22 @@ function withAnonymousAutoCentres(commands: AnyCommand[]): AnyCommand[] {
 function autoVertexLabels(n: number, used: string[] = []): Id[] {
   const taken = new Set(used.map((u) => u.toUpperCase()));
   const out: Id[] = [];
-  for (let c = 0; out.length < n && c < 26; c++) {
-    const ch = String.fromCharCode(65 + c); // 'A' + c
-    if (!taken.has(ch)) out.push(ch);
+  // #595: TOTAL by construction — always exactly `n` fresh ids. The old version walked A–Z once and
+  // returned a SHORT array when the alphabet ran out, saying nothing; its 13 callers all assume length
+  // `n` and destructure positionally, so with 23 points already placed «ריבוע» committed
+  // `{square, ids:['X','Y','Z',undefined]}` with a green ✓ — a figure referencing a point nothing
+  // created. Guarding at each call site would spread one broken promise across 13 places (and site 14
+  // would forget); making the promise true instead retires the whole class without touching them.
+  //
+  // Past Z the sequence continues A1…Z1, A2…Z2, … — ids the LABEL grammar (`[A-Za-z]\d*`) already
+  // accepts and the engine already carries, so the 26-point ceiling was arbitrary rather than a limit
+  // of the model. Terminates: `used` is finite, so some cycle is necessarily free.
+  for (let cycle = 0; out.length < n; cycle++) {
+    const suffix = cycle === 0 ? '' : String(cycle);
+    for (let c = 0; c < 26 && out.length < n; c++) {
+      const id = String.fromCharCode(65 + c) + suffix; // 'A' + c, then A1…Z1, A2…
+      if (!taken.has(id)) out.push(id);
+    }
   }
   return out;
 }

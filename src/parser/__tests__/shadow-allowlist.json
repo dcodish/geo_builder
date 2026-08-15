@@ -11,6 +11,7 @@
     "circumcircleMeetsSegment → lineMeetsCircle",
     "commonTangent → circlesTangent",
     "commonTangent → tangentLine",
+    "commonTangent → tangentsFromExternal",
     "concentricCircles → circle",
     "cornerTangentCircle → tangentLine",
     "diameterCutsSegment → diameter",
