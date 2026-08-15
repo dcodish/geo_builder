@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { absC, argDeg, cisDeg, cx, formatCart, formatPolar, mul } from '../engine/complex';
+import { absC, argDeg, cisDeg, cx, formatCart, formatPolar, mul, sub } from '../engine/complex';
 import { defaultFree, derive, deriveScene, factNames, type Fact } from '../engine/model';
 import { parseLine } from '../parser/parse';
 import { useComplexStore } from '../store/useComplexStore';
@@ -806,23 +806,7 @@ describe('part ד: anonymous solution sets and count claims (F8 collision + F12)
     useComplexStore.getState().clearAll();
   });
 
-  it('counts solutions inside / on / outside a polygon', () => {
-    const st = useComplexStore.getState();
-    st.clearAll();
-    st.addLine('z1 = 1');
-    st.addLine('z2 = i');
-    st.addLine('z3 = -1');
-    st.addLine('z4 = -i');
-    st.addLine('w^4 = 0.0625'); // ±0.5, ±0.5i — all inside the unit diamond
-    st.addLine('פתרונות במרובע z1z2z3z4');
-    const s = derive(useComplexStore.getState().facts, {});
-    expect(s.errors).toEqual({});
-    const row = s.measures.find((m) => m.form?.startsWith('בתוך'))!;
-    expect(row.form).toBe('בתוך 4 · על 0 · מחוץ 0');
-    useComplexStore.getState().clearAll();
-  });
-
-  it('THE FULL EXEMPLAR, parts setup+א+ב+ג+ד: counts 1 on, 1 inside, 3 outside', () => {
+  it('THE FULL EXEMPLAR, parts setup+א+ב+ג+ד: the figure answers every part', () => {
     const st = useComplexStore.getState();
     st.clearAll();
     for (const l of [
@@ -839,7 +823,6 @@ describe('part ד: anonymous solution sets and count claims (F8 collision + F12)
       'z1, z2, z4 סדרה הנדסית', // ג
       'מרובע oz2z3z4',
       'z^5 = z1*z2^3*z4', // ד equation (RHS collapses to z2^5)
-      'פתרונות במרובע oz2z3z4', // ד ask
     ])
       st.addLine(l);
     for (const seed of [0, 1]) {
@@ -848,8 +831,13 @@ describe('part ד: anonymous solution sets and count claims (F8 collision + F12)
       expect(Object.values(s.checks).every((c) => c.ok)).toBe(true);
       expect(s.measures.find((m) => m.label === '|z₁ - z₂|')!.form).toBe('15r'); // א
       expect(s.measures.find((m) => m.label.includes('היקף'))!.form).toBe('60r'); // ב
-      const count = s.measures.find((m) => m.form?.startsWith('בתוך'))!;
-      expect(count.form).toBe('בתוך 1 · על 1 · מחוץ 3'); // ד
+      // ד is answered VISUALLY (operator ruling): five anonymous solutions on their circle,
+      // one of them exactly z2 — the student counts against the drawn quadrilateral
+      const roots = s.points.filter((p) => p.kind === 'root');
+      expect(roots).toHaveLength(5);
+      expect(roots.every((p) => p.bare)).toBe(true);
+      const z2 = s.points.find((p) => p.label === 'z₂')!.z;
+      expect(roots.some((p) => absC(sub(p.z, z2)) < 1e-6 * absC(z2))).toBe(true);
     }
     useComplexStore.getState().clearAll();
   });

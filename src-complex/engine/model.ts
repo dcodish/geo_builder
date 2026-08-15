@@ -68,8 +68,6 @@ export type Fact =
       src: string;
       norm: string;
     }
-  /** F12: count the LAST equation's solutions inside / on / outside a polygon (part-ד ask) */
-  | { id: string; kind: 'scount'; pts: string[]; src: string; norm: string }
   /** F6: a segment (2 pts) or polygon (3+ pts) over named points; 'o' is always the origin */
   | { id: string; kind: 'shape'; pts: string[]; src: string; norm: string }
   /** F7 measure: area/perimeter of a polygon, length of a segment — a calc-panel entry */
@@ -158,32 +156,6 @@ const seqSolve = (
 };
 
 const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫';
-
-/** strict point-vs-polygon: 'on' within a relative tolerance of an edge, else ray-cast */
-const pointVsPolygon = (p: Cx, poly: Cx[]): 'in' | 'on' | 'out' => {
-  const scale = Math.max(1, ...poly.map(absC));
-  for (let i = 0; i < poly.length; i++) {
-    const a = poly[i];
-    const b = poly[(i + 1) % poly.length];
-    const abx = b.re - a.re;
-    const aby = b.im - a.im;
-    const t = Math.max(
-      0,
-      Math.min(1, ((p.re - a.re) * abx + (p.im - a.im) * aby) / (abx * abx + aby * aby || 1)),
-    );
-    if (Math.hypot(p.re - (a.re + t * abx), p.im - (a.im + t * aby)) <= 1e-6 * scale) return 'on';
-  }
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const xi = poly[i].re;
-    const yi = poly[i].im;
-    const xj = poly[j].re;
-    const yj = poly[j].im;
-    if (yi > p.im !== yj > p.im && p.re < ((xj - xi) * (p.im - yi)) / (yj - yi) + xi)
-      inside = !inside;
-  }
-  return inside ? 'in' : 'out';
-};
 
 /** consecutive-terms consistency: equal adjacent ratios (geo) / differences (ari) */
 const seqHolds = (f: Extract<Fact, { kind: 'seq' }>, env: Map<string, Cx>): boolean => {
@@ -642,7 +614,6 @@ export const derive = (
   const checks: Record<string, { ok: boolean; driven: boolean }> = {};
   const params: Record<string, number> = {};
   const measures: SceneMeasure[] = [];
-  let lastRoots: Cx[] = []; // the most recent equation's solution set (scount's referent)
 
   for (const f of facts) {
     try {
@@ -708,33 +679,6 @@ export const derive = (
           });
         }
         checks[f.id] = { ok: seqHolds(f, env), driven: !!drove[f.id] || !!f.defines };
-      } else if (f.kind === 'scount') {
-        if (lastRoots.length === 0) {
-          errors[f.id] = { key: 'unknown-ref', detail: 'פתרונות' };
-          continue;
-        }
-        const miss = f.pts.find((p) => !env.has(p));
-        if (miss) {
-          errors[f.id] = { key: 'unknown-ref', detail: miss };
-          continue;
-        }
-        const poly = f.pts.map((p) => env.get(p)!);
-        let nIn = 0;
-        let nOn = 0;
-        let nOut = 0;
-        for (const z of lastRoots) {
-          const side = pointVsPolygon(z, poly);
-          if (side === 'in') nIn++;
-          else if (side === 'on') nOn++;
-          else nOut++;
-        }
-        measures.push({
-          key: f.id,
-          label: prettyExpr(f.norm),
-          value: nIn,
-          factId: f.id,
-          form: `בתוך ${nIn} · על ${nOn} · מחוץ ${nOut}`,
-        });
       } else if (f.kind === 'shape') {
         const miss = f.pts.find((p) => !env.has(p));
         if (miss) {
@@ -796,7 +740,6 @@ export const derive = (
           if (drove[f.id] && absC(w) > 0) {
             // represent the solvable meaning: the full candidate set, X sitting on one of them
             const roots = nthRoots(w, f.n);
-            lastRoots = roots;
             circles.push({ r: absC(roots[0]), factId: f.id });
             // display-only candidates — no env registration (factNames introduces nothing here)
             roots.forEach((z, k) => {
@@ -816,7 +759,6 @@ export const derive = (
           continue;
         }
         const roots = nthRoots(w, f.n);
-        lastRoots = roots;
         circles.push({ r: absC(roots[0]), factId: f.id });
         roots.forEach((z, k) => {
           if (f.anon) {
@@ -904,6 +846,4 @@ export const factRefs = (f: Fact): string[] =>
           ? f.pts.filter((p) => p !== 'o') // O always exists; never implicit-created
           : f.kind === 'seq'
             ? f.names.filter((n) => n !== 'o' && n !== f.defines)
-            : f.kind === 'scount'
-              ? f.pts.filter((p) => p !== 'o')
               : [];

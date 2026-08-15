@@ -268,11 +268,6 @@ const SREL_RE = new RegExp(
   'i',
 );
 const SREL_RHS = /^(\d+(?:\.\d+)?)?\s*\*?\s*([a-zA-Z]\w*)?\s*(\^\s*2)?$/;
-// F12: solutions of the LAST equation vs a polygon — the part-ד counting ask
-const SCOUNT_RE = new RegExp(
-  `^ה?פתרונות\\s+(?:ש)?ב(?:תוך\\s+)?(?:ה?(?:מרובע|משולש)\\s+)?${RUN}$|^solutions\\s+(?:in|inside)\\s+(?:the\\s+)?(?:triangle\\s+|quadrilateral\\s+)?((?:o|[zw]\\d*){2,})$`,
-  'i',
-);
 // F9 list form: comma-separated names are CONSECUTIVE terms of one sequence
 const SEQ_RE = new RegExp(
   `^((?:o|[zw]\\d*)(?:\\s*,\\s*(?:o|[zw]\\d*)){2,})\\s+(?:היא\\s+|הם\\s+)?(?:סדרה\\s+(הנדסית|חשבונית)|(?:is\\s+)?(?:an?\\s+)?(geometric|arithmetic)\\s+sequence)$`,
@@ -452,14 +447,6 @@ export const parseLine = (raw: string): ParseResult => {
     if (want !== undefined && pts.length !== want)
       return { ok: false, key: 'parse-error', detail: raw.trim() };
     const f = { kind: 'shape' as const, pts, src: raw.trim(), norm: line };
-    return { ok: true, facts: [{ ...f, id: factId(f) }] };
-  }
-
-  const scount = SCOUNT_RE.exec(line);
-  if (scount) {
-    const pts = splitRun(scount[1] ?? scount[2]);
-    if (pts.length < 3) return { ok: false, key: 'parse-error', detail: raw.trim() };
-    const f = { kind: 'scount' as const, pts, src: raw.trim(), norm: line };
     return { ok: true, facts: [{ ...f, id: factId(f) }] };
   }
 
