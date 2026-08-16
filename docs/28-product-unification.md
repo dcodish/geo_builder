@@ -180,6 +180,164 @@ nothing today and is the difference between "we chose not to" and "we cannot".
 
 ---
 
+## 4a. The UI/UX rulings (2026-08-16, taken one at a time)
+
+The operator asked to be walked through the interface decisions individually. Each row is a ruling,
+with what it changes. **Measured before asking, not recalled** — the differences below were read out
+of `src/App.tsx` (2,240 lines), `src3d/App3.tsx` (851) and `src-complex/App.tsx` (319).
+
+### D1 — Column model: **three columns, data panel opt-in, on its own side**
+
+What the two shipped builders actually are:
+
+- **2-D is two-column.** Canvas + one 400px `<aside>` (`order: 1`, so RTL puts it on the right)
+  holding *everything*: input, steps, values, the query lane, shapes.
+- **3-D is three-column.** Input + fact list (`md:w-96`, right), canvas (`flex-1`, centre), and a
+  separate `md:w-64` data panel (left), gated behind one `showData` checkbox.
+
+The operator's preference — *"what I like in the 3-D is that the data panel is on the left… it makes
+it a bit more cleaner"* — decodes to something structural rather than positional: **3-D separates
+"what I typed" from "what the figure knows"**, where 2-D stacks five kinds of thing in one column.
+
+**Ruled: 3-D's three-column structure, 2-D's visual design, data column opt-in.**
+
+*Consequence:* the layout must collapse on narrow screens, which is what forced D2.
+
+### D2 — Styling mechanism: **Tailwind, carrying 2-D's token values, migrated per surface**
+
+Three mechanisms exist today: 2-D inline `React.CSSProperties` over `ui/theme.ts`; 3-D real
+**Tailwind v4** (`@tailwindcss/vite`, already in `package.json`); complex a plain CSS file.
+
+The deciding fact: **inline style objects cannot express `:hover` or media queries at all.** Under D1
+that is disqualifying — 3-D's `md:flex-row` collapse would have to be rebuilt as a JS resize
+listener. And the failure mode is already measured: 2-D carries **194 inline hex colours despite
+owning `theme.ts`**, because nothing forces token use.
+
+**Ruled:** `theme.ts` *values* become the Tailwind theme, so the look is 2-D's, unchanged. `shell/`
+and `src-complex` use it immediately; **2-D migrates one surface at a time as phase 3 touches it**,
+each surface its own PR and revert unit. No big-bang conversion of the stable product.
+
+### D3 — Colour palette: **one identical palette, 2-D's values**
+
+Closer than they look: 2-D and 3-D **already share slate neutrals**. The divergence is one hue —
+2-D `primary: #2563eb` (blue-600) vs 3-D sky-600 — plus complex's warm **stone** neutrals. Complex
+had already borrowed 2-D's exact violet accent values (`#6d28d9` / `#f5f3ff` / `#ddd6fe`) — copying
+by eye rather than by token, which is the ADR-W-016 argument in miniature.
+
+**Ruled:** `src/ui/theme.ts` is the single palette — slate neutrals, blue-600 primary, violet accent,
+`ok`/`warn`/`danger`. 3-D changes sky→blue; complex changes stone→slate; 2-D unchanged. Builder
+identity is carried by the **switcher's active state**, not by the theme.
+
+> **Guard — the operator's qualification, in the same breath:** *"we need to ensure that only
+> relevant symbols appear per tool."*
+>
+> **The COLOUR palette is identical; the SYMBOL palette is NOT.** The word collides and the mistake
+> would be easy to make. Symbols stay a **shared core + per-tool extension**, per the operator's
+> 2026-08-16 ruling on [#525](https://github.com/dcodish/geo_builder/issues/525): most symbols are
+> common to 2-D and 3-D, and complex diverges much more. A builder must never offer a glyph it
+> refuses in every position — the offered-but-unsupported asymmetry that
+> [#511](https://github.com/dcodish/geo_builder/issues/511) is blocked on.
+
+### D4 — Header: **full bar, secondary actions behind an overflow menu**
+
+The header is where "implemented-or-forgotten three times" is most visible. Measured:
+
+| control | 2-D | 3-D | complex |
+| --- | --- | --- | --- |
+| title | h1 + subtitle | h1 + tagline | h1 |
+| figure name | header field | header field (inline-editable, #42) | — |
+| save / load | header row | — | header buttons |
+| **language toggle** | ✅ | **❌ absent from the whole tree** | ✅ |
+| Help / guide | ✅ | ❌ | ❌ |
+| About modal | ✅ | ❌ — the code says *"this app has no about modal"* | ❌ |
+| privacy note | inside About | a footer line (NFR-SE-3 fallback) | — |
+
+**`changeLanguage` appears in `src/` and `src-complex/` and nowhere in `src3d/`** — a student in the
+3-D builder cannot switch to English, though the parser handles both. Filed separately; it is not a
+design difference but a forgotten surface, and exactly the class §6 family 2 exists to catch.
+
+**Ruled:** title, figure name and the switcher stay visible; save / load / export / language / guide /
+about collapse into a `⋯` overflow menu. The switcher is a dropdown, not a tab strip — *"4 or maybe
+even more builders"* is the case a tab strip fails. Every builder gets the **full** action set, so
+3-D gains both the language toggle and an About modal.
+
+*Cost accepted:* one extra click for save/load.
+
+### D5 — Input area: **one preview doing both jobs, wrap-selection palette**
+
+Measured, and the three builders disagree in three different ways:
+
+| | 2-D | 3-D | complex |
+| --- | --- | --- | --- |
+| preview | **maths** rendered (fractions, radicals, subscripts — #77/#40) | **bidi** isolation, and only when it would change the layout (`inputPreview3`, #482 option 3) | none |
+| palette insert | at the caret, with `caretBack` for `\|·\|` | at the caret | **wraps the current selection** — select `AB`, press `\|·\|`, get `\|AB\|` |
+
+**Third instance of the pattern from §1c: the newest builder has the better mechanism.** Complex's
+wrap-selection palette strictly subsumes caret-insert (an empty selection *is* a caret insert, and
+2-D's `caretBack` case falls out of it). Span accounting, then wrap-selection — twice now the rebuild
+found the better answer while the shipped products kept the first one.
+
+**Ruled:** one preview box that renders the maths **and** isolates the bidi, shown whenever either
+job applies and hidden on a plain line — 3-D's "only when it adds information" gate, over 2-D's
+content. Wrap-selection palette behaviour everywhere.
+
+*Consequence:* the "does this add information?" gate is one predicate, and it must hold in every
+builder — a natural row for §6 family 2.
+
+### D6 — Fact list: **disable, edit in place, and delete — all three, everywhere**
+
+The widest divergence found in the whole walkthrough, and it is on the surface the architecture is
+built on (*"the ordered fact list is the source of truth; the figure is derived by replay"*).
+Verified at the **store** level, not just the UI:
+
+| operation | 2-D | 3-D | complex |
+| --- | --- | --- | --- |
+| enable / disable | ✅ (also per group) | ✅ | ❌ |
+| edit in place | ✅ `replaceGroup`, re-parses | ❌ | ❌ |
+| delete | ✅ `removeGroup` | ❌ | ❌ → ✅ `removeFact` |
+
+`src3d/store/store3.ts` has neither `removeFact` nor `replaceGroup`; `useComplexStore` has
+`removeFact` and no `enabled` flag. **The reversible/destructive pair is inverted between them** — in
+3-D you can only mute a statement, in complex the only button destroys it.
+
+**Ruled:** all three operations in every builder. They are semantically distinct — *disable* answers
+"what if I hadn't said this?" and is reversible; *delete* answers "I typed that by mistake"; *edit*
+keeps the statement's **position**, which matters because order is meaningful in a construction.
+
+*Cost accepted:* this is the largest build of the walkthrough — 3-D needs `replaceGroup` +
+`removeGroup`, complex needs an `enabled` flag threaded through its replay. **An edited line
+re-parses**, so it faces the same honesty gates as a typed one; that is a §6 family 1 row, not just
+a UI behaviour.
+
+### D7 — Canvas controls: **every figure action lives under the canvas**
+
+Both builders have viewport control already — 2-D's `Figure.tsx` carries a pan/zoom layer with
+rotation and flips; 3-D has orbit/pan/zoom + reset view (#533). Those differ **by nature** (orbit is
+meaningless in 2-D) and are `n/a` rows, not divergence. The real difference is placement:
+
+- **2-D** puts *show another configuration*, undo, redo, clear and the DOF cue in the **sidebar**.
+- **3-D** puts the same set in a row **under the canvas**.
+
+**Ruled:** under the canvas, in every builder. Two zones with no ambiguity — *things I do to the
+figure* beneath the drawing, *things I said* in the input column — which is the same separation D1
+was chosen for. 2-D moves four controls; 3-D is already there.
+
+**This also settles the DOF cue's placement** (originally listed as its own step): it reports the
+figure's remaining freedom, so it belongs with the figure. Its *semantics* are a separate, already-
+ruled matter ([#370](https://github.com/dcodish/geo_builder/issues/370): count the 6 sampled
+placement DOFs).
+
+*Argument on the losing side, recorded:* undo/redo act on the **fact list**, not the figure, so they
+now sit one column away from what they rewind. Accepted for the simpler two-zone rule.
+
+### Still to walk through
+
+8. Data panel contents (position, palette, live preview) · 6. Fact/steps
+list · 7. Canvas controls ("show another configuration", zoom/pan/reset) · 8. Data panel contents
+· 9. DOF cue · 10. Modals (About/privacy — 2-D only today) · 11. Responsive/mobile
+
+---
+
 ## 5. Proposed order of work
 
 Phased so that each phase is independently valuable and independently revertible. **Nothing here is
