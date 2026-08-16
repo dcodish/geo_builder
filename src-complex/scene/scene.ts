@@ -28,7 +28,16 @@
 
 import type { Cx } from '../value/value';
 import { prettyName } from '../model/naming';
-import type { DerivedObject, DerivedPoint } from '../replay/derive2';
+import type {
+  DerivedObject,
+  DerivedPoint,
+  DerivedRotation,
+  DerivedSequence,
+} from '../replay/derive2';
+import { type SceneChain, type SceneSpiral, chainsOf, spiralsOf } from './series';
+import { type SceneRotationArc, rotationArcsOf } from './rotation';
+import { type SceneCycle, cyclesOf } from './cycle';
+import { type SceneRegion, regionsOf } from './region';
 
 export interface ScenePoint {
   readonly name: string;
@@ -109,9 +118,44 @@ export interface Scene {
   readonly arcs: readonly SceneArgArc[];
   readonly rings: readonly SceneModRing[];
   readonly shapes: readonly SceneShape[];
+  /** the log-spiral through a sequence's terms — a circle or a ray in the degenerate cases */
+  readonly spirals: readonly SceneSpiral[];
+  /** the partial sums, head to tail */
+  readonly chains: readonly SceneChain[];
+  /** `w = z·u` as the turn and the stretch it is */
+  readonly rotations: readonly SceneRotationArc[];
+  /** the finite ring of directions a power visits, with the `n` stepper's current one marked */
+  readonly cycles: readonly SceneCycle[];
+  /** a stated polygon, with every plotted number placed inside / on / outside it */
+  readonly regions: readonly SceneRegion[];
   readonly grid: ScenePolarGrid;
   /** world half-width the view must cover, already padded */
   readonly extent: number;
+}
+
+/**
+ * What the scene is built FROM — the figure, named rather than positional.
+ *
+ * `Derived2` satisfies it structurally, which is the point: the app hands the fold's own output
+ * straight in, and a test can hand in a figure it assembled itself.
+ */
+export interface SceneInput {
+  readonly points: readonly DerivedPoint[];
+  readonly objects?: readonly DerivedObject[];
+  readonly sequences?: readonly DerivedSequence[];
+  readonly rotations?: readonly DerivedRotation[];
+}
+
+/**
+ * DISPLAY STATE — the parts of the picture the student steers, which are not part of the figure.
+ *
+ * `n` steps through a power cycle. It is an ARGUMENT and never a stored value
+ * ([ADR-CX-001](../../docs/06d-decisions-complex.md#adr-cx-001) D3): it is outside the store, outside
+ * undo, and it cannot reach the parser or the engine — stepping it changes which power is highlighted
+ * and nothing else. The polar/cartesian toggle is the same kind of thing at the renderer.
+ */
+export interface SceneDisplay {
+  readonly n?: number;
 }
 
 /** One definition of how a name is written, shared with every other surface (`model/naming`). */
@@ -138,10 +182,8 @@ const RAY_STEP_DEG = 30;
  * The arc radii are staggered deliberately: two numbers whose arcs both start at 0° would otherwise
  * draw on top of each other and the student could not tell which angle belonged to which number.
  */
-export function buildScene(
-  points: readonly DerivedPoint[],
-  objects: readonly DerivedObject[] = [],
-): Scene {
+export function buildScene(figure: SceneInput, display: SceneDisplay = {}): Scene {
+  const { points, objects = [], sequences = [], rotations = [] } = figure;
   const magnitudes = points.map((p) => Math.hypot(p.z.re, p.z.im));
   /**
    * A circle must fit in the view, not just its centre.
@@ -220,6 +262,11 @@ export function buildScene(
     arcs,
     rings: modRings,
     shapes,
+    spirals: spiralsOf(sequences),
+    chains: chainsOf(sequences),
+    rotations: rotationArcsOf(rotations, points),
+    cycles: cyclesOf(points, display.n ?? 1),
+    regions: regionsOf(objects, points),
     grid: { rings, rays, rayStepDeg: RAY_STEP_DEG },
     extent,
   };

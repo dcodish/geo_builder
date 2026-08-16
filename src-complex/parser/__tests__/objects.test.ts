@@ -148,20 +148,17 @@ describe('F6 — honesty travels with the object', () => {
 
   it('the scene carries the shapes, and a circle widens the view to fit', () => {
     const d = deriveLines(['z1 = 1', 'המעגל שמרכזו O ורדיוסו 8']);
-    const scene = buildScene(d.points, d.objects);
+    const scene = buildScene(d);
     expect(scene.shapes).toHaveLength(1);
     expect(scene.extent).toBeGreaterThan(8);
   });
 
   it('a polygon closes and a segment does not', () => {
-    const seg = buildScene(...sceneArgs('הקטע z1z2'));
-    const poly = buildScene(...sceneArgs('המשולש Oz1z2'));
+    const seg = buildScene(sceneOf('הקטע z1z2'));
+    const poly = buildScene(sceneOf('המשולש Oz1z2'));
     expect(seg.shapes[0].closed).toBe(false);
     expect(poly.shapes[0].closed).toBe(true);
   });
 });
 
-const sceneArgs = (line: string) => {
-  const d = deriveLines(['z1 = 3+4i', 'z2 = 1+i', line]);
-  return [d.points, d.objects] as const;
-};
+const sceneOf = (line: string) => deriveLines(['z1 = 3+4i', 'z2 = 1+i', line]);

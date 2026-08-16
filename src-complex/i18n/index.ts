@@ -50,6 +50,19 @@ const he = {
   calc: 'חשב',
   calcPlaceholder: 'הקלידו ביטוי לחישוב, למשל |z1-z2|',
   calcCurrent: 'בדגימה הנוכחית: {{value}}',
+  // S5 — the visualization layer (#622)
+  stepperLabel: 'מחזור החזקות: n',
+  stepBack: 'הקודם',
+  stepForward: 'הבא',
+  cyclePeriod: 'מחזור באורך {{count}}',
+  seriesRatio: 'מנת הסדרה',
+  seriesLimit: 'סכום הסדרה האינסופית',
+  seriesClosed: 'סכום האיברים הוא אפס — השרשרת נסגרת',
+  rotationHint: 'כפל = סיבוב ומתיחה',
+  regionCounts: '{{label}}: {{inside}} בפנים · {{on}} על המצולע · {{outside}} בחוץ',
+  showSeries: 'סדרה',
+  showCycle: 'מחזור חזקות',
+  showRegion: 'פנים/חוץ',
 };
 
 const en = {
@@ -98,6 +111,19 @@ const en = {
   calc: 'Calc',
   calcPlaceholder: 'type an expression to calculate, e.g. |z1-z2|',
   calcCurrent: 'at the current sample: {{value}}',
+  // S5 — the visualization layer (#622)
+  stepperLabel: 'power cycle: n',
+  stepBack: 'previous',
+  stepForward: 'next',
+  cyclePeriod: 'period {{count}}',
+  seriesRatio: 'the ratio',
+  seriesLimit: 'the sum of the infinite series',
+  seriesClosed: 'the terms sum to zero — the chain closes',
+  rotationHint: 'multiplication = rotation and scaling',
+  regionCounts: '{{label}}: {{inside}} inside · {{on}} on the polygon · {{outside}} outside',
+  showSeries: 'series',
+  showCycle: 'power cycle',
+  showRegion: 'inside/outside',
 };
 
 complexI18n.use(initReactI18next).init({

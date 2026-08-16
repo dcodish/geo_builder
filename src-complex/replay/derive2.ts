@@ -23,8 +23,8 @@
 import type { Cx } from '../value/value';
 import { cPolar, evaluate, exact, formatPolar, fromCartesian } from '../value/value';
 import { type Rat, fromNumber, rat, toNumber } from '../value/rational';
-import { type ExpVec, evaluate as evalMod, format as fmtMod } from '../value/modulus';
-import { type Angle, toDegrees } from '../value/angle';
+import { type ExpVec, evaluate as evalMod, format as fmtMod, isOne as modIsOne } from '../value/modulus';
+import { type Angle, period as anglePeriod, toDegrees } from '../value/angle';
 import { type Expr, abs, conj, div, mul, neg, num, param, paramsOf, pow, ref, val } from '../model/expr';
 import { type Branch, isTurnUnknown, solveTier1 } from '../solve/tier1';
 import type { Claim as Assertion, CheckedClaim } from '../model/claim';
@@ -32,6 +32,7 @@ import { type FigureObject, ORIGIN, objectPoints } from '../model/figure';
 import { type CheckedMeasure, type MeasureQuery, type MeasureRelation, measureOf } from '../model/measure';
 import { type KnowledgeRow, isKnowledge, whyNotKnowledge } from '../model/knowledge';
 import { prettyName } from '../model/naming';
+import type { SequenceKind, SequenceStatement } from '../model/sequence';
 import { type Bound, solveResiduals } from '../solve/tier2';
 import { type Env, type ResidualSpec, deferredResidual, evalReal, measureResidual } from '../solve/residuals';
 import { verifyClaims } from '../solve/claims';
@@ -273,6 +274,17 @@ export interface DerivedPoint {
   readonly reading: string;
   /** the exact polar text, when the whole value is carried exactly — a VALUE question, not a display one */
   readonly exactLabel: string | null;
+  /**
+   * How many powers `z, z², z³, …` this number visits before returning to itself — null when it never
+   * does, which is the ordinary case.
+   *
+   * A finite cycle needs BOTH halves decided exactly: modulus exactly 1 (otherwise the powers walk
+   * outward or inward forever) and an argument that is a rational multiple of a turn (otherwise they
+   * never land on the same direction twice). Both are questions the exact carriers answer and floats
+   * cannot — «z^(6n) takes only two values» is a corpus ask, and a sampled 59.9999° would answer it
+   * wrong with total confidence.
+   */
+  readonly cyclePeriod: number | null;
   /** the givens FORCE this magnitude — otherwise it is one sample of many (ADR-052) */
   readonly modulusKnown: boolean;
   /** the givens FORCE this direction */
@@ -299,12 +311,57 @@ export interface DerivedObject {
   readonly known: boolean;
 }
 
+/**
+ * A stated sequence, RESOLVED to the configuration on screen (F9).
+ *
+ * The terms carry their positions because the picture depends on them: consecutive terms make the
+ * partial-sum chain meaningful, and a gap («the first two terms … and the fifth») means the spiral
+ * passes through more than one multiplication per drawn segment.
+ */
+export interface DerivedSequence {
+  readonly kind: SequenceKind;
+  readonly src: string;
+  /** the STATED terms only, in position order — no term the student never named is invented */
+  readonly terms: readonly { readonly name: string; readonly position: number; readonly z: Cx }[];
+  /**
+   * The per-position step of this configuration: the ratio `q` of a geometric sequence, the difference
+   * `d` of an arithmetic one. Null when the stated terms are not adjacent, because then the step is a
+   * Δ-th root with Δ values and choosing one would assert an intermediate term the student never gave.
+   */
+  readonly step: Cx | null;
+  /** every term rests on a position the givens force */
+  readonly known: boolean;
+}
+
+/**
+ * `w = z·u` seen as what it IS: a rotation by `arg u` and a scaling by `|u|` (docs/27 §2, the
+ * operation the corpus uses most and the one the Gauss plane exists to make visible).
+ *
+ * Read off the RESOLVED positions rather than re-evaluated from the expression: the angle drawn is
+ * then the angle between the two points the student can see, and cannot disagree with them.
+ */
+export interface DerivedRotation {
+  readonly key: string;
+  readonly from: string;
+  readonly to: string;
+  readonly src: string;
+  /** the sweep, signed, in degrees — `arg(to) − arg(from)` folded into (−180°, 180°] */
+  readonly byDeg: number;
+  /** `|to| / |from|` — 1 when the multiplication is a pure rotation */
+  readonly scale: number;
+  readonly known: boolean;
+}
+
 export interface Derived2 {
   /** null when the givens contradict each other, with which system found it */
   readonly contradiction: null | 'modulus' | 'argument';
   readonly points: DerivedPoint[];
   /** the figure's non-numeric objects, resolved to this configuration (F6) */
   readonly objects: readonly DerivedObject[];
+  /** stated sequences, resolved — what the term spiral and the partial-sum chain are drawn from */
+  readonly sequences: readonly DerivedSequence[];
+  /** products between drawn numbers, read as rotation-and-scale */
+  readonly rotations: readonly DerivedRotation[];
   /** how many valid configurations the givens leave — what "show another" cycles */
   readonly configCount: number;
   readonly configIndex: number;
@@ -349,17 +406,42 @@ const paramSample = (name: string, seed: number): number => {
  */
 export function derive2(facts: readonly ProtoFact[], configIndex = 0, seed = 0): Derived2 {
   const bridged = bridgeFacts(facts);
-  return foldConstraints(
-    bridged.constraints,
-    bridged.filters,
-    bridged.freeNames,
-    bridged.sample,
-    bridged.untranslated,
+  return foldConstraints({
+    constraints: bridged.constraints,
+    filters: bridged.filters,
+    declared: bridged.freeNames,
+    atoms: bridged.sample,
+    untranslated: bridged.untranslated,
     configIndex,
     seed,
-  );
+  });
   // the bridge carries no objects: the prototype's `shape` facts are exactly what S4's grammar
   // replaces, and translating them would keep the retiring path alive one slice longer
+}
+
+/**
+ * Everything a fold reads, named rather than ordered.
+ *
+ * It was eleven positional parameters and every family since F6 has added another. A call site of
+ * eleven bare arguments is one transposition away from a figure that is quietly about something else,
+ * and the transposition typechecks whenever two neighbours share a type.
+ */
+export interface FoldInput {
+  readonly constraints: readonly Constraint[];
+  readonly filters: readonly BranchFilter[];
+  /** names the lines brought into existence, whether or not a constraint mentions them */
+  readonly declared: readonly string[];
+  /** angle atoms a cartesian literal introduced, with the degrees they stand for */
+  readonly atoms: ReadonlyMap<string, number>;
+  readonly untranslated: readonly Untranslated[];
+  readonly configIndex: number;
+  readonly seed: number;
+  readonly assertions?: readonly Assertion[];
+  readonly objects?: readonly FigureObject[];
+  readonly measures?: readonly MeasureRelation[];
+  readonly queries?: readonly MeasureQuery[];
+  /** stated sequences, kept as STATEMENTS as well as constraints — the spiral is drawn from these */
+  readonly sequences?: readonly SequenceStatement[];
 }
 
 /**
@@ -369,19 +451,21 @@ export function derive2(facts: readonly ProtoFact[], configIndex = 0, seed = 0):
  * sibling trees paid for that repeatedly (ADR-346's mirror class). The bridge and the v2 parser differ only
  * in how they PRODUCE constraints; what happens to them afterwards is identical.
  */
-export function foldConstraints(
-  constraints: readonly Constraint[],
-  filterList: readonly BranchFilter[],
-  declaredNames: readonly string[],
-  literalSample: ReadonlyMap<string, number>,
-  untranslated: readonly Untranslated[],
-  configIndex: number,
-  seed: number,
-  assertions: readonly Assertion[] = [],
-  objects: readonly FigureObject[] = [],
-  measures: readonly MeasureRelation[] = [],
-  queries: readonly MeasureQuery[] = [],
-): Derived2 {
+export function foldConstraints(input: FoldInput): Derived2 {
+  const {
+    constraints,
+    filters: filterList,
+    declared: declaredNames,
+    atoms: literalSample,
+    untranslated,
+    configIndex,
+    seed,
+    assertions = [],
+    objects = [],
+    measures = [],
+    queries = [],
+    sequences = [],
+  } = input;
   const t1 = solveTier1(constraints);
 
   const sample = new Map(literalSample);
@@ -642,6 +726,8 @@ export function foldConstraints(
       const a = argumentOf(name, state);
       if (!Number.isFinite(m.value) || !Number.isFinite(a.deg)) continue;
       const modulus = m.exact ? fmtMod(m.exact) : round2(m.value);
+      // a cycle needs BOTH halves exact: unit modulus, and an argument that is a rational part of a turn
+      const cycle = m.exact && a.exact && modIsOne(m.exact) ? anglePeriod(a.exact) : null;
       // a DIRECTION, folded into one turn — see the note on `argumentDeg` below
       const argumentDeg = ((a.deg % 360) + 360) % 360;
       const exactLabel = m.exact && a.exact ? exactLabelOf(m.exact, a.exact) : null;
@@ -668,6 +754,7 @@ export function foldConstraints(
           argumentKnown: a.exact !== null,
         }),
         exactLabel,
+        cyclePeriod: cycle === null ? null : Number(cycle),
         modulusKnown: m.exact !== null,
         argumentKnown: a.exact !== null,
       });
@@ -732,6 +819,8 @@ export function foldConstraints(
     contradiction: t1.inconsistent,
     points,
     objects: t1.inconsistent ? [] : resolveObjects(objects, points, sample),
+    sequences: t1.inconsistent ? [] : resolveSequences(sequences, points),
+    rotations: t1.inconsistent ? [] : resolveRotations(constraints, points),
     configCount,
     configIndex: index,
     freeDof: freeDofNames,
@@ -834,6 +923,133 @@ function resolveObjects(
     out.push({ kind: 'circle', key, label, vertices: [], center: c.center, radius: c.r, known });
   });
   return out;
+}
+
+/**
+ * Resolve the stated sequences against this configuration.
+ *
+ * A term whose number is not on the canvas drops the WHOLE sequence rather than a link of it: a spiral
+ * through two of three stated terms is a different sequence from the one the student stated, and it
+ * would be drawn with no sign that a term is missing.
+ */
+function resolveSequences(
+  statements: readonly SequenceStatement[],
+  points: readonly DerivedPoint[],
+): DerivedSequence[] {
+  const at = new Map(points.map((p) => [p.name, p]));
+  const out: DerivedSequence[] = [];
+  for (const s of statements) {
+    const ordered = [...s.terms].sort((a, b) => a.position - b.position);
+    const resolved = ordered.map((t) => ({ term: t, point: at.get(t.name) }));
+    if (resolved.some((r) => r.point === undefined)) continue;
+    const terms = resolved.map((r) => ({
+      name: r.term.name,
+      position: r.term.position,
+      z: r.point!.z,
+    }));
+    const known = resolved.every((r) => r.point!.modulusKnown && r.point!.argumentKnown);
+    /**
+     * The step is published only between ADJACENT terms.
+     *
+     * With a gap of Δ positions the step is a Δ-th root of the ratio the student stated — Δ different
+     * values, each a different sequence through the same stated points. Publishing one would put an
+     * intermediate term on the screen that the givens do not force, which is what
+     * [ADR-052](../../docs/06-decisions.md#adr-052) forbids and what «כל האפשרויות» is about.
+     */
+    const step =
+      terms.length >= 2 && terms[1].position === terms[0].position + 1
+        ? s.kind === 'geometric'
+          ? cDiv(terms[1].z, terms[0].z)
+          : { re: terms[1].z.re - terms[0].z.re, im: terms[1].z.im - terms[0].z.im }
+        : null;
+    out.push({ kind: s.kind, src: s.src, terms, step, known });
+  }
+  return out;
+}
+
+/** `a / b`, or null at the origin where the ratio has no meaning. */
+function cDiv(a: Cx, b: Cx): Cx | null {
+  const d = b.re * b.re + b.im * b.im;
+  if (d < 1e-18) return null;
+  return { re: (a.re * b.re + a.im * b.im) / d, im: (a.im * b.re - a.re * b.im) / d };
+}
+
+/**
+ * Which constraints are a MULTIPLICATION between numbers that are both on the canvas.
+ *
+ * Read structurally — `w = z·u`, in either orientation, with any of the three names possibly the
+ * product — and then measured off the RESOLVED points rather than re-evaluated. That ordering matters:
+ * an arc computed from the expression could disagree with the two dots it is drawn between, which is
+ * the renderer-re-derives-geometry defect (ADR-044/201/380/423) arriving through the engine instead.
+ */
+function resolveRotations(
+  constraints: readonly Constraint[],
+  points: readonly DerivedPoint[],
+): DerivedRotation[] {
+  const at = new Map(points.map((p) => [p.name, p]));
+  const out: DerivedRotation[] = [];
+  constraints.forEach((c, i) => {
+    if (c.kind && c.kind !== 'eq') return;
+    const pair =
+      productPair(c.lhs, c.rhs) ?? productPair(c.rhs, c.lhs);
+    if (!pair) return;
+    const from = at.get(pair.from);
+    const to = at.get(pair.product);
+    if (!from || !to) return;
+    const rFrom = Math.hypot(from.z.re, from.z.im);
+    const rTo = Math.hypot(to.z.re, to.z.im);
+    if (rFrom < 1e-12) return; // a rotation of the origin is not a picture, it is a point
+    const raw = to.argumentDeg - from.argumentDeg;
+    out.push({
+      key: `rot-${pair.from}-${pair.product}-${i}`,
+      from: pair.from,
+      to: pair.product,
+      src: c.src ?? '',
+      byDeg: ((((raw + 180) % 360) + 360) % 360) - 180,
+      scale: rTo / rFrom,
+      known:
+        from.modulusKnown && from.argumentKnown && to.modulusKnown && to.argumentKnown,
+    });
+  });
+  return out;
+}
+
+/** `product = from · anything` — the naming half of the rotation reading. */
+function productPair(product: Expr, rhs: Expr): { product: string; from: string } | null {
+  if (product.t !== 'ref' || rhs.t !== 'mul') return null;
+  // either factor may be the number being turned; the other is the multiplier, whatever it is
+  for (const [a, b] of [
+    [rhs.l, rhs.r],
+    [rhs.r, rhs.l],
+  ]) {
+    if (a.t === 'ref' && a.name !== product.name && !mentions(b, product.name)) {
+      return { product: product.name, from: a.name };
+    }
+  }
+  return null;
+}
+
+const mentions = (e: Expr, name: string): boolean =>
+  refNamesOf(e).includes(name);
+
+function refNamesOf(e: Expr): string[] {
+  switch (e.t) {
+    case 'ref':
+      return [e.name];
+    case 'mul':
+    case 'div':
+    case 'add':
+    case 'sub':
+      return [...refNamesOf(e.l), ...refNamesOf(e.r)];
+    case 'pow':
+      return refNamesOf(e.base);
+    case 'conj':
+    case 'neg':
+    case 'abs':
+      return refNamesOf(e.e);
+    default:
+      return [];
+  }
 }
 
 /** A stated radius is a number or a real parameter; anything else is not a length. */

@@ -98,7 +98,7 @@ minimal-n by congruence on turns — and by the sampled knowledge discipline oth
 |---|---|---|
 | 5a | `isDisplayable(facts, config)` — every enabled fact `ok`, verifier clean, every stated inequality satisfied. **One predicate**, consulted by initial display, resample and every cycle action | `cx5:displayable` |
 | 5b | config search — walk the packed configuration index under 5a; when none exists, **say so** ([ADR-065](06-decisions.md#adr-065)'s report, which never crossed to a sibling) | `cx5:search` |
-| 5c | `buildScene()` — pure; the visual model (points, arg arcs, modulus rings, spirals, sum chains, cycles, loci) | — |
+| 5c | `buildScene()` — pure; the visual model (points, arg arcs, modulus rings, spirals, sum chains, rotation arcs, value cycles, regions; loci await F13). **Display state — the `n` stepper, the polar/cartesian toggle — arrives as an ARGUMENT and is never stored** ([ADR-CX-016](06d-decisions-complex.md#adr-cx-016)) | — |
 | 5d | knowledge rows — a value prints only when invariant across every valid configuration **and** its gauge is pinned; formula surfacing reads the same model. **Every plotted number's `reading` is composed here too** ([ADR-CX-015](06d-decisions-complex.md#adr-cx-015)) — one string, printed unchanged by the canvas and the banner alike | — |
 
 ## Invariants that hold across the whole ladder

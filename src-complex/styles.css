@@ -79,3 +79,16 @@ button:hover { background: #f5f5f4; }
 .v2-skip { color: #92400e; }
 
 .v2-claim { color: #1e3a8a; }
+
+/* S5 (#622): the n stepper and the region counts. Both are DISPLAY surfaces — the stepper's value
+   never leaves the component, and the counts are read off the scene, never recomputed here. */
+.stepper {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 6px; padding: 5px 10px; font-size: 0.85rem;
+  color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;
+}
+.stepper button { padding: 1px 10px; font-size: 1rem; line-height: 1.2; }
+.region-count {
+  margin-top: 6px; padding: 5px 10px; font-size: 0.85rem;
+  color: #4c1d95; background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 6px;
+}
