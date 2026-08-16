@@ -122,6 +122,24 @@ export function App() {
   const scene = useMemo(() => deriveScene(facts, freePos, seed), [facts, freePos, seed]);
   // the v2 canvas is the POLAR one: a complex number as a length and a direction, not a dot on a grid
   const polarScene = useMemo(() => (derived2 ? buildScene(derived2.points) : null), [derived2]);
+
+  /**
+   * WHICH ENGINE'S VERDICT THE FACT LIST SHOWS.
+   *
+   * The canvas draws v2 while the rows were still styled by the PROTOTYPE's evaluation — and the
+   * prototype is precisely what refuses `-2z1 = conj(z3)` (#607). So the figure said "built" and the
+   * row said "failed", about the same line, at the same time. One surface must not contradict another
+   * about the same fact; when v2 is driving the picture it must drive the verdict too.
+   *
+   * v2 keys its refusals by the student's LINE, so a row is red exactly when v2 could not read the
+   * line that produced it.
+   */
+  const v2Failed = useMemo(
+    () => new Set((derived2?.untranslated ?? []).map((u) => u.src)),
+    [derived2],
+  );
+  const rowFailed = (f: { id: string; src: string }): boolean =>
+    derived2 ? v2Failed.has(f.src) : Boolean(scene.errors[f.id]);
   const [calcInput, setCalcInput] = useState('');
   const submitCalc = () => {
     if (calcInput.trim() === '') return;
@@ -227,7 +245,7 @@ export function App() {
           <ul className="facts">
             {facts.length === 0 && <li className="hint">{t('emptyHint')}</li>}
             {facts.map((f) => (
-              <li key={f.id} className={scene.errors[f.id] ? 'fact err' : 'fact'}>
+              <li key={f.id} className={rowFailed(f) ? 'fact err' : 'fact'}>
                 <code dir="ltr">{f.src}</code>
                 {f.kind === 'free' && (
                   <span className="badge">
@@ -240,7 +258,7 @@ export function App() {
                     )}
                   </span>
                 )}
-                {scene.checks[f.id] && (
+                {!derived2 && scene.checks[f.id] && (
                   <span
                     className={scene.checks[f.id].ok ? 'check ok' : 'check bad'}
                     title={t(
@@ -254,7 +272,12 @@ export function App() {
                     {scene.checks[f.id].ok ? '✓' : '✗'}
                   </span>
                 )}
-                {scene.errors[f.id] && (
+                {derived2 && rowFailed(f) && (
+                  <span className="fact-error">
+                    {derived2.untranslated.find((u) => u.src === f.src)?.why}
+                  </span>
+                )}
+                {!derived2 && scene.errors[f.id] && (
                   <span className="fact-error">
                     {t(
                       scene.errors[f.id].key === 'unknown-ref' ? 'errUnknownRef' : 'errRootsOfZero',

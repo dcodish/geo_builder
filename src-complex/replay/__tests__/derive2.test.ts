@@ -306,3 +306,26 @@ describe('A FILTER BOUNDS THE SAMPLE, not only the branches (operator report, 20
     expect(d.emptiedBy).not.toBeNull();
   });
 });
+
+describe('ONE VERDICT PER LINE — the row and the canvas cannot disagree (operator report, 2026-08-16)', () => {
+  // Reported from prod: the figure BUILT and z1/z3 were determined, while the row for
+  // `-2z1 = conj(z3)` was marked red — because the canvas drew v2 while the fact list was still
+  // styled by the PROTOTYPE's evaluation, and the prototype is precisely what refuses that line
+  // (#607). Two surfaces, one fact, opposite answers. The UI half is in App.tsx; this locks the
+  // engine half: v2 must report NOTHING wrong with a line it read.
+  const SESSION = ['z1 ברביע הראשון', 'z1^3 = z3', '-2z1 = conj(z3)'];
+
+  it('v2 reports no failure for any line of a session it fully understands', () => {
+    const d = deriveLines(SESSION);
+    expect(d.untranslated).toEqual([]);
+    expect(d.contradiction).toBeNull();
+  });
+
+  it('the refusals v2 DOES report are keyed by the student’s own line, so a row can find its own', () => {
+    const d = deriveLines([...SESSION, 'סדרה הנדסית z1, z2, z3']);
+    expect(d.untranslated).toHaveLength(1);
+    expect(d.untranslated[0].src).toBe('סדרה הנדסית z1, z2, z3');
+    // ...and every OTHER line is unblamed, which is what keeps the red mark on the right row
+    for (const line of SESSION) expect(d.untranslated.some((u) => u.src === line)).toBe(false);
+  });
+});
