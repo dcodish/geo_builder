@@ -104,6 +104,8 @@ export interface Tier1Result {
   readonly freeDof: readonly string[];
   /** constraints that are not monomial — they belong to the numeric tier, listed rather than dropped */
   readonly deferred: readonly Constraint[];
+  /** every complex name the constraints mention, in first-seen order — the set the figure must DRAW */
+  readonly names: readonly string[];
 }
 
 const BRANCH_BUDGET = 2048;
@@ -192,6 +194,7 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
     knownModulus,
     freeDof,
     deferred,
+    names,
   };
 }
 

@@ -22,11 +22,11 @@
 
 import type { Cx } from '../value/value';
 import { cPolar, evaluate, exact, formatPolar, fromCartesian } from '../value/value';
-import { type Rat, fromNumber, rat } from '../value/rational';
+import { type Rat, fromNumber, rat, toNumber } from '../value/rational';
 import { type ExpVec, evaluate as evalMod, format as fmtMod } from '../value/modulus';
 import { type Angle, toDegrees } from '../value/angle';
 import { type Expr, abs, conj, div, mul, neg, num, param, pow, ref, val } from '../model/expr';
-import { type Branch, type Constraint, solveTier1 } from '../solve/tier1';
+import { type Branch, type Constraint, isTurnUnknown, solveTier1 } from '../solve/tier1';
 import { type BranchFilter, filterBranches, quadrant } from '../solve/filter';
 
 // The prototype's fact/expression types — the ONLY import from the retiring engine, and the whole
@@ -248,6 +248,10 @@ export interface DerivedPoint {
   readonly argumentDeg: number;
   /** the exact polar text, when the whole value is carried exactly */
   readonly exactLabel: string | null;
+  /** the givens FORCE this magnitude — otherwise it is one sample of many (ADR-052) */
+  readonly modulusKnown: boolean;
+  /** the givens FORCE this direction */
+  readonly argumentKnown: boolean;
 }
 
 export interface Derived2 {
@@ -294,20 +298,66 @@ export function derive2(facts: readonly ProtoFact[], configIndex = 0, seed = 0):
   const index = configCount ? ((configIndex % configCount) + configCount) % configCount : 0;
   const branch: Branch | undefined = kept[index];
 
+  /**
+   * SAMPLE THE FREE DEGREES OF FREEDOM, then draw everything.
+   *
+   * The first version plotted only numbers whose magnitude the givens forced, and so drew NOTHING for
+   * any partially-specified figure — which is every figure while the student is still typing. That
+   * conflated two different rules. «Do not print an unknown value as knowledge» is right and is kept,
+   * at the LABEL. «Do not draw it» is wrong: the standing product rule is *always visualise*
+   * ([ADR-CX-001](../../docs/06d-decisions-complex.md#adr-cx-001) D3), and
+   * [ADR-052](../../docs/06-decisions.md#adr-052) permits a default as a **starting** value precisely
+   * so the figure can exist — provided it moves when the configuration changes, which it does, because
+   * the sample is keyed on the seed that "show another configuration" advances.
+   */
+  const freeMod = new Map<string, number>();
+  for (const n of t1.modulus.free) freeMod.set(n, 0.8 + paramSample(`|${n}|`, seed));
+  const freeArg = new Map<string, number>();
+  for (const n of t1.argument.free) if (!isTurnUnknown(n)) freeArg.set(n, paramSample(`arg ${n}`, seed) * 150);
+
+  const modulusOf = (name: string): { value: number; exact: ExpVec | null } => {
+    const d = t1.modulus.determined.get(name);
+    if (!d) return { value: freeMod.get(name) ?? 1, exact: null };
+    const base = evalMod(d.konst, sample);
+    if (base === null) return { value: 1, exact: null };
+    let v = base;
+    for (const [fn, c] of d.coefs) v *= Math.pow(freeMod.get(fn) ?? 1, toNumber(c));
+    return { value: v, exact: d.coefs.size === 0 ? d.konst : null };
+  };
+
+  const argumentOf = (name: string): { deg: number; exact: Angle | null } => {
+    const fixed = branch?.angles.get(name);
+    if (fixed) {
+      const deg = toDegrees(fixed, sample);
+      if (deg !== null) return { deg, exact: fixed };
+    }
+    const d = t1.argument.determined.get(name);
+    if (!d) return { deg: freeArg.get(name) ?? 0, exact: null };
+    let deg = toDegrees(d.konst, sample);
+    if (deg === null) return { deg: 0, exact: null };
+    for (const [fn, c] of d.coefs) {
+      const turn = branch?.k.get(fn);
+      deg += toNumber(c) * (isTurnUnknown(fn) ? Number(turn ?? 0n) * 360 : (freeArg.get(fn) ?? 0));
+    }
+    return { deg, exact: null };
+  };
+
   const points: DerivedPoint[] = [];
-  if (!t1.inconsistent && branch) {
-    for (const [name, angle] of branch.angles) {
-      const mod = t1.knownModulus.get(name);
-      if (!mod) continue; // the direction is fixed but the magnitude is not — nothing to plot yet
-      const m = evalMod(mod, sample);
-      const deg = toDegrees(angle, sample);
-      if (m === null || deg === null) continue;
+  if (!t1.inconsistent) {
+    // the union: names the constraints mention PLUS bare declarations, so a number the student merely
+    // named is still on the canvas (always-visualise) rather than waiting for a constraint to earn it
+    for (const name of [...new Set([...t1.names, ...bridged.freeNames])]) {
+      const m = modulusOf(name);
+      const a = argumentOf(name);
+      if (!Number.isFinite(m.value) || !Number.isFinite(a.deg)) continue;
       points.push({
         name,
-        z: cPolar(m, deg),
-        modulus: fmtMod(mod),
-        argumentDeg: deg,
-        exactLabel: exactLabelOf(mod, angle),
+        z: cPolar(m.value, a.deg),
+        modulus: m.exact ? fmtMod(m.exact) : round2(m.value),
+        argumentDeg: a.deg,
+        exactLabel: m.exact && a.exact ? exactLabelOf(m.exact, a.exact) : null,
+        modulusKnown: m.exact !== null,
+        argumentKnown: a.exact !== null,
       });
     }
   }
@@ -324,6 +374,8 @@ export function derive2(facts: readonly ProtoFact[], configIndex = 0, seed = 0):
     emptiedBy,
   };
 }
+
+const round2 = (x: number): string => `${Math.round(x * 100) / 100}`;
 
 const exactLabelOf = (mod: ExpVec, arg: Angle): string | null => {
   const v = exact(mod, arg);

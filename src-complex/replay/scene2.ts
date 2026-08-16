@@ -47,8 +47,19 @@ export function v2Status(d: Derived2): string {
   return parts.join(' · ');
 }
 
-/** The exact polar reading of every plotted number — the point of the whole exercise. */
+/**
+ * The polar reading of every plotted number.
+ *
+ * `=` is reserved for values the givens FORCE. A number with a sampled half is written with `≈`, so
+ * the canvas can show it (always visualise) without the label claiming it is knowledge — the drawn
+ * figure is then one configuration among many, and says so.
+ */
 export const v2Labels = (d: Derived2): string[] =>
-  d.points.map((p) => `${pretty(p.name)} = ${p.exactLabel ?? `${p.modulus}·cis${round(p.argumentDeg)}°`}`);
+  d.points.map((p) => {
+    if (p.exactLabel) return `${pretty(p.name)} = ${p.exactLabel}`;
+    const mod = p.modulusKnown ? p.modulus : `~${p.modulus}`;
+    const arg = p.argumentKnown ? `${round(p.argumentDeg)}°` : `~${round(p.argumentDeg)}°`;
+    return `${pretty(p.name)} ≈ ${mod}·cis${arg}`;
+  });
 
 const round = (x: number): number => Math.round(x * 1e4) / 1e4;

@@ -131,3 +131,57 @@ describe('parameters stay free (ADR-052)', () => {
     expect(a.freeDof).toContain('arg z1');
   });
 });
+
+describe('ALWAYS VISUALISE — an under-determined figure still draws (operator report, 2026-08-16)', () => {
+  // Reported from ?engine=v2: with `z1 ברביע הראשון` + `z1^3 = z3` the canvas was EMPTY. The engine
+  // plotted only numbers whose magnitude the givens forced, so every partially-specified figure — which
+  // is every figure while the student is still typing — rendered nothing. Two rules had been conflated:
+  // "do not print an unknown value as knowledge" (kept, at the label) and "do not draw it" (wrong; the
+  // standing product rule is ADR-CX-001 D3, always visualise, with ADR-052's default-as-a-STARTING-value).
+  const REPORTED = ['z1 ברביע הראשון', 'z1^3 = z3'];
+
+  it('the reported session DRAWS both numbers', () => {
+    const d = derive2(facts(...REPORTED));
+    expect(d.contradiction).toBeNull();
+    expect(d.points.map((p) => p.name).sort()).toEqual(['z1', 'z3']);
+    for (const p of d.points) {
+      expect(Number.isFinite(p.z.re) && Number.isFinite(p.z.im), p.name).toBe(true);
+      expect(p.z.re === 0 && p.z.im === 0, `${p.name} must not sit on the origin`).toBe(false);
+    }
+  });
+
+  it('...but reports the sampled halves as NOT known — drawn is not the same as forced', () => {
+    const d = derive2(facts(...REPORTED));
+    for (const p of d.points) {
+      expect(p.modulusKnown, `${p.name} magnitude is not stated`).toBe(false);
+      expect(p.exactLabel, `${p.name} has no exact reading yet`).toBeNull();
+    }
+    expect(d.freeDof.length).toBeGreaterThan(0);
+  });
+
+  it('the sample MOVES with the configuration — a default, never a fixed value (ADR-052)', () => {
+    const a = derive2(facts(...REPORTED), 0, 0);
+    const b = derive2(facts(...REPORTED), 0, 1);
+    const moved = a.points.some((p, i) => Math.hypot(p.z.re - b.points[i].z.re, p.z.im - b.points[i].z.im) > 1e-6);
+    expect(moved, 'a new configuration must resample the free DOFs').toBe(true);
+  });
+
+  it('the quadrant given still HOLDS in the drawing it produced', () => {
+    const d = derive2(facts(...REPORTED));
+    const z1 = d.points.find((p) => p.name === 'z1')!;
+    expect(z1.z.re, 'z1 is in the first quadrant').toBeGreaterThan(0);
+    expect(z1.z.im, 'z1 is in the first quadrant').toBeGreaterThan(0);
+  });
+
+  it('a number that is merely NAMED is on the canvas too', () => {
+    const d = derive2(facts('z9'));
+    expect(d.points.map((p) => p.name)).toContain('z9');
+  });
+
+  it('a fully-determined figure is unchanged — the fix did not loosen what was known', () => {
+    const d = derive2(facts('z1 ברביע הראשון', 'z1^3 = z3', '-2z1 = conj(z3)'));
+    const z1 = d.points.find((p) => p.name === 'z1')!;
+    expect(z1.modulusKnown && z1.argumentKnown).toBe(true);
+    expect(z1.exactLabel).toBe('√2·cis45°');
+  });
+});
