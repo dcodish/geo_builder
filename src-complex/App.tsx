@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { fmtNum } from './engine/complex';
 import { deriveScene } from './engine/model';
 import { deriveLines } from './app/deriveLines';
-import { v2Claims, v2Knowledge, v2Labels, v2Measures, v2Status } from './replay/scene2';
+import { v2Claims, v2Formulas, v2Knowledge, v2Labels, v2Measures, v2Status } from './replay/scene2';
 import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
 import { GaussPlane } from './render/GaussPlane';
@@ -345,6 +345,12 @@ export function App() {
               {v2Knowledge(derived2).map((k) => (
                 <div key={k} className="v2-claim">
                   {k}
+                </div>
+              ))}
+              {/* the formula sheet, surfaced from what the figure DOES — each row names its premises */}
+              {v2Formulas(derived2, i18n.language === 'he' ? 'he' : 'en').map((f) => (
+                <div key={f} className="v2-formula" dir="ltr">
+                  {f}
                 </div>
               ))}
               {/* a relation the numeric tier could not satisfy has no row of its own — tier 1 pushed

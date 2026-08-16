@@ -81,6 +81,27 @@ export const REAL_KW = String.raw`(?:${HE_PREFIX}${MEM}${MEM}שי${HE_SUFFIX}|re
 /** «מדומה טהור» — pure imaginary. */
 export const IMAGINARY_KW = String.raw`(?:${HE_PREFIX}${MEM}דומה(?: ${HE_PREFIX}טהור${HE_SUFFIX})?|pure imaginary|imaginary)`;
 
+/**
+ * «ה-» before a LATIN letter: «ה-n המינימלי».
+ *
+ * Hebrew attaches the definite article directly to a Hebrew word (and {@link HE_PREFIX} covers that),
+ * but a Latin variable takes a maqaf. Spelled once, here, because a rule that inlines it is exactly
+ * what the lexical ratchet exists to refuse.
+ */
+export const HE_THE_VAR = String.raw`(?:ה-?)?`;
+
+/** «לכל» / «for every» — the universal quantifier of F12. */
+export const FORALL_KW = String.raw`(?:${HE_PREFIX}כל|for (?:every|all|each))`;
+
+/** «טבעי» / «natural» — the domain of the quantified exponent. */
+export const NATURAL_KW = String.raw`(?:${HE_PREFIX}טבעי${HE_SUFFIX}|natural)`;
+
+/** «המינימלי» / «הקטן ביותר» / «minimal» — the least-n ask, four of eleven exams. */
+export const MINIMAL_KW = String.raw`(?:${HE_PREFIX}${MEM}ינימלי|${HE_PREFIX}קט${NUN} ביותר|minimal|smallest|least)`;
+
+/** «שעבורו» / «for which» — the relative that binds the quantified n to the statement. */
+export const FOR_WHICH_KW = String.raw`(?:${HE_PREFIX}ש?עבור[וםן]?|${HE_PREFIX}ש?בו|for which|such that)`;
+
 /** «צמוד» — conjugate. */
 export const CONJUGATE_KW = String.raw`(?:${HE_PREFIX}צמוד${HE_SUFFIX}|conjugates?)`;
 
@@ -273,6 +294,11 @@ export const ATOM_SOURCES: Readonly<Record<string, string>> = {
   REAL_KW,
   IMAGINARY_KW,
   CONJUGATE_KW,
+  HE_THE_VAR,
+  FORALL_KW,
+  NATURAL_KW,
+  MINIMAL_KW,
+  FOR_WHICH_KW,
   AND_KW,
   COPULA_KW,
   SEQUENCE_KW,

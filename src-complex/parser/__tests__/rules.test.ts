@@ -48,7 +48,7 @@ describe('CATALOG — every specimen parses, in both languages', () => {
 
   it('reports MEASURED coverage — which families actually work today', () => {
     // this is the honest number, and it is deliberately much smaller than the contract
-    expect(coveredFamilies()).toEqual(['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9']);
+    expect(coveredFamilies()).toEqual(['F1', 'F12', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9']);
     expect(Object.keys(FAMILY_TITLE).length).toBeGreaterThan(coveredFamilies().length);
   });
 });
@@ -182,6 +182,8 @@ describe('span accounting is ENFORCING, not advisory', () => {
       'declaration',
       'quadrant',
       'conjugates-claim',
+      'forall-power',
+      'minimal-power',
       'type-claim',
       // the long sequence sentence outranks the bare list, and both outrank the relation rules: its
       // tail «האיבר השלישי הוא Z4» is a type-claim shape if read by a laxer rule first

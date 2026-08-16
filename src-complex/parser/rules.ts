@@ -38,6 +38,11 @@ import {
   ARITHMETIC_KW,
   CENTER_KW,
   EQUATES_KW,
+  FORALL_KW,
+  FOR_WHICH_KW,
+  HE_THE_VAR,
+  MINIMAL_KW,
+  NATURAL_KW,
   LENGTH_KW,
   PERIMETER_KW,
   CIRCLE_KW,
@@ -563,11 +568,97 @@ const sequenceFirstTerms: Rule = (s) => {
   );
 };
 
+
+// --- F12: quantified claims over the powers of a number ---------------------
+
+/**
+ * The exponent of a quantified power: `n`, `4n`, `4n+2` — the corpus's shape, and nothing wider.
+ *
+ * Returned as `(k, c)` for `k·n + c`, so the verifier reads a congruence rather than a syntax tree.
+ * A bare `n` is `k = 1, c = 0`; a plain integer is not accepted here at all, because «for every n» over
+ * an exponent that does not mention n is not a quantified claim, it is F10 with extra words.
+ */
+const exponentKN = (text: string): { k: number; c: number } | null => {
+  const m = text.match(rx(`^\\(?\\s*(\\d*)\\s*n\\s*(?:([+-])\\s*(\\d+))?\\s*\\)?$`));
+  if (!m) return null;
+  const k = m[1] === '' ? 1 : Number(m[1]);
+  const c = m[3] === undefined ? 0 : Number(m[3]) * (m[2] === '-' ? -1 : 1);
+  return Number.isFinite(k) && k !== 0 ? { k, c } : null;
+};
+
+/** Which of the two sheet-decidable properties the tail states, if either. */
+const propertyOf = (tail: string): 'real' | 'imaginary' | null =>
+  rx(IMAGINARY_KW).test(tail) ? 'imaginary' : rx(REAL_KW).test(tail) ? 'real' : null;
+
+/**
+ * F12 — «לכל n טבעי, w^(4n) ממשי» / «for every natural n, w^(4n) is real», in either word order.
+ *
+ * Hebrew puts the quantifier first and English can put it last («w^(4n) is real for every natural n»),
+ * so both orders are spelled — the third family in a row to need that, which is why the rule is stated
+ * as a rule rather than discovered again (ADR-CX-012).
+ */
+const forallPower: Rule = (s) => {
+  // «לכל n טבעי» puts the adjective AFTER the variable; «for every natural n» puts it before. Same
+  // asymmetry as «ברביע הראשון» / «in the first quadrant» and «שני האיברים הראשונים» / «the first two
+  // terms» — every noun-plus-modifier phrase in this grammar needs both orders spelled.
+  const quantifier = `${FORALL_KW}\\s+(?:${NATURAL_KW}\\s+)?n(?:\\s+${NATURAL_KW})?`;
+  const power = `(${NAME})\\s*\\^\\s*([^\\s]+?)`;
+  const m =
+    s.match(rx(`^${quantifier}\\s*,?\\s*${power}\\s+${COPULA_KW}(.+)$`)) ??
+    s.match(rx(`^${power}\\s+${COPULA_KW}(.+?)\\s+${quantifier}$`));
+  if (!m) return null;
+  const name = m[1].toLowerCase();
+  if (!isComplexName(name)) return null;
+  const exp = exponentKN(m[2]);
+  const prop = propertyOf(m[3]);
+  if (!exp || !prop) return null;
+  return {
+    ...empty(),
+    declares: [name],
+    assertions: [{ kind: 'forall-power' as const, name, k: exp.k, c: exp.c, prop, src: s }],
+    claims: [claimAll(s)],
+  };
+};
+
+/**
+ * F12 — «ה-n המינימלי שעבורו w^n מדומה טהור הוא 5» / «the minimal n for which w^n is pure imaginary is 5».
+ *
+ * The student states their answer and the engine solves the same congruence for its least solution.
+ * There is no question form here on purpose: «find the minimal n» is what the exam asks the STUDENT,
+ * and a tool that printed it unprompted would be answering the question rather than checking it.
+ */
+const minimalPower: Rule = (s) => {
+  const m = s.match(
+    rx(
+      // «ה-n המינימלי» against «the minimal n» — the same both-orders rule as every other modifier here
+      `^${OF_A}(?:${HE_THE_VAR}n\\s*${MINIMAL_KW}|${MINIMAL_KW}\\s+n)\\s+${FOR_WHICH_KW}\\s+(${NAME})\\s*\\^\\s*n\\s+` +
+        `${COPULA_KW}(.+?)\\s+${EQUATES_KW}\\s*(\\d+)$`,
+    ),
+  );
+  if (!m) return null;
+  const name = m[1].toLowerCase();
+  if (!isComplexName(name)) return null;
+  const prop = propertyOf(m[2]);
+  if (!prop) return null;
+  return {
+    ...empty(),
+    declares: [name],
+    assertions: [
+      { kind: 'minimal-power' as const, name, prop, stated: Number(m[3]), src: s },
+    ],
+    claims: [claimAll(s)],
+  };
+};
+
 /** First match wins. Order is specific-to-general: a relation sentence before the bare equation. */
 export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = [
   { name: 'declaration', rule: declaration },
   { name: 'quadrant', rule: quadrantGiven },
   { name: 'conjugates-claim', rule: conjugatesClaim },
+  // the QUANTIFIED claims outrank the plain type claim: «לכל n טבעי w^(4n) ממשי» ends in the same
+  // words as «w ממשי», and the general rule would read the quantifier as part of a name
+  { name: 'forall-power', rule: forallPower },
+  { name: 'minimal-power', rule: minimalPower },
   { name: 'type-claim', rule: typeClaim },
   // the long sequence sentence first: its tail «האיבר השלישי הוא Z4» would otherwise be read as a
   // type-claim about a number called «האיבר»

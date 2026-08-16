@@ -943,3 +943,93 @@ arguments, one transposition away from a figure quietly about something else).
   ([ADR-W-018](06w-decisions-workspace.md)), for all four builders, rather than a third private copy
   here. Complex therefore finishes the foundation rebuild with known parity gaps — **no undo/redo,
   delete-only facts** — and that is a scheduling decision, not a decision to leave them unbuilt.
+
+---
+
+## ADR-CX-017 — Knowledge in a UNIT, the formula sheet, and claims about every n (2026-08-16)
+
+**Status:** Accepted · **Slice:** S6 ([#623](https://github.com/dcodish/geo_builder/issues/623))
+· **Ladder:** stages 4a and 5d · **Families:** F7 (the parameter register), F12 (quantified claims)
+
+### 1. «הביעו באמצעות r» — a free parameter can be a UNIT rather than an unknown
+
+The corpus asks constantly for a measure *expressed in a parameter*: «הביעו באמצעות r את אורך הקטע
+Z₁Z₂» (docs/27 §2b א, answer `15r`), «הביעו באמצעות r את היקף המרובע» (`60r`). The knowledge gate
+([ADR-CX-014](#adr-cx-014)) had to refuse every one of them: the figure genuinely has a free degree of
+freedom, so no NUMBER is knowledge. And yet `15r` **is** knowledge, exactly, and it is the answer the
+exam wants.
+
+The resolution is that `r` is not an unknown of the figure — it is its **unit**. If scaling every
+magnitude and `r` together produces another configuration that satisfies every relation, the givens
+describe a one-parameter family of *similar* figures, and a length in that family is `c·r` for a single
+c: a fact about all of them at once.
+
+So the predicate is: **the remaining freedom is exactly the symmetry group.** Two transformations are
+tried and each is *checked against every live residual*, not assumed —
+
+| symmetry | what it does | what a measure must do under it |
+|---|---|---|
+| **scale** | every magnitude and every free parameter ×λ | multiply by `λ^degree` (1 for a length or perimeter, 2 for an area) |
+| **turn** | every free direction +37° | not change at all |
+
+— and the value prints only when the number of *verified* symmetries equals the remaining DOF count,
+so nothing is left that could move the shape. A figure that pins an absolute size somewhere («z1 = 3»
+beside a free `r`) fails both checks and prints nothing, which is correct: there `r` really is an
+unknown. A figure free only up to **rotation**, with no parameter at all, now prints the plain number —
+the same discovery, in the case where the unit is 1.
+
+This is deliberately not the shape [ADR-421](06-decisions.md#adr-421) forbids. Nothing is inferred from
+sampling variance: the transformed states are *evaluated* against the constraint system, and the
+homogeneity of the measure is *required* rather than observed. It inherits ADR-CX-014's conservative
+direction unchanged — every check that fails withholds the value.
+
+### 2. The formula sheet, byte-matched
+
+[docs/29](29-complex-formula-reference.md) transcribes the three formulas the official 5-unit sheet
+carries for this topic — polar multiplication, De Moivre, the n-th roots — and
+`src-complex/formulas/table.ts` carries the same three strings, matched **in both directions** by an
+integrity test: nothing in the table the sheet does not say, and nothing in the document the table does
+not carry. (docs/28 was taken by the unification programme between the issue being written and the work
+being done; the reference is docs/**29**.)
+
+The two-way check is the point. A one-way check lets the table quietly grow a fourth formula — the
+conjugate, division and `|z|` are the three most tempting, and none of them is on the sheet — which
+would be the app teaching, as *"the formula sheet says"*, something the sheet does not say. That is the
+same class of dishonesty as printing a sampled value as knowledge.
+
+**Surfacing is structural, never a keyword match**: a formula appears because the figure *does the
+operation* — a product surfaces CX-F1, an integer power surfaces CX-F2, and an equation `Xⁿ = c` that
+produced more than one configuration surfaces CX-F3, because the `k` in that formula is exactly what
+"show another configuration" walks. Every surfaced row names the student's own lines that triggered it,
+which is what "premise highlighting" reads.
+
+### 3. F12 — «לכל n טבעי» and «ה-n המינימלי», decided by congruence
+
+Four of the eleven re-read exams ask a minimal-n question and three ask a for-all-n one. Neither is a
+property any finite set of drawings has, which is the whole reason [ADR-CX-006](#adr-cx-006) D1 chose
+exact turns over floats — and the machinery was already in the value layer (`smallestPower`, `period`)
+waiting for a grammar.
+
+- «לכל n טבעי, w^(4n) ממשי» → `w^m` is real iff `2m·θ ≡ 0 (mod 1)`; substituting `m = kn + c` and
+  requiring it for every n splits into two integer conditions (`2kθ ≡ 0`, `2cθ ≡ target`). No search.
+- «ה-n המינימלי שעבורו wⁿ מדומה טהור הוא 5» → the least solution of `n·2θ ≡ ½`. A stated n that *works*
+  but is not least is refuted **with the least one named**, because that is the question that was asked.
+- An argument with no closed form (`3+4i`, whose 53.13° is not a rational part of a turn) is `unknown`,
+  never refuted — refusing a true claim tells a student their correct answer is wrong, and that is the
+  one direction of this error that costs something.
+
+There is deliberately **no question form** for the minimal n. «Find the minimal n» is what the exam asks
+the *student*; a tool that printed it unprompted would be answering the question rather than checking
+the answer, which is the charter line every sibling holds.
+
+### What S6 still owes, named rather than implied
+
+- **Families G4–G9** (transform over a point set, incidence on a regular n-gon, equation synthesis, sums
+  over a set, real-parameter algebra, non-linear loci). Each needs grammar *and* engine work of its own
+  — they are a slice apiece, not a finishing touch — and none is built. Filed as follow-up work rather
+  than left implicit in this slice's issue.
+- **The compound half of the 2023 קיץ א ד gate**: «the minimal n such that wⁿ is pure imaginary AND
+  lies outside the circumscribed circle» is a conjunction of a congruence with a region test. The
+  congruence half is built and exact; the conjunction is not.
+- **A region COUNT claim** (F12's third clause, «כמה … בתוך / על / מחוץ»). S5 draws the counting picture
+  ([ADR-CX-016](#adr-cx-016)); asserting the count is a stage-4 claim and is not built.

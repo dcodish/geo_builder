@@ -33,6 +33,7 @@ import { type CheckedMeasure, type MeasureQuery, type MeasureRelation, measureOf
 import { type KnowledgeRow, isKnowledge, whyNotKnowledge } from '../model/knowledge';
 import { prettyName } from '../model/naming';
 import type { SequenceKind, SequenceStatement } from '../model/sequence';
+import { type SurfacedFormula, surfacedFormulas } from '../formulas/table';
 import { type Bound, solveResiduals } from '../solve/tier2';
 import { type Env, type ResidualSpec, deferredResidual, evalReal, measureResidual } from '../solve/residuals';
 import { verifyClaims } from '../solve/claims';
@@ -388,6 +389,11 @@ export interface Derived2 {
   readonly emptiedBy: BranchFilter | null;
   /** the student's ANSWERS, checked against the figure the givens produced — never drivers */
   readonly claims: readonly CheckedClaim[];
+  /**
+   * Which of the three official sheet formulas this figure is USING, with the lines that brought each
+   * up (S6, #623). Published from the fold so the panel and the canvas highlight from one list.
+   */
+  readonly formulas: readonly SurfacedFormula[];
 }
 
 /** A deterministic positive sample for a parameter the student never valued (ADR-052: a START, not a fixed value). */
@@ -806,13 +812,123 @@ export function foldConstraints(input: FoldInput): Derived2 {
     remainingDof: Math.max(0, freeDofNames.length - drivenCount),
     configCount,
   };
+  /**
+   * IS THE ONE REMAINING FREEDOM A PURE **GAUGE**? — «הביעו באמצעות r», answered.
+   *
+   * The corpus asks a whole register of questions the current knowledge gate has to refuse: *express
+   * the length of Z₁Z₂ in terms of r*, *express the perimeter in terms of r*. The figure genuinely has
+   * a free degree of freedom, so no NUMBER is knowledge — and yet `15r` is knowledge, exactly, and it
+   * is the answer the exam wants.
+   *
+   * The difference is that `r` is not an unknown of the figure, it is its **unit**. If scaling every
+   * magnitude and `r` together by λ produces another configuration that satisfies every relation, then
+   * the givens describe a one-parameter FAMILY of similar figures, and a length in that family is
+   * `c·r` for a single c — a fact about all of them at once.
+   *
+   * That is checked, never assumed, and it is deliberately not the sampling-variance shape
+   * [ADR-421](../../docs/06-decisions.md#adr-421) forbids: the scaled state is *evaluated against every
+   * live residual* (the family is valid), and the quantity is required to scale by exactly `λ^degree`
+   * (it really is homogeneous). A figure that pins an absolute size somewhere — «|z₁| = 5» beside a
+   * free `r` — fails both checks and prints no expression, which is correct: there, `r` is a genuine
+   * unknown rather than a unit.
+   */
+  const GAUGE_LAMBDA = 2;
+  const GAUGE_TURN_DEG = 37;
+
+  /** The transformed state, and the environment that reads positions out of it. */
+  const transformed = (f: (st: State) => State): { env: Env; moves: boolean } => {
+    const next = f(state);
+    const env = envFor(next);
+    const moves =
+      [...next.mod].some(([n, v]) => Math.abs(v - (state.mod.get(n) ?? v)) > 1e-12) ||
+      [...next.arg].some(([n, v]) => Math.abs(v - (state.arg.get(n) ?? v)) > 1e-12) ||
+      [...next.par].some(([n, v]) => Math.abs(v - (state.par.get(n) ?? v)) > 1e-12);
+    return { env, moves };
+  };
+
+  const satisfiesEverything = (env: Env): boolean => {
+    const reach = Math.max(1, ...[...drawnNames].map((n) => modulusOf(n, state).value)) * GAUGE_LAMBDA;
+    const tol = 1e-7 * reach * reach;
+    return live.every(({ spec }) => {
+      const v = spec.values(env);
+      return v !== null && v.every((r) => Math.abs(r) <= tol);
+    });
+  };
+
+  /** Scale every magnitude and the unit together: the figure becomes a similar one. */
+  const scaleAll = (st: State): State => ({
+    mod: new Map([...st.mod].map(([n, v]) => [n, v * GAUGE_LAMBDA])),
+    arg: st.arg,
+    par: new Map([...st.par].map(([n, v]) => [n, freeParamNames.includes(n) ? v * GAUGE_LAMBDA : v])),
+  });
+
+  /** Turn every free direction by the same angle: the figure becomes a rotated one. */
+  const rotateAll = (st: State): State => ({
+    mod: st.mod,
+    arg: new Map([...st.arg].map(([n, v]) => [n, v + GAUGE_TURN_DEG])),
+    par: st.par,
+  });
+
+  const scale = transformed(scaleAll);
+  const turn = transformed(rotateAll);
+  const symmetries = [
+    { kind: 'scale' as const, ...scale },
+    { kind: 'turn' as const, ...turn },
+  ].filter((s) => s.moves && !t1.inconsistent && satisfiesEverything(s.env));
+
+  /**
+   * The remaining freedom is EXACTLY the symmetry group — so a Euclidean measure is determined.
+   *
+   * `remainingDof` counts directions the figure can still move in; the symmetries are directions along
+   * which it moves to a *congruent or similar* figure. When the two counts agree, every valid
+   * configuration is the same shape as this one, and a length is `c·r`, an area `c·r²`, for a single c.
+   */
+  const shapeFixed = symmetries.length > 0 && closure.remainingDof === symmetries.length;
+  const gaugeName = symmetries.some((s) => s.kind === 'scale') && freeParamNames.length === 1
+    ? freeParamNames[0]
+    : null;
+
+  /**
+   * A measure over a shape-fixed figure, written the way the exam asks for it.
+   *
+   * Every symmetry is CHECKED against the measure as well as against the relations: a rotation must
+   * leave it alone and a scaling must multiply it by `λ^degree`. If either fails, this is not the
+   * quantity's symmetry group after all and nothing is printed — the conservative direction
+   * ([ADR-CX-014](../../docs/06d-decisions-complex.md#adr-cx-014)): a withheld truth costs a hint, an
+   * asserted falsehood costs the answer.
+   */
+  const expressMeasure = (
+    kind: MeasureQuery['kind'],
+    names: readonly string[],
+    value: number,
+  ): string | null => {
+    if (!shapeFixed) return null;
+    const degree = kind === 'area' ? 2 : 1;
+    for (const s of symmetries) {
+      const pts = names.map((n) => s.env.at(n));
+      if (pts.some((p) => p === undefined)) return null;
+      const moved = measureOf(kind, pts as Cx[]);
+      if (moved === null) return null;
+      const want = s.kind === 'scale' ? value * GAUGE_LAMBDA ** degree : value;
+      if (Math.abs(moved - want) > 1e-6 * Math.max(1, Math.abs(want))) return null;
+    }
+    if (!gaugeName) {
+      // no unit to express it in: the number itself is the same in every configuration
+      return freeParamNames.length === 0 ? round2(value) : null;
+    }
+    const unit = state.par.get(gaugeName);
+    if (!unit || !Number.isFinite(unit)) return null;
+    return `${fmtCoefficient(value / unit ** degree)}${gaugeName}${degree === 2 ? '²' : ''}`;
+  };
+
   const knowledge: KnowledgeRow[] = queries.map((q) => {
     const pts = q.points.map((n) => finalEnv.at(n));
     const value = pts.some((p) => p === undefined) ? null : measureOf(q.kind, pts as Cx[]);
-    if (value === null || !isKnowledge(false, closure)) {
-      return { label: q.src, value: null, why: whyNotKnowledge(closure) };
-    }
-    return { label: q.src, value: round2(value), why: '' };
+    if (value === null) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
+    if (isKnowledge(false, closure)) return { label: q.src, value: round2(value), why: '' };
+    const expressed = expressMeasure(q.kind, q.points, value);
+    if (expressed) return { label: q.src, value: expressed, why: '' };
+    return { label: q.src, value: null, why: whyNotKnowledge(closure) };
   });
 
   return {
@@ -832,6 +948,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     knowledge,
     emptiedBy,
     claims: verifyClaims(assertions, t1, branch),
+    formulas: t1.inconsistent ? [] : surfacedFormulas(constraints, configCount),
   };
 }
 
@@ -1088,6 +1205,19 @@ function circumcircle(a: Cx, b: Cx, c: Cx): { center: Cx; r: number } | null {
 }
 
 const round2 = (x: number): string => `${Math.round(x * 100) / 100}`;
+
+/**
+ * The coefficient of a gauge expression: `15r`, not `15.0000001r`, and `r` rather than `1r`.
+ *
+ * A whole number that the minimiser reached to within a hair is printed as the whole number — the exam
+ * answer is `15r`, and a student who typed the given cannot be shown their own figure as `14.999998r`.
+ * The snap is deliberately tight: it corrects float noise, it never rounds a value into a lie.
+ */
+function fmtCoefficient(c: number): string {
+  const near = Math.round(c);
+  const v = Math.abs(c - near) <= 1e-6 * Math.max(1, Math.abs(c)) ? near : Math.round(c * 1e4) / 1e4;
+  return v === 1 ? '' : `${v}`;
+}
 
 const exactLabelOf = (mod: ExpVec, arg: Angle): string | null => {
   const v = exact(mod, arg);

@@ -157,6 +157,7 @@
     "src-complex/replay": "engine",
     "src-complex/app": "engine",
     "src-complex/scene": "engine",
+    "src-complex/formulas": "lexicon",
     "src-complex/i18n": "shell"
   },
 

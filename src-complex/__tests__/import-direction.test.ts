@@ -37,7 +37,9 @@ const MAY_IMPORT: Record<string, readonly string[]> = {
   // fact types so the new engine can be played through the existing input box, rather than a second
   // parser being written ahead of S4's span accounting (ADR-CX-009). It is one import of two TYPES,
   // it is deleted with `bridgeFacts` when S4 lands, and it is listed here so it stays that small.
-  replay: ['value', 'model', 'solve', LEGACY],
+  // `replay -> formulas` is the S6 surfacing seam: the fold publishes WHICH sheet formulas the figure
+  // uses, so the canvas and the panel read one list rather than each detecting its own (#653's class).
+  replay: ['value', 'model', 'solve', 'formulas', LEGACY],
   store: ['value', 'model', 'solve', 'replay', 'parser', LEGACY],
   scene: ['value', 'model', 'solve', 'replay'],
   render: ['value', 'scene', LEGACY],
