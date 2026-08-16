@@ -3,7 +3,9 @@
 > **Status: WORKING DRAFT — decision-complete, not yet accepted, nothing here is executable.**
 > No ADR has been written for it. The operator asked for a draft to iterate on before any of it is
 > committed to; tracking issue [#648](https://github.com/dcodish/geo_builder/issues/648).
-> §8 carries what is still open.
+> **§8 is now empty of open questions** — every fork, every interface decision (§4a D1–D10) and all
+> four programme questions were ruled on 2026-08-16. What remains before execution is an ADR and
+> your acceptance, not a decision.
 >
 > **§4 was ruled on by the operator on 2026-08-16 and is no longer a fork** — separate builders at
 > separate links, one learned interface, a toolbar switcher. That ruling added a second row family
