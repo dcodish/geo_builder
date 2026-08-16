@@ -152,6 +152,8 @@
     "src-complex/render": "engine",
     "src-complex/store": "engine",
     "src-complex/value": "engine",
+    "src-complex/model": "engine",
+    "src-complex/solve": "engine",
     "src-complex/i18n": "shell"
   },
 
