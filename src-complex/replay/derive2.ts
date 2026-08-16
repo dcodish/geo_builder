@@ -338,16 +338,61 @@ export function foldConstraints(
    * so the figure can exist — provided it moves when the configuration changes, which it does, because
    * the sample is keyed on the seed that "show another configuration" advances.
    */
+  /**
+   * THE ANGULAR WINDOW a filter leaves open for a FREE direction.
+   *
+   * An inequality prunes enumerated branches — but a direction the givens never pin is not a branch,
+   * it is a sampled degree of freedom, and pruning cannot reach it. «z1 ברביע הראשון» on its own is
+   * exactly that case, and it drew z1 on the +Re axis: a point on an axis is in NO quadrant, so the
+   * figure contradicted its own given while every check passed, because nothing had asked the sample
+   * to respect the filter.
+   *
+   * So a filter does two jobs, not one: it PRUNES the configurations the equations produced, and it
+   * BOUNDS the sampling of what they left free. Both are the same statement about the same direction.
+   */
+  const windows = new Map<string, { min: number; max: number }>();
+  const narrow = (name: string, min: number, max: number): void => {
+    const prev = windows.get(name);
+    windows.set(name, { min: Math.max(prev?.min ?? -Infinity, min), max: Math.min(prev?.max ?? Infinity, max) });
+  };
+  for (const f of filterList) {
+    if (f.kind === 'quadrant') narrow(f.name, (f.q - 1) * 90, f.q * 90);
+    else if (f.kind === 'range') {
+      if (f.minDeg) narrow(f.name, Number(f.minDeg.n) / Number(f.minDeg.d), Infinity);
+      if (f.maxDeg) narrow(f.name, -Infinity, Number(f.maxDeg.n) / Number(f.maxDeg.d));
+    } else narrow(f.name, Number(f.deg.n) / Number(f.deg.d), Number(f.deg.n) / Number(f.deg.d));
+  }
+
+  /**
+   * Sample a free direction, STRICTLY inside its window when it has one.
+   *
+   * Strictly, because a quadrant is an open region: 0° and 90° are on the axes and belong to neither
+   * neighbour. The 0.12–0.88 inset also keeps the drawn point clear of the boundary, so a student can
+   * see which quadrant it is in rather than having to judge a point sitting on a ray.
+   */
+  const sampleArgDeg = (name: string): number => {
+    const t = (paramSample(`arg ${name}`, seed) - 0.6) / 1.8; // 0 .. 1, deterministic per seed
+    const w = windows.get(name);
+    if (!w || !Number.isFinite(w.min) || !Number.isFinite(w.max)) {
+      const lo = Number.isFinite(w?.min ?? NaN) ? w!.min : 0;
+      const hi = Number.isFinite(w?.max ?? NaN) ? w!.max : 360;
+      return lo + (0.12 + 0.76 * t) * (hi - lo);
+    }
+    return w.min + (0.12 + 0.76 * t) * (w.max - w.min);
+  };
+
+  const sampleModulus = (name: string): number => 0.8 + paramSample(`|${name}|`, seed);
+
   const freeMod = new Map<string, number>();
-  for (const n of t1.modulus.free) freeMod.set(n, 0.8 + paramSample(`|${n}|`, seed));
+  for (const n of t1.modulus.free) freeMod.set(n, sampleModulus(n));
   const freeArg = new Map<string, number>();
-  for (const n of t1.argument.free) if (!isTurnUnknown(n)) freeArg.set(n, paramSample(`arg ${n}`, seed) * 150);
+  for (const n of t1.argument.free) if (!isTurnUnknown(n)) freeArg.set(n, sampleArgDeg(n));
 
   const modulusOf = (name: string): { value: number; exact: ExpVec | null } => {
     const d = t1.modulus.determined.get(name);
-    if (!d) return { value: freeMod.get(name) ?? 1, exact: null };
+    if (!d) return { value: freeMod.get(name) ?? sampleModulus(name), exact: null };
     const base = evalMod(d.konst, sample);
-    if (base === null) return { value: 1, exact: null };
+    if (base === null) return { value: sampleModulus(name), exact: null };
     let v = base;
     for (const [fn, c] of d.coefs) v *= Math.pow(freeMod.get(fn) ?? 1, toNumber(c));
     return { value: v, exact: d.coefs.size === 0 ? d.konst : null };
@@ -360,9 +405,9 @@ export function foldConstraints(
       if (deg !== null) return { deg, exact: fixed };
     }
     const d = t1.argument.determined.get(name);
-    if (!d) return { deg: freeArg.get(name) ?? 0, exact: null };
+    if (!d) return { deg: freeArg.get(name) ?? sampleArgDeg(name), exact: null };
     let deg = toDegrees(d.konst, sample);
-    if (deg === null) return { deg: 0, exact: null };
+    if (deg === null) return { deg: sampleArgDeg(name), exact: null };
     for (const [fn, c] of d.coefs) {
       const turn = branch?.k.get(fn);
       deg += toNumber(c) * (isTurnUnknown(fn) ? Number(turn ?? 0n) * 360 : (freeArg.get(fn) ?? 0));
