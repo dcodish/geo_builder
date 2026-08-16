@@ -1,6 +1,6 @@
 # 28 — Product unification: making three tools feel and behave like one
 
-> **Status: WORKING DRAFT — not accepted, not scheduled, nothing here is executable.**
+> **Status: WORKING DRAFT — decision-complete, not yet accepted, nothing here is executable.**
 > No ADR has been written for it. The operator asked for a draft to iterate on before any of it is
 > committed to; tracking issue [#648](https://github.com/dcodish/geo_builder/issues/648).
 > §8 carries what is still open.
@@ -586,20 +586,87 @@ landing now is written against no shared floor.
 - ~~What is the visual target?~~ **2-D's look**, via `theme.ts` values carried by Tailwind — §4a D2
   and D3. The whole interface is now specified in §4a, D1–D10.
 
-**Still open:**
+**All four remaining questions were answered 2026-08-16:**
 
-1. **§6: derived or hand-maintained rows**, and does the matrix start with one family or both?
-   Starting narrow is cheaper; starting narrow also means the first run's failure list understates
-   the real gap.
-2. **Does phase 2 block on phase 1?** They are independent. Running phase 2 first means the failure
-   list exists before any code moves.
-3. **When products disagree, does the stronger mechanism become an obligation?** Complex's span
-   accounting vs the older `dropped*` families: is `satisfied:` satisfied by *any* mechanism that
-   holds the property, or does the best-known mechanism become the bar? The draft assumes the
-   former — the latter turns every improvement into N-1 obligations, which would make improving
-   anything expensive.
-4. **Where does the switcher's roster live**, and what pins it? (§4 consequence 1 — configuration,
-   not imports; four-plus builders is where a hand-maintained roster drifts.)
+**Q1 — sequencing: BUILD-LED.** 2-D is the reference; work starts (shell/ + the CI lane, then the UI
+rulings) and matrix rows are written **alongside each surface as it lands**, rather than up front.
+*Accepted cost, stated plainly:* there is no baseline, so improvement is asserted rather than shown,
+and the **correctness** gaps — the unknown ones, the class that produced a P1 — stay unmeasured
+during the build.
+
+> **Implementation rule that keeps that cost from growing:** when a surface lands, its row is written
+> for **every** builder, not only the one being worked on. Otherwise "measure as we go" yields a
+> matrix describing whichever builder was touched last, and the cross-builder question — the entire
+> point — never gets asked.
+
+**Q2 — the row list is DERIVED, by a dedicated extraction pass over the ADR corpus.** The operator
+rejected the draft's hand-authored answer as under-specified, correctly: it described the enforcement
+and skipped where the content comes from.
+
+Measured: **665 ADRs** across the four logs, of which **109 have contract-shaped titles** that state
+the property outright (*"…may never share a location"*, *"…escalates, never half-parses"*, *"…never
+silently read as a plain line"*). **The row list already exists — distributed across the logs.**
+
+Ruled: **triage all 665 titles**, classify each as cross-cutting contract / product-specific
+mechanism / process decision, and read every candidate's body to extract the property, its
+provenance, which builders it binds, and how each answers today. The keyword shortlist is rejected as
+the scope — it would miss ADR-421 (the knowledge rule, a P1) and ADR-232 (replay inputs only), whose
+titles carry none of those words, and a filter cannot report what it missed.
+
+> **This resolves the ADR-W-006 tension rather than excusing it.** The ADR corpus *is* the source to
+> derive from, so the matrix is a derivation, not an enumeration. The maintenance rule can then be
+> mechanical: a new ADR whose title carries contract language must be either classified into the
+> matrix or explicitly excluded with a stated reason — otherwise the check fails.
+
+**Q3 — any mechanism that holds the property counts.** The matrix asks *does the property hold*, not
+*how*; it still records **which** mechanism each builder uses, so asymmetry stays visible and can be
+picked up as ordinary scheduled work. A better mechanism appearing in one builder creates **zero**
+obligations in the others — the alternative turns every improvement into N−1 obligations and makes
+improving expensive, which punishes exactly the behaviour worth encouraging.
+
+*Live case that shaped the ruling:* on *"nothing stated is silently dropped"* — complex **enforces**
+span accounting (#621, landed 2026-08-16), 2-D has the same accounting **in shadow** behind its 18
+gates, 3-D has 8 gates and no accounting. All three pass the property. The asymmetry is recorded and
+scheduled as [#659](https://github.com/dcodish/geo_builder/issues/659), not forced.
+
+*Accepted cost:* the weakest mechanism can persist as long as no counter-example is found — and "no
+counter-example found" is not "holds".
+
+**Q4 — one machine-readable product registry, several consumers — plus operator-editable config.**
+
+The registry is the machine version of the [docs/22 §9](22-workflow.md) table that nothing enforces
+today: id, label key, URL, icon, source tree, build target. `shell/`'s switcher renders it as **data,
+never imports** (the forbidden edge stands), and the isolation test cross-checks it against
+`BOUNDARIES.json` — a registered tree with no roster entry **fails**, so builder 5 cannot ship missing
+from two toolbars. It also retires the drift in the docs/22 §9 table and the `ci.yml` classifier's
+second hand-maintained copy of the same paths.
+
+**Operator requirement added in the same answer:**
+
+> *"I would also add to the recommendation that we have human manageable config/admin pages where i
+> can decide things without having to change code for it."*
+
+`server/admin.ts` already exists — password-protected, parameterized by `tool:` — but it is
+**read-only and stateless** (a signed cookie, no store), so editable config is new scope: persistence
++ write endpoints, on an auth surface that is already built.
+
+**The line that keeps it honest, and it is not negotiable:** admin config may only **choose among
+what the code already supports**; it may never **assert support the code lacks**.
+
+| may be configured (curation) | must stay in code + tests (capability) |
+| --- | --- |
+| which builders appear in the switcher, and their order | which builders exist, their trees and URLs — cross-checked against `BOUNDARIES.json` |
+| labels and icons | what the parser accepts |
+| **which quick commands are featured**, per builder | the catalog itself — the coverage map |
+| defaults a deploy shouldn't be needed to change | any honesty gate, contract or verifier |
+
+A quick command saved in admin is **validated against that builder's catalog at save time** and
+refused if absent. Without that, the admin page becomes a way to offer a student a command that
+fails — the offered-but-unsupported asymmetry [#511](https://github.com/dcodish/geo_builder/issues/511)
+is blocked on, with a nicer UI.
+
+*Degraded path:* the static registry is the fallback and the config overlays it, so a server that is
+down or unreachable leaves every builder working with its built-in roster.
 
 ---
 
