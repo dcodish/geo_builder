@@ -18,7 +18,10 @@
  *     succeeding.
  */
 
-import { type Expr, isMonomial, refsOf } from '../model/expr';
+import { isMonomial, refsOf } from '../model/expr';
+import type { Constraint } from '../model/constraint';
+
+export type { Constraint } from '../model/constraint';
 import { type LogPolarForm, argumentRow, linearize, modulusRow } from './logpolar';
 import { type LinearSolution, type Row, type VectorOps, solveLinear } from './linear';
 import { type Rat, isInt, mul as ratMul, rat, toNumber } from '../value/rational';
@@ -42,23 +45,6 @@ import {
   format as fmtAngle,
 } from '../value/angle';
 
-/**
- * One stated relation. `src` is the student's own line, carried so a refusal can quote it.
- *
- * `kind` exists because two corpus families are NOT complex equations. `|z₁| = 9r` (F3) says nothing
- * about direction, and `arg Z₁ − arg Z₂ = 90°` (F4) says nothing about magnitude — writing either as a
- * full equation would invent the half the student did not state, which is the ADR-052 sin in its
- * purest form. Each therefore emits only the row it actually constrains.
- */
-export interface Constraint {
-  readonly lhs: Expr;
-  readonly rhs: Expr;
-  /** `eq` (the default) emits both rows · `mod` only the modulus row · `arg` only the argument row */
-  readonly kind?: 'eq' | 'mod' | 'arg';
-  /** for `arg` only: `arg(lhs) − arg(rhs) = deltaTurns`, in turns */
-  readonly deltaTurns?: Rat;
-  readonly src?: string;
-}
 
 /** The integer turn-unknown namespace. `#` cannot occur in a student's name, so collision is impossible. */
 const kName = (i: number): string => `#k${i}`;

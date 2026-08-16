@@ -93,8 +93,15 @@ export interface Unaccounted {
   readonly reason: 'content';
 }
 
+/**
+ * A listed connective is filler whatever KIND the tokenizer guessed.
+ *
+ * `in` and `the` match the name shape, so keying filler on `kind === 'word'` classified them as names
+ * and «z1 in the first quadrant» was refused for its own English. The allowlist is the authority here;
+ * the kind is a hint for other consumers.
+ */
 const isFiller = (s: Span): boolean =>
-  s.kind === 'punctuation' || (s.kind === 'word' && FILLER.has(s.text.toLowerCase()));
+  s.kind === 'punctuation' || (s.kind !== 'number' && FILLER.has(s.text.toLowerCase()));
 
 /**
  * Which spans the parse failed to claim.
