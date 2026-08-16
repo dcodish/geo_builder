@@ -72,6 +72,12 @@ export const IMAGINARY_KW = String.raw`(?:${HE_PREFIX}${MEM}דומה(?: ${HE_PRE
 /** «צמוד» — conjugate. */
 export const CONJUGATE_KW = String.raw`(?:${HE_PREFIX}צמוד${HE_SUFFIX}|conjugates?)`;
 
+/** «ו-» / «and» — the conjunction joining two named numbers. */
+export const AND_KW = String.raw`(?:ו-?|and)`;
+
+/** «הוא» / «היא» / `is` — the optional copula before a predicate. */
+export const COPULA_KW = String.raw`(?:הוא\s+|היא\s+|is\s+)?`;
+
 /** Build a case-insensitive, unicode-aware regex from atoms. */
 export const rx = (fragment: string, flags = 'iu'): RegExp => new RegExp(fragment, flags);
 
@@ -95,4 +101,6 @@ export const ATOM_SOURCES: Readonly<Record<string, string>> = {
   REAL_KW,
   IMAGINARY_KW,
   CONJUGATE_KW,
+  AND_KW,
+  COPULA_KW,
 };

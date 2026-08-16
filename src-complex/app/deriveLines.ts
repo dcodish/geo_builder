@@ -12,6 +12,7 @@
 
 import { parseLineV2 } from '../parser/rules';
 import type { BranchFilter, Constraint } from '../model/constraint';
+import type { Claim as Assertion } from '../model/claim';
 import { type Derived2, type Untranslated, foldConstraints } from '../replay/derive2';
 
 /**
@@ -25,6 +26,8 @@ export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0)
   const constraints: Constraint[] = [];
   const filters: BranchFilter[] = [];
   const declared: string[] = [];
+  const assertions: Assertion[] = [];
+  const atoms = new Map<string, number>();
   const untranslated: Untranslated[] = [];
 
   lines.forEach((raw, idx) => {
@@ -40,7 +43,9 @@ export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0)
     constraints.push(...r.line.constraints);
     filters.push(...r.line.filters);
     declared.push(...r.line.declares);
+    assertions.push(...r.line.assertions);
+    for (const [k, v] of r.line.atoms) atoms.set(k, v);
   });
 
-  return foldConstraints(constraints, filters, declared, new Map(), untranslated, configIndex, seed);
+  return foldConstraints(constraints, filters, declared, atoms, untranslated, configIndex, seed, assertions);
 }

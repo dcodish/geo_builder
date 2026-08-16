@@ -157,6 +157,13 @@ describe('span accounting is ENFORCING, not advisory', () => {
   });
 
   it('the rule list is ordered and named, so precedence is reviewable', () => {
-    expect(RULES.map((r) => r.name)).toEqual(['declaration', 'quadrant', 'argument-relation', 'equation']);
+    expect(RULES.map((r) => r.name)).toEqual([
+      'declaration',
+      'quadrant',
+      'conjugates-claim',
+      'type-claim',
+      'argument-relation',
+      'equation',
+    ]);
   });
 });

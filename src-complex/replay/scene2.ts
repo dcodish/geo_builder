@@ -63,3 +63,10 @@ export const v2Labels = (d: Derived2): string[] =>
   });
 
 const round = (x: number): number => Math.round(x * 1e4) / 1e4;
+
+/** The student's answers, with the verdict the exact core reached. */
+export const v2Claims = (d: Derived2): string[] =>
+  d.claims.map(({ claim, verdict }) => {
+    const mark = verdict.status === 'holds' ? '✓' : verdict.status === 'refuted' ? '✗' : '?';
+    return `${mark} ${claim.src} — ${verdict.why}`;
+  });
