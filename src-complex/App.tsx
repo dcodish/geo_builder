@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fmtNum } from './engine/complex';
 import { deriveScene } from './engine/model';
+import { derive2 } from './replay/derive2';
+import { sceneFromDerived2, v2Labels, v2Status } from './replay/scene2';
 import { GaussPlane } from './render/GaussPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
 
@@ -97,7 +99,21 @@ export function App() {
     document.documentElement.dir = i18n.language === 'he' ? 'rtl' : 'ltr';
   }, [i18n.language]);
 
-  const scene = useMemo(() => deriveScene(facts, freePos, seed), [facts, freePos, seed]);
+  /**
+   * `?engine=v2` runs the REBUILT engine (#616): the exact log-polar solver instead of the prototype's
+   * per-fact sweeps. Off by default, so prod is untouched while the foundation is played
+   * (ADR-CX-008's switch). The preview surface below is temporary — S5 replaces the whole render and
+   * shell layer, and this banner with it.
+   */
+  const useV2 = useMemo(
+    () => typeof location !== 'undefined' && new URLSearchParams(location.search).get('engine') === 'v2',
+    [],
+  );
+  const derived2 = useMemo(() => (useV2 ? derive2(facts, seed, seed) : null), [useV2, facts, seed]);
+  const scene = useMemo(
+    () => (derived2 ? sceneFromDerived2(derived2) : deriveScene(facts, freePos, seed)),
+    [derived2, facts, freePos, seed],
+  );
   const [calcInput, setCalcInput] = useState('');
   const submitCalc = () => {
     if (calcInput.trim() === '') return;
@@ -246,6 +262,17 @@ export function App() {
           </ul>
         </section>
         <section className="canvas">
+          {derived2 && (
+            <div className="v2-banner" dir="rtl">
+              <strong>engine=v2</strong> · {v2Status(derived2)}
+              {v2Labels(derived2).length > 0 && <div dir="ltr">{v2Labels(derived2).join('   ')}</div>}
+              {derived2.untranslated.map((u) => (
+                <div key={u.factId} className="v2-skip">
+                  ⚠ «{u.src}» — {u.why}
+                </div>
+              ))}
+            </div>
+          )}
           <GaussPlane scene={scene} view={view} onDragFree={setFree} />
         </section>
       </main>
