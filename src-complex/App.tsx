@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { fmtNum } from './engine/complex';
 import { deriveScene } from './engine/model';
 import { deriveLines } from './app/deriveLines';
-import { v2Claims, v2Labels, v2Status } from './replay/scene2';
+import { v2Claims, v2Knowledge, v2Labels, v2Measures, v2Status } from './replay/scene2';
 import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
 import { GaussPlane } from './render/GaussPlane';
@@ -120,7 +120,10 @@ export function App() {
   const derived2 = useMemo(() => (useV2 ? deriveLines(lines, seed, seed) : null), [useV2, lines, seed]);
   const scene = useMemo(() => deriveScene(facts, freePos, seed), [facts, freePos, seed]);
   // the v2 canvas is the POLAR one: a complex number as a length and a direction, not a dot on a grid
-  const polarScene = useMemo(() => (derived2 ? buildScene(derived2.points) : null), [derived2]);
+  const polarScene = useMemo(
+    () => (derived2 ? buildScene(derived2.points, derived2.objects) : null),
+    [derived2],
+  );
 
   /**
    * WHICH ENGINE'S VERDICT THE FACT LIST SHOWS.
@@ -323,6 +326,23 @@ export function App() {
               {v2Claims(derived2).map((c) => (
                 <div key={c} className="v2-claim">
                   {c}
+                </div>
+              ))}
+              {v2Measures(derived2).map((m) => (
+                <div key={m} className="v2-claim">
+                  {m}
+                </div>
+              ))}
+              {v2Knowledge(derived2).map((k) => (
+                <div key={k} className="v2-claim">
+                  {k}
+                </div>
+              ))}
+              {/* a relation the numeric tier could not satisfy has no row of its own — tier 1 pushed
+                  it down — so without this it would simply be absent from a figure that ignores it */}
+              {derived2.unsatisfied.map((u) => (
+                <div key={u} className="v2-skip">
+                  ✗ «{u}» — לא מתקיים בתצורה הזו
                 </div>
               ))}
               {derived2.untranslated.map((u) => (

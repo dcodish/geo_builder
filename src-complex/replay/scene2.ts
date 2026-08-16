@@ -42,10 +42,37 @@ export function v2Status(d: Derived2): string {
   if (d.contradiction) return `✗ הנתונים סותרים זה את זה (${d.contradiction})`;
   const parts: string[] = [];
   parts.push(d.configCount ? `תצורה ${d.configIndex + 1} מתוך ${d.configCount}` : 'אין תצורה תקפה');
-  if (d.freeDof.length) parts.push(`דרגות חופש: ${d.freeDof.join(', ')}`);
-  else parts.push('הצורה נקבעה במלואה');
+  /**
+   * The DOF cue must report the freedom that is LEFT, not the freedom tier 1 started with.
+   *
+   * `freeDof` is the nullspace dimension of the exact tier — the state of the figure *before* the
+   * numeric tier runs. Once «שטח OZ₁Z₂Z₃ = 150r²» consumes a direction, printing the tier-1 list tells
+   * a student the figure can still move in a direction their own given has just pinned.
+   */
+  const remaining = Math.max(0, d.freeDof.length - d.drivenDof);
+  if (remaining > 0) {
+    const shown = d.drivenDof > 0 ? `${remaining} מתוך ${d.freeDof.length}` : d.freeDof.join(', ');
+    parts.push(`דרגות חופש: ${shown}`);
+  } else parts.push('הצורה נקבעה במלואה');
   return parts.join(' · ');
 }
+
+/**
+ * THE KNOWLEDGE PANEL — answers to what the student asked to see.
+ *
+ * A row with no value is not an empty row: «the givens do not determine this yet» is the answer, and
+ * printing the current sample instead would present one configuration as the result. The prototype's
+ * «בדגימה הנוכחית» string is the shape this replaces.
+ */
+export const v2Knowledge = (d: Derived2): string[] =>
+  d.knowledge.map((k) => (k.value === null ? `${k.label} — ${k.why}` : `${k.label} = ${k.value}`));
+
+/** Stated measures, with the verdict the figure gives them (F7). */
+export const v2Measures = (d: Derived2): string[] =>
+  d.measures.map((m) => {
+    const mark = m.status === 'holds' ? '✓' : m.status === 'violated' ? '✗' : '?';
+    return `${mark} ${m.why}`;
+  });
 
 /**
  * The polar reading of every plotted number.

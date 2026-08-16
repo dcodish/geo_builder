@@ -92,6 +92,35 @@ export function PolarPlane({ scene, showGrid = true }: { scene: Scene; showGrid?
         />
       ))}
 
+      {/* stated objects (F6): segments, polygons, circles — under the numbers, so a vertex label
+          always sits on top of the edge that meets it */}
+      {scene.shapes.map((sh) =>
+        sh.radius !== undefined && sh.center ? (
+          <circle
+            key={sh.key}
+            cx={X(sh.center.re)}
+            cy={Y(sh.center.im)}
+            r={sh.radius * k}
+            fill="none"
+            stroke={sh.known ? INK.known : INK.sampled}
+            strokeWidth={1.8}
+            strokeDasharray={sh.known ? undefined : '6 4'}
+          />
+        ) : (
+          <polyline
+            key={sh.key}
+            points={(sh.closed ? [...sh.vertices, sh.vertices[0]] : sh.vertices)
+              .map((v) => `${X(v.re)},${Y(v.im)}`)
+              .join(' ')}
+            fill="none"
+            stroke={sh.known ? INK.known : INK.sampled}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeDasharray={sh.known ? undefined : '6 4'}
+          />
+        ),
+      )}
+
       {/* argument arcs: the direction, drawn as an angle */}
       {scene.arcs.map((a) => {
         const [lx, ly] = polar(a.radius * 1.12, a.toDeg / 2);

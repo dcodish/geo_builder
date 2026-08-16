@@ -61,14 +61,24 @@ it reads), **`residual`** (a signed scalar, zero exactly when satisfied), **`des
 it in a refusal). Constraints carry a typed `strength: required | preference | visual`; a satisfied
 preference costs zero ([ADR-276](06-decisions.md#adr-276)).
 
-| # | Step | Trace token |
-|---|---|---|
-| 3a | build residuals over the free basis stage 1 left (usually 0–3 dimensions) | — |
-| 3b | 1-D: enumerate **all** roots → further branches, ordered by nearness to the current value (stability) | `cx3:roots` |
-| 3c | n-D: Levenberg–Marquardt with a numeric Jacobian, multi-start, budgeted | `cx3:lm` |
-| 3d | **obligation-preservation gate** — a solve may not lose a given; `obligations(next) ⊇ obligations(prev)` | `preserve:reject` on a voided accept |
-| 3e | honesty backstop: re-verify **every** constraint against final values; a best-effort solve that missed fails loudly | `cx3:verify` |
-| — | refuse, naming the student's **new statement**, never a collateral casualty | `cx3:refuse` |
+| # | Step | Trace token | Built |
+|---|---|---|---|
+| 3a | build residuals over the free basis stage 1 left (usually 0–3 dimensions) | — | ✅ `solve/residuals.ts` |
+| 3b | 1-D: enumerate **all** roots → further branches, ordered by nearness to the current value (stability) | `cx3:roots` | ✅ `otherRoots` |
+| 3c | n-D: Levenberg–Marquardt with a numeric Jacobian, multi-start, budgeted | `cx3:lm` | ✅ `solveResiduals` |
+| 3d | **obligation-preservation gate** — a solve may not lose a given; `obligations(next) ⊇ obligations(prev)` | `preserve:reject` on a voided accept | ⬜ pending |
+| 3e | honesty backstop: re-verify **every** constraint against final values; a best-effort solve that missed fails loudly | `cx3:verify` | ✅ `Derived2.measures` / `.unsatisfied` |
+| — | refuse, naming the student's **new statement**, never a collateral casualty | `cx3:refuse` | ⬜ pending |
+
+**The free basis is taken over the DRAWN names, not the constraint names**
+([ADR-CX-013](06d-decisions-complex.md#adr-cx-013)). Tier 1 only ever sees names a constraint
+mentions, so a number the student merely declared is absent from its `free` list while still being
+drawn — and a measure that could only be satisfied by moving *that* point reports violated. A point
+free enough to draw is free enough to drive.
+
+**Stage 3 changes the DOF count, so stage 5 must read the changed one.** `freeDof` is the nullspace
+dimension *before* this stage; `drivenDof` is the numeric rank of the residual Jacobian at the
+solution. The cue reports the difference.
 
 ## Stage 4 — claims
 

@@ -48,7 +48,7 @@ describe('CATALOG — every specimen parses, in both languages', () => {
 
   it('reports MEASURED coverage — which families actually work today', () => {
     // this is the honest number, and it is deliberately much smaller than the contract
-    expect(coveredFamilies()).toEqual(['F1', 'F2', 'F3', 'F4', 'F5', 'F8']);
+    expect(coveredFamilies()).toEqual(['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9']);
     expect(Object.keys(FAMILY_TITLE).length).toBeGreaterThan(coveredFamilies().length);
   });
 });
@@ -86,7 +86,11 @@ describe('THE LEXICAL RATCHET — no rule spells a fragment inline (ADR-CX-009 �
       const body = src.split(ATOM_SOURCES.HE_PREFIX).join('');
       // Only a WORD-FINAL position can take a final form — `ארגומנט` has a medial mem mid-word and is
       // correct as written. So the check looks for a letter ending an alternative, not anywhere.
-      for (const [medial, final] of [['כ', 'ך'], ['מ', 'ם'], ['נ', 'ן']] as const) {
+      // ALL FIVE final forms. The list stopped at three, and «היקף» — which ends in a final pe — was
+      // then spelled with the KAF atom and refused its own word. A guard that checks most of a closed
+      // set is a guard that will be wrong about the rest of it.
+      const FINALS = [['כ', 'ך'], ['מ', 'ם'], ['נ', 'ן'], ['פ', 'ף'], ['צ', 'ץ']] as const;
+      for (const [medial, final] of FINALS) {
         const atEnd = new RegExp(`${medial}(?=[|)]|$)`, 'u');
         if (atEnd.test(body) && !body.includes(final)) {
           throw new Error(`${name} ends a word with ${medial} but never spells ${final} — the ADR-3D-035 trap`);
@@ -179,8 +183,23 @@ describe('span accounting is ENFORCING, not advisory', () => {
       'quadrant',
       'conjugates-claim',
       'type-claim',
+      // the long sequence sentence outranks the bare list, and both outrank the relation rules: its
+      // tail «האיבר השלישי הוא Z4» is a type-claim shape if read by a laxer rule first
+      'sequence-first-terms',
+      'sequence-list',
+      // a measure sentence carries a shape noun too, so it outranks the shape rules; and the circle
+      // sentences outrank them for the same reason — «המעגל החוסם את המשולש …» contains a shape noun,
+      // and the shape rule would claim its tail and drop the circumscription
+      'measure-relation',
+      // and the QUESTION form after the statement form: the same words minus the equating word
+      'measure-query',
+      'circumscribed-circle',
+      'circle-centre-radius',
+      'named-shape',
       'argument-relation',
       'equation',
+      // last of all: a bare glued run is a figure only when nothing read the line as maths
+      'bare-run',
     ]);
   });
 });
