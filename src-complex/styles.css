@@ -64,3 +64,16 @@ button:hover { background: #f5f5f4; }
 .del { border: none; background: none; color: #a8a29e; margin-inline-start: auto; padding: 2px 6px; }
 .del:hover { color: #b91c1c; background: none; }
 .hint { color: #a8a29e; font-size: 0.9rem; padding: 8px 2px; }
+
+/* The ?engine=v2 preview banner (#616). Temporary: S5 replaces this surface with the real shell. */
+.v2-banner {
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border: 1px solid #a78bfa;
+  border-radius: 6px;
+  background: #f5f3ff;
+  color: #4c1d95;
+}
+.v2-skip { color: #92400e; }
