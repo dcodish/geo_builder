@@ -628,7 +628,16 @@ export function foldConstraints(
         name,
         z: cPolar(m.value, a.deg),
         modulus: m.exact ? fmtMod(m.exact) : round2(m.value),
-        argumentDeg: a.deg,
+        /**
+         * A DIRECTION, folded into one turn — not a winding.
+         *
+         * Tier 1 deliberately does not reduce turns, because `z⁵` genuinely winds five times and
+         * `smallestPower` solves over the winding count. But that is a property of the exact ANGLE
+         * carrier; a drawn point has a direction and nothing else. Passing the raw value through
+         * printed «z₂ ≈ 3·cis-190440°» for a number sitting on the positive real axis — arithmetically
+         * true, and useless. The exact carriers keep the winding; the plotted point does not.
+         */
+        argumentDeg: ((a.deg % 360) + 360) % 360,
         exactLabel: m.exact && a.exact ? exactLabelOf(m.exact, a.exact) : null,
         modulusKnown: m.exact !== null,
         argumentKnown: a.exact !== null,

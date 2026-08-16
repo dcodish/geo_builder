@@ -164,6 +164,22 @@ describe('an arithmetic sequence now SOLVES, through the same tier', () => {
     expect(d.unsatisfied).toContain('z2 = 0');
   });
 
+  /**
+   * A drawn point has a DIRECTION, not a winding.
+   *
+   * The free angle coordinate is unbounded, so the minimiser is free to travel many turns to reach a
+   * solution — and it does. The figure was correct and the label read «z₂ ≈ 3·cis-190440°» for a number
+   * sitting on the positive real axis: arithmetically true, and useless to a student. The exact
+   * carriers keep the winding (`smallestPower` solves over it); the plotted point does not.
+   */
+  it('a solved direction is reported inside one turn', () => {
+    const d = deriveLines(['z1 = 1', 'z3 = 5', 'z1, z2, z3 סדרה חשבונית']);
+    for (const p of d.points) {
+      expect(p.argumentDeg).toBeGreaterThanOrEqual(0);
+      expect(p.argumentDeg).toBeLessThan(360);
+    }
+  });
+
   it('an unsatisfiable deferred relation is REPORTED, never silently ignored', () => {
     // z2 is pinned to a value the arithmetic relation cannot accept
     const d = deriveLines(['z1 = 1', 'z2 = 10i', 'z3 = 5', 'z1, z2, z3 סדרה חשבונית']);
