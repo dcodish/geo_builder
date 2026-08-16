@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { fmtNum } from './engine/complex';
 import { deriveScene } from './engine/model';
 import { deriveLines } from './app/deriveLines';
-import { v2Labels, v2Status } from './replay/scene2';
+import { v2Claims, v2Labels, v2Status } from './replay/scene2';
 import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
 import { GaussPlane } from './render/GaussPlane';
@@ -300,6 +300,11 @@ export function App() {
               {derived2.points.some((p) => !p.modulusKnown || !p.argumentKnown) && (
                 <div>~ = ערך שנדגם, לא נתון — לחצו "אפשרות נוספת" כדי לראות תצורה אחרת</div>
               )}
+              {v2Claims(derived2).map((c) => (
+                <div key={c} className="v2-claim">
+                  {c}
+                </div>
+              ))}
               {derived2.untranslated.map((u) => (
                 <div key={u.factId} className="v2-skip">
                   ⚠ «{u.src}» — {u.why}

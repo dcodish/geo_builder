@@ -15,9 +15,9 @@
  * Every parse reports the SPAN it consumed, because the accountant needs a claim, not a promise.
  */
 
-import { type Expr, I, abs, conj, div, mul, neg, num, param, pow, ref } from '../model/expr';
-import { rat, type Rat } from '../value/rational';
-import { exact } from '../value/value';
+import { type Expr, I, abs, conj, div, mul, neg, num, param, pow, ref, val } from '../model/expr';
+import { fromNumber, rat, type Rat } from '../value/rational';
+import { evaluate, exact, fromCartesian } from '../value/value';
 import { fromDegrees } from '../value/angle';
 import { one as modOne } from '../value/modulus';
 
@@ -67,7 +67,13 @@ function lex(src: string, from: number, to: number): Tok[] | null {
 }
 
 /** Parse the whole range as one expression, or null. */
-export function parseExpr(src: string, from = 0, to = src.length): Expr | null {
+export function parseExpr(
+  src: string,
+  from = 0,
+  to = src.length,
+  /** angle atoms a cartesian literal introduced, collected for the caller's sample */
+  atoms: Map<string, number> = new Map(),
+): Expr | null {
   const toks = lex(src, from, to);
   if (!toks || toks.length === 0) return null;
   let i = 0;
@@ -224,7 +230,88 @@ export function parseExpr(src: string, from = 0, to = src.length): Expr | null {
   };
 
   const result = parseSum();
-  return result && i === toks.length ? result : null;
+  if (!result || i !== toks.length) return null;
+  return foldConstants(result, atoms);
+}
+
+/** The numeric value of a subtree that mentions no name, or null. */
+function constValue(e: Expr): { re: number; im: number } | null {
+  switch (e.t) {
+    case 'num':
+      return { re: Number(e.v.n) / Number(e.v.d), im: 0 };
+    case 'i':
+      return { re: 0, im: 1 };
+    case 'val': {
+      const n = evaluate(e.v);
+      return n ? { re: n.re, im: n.im } : null;
+    }
+    case 'add':
+    case 'sub':
+    case 'mul':
+    case 'div': {
+      const l = constValue(e.l);
+      const r = constValue(e.r);
+      if (!l || !r) return null;
+      if (e.t === 'add') return { re: l.re + r.re, im: l.im + r.im };
+      if (e.t === 'sub') return { re: l.re - r.re, im: l.im - r.im };
+      if (e.t === 'mul') return { re: l.re * r.re - l.im * r.im, im: l.re * r.im + l.im * r.re };
+      const d = r.re * r.re + r.im * r.im;
+      if (d === 0) return null;
+      return { re: (l.re * r.re + l.im * r.im) / d, im: (l.im * r.re - l.re * r.im) / d };
+    }
+    case 'neg': {
+      const x = constValue(e.e);
+      return x ? { re: -x.re, im: -x.im } : null;
+    }
+    case 'conj': {
+      const x = constValue(e.e);
+      return x ? { re: x.re, im: -x.im } : null;
+    }
+    case 'abs': {
+      const x = constValue(e.e);
+      return x ? { re: Math.hypot(x.re, x.im), im: 0 } : null;
+    }
+    default:
+      return null; // a ref, a param, or a power over one
+  }
+}
+
+/**
+ * Replace every name-free subtree with its exact VALUE.
+ *
+ * `3+4i` is written as an addition, and addition is the one operation the exact core cannot carry —
+ * so without this the most basic input there is would route to the numeric tier. But a constant
+ * expression is a LITERAL whatever its syntax: `3+4i` is one number with modulus exactly 5. Folding
+ * before classifying is what keeps the SYNTAX of a literal from deciding whether the engine can be
+ * exact about it. (The S3 bridge did this; the parser has to do it too, and the conjugates claim is
+ * what caught that it did not.)
+ */
+function foldConstants(e: Expr, atoms: Map<string, number>): Expr {
+  const k = constValue(e);
+  if (k) {
+    const re = fromNumber(k.re, 10_000, 1e-9);
+    const im = fromNumber(k.im, 10_000, 1e-9);
+    if (re && im && !(re.n === 0n && im.n === 0n)) {
+      const lit = fromCartesian(re, im);
+      if (lit.atomBinding) atoms.set(lit.atomBinding.atom, lit.atomBinding.degrees);
+      return val(lit.value);
+    }
+  }
+  switch (e.t) {
+    case 'add':
+    case 'sub':
+    case 'mul':
+    case 'div':
+      return { ...e, l: foldConstants(e.l, atoms), r: foldConstants(e.r, atoms) };
+    case 'pow':
+      return { ...e, base: foldConstants(e.base, atoms) };
+    case 'conj':
+    case 'neg':
+    case 'abs':
+      return { ...e, e: foldConstants(e.e, atoms) };
+    default:
+      return e;
+  }
 }
 
 /**

@@ -14,18 +14,27 @@
 
 import { type Expr, abs, ref } from '../model/expr';
 import type { BranchFilter, Constraint } from '../model/constraint';
+import type { Claim as Assertion } from '../model/claim';
 import { rat } from '../value/rational';
 import { isComplexName, parseExpr } from './exprParse';
-import { ARG_KW, NAME, ORDINALS, QUADRANT_KW, rx } from './lexicon';
+import { AND_KW, ARG_KW, CONJUGATE_KW, COPULA_KW, IMAGINARY_KW, NAME, ORDINALS, QUADRANT_KW, REAL_KW, rx } from './lexicon';
 import { normalize } from './normalize';
 import { type Claim, claimAll, unaccountedText } from './span';
 
 export interface ParsedLine {
   readonly constraints: Constraint[];
   readonly filters: BranchFilter[];
+  /**
+   * The student's ANSWERS — verified, never allowed to move the figure. Named `assertions` and not
+   * `claims` because `claims` on this interface already means the SPAN ranges the rule consumed, and
+   * two different `claims` on one object is how a reader ends up checking the wrong one.
+   */
+  readonly assertions: Assertion[];
   /** names the line brings into existence, whether or not a constraint mentions them */
   readonly declares: string[];
   readonly claims: Claim[];
+  /** angle atoms a cartesian literal introduced, with the degrees they stand for */
+  readonly atoms: Map<string, number>;
 }
 
 export type ParseOutcome =
@@ -40,7 +49,7 @@ export type ParseOutcome =
       readonly items: string[];
     };
 
-const empty = (): ParsedLine => ({ constraints: [], filters: [], declares: [], claims: [] });
+const empty = (): ParsedLine => ({ constraints: [], filters: [], assertions: [], declares: [], claims: [], atoms: new Map() });
 
 type Rule = (s: string) => ParsedLine | null;
 
@@ -143,12 +152,14 @@ const argumentRelation: Rule = (s) => {
 const equation: Rule = (s) => {
   const eq = s.indexOf('=');
   if (eq < 0) return null;
-  const lhs = parseExpr(s, 0, eq);
-  const rhs = parseExpr(s, eq + 1, s.length);
+  const atoms = new Map<string, number>();
+  const lhs = parseExpr(s, 0, eq, atoms);
+  const rhs = parseExpr(s, eq + 1, s.length, atoms);
   if (!lhs || !rhs) return null;
   const modulusOnly = lhs.t === 'abs' || rhs.t === 'abs';
   return {
     ...empty(),
+    atoms,
     declares: refNames(lhs).concat(refNames(rhs)),
     constraints: [
       modulusOnly
@@ -189,10 +200,46 @@ function refNames(e: Expr): string[] {
   return out;
 }
 
+/**
+ * F10 — NUMBER-TYPE CLAIMS: «w ממשי», «w מדומה טהור», «z1 ו-z2 צמודים זה לזה».
+ *
+ * These produce an assertion, never a constraint. A claim that could move the figure would make every
+ * answer correct, which is the opposite of the point (`src3d/CLAUDE.md`: *"CLAIMS are the student's
+ * answer, never a driver"*).
+ */
+const conjugatesClaim: Rule = (s) => {
+  const m = s.match(rx(`^(${NAME})\\s*${AND_KW}\\s*(${NAME})\\s+.*${CONJUGATE_KW}`));
+  if (!m) return null;
+  return {
+    ...empty(),
+    declares: [m[1].toLowerCase(), m[2].toLowerCase()],
+    assertions: [{ kind: 'conjugates' as const, a: m[1].toLowerCase(), b: m[2].toLowerCase(), src: s }],
+    claims: [claimAll(s)],
+  };
+};
+
+const typeClaim: Rule = (s) => {
+  const m = s.match(rx(`^(${NAME})\\s+${COPULA_KW}(.*)$`));
+  if (!m) return null;
+  const name = m[1].toLowerCase();
+  const tail = m[2];
+  // the imaginary test runs FIRST: «מדומה טהור» contains no real-keyword, but an English
+  // "pure imaginary" must not be caught by a laxer real rule if one is ever added above it
+  if (rx(IMAGINARY_KW).test(tail)) {
+    return { ...empty(), declares: [name], assertions: [{ kind: 'imaginary' as const, name, src: s }], claims: [claimAll(s)] };
+  }
+  if (rx(REAL_KW).test(tail)) {
+    return { ...empty(), declares: [name], assertions: [{ kind: 'real' as const, name, src: s }], claims: [claimAll(s)] };
+  }
+  return null;
+};
+
 /** First match wins. Order is specific-to-general: a relation sentence before the bare equation. */
 export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = [
   { name: 'declaration', rule: declaration },
   { name: 'quadrant', rule: quadrantGiven },
+  { name: 'conjugates-claim', rule: conjugatesClaim },
+  { name: 'type-claim', rule: typeClaim },
   { name: 'argument-relation', rule: argumentRelation },
   { name: 'equation', rule: equation },
 ];

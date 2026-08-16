@@ -27,6 +27,8 @@ import { type ExpVec, evaluate as evalMod, format as fmtMod } from '../value/mod
 import { type Angle, toDegrees } from '../value/angle';
 import { type Expr, abs, conj, div, mul, neg, num, param, pow, ref, val } from '../model/expr';
 import { type Branch, isTurnUnknown, solveTier1 } from '../solve/tier1';
+import type { Claim as Assertion, CheckedClaim } from '../model/claim';
+import { verifyClaims } from '../solve/claims';
 import { filterBranches, quadrant } from '../solve/filter';
 import type { BranchFilter, Constraint } from '../model/constraint';
 
@@ -269,6 +271,8 @@ export interface Derived2 {
   readonly deferred: readonly Constraint[];
   /** the filter that emptied the configuration set, when one did */
   readonly emptiedBy: BranchFilter | null;
+  /** the student's ANSWERS, checked against the figure the givens produced — never drivers */
+  readonly claims: readonly CheckedClaim[];
 }
 
 /** A deterministic positive sample for a parameter the student never valued (ADR-052: a START, not a fixed value). */
@@ -313,6 +317,7 @@ export function foldConstraints(
   untranslated: readonly Untranslated[],
   configIndex: number,
   seed: number,
+  assertions: readonly Assertion[] = [],
 ): Derived2 {
   const t1 = solveTier1(constraints);
 
@@ -445,6 +450,7 @@ export function foldConstraints(
     untranslated,
     deferred: t1.deferred,
     emptiedBy,
+    claims: verifyClaims(assertions, t1, branch),
   };
 }
 
