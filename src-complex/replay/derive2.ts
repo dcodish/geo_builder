@@ -25,9 +25,10 @@ import { cPolar, evaluate, exact, formatPolar, fromCartesian } from '../value/va
 import { type Rat, fromNumber, rat, toNumber } from '../value/rational';
 import { type ExpVec, evaluate as evalMod, format as fmtMod } from '../value/modulus';
 import { type Angle, toDegrees } from '../value/angle';
-import { type Expr, abs, conj, div, mul, neg, num, param, pow, ref, val } from '../model/expr';
+import { type Expr, abs, conj, div, mul, neg, num, param, paramsOf, pow, ref, val } from '../model/expr';
 import { type Branch, isTurnUnknown, solveTier1 } from '../solve/tier1';
 import type { Claim as Assertion, CheckedClaim } from '../model/claim';
+import { type FigureObject, ORIGIN, objectPoints } from '../model/figure';
 import { verifyClaims } from '../solve/claims';
 import { filterBranches, quadrant } from '../solve/filter';
 import type { BranchFilter, Constraint } from '../model/constraint';
@@ -257,10 +258,32 @@ export interface DerivedPoint {
   readonly argumentKnown: boolean;
 }
 
+/**
+ * An object RESOLVED against the configuration on screen — positions, not names.
+ *
+ * Resolved here rather than in the scene layer because this is where the parameter sample lives: a
+ * circle of radius `r` has no drawable size until `r` has a value, and the scene must not be the layer
+ * that invents one. `known` travels with it for the same reason a point's does — an object over
+ * sampled vertices is one configuration of many and the ink says so.
+ */
+export interface DerivedObject {
+  readonly kind: 'segment' | 'polygon' | 'circle';
+  readonly key: string;
+  readonly label: string;
+  /** the endpoints or vertices, in the stated order; empty for a circle */
+  readonly vertices: readonly Cx[];
+  readonly center?: Cx;
+  readonly radius?: number;
+  /** every position it rests on is FORCED by the givens */
+  readonly known: boolean;
+}
+
 export interface Derived2 {
   /** null when the givens contradict each other, with which system found it */
   readonly contradiction: null | 'modulus' | 'argument';
   readonly points: DerivedPoint[];
+  /** the figure's non-numeric objects, resolved to this configuration (F6) */
+  readonly objects: readonly DerivedObject[];
   /** how many valid configurations the givens leave — what "show another" cycles */
   readonly configCount: number;
   readonly configIndex: number;
@@ -300,6 +323,8 @@ export function derive2(facts: readonly ProtoFact[], configIndex = 0, seed = 0):
     configIndex,
     seed,
   );
+  // the bridge carries no objects: the prototype's `shape` facts are exactly what S4's grammar
+  // replaces, and translating them would keep the retiring path alive one slice longer
 }
 
 /**
@@ -318,12 +343,20 @@ export function foldConstraints(
   configIndex: number,
   seed: number,
   assertions: readonly Assertion[] = [],
+  objects: readonly FigureObject[] = [],
 ): Derived2 {
   const t1 = solveTier1(constraints);
 
   const sample = new Map(literalSample);
   for (const c of constraints) {
     for (const p of collectParams(c)) if (!sample.has(p)) sample.set(p, paramSample(p, seed));
+  }
+  // An OBJECT can be the only mention of a parameter — «המעגל שמרכזו O ורדיוסו r» names `r` and no
+  // constraint does. Sampling only what the constraints mention left that circle with no radius, so it
+  // silently did not draw: a stated given producing nothing on the canvas, which is the drop class.
+  for (const o of objects) {
+    if (o.kind !== 'circle') continue;
+    for (const p of paramsOf(o.radius)) if (!sample.has(p)) sample.set(p, paramSample(p, seed));
   }
 
   const { kept, emptiedBy } = filterBranches(t1.branches, filterList, sample);
@@ -444,6 +477,7 @@ export function foldConstraints(
   return {
     contradiction: t1.inconsistent,
     points,
+    objects: t1.inconsistent ? [] : resolveObjects(objects, points, sample),
     configCount,
     configIndex: index,
     freeDof: t1.freeDof,
@@ -452,6 +486,88 @@ export function foldConstraints(
     emptiedBy,
     claims: verifyClaims(assertions, t1, branch),
   };
+}
+
+/**
+ * Resolve the stated objects against the configuration that was just solved.
+ *
+ * An object whose vertices are not all on the canvas is DROPPED rather than drawn partially — a
+ * triangle missing a corner is not a triangle, and inventing the missing one would be the ADR-052 sin
+ * with a straight edge on it. The name is still declared by the parser, so the missing point shows up
+ * as a free degree of freedom rather than as silence.
+ */
+function resolveObjects(
+  objects: readonly FigureObject[],
+  points: readonly DerivedPoint[],
+  sample: ReadonlyMap<string, number>,
+): DerivedObject[] {
+  const at = new Map<string, Cx>([[ORIGIN, { re: 0, im: 0 }]]);
+  const forced = new Map<string, boolean>([[ORIGIN, true]]);
+  for (const p of points) {
+    at.set(p.name, p.z);
+    forced.set(p.name, p.modulusKnown && p.argumentKnown);
+  }
+
+  const out: DerivedObject[] = [];
+  objects.forEach((o, i) => {
+    const names = objectPoints(o);
+    const spots = names.map((n) => at.get(n));
+    if (spots.some((z) => z === undefined)) return;
+    const vertices = spots as Cx[];
+    const known = names.every((n) => forced.get(n) === true);
+    const label = names.map((n) => (n === ORIGIN ? 'O' : n)).join('');
+    const key = `${o.kind}-${label}-${i}`;
+
+    if (o.kind === 'segment' || o.kind === 'polygon') {
+      out.push({ kind: o.kind, key, label, vertices, known });
+      return;
+    }
+    if (o.kind === 'circle') {
+      const r = radiusValue(o.radius, sample);
+      if (r === null || !(r > 0)) return;
+      out.push({ kind: 'circle', key, label, vertices: [], center: vertices[0], radius: r, known });
+      return;
+    }
+    const c = circumcircle(vertices[0], vertices[1], vertices[2]);
+    if (!c) return; // three collinear points have no circumscribed circle — say nothing, draw nothing
+    out.push({ kind: 'circle', key, label, vertices: [], center: c.center, radius: c.r, known });
+  });
+  return out;
+}
+
+/** A stated radius is a number or a real parameter; anything else is not a length. */
+function radiusValue(e: Expr, sample: ReadonlyMap<string, number>): number | null {
+  switch (e.t) {
+    case 'num':
+      return toNumber(e.v);
+    case 'param':
+      return sample.get(e.name) ?? null;
+    case 'mul': {
+      const l = radiusValue(e.l, sample);
+      const r = radiusValue(e.r, sample);
+      return l !== null && r !== null ? l * r : null;
+    }
+    case 'val': {
+      const v = evaluate(e.v);
+      return v ? Math.hypot(v.re, v.im) : null;
+    }
+    default:
+      return null;
+  }
+}
+
+/** The circle through three points, or null when they are collinear. */
+function circumcircle(a: Cx, b: Cx, c: Cx): { center: Cx; r: number } | null {
+  const d = 2 * (a.re * (b.im - c.im) + b.re * (c.im - a.im) + c.re * (a.im - b.im));
+  if (Math.abs(d) < 1e-12) return null;
+  const sa = a.re * a.re + a.im * a.im;
+  const sb = b.re * b.re + b.im * b.im;
+  const sc = c.re * c.re + c.im * c.im;
+  const center = {
+    re: (sa * (b.im - c.im) + sb * (c.im - a.im) + sc * (a.im - b.im)) / d,
+    im: (sa * (c.re - b.re) + sb * (a.re - c.re) + sc * (b.re - a.re)) / d,
+  };
+  return { center, r: Math.hypot(a.re - center.re, a.im - center.im) };
 }
 
 const round2 = (x: number): string => `${Math.round(x * 100) / 100}`;

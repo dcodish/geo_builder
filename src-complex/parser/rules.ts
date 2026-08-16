@@ -15,9 +15,44 @@
 import { type Expr, abs, ref } from '../model/expr';
 import type { BranchFilter, Constraint } from '../model/constraint';
 import type { Claim as Assertion } from '../model/claim';
+import { type SequenceKind, type SequenceTerm, sequenceConstraints } from '../model/sequence';
+import { type FigureObject, objectDeclares } from '../model/figure';
 import { rat } from '../value/rational';
 import { isComplexName, parseExpr } from './exprParse';
-import { AND_KW, ARG_KW, CONJUGATE_KW, COPULA_KW, IMAGINARY_KW, NAME, ORDINALS, QUADRANT_KW, REAL_KW, rx } from './lexicon';
+import {
+  ACCUSATIVE_KW,
+  AND_KW,
+  ARG_KW,
+  ARITHMETIC_KW,
+  CENTER_KW,
+  CIRCLE_KW,
+  CIRCUMSCRIBED_KW,
+  CONJUGATE_KW,
+  COPULA_KW,
+  POLYGON_KW,
+  QUADRILATERAL_KW,
+  RADIUS_KW,
+  RUN,
+  RUN_ATOM,
+  RUN_GLUED,
+  SEGMENT_KW,
+  TRIANGLE_KW,
+  WITH_KW,
+  FIRST_TERMS_PHRASE,
+  GEOMETRIC_KW,
+  IMAGINARY_KW,
+  NAME,
+  OF_A,
+  ORDINAL_ANY,
+  ORDINALS,
+  QUADRANT_KW,
+  REAL_KW,
+  SEQUENCE_KW,
+  TERM_KW,
+  TERM_ORDINALS,
+  WHERE_KW,
+  rx,
+} from './lexicon';
 import { normalize } from './normalize';
 import { type Claim, claimAll, unaccountedText } from './span';
 
@@ -30,6 +65,8 @@ export interface ParsedLine {
    * two different `claims` on one object is how a reader ends up checking the wrong one.
    */
   readonly assertions: Assertion[];
+  /** the things to DRAW that are not numbers — segments, polygons, circles (F6) */
+  readonly objects: FigureObject[];
   /** names the line brings into existence, whether or not a constraint mentions them */
   readonly declares: string[];
   readonly claims: Claim[];
@@ -49,7 +86,15 @@ export type ParseOutcome =
       readonly items: string[];
     };
 
-const empty = (): ParsedLine => ({ constraints: [], filters: [], assertions: [], declares: [], claims: [], atoms: new Map() });
+const empty = (): ParsedLine => ({
+  constraints: [],
+  filters: [],
+  assertions: [],
+  objects: [],
+  declares: [],
+  claims: [],
+  atoms: new Map(),
+});
 
 type Rule = (s: string) => ParsedLine | null;
 
@@ -234,14 +279,207 @@ const typeClaim: Rule = (s) => {
   return null;
 };
 
+// --- F6: objects ------------------------------------------------------------
+
+/** The point names inside a run, in order. `z1*z2` and `z1z2` split identically. */
+const splitRun = (text: string): string[] =>
+  (text.toLowerCase().match(rx(RUN_ATOM, 'giu')) ?? []).map((s) => s);
+
+/** The shape nouns, with the arity each one promises. `null` = any arity from three up. */
+const SHAPES: readonly (readonly [string, number | null])[] = [
+  [SEGMENT_KW, 2],
+  [TRIANGLE_KW, 3],
+  [QUADRILATERAL_KW, 4],
+  [POLYGON_KW, null],
+];
+
+const objectLine = (o: FigureObject, s: string): ParsedLine => ({
+  ...empty(),
+  objects: [o],
+  declares: objectDeclares(o),
+  claims: [claimAll(s)],
+});
+
+/**
+ * F6 — «הקטע Z₁Z₂», «המשולש OZ₁Z₂», «המרובע OZ₁Z₂Z₃», «המצולע …».
+ *
+ * The stated arity is ENFORCED: «המשולש OZ₁Z₂Z₃» names four points and is refused rather than drawn
+ * as something the student did not say. A noun that promises three vertices and receives four is a
+ * mis-typed line, and drawing it anyway would be the figure quietly disagreeing with its own label.
+ */
+const namedShape: Rule = (s) => {
+  for (const [kw, arity] of SHAPES) {
+    const m = s.match(rx(`^${kw}\\s+(${RUN})$`));
+    if (!m) continue;
+    const points = splitRun(m[1]);
+    if (arity !== null && points.length !== arity) return null;
+    if (points.length < 2) return null;
+    return objectLine(
+      points.length === 2
+        ? { kind: 'segment', points, src: s }
+        : { kind: 'polygon', points, src: s },
+      s,
+    );
+  }
+  return null;
+};
+
+/**
+ * F6 — a BARE run: «OZ₁Z₂Z₃» on its own line is the figure.
+ *
+ * No separator is tolerated here, and that is the operator's drawing convention rather than an
+ * oversight: `z1*z2` is the PRODUCT of two numbers (F2) and must keep meaning that, while a glued
+ * `z1z2` cannot be an identifier — the name grammar puts digits last — so it is unambiguously a run.
+ * With a keyword in front the ambiguity is gone and the separator is allowed again.
+ */
+const bareRun: Rule = (s) => {
+  const m = s.match(rx(`^(${RUN_GLUED})$`));
+  if (!m) return null;
+  const points = splitRun(m[1]);
+  if (points.length < 2) return null;
+  return objectLine(
+    points.length === 2 ? { kind: 'segment', points, src: s } : { kind: 'polygon', points, src: s },
+    s,
+  );
+};
+
+/**
+ * F6 — «המעגל החוסם את המשולש Z₁Z₂Z₃» / «the circumscribed circle of triangle Z₁Z₂Z₃».
+ *
+ * Both noun/adjective orders are spelled. Hebrew puts the adjective after the noun («המעגל החוסם») and
+ * English before it («circumscribed circle») — the same asymmetry that «ברביע הראשון» / «in the first
+ * quadrant» has, and the third time in this grammar that assuming one order would have refused half
+ * the register.
+ */
+const circumscribedCircle: Rule = (s) => {
+  const shapeNoun = `(?:${SHAPES.map(([kw]) => kw).join('|')})`;
+  const m = s.match(
+    rx(
+      `^${OF_A}(?:${CIRCLE_KW}\\s+${CIRCUMSCRIBED_KW}|${CIRCUMSCRIBED_KW}\\s+${CIRCLE_KW})\\s+` +
+        `${ACCUSATIVE_KW}${OF_A}(?:${shapeNoun}\\s+)?(${RUN})$`,
+    ),
+  );
+  if (!m) return null;
+  const points = splitRun(m[1]);
+  // Three points determine a circle. More is a CYCLIC claim about the extra vertices — a different
+  // family (F11), and asserting it here would let a false statement draw a circle that fits three of
+  // the four points and silently ignore the fourth.
+  if (points.length !== 3) return null;
+  return objectLine({ kind: 'circumcircle', points, src: s }, s);
+};
+
+/**
+ * F6 — «המעגל שמרכזו O ורדיוסו r» / «the circle with centre O and radius 2».
+ *
+ * The radius is parsed as an EXPRESSION over the span it occupies, so `r`, `2` and `2r` are one form.
+ * Both English spellings of «centre» are in the atom: textbooks and students split on it, and refusing
+ * one is the same shape of defect as refusing one Hebrew word order.
+ */
+const circleByCenterRadius: Rule = (s) => {
+  const m = s.match(
+    rx(`^${OF_A}${CIRCLE_KW}\\s+${WITH_KW}${CENTER_KW}\\s+(${RUN_ATOM})\\s+${AND_KW}?\\s*${RADIUS_KW}\\s+(.+)$`),
+  );
+  if (!m) return null;
+  // the radius text is anchored to the end of the line, so its span starts exactly that far back
+  const radius = parseExpr(s, s.length - m[2].length, s.length);
+  if (!radius) return null;
+  return objectLine({ kind: 'circle', center: m[1].toLowerCase(), radius, src: s }, s);
+};
+
+// --- F9: sequences ----------------------------------------------------------
+
+/** The type word, and which tier will end up reading the relations it implies. */
+const SEQ_PHRASE = `(?:${SEQUENCE_KW}\\s+(?:${GEOMETRIC_KW}|${ARITHMETIC_KW})|(?:${GEOMETRIC_KW}|${ARITHMETIC_KW})\\s+${SEQUENCE_KW})`;
+const NAME_LIST = `(?:${NAME}(?:\\s*,\\s*${NAME})+)`;
+
+const kindOf = (s: string): SequenceKind => (rx(ARITHMETIC_KW).test(s) ? 'arithmetic' : 'geometric');
+
+const ordinalOf = (s: string): number | null => TERM_ORDINALS.find(([re]) => re.test(s))?.[1] ?? null;
+
+const sequenceLine = (
+  kind: SequenceKind,
+  terms: SequenceTerm[],
+  s: string,
+): ParsedLine | null => {
+  const constraints = sequenceConstraints(kind, terms, s);
+  if (!constraints) return null;
+  return { ...empty(), constraints, declares: terms.map((t) => t.name), claims: [claimAll(s)] };
+};
+
+/**
+ * F9 — «z1, z2, z4 סדרה הנדסית», in either word order.
+ *
+ * Both orders are spelled because RTL typing makes the order genuinely ambiguous, and the sibling
+ * trees paid for assuming one (#598, ADR-3D-145). Listed names are CONSECUTIVE terms.
+ */
+const sequenceList: Rule = (s) => {
+  const m =
+    s.match(rx(`^(${NAME_LIST})\\s+${COPULA_KW}${OF_A}${SEQ_PHRASE}$`)) ??
+    s.match(rx(`^${SEQ_PHRASE}\\s*:?\\s*(${NAME_LIST})$`));
+  if (!m) return null;
+  const list = m[1].split(',').map((n) => n.trim().toLowerCase());
+  if (!list.every(isComplexName)) return null; // a real parameter is not a term of a complex sequence
+  return sequenceLine(
+    kindOf(s),
+    list.map((name, i) => ({ name, position: i + 1 })),
+    s,
+  );
+};
+
+/**
+ * F9 — the corpus witness, verbatim from §2b ג:
+ * «Z₁ ו-Z₂ הם שני האיברים הראשונים בסדרה הנדסית שבה האיבר השלישי הוא Z₄».
+ *
+ * The ordinal is READ rather than assumed, so «האיבר החמישי» states position 5 and the relation
+ * between positions 1, 2 and 5 is emitted — which is what makes term-position givens («בהתאמה») the
+ * general case here instead of a second rule.
+ */
+const sequenceFirstTerms: Rule = (s) => {
+  // The TARGET term is the only ordinal the rule reads, and the two languages order it the other way
+  // round — «האיבר השלישי» against «the third term» — so both orders are spelled and whichever group
+  // matched carries the position.
+  const target = `(?:${TERM_KW}\\s+(${ORDINAL_ANY})|(${ORDINAL_ANY})\\s+${TERM_KW})`;
+  const m = s.match(
+    rx(
+      `^(${NAME})\\s*${AND_KW}\\s*(${NAME})\\s+${COPULA_KW}${OF_A}${FIRST_TERMS_PHRASE}\\s+` +
+        `${OF_A}${SEQ_PHRASE}\\s+${WHERE_KW}\\s+${OF_A}${target}\\s+${COPULA_KW}(${NAME})$`,
+    ),
+  );
+  if (!m) return null;
+  const at = ordinalOf(m[3] ?? m[4] ?? '');
+  if (at === null) return null;
+  const [a, b, c] = [m[1], m[2], m[5]].map((n) => n.toLowerCase());
+  if (![a, b, c].every(isComplexName)) return null;
+  return sequenceLine(
+    kindOf(s),
+    [
+      { name: a, position: 1 },
+      { name: b, position: 2 },
+      { name: c, position: at },
+    ],
+    s,
+  );
+};
+
 /** First match wins. Order is specific-to-general: a relation sentence before the bare equation. */
 export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = [
   { name: 'declaration', rule: declaration },
   { name: 'quadrant', rule: quadrantGiven },
   { name: 'conjugates-claim', rule: conjugatesClaim },
   { name: 'type-claim', rule: typeClaim },
+  // the long sequence sentence first: its tail «האיבר השלישי הוא Z4» would otherwise be read as a
+  // type-claim about a number called «האיבר»
+  { name: 'sequence-first-terms', rule: sequenceFirstTerms },
+  { name: 'sequence-list', rule: sequenceList },
+  // the circle sentences before the plain shape nouns: «המעגל החוסם את המשולש …» contains a shape
+  // noun, and the shape rule would otherwise claim the tail and drop the circumscription
+  { name: 'circumscribed-circle', rule: circumscribedCircle },
+  { name: 'circle-centre-radius', rule: circleByCenterRadius },
+  { name: 'named-shape', rule: namedShape },
   { name: 'argument-relation', rule: argumentRelation },
   { name: 'equation', rule: equation },
+  // last: a bare glued run is a figure only when nothing else read the line as maths
+  { name: 'bare-run', rule: bareRun },
 ];
 
 /**

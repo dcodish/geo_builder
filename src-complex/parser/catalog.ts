@@ -114,6 +114,55 @@ export const CATALOG: readonly CatalogEntry[] = [
     descHe: 'משוואה כללית — נפתרת באלימינציה, לא באיטרציה',
     descEn: 'a general equation — solved by elimination, not iteration',
   },
+  {
+    family: 'F6',
+    he: 'המרובע Oz1z2z3',
+    en: 'quadrilateral Oz1z2z3',
+    descHe: 'מצולע — ראשית הצירים O זמינה תמיד; אין כאן טענה על הצורה',
+    descEn: 'a polygon — the origin O is always available; it claims nothing about the shape',
+  },
+  {
+    family: 'F6',
+    he: 'הקטע z1z2',
+    en: 'segment z1z2',
+    descHe: 'קטע בין שני מספרים',
+    descEn: 'a segment between two numbers',
+  },
+  {
+    family: 'F6',
+    he: 'המעגל החוסם את המשולש z1z2z3',
+    en: 'circumscribed circle of triangle z1z2z3',
+    descHe: 'המעגל החוסם — עובר בשלוש הנקודות',
+    descEn: 'the circumscribed circle — through the three points',
+  },
+  {
+    family: 'F6',
+    he: 'המעגל שמרכזו O ורדיוסו r',
+    en: 'the circle with centre O and radius r',
+    descHe: 'מעגל לפי מרכז ורדיוס — r נדגם, ומשתנה עם "אפשרות נוספת"',
+    descEn: 'a circle by centre and radius — r is sampled, and moves on "another configuration"',
+  },
+  {
+    family: 'F9',
+    he: 'z1, z2, z3 סדרה הנדסית',
+    en: 'z1, z2, z3 are a geometric sequence',
+    descHe: 'סדרה הנדסית — האיברים ברשימה הם איברים עוקבים',
+    descEn: 'a geometric sequence — the listed names are consecutive terms',
+  },
+  {
+    family: 'F9',
+    he: 'z1 ו-z2 הם שני האיברים הראשונים בסדרה הנדסית שבה האיבר השלישי הוא z4',
+    en: 'z1 and z2 are the first two terms of a geometric sequence in which the third term is z4',
+    descHe: 'איבר במקום נתון — המנה נקבעת, וכל האפשרויות שלה הן התצורות',
+    descEn: 'a term at a stated position — the ratio follows, and its alternatives are the configurations',
+  },
+  {
+    family: 'F9',
+    he: 'z1, z2, z3 סדרה חשבונית',
+    en: 'z1, z2, z3 are an arithmetic sequence',
+    descHe: 'סדרה חשבונית — חיבורית, ולכן נפתרת בשכבה הנומרית',
+    descEn: 'an arithmetic sequence — additive, so the numeric tier solves it',
+  },
 ];
 
 /** Group for the in-app panel; the family table is the ordering, not the insertion order. */

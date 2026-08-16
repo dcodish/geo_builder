@@ -48,7 +48,7 @@ describe('CATALOG — every specimen parses, in both languages', () => {
 
   it('reports MEASURED coverage — which families actually work today', () => {
     // this is the honest number, and it is deliberately much smaller than the contract
-    expect(coveredFamilies()).toEqual(['F1', 'F2', 'F3', 'F4', 'F5', 'F8']);
+    expect(coveredFamilies()).toEqual(['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F8', 'F9']);
     expect(Object.keys(FAMILY_TITLE).length).toBeGreaterThan(coveredFamilies().length);
   });
 });
@@ -179,8 +179,19 @@ describe('span accounting is ENFORCING, not advisory', () => {
       'quadrant',
       'conjugates-claim',
       'type-claim',
+      // the long sequence sentence outranks the bare list, and both outrank the relation rules: its
+      // tail «האיבר השלישי הוא Z4» is a type-claim shape if read by a laxer rule first
+      'sequence-first-terms',
+      'sequence-list',
+      // the circle sentences outrank the plain shape nouns: «המעגל החוסם את המשולש …» contains a
+      // shape noun, and the shape rule would claim its tail and drop the circumscription
+      'circumscribed-circle',
+      'circle-centre-radius',
+      'named-shape',
       'argument-relation',
       'equation',
+      // last of all: a bare glued run is a figure only when nothing read the line as maths
+      'bare-run',
     ]);
   });
 });

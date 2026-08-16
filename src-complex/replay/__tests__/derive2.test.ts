@@ -233,9 +233,12 @@ describe('S4 CLOSE — the same figures, now from the v2 parser (deriveLines)', 
   });
 
   it('a line the v2 grammar cannot read is REPORTED, with the student’s own words', () => {
-    const d = deriveLines(['z1^3 = z3', 'סדרה הנדסית z1, z2, z3']);
+    // F13 (loci) is the specimen now that F9 parses. The point of this test is the REPORTING, so it
+    // needs a line the grammar genuinely does not cover — using one that has since been implemented
+    // would leave the assertion passing for the wrong reason.
+    const d = deriveLines(['z1^3 = z3', 'המקום הגאומטרי של z הוא מעגל']);
     expect(d.untranslated).toHaveLength(1);
-    expect(d.untranslated[0].src).toContain('סדרה');
+    expect(d.untranslated[0].src).toContain('המקום');
     // ...and the rest of the session still builds
     expect(d.points.length).toBeGreaterThan(0);
   });
@@ -322,9 +325,9 @@ describe('ONE VERDICT PER LINE — the row and the canvas cannot disagree (opera
   });
 
   it('the refusals v2 DOES report are keyed by the student’s own line, so a row can find its own', () => {
-    const d = deriveLines([...SESSION, 'סדרה הנדסית z1, z2, z3']);
+    const d = deriveLines([...SESSION, 'המקום הגאומטרי של z הוא מעגל']);
     expect(d.untranslated).toHaveLength(1);
-    expect(d.untranslated[0].src).toBe('סדרה הנדסית z1, z2, z3');
+    expect(d.untranslated[0].src).toBe('המקום הגאומטרי של z הוא מעגל');
     // ...and every OTHER line is unblamed, which is what keeps the red mark on the right row
     for (const line of SESSION) expect(d.untranslated.some((u) => u.src === line)).toBe(false);
   });

@@ -120,7 +120,10 @@ export function App() {
   const derived2 = useMemo(() => (useV2 ? deriveLines(lines, seed, seed) : null), [useV2, lines, seed]);
   const scene = useMemo(() => deriveScene(facts, freePos, seed), [facts, freePos, seed]);
   // the v2 canvas is the POLAR one: a complex number as a length and a direction, not a dot on a grid
-  const polarScene = useMemo(() => (derived2 ? buildScene(derived2.points) : null), [derived2]);
+  const polarScene = useMemo(
+    () => (derived2 ? buildScene(derived2.points, derived2.objects) : null),
+    [derived2],
+  );
 
   /**
    * WHICH ENGINE'S VERDICT THE FACT LIST SHOWS.

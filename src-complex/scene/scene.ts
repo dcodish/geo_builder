@@ -27,7 +27,7 @@
  */
 
 import type { Cx } from '../value/value';
-import type { DerivedPoint } from '../replay/derive2';
+import type { DerivedObject, DerivedPoint } from '../replay/derive2';
 
 export interface ScenePoint {
   readonly name: string;
@@ -75,11 +75,32 @@ export interface ScenePolarGrid {
   readonly rayStepDeg: number;
 }
 
+/**
+ * A stated object — a segment, a polygon, or a circle (F6).
+ *
+ * Deliberately one primitive rather than three: the renderer draws a path and a circle, and the only
+ * thing it needs to vary is how many points the path joins and whether it closes. Splitting it would
+ * put the same honesty flag on three types and invite two of them to drift.
+ */
+export interface SceneShape {
+  readonly key: string;
+  readonly label: string;
+  /** the vertices to join, in order; empty for a circle */
+  readonly vertices: readonly Cx[];
+  /** true for a polygon — the path returns to its first vertex */
+  readonly closed: boolean;
+  readonly center?: Cx;
+  readonly radius?: number;
+  /** every position it rests on is FORCED by the givens; otherwise it moves with the configuration */
+  readonly known: boolean;
+}
+
 export interface Scene {
   readonly points: readonly ScenePoint[];
   readonly radii: readonly SceneRadius[];
   readonly arcs: readonly SceneArgArc[];
   readonly rings: readonly SceneModRing[];
+  readonly shapes: readonly SceneShape[];
   readonly grid: ScenePolarGrid;
   /** world half-width the view must cover, already padded */
   readonly extent: number;
@@ -110,9 +131,24 @@ const RAY_STEP_DEG = 30;
  * The arc radii are staggered deliberately: two numbers whose arcs both start at 0° would otherwise
  * draw on top of each other and the student could not tell which angle belonged to which number.
  */
-export function buildScene(points: readonly DerivedPoint[]): Scene {
+export function buildScene(
+  points: readonly DerivedPoint[],
+  objects: readonly DerivedObject[] = [],
+): Scene {
   const magnitudes = points.map((p) => Math.hypot(p.z.re, p.z.im));
-  const extent = Math.max(3, ...magnitudes) * 1.25;
+  /**
+   * A circle must fit in the view, not just its centre.
+   *
+   * The extent was computed from the plotted NUMBERS alone, so «המעגל שמרכזו O ורדיוסו 8» over small
+   * numbers drew a circle running off every edge — the figure was correct and unreadable, which for a
+   * product whose thesis is *the figure answers the question* is the same as being wrong.
+   */
+  const reach = objects.flatMap((o) =>
+    o.kind === 'circle' && o.center && o.radius !== undefined
+      ? [Math.hypot(o.center.re, o.center.im) + o.radius]
+      : o.vertices.map((v) => Math.hypot(v.re, v.im)),
+  );
+  const extent = Math.max(3, ...magnitudes, ...reach) * 1.25;
 
   const step = niceStep(extent / 4);
   const rings: number[] = [];
@@ -161,11 +197,22 @@ export function buildScene(points: readonly DerivedPoint[]): Scene {
   });
   const modRings: SceneModRing[] = [...byMagnitude.values()].sort((a, b) => a.r - b.r);
 
+  const shapes: SceneShape[] = objects.map((o) => ({
+    key: o.key,
+    label: o.label,
+    vertices: o.vertices,
+    closed: o.kind === 'polygon',
+    center: o.center,
+    radius: o.radius,
+    known: o.known,
+  }));
+
   return {
     points: scenePoints,
     radii,
     arcs,
     rings: modRings,
+    shapes,
     grid: { rings, rays, rayStepDeg: RAY_STEP_DEG },
     extent,
   };
