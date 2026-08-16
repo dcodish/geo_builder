@@ -1,0 +1,362 @@
+/**
+ * REPLAY (v2) — the ordered fact list folded into a figure, through the tier-1 solver.
+ *
+ * Same discipline as every sibling: **the fact list is the source of truth and the figure is derived**,
+ * so positions are never stored and undo cannot desync. What is new is what sits in the middle — the
+ * exact linear solve ([ADR-CX-006](../../docs/06d-decisions-complex.md#adr-cx-006)) instead of per-fact
+ * iteration, which is why the systems in #607's family reach a figure at all.
+ *
+ * ## The bridge, and why it is deliberately throwaway
+ *
+ * The v2 engine has no parser yet — that is S4 (#621), and it must be built with span accounting and
+ * the lexicon from its first rule ([ADR-CX-009](../../docs/06d-decisions-complex.md#adr-cx-009)).
+ * Writing a second parser here to get something on screen sooner would be exactly the shortcut that
+ * plan forbids. So this module instead **reads the prototype parser's own facts** and translates them,
+ * which lets the new engine be played through the existing input box today and leaves nothing to
+ * un-learn later: `bridgeFacts` is deleted whole when S4 lands, and the solver below is untouched.
+ *
+ * A form the bridge cannot translate is REPORTED, never silently skipped — an untranslated fact would
+ * otherwise vanish from a figure that still looked plausible, which is the silent-drop class the
+ * siblings paid for 33 times over.
+ */
+
+import type { Cx } from '../value/value';
+import { cPolar, evaluate, exact, formatPolar, fromCartesian } from '../value/value';
+import { type Rat, fromNumber, rat } from '../value/rational';
+import { type ExpVec, evaluate as evalMod, format as fmtMod } from '../value/modulus';
+import { type Angle, toDegrees } from '../value/angle';
+import { type Expr, abs, conj, div, mul, neg, num, param, pow, ref, val } from '../model/expr';
+import { type Branch, type Constraint, solveTier1 } from '../solve/tier1';
+import { type BranchFilter, filterBranches, quadrant } from '../solve/filter';
+
+// The prototype's fact/expression types — the ONLY import from the retiring engine, and the whole
+// surface the deletion in S4 has to touch.
+import type { Expr as ProtoExpr, Fact as ProtoFact } from '../engine/model';
+
+/** A fact the bridge could not translate, with the reason — surfaced, never swallowed. */
+export interface Untranslated {
+  readonly factId: string;
+  readonly src: string;
+  readonly why: string;
+}
+
+export interface BridgeResult {
+  readonly constraints: Constraint[];
+  readonly filters: BranchFilter[];
+  /** free numbers: named, unconstrained, two degrees of freedom each */
+  readonly freeNames: string[];
+  /** angle atoms a cartesian literal introduced, with the degrees they stand for */
+  readonly sample: Map<string, number>;
+  readonly untranslated: Untranslated[];
+}
+
+const asRat = (x: number): Rat | null => fromNumber(x, 10_000, 1e-9);
+
+/**
+ * The numeric value of a REF-FREE subtree, or null if it mentions a number the student named.
+ *
+ * This exists because `3+4i` reaches the bridge as an ADDITION — the prototype parses the cartesian
+ * form structurally — and a naive "no addition ⇒ monomial" test would push every cartesian literal to
+ * the numeric tier. But a constant expression is a *literal* whatever its syntax: `3+4i` is one number
+ * with modulus exactly 5. Folding constants before classifying is what keeps the syntax of a literal
+ * from deciding whether the engine can be exact about it.
+ */
+function literalValue(e: ProtoExpr): Cx | null {
+  switch (e.t) {
+    case 'lit':
+      return e.v;
+    case 'bin': {
+      const l = literalValue(e.l);
+      const r = literalValue(e.r);
+      if (!l || !r) return null;
+      switch (e.op) {
+        case '+':
+          return { re: l.re + r.re, im: l.im + r.im };
+        case '-':
+          return { re: l.re - r.re, im: l.im - r.im };
+        case '*':
+          return { re: l.re * r.re - l.im * r.im, im: l.re * r.im + l.im * r.re };
+        case '/': {
+          const d = r.re * r.re + r.im * r.im;
+          if (d === 0) return null;
+          return { re: (l.re * r.re + l.im * r.im) / d, im: (l.im * r.re - l.re * r.im) / d };
+        }
+      }
+      return null;
+    }
+    case 'neg': {
+      const x = literalValue(e.e);
+      return x ? { re: -x.re, im: -x.im } : null;
+    }
+    case 'conj': {
+      const x = literalValue(e.e);
+      return x ? { re: x.re, im: -x.im } : null;
+    }
+    case 'abs': {
+      const x = literalValue(e.e);
+      return x ? { re: Math.hypot(x.re, x.im), im: 0 } : null;
+    }
+    case 'pow': {
+      const x = literalValue(e.base);
+      if (!x || !Number.isInteger(e.exp) || e.exp < 0) return null;
+      let acc = { re: 1, im: 0 };
+      for (let i = 0; i < e.exp; i++) acc = { re: acc.re * x.re - acc.im * x.im, im: acc.re * x.im + acc.im * x.re };
+      return acc;
+    }
+    default:
+      return null;
+  }
+}
+
+/** A prototype expression → a v2 expression, or null when it has no exact reading. */
+function bridgeExpr(e: ProtoExpr, sample: Map<string, number>, label: string): Expr | null {
+  // constants first, whatever their syntax — see literalValue
+  const konst = literalValue(e);
+  if (konst) {
+    const re = asRat(konst.re);
+    const im = asRat(konst.im);
+    if (re === null || im === null) return null;
+    const lit = fromCartesian(re, im, label);
+    if (lit.atomBinding) sample.set(lit.atomBinding.atom, lit.atomBinding.degrees);
+    return val(lit.value);
+  }
+
+  switch (e.t) {
+    case 'lit':
+      return null; // unreachable: a literal is always constant, and was folded above
+    case 'ref':
+      return ref(e.name);
+    case 'bin': {
+      const l = bridgeExpr(e.l, sample, label);
+      const r = bridgeExpr(e.r, sample, label);
+      if (!l || !r) return null;
+      return e.op === '*' ? mul(l, r) : e.op === '/' ? div(l, r) : null; // + and − are not monomial
+    }
+    case 'pow': {
+      const b = bridgeExpr(e.base, sample, label);
+      return b ? pow(b, rat(e.exp)) : null;
+    }
+    case 'neg': {
+      const x = bridgeExpr(e.e, sample, label);
+      return x ? neg(x) : null;
+    }
+    case 'conj': {
+      const x = bridgeExpr(e.e, sample, label);
+      return x ? conj(x) : null;
+    }
+    case 'abs': {
+      const x = bridgeExpr(e.e, sample, label);
+      return x ? abs(x) : null;
+    }
+    default:
+      return null; // re/im are additive projections — the numeric tier's business
+  }
+}
+
+/** Prototype facts → the tier-1 inputs. Anything untranslatable is listed, not dropped. */
+export function bridgeFacts(facts: readonly ProtoFact[]): BridgeResult {
+  const constraints: Constraint[] = [];
+  const filters: BranchFilter[] = [];
+  const freeNames: string[] = [];
+  const sample = new Map<string, number>();
+  const untranslated: Untranslated[] = [];
+
+  const give = (f: ProtoFact, why: string): void => {
+    untranslated.push({ factId: f.id, src: f.src, why });
+  };
+
+  for (const f of facts) {
+    switch (f.kind) {
+      case 'free':
+        freeNames.push(f.name);
+        break;
+      case 'def': {
+        const rhs = bridgeExpr(f.expr, sample, f.name);
+        if (!rhs) give(f, 'the definition is not multiplicative — it belongs to the numeric tier');
+        else constraints.push({ lhs: ref(f.name), rhs, src: f.src });
+        break;
+      }
+      case 'roots': {
+        const rhs = bridgeExpr(f.rhs, sample, f.varName);
+        if (!rhs) give(f, 'the equation’s right-hand side is not multiplicative');
+        else constraints.push({ lhs: pow(ref(f.varName), rat(f.n)), rhs, src: f.src });
+        break;
+      }
+      case 'eq': {
+        const lhs = bridgeExpr(f.lhs, sample, 'eq');
+        const rhs = bridgeExpr(f.rhs, sample, 'eq');
+        if (!lhs || !rhs) give(f, 'the equation is not multiplicative on both sides');
+        else constraints.push({ lhs, rhs, src: f.src });
+        break;
+      }
+      case 'rel': {
+        const r = f.rel;
+        if (r.type === 'quad') {
+          filters.push(quadrant(r.name, r.q));
+        } else if (r.type === 'mod') {
+          const k = asRat(r.k);
+          if (k === null) {
+            give(f, 'the magnitude factor has no exact reading');
+            break;
+          }
+          const rhs = r.other
+            ? mul(num(k), abs(ref(r.other)))
+            : r.param
+              ? mul(num(k), param(r.param))
+              : num(k);
+          if (r.cmp && r.cmp !== '=') give(f, 'a modulus INEQUALITY is a numeric-tier bound, not a linear row');
+          else constraints.push({ kind: 'mod', lhs: abs(ref(r.name)), rhs, src: f.src });
+        } else {
+          // Σ sign·arg(name) = rhsDeg. Two signed terms is the corpus form (F4).
+          const plus = r.terms.filter((t) => t.sign === 1);
+          const minus = r.terms.filter((t) => t.sign === -1);
+          const delta = asRat(r.rhsDeg / 360);
+          if (r.cmp && r.cmp !== '=') {
+            filters.push(
+              r.cmp === '<' || r.cmp === '<='
+                ? { kind: 'range', name: r.terms[0]?.name ?? '', maxDeg: rat(Math.round(r.rhsDeg)) }
+                : { kind: 'range', name: r.terms[0]?.name ?? '', minDeg: rat(Math.round(r.rhsDeg)) },
+            );
+          } else if (delta === null || plus.length !== 1 || minus.length > 1) {
+            give(f, 'only one-or-two-term argument equations are linearised so far');
+          } else {
+            constraints.push({
+              kind: 'arg',
+              lhs: ref(plus[0].name),
+              rhs: minus.length ? ref(minus[0].name) : num(rat(1)),
+              deltaTurns: delta,
+              src: f.src,
+            });
+          }
+        }
+        break;
+      }
+      default:
+        give(f, `“${f.kind}” has no v2 form yet`);
+    }
+  }
+
+  return { constraints, filters, freeNames, sample, untranslated };
+}
+
+// ---------------------------------------------------------------------------
+
+export interface DerivedPoint {
+  readonly name: string;
+  readonly z: Cx;
+  readonly modulus: string;
+  readonly argumentDeg: number;
+  /** the exact polar text, when the whole value is carried exactly */
+  readonly exactLabel: string | null;
+}
+
+export interface Derived2 {
+  /** null when the givens contradict each other, with which system found it */
+  readonly contradiction: null | 'modulus' | 'argument';
+  readonly points: DerivedPoint[];
+  /** how many valid configurations the givens leave — what "show another" cycles */
+  readonly configCount: number;
+  readonly configIndex: number;
+  /** the still-open degrees of freedom, named the way the cue shows them */
+  readonly freeDof: readonly string[];
+  readonly untranslated: readonly Untranslated[];
+  /** constraints routed to the numeric tier, which does not exist yet — listed, never hidden */
+  readonly deferred: readonly Constraint[];
+  /** the filter that emptied the configuration set, when one did */
+  readonly emptiedBy: BranchFilter | null;
+}
+
+/** A deterministic positive sample for a parameter the student never valued (ADR-052: a START, not a fixed value). */
+const paramSample = (name: string, seed: number): number => {
+  let h = 2166136261;
+  for (const ch of `${name}@${seed}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return 0.6 + ((h >>> 0) % 181) / 100;
+};
+
+/**
+ * Fold the facts into a figure.
+ *
+ * `configIndex` selects among the enumerated branches — this is what "show another configuration"
+ * advances, and because the branches come out of the integer turn-unknowns it is the exam's
+ * «כל האפשרויות» rather than a separate feature.
+ */
+export function derive2(facts: readonly ProtoFact[], configIndex = 0, seed = 0): Derived2 {
+  const bridged = bridgeFacts(facts);
+  const t1 = solveTier1(bridged.constraints);
+
+  const sample = new Map(bridged.sample);
+  for (const c of bridged.constraints) {
+    for (const p of collectParams(c)) if (!sample.has(p)) sample.set(p, paramSample(p, seed));
+  }
+
+  const { kept, emptiedBy } = filterBranches(t1.branches, bridged.filters, sample);
+  const configCount = kept.length;
+  const index = configCount ? ((configIndex % configCount) + configCount) % configCount : 0;
+  const branch: Branch | undefined = kept[index];
+
+  const points: DerivedPoint[] = [];
+  if (!t1.inconsistent && branch) {
+    for (const [name, angle] of branch.angles) {
+      const mod = t1.knownModulus.get(name);
+      if (!mod) continue; // the direction is fixed but the magnitude is not — nothing to plot yet
+      const m = evalMod(mod, sample);
+      const deg = toDegrees(angle, sample);
+      if (m === null || deg === null) continue;
+      points.push({
+        name,
+        z: cPolar(m, deg),
+        modulus: fmtMod(mod),
+        argumentDeg: deg,
+        exactLabel: exactLabelOf(mod, angle),
+      });
+    }
+  }
+  points.sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    contradiction: t1.inconsistent,
+    points,
+    configCount,
+    configIndex: index,
+    freeDof: t1.freeDof,
+    untranslated: bridged.untranslated,
+    deferred: t1.deferred,
+    emptiedBy,
+  };
+}
+
+const exactLabelOf = (mod: ExpVec, arg: Angle): string | null => {
+  const v = exact(mod, arg);
+  return evaluate(v) ? formatPolar(v) : null;
+};
+
+function collectParams(c: Constraint): string[] {
+  const out: string[] = [];
+  const walk = (e: Expr): void => {
+    switch (e.t) {
+      case 'param':
+        out.push(e.name);
+        return;
+      case 'mul':
+      case 'div':
+      case 'add':
+      case 'sub':
+        walk(e.l);
+        walk(e.r);
+        return;
+      case 'pow':
+        walk(e.base);
+        return;
+      case 'conj':
+      case 'neg':
+      case 'abs':
+        walk(e.e);
+        return;
+      default:
+        return;
+    }
+  };
+  walk(c.lhs);
+  walk(c.rhs);
+  return out;
+}

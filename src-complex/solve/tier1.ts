@@ -33,6 +33,7 @@ import {
 import {
   type Angle,
   add as angAdd,
+  fromTurns,
   isExactRational,
   normalize as angNormalize,
   scale as angScale,
@@ -41,10 +42,21 @@ import {
   format as fmtAngle,
 } from '../value/angle';
 
-/** One stated relation. `src` is the student's own line, carried so a refusal can quote it. */
+/**
+ * One stated relation. `src` is the student's own line, carried so a refusal can quote it.
+ *
+ * `kind` exists because two corpus families are NOT complex equations. `|z₁| = 9r` (F3) says nothing
+ * about direction, and `arg Z₁ − arg Z₂ = 90°` (F4) says nothing about magnitude — writing either as a
+ * full equation would invent the half the student did not state, which is the ADR-052 sin in its
+ * purest form. Each therefore emits only the row it actually constrains.
+ */
 export interface Constraint {
   readonly lhs: Expr;
   readonly rhs: Expr;
+  /** `eq` (the default) emits both rows · `mod` only the modulus row · `arg` only the argument row */
+  readonly kind?: 'eq' | 'mod' | 'arg';
+  /** for `arg` only: `arg(lhs) − arg(rhs) = deltaTurns`, in turns */
+  readonly deltaTurns?: Rat;
   readonly src?: string;
 }
 
@@ -133,18 +145,22 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
       continue;
     }
 
-    modRows.push(modulusRow(lf, rf));
+    const kind = c.kind ?? 'eq';
+    if (kind === 'eq' || kind === 'mod') modRows.push(modulusRow(lf, rf));
+    if (kind === 'mod') continue; // a magnitude given says nothing about direction
 
     const a = argumentRow(lf, rf);
+    // `arg(lhs) − arg(rhs) = delta` shifts the constant; an `eq` is the delta-zero case
+    const rhs = c.deltaTurns ? angAdd(a.rhs, fromTurns(c.deltaTurns)) : a.rhs;
     // `Σ coef·t − k = const` — the integer turn unknown enters with coefficient −1
     const k = kName(kNames.length);
     const coef = new Map(a.coef);
     coef.set(k, rat(-1));
     // A row with no argument unknowns at all is either trivially true or a pure constant claim; the
     // turn unknown makes the former satisfiable, so only keep rows that say something.
-    if (a.coef.size === 0 && ANG_OPS.isZero(a.rhs)) continue;
+    if (a.coef.size === 0 && ANG_OPS.isZero(rhs)) continue;
     kNames.push(k);
-    argRows.push({ coef, rhs: a.rhs });
+    argRows.push({ coef, rhs });
   }
 
   const modulus = solveLinear(modRows, names, MOD_OPS);

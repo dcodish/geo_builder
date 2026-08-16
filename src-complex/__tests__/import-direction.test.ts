@@ -33,7 +33,11 @@ const MAY_IMPORT: Record<string, readonly string[]> = {
   value: [],
   model: ['value'],
   solve: ['value', 'model'],
-  replay: ['value', 'model', 'solve'],
+  // `replay -> engine` is the S3 BRIDGE and nothing else: `derive2` reads the prototype parser's own
+  // fact types so the new engine can be played through the existing input box, rather than a second
+  // parser being written ahead of S4's span accounting (ADR-CX-009). It is one import of two TYPES,
+  // it is deleted with `bridgeFacts` when S4 lands, and it is listed here so it stays that small.
+  replay: ['value', 'model', 'solve', LEGACY],
   store: ['value', 'model', 'solve', 'replay', 'parser', LEGACY],
   scene: ['value', 'model', 'solve', 'replay'],
   render: ['value', 'scene', LEGACY],
