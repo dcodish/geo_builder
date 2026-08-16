@@ -246,3 +246,63 @@ describe('S4 CLOSE — the same figures, now from the v2 parser (deriveLines)', 
     expect(d.untranslated[0].why).toContain('ומקבילית');
   });
 });
+
+describe('A FILTER BOUNDS THE SAMPLE, not only the branches (operator report, 2026-08-16)', () => {
+  // Reported from prod: «z1 ברביע הראשון» alone drew z1 at ~1·cis~0° — on the +Re AXIS, which is in
+  // no quadrant at all. The quadrant pruned enumerated branches, but a direction the givens never pin
+  // is a sampled DOF, not a branch, so nothing asked the sample to respect the given. The figure
+  // contradicted its own stated fact while every check passed.
+  const quadrantOf = (re: number, im: number): number =>
+    re > 0 && im > 0 ? 1 : re < 0 && im > 0 ? 2 : re < 0 && im < 0 ? 3 : re > 0 && im < 0 ? 4 : 0;
+
+  it('THE REPORT: the quadrant given holds in the drawing, with nothing else stated', () => {
+    const d = deriveLines(['z1 ברביע הראשון']);
+    const z1 = d.points.find((p) => p.name === 'z1')!;
+    expect(quadrantOf(z1.z.re, z1.z.im), 'z1 must be strictly inside quadrant 1').toBe(1);
+  });
+
+  it('...and never lands ON an axis, which belongs to no quadrant', () => {
+    for (let seed = 0; seed < 40; seed++) {
+      const z1 = deriveLines(['z1 ברביע הראשון'], 0, seed).points[0];
+      expect(Math.abs(z1.z.re), `seed ${seed}`).toBeGreaterThan(1e-6);
+      expect(Math.abs(z1.z.im), `seed ${seed}`).toBeGreaterThan(1e-6);
+      expect(quadrantOf(z1.z.re, z1.z.im), `seed ${seed}`).toBe(1);
+    }
+  });
+
+  it('every quadrant, in both languages', () => {
+    for (const [line, q] of [
+      ['z1 ברביע הראשון', 1],
+      ['z1 ברביע השני', 2],
+      ['z1 ברביע השלישי', 3],
+      ['z1 ברביע הרביעי', 4],
+      ['z1 in the second quadrant', 2],
+      ['z1 in the fourth quadrant', 4],
+    ] as const) {
+      const p = deriveLines([line]).points[0];
+      expect(quadrantOf(p.z.re, p.z.im), line).toBe(q);
+    }
+  });
+
+  it('the sample still MOVES between configurations — bounded is not frozen (ADR-052)', () => {
+    const degs = [0, 1, 2, 3].map((s) => deriveLines(['z1 ברביע הראשון'], 0, s).points[0].argumentDeg);
+    expect(new Set(degs.map((d) => Math.round(d))).size).toBeGreaterThan(1);
+    for (const d of degs) {
+      expect(d).toBeGreaterThan(0);
+      expect(d).toBeLessThan(90);
+    }
+  });
+
+  it('an unconstrained number is sampled, never a fixed 1·cis0°', () => {
+    const a = deriveLines(['z9'], 0, 0).points[0];
+    const b = deriveLines(['z9'], 0, 1).points[0];
+    expect(Math.hypot(a.z.re - b.z.re, a.z.im - b.z.im)).toBeGreaterThan(1e-6);
+  });
+
+  it('a DETERMINED direction is still verified, not resampled — the filter did not become a driver', () => {
+    // z^3 = 8 puts a root at 0°, which is in no quadrant; asking for quadrant 1 must find none
+    const d = deriveLines(['z^3 = 8', 'z ברביע הראשון']);
+    expect(d.configCount).toBe(0);
+    expect(d.emptiedBy).not.toBeNull();
+  });
+});
