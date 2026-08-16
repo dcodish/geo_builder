@@ -468,6 +468,57 @@ chrome — which is the whole return on this work.
 
 ---
 
+## 5a. How this is executed — branch strategy and the work items
+
+**Accepted by [ADR-W-018](06w-decisions-workspace.md#adr-w-018). Operator ruling, 2026-08-16:**
+*"we might want to create this as a fork … so we dont impact existing tools until i confirm all works
+well."*
+
+**The exposure being isolated is narrower than it first appears.** Deploys here are manual — a static
+build rsynced to Apache paths (docs/RUNBOOK.md) — so `main` never reaches a student on its own, and
+`main` running far ahead of prod is the normal state. The real risk is different: a **half-migrated
+`main` would force an emergency 2-D or 3-D P1 deploy to carry unfinished UI work**. That, and only
+that, is what the branch protects.
+
+### Track A → straight to `main`
+
+Work that **cannot** change 2-D or 3-D behaviour — and `npm run check:siblings` (ADR-W-017) refuses
+it at the diff if it tries:
+
+| item | issue |
+| --- | --- |
+| `shell/` + the CI lane | **#617** (already open; independently urgent — `ci.yml` still has zero occurrences of "complex" while five complex PRs have merged) |
+| product registry + the `BOUNDARIES.json` cross-check | A2 |
+| admin config: persistence, write endpoints, the curation/capability line | A3 |
+| the ADR extraction pass → the row list with provenance | A4 |
+| the conformance harness + the maintenance check | A5 |
+| the manual screen, complex first | A6 |
+
+### Track B → `unify/ui`, one surface per PR
+
+The visible migration of the shipped builders. Each PR: full gates, both sibling builds, **operator
+plays the branch**, then it merges into `unify/ui`. `unify/ui` merges to `main` when the operator
+accepts the whole interface.
+
+| item | decisions | note |
+| --- | --- | --- |
+| B1 tokens | D2, D3 | `theme.ts` values → Tailwind theme; 3-D sky→blue; complex stone→slate. **Enables everything after it** |
+| B2 layout | D1, D10 | three columns + the tablet overlay |
+| B3 header | D4 | switcher, overflow menu — **closes #656** |
+| B4 input | D5, D9b | one preview, wrap-selection palette, quick commands — **absorbs #525** |
+| B5 fact list | D6 | the largest: `replaceGroup` + `removeGroup` for 3-D, `enabled` for complex |
+| B6 figure surfaces | D7, D8 | controls under the canvas; the one panel skeleton |
+| B7 manual | D9 | the shipped builders' manual screens |
+
+**Ordering constraint:** B1 first — every other B item is expressed in the tokens it establishes.
+B2–B7 are otherwise independent and can be played in any order.
+
+**Rebase discipline:** `unify/ui` rebases on `main` whenever a track-A item lands, so drift stays
+measured in days. Complex is currently merging to `main` most days, which is exactly why track A does
+not sit on the branch.
+
+---
+
 ## 6. The conformance matrix (phase 2, design sketch)
 
 **Not shared code.** A shared *checklist with teeth*: the contracts listed once, each product
