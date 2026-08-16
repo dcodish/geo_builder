@@ -48,6 +48,15 @@ describe('a claim is verified, and never moves the figure', () => {
     expect(verdicts('z1 = 3+4i', 'z2 = 3-4i', 'z1 ו-z2 צמודים')).toEqual(['unknown']);
   });
 
+  /**
+   * The other side of the same coin: an opaque angle is not automatically an obstacle. «z2 = conj(z1)»
+   * propagates the SAME atom negated, so conjugacy is decided outright however unpleasant z1's angle
+   * is — no sampling, and true for every configuration.
+   */
+  it('a DERIVED conjugate is decided exactly, opaque base angle and all', () => {
+    expect(verdicts('z1 = 3+4i', 'z2 = conj(z1)', 'z1 ו-z2 צמודים')).toEqual(['holds']);
+  });
+
   it('English mirrors', () => {
     expect(verdicts('z = 2i', 'z is pure imaginary')).toEqual(['holds']);
     expect(verdicts('z = 3', 'z is real')).toEqual(['holds']);

@@ -651,3 +651,152 @@ are in the atom for the same reason.
 - **The prototype's `shape` facts are NOT bridged.** They are exactly what this grammar replaces;
   translating them would keep the retiring input path alive one slice longer than
   [ADR-CX-008](#adr-cx-008) allows.
+
+---
+
+## ADR-CX-013 — Tier 2 exists: the numeric residue, and F7 measures that drive or check (2026-08-16)
+
+**Status:** Accepted · **Slice:** S3 (the missing half) + S4 (grammar) · **Ladder:** stage 3a/3b/3c/3e
+· **Family:** F7 (docs/27 §10), and F9's additive half
+
+### What was missing
+
+[ADR-CX-006](#adr-cx-006) specified two tiers. Only tier 1 existed. Everything non-multiplicative —
+distances, perimeters, areas, arithmetic sequences, cartesian component equations — was *listed as
+deferred* and then nothing read the list. That was honest as far as it went, but it meant the §2b
+capstone («θ pinned by the area given … perimeter 60r») could not be built at all.
+
+### The design
+
+**A constraint contributes exactly three things and the solver never changes**: `refs`, a signed
+`residual` that is zero exactly when satisfied, and a `describe` for the refusal
+([ADR-CX-009](#adr-cx-009) §3). The minimiser sees numbers only. That is the whole guard against the
+2-D tree's six-case recruiter, which grew because every new constraint type could teach the solver a
+new trick; here a constraint may only *report*.
+
+- **3a** — residuals over the free basis tier 1 leaves, typically 0–3 dimensions. Iteration is over
+  what elimination could not remove, never over the whole figure. That is the difference from the C0
+  prototype, which iterated per fact over everything and diverged on #607.
+- **3b** — one free dimension is a root-finding problem, and every root is a configuration. «כל
+  האפשרויות» over a single DOF falls out here the way branch enumeration does in tier 1.
+- **3c** — Levenberg–Marquardt with a numeric Jacobian and deterministic multi-start. LM rather than
+  Gauss–Newton because an area is quadratic and a distance is a square root, and Gauss–Newton
+  overshoots badly on exactly those. The jitter is deterministic: a solver that finds the answer only
+  sometimes is worse than one that never does, because the failure is unreportable.
+- **3e** — the honesty backstop. Every relation is re-verified against the FINAL values and reported.
+
+### F7: one sentence form, and the ENGINE decides
+
+«שטח OZ₁Z₂Z₃ הוא 150r²» is a given in one exam and a claim in another. docs/27 §10's P1 says one form
+and the engine decides — and here that is not a heuristic, it is arithmetic: **if the figure has a free
+degree of freedom the residual can consume, tier 2 drives it; if the figure is determined, the same
+residual is evaluated and reported.** There is no second sentence shape for "verify that the area is
+150r²", and the parser never has to guess which the student meant.
+
+### Three defects found by building it, each fixed at the root
+
+1. **The free basis was taken over the CONSTRAINT names, not the drawn names.** Tier 1 only sees names
+   a constraint mentions, so «z2» declared on its own line was drawn (at an ad-hoc sample) but was
+   absent from the vector tier 2 was allowed to move. «אורך z1z2 = 5» with z2 free therefore reported
+   *violated* — the one point that could have satisfied it was pinned by omission. **A point free
+   enough to draw is free enough to drive.**
+2. **A measure can be the only mention of a parameter.** «אורך z1z2 = 15r» names `r` where no
+   constraint does, so it was undecidable and silently did not drive. This is literally the same
+   omission that left an F6 circle with no radius — one cause, two symptoms, both fixed by sampling
+   parameters from every surface that can name one.
+3. **The final-letter trap, twice in one session.** «היקף» ends in a final *pe* and was spelled with
+   the `KAF` atom, so the word refused itself. The guard test only checked כ/מ/נ — three of the five
+   final forms — so it could not see it. **A guard that checks most of a closed set will be wrong about
+   the rest**: it now checks all five, and `PE`/`TSADI` atoms exist.
+
+### The DOF cue had to change with it
+
+`freeDof` is tier 1's nullspace dimension — the freedom *before* stage 3. Reporting it afterwards tells
+a student the figure can still move in a direction their own given has just pinned. So `drivenDof` is
+published alongside it: the **numeric rank of the residual Jacobian at the solution**, computed rather
+than tracked so it cannot drift from what the residuals actually did. The cue reports the difference.
+
+### What a tier-2 value is NOT
+
+A value the numeric tier determined is **not** marked as known. `modulusKnown`/`argumentKnown` mean
+*carried exactly*, and a floating-point solution is not that, so a driven figure still prints with `≈`.
+This is deliberately conservative: it understates rather than overclaims, and the alternative — calling
+a converged float "knowledge" — is the failure mode a knowledge panel exists to prevent (S6, #623).
+
+### Known gap, named rather than papered over
+
+**Stage 3d, the obligation-preservation gate, is not built.** With conflicting givens («z2 = 0» and
+«אורך z1z2 = 99») the backstop reports both as unsatisfied — nothing vanishes under a green figure,
+which is the property that matters most — but the minimiser lands between them and `z2` drifts off its
+stated value. The correct behaviour is to refuse the student's NEWEST statement and keep the earlier
+figure intact: [ADR-402](06-decisions.md#adr-402)'s lesson, that a solve which drops a given makes the
+remaining system *easier* and is therefore **rewarded** for destroying it. LADDER-CX marks 3d and
+`cx3:refuse` as pending, and a test pins the current behaviour so the gap is visible rather than
+assumed away.
+
+Also not built: symbolic series («w + w² + … + w^(4n)»), which needs symbolic exponents as well as
+this tier; and `z = 0` has no log-polar form, so it reaches tier 2 as a deferred equation and is solved
+numerically rather than exactly.
+
+---
+
+## ADR-CX-014 — The knowledge panel: a number prints only when the givens force it (2026-08-16)
+
+**Status:** Accepted · **Slice:** S6 (#623) · **Ladder:** stage 5d · **Family:** F7 (the question form)
+
+### The operator's ruling
+
+Values print **only on request, and only when they are knowledge** — invariant across every valid
+configuration, with the gauge pinned. The figure shows everything; the panel prints only what was asked
+for and only what is known.
+
+### Why this is a predicate and not a heuristic
+
+The natural implementation is to sample a few configurations and print the value if it did not move.
+[ADR-421](06-decisions.md#adr-421) is a P1 that came out of exactly that shape: an inference from
+sampling variance **inverts silently at N = 1**, because with one sample nothing varies and therefore
+everything looks invariant. The rule is not merely imprecise — it is *backwards* in the case the
+student hits first, a figure they have only begun to specify.
+
+So `isKnowledge` is structural and is asked once, by everything:
+
+1. **Carried exactly?** Knowledge, whatever else is free. `|z₁| = 9r` is knowledge *expressed in r* —
+   the corpus's «הביעו באמצעות r» register — and the exponent vector carries it with nothing sampled.
+2. **Otherwise, is the figure closed?** No remaining free DOF, and exactly one valid configuration.
+3. **Otherwise not knowledge**, and the panel says *why* rather than printing a number.
+
+Rule 3 is deliberately conservative: it will withhold values that are in fact invariant, such as an
+area equal across all four branches. That is the safe direction — a withheld truth costs a hint, an
+asserted falsehood costs the answer.
+
+### A question and a statement are the same words minus one
+
+«שטח OZ₁Z₂Z₃» asks; «שטח OZ₁Z₂Z₃ = 150r²» states. That is the whole difference, which is why
+`EQUATES_KW` is **required** in the relation rule rather than optional: an optional separator would
+silently turn a question into an assertion.
+
+### The defect this uncovered — two definitions of one number
+
+The panel printed a sampled area as knowledge on its first run. Root cause: `freeDof` was published
+from `t1.freeDof`, and **tier 1 only ever sees names a constraint mentions**. A number the student
+merely declared («z2» on its own line) was genuinely free, invisible to tier 1, and the figure
+therefore reported ZERO degrees of freedom — so the knowledge gate, asking that same count, concluded
+the figure was closed.
+
+[ADR-CX-006](#adr-cx-006) requires the free-DOF count to be **one definition, read by the cue, the
+knowledge gates and the sampler alike**. There were two: tier 1's list, and the larger basis tier 2 was
+already optimising over ([ADR-CX-013](#adr-cx-013) found the same gap from the other side, where a
+measure could not drive the point it needed). They are now one list, derived from the basis, and real
+parameters are in it — `r` unstated is a free magnitude, and a measure in `r` is not a number until
+something pins it.
+
+That both a solver bug and an honesty bug came out of the same duplicated quantity is the argument for
+the single-definition rule, not an anecdote about it.
+
+### Not done here, and named
+
+The prototype's «בדגימה הנוכחית: {{value}}» string still exists in `i18n/index.ts`. It is unreachable
+under `?engine=v2` — the panel that rendered it is not mounted — so the ruling holds for the v2 surface.
+It is deleted with the rest of the prototype in S7 rather than edited now, which would grow the
+retiring path. **G4–G9, the formula-sheet surfacing and parameter-expression rows for non-modulus
+quantities remain open on #623.**

@@ -14,6 +14,7 @@ import { parseLineV2 } from '../parser/rules';
 import type { BranchFilter, Constraint } from '../model/constraint';
 import type { Claim as Assertion } from '../model/claim';
 import type { FigureObject } from '../model/figure';
+import type { MeasureQuery, MeasureRelation } from '../model/measure';
 import { type Derived2, type Untranslated, foldConstraints } from '../replay/derive2';
 
 /**
@@ -29,6 +30,8 @@ export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0)
   const declared: string[] = [];
   const assertions: Assertion[] = [];
   const objects: FigureObject[] = [];
+  const measures: MeasureRelation[] = [];
+  const queries: MeasureQuery[] = [];
   const atoms = new Map<string, number>();
   const untranslated: Untranslated[] = [];
 
@@ -47,6 +50,8 @@ export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0)
     declared.push(...r.line.declares);
     assertions.push(...r.line.assertions);
     objects.push(...r.line.objects);
+    measures.push(...r.line.measures);
+    queries.push(...r.line.queries);
     for (const [k, v] of r.line.atoms) atoms.set(k, v);
   });
 
@@ -60,5 +65,7 @@ export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0)
     seed,
     assertions,
     objects,
+    measures,
+    queries,
   );
 }

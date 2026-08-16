@@ -41,6 +41,19 @@ export interface MeasureRelation {
   readonly src: string;
 }
 
+/**
+ * «שטח OZ₁Z₂Z₃» with no value — a request to DISPLAY the measure, not a statement about it.
+ *
+ * The same words minus the equating word, and that is why {@link EQUATES_KW} is required rather than
+ * optional in the relation rule: an optional separator would silently turn a question into an
+ * assertion. What comes back is a knowledge row, which prints a number only if the givens force one.
+ */
+export interface MeasureQuery {
+  readonly kind: MeasureKind;
+  readonly points: readonly string[];
+  readonly src: string;
+}
+
 /** How a measure came out once the figure was solved. */
 export type MeasureStatus =
   /** the figure satisfies it — either because it drove, or because it was already true */

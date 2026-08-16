@@ -37,6 +37,10 @@ export const KAF = String.raw`[כך]`;
 export const MEM = String.raw`[מם]`;
 /** Nun, medial or final. */
 export const NUN = String.raw`[נן]`;
+/** Pe, medial or final — «היקף» ends in one, and spelling it with {@link KAF} refused the word. */
+export const PE = String.raw`[פף]`;
+/** Tsadi, medial or final. */
+export const TSADI = String.raw`[צץ]`;
 
 /** Hebrew gender/number suffixes, all optional. */
 export const HE_SUFFIX = String.raw`(?:ים|ות|ה|ת)?`;
@@ -150,7 +154,7 @@ export const WITH_KW = String.raw`(?:with\s+|whose\s+)?`;
 export const LENGTH_KW = String.raw`(?:${HE_PREFIX}אורך|length|distance)`;
 
 /** «היקף» / «perimeter». */
-export const PERIMETER_KW = String.raw`(?:${HE_PREFIX}היק${KAF}|perimeter)`;
+export const PERIMETER_KW = String.raw`(?:${HE_PREFIX}היק${PE}|perimeter)`;
 
 /** «שטח» / «area». */
 export const AREA_KW = String.raw`(?:${HE_PREFIX}שטח|area)`;
@@ -259,6 +263,8 @@ export const ATOM_SOURCES: Readonly<Record<string, string>> = {
   KAF,
   MEM,
   NUN,
+  PE,
+  TSADI,
   HE_SUFFIX,
   QUADRANT_KW,
   ARG_KW,

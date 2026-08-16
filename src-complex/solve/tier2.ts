@@ -229,17 +229,25 @@ function otherRoots(
   const roots: number[] = [];
   let prevX = lo;
   let prevY = g(lo);
-  for (let i = 1; i <= STEPS; i++) {
+  for (let i = 0; i <= STEPS; i++) {
     const cx = lo + ((hi - lo) * i) / STEPS;
     const cy = g(cx);
-    if (Number.isFinite(prevY) && Number.isFinite(cy) && prevY * cy < 0) {
+    // A root sitting EXACTLY on a scan node never produces a sign change, so a test for `prev*cur < 0`
+    // alone walks straight past it — and an exam's answers are integers, which is precisely where the
+    // nodes of a regular scan land. Checking for the zero itself is not an edge case here, it is the
+    // common case.
+    if (Math.abs(cy) <= TOL) roots.push(cx);
+    else if (i > 0 && Number.isFinite(prevY) && Number.isFinite(cy) && prevY * cy < 0) {
       roots.push(bisect(g, prevX, cx));
     }
     prevX = cx;
     prevY = cy;
   }
 
-  return roots
+  const distinct: number[] = [];
+  for (const r of roots) if (!distinct.some((d) => Math.abs(d - r) < 1e-6)) distinct.push(r);
+
+  return distinct
     .filter((r) => Math.abs(r - around) > 1e-6)
     .sort((a, b) => Math.abs(a - around) - Math.abs(b - around))
     .map((r) => [r]);

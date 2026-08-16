@@ -58,16 +58,26 @@ export function verifyClaim(claim: Claim, t1: Tier1Result, branch: Branch | unde
         if (!a.mod || !b.mod) return undecided(`הערך המוחלט של ${claim.a} או של ${claim.b}`);
         if (!a.arg || !b.arg) return undecided(`הארגומנט של ${claim.a} או של ${claim.b}`);
         if (!modEq(a.mod, b.mod)) return { status: 'refuted', why: `הערכים המוחלטים שונים` };
-        // An OPAQUE base angle cannot be proved to be the negative of another opaque one — `3+4i` and
-        // `3-4i` each carry their own atom. That is undecidable, and undecidable must not be reported
-        // as refuted: refuting a TRUE claim tells a student their correct answer is wrong, which is
-        // the one direction of this error that actually costs something.
+        /**
+         * PROVE IT FIRST, and only then ask whether the angles were decidable at all.
+         *
+         * An opaque base angle is not automatically an obstacle. `sameDirection` compares atoms
+         * symbolically, so when the two arguments carry the SAME atom with opposing coefficients — which
+         * is exactly what «z2 = conj(z1)» produces, whatever z1 is — conjugacy is decided outright.
+         * Testing for opacity before testing the claim reported that case as `unknown`, which is a true
+         * answer withheld rather than a false one given, but still the wrong verdict.
+         */
+        if (sameDirection(a.arg, angNeg(b.arg))) {
+          return { status: 'holds', why: `${claim.a} ו-${claim.b} צמודים — נובע מהנתונים` };
+        }
+        // Now opacity does matter. Two INDEPENDENT opaque angles — `3+4i` and `3-4i`, each carrying its
+        // own atom — cannot be proved opposite, and undecidable must not be reported as refuted:
+        // refuting a TRUE claim tells a student their correct answer is wrong, which is the one
+        // direction of this error that actually costs something.
         if (!isExactRational(a.arg) || !isExactRational(b.arg)) {
           return undecided(`הארגומנטים של ${claim.a} ו-${claim.b} (זווית לא־רציונלית)`);
         }
-        return sameDirection(a.arg, angNeg(b.arg))
-          ? { status: 'holds', why: `${claim.a} ו-${claim.b} צמודים — נובע מהנתונים` }
-          : { status: 'refuted', why: `הארגומנטים אינם הפוכים` };
+        return { status: 'refuted', why: `הארגומנטים אינם הפוכים` };
       }
     }
   })();

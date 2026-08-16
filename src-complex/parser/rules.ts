@@ -16,15 +16,25 @@ import { type Expr, abs, ref } from '../model/expr';
 import type { BranchFilter, Constraint } from '../model/constraint';
 import type { Claim as Assertion } from '../model/claim';
 import { type SequenceKind, type SequenceTerm, sequenceConstraints } from '../model/sequence';
-import { type FigureObject, objectDeclares } from '../model/figure';
+import { type FigureObject, isOrigin, objectDeclares } from '../model/figure';
+import {
+  MEASURE_ARITY,
+  type MeasureKind,
+  type MeasureQuery,
+  type MeasureRelation,
+} from '../model/measure';
 import { rat } from '../value/rational';
 import { isComplexName, parseExpr } from './exprParse';
 import {
   ACCUSATIVE_KW,
   AND_KW,
+  AREA_KW,
   ARG_KW,
   ARITHMETIC_KW,
   CENTER_KW,
+  EQUATES_KW,
+  LENGTH_KW,
+  PERIMETER_KW,
   CIRCLE_KW,
   CIRCUMSCRIBED_KW,
   CONJUGATE_KW,
@@ -67,6 +77,16 @@ export interface ParsedLine {
   readonly assertions: Assertion[];
   /** the things to DRAW that are not numbers — segments, polygons, circles (F6) */
   readonly objects: FigureObject[];
+  /**
+   * Stated MEASURES — length, perimeter, area (F7).
+   *
+   * Kept apart from `constraints` because they are never monomial and so never reach tier 1; and apart
+   * from `assertions` because, unlike a claim, a measure MAY drive when the figure has a free degree
+   * of freedom for it to consume. One form, and the engine decides (docs/27 §10 P1).
+   */
+  readonly measures: MeasureRelation[];
+  /** «שטח OZ₁Z₂Z₃» — a request to DISPLAY a measure, answered only when the value is knowledge */
+  readonly queries: MeasureQuery[];
   /** names the line brings into existence, whether or not a constraint mentions them */
   readonly declares: string[];
   readonly claims: Claim[];
@@ -91,6 +111,8 @@ const empty = (): ParsedLine => ({
   filters: [],
   assertions: [],
   objects: [],
+  measures: [],
+  queries: [],
   declares: [],
   claims: [],
   atoms: new Map(),
@@ -386,6 +408,70 @@ const circleByCenterRadius: Rule = (s) => {
   return objectLine({ kind: 'circle', center: m[1].toLowerCase(), radius, src: s }, s);
 };
 
+// --- F7: measures -----------------------------------------------------------
+
+const MEASURE_NOUNS: readonly (readonly [string, MeasureKind])[] = [
+  [LENGTH_KW, 'length'],
+  [PERIMETER_KW, 'perimeter'],
+  [AREA_KW, 'area'],
+];
+
+/**
+ * F7 — «אורך Z₁Z₂ = 15r», «שטח OZ₁Z₂Z₃ הוא 150r²», «היקף המרובע OZ₁Z₂Z₃ = 60r».
+ *
+ * ONE form, and the engine decides whether it drives or checks (docs/27 §10 P1). Nothing here asks
+ * which the student meant: the relation becomes a residual, and if the figure still has a free degree
+ * of freedom the numeric tier drives it to zero, while a determined figure simply evaluates it. That
+ * is why there is no second sentence shape for "verify that the area is 150r²".
+ */
+const measureRelation: Rule = (s) => {
+  const shapeNoun = `(?:${SHAPES.map(([kw]) => kw).join('|')})`;
+  for (const [kw, kind] of MEASURE_NOUNS) {
+    const m = s.match(
+      rx(`^${kw}\\s+${ACCUSATIVE_KW}${OF_A}(?:${shapeNoun}\\s+)?(${RUN})\\s*${EQUATES_KW}\\s*(.+)$`),
+    );
+    if (!m) continue;
+    const points = splitRun(m[1]);
+    const arity = MEASURE_ARITY[kind];
+    if (points.length < arity.min) return null;
+    if (arity.exact !== undefined && points.length !== arity.exact) return null;
+    const rhs = parseExpr(s, s.length - m[2].length, s.length);
+    if (!rhs) return null;
+    return {
+      ...empty(),
+      measures: [{ kind, points, rhs, src: s }],
+      declares: points.filter((n) => !isOrigin(n)),
+      claims: [claimAll(s)],
+    };
+  }
+  return null;
+};
+
+/**
+ * F7 — «שטח OZ₁Z₂Z₃», with no value: a request to DISPLAY the measure.
+ *
+ * Ordered after {@link measureRelation}, so a sentence that states a value is read as a statement and
+ * only a sentence that states none is read as a question.
+ */
+const measureQuery: Rule = (s) => {
+  const shapeNoun = `(?:${SHAPES.map(([kw]) => kw).join('|')})`;
+  for (const [kw, kind] of MEASURE_NOUNS) {
+    const m = s.match(rx(`^${kw}\\s+${ACCUSATIVE_KW}${OF_A}(?:${shapeNoun}\\s+)?(${RUN})$`));
+    if (!m) continue;
+    const points = splitRun(m[1]);
+    const arity = MEASURE_ARITY[kind];
+    if (points.length < arity.min) return null;
+    if (arity.exact !== undefined && points.length !== arity.exact) return null;
+    return {
+      ...empty(),
+      queries: [{ kind, points, src: s }],
+      declares: points.filter((n) => !isOrigin(n)),
+      claims: [claimAll(s)],
+    };
+  }
+  return null;
+};
+
 // --- F9: sequences ----------------------------------------------------------
 
 /** The type word, and which tier will end up reading the relations it implies. */
@@ -473,6 +559,10 @@ export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = 
   { name: 'sequence-list', rule: sequenceList },
   // the circle sentences before the plain shape nouns: «המעגל החוסם את המשולש …» contains a shape
   // noun, and the shape rule would otherwise claim the tail and drop the circumscription
+  // a measure sentence carries a shape noun too, so it must outrank the shape rules
+  { name: 'measure-relation', rule: measureRelation },
+  // a measure with NO value is a question, so it may only be tried once the statement form has failed
+  { name: 'measure-query', rule: measureQuery },
   { name: 'circumscribed-circle', rule: circumscribedCircle },
   { name: 'circle-centre-radius', rule: circleByCenterRadius },
   { name: 'named-shape', rule: namedShape },
