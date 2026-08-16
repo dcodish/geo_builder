@@ -29,7 +29,13 @@ import { type Expr, abs, conj, div, mul, neg, num, param, paramsOf, pow, ref, va
 import { type Branch, isTurnUnknown, solveTier1 } from '../solve/tier1';
 import type { Claim as Assertion, CheckedClaim } from '../model/claim';
 import { type FigureObject, ORIGIN, objectPoints } from '../model/figure';
-import { type CheckedMeasure, type MeasureQuery, type MeasureRelation, measureOf } from '../model/measure';
+import {
+  type CheckedMeasure,
+  type MeasureQuery,
+  type MeasureRelation,
+  type RatioQuery,
+  measureOf,
+} from '../model/measure';
 import { type KnowledgeRow, isKnowledge, whyNotKnowledge } from '../model/knowledge';
 import { prettyName } from '../model/naming';
 import type { SequenceKind, SequenceStatement } from '../model/sequence';
@@ -383,6 +389,13 @@ export interface Derived2 {
   readonly drivenDof: number;
   /** a relation the numeric tier could not satisfy — reported, never rounded away (stage 3e) */
   readonly unsatisfied: readonly string[];
+  /**
+   * A stated relation the engine could not EVALUATE — undecided, which is not the same as violated.
+   *
+   * Listed rather than dropped: an equation that produces no drive, no refusal and no row is a given
+   * the figure quietly ignored while looking finished.
+   */
+  readonly undecided: readonly string[];
   /** answers to what the student ASKED to see — a number only when the givens force one (stage 5d) */
   readonly knowledge: readonly KnowledgeRow[];
   /** the filter that emptied the configuration set, when one did */
@@ -446,6 +459,8 @@ export interface FoldInput {
   readonly objects?: readonly FigureObject[];
   readonly measures?: readonly MeasureRelation[];
   readonly queries?: readonly MeasureQuery[];
+  /** «היחס בין … ל…» — G8 ratio questions, answered when the quotient is invariant */
+  readonly ratios?: readonly RatioQuery[];
   /** stated sequences, kept as STATEMENTS as well as constraints — the spiral is drawn from these */
   readonly sequences?: readonly SequenceStatement[];
 }
@@ -470,6 +485,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     objects = [],
     measures = [],
     queries = [],
+    ratios = [],
     sequences = [],
   } = input;
   const t1 = solveTier1(constraints);
@@ -652,7 +668,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
 
   const envFor = (st: State): Env => {
     const pos = positionsOf(st);
-    return { at: (n) => pos.get(n), param: (p) => st.par.get(p) };
+    // `st.par` carries the literal ANGLE ATOMS as well as the real parameters — both are numbers the
+    // residuals need, and keeping them in one map is what lets a `5+2i` literal be evaluated at all
+    return { at: (n) => pos.get(n), param: (p) => st.par.get(p), atoms: st.par };
   };
 
   // --- TIER 2: drive the free basis to satisfy what tier 1 could not read ----
@@ -660,14 +678,23 @@ export function foldConstraints(input: FoldInput): Derived2 {
     ...t1.deferred.map((c, i) => deferredResidual(c, i)),
     ...measures.map((m, i) => measureResidual(m, i)),
   ];
-  // Only relations that can be EVALUATED join the residual vector; its length has to be constant for
-  // the minimiser. One that cannot is `undecided` — a distinct answer from unsatisfied, and reported
-  // as one rather than counted as a failure.
+  /**
+   * Only relations that can be EVALUATED join the residual vector — its length has to be constant for
+   * the minimiser — and the ones that cannot are **collected and reported**.
+   *
+   * They used to be dropped here in silence. A stated equation the engine could not read then produced
+   * nothing at all: no drive, no refusal, no row — a figure that ignored a given while looking finished,
+   * which is the silent-drop class the whole tree is built to refuse (`src-complex/CLAUDE.md`:
+   * *nothing stated is ever silently dropped*). `undecided` is a distinct answer from `unsatisfied` and
+   * is now shown as one.
+   */
   const initialEnv = envFor(initial);
   const live: { spec: ResidualSpec; width: number }[] = [];
+  const undecided: string[] = [];
   for (const spec of specs) {
     const v = spec.values(initialEnv);
     if (v !== null) live.push({ spec, width: v.length });
+    else if (spec.key.startsWith('deferred')) undecided.push(spec.describe);
   }
 
   const encode = (st: State): number[] => [
@@ -921,14 +948,48 @@ export function foldConstraints(input: FoldInput): Derived2 {
     return `${fmtCoefficient(value / unit ** degree)}${gaugeName}${degree === 2 ? '²' : ''}`;
   };
 
+  const measureAt = (env: Env, q: MeasureQuery): number | null => {
+    const pts = q.points.map((n) => env.at(n));
+    return pts.some((p) => p === undefined) ? null : measureOf(q.kind, pts as Cx[]);
+  };
+
   const knowledge: KnowledgeRow[] = queries.map((q) => {
-    const pts = q.points.map((n) => finalEnv.at(n));
-    const value = pts.some((p) => p === undefined) ? null : measureOf(q.kind, pts as Cx[]);
+    const value = measureAt(finalEnv, q);
     if (value === null) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
     if (isKnowledge(false, closure)) return { label: q.src, value: round2(value), why: '' };
     const expressed = expressMeasure(q.kind, q.points, value);
     if (expressed) return { label: q.src, value: expressed, why: '' };
     return { label: q.src, value: null, why: whyNotKnowledge(closure) };
+  });
+
+  /**
+   * G8 — a RATIO of two measures, which is knowable where neither half is.
+   *
+   * «מצאו את היחס בין השטחים» is answerable for a figure with a free unit, because the unit divides
+   * out; that is why 2021 קיץ ב can demand every answer «באמצעות a ו-b» and still have determinate
+   * ratios. The test is the same one the parameter rows use — the value must be unchanged under every
+   * verified symmetry — applied to the quotient rather than to either measure, so a ratio of two
+   * lengths passes where each length alone is only knowable in a unit.
+   */
+  const ratioRows: KnowledgeRow[] = ratios.map((r) => {
+    const top = measureAt(finalEnv, r.numerator);
+    const bottom = measureAt(finalEnv, r.denominator);
+    if (top === null || bottom === null || Math.abs(bottom) < 1e-12) {
+      return { label: r.src, value: null, why: whyNotKnowledge(closure) };
+    }
+    const value = top / bottom;
+    if (isKnowledge(false, closure)) return { label: r.src, value: round2(value), why: '' };
+    const invariant =
+      shapeFixed &&
+      symmetries.every((s) => {
+        const a = measureAt(s.env, r.numerator);
+        const b = measureAt(s.env, r.denominator);
+        if (a === null || b === null || Math.abs(b) < 1e-12) return false;
+        return Math.abs(a / b - value) <= 1e-6 * Math.max(1, Math.abs(value));
+      });
+    return invariant
+      ? { label: r.src, value: round2(value), why: '' }
+      : { label: r.src, value: null, why: whyNotKnowledge(closure) };
   });
 
   return {
@@ -945,7 +1006,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
     measures: checkedMeasures,
     drivenDof: drivenCount,
     unsatisfied,
-    knowledge,
+    undecided,
+    knowledge: [...knowledge, ...ratioRows],
     emptiedBy,
     claims: verifyClaims(assertions, t1, branch),
     formulas: t1.inconsistent ? [] : surfacedFormulas(constraints, configCount),

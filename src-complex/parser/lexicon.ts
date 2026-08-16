@@ -90,6 +90,15 @@ export const IMAGINARY_KW = String.raw`(?:${HE_PREFIX}${MEM}דומה(?: ${HE_PRE
  */
 export const HE_THE_VAR = String.raw`(?:ה-?)?`;
 
+/** «היחס» / «the ratio» — G8's register, where the answer is demanded as a proportion. */
+export const RATIO_KW = String.raw`(?:${HE_PREFIX}יחס|ratio)`;
+
+/** «בין» / «between» / «of» — the opener of a two-term comparison, in both registers. */
+export const BETWEEN_KW = String.raw`(?:${HE_PREFIX}בי${NUN}\s+|between\s+|of\s+)`;
+
+/** «ל…» / «to» / «and» — the separator between the two terms of a ratio. */
+export const TO_KW = String.raw`(?:ל|to\s+|and\s+)`;
+
 /** «לכל» / «for every» — the universal quantifier of F12. */
 export const FORALL_KW = String.raw`(?:${HE_PREFIX}כל|for (?:every|all|each))`;
 
@@ -294,6 +303,9 @@ export const ATOM_SOURCES: Readonly<Record<string, string>> = {
   REAL_KW,
   IMAGINARY_KW,
   CONJUGATE_KW,
+  RATIO_KW,
+  BETWEEN_KW,
+  TO_KW,
   HE_THE_VAR,
   FORALL_KW,
   NATURAL_KW,

@@ -21,6 +21,16 @@ import type { Strength } from './tier2';
 export interface Env {
   readonly at: (name: string) => Cx | undefined;
   readonly param: (name: string) => number | undefined;
+  /**
+   * The ANGLE ATOMS a cartesian literal introduced, in degrees.
+   *
+   * `5+2i` has no closed polar form — `arctan(2/5)` is not a rational part of a turn — so the value
+   * layer carries its direction as an opaque atom, and `evaluate()` cannot resolve it without this map.
+   * Without it every literal of that shape evaluated to `null`, and a `null` residual is not part of the
+   * live system: «z1 + z2 = 5+2i» quietly did nothing at all. Same root as #675 — an exact carrier that
+   * *has no symbolic form* being read as *having no value*.
+   */
+  readonly atoms?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -49,7 +59,7 @@ export function evalComplex(e: Expr, env: Env): Cx | null {
     case 'i':
       return C(0, 1);
     case 'val': {
-      const v = evaluate(e.v);
+      const v = evaluate(e.v, env.atoms);
       return v ? C(v.re, v.im) : null;
     }
     case 'ref':

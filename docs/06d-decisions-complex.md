@@ -1033,3 +1033,54 @@ the answer, which is the charter line every sibling holds.
   congruence half is built and exact; the conjunction is not.
 - **A region COUNT claim** (F12's third clause, «כמה … בתוך / על / מחוץ»). S5 draws the counting picture
   ([ADR-CX-016](#adr-cx-016)); asserting the count is a stage-4 claim and is not built.
+
+---
+
+## ADR-CX-018 — G7 sums, G8 ratios, and the equation that was dropped in silence (2026-08-16)
+
+**Status:** Accepted · **Slice:** S6 ([#623](https://github.com/dcodish/geo_builder/issues/623))
+· **Ladder:** stages 3a and 5d · **Families:** G7, G8 (docs/27 §10b)
+
+### The defect this uncovered, which matters more than the families
+
+«z1 + z2 = 5+2i» **did nothing at all**: no drive, no refusal, no row. Two causes, both at the root:
+
+1. **An exact carrier with no symbolic form was read as having no value.** `5+2i` has an argument that
+   is not a rational part of a turn, so the value layer carries its direction as an opaque *atom*;
+   `evaluate()` cannot resolve an atom without the sample map, and the residual builder never had one.
+   This is [#675](https://github.com/dcodish/geo_builder/issues/675)'s root cause in a second place —
+   *no closed form* misread as *no value* — and it is fixed the same way: the residual `Env` carries the
+   atom sample, which the fold already had.
+2. **An unevaluable relation was excluded from the live system and then never mentioned.** The comment
+   above the filter said `undecided` was "a distinct answer from unsatisfied, and reported as one" —
+   and nothing reported it. `Derived2.undecided` now carries them and the banner prints them.
+
+The second is the graver of the two. A given that produces *nothing* is the silent-drop class this
+tree's charter names first: *nothing stated is ever silently dropped*. It was invisible because the
+figure still looked finished.
+
+### G7 — sums over a set
+
+`z₁·z̄₁ + z₂·z̄₂ + … = 30` (2024 חורף) and «סכום המספרים הוא אפס» (2021 חורף א) need no new machinery
+once the above is fixed: an additive equation is a deferred constraint, its residual is the two real
+equations it implies, and docs/27 §10's P1 does the rest — the same sentence **drives** a free term and
+**checks** a determined figure, with a false sum reported by the stage-3e backstop.
+
+### G8 — a ratio is knowable where neither half is
+
+«מצאו את היחס בין השטחים» is answerable for a figure with a free unit, because the unit divides out —
+which is why 2021 קיץ ב can demand every answer «באמצעות a ו-b» and still have determinate ratios.
+
+`RatioQuery` is its own form rather than two queries, because the *knowability* differs: a length is
+`15r` only when the figure has a unit, while a ratio of two lengths is a plain number whatever the unit
+is. The test is [ADR-CX-017](#adr-cx-017)'s symmetry check applied to the quotient — the value must be
+unchanged under every verified symmetry — so it passes exactly where the ratio really is invariant.
+
+### Still not built, and named
+
+**G4** (transform over a point set), **G5** (incidence on a regular n-gon) and **G6** (equation
+synthesis) all need the same missing substrate: a **solution SET as a first-class object**. Today
+`z³ = 8` is one point per configuration and the branch button walks the three; those three families need
+all n solutions present at once, which is [ADR-CX-005](#adr-cx-005)'s «X reserves the bare letter and is
+related to X₁..Xₙ» half, not yet implemented. **G9** (non-linear loci) needs the F13 locus layer, which
+also does not exist. Each is a slice; none is a finishing touch.

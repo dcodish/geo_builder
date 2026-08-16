@@ -54,6 +54,21 @@ export interface MeasureQuery {
   readonly src: string;
 }
 
+/**
+ * G8 — «מצאו את היחס בין השטחים» / «find the ratio b/a»: a RATIO of two measures.
+ *
+ * Worth its own form rather than being two queries, because a ratio is knowable in strictly more
+ * situations than either half. A length is `15r` only when the figure has a unit; a ratio of two
+ * lengths is a plain number **whatever the unit is**, because the scale cancels — so «the ratio of the
+ * areas» is an answer even for a figure with several free parameters, which is exactly the register
+ * 2021 קיץ ב asks in and the reason that exam's answers are all «באמצעות a ו-b».
+ */
+export interface RatioQuery {
+  readonly numerator: MeasureQuery;
+  readonly denominator: MeasureQuery;
+  readonly src: string;
+}
+
 /** How a measure came out once the figure was solved. */
 export type MeasureStatus =
   /** the figure satisfies it — either because it drove, or because it was already true */
