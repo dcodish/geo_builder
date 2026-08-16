@@ -15,10 +15,17 @@
  */
 
 import type { Rat } from '../value/rational';
+import { type Value, formatPolar } from '../value/value';
 
 export type Expr =
   /** a real rational literal; the sign is carried here and becomes a half-turn in the log-polar form */
   | { readonly t: 'num'; readonly v: Rat }
+  /**
+   * A literal whose exact form is already carried. This is what keeps `3+4i` MONOMIAL: written as
+   * `3 + 4i` it contains an addition and would be pushed to the numeric tier, but the number itself is
+   * a perfectly good exact value (modulus 5, argument an atom) and nothing about it is additive.
+   */
+  | { readonly t: 'val'; readonly v: Value }
   /** the imaginary unit */
   | { readonly t: 'i' }
   /** a named complex number — an unknown of the system */
@@ -37,6 +44,7 @@ export type Expr =
   | { readonly t: 'abs'; readonly e: Expr };
 
 export const num = (v: Rat): Expr => ({ t: 'num', v });
+export const val = (v: Value): Expr => ({ t: 'val', v });
 export const I: Expr = { t: 'i' };
 export const ref = (name: string): Expr => ({ t: 'ref', name });
 export const param = (name: string): Expr => ({ t: 'param', name });
@@ -60,6 +68,7 @@ export const abs = (e: Expr): Expr => ({ t: 'abs', e });
 export function isMonomial(e: Expr): boolean {
   switch (e.t) {
     case 'num':
+    case 'val':
     case 'i':
     case 'ref':
     case 'param':
@@ -88,6 +97,7 @@ export function refsOf(e: Expr): string[] {
         if (!out.includes(x.name)) out.push(x.name);
         return;
       case 'num':
+      case 'val':
       case 'i':
       case 'param':
         return;
@@ -121,6 +131,7 @@ export function paramsOf(e: Expr): string[] {
         out.add(x.name);
         return;
       case 'num':
+      case 'val':
       case 'i':
       case 'ref':
         return;
@@ -150,6 +161,8 @@ export function format(e: Expr): string {
   switch (e.t) {
     case 'num':
       return e.v.d === 1n ? `${e.v.n}` : `${e.v.n}/${e.v.d}`;
+    case 'val':
+      return formatPolar(e.v);
     case 'i':
       return 'i';
     case 'ref':

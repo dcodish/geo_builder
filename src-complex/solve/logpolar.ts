@@ -92,6 +92,11 @@ export function linearize(e: Expr): LogPolarForm | null {
         tConst: negative ? fromTurns(rat(1, 2)) : angZero(),
       };
     }
+    case 'val': {
+      // an exact value is a pure constant: its modulus and argument are already carried
+      if (e.v.kind !== 'exact') return null; // zero, or a numeric-only value -> the numeric tier
+      return { ...EMPTY, uConst: e.v.mod, tConst: e.v.arg };
+    }
     case 'i':
       return { ...EMPTY, tConst: fromTurns(rat(1, 4)) };
     case 'ref':
