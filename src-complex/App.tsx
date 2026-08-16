@@ -34,18 +34,22 @@ const ERROR_KEY: Record<InputError['key'], string> = {
   'parse-error': 'errParse',
   'duplicate-name': 'errDuplicate',
   incompatible: 'errIncompatible',
+  unaccounted: 'errUnaccounted',
 };
 
 export function App() {
   const { t, i18n } = useTranslation();
   const {
+    lines,
     facts,
     freePos,
     seed,
     view,
+    engine,
     lastError,
     addLine,
     removeFact,
+    removeLine,
     setFree,
     setView,
     nextConfig,
@@ -106,19 +110,14 @@ export function App() {
    * per-fact sweeps. Off by default, so prod is untouched while the foundation is played
    * (ADR-CX-008's switch). The preview surface below is temporary — S5 replaces the whole render and
    * shell layer, and this banner with it.
+   *
+   * The switch itself lives in the store, because the stored session is replayed through `addLine` at
+   * import time and the engine has to be known before that runs (#658).
    */
-  const useV2 = useMemo(
-    () => typeof location !== 'undefined' && new URLSearchParams(location.search).get('engine') === 'v2',
-    [],
-  );
-  // The v2 engine reads the student's LINES, not the prototype's facts (S4). One utterance can lower
-  // to several prototype facts, so the lines are the distinct `src` values in entry order — the store
-  // does not keep them separately, and that is the last thing the cutover removes.
-  const v2Lines = useMemo(() => [...new Set(facts.map((f) => f.src))], [facts]);
-  const derived2 = useMemo(
-    () => (useV2 ? deriveLines(v2Lines, seed, seed) : null),
-    [useV2, v2Lines, seed],
-  );
+  const useV2 = engine === 'v2';
+  // The v2 engine reads the student's LINES — which the store owns outright, so a line the retiring
+  // prototype cannot read still reaches the grammar that can (#658).
+  const derived2 = useMemo(() => (useV2 ? deriveLines(lines, seed, seed) : null), [useV2, lines, seed]);
   const scene = useMemo(() => deriveScene(facts, freePos, seed), [facts, freePos, seed]);
   // the v2 canvas is the POLAR one: a complex number as a length and a direction, not a dot on a grid
   const polarScene = useMemo(() => (derived2 ? buildScene(derived2.points) : null), [derived2]);
@@ -138,8 +137,6 @@ export function App() {
     () => new Set((derived2?.untranslated ?? []).map((u) => u.src)),
     [derived2],
   );
-  const rowFailed = (f: { id: string; src: string }): boolean =>
-    derived2 ? v2Failed.has(f.src) : Boolean(scene.errors[f.id]);
   const [calcInput, setCalcInput] = useState('');
   const submitCalc = () => {
     if (calcInput.trim() === '') return;
@@ -210,9 +207,12 @@ export function App() {
           <div className="panel-actions">
             <button onClick={() => EXAMPLE_LINES.forEach((l) => addLine(l))}>{t('example')}</button>
             <button onClick={clearAll}>{t('clearAll')}</button>
-            <span className="count">{t('factCount', { count: facts.length })}</span>
+            <span className="count">{t('factCount', { count: useV2 ? lines.length : facts.length })}</span>
           </div>
-          <div className="measures">
+          {/* the calculation panel reads the PROTOTYPE's scene; under v2 the polar canvas and the
+              banner carry the readings instead, and a panel fed by an idle engine would print stale
+              numbers next to live ones */}
+          {!useV2 && <div className="measures">
             <div className="measures-title">{t('calcsLabel')}</div>
             {scene.measures.map((m) => (
               <div key={m.key} className="measure-row" dir="ltr">
@@ -234,18 +234,43 @@ export function App() {
               />
               <button onClick={submitCalc}>{t('calc')}</button>
             </div>
-          </div>
-          {Object.keys(scene.params).length > 0 && (
+          </div>}
+          {!useV2 && Object.keys(scene.params).length > 0 && (
             <div className="params" dir="ltr" title={t('paramsLabel')}>
               {Object.entries(scene.params)
                 .map(([n, v]) => `${n} = ${fmtNum(v)}`)
                 .join('   ·   ')}
             </div>
           )}
+          {/*
+            THE STATEMENT LIST FOLLOWS THE ACTIVE ENGINE.
+
+            Under v2 the rows ARE the student's lines — the store's source of truth — not the
+            prototype's facts. Deriving them from facts is what made every v2-only form invisible as
+            well as unreachable (#658): a line the prototype refused had no row to appear in.
+          */}
           <ul className="facts">
-            {facts.length === 0 && <li className="hint">{t('emptyHint')}</li>}
-            {facts.map((f) => (
-              <li key={f.id} className={rowFailed(f) ? 'fact err' : 'fact'}>
+            {useV2 && lines.length === 0 && <li className="hint">{t('emptyHint')}</li>}
+            {useV2 &&
+              lines.map((src, i) => {
+                const failed = v2Failed.has(src);
+                return (
+                  <li key={`${i}-${src}`} className={failed ? 'fact err' : 'fact'}>
+                    <code dir="ltr">{src}</code>
+                    {failed && (
+                      <span className="fact-error">
+                        {derived2?.untranslated.find((u) => u.src === src)?.why}
+                      </span>
+                    )}
+                    <button className="del" onClick={() => removeLine(i)} aria-label="delete">
+                      ✕
+                    </button>
+                  </li>
+                );
+              })}
+            {!useV2 && facts.length === 0 && <li className="hint">{t('emptyHint')}</li>}
+            {!useV2 && facts.map((f) => (
+              <li key={f.id} className={scene.errors[f.id] ? 'fact err' : 'fact'}>
                 <code dir="ltr">{f.src}</code>
                 {f.kind === 'free' && (
                   <span className="badge">
@@ -258,7 +283,7 @@ export function App() {
                     )}
                   </span>
                 )}
-                {!derived2 && scene.checks[f.id] && (
+                {scene.checks[f.id] && (
                   <span
                     className={scene.checks[f.id].ok ? 'check ok' : 'check bad'}
                     title={t(
@@ -272,12 +297,7 @@ export function App() {
                     {scene.checks[f.id].ok ? '✓' : '✗'}
                   </span>
                 )}
-                {derived2 && rowFailed(f) && (
-                  <span className="fact-error">
-                    {derived2.untranslated.find((u) => u.src === f.src)?.why}
-                  </span>
-                )}
-                {!derived2 && scene.errors[f.id] && (
+                {scene.errors[f.id] && (
                   <span className="fact-error">
                     {t(
                       scene.errors[f.id].key === 'unknown-ref' ? 'errUnknownRef' : 'errRootsOfZero',

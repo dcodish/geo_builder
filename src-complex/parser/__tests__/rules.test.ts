@@ -133,6 +133,23 @@ describe('the rules build the corpus systems', () => {
     expect(branchDegrees(t1.branches[0], 'z2')).toBe(150);
   });
 
+  /**
+   * The sign belongs to the ANGLE, and it is read in the expression grammar.
+   *
+   * `2cis(-30)` is the exam's way of writing a direction below the real axis. It reaches `cisOf` as a
+   * negation rather than as a number, so a bare `num` test refused it — in the *expression* grammar,
+   * which meant every rule composed on top inherited the gap rather than each having its own.
+   */
+  it.each([
+    ['z2 = 2cis(-30)', 330],
+    ['z2 = 2cis-30', 330],
+    ['z2 = 2cis(30)', 30],
+  ])('a negative polar angle parses: %s', (line, deg) => {
+    const { t1 } = build(line);
+    expect(fmtMod(t1.knownModulus.get('z2')!)).toBe('2');
+    expect(branchDegrees(t1.branches[0], 'z2')).toBe(deg);
+  });
+
   it('r is a real PARAMETER, never auto-created as a complex number (ADR-CX-004)', () => {
     const { t1 } = build('|z1| = 9r');
     expect(t1.names).toEqual(['z1']); // r is a parameter, not a drawable number

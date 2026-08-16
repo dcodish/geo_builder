@@ -178,10 +178,11 @@ export function parseExpr(
     if (!t) return null;
     if (t.t === 'num') {
       i++;
-      // `3cis45` — a modulus and an angle, the exam's polar literal
+      // `3cis45` — a modulus and an angle, the exam's polar literal. The angle is read through
+      // `parseUnary` so its SIGN is part of it: `2cis-30` and `2cis(-30)` are the same direction.
       if (peek()?.t === 'cis') {
         i++;
-        const a = parseAtom();
+        const a = parseUnary();
         if (!a) return null;
         const unit = cisOf(a);
         return unit ? mul(num(t.v), unit) : null;
@@ -194,7 +195,7 @@ export function parseExpr(
     }
     if (t.t === 'cis') {
       i++;
-      const a = parseAtom();
+      const a = parseUnary();
       return a ? cisOf(a) : null;
     }
     if (t.t === 'name') {
@@ -323,8 +324,22 @@ function foldConstants(e: Expr, atoms: Map<string, number>): Expr {
  * not to a literal.
  */
 function cisOf(angle: Expr): Expr | null {
-  if (angle.t !== 'num') return null;
-  return { t: 'val', v: unitAt(angle.v) };
+  const deg = signedDegrees(angle);
+  return deg ? { t: 'val', v: unitAt(deg) } : null;
 }
+
+/**
+ * The signed degrees a `cis` argument states, or null when it is not a numeric angle.
+ *
+ * The sign has to be read HERE rather than left to a bare `num` test: `2cis(-30)` is how the exam
+ * writes a direction below the real axis, and it reaches this point as a negation — so requiring a
+ * plain number refused it in the *expression* grammar, which every rule built on top then inherited.
+ * A symbolic angle (`cis α`) is deliberately still null: that is a free direction, and it belongs to
+ * the relation rules rather than to a literal.
+ */
+const signedDegrees = (e: Expr): Rat | null =>
+  e.t === 'num' ? e.v : e.t === 'neg' ? negate(signedDegrees(e.e)) : null;
+
+const negate = (r: Rat | null): Rat | null => (r ? rat(-r.n, r.d) : null);
 
 const unitAt = (deg: Rat) => exact(modOne(), fromDegrees(deg));

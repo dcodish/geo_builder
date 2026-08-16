@@ -429,3 +429,70 @@ test, the ratchet, the span accountant and the `strength` field are each part of
 introduces their layer, and a slice that would grow a chokepoint list is mis-scoped (docs/24 §0).
 [docs/17](17-design-rules.md) applies to this tree **as-is** rather than as a per-product copy, and the
 sibling audit it mandates now spans three trees.
+
+---
+
+## ADR-CX-010 — The ordered LINE list is the source of truth; the ACTIVE engine gatekeeps input (2026-08-16)
+
+**Status:** Accepted · **Closes:** #658 · **Ladder:** stage 0b (`cx0:parse`) — which parser the input
+boundary consults · **Slice:** S7's cutover, arriving early
+
+### Context
+
+The C0 prototype's store kept only its own `Fact[]` and reconstructed the student's lines from
+`f.src`. Under `?engine=v2` the app then derived the v2 input from those facts. The consequence was
+not a cosmetic one: **the retiring parser gatekept the input box.** A line the prototype refused never
+became a fact, so it never reached v2 at all — and therefore *every* form the v2 grammar added beyond
+the prototype's was unreachable in the running app, however well the engine handled it.
+
+The operator's report was «z1 מדומה טהור» — not recognised in prod. The v2 grammar reads that line
+correctly and has since S6 part 1; the prototype cannot read it, and the prototype was asked.
+
+This is the same class [#653](https://github.com/dcodish/geo_builder/issues/653) fixed one layer
+higher. There the *canvas* was v2 while the *fact list* was the prototype, and the two contradicted
+each other about the same line. Here the *engine* is v2 while the *input path* was still the
+prototype. Both are one question answered by two engines; the second was simply invisible, because a
+line that never arrives produces no contradiction to notice.
+
+### Decision
+
+**The store owns an ordered `lines: string[]`, and that is the session's source of truth.** The
+prototype's fact list becomes one derived consumer of it rather than its origin.
+
+1. **The active engine decides acceptance.** Under `v2`, `addLine` consults `parseLineV2` and nothing
+   else — no prototype parse, no fact staging, no acceptance gate borrowed from the retiring engine. A
+   line is accepted when the engine that will draw it can read it, and refused with *that* engine's
+   reason when it cannot.
+2. **The engine switch is read in the store, not in the component.** The stored session is replayed
+   through `addLine` at import time, so the engine has to be known before that happens — a v2 session
+   rehydrated through the prototype's yes/no would silently lose every v2-only line on reload, which
+   is this same defect returning by the back door.
+3. **The statement list follows the active engine**, completing #653: under v2 the rows *are* the
+   lines, deleted by position, since a v2 row owns no fact id.
+4. **`serialize()` emits the lines directly** instead of collapsing consecutive `src` duplicates — the
+   saved session is now literally what the student typed.
+
+### Why this is the cutover arriving early, not a patch
+
+[ADR-CX-008](#adr-cx-008) already commits S7 to deleting the prototype input path. Owning the line
+list is the first half of that deletion. The alternative — teaching the prototype parser the v2 forms
+so it would stop refusing them — would have grown the tree that is scheduled for removal, and would
+have had to be done again for every family S4–S6 adds. The seam moves once.
+
+### The test discipline this changes
+
+#658's own diagnosis of why S6 shipped broken: *"The S6 claim tests call `deriveLines` directly and
+never cross the store."* That is [#535](https://github.com/dcodish/geo_builder/issues/535)'s lesson in
+the 3-D tree — **a solver that works when called and never gets called** — and the S3 commit message
+quoted it immediately before this reintroduced it. So the lock is
+`src-complex/store/__tests__/submit-path.test.ts`, which drives `useComplexStore.addLine`, the one
+entry point the input box uses. **A fix at this seam is not accepted on a test that calls the engine
+directly.**
+
+### Also fixed, in the same layer
+
+`2cis(-30)` did not parse. The sign reached `cisOf` as a negation rather than as a number, and a bare
+`num` test refused it — in the *expression* grammar, so every rule composed on top inherited the gap
+rather than each carrying its own. The angle is now read through `parseUnary`, which makes
+`2cis(-30)`, `2cis-30` and `2cis(30)` one form. A symbolic angle (`cis α`) is still refused there
+deliberately: that is a free direction and belongs to the relation rules, not to a literal.
