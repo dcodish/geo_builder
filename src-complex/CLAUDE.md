@@ -58,9 +58,21 @@ grammar contract** (sentence families), §9 the slice plan.
 The stage order every mechanism inserts into is [`docs/LADDER-CX.md`](../docs/LADDER-CX.md). **Every
 mechanism ADR names its stage and updates that file.**
 
+## The siblings are never harmed — and it is checked, not promised
+
+The operator's standing requirement for this rebuild
+([ADR-W-017](../docs/06w-decisions-workspace.md#adr-w-017)): capability grows here, and the two
+shipped products never regress. **Run `npm run check:siblings` before every commit in this tree.** It
+refuses any change to `src/` or `src3d/` (escape hatch: `ALLOW_SIBLING_EDIT="the reason"`, a reason
+rather than a flag) and builds both siblings regardless of the diff, because a shared-surface edit can
+break them without touching one of their files. It takes ~10 seconds; it does **not** replace
+`npm run test:full`, which is still the gate — the builds prove the siblings compile, only the suite
+proves they behave.
+
 ## Commands
 
 - `npm run dev` → `http://localhost:5173/complex.html` (dev serves at the ROOT, not `/complex-builder/`)
+- `npm run check:siblings` — the sibling-safety check above
 - `npm run build:complex` — `tsc -b` then the product build
 - `npm run test:complex` — this tree + the shared `server/` tests; one-shot `npm run test:run:complex`
 - **`npm run test:full`** — the FULL suite, the bar before any commit and any deploy

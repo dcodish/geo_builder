@@ -626,3 +626,50 @@ reconciliation.
 `shared-parameterized`; `lexicon` stays `undecided` (its carriers exist now — `src/parser/lexicon.ts`
 and the morphology constants in `parse3.ts` — but #361 records that even the 2-D atoms have one
 consumer, so demand is unproven). ADR-W-003's trigger is spent and is replaced by this entry.
+
+## ADR-W-017 — Sibling safety is a check, not a promise (2026-08-16)
+
+**Status:** accepted, 2026-08-16 · **Operator requirement** · **Guard:** `scripts/check-sibling-safety.mjs`,
+`npm run check:siblings`, classifier unit-tested in `server/__tests__/sibling-safety.test.ts`
+
+**Context.** Opening the complex-tool foundation rebuild ([#616](https://github.com/dcodish/geo_builder/issues/616)),
+the operator set a standing requirement: *"as we continue evolving this complex tool we gain
+capability, but we never, never, never harm the other tools that are running."* Two mechanisms already
+pointed at that and neither covers it alone:
+
+- [ADR-W-003](#adr-w-003)'s manifest + `isolation.test.ts` forbid **import** coupling. That closes
+  `src-complex → src`, and says nothing about a change that edits `src/` **directly**, or that breaks a
+  sibling through a file every product compiles.
+- [ADR-W-005](#adr-w-005)'s local full suite catches behavioural regressions — but only after the work
+  is written, only if it is run, and at ~4 minutes it is a gate, not a habit.
+
+The gap between them is the one that bites: a slice scoped to one product quietly editing another's
+tree, or a shared-surface edit (`tsconfig.json`, `package.json`, the proxy) whose sibling fallout
+nobody thought to look for. Both are invisible to the import guard and both are cheap to detect.
+
+**Decision.** A change is checked against the siblings in two ways, in seconds:
+
+1. **A diff refusal.** Files belonging to a shipped sibling product — `src/`, `src3d/`, their entry
+   HTML, their vite configs, their fixtures — may not change. The escape hatch is deliberately a
+   **reason, not a flag**: `ALLOW_SIBLING_EDIT="why"` permits and records it. A bare `--force` gets
+   typed reflexively; a sentence gets read back in review.
+2. **The sibling builds, run regardless of the diff.** A shared-surface edit can break a sibling
+   without touching one of its files, which is precisely what the diff check cannot see. `npm run
+   build` and `build:3d` are the half that costs seconds and catches that class.
+
+Two properties are load-bearing and are asserted rather than assumed. The classifier **partitions
+totally**, and an **unrecognised path is SHARED, never inert** — unknown-by-default must mean "check
+it", the `ci.yml` classifier's rule for the same reason. And `src-complex/` is matched **before**
+`src/`, because a prefix table that swallows it would fail OPEN, waving through the exact edit the
+script exists to catch. That near-miss is the first case in the unit test.
+
+**What this does NOT replace.** `npm run test:full` remains the gate ([ADR-W-005](#adr-w-005)): the
+builds prove the siblings still COMPILE, only the suite proves they still BEHAVE, and the script says
+so in its own output whenever a shared file changed. Nor does it replace the import guard — the two
+answer different questions, which is why both run.
+
+**Consequences.** Complex slices carry a sibling-safety line in their PR, and a cross-product change
+carries its reason in the environment where a reviewer will see it. Cost is one script, one unit test
+in `server/__tests__/` (so it runs in every per-product lane, the `isolation.test.ts` precedent), and
+~10 seconds per invocation. Verified non-vacuous on adoption: a one-line edit to `src/format.ts` was
+REFUSED, and the check passed once it was reverted.
