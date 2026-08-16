@@ -20,7 +20,8 @@
     "test:run:complex": "vitest run src-complex/ server/",
     "test:full": "node scripts/test-tiers.mjs full",
     "test:fast": "node scripts/test-tiers.mjs fast",
-    "test:tiers": "node scripts/test-tiers.mjs report"
+    "test:tiers": "node scripts/test-tiers.mjs report",
+    "check:siblings": "node scripts/check-sibling-safety.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
