@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { fmtNum } from './engine/complex';
 import { deriveScene } from './engine/model';
 import { deriveLines } from './app/deriveLines';
-import { sceneFromDerived2, v2Labels, v2Status } from './replay/scene2';
+import { v2Labels, v2Status } from './replay/scene2';
+import { buildScene } from './scene/scene';
+import { PolarPlane } from './render/PolarPlane';
 import { GaussPlane } from './render/GaussPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
 
@@ -117,10 +119,9 @@ export function App() {
     () => (useV2 ? deriveLines(v2Lines, seed, seed) : null),
     [useV2, v2Lines, seed],
   );
-  const scene = useMemo(
-    () => (derived2 ? sceneFromDerived2(derived2) : deriveScene(facts, freePos, seed)),
-    [derived2, facts, freePos, seed],
-  );
+  const scene = useMemo(() => deriveScene(facts, freePos, seed), [facts, freePos, seed]);
+  // the v2 canvas is the POLAR one: a complex number as a length and a direction, not a dot on a grid
+  const polarScene = useMemo(() => (derived2 ? buildScene(derived2.points) : null), [derived2]);
   const [calcInput, setCalcInput] = useState('');
   const submitCalc = () => {
     if (calcInput.trim() === '') return;
@@ -283,7 +284,11 @@ export function App() {
               ))}
             </div>
           )}
-          <GaussPlane scene={scene} view={view} onDragFree={setFree} />
+          {polarScene ? (
+            <PolarPlane scene={polarScene} showGrid={view === 'polar'} />
+          ) : (
+            <GaussPlane scene={scene} view={view} onDragFree={setFree} />
+          )}
         </section>
       </main>
     </div>
