@@ -266,6 +266,9 @@ export function App() {
             <div className="v2-banner" dir="rtl">
               <strong>engine=v2</strong> · {v2Status(derived2)}
               {v2Labels(derived2).length > 0 && <div dir="ltr">{v2Labels(derived2).join('   ')}</div>}
+              {derived2.points.some((p) => !p.modulusKnown || !p.argumentKnown) && (
+                <div>~ = ערך שנדגם, לא נתון — לחצו "אפשרות נוספת" כדי לראות תצורה אחרת</div>
+              )}
               {derived2.untranslated.map((u) => (
                 <div key={u.factId} className="v2-skip">
                   ⚠ «{u.src}» — {u.why}
