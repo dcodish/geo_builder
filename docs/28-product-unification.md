@@ -1,10 +1,13 @@
 # 28 — Product unification: making three tools feel and behave like one
 
 > **Status: WORKING DRAFT — not accepted, not scheduled, nothing here is executable.**
-> No ADR has been written for it and no issues have been filed. The operator asked for a draft to
-> iterate on before any of it is committed to. §8 carries the questions that must be answered
-> before this becomes a plan of record; §4 is a genuine fork, not a recommendation with a preferred
-> branch already chosen.
+> No ADR has been written for it. The operator asked for a draft to iterate on before any of it is
+> committed to; tracking issue [#648](https://github.com/dcodish/geo_builder/issues/648).
+> §8 carries what is still open.
+>
+> **§4 was ruled on by the operator on 2026-08-16 and is no longer a fork** — separate builders at
+> separate links, one learned interface, a toolbar switcher. That ruling added a second row family
+> to §6 (interaction contracts), which is the draft's main change since the first pass.
 >
 > Drafted 2026-08-16. Every number in §1 is measured at `main` @ `397e8e5`, not estimated.
 
@@ -127,41 +130,53 @@ Recorded so that no phase below is read as proposing otherwise:
 
 ---
 
-## 4. THE OPEN FORK — one app, or three that match?
+## 4. RESOLVED — separate builders at separate links, one learned interface
 
-**This is the operator's decision and the draft deliberately does not pick.** It changes what phase 3
-even means.
+**Operator ruling, 2026-08-16:**
 
-### Option A — three builds sharing chrome
-Each product keeps its own entry, build, dist and prod path (`/geo-builder/`, `/3d-builder/`, …).
-`shell/` makes them look identical and behave identically at the edges: same header, same tokens,
-same save/load audit, same privacy note, same palette behaviour.
+> *"i will eventually have 4 or maybe even more builders that should all look and feel the same but
+> in reality they are accessed via different links. we might have a toolbar on the ui to switch
+> between them but thats it. so from a user pov he should be familiar with the tool and how to use
+> it and what to expect."*
 
-- *Buys:* the visible complaint, at low risk. No change to any product's URL, deploy, or bundle.
-- *Costs:* a student with a geometry question and a vectors question still visits two addresses.
-  "One tool" is a resemblance, not a fact.
-- *Prod risk:* lowest. Compatible with the operator's *"I cannot afford impacting the 2-D and 3-D in
-  prod"* constraint essentially unchanged.
+**Decided.** Each builder keeps its own entry, build, `dist-*`, and prod path. There is **no
+merge into one app with modes** — that option is rejected, not deferred. Navigation between builders
+is an ordinary link in a shared toolbar.
 
-### Option B — one app with modes
-One URL, one bundle (or lazy-loaded per mode), a mode switcher. The products become *modes* of one
-Builder; `shell/` becomes the app itself rather than a library it imports.
+This is the low-risk branch, and it leaves the operator's *"I cannot afford impacting the 2-D and 3-D
+in prod"* constraint intact: no product's URL, bundle, routing or deploy topology changes.
 
-- *Buys:* genuinely one product. A shared session, one save-file envelope, one commands panel that
-  can say "this belongs to the 3-D mode", plausibly cross-mode figures later.
-- *Costs:* touches both shipped products' entry, routing, store bootstrap and deploy topology —
-  exactly what ADR-W-016 was written to avoid doing while they are stable. Bundle size, and a
-  regression in one mode is now a regression in *the* product.
-- *Prod risk:* high, and it cannot be delivered incrementally in the way Option A can.
+**Three consequences that shape everything below, and the third is not obvious:**
 
-### Option A→B (the fork's third branch)
-Do A now; keep B possible by writing `shell/` so it owns the app frame rather than being decoration.
-The cost of keeping B open is a rule, not code: **`shell/` may not assume a single product per page.**
+1. **The product switcher is itself a shared shell surface** — already named in ADR-W-016's rule-1
+   seed list. It must be **data-driven, never import-driven**: `shell/` may not import a product
+   tree (a forbidden edge in `BOUNDARIES.json`), so the roster of builders is configuration — name,
+   URL, icon, per locale — handed in by the caller. Four-plus builders is exactly the case where a
+   hand-maintained roster drifts, so the roster wants one home and a test that every declared
+   product appears in it.
 
-*My read, offered as input and not as the decision:* the operator's complaint is aesthetic and
-consistency-shaped ("look and feel is a bit different", "don't feel like one tool"), which A answers
-in full. B answers a question nobody has yet asked — whether a student wants one address. **A→B**
-costs nothing extra today and forecloses nothing.
+2. **The bar is "familiar", not "identical".** The engines differ by design (§2) and always will.
+   A student who has used the 2-D builder should find the 3-D one's *frame* already learned — the
+   same header, the same input box and palette behaviour, the same fact list, the same
+   configuration cycling, the same save/load, the same error voice — while the *subject matter*
+   inside is different. That is a statement about the shell and about interaction behaviour, not
+   about geometry.
+
+3. **"What to expect" makes UX consistency a testable contract, not a style guide.** This is the
+   part that changes §6. If a student learns *"press this to see another configuration"* in 2-D and
+   the complex builder either lacks the control, places it elsewhere, or makes it mean something
+   subtly different, the tool has broken the promise the ruling makes — and nothing in the repo
+   would currently catch it. The correctness doctrine (§1c) and the interaction contract are two
+   row families of one mechanism, and this ruling is what puts the second family on the list.
+
+**What was rejected, recorded so it is not re-litigated:** one app with modes (one URL, one bundle,
+a mode switcher). It buys a shared session and cross-builder figures, and costs a change to both
+shipped products' entry, routing, store bootstrap and deploy topology — precisely what ADR-W-016 was
+written to avoid while they are stable, and it cannot be delivered incrementally.
+
+**One rule kept anyway, because it is free:** `shell/` should not *assume* a single product per page.
+Nothing plans to exploit that, but writing the frame parameterized rather than hard-wired costs
+nothing today and is the difference between "we chose not to" and "we cannot".
 
 ---
 
@@ -188,9 +203,12 @@ every contract a product does not answer for. Nothing is fixed in this phase; un
 issues.
 
 ### Phase 3 — the shipped products adopt `shell/`
-**Only after complex has proved `shell/` in prod**, and its shape depends on §4. One surface at a
-time, each its own PR and its own revert unit, sibling builds green at every step, tokens first
-(the highest-visibility, lowest-risk surface).
+**Only after complex has proved `shell/` in prod.** One surface at a time, each its own PR and its
+own revert unit, sibling builds green at every step, tokens first (the highest-visibility,
+lowest-risk surface), then the frame + switcher, then the rest of the seed list.
+
+Under the §4 ruling this phase is bounded: it changes what the shipped products *import*, never
+their entry, routing, bundle or prod path.
 
 *Gate:* per surface — `npm run test:full`, both sibling builds, and an operator play of both shipped
 products before the next surface starts.
@@ -219,6 +237,12 @@ answering for itself, a missing answer made loud instead of invisible.
 The fourth state is the entire point. Today a 3-D gate that nobody thought about is
 indistinguishable from one deliberately omitted; this makes them different objects.
 
+**Two row families**, per the §4 ruling. The correctness family was always the point; the
+interaction family exists because *"the user should be familiar with the tool and what to expect"* is
+a promise that four-plus builders can break silently.
+
+### Family 1 — correctness contracts
+
 **Properties, not implementations** (per §1c's finding). Rows are written as claims about behaviour:
 
 - *No stated magnitude is silently dropped.* — 2-D `satisfied: 18 dropped*/stated* gates`;
@@ -235,6 +259,32 @@ indistinguishable from one deliberately omitted; this makes them different objec
   the first contract to enter the matrix already scoped cross-product.
 - *A saved file replays to the same figure; positions are never stored* (ADR-232).
 - *The load audit reports what it could not restore* (ADR-242 / ADR-3D-087).
+
+### Family 2 — interaction contracts (the §4 ruling's half)
+
+What a student learns once and expects everywhere. Each row is *"this control exists, is reachable
+the same way, and means the same thing"* — or an explicit `n/a` with a reason.
+
+- **The utterance input**: same position, same submit behaviour, same symbol palette (shared
+  vocabulary + per-builder extension, the operator's ruling on
+  [#525](https://github.com/dcodish/geo_builder/issues/525)), same live preview, same RTL/bidi
+  handling of the student's own text ([#482](https://github.com/dcodish/geo_builder/issues/482)).
+- **The fact list**: same place, same enable/disable, same edit and undo semantics, same rule that
+  restating a known fact adds no row ([#613](https://github.com/dcodish/geo_builder/issues/613), the
+  operator's *"true to all tools"*).
+- **"Show another configuration"**: present wherever the builder has free DOFs, same label, same
+  meaning — cycle an unstated choice, never change a stated one.
+- **The DOF cue**: same place, same semantics for "fully determined".
+- **The commands/coverage panel**: driven by that builder's own catalog, presented identically.
+- **Save / load**: one envelope shape, one naming convention, one load audit, one file-suffix
+  convention per builder.
+- **Error voice**: a refusal names the conflicting *statement*, never internal state — the same
+  sentence shape in every builder.
+- **The product switcher**: same position, same roster, in every builder.
+
+An `n/a` here is normal and healthy — "show another configuration" means nothing in a builder with
+no free DOFs. What the matrix forbids is the *unexamined* cell: a control that exists in three
+builders and was simply never considered in the fourth.
 
 **Where it lives.** `server/__tests__/` — the `isolation.test.ts` precedent, so it runs in **every**
 per-product lane and a product cannot skip its own row by staying in its lane.
@@ -266,8 +316,8 @@ Phases 1 and 2 respect this **completely**: phase 1 changes zero lines of `src/`
 construction, and phase 2 adds a test that reports, and changes no product behaviour.
 
 Phase 3 is the first phase that edits shipped products, which is why it is gated on prod evidence
-from complex and split per surface. Under Option B, phase 3 is a different and much larger animal —
-another reason §4 must be answered before phase 3 is scoped, though **not** before phases 1–2 run.
+from complex and split per surface. The §4 ruling caps how far it can go: imports change, entry
+points and deploy topology do not.
 
 **The cost of waiting**, stated so the choice is symmetric: ADR-W-016's own argument is that a third
 copy *"re-drifts on the first divergent edit — which already happened"* and turns the later
@@ -278,21 +328,33 @@ landing now is written against no shared floor.
 
 ## 8. Open questions — must be answered before this becomes a plan of record
 
-1. **§4: Option A, B, or A→B?** The one that changes the shape of everything downstream.
-2. **Does `shell/` own the app frame, or only its parts?** (Header, error/notice banners, DOF cue,
-   About/privacy modal, product switcher — ADR-W-016's rule-1 seed list includes the frame; that
-   only matters under A→B or B.)
-3. **What is the visual target?** Adopting the 2-D look (the only documented design system, and the
-   token source ADR-W-016 names) — or a new one designed once for all three? The draft assumes the
-   former; the latter is a design project, not a refactor.
-4. **§6: derived or hand-maintained rows**, and does the matrix start with the honesty family alone
-   or the full contract set? Starting narrow is cheaper; starting narrow also means the first run's
-   failure list understates the real gap.
-5. **Does phase 2 block on phase 1?** They are independent. Running phase 2 first means the failure
-   list exists before any code moves — which is arguably the better order for deciding §4.
-6. **Who owns the doctrine rows** when products disagree — e.g. complex's span accounting vs the
-   older `dropped*` families? Does a stronger mechanism in one product become an obligation on the
-   others, or is `satisfied:` satisfied by any mechanism that holds the property?
+**Answered 2026-08-16 — kept here as the record:**
+
+- ~~One app, or separate builders?~~ **Separate builders at separate links, with a toolbar
+  switcher** (§4). One app with modes is rejected, not deferred.
+- ~~Does `shell/` own the app frame, or only its parts?~~ **The frame**, which follows from the
+  ruling rather than being decided separately: a switcher in every builder's toolbar is a frame the
+  builders share, not a widget each one hosts. *Flagged as a reading of the ruling — correct it here
+  if the intent was narrower.*
+
+**Still open:**
+
+1. **What is the visual target?** Adopting the 2-D look (the only documented design system, and the
+   token source ADR-W-016 names) — or a new one designed once for all four-plus builders? The draft
+   assumes the former; the latter is a design project, not a refactor, and the §4 ruling
+   ("all look and feel the same") raises the stakes without settling which look wins.
+2. **§6: derived or hand-maintained rows**, and does the matrix start with one family or both?
+   Starting narrow is cheaper; starting narrow also means the first run's failure list understates
+   the real gap.
+3. **Does phase 2 block on phase 1?** They are independent. Running phase 2 first means the failure
+   list exists before any code moves.
+4. **When products disagree, does the stronger mechanism become an obligation?** Complex's span
+   accounting vs the older `dropped*` families: is `satisfied:` satisfied by *any* mechanism that
+   holds the property, or does the best-known mechanism become the bar? The draft assumes the
+   former — the latter turns every improvement into N-1 obligations, which would make improving
+   anything expensive.
+5. **Where does the switcher's roster live**, and what pins it? (§4 consequence 1 — configuration,
+   not imports; four-plus builders is where a hand-maintained roster drifts.)
 
 ---
 
@@ -302,5 +364,5 @@ landing now is written against no shared floor.
 - Changing `BOUNDARIES.json`'s copied-never-shared rule for `engine`.
 - Touching `src/` or `src3d/` in phases 1–2.
 - A big-bang refactor. Every phase is independently revertible, and phase 3 is per-surface.
-- Any change to the products' URLs or deploy topology — unless §4 resolves to Option B, which is
-  precisely why §4 is a question and not an assumption.
+- **Any change to the products' URLs, entry points, bundles or deploy topology.** Ruled out by §4:
+  the builders stay separate apps at separate links, and the switcher is a link in a shared toolbar.
