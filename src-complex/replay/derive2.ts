@@ -26,8 +26,9 @@ import { type Rat, fromNumber, rat, toNumber } from '../value/rational';
 import { type ExpVec, evaluate as evalMod, format as fmtMod } from '../value/modulus';
 import { type Angle, toDegrees } from '../value/angle';
 import { type Expr, abs, conj, div, mul, neg, num, param, pow, ref, val } from '../model/expr';
-import { type Branch, type Constraint, isTurnUnknown, solveTier1 } from '../solve/tier1';
-import { type BranchFilter, filterBranches, quadrant } from '../solve/filter';
+import { type Branch, isTurnUnknown, solveTier1 } from '../solve/tier1';
+import { filterBranches, quadrant } from '../solve/filter';
+import type { BranchFilter, Constraint } from '../model/constraint';
 
 // The prototype's fact/expression types — the ONLY import from the retiring engine, and the whole
 // surface the deletion in S4 has to touch.
@@ -286,14 +287,41 @@ const paramSample = (name: string, seed: number): number => {
  */
 export function derive2(facts: readonly ProtoFact[], configIndex = 0, seed = 0): Derived2 {
   const bridged = bridgeFacts(facts);
-  const t1 = solveTier1(bridged.constraints);
+  return foldConstraints(
+    bridged.constraints,
+    bridged.filters,
+    bridged.freeNames,
+    bridged.sample,
+    bridged.untranslated,
+    configIndex,
+    seed,
+  );
+}
 
-  const sample = new Map(bridged.sample);
-  for (const c of bridged.constraints) {
+/**
+ * The one derivation both entry points share.
+ *
+ * Extracted rather than duplicated: two folds that must agree are two folds that will drift, and the
+ * sibling trees paid for that repeatedly (ADR-346's mirror class). The bridge and the v2 parser differ only
+ * in how they PRODUCE constraints; what happens to them afterwards is identical.
+ */
+export function foldConstraints(
+  constraints: readonly Constraint[],
+  filterList: readonly BranchFilter[],
+  declaredNames: readonly string[],
+  literalSample: ReadonlyMap<string, number>,
+  untranslated: readonly Untranslated[],
+  configIndex: number,
+  seed: number,
+): Derived2 {
+  const t1 = solveTier1(constraints);
+
+  const sample = new Map(literalSample);
+  for (const c of constraints) {
     for (const p of collectParams(c)) if (!sample.has(p)) sample.set(p, paramSample(p, seed));
   }
 
-  const { kept, emptiedBy } = filterBranches(t1.branches, bridged.filters, sample);
+  const { kept, emptiedBy } = filterBranches(t1.branches, filterList, sample);
   const configCount = kept.length;
   const index = configCount ? ((configIndex % configCount) + configCount) % configCount : 0;
   const branch: Branch | undefined = kept[index];
@@ -346,7 +374,7 @@ export function derive2(facts: readonly ProtoFact[], configIndex = 0, seed = 0):
   if (!t1.inconsistent) {
     // the union: names the constraints mention PLUS bare declarations, so a number the student merely
     // named is still on the canvas (always-visualise) rather than waiting for a constraint to earn it
-    for (const name of [...new Set([...t1.names, ...bridged.freeNames])]) {
+    for (const name of [...new Set([...t1.names, ...declaredNames])]) {
       const m = modulusOf(name);
       const a = argumentOf(name);
       if (!Number.isFinite(m.value) || !Number.isFinite(a.deg)) continue;
@@ -369,7 +397,7 @@ export function derive2(facts: readonly ProtoFact[], configIndex = 0, seed = 0):
     configCount,
     configIndex: index,
     freeDof: t1.freeDof,
-    untranslated: bridged.untranslated,
+    untranslated,
     deferred: t1.deferred,
     emptiedBy,
   };
@@ -412,3 +440,5 @@ function collectParams(c: Constraint): string[] {
   walk(c.rhs);
   return out;
 }
+
+
