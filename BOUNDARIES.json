@@ -155,6 +155,7 @@
     "src-complex/model": "engine",
     "src-complex/solve": "engine",
     "src-complex/replay": "engine",
+    "src-complex/app": "engine",
     "src-complex/i18n": "shell"
   },
 

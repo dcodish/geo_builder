@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fmtNum } from './engine/complex';
 import { deriveScene } from './engine/model';
-import { derive2 } from './replay/derive2';
+import { deriveLines } from './app/deriveLines';
 import { sceneFromDerived2, v2Labels, v2Status } from './replay/scene2';
 import { GaussPlane } from './render/GaussPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
@@ -109,7 +109,14 @@ export function App() {
     () => typeof location !== 'undefined' && new URLSearchParams(location.search).get('engine') === 'v2',
     [],
   );
-  const derived2 = useMemo(() => (useV2 ? derive2(facts, seed, seed) : null), [useV2, facts, seed]);
+  // The v2 engine reads the student's LINES, not the prototype's facts (S4). One utterance can lower
+  // to several prototype facts, so the lines are the distinct `src` values in entry order — the store
+  // does not keep them separately, and that is the last thing the cutover removes.
+  const v2Lines = useMemo(() => [...new Set(facts.map((f) => f.src))], [facts]);
+  const derived2 = useMemo(
+    () => (useV2 ? deriveLines(v2Lines, seed, seed) : null),
+    [useV2, v2Lines, seed],
+  );
   const scene = useMemo(
     () => (derived2 ? sceneFromDerived2(derived2) : deriveScene(facts, freePos, seed)),
     [derived2, facts, freePos, seed],

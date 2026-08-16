@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { parseLine } from '../../parser/parse';
 import type { Fact } from '../../engine/model';
 import { bridgeFacts, derive2 } from '../derive2';
+import { deriveLines } from '../../app/deriveLines';
 
 /** The real path: an utterance becomes facts exactly as the input box would produce them. */
 const facts = (...lines: string[]): Fact[] => {
@@ -183,5 +184,65 @@ describe('ALWAYS VISUALISE — an under-determined figure still draws (operator 
     const z1 = d.points.find((p) => p.name === 'z1')!;
     expect(z1.modulusKnown && z1.argumentKnown).toBe(true);
     expect(z1.exactLabel).toBe('√2·cis45°');
+  });
+});
+
+describe('S4 CLOSE — the same figures, now from the v2 parser (deriveLines)', () => {
+  // The bridge reads the prototype's facts; this reads the student's TEXT. Both feed one shared fold,
+  // so the check that matters is that they agree — a second derivation that must match a first is a
+  // second derivation that will drift (the ADR-346 mirror class).
+  const SESSION = ['z1 ברביע הראשון', 'z1^3 = z3', '-2z1 = conj(z3)'];
+
+  it('#607 builds from TEXT, with the same exact readings', () => {
+    const d = deriveLines(SESSION);
+    expect(d.contradiction).toBeNull();
+    expect(d.untranslated).toEqual([]);
+    expect(d.points.find((p) => p.name === 'z1')!.exactLabel).toBe('√2·cis45°');
+    expect(d.points.find((p) => p.name === 'z3')!.exactLabel).toBe('2√2·cis135°');
+    expect(d.freeDof).toEqual([]);
+  });
+
+  it('agrees with the bridge, point for point', () => {
+    const viaText = deriveLines(SESSION);
+    const viaBridge = derive2(facts(...SESSION));
+    expect(viaText.points.map((p) => [p.name, p.exactLabel])).toEqual(
+      viaBridge.points.map((p) => [p.name, p.exactLabel]),
+    );
+    expect(viaText.configCount).toBe(viaBridge.configCount);
+  });
+
+  it('the four configurations still enumerate, and cycle', () => {
+    const noQuadrant = ['z1^3 = z3', '-2z1 = conj(z3)'];
+    expect(deriveLines(noQuadrant).configCount).toBe(4);
+    const degs = [0, 1, 2, 3].map((i) =>
+      Math.round(deriveLines(noQuadrant, i).points.find((p) => p.name === 'z1')!.argumentDeg),
+    );
+    expect(degs.sort((a, b) => a - b)).toEqual([45, 135, 225, 315]);
+  });
+
+  it('the English mirror gives the same figure', () => {
+    const en = deriveLines(['z1 in the first quadrant', 'z1^3 = z3', '-2z1 = conj(z3)']);
+    expect(en.points.find((p) => p.name === 'z1')!.exactLabel).toBe('√2·cis45°');
+  });
+
+  it('under-determination still DRAWS and still reports what is free', () => {
+    const d = deriveLines(['z1 ברביע הראשון', 'z1^3 = z3']);
+    expect(d.points.map((p) => p.name).sort()).toEqual(['z1', 'z3']);
+    expect(d.points.every((p) => !p.modulusKnown)).toBe(true);
+    expect(d.freeDof.length).toBeGreaterThan(0);
+  });
+
+  it('a line the v2 grammar cannot read is REPORTED, with the student’s own words', () => {
+    const d = deriveLines(['z1^3 = z3', 'סדרה הנדסית z1, z2, z3']);
+    expect(d.untranslated).toHaveLength(1);
+    expect(d.untranslated[0].src).toContain('סדרה');
+    // ...and the rest of the session still builds
+    expect(d.points.length).toBeGreaterThan(0);
+  });
+
+  it('a line that DROPS content is reported as not-understood, never absorbed', () => {
+    const d = deriveLines(['z1 ברביע הראשון ומקבילית']);
+    expect(d.untranslated).toHaveLength(1);
+    expect(d.untranslated[0].why).toContain('ומקבילית');
   });
 });

@@ -42,6 +42,9 @@ const MAY_IMPORT: Record<string, readonly string[]> = {
   scene: ['value', 'model', 'solve', 'replay'],
   render: ['value', 'scene', LEGACY],
   parser: ['value', 'model', LEGACY],
+  // `app` is the ONLY layer that may compose the parser with replay: parser names what the student
+  // said, replay folds constraints into a figure, and neither may reach for the other. The guard
+  // caught `deriveLines` living in replay/ and was right to.
   app: ['value', 'model', 'solve', 'replay', 'store', 'parser'],
   formulas: ['value', 'model'],
   [LEGACY]: [],
