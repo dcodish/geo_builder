@@ -330,9 +330,97 @@ placement DOFs).
 *Argument on the losing side, recorded:* undo/redo act on the **fact list**, not the figure, so they
 now sit one column away from what they rewind. Accepted for the simpler two-zone rule.
 
-### Still to walk through
+### D8 — Data panel: **one skeleton, one gate, per-builder rows**
 
-8. Data panel contents (position, palette, live preview) · 6. Fact/steps
+| | 2-D | 3-D |
+| --- | --- | --- |
+| gate | a **compute button** (`values.compute` / `computing`) — the values are expensive | a **checkbox** (`showData`) — cheap |
+| rows | radius, area, perimeter, angle + the query lane | relations, mutual, vectors (decomp/coords/magnitude/square), points, planes, params + the query lane |
+
+**Ruled:** the same five sections in the same order in every builder — **points · measures ·
+relations · parameters · ask** — each filling only the rows that apply to it (complex adds
+modulus/argument; 3-D adds vectors and planes; an empty section is simply absent). **One control
+opens it**; where the values are expensive, that is a *computing state*, not a different kind of
+control.
+
+*Cost accepted:* 2-D's compute-button becomes a checkbox plus a computing state — a real change to a
+shipped behaviour, taken so the panel does not open two different ways depending on which builder
+you are in.
+
+**Not a UI choice, and binding regardless of the above:** the panel may print a value only when it is
+**knowledge** — invariant across every valid configuration, with the gauge pinned — never "in the
+current sample". ADR-421 was a **P1** on exactly this, and the operator ruled it again for complex on
+[#623](https://github.com/dcodish/geo_builder/issues/623). §6 family 1 row.
+
+### D9 — Guide: **a separate manual SCREEN per builder, plus in-app quick commands**
+
+Operator ruling, 2026-08-16 — none of the three options offered:
+
+> *"re the command catalog - it should be a separate screen altogether for each tool with examples of
+> how to enter commands. so my vision is more of a manual guide than just a list of options. having
+> said that, the tool should have some quick commands. the most popular commands that a user can
+> click and see build without data entry."*
+
+**This splits one surface into two things with different jobs:**
+
+| | the manual | quick commands |
+| --- | --- | --- |
+| what | a **separate screen**, per builder — prose + worked examples of *how to enter* commands | a **small set** of the most popular commands, clickable, building with no typing |
+| job | teaching | doing |
+| where | its own route, reached from the `⋯` menu and the empty state | in the app itself (D9b) |
+
+Today's surfaces are neither: 2-D's modal tab and 3-D's inline block are both *lists of options*,
+which is exactly what the ruling rejects.
+
+> **Risk this creates, and the guard for it.** `catalog.ts` is not only the user-facing reference —
+> it is the **coverage map** (`CLAUDE.md`: *"Absence from the catalog = absence from coverage"*), and
+> today the in-app list is rendered straight from it, so the list cannot lie about what the parser
+> accepts. A hand-written manual **can**: prose drifts from the grammar the moment a rule changes,
+> and a manual that teaches an utterance the parser refuses is an honesty violation aimed at exactly
+> the student who trusted it.
+>
+> **The manual must stay catalog-backed:** every catalog entry appears in the manual, and **every
+> example printed in the manual is executed through the real parser in the test suite**. Prose is
+> free; examples are tested. That is a §6 family 1 row, and it is what makes a manual safe to write.
+
+**Following from the ruling, not separately decided:** About/privacy stays a small modal mounted by
+every builder — complex ships publicly with **no privacy note at all** (NFR-SE-3, flagged by
+ADR-W-016), which the manual screen does not fix.
+
+### D9b — Quick commands: **big on the empty canvas, a compact row once building**
+
+**Ruled:** large chips centred on the empty canvas — a first click that needs no reading and no
+typing — shrinking to a one-line strip above the input once a figure exists, so the affordance is
+still there when a student forgets a phrasing mid-build. The empty state also links to the manual.
+
+2-D already has the empty-state half (`canvas.emptyTitle` + clickable example chips); the compact
+strip and the whole surface in 3-D and complex are new.
+
+*Cost accepted:* one more line in the column D1 was chosen to unclutter.
+
+### D10 — Tablet: **the data panel becomes an overlay in portrait; canvas and input stay side by side**
+
+Bounded by an existing ruling: **NFR-US-4** — tablets in scope (touch, pinch-zoom, +/− buttons),
+**phones explicitly out of scope** (operator, 2026-07-03, reaffirmed 2026-07-11).
+
+The arithmetic forces the question: 256 + 384 = **640px of side panels**, against an iPad portrait
+width of **768px**, leaves ~128px of canvas. 2-D's canvas already declares a 360px minimum, so it
+would overflow rather than compress.
+
+**Ruled:** landscape keeps all three columns. In portrait the data panel stops being a column and
+slides **over** the canvas as a dismissable overlay when ticked, so **the canvas and the input box
+are always both visible**. That is not an aesthetic preference — the defining interaction is watching
+the figure form as information is added, and a layout that scrolls the figure off-screen while the
+student types breaks the product, not just the page.
+
+*Cost accepted:* while open, the overlay covers part of the figure it describes.
+
+### Walkthrough complete
+
+All ten decisions are ruled. Two of them changed the plan rather than just the pixels: **D9** added a
+per-builder manual screen that did not exist in any product, and **D6** turned out to be the largest
+build in the programme. The **§6 family 2** row set is now concrete rather than illustrative — every
+ruling above is a row, and the builders' current states are its first failing column. (position, palette, live preview) · 6. Fact/steps
 list · 7. Canvas controls ("show another configuration", zoom/pan/reset) · 8. Data panel contents
 · 9. DOF cue · 10. Modals (About/privacy — 2-D only today) · 11. Responsive/mobile
 
@@ -495,23 +583,22 @@ landing now is written against no shared floor.
   builders share, not a widget each one hosts. *Flagged as a reading of the ruling — correct it here
   if the intent was narrower.*
 
+- ~~What is the visual target?~~ **2-D's look**, via `theme.ts` values carried by Tailwind — §4a D2
+  and D3. The whole interface is now specified in §4a, D1–D10.
+
 **Still open:**
 
-1. **What is the visual target?** Adopting the 2-D look (the only documented design system, and the
-   token source ADR-W-016 names) — or a new one designed once for all four-plus builders? The draft
-   assumes the former; the latter is a design project, not a refactor, and the §4 ruling
-   ("all look and feel the same") raises the stakes without settling which look wins.
-2. **§6: derived or hand-maintained rows**, and does the matrix start with one family or both?
+1. **§6: derived or hand-maintained rows**, and does the matrix start with one family or both?
    Starting narrow is cheaper; starting narrow also means the first run's failure list understates
    the real gap.
-3. **Does phase 2 block on phase 1?** They are independent. Running phase 2 first means the failure
+2. **Does phase 2 block on phase 1?** They are independent. Running phase 2 first means the failure
    list exists before any code moves.
-4. **When products disagree, does the stronger mechanism become an obligation?** Complex's span
+3. **When products disagree, does the stronger mechanism become an obligation?** Complex's span
    accounting vs the older `dropped*` families: is `satisfied:` satisfied by *any* mechanism that
    holds the property, or does the best-known mechanism become the bar? The draft assumes the
    former — the latter turns every improvement into N-1 obligations, which would make improving
    anything expensive.
-5. **Where does the switcher's roster live**, and what pins it? (§4 consequence 1 — configuration,
+4. **Where does the switcher's roster live**, and what pins it? (§4 consequence 1 — configuration,
    not imports; four-plus builders is where a hand-maintained roster drifts.)
 
 ---
