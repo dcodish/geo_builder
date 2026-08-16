@@ -800,3 +800,68 @@ under `?engine=v2` — the panel that rendered it is not mounted — so the ruli
 It is deleted with the rest of the prototype in S7 rather than edited now, which would grow the
 retiring path. **G4–G9, the formula-sheet surfacing and parameter-expression rows for non-modulus
 quantities remain open on #623.**
+
+---
+
+## ADR-CX-015 — A plotted number carries a READING, composed once (2026-08-16)
+
+**Status:** Accepted · **Slice:** S5 (#622), before the visualization layer · **Ladder:** stage 5d
+· **Fixes:** [#675](https://github.com/dcodish/geo_builder/issues/675)
+
+### The report
+
+«z1 = 3+4i» drew `z₁` on the canvas with **no value beside it** — while the banner one inch above it
+printed `z₁ ≈ 5·cis53.1301°`. `z1 = 1+i` worked. The difference is that 45° is a rational multiple of
+π and 53.13° is not, so `fromCartesian` carries the second as an opaque angle **atom**, no closed
+polar form exists, and `exactLabel` is null.
+
+That the commonest way a student writes a complex number is the one that renders worst made this a
+foundation defect rather than a cosmetic one, and it was fixed **before** S5 rather than after: S5
+builds an entire visualization layer on this same scene→renderer seam.
+
+### Two defects, one visible
+
+1. **The renderer decided a presentation it had nothing to decide with.** `PolarPlane` did
+   `p.exact ? \`${p.label} = ${p.exact}\` : p.label` — a fallback to *nothing*, because a nullable
+   field forces the consumer to invent the other case. The banner had a decimal fallback; the canvas
+   had none. Two surfaces answering one question from two sources is the [#653](https://github.com/dcodish/geo_builder/issues/653)
+   class, and it is also a straight breach of this renderer's own header: *the engine owns what
+   exists; this file owns where the ink goes.*
+2. **`exactLabel === null` was read as "nothing to say".** It means *no symbolic rendering exists*.
+   Both halves of `3+4i` are forced by the given — it is knowledge by every test in
+   [ADR-CX-014](#adr-cx-014); only its typography is decimal. The engine was **understating what it
+   knew**, which is the honest direction to be wrong in and still wrong.
+
+### The decision
+
+**Stage 5d composes the reading; every surface prints it.** `DerivedPoint.reading: string` is
+non-null and non-empty by construction, built beside the value it describes:
+
+| the value | the reading |
+|---|---|
+| carried in closed form | `z₁ = √2·cis45°` — `=` is reserved for a forced value the exact core can write |
+| forced, no closed form | `z₁ ≈ 5·cis53.1301°` — `≈` says the typography is decimal, not that the value is loose |
+| a sampled half | `z₁ ≈ ~2.5·cis~63°` — `~` marks the coordinate the student did **not** state (ADR-052) |
+
+There is deliberately **no fourth case in which a point carries only its name.** `ScenePoint.exact:
+string | null` became `reading: string` for the same reason: a nullable field is an invitation to a
+second rule downstream.
+
+`v2Labels` now *reads* that field instead of re-deriving it from the same inputs. That is the half of
+the fix that prevents recurrence — patching `PolarPlane` with its own fallback would have left two
+independent label rules in the tree and returned this issue in a different costume.
+
+### A second copy found in passing
+
+Three implementations of `prettyName` existed (the prototype's, the scene's, and a local one in the
+v2 adapter), and they had already drifted: the adapter's subscripted only the **first** trailing
+digit, so `z10` printed `z₁0`. Since the reading now carries the name, one definition is forced —
+`model/naming.ts`, imported by both. A display rule with two implementations is the same class as a
+value with two definitions ([ADR-CX-014](#adr-cx-014)); it is only cheaper when it is found early.
+
+### The lock
+
+A canvas-reading test over the cartesian corpus (`3+4i`, `1+i`, `2cis150`, `5`, `2cis(-30)`, `-3i`)
+asserts every plotted point carries a reading that is not the bare name — and, the assertion that
+actually matters, that the canvas reading and the banner reading are the **same string** for the same
+point. The first assertion catches this bug; the second catches its whole class.
