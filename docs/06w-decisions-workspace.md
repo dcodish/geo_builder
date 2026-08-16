@@ -673,3 +673,84 @@ carries its reason in the environment where a reviewer will see it. Cost is one 
 in `server/__tests__/` (so it runs in every per-product lane, the `isolation.test.ts` precedent), and
 ~10 seconds per invocation. Verified non-vacuous on adoption: a one-line edit to `src/format.ts` was
 REFUSED, and the check passed once it was reverted.
+
+## ADR-W-018 — Product unification: four-plus builders, one learned interface (2026-08-16)
+
+**Status:** accepted, 2026-08-16 · **Operator rulings throughout** · **Plan of record:**
+[docs/28](28-product-unification.md) · **Umbrella:** [#648](https://github.com/dcodish/geo_builder/issues/648)
+
+**Context.** The operator, on three shipped/rebuilding tools: *"we now have 3 tools but each has its
+own ui and look and feel is a bit different so they don't feel like one tool… should we continue on
+this route or step back a sec and do some ordering and ensure we have a robust product that doesn't
+fix one item in 2d just to realise we should have also done it on other tools, or worse — we fix in
+one tool and break in another."*
+
+Measured at `main`, that is three complaints with three different answers:
+
+| layer | duplicated? | answer |
+| --- | --- | --- |
+| **Engine** (~15,300 / ~10,900 / ~4,900 LOC) | **No** — different mathematics | Leave alone; [ADR-W-003](#adr-w-003)'s copied-never-shared stands |
+| **Chrome** (194 inline hexes in `App.tsx`, 42 in `App3.tsx` with no token module, a third palette on a third styling stack, one ~25-line i18n bootstrap written 3×) | **Yes, visibly** | Share via `shell/` — already decided by [ADR-W-016](#adr-w-016), still unbuilt (#617) |
+| **Doctrine** (51 distinct 2-D ADR ids cited from the 3-D log; honesty gates **18 / 8 / 0**) | **Yes — in prose only** | Make it enumerable and checkable. No mechanism exists today |
+
+[ADR-W-017](#adr-w-017) already closed *breaking* a sibling. This ADR addresses *forgetting* one,
+which [ADR-W-004](#adr-w-004)'s prose discipline has been practised faithfully (173 + 61 sibling
+mentions) and still could not prevent: #555 (a gate whose 2-D twin was a P1), #656 (3-D has no
+language toggle at all), and an inverted disable/delete pair between 3-D and complex.
+
+**Decisions.**
+
+1. **Separate builders at separate links, one learned interface.** *"i will eventually have 4 or maybe
+   even more builders that should all look and feel the same but in reality they are accessed via
+   different links… from a user pov he should be familiar with the tool and how to use it and what to
+   expect."* One app with modes is **rejected, not deferred**. Navigation is a link in a shared
+   toolbar. Nothing changes any builder's entry, bundle, URL or deploy topology.
+2. **"What to expect" is a testable contract, not a style guide.** The conformance artifact therefore
+   carries two row families — **correctness** and **interaction** — and is written over
+   **properties, not implementations**, because `src-complex` demonstrated that the newest tree can
+   hold the better mechanism (total span accounting over 18 post-hoc vetoes; wrap-selection over
+   caret-insert). Enumerating mechanisms would drag the best answer down to the oldest one.
+3. **The interface is fully specified** — docs/28 §4a, D1–D10, each measured out of the three `App`
+   files before being ruled. 2-D is the reference and won six of ten; where it was measurably weaker
+   the better mechanism won (D2 Tailwind, D5 wrap-selection), and D9 went somewhere no builder is
+   today.
+4. **The row list is DERIVED from the ADR corpus, not authored.** 665 ADRs exist; 109 carry
+   contract-shaped titles that state the property outright. A dedicated pass triages all 665 titles
+   and reads every candidate, yielding rows with provenance. This **satisfies** [ADR-W-006](#adr-w-006)
+   rather than excepting it — the logs are the source to derive from — and makes the maintenance rule
+   mechanical: a new ADR whose title carries contract language is either classified into the matrix
+   or explicitly excluded with a stated reason, else the check fails.
+5. **Any mechanism that holds a property counts.** The matrix records *which* mechanism each builder
+   uses, so asymmetry stays visible (#659), but a better mechanism creates **zero** obligations
+   elsewhere — the alternative turns every improvement into N−1 obligations and makes improving
+   expensive.
+6. **One machine-readable product registry**, cross-checked against `BOUNDARIES.json`: a registered
+   tree with no roster entry **fails**. It retires the drift in the [docs/22 §9](22-workflow.md) table
+   and `ci.yml`'s second hand-maintained copy of the same paths. The switcher renders it as **data**;
+   `shell/` may not import a product tree.
+7. **Operator-editable admin config**, on the existing password-protected `server/admin.ts`:
+   *"human manageable config/admin pages where i can decide things without having to change code for
+   it."* **Bounded by one non-negotiable line: config may CHOOSE AMONG what the code already
+   supports and may never ASSERT support the code lacks.** A featured quick command is validated
+   against that builder's catalog at save time and refused if absent — otherwise the admin page
+   becomes a way to offer a student a command that fails, which is #511's blocker with a nicer UI.
+   The static registry is the fallback, so an unreachable server leaves every builder working.
+8. **Execution is BUILD-LED and split by exposure.** Matrix rows are written alongside each surface
+   as it lands, and **a landing surface writes its row for every builder, not only the one being
+   worked on**. Work that cannot change 2-D or 3-D behaviour goes to `main`; the visible UI migration
+   of the shipped builders lives on `unify/ui`, one surface per PR, merged after the operator plays
+   it. Rationale: `main` never reaches students on its own (deploys are manual), but a half-migrated
+   `main` would force an emergency P1 deploy to carry unfinished UI.
+
+**Consequences.** `shell`'s `sharing` field completes the move ADR-W-016 began. The docs/22 §9 table
+becomes generated rather than typed. `server/admin.ts` gains persistence and write endpoints, having
+been stateless and read-only. Two capabilities arrive that exist in no builder today: a per-builder
+**manual screen** and **quick commands**. And the largest single build in the programme is D6 — the
+fact list — because `src3d/store/store3.ts` has neither `removeFact` nor `replaceGroup` and
+`useComplexStore` has no `enabled` flag.
+
+**Accepted costs, recorded so they are not rediscovered as surprises.** No baseline: improvement is
+asserted rather than measured, and the correctness gaps stay unknown during the build (Q1). The
+weakest mechanism may persist as long as no counter-example is found, and "no counter-example found"
+is not "holds" (Q3). 2-D runs two styling systems during the transition (D2). And the row list is a
+judgement call per ADR — two passes could differ at the margins (Q2).
