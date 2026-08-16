@@ -12,16 +12,12 @@
  */
 
 import type { Branch } from './tier1';
-import { type Rat, rat } from '../value/rational';
+import { rat } from '../value/rational';
 import { toDegrees } from '../value/angle';
 
-export type BranchFilter =
-  /** strict interior of a quadrant, numbered the exam's way: 1 = (0°, 90°) */
-  | { readonly kind: 'quadrant'; readonly name: string; readonly q: 1 | 2 | 3 | 4 }
-  /** an open range in degrees; either end may be omitted */
-  | { readonly kind: 'range'; readonly name: string; readonly minDeg?: Rat; readonly maxDeg?: Rat }
-  /** the direction is exactly this many degrees */
-  | { readonly kind: 'exact'; readonly name: string; readonly deg: Rat };
+import type { BranchFilter } from '../model/constraint';
+
+export type { BranchFilter } from '../model/constraint';
 
 const norm360 = (d: number): number => ((d % 360) + 360) % 360;
 
