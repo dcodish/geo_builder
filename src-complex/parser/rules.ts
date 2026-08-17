@@ -22,6 +22,7 @@ import {
   sequenceConstraints,
 } from '../model/sequence';
 import { type FigureObject, isOrigin, objectDeclares } from '../model/figure';
+import { type RootsEquation, asRootsEquation } from '../model/solutionSet';
 import {
   MEASURE_ARITY,
   type MeasureKind,
@@ -109,6 +110,15 @@ export interface ParsedLine {
   readonly exprQueries: ExprQuery[];
   /** stated sequences as STATEMENTS — what the series pictures are drawn from (F9) */
   readonly sequences: SequenceStatement[];
+  /**
+   * `X^n = …` seen as a SHAPE, not yet as a constraint (#680).
+   *
+   * The reading depends on what earlier lines mentioned — ADR-CX-005's three modes — and this parser is
+   * stateless per line, so it reports the shape and the fold decides. A line that produces a `roots`
+   * entry deliberately produces NO constraint for it: emitting the narrow reading as a default is how
+   * the enumeration went missing on this path in the first place.
+   */
+  readonly roots: RootsEquation[];
   /** names the line brings into existence, whether or not a constraint mentions them */
   readonly declares: string[];
   readonly claims: Claim[];
@@ -138,6 +148,7 @@ const empty = (): ParsedLine => ({
   ratios: [],
   exprQueries: [],
   sequences: [],
+  roots: [],
   declares: [],
   claims: [],
   atoms: new Map(),
@@ -341,6 +352,12 @@ const equation: Rule = (s) => {
   const rhs = parseExpr(s, eq + 1, s.length, atoms);
   if (!lhs || !rhs) return null;
   const modulusOnly = lhs.t === 'abs' || rhs.t === 'abs';
+  // `X^n = rhs` on a bare letter: report the SHAPE and let the fold read it, because which of
+  // ADR-CX-005's three modes it is depends on what earlier lines mentioned (#680, model/solutionSet.ts).
+  const roots = modulusOnly ? null : asRootsEquation(lhs, rhs, s);
+  if (roots) {
+    return { ...empty(), atoms, roots: [roots], declares: refNames(rhs), claims: [claimAll(s)] };
+  }
   return {
     ...empty(),
     atoms,

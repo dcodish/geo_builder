@@ -16,7 +16,10 @@ import type { Claim as Assertion } from '../model/claim';
 import type { FigureObject } from '../model/figure';
 import type { ExprQuery, MeasureQuery, MeasureRelation, RatioQuery } from '../model/measure';
 import type { SequenceStatement } from '../model/sequence';
-import { type Derived2, type Untranslated, foldConstraints } from '../replay/derive2';
+import { rootsMode } from '../model/naming';
+import { refsOf } from '../model/expr';
+import { solutionSetConstraints, solutionSetNames } from '../model/solutionSet';
+import { type Derived2, type FoldInput, type Untranslated, foldConstraints } from '../replay/derive2';
 
 /**
  * Fold the student's LINES through the v2 parser and the exact solver.
@@ -24,8 +27,33 @@ import { type Derived2, type Untranslated, foldConstraints } from '../replay/der
  * A line the grammar does not cover yet is REPORTED with its own words and the parser's reason, never
  * skipped: the honesty contract does not change with the source of the input, and a figure that
  * quietly ignored a line would be the silent-drop class arriving by a new route.
+ *
+ * ## Why the readings that depend on ORDER are decided here (#680, ADR-CX-024)
+ *
+ * `parseLineV2(raw)` takes one line and is stateless — deliberately, because span accounting depends on
+ * it — so it cannot answer *what did earlier lines establish?* And ADR-CX-005's three readings of
+ * `X^n = …` turn on exactly that question: a fresh letter over a grounded right-hand side is the exam's
+ * «פתרו את המשוואה» and enumerates; an existing letter is constrained; a letter whose right-hand side
+ * this very line invented is relating two numbers, not solving for one.
+ *
+ * This function is the first layer that sees the lines **in order**, so it is where the question can be
+ * asked. It was not asked at all until now: the enumeration lived inside the retiring prototype's
+ * bridge, and on this path `z³ = 8` was one point with three configurations while `w = z1 * 2` invented
+ * `z1` as a free number and printed a sampled position for it.
  */
 export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0): Derived2 {
+  return foldConstraints({ ...lowerLines(lines), configIndex, seed });
+}
+
+/**
+ * The lines, LOWERED — everything the fold needs, and the only sanctioned way to get it.
+ *
+ * Exported because it is the one place `X^n = …` is read (see above), and a caller that assembled fold
+ * input by concatenating `parsedLine.constraints` itself would silently drop every power equation. That
+ * is not hypothetical: `parser/__tests__/rules.test.ts` had exactly such a helper, and it dropped #607's
+ * middle line the moment the reading moved here. One accumulator, so there is nothing to forget.
+ */
+export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configIndex' | 'seed'> {
   const constraints: Constraint[] = [];
   const filters: BranchFilter[] = [];
   const declared: string[] = [];
@@ -39,6 +67,28 @@ export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0)
   const atoms = new Map<string, number>();
   const untranslated: Untranslated[] = [];
 
+  /**
+   * Every name an EARLIER line mentioned — defined, constrained, or merely referred to.
+   *
+   * "Mentioned, not defined" is the whole test, and it is ADR-CX-021 Decision 3: «|z₁| = 9r» introduces
+   * z₁ through a relation, and a student who wrote that has plainly stated z₁. Read BEFORE each line is
+   * lowered, so a line sees its predecessors and never itself — a number cannot ground the statement
+   * that invented it.
+   */
+  const mentioned = new Set<string>(['o']);
+
+  /**
+   * A RESERVED letter, and the statement that reserved it: `z` after `z³ = 8` stands for the solution
+   * SET, not for a number.
+   *
+   * Enforced rather than merely declared, because reserving without enforcing only moves the phantom.
+   * A later «z = 1+i» has no honest reading — `z` is already three points — and left alone the fold
+   * auto-creates a fourth, free `z` and draws it at a sampled position. That is the same silent
+   * invention #680 was filed about, one name along, so it is refused here with the statement that owns
+   * the letter named, which is what the prototype did.
+   */
+  const reserved = new Map<string, string>();
+
   lines.forEach((raw, idx) => {
     const r = parseLineV2(raw);
     if (!r.ok) {
@@ -48,6 +98,33 @@ export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0)
         why: r.reason === 'unaccounted' ? `לא הובן: ${r.items.join(', ')}` : 'הדקדוק לא מזהה את השורה הזו',
       });
       return;
+    }
+    const clash = r.line.declares.find((n) => reserved.has(n));
+    if (clash !== undefined) {
+      untranslated.push({
+        factId: `line-${idx}`,
+        src: raw,
+        why: `${clash} מסמן את פתרונות המשוואה «${reserved.get(clash)}» — התייחסו לפתרונות עצמם`,
+      });
+      return;
+    }
+    // `X^n = …`: ask the mode from what came before, then emit the one lowering both engines share.
+    // The letter itself is declared only in `constrain` mode — otherwise it is RESERVED, standing for
+    // the whole set, and drawing a point for it would plot the sampler's guess at "the solutions".
+    for (const eq of r.line.roots) {
+      const grounded = refsOf(eq.rhs).every((n) => mentioned.has(n));
+      const mode = rootsMode(eq.varName, eq.n, mentioned, grounded);
+      constraints.push(...solutionSetConstraints(eq, mode));
+      declared.push(...solutionSetNames(eq, mode));
+      // the bare letter stays reserved in every mode: `z` is related to `z₁..zₙ`
+      mentioned.add(eq.varName);
+      for (const n of solutionSetNames(eq, mode)) mentioned.add(n);
+      // …but only an ENUMERATION makes the letter mean the set rather than a number. In `constrain`
+      // mode `z` IS the number the equation is about, and a later line may say more about it.
+      if (mode !== 'constrain') reserved.set(eq.varName, eq.src);
+    }
+    for (const n of [...r.line.declares, ...r.line.roots.flatMap((e) => refsOf(e.rhs))]) {
+      mentioned.add(n);
     }
     constraints.push(...r.line.constraints);
     filters.push(...r.line.filters);
@@ -62,14 +139,12 @@ export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0)
     for (const [k, v] of r.line.atoms) atoms.set(k, v);
   });
 
-  return foldConstraints({
+  return {
     constraints,
     filters,
     declared,
     atoms,
     untranslated,
-    configIndex,
-    seed,
     assertions,
     objects,
     measures,
@@ -77,5 +152,5 @@ export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0)
     ratios,
     exprQueries,
     sequences,
-  });
+  };
 }

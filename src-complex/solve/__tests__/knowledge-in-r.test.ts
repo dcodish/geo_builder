@@ -130,8 +130,13 @@ describe('canCycle — is there another drawing to show?', () => {
     expect(d.canCycle).toBe(false);
   });
 
-  it('an equation with several solutions can cycle', () => {
-    const d = deriveLines(['z^3 = 8']);
+  /**
+   * The several DRAWINGS of one letter, not the several solutions of an equation: an enumeration is one
+   * configuration containing n points and has nothing to cycle, which is ADR-CX-020 and ADR-CX-021
+   * agreeing. Declaring `z` first makes the equation constrain it, and then there genuinely are three.
+   */
+  it('a constrained letter with several solutions can cycle', () => {
+    const d = deriveLines(['z', 'z^3 = 8']);
     expect(d.configCount).toBe(3);
     expect(d.canCycle).toBe(true);
   });

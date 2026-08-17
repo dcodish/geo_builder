@@ -16,6 +16,10 @@ dist-server
 
 # Dev debug log (server-written session log; reconstruct figures from it)
 logs/
+# A dev SERVER's own stdout, when a session redirects `npm run dev` to a file to read the port from.
+# Two of these reached `main` before the pattern existed — `git add -A` will pick up anything the
+# ignore list does not name, so the list names it.
+*.log
 
 # Vite temp config
 vite.config.ts.timestamp-*.mjs

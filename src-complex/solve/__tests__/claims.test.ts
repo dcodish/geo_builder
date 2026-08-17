@@ -85,8 +85,11 @@ describe('the claim is exact, so it holds for EVERY configuration', () => {
   it('z^4 = 16 — every root is checked by the same congruence, not by one drawing', () => {
     // roots at 0/90/180/270; the real claim holds on two of them and is refuted on the others,
     // and which one is on screen is the configuration index, not a tolerance
+    // `z` is declared FIRST, so the equation constrains that letter and its four solutions are the
+ //  four configurations (ADR-CX-005 mode 2). Without the declaration the line enumerates and `z` is a
+ //  reserved name for the whole set, which is a different sentence (ADR-CX-021).
     const statuses = [0, 1, 2, 3].map(
-      (i) => deriveLines(['z^4 = 16', 'z ממשי'], i).claims[0].verdict.status,
+      (i) => deriveLines(['z', 'z^4 = 16', 'z ממשי'], i).claims[0].verdict.status,
     );
     expect(statuses.filter((s) => s === 'holds')).toHaveLength(2);
     expect(statuses.filter((s) => s === 'refuted')).toHaveLength(2);

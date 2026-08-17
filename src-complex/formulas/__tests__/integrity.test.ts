@@ -71,11 +71,20 @@ describe('a formula surfaces because the figure DOES the operation', () => {
     expect(d.formulas.map((f) => f.id)).toContain('CX-F2');
   });
 
-  it('an equation with several configurations surfaces the ROOTS formula — the k it walks', () => {
+  it('an enumerating equation surfaces the ROOTS formula — the whole solution set', () => {
     const d = deriveLines(['z^3 = 8']);
-    expect(d.configCount).toBe(3);
+    // ADR-CX-021: the three solutions are ONE configuration, so the formula is surfaced by the
+    // enumeration itself rather than by a branch count
+    expect(d.configCount).toBe(1);
+    expect(d.points.map((p) => p.name).sort()).toEqual(['z1', 'z2', 'z3']);
     const f = d.formulas.find((x) => x.id === 'CX-F3');
     expect(f?.premises).toEqual(['z^3 = 8']);
+  });
+
+  it('and surfaces it for the CONSTRAINED letter too — there the k really is walked', () => {
+    const d = deriveLines(['z', 'z^3 = 8']);
+    expect(d.configCount).toBe(3);
+    expect(d.formulas.map((f) => f.id)).toContain('CX-F3');
   });
 
   it('a figure that multiplies nothing and powers nothing surfaces nothing', () => {

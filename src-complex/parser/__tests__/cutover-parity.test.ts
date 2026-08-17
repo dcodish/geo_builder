@@ -83,9 +83,15 @@ describe('F4 inequalities are branch SELECTORS, not drivers', () => {
     expect(z1.argumentDeg).toBeLessThan(180);
   });
 
+  /**
+   * `z` is declared FIRST, so «z³ = 8» constrains that letter and its three roots are its three
+   * configurations (ADR-CX-005 mode 2) — which is the branch set this property is about. Without the
+   * declaration the same line ENUMERATES, `z` becomes a reserved name for the whole solution set, and
+   * a window on `arg z` is a different sentence: see `solution-sets.test.ts`, where it is refused.
+   */
   it('it PRUNES an enumerated branch set rather than moving a forced value (#651)', () => {
     // the three cube roots of 8 sit at 0°, 120°, 240°: only one is in (90°, 180°)
-    const d = deriveLines(['z^3 = 8', '90 < arg z < 180']);
+    const d = deriveLines(['z', 'z^3 = 8', '90 < arg z < 180']);
     expect(d.configCount).toBe(1);
     expect(d.points[0].reading).toBe('z = 2·cis120°');
   });

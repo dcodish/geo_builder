@@ -12,22 +12,23 @@ import { CATALOG, coveredFamilies } from '../catalog';
 import { ALL_FAMILIES, FAMILY_TITLE } from '../families';
 import { ATOM_SOURCES } from '../lexicon';
 import { parseLineV2 } from '../rules';
+import { lowerLines } from '../../app/deriveLines';
 import { RULES } from '../rules';
 import { solveTier1 } from '../../solve/tier1';
 import { filterBranches } from '../../solve/filter';
 import { format as fmtMod } from '../../value/modulus';
 import { branchDegrees } from '../../solve/tier1';
 
-const ok = (line: string) => {
-  const r = parseLineV2(line);
-  if (!r.ok) throw new Error(`did not parse: ${line} (${r.reason}${'items' in r ? `: ${r.items}` : ''})`);
-  return r.line;
-};
-
 /** Run several lines the way the app will: parse each, collect, solve. */
+/**
+ * Build through the REAL lowering, not a hand-rolled concatenation of `parsedLine.constraints`.
+ *
+ * It was the latter, and `X^n = …` is not lowered by the parser any more — its reading depends on what
+ * earlier lines mentioned, so `app/deriveLines.ts` owns it (#680, ADR-CX-024). Concatenating constraints
+ * here dropped #607's middle line entirely and the test still looked like it was testing something.
+ */
 const build = (...lines: string[]) => {
-  const constraints = lines.flatMap((l) => ok(l).constraints);
-  const filters = lines.flatMap((l) => ok(l).filters);
+  const { constraints, filters } = lowerLines(lines);
   const t1 = solveTier1(constraints);
   return { t1, kept: filterBranches(t1.branches, filters).kept };
 };
@@ -126,8 +127,19 @@ describe('the rules build the corpus systems', () => {
     expect(t1.freeDof).toContain('|z1|');
   });
 
-  it('z^3 = 8 enumerates three roots', () => {
+  /**
+   * «z³ = 8» enumerates: three NAMED solutions in ONE configuration (ADR-CX-021), not one letter with
+   * three configurations. The branch count was the old reading and it is the letter's, not the set's —
+   * `['z', 'z^3 = 8']` is where three branches live, and it is asserted just below.
+   */
+  it('z^3 = 8 enumerates three roots — three names, one configuration', () => {
     const { t1 } = build('z^3 = 8');
+    expect(t1.names.filter((n) => ['z1', 'z2', 'z3'].includes(n)).sort()).toEqual(['z1', 'z2', 'z3']);
+    expect(t1.branches).toHaveLength(1);
+  });
+
+  it('…while an EXISTING letter keeps its three branches', () => {
+    const { t1 } = build('z', 'z^3 = 8');
     expect(t1.branches).toHaveLength(3);
   });
 

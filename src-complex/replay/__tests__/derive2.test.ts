@@ -308,8 +308,10 @@ describe('A FILTER BOUNDS THE SAMPLE, not only the branches (operator report, 20
   });
 
   it('a DETERMINED direction is still verified, not resampled — the filter did not become a driver', () => {
-    // z^3 = 8 puts a root at 0°, which is in no quadrant; asking for quadrant 1 must find none
-    const d = deriveLines(['z^3 = 8', 'z ברביע הראשון']);
+    // z^3 = 8 puts a root at 0°, which is in no quadrant; asking for quadrant 1 must find none.
+    // `z` is declared first so the equation constrains that letter — the three roots are its three
+    // configurations, and none of them is interior to a quadrant (ADR-CX-021).
+    const d = deriveLines(['z', 'z^3 = 8', 'z ברביע הראשון']);
     expect(d.configCount).toBe(0);
     expect(d.emptiedBy).not.toBeNull();
   });

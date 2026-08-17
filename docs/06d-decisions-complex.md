@@ -1436,3 +1436,100 @@ accept-with-a-✗ is retired with it.
   contradictory, and finding it was the first thing the gate did.
 - Steps 3–5 of #624 remain blocked on [#680](https://github.com/dcodish/geo_builder/issues/680): the
   solution-set capability is not on the v2 path at all, only on the retiring bridge.
+
+---
+
+## ADR-CX-024 — The solution set reaches the v2 path, and the fold becomes where order-dependent readings are decided (2026-08-17)
+
+**Status:** accepted · **Slice:** S7 ([#624](https://github.com/dcodish/geo_builder/issues/624)),
+closes [#680](https://github.com/dcodish/geo_builder/issues/680) and
+[#686](https://github.com/dcodish/geo_builder/issues/686) ·
+**Ladder stage:** **0d′** — `rootsMode` already lives there; what changes is *who asks it*. No new rung.
+
+### The defect
+
+[ADR-CX-021](#adr-cx-021) built the solution set — the n solutions as one configuration containing n
+points — **inside `bridgeFacts`**. `rootsMode` and `solutionNames` were called from nowhere else, so the
+capability existed only for facts arriving from the retiring prototype parser. Under `?engine=v2`,
+measured:
+
+| lines | prototype | v2, before |
+| --- | --- | --- |
+| `z^3 = 8` | `z1,z2,z3` named, 1 config | one point `z`, 3 configs |
+| `z^3 = 8` · `w = z1 * 2` | `w = 4·cis0°` | **`z1` invented as a free number**, `w ≈ ~4.8·cis~189°` |
+| `z^3 = 8` · `z = 1+i` | refused, naming the equation | accepted |
+| `z1 = 5` · `z^4 = 16` | 4 anonymous solutions + `z1` | one point `z`, 4 configs |
+
+Row 2 is [ADR-052](06-decisions.md#adr-052)'s sin, not a missing feature: a reference to a stated
+solution silently became an invented free number with a sampled position printed for it.
+
+Two things hid it. `cutover-parity.test.ts` asks `parseLineV2(line).ok` — a question about **parsing**,
+which every one of these forms passes; the capability is in the fold. And `solution-sets.test.ts` never
+called `setEngine`, so it submitted through the store's **prototype** branch and folded through the
+bridge: eight green tests describing a path the product does not ship (#686).
+
+### Decision 1 — the parser reports the SHAPE; the fold decides the READING
+
+`rootsMode(varName, n, priorNames, grounded)` needs the names *earlier lines* mentioned. `parseLineV2`
+takes one line and is stateless — deliberately, because span accounting depends on it — so it
+structurally cannot answer. That is why the lowering ended up on the bridge: the bridge was the only
+place that iterated statements in order.
+
+So the parser's `equation` rule now emits a `RootsEquation` in a new `roots` channel and **no
+constraint** for it, and `app/deriveLines.ts` — the first layer that sees the lines in order — asks the
+mode and emits the constraints. This is the split the tree already uses for measures, which drive or
+verify by the same logic: *the parser names what the student said; the fold decides what it means.*
+
+### Decision 2 — one lowering, in `model/solutionSet.ts`
+
+`asRootsEquation` and `solutionSetConstraints` are shared by `deriveLines` and `bridgeFacts`. ADR-CX-021
+Decision 2 removed a forgettable *stamp* and left a forgettable *lowering* one layer out — the same
+class, so it gets the same answer: the lowering lives where both producers reach it and neither owns it,
+and the two paths cannot emit different constraints for the same sentence.
+
+### Decision 3 — a reserved letter is ENFORCED, not merely declared
+
+Reserving without enforcing only moves the phantom. After `z^3 = 8`, a line mentioning `z` has no honest
+reading — `z` is already three points — and the fold auto-created a *fourth*, free `z` and drew it at a
+sampled direction. So `deriveLines` tracks the reserving statement and reports any later line that
+mentions the letter, quoting that statement; the acceptance gate ([ADR-CX-023](#adr-cx-023)) refuses on
+a newly-untranslated line, so the refusal reaches the student the way the prototype's did.
+
+This makes «arg z» after an enumeration a refusal rather than an answer. That is honest but not
+complete: the exam's «הפתרון ברביע הרביעי» *selects* among an enumerated set (2023 קיץ א opens with it),
+and selection is a capability neither engine has. Filed rather than faked.
+
+### Decision 4 — the roots formula is recognised STRUCTURALLY, not by a branch count
+
+`surfacedFormulas` surfaced CX-F3 (n-th roots) when an equation `Xⁿ = <no unknowns>` had
+`configCount > 1`. With an enumeration that count is 1, so «z³ = 8» — the roots formula's own example —
+started surfacing **CX-F2, De Moivre**: not a missing row but the wrong one. A branch count was a proxy
+for *the base is being solved for*; the structure says it outright, so the condition is now
+`c.principal === true || configCount > 1` — an enumerated set's own row, or a constrained letter still
+walking its turn unknown. A verification of a determined value is neither, and stays De Moivre.
+
+### What the corpus tests were encoding
+
+Eleven tests failed, and none of them was a regression: each used `['z^n = c']` as a convenient source of
+*configurations*, which is the reading ADR-CX-021 had already retired for the bridge. They passed only
+because this path had not received the lowering. Every one is re-expressed on `['z', 'z^n = c']` — an
+existing letter, constrained, whose n roots genuinely are its n configurations (ADR-CX-005 mode 2) — and
+the enumeration is asserted separately, on names rather than on a count.
+
+One was a different kind of failure and is worth recording: `rules.test.ts`'s `build()` helper
+concatenated `parsedLine.constraints`, so it silently dropped #607's middle line the moment power
+equations stopped being lowered by the parser. The accumulator is therefore exported as `lowerLines`, and
+it is the only sanctioned way to turn lines into fold input — a hand-rolled one drops whatever channel it
+has not heard of, which is the silent-drop class wearing a test helper's clothes.
+
+### Consequences
+
+- **#624's deletion step is unblocked.** v2 now covers the referencable solution set, which was the
+  ninth cutover gap and the operator's stated stop condition.
+- **G4, G5 and G6** ([#623](https://github.com/dcodish/geo_builder/issues/623)) are unblocked on the path
+  that ships, not only on the bridge.
+- `bridgeFacts` still has its own copy of the mode question; both call `rootsMode` and
+  `solutionSetConstraints`, so they cannot drift, and the bridge goes with the cutover.
+- Selection among an enumerated solution set, and [#688](https://github.com/dcodish/geo_builder/issues/688)'s
+  claim drive-or-check, are named gaps — operator ruling 2026-08-17: v2 defects wait for dedicated
+  complex sessions; only capability the prototype HAS blocks the cutover.
