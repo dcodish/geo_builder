@@ -5,11 +5,13 @@ body {
   background: #f5f5f4;
   color: #292524;
 }
-.app { max-width: 1180px; margin: 0 auto; padding: 12px 16px; }
-/* The header, About modal and banners are the shared frame's (shell/frame, #673), styled by the
-   shell's own tokens. This sheet keeps the product BODY only, until B1 (#666) migrates the
-   palette onto the Tailwind tokens. */
+.app { max-width: 1180px; margin: 0 auto; padding: 4px 16px 12px; }
+/* The suite bar, tool row, About modal and banners are the shared frame's (shell/frame, #673 +
+   the #706 level model), styled by the shell's own tokens. This sheet keeps the product BODY
+   only, until B1 (#666) migrates the palette onto the Tailwind tokens. */
 main { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+/* LEVEL 3 (docs/28 §4a levels ruling): figure actions live UNDER the canvas — they act on the figure. */
+.figure-actions { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
 .panel { flex: 1 1 320px; min-width: 300px; }
 .canvas { flex: 1 1 480px; min-width: 320px; }
 .gauss-plane { width: 100%; height: auto; border: 1px solid #d6d3d1; border-radius: 8px; background: #fafaf9; touch-action: none; }
