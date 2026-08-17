@@ -15,7 +15,12 @@
 import { type Expr, abs, ref } from '../model/expr';
 import type { BranchFilter, Constraint } from '../model/constraint';
 import type { Claim as Assertion } from '../model/claim';
-import { type SequenceKind, type SequenceTerm, sequenceConstraints } from '../model/sequence';
+import {
+  type SequenceKind,
+  type SequenceStatement,
+  type SequenceTerm,
+  sequenceConstraints,
+} from '../model/sequence';
 import { type FigureObject, isOrigin, objectDeclares } from '../model/figure';
 import {
   MEASURE_ARITY,
@@ -87,6 +92,8 @@ export interface ParsedLine {
   readonly measures: MeasureRelation[];
   /** «שטח OZ₁Z₂Z₃» — a request to DISPLAY a measure, answered only when the value is knowledge */
   readonly queries: MeasureQuery[];
+  /** stated sequences as STATEMENTS — what the series pictures are drawn from (F9) */
+  readonly sequences: SequenceStatement[];
   /** names the line brings into existence, whether or not a constraint mentions them */
   readonly declares: string[];
   readonly claims: Claim[];
@@ -113,6 +120,7 @@ const empty = (): ParsedLine => ({
   objects: [],
   measures: [],
   queries: [],
+  sequences: [],
   declares: [],
   claims: [],
   atoms: new Map(),
@@ -489,7 +497,15 @@ const sequenceLine = (
 ): ParsedLine | null => {
   const constraints = sequenceConstraints(kind, terms, s);
   if (!constraints) return null;
-  return { ...empty(), constraints, declares: terms.map((t) => t.name), claims: [claimAll(s)] };
+  return {
+    ...empty(),
+    constraints,
+    // the STATEMENT travels beside its constraints: the relations say what is true of these numbers,
+    // and the statement is what the scene draws as a spiral and a chain of partial sums
+    sequences: [{ kind, terms, src: s }],
+    declares: terms.map((t) => t.name),
+    claims: [claimAll(s)],
+  };
 };
 
 /**

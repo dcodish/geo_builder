@@ -865,3 +865,81 @@ A canvas-reading test over the cartesian corpus (`3+4i`, `1+i`, `2cis150`, `5`, 
 asserts every plotted point carries a reading that is not the bare name — and, the assertion that
 actually matters, that the canvas reading and the banner reading are the **same string** for the same
 point. The first assertion catches this bug; the second catches its whole class.
+
+---
+
+## ADR-CX-016 — The visualization layer: series, rotation, cycles, regions (2026-08-16)
+
+**Status:** Accepted · **Slice:** S5 ([#622](https://github.com/dcodish/geo_builder/issues/622))
+· **Ladder:** stage 5c · **Families:** F9 (the shape of a sequence), F2 (product as rotation), F12 (the
+counting picture)
+
+### What this slice is for
+
+The operator's headline requirement, from the first conversation about this product: *"I want the
+visualization part to be strong. I want students to see the polar coordinates… and see how a series
+behaves."* The polar substrate landed with S3; this is the rest — the pictures that make the topic's
+four moves visible instead of algebraic.
+
+| picture | what it makes visible | corpus witness |
+|---|---|---|
+| **TermSpiral** | a geometric sequence is a **logarithmic spiral**; `\|q\| = 1` closes it into a **circle**, `arg q = 0` collapses it to a **ray**, an arithmetic sequence is a **straight line** | §2b ג, 2024 חורף, 2015 |
+| **SumChain** | partial sums head to tail: convergence is a point the chain crawls into, and «the terms sum to zero» is a **closed polygon** | 2015 ב, 2024 ד, G7 |
+| **RotationArc** | `w = z·u` is a **turn by arg u and a stretch by \|u\|** — De Moivre, one step at a time | 2020, 2023, F2 |
+| **ValueCycle** | `wⁿ` visits a **finite ring of directions** and starts again; the period is the answer to «z^(6n) takes only two values» | 2013, 2015, 2022, 2023 |
+| **Region** | every plotted number placed **inside / on / outside** a stated polygon — the §2b ד count, as a picture | §2b ד |
+
+### Three decisions inside it
+
+**1 — the statement travels beside its constraints.** A sequence lowers to `(t₃/t₁)² = (t₂/t₁)³`, which
+is the same relation with the *sequence dissolved out of it*: nothing downstream could tell those three
+numbers from three unrelated ones, so no spiral could be drawn from the fold's output. `ParsedLine`
+therefore carries `sequences` as **statements** as well as the constraints they imply. The statement
+asserts nothing extra — the constraints remain the whole of what the sentence claims — it is what the
+scene draws.
+
+**2 — the spiral takes the SHORT way round, and says which terms are stated.** Between two terms Δ
+positions apart the true path may wind any number of extra turns, and which one is right depends on
+intermediate terms the student never named. The minimal winding is the only choice that adds no
+information. For the same reason the per-position step `q` is published **only between adjacent stated
+terms**: with a gap it is a Δ-th root with Δ values, and choosing one would put an intermediate term on
+the screen that the givens do not force ([ADR-052](06-decisions.md#adr-052)). The chain sums the
+**stated terms only**, and the infinite-sum limit point appears only when they run consecutively from
+the first — otherwise `t₁/(1−q)` would not be the sum of the sequence the student stated.
+
+**3 — a cycle is DECIDED, never measured.** `cyclePeriod` is non-null only when the modulus is exactly
+1 **and** the argument is a rational part of a turn, both asked of the exact carriers
+([ADR-CX-006](#adr-cx-006) D1) — `period` is the reduced denominator of the turns. A float would answer
+this question wrong with complete confidence: a sampled 59.9999° looks like 60° and has no period at
+all. This is the same line ADR-CX-013 drew for tier-2 values, applied to a picture rather than a label.
+
+### The display seam, asserted rather than promised
+
+The `n` stepper is **component state**: not in the store, not in the save file, not in undo, and it
+reaches the scene as an argument. The polar/cartesian toggle already sat outside the parse path; what
+was missing was the proof. The gate now runs **every catalog specimen, in both languages, through the
+real store under both views** and requires the accepted lines and the derived figure to be identical
+strings — the ADR-448 / ADR-3D-144 seam rule, checked over the whole surface rather than an example,
+because both sibling products state this rule and both have broken it once.
+
+`buildScene` grew its inputs at the same time, and took a named `SceneInput` + `SceneDisplay` rather
+than more positional parameters — the same move `foldConstraints` needed this slice (eleven positional
+arguments, one transposition away from a figure quietly about something else).
+
+### Deliberately not built, and named
+
+- **`Locus`** — the primitive is in the S5 scope list, but **F13 has no grammar yet**: nothing in the
+  parser produces a locus, so a locus primitive would have no witness to render and no test that could
+  fail. It lands with the family, not before it. (docs/27 §10 F13, slice C4/S4 in the original plan.)
+- **A count CLAIM over a region** (F12, «כמה … בתוך / על / מחוץ»). The region layer draws where the
+  numbers are and counts them; asserting that count is a *claim*, checked at stage 4, and the claim
+  grammar for it is S6/#623 work. The picture is what this slice owes.
+- **Symbolic series** («w + w² + … + w^(4n)») still needs symbolic exponents, as
+  [ADR-CX-013](#adr-cx-013) recorded. `ValueCycle` draws the *cycle* a symbolic power walks; the sum
+  over it is not yet expressible.
+- **The shell adoption** — struck from this slice by operator ruling on 2026-08-16 (issue #622 comment):
+  `AppFrame`, the product switcher, fact enable/disable, the DOF cue, undo/redo, image export, the build
+  stamp and the privacy note are built once in `shell/` by the unification programme
+  ([ADR-W-018](06w-decisions-workspace.md)), for all four builders, rather than a third private copy
+  here. Complex therefore finishes the foundation rebuild with known parity gaps — **no undo/redo,
+  delete-only facts** — and that is a scheduling decision, not a decision to leave them unbuilt.

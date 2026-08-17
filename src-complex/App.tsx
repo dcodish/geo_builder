@@ -118,11 +118,20 @@ export function App() {
   // The v2 engine reads the student's LINES — which the store owns outright, so a line the retiring
   // prototype cannot read still reaches the grammar that can (#658).
   const derived2 = useMemo(() => (useV2 ? deriveLines(lines, seed, seed) : null), [useV2, lines, seed]);
+  /**
+   * THE `n` STEPPER — display state, and nowhere else (ADR-CX-001 D3).
+   *
+   * It lives in the component: not in the store, not in the save file, not in undo, and it reaches the
+   * scene as an ARGUMENT. Stepping it moves the marker around a power cycle and changes nothing about
+   * the figure — the same seam rule as the polar/cartesian toggle, which the sibling products learned
+   * to hold at (ADR-448 / ADR-3D-144) after learning what it costs not to.
+   */
+  const [stepN, setStepN] = useState(1);
   const scene = useMemo(() => deriveScene(facts, freePos, seed), [facts, freePos, seed]);
   // the v2 canvas is the POLAR one: a complex number as a length and a direction, not a dot on a grid
   const polarScene = useMemo(
-    () => (derived2 ? buildScene(derived2.points, derived2.objects) : null),
-    [derived2],
+    () => (derived2 ? buildScene(derived2, { n: stepN }) : null),
+    [derived2, stepN],
   );
 
   /**
@@ -353,7 +362,45 @@ export function App() {
             </div>
           )}
           {polarScene ? (
-            <PolarPlane scene={polarScene} showGrid={view === 'polar'} />
+            <>
+              <PolarPlane
+                scene={polarScene}
+                showGrid={view === 'polar'}
+                labels={{
+                  ratio: t('seriesRatio'),
+                  limit: t('seriesLimit'),
+                  closed: t('seriesClosed'),
+                }}
+              />
+              {polarScene.cycles.length > 0 && (
+                <div className="stepper" dir="rtl">
+                  <span>
+                    {t('stepperLabel')} = {stepN}
+                  </span>
+                  <button onClick={() => setStepN((n) => Math.max(1, n - 1))} title={t('stepBack')}>
+                    −
+                  </button>
+                  <button onClick={() => setStepN((n) => n + 1)} title={t('stepForward')}>
+                    +
+                  </button>
+                  {polarScene.cycles.map((c) => (
+                    <span key={`per-${c.name}`} className="count">
+                      {c.name}: {t('cyclePeriod', { count: c.period })}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {polarScene.regions.map((rg) => (
+                <div key={rg.key} className="region-count" dir="rtl">
+                  {t('regionCounts', {
+                    label: rg.label,
+                    inside: rg.counts.in,
+                    on: rg.counts.on,
+                    outside: rg.counts.out,
+                  })}
+                </div>
+              ))}
+            </>
           ) : (
             <GaussPlane scene={scene} view={view} onDragFree={setFree} />
           )}

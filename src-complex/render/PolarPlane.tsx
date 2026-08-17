@@ -17,14 +17,46 @@ const W = 680;
 const H = 620;
 
 /** Stated values are solid and dark; sampled ones are dashed and muted — the honesty is visual. */
-const INK = { known: '#4c1d95', sampled: '#a78bfa', grid: '#e7e5e4', axis: '#78716c', faint: '#a8a29e' };
+const INK = {
+  known: '#4c1d95',
+  sampled: '#a78bfa',
+  grid: '#e7e5e4',
+  axis: '#78716c',
+  faint: '#a8a29e',
+  series: '#0f766e',
+  rotation: '#b45309',
+  cycle: '#1d4ed8',
+  region: '#4c1d95',
+};
+
+/**
+ * Every WORD this file prints, injected.
+ *
+ * The renderer is bilingual by not knowing which language it is in: a Hebrew string spelled here would
+ * be a translation living outside `i18n/`, and RTL Hebrew is the product default (ADR-3D-001 §9). Math
+ * text — `√2`, `45°`, `×2` — is not translated and arrives on the scene primitives, composed at
+ * stage 5d where the numbers are.
+ */
+export interface PlaneLabels {
+  readonly ratio: string;
+  readonly limit: string;
+  readonly closed: string;
+}
 
 const polar = (r: number, deg: number): [number, number] => {
   const t = (deg * Math.PI) / 180;
   return [r * Math.cos(t), r * Math.sin(t)];
 };
 
-export function PolarPlane({ scene, showGrid = true }: { scene: Scene; showGrid?: boolean }) {
+export function PolarPlane({
+  scene,
+  showGrid = true,
+  labels,
+}: {
+  scene: Scene;
+  showGrid?: boolean;
+  labels: PlaneLabels;
+}) {
   const k = Math.min(W, H) / 2 / scene.extent;
   const X = (x: number) => W / 2 + x * k;
   const Y = (y: number) => H / 2 - y * k;
@@ -92,6 +124,17 @@ export function PolarPlane({ scene, showGrid = true }: { scene: Scene; showGrid?
         />
       ))}
 
+      {/* regions (F12): the shaded interior goes down FIRST, so every later stroke sits on top of it */}
+      {scene.regions.map((rg) => (
+        <polygon
+          key={rg.key}
+          points={rg.vertices.map((v) => `${X(v.re)},${Y(v.im)}`).join(' ')}
+          fill={INK.region}
+          fillOpacity={rg.known ? 0.08 : 0.05}
+          stroke="none"
+        />
+      ))}
+
       {/* stated objects (F6): segments, polygons, circles — under the numbers, so a vertex label
           always sits on top of the edge that meets it */}
       {scene.shapes.map((sh) =>
@@ -152,6 +195,124 @@ export function PolarPlane({ scene, showGrid = true }: { scene: Scene; showGrid?
           strokeWidth={2}
           strokeDasharray={r.known ? undefined : '6 4'}
         />
+      ))}
+
+      {/* the series pictures: the spiral through the terms, and the partial sums head to tail */}
+      {scene.spirals.map((sp) => (
+        <g key={sp.key}>
+          <polyline
+            points={sp.path.map((z) => `${X(z.re)},${Y(z.im)}`).join(' ')}
+            fill="none"
+            stroke={INK.series}
+            strokeWidth={2}
+            strokeOpacity={sp.known ? 0.9 : 0.5}
+            strokeDasharray={sp.known ? undefined : '6 4'}
+          />
+          {sp.stepLabel && sp.path.length > 0 && (
+            <text
+              x={X(sp.path[Math.floor(sp.path.length / 2)].re) + 8}
+              y={Y(sp.path[Math.floor(sp.path.length / 2)].im) - 8}
+              fontSize={11}
+              fill={INK.series}
+            >
+              {labels.ratio} {sp.stepLabel}
+            </text>
+          )}
+        </g>
+      ))}
+
+      {scene.chains.map((ch) => (
+        <g key={ch.key}>
+          <polyline
+            points={ch.vertices.map((z) => `${X(z.re)},${Y(z.im)}`).join(' ')}
+            fill="none"
+            stroke={INK.series}
+            strokeWidth={1.5}
+            strokeOpacity={0.75}
+            strokeDasharray="2 3"
+          />
+          {ch.vertices.slice(1).map((z, i) => (
+            <circle key={`${ch.key}-s${i}`} cx={X(z.re)} cy={Y(z.im)} r={3} fill={INK.series} />
+          ))}
+          {ch.limit && (
+            <g>
+              <circle
+                cx={X(ch.limit.re)}
+                cy={Y(ch.limit.im)}
+                r={5}
+                fill="none"
+                stroke={INK.series}
+                strokeWidth={1.5}
+              />
+              <text x={X(ch.limit.re) + 8} y={Y(ch.limit.im) + 4} fontSize={10} fill={INK.series}>
+                {labels.limit}
+              </text>
+            </g>
+          )}
+          {ch.closes && (
+            <text x={X(0) + 8} y={Y(0) + 16} fontSize={10} fill={INK.series}>
+              {labels.closed}
+            </text>
+          )}
+        </g>
+      ))}
+
+      {/* multiplication as rotation: the sweep from the number to its product, with the stretch */}
+      {scene.rotations.map((r) => {
+        const [lx, ly] = polar(r.radius * 1.06, (r.fromDeg + r.toDeg) / 2);
+        return (
+          <g key={r.key}>
+            <path
+              d={arcPath(r.radius, r.fromDeg, r.toDeg)}
+              fill="none"
+              stroke={INK.rotation}
+              strokeWidth={2}
+              strokeOpacity={r.known ? 0.95 : 0.55}
+              strokeDasharray={r.known ? undefined : '5 4'}
+            />
+            <text x={X(lx)} y={Y(ly)} fontSize={11} fill={INK.rotation} textAnchor="middle">
+              {r.turnLabel} {r.scaleLabel}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* the value cycle: the finite ring of directions a power visits, and where n is standing */}
+      {scene.cycles.map((c) => (
+        <g key={`cycle-${c.name}`}>
+          <circle
+            cx={X(0)}
+            cy={Y(0)}
+            r={c.radius * k}
+            fill="none"
+            stroke={INK.cycle}
+            strokeWidth={1}
+            strokeOpacity={0.4}
+          />
+          {c.powers.map((z, i) => (
+            <circle
+              key={`cy-${c.name}-${i}`}
+              cx={X(z.re)}
+              cy={Y(z.im)}
+              r={i === c.current ? 6 : 3.5}
+              fill={i === c.current ? INK.cycle : '#fff'}
+              stroke={INK.cycle}
+              strokeWidth={1.5}
+            />
+          ))}
+          {c.powers.map((z, i) => (
+            <text
+              key={`cyl-${c.name}-${i}`}
+              x={X(z.re * 1.12)}
+              y={Y(z.im * 1.12) + 4}
+              fontSize={10}
+              fill={INK.cycle}
+              textAnchor="middle"
+            >
+              {i + 1}
+            </text>
+          ))}
+        </g>
       ))}
 
       {/* the numbers themselves */}

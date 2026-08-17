@@ -43,6 +43,24 @@ export interface SequenceTerm {
 }
 
 /**
+ * The sentence itself, kept beside the constraints it lowers to.
+ *
+ * A sequence is the one family whose *shape* is the picture: the terms of a geometric sequence lie on
+ * a logarithmic spiral, and «how a series behaves» — the operator's headline requirement for this
+ * product — is that spiral and the head-to-tail chain of its partial sums. Constraints alone cannot
+ * carry it: `(t₃/t₁)² = (t₂/t₁)³` is the same relation with the sequence dissolved out of it, and no
+ * consumer downstream could tell those three points apart from three unrelated numbers.
+ *
+ * So the statement travels as well as its consequences. It imposes nothing extra — the constraints are
+ * still the whole of what the sentence *asserts* — it is what the scene layer draws.
+ */
+export interface SequenceStatement {
+  readonly kind: SequenceKind;
+  readonly terms: readonly SequenceTerm[];
+  readonly src: string;
+}
+
+/**
  * The constraints a stated sequence imposes.
  *
  * **Two terms impose nothing**, and that is deliberate: any two numbers are the first two terms of

@@ -10,7 +10,7 @@ import { deriveLines } from '../../app/deriveLines';
 import { v2Labels } from '../../replay/scene2';
 import { buildScene, prettyName } from '../scene';
 
-const scene = (...lines: string[]) => buildScene(deriveLines(lines).points);
+const scene = (...lines: string[]) => buildScene(deriveLines(lines));
 
 describe('every number is drawn as a length and a direction', () => {
   const s = scene('z1 ברביע הראשון', 'z1^3 = z3', '-2z1 = conj(z3)');
@@ -53,7 +53,7 @@ describe('every plotted number carries a reading, and the two surfaces carry the
 
   it.each(CORPUS)('%s is never drawn as a bare name', (line) => {
     const d = deriveLines([line]);
-    const s = buildScene(d.points);
+    const s = buildScene(d);
     expect(s.points).toHaveLength(1);
     // a reading is the name AND what the number is — never the name alone
     expect(s.points[0].reading).not.toBe(s.points[0].label);
@@ -62,13 +62,13 @@ describe('every plotted number carries a reading, and the two surfaces carry the
 
   it.each(CORPUS)('%s reads identically on the canvas and in the banner', (line) => {
     const d = deriveLines([line]);
-    expect(buildScene(d.points).points.map((p) => p.reading)).toEqual(v2Labels(d));
+    expect(buildScene(d).points.map((p) => p.reading)).toEqual(v2Labels(d));
   });
 
   it('a value with no symbolic form is still stated — with ≈, because its typography is decimal', () => {
     // 53.13° is not a rational multiple of π, so `3+4i` has no closed polar form; both halves are
     // still FORCED by the given, so nothing here is a sample and nothing is marked `~`
-    const p = buildScene(deriveLines(['z1 = 3+4i']).points).points[0];
+    const p = buildScene(deriveLines(['z1 = 3+4i'])).points[0];
     expect(p.reading).toBe('z₁ ≈ 5·cis53.1301°');
     expect(p.modulusKnown && p.argumentKnown).toBe(true);
     expect(p.reading).not.toContain('~');
@@ -95,7 +95,7 @@ describe('equal magnitudes share ONE ring — the picture that makes the fact on
   it('the three cube roots of 8 sit on a single ring', () => {
     // all three roots have modulus 2; drawn as three rings it reads as three facts
     const all = [0, 1, 2].map((i) => deriveLines(['z^3 = 8'], i).points[0]);
-    const s = buildScene(all);
+    const s = buildScene({ points: all });
     expect(s.rings).toHaveLength(1);
     expect(s.rings[0].r).toBeCloseTo(2, 9);
     expect(s.rings[0].names).toHaveLength(3);
