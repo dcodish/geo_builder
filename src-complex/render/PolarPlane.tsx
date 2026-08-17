@@ -169,7 +169,7 @@ export function PolarPlane({ scene, showGrid = true }: { scene: Scene; showGrid?
               textAnchor={left ? 'end' : 'start'}
               style={{ userSelect: 'none' }}
             >
-              {p.exact ? `${p.label} = ${p.exact}` : p.label}
+              {p.reading}
             </text>
           </g>
         );

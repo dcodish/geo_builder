@@ -27,14 +27,22 @@
  */
 
 import type { Cx } from '../value/value';
+import { prettyName } from '../model/naming';
 import type { DerivedObject, DerivedPoint } from '../replay/derive2';
 
 export interface ScenePoint {
   readonly name: string;
   readonly label: string;
   readonly z: Cx;
-  /** the exact polar reading when the givens force it, else null */
-  readonly exact: string | null;
+  /**
+   * The full text this point carries, composed by stage 5d and printed verbatim.
+   *
+   * Not `exact: string | null`, which is what it was: a nullable field makes the renderer decide what
+   * to say when it is null, and the renderer has nothing to decide it with — so it said nothing, and
+   * `z1 = 3+4i` drew a bare name (#675). A reading is always present, and the choice of `=` / `≈` /
+   * `~` was made where the knowledge lives.
+   */
+  readonly reading: string;
   readonly modulusKnown: boolean;
   readonly argumentKnown: boolean;
 }
@@ -106,9 +114,8 @@ export interface Scene {
   readonly extent: number;
 }
 
-/** Subscript the trailing digits, the way the exam prints them. */
-export const prettyName = (name: string): string =>
-  name.replace(/(\d+)$/, (d) => [...d].map((c) => '₀₁₂₃₄₅₆₇₈₉'[Number(c)]).join(''));
+/** One definition of how a name is written, shared with every other surface (`model/naming`). */
+export { prettyName };
 
 const niceStep = (raw: number): number => {
   const mag = 10 ** Math.floor(Math.log10(raw));
@@ -161,7 +168,7 @@ export function buildScene(
     name: p.name,
     label: prettyName(p.name),
     z: p.z,
-    exact: p.exactLabel,
+    reading: p.reading,
     modulusKnown: p.modulusKnown,
     argumentKnown: p.argumentKnown,
   }));

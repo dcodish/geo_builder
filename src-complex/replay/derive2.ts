@@ -31,6 +31,7 @@ import type { Claim as Assertion, CheckedClaim } from '../model/claim';
 import { type FigureObject, ORIGIN, objectPoints } from '../model/figure';
 import { type CheckedMeasure, type MeasureQuery, type MeasureRelation, measureOf } from '../model/measure';
 import { type KnowledgeRow, isKnowledge, whyNotKnowledge } from '../model/knowledge';
+import { prettyName } from '../model/naming';
 import { type Bound, solveResiduals } from '../solve/tier2';
 import { type Env, type ResidualSpec, deferredResidual, evalReal, measureResidual } from '../solve/residuals';
 import { verifyClaims } from '../solve/claims';
@@ -254,7 +255,23 @@ export interface DerivedPoint {
   readonly z: Cx;
   readonly modulus: string;
   readonly argumentDeg: number;
-  /** the exact polar text, when the whole value is carried exactly */
+  /**
+   * THE TEXT THIS NUMBER CARRIES — composed once here, printed unchanged by every surface.
+   *
+   * Never null and never empty: a plotted number the student can see always has a reading, because
+   * «what is this point?» always has an answer. `exactLabel` answers a different question — whether a
+   * SYMBOLIC form exists — and reading it as "have we anything to say" is what left `z1 = 3+4i`, the
+   * commonest input form in the corpus, drawn as a bare name with no value beside it (#675). The
+   * angle of `3+4i` is not a rational multiple of π, so it has no closed form; it is knowledge all
+   * the same and only its typography is decimal.
+   *
+   * Composed at this layer rather than at each consumer because the canvas and the banner answering
+   * the same question from different sources is the [#653](https://github.com/dcodish/geo_builder/issues/653)
+   * class, and the renderer's own contract forbids it deciding: *the engine owns what exists; the
+   * renderer owns where the ink goes.*
+   */
+  readonly reading: string;
+  /** the exact polar text, when the whole value is carried exactly — a VALUE question, not a display one */
   readonly exactLabel: string | null;
   /** the givens FORCE this magnitude — otherwise it is one sample of many (ADR-052) */
   readonly modulusKnown: boolean;
@@ -624,10 +641,14 @@ export function foldConstraints(
       const m = modulusOf(name, state);
       const a = argumentOf(name, state);
       if (!Number.isFinite(m.value) || !Number.isFinite(a.deg)) continue;
+      const modulus = m.exact ? fmtMod(m.exact) : round2(m.value);
+      // a DIRECTION, folded into one turn — see the note on `argumentDeg` below
+      const argumentDeg = ((a.deg % 360) + 360) % 360;
+      const exactLabel = m.exact && a.exact ? exactLabelOf(m.exact, a.exact) : null;
       points.push({
         name,
         z: cPolar(m.value, a.deg),
-        modulus: m.exact ? fmtMod(m.exact) : round2(m.value),
+        modulus,
         /**
          * A DIRECTION, folded into one turn — not a winding.
          *
@@ -637,8 +658,16 @@ export function foldConstraints(
          * printed «z₂ ≈ 3·cis-190440°» for a number sitting on the positive real axis — arithmetically
          * true, and useless. The exact carriers keep the winding; the plotted point does not.
          */
-        argumentDeg: ((a.deg % 360) + 360) % 360,
-        exactLabel: m.exact && a.exact ? exactLabelOf(m.exact, a.exact) : null,
+        argumentDeg,
+        reading: readingOf({
+          name,
+          exactLabel,
+          modulus,
+          modulusKnown: m.exact !== null,
+          argumentDeg,
+          argumentKnown: a.exact !== null,
+        }),
+        exactLabel,
         modulusKnown: m.exact !== null,
         argumentKnown: a.exact !== null,
       });
@@ -848,6 +877,44 @@ const exactLabelOf = (mod: ExpVec, arg: Angle): string | null => {
   const v = exact(mod, arg);
   return evaluate(v) ? formatPolar(v) : null;
 };
+
+/** four places, so `53.1301°` reads as a measurement and not as a claim to more precision than that */
+const round4 = (x: number): number => {
+  const r = Math.round(x * 1e4) / 1e4;
+  return Object.is(r, -0) ? 0 : r;
+};
+
+/**
+ * STAGE 5d — the one place a plotted number becomes the text a student reads.
+ *
+ * Three things are said, in this order of preference:
+ *
+ * 1. **A symbolic form, with `=`.** `z₁ = √2·cis45°`. `=` is reserved for a value the givens force
+ *    AND that the exact core carries in closed form.
+ * 2. **Otherwise the polar decimal, with `≈`.** `z₁ ≈ 5·cis53.1301°`. The value may be perfectly
+ *    determined — `3+4i` forces both halves — and still have no closed form, because its argument is
+ *    not a rational multiple of π. `≈` then says what is true: the typography is decimal.
+ * 3. **`~` on whichever half is a SAMPLE** rather than a given, so «always visualise» (ADR-CX-001 D3)
+ *    never costs honesty (ADR-052): the figure is drawn, and the drawn number says which of its two
+ *    coordinates the student actually stated.
+ *
+ * There is deliberately no fourth case in which a point carries only its name. That was the defect:
+ * silence read as "nothing to say" when what was missing was only a symbolic rendering.
+ */
+function readingOf(p: {
+  name: string;
+  exactLabel: string | null;
+  modulus: string;
+  modulusKnown: boolean;
+  argumentDeg: number;
+  argumentKnown: boolean;
+}): string {
+  const label = prettyName(p.name);
+  if (p.exactLabel) return `${label} = ${p.exactLabel}`;
+  const mod = p.modulusKnown ? p.modulus : `~${p.modulus}`;
+  const deg = `${round4(p.argumentDeg)}°`;
+  return `${label} ≈ ${mod}·cis${p.argumentKnown ? deg : `~${deg}`}`;
+}
 
 function collectParams(c: Constraint): string[] {
   const out: string[] = [];

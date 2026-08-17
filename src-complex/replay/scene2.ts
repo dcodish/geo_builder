@@ -14,10 +14,8 @@
  */
 
 import type { Scene } from '../engine/model';
+import { prettyName as pretty } from '../model/naming';
 import type { Derived2 } from './derive2';
-
-/** The prototype's `prettyName`, kept local so this adapter has one import from the retiring engine. */
-const pretty = (name: string): string => name.replace(/(\d+)$/, (d) => '₀₁₂₃₄₅₆₇₈₉'.slice(+d[0], +d[0] + 1));
 
 export function sceneFromDerived2(d: Derived2): Scene {
   return {
@@ -75,21 +73,15 @@ export const v2Measures = (d: Derived2): string[] =>
   });
 
 /**
- * The polar reading of every plotted number.
+ * The polar reading of every plotted number — READ, not re-derived.
  *
- * `=` is reserved for values the givens FORCE. A number with a sampled half is written with `≈`, so
- * the canvas can show it (always visualise) without the label claiming it is knowledge — the drawn
- * figure is then one configuration among many, and says so.
+ * This function used to compose the text itself, from the same fields the canvas had, by its own
+ * rules. Two surfaces answering one question from two sources is the #653 class, and it duly
+ * diverged: the banner had a decimal fallback for a value with no symbolic form and the canvas had
+ * none, so `z1 = 3+4i` printed here and drew as a bare name there (#675). The composition lives at
+ * stage 5d in `derive2`; both surfaces print what it decided.
  */
-export const v2Labels = (d: Derived2): string[] =>
-  d.points.map((p) => {
-    if (p.exactLabel) return `${pretty(p.name)} = ${p.exactLabel}`;
-    const mod = p.modulusKnown ? p.modulus : `~${p.modulus}`;
-    const arg = p.argumentKnown ? `${round(p.argumentDeg)}°` : `~${round(p.argumentDeg)}°`;
-    return `${pretty(p.name)} ≈ ${mod}·cis${arg}`;
-  });
-
-const round = (x: number): number => Math.round(x * 1e4) / 1e4;
+export const v2Labels = (d: Derived2): string[] => d.points.map((p) => p.reading);
 
 /** The student's answers, with the verdict the exact core reached. */
 export const v2Claims = (d: Derived2): string[] =>
