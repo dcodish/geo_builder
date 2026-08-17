@@ -1,0 +1,12 @@
+{
+  "app": "complex-builder",
+  "version": 1,
+  "lines": [
+    "z^6 = 1",
+    "|z1|",
+    "w = z2*z3"
+  ],
+  "freePos": {},
+  "seed": 0,
+  "view": "polar"
+}
