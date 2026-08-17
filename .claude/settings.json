@@ -30,10 +30,12 @@
       "PowerShell(git worktree prune:*)",
       "Bash(scp -r dist/* root@themathbible.com:*)",
       "Bash(scp -r dist-3d/* root@themathbible.com:*)",
+      "Bash(scp -r dist-complex/* root@themathbible.com:*)",
       "Bash(scp dist-server/proxy.mjs root@themathbible.com:*)",
       "Bash(ssh root@themathbible.com:*)",
       "PowerShell(scp -r dist/* root@themathbible.com:*)",
       "PowerShell(scp -r dist-3d/* root@themathbible.com:*)",
+      "PowerShell(scp -r dist-complex/* root@themathbible.com:*)",
       "PowerShell(scp dist-server/proxy.mjs root@themathbible.com:*)",
       "PowerShell(ssh root@themathbible.com:*)"
     ]
