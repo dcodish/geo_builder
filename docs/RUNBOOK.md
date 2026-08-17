@@ -57,6 +57,56 @@ scp dist-server/proxy.mjs root@themathbible.com:/var/www/geo-proxy/
 ssh root@themathbible.com 'systemctl restart geo-proxy'
 ```
 
+## The parallel `-next` channel ([ADR-W-020](06w-decisions-workspace.md#adr-w-020), #700) — Track B evaluation without touching prod
+
+**What it is.** During the UI unification's Track B, each shipped builder gets a parallel URL —
+`/geo-builder-next/`, `/3d-builder-next/` — serving the **`unify/ui`** build, while the canonical
+URLs keep the untouched current builds. Students can only ever be on the canonical URL; the
+operator evaluates `-next` at leisure; the switchover (one ordinary Standard deploy per builder of
+the accepted build) happens once, at acceptance, and the `-next` paths are torn down after.
+
+**The one deliberate exception to "deploy only committed `main`":** the `-next` paths deploy
+**committed `unify/ui`** state — that is their entire purpose (ADR-W-020). The canonical paths keep
+the main-only rule unchanged. Complex has no `-next` path: it evolves on `main` directly as the
+programme's proving ground.
+
+**One-time server prep (operator):**
+
+```sh
+ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs && mkdir -p geo-builder-next 3d-builder-next && chown root:root geo-builder-next 3d-builder-next && chmod 755 geo-builder-next 3d-builder-next'
+# Apache: map /geo-builder-next/api and /3d-builder-next/api onto the SAME proxy as the canonical
+# /geo-builder/api mapping (the client resolves its API under import.meta.env.BASE_URL, so no code
+# changes). Until this mapping exists, the -next builds run with the degraded path: no logging, no
+# LLM fallback, static roster — usable for layout/interaction evaluation, flagged in the deploy log.
+```
+
+**Per `-next` deploy:**
+
+```sh
+git checkout unify/ui && git pull --ff-only   # the channel deploys COMMITTED unify/ui state
+npx vitest run                                # suite green on the exact tree being deployed
+npm run build:next:2d
+scp -r dist-next/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/geo-builder-next/
+npm run build:next:3d
+scp -r dist-3d-next/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/3d-builder-next/
+ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/3d-builder-next && mv -f 3d.html index.html'
+```
+
+**Canonical-untouched proof (every `-next` deploy):** the canonical dirs' bytes must not change —
+
+```sh
+ssh root@themathbible.com 'stat -c "%y %n" /var/www/vhosts/themathbible.com/httpdocs/geo-builder/index.html /var/www/vhosts/themathbible.com/httpdocs/3d-builder/index.html'
+# timestamps identical before and after the -next deploy
+```
+
+**Every `-next` deploy is a deploy**: it gets a DEPLOY-LOG entry naming the `-next` path (the
+ADR-W-007 lesson — an undocumented deployment surface is invisible after a machine switch). Tag
+scheme `next/YYYY-MM-DD[-n]`.
+
+**Switchover + teardown (per builder, at the operator's acceptance):** merge `unify/ui` → `main`,
+run the Standard deploy of the canonical path, then after a grace period
+`rm -rf` the `-next` dir and remove its Apache api mapping.
+
 ## Verify (every deploy)
 
 - `ssh root@themathbible.com 'curl -s http://127.0.0.1:8788/healthz'` → `ok`

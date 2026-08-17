@@ -55,6 +55,6 @@ export default defineConfig(({ command }) => ({
     // dist-3d/ is the 3-D app's build output — not covered by the default `**/dist/**` — and
     // .claude/ holds assistant worktrees (stale full repo copies); a Dropbox dehydrated
     // placeholder inside either EPERMs vitest's crawl before a single test runs.
-    exclude: ['**/node_modules/**', '**/_node_modules_dropbox_old/**', '**/dist/**', 'dist-3d/**', '**/.claude/**', 'archive/**', '**/*.tmp.*'],
+    exclude: ['**/node_modules/**', '**/_node_modules_dropbox_old/**', '**/dist/**', 'dist-3d/**', 'dist-next/**', 'dist-3d-next/**', '**/.claude/**', 'archive/**', '**/*.tmp.*'],
   },
 }));
