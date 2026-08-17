@@ -144,6 +144,12 @@ export function App() {
   const [stepN, setStepN] = useState(1);
   // the canvas is POLAR: a complex number as a length and a direction, not a dot on a grid
   const polarScene = useMemo(() => buildScene(derived2, { n: stepN }), [derived2, stepN]);
+  /**
+   * THE DATA COLUMN (B2, docs/28 §4a D1): opt-in, on its own side. Display state only — like the
+   * `n` stepper, it lives here and nowhere else. What it may CONTAIN is bounded by the honesty
+   * split below: values and knowledge are opt-in; refusal surfaces never are.
+   */
+  const [showData, setShowData] = useState(false);
 
   /**
    * WHICH LINES THE FIGURE COULD NOT USE — so a row is red exactly when the engine could not read it.
@@ -260,6 +266,7 @@ export function App() {
         />
         <main>
           <section className="panel">
+            <div className="card input-card">
             <div className="input-row">
               <input
                 ref={inputRef}
@@ -291,6 +298,7 @@ export function App() {
               <button onClick={clearAll}>{t('clearAll')}</button>
               <span className="count">{t('factCount', { count: lines.length })}</span>
             </div>
+            </div>
             {/*
               THE STATEMENT LIST FOLLOWS THE ACTIVE ENGINE.
 
@@ -321,37 +329,16 @@ export function App() {
           </section>
           <section className="canvas">
             {
-              /* The readings beside the canvas. It carried an `engine=v2` badge while two engines
-                 existed and the operator needed to know which one drew the figure; there is one engine
-                 now (ADR-CX-027), so the badge is gone and the honest state remains. */
+              /* THE HONESTY STRIP — always visible, never opt-in (B2's split of the old banner).
+                 A violated, undecided or unread STATEMENT is the figure refusing to lie about
+                 itself; hiding those behind the data toggle would be the tool hiding a broken
+                 given. Values/knowledge/formulas moved to the opt-in data column; refusals stay. */
             }
             <div className="v2-banner" dir="rtl">
                 {v2Status(derived2)}
-                {v2Labels(derived2).length > 0 && <div dir="ltr">{v2Labels(derived2).join('   ')}</div>}
                 {derived2.points.some((p) => !p.modulusKnown || !p.argumentKnown) && (
                   <div>~ = ערך שנדגם, לא נתון — לחצו "אפשרות נוספת" כדי לראות תצורה אחרת</div>
                 )}
-                {v2Claims(derived2).map((c) => (
-                  <div key={c} className="v2-claim">
-                    {c}
-                  </div>
-                ))}
-                {v2Measures(derived2).map((m) => (
-                  <div key={m} className="v2-claim">
-                    {m}
-                  </div>
-                ))}
-                {v2Knowledge(derived2).map((k) => (
-                  <div key={k} className="v2-claim">
-                    {k}
-                  </div>
-                ))}
-                {/* the formula sheet, surfaced from what the figure DOES — each row names its premises */}
-                {v2Formulas(derived2, i18n.language === 'he' ? 'he' : 'en').map((f) => (
-                  <div key={f} className="v2-formula" dir="ltr">
-                    {f}
-                  </div>
-                ))}
                 {/* a relation the numeric tier could not satisfy has no row of its own — tier 1 pushed
                     it down — so without this it would simply be absent from a figure that ignores it */}
                 {derived2.unsatisfied.map((u) => (
@@ -421,8 +408,40 @@ export function App() {
               <button onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
                 {view === 'cart' ? t('viewPolar') : t('viewCart')}
               </button>
+              <button onClick={() => setShowData((s) => !s)} aria-expanded={showData}>
+                {showData ? t('dataHide') : t('dataShow')}
+              </button>
             </div>
           </section>
+          {showData && (
+            <aside className="data" dir="rtl">
+              {/* THE DATA COLUMN (D1 opt-in half; D8's skeleton arrives in B6): what the figure
+                  KNOWS — labels, verified claims, measures, knowledge rows, the formula sheet. */}
+              <div className="data-title">{t('dataTitle')}</div>
+              {v2Labels(derived2).length > 0 && <div dir="ltr">{v2Labels(derived2).join('   ')}</div>}
+              {v2Claims(derived2).map((c) => (
+                <div key={c} className="v2-claim">
+                  {c}
+                </div>
+              ))}
+              {v2Measures(derived2).map((m) => (
+                <div key={m} className="v2-claim">
+                  {m}
+                </div>
+              ))}
+              {v2Knowledge(derived2).map((k) => (
+                <div key={k} className="v2-claim">
+                  {k}
+                </div>
+              ))}
+              {/* the formula sheet, surfaced from what the figure DOES — each row names its premises */}
+              {v2Formulas(derived2, i18n.language === 'he' ? 'he' : 'en').map((f) => (
+                <div key={f} className="v2-formula" dir="ltr">
+                  {f}
+                </div>
+              ))}
+            </aside>
+          )}
         </main>
       </div>
     </AppFrame>

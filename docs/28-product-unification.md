@@ -574,6 +574,12 @@ B2–B7 are otherwise independent and can be played in any order.
 measured in days. Complex is currently merging to `main` most days, which is exactly why track A does
 not sit on the branch.
 
+**Gate discipline on track B:** `check:siblings` diffs against the branch a change will MERGE INTO —
+for track B that is `npm run check:siblings -- --base origin/unify/ui` (the script's own `--base`
+flag), after `unify/ui` has taken the latest `main`. Diffing a B branch against `main` re-flags every
+sibling edit already gated into `unify/ui` (B1's sky→blue, forever), and re-stating an
+already-approved reason each PR is the patch the flag exists to avoid.
+
 ---
 
 ## 6. The conformance matrix (phase 2, design sketch)

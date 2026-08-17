@@ -80,6 +80,10 @@ const he = {
   switcher3d: 'הנדסת המרחב',
   switcherComplex: 'מספרים מרוכבים',
   switcherAria: 'מעבר בין הבונים',
+  // B2 (#667): the opt-in data column (D1) — values/knowledge only; refusals stay on the canvas strip.
+  dataShow: 'נתונים',
+  dataHide: 'הסתר נתונים',
+  dataTitle: 'מה הציור יודע',
   // S5 — the visualization layer (#622)
   stepperLabel: 'מחזור החזקות: n',
   stepBack: 'הקודם',
@@ -160,6 +164,10 @@ const en = {
   switcher3d: 'Space Geometry',
   switcherComplex: 'Complex Numbers',
   switcherAria: 'Switch between builders',
+  // B2 (#667): the opt-in data column (D1) — values/knowledge only; refusals stay on the canvas strip.
+  dataShow: 'Data',
+  dataHide: 'Hide data',
+  dataTitle: 'What the figure knows',
   // S5 — the visualization layer (#622)
   stepperLabel: 'power cycle: n',
   stepBack: 'previous',
