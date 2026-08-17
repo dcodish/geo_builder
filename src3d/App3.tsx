@@ -430,7 +430,7 @@ export default function App3() {
           placeholder={t('actions.namePlaceholder')}
           dir="auto"
           aria-label={t('actions.namePlaceholder')}
-          className="min-w-0 max-w-md flex-1 rounded-lg border border-dashed border-slate-300 bg-transparent px-3 py-1.5 text-center text-base font-semibold text-slate-800 focus:border-sky-500 focus:outline-none"
+          className="min-w-0 max-w-md flex-1 rounded-lg border border-dashed border-slate-300 bg-transparent px-3 py-1.5 text-center text-base font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
         />
       </header>
 
@@ -444,9 +444,9 @@ export default function App3() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={t('input.placeholder')}
-              className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 focus:border-sky-500 focus:outline-none"
+              className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none"
             />
-            <button type="submit" disabled={busy} className="rounded-xl bg-sky-600 px-4 py-2 font-medium text-white hover:bg-sky-700 disabled:opacity-50">
+            <button type="submit" disabled={busy} className="rounded-xl bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50">
               {busy ? t('input.thinking') : t('input.add')}
             </button>
           </form>
@@ -476,7 +476,7 @@ export default function App3() {
                 key={label}
                 type="button"
                 onClick={() => insertSym(sym, back)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-sm text-slate-600 hover:border-sky-400 hover:text-sky-700"
+                className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-sm text-slate-600 hover:border-blue-400 hover:text-blue-700"
               >
                 {label}
               </button>
@@ -494,7 +494,7 @@ export default function App3() {
               adjusted so the statement could hold («ישרה» over a non-cyclic base). Distinct from the
               amber error strip: nothing failed, so it reads as information, not a warning. */}
           {!busy && notices.map((n, i) => (
-            <div key={`notice-${i}`} role="note" className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            <div key={`notice-${i}`} role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {n.kind === 'base-constrained'
                 ? t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
                 : n.kind === 'shape-redundant'
@@ -509,7 +509,7 @@ export default function App3() {
             </div>
           ))}
           {guidanceNote && !lastError && !busy && (
-            <div role="note" className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {guidanceNote}
             </div>
           )}
@@ -528,7 +528,7 @@ export default function App3() {
                   key={k}
                   type="button"
                   onClick={() => setText(t(`examples.${k}`))}
-                  className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-600 hover:border-sky-400 hover:text-sky-700"
+                  className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-600 hover:border-blue-400 hover:text-blue-700"
                 >
                   {t(`examples.${k}`)}
                 </button>
@@ -545,7 +545,7 @@ export default function App3() {
                   checked={f.enabled}
                   onChange={() => toggle(f.id)}
                   title={t('facts.toggleTitle')}
-                  className="accent-sky-600"
+                  className="accent-blue-600"
                 />
                 {f.cmds.some((c) => c.type === 'claim') && derived.status[f.id] === 'ok' ? (
                   <span className="text-xs font-bold text-emerald-600" title={t('facts.claimVerified')}>
@@ -593,7 +593,7 @@ export default function App3() {
                     type="button"
                     title={t('facts.planeToggleTitle', { name })}
                     onClick={() => togglePlaneDisplay(name)}
-                    className="shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] leading-4 text-slate-500 hover:border-sky-400 hover:text-sky-700"
+                    className="shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] leading-4 text-slate-500 hover:border-blue-400 hover:text-blue-700"
                   >
                     {(planeDisplay[name] ?? 'full') === 'full' ? t('facts.planeFace') : (planeDisplay[name] === 'face' ? t('facts.planeHide') : t('facts.planeFull'))}
                   </button>
@@ -623,7 +623,7 @@ export default function App3() {
                       key={c.he}
                       type="button"
                       onClick={() => setText(c.he)}
-                      className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:border-sky-400 hover:text-sky-700"
+                      className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:border-blue-400 hover:text-blue-700"
                     >
                       {c.he}
                     </button>
@@ -712,7 +712,7 @@ export default function App3() {
           {showData && (
             /* #274 (ADR-3D-057): the query lane — ask for a quantity («w·v», «|AB|», «∠SAB», «area ABC»,
                «volume SABCD») and see it if it's genuinely determined. A question, never a fact. */
-            <div className="rounded-xl border border-sky-200 bg-sky-50/40 p-3 text-sm">
+            <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 text-sm">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -728,7 +728,7 @@ export default function App3() {
                   placeholder={t('query.placeholder')}
                   className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1 text-sm"
                 />
-                <button type="submit" className="rounded-lg bg-sky-600 px-2 py-1 text-sm text-white hover:bg-sky-700">
+                <button type="submit" className="rounded-lg bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700">
                   {t('query.add')}
                 </button>
               </form>
