@@ -1320,3 +1320,119 @@ plane and `scene2`'s adapter).
 **Consequences.** The cutover's deletion step shrinks to genuinely dead code. Also the prerequisite
 [#673](https://github.com/dcodish/geo_builder/issues/673) needs before a `shell/` tree can exist: a
 vocabulary in a layer, not in a monolith about to be removed.
+
+---
+
+## ADR-CX-023 — The acceptance gate comes up a layer, and v2 gets one at all (2026-08-17)
+
+**Status:** accepted · **Slice:** S7 ([#624](https://github.com/dcodish/geo_builder/issues/624)) ·
+**Ladder stage:** **0e — the dry run.** Stage 0e is *"dry-run on a trial fact list; keep-prior on
+failure"*, and this is that stage for the v2 line list. It sits above stage 1's own refusal because the
+two answer different questions: stage 1 says *these givens cannot all hold*, stage 0e says *which line
+to blame, and therefore what to keep*.
+
+### The defect
+
+[ADR-CX-019](#adr-cx-019)'s plan described the store's ADR-276 gate as *"not behind the engine
+switch — a v2 session's acceptance is decided by the prototype today"*. Measured, it is worse than
+that: [#658](https://github.com/dcodish/geo_builder/issues/658) made `addLine` **return early** for v2
+as soon as the grammar could read a line, and the gate sits below that return. **Under `?engine=v2`
+there was no acceptance gate at all** — a session accepted `|z1| = 5` and then `|z1| = 7`, and drew a
+figure satisfying neither.
+
+So this is not a port. It is restoring a doctrine v2 never had.
+
+### Decision 1 — the gate lives in `app/`, and the store stops deciding
+
+The prototype's `derive` is in `engine/`, which the store may import. v2's fold is reached through
+`deriveLines`, which composes `parser` with `replay` — permitted in `app/` **and nowhere else**, by a
+guard that already caught this exact composition living in the wrong layer once. The gate therefore
+comes up a layer into `app/submit.ts`, and the store goes back to being state: `recordLine`, `setError`,
+`resetSession`, `restoreView`, and it decides nothing.
+
+`addLine` **throws** on a v2 line rather than falling through. A default that is wrong whenever the
+caller forgets is the seam [ADR-CX-009](#adr-cx-009) exists to remove, and a silent bypass of the gate
+is exactly that shape.
+
+Session persistence went up with it, into `app/session.ts`, called once from `main.tsx`. Replaying a
+stored session **is** a submit — every stored line passes the grammar and the gate — so it cannot be a
+module side effect of defining the state container. The saved seed is now restored *before* the replay:
+the old order restored it after, which with a gate in the path would re-gate a session saved in
+configuration 3 against configuration 0 and silently drop a line that holds only in the saved drawing.
+
+This is also the extraction 2-D had to perform after the fact (docs/23: a 2,717-line store holding the
+replay engine) and the reason this tree has an `app/` layer from its first slice.
+
+### Decision 2 — a GIVEN can be violated; an ANSWER cannot
+
+The gate reads the three signals a stated given produces — `contradiction` (an inconsistent linear
+system), `emptiedBy` (a filter that empties the configuration set, stage 2's `bound-unsatisfiable`) and
+`unsatisfied` (a numeric relation the solver could not satisfy) — and **ignores `claims` entirely**. A
+student's wrong answer must land and be marked ✗; refusing it would be the tool grading the input box
+instead of the figure. `undecided` is not a violation either: *the engine could not evaluate this* is a
+different sentence from *this is false*, and its own contract says so.
+
+Only a **newly** broken signal refuses. A figure that already carries an unsatisfiable given keeps
+accepting statements — the doctrine is about damage the new line causes, not the state it arrives into.
+
+The mini config-search is kept (8 configurations, the prototype's number) and is justified only by the
+numeric tier: tier 1's contradictions and stage 2's pruning are exact and seed-independent, but a
+relation over a sampled parameter may hold at another seed, and refusing a student's line over one
+sample would be [ADR-052](06-decisions.md#adr-052) inverted.
+
+### Decision 3 — the refusal names the earlier statement DIFFERENTIALLY
+
+*"Which earlier line, removed, lets this one in?"* — the doctrine's own question, answered the way it is
+phrased. The alternative was provenance tracking through Gaussian elimination, and it is the wrong tool:
+elimination's conflict set names only its own rows, and would say nothing about a filter that emptied
+the branch set or a numeric relation that stopped being satisfiable. The differential search covers
+every refusal cause with one mechanism, and it costs `2n` folds on the refusal path only.
+
+When no single earlier line explains it, the statement cannot hold at all (`o = 1+i`) and the new
+`impossible` error quotes the student's own line. `incompatible` with an empty detail — what the
+prototype fell back to — would have printed *"cannot hold together with: «»"*: an error message about
+internal state wearing a statement's clothes.
+
+### The parity gap this uncovered
+
+`arg(z1) < 30`, parenthesised, is what the prototype's own #606 case types. The prototype reads it; v2
+returned `not-handled`. ADR-CX-019's form list sampled the bare `arg z2 < 45` and missed it — a
+capability the cutover would have deleted. `arg` is a KEYWORD in four relation rules, not an operator in
+the expression grammar, so the fix is at the orthography chokepoint (`normalize.ts`: parentheses around
+a name after the argument keyword are punctuation) rather than an optional paren in each pattern and in
+every future argument rule. `conj`/`re`/`im` are genuinely functions and keep theirs. The three
+parenthesised spellings are now in `PROTOTYPE_FORMS`.
+
+### Measured before/after over the corpus
+
+39 sessions, 104 lines, driven through the v2 submit path before and after.
+
+- **8 lines change verdict, every one of them a contradiction v2 previously accepted**, and each new
+  refusal names the earlier statement: `|z1| = 7` after `|z1| = 5` · `arg z1 = 60` after `arg z1 = 30` ·
+  `z1 ברביע השני` after `arg z1 = 30` · `|z1| = 7` and `z1 = 5` after `z1 = 3+4i` · `arg z1 < 30` after
+  `z1 = 1+i` · `o = 1+i` (now `impossible`).
+- **7 final figures change**, all in the same direction: from a broken figure (a contradiction, an empty
+  branch set, or zero points drawn) to the last valid one. That is keep-prior working.
+- **Zero regressions.** Nothing that was accepted and clean is now refused: every §2b exemplar part,
+  every grammar form and every claim family is byte-identical.
+
+One divergence from the prototype is deliberate, and it is Decision 2's line: `z1 = 1+i` then
+`arg z1 < 30` is **accepted with a ✗** by the prototype and **refused** by v2. Drawing z₁ at 45° while
+the student stated `< 30` violates a given, which is the cardinal sin this product is written against,
+so the stricter reading is the honest one — and the prototype had no claim families with which to tell a
+given from an answer.
+
+**Operator ruling, 2026-08-17, on that exact case:** *"z1 = 1+i then arg z1 < 30 — we should refuse."*
+So the refusal is the decision rather than an inference from the ladder, and the prototype's
+accept-with-a-✗ is retired with it.
+
+### Consequences
+
+- `duplicate-name` becomes prototype-only. Under [ADR-CX-009](#adr-cx-009) §1 a second mention of a name
+  is a *given*, so a contradictory redefinition is `incompatible` and a consistent one is simply another
+  given — which is why `z1 = 3+4i` then `|z1| = 5` is accepted.
+- `store/__tests__/submit-path.test.ts` used `['z1 = 3+4i', 'z1 ממשי', 'arg z1 = 45']` as neutral data;
+  `3+4i` fixes the argument at 53.13°, so the gate refuses the third line. The data was accidentally
+  contradictory, and finding it was the first thing the gate did.
+- Steps 3–5 of #624 remain blocked on [#680](https://github.com/dcodish/geo_builder/issues/680): the
+  solution-set capability is not on the v2 path at all, only on the retiring bridge.

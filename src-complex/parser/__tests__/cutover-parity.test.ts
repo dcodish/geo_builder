@@ -41,6 +41,14 @@ const PROTOTYPE_FORMS: string[] = [
   '|z1| = 2|z2|',
   'arg z1 - arg z2 = 90',
   'arg z2 < 45',
+  // The PARENTHESISED spellings. The list above sampled only the bare ones, and that hole hid a real
+  // gap: `arg(z1) < 30` is what the prototype's own #606 case types, the prototype reads it, and v2
+  // returned `not-handled` — a capability the cutover would have deleted. Fixed at the orthography
+  // chokepoint (ADR-CX-023), so every argument rule gained it at once rather than four patterns each
+  // growing an optional paren.
+  'arg(z1) < 30',
+  'arg(z1) = 45',
+  'arg(z1) - arg(z2) = 90',
   'z1 ברביע הראשון',
   'המרובע Oz1z2z3',
   'שטח Oz1z2z3 הוא 150r^2',

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { fmtNum } from './value/value';
 import { deriveScene } from './engine/model';
 import { deriveLines } from './app/deriveLines';
+import { hydrateSession, submitLine } from './app/submit';
 import { v2Claims, v2Formulas, v2Knowledge, v2Labels, v2Measures, v2Status } from './replay/scene2';
 import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
@@ -34,6 +35,7 @@ const ERROR_KEY: Record<InputError['key'], string> = {
   'parse-error': 'errParse',
   'duplicate-name': 'errDuplicate',
   incompatible: 'errIncompatible',
+  impossible: 'errImpossible',
   unaccounted: 'errUnaccounted',
 };
 
@@ -47,7 +49,6 @@ export function App() {
     view,
     engine,
     lastError,
-    addLine,
     removeFact,
     removeLine,
     setFree,
@@ -55,7 +56,6 @@ export function App() {
     nextConfig,
     clearAll,
     serialize,
-    hydrate,
   } = useComplexStore();
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -76,7 +76,7 @@ export function App() {
     void file.text().then((txt) => {
       let ok = false;
       try {
-        ok = hydrate(JSON.parse(txt));
+        ok = hydrateSession(JSON.parse(txt));
       } catch {
         ok = false;
       }
@@ -152,12 +152,12 @@ export function App() {
   const [calcInput, setCalcInput] = useState('');
   const submitCalc = () => {
     if (calcInput.trim() === '') return;
-    if (addLine(calcInput)) setCalcInput('');
+    if (submitLine(calcInput)) setCalcInput('');
   };
 
   const submit = () => {
     if (input.trim() === '') return;
-    if (addLine(input)) setInput('');
+    if (submitLine(input)) setInput('');
   };
 
   return (
@@ -220,7 +220,7 @@ export function App() {
             </p>
           )}
           <div className="panel-actions">
-            <button onClick={() => EXAMPLE_LINES.forEach((l) => addLine(l))}>{t('example')}</button>
+            <button onClick={() => EXAMPLE_LINES.forEach((l) => submitLine(l))}>{t('example')}</button>
             <button onClick={clearAll}>{t('clearAll')}</button>
             <span className="count">{t('factCount', { count: useV2 ? lines.length : facts.length })}</span>
           </div>
