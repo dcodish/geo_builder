@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: a822a2f5-6af6-476b-ae68-7d43e510e8f1
-  modified: 2026-08-13T18:31:03.033Z
+  modified: 2026-08-17T14:01:55.530Z
 ---
 
 On 2026-08-13 an `ff-merge to main` ran in the shared tree minutes after the branch had been verified —
@@ -23,3 +23,10 @@ operation — e.g. `test "$(git branch --show-current)" = "main" && git merge --
 avoid the shared tree entirely: land on main by pushing the gated branch (`git push origin
 <branch>:main`) and fast-forwarding the local ref via `git fetch . <branch>:main`. See
 [[work-pc-cross-machine]].
+
+**Second instance, new mechanism (2026-08-17):** the Bash tool's cwd RESETS to the project root at
+turn boundaries — a session working in a worktree composed a commit there, the turn ended (background
+task notification), and the next turn's `git add -A && git commit` ran against the SHARED tree
+instead; only the same-compound branch guard refused it. So the guard rule covers a second race:
+your own cwd, not just a parallel session. **Worktree git ops always use explicit
+`git -C <worktree-path>` — never rely on Bash cwd persisting across turns.**

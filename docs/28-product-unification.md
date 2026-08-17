@@ -501,6 +501,15 @@ The visible migration of the shipped builders. Each PR: full gates, both sibling
 plays the branch**, then it merges into `unify/ui`. `unify/ui` merges to `main` when the operator
 accepts the whole interface.
 
+> **Amended by [ADR-W-020](06w-decisions-workspace.md#adr-w-020) (operator ruling, 2026-08-17):
+> acceptance runs PROD-PARALLEL.** Each shipped builder gets a `-next` URL
+> (`…/geo-builder-next/`, `…/3d-builder-next/`) serving the `unify/ui` build, while the canonical
+> URL keeps the untouched current build for the whole of Track B — students can only ever be on the
+> canonical URL. The canonical path changes **once per builder**, at the operator's acceptance (the
+> switchover); the `-next` path is torn down after. [#700](https://github.com/dcodish/geo_builder/issues/700)
+> owns the deploy channel; its first use is the B1 build, a deliberate visual no-op for 2-D, so the
+> channel is proven before any visible surface rides it.
+
 | item | decisions | note |
 | --- | --- | --- |
 | B1 tokens | D2, D3 | `theme.ts` values → Tailwind theme; 3-D sky→blue; complex stone→slate. **Enables everything after it** |
