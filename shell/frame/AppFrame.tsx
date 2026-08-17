@@ -131,11 +131,11 @@ export function AppFrame({
   );
 }
 
-/** One centred container so the suite bar's content, the tool row and the body align. */
+/** One container so the suite bar's content, the tool row and the body align — full width with
+ *  matched edge padding (operator, 2026-08-17: the centred cap wasted the screen's sides). */
 const container: CSSProperties = {
-  maxWidth: 1180,
   margin: '0 auto',
-  paddingInline: 16,
+  paddingInline: 20,
 };
 const suiteBar: CSSProperties = {
   background: color.surface,

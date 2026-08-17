@@ -1,3 +1,8 @@
+/* B2 (#667) — the three-column layout (docs/28 §4a D1) at the mockup polish level (the D3
+   calibration): input+facts RIGHT, canvas CENTRE, the opt-in data column LEFT; card surfaces on
+   the slate tokens (B1). D10: on narrow viewports the data column becomes a dismissable overlay —
+   the canvas and the input box are ALWAYS both visible (the defining interaction is watching the
+   figure form while typing). The suite bar, tool row, About and banners are the shared frame's. */
 * { box-sizing: border-box; }
 body {
   margin: 0;
@@ -5,44 +10,75 @@ body {
   background: #f8fafc;
   color: #0f172a;
 }
-.app { max-width: 1180px; margin: 0 auto; padding: 4px 16px 12px; }
-/* The suite bar, tool row, About modal and banners are the shared frame's (shell/frame, #673 +
-   the #706 level model), styled by the shell's own tokens. This sheet keeps the product BODY
-   only, until B1 (#666) migrates the palette onto the Tailwind tokens. */
-main { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+/* Full-width app (operator, 2026-08-17: "a lot of wasted space to the left and right") — the
+   canvas takes the stretch; the side columns hold their widths. The shared frame rows use the
+   same edge padding so all three levels align. */
+.app { max-width: none; margin: 0 auto; padding: 4px 20px 16px; }
+main { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+/* RTL flex: DOM order panel → canvas → data renders right → centre → left (D1's sides). */
+.panel { flex: 1 1 340px; min-width: 320px; display: flex; flex-direction: column; gap: 12px; }
+.canvas { flex: 2 1 460px; min-width: 360px; }
+/* The data column is a PERMANENT fixture on wide screens (operator refinement of D1): the header
+   button collapses its CONTENT, never the column. On narrow screens (D10) the column hides and
+   the launcher under the canvas opens it as an overlay. */
+.data {
+  flex: 0 0 260px; min-width: 230px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  font-size: 13px; line-height: 1.6;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.data-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.data-title { font-size: 12px; font-weight: 700; color: #475569; letter-spacing: 0.2px; }
+.data-toggle { font-size: 12px; padding: 4px 10px; }
+.data-launcher { display: none; }
+
+/* The card surface — the mockups' grouping (one for input+palette, one for the fact list). */
+.card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.input-card { display: flex; flex-direction: column; gap: 10px; }
+
 /* LEVEL 3 (docs/28 §4a levels ruling): figure actions live UNDER the canvas — they act on the figure. */
 .figure-actions { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
-.panel { flex: 1 1 320px; min-width: 300px; }
-.canvas { flex: 1 1 480px; min-width: 320px; }
-.gauss-plane { width: 100%; height: auto; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; touch-action: none; }
-.input-row { display: flex; gap: 6px; }
+
+.gauss-plane {
+  width: 100%; height: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); touch-action: none;
+  /* on very wide screens the square plane must not devour the viewport — the figure actions
+     under it (D7) stay reachable without scrolling */
+  max-height: 76vh;
+}
+.input-row { display: flex; gap: 8px; }
 .input-row input {
-  flex: 1; padding: 8px 10px; font-size: 0.95rem; font-family: ui-monospace, Consolas, monospace;
-  border: 1px solid #cbd5e1; border-radius: 6px;
+  flex: 1; padding: 11px 12px; font-size: 15px; font-family: ui-monospace, Consolas, monospace;
+  border: 1px solid #cbd5e1; border-radius: 9px;
 }
-/* The ONE "do it" action gets the primary treatment (theme.ts btn.primary; the mockups' send
-   button) — the operator's B1 report: «הוסף» had the palette but not the treatment. */
-.input-row button {
-  background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600;
-}
-.input-row button:hover { background: #1d4ed8; }
 button {
-  padding: 7px 12px; font-size: 0.9rem; border: 1px solid #cbd5e1; border-radius: 6px;
+  padding: 8px 14px; font-size: 0.9rem; border: 1px solid #cbd5e1; border-radius: 9px;
   background: #fff; cursor: pointer;
 }
 button:hover { background: #f8fafc; }
-.symbols { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+/* The ONE "do it" action gets the primary treatment (theme.ts btn.primary; the mockups' send
+   button) — the operator's B1 report: «הוסף» had the palette but not the treatment. */
+.input-row button {
+  background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600; padding: 10px 18px;
+}
+.input-row button:hover { background: #1d4ed8; }
+.symbols { display: flex; gap: 5px; flex-wrap: wrap; }
 .sym {
   font-family: ui-monospace, Consolas, monospace; font-size: 0.92rem;
-  padding: 4px 9px; background: #f8fafc;
+  padding: 6px 10px; background: #f8fafc; border-radius: 8px;
 }
-.panel-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.panel-actions { display: flex; gap: 8px; align-items: center; }
 .count { color: #94a3b8; font-size: 0.85rem; margin-inline-start: auto; }
 .error { color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 6px 10px; font-size: 0.9rem; }
-.facts { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.facts { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .fact {
-  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
-  background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 9px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
 }
 .fact.err { border-color: #fecaca; background: #fef2f2; }
 .fact code { font-size: 0.92rem; }
@@ -72,33 +108,53 @@ button:hover { background: #f8fafc; }
 .del:hover { color: #b91c1c; background: none; }
 .hint { color: #94a3b8; font-size: 0.9rem; padding: 8px 2px; }
 
-/* The ?engine=v2 preview banner (#616). Temporary: S5 replaces this surface with the real shell. */
+/* THE HONESTY STRIP (B2's split of the old banner): refusal/status surfaces, always visible. */
 .v2-banner {
   font-size: 12px;
   line-height: 1.5;
   padding: 6px 10px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   border: 1px solid #a78bfa;
-  border-radius: 6px;
+  border-radius: 9px;
   background: #f5f3ff;
   color: #4c1d95;
 }
 .v2-skip { color: #92400e; }
-
 .v2-claim { color: #1e3a8a; }
 
 /* S5 (#622): the n stepper and the region counts. Both are DISPLAY surfaces — the stepper's value
    never leaves the component, and the counts are read off the scene, never recomputed here. */
 .stepper {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin-top: 6px; padding: 5px 10px; font-size: 0.85rem;
-  color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;
+  margin-top: 8px; padding: 5px 10px; font-size: 0.85rem;
+  color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 9px;
 }
 .stepper button { padding: 1px 10px; font-size: 1rem; line-height: 1.2; }
 .region-count {
   margin-top: 6px; padding: 5px 10px; font-size: 0.85rem;
-  color: #4c1d95; background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 6px;
+  color: #4c1d95; background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 9px;
 }
 
 /* S6 (#623): a surfaced formula-sheet row. The formula text is LTR maths whatever the UI language. */
 .v2-formula { color: #065f46; font-family: ui-monospace, Consolas, monospace; font-size: 11px; }
+
+/* D10 — narrow viewports (portrait tablet): the data column stops being a column and slides OVER
+   the canvas as a dismissable overlay (the «נתונים» button under the canvas toggles it), so the
+   canvas and the input box are always both visible. Phones stay out of scope (NFR-US-4). */
+@media (max-width: 1000px) {
+  .data { display: none; }
+  .data.open {
+    display: flex;
+    position: fixed;
+    /* inline-END = the LEFT edge in RTL — the overlay covers the canvas side (D10), never the
+       input column: the student keeps typing while the data floats over the figure */
+    inset-inline-end: 12px;
+    top: 84px;
+    bottom: 16px;
+    width: min(320px, 85vw);
+    overflow-y: auto;
+    z-index: 60;
+    box-shadow: 0 18px 50px rgba(15, 23, 42, 0.25);
+  }
+  .data-launcher { display: inline-block; }
+}
