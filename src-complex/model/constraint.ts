@@ -49,8 +49,8 @@ export interface Constraint {
  */
 export type BranchFilter =
   /** strict interior of a quadrant, numbered the exam's way: 1 = (0°, 90°) */
-  | { readonly kind: 'quadrant'; readonly name: string; readonly q: 1 | 2 | 3 | 4 }
+  | { readonly kind: 'quadrant'; readonly name: string; readonly q: 1 | 2 | 3 | 4; readonly src?: string }
   /** an open range in degrees; either end may be omitted */
-  | { readonly kind: 'range'; readonly name: string; readonly minDeg?: Rat; readonly maxDeg?: Rat }
+  | { readonly kind: 'range'; readonly name: string; readonly minDeg?: Rat; readonly maxDeg?: Rat; readonly src?: string }
   /** the direction is exactly this many degrees */
-  | { readonly kind: 'exact'; readonly name: string; readonly deg: Rat };
+  | { readonly kind: 'exact'; readonly name: string; readonly deg: Rat; readonly src?: string };

@@ -1533,3 +1533,92 @@ has not heard of, which is the silent-drop class wearing a test helper's clothes
 - Selection among an enumerated solution set, and [#688](https://github.com/dcodish/geo_builder/issues/688)'s
   claim drive-or-check, are named gaps — operator ruling 2026-08-17: v2 defects wait for dedicated
   complex sessions; only capability the prototype HAS blocks the cutover.
+
+## ADR-CX-025 — A filter's window survives the change of basis, and is re-verified on the drawn direction (2026-08-17)
+
+**Status:** accepted · **Slice:** S7 ([#624](https://github.com/dcodish/geo_builder/issues/624)),
+fixes [#690](https://github.com/dcodish/geo_builder/issues/690) ·
+**Ladder stage:** **2b** gains the projection; **3e** gains the filter backstop it never had.
+
+### The defect
+
+Found by the #624 step-3 coverage measurement, not by a user — which is the point of measuring rather
+than eyeballing what the retiring suite locks.
+
+A filter had exactly two arms, and a name could fall between them. `filterBranches` PRUNES enumerated
+branches, reading `branch.angles` — so it reaches a name whose direction the equations *fixed*. The
+`windows` map BOUNDS the sample and the minimiser, keyed by name — so it reaches a name in the *free
+basis*. A name elimination made **dependent** on the basis is in neither, and its filter was dropped in
+silence:
+
+```
+z3 ברביע הראשון
+arg z3 + arg z2 = 0
+```
+
+→ z₃ drawn at **219.52°**, outside the stated quadrant, with `unsatisfied`, `emptiedBy`, `undecided` and
+`untranslated` all clean. Deriving the §2b setup **with** and **without** its two z₂ filters gave the
+identical figure: the givens had no effect at all.
+
+It cost the corpus exemplar. §2b part ב built at z₂ = 243.44° with a perimeter of 72.8452r, where the
+prototype builds z₂ = 20°→26.57° and answers **60r**. This is [ADR-052](06-decisions.md#adr-052)'s
+cardinal sin — a figure that contradicts a stated given — reached by a new route.
+
+It is a **class, not a case**: which of a filter's three possible roles a name gets is decided by pivot
+order inside Gaussian elimination, which is invisible from the line the student typed. Any F4/F5 filter
+paired with any monomial relation can land in it. And because ADR-CX-023's acceptance gate reads exactly
+the signals that stayed clean, the gate accepted the line that broke the figure.
+
+### Decision 1 — a window on a dependent name is a window on the basis coordinate that carries it
+
+The linear tier leaves every dependent direction as an affine function of the basis,
+`arg(name) = K + Σ cᵢ·arg(basisᵢ)`. A window on the left is therefore a window on the right whenever
+exactly one `cᵢ` is non-zero — the corpus case, because the exam relates directions in pairs. So
+`solve/window.ts` projects it there and the existing `windows` map does both of its jobs for the
+dependent name too.
+
+This is deliberately **not a third arm**. One `narrow()` call already reaches the initial sample *and*
+the minimiser bounds, because both read that map — so the fix is at the chokepoint that exists rather
+than beside it. LADDER-CX's own tripwire is *"if this file grows a case ladder, that is the tripwire"*,
+and a third mechanism per filter role would have been one.
+
+A filter still **selects and never drives** ([ADR-CX-002](#adr-cx-002)): bounding the basis picks among
+the drawings the equations already allow, exactly as bounding a free direction always did. No row, no
+residual, nothing determined.
+
+### Decision 2 — a direction's window is bounded at its turn, both ends
+
+«arg z < 45°» is the sector (0°, 45°), not the half-line (−∞, 45°). `filter.ts` already read it that way
+— it folds into [0°, 360°) before comparing — but the bound was implicit, and an implicit one cannot
+survive a change of basis: an unbounded end has no turn to be a representative *of*, so shifting it by a
+turn silently admits different directions. The first cut of this module carried the infinity through and
+let «arg z2 < 45» pass at 66.28°. Making both ends explicit is the fix, not a tidy-up.
+
+Which turn's representative to keep is chosen by overlap with what that coordinate is **already**
+confined to, so accumulating two filters intersects instead of landing in different turns.
+
+### Decision 3 — stage 3e re-verifies every filter against the direction actually DRAWN
+
+Measures have had this backstop since the tier landed; filters had none, and that asymmetry is what made
+#690 silent rather than merely wrong. Pruning and projection are both *arrangements* to make a filter
+hold, and an arrangement can fail to reach: a window over two basis coordinates is a half-plane that
+projection honestly declines, and the numeric tier may afterwards move a direction pruning had settled.
+
+So the last word is read off the drawn point — whatever route the number took, the student's question is
+asked about the student's number. It is reported through `unsatisfied` rather than a new channel because
+it is the same sentence (*you stated this and the drawing does not do it*), and because the acceptance
+gate already reads that signal — so the line that breaks an earlier given is now blamed rather than
+accepted, with no change to the gate.
+
+`BranchFilter` gained `src`, so the report quotes the student's line; `describeFilter` is the fallback
+for a filter built in code, and is in the student's register because a violated filter is shown to them.
+
+### Consequences
+
+- **The §2b capstone builds on v2**: z₂ = 26.57° (arctan ½), perimeter **60r**, matching the prototype.
+- **The cutover is unblocked** on this axis — this was a capability the prototype had and v2 did not.
+- Projection covers one basis coordinate; two or more is reported, not drawn. A half-plane window would
+  need an interval-propagation machine, and that is a CAS-shaped thing this tree refuses without an
+  operator decision (`src-complex/CLAUDE.md` boundary 3). Reporting is honest; inventing is not.
+- `filterBranches` is unchanged: pruning a branch that fixes the direction is still the first arm, and
+  projection deliberately skips a branch-fixed name rather than bounding a coordinate that moves nothing.

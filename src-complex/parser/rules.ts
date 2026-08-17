@@ -203,7 +203,7 @@ const quadrantGiven: Rule = (s) => {
   return {
     ...empty(),
     declares: [name],
-    filters: [{ kind: 'quadrant', name, q: found[1] }],
+    filters: [{ kind: 'quadrant', name, q: found[1], src: s }],
     claims: [
       { start: 0, end: m[1].length },
       { start: tailAt + (kw.index ?? 0), end: tailAt + (kw.index ?? 0) + kw[0].length },
@@ -316,7 +316,7 @@ const argumentInequality: Rule = (s) => {
     return {
       ...empty(),
       declares: [name.toLowerCase()],
-      filters: [{ kind: 'range', name: name.toLowerCase(), minDeg: rat(low, 1), maxDeg: rat(high, 1) }],
+      filters: [{ kind: 'range', name: name.toLowerCase(), minDeg: rat(low, 1), maxDeg: rat(high, 1), src: s }],
       claims: [claimAll(s)],
     };
   }
@@ -329,8 +329,8 @@ const argumentInequality: Rule = (s) => {
     declares: [name],
     filters: [
       isBelow(op)
-        ? { kind: 'range', name, maxDeg: rat(Number(deg), 1) }
-        : { kind: 'range', name, minDeg: rat(Number(deg), 1) },
+        ? { kind: 'range', name, maxDeg: rat(Number(deg), 1), src: s }
+        : { kind: 'range', name, minDeg: rat(Number(deg), 1), src: s },
     ],
     claims: [claimAll(s)],
   };
