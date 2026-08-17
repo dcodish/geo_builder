@@ -84,6 +84,8 @@ describe("a CLAIM is the student's answer — it lands and is marked, never refu
    * refused rather than drawn. «z1 מדומה טהור» is an ASSERTION and is verified. The prototype had no
    * claim families at all and read the inequality as a check it could fail with a ✗; drawing z₁ at 45°
    * while the student stated `< 30` violates a given, so v2's stricter reading is the honest one.
+   *
+   * Operator ruling, 2026-08-17, on this exact pair: *"we should refuse."*
    */
   it('an inequality is a GIVEN, so it refuses where a claim would be marked ✗', () => {
     expect(submitLine('z1 = 1+i')).toBe(true);

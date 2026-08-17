@@ -1422,6 +1422,10 @@ the student stated `< 30` violates a given, which is the cardinal sin this produ
 so the stricter reading is the honest one — and the prototype had no claim families with which to tell a
 given from an answer.
 
+**Operator ruling, 2026-08-17, on that exact case:** *"z1 = 1+i then arg z1 < 30 — we should refuse."*
+So the refusal is the decision rather than an inference from the ladder, and the prototype's
+accept-with-a-✗ is retired with it.
+
 ### Consequences
 
 - `duplicate-name` becomes prototype-only. Under [ADR-CX-009](#adr-cx-009) §1 a second mention of a name
