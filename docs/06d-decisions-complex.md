@@ -1681,6 +1681,23 @@ A complex `ref` appearing outside every `|·|` now refuses. Inside the bars a co
 magnitude and belongs there; outside them it carries a direction too, and equating that to a magnitude
 states nothing coherent. The student is told, rather than shown a different statement.
 
+**And the same flag was hiding a third reading**, found while locking the palette forms in step 3. A bare
+NAME opposite the bars is a **definition**, not a magnitude relation: «w1 = \|z1\|» states w1 completely —
+it is the real number \|z1\|, argument included. Lowered modulus-only it kept `\|w1\| = 5` and left the
+direction free to be sampled, so over `z1 = 3+4i` it drew **1.91 + 4.62i** instead of **5**. Half a given,
+dropped in silence — the same class as the other two, one flag along.
+
+So the shape asks a three-way question and is now read as three:
+
+| opposite the bars | sentence | lowering |
+| --- | --- | --- |
+| a bare name | a definition — the number, completely | ordinary equation, both rows |
+| a real-valued expression | a magnitude relation | modulus row only (ADR-052: no invented direction) |
+| a complex expression | a type error | refused, naming the line |
+
+`abs` is already exact in the value layer — real and non-negative — so the definition case needs nothing
+added beyond letting the ordinary equation carry it.
+
 ### Withdrawn from the issue
 
 A false geometric sequence over determined numbers was filed as a fourth gap and is not one: it lowers to

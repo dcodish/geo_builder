@@ -212,6 +212,25 @@ describe('a magnitude may not silently equal a COMPLEX number', () => {
       expect(deriveLines([line]).untranslated, line).toEqual([]);
     }
   });
+
+  /**
+   * The third reading of the same shape. A bare NAME opposite the bars is a DEFINITION, and it states
+   * the number completely — argument included. Lowering it modulus-only left the direction free to be
+   * sampled, which is half a given dropped in silence.
+   */
+  it('«w1 = |z1|» DEFINES a real number — both halves, not just the magnitude', () => {
+    const d = deriveLines(['z1 = 3+4i', 'w1 = |z1|']);
+    const w1 = d.points.find((p) => p.name === 'w1')!;
+    expect(w1.z.re).toBeCloseTo(5, 6);
+    expect(w1.z.im).toBeCloseTo(0, 6);
+    expect(d.freeDof).toEqual([]);
+  });
+
+  it('…and a magnitude RELATION still leaves the direction free, as ADR-052 requires', () => {
+    const d = deriveLines(['|z1| = 5']);
+    expect(Math.hypot(d.points[0].z.re, d.points[0].z.im)).toBeCloseTo(5, 6);
+    expect(d.freeDof).toContain('arg z1');
+  });
 });
 
 describe('a quadrant given reads in every word order the register has', () => {

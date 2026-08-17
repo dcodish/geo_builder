@@ -392,13 +392,25 @@ const equation: Rule = (s) => {
   const lhs = parseExpr(s, 0, eq, atoms);
   const rhs = parseExpr(s, eq + 1, s.length, atoms);
   if (!lhs || !rhs) return null;
-  const modulusOnly = lhs.t === 'abs' || rhs.t === 'abs';
-  // A magnitude may not silently equal a COMPLEX number. When one side is `|·|` the other is wrapped
-  // in `abs` below, which is right for `|z1| = 9r` (a real parameter) and `|z1| = 2|z2|` (already a
-  // magnitude) — and wrong for `|z1| = 9w`, where it re-reads a type error as `|z1| = 9|w|`, invents a
-  // complex `w` and draws a phantom for it. The student stated something that cannot hold; they are
-  // told so, rather than shown a different statement (#691).
-  if (modulusOnly && [lhs, rhs].some(hasBareComplexRef)) return null;
+  /**
+   * A `|·|` on one side asks a THREE-way question, and reading it as two is how givens went missing.
+   *
+   * The side opposite the bars decides which sentence this is:
+   *
+   * - a bare NAME — «w1 = |z1|» — is a DEFINITION. It states the number completely: w1 is the real
+   *   |z1|, argument included. Lowering it modulus-only kept `|w1| = 5` and left the direction free to
+   *   be sampled, so `w1 = |z1|` over `z1 = 3+4i` drew 1.91 + 4.62i instead of 5. Half a given, dropped
+   *   in silence. `abs` is already exact in the value layer — real and non-negative — so the ordinary
+   *   equation carries both rows and needs nothing added.
+   * - a real-valued EXPRESSION — «|z1| = 9r», «|z1| = 2|z2|» — is a magnitude relation, and must stay
+   *   modulus-only or it would invent a direction the student never stated (ADR-052).
+   * - a complex expression — «|z1| = 9w» — is a TYPE ERROR. Wrapping it in `abs` re-read it as
+   *   «|z1| = 9|w|», invented a complex `w` and drew a phantom for it. The student is told instead.
+   */
+  const other = lhs.t === 'abs' ? rhs : lhs;
+  const barred = lhs.t === 'abs' || rhs.t === 'abs';
+  if (barred && other.t !== 'ref' && hasBareComplexRef(other)) return null;
+  const modulusOnly = barred && other.t !== 'ref';
   // `X^n = rhs` on a bare letter: report the SHAPE and let the fold read it, because which of
   // ADR-CX-005's three modes it is depends on what earlier lines mentioned (#680, model/solutionSet.ts).
   const roots = modulusOnly ? null : asRootsEquation(lhs, rhs, s);
