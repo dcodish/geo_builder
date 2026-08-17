@@ -64,6 +64,11 @@
         "from": "src-complex",
         "to": "shell",
         "why": "The one sanctioned shared-code edge (ADR-W-016): shell/ is chrome parameterized by the caller, and src-complex is its first consumer. Listed as allowed so the isolation test asserts the edge is REAL — shell/ can never silently become a dead tree the manifest still advertises."
+      },
+      {
+        "from": "server",
+        "to": "src-complex",
+        "why": "The same binding-point pattern as server -> src / src3d (llmShared): server/adminConfig.ts runs the complex grammar (parser/rules parseLineV2, context-free) to validate featured quick commands at SAVE time — a command the parser refuses is never offered to a student (#662's lock, the #511 asymmetry closed at the source)."
       }
     ],
     "forbidden": [

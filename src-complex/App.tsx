@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { Banner } from '../shell/frame/Banner';
 import { readEnvelope, savedFileName } from '../shell/save';
+import { applySwitcherConfig, type ToolConfig } from '../shell/switcherConfig';
 import { applySymbol, type SymbolSpec } from '../shell/symbols';
 import { deriveLines } from './app/deriveLines';
 import { COMPLEX_SESSION, hydrateSession, submitLine } from './app/submit';
@@ -112,6 +113,19 @@ export function App() {
   }, [i18n.language]);
 
   /**
+   * THE OPERATOR'S CURATION OVERLAY (A3, #662): fetched once, applied over the static roster.
+   * DEGRADED PATH by construction — a dead or configless server answers non-200 and the switcher
+   * renders the built-in registry roster; nothing here can error at the student.
+   */
+  const [toolConfig, setToolConfig] = useState<ToolConfig | null>(null);
+  useEffect(() => {
+    void fetch(`${import.meta.env.BASE_URL}api/config?tool=complex`)
+      .then((r) => (r.status === 200 ? (r.json() as Promise<ToolConfig>) : null))
+      .then((cfg) => setToolConfig(cfg))
+      .catch(() => setToolConfig(null));
+  }, []);
+
+  /**
    * THE FIGURE — the student's lines, folded. One engine, no switch
    * ([ADR-CX-027](../docs/06d-decisions-complex.md#adr-cx-027)).
    *
@@ -157,15 +171,18 @@ export function App() {
    */
   const roster = useMemo(
     () =>
-      registry.products
-        .filter((p) => p.enabled)
-        .map((p) => ({
-          id: p.id,
-          label: t(p.labelKey),
-          icon: p.icon,
-          url: import.meta.env.DEV ? p.devUrl : p.url,
-        })),
-    [t],
+      applySwitcherConfig(
+        registry.products
+          .filter((p) => p.enabled)
+          .map((p) => ({
+            id: p.id,
+            label: t(p.labelKey),
+            icon: p.icon,
+            url: import.meta.env.DEV ? p.devUrl : p.url,
+          })),
+        toolConfig,
+      ),
+    [t, toolConfig],
   );
 
   /**
