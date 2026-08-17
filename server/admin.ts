@@ -1131,6 +1131,9 @@ ${savedBlock}${refusalBlock}
 ${rows}
 </table>
 <h2>פקודות מהירות (שורה לפקודה) — מאומתות מול הדקדוק בשמירה</h2>
+<p class="note">נשמרות כבר עכשיו, אך <strong>עדיין אינן מוצגות בכלי</strong> — משטח הפקודות המהירות
+(צ'יפים על הקנבס הריק + שורה מעל הקלט) נבנה בשלב B4 של התוכנית, ואז הרשימה הזו תופיע. השינויים
+שנראים בכלי מיד: שורת הבורר למעלה (מוצג / סדר / תווית / סמל).</p>
 <textarea name="quick" placeholder="z1 = 3+4i">${esc((cfg.quickCommands ?? []).join('\n'))}</textarea>
 <div><button type="submit">שמירה</button> <a href="${base}" style="margin-inline-start:12px">חזרה לדוח</a></div>
 </form>
