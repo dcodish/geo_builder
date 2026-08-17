@@ -866,3 +866,35 @@ the npm script and the lane had lagged), and §9 records complex as shipped rath
 icons, order, visibility) is exactly what A3's admin config owns, bounded by choose-among-what-exists
 (ADR-W-018 decision 7). What is NOT configurable stays in code: which builders exist, their trees and
 URLs — this file, cross-checked.
+
+## ADR-W-022 — Operator config: persisted curation, bounded by choose-among-what-exists (#662)
+
+**Status:** accepted, 2026-08-17 · **Issue:** [#662](https://github.com/dcodish/geo_builder/issues/662)
+(unify A3; [ADR-W-018](#adr-w-018) decision 7)
+
+**Decision.** `server/adminConfig.ts` + a `/config` page on the existing password-protected admin:
+
+1. **The store** is one JSON document per tool beside the events log, written ATOMICALLY
+   (tmp + rename, the event-log precedent). Malformed or missing reads as **absent** — the degraded
+   path is a lock, not a fallback: a dead or configless server leaves every builder rendering its
+   static registry roster.
+2. **Save-time validation enforces the non-negotiable line** — config chooses among what exists:
+   a switcher id absent from `products.json` is refused (builder 5 cannot be conjured from a form);
+   a featured quick command runs through the tool's REAL grammar and is refused with the entry and
+   reason if it does not parse. The complex lane uses `parseLineV2` (context-free), which adds the
+   **`server → src-complex` allowed edge** to the manifest — the same binding-point pattern as the
+   llmShared edges, asserted real by the isolation test. Tools whose validation lane does not exist
+   yet (2-D/3-D quick commands await their B4 surface) are refused HONESTLY, never stored unchecked.
+3. **The wire contract is a guarded mirror**: `server/adminConfig.ts` ↔ `shell/switcherConfig.ts`
+   may not import each other (BOUNDARIES), so the `ToolConfig` shape lives on both sides and both
+   sides tolerate unknown fields — the mirror can drift ahead but never hard-break the other.
+4. **One config page curates every tool** (`…/admin/config?tool=<id>`, registry-validated): complex
+   has no dashboard mount of its own — it does not log — and its curation must not wait for one.
+5. **The public read** `GET /api/config?tool=` is unauthenticated by design (it serves students'
+   builders and can only reveal curation saved for public display); `204` means "use your static
+   roster". The complex builder applies the overlay via `shell/switcherConfig.applySwitcherConfig`;
+   2-D/3-D consume it when their shell adoption lands (B3).
+
+**Flagged, operator-side, one-time:** prod complex reads `/complex-builder/api/config`, so the same
+Apache api-mapping the siblings have must be added for complex before the overlay is live in prod —
+until then the degraded path serves the static roster, which is correct behaviour, not an error.

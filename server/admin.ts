@@ -20,6 +20,8 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { eventsLogPath, type UsageEvent } from './eventLog';
 import { clientIp, makeRateLimiter } from './http';
+import { readToolConfig, validateToolConfig, writeToolConfig, type ConfigRefusal, type ToolConfig } from './adminConfig';
+import productRegistry from '../products.json';
 
 const SESSION_MS = 8 * 60 * 60 * 1000; // 8 h
 const COOKIE = 'geo_admin';
@@ -165,6 +167,8 @@ const VERDICT_LABELS: Record<string, string> = {
 export interface DashboardProfile {
   /** Page + header title. */
   title: string;
+  /** The tool id this dashboard serves (registry id; keys the per-tool config file — A3, #662). */
+  tool: string;
   /** Outcome-key → Hebrew label, in display order (the outcome-bars + recent-activity table read this). */
   outcomeLabels: Record<string, string>;
   /** Map one `submit` event to its outcome key. */
@@ -234,6 +238,7 @@ function scopeCategoryOf2D(e: UsageEvent): string | null {
 }
 
 export const PROFILE_2D: DashboardProfile = {
+  tool: '2d',
   title: 'Geo Builder — דוח שימוש',
   outcomeLabels: OUTCOME_LABELS_2D,
   classify: outcomeOf2D,
@@ -317,6 +322,7 @@ function refusalCodeOf3D(e: UsageEvent): string | null {
 }
 
 export const PROFILE_3D: DashboardProfile = {
+  tool: '3d',
   title: '3D Builder — דוח שימוש',
   outcomeLabels: OUTCOME_LABELS_3D,
   classify: outcomeOf3D,
@@ -1025,6 +1031,115 @@ function send(res: ServerResponse, code: number, html: string, headers: Record<s
 }
 
 /** Handle any `.../admin*` request: login form, login POST, logout, or dashboard. */
+/** Build a ToolConfig from the config form's fields (A3): absent show_<id> ⇒ hidden; numeric
+ *  order_<id> ranks the listed ids; empty overrides are simply not recorded. */
+export function configFromForm(params: URLSearchParams): ToolConfig {
+  const hidden: string[] = [];
+  const labels: Record<string, string> = {};
+  const icons: Record<string, string> = {};
+  const ranked: { id: string; rank: number }[] = [];
+  for (const p of productRegistry.products) {
+    if (params.get(`show_${p.id}`) === null) hidden.push(p.id);
+    const label = (params.get(`label_${p.id}`) ?? '').trim();
+    if (label) labels[p.id] = label;
+    const icon = (params.get(`icon_${p.id}`) ?? '').trim();
+    if (icon) icons[p.id] = icon;
+    const rank = Number((params.get(`order_${p.id}`) ?? '').trim());
+    if (Number.isFinite(rank) && (params.get(`order_${p.id}`) ?? '').trim() !== '')
+      ranked.push({ id: p.id, rank });
+  }
+  const quickCommands = (params.get('quick') ?? '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  const cfg: ToolConfig = {};
+  const switcher: ToolConfig['switcher'] = {};
+  if (hidden.length) switcher.hidden = hidden;
+  if (Object.keys(labels).length) switcher.labels = labels;
+  if (Object.keys(icons).length) switcher.icons = icons;
+  if (ranked.length) switcher.order = ranked.sort((a, b) => a.rank - b.rank).map((r) => r.id);
+  if (Object.keys(switcher).length) cfg.switcher = switcher;
+  if (quickCommands.length) cfg.quickCommands = quickCommands;
+  return cfg;
+}
+
+/** The operator config form (A3, #662). Curation only: the rows ARE the registry — nothing can be
+ *  added here, only hidden, reordered, relabeled. Refusals render inline, naming each entry. */
+function configPage(
+  base: string,
+  profile: DashboardProfile,
+  tool: string,
+  cfg: ToolConfig,
+  refusals: ConfigRefusal[],
+  saved: boolean,
+): string {
+  const sw = cfg.switcher ?? {};
+  const hiddenSet = new Set(sw.hidden ?? []);
+  const orderOf = (id: string) => {
+    const i = (sw.order ?? []).indexOf(id);
+    return i < 0 ? '' : String(i + 1);
+  };
+  const esc = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const rows = productRegistry.products
+    .map(
+      (p) => `<tr>
+        <td><code>${p.id}</code></td>
+        <td style="text-align:center"><input type="checkbox" name="show_${p.id}" ${hiddenSet.has(p.id) ? '' : 'checked'}></td>
+        <td><input type="number" name="order_${p.id}" value="${orderOf(p.id)}" min="1" style="width:4em"></td>
+        <td><input type="text" name="label_${p.id}" value="${esc(sw.labels?.[p.id] ?? '')}" placeholder="ברירת מחדל: תווית הכלי"></td>
+        <td><input type="text" name="icon_${p.id}" value="${esc(sw.icons?.[p.id] ?? '')}" placeholder="${esc(p.icon)}" style="width:5em"></td>
+      </tr>`,
+    )
+    .join('\n');
+  const refusalBlock = refusals.length
+    ? `<div class="refusals"><strong>לא נשמר — יש לתקן:</strong><ul>${refusals
+        .map((r) => `<li><code>${esc(r.field)}</code> · <code dir="ltr">${esc(r.entry)}</code> — ${esc(r.why)}</li>`)
+        .join('')}</ul></div>`
+    : '';
+  const savedBlock = saved ? '<div class="saved">נשמר. הבונים יקראו את הקונפיגורציה בטעינה הבאה.</div>' : '';
+  return `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
+<title>${esc(profile.title)} — קונפיגורציה</title>
+<style>
+ body{font-family:system-ui,'Segoe UI',sans-serif;background:#f8fafc;color:#0f172a;margin:0;padding:24px;max-width:860px;margin-inline:auto}
+ h1{font-size:20px} h2{font-size:15px;margin-top:24px}
+ table{border-collapse:collapse;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:8px}
+ th,td{padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:start;font-size:14px}
+ input[type=text],input[type=number],textarea{border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:14px;width:100%;box-sizing:border-box}
+ textarea{font-family:ui-monospace,Consolas,monospace;direction:ltr;min-height:90px}
+ button{background:#2563eb;color:#fff;border:1px solid #2563eb;border-radius:8px;padding:9px 18px;font-size:14px;cursor:pointer;margin-top:16px}
+ .refusals{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:10px 14px;margin:14px 0}
+ .saved{background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;border-radius:8px;padding:10px 14px;margin:14px 0}
+ .note{color:#64748b;font-size:13px} a{color:#2563eb}
+</style></head><body>
+<h1>קונפיגורציה</h1>
+<p class="note">עריכה עבור הכלי: ${productRegistry.products
+    .map((p) =>
+      p.id === tool
+        ? `<strong>${esc(p.icon)} ${esc(p.id)}</strong>`
+        : `<a href="${base}/config?tool=${p.id}">${esc(p.icon)} ${esc(p.id)}</a>`,
+    )
+    .join(' · ')}</p>
+<p class="note">הקונפיגורציה <strong>בוחרת מבין הקיים</strong>: אפשר להסתיר, לסדר ולכנות בונים רשומים —
+אי אפשר להמציא בונה, ופקודה מהירה שהדקדוק אינו מקבל אינה נשמרת. קונפיגורציה חסרה או שבורה = הבונים
+עובדים עם הרוסטר המובנה.</p>
+${savedBlock}${refusalBlock}
+<form method="post" action="${base}/config">
+<input type="hidden" name="tool" value="${esc(tool)}">
+<h2>הבורר (רוסטר הבונים)</h2>
+<table><tr><th>מזהה</th><th>מוצג</th><th>סדר</th><th>תווית (עוקפת)</th><th>סמל</th></tr>
+${rows}
+</table>
+<h2>פקודות מהירות (שורה לפקודה) — מאומתות מול הדקדוק בשמירה</h2>
+<p class="note">נשמרות כבר עכשיו, אך <strong>עדיין אינן מוצגות בכלי</strong> — משטח הפקודות המהירות
+(צ'יפים על הקנבס הריק + שורה מעל הקלט) נבנה בשלב B4 של התוכנית, ואז הרשימה הזו תופיע. השינויים
+שנראים בכלי מיד: שורת הבורר למעלה (מוצג / סדר / תווית / סמל).</p>
+<textarea name="quick" placeholder="z1 = 3+4i">${esc((cfg.quickCommands ?? []).join('\n'))}</textarea>
+<div><button type="submit">שמירה</button> <a href="${base}" style="margin-inline-start:12px">חזרה לדוח</a></div>
+</form>
+</body></html>`;
+}
+
 export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opts: AdminOpts): Promise<void> {
   const base = opts.base ?? '/admin';
   const cookiePath = base; // Path attr the browser scopes the cookie to
@@ -1074,6 +1189,34 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
   // well-formed cookie is rejected — a forged cookie under a guessed/default secret can't get in (SEC-3).
   const authed = secure && validCookie(readCookies(req)[COOKIE], opts.cookieSecret);
   if (!authed) return send(res, 200, loginPage(base, false, profile.title));
+
+  // ── the operator config page (A3, #662) — curation bounded by choose-among-what-exists ──────
+  // One page curates EVERY tool (?tool=<registry id>; default: this dashboard's own tool) —
+  // complex has no dashboard mount of its own yet (it does not log), but its curation must not
+  // wait for one.
+  if (path.endsWith('/config')) {
+    const configDir = dirname(opts.logPath ?? eventsLogPath());
+    const q0 = new URLSearchParams((req.url ?? '').split('?')[1] ?? '');
+    const known = new Set(productRegistry.products.map((p) => p.id));
+    if (req.method === 'POST') {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const params = new URLSearchParams(body);
+      const tool = known.has(params.get('tool') ?? '') ? (params.get('tool') as string) : profile.tool;
+      const cfg = configFromForm(params);
+      const refusals = validateToolConfig(tool, cfg);
+      if (refusals.length > 0)
+        return send(res, 422, configPage(base, profile, tool, cfg, refusals, false));
+      await writeToolConfig(configDir, tool, cfg);
+      res.statusCode = 303;
+      res.setHeader('location', `${base}/config?tool=${tool}&saved=1`);
+      res.end();
+      return;
+    }
+    const tool = known.has(q0.get('tool') ?? '') ? (q0.get('tool') as string) : profile.tool;
+    const current = (await readToolConfig(configDir, tool)) ?? {};
+    return send(res, 200, configPage(base, profile, tool, current, [], q0.get('saved') === '1'));
+  }
 
   const logPath = opts.logPath ?? eventsLogPath();
   const all = await readEvents(logPath);

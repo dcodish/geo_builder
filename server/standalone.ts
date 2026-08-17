@@ -31,9 +31,11 @@
 
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
+import { dirname } from 'node:path';
 import { handleParse } from './parseHandler';
-import { handleLog, events3LogPath } from './eventLog';
+import { handleLog, events3LogPath, eventsLogPath } from './eventLog';
 import { handleAdmin, PROFILE_3D } from './admin';
+import { handleConfigRead } from './adminConfig';
 
 const PORT = Number(process.env.PORT ?? 8788);
 const HOST = process.env.HOST ?? '127.0.0.1';
@@ -89,6 +91,12 @@ const server = createServer((req, res) => {
   if (path.endsWith('/api/log')) {
     // handleLog routes the event to the 2-D or 3-D file by the request body's `tool` tag.
     void handleLog(req, res, { ipSalt });
+    return;
+  }
+  if (path.endsWith('/api/config')) {
+    // A3 (#662): the PUBLIC curation read — unauthenticated by design; 204 = "use your static
+    // roster" (the degraded path). Config lives beside the events files.
+    void handleConfigRead(req, res, { dir: dirname(eventsLogPath()) });
     return;
   }
   // The 3-D dashboard tail (`/admin3`) MUST be checked before the 2-D `/admin` — `'/admin3'.includes('/admin')`
