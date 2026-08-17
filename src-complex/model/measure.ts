@@ -55,6 +55,19 @@ export interface MeasureQuery {
 }
 
 /**
+ * A BARE EXPRESSION on its own line — «|z1-z2|», «im(z1)», «z1*z2».
+ *
+ * The student is asking what a value IS. It states nothing, so it constrains nothing; it is answered
+ * by the knowledge rule like every other question, which is the difference between this and the
+ * prototype's calculation panel — that panel printed the current sample and called it an answer, and
+ * [ADR-CX-014](../../docs/06d-decisions-complex.md#adr-cx-014) is why it may not.
+ */
+export interface ExprQuery {
+  readonly expr: Expr;
+  readonly src: string;
+}
+
+/**
  * G8 — «מצאו את היחס בין השטחים» / «find the ratio b/a»: a RATIO of two measures.
  *
  * Worth its own form rather than being two queries, because a ratio is knowable in strictly more

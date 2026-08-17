@@ -34,6 +34,7 @@ import {
   type MeasureQuery,
   type MeasureRelation,
   type RatioQuery,
+  type ExprQuery,
   measureOf,
 } from '../model/measure';
 import { type KnowledgeRow, isKnowledge, whyNotKnowledge } from '../model/knowledge';
@@ -41,7 +42,14 @@ import { prettyName } from '../model/naming';
 import type { SequenceKind, SequenceStatement } from '../model/sequence';
 import { type SurfacedFormula, surfacedFormulas } from '../formulas/table';
 import { type Bound, solveResiduals } from '../solve/tier2';
-import { type Env, type ResidualSpec, deferredResidual, evalReal, measureResidual } from '../solve/residuals';
+import {
+  type Env,
+  type ResidualSpec,
+  deferredResidual,
+  evalComplex,
+  evalReal,
+  measureResidual,
+} from '../solve/residuals';
 import { verifyClaims } from '../solve/claims';
 import { filterBranches, quadrant } from '../solve/filter';
 import type { BranchFilter, Constraint } from '../model/constraint';
@@ -461,6 +469,8 @@ export interface FoldInput {
   readonly queries?: readonly MeasureQuery[];
   /** «היחס בין … ל…» — G8 ratio questions, answered when the quotient is invariant */
   readonly ratios?: readonly RatioQuery[];
+  /** bare expressions the student asked the value of */
+  readonly exprQueries?: readonly ExprQuery[];
   /** stated sequences, kept as STATEMENTS as well as constraints — the spiral is drawn from these */
   readonly sequences?: readonly SequenceStatement[];
 }
@@ -486,6 +496,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     measures = [],
     queries = [],
     ratios = [],
+    exprQueries = [],
     sequences = [],
   } = input;
   const t1 = solveTier1(constraints);
@@ -953,6 +964,55 @@ export function foldConstraints(input: FoldInput): Derived2 {
     return pts.some((p) => p === undefined) ? null : measureOf(q.kind, pts as Cx[]);
   };
 
+  /**
+   * A BARE EXPRESSION — «|z1-z2|», «im(z1)» — answered by the same rule as everything else.
+   *
+   * The prototype's calculation panel printed the current sample and called it an answer; this is that
+   * capability rebuilt on the honesty contract ([ADR-CX-014](../../docs/06d-decisions-complex.md#adr-cx-014)).
+   * The DEGREE of a real-valued expression is measured rather than assumed — `|z1-z2|` comes out
+   * degree 1 and `|z1-z2|²` degree 2 — so «הביעו באמצעות r» answers in `r` without anyone declaring
+   * what kind of quantity the student wrote.
+   *
+   * A complex-valued expression is only knowledge over a figure with no rotational freedom, and that is
+   * not a limitation to fix: under a free rotation the value genuinely is different in every
+   * configuration, and only its modulus is invariant.
+   */
+  const exprRows: KnowledgeRow[] = exprQueries.map((q) => {
+    const here = evalComplex(q.expr, finalEnv);
+    if (!here) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
+    const real = Math.abs(here.im) <= 1e-9 * Math.max(1, Math.hypot(here.re, here.im));
+    const show = (z: Cx): string =>
+      real ? round2(z.re) : `${round2(z.re)}${z.im < 0 ? '-' : '+'}${round2(Math.abs(z.im))}i`;
+    if (isKnowledge(false, closure)) return { label: q.src, value: show(here), why: '' };
+    if (!shapeFixed || !gaugeName || !real) {
+      return { label: q.src, value: null, why: whyNotKnowledge(closure) };
+    }
+    const turned = symmetries.find((s) => s.kind === 'turn');
+    if (turned) {
+      const v = evalComplex(q.expr, turned.env);
+      if (!v || Math.abs(v.re - here.re) > 1e-6 * Math.max(1, Math.abs(here.re))) {
+        return { label: q.src, value: null, why: whyNotKnowledge(closure) };
+      }
+    }
+    const scaled = symmetries.find((s) => s.kind === 'scale');
+    const v = scaled ? evalComplex(q.expr, scaled.env) : null;
+    if (!v) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
+    // the degree is MEASURED: |z1-z2| doubles under λ=2, an area-like expression quadruples
+    const degree = Math.round(Math.log(Math.abs(v.re / here.re)) / Math.log(GAUGE_LAMBDA));
+    if (!Number.isFinite(degree) || Math.abs(v.re - here.re * GAUGE_LAMBDA ** degree) > 1e-6 * Math.max(1, Math.abs(v.re))) {
+      return { label: q.src, value: null, why: whyNotKnowledge(closure) };
+    }
+    const unit = state.par.get(gaugeName);
+    if (!unit || !Number.isFinite(unit)) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
+    if (degree === 0) return { label: q.src, value: round2(here.re), why: '' };
+    const power = degree === 1 ? '' : degree === 2 ? '²' : `^${degree}`;
+    return {
+      label: q.src,
+      value: `${fmtCoefficient(here.re / unit ** degree)}${gaugeName}${power}`,
+      why: '',
+    };
+  });
+
   const knowledge: KnowledgeRow[] = queries.map((q) => {
     const value = measureAt(finalEnv, q);
     if (value === null) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
@@ -1007,7 +1067,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     drivenDof: drivenCount,
     unsatisfied,
     undecided,
-    knowledge: [...knowledge, ...ratioRows],
+    knowledge: [...knowledge, ...ratioRows, ...exprRows],
     emptiedBy,
     claims: verifyClaims(assertions, t1, branch),
     formulas: t1.inconsistent ? [] : surfacedFormulas(constraints, configCount),

@@ -15,7 +15,7 @@
  * Every parse reports the SPAN it consumed, because the accountant needs a claim, not a promise.
  */
 
-import { type Expr, I, abs, conj, div, mul, neg, num, param, pow, ref, val } from '../model/expr';
+import { type Expr, I, abs, add, conj, div, mul, neg, num, param, pow, ref, sub, val } from '../model/expr';
 import { fromNumber, rat, type Rat } from '../value/rational';
 import { evaluate, exact, fromCartesian } from '../value/value';
 import { fromDegrees } from '../value/angle';
@@ -35,12 +35,13 @@ type Tok =
   | { t: 'i'; at: number; len: number }
   | { t: 'cis'; at: number; len: number }
   | { t: 'conj'; at: number; len: number }
+  | { t: 'proj'; v: 're' | 'im'; at: number; len: number }
   | { t: 'op'; v: string; at: number; len: number };
 
 // `cis` and `conj` end on a non-LETTER, not on a word boundary. `\b` does not fire between `cis` and
 // `150`, so `2cis150` lexed the tail as the NAME `cis150` — a polar literal silently became a product
 // with an invented parameter, and printed as `2cis150`.
-const TOKEN = /\s+|conj(?![A-Za-z])|cis(?![A-Za-z])|[A-Za-z][A-Za-z]*\d*|\d+(?:\.\d+)?|[()|^*/+\-]/giu;
+const TOKEN = /\s+|conj(?![A-Za-z])|cis(?![A-Za-z])|re(?=\s*\()|im(?=\s*\()|[A-Za-z][A-Za-z]*\d*|\d+(?:\.\d+)?|[()|^*/+\-]/giu;
 
 function lex(src: string, from: number, to: number): Tok[] | null {
   const out: Tok[] = [];
@@ -55,6 +56,7 @@ function lex(src: string, from: number, to: number): Tok[] | null {
     const len = text.length;
     const low = text.toLowerCase();
     if (low === 'conj') out.push({ t: 'conj', at, len });
+    else if (low === 're' || low === 'im') out.push({ t: 'proj', v: low, at, len });
     else if (low === 'cis') out.push({ t: 'cis', at, len });
     else if (low === 'i') out.push({ t: 'i', at, len });
     else if (/^\d/.test(text)) {
@@ -130,6 +132,7 @@ export function parseExpr(
             t.t === 'num' ||
             t.t === 'i' ||
             t.t === 'conj' ||
+            t.t === 'proj' ||
             (t.t === 'op' && (t.v === '(' || (t.v === '|' && absDepth === 0))))
         ) {
           const r = parsePower();
@@ -210,6 +213,30 @@ export function parseExpr(
       if (!e || !isOp(')')) return null;
       i++;
       return conj(e);
+    }
+    /**
+     * `re(z)` and `im(z)` — the projections, written in terms the engine already has.
+     *
+     * `re z = (z + z̄)/2` and `im z = (z − z̄)/(2i)`. Lowering them rather than adding two AST nodes
+     * keeps every consumer — the solver, the residuals, the formula detector — reading the same six
+     * operations, and it lands them in the numeric tier automatically, which is where an ADDITIVE
+     * projection belongs (log-polar coordinates have no closed form for a sum).
+     *
+     * Until this existed the tokenizer read `im(z1)` as the NAME `im` times `z1`: a stated projection
+     * silently became a product with an invented real parameter. That is the same defect the comment on
+     * TOKEN records for `2cis150`, and the same class as a value that quietly means something else.
+     */
+    if (t.t === 'proj') {
+      const which = t.v;
+      i++;
+      if (!isOp('(')) return null;
+      i++;
+      const e = parseSum();
+      if (!e || !isOp(')')) return null;
+      i++;
+      return which === 're'
+        ? div(add(e, conj(e)), num(rat(2)))
+        : div(sub(e, conj(e)), mul(num(rat(2)), I));
     }
     if (t.t === 'op' && t.v === '(') {
       i++;

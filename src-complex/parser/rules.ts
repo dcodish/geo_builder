@@ -28,6 +28,7 @@ import {
   type MeasureQuery,
   type MeasureRelation,
   type RatioQuery,
+  type ExprQuery,
 } from '../model/measure';
 import { rat } from '../value/rational';
 import { isComplexName, parseExpr } from './exprParse';
@@ -51,6 +52,7 @@ import {
   PERIMETER_KW,
   CIRCLE_KW,
   CIRCUMSCRIBED_KW,
+  COMPLEX_KW,
   CONJUGATE_KW,
   COPULA_KW,
   POLYGON_KW,
@@ -103,6 +105,8 @@ export interface ParsedLine {
   readonly queries: MeasureQuery[];
   /** «היחס בין … ל…» — a ratio of two measures, knowable where neither half is (G8) */
   readonly ratios: RatioQuery[];
+  /** a bare expression: «what is this value?» — answered only when it is knowledge */
+  readonly exprQueries: ExprQuery[];
   /** stated sequences as STATEMENTS — what the series pictures are drawn from (F9) */
   readonly sequences: SequenceStatement[];
   /** names the line brings into existence, whether or not a constraint mentions them */
@@ -132,6 +136,7 @@ const empty = (): ParsedLine => ({
   measures: [],
   queries: [],
   ratios: [],
+  exprQueries: [],
   sequences: [],
   declares: [],
   claims: [],
@@ -140,13 +145,29 @@ const empty = (): ParsedLine => ({
 
 type Rule = (s: string) => ParsedLine | null;
 
-/** F1 — a bare name declares a number. `z1` on its own line is a legitimate given. */
+/**
+ * F1 — a name declares a number: `z1` on its own line, or «z1 מספר מרוכב» / «z1 is a complex number».
+ *
+ * The bare form is the ADR-CX-004 convention (z- and w-names need no declaration); the spelled-out form
+ * is how the exam itself opens («המספרים המרוכבים Z₁ ו-Z₂…»), and it is the one form in which a name
+ * OUTSIDE that convention can be declared complex at all — without it, a student who writes `a` and
+ * says it is a complex number is told the line is not understood.
+ */
 const declaration: Rule = (s) => {
-  const m = s.match(rx(`^(${NAME})$`));
-  if (!m) return null;
-  const name = m[1].toLowerCase();
-  if (!isComplexName(name)) return null; // a bare parameter declares nothing to draw
-  return { ...empty(), declares: [name], claims: [claimAll(s)] };
+  const bare = s.match(rx(`^(${NAME})$`));
+  if (bare) {
+    const name = bare[1].toLowerCase();
+    if (!isComplexName(name)) return null; // a bare parameter declares nothing to draw
+    return { ...empty(), declares: [name], claims: [claimAll(s)] };
+  }
+  // «z1 ו-z2 מספרים מרוכבים» — any number of names, either language, the copula optional in Hebrew
+  const spelled = s.match(
+    rx(`^(${NAME}(?:\\s*(?:,|${AND_KW})\\s*${NAME})*)\\s+${COPULA_KW}${OF_A}${COMPLEX_KW}$`),
+  );
+  if (!spelled) return null;
+  const names = (spelled[1].match(rx(NAME, 'giu')) ?? []).map((n) => n.toLowerCase());
+  if (!names.length) return null;
+  return { ...empty(), declares: names, claims: [claimAll(s)] };
 };
 
 /** F5 — «z1 ברביע הראשון» / «z1 in the first quadrant». A filter, never a driver. */
@@ -223,6 +244,82 @@ const argumentRelation: Rule = (s) => {
     ...empty(),
     declares: [name],
     constraints: [{ kind: 'arg', lhs: ref(name), rhs: { t: 'num', v: rat(1) }, deltaTurns: rat(Number(one[2]), 360), src: s },
+    ],
+    claims: [claimAll(s)],
+  };
+};
+
+/**
+ * F2's generic polar form — «z1 = 2cis(θ)»: a stated MAGNITUDE at a free direction.
+ *
+ * `cis` with a symbolic angle is not a literal (the value layer can only carry a numeric direction
+ * exactly), and the expression grammar rightly refuses to invent one. But the sentence still states
+ * something — the modulus — and refusing the whole line would drop a given the student made, which is
+ * the one thing this parser may never do. So it lowers exactly as the prototype's own rule did: the
+ * name is declared, `|z1| = 2` is emitted, and the direction stays a free degree of freedom that
+ * "another configuration" resamples.
+ */
+const genericPolar: Rule = (s) => {
+  const m = s.match(rx(`^(${NAME})\\s*=\\s*(\\d+(?:\\.\\d+)?)?\\s*cis\\s*\\(?\\s*(${NAME})\\s*\\)?$`));
+  if (!m) return null;
+  const name = m[1].toLowerCase();
+  if (!isComplexName(name)) return null;
+  const angle = m[3].toLowerCase();
+  // a NUMERIC angle is a literal and belongs to the expression grammar, which reads it exactly
+  if (isComplexName(angle)) return null; // `z1 = 2cis z2` is not an angle, it is a product
+  const modulus = m[2] === undefined ? rat(1) : rat(Math.round(Number(m[2]) * 1000), 1000);
+  return {
+    ...empty(),
+    declares: [name],
+    constraints: [{ kind: 'mod', lhs: abs(ref(name)), rhs: { t: 'num', v: modulus }, src: s }],
+    claims: [claimAll(s)],
+  };
+};
+
+/**
+ * F4's other half — an argument INEQUALITY: «arg z2 < 45», «90 < arg z1 < 180».
+ *
+ * docs/27 §10 F4 is explicit that these are **branch selectors**, not drivers: a whole region satisfies
+ * `arg z₂ < 45°`, so it prunes the configurations the equations already produced and bounds the sampling
+ * of a direction they left free. The engine has carried `BranchFilter.range` since S2 and the sampler
+ * has honoured its window since S3 — only the sentence was missing, which is why the §2b capstone's own
+ * branch selector («arg Z₂ < 45°», the line that prunes θ ≈ 63.4° and leaves arctan ½) could not be
+ * typed at all.
+ *
+ * A one-sided form gives one bound; a chained one gives both. Every comparator the corpus writes is
+ * accepted, and `≤` differs from `<` by nothing the figure can show — the filter is over an open region
+ * either way, which is the honest reading of a strict inequality on a continuum.
+ */
+const CMP = String.raw`(?:<=|>=|≤|≥|<|>)`;
+const isBelow = (op: string): boolean => op === '<' || op === '<=' || op === '≤';
+
+const argumentInequality: Rule = (s) => {
+  // «90 < arg z1 < 180» — a two-sided window, in the exam's own order
+  const both = s.match(rx(`^(-?\\d+)\\s*(${CMP})\\s*${ARG_KW}\\s*(${NAME})\\s*(${CMP})\\s*(-?\\d+)$`));
+  if (both) {
+    const [, lo, opLo, name, opHi, hi] = both;
+    // the left comparator points INTO the window, so «90 < arg z» is a lower bound and «90 > arg z» an upper one
+    const low = isBelow(opLo) ? Number(lo) : Number(hi);
+    const high = isBelow(opLo) ? Number(hi) : Number(lo);
+    if (!isBelow(opLo) !== !isBelow(opHi)) return null; // «90 < arg z > 180» is not a window
+    return {
+      ...empty(),
+      declares: [name.toLowerCase()],
+      filters: [{ kind: 'range', name: name.toLowerCase(), minDeg: rat(low, 1), maxDeg: rat(high, 1) }],
+      claims: [claimAll(s)],
+    };
+  }
+  const one = s.match(rx(`^${ARG_KW}\\s*(${NAME})\\s*(${CMP})\\s*(-?\\d+)$`));
+  if (!one) return null;
+  const [, raw, op, deg] = one;
+  const name = raw.toLowerCase();
+  return {
+    ...empty(),
+    declares: [name],
+    filters: [
+      isBelow(op)
+        ? { kind: 'range', name, maxDeg: rat(Number(deg), 1) }
+        : { kind: 'range', name, minDeg: rat(Number(deg), 1) },
     ],
     claims: [claimAll(s)],
   };
@@ -695,10 +792,53 @@ const minimalPower: Rule = (s) => {
   };
 };
 
+/**
+ * A BARE EXPRESSION — «|z1-z2|», «im(z1)», «z1*z2». The student is asking what a value is.
+ *
+ * Last of all the rules, and deliberately: almost every sentence in this grammar would also parse as
+ * an expression if nothing else claimed it first, so this rule may only see what every other rule has
+ * already refused. It states nothing and constrains nothing — the names it mentions are declared (so
+ * «|z1-z2|» draws both numbers, always-visualise) and the value is answered by the knowledge rule.
+ */
+const bareExpression: Rule = (s) => {
+  if (s.includes('=')) return null; // an equation is a statement, and its rule has already run
+  /**
+   * TWO WORDS ARE A SENTENCE, NOT AN EXPRESSION — and this rule may not rescue a refused sentence.
+   *
+   * «triangle Oz1z2z3» is a shape noun with the wrong vertex count, and the shape rule REFUSES it on
+   * purpose: a noun promising three vertices and given four is a mistyped line, and drawing it anyway
+   * is the class where a green ✓ sits over a wrong picture. Reading the leftovers as an implicit
+   * product (`triangle · O · z1 · z2 · z3`) would quietly undo that refusal — a last-resort rule
+   * turning every honest refusal into a silent acceptance is the worst thing a last-resort rule can do.
+   *
+   * A student writes a bare expression the way maths is written, with no space between operands, so
+   * requiring that is enough to keep this rule to the lines it is for.
+   */
+  if (/[A-Za-z0-9)|]\s+[A-Za-z(|]/u.test(s)) return null;
+  const atoms = new Map<string, number>();
+  const expr = parseExpr(s, 0, s.length, atoms);
+  if (!expr) return null;
+  const names = refNames(expr);
+  // a bare literal («5») asks nothing about the figure; a bare name is F1 and was matched above
+  if (!names.length || expr.t === 'ref') return null;
+  return {
+    ...empty(),
+    atoms,
+    exprQueries: [{ expr, src: s }],
+    declares: names,
+    claims: [claimAll(s)],
+  };
+};
+
 /** First match wins. Order is specific-to-general: a relation sentence before the bare equation. */
 export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = [
   { name: 'declaration', rule: declaration },
   { name: 'quadrant', rule: quadrantGiven },
+  // an INEQUALITY before the equation rule: «arg z2 < 45» has no '=' but the chained form does not
+  // either, and a comparator is a filter, never a relation to solve
+  { name: 'argument-inequality', rule: argumentInequality },
+  // a SYMBOLIC-angle polar form before the equation rule, which cannot read one and would refuse the line
+  { name: 'generic-polar', rule: genericPolar },
   { name: 'conjugates-claim', rule: conjugatesClaim },
   // the QUANTIFIED claims outrank the plain type claim: «לכל n טבעי w^(4n) ממשי» ends in the same
   // words as «w ממשי», and the general rule would read the quantifier as part of a name
@@ -724,6 +864,8 @@ export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = 
   { name: 'equation', rule: equation },
   // last: a bare glued run is a figure only when nothing else read the line as maths
   { name: 'bare-run', rule: bareRun },
+  // LAST: a bare expression is a question, and it may only see what every statement rule refused
+  { name: 'bare-expression', rule: bareExpression },
 ];
 
 /**
