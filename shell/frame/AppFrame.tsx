@@ -20,9 +20,8 @@
  */
 import type { CSSProperties, ReactNode } from 'react';
 import { useState } from 'react';
-import { color, fs } from '../theme';
+import { color, fs, radius } from '../theme';
 import { Modal } from './Modal';
-import { OverflowMenu, type MenuItem } from './Menu';
 import { ProductSwitcher, type RosterEntry } from './Switcher';
 
 export interface AppFrameAbout {
@@ -40,13 +39,12 @@ export interface AppFrameProps {
   subtitle?: string;
   /** The product's PRIMARY visible controls (figure actions move under the canvas in B6/D7). */
   headerActions?: ReactNode;
-  /** VISIBLE utilities beside the switcher — שמור/טען per the #706 D4 amendment (the one-extra-click
-   *  cost fell on the most-used pair). */
+  /** VISIBLE utilities in the TOOL row — שמור/טען per the #706 D4 amendment and level model. */
   utilityActions?: ReactNode;
-  /** The collapsed set after #706: language / guide / export — the frame appends About. */
-  overflowItems?: MenuItem[];
-  /** Accessible label for the `⋯` trigger. */
-  menuLabel: string;
+  /** SUITE-level actions, rendered as visible buttons on the suite bar (the operator's 2026-08-17
+   *  ruling retired the `⋯` menu: with two items left, a menu is pure hiding). The product passes
+   *  its language toggle; the frame appends the About button. */
+  suiteActions?: ReactNode;
   about: AppFrameAbout;
   /** The build stamp (`__BUILD__`), shown in About — provenance for bug reports. */
   buildStamp?: string;
@@ -67,8 +65,7 @@ export function AppFrame({
   subtitle,
   headerActions,
   utilityActions,
-  overflowItems,
-  menuLabel,
+  suiteActions,
   about,
   buildStamp,
   roster,
@@ -79,10 +76,6 @@ export function AppFrame({
   children,
 }: AppFrameProps) {
   const [aboutOpen, setAboutOpen] = useState(false);
-  const items: MenuItem[] = [
-    ...(overflowItems ?? []),
-    { key: 'about', label: about.label, onSelect: () => setAboutOpen(true) },
-  ];
 
   return (
     <>
@@ -99,7 +92,12 @@ export function AppFrame({
           ) : (
             <span />
           )}
-          <OverflowMenu label={menuLabel} items={items} />
+          <div style={suiteActionsRow}>
+            {suiteActions}
+            <button type="button" style={suiteBtn} onClick={() => setAboutOpen(true)}>
+              {about.label}
+            </button>
+          </div>
         </div>
       </div>
       {/* LEVEL 2 — the tool: this session. Title beside the session's actions. */}
@@ -156,6 +154,16 @@ const toolRow: CSSProperties = {
   alignItems: 'center',
   gap: 12,
   paddingBlock: 12,
+};
+const suiteActionsRow: CSSProperties = { display: 'flex', gap: 6, alignItems: 'center' };
+const suiteBtn: CSSProperties = {
+  fontSize: fs.body,
+  padding: '6px 12px',
+  border: `1px solid ${color.border}`,
+  borderRadius: radius.control,
+  background: color.surface,
+  color: color.ink,
+  cursor: 'pointer',
 };
 const h1Style: CSSProperties = { fontSize: fs.h1, margin: 0, color: color.ink };
 const subtitleStyle: CSSProperties = { margin: '2px 0 0', color: color.muted, fontSize: fs.body };

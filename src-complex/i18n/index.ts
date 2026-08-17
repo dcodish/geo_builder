@@ -64,8 +64,7 @@ const he = {
   calc: 'חשב',
   calcPlaceholder: 'הקלידו ביטוי לחישוב, למשל |z1-z2|',
   calcCurrent: 'בדגימה הנוכחית: {{value}}',
-  // The shared frame (shell/, #673): the overflow menu, About and the privacy note (NFR-SE-3).
-  menuLabel: 'עוד פעולות',
+  // The shared frame (shell/, #673): the suite bar's visible buttons and the privacy note (NFR-SE-3).
   menuAbout: 'אודות',
   aboutTitle: 'על הכלי',
   aboutLead:
@@ -145,8 +144,7 @@ const en = {
   calc: 'Calc',
   calcPlaceholder: 'type an expression to calculate, e.g. |z1-z2|',
   calcCurrent: 'at the current sample: {{value}}',
-  // The shared frame (shell/, #673): the overflow menu, About and the privacy note (NFR-SE-3).
-  menuLabel: 'More actions',
+  // The shared frame (shell/, #673): the suite bar's visible buttons and the privacy note (NFR-SE-3).
   menuAbout: 'About',
   aboutTitle: 'About this tool',
   aboutLead:

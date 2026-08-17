@@ -211,14 +211,13 @@ export function App() {
           <button onClick={() => fileRef.current?.click()}>📂 {t('load')}</button>
         </>
       }
-      overflowItems={[
-        {
-          key: 'language',
-          label: t('language'),
-          onSelect: () => void i18n.changeLanguage(i18n.language === 'he' ? 'en' : 'he'),
-        },
-      ]}
-      menuLabel={t('menuLabel')}
+      suiteActions={
+        <button
+          onClick={() => void i18n.changeLanguage(i18n.language === 'he' ? 'en' : 'he')}
+        >
+          {t('language')}
+        </button>
+      }
       roster={roster}
       activeProductId="complex"
       switcherLabel={t('switcherAria')}
