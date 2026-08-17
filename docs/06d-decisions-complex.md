@@ -1147,3 +1147,41 @@ capability rather than replacing it. It is [#680](https://github.com/dcodish/geo
 it carries a design question that needs a ruling (what branch cycling cycles once all n roots are drawn
 at once), and **#616 cannot close until it is built.** Everything else S7 asks for — the fixture net,
 the corpus fixtures, the test rewrite onto the store's submit path — is unblocked and remains to do.
+
+---
+
+## ADR-CX-020 — Nothing to cycle: the button reads one published answer (2026-08-17)
+
+**Status:** Accepted · **Slice:** S5/S7 seam · **Ladder:** stage 5b · **Operator ruling:** 2026-08-17,
+answering [#680](https://github.com/dcodish/geo_builder/issues/680)'s design question
+
+### The ruling
+
+Asked what "show another configuration" should cycle once an equation's solutions are all drawn at
+once rather than walked one at a time, the operator answered: **«if there are no dofs left, the button
+can be disabled»**.
+
+That settles more than the question asked. It says the button's meaning is not "walk the branch index"
+but **"is there another drawing to show?"** — which is one question with one answer, whatever produces
+the alternatives.
+
+### What it decides
+
+- **Today**: a figure with exactly one configuration and no remaining freedom disables the button. It
+  could not change the picture, and a control that visibly does nothing tells a student their figure
+  might be wrong when it is simply *determined*.
+- **For #680**: materialising `z³ = 8` as three named points z₁, z₂, z₃ in ONE configuration is now
+  unblocked. The three solutions stop being three configurations, and the button — reading the same
+  published answer — switches itself off for that figure, because there is genuinely nothing else to
+  show. No separate rule is needed for the roots case.
+
+`Derived2.canCycle` is published rather than recomputed in the component, for the reason every count in
+this engine is ([ADR-CX-006](#adr-cx-006)): the DOF cue, the knowledge gates and this button must not
+be able to disagree about how free the figure is. It is `configCount > 1 || remainingDof > 0`, and
+`remainingDof` is the same tier-1-minus-tier-2 number [ADR-CX-013](#adr-cx-013) made honest.
+
+### What it does NOT decide
+
+The rest of #680 — the enumeration itself, the reserved bare letter, the anonymous set of §2b part ד —
+is still to build, and remains the reason [#616](https://github.com/dcodish/geo_builder/issues/616)
+cannot close ([ADR-CX-019](#adr-cx-019)).
