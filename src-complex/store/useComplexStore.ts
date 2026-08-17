@@ -19,6 +19,17 @@
  * both engines read. That is also exactly what S7's cutover does when it deletes the prototype input
  * path ([ADR-CX-008](../../docs/06d-decisions-complex.md#adr-cx-008)), arriving early rather than as a
  * separate concern.
+ *
+ * ## What this store does NOT do (ADR-CX-023)
+ *
+ * It does not decide whether a v2 line is acceptable. That is the acceptance gate, and it needs the
+ * fold — which is reached through `deriveLines`, which composes `parser` with `replay`, which the layer
+ * guard permits in `app/` and nowhere else. So the v2 submit path lives in
+ * [`app/submit.ts`](../app/submit.ts) and this store exposes the state it writes: `recordLine`,
+ * `setError`, `resetSession`, `restoreView`. Session persistence went up with it, because replaying a
+ * stored session IS a submit and cannot be a side effect of defining the state container.
+ *
+ * `addLine` below is the PROTOTYPE path only, and it is deleted whole by the cutover.
  */
 import { create } from 'zustand';
 import type { Cx } from '../value/value';
@@ -26,7 +37,6 @@ import { derive } from '../engine/model';
 import { factNames, factRefs, IMPLICIT_COMPLEX_RE, type Fact } from '../model/fact';
 import { rootsMode } from '../model/naming';
 import { parseLine } from '../parser/parse';
-import { parseLineV2 } from '../parser/rules';
 
 /** Which engine owns the session. `v2` is the rebuild (#616); `proto` is the retiring C0 prototype. */
 export type Engine = 'proto' | 'v2';
@@ -36,6 +46,14 @@ export type InputError =
   | { key: 'duplicate-name'; detail: string }
   /** the new statement cannot hold together with the named earlier statement (#606) */
   | { key: 'incompatible'; detail: string }
+  /**
+   * The statement cannot hold at ALL — no earlier line explains it, so there is none to name.
+   *
+   * `|z1| = -5`, or a claim on the origin. `incompatible` with an empty detail would have printed
+   * *"cannot hold together with: «»"*, which is an error message about internal state pretending to be
+   * about a statement — the honesty invariant this product is built on forbids exactly that.
+   */
+  | { key: 'impossible'; detail: string }
   /** v2 read part of the line and could not account for the rest — it names the student's own words */
   | { key: 'unaccounted'; detail: string };
 
@@ -62,6 +80,7 @@ interface ComplexState {
   engine: Engine;
   lastError: InputError | null;
   setEngine: (e: Engine) => void;
+  /** the PROTOTYPE submit path. v2's lives in `app/submit.ts`; this goes with the cutover */
   addLine: (raw: string) => boolean;
   removeFact: (id: string) => void;
   /** remove one line by its position — the v2 delete, which owns no fact ids */
@@ -72,7 +91,12 @@ interface ComplexState {
   clearAll: () => void;
   clearError: () => void;
   serialize: () => SavedSession;
-  hydrate: (data: unknown) => boolean;
+  // --- what `app/submit.ts` writes: the store records, it does not decide ---
+  /** an ACCEPTED v2 line, with the configuration the gate found for it */
+  recordLine: (line: string, seed: number) => void;
+  setError: (e: InputError) => void;
+  resetSession: () => void;
+  restoreView: (v: { freePos: Record<string, Cx>; seed: number; view: 'cart' | 'polar' }) => void;
 }
 
 export const useComplexStore = create<ComplexState>((set, get) => ({
@@ -86,27 +110,16 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
 
   setEngine: (engine) => set({ engine }),
 
+  /**
+   * THE PROTOTYPE SUBMIT PATH, and only it.
+   *
+   * v2's is `app/submit.ts` — it needs the fold to hold ADR-276's acceptance doctrine, and the fold is
+   * a layer this store may not reach (ADR-CX-023). A v2 line arriving here would silently bypass the
+   * gate, so it refuses to guess: the caller is `submitLine`, which routes by engine.
+   */
   addLine: (raw) => {
-    /**
-     * UNDER v2 THE v2 GRAMMAR DECIDES, and nothing else does.
-     *
-     * No prototype parse, no fact staging, no acceptance gate borrowed from the retiring engine: a
-     * line is accepted when the active engine can read it, refused with that engine's own reason when
-     * it cannot. Routing a v2 session through the prototype's yes/no is what made every v2-only form
-     * unreachable (#658).
-     */
     if (get().engine === 'v2') {
-      const r = parseLineV2(raw);
-      if (!r.ok) {
-        set(
-          r.reason === 'unaccounted'
-            ? { lastError: { key: 'unaccounted', detail: r.items.join(', ') } }
-            : { lastError: { key: 'not-handled', detail: raw.trim() } },
-        );
-        return false;
-      }
-      set(({ lines }) => ({ lines: [...lines, raw.trim()], lastError: null }));
-      return true;
+      throw new Error('addLine is the prototype path; a v2 line goes through app/submit.ts');
     }
 
     const res = parseLine(raw);
@@ -238,47 +251,9 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
     return { app: 'complex-builder', version: 1, lines: [...lines], freePos, seed, view };
   },
 
-  hydrate: (data) => {
-    const d = data as SavedSession;
-    if (!d || d.app !== 'complex-builder' || !Array.isArray(d.lines)) return false;
-    set({ lines: [], facts: [], freePos: {}, seed: 0, lastError: null });
-    for (const line of d.lines) get().addLine(String(line));
-    set({
-      freePos: d.freePos ?? {},
-      seed: typeof d.seed === 'number' ? d.seed : 0,
-      view: d.view === 'polar' ? 'polar' : 'cart',
-      lastError: null,
-    });
-    return true;
-  },
+  recordLine: (line, seed) =>
+    set(({ lines }) => ({ lines: [...lines, line], seed, lastError: null })),
+  setError: (lastError) => set({ lastError }),
+  resetSession: () => set({ lines: [], facts: [], freePos: {}, seed: 0, lastError: null }),
+  restoreView: ({ freePos, seed, view }) => set({ freePos, seed, view }),
 }));
-
-/**
- * `?engine=v2` selects the rebuilt engine, and it is read HERE rather than in the component.
- *
- * Because the stored session below is replayed through `addLine`, the engine must already be known
- * when that happens — a v2 session rehydrated through the prototype's yes/no would silently lose every
- * v2-only line on reload, which is #658 returning by the back door.
- */
-if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('engine') === 'v2') {
-  useComplexStore.getState().setEngine('v2');
-}
-
-// Session survival across reloads (the operator's "don't re-enter each time"): auto-persist
-// to localStorage; the explicit save/load buttons handle files for durability and sharing.
-const LS_KEY = 'complex-proto-session';
-if (typeof localStorage !== 'undefined') {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (raw) useComplexStore.getState().hydrate(JSON.parse(raw));
-  } catch {
-    // a corrupt stored session must never wedge the app
-  }
-  useComplexStore.subscribe(() => {
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify(useComplexStore.getState().serialize()));
-    } catch {
-      // quota/serialization problems only cost persistence, never the session
-    }
-  });
-}

@@ -21,7 +21,7 @@
  * keeps it deliberately — with the transforms named and the round-trip property now asserted.
  */
 
-import { CONJ_OF_KW, IM_OF_KW, NAME, RE_OF_KW, RECIPROCAL_OF_KW } from './lexicon';
+import { ARG_KW, CONJ_OF_KW, IM_OF_KW, NAME, RE_OF_KW, RECIPROCAL_OF_KW } from './lexicon';
 
 /** Superscript digits become an explicit power: `Z₂³` → `z2^3`. */
 const SUPERSCRIPTS: Record<string, string> = {
@@ -82,6 +82,24 @@ const TRANSFORMS: readonly { readonly why: string; readonly apply: (s: string) =
         .replace(new RegExp(`${RECIPROCAL_OF_KW}\\s+(${NAME})`, 'giu'), '1/($1)')
         .replace(new RegExp(`${RE_OF_KW}\\s+(${NAME})`, 'giu'), 're($1)')
         .replace(new RegExp(`${IM_OF_KW}\\s+(${NAME})`, 'giu'), 'im($1)'),
+  },
+  {
+    /**
+     * `arg(z1)` is `arg z1`. The parentheses are the student's punctuation, not a function call.
+     *
+     * `arg` is a KEYWORD in the relation rules (F4, and the inequality windows), not an operator in the
+     * expression grammar — so `${ARG_KW}\s*(${NAME})` is what every one of those rules spells, and a
+     * student who wrote the parenthesised form got `not-handled`. The prototype read both, so this was
+     * a capability the cutover would have deleted; ADR-CX-019's form list happened to sample the bare
+     * spelling and missed it.
+     *
+     * Fixed HERE and not in the rules for the reason this file exists: `arg` appears in four patterns
+     * today and every future argument rule would have to remember the optional parens. `conj`/`re`/`im`
+     * are genuinely functions and keep theirs.
+     */
+    why: 'parentheses around a name after the argument keyword are punctuation',
+    apply: (s) =>
+      s.replace(new RegExp(`(${ARG_KW})\\s*\\(\\s*(${NAME})\\s*\\)`, 'giu'), '$1 $2'),
   },
   {
     // The symbol palette inserts θ/α/β and the exam prints them; a NAME is Latin, so the two spellings

@@ -24,7 +24,7 @@ in Gaussian elimination. If this file grows a case ladder, that is the tripwire 
 | 0c | **span accounting** — every non-filler token span must be claimed by the winning parse. Multiset, fails closed | `cx0:span` | yes → escalate, naming what was unclaimed |
 | 0d | `existingRef()` — a name already in the figure resolves to that object. **A second mention is a GIVEN, not a redefinition** ([ADR-CX-009](06d-decisions-complex.md#adr-cx-009) §1) | `cx0:ref` | no |
 | 0d′ | `rootsMode()` — which of ADR-CX-005's three readings `X^n = …` has, ASKED from the names earlier lines mentioned, never stamped onto the fact ([ADR-CX-021](06d-decisions-complex.md#adr-cx-021)) | `cx0:ref` | no |
-| 0e | dry-run on a trial fact list; keep-prior on failure | `cx0:dryrun` | yes |
+| 0e | **the acceptance gate** — dry-run the trial line list, keep-prior on failure: a new statement may never break an earlier one. Reads the three signals a GIVEN produces (`contradiction`, `emptiedBy`, `unsatisfied`) and never `claims` — a wrong answer is marked ✗, not refused. Blames by asking which earlier line, removed, lets the new one in ([ADR-CX-023](06d-decisions-complex.md#adr-cx-023)) | `cx0:dryrun` | yes → `incompatible` naming the earlier statement; `impossible` when no earlier line explains it |
 
 ## Stage 1 — the exact linear tier
 

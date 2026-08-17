@@ -5,6 +5,7 @@ import { derive, deriveScene } from '../engine/model';
 import { defaultFree, factNames, type Fact } from '../model/fact';
 import { parseLine } from '../parser/parse';
 import { useComplexStore } from '../store/useComplexStore';
+import { hydrateSession } from '../app/submit';
 
 const wrap360 = (d: number): number => ((d % 360) + 360) % 360;
 const angDist = (d: number): number => Math.min(wrap360(d), 360 - wrap360(d));
@@ -672,7 +673,7 @@ describe('save/load (suffix -complex.json: source lines replayed through the rea
 
     st.clearAll();
     expect(useComplexStore.getState().facts).toHaveLength(0);
-    expect(useComplexStore.getState().hydrate(JSON.parse(JSON.stringify(saved)))).toBe(true);
+    expect(hydrateSession(JSON.parse(JSON.stringify(saved)))).toBe(true);
     const after = useComplexStore.getState();
     expect(after.seed).toBe(saved.seed);
     expect(after.freePos).toEqual(saved.freePos);
@@ -691,7 +692,7 @@ describe('save/load (suffix -complex.json: source lines replayed through the rea
     const saved = st.serialize();
     expect(saved.lines).toEqual(['z = 2cis(θ)']);
     st.clearAll();
-    st.hydrate(saved);
+    hydrateSession(saved);
     expect(useComplexStore.getState().facts.map((f) => f.kind)).toEqual(['free', 'rel']);
     useComplexStore.getState().clearAll();
   });
@@ -700,8 +701,8 @@ describe('save/load (suffix -complex.json: source lines replayed through the rea
     const st = useComplexStore.getState();
     st.clearAll();
     st.addLine('z1 = 3+4i');
-    expect(st.hydrate({ app: 'geo-builder', lines: [] })).toBe(false);
-    expect(st.hydrate('garbage')).toBe(false);
+    expect(hydrateSession({ app: 'geo-builder', lines: [] })).toBe(false);
+    expect(hydrateSession('garbage')).toBe(false);
     expect(useComplexStore.getState().facts).toHaveLength(1);
     useComplexStore.getState().clearAll();
   });

@@ -12,6 +12,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { deriveLines } from '../../app/deriveLines';
+import { submitLine } from '../../app/submit';
 import { CATALOG } from '../../parser/catalog';
 import { useComplexStore } from '../../store/useComplexStore';
 import { buildScene } from '../scene';
@@ -210,7 +211,7 @@ describe('the polar/cartesian toggle is display-only, over the whole catalog', (
     const store = useComplexStore.getState();
     store.clearAll();
     store.setView(view);
-    const accepted = useComplexStore.getState().addLine(line);
+    const accepted = submitLine(line);
     const lines = useComplexStore.getState().lines;
     return { accepted, lines: [...lines], figure: figureOf(lines) };
   };
@@ -227,7 +228,7 @@ describe('the polar/cartesian toggle is display-only, over the whole catalog', (
     const store = useComplexStore.getState();
     store.clearAll();
     store.setView('cart');
-    store.addLine('z1 = 3+4i');
+    submitLine('z1 = 3+4i');
     const before = useComplexStore.getState();
     const snapshot = JSON.stringify({ lines: before.lines, facts: before.facts, seed: before.seed });
     useComplexStore.getState().setView('polar');
