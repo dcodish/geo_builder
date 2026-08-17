@@ -300,6 +300,11 @@ even more builders"* is the case a tab strip fails. Every builder gets the **ful
 > This composes the two #706 picks: mockup C's two-row architecture carrying mockup B's strip.
 > Executed for complex in the same change (cycle and the polar/cartesian toggle moved under the
 > canvas, ahead of B6); 2-D and 3-D adopt the same zoning via B2/B3.
+>
+> **The `⋯` menu is RETIRED (operator, 2026-08-17):** with שמור/טען out, it held two items — and
+> *"there are 2 options there that can be on the toolbar as is."* Language and About sit on the
+> suite bar as visible buttons. Revisit only if the suite-level set genuinely outgrows the bar;
+> hiding is never the default again.
 
 > **DISPLAY NAMES (operator ruling, 2026-08-17): the curriculum's subject names, not "בונה X".**
 > The suite's student-facing names are **הנדסת המישור** (2-D · Plane Geometry), **הנדסת המרחב**
