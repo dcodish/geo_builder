@@ -49,6 +49,7 @@ import {
   HE_THE_VAR,
   MINIMAL_KW,
   NATURAL_KW,
+  NUM,
   LENGTH_KW,
   PERIMETER_KW,
   CIRCLE_KW,
@@ -186,16 +187,27 @@ const quadrantGiven: Rule = (s) => {
   // The two languages order the noun and the ordinal differently — «ברביע הראשון» against «in the
   // first quadrant» — so the rule requires BOTH to be present in the tail rather than fixing a word
   // order. Spelling one order would refuse half the register: the ADR-3D-145 class.
-  const m = s.match(rx(`^(${NAME})\\s+(.*)$`));
-  if (!m) return null;
-  const tail = m[2];
-  const tailAt = s.length - tail.length;
-  const kw = tail.match(rx(QUADRANT_KW));
+  //
+  // The NAME's own order is free for the same reason, and RTL typing makes it genuinely so: «ברביע
+  // הראשון z2» is what the operator types (#599, and #598 for the sequence twin). Both placements are
+  // tried rather than searched for generally, because the region searched for the ordinal must exclude
+  // the name — otherwise «z4 quadrant 4» finds its ordinal inside `z4`.
+  const nameFirst = s.match(rx(`^(${NAME})\\s+(.*)$`));
+  const nameLast = s.match(rx(`^(.*?)\\s+(${NAME})$`));
+  const placement = nameFirst
+    ? { raw: nameFirst[1], nameAt: 0, rest: nameFirst[2], restAt: s.length - nameFirst[2].length }
+    : nameLast
+      ? { raw: nameLast[2], nameAt: s.length - nameLast[2].length, rest: nameLast[1], restAt: 0 }
+      : null;
+  if (!placement) return null;
+  const { rest } = placement;
+  const restAt = placement.restAt;
+  const kw = rest.match(rx(QUADRANT_KW));
   if (!kw) return null;
-  const name = m[1].toLowerCase();
-  const found = ORDINALS.find(([re]) => re.test(tail));
+  const name = placement.raw.toLowerCase();
+  const found = ORDINALS.find(([re]) => re.test(rest));
   if (!found) return null;
-  const ord = tail.match(found[0]);
+  const ord = rest.match(found[0]);
   if (!ord) return null;
   // Claim ONLY what was understood: the name, the noun, the ordinal. Claiming the whole line would
   // let «z1 ברביע הראשון ומקבילית» through with the last word silently dropped — which is precisely
@@ -205,9 +217,9 @@ const quadrantGiven: Rule = (s) => {
     declares: [name],
     filters: [{ kind: 'quadrant', name, q: found[1], src: s }],
     claims: [
-      { start: 0, end: m[1].length },
-      { start: tailAt + (kw.index ?? 0), end: tailAt + (kw.index ?? 0) + kw[0].length },
-      { start: tailAt + (ord.index ?? 0), end: tailAt + (ord.index ?? 0) + ord[0].length },
+      { start: placement.nameAt, end: placement.nameAt + placement.raw.length },
+      { start: restAt + (kw.index ?? 0), end: restAt + (kw.index ?? 0) + kw[0].length },
+      { start: restAt + (ord.index ?? 0), end: restAt + (ord.index ?? 0) + ord[0].length },
     ],
   };
 };
@@ -271,20 +283,49 @@ const argumentRelation: Rule = (s) => {
  * "another configuration" resamples.
  */
 const genericPolar: Rule = (s) => {
-  const m = s.match(rx(`^(${NAME})\\s*=\\s*(\\d+(?:\\.\\d+)?)?\\s*cis\\s*\\(?\\s*(${NAME})\\s*\\)?$`));
+  // Either half may be symbolic, so both are read as "number or name" and the SHAPE decides the
+  // lowering. Writing only the numeric-modulus case meant «z1 = r cis θ» — the spelling the exam
+  // prints — fell through to the expression grammar, which lexed `rcis` as one name and read the line
+  // as a product of two invented parameters. The modulus group backtracks over `rcis`, which is what
+  // lets the unspaced and spaced spellings be one rule rather than two (#691).
+  const HALF = `(?:${NUM}|${NAME})`;
+  const m = s.match(rx(`^(${NAME})\\s*=\\s*(${HALF})?\\s*cis\\s*\\(?\\s*(${HALF})\\s*\\)?$`));
   if (!m) return null;
   const name = m[1].toLowerCase();
   if (!isComplexName(name)) return null;
   const angle = m[3].toLowerCase();
-  // a NUMERIC angle is a literal and belongs to the expression grammar, which reads it exactly
   if (isComplexName(angle)) return null; // `z1 = 2cis z2` is not an angle, it is a product
-  const modulus = m[2] === undefined ? rat(1) : rat(Math.round(Number(m[2]) * 1000), 1000);
-  return {
-    ...empty(),
-    declares: [name],
-    constraints: [{ kind: 'mod', lhs: abs(ref(name)), rhs: { t: 'num', v: modulus }, src: s }],
-    claims: [claimAll(s)],
-  };
+  const isNumeric = (t: string): boolean => rx(`^${NUM}$`).test(t);
+  const modIsNum = m[2] !== undefined && isNumeric(m[2]);
+  const angIsNum = isNumeric(angle);
+  // both numeric is a LITERAL and belongs to the expression grammar, which reads it exactly
+  if (modIsNum && angIsNum) return null;
+  // a magnitude is not negative; `-2 cis θ` is not this sentence, so it goes to the equation rule
+  if (modIsNum && Number(m[2]) < 0) return null;
+  if (m[2] !== undefined && !modIsNum && isComplexName(m[2].toLowerCase())) return null;
+
+  /**
+   * What the sentence actually STATES — never more (ADR-052: an unstated magnitude is a free DOF).
+   *
+   * A numeric modulus pins the magnitude and leaves the direction free; a numeric angle pins the
+   * direction and leaves the magnitude free; two symbolic halves pin nothing and the line is a plain
+   * declaration. An ABSENT modulus is `cis θ`, which is the unit circle and so states 1.
+   */
+  const constraints: Constraint[] = [];
+  if (m[2] === undefined || modIsNum) {
+    const modulus = m[2] === undefined ? rat(1) : rat(Math.round(Number(m[2]) * 1000), 1000);
+    constraints.push({ kind: 'mod', lhs: abs(ref(name)), rhs: { t: 'num', v: modulus }, src: s });
+  }
+  if (angIsNum) {
+    constraints.push({
+      kind: 'arg',
+      lhs: ref(name),
+      rhs: { t: 'num', v: rat(1) },
+      deltaTurns: rat(Math.round(Number(angle)), 360),
+      src: s,
+    });
+  }
+  return { ...empty(), declares: [name], constraints, claims: [claimAll(s)] };
 };
 
 /**
@@ -351,7 +392,25 @@ const equation: Rule = (s) => {
   const lhs = parseExpr(s, 0, eq, atoms);
   const rhs = parseExpr(s, eq + 1, s.length, atoms);
   if (!lhs || !rhs) return null;
-  const modulusOnly = lhs.t === 'abs' || rhs.t === 'abs';
+  /**
+   * A `|·|` on one side asks a THREE-way question, and reading it as two is how givens went missing.
+   *
+   * The side opposite the bars decides which sentence this is:
+   *
+   * - a bare NAME — «w1 = |z1|» — is a DEFINITION. It states the number completely: w1 is the real
+   *   |z1|, argument included. Lowering it modulus-only kept `|w1| = 5` and left the direction free to
+   *   be sampled, so `w1 = |z1|` over `z1 = 3+4i` drew 1.91 + 4.62i instead of 5. Half a given, dropped
+   *   in silence. `abs` is already exact in the value layer — real and non-negative — so the ordinary
+   *   equation carries both rows and needs nothing added.
+   * - a real-valued EXPRESSION — «|z1| = 9r», «|z1| = 2|z2|» — is a magnitude relation, and must stay
+   *   modulus-only or it would invent a direction the student never stated (ADR-052).
+   * - a complex expression — «|z1| = 9w» — is a TYPE ERROR. Wrapping it in `abs` re-read it as
+   *   «|z1| = 9|w|», invented a complex `w` and drew a phantom for it. The student is told instead.
+   */
+  const other = lhs.t === 'abs' ? rhs : lhs;
+  const barred = lhs.t === 'abs' || rhs.t === 'abs';
+  if (barred && other.t !== 'ref' && hasBareComplexRef(other)) return null;
+  const modulusOnly = barred && other.t !== 'ref';
   // `X^n = rhs` on a bare letter: report the SHAPE and let the fold read it, because which of
   // ADR-CX-005's three modes it is depends on what earlier lines mentioned (#680, model/solutionSet.ts).
   const roots = modulusOnly ? null : asRootsEquation(lhs, rhs, s);
@@ -370,6 +429,33 @@ const equation: Rule = (s) => {
     claims: [claimAll(s)],
   };
 };
+
+/**
+ * Does a complex name appear OUTSIDE every `|·|`? — the type question a magnitude relation must ask.
+ *
+ * Inside the bars a complex number is a magnitude and belongs there (`|z1| = 2|z2|`); outside them it
+ * is a direction as well as a length, and equating it to a magnitude states nothing coherent.
+ */
+function hasBareComplexRef(e: Expr): boolean {
+  switch (e.t) {
+    case 'abs':
+      return false; // everything under the bars is a magnitude
+    case 'ref':
+      return true;
+    case 'num':
+    case 'val':
+    case 'i':
+    case 'param':
+      return false;
+    case 'conj':
+    case 'neg':
+      return hasBareComplexRef(e.e);
+    case 'pow':
+      return hasBareComplexRef(e.base);
+    default:
+      return hasBareComplexRef(e.l) || hasBareComplexRef(e.r);
+  }
+}
 
 function refNames(e: Expr): string[] {
   const out: string[] = [];

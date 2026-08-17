@@ -42,9 +42,12 @@ const FILLER = new Set([
   // Hebrew connectives and copulas
   'ו', 'הוא', 'היא', 'הם', 'הן', 'של', 'את', 'עם', 'אשר', 'כי', 'אם', 'גם', 'או',
   'נתון', 'נתונים', 'נתונה', 'ידוע', 'כאשר', 'לכל', 'כך', 'שבו', 'שבה',
+  // the exam's LOCATION verbs — «z2 נמצא ברביע השלישי» says no more than «z2 ברביע השלישי»
+  'נמצא', 'נמצאת', 'נמצאים', 'נמצאות', 'מונח', 'מונחת',
   // English
   'a', 'an', 'the', 'is', 'are', 'be', 'and', 'or', 'of', 'with', 'that', 'where',
   'given', 'let', 'suppose', 'such', 'to', 'for', 'in', 'on', 'we', 'it',
+  'lies', 'lie', 'located', 'situated',
 ]);
 
 const NAME = /^[A-Za-z][A-Za-z]*\d*$/;
