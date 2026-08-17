@@ -7,6 +7,9 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+// The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
+import { AppFrame } from '../shell/frame/AppFrame';
+import registry from '../products.json';
 import { dataView, panelIsEmpty } from './engine/dataView';
 import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
@@ -156,6 +159,20 @@ export default function App3() {
   const facts = useGeo3((s) => s.facts);
   const seed = useGeo3((s) => s.seed);
   const figureName = useGeo3((s) => s.figureName);
+  /** The switcher roster — A2's registry as DATA (ADR-W-021); labels resolve through THIS
+   *  product's own locales, devUrl under the one-origin dev server. */
+  const roster = useMemo(
+    () =>
+      registry.products
+        .filter((p) => p.enabled)
+        .map((p) => ({
+          id: p.id,
+          label: t(p.labelKey),
+          icon: p.icon,
+          url: import.meta.env.DEV ? p.devUrl : p.url,
+        })),
+    [t],
+  );
   const setFigureName = useGeo3((s) => s.setFigureName);
   // the "organize your data" panel (ADR-3D-014): derived vector/point presentations,
   // OPT-IN by checkbox — it shows derived results, so the student chooses to peek
@@ -416,13 +433,12 @@ export default function App3() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="flex items-center gap-4 border-b border-slate-200 bg-white px-5 py-3">
-        <h1 className="text-xl font-bold">
-          {t('title')} <span className="ms-2 align-middle text-xs font-normal text-slate-400">{t('tagline')}</span>
-        </h1>
-        {/* The figure's name (issue #42): an inline-editable title - one control is both the field and
-            the visible name. */}
+    <AppFrame
+      title={t('title')}
+      subtitle={t('tagline')}
+      headerActions={
+        /* The figure's name (issue #42): an inline-editable title — session-level, so it lives in
+           the tool row beside שמור/טען (the level model). */
         <input
           type="text"
           value={figureName}
@@ -430,10 +446,58 @@ export default function App3() {
           placeholder={t('actions.namePlaceholder')}
           dir="auto"
           aria-label={t('actions.namePlaceholder')}
-          className="min-w-0 max-w-md flex-1 rounded-lg border border-dashed border-slate-300 bg-transparent px-3 py-1.5 text-center text-base font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
+          className="min-w-0 max-w-md rounded-lg border border-dashed border-slate-300 bg-transparent px-3 py-1.5 text-center text-base font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
         />
-      </header>
-
+      }
+      utilityActions={
+        <>
+          <button
+            type="button"
+            onClick={onSaveFile}
+            disabled={facts.length === 0}
+            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-40"
+          >
+            💾 {t('actions.save')}
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInput.current?.click()}
+            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100"
+          >
+            📂 {t('actions.load')}
+          </button>
+          <button
+            type="button"
+            onClick={onSaveImage}
+            disabled={facts.length === 0}
+            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-40"
+          >
+            {t('actions.saveImage')}
+          </button>
+        </>
+      }
+      suiteActions={
+        <button
+          type="button"
+          onClick={() => void i18n.changeLanguage(i18n.language === 'he' ? 'en' : 'he')}
+          style={{ fontSize: 13, padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff', cursor: 'pointer' }}
+        >
+          {t('language')}
+        </button>
+      }
+      roster={roster}
+      activeProductId="3d"
+      switcherLabel={t('switcherAria')}
+      about={{
+        label: t('aboutLabel'),
+        title: t('aboutTitle'),
+        body: <p style={{ marginTop: 0 }}>{t('aboutLead')}</p>,
+        privacy: t('privacy'),
+        closeLabel: t('aboutClose'),
+      }}
+      buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
+    >
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       <main className="mx-auto flex max-w-screen-2xl flex-col gap-5 p-5 md:flex-row">
         {/* Input + fact list */}
         <section className="flex w-full flex-col gap-3 md:w-96">
@@ -669,31 +733,9 @@ export default function App3() {
             <button type="button" onClick={clearAll} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50">
               {t('actions.clear')}
             </button>
-            <span className="mx-1 self-center text-slate-300">|</span>
-            <button
-              type="button"
-              onClick={onSaveFile}
-              disabled={facts.length === 0}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-40"
-            >
-              {t('actions.save')}
-            </button>
-            <button
-              type="button"
-              onClick={() => fileInput.current?.click()}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100"
-            >
-              {t('actions.load')}
-            </button>
+            {/* שמור/טען/תמונה moved to the TOOL ROW (B3, the level model): they act on the
+                session, not the fact list. The load target stays here so it outlives the frame. */}
             <input ref={fileInput} type="file" accept=".geo3.json,application/json,.json" className="hidden" onChange={onLoadFile} />
-            <button
-              type="button"
-              onClick={onSaveImage}
-              disabled={facts.length === 0}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-40"
-            >
-              {t('actions.saveImage')}
-            </button>
           </div>
         </section>
         {/* organize-your-data (ADR-3D-014): derived presentations, student opt-in */}
@@ -844,8 +886,8 @@ export default function App3() {
           )}
         </section>
       </main>
-      {/* The in-app privacy note (NFR-SE-3 / ADR-278) — this app has no about modal, so it lives in a footer. */}
-      <footer className="px-5 pb-4 text-center text-xs text-slate-400">{t('privacy')}</footer>
+      {/* NFR-SE-3's note now lives in the frame's About modal (B3) — the footer fallback retired. */}
     </div>
+    </AppFrame>
   );
 }

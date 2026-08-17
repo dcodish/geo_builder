@@ -69,6 +69,11 @@
         "from": "server",
         "to": "src-complex",
         "why": "The same binding-point pattern as server -> src / src3d (llmShared): server/adminConfig.ts runs the complex grammar (parser/rules parseLineV2, context-free) to validate featured quick commands at SAVE time — a command the parser refuses is never offered to a student (#662's lock, the #511 asymmetry closed at the source)."
+      },
+      {
+        "from": "src3d",
+        "to": "shell",
+        "why": "Flipped from forbidden by B3 (#668) — the deliberate Track B adoption ADR-W-019 reserved: the 3-D app mounts the shared frame (suite bar, builder strip, tool row, About/privacy). Asserted real by the isolation test, so the manifest can never advertise an adoption the code lost."
       }
     ],
     "forbidden": [
@@ -141,11 +146,6 @@
         "from": "src",
         "to": "shell",
         "why": "The 2-D app adopts shell/ only in Track B of the unification programme (docs/28 section 5a), one surface per PR with the operator playing each — until that flips this edge deliberately, an accidental import must fail."
-      },
-      {
-        "from": "src3d",
-        "to": "shell",
-        "why": "Same as src -> shell: 3-D adoption is a deliberate Track B act, never an accident."
       },
       {
         "from": "server",

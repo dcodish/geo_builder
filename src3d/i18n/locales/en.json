@@ -1,7 +1,16 @@
 {
-  "title": "Space Builder",
+  "title": "Space Geometry",
   "tagline": "Build in 3-D space — solids, points, vectors",
   "privacy": "Privacy: no sign-up and no personal details are collected; typed instructions (math text only) are kept for a few days with an anonymous visitor id — your IP address is never stored.",
+  "language": "עברית",
+  "switcherAria": "Switch between builders",
+  "switcher2d": "Plane Geometry",
+  "switcher3d": "Space Geometry",
+  "switcherComplex": "Complex Numbers",
+  "aboutLabel": "About",
+  "aboutTitle": "About this tool",
+  "aboutLead": "A tool for building the figure of a space-geometry question: enter the givens line by line — solids, points, vectors — and the figure builds and orbits in front of you. It draws and verifies the givens; it never solves the question.",
+  "aboutClose": "Close",
   "input": {
     "placeholder": "Type a given, e.g.: cube ABCD",
     "add": "Add",
