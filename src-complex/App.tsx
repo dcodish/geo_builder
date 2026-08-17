@@ -177,7 +177,10 @@ export function App() {
             style={{ display: 'none' }}
             onChange={onLoadFile}
           />
-          <button onClick={nextConfig}>{t('anotherConfig')}</button>
+          {/* nothing to cycle when the givens determine the figure completely (ADR-CX-020) */}
+          <button onClick={nextConfig} disabled={derived2 ? !derived2.canCycle : false}>
+            {t('anotherConfig')}
+          </button>
           <button onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
             {view === 'cart' ? t('viewPolar') : t('viewCart')}
           </button>

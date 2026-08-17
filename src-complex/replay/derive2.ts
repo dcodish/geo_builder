@@ -406,6 +406,20 @@ export interface Derived2 {
   readonly undecided: readonly string[];
   /** answers to what the student ASKED to see — a number only when the givens force one (stage 5d) */
   readonly knowledge: readonly KnowledgeRow[];
+  /**
+   * Is there ANOTHER drawing to show? — the one definition the button reads.
+   *
+   * "Show another configuration" does two things: it walks the enumerated branch set, and it resamples
+   * whatever the givens left free. When there is neither a second configuration nor a free degree of
+   * freedom, pressing it cannot change the picture, and a button that visibly does nothing tells a
+   * student their figure might be wrong when it is simply *determined* (operator ruling, 2026-08-17:
+   * *"if there are no dofs left, the button can be disabled"*).
+   *
+   * Published rather than recomputed in the component for the reason every count in this engine is
+   * ([ADR-CX-006](../../docs/06d-decisions-complex.md#adr-cx-006)): the cue, the knowledge gates and
+   * this button must not be able to disagree about how free the figure is.
+   */
+  readonly canCycle: boolean;
   /** the filter that emptied the configuration set, when one did */
   readonly emptiedBy: BranchFilter | null;
   /** the student's ANSWERS, checked against the figure the givens produced — never drivers */
@@ -1068,6 +1082,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     unsatisfied,
     undecided,
     knowledge: [...knowledge, ...ratioRows, ...exprRows],
+    canCycle: configCount > 1 || closure.remainingDof > 0,
     emptiedBy,
     claims: verifyClaims(assertions, t1, branch),
     formulas: t1.inconsistent ? [] : surfacedFormulas(constraints, configCount),

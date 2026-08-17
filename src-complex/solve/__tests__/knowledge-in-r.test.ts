@@ -114,3 +114,40 @@ describe('F12 — the minimal n: the student answers, the tool checks', () => {
     expect(d.claims[0].verdict.status).toBe('holds');
   });
 });
+
+/**
+ * The cycle button reads ONE published answer (ADR-CX-020, operator ruling 2026-08-17).
+ *
+ * «Show another configuration» walks the branch set and resamples what is free. When there is neither
+ * a second configuration nor a free degree of freedom, it cannot change the picture — and a button that
+ * visibly does nothing tells a student their figure might be wrong when it is simply determined.
+ */
+describe('canCycle — is there another drawing to show?', () => {
+  it('a fully determined figure has nothing to cycle', () => {
+    const d = deriveLines(['z1 = 3+4i', 'z2 = 2cis150']);
+    expect(d.configCount).toBe(1);
+    expect(d.freeDof).toEqual([]);
+    expect(d.canCycle).toBe(false);
+  });
+
+  it('an equation with several solutions can cycle', () => {
+    const d = deriveLines(['z^3 = 8']);
+    expect(d.configCount).toBe(3);
+    expect(d.canCycle).toBe(true);
+  });
+
+  it('a free number can cycle — resampling IS another drawing', () => {
+    expect(deriveLines(['z1 = 3', 'z2']).canCycle).toBe(true);
+  });
+
+  it('a free PARAMETER counts too: «|z1| = 9r» is one shape at many sizes', () => {
+    expect(deriveLines(['|z1| = 9r']).canCycle).toBe(true);
+  });
+
+  it('a measure that consumes the last freedom turns it off', () => {
+    const open = deriveLines(['z1 = 3+4i', 'z2', '|z2| = 2']);
+    expect(open.canCycle).toBe(true);
+    const closed = deriveLines(['z1 = 3+4i', 'z2 = 3']);
+    expect(closed.canCycle).toBe(false);
+  });
+});
