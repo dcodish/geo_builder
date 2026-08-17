@@ -49,7 +49,7 @@ empties the set is `bound-unsatisfiable`, refused rather than drawn.
 | # | Step | Trace token |
 |---|---|---|
 | 2a | prune the stage-1 branch set | `cx2:prune` |
-| 2b | restrict the free-parameter ranges | `cx2:range` |
+| 2b | restrict the free-parameter ranges — **on the coordinate the sampler MOVES, not on the name the student wrote.** A filter on a name elimination made *dependent* is projected onto the one basis coordinate that carries it, `arg(name) = K + c·arg(basis)`; it reached neither this step nor 2a before, and was dropped in silence ([ADR-CX-025](06d-decisions-complex.md#adr-cx-025)). A direction's window is bounded at BOTH ends — an unbounded end has no turn to be a representative of and cannot survive the change of basis. Two or more carrying coordinates is a half-plane, not an interval: declined here and caught at 3e | `cx2:range` |
 | — | empty after pruning | `cx2:refuse` |
 
 ## Stage 3 — the numeric residue
@@ -68,7 +68,7 @@ preference costs zero ([ADR-276](06-decisions.md#adr-276)).
 | 3b | 1-D: enumerate **all** roots → further branches, ordered by nearness to the current value (stability) | `cx3:roots` | ✅ `otherRoots` |
 | 3c | n-D: Levenberg–Marquardt with a numeric Jacobian, multi-start, budgeted | `cx3:lm` | ✅ `solveResiduals` |
 | 3d | **obligation-preservation gate** — a solve may not lose a given; `obligations(next) ⊇ obligations(prev)` | `preserve:reject` on a voided accept | ⬜ pending |
-| 3e | honesty backstop: re-verify **every** constraint against final values; a best-effort solve that missed fails loudly | `cx3:verify` | ✅ `Derived2.measures` / `.unsatisfied` |
+| 3e | honesty backstop: re-verify **every** constraint against final values; a best-effort solve that missed fails loudly. **Filters too** — read off the DRAWN direction, so no change of basis and no later numeric drive can void a stated window in silence; reported through `unsatisfied`, which is the signal stage 0e's gate already reads ([ADR-CX-025](06d-decisions-complex.md#adr-cx-025)) | `cx3:verify` | ✅ `Derived2.measures` / `.unsatisfied` |
 | — | refuse, naming the student's **new statement**, never a collateral casualty | `cx3:refuse` | ⬜ pending |
 
 **The free basis is taken over the DRAWN names, not the constraint names**

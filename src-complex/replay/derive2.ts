@@ -52,6 +52,7 @@ import {
 } from '../solve/residuals';
 import { verifyClaims } from '../solve/claims';
 import { filterBranches, quadrant } from '../solve/filter';
+import { type AffineArg, describeFilter, projectWindow, statedWindow, violatesDeg } from '../solve/window';
 import type { BranchFilter, Constraint } from '../model/constraint';
 
 // The prototype PARSER's fact/expression vocabulary — no longer an import from the retiring engine
@@ -641,18 +642,55 @@ export function foldConstraints(input: FoldInput): Derived2 {
    *
    * So a filter does two jobs, not one: it PRUNES the configurations the equations produced, and it
    * BOUNDS the sampling of what they left free. Both are the same statement about the same direction.
+   *
+   * And it must do the second job on the coordinate the sampler actually MOVES, which is not always the
+   * name the student wrote — see `solve/window.ts`. Keying the window by the stated name reached the
+   * filter only while that name was the pivot; a name elimination made dependent was reached by neither
+   * this map nor the branch pruner, and the given was silently dropped (#690, ADR-CX-025).
    */
   const windows = new Map<string, { min: number; max: number }>();
   const narrow = (name: string, min: number, max: number): void => {
     const prev = windows.get(name);
     windows.set(name, { min: Math.max(prev?.min ?? -Infinity, min), max: Math.min(prev?.max ?? Infinity, max) });
   };
+
+  /**
+   * The affine form the linear tier left for a direction: `arg(name) = K + Σ c·arg(basis)`.
+   *
+   * The turn unknowns are folded into `K` because the branch has already chosen them — they are a
+   * constant here, not a coordinate anything may move. Mirrors `argumentOf` below, which is the
+   * function this must agree with: if the two ever disagreed, the window would bound one number while
+   * the figure drew another.
+   */
+  const affineArgOf = (name: string): AffineArg | null => {
+    const d = t1.argument.determined.get(name);
+    if (!d) return null;
+    let konstDeg = toDegrees(d.konst, sample);
+    if (konstDeg === null) return null;
+    const terms = new Map<string, number>();
+    for (const [fn, c] of d.coefs) {
+      const coef = toNumber(c);
+      if (isTurnUnknown(fn)) konstDeg += coef * Number(branch?.k.get(fn) ?? 0n) * 360;
+      else terms.set(fn, (terms.get(fn) ?? 0) + coef);
+    }
+    return { konstDeg, terms };
+  };
+
   for (const f of filterList) {
-    if (f.kind === 'quadrant') narrow(f.name, (f.q - 1) * 90, f.q * 90);
-    else if (f.kind === 'range') {
-      if (f.minDeg) narrow(f.name, Number(f.minDeg.n) / Number(f.minDeg.d), Infinity);
-      if (f.maxDeg) narrow(f.name, -Infinity, Number(f.maxDeg.n) / Number(f.maxDeg.d));
-    } else narrow(f.name, Number(f.deg.n) / Number(f.deg.d), Number(f.deg.n) / Number(f.deg.d));
+    const stated = statedWindow(f);
+    if (stated === null) continue;
+    // a direction the BRANCH fixed is already handled by pruning — bounding it would bound nothing
+    if (branch?.angles.has(f.name)) continue;
+    const affine = affineArgOf(f.name);
+    if (affine === null) {
+      // the name is in the free basis: the window is about the coordinate itself, as it always was
+      narrow(f.name, stated.min, stated.max);
+      continue;
+    }
+    // …otherwise it is DEPENDENT, and the window belongs on the basis coordinate that carries it
+    const projected = projectWindow(stated, affine, (n) => windows.get(n));
+    // `null` means it is not expressible as one interval — stage 3e verifies it instead of dropping it
+    if (projected !== null) narrow(projected.name, projected.min, projected.max);
   }
 
   /**
@@ -926,13 +964,39 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * These have no row in the fact list of their own — they are equations tier 1 pushed down — so
    * without this an arithmetic sequence that cannot hold would simply draw a figure that ignores it.
    */
-  const unsatisfied = live
+  const unsatisfiedRelations = live
     .filter(({ spec }) => {
       const v = spec.values(finalEnv);
       return v === null || v.some((r) => Math.abs(r) > 1e-6);
     })
     .filter(({ spec }) => spec.key.startsWith('deferred'))
     .map(({ spec }) => spec.describe);
+
+  /**
+   * STAGE 3e FOR FILTERS — re-verify every stated window against the direction actually DRAWN.
+   *
+   * Measures have had this backstop since the tier landed; filters had none, and that asymmetry is what
+   * let #690 be silent rather than merely wrong. Pruning and window-projection are both *arrangements*
+   * to make a filter hold, and an arrangement can fail to reach — a window over two basis coordinates
+   * is a half-plane that `projectWindow` honestly declines, and the numeric tier may afterwards move a
+   * direction that pruning had settled. Neither may end with a figure that contradicts the student.
+   *
+   * So the last word is read off the drawn point: whatever route the number took, this asks the
+   * student's question about the student's number. Reported through `unsatisfied` rather than a new
+   * channel because it is the same sentence — *you stated this and the drawing does not do it* — and
+   * because ADR-CX-023's acceptance gate already reads that signal, so the line that breaks an earlier
+   * given is now blamed instead of accepted.
+   */
+  const violatedFilters = t1.inconsistent
+    ? []
+    : filterList
+        .filter((f) => {
+          const p = points.find((q) => q.name === f.name);
+          return p !== undefined && violatesDeg(f, p.argumentDeg);
+        })
+        .map((f) => f.src ?? describeFilter(f));
+
+  const unsatisfied = [...unsatisfiedRelations, ...violatedFilters];
 
   /**
    * STAGE 5d — the only place a number the engine computed reaches a string.
