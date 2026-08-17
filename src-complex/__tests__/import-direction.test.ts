@@ -22,10 +22,18 @@ const ROOT = path.resolve(__dirname, '..');
 /**
  * Each layer may import only from itself and the layers listed. Absent directories are skipped.
  *
- * `engine` is the RETIRING prototype monolith (fact model + evaluation + solving + presentation in one
- * file), kept here so the guard describes the tree that exists rather than only the one being built.
- * Its three allowances below are exactly the edges present today — no more — so the cutover (S7, #624)
- * deletes the directory and these four entries together, and nothing new may attach to it meanwhile.
+ * `engine` is the RETIRING prototype's EVALUATOR, kept here so the guard describes the tree that
+ * exists rather than only the one being built. The allowances below are exactly the edges present
+ * today — no more — so the cutover (S7, #624) deletes the directory and these entries together, and
+ * nothing new may attach to it meanwhile.
+ *
+ * It was a monolith (fact model + evaluation + solving + presentation in one file) until the #624
+ * extraction moved the fact VOCABULARY down into `model/fact.ts` and `value/value.ts`. That is why
+ * `engine` now imports DOWNWARD from `value` and `model` while four layers still import it: the
+ * vocabulary outlives the evaluator, because `parser/parse.ts` survives the cutover as ADR-CX-019's
+ * parity oracle and a parser cannot outlive the facts it produces. Every remaining edge INTO `engine`
+ * is one the cutover deletes outright — `derive` (the store's acceptance gate), `deriveScene`
+ * (App.tsx), the prototype `Scene` (the Gauss plane and its adapter).
  */
 const LEGACY = 'engine';
 
@@ -33,12 +41,10 @@ const MAY_IMPORT: Record<string, readonly string[]> = {
   value: [],
   model: ['value'],
   solve: ['value', 'model'],
-  // `replay -> engine` is the S3 BRIDGE and nothing else: `derive2` reads the prototype parser's own
-  // fact types so the new engine can be played through the existing input box, rather than a second
-  // parser being written ahead of S4's span accounting (ADR-CX-009). It is one import of two TYPES,
-  // it is deleted with `bridgeFacts` when S4 lands, and it is listed here so it stays that small.
   // `replay -> formulas` is the S6 surfacing seam: the fold publishes WHICH sheet formulas the figure
   // uses, so the canvas and the panel read one list rather than each detecting its own (#653's class).
+  // `replay -> engine` is now only `scene2`'s prototype-`Scene` adapter — the S3 bridge's own import of
+  // the fact types became a `model/` one with the #624 extraction, so this edge shrank rather than grew.
   replay: ['value', 'model', 'solve', 'formulas', LEGACY],
   store: ['value', 'model', 'solve', 'replay', 'parser', LEGACY],
   scene: ['value', 'model', 'solve', 'replay'],
@@ -49,7 +55,9 @@ const MAY_IMPORT: Record<string, readonly string[]> = {
   // caught `deriveLines` living in replay/ and was right to.
   app: ['value', 'model', 'solve', 'replay', 'store', 'parser'],
   formulas: ['value', 'model'],
-  [LEGACY]: [],
+  // the extraction's two downward edges, and the only ones: the evaluator reads the vocabulary it
+  // used to own. They go with the directory.
+  [LEGACY]: ['value', 'model'],
 };
 
 const sourcesIn = (dir: string): string[] => {

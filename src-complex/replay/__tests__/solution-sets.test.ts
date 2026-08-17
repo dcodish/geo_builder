@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { useComplexStore } from '../../store/useComplexStore';
 import { derive2 } from '../derive2';
 import { isAnonymous, prettyName, solutionNames } from '../../model/naming';
-import { factNames } from '../../engine/model';
+import { factNames } from '../../model/fact';
 import { parseLine } from '../../parser/parse';
 
 const fresh = () => {

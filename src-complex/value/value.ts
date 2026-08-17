@@ -283,3 +283,17 @@ const round = (x: number): number => {
   const r = Math.round(x * 1e6) / 1e6;
   return Object.is(r, -0) ? 0 : r;
 };
+
+/**
+ * A plain real, as a PANEL reads it — three decimals, and never `-0`.
+ *
+ * Deliberately coarser than `round` above, and the two are not the same question. `round` exists to
+ * stop float noise from printing as significant digits in a value's own form; this is the calculation
+ * panel's display convention, where `2.121` is what a student writes and `2.1213203435596424` is
+ * noise the exam would never ask for. Both live here because the value layer owns the display seam —
+ * rounding anywhere else is how two surfaces start printing the same number differently (#653).
+ */
+export const fmtNum = (x: number): string => {
+  const r = Math.round(x * 1000) / 1000;
+  return Object.is(r, -0) ? '0' : String(r);
+};

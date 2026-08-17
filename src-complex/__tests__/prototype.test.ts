@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { absC, argDeg, cisDeg, cx, formatCart, formatPolar, mul, sub } from '../engine/complex';
-import { defaultFree, derive, deriveScene, factNames, type Fact } from '../engine/model';
+import { absC, argDeg, formatCart, formatPolar, mul, sub } from '../engine/complex';
+import { cPolar, cx } from '../value/value';
+import { derive, deriveScene } from '../engine/model';
+import { defaultFree, factNames, type Fact } from '../model/fact';
 import { parseLine } from '../parser/parse';
 import { useComplexStore } from '../store/useComplexStore';
 
@@ -160,7 +162,7 @@ describe('parser', () => {
 
 describe('engine', () => {
   it('multiplication adds arguments and multiplies moduli', () => {
-    const p = mul(cisDeg(2, 30), cisDeg(3, 60));
+    const p = mul(cPolar(2, 30), cPolar(3, 60));
     expect(absC(p)).toBeCloseTo(6);
     expect(argDeg(p)).toBeCloseTo(90);
   });
@@ -193,7 +195,7 @@ describe('engine', () => {
   it('formatting: pure imaginary and polar', () => {
     expect(formatCart(cx(0, 1))).toBe('i');
     expect(formatCart(cx(3, -1))).toBe('3-i');
-    expect(formatPolar(cisDeg(2, 150))).toBe('2·cis 150°');
+    expect(formatPolar(cPolar(2, 150))).toBe('2·cis 150°');
   });
 });
 

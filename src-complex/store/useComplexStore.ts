@@ -21,8 +21,9 @@
  * separate concern.
  */
 import { create } from 'zustand';
-import type { Cx } from '../engine/complex';
-import { derive, factNames, factRefs, IMPLICIT_COMPLEX_RE, type Fact } from '../engine/model';
+import type { Cx } from '../value/value';
+import { derive } from '../engine/model';
+import { factNames, factRefs, IMPLICIT_COMPLEX_RE, type Fact } from '../model/fact';
 import { rootsMode } from '../model/naming';
 import { parseLine } from '../parser/parse';
 import { parseLineV2 } from '../parser/rules';

@@ -54,9 +54,9 @@ import { verifyClaims } from '../solve/claims';
 import { filterBranches, quadrant } from '../solve/filter';
 import type { BranchFilter, Constraint } from '../model/constraint';
 
-// The prototype's fact/expression types — the ONLY import from the retiring engine, and the whole
-// surface the deletion in S4 has to touch.
-import { factRefs, type Expr as ProtoExpr, type Fact as ProtoFact } from '../engine/model';
+// The prototype PARSER's fact/expression vocabulary — no longer an import from the retiring engine
+// (it moved down to `model/` with the #624 extraction), and still the whole surface `bridgeFacts` has.
+import { factRefs, type Expr as ProtoExpr, type Fact as ProtoFact } from '../model/fact';
 
 /** A fact the bridge could not translate, with the reason — surfaced, never swallowed. */
 export interface Untranslated {

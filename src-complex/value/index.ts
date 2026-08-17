@@ -34,6 +34,7 @@ export {
   div,
   evaluate,
   exact,
+  fmtNum,
   formatCartesian,
   formatPolar,
   fromCartesian,
