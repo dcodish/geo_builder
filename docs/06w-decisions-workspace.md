@@ -754,3 +754,33 @@ asserted rather than measured, and the correctness gaps stay unknown during the 
 weakest mechanism may persist as long as no counter-example is found, and "no counter-example found"
 is not "holds" (Q3). 2-D runs two styling systems during the transition (D2). And the row list is a
 judgement call per ADR — two passes could differ at the margins (Q2).
+
+## ADR-W-020 — Track B acceptance runs on a PARALLEL prod URL; the canonical 2-D/3-D paths change only at switchover
+
+**Status:** accepted, 2026-08-17 · **Operator ruling** · **Issue:**
+[#700](https://github.com/dcodish/geo_builder/issues/700) · **Amends:** [ADR-W-018](#adr-w-018)
+decision 8 / docs/28 §5a
+
+**The ruling.** *"I don't want to impact the existing 2-D tool. We can create a separate URL that
+works in parallel until I'm happy with the new one, and then we switch over."*
+
+**What changes.** ADR-W-018 already kept unfinished UI off `main` (Track B on `unify/ui`, per-surface
+play, merge at whole-interface acceptance) — but its play channel was a dev server, and its endpoint
+was a deploy onto the canonical paths. This ruling adds a **prod-parallel evaluation channel** and
+moves acceptance onto it: each shipped builder gets a parallel URL (`…/geo-builder-next/`,
+`…/3d-builder-next/`) serving the `unify/ui` build, while the canonical URL keeps serving the
+untouched current build for the whole of Track B. The **switchover** — the canonical path taking the
+accepted build — happens once per builder, at the operator's declared acceptance, as an ordinary
+RUNBOOK deploy; the `-next` path is torn down after a grace period. 2-D is the named driver; 3-D
+gets the same treatment (the standing constraint has always covered both shipped tools). Students
+can only ever be on the canonical URL until the operator switches it.
+
+**What does not change.** The `unify/ui` branch flow and per-surface PRs, `check:siblings`, the
+engine boundaries, manual deploys, and the DEPLOY-LOG discipline — a `-next` deploy is a deploy and
+is logged with its path named (the ADR-W-007 lesson applied to the new channel).
+
+**Mechanism** — owned by #700: CLI overrides on the existing configs (`vite build
+--base=/geo-builder-next/ --outDir dist-next`; no config forks), a RUNBOOK `-next` section including
+the one-time Apache mapping of `/geo-builder-next/api` onto the same proxy, `__BUILD__`-stamped
+usage separation, and a canonical-bytes-unchanged check. First use is deliberately the B1 (#666)
+build — a visual no-op for 2-D — so the channel is proven before any visible surface rides it.
