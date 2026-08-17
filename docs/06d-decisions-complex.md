@@ -1705,3 +1705,73 @@ a **monomial** constraint, so tier 1 reports it as an inconsistent row through `
 and better than the numeric check the measurement looked for. The probe read `unsatisfied` and not
 `contradiction`. Recorded because a withdrawn finding is worth as much as a confirmed one when the next
 session re-measures.
+
+## ADR-CX-027 — The cutover: the prototype is deleted, and there is one engine (2026-08-17)
+
+**Status:** accepted · **Slice:** S7 ([#624](https://github.com/dcodish/geo_builder/issues/624)),
+closes [#616](https://github.com/dcodish/geo_builder/issues/616) ·
+**Ladder stage:** none — no mechanism changes. This removes the second path *to* the ladder.
+
+### What went
+
+| deleted | why it could go |
+| --- | --- |
+| `engine/complex.ts`, `engine/model.ts` | the prototype's float evaluator and its `Scene` — replaced by `value/` + `replay/` + `scene/` |
+| `parser/parse.ts` | the prototype grammar. It outlived the evaluator only as ADR-CX-019's parity oracle; see below |
+| `model/fact.ts` | the fact vocabulary ADR-CX-022 extracted **so that `parse.ts` could outlive the evaluator**. With `parse.ts` gone it had zero importers |
+| `render/GaussPlane.tsx` | the prototype canvas; `PolarPlane` replaced it in S5 |
+| `replay/scene2.ts`'s `sceneFromDerived2` | the adapter that drew a `Derived2` through the prototype `Scene`. The file's banner readings stay — they are live |
+| `replay/derive2.ts`'s `bridgeFacts` + `derive2(facts)` | the second entry into the fold, test-only since S4 |
+| the store's `engine` / `setEngine` / `facts` / `addLine` / `removeFact` | the second submit path |
+| `?engine=v2`, `useV2`, the `engine=v2` badge, the prototype panels | the switch and everything that branched on it |
+| `__tests__/prototype.test.ts`, `replay/__tests__/derive2.test.ts` | the suites of the deleted code, replaced by the step-3 measurement |
+
+`value/value.ts` stays: it is the exact value layer, not prototype vocabulary.
+
+### Decision 1 — `parse.ts` goes, and its FORM LIST stays
+
+ADR-CX-022 assumed `parse.ts` would survive as the parity oracle, and that assumption was worth
+re-testing at the point the prototype actually died (operator decision, 2026-08-17). It does not
+survive. The parity question — *does v2 read everything the prototype read?* — is asked **once**, at the
+cutover, and after it there is nothing left to be at parity with; keeping a second 528-line grammar to
+answer a question that no longer has a product meaning is a drift source, not a safety net.
+
+What was worth keeping is the **list**, and it is kept. `cutover-parity.test.ts` becomes a v2-only form
+corpus: every utterance still parses, and a grammar regression fails it. The list is not about the
+prototype and never was — it is the set of forms a student types, assembled by measurement rather than
+by invention, which is exactly why it found eight capabilities in S7, then #680, then #690 and #691.
+
+Deleting `parse.ts` made `model/fact.ts` dead in turn, which is the extraction being *undone in the
+right order*: the vocabulary was moved down so the parser could outlive the evaluator, and when the
+parser goes the reason goes with it.
+
+### Decision 2 — one way in, and the guard shrinks to say so
+
+The tree had two entry paths for four slices: `addLine` → prototype facts → `derive`, and `submitLine`
+→ lines → `deriveLines` → the fold. That arrangement cost three issues, all the same shape — a
+capability reachable from only one path is invisible to tests aimed at the other:
+
+* **#658** — the prototype parser gatekept the input box, so every v2-only form was unreachable
+* **#680** — ADR-CX-021's solution set lived inside `bridgeFacts`, so the shipped path never had it
+* **#686** — eight green tests described the bridge rather than the product
+
+`import-direction.test.ts` records the result rather than a promise: the `engine` layer and its
+allowances are gone, and `store` may now import `value` and nothing else, because the store is state.
+The allowances were listed as *exactly the edges that existed* while the prototype waited to die,
+which is what let the deletion be a subtraction instead of an excavation.
+
+### Decision 3 — the prototype's calculation panel goes with it
+
+It read `deriveScene`, so it could not survive the evaluator. Its own calc input is not a lost
+affordance: the same lines are typed in the main box, where a bare expression is a query. The panel's
+replacement is [#648](https://github.com/dcodish/geo_builder/issues/648)'s UI programme, which owns the
+design; a stopgap panel built here would be work that programme would delete.
+
+### Consequences
+
+- **v2 is what students get.** Prod ran the prototype until this deploy.
+- **#616 closes.** The foundation rebuild is complete: S0–S7.
+- `src-complex/` loses ~1,900 lines and one whole layer. 556 tests over 22 files, all green.
+- The named gaps stay named, not fixed: [#688](https://github.com/dcodish/geo_builder/issues/688)
+  (claim drive-or-check), [#694](https://github.com/dcodish/geo_builder/issues/694) (selection among an
+  enumerated solution set), and the rest of the 572 booklet's Q3s as fixtures.

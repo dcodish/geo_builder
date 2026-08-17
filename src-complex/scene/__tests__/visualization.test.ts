@@ -192,8 +192,7 @@ describe('Region — inside, on, outside (the docs/27 §2b ד counting picture)'
  */
 describe('the polar/cartesian toggle is display-only, over the whole catalog', () => {
   beforeEach(() => {
-    useComplexStore.setState({ lines: [], facts: [], freePos: {}, seed: 0, lastError: null });
-    useComplexStore.getState().setEngine('v2');
+    useComplexStore.setState({ lines: [], freePos: {}, seed: 0, lastError: null });
   });
 
   const figureOf = (lines: readonly string[]): string => {
@@ -230,10 +229,10 @@ describe('the polar/cartesian toggle is display-only, over the whole catalog', (
     store.setView('cart');
     submitLine('z1 = 3+4i');
     const before = useComplexStore.getState();
-    const snapshot = JSON.stringify({ lines: before.lines, facts: before.facts, seed: before.seed });
+    const snapshot = JSON.stringify({ lines: before.lines, seed: before.seed });
     useComplexStore.getState().setView('polar');
     const after = useComplexStore.getState();
-    expect(JSON.stringify({ lines: after.lines, facts: after.facts, seed: after.seed })).toBe(snapshot);
+    expect(JSON.stringify({ lines: after.lines, seed: after.seed })).toBe(snapshot);
     expect(after.view).toBe('polar');
   });
 

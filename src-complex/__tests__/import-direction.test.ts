@@ -22,42 +22,31 @@ const ROOT = path.resolve(__dirname, '..');
 /**
  * Each layer may import only from itself and the layers listed. Absent directories are skipped.
  *
- * `engine` is the RETIRING prototype's EVALUATOR, kept here so the guard describes the tree that
- * exists rather than only the one being built. The allowances below are exactly the edges present
- * today — no more — so the cutover (S7, #624) deletes the directory and these entries together, and
- * nothing new may attach to it meanwhile.
- *
- * It was a monolith (fact model + evaluation + solving + presentation in one file) until the #624
- * extraction moved the fact VOCABULARY down into `model/fact.ts` and `value/value.ts`. That is why
- * `engine` now imports DOWNWARD from `value` and `model` while four layers still import it: the
- * vocabulary outlives the evaluator, because `parser/parse.ts` survives the cutover as ADR-CX-019's
- * parity oracle and a parser cannot outlive the facts it produces. Every remaining edge INTO `engine`
- * is one the cutover deletes outright — `derive` (the store's acceptance gate), `deriveScene`
- * (App.tsx), the prototype `Scene` (the Gauss plane and its adapter).
+ * There was an `engine` layer — the prototype's evaluator — with allowances into it from four layers
+ * at once, listed here as exactly the edges that existed so that nothing new could attach while it
+ * waited to die. The cutover deleted the directory and those entries together
+ * ([ADR-CX-027](../../docs/06d-decisions-complex.md#adr-cx-027)), which is what a scheduled deletion
+ * is supposed to look like: the guard shrinks, and no layer learned to depend on it in the meantime.
  */
-const LEGACY = 'engine';
-
 const MAY_IMPORT: Record<string, readonly string[]> = {
   value: [],
   model: ['value'],
   solve: ['value', 'model'],
   // `replay -> formulas` is the S6 surfacing seam: the fold publishes WHICH sheet formulas the figure
   // uses, so the canvas and the panel read one list rather than each detecting its own (#653's class).
-  // `replay -> engine` is now only `scene2`'s prototype-`Scene` adapter — the S3 bridge's own import of
-  // the fact types became a `model/` one with the #624 extraction, so this edge shrank rather than grew.
-  replay: ['value', 'model', 'solve', 'formulas', LEGACY],
-  store: ['value', 'model', 'solve', 'replay', 'parser', LEGACY],
+  replay: ['value', 'model', 'solve', 'formulas'],
+  // the store is STATE. It reaches nothing but the types it stores — the submit path, the gate and
+  // session persistence all live in `app/` (ADR-CX-023), and the cutover removed the second, in-store
+  // path that made this list four entries longer.
+  store: ['value'],
   scene: ['value', 'model', 'solve', 'replay'],
-  render: ['value', 'scene', LEGACY],
-  parser: ['value', 'model', LEGACY],
+  render: ['value', 'scene'],
+  parser: ['value', 'model'],
   // `app` is the ONLY layer that may compose the parser with replay: parser names what the student
   // said, replay folds constraints into a figure, and neither may reach for the other. The guard
   // caught `deriveLines` living in replay/ and was right to.
   app: ['value', 'model', 'solve', 'replay', 'store', 'parser'],
   formulas: ['value', 'model'],
-  // the extraction's two downward edges, and the only ones: the evaluator reads the vocabulary it
-  // used to own. They go with the directory.
-  [LEGACY]: ['value', 'model'],
 };
 
 const sourcesIn = (dir: string): string[] => {

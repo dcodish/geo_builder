@@ -18,15 +18,12 @@ import { useComplexStore } from '../../store/useComplexStore';
 import { deriveLines } from '../../app/deriveLines';
 import { submitLine } from '../../app/submit';
 import { isAnonymous, prettyName, solutionNames } from '../../model/naming';
-import { factNames } from '../../model/fact';
-import { parseLine } from '../../parser/parse';
 
 const store = () => useComplexStore.getState();
 
 /** Stated, never inherited: the engine an assertion is about is the whole point of this file (#686). */
 const fresh = () => {
   store().clearAll();
-  store().setEngine('v2');
   return store();
 };
 
@@ -117,14 +114,6 @@ describe('#680 — an enumerating equation draws its whole solution set', () => 
   it('an anonymous id never reaches a rendered string (ADR-447)', () => {
     for (const n of solutionNames('z', 4, true)) expect(prettyName(n)).toBe('');
     expect(prettyName('z1')).toBe('z₁');
-  });
-
-  it('the two namings agree while both engines exist — one convention, not two', () => {
-    // factNames lives in the retiring prototype; solutionNames is v2's. They must not drift before
-    // the cutover deletes the first, or a name the store reserves is not the name the figure draws.
-    const parsed = parseLine('z^3 = 8');
-    if (!parsed.ok) throw new Error('«z^3 = 8» did not parse');
-    expect(factNames(parsed.facts[0])).toEqual(['z', ...solutionNames('z', 3)]);
   });
 });
 

@@ -28,7 +28,6 @@ const store = () => useComplexStore.getState();
 
 beforeEach(() => {
   store().resetSession();
-  store().setEngine('v2');
 });
 
 const figure = (seed = store().seed) => deriveLines(store().lines, seed, seed);
@@ -147,7 +146,6 @@ describe('the sequence family (F9)', () => {
       'z1, z2, z3 is an arithmetic sequence',
     ]) {
       store().resetSession();
-      store().setEngine('v2');
       expect(submitLine(line), line).toBe(true);
       expect(figure().untranslated, line).toEqual([]);
     }
@@ -223,7 +221,6 @@ describe('save / load, through the real hydration path', () => {
     const before = figure(saved.seed);
 
     store().resetSession();
-    store().setEngine('v2');
     expect(store().lines).toHaveLength(0);
     expect(hydrateSession(JSON.parse(JSON.stringify(saved)))).toBe(true);
 
