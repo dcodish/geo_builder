@@ -22,11 +22,16 @@
  * cutover is what makes it true rather than merely intended.
  */
 import { create } from 'zustand';
+import type { LoadAudit } from '../../shell/save';
 import type { Cx } from '../value/value';
 
 export type InputError =
   | { key: 'not-handled' | 'parse-error'; detail: string }
   | { key: 'duplicate-name'; detail: string }
+  /** the loaded file belongs to another builder — its `app` marker is named (shell/save envelope) */
+  | { key: 'wrong-app'; detail: string }
+  /** the loaded file was saved by a NEWER app version — refused rather than half-loaded */
+  | { key: 'newer-version'; detail: string }
   /** the new statement cannot hold together with the named earlier statement (#606) */
   | { key: 'incompatible'; detail: string }
   /**
@@ -60,6 +65,9 @@ interface ComplexState {
   seed: number;
   view: 'cart' | 'polar';
   lastError: InputError | null;
+  /** The load audit (ADR-242, via shell/save): what the last load could NOT restore — the report
+   *  the App shows so a dropped line is never silent. Null = nothing to report. */
+  loadAudit: LoadAudit<InputError> | null;
   /** remove one line by its position — a row owns no fact id */
   removeLine: (index: number) => void;
   setFree: (name: string, z: Cx) => void;
@@ -72,6 +80,7 @@ interface ComplexState {
   /** an ACCEPTED v2 line, with the configuration the gate found for it */
   recordLine: (line: string, seed: number) => void;
   setError: (e: InputError) => void;
+  setLoadAudit: (a: LoadAudit<InputError> | null) => void;
   resetSession: () => void;
   restoreView: (v: { freePos: Record<string, Cx>; seed: number; view: 'cart' | 'polar' }) => void;
 }
@@ -82,6 +91,7 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
   seed: 0,
   view: 'cart',
   lastError: null,
+  loadAudit: null,
 
   removeLine: (index) => set(({ lines }) => ({ lines: lines.filter((_, i) => i !== index) })),
   setFree: (name, z) => set(({ freePos }) => ({ freePos: { ...freePos, [name]: z } })),
@@ -89,7 +99,7 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
   // a new configuration = fresh samples for every free DOF; drag overrides are part of the
   // OLD configuration and are released (the sibling "show another configuration" semantics)
   nextConfig: () => set(({ seed }) => ({ seed: seed + 1, freePos: {} })),
-  clearAll: () => set({ lines: [], freePos: {}, seed: 0, lastError: null }),
+  clearAll: () => set({ lines: [], freePos: {}, seed: 0, lastError: null, loadAudit: null }),
   clearError: () => set({ lastError: null }),
 
   serialize: () => {
@@ -100,6 +110,7 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
   recordLine: (line, seed) =>
     set(({ lines }) => ({ lines: [...lines, line], seed, lastError: null })),
   setError: (lastError) => set({ lastError }),
-  resetSession: () => set({ lines: [], freePos: {}, seed: 0, lastError: null }),
+  setLoadAudit: (loadAudit) => set({ loadAudit }),
+  resetSession: () => set({ lines: [], freePos: {}, seed: 0, lastError: null, loadAudit: null }),
   restoreView: ({ freePos, seed, view }) => set({ freePos, seed, view }),
 }));

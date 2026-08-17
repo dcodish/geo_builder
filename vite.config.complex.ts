@@ -1,6 +1,20 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { execSync } from 'node:child_process';
+
+// The same per-build release id as the siblings (git short-hash · build date), baked in as
+// `__BUILD__` and shown in the shared frame's About modal — provenance for bug reports. The root
+// vite.config.ts defines it for the dev server; this production config was the one build missing
+// it (an ADR-W-016 "implemented-or-forgotten" surface, closed by #673).
+const BUILD_ID = (() => {
+  try {
+    const hash = execSync('git rev-parse --short HEAD', { cwd: __dirname }).toString().trim();
+    return `${hash} · ${new Date().toISOString().slice(0, 10)}`;
+  } catch {
+    return 'dev';
+  }
+})();
 
 // The complex-numbers tool (docs/27) — the fourth sibling with its OWN production build:
 // base `/complex-builder/`, output `dist-complex/`, entry `complex.html` (renamed to index.html
@@ -10,6 +24,7 @@ import path from 'path';
 // BOUNDARIES.json) makes a cross-product import fail the build instead of silently working.
 export default defineConfig({
   base: '/complex-builder/',
+  define: { __BUILD__: JSON.stringify(BUILD_ID) },
   plugins: [react()],
   build: {
     outDir: 'dist-complex',

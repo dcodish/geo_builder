@@ -37,15 +37,17 @@ const MAY_IMPORT: Record<string, readonly string[]> = {
   replay: ['value', 'model', 'solve', 'formulas'],
   // the store is STATE. It reaches nothing but the types it stores — the submit path, the gate and
   // session persistence all live in `app/` (ADR-CX-023), and the cutover removed the second, in-store
-  // path that made this list four entries longer.
-  store: ['value'],
+  // path that made this list four entries longer. `shell` is the LoadAudit type it stores
+  // (shell/save, ADR-W-019) — the shared contract sits below every product layer.
+  store: ['value', 'shell'],
   scene: ['value', 'model', 'solve', 'replay'],
   render: ['value', 'scene'],
   parser: ['value', 'model'],
   // `app` is the ONLY layer that may compose the parser with replay: parser names what the student
   // said, replay folds constraints into a figure, and neither may reach for the other. The guard
-  // caught `deriveLines` living in replay/ and was right to.
-  app: ['value', 'model', 'solve', 'replay', 'store', 'parser'],
+  // caught `deriveLines` living in replay/ and was right to. `shell` is the save envelope + the
+  // load-audit contract the session path validates and collects through (shell/save, ADR-W-019).
+  app: ['value', 'model', 'solve', 'replay', 'store', 'parser', 'shell'],
   formulas: ['value', 'model'],
 };
 
@@ -89,7 +91,13 @@ describe('src-complex layer direction', () => {
       for (const spec of specifiersOf(file)) {
         if (!spec.startsWith('.')) continue; // packages are handled by the boundaries manifest
         const target = path.resolve(path.dirname(file), spec);
-        const rel = path.relative(ROOT, target).split(path.sep)[0];
+        let rel = path.relative(ROOT, target).split(path.sep)[0];
+        // The ONE sanctioned destination outside the tree: the shared shell/ tree (ADR-W-016 /
+        // ADR-W-019; BOUNDARIES.json's src-complex -> shell edge). Classified under its own layer
+        // name so a layer must LIST it explicitly — any other escape from the tree stays a
+        // violation here, on top of the manifest guard.
+        if (rel === '..' && target.startsWith(path.resolve(ROOT, '..', 'shell') + path.sep))
+          rel = 'shell';
         // a specifier that stays inside the layer resolves to the layer's own directory
         if (rel === layer || allowed.has(rel)) continue;
         violations.push(`${path.relative(ROOT, file)} -> ${spec}`);

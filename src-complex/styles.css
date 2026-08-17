@@ -6,10 +6,9 @@ body {
   color: #292524;
 }
 .app { max-width: 1180px; margin: 0 auto; padding: 12px 16px; }
-header { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
-h1 { font-size: 1.35rem; margin: 0; }
-.subtitle { margin: 2px 0 10px; color: #78716c; font-size: 0.9rem; }
-.header-actions { display: flex; gap: 8px; }
+/* The header, About modal and banners are the shared frame's (shell/frame, #673), styled by the
+   shell's own tokens. This sheet keeps the product BODY only, until B1 (#666) migrates the
+   palette onto the Tailwind tokens. */
 main { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
 .panel { flex: 1 1 320px; min-width: 300px; }
 .canvas { flex: 1 1 480px; min-width: 320px; }

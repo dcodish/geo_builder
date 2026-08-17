@@ -1,11 +1,12 @@
 # 28 — Product unification: making three tools feel and behave like one
 
-> **Status: WORKING DRAFT — decision-complete, not yet accepted, nothing here is executable.**
-> No ADR has been written for it. The operator asked for a draft to iterate on before any of it is
-> committed to; tracking issue [#648](https://github.com/dcodish/geo_builder/issues/648).
-> **§8 is now empty of open questions** — every fork, every interface decision (§4a D1–D10) and all
-> four programme questions were ruled on 2026-08-16. What remains before execution is an ADR and
-> your acceptance, not a decision.
+> **Status: PLAN OF RECORD — accepted by [ADR-W-018](06w-decisions-workspace.md#adr-w-018)
+> (2026-08-16), merged via PR #660. Execution began 2026-08-17 with A1 (#673, the `shell/` tree —
+> [ADR-W-019](06w-decisions-workspace.md#adr-w-019)).** Tracking issue
+> [#648](https://github.com/dcodish/geo_builder/issues/648); the work items are #673, #661–#665
+> (track A) and #666–#672 (track B).
+> **§8 is empty of open questions** — every fork, every interface decision (§4a D1–D10) and all
+> four programme questions were ruled on 2026-08-16.
 >
 > **§4 was ruled on by the operator on 2026-08-16 and is no longer a fork** — separate builders at
 > separate links, one learned interface, a toolbar switcher. That ruling added a second row family
