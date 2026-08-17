@@ -1,11 +1,20 @@
-// Own i18next instance (the ADR-3D-001 §9 rule: sibling instances must not clobber each other).
-import i18next from 'i18next';
-import { initReactI18next } from 'react-i18next';
+/**
+ * The complex builder's i18n — the RESOURCES are this product's own; the BOOTSTRAP is shared
+ * (`shell/i18n`, ADR-W-016: the ~25-line init was written three times; this tree now consumes the
+ * one copy, on its own instance — the ADR-3D-001 §9 rule holds by construction).
+ *
+ * Bidi isolation (`shell/bidi`) rides as a post-processor over every rendered message — the
+ * mechanism 2-D (#464) and 3-D (#468) each built and this tree shipped WITHOUT (docs/28 §1a
+ * measured it absent): an RTL sentence can no longer reverse `z1 = 3+4i` inside a refusal.
+ */
+import { makeBidi } from '../../shell/bidi';
+import { createProductI18n } from '../../shell/i18n';
 
-export const complexI18n = i18next.createInstance();
+/** The bidi kit — exported for composed (non-`t()`) strings and for the palette drift lock. */
+export const complexBidi = makeBidi();
 
 const he = {
-  title: 'בונה מרוכבים — אב-טיפוס',
+  title: 'בונה מרוכבים',
   subtitle: 'מישור גאוס: הקלידו נתונים שורה-שורה והתבוננו בנקודות',
   inputPlaceholder: 'למשל: z1 = 3+4i או w = z1*z2 או z^3 = 8',
   add: 'הוסף',
@@ -23,6 +32,8 @@ const he = {
   errIncompatible: 'המשפט לא נוסף — אינו מתיישב עם: "{{detail}}"',
   errImpossible: 'המשפט לא נוסף — הוא לא יכול להתקיים: "{{detail}}"',
   errUnaccounted: 'הבנתי חלק מהשורה, אבל לא את: {{detail}}',
+  errWrongApp: 'הקובץ שייך לכלי אחר ({{detail}}) — כאן נטענים קבצים של בונה המרוכבים בלבד',
+  errNewerVersion: 'הקובץ נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב',
   freeLabel: 'מספר חופשי (ניתן לגרירה)',
   implicitLabel: 'נוצר מעצם האזכור — חופשי, ניתן לגרירה',
   drivenLabel: 'מכוון על-ידי הנתונים — לחלופות: "אפשרות נוספת"',
@@ -51,6 +62,18 @@ const he = {
   calc: 'חשב',
   calcPlaceholder: 'הקלידו ביטוי לחישוב, למשל |z1-z2|',
   calcCurrent: 'בדגימה הנוכחית: {{value}}',
+  // The shared frame (shell/, #673): the overflow menu, About and the privacy note (NFR-SE-3).
+  menuLabel: 'עוד פעולות',
+  menuAbout: 'אודות',
+  aboutTitle: 'על הכלי',
+  aboutLead:
+    'כלי לבניית הציור של שאלת מספרים מרוכבים: מקלידים את הנתונים שורה-שורה, והציור נבנה ומתעדכן תוך כדי. הכלי מצייר ובודק את הנתונים — הוא אינו פותר את השאלה.',
+  aboutClose: 'סגירה',
+  privacy:
+    'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. העבודה נשמרת בדפדפן שלכם בלבד ובקבצים שאתם בוחרים לשמור — שום מידע אינו נשלח לשרת.',
+  // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
+  loadAuditTitle: 'הקובץ נטען חלקית: {{restored}} מתוך {{total}} שורות נוספו. שורות שלא נוספו:',
+  loadAuditDismiss: 'סגור',
   // S5 — the visualization layer (#622)
   stepperLabel: 'מחזור החזקות: n',
   stepBack: 'הקודם',
@@ -67,7 +90,7 @@ const he = {
 };
 
 const en = {
-  title: 'Complex Builder — prototype',
+  title: 'Complex Builder',
   subtitle: 'The Gauss plane: enter givens line by line and watch the points',
   inputPlaceholder: 'e.g. z1 = 3+4i or w = z1*z2 or z^3 = 8',
   add: 'Add',
@@ -85,6 +108,8 @@ const en = {
   errIncompatible: 'Statement not added — it cannot hold together with: "{{detail}}"',
   errImpossible: 'Statement not added — it cannot hold at all: "{{detail}}"',
   errUnaccounted: 'I read part of the line, but not: {{detail}}',
+  errWrongApp: 'This file belongs to another tool ({{detail}}) — only Complex Builder files load here',
+  errNewerVersion: 'This file was saved by a newer version of the tool — refresh the page and try again',
   freeLabel: 'free number (draggable)',
   implicitLabel: 'created by reference — free, draggable',
   drivenLabel: 'driven by the givens — use "Another configuration"',
@@ -113,6 +138,18 @@ const en = {
   calc: 'Calc',
   calcPlaceholder: 'type an expression to calculate, e.g. |z1-z2|',
   calcCurrent: 'at the current sample: {{value}}',
+  // The shared frame (shell/, #673): the overflow menu, About and the privacy note (NFR-SE-3).
+  menuLabel: 'More actions',
+  menuAbout: 'About',
+  aboutTitle: 'About this tool',
+  aboutLead:
+    'A tool for building the figure of a complex-numbers question: enter the givens line by line and the figure forms and adapts as you go. It draws and verifies the givens — it never solves the question.',
+  aboutClose: 'Close',
+  privacy:
+    'Privacy: no registration, and no personal data is collected. Your work is stored only in your browser and in files you choose to save — nothing is sent to a server.',
+  // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
+  loadAuditTitle: 'The file loaded partially: {{restored}} of {{total}} lines were added. Lines not added:',
+  loadAuditDismiss: 'Dismiss',
   // S5 — the visualization layer (#622)
   stepperLabel: 'power cycle: n',
   stepBack: 'previous',
@@ -128,9 +165,7 @@ const en = {
   showRegion: 'inside/outside',
 };
 
-complexI18n.use(initReactI18next).init({
-  lng: 'he',
-  fallbackLng: 'he',
-  resources: { he: { translation: he }, en: { translation: en } },
-  interpolation: { escapeValue: false },
+export const complexI18n = createProductI18n({
+  resources: { he, en },
+  postProcessors: [complexBidi.postProcessor('bidiIsolateCx')],
 });

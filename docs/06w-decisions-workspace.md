@@ -754,3 +754,53 @@ asserted rather than measured, and the correctness gaps stay unknown during the 
 weakest mechanism may persist as long as no counter-example is found, and "no counter-example found"
 is not "holds" (Q3). 2-D runs two styling systems during the transition (D2). And the row list is a
 judgement call per ADR — two passes could differ at the margins (Q2).
+
+## ADR-W-019 — The shell/ tree lands: the seeded surfaces, the boundary edges, and what deliberately waited (#673)
+
+**Status:** accepted, 2026-08-17 · **Issue:** [#673](https://github.com/dcodish/geo_builder/issues/673)
+(unify A1; programme [#648](https://github.com/dcodish/geo_builder/issues/648), [ADR-W-018](#adr-w-018)) ·
+**Implements:** [ADR-W-016](#adr-w-016)
+
+**What landed.** `shell/` exists and `src-complex/` consumes it — ADR-W-016 executed. Seeded exactly
+by the ≥2×-implemented-and-settled set, nothing speculative:
+
+| surface | shell module | what complex gained by consuming it |
+| --- | --- | --- |
+| design tokens | `shell/theme.ts` — `src/ui/theme.ts` VALUES, the declared token source | consumed by the frame's own styling today; becomes the Tailwind theme in B1 (#666) |
+| bidi isolation | `shell/bidi.ts` — the 3-D refinement as a FACTORY: the run alphabet and the declaration-split rule are caller parameters, never a product branch | registered as a post-processor on the complex i18n instance — the third builder had shipped with NO isolation (docs/28 §1a) |
+| i18n bootstrap | `shell/i18n.ts` — `createProductI18n`, an own instance per product (ADR-3D-001 §9 by construction) | `src-complex/i18n` keeps only its resources |
+| save envelope + naming + load audit | `shell/save.ts` | the envelope is validated on load (`version` was never checked — a future file half-loaded); saves are date-stamped `…-complex.json` (a fixed name silently overwrote); and the **ADR-242 audit arrived**: a line the load could not restore is REPORTED with its own refusal reason — before this it vanished, and `clearError()` erased even the evidence |
+| symbol palette | `shell/symbols.ts` — the module SHAPE (#482: a module can be asserted) + the wrap-selection core (D5: an empty selection IS a caret insert) | palette data moved to `src-complex/ui/symbols.ts`, with a new totality lock: every button lands in an utterance the real grammar reads, and every inserted character stays inside the bidi run alphabet |
+| app frame | `shell/frame/` — `AppFrame`, `Modal` (the 2-D a11y modal), `Banner`, `OverflowMenu`, `ProductSwitcher` | the D4 header (save/load/language behind `⋯`); an About modal whose **privacy note is a REQUIRED prop** — NFR-SE-3 can no longer be forgotten by a consumer, and complex had shipped publicly without one; the `__BUILD__` stamp, which the complex production config never defined |
+
+**The boundary edges.** `shell` is a declared tree in `BOUNDARIES.json`; `layers.shell.sharing`
+completes the ADR-W-016→W-018 move to `shared-parameterized`. Eight forbidden edges close the
+boundary in both directions (`shell` → every tree; every tree → `shell` except the consumer), and
+ONE allowed edge — `src-complex → shell` — which the isolation test asserts is **real**, so `shell/`
+can never silently become a dead tree the manifest still advertises. `src → shell` and
+`src3d → shell` are forbidden **deliberately**: Track B flips each one as an operator-played act
+(docs/28 §5a), never by accident.
+
+**What deliberately waited, so A1 did not absorb its neighbours.** The switcher ships DARK —
+component and roster prop exist, and A2's registry (#661) lights it, because a hand-rolled roster
+here is exactly the drift A2 exists to kill. No Tailwind (B1 owns the mechanism change; the frame
+styles by tokens through the settled inline mechanism). Figure actions (cycle, view toggle) stay in
+the header until B6 executes D7. No quick commands (B4), no fact-list operations (B5), no complex
+locale-file split. Complex still has no figure-name field, so saves use the date-stamped fallback —
+the name field arrives with B3's header.
+
+**Also made honest on the way.** The complex title dropped «אב-טיפוס» — the prototype it named was
+deleted by the cutover (ADR-CX-027), and a public banner claiming prototype status was stale. The
+new privacy note states what is true TODAY (no registration, nothing leaves the browser — complex
+has no usage logging); when logging arrives, the note must change with it.
+
+**Consequences.** Every remaining A/B item now has the tree it is expressed in. `test:complex` runs
+`shell/` (its only consumer's lane; sibling lanes adopt it when they adopt the tree). To ci.yml's
+classifier and `check:siblings`, a `shell/` path is *unrecognised ⇒ shared* (the ADR-W-017 rule), so
+a shell edit runs every lane — conservative and correct until A2 replaces the hand-kept path lists.
+The complex layer-direction guard (`import-direction.test.ts`) gained the `shell` vocabulary — an
+out-of-tree import classifies as the `shell` layer only when it lands inside `shell/`, and a layer
+must LIST it explicitly (`store` and `app` today); any other escape from the tree stays a violation,
+so the guard's fail-closed posture survives the new tree rather than being loosened by it.
+Cost accepted: complex renders two styling mechanisms until B1 (tokens inline in the frame, the
+stone-palette CSS in the body) — the same per-surface transition D2 ruled for 2-D.

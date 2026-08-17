@@ -38,10 +38,15 @@
  * blame and therefore what to keep*.
  */
 
+import { readEnvelope, type LoadAudit } from '../../shell/save';
 import { parseLineV2 } from '../parser/rules';
 import type { Derived2 } from '../replay/derive2';
 import { type InputError, type SavedSession, useComplexStore } from '../store/useComplexStore';
 import { deriveLines } from './deriveLines';
+
+/** This product's save-file envelope (shell/save): the marker `serialize()` writes, and the
+ *  highest `SavedSession.version` this build can read. */
+export const COMPLEX_SESSION = { app: 'complex-builder', maxVersion: 1 } as const;
 
 /**
  * How many configurations to try before blaming the new line — the prototype's mini config-search.
@@ -157,10 +162,18 @@ export function submitLine(raw: string): boolean {
  * with a gate in the path that is a bug waiting: a session saved in configuration 3 would be re-gated
  * in configuration 0, and a line that holds only in the saved drawing would be refused on load — the
  * session silently losing a statement, which is #658's failure mode arriving through the file dialog.
+ *
+ * The envelope is validated BEFORE anything is touched (shell/save: a foreign or future file refuses
+ * without resetting the open session), and the replay keeps a LOAD AUDIT (ADR-242, the rule this tree
+ * shipped without): a line the grammar no longer reads or the gate now refuses is REPORTED with its
+ * reason, never silently dropped — before this, `clearError()` erased even the last line's evidence.
+ * The boolean answers only "was this a loadable session"; partial restores return true WITH an audit.
  */
 export function hydrateSession(data: unknown): boolean {
-  const d = data as SavedSession;
-  if (!d || d.app !== 'complex-builder' || !Array.isArray(d.lines)) return false;
+  const env = readEnvelope(data, COMPLEX_SESSION);
+  if (!env.ok) return false;
+  const d = env.data as unknown as SavedSession;
+  if (!Array.isArray(d.lines)) return false;
   const st = () => useComplexStore.getState();
   st().resetSession();
   st().restoreView({
@@ -168,7 +181,13 @@ export function hydrateSession(data: unknown): boolean {
     seed: typeof d.seed === 'number' ? d.seed : 0,
     view: d.view === 'polar' ? 'polar' : 'cart',
   });
-  for (const line of d.lines) submitLine(String(line));
+  const failed: LoadAudit<InputError>['failed'] = [];
+  for (const raw of d.lines) {
+    const line = String(raw);
+    if (!submitLine(line))
+      failed.push({ line, reason: st().lastError ?? { key: 'not-handled', detail: line } });
+  }
   st().clearError();
+  st().setLoadAudit(failed.length > 0 ? { total: d.lines.length, failed } : null);
   return true;
 }

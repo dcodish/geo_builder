@@ -25,12 +25,13 @@
     },
     "shell": {
       "question": "Neither of the above.",
-      "sharing": "undecided",
-      "rationale": "Not geometry. If it is ever shared it must be parameterized by the caller — branching on product identity inside a shared module is a fork wearing a shared file's name."
+      "sharing": "shared-parameterized",
+      "rationale": "Shared via the shell/ tree (ADR-W-016, ADR-W-018): chrome only, parameterized by the caller — branching on product identity inside a shared module is a fork wearing a shared file's name. Seeded only by surfaces already implemented >= 2 times and settled."
     }
   },
 
   "trees": {
+    "shell": { "product": "workspace", "label": "workspace", "adrLog": "docs/06w-decisions-workspace.md" },
     "src": { "product": "2d", "label": "2d", "adrLog": "docs/06-decisions.md" },
     "src3d": { "product": "3d", "label": "3d", "adrLog": "docs/06b-decisions-3d.md" },
     "src-complex": { "product": "complex", "label": "complex", "adrLog": "docs/06d-decisions-complex.md" },
@@ -58,6 +59,11 @@
         "from": "server",
         "to": "src3d",
         "why": "Same binding point: src3d/parser/llmShared3. Listed so the coupling is visible rather than folklore that merely looks like a violation."
+      },
+      {
+        "from": "src-complex",
+        "to": "shell",
+        "why": "The one sanctioned shared-code edge (ADR-W-016): shell/ is chrome parameterized by the caller, and src-complex is its first consumer. Listed as allowed so the isolation test asserts the edge is REAL — shell/ can never silently become a dead tree the manifest still advertises."
       }
     ],
     "forbidden": [
@@ -105,6 +111,41 @@
         "from": "src-complex",
         "to": "server",
         "why": "Same as the siblings: the complex app will post to the proxy over HTTP (tool:'complex'), never by import, so the key-handling path cannot reach a browser bundle."
+      },
+      {
+        "from": "shell",
+        "to": "src",
+        "why": "shell/ is parameterized by the caller and may never import a product tree (ADR-W-016 rule 2) — an import would couple every consumer to that product and make the shared chrome a fork wearing a shared file's name."
+      },
+      {
+        "from": "shell",
+        "to": "src3d",
+        "why": "Same rule: the roster, labels and content arrive as data from the caller, never by importing a product."
+      },
+      {
+        "from": "shell",
+        "to": "src-complex",
+        "why": "Same rule, stated toward its own first consumer: the frame must serve builder N+1 without knowing any builder."
+      },
+      {
+        "from": "shell",
+        "to": "server",
+        "why": "shell/ ships in browser bundles; importing server code would pull the key-handling path into every consumer's bundle (the same reason each product tree is forbidden from server)."
+      },
+      {
+        "from": "src",
+        "to": "shell",
+        "why": "The 2-D app adopts shell/ only in Track B of the unification programme (docs/28 section 5a), one surface per PR with the operator playing each — until that flips this edge deliberately, an accidental import must fail."
+      },
+      {
+        "from": "src3d",
+        "to": "shell",
+        "why": "Same as src -> shell: 3-D adoption is a deliberate Track B act, never an accident."
+      },
+      {
+        "from": "server",
+        "to": "shell",
+        "why": "The proxy has no UI; nothing in browser chrome belongs in it. Listed so the boundary around the new tree is total rather than assumed."
       }
     ]
   },
@@ -119,6 +160,9 @@
 
   "classification": {
     "$comment": "TOTAL over every directory in every declared tree. A tree's own key covers the files sitting directly in it. An unclassified directory fails the isolation test — that is the copy tripwire made mechanical.",
+
+    "shell": "shell",
+    "shell/frame": "shell",
 
     "src": "shell",
     "src/app": "engine",
@@ -158,7 +202,8 @@
     "src-complex/app": "engine",
     "src-complex/scene": "engine",
     "src-complex/formulas": "lexicon",
-    "src-complex/i18n": "shell"
+    "src-complex/i18n": "shell",
+    "src-complex/ui": "shell"
   },
 
   "classificationNotes": {
