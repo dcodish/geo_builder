@@ -48,7 +48,7 @@ describe('CATALOG — every specimen parses, in both languages', () => {
 
   it('reports MEASURED coverage — which families actually work today', () => {
     // this is the honest number, and it is deliberately much smaller than the contract
-    expect(coveredFamilies()).toEqual(['F1', 'F12', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9']);
+    expect(coveredFamilies()).toEqual(['F1', 'F12', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'G7', 'G8']);
     expect(Object.keys(FAMILY_TITLE).length).toBeGreaterThan(coveredFamilies().length);
   });
 });
@@ -195,6 +195,7 @@ describe('span accounting is ENFORCING, not advisory', () => {
       'measure-relation',
       // and the QUESTION form after the statement form: the same words minus the equating word
       'measure-query',
+      'measure-ratio',
       'circumscribed-circle',
       'circle-centre-radius',
       'named-shape',

@@ -205,6 +205,20 @@ export const CATALOG: readonly CatalogEntry[] = [
     descHe: 'ה-n המינימלי — התלמיד עונה, הכלי בודק',
     descEn: 'the minimal n — the student answers, the tool checks',
   },
+  {
+    family: 'G7',
+    he: 'z1*conj(z1) + z2*conj(z2) = 25',
+    en: 'z1*conj(z1) + z2*conj(z2) = 25',
+    descHe: 'סכום מעל קבוצה — נתון אם יש דרגת חופש, ואחרת טענה שנבדקת',
+    descEn: 'a sum over a set — a given when something is free, otherwise a claim that is checked',
+  },
+  {
+    family: 'G8',
+    he: 'היחס בין שטח Oz1z2 לשטח Oz1z3',
+    en: 'the ratio of area Oz1z2 to area Oz1z3',
+    descHe: 'יחס בין מידות — ידוע גם כשאף אחת מהן אינה מספר, כי היחידה מצטמצמת',
+    descEn: 'a ratio of measures — knowable even when neither half is a number, because the unit cancels',
+  },
 ];
 
 /** Group for the in-app panel; the family table is the ordering, not the insertion order. */

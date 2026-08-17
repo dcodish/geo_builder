@@ -360,6 +360,12 @@ export function App() {
                   ✗ «{u}» — לא מתקיים בתצורה הזו
                 </div>
               ))}
+              {/* a relation the engine could not EVALUATE — undecided, and said so rather than dropped */}
+              {derived2.undecided.map((u) => (
+                <div key={`und-${u}`} className="v2-skip">
+                  ? «{u}» — לא ניתן להכריע מהנתונים שניתנו
+                </div>
+              ))}
               {derived2.untranslated.map((u) => (
                 <div key={u.factId} className="v2-skip">
                   ⚠ «{u.src}» — {u.why}

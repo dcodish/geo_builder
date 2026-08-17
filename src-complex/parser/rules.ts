@@ -27,6 +27,7 @@ import {
   type MeasureKind,
   type MeasureQuery,
   type MeasureRelation,
+  type RatioQuery,
 } from '../model/measure';
 import { rat } from '../value/rational';
 import { isComplexName, parseExpr } from './exprParse';
@@ -37,7 +38,10 @@ import {
   ARG_KW,
   ARITHMETIC_KW,
   CENTER_KW,
+  BETWEEN_KW,
   EQUATES_KW,
+  RATIO_KW,
+  TO_KW,
   FORALL_KW,
   FOR_WHICH_KW,
   HE_THE_VAR,
@@ -97,6 +101,8 @@ export interface ParsedLine {
   readonly measures: MeasureRelation[];
   /** «שטח OZ₁Z₂Z₃» — a request to DISPLAY a measure, answered only when the value is knowledge */
   readonly queries: MeasureQuery[];
+  /** «היחס בין … ל…» — a ratio of two measures, knowable where neither half is (G8) */
+  readonly ratios: RatioQuery[];
   /** stated sequences as STATEMENTS — what the series pictures are drawn from (F9) */
   readonly sequences: SequenceStatement[];
   /** names the line brings into existence, whether or not a constraint mentions them */
@@ -125,6 +131,7 @@ const empty = (): ParsedLine => ({
   objects: [],
   measures: [],
   queries: [],
+  ratios: [],
   sequences: [],
   declares: [],
   claims: [],
@@ -485,6 +492,44 @@ const measureQuery: Rule = (s) => {
   return null;
 };
 
+/**
+ * G8 — «היחס בין שטח Oz1z2 לשטח Oz2z3» / «the ratio between area Oz1z2 and area Oz2z3».
+ *
+ * A ratio is knowable where neither half is: the unit cancels. The two measure phrases are read by the
+ * same noun list as every other measure sentence, so nothing about lengths, perimeters or areas is
+ * spelled twice — a second spelling is how the two would come to disagree about what «היקף» means.
+ */
+const measureRatio: Rule = (s) => {
+  const shapeNoun = `(?:${SHAPES.map(([kw]) => kw).join('|')})`;
+  const phrase = `(?:${MEASURE_NOUNS.map(([kw]) => kw).join('|')})\\s+${ACCUSATIVE_KW}${OF_A}(?:${shapeNoun}\\s+)?${RUN}`;
+  const m = s.match(rx(`^${OF_A}${RATIO_KW}\\s+${BETWEEN_KW}(${phrase})\\s+${TO_KW}(${phrase})$`));
+  if (!m) return null;
+  const one = measureTerm(m[1]);
+  const two = measureTerm(m[2]);
+  if (!one || !two) return null;
+  return {
+    ...empty(),
+    ratios: [{ numerator: one, denominator: two, src: s }],
+    declares: [...one.points, ...two.points].filter((n) => !isOrigin(n)),
+    claims: [claimAll(s)],
+  };
+};
+
+/** One measure phrase — «שטח Oz1z2» — as the query it denotes, or null when the arity is wrong. */
+const measureTerm = (text: string): MeasureQuery | null => {
+  const shapeNoun = `(?:${SHAPES.map(([kw]) => kw).join('|')})`;
+  for (const [kw, kind] of MEASURE_NOUNS) {
+    const m = text.match(rx(`^${kw}\\s+${ACCUSATIVE_KW}${OF_A}(?:${shapeNoun}\\s+)?(${RUN})$`));
+    if (!m) continue;
+    const points = splitRun(m[1]);
+    const arity = MEASURE_ARITY[kind];
+    if (points.length < arity.min) return null;
+    if (arity.exact !== undefined && points.length !== arity.exact) return null;
+    return { kind, points, src: text };
+  }
+  return null;
+};
+
 // --- F9: sequences ----------------------------------------------------------
 
 /** The type word, and which tier will end up reading the relations it implies. */
@@ -670,6 +715,8 @@ export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = 
   { name: 'measure-relation', rule: measureRelation },
   // a measure with NO value is a question, so it may only be tried once the statement form has failed
   { name: 'measure-query', rule: measureQuery },
+  // a RATIO names two measures, so it must outrank both single-measure rules
+  { name: 'measure-ratio', rule: measureRatio },
   { name: 'circumscribed-circle', rule: circumscribedCircle },
   { name: 'circle-centre-radius', rule: circleByCenterRadius },
   { name: 'named-shape', rule: namedShape },
