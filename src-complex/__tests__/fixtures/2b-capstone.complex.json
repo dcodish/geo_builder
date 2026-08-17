@@ -1,0 +1,23 @@
+{
+  "app": "complex-builder",
+  "version": 1,
+  "lines": [
+    "arg z1 - arg z2 = 90",
+    "|z1| = 9r",
+    "|z2| = 12r",
+    "z2 ברביע הראשון",
+    "arg z2 < 45",
+    "|z1-z2|",
+    "|z3| = 20r",
+    "arg z3 + arg z2 = 0",
+    "המרובע Oz1z2z3",
+    "שטח Oz1z2z3 הוא 150r^2",
+    "היקף Oz1z2z3",
+    "z1, z2, z4 סדרה הנדסית",
+    "המרובע Oz2z3z4",
+    "z^5 = z1*z2^3*z4"
+  ],
+  "freePos": {},
+  "seed": 0,
+  "view": "cart"
+}
