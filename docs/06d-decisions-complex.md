@@ -1084,3 +1084,66 @@ synthesis) all need the same missing substrate: a **solution SET as a first-clas
 all n solutions present at once, which is [ADR-CX-005](#adr-cx-005)'s «X reserves the bare letter and is
 related to X₁..Xₙ» half, not yet implemented. **G9** (non-linear loci) needs the F13 locus layer, which
 also does not exist. Each is a slice; none is a finishing touch.
+
+---
+
+## ADR-CX-019 — The cutover gate, measured: eight capabilities rebuilt, one blocker named (2026-08-17)
+
+**Status:** Accepted · **Slice:** S7 ([#624](https://github.com/dcodish/geo_builder/issues/624))
+· **Ladder:** stage 0b · **Families:** F1, F2, F4 (the inequality half), F7
+
+### The gate, and why it had to be measured rather than argued
+
+[ADR-CX-008](#adr-cx-008)'s cutover deletes `engine/model.ts` and `engine/complex.ts`. The operator's
+condition on it is exact: *"if v2 cannot cover something the prototype covers, STOP and report it
+rather than deleting the capability."* A claim that v2 is ready would be worth nothing without a
+measurement, so every form the prototype's own 76-test suite exercises was run through **both**
+grammars and the difference printed.
+
+That measurement is now a test (`cutover-parity.test.ts`), not a document: a form the prototype reads
+and v2 does not **fails the suite**. It found nine gaps.
+
+### Eight were grammar, and are built
+
+| gap | what it is now |
+|---|---|
+| «z1 מספר מרוכב» | F1 spelled out — and the only way to declare a name *outside* the z/w convention complex at all |
+| «הצמוד של z1», «ההופכי של z1» | word-spelled operators, rewritten to `conj(…)` / `1/(…)` at the orthography chokepoint, beside the combining overline |
+| «החלק הממשי של z1» | the same treatment for the projections |
+| `z1 = 2cis(θ)` | the Greek letters the palette inserts are normalized to their Latin spellings — two spellings of one parameter were two different parameters |
+| `z1 = 2cis(theta)` | F2's generic polar form: it states the **magnitude** and leaves the direction free, rather than refusing the line |
+| `arg z2 < 45`, `90 < arg z1 < 180` | **F4's inequality half** — the engine has carried `BranchFilter.range` since S2 and the sampler has honoured its window since S3; only the sentence was missing, so the §2b capstone's own branch selector could not be typed |
+| `re(z1)`, `im(z1)` | real projections, lowered to `(z ± z̄)/…` so every consumer keeps reading the same six operations |
+| `\|z1-z2\|`, `im(z1)`, `z1*z2` on their own line | a bare expression is a **question**, answered by the knowledge rule |
+
+### Two defects the measurement uncovered
+
+1. **`im(z1)` was a product.** The tokenizer read `im` as a NAME, so a stated projection silently
+   became a product with an invented real parameter — the same defect the `TOKEN` comment already
+   records for `2cis150`, in a second place. A mis-parse is worse than a refusal: the refusal says so.
+2. **A last-resort rule can undo an honest refusal.** The first bare-expression rule read
+   «triangle Oz1z2z3» — a shape noun with the wrong vertex count, which the shape rule refuses **on
+   purpose** — as the implicit product `triangle · O · z1 · z2 · z3`. The arity guard exists to stop a
+   green ✓ sitting over a wrong picture, and a catch-all rule that rescues every refused sentence is
+   the worst thing a catch-all can be. It now requires the line to be written the way maths is written,
+   with no space between operands, and the guard test that caught it stays.
+
+The bare-expression answer is also where the prototype's **calculation panel** lands, rebuilt on the
+honesty contract: that panel printed the current sample and called it an answer, and this one prints
+`15r` for «|z1-z2|» over the §2b givens, a number over a determined figure, and *why not* otherwise.
+The degree is **measured** under the scale symmetry rather than declared, so `r` versus `r²` is
+arithmetic rather than a table of quantity kinds.
+
+### The ninth gap is not grammar, and it BLOCKS the cutover
+
+**A solution set is not referencable in v2.** The prototype's «z³ = 8» names z₁, z₂, z₃ — three points
+a later line can talk about — while v2 draws one point and walks the three as *configurations*. Three
+prototype tests depend on it (referencable solution names, name reservation, and the anonymous set of
+the §2b part ד), and [ADR-CX-005](#adr-cx-005) specifies the v2 behaviour that would replace it and
+which is not implemented.
+
+Under the operator's own condition this **stops the cutover**: deleting the prototype today deletes a
+capability rather than replacing it. It is [#680](https://github.com/dcodish/geo_builder/issues/680),
+it carries a design question that needs a ruling (what branch cycling cycles once all n roots are drawn
+at once), and **#616 cannot close until it is built.** Everything else S7 asks for — the fixture net,
+the corpus fixtures, the test rewrite onto the store's submit path — is unblocked and remains to do.

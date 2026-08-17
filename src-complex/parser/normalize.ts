@@ -21,6 +21,8 @@
  * keeps it deliberately — with the transforms named and the round-trip property now asserted.
  */
 
+import { CONJ_OF_KW, IM_OF_KW, NAME, RE_OF_KW, RECIPROCAL_OF_KW } from './lexicon';
+
 /** Superscript digits become an explicit power: `Z₂³` → `z2^3`. */
 const SUPERSCRIPTS: Record<string, string> = {
   '⁰': '0',
@@ -49,6 +51,9 @@ const SUBSCRIPTS: Record<string, string> = {
   '₉': '9',
 };
 
+/** The angle letters the palette inserts and the exam prints, as the Latin names a rule can read. */
+const GREEK: Record<string, string> = { 'θ': 'theta', 'α': 'alpha', 'β': 'beta', 'φ': 'phi' };
+
 /**
  * Invisible formatting characters: LRM, RLM, ALM, the embedding/override run, and the isolates.
  *
@@ -66,6 +71,24 @@ const TRANSFORMS: readonly { readonly why: string; readonly apply: (s: string) =
     // `z̄` and `z̅` — the exam's conjugate notation (2024 חורף's locus is written this way)
     why: 'a combining overline after a name is the conjugate',
     apply: (s) => s.replace(/([a-zA-Z])[̄̅](\w*)/g, 'conj($1$2)'),
+  },
+  {
+    // «הצמוד של z1» and «conj(z1)» are the same operation spelled two ways — one spelling problem,
+    // fixed where the combining overline is fixed, so no rule downstream needs to know both.
+    why: 'a word-spelled operator becomes its function form',
+    apply: (s) =>
+      s
+        .replace(new RegExp(`${CONJ_OF_KW}\\s+(${NAME})`, 'giu'), 'conj($1)')
+        .replace(new RegExp(`${RECIPROCAL_OF_KW}\\s+(${NAME})`, 'giu'), '1/($1)')
+        .replace(new RegExp(`${RE_OF_KW}\\s+(${NAME})`, 'giu'), 're($1)')
+        .replace(new RegExp(`${IM_OF_KW}\\s+(${NAME})`, 'giu'), 'im($1)'),
+  },
+  {
+    // The symbol palette inserts θ/α/β and the exam prints them; a NAME is Latin, so the two spellings
+    // of one parameter would otherwise be two different parameters — «z = 2cis(θ)» parsed as nothing
+    // while «z = 2cis(theta)» parsed fine.
+    why: 'a Greek parameter letter is its Latin spelling',
+    apply: (s) => s.replace(/[θαβφ]/g, (c) => GREEK[c]),
   },
   { why: 'the multiplication dot and cross are `*`', apply: (s) => s.replace(/[·×]/g, '*') },
   { why: 'the Unicode minus is a hyphen', apply: (s) => s.replace(/−/g, '-') },

@@ -181,6 +181,8 @@ describe('span accounting is ENFORCING, not advisory', () => {
     expect(RULES.map((r) => r.name)).toEqual([
       'declaration',
       'quadrant',
+      'argument-inequality',
+      'generic-polar',
       'conjugates-claim',
       'forall-power',
       'minimal-power',
@@ -203,6 +205,7 @@ describe('span accounting is ENFORCING, not advisory', () => {
       'equation',
       // last of all: a bare glued run is a figure only when nothing read the line as maths
       'bare-run',
+      'bare-expression',
     ]);
   });
 });

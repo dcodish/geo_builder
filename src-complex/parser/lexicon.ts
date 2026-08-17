@@ -90,6 +90,25 @@ export const IMAGINARY_KW = String.raw`(?:${HE_PREFIX}${MEM}דומה(?: ${HE_PRE
  */
 export const HE_THE_VAR = String.raw`(?:ה-?)?`;
 
+/**
+ * The two operators the exam spells as WORDS: «הצמוד של z1», «ההופכי של z1».
+ *
+ * Function notation (`conj(z1)`, `1/(z1)`) and the word form are the same operation, so they are one
+ * spelling problem and are fixed at the orthography chokepoint — the same place the combining overline
+ * becomes `conj(...)`. A rule that had to know both spellings would be the second place this decision
+ * lives, which is the drift the lexical layer exists to prevent.
+ */
+export const CONJ_OF_KW = String.raw`(?:${HE_PREFIX}צמוד${HE_SUFFIX}\s+של|(?:the\s+)?conjugate\s+of)`;
+
+/** «החלק הממשי של» / «the real part of» — the projection `re`. */
+export const RE_OF_KW = String.raw`(?:${HE_PREFIX}חלק ${HE_PREFIX}${MEM}${MEM}שי${HE_SUFFIX}\s+של|(?:the\s+)?real\s+part\s+of)`;
+
+/** «החלק המדומה של» / «the imaginary part of» — the projection `im`. */
+export const IM_OF_KW = String.raw`(?:${HE_PREFIX}חלק ${HE_PREFIX}${MEM}דומה\s+של|(?:the\s+)?imaginary\s+part\s+of)`;
+
+/** «ההופכי של» / «the reciprocal of» — `1/z`. */
+export const RECIPROCAL_OF_KW = String.raw`(?:${HE_PREFIX}הופכי${HE_SUFFIX}\s+של|(?:the\s+)?reciprocal\s+of)`;
+
 /** «היחס» / «the ratio» — G8's register, where the answer is demanded as a proportion. */
 export const RATIO_KW = String.raw`(?:${HE_PREFIX}יחס|ratio)`;
 
@@ -303,6 +322,10 @@ export const ATOM_SOURCES: Readonly<Record<string, string>> = {
   REAL_KW,
   IMAGINARY_KW,
   CONJUGATE_KW,
+  CONJ_OF_KW,
+  RECIPROCAL_OF_KW,
+  RE_OF_KW,
+  IM_OF_KW,
   RATIO_KW,
   BETWEEN_KW,
   TO_KW,

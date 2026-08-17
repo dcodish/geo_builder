@@ -14,7 +14,7 @@ import { parseLineV2 } from '../parser/rules';
 import type { BranchFilter, Constraint } from '../model/constraint';
 import type { Claim as Assertion } from '../model/claim';
 import type { FigureObject } from '../model/figure';
-import type { MeasureQuery, MeasureRelation, RatioQuery } from '../model/measure';
+import type { ExprQuery, MeasureQuery, MeasureRelation, RatioQuery } from '../model/measure';
 import type { SequenceStatement } from '../model/sequence';
 import { type Derived2, type Untranslated, foldConstraints } from '../replay/derive2';
 
@@ -34,6 +34,7 @@ export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0)
   const measures: MeasureRelation[] = [];
   const queries: MeasureQuery[] = [];
   const ratios: RatioQuery[] = [];
+  const exprQueries: ExprQuery[] = [];
   const sequences: SequenceStatement[] = [];
   const atoms = new Map<string, number>();
   const untranslated: Untranslated[] = [];
@@ -56,6 +57,7 @@ export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0)
     measures.push(...r.line.measures);
     queries.push(...r.line.queries);
     ratios.push(...r.line.ratios);
+    exprQueries.push(...r.line.exprQueries);
     sequences.push(...r.line.sequences);
     for (const [k, v] of r.line.atoms) atoms.set(k, v);
   });
@@ -73,6 +75,7 @@ export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0)
     measures,
     queries,
     ratios,
+    exprQueries,
     sequences,
   });
 }

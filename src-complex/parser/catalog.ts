@@ -219,6 +219,27 @@ export const CATALOG: readonly CatalogEntry[] = [
     descHe: 'יחס בין מידות — ידוע גם כשאף אחת מהן אינה מספר, כי היחידה מצטמצמת',
     descEn: 'a ratio of measures — knowable even when neither half is a number, because the unit cancels',
   },
+  {
+    family: 'F4',
+    he: 'arg z2 < 45',
+    en: 'arg z2 < 45',
+    descHe: 'אי-שוויון בארגומנט — בורר תצורה, וגם תוחם את הדגימה',
+    descEn: 'an argument inequality — it selects a configuration, and bounds the sampling too',
+  },
+  {
+    family: 'F2',
+    he: 'z1 = 2cis(θ)',
+    en: 'z1 = 2cis(θ)',
+    descHe: 'גודל נתון בכיוון חופשי — מה שנאמר נשמר, מה שלא נאמר נשאר חופשי',
+    descEn: 'a stated magnitude at a free direction — nothing stated is dropped, nothing unstated invented',
+  },
+  {
+    family: 'F7',
+    he: '|z1-z2|',
+    en: '|z1-z2|',
+    descHe: 'ביטוי בשורה משלו — שאלה, שנענית רק אם הנתונים קובעים את הערך',
+    descEn: 'a bare expression — a question, answered only when the givens force the value',
+  },
 ];
 
 /** Group for the in-app panel; the family table is the ordering, not the insertion order. */
