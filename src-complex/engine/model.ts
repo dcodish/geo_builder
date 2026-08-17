@@ -1,7 +1,8 @@
-// Fact model + derive for the C0 prototype: the ordered fact list is the source of truth,
-// the scene is derived (the sibling products' store/replay discipline in miniature).
+// The C0 prototype's EVALUATOR — `derive`: the per-fact constraint sweeps, the numeric solves and the
+// prototype `Scene`. The fact VOCABULARY it used to carry alongside has moved down to `model/fact.ts`
+// and `value/value.ts`, because `parser/parse.ts` outlives this file as ADR-CX-019's parity oracle
+// while nothing outside this directory needs the evaluator. What remains here is what #624 deletes.
 import {
-  type Cx,
   add,
   sub,
   mul,
@@ -10,109 +11,21 @@ import {
   conj,
   absC,
   argDeg,
-  cisDeg,
-  cx,
-  fmtNum,
   ipow,
   nthRoots,
 } from './complex';
-
-export type Expr =
-  | { t: 'lit'; v: Cx }
-  | { t: 'ref'; name: string }
-  | { t: 'bin'; op: '+' | '-' | '*' | '/'; l: Expr; r: Expr }
-  | { t: 'pow'; base: Expr; exp: number }
-  | { t: 'neg'; e: Expr }
-  | { t: 'conj'; e: Expr }
-  | { t: 'abs'; e: Expr }
-  | { t: 're'; e: Expr }
-  | { t: 'im'; e: Expr };
-
-export type Fact =
-  | { id: string; kind: 'free'; name: string; src: string; implicit?: boolean }
-  | { id: string; kind: 'def'; name: string; expr: Expr; src: string }
-  /** X^n = expr. Three modes (operator ruling 2026-08-15): X fresh → enumerate the solution
-   *  set X1..Xn and RESERVE the bare letter (X is related to its indexed letters); X an
-   *  existing free number → the equation CONSTRAINS it (snap to the nearest solution, show
-   *  the candidates); X determined → the equation VERIFIES (✓/✗). `constrains` is stamped
-   *  by the store from whether X already existed. */
-  | {
-      id: string;
-      kind: 'roots';
-      varName: string;
-      n: number;
-      rhs: Expr;
-      src: string;
-      norm: string;
-      constrains?: boolean;
-      /** enumeration whose indexed names are already taken (the §2b Z vs Z₁ case): the
-       *  solutions are an ANONYMOUS SET — marked points, no names claimed (exam-faithful) */
-      anon?: boolean;
-    }
-  /** an unnamed expression line — plotted, labeled by the expression itself, never referencable
-   *  (ADR-447: anonymous ids never reach a rendered string; the label is the student's text) */
-  | { id: string; kind: 'show'; expr: Expr; src: string; norm: string }
-  /** a relation (F3 modulus / F4 argument): DRIVES a free number when one is available,
-   *  VERIFIES (✓/✗) when everything is determined — driveOrCheck-lite */
-  | { id: string; kind: 'rel'; rel: RelSpec; src: string; norm: string }
-  /** F9 list form (ADR-CX-003; operator 2026-08-15 — "the list form is correct for now"):
-   *  the named numbers are CONSECUTIVE terms of one sequence. driveOrCheck: all determined →
-   *  verify; `defines` (stamped by the store: exactly one unknown name) → that term is DERIVED
-   *  from the others; one FREE term among determined ones → driven. */
-  | {
-      id: string;
-      kind: 'seq';
-      stype: 'geo' | 'ari';
-      names: string[];
-      defines?: string;
-      src: string;
-      norm: string;
-    }
-  /** general equation between expressions (#605): driveOrCheck — one free unclaimed unknown
-   *  is solved numerically (2-D Newton, verified residual); determined sides verify */
-  | { id: string; kind: 'eq'; lhs: Expr; rhs: Expr; src: string; norm: string }
-  /** F6: a segment (2 pts) or polygon (3+ pts) over named points; 'o' is always the origin */
-  | { id: string; kind: 'shape'; pts: string[]; src: string; norm: string }
-  /** F7 measure: area/perimeter of a polygon, length of a segment — a calc-panel entry */
-  | { id: string; kind: 'smeasure'; mtype: 'area' | 'perim' | 'len'; pts: string[]; src: string; norm: string }
-  /** F7 given/claim: area/perimeter = k·param^pow — drives a free angular DOF (1-D root
-   *  find over the constraint replay) or verifies when nothing is free */
-  | {
-      id: string;
-      kind: 'srel';
-      mtype: 'area' | 'perim';
-      pts: string[];
-      k: number;
-      param?: string;
-      pow?: 1 | 2;
-      src: string;
-      norm: string;
-    };
-
-export interface ArgTerm {
-  sign: 1 | -1;
-  name: string;
-}
-
-export type Cmp = '=' | '<' | '>' | '<=' | '>=';
-
-export type RelSpec =
-  /** Σ sign·arg(name) ⟨cmp⟩ rhsDeg — '=' drives; inequalities verify, folding a free number
-   *  into range (the branch-selector reading of `arg z2 < 45`) */
-  | { type: 'arg'; terms: ArgTerm[]; rhsDeg: number; cmp?: Cmp }
-  /** |name| ⟨cmp⟩ k · (param | |other| | 1) — a PARAM is a shared real DOF sampled per seed:
-   *  `|z1| = 9r` and `|z2| = 12r` share the same r (the exam's parameter convention) */
-  | { type: 'mod'; name: string; k: number; other?: string; param?: string; cmp?: Cmp }
-  /** quadrant membership (F5): strict interior of quadrant q — verifies when determined,
-   *  folds a free number's argument into the quadrant when violated */
-  | { type: 'quad'; name: string; q: 1 | 2 | 3 | 4 };
-
-/** Deterministic positive sample for a real parameter, per (name, seed) — 0.6 .. 2.4. */
-export const paramValue = (name: string, seed = 0): number => {
-  let h = 0;
-  for (const ch of `${name}@${seed}`) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return 0.6 + (h % 181) / 100;
-};
+import { type Cx, cPolar, cx, fmtNum } from '../value/value';
+import {
+  type Cmp,
+  type Expr,
+  type Fact,
+  type RelSpec,
+  collectRefs,
+  defaultFree,
+  isScalarExpr,
+  paramValue,
+} from '../model/fact';
+import { prettyName } from '../model/naming';
 
 /** area (shoelace), perimeter (closed), or segment length over named vertices; 'o' is O. */
 const shapeMeasure = (mtype: 'area' | 'perim' | 'len', pts: string[], env: Map<string, Cx>): number => {
@@ -148,7 +61,7 @@ const seqSolve = (
     if (p > 0 && p < last) {
       const prod = mul(at(p - 1), at(p + 1));
       const branch = seed % 2;
-      return cisDeg(Math.sqrt(absC(prod)), argDeg(prod) / 2 + branch * 180);
+      return cPolar(Math.sqrt(absC(prod)), argDeg(prod) / 2 + branch * 180);
     }
     if (p === last) return mul(at(last - 1), div(at(1), at(0)));
     return div(at(1), div(at(2), at(1)));
@@ -198,7 +111,7 @@ const solveEq = (
   };
   const scale0 = Math.max(1, absC(start));
   const starts: Cx[] = [start];
-  for (let k = 0; k < 4; k++) starts.push(cisDeg(scale0, 37 + 83 * k)); // deterministic multi-start
+  for (let k = 0; k < 4; k++) starts.push(cPolar(scale0, 37 + 83 * k)); // deterministic multi-start
   for (const s0 of starts) {
     let X = s0;
     for (let it = 0; it < 60; it++) {
@@ -253,7 +166,7 @@ const applyRel = (
         .filter((t) => t !== target)
         .reduce((s, t) => s + t.sign * argDeg(env.get(t.name)!), 0);
       const v = env.get(target.name)!;
-      return setF(target.name, cisDeg(absC(v), (r.rhsDeg - sumOther) * target.sign));
+      return setF(target.name, cPolar(absC(v), (r.rhsDeg - sumOther) * target.sign));
     }
     const t0 = r.terms[0];
     if (r.terms.length !== 1 || t0.sign !== 1 || !freeNames.has(t0.name)) return null;
@@ -266,7 +179,7 @@ const applyRel = (
           ? interior(a % r.rhsDeg, 0, r.rhsDeg)
           : 0
         : interior(r.rhsDeg + (a % Math.max(1, 360 - r.rhsDeg)), r.rhsDeg, 360);
-    return setF(t0.name, cisDeg(absC(v), na));
+    return setF(t0.name, cPolar(absC(v), na));
   }
   if (r.type === 'quad') {
     if (!env.has(r.name) || !freeNames.has(r.name)) return null;
@@ -274,16 +187,16 @@ const applyRel = (
     const a = argDeg(v);
     const lo = (r.q - 1) * 90;
     if (a > lo && a < lo + 90) return null;
-    return setF(r.name, cisDeg(absC(v), interior(lo + (a % 90), lo, lo + 90)));
+    return setF(r.name, cPolar(absC(v), interior(lo + (a % 90), lo, lo + 90)));
   }
   if ((r.cmp ?? '=') !== '=') return null;
   if (!env.has(r.name) || (r.other && !env.has(r.other))) return null;
   const targetMod = r.k * (r.param ? P(r.param) : r.other ? absC(env.get(r.other)!) : 1);
   if (freeNames.has(r.name)) {
-    return setF(r.name, cisDeg(targetMod, argDeg(env.get(r.name)!)));
+    return setF(r.name, cPolar(targetMod, argDeg(env.get(r.name)!)));
   }
   if (r.other && !r.param && freeNames.has(r.other)) {
-    return setF(r.other, cisDeg(absC(env.get(r.name)!) / r.k, argDeg(env.get(r.other)!)));
+    return setF(r.other, cPolar(absC(env.get(r.name)!) / r.k, argDeg(env.get(r.other)!)));
   }
   return null;
 };
@@ -297,44 +210,6 @@ const relNames = (r: RelSpec): string[] =>
     : r.type === 'mod' && r.other
       ? [r.name, r.other]
       : [r.name];
-
-/** The exam's naming convention (ADR-CX-004): z- and w-family names ARE complex numbers — first
- * reference auto-creates a free number. Other letters stay explicit (a,d,m,n,r are real params). */
-export const IMPLICIT_COMPLEX_RE = /^[zw]\d*$/;
-
-export const collectRefs = (e: Expr, out: string[] = []): string[] => {
-  switch (e.t) {
-    case 'ref':
-      out.push(e.name);
-      break;
-    case 'bin':
-      collectRefs(e.l, out);
-      collectRefs(e.r, out);
-      break;
-    case 'pow':
-      collectRefs(e.base, out);
-      break;
-    case 'neg':
-    case 'conj':
-    case 'abs':
-    case 're':
-    case 'im':
-      collectRefs(e.e, out);
-      break;
-    case 'lit':
-      break;
-  }
-  return out;
-};
-
-/** Distributive Omit — plain Omit collapses the union and loses the discriminant's payload. */
-type FactBody = Fact extends infer F ? (F extends Fact ? Omit<F, 'id'> : never) : never;
-
-/** Deterministic ids (the sibling convention): re-adding the same statement is idempotent. */
-export const factId = (f: FactBody): string =>
-  f.kind === 'free' || f.kind === 'def'
-    ? `${f.kind}-${f.name}`
-    : `${f.kind}-${f.norm.replace(/ /g, '')}`;
 
 export interface ScenePoint {
   key: string;
@@ -364,25 +239,6 @@ export interface SceneSegment {
 }
 
 export type EvalError = { key: 'unknown-ref'; detail: string } | { key: 'roots-of-zero'; detail: string };
-
-/** Static scalarness: is this expression a MEASURE (a real calc) rather than a point?
- * abs/re/im produce scalars; arithmetic containing a scalar stays scalar. */
-export const isScalarExpr = (e: Expr): boolean => {
-  switch (e.t) {
-    case 'abs':
-    case 're':
-    case 'im':
-      return true;
-    case 'neg':
-      return isScalarExpr(e.e);
-    case 'pow':
-      return isScalarExpr(e.base);
-    case 'bin':
-      return isScalarExpr(e.l) || isScalarExpr(e.r);
-    default:
-      return false;
-  }
-};
 
 export interface SceneMeasure {
   key: string;
@@ -444,29 +300,12 @@ const evalExpr = (e: Expr, env: Map<string, Cx>): Cx => {
   }
 };
 
-/** Deterministic default position for a free number, keyed by NAME + configuration seed
- * (never insertion order) — the stability discipline: adding another fact cannot move an
- * existing free point; "show another configuration" bumps the seed and resamples them all. */
-export const defaultFree = (name: string, seed = 0): Cx => {
-  let h = 0;
-  for (const ch of `${name}#${seed}`) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  const angle = 15 + (h % 8) * 45 + ((h >> 5) % 15); // spread, avoiding axis-hugging
-  const r = 1.5 + ((h >> 3) % 20) / 10; // 1.5 .. 3.4
-  return cisDeg(r, angle);
-};
-
-const SUB_DIGITS: Record<string, string> = {
-  '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
-  '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉',
-};
-
-export const prettyName = (name: string): string =>
-  name.replace(/(\d+)$/, (d) => d.split('').map((c) => SUB_DIGITS[c] ?? c).join(''));
-
-/** Prettify digits inside an expression string: z1^5 → z₁^5 (label duty only). */
+/** Prettify digits inside an expression string: z1^5 → z₁^5 (label duty only). The single-NAME case
+ * is `model/naming.ts`'s `prettyName`, imported above — a local fourth copy of it lived here and was
+ * deleted with the extraction (#624); this one is about a whole expression string, not a name. */
 export const prettyExpr = (s: string): string =>
   s.replace(/([a-zA-Z])(\d+)/g, (_, a: string, d: string) =>
-    a + d.split('').map((c) => SUB_DIGITS[c] ?? c).join(''),
+    a + d.split('').map((c) => '₀₁₂₃₄₅₆₇₈₉'[Number(c)] ?? c).join(''),
   );
 
 const wrapDeg = (d: number): number => ((d % 360) + 360) % 360;
@@ -643,7 +482,7 @@ const projectConstraints = (
             for (const g of facts.slice(0, idx)) {
               if (g.kind === 'free') {
                 const b = baseOf(g.name);
-                e2.set(g.name, g.name === fname ? cisDeg(absC(b), aDeg) : b);
+                e2.set(g.name, g.name === fname ? cPolar(absC(b), aDeg) : b);
                 fn2.add(g.name);
               } else if (g.kind === 'def') e2.set(g.name, evalExpr(g.expr, e2));
               else if (g.kind === 'roots' && !g.constrains) {
@@ -686,7 +525,7 @@ const projectConstraints = (
                 else a = mid;
               }
               const bv = baseOf(fd.name);
-              const nv = cisDeg(absC(bv), (a + b) / 2);
+              const nv = cPolar(absC(bv), (a + b) / 2);
               env.set(fd.name, nv);
               adjusted[fd.name] = nv;
               drove[f.id] = true;
@@ -914,22 +753,6 @@ export const derive = (
   return { points, circles, segments, errors, checks, params, measures };
 };
 
-/** Names a fact introduces — used by the store's duplicate-name honesty check.
- * A solution-enumerating roots fact also RESERVES its bare letter: z is related to z1..zn,
- * so a later independent `z = …` (or implicit creation of z) must refuse, naming this fact. */
-export const factNames = (f: Fact): string[] =>
-  f.kind === 'roots'
-    ? f.constrains
-      ? [] // constraint/claim mode: the candidates are display-only, no names introduced
-      : f.anon
-        ? [f.varName] // anonymous set: the letter stays reserved, the indices stay everyone else's
-        : [f.varName, ...Array.from({ length: f.n }, (_, k) => `${f.varName}${k + 1}`)]
-    : f.kind === 'free' || f.kind === 'def'
-      ? [f.name]
-      : f.kind === 'seq' && f.defines
-        ? [f.defines]
-        : [];
-
 const near = (a: number, b: number): boolean => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(b));
 
 /** derive + symbolic parameter forms for measures: re-derives with each parameter scaled
@@ -960,19 +783,3 @@ export const deriveScene = (facts: Fact[], freePos: Record<string, Cx>, seed = 0
   });
   return base;
 };
-
-/** Names a fact CONSUMES — drives the store's implicit z/w auto-creation (ADR-CX-004). */
-export const factRefs = (f: Fact): string[] =>
-  f.kind === 'def' || f.kind === 'show'
-    ? collectRefs(f.expr)
-    : f.kind === 'eq'
-      ? [...collectRefs(f.lhs), ...collectRefs(f.rhs)]
-      : f.kind === 'roots'
-      ? collectRefs(f.rhs)
-      : f.kind === 'rel'
-        ? relNames(f.rel)
-        : f.kind === 'shape' || f.kind === 'smeasure' || f.kind === 'srel'
-          ? f.pts.filter((p) => p !== 'o') // O always exists; never implicit-created
-          : f.kind === 'seq'
-            ? f.names.filter((n) => n !== 'o' && n !== f.defines)
-              : [];

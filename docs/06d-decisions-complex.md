@@ -1261,3 +1261,62 @@ rendered string is enforced where names become text rather than at each surface 
   prototype's 76 tests moving onto the store's submit path, and the deletion itself (#624).
 - `Constraint.principal` is the first row-level flag in tier 1. It is deliberately narrow: set by one
   lowering, meaningless elsewhere, and inert for every other constraint.
+
+---
+
+## ADR-CX-022 — The fact vocabulary outlives the evaluator: `engine/` splits before it is deleted (2026-08-17)
+
+**Status:** accepted · **Slice:** S7 ([#624](https://github.com/dcodish/geo_builder/issues/624)) ·
+**Ladder stage:** none — it relocates what stages 0a–0b *produce* and removes a stage-5 duplicate; no
+step, token or refusal changes. Verified by the suite being unchanged: 577 green in `src-complex/`
+before and after, the 76 prototype tests and [ADR-CX-019](#adr-cx-019)'s 38-test parity gate included.
+
+**Context.** ADR-CX-008's cutover plan reads *"delete `engine/model.ts` and `engine/complex.ts`"*, and
+that turned out to be two different deletions wearing one filename. Fourteen files imported from
+`engine/`; measured, most of them wanted the **fact vocabulary** and none of them wanted the evaluator.
+
+The vocabulary cannot go with the evaluator, for a reason the cutover gate itself creates:
+`parser/parse.ts` **survives** the deletion. It is ADR-CX-019's parity oracle — the test that fails if
+v2 stops reading a form the prototype reads — and a parser cannot outlive the facts it produces.
+
+**Decision.** Split `engine/` along that line before deleting half of it.
+
+- **`model/fact.ts`** (new) — `Fact`, `Expr`, `ArgTerm`, `Cmp`, `RelSpec`, `factId`, `collectRefs`,
+  `factNames`, `factRefs`, `IMPLICIT_COMPLEX_RE`, `isScalarExpr`, `paramValue`, `defaultFree`. What a
+  statement *is*, with nothing that evaluates one.
+- **`value/value.ts`** — `fmtNum`, the panel's three-decimal number formatter. `Cx` and `cx` were
+  **already here**, structurally identical to the prototype's, so the duplicates were deleted rather
+  than moved; `cisDeg(r, deg)` was likewise already here as `cPolar`, and the 15 call sites were
+  repointed rather than an alias kept.
+- **`engine/`** keeps only `derive`/`deriveScene`, the prototype `Scene`, and the doubles-only
+  operators the sweeps use — i.e. exactly what #624 deletes.
+
+Two `Expr` types now sit in `model/`, and they stay separate. `expr.ts`'s is v2's, whose defining
+question is whether a node is monomial; `fact.ts`'s is the prototype grammar's, carrying IEEE doubles.
+Merging them would push the prototype's precision boundary into the layer built not to have one
+([ADR-CX-006](#adr-cx-006)).
+
+`engine/model.ts:463`'s `prettyName` was a **fourth** copy of a rule `model/naming.ts` exists to hold
+alone — the #653 class, and the one its own header was written about. Deleted, callers repointed. The
+remaining `prettyExpr` is a different question (a whole expression string, not a name) and stays.
+
+**What this cost the layer guard.** `engine` now imports downward from `value` and `model` while four
+layers still import `engine` — recorded as the two allowances in `__tests__/import-direction.test.ts`,
+which go with the directory. Every remaining edge *into* `engine` is one the cutover deletes outright:
+`derive` (the store's acceptance gate), `deriveScene` (`App.tsx:130`), the prototype `Scene` (the Gauss
+plane and `scene2`'s adapter).
+
+**Two measurements this exposed, both reported to #624 rather than acted on here:**
+
+1. **Under `?engine=v2` there is no acceptance gate at all.** ADR-CX-019's plan describes the store's
+   ADR-276 gate as *"not behind the engine switch"*; #658 in fact made `addLine` return early for v2
+   before ever reaching it. So a v2 session today cannot produce `incompatible` or `duplicate-name` —
+   the next step is not a like-for-like port but restoring a doctrine v2 never had, which is why its
+   corpus before/after matters more than the plan assumed, not less.
+2. **`bridgeFacts` and `derive2(facts)` have no production caller** — `deriveLines` → `parseLineV2` →
+   `foldConstraints` is the app path, and the S3 bridge survives only in `derive2.test.ts`. The guard's
+   own comment predicted its deletion *"when S4 lands"*; S4 has landed.
+
+**Consequences.** The cutover's deletion step shrinks to genuinely dead code. Also the prerequisite
+[#673](https://github.com/dcodish/geo_builder/issues/673) needs before a `shell/` tree can exist: a
+vocabulary in a layer, not in a monolith about to be removed.

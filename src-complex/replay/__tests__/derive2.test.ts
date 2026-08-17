@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseLine } from '../../parser/parse';
-import type { Fact } from '../../engine/model';
+import type { Fact } from '../../model/fact';
 import { bridgeFacts, derive2 } from '../derive2';
 import { deriveLines } from '../../app/deriveLines';
 

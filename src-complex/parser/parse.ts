@@ -1,7 +1,7 @@
 // Bilingual line parser for the C0 prototype. Deterministic, tiny expression grammar
 // (docs/27 §5.2 subset): literals a+bi and r·cis θ, + - * / ^int, conj, parens.
 // Unmatched input returns { ok: false, key: 'not-handled' } — the sibling seam.
-import { cisDeg, cx } from '../engine/complex';
+import { cPolar, cx } from '../value/value';
 import {
   factId,
   IMPLICIT_COMPLEX_RE,
@@ -9,7 +9,7 @@ import {
   type Cmp,
   type Expr,
   type Fact,
-} from '../engine/model';
+} from '../model/fact';
 
 /** One utterance may LOWER to several facts (the sibling macro-lowering idiom, FR-IN-7):
  * e.g. `z = 2cis(θ)` states freeness AND a modulus — both must survive (honesty: no stated
@@ -175,7 +175,7 @@ class P {
       const nx = this.peek();
       if (nx?.t === 'cis') {
         this.pos++;
-        return { t: 'lit', v: cisDeg(t.v, this.cisAngle()) };
+        return { t: 'lit', v: cPolar(t.v, this.cisAngle()) };
       }
       if (nx?.t === 'i') {
         this.pos++;

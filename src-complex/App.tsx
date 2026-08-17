@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { fmtNum } from './engine/complex';
+import { fmtNum } from './value/value';
 import { deriveScene } from './engine/model';
 import { deriveLines } from './app/deriveLines';
 import { v2Claims, v2Formulas, v2Knowledge, v2Labels, v2Measures, v2Status } from './replay/scene2';

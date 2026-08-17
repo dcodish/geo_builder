@@ -1,7 +1,8 @@
 // Pure SVG Gauss-plane renderer for the C0 prototype: axes, grid, numbers as position
 // vectors (D3: always visualize), root constellations with their circle, drag on free numbers.
 import { useCallback, useRef } from 'react';
-import { cx, formatCart, formatPolar, type Cx } from '../engine/complex';
+import { formatCart, formatPolar } from '../engine/complex';
+import { cx, type Cx } from '../value/value';
 import type { Scene } from '../engine/model';
 
 const W = 680;

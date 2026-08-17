@@ -2,13 +2,15 @@
 // PROTOTYPE BOUNDARY: this is IEEE-double arithmetic only. The accepted design (ADR-CX-001 D1,
 // refined in ADR-CX-002) calls for an exact layer — symbolic-base + rational-π arguments — which is
 // deliberately NOT built here: a throwaway walking skeleton must not pay for the exact core.
+//
+// What is left here is the part that DIES with the prototype (#624): the doubles-only operators the
+// evaluator sweeps with, and the Gauss plane's two label formatters. Everything the cutover leaves
+// standing has moved down a layer — `Cx`/`cx`/`cPolar` and `fmtNum` to `value/value.ts`, the fact
+// vocabulary to `model/fact.ts`. The duplicate operators below (`add` vs `value`'s `cAdd`, …) are
+// deliberately NOT reconciled: they have no consumer outside this directory, so the cutover deletes
+// them rather than a rename touching two hundred call sites in a file about to be removed.
 
-export interface Cx {
-  re: number;
-  im: number;
-}
-
-export const cx = (re: number, im = 0): Cx => ({ re, im });
+import { type Cx, cPolar, cx, fmtNum } from '../value/value';
 
 export const add = (a: Cx, b: Cx): Cx => cx(a.re + b.re, a.im + b.im);
 export const sub = (a: Cx, b: Cx): Cx => cx(a.re - b.re, a.im - b.im);
@@ -29,11 +31,6 @@ export const argDeg = (a: Cx): number => {
   return d;
 };
 
-export const cisDeg = (r: number, deg: number): Cx => {
-  const t = (deg * Math.PI) / 180;
-  return cx(r * Math.cos(t), r * Math.sin(t));
-};
-
 /** Integer power (negative allowed; ipow(0, n<=0) yields NaN components, surfaced as an eval error). */
 export const ipow = (a: Cx, n: number): Cx => {
   if (n < 0) return div(cx(1), ipow(a, -n));
@@ -52,17 +49,12 @@ export const ipow = (a: Cx, n: number): Cx => {
 export const nthRoots = (w: Cx, n: number): Cx[] => {
   const r = Math.pow(absC(w), 1 / n);
   const base = argDeg(w) / n;
-  return Array.from({ length: n }, (_, k) => cisDeg(r, base + (360 * k) / n));
+  return Array.from({ length: n }, (_, k) => cPolar(r, base + (360 * k) / n));
 };
 
 // --- display formatting (rounding only at the display seam) ---
 
 const round3 = (x: number): number => Math.round(x * 1000) / 1000;
-
-export const fmtNum = (x: number): string => {
-  const r = round3(x);
-  return Object.is(r, -0) ? '0' : String(r);
-};
 
 export const formatCart = (z: Cx): string => {
   const re = round3(z.re);
