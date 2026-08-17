@@ -23,6 +23,7 @@ in Gaussian elimination. If this file grows a case ladder, that is the tripwire 
 | 0b | `parse()` — ordered rules over `lexicon` atoms; first match wins; `'stop'` on recognised-but-unreadable | `cx0:parse` | `not-handled` → the LLM seam |
 | 0c | **span accounting** — every non-filler token span must be claimed by the winning parse. Multiset, fails closed | `cx0:span` | yes → escalate, naming what was unclaimed |
 | 0d | `existingRef()` — a name already in the figure resolves to that object. **A second mention is a GIVEN, not a redefinition** ([ADR-CX-009](06d-decisions-complex.md#adr-cx-009) §1) | `cx0:ref` | no |
+| 0d′ | `rootsMode()` — which of ADR-CX-005's three readings `X^n = …` has, ASKED from the names earlier lines mentioned, never stamped onto the fact ([ADR-CX-021](06d-decisions-complex.md#adr-cx-021)) | `cx0:ref` | no |
 | 0e | dry-run on a trial fact list; keep-prior on failure | `cx0:dryrun` | yes |
 
 ## Stage 1 — the exact linear tier
@@ -34,7 +35,7 @@ conjugation — **no addition**) become two ℚ-linear systems over the log-pola
 |---|---|---|
 | 1a | classify each constraint `monomial | general` — structural, on the AST | — |
 | 1b | modulus system: exact Gaussian elimination over ℚ, RHS an exponent vector over prime/parameter atoms | `cx1:mod` |
-| 1c | argument system: elimination over ℚ in **turns**, carrying the integer unknowns `k` | `cx1:arg` |
+| 1c | argument system: elimination over ℚ in **turns**, carrying the integer unknowns `k` — except a `principal` row, which drops its `k` because a solution set's labelling is a convention, not a configuration ([ADR-CX-021](06d-decisions-complex.md#adr-cx-021)) | `cx1:arg` |
 | 1d | **branch enumeration** — solve the `k` family modulo one turn; the result IS the configuration set | `cx1:branch` |
 | 1e | publish the **nullspace dimension as the free-DOF count** — one definition, read by the DOF cue, the knowledge gates and the sampler alike | `cx1:dof` |
 | — | an inconsistent linear system is an honest contradiction naming the conflicting statements | `cx1:refuse` |

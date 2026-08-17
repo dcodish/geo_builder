@@ -1185,3 +1185,79 @@ be able to disagree about how free the figure is. It is `configCount > 1 || rema
 The rest of #680 — the enumeration itself, the reserved bare letter, the anonymous set of §2b part ד —
 is still to build, and remains the reason [#616](https://github.com/dcodish/geo_builder/issues/616)
 cannot close ([ADR-CX-019](#adr-cx-019)).
+
+---
+
+## ADR-CX-021 — A solution set is one configuration of n points, and «solve» is told from «relate» by the earlier lines (2026-08-17)
+
+**Status:** Accepted · **Issue:** [#680](https://github.com/dcodish/geo_builder/issues/680) ·
+**Stage:** LADDER-CX 1b (lowering) and 1c (exact argument solve) · **Supersedes nothing; refines**
+[ADR-CX-005](#adr-cx-005)
+
+**Context.** [ADR-CX-019](#adr-cx-019) measured the cutover gate and found nine capabilities the
+prototype reads and v2 did not. Eight were grammar. The ninth was structural: the prototype's
+`z³ = 8` names **z₁, z₂, z₃** — three points a later line can refer to — while v2 lowered the same
+equation to one unknown and walked the three roots as *configurations*. Deleting `engine/model.ts`
+with that gap open would have deleted a capability rather than replaced it, which is what S7's own
+gate forbids. This is the ninth gap closed.
+
+### Decision 1 — the n solutions are ONE configuration containing n points
+
+Lowering a fresh enumerating equation emits the solutions as *related* unknowns rather than as n
+independent ones: X₁ solves the equation itself, and every later solution is pinned to X₁ — same
+modulus, exactly `k/n` of a turn further round. The constellation is therefore exact even when the
+right-hand side is not yet known, and it needs no closed form for the roots.
+
+X₁'s argument row is marked **`principal`** and drops its integer turn unknown, which is the one place
+this engine ever refuses a branch. The justification is that it is not a branch: *which* solution is
+called X₁ is a labelling convention (argument order from the principal root, the same order the
+prototype's `nthRoots` used), and left un-pinned the n rotations of one point set would enumerate as n
+indistinguishable configurations. `configCount` is then 1 and the cycle button switches itself off,
+which is [ADR-CX-020](#adr-cx-020) arriving exactly as it predicted, with no rule special to roots.
+
+Ordinary equations keep their turn unknown, so #607's genuinely multi-configuration family is
+untouched — verified, not asserted, by that session's tests still reading `configCount === 4`.
+
+### Decision 2 — the mode is ASKED, never stamped
+
+ADR-CX-005's three modes were stamped onto the fact by the store. Only by the store — so every other
+producer (the v2 parser's own path, a fixture from disk, a hand-built fact in a test) silently got the
+*fresh* reading, and `z1^3 = 8` enumerated into `z11, z12, z13`. A default that is wrong whenever the
+caller forgets is the seam [ADR-CX-009](#adr-cx-009) exists to remove.
+
+`rootsMode(varName, n, mentioned, grounded)` in `model/naming.ts` is now the single question. The store
+still stamps — the retiring prototype's `factNames` reads the stamp — but it stamps *by asking*, so the
+mode the store reserves names for and the mode the figure is built from cannot drift apart.
+
+### Decision 3 — «solve this» is told from «relate these» by what earlier lines mentioned
+
+Not by whether the right-hand side is closed. That was the first attempt and the corpus refuted it:
+§2b part ד is `z⁵ = z₁z₂³z₄`, an enumeration with three unknowns on the right.
+
+An equation enumerates when its letter is new **and every name on its right was mentioned by an earlier
+line**. `z³ = 8` and part ד both qualify. `z₁³ = z₃` typed cold does not — z₃ is brought into being by
+that very statement, and a number cannot ground the statement that invented it; its several solutions
+are the exam's «כל האפשרויות», the configurations #607 exists to cycle.
+
+**Mentioned, not defined.** «|z₁| = 9r» introduces z₁ through a relation, and the student who wrote it
+has plainly stated z₁ — reading only definitions would have broken the §2b exemplar, whose numbers all
+enter through relations.
+
+The honesty argument is the one that settles it: reading `z₁³ = z₃` as an enumeration prints
+`z₁₁, z₁₂, z₁₃`, and a doubled subscript is a *different number* in exam notation.
+
+### Decision 4 — an anonymous solution has no name, and the one place that writes names enforces it
+
+When the indexed names are already the student's, the set is drawn anonymously (ADR-CX-005's existing
+ruling). Those ids live in a `#s…` namespace — uncollidable for the same reason tier 1's `#k` is — and
+`prettyName` returns the empty string for them, so ADR-447's rule that an internal id never reaches a
+rendered string is enforced where names become text rather than at each surface (the #653 class).
+
+### Consequences
+
+- **G4, G5 and G6 are unblocked** — all three needed the solution set as an object
+  ([#623](https://github.com/dcodish/geo_builder/issues/623)).
+- The cutover's remaining work is no longer blocked on capability, only on the fixture net, the
+  prototype's 76 tests moving onto the store's submit path, and the deletion itself (#624).
+- `Constraint.principal` is the first row-level flag in tier 1. It is deliberately narrow: set by one
+  lowering, meaningless elsewhere, and inert for every other constraint.

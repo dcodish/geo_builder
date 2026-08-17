@@ -23,6 +23,7 @@
 import { create } from 'zustand';
 import type { Cx } from '../engine/complex';
 import { derive, factNames, factRefs, IMPLICIT_COMPLEX_RE, type Fact } from '../engine/model';
+import { rootsMode } from '../model/naming';
 import { parseLine } from '../parser/parse';
 import { parseLineV2 } from '../parser/rules';
 
@@ -120,14 +121,15 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
       // an enumeration whose indexed names are taken becomes an ANONYMOUS solution set
       if (fact.kind === 'roots') {
         const rf = fact;
-        const names = new Set(working.flatMap(factNames));
-        const constrains = names.has(rf.varName);
-        const anon =
-          !constrains &&
-          Array.from({ length: rf.n }, (_, k) => `${rf.varName}${k + 1}`).some((n) =>
-            names.has(n),
-          );
-        fact = { ...rf, constrains, anon: anon || undefined };
+        // One question, one answer: the v2 lowering asks `rootsMode` too, so the mode the store stamps
+        // for the prototype's `factNames` and the mode the figure is built from cannot drift apart.
+        const mentioned = new Set(
+          working
+            .filter((w) => !(w.kind === 'free' && w.implicit))
+            .flatMap((w) => [...factNames(w), ...factRefs(w)]),
+        );
+        const mode = rootsMode(rf.varName, rf.n, mentioned, factRefs(rf).every((r) => mentioned.has(r)));
+        fact = { ...rf, constrains: mode === 'constrain', anon: mode === 'anonymous' || undefined };
       }
       // stamp the sequence mode: exactly ONE unknown listed name becomes the DEFINED term
       if (fact.kind === 'seq') {

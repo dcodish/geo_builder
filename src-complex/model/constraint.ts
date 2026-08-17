@@ -25,6 +25,21 @@ export interface Constraint {
   readonly kind?: 'eq' | 'mod' | 'arg';
   /** for `arg` only: `arg(lhs) − arg(rhs) = deltaTurns`, in turns */
   readonly deltaTurns?: Rat;
+  /**
+   * Pin this row's turn unknown to zero — read the PRINCIPAL value rather than enumerating.
+   *
+   * Every argument row is otherwise stated modulo a whole turn, and that integer freedom is the branch
+   * set (ADR-CX-006). One case is not a branch: when an equation's n solutions are all drawn at once as
+   * X₁..Xₙ, *which* solution is called X₁ is a labelling convention, not a configuration the student can
+   * see ([ADR-CX-005](../../docs/06d-decisions-complex.md#adr-cx-005) mode 1). Left un-pinned, the n
+   * rotations of the same point SET would enumerate as n identical-looking configurations and
+   * «show another configuration» would offer a walk through relabelings — which is precisely what
+   * [ADR-CX-020](../../docs/06d-decisions-complex.md#adr-cx-020) ruled there is nothing of here.
+   *
+   * Set ONLY by the solution-set lowering. Ordinary equations keep their turn unknown, so #607's
+   * genuinely multi-configuration family is untouched.
+   */
+  readonly principal?: boolean;
   readonly src?: string;
 }
 
