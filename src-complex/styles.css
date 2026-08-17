@@ -92,3 +92,6 @@ button:hover { background: #f5f5f4; }
   margin-top: 6px; padding: 5px 10px; font-size: 0.85rem;
   color: #4c1d95; background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 6px;
 }
+
+/* S6 (#623): a surfaced formula-sheet row. The formula text is LTR maths whatever the UI language. */
+.v2-formula { color: #065f46; font-family: ui-monospace, Consolas, monospace; font-size: 11px; }

@@ -22,7 +22,36 @@ export type Claim =
   /** «w מדומה טהור» — the number is pure imaginary */
   | { readonly kind: 'imaginary'; readonly name: string; readonly src: string }
   /** «z₁ ו-z₂ צמודים זה לזה» — the two are conjugates of each other */
-  | { readonly kind: 'conjugates'; readonly a: string; readonly b: string; readonly src: string };
+  | { readonly kind: 'conjugates'; readonly a: string; readonly b: string; readonly src: string }
+  /**
+   * F12 — «לכל n טבעי, w^(4n) ממשי». A claim about EVERY power at once.
+   *
+   * The exponent is `k·n + c`, which is the corpus's shape («w^(4n)», «w^(4n+2)», «z^(6n)»), and the
+   * claim is decided by a congruence on turns rather than by trying values of n: `w^m` is real iff
+   * `2m·θ ≡ 0 (mod 1)`, so «for every n» is two integer conditions and no search
+   * ([ADR-CX-006](../../docs/06d-decisions-complex.md#adr-cx-006) D1's whole purpose).
+   */
+  | {
+      readonly kind: 'forall-power';
+      readonly name: string;
+      readonly k: number;
+      readonly c: number;
+      readonly prop: 'real' | 'imaginary';
+      readonly src: string;
+    }
+  /**
+   * F12 — «ה-n המינימלי שעבורו wⁿ מדומה טהור הוא 5»: the student's answer to a minimal-n ask.
+   *
+   * One sentence form, and the student states their n — the charter's shape. The engine solves the
+   * same congruence for its least solution and agrees or does not.
+   */
+  | {
+      readonly kind: 'minimal-power';
+      readonly name: string;
+      readonly prop: 'real' | 'imaginary';
+      readonly stated: number;
+      readonly src: string;
+    };
 
 /** How a claim came out. `unknown` is a first-class answer, not a failure. */
 export type ClaimVerdict =

@@ -191,6 +191,20 @@ export const CATALOG: readonly CatalogEntry[] = [
     descHe: 'סדרה חשבונית — חיבורית, ולכן נפתרת בשכבה הנומרית',
     descEn: 'an arithmetic sequence — additive, so the numeric tier solves it',
   },
+  {
+    family: 'F12',
+    he: 'לכל n טבעי, w^(4n) ממשי',
+    en: 'for every natural n, w^(4n) is real',
+    descHe: 'טענה על כל החזקות — נקבעת בחשבון שאריות, לא בדגימה',
+    descEn: 'a claim about every power at once — decided by congruence, never sampled',
+  },
+  {
+    family: 'F12',
+    he: 'ה-n המינימלי שעבורו w^n מדומה טהור הוא 2',
+    en: 'the minimal n for which w^n is pure imaginary is 2',
+    descHe: 'ה-n המינימלי — התלמיד עונה, הכלי בודק',
+    descEn: 'the minimal n — the student answers, the tool checks',
+  },
 ];
 
 /** Group for the in-app panel; the family table is the ordering, not the insertion order. */

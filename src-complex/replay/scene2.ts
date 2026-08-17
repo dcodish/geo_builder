@@ -15,6 +15,7 @@
 
 import type { Scene } from '../engine/model';
 import { prettyName as pretty } from '../model/naming';
+import { FORMULA_TABLE } from '../formulas/table';
 import type { Derived2 } from './derive2';
 
 export function sceneFromDerived2(d: Derived2): Scene {
@@ -82,6 +83,18 @@ export const v2Measures = (d: Derived2): string[] =>
  * stage 5d in `derive2`; both surfaces print what it decided.
  */
 export const v2Labels = (d: Derived2): string[] => d.points.map((p) => p.reading);
+
+/**
+ * The sheet formulas this figure is using, with the lines that brought each up.
+ *
+ * The row names the STATEMENTS that triggered it — that is the premise highlighting: a formula with no
+ * traceable premise is a formula the app is teaching at random.
+ */
+export const v2Formulas = (d: Derived2, lang: 'he' | 'en'): string[] =>
+  d.formulas.map((f) => {
+    const row = FORMULA_TABLE.find((r) => r.id === f.id)!;
+    return `${lang === 'he' ? row.he : row.en}: ${row.statement}  ←  ${f.premises.join(' · ')}`;
+  });
 
 /** The student's answers, with the verdict the exact core reached. */
 export const v2Claims = (d: Derived2): string[] =>
