@@ -1622,3 +1622,69 @@ for a filter built in code, and is in the student's register because a violated 
   operator decision (`src-complex/CLAUDE.md` boundary 3). Reporting is honest; inventing is not.
 - `filterBranches` is unchanged: pruning a branch that fixes the direction is still the first arm, and
   projection deliberately skips a branch-fixed name rather than bounding a coordinate that moves nothing.
+
+## ADR-CX-026 — Three parity gaps the cutover measurement found: word order, the polar shape, and a type error (2026-08-17)
+
+**Status:** accepted · **Slice:** S7 ([#624](https://github.com/dcodish/geo_builder/issues/624)),
+fixes [#691](https://github.com/dcodish/geo_builder/issues/691) ·
+**Ladder stage:** **0b** (rules) and **0c** (span accounting). No new rung.
+
+The remainder of the #624 step-3 measurement — driving every input line the prototype suite exercises
+through `app/submit.ts`. Each is a form the prototype reads or a refusal it makes and v2 did not, so each
+blocked the cutover on the operator's stated condition.
+
+### Decision 1 — a quadrant given has no word order
+
+`quadrantGiven` already refused to fix the order of the *noun* and the *ordinal*, citing ADR-3D-145:
+*spelling one order refuses half the register*. It then fixed the order of the **name**, anchoring on
+`^(NAME)\s+…`. That refused «ברביע הראשון z2» — which is what RTL typing produces and what the operator
+types ([#599](https://github.com/dcodish/geo_builder/issues/599); its regression coverage existed only
+inside the prototype suite). Both placements are now read.
+
+Tried as two placements rather than searched for generally, because the region scanned for the ordinal
+must **exclude** the name: «z4 quadrant 4» otherwise finds its ordinal inside `z4`.
+
+«נמצא» went to the span accountant instead — the rule matched, and the framing verb was left unclaimed,
+so the line was refused for content nobody dropped. It joins `FILLER` with its inflections and the
+English location verbs. That list is an **allowlist that may grow**, and each addition costs at most one
+unnecessary escalation; the alternative, a denylist, costs a wrong figure (ADR-CX-009 §2).
+
+### Decision 2 — the generic polar form states what its SHAPE states, and no more
+
+`<mod> cis <ang>` has a symbolic half in either position, and only *numeric modulus, symbolic angle* was
+read. «z1 = r cis θ» — the spelling the exam prints — fell through to the expression grammar, which lexed
+`rcis` as a single name and read the line as a product of two invented parameters.
+
+One rule now reads all of them, and the shape decides the lowering, which is [ADR-052](06-decisions.md#adr-052)
+applied literally:
+
+| modulus | angle | stated |
+| --- | --- | --- |
+| numeric | symbolic | `\|z\| = m` — direction free |
+| symbolic | numeric | `arg z = a` — magnitude free |
+| symbolic | symbolic | nothing but the name |
+| absent | symbolic | `\|z\| = 1` — `cis θ` is the unit circle |
+| numeric | numeric | a literal; the expression grammar reads it exactly |
+
+The modulus group backtracks over `rcis`, so the spaced and unspaced spellings are one rule rather than
+two. The numeric classes come from the `NUM` lexicon atom — the ratchet test caught the first cut
+spelling the fragment inline, which is ADR-CX-009 §4 working as designed.
+
+### Decision 3 — a magnitude may not silently equal a complex number
+
+When one side of an equation is `|·|`, the other was wrapped in `abs` unconditionally. That is right for
+«\|z1\| = 9r» (a real parameter) and «\|z1\| = 2\|z2\|» (already a magnitude), and wrong for «\|z1\| = 9w»,
+which it re-read as «\|z1\| = 9\|w\|» — inventing a complex `w`, drawing a phantom for it and reporting
+`freeDof: ["|w|", "arg z1", "arg w"]`. The prototype refuses the line.
+
+A complex `ref` appearing outside every `|·|` now refuses. Inside the bars a complex number *is* a
+magnitude and belongs there; outside them it carries a direction too, and equating that to a magnitude
+states nothing coherent. The student is told, rather than shown a different statement.
+
+### Withdrawn from the issue
+
+A false geometric sequence over determined numbers was filed as a fourth gap and is not one: it lowers to
+a **monomial** constraint, so tier 1 reports it as an inconsistent row through `contradiction` — earlier
+and better than the numeric check the measurement looked for. The probe read `unsatisfied` and not
+`contradiction`. Recorded because a withdrawn finding is worth as much as a confirmed one when the next
+session re-measures.

@@ -50,6 +50,20 @@ const PROTOTYPE_FORMS: string[] = [
   'arg(z1) = 45',
   'arg(z1) - arg(z2) = 90',
   'z1 ברביע הראשון',
+  // The other placements of the same three words. The list above sampled one word order, and that hole
+  // hid three more: «נמצא» is a framing verb the accountant blamed the student for, and the
+  // keyword-first order is what RTL typing produces (#599 — its regression coverage lived only in the
+  // prototype). A rule that fixes a word order refuses half the register, which is this rule's own
+  // ADR-3D-145 note read one level up.
+  'z2 נמצא ברביע השלישי',
+  'ברביע הראשון z2',
+  'z3 in the second quadrant',
+  'z4 quadrant 4',
+  // The generic polar form, SPACED — the spelling the exam prints. Only the unspaced one was covered,
+  // and the spaced one fell through to the expression grammar, which lexed `rcis` as a single name.
+  'z1 = r cis θ',
+  'w = r cis 45',
+  'z = rcis(β)',
   'המרובע Oz1z2z3',
   'שטח Oz1z2z3 הוא 150r^2',
   'z1, z2, z3 סדרה הנדסית',
@@ -156,5 +170,62 @@ describe('the spelled-out declaration and the symbolic polar form', () => {
     const z1 = d.points[0];
     expect(Math.hypot(z1.z.re, z1.z.im)).toBeCloseTo(2, 6);
     expect(d.freeDof.some((f) => f.includes('arg'))).toBe(true);
+  });
+
+  /**
+   * Each half of `<mod> cis <ang>` may be symbolic, and the SHAPE decides what is stated — never more
+   * than was stated ([ADR-052](../../../docs/06-decisions.md#adr-052)).
+   */
+  it('«w = r cis 45» states the DIRECTION and leaves the magnitude free — the mirror case', () => {
+    const d = deriveLines(['w = r cis 45']);
+    expect(d.points[0].argumentDeg).toBeCloseTo(45, 6);
+    expect(d.freeDof).toContain('|w|');
+    expect(d.freeDof.some((f) => f.includes('arg'))).toBe(false);
+  });
+
+  it('«z1 = r cis θ» states NOTHING but the name — both halves stay free', () => {
+    const d = deriveLines(['z1 = r cis θ']);
+    expect(d.points.map((p) => p.name)).toEqual(['z1']);
+    expect(d.freeDof).toEqual(expect.arrayContaining(['|z1|', 'arg z1']));
+    // and it invents no parameter: `rcis` lexed as one name is what the old reading produced
+    expect(d.freeDof.filter((f) => /cis|theta/i.test(f))).toEqual([]);
+  });
+
+  it('a numeric pair stays a LITERAL — the expression grammar reads it exactly', () => {
+    const d = deriveLines(['z1 = 2cis150']);
+    expect(d.points[0].argumentDeg).toBeCloseTo(150, 6);
+    expect(d.freeDof).toEqual([]);
+  });
+});
+
+describe('a magnitude may not silently equal a COMPLEX number', () => {
+  it('«|z1| = 9w» is refused — it is not re-read as «|z1| = 9|w|» with a phantom w', () => {
+    expect(parseLineV2('|z1| = 9w').ok).toBe(false);
+    const d = deriveLines(['|z1| = 9w']);
+    expect(d.points).toEqual([]);
+    expect(d.untranslated).toHaveLength(1);
+  });
+
+  it('…while the forms that ARE magnitudes keep working', () => {
+    for (const line of ['|z1| = 9r', '|z1| = 2|z2|', '|z1| = 2', '|z1| = |z2|']) {
+      expect(parseLineV2(line).ok, line).toBe(true);
+      expect(deriveLines([line]).untranslated, line).toEqual([]);
+    }
+  });
+});
+
+describe('a quadrant given reads in every word order the register has', () => {
+  it.each([
+    ['z1 ברביע הראשון', 1],
+    ['z2 נמצא ברביע השלישי', 3],
+    ['ברביע הראשון z2', 1],
+    ['z3 in the second quadrant', 2],
+    ['z4 quadrant 4', 4],
+  ])('«%s» folds the direction into quadrant %i', (line, q) => {
+    const d = deriveLines([line], 0, 0);
+    const deg = d.points[0].argumentDeg;
+    expect(deg).toBeGreaterThan((q - 1) * 90);
+    expect(deg).toBeLessThan(q * 90);
+    expect(d.untranslated).toEqual([]);
   });
 });
