@@ -133,7 +133,7 @@ describe('RotationArc — multiplication is a rotation and a stretch', () => {
 
 describe('ValueCycle — the finite ring of directions a power visits', () => {
   it('a sixth root of unity cycles with period 6, on the unit ring', () => {
-    const d = deriveLines(['z^6 = 1'], 1); // configuration 2 of 6: cis60°
+    const d = deriveLines(['z', 'z^6 = 1'], 1); // configuration 2 of 6: cis60°
     const z = d.points[0];
     expect(z.reading).toBe('z = 1·cis60°');
     expect(z.cyclePeriod).toBe(6);
@@ -144,8 +144,8 @@ describe('ValueCycle — the finite ring of directions a power visits', () => {
   });
 
   it('the period is DECIDED, not measured: cis120° cycles in 3, cis180° in 2', () => {
-    expect(deriveLines(['z^6 = 1'], 2).points[0].cyclePeriod).toBe(3);
-    expect(deriveLines(['z^6 = 1'], 3).points[0].cyclePeriod).toBe(2);
+    expect(deriveLines(['z', 'z^6 = 1'], 2).points[0].cyclePeriod).toBe(3);
+    expect(deriveLines(['z', 'z^6 = 1'], 3).points[0].cyclePeriod).toBe(2);
   });
 
   it('a number that is not exactly on the unit circle has NO cycle — its powers walk away forever', () => {
@@ -155,7 +155,7 @@ describe('ValueCycle — the finite ring of directions a power visits', () => {
   });
 
   it('the n stepper walks the cycle and comes back — n and n+period mark the same power', () => {
-    const d = deriveLines(['z^6 = 1'], 1);
+    const d = deriveLines(['z', 'z^6 = 1'], 1);
     expect(buildScene(d, { n: 1 }).cycles[0].current).toBe(0);
     expect(buildScene(d, { n: 3 }).cycles[0].current).toBe(2);
     expect(buildScene(d, { n: 7 }).cycles[0].current).toBe(0);
@@ -238,7 +238,7 @@ describe('the polar/cartesian toggle is display-only, over the whole catalog', (
   });
 
   it('the n stepper moves the marker and nothing else', () => {
-    const d = deriveLines(['z^6 = 1'], 1);
+    const d = deriveLines(['z', 'z^6 = 1'], 1);
     const strip = (n: number) => {
       const s = buildScene(d, { n });
       return JSON.stringify({ ...s, cycles: s.cycles.map(({ current, ...rest }) => rest) });

@@ -60,19 +60,30 @@ interface Violations {
   readonly contradicted: boolean;
   readonly emptied: boolean;
   readonly unsatisfied: ReadonlySet<string>;
+  /**
+   * Lines the FOLD could not use, by their own text.
+   *
+   * `submitLine` already refuses what the grammar cannot read, so this catches only what parses and
+   * still has no reading in context — today, a reference to a letter an enumerating equation has
+   * reserved (`z = 1+i` after `z³ = 8`, which the prototype refuses by naming that equation). Left out
+   * of the gate, such a line would sit red in the list while the figure drew a phantom for it.
+   */
+  readonly untranslated: ReadonlySet<string>;
 }
 
 const violationsOf = (d: Derived2): Violations => ({
   contradicted: d.contradiction !== null,
   emptied: d.emptiedBy !== null,
   unsatisfied: new Set(d.unsatisfied),
+  untranslated: new Set(d.untranslated.map((u) => u.src)),
 });
 
 /** Did going from `before` to `after` break something that was not already broken? */
 const broke = (before: Violations, after: Violations): boolean =>
   (after.contradicted && !before.contradicted) ||
   (after.emptied && !before.emptied) ||
-  [...after.unsatisfied].some((u) => !before.unsatisfied.has(u));
+  [...after.unsatisfied].some((u) => !before.unsatisfied.has(u)) ||
+  [...after.untranslated].some((u) => !before.untranslated.has(u));
 
 export type Verdict =
   /** accepted, in this configuration — the caller records the seed so the figure shown is the one that fit */

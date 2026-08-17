@@ -79,7 +79,10 @@ describe('answers are given only when the figure forces them', () => {
 
   /** Invariance is across EVERY valid configuration, not the one on screen. */
   it('WITHHOLDS a value that differs between configurations', () => {
-    const d = deriveLines(['z^3 = 8', 'z1 = 4', 'אורך z1z']);
+    // `z` is declared first so the equation CONSTRAINS it — three configurations, and the distance to
+    // w differs between them. (Without the declaration «z^3 = 8» enumerates and `z1` would be one of
+    // its own solutions, so `z1 = 4` would contradict it — ADR-CX-021.)
+    const d = deriveLines(['z', 'z^3 = 8', 'w = 4', 'אורך wz']);
     expect(d.knowledge[0].value).toBeNull();
     expect(d.knowledge[0].why).toContain('תצורות');
   });

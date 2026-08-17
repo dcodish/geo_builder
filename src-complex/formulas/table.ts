@@ -130,8 +130,18 @@ export function surfacedFormulas(
         if (e.t === 'mul' && hasRef(e.l) && hasRef(e.r)) note('CX-F1', c.src);
         if (!isIntegerPower(e) || !hasRef(e.base)) continue;
         const other = side === c.lhs ? c.rhs : c.lhs;
-        // an equation `Xⁿ = <no unknowns>` with several configurations IS the roots formula
-        if (!hasRef(other) && configCount > 1) note('CX-F3', c.src);
+        /**
+         * `Xⁿ = <no unknowns>` where X is what the equation FINDS is the roots formula; a power the
+         * figure merely computes is De Moivre.
+         *
+         * "Being found" was read off `configCount > 1`, and that broke the moment an enumeration became
+         * one configuration containing n points (#680, ADR-CX-021): «z³ = 8» — the roots formula's own
+         * example — started surfacing De Moivre instead. A branch count is a proxy; the structure says
+         * it outright. `principal` marks the row of an enumerated solution set, and a still-live turn
+         * unknown (several configurations) marks a constrained letter walking its own roots. Both are
+         * the base being solved for; a verification of a determined value is neither.
+         */
+        if (!hasRef(other) && (c.principal === true || configCount > 1)) note('CX-F3', c.src);
         else note('CX-F2', c.src);
       }
     }

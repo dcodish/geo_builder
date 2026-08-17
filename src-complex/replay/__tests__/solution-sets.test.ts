@@ -5,37 +5,46 @@
  * three as configurations. That difference is the ninth cutover gap (ADR-CX-019) and the reason #616
  * cannot close: deleting the prototype while it holds a capability v2 lacks would delete the capability.
  *
- * These drive the STORE's submit path rather than the bridge directly — a test that calls the lowering
- * cannot catch a pipeline that stops calling it, which is the same discipline S7 imposes on the
- * prototype's own suite.
+ * These drive the **v2** submit path — `app/submit.ts`, what the input box calls — and that correction is
+ * [#686](https://github.com/dcodish/geo_builder/issues/686). The first version of this file never called
+ * `setEngine`, and the store's default is `'proto'`, so it submitted through the PROTOTYPE and folded
+ * through the retiring bridge: eight green tests describing a capability the shipped path did not have.
+ * A test that calls the lowering cannot catch a pipeline that stops calling it, and neither can a test
+ * that calls the wrong engine's pipeline.
  */
 
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { useComplexStore } from '../../store/useComplexStore';
-import { derive2 } from '../derive2';
+import { deriveLines } from '../../app/deriveLines';
+import { submitLine } from '../../app/submit';
 import { isAnonymous, prettyName, solutionNames } from '../../model/naming';
 import { factNames } from '../../model/fact';
 import { parseLine } from '../../parser/parse';
 
+const store = () => useComplexStore.getState();
+
+/** Stated, never inherited: the engine an assertion is about is the whole point of this file (#686). */
 const fresh = () => {
-  useComplexStore.setState({ facts: [], lines: [], lastError: null });
-  return useComplexStore.getState();
+  store().clearAll();
+  store().setEngine('v2');
+  return store();
 };
 
-/** Submit each line through the real store path; fail loudly on a refusal rather than testing nothing. */
+beforeEach(fresh);
+
+/** Submit each line through the real path; fail loudly on a refusal rather than testing nothing. */
 const build = (...lines: string[]) => {
   fresh();
   for (const line of lines) {
-    const ok = useComplexStore.getState().addLine(line);
-    if (!ok) {
-      const err = useComplexStore.getState().lastError;
+    if (!submitLine(line)) {
+      const err = store().lastError;
       throw new Error(`«${line}» was refused: ${err?.key} ${err?.detail ?? ''}`);
     }
   }
-  return derive2(useComplexStore.getState().facts);
+  return deriveLines(store().lines, store().seed, store().seed);
 };
 
-const at = (d: ReturnType<typeof derive2>, name: string) => d.points.find((p) => p.name === name);
+const at = (d: ReturnType<typeof deriveLines>, name: string) => d.points.find((p) => p.name === name);
 
 describe('#680 — an enumerating equation draws its whole solution set', () => {
   it('«z^3 = 8» plots z₁, z₂, z₃ — three NAMED points in ONE configuration', () => {
@@ -63,13 +72,28 @@ describe('#680 — an enumerating equation draws its whole solution set', () => 
   });
 
   it('the bare letter is RESERVED — a later definition of z names the equation that holds it', () => {
-    fresh();
-    expect(useComplexStore.getState().addLine('z^3 = 8')).toBe(true);
-    expect(useComplexStore.getState().addLine('z = 1+i')).toBe(false);
-    const err = useComplexStore.getState().lastError;
-    expect(err?.key).toBe('duplicate-name');
-    // the refusal quotes the STATEMENT that already owns the letter, never internal state
+    expect(submitLine('z^3 = 8')).toBe(true);
+    expect(submitLine('z = 1+i')).toBe(false);
+    const err = store().lastError;
+    // v2 reads a second mention as a GIVEN (ADR-CX-009 §1), so the refusal is `incompatible` rather
+    // than the prototype's `duplicate-name`; what matters is that it quotes the STATEMENT owning the
+    // letter and never internal state.
+    expect(err?.key).toBe('incompatible');
     expect(err?.detail).toContain('z^3');
+    expect(store().lines).toEqual(['z^3 = 8']);
+  });
+
+  /**
+   * Reserving without enforcing only moves the phantom. «arg z» after an enumeration has no honest
+   * reading — `z` is already three points — and left alone the fold auto-created a FOURTH free `z` and
+   * drew it at a sampled direction, which is the very invention #680 was filed about.
+   */
+  it('and a WINDOW on the reserved letter is refused too, not answered with a phantom', () => {
+    expect(submitLine('z^3 = 8')).toBe(true);
+    expect(submitLine('90 < arg z < 180')).toBe(false);
+    expect(store().lastError?.detail).toContain('z^3');
+    // the figure is the solution set and nothing else — no fourth point called `z`
+    expect(build('z^3 = 8').points.map((p) => p.name).sort()).toEqual(['z1', 'z2', 'z3']);
   });
 
   it('the solutions are REFERENCABLE — a later line may constrain z₁', () => {
