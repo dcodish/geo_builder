@@ -166,3 +166,62 @@ describe('product boundaries (BOUNDARIES.json is the authority)', () => {
     }
   });
 });
+
+describe('the product registry (products.json) matches the manifest (#661 / ADR-W-021)', () => {
+  interface RegistryEntry {
+    id: string;
+    labelKey: string;
+    icon: string;
+    url: string;
+    devUrl: string;
+    tree: string;
+    buildTarget: string;
+    enabled: boolean;
+  }
+  const registry = JSON.parse(fs.readFileSync(path.join(ROOT, 'products.json'), 'utf8')) as {
+    products: RegistryEntry[];
+  };
+  const products = registry.products;
+  // A PRODUCT tree serves students. The shared server and the shell/ chrome are declared trees but
+  // not products — they must never appear in a student-facing switcher.
+  const productTrees = Object.entries(withoutComments(manifest.trees))
+    .filter(([, meta]) => !['server', 'workspace'].includes(meta.product))
+    .map(([tree]) => tree);
+
+  it('is well-formed and non-vacuous', () => {
+    expect(products.length, 'empty registry').toBeGreaterThan(1);
+    for (const key of ['id', 'tree', 'url', 'devUrl', 'labelKey', 'buildTarget'] as const) {
+      const values = products.map((p) => p[key]);
+      expect(new Set(values).size, `duplicate ${key} in products.json`).toBe(values.length);
+      for (const v of values)
+        expect(typeof v === 'string' && v.length > 0, `${key} must be a non-empty string`).toBe(true);
+    }
+    for (const p of products) {
+      expect(p.url.startsWith('/'), `${p.id}.url must be an absolute path`).toBe(true);
+      expect(p.devUrl.startsWith('/'), `${p.id}.devUrl must be an absolute path`).toBe(true);
+      expect(typeof p.enabled, `${p.id}.enabled must be boolean`).toBe('boolean');
+    }
+  });
+
+  it('every product tree has a registry entry, and every entry names a declared product tree', () => {
+    expect(
+      products.map((p) => p.tree).sort(),
+      'the bijection is the point: a registered tree with no roster entry fails, so builder N+1 ' +
+        'cannot ship missing from the switcher — and a roster entry for a tree that does not ' +
+        'exist fails the other way.',
+    ).toEqual([...productTrees].sort());
+  });
+
+  it('every buildTarget is a real npm script', () => {
+    const scripts = (
+      JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
+        scripts: Record<string, string>;
+      }
+    ).scripts;
+    for (const p of products)
+      expect(
+        scripts[p.buildTarget],
+        `${p.id}'s buildTarget "${p.buildTarget}" is not an npm script`,
+      ).toBeDefined();
+  });
+});

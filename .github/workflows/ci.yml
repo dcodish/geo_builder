@@ -138,7 +138,7 @@ jobs:
         run: npx vitest run src3d/ server/
 
   test-complex:
-    name: Complex Builder (src-complex/ + server/)
+    name: Complex Builder (src-complex/ + shell/ + server/)
     needs: changes
     if: needs.changes.outputs.runcomplex == 'true'
     runs-on: ubuntu-latest
@@ -162,8 +162,10 @@ jobs:
       - name: Build proxy (shared server bundle)
         run: npm run build:proxy
 
-      - name: Test (complex + shared server)
-        run: npx vitest run src-complex/ server/
+      # shell/ rides in this lane because complex is its only consumer (ADR-W-019); sibling
+      # lanes adopt it when their trees do (Track B).
+      - name: Test (complex + shell + shared server)
+        run: npx vitest run src-complex/ shell/ server/
 
       # The sibling guarantee (ADR-W-017) is the reason this lane exists at all: a change here
       # must not be able to regress a shipped product, and the check proves it in seconds.

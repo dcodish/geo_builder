@@ -12,6 +12,7 @@ import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
 import { SYMBOLS } from './ui/symbols';
+import registry from '../products.json';
 
 const EXAMPLE_LINES = ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2', 'z^5 = w^2'];
 
@@ -149,6 +150,25 @@ export function App() {
   };
 
   /**
+   * THE SWITCHER ROSTER — A2's registry rendered as DATA (ADR-W-021): the shell frame receives a
+   * list, never a product import, and dev swaps in `devUrl` because `npm run dev` serves every app
+   * from one origin. Rebuilt on language change — the labelKeys resolve through THIS product's own
+   * i18n, which is what keeps the registry product-neutral.
+   */
+  const roster = useMemo(
+    () =>
+      registry.products
+        .filter((p) => p.enabled)
+        .map((p) => ({
+          id: p.id,
+          label: t(p.labelKey),
+          icon: p.icon,
+          url: import.meta.env.DEV ? p.devUrl : p.url,
+        })),
+    [t],
+  );
+
+  /**
    * THE LOAD AUDIT (ADR-242, via shell/save): what the last load could not restore, named line by
    * line with each line's own refusal reason — before this, a dropped line simply vanished and
    * `clearError()` erased even the last one's evidence.
@@ -200,6 +220,8 @@ export function App() {
           },
         ]}
         menuLabel={t('menuLabel')}
+        roster={roster}
+        activeProductId="complex"
         about={{
           label: t('menuAbout'),
           title: t('aboutTitle'),

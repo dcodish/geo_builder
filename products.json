@@ -1,0 +1,45 @@
+{
+  "$comment": [
+    "THE machine-readable product registry (ADR-W-018 decision 6 / ADR-W-021; issue #661).",
+    "One roster, several consumers: the shell/ switcher renders it as DATA (shell/ may never import",
+    "a product tree), server/__tests__/isolation.test.ts cross-checks it against BOUNDARIES.json",
+    "(a product tree with no entry FAILS the suite), and server/__tests__/registry-consistency.test.ts",
+    "asserts ci.yml's classifier and the docs/22 §9 table stay in step with it.",
+    "Adding builder N+1 means editing THIS file — the guards name every other place that must follow.",
+    "labelKey is resolved by EACH consuming product's own i18n resources; url is the prod path,",
+    "devUrl is where `npm run dev` serves the same app."
+  ],
+  "version": 1,
+  "products": [
+    {
+      "id": "2d",
+      "labelKey": "switcher2d",
+      "icon": "📐",
+      "url": "/geo-builder/",
+      "devUrl": "/",
+      "tree": "src",
+      "buildTarget": "build",
+      "enabled": true
+    },
+    {
+      "id": "3d",
+      "labelKey": "switcher3d",
+      "icon": "🧊",
+      "url": "/3d-builder/",
+      "devUrl": "/3d.html",
+      "tree": "src3d",
+      "buildTarget": "build:3d",
+      "enabled": true
+    },
+    {
+      "id": "complex",
+      "labelKey": "switcherComplex",
+      "icon": "ℂ",
+      "url": "/complex-builder/",
+      "devUrl": "/complex.html",
+      "tree": "src-complex",
+      "buildTarget": "build:complex",
+      "enabled": true
+    }
+  ]
+}
