@@ -20,6 +20,12 @@ main { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
   flex: 1; padding: 8px 10px; font-size: 0.95rem; font-family: ui-monospace, Consolas, monospace;
   border: 1px solid #cbd5e1; border-radius: 6px;
 }
+/* The ONE "do it" action gets the primary treatment (theme.ts btn.primary; the mockups' send
+   button) — the operator's B1 report: «הוסף» had the palette but not the treatment. */
+.input-row button {
+  background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600;
+}
+.input-row button:hover { background: #1d4ed8; }
 button {
   padding: 7px 12px; font-size: 0.9rem; border: 1px solid #cbd5e1; border-radius: 6px;
   background: #fff; cursor: pointer;
