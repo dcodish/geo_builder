@@ -1,25 +1,24 @@
 /**
- * S7's HARD GATE, as a test: v2 must read everything the prototype reads before the prototype is
- * deleted ([#624](https://github.com/dcodish/geo_builder/issues/624), ADR-CX-019).
+ * THE FORM CORPUS — every utterance the grammar must read, and what each one means.
  *
- * The cutover deletes `engine/model.ts` and `engine/complex.ts`. The operator's condition on it is
- * exact: *"if v2 cannot cover something the prototype covers, STOP and report it rather than deleting
- * the capability."* So the gate is measured rather than asserted — every form the prototype's own
- * suite exercises is run through BOTH grammars, and a form the prototype reads and v2 does not is a
- * failure of this test, not a note in a document.
+ * This began as S7's hard gate ([#624](https://github.com/dcodish/geo_builder/issues/624),
+ * ADR-CX-019): each form was run through BOTH grammars, and a form the prototype read and v2 did not
+ * was a failure here rather than a note in a document. That measurement is what found the eight
+ * capabilities S7 rebuilt, then #680's solution set, then #690 and #691.
  *
- * The forms below are the ones the measurement found missing, each now built. What the measurement did
- * NOT cover is behaviour after parsing — the referencable solution set («z^3 = 8» naming z₁,z₂,z₃) is
- * a capability the prototype has and v2 does not, and it is [#680](https://github.com/dcodish/geo_builder/issues/680).
+ * The prototype is now deleted, and with it the `parseLine` half of every case
+ * ([ADR-CX-027](../../../docs/06d-decisions-complex.md#adr-cx-027)). The parity QUESTION is answered
+ * once and cannot be asked again — there is nothing left to be at parity with — but the LIST is not
+ * about the prototype and never was: it is the corpus of utterances a student types, collected by
+ * measurement rather than by invention, and it catches a grammar regression on its own.
  */
 import { describe, expect, it } from 'vitest';
 
-import { parseLine } from '../parse';
 import { parseLineV2 } from '../rules';
 import { deriveLines } from '../../app/deriveLines';
 
-/** Every form the prototype's suite exercises, as one representative utterance each. */
-const PROTOTYPE_FORMS: string[] = [
+/** Every form the corpus and the retired prototype's suite exercise, one representative each. */
+const PROTOTYPE_FORMS: readonly string[] = [
   'z1 = 3+4i',
   'z2 = 2cis150',
   'z1 מספר מרוכב',
@@ -70,16 +69,13 @@ const PROTOTYPE_FORMS: string[] = [
   'z1*conj(z1) + z2*conj(z2) = 25',
 ];
 
-describe('the cutover gate: v2 reads everything the prototype reads', () => {
+describe('the form corpus: every one of these still parses', () => {
   it.each(PROTOTYPE_FORMS)('«%s»', (line) => {
-    const proto = parseLine(line);
-    const v2 = parseLineV2(line);
-    if (!proto.ok) return; // a form the prototype cannot read is not a capability the cutover loses
-    expect(
-      v2.ok,
-      `the prototype reads «${line}» and v2 does not — deleting the prototype would delete this ` +
-        `capability, which #624's gate forbids`,
-    ).toBe(true);
+    expect(parseLineV2(line).ok, `the grammar stopped reading «${line}»`).toBe(true);
+  });
+
+  it('is not vacuous', () => {
+    expect(PROTOTYPE_FORMS.length).toBeGreaterThan(30);
   });
 });
 

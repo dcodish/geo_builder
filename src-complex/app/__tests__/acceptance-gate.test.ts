@@ -19,7 +19,6 @@ const store = () => useComplexStore.getState();
 
 beforeEach(() => {
   store().clearAll();
-  store().setEngine('v2');
 });
 
 const figure = () => deriveLines(store().lines, store().seed, store().seed);
@@ -166,19 +165,15 @@ describe('the gate is PURE over (lines, raw, seed)', () => {
   });
 });
 
-describe('the prototype path is not routed through here', () => {
+describe('the store records; it does not decide', () => {
   /**
-   * A v2 line reaching the store's `addLine` would bypass the gate silently. It throws instead — the
-   * ADR-CX-009 rule that a default which is wrong when the caller forgets is a seam to remove, not a
-   * convenience to keep.
+   * There is one submit path and it runs the gate. The store held a second one until the cutover
+   * (ADR-CX-027), and a line reaching THAT one bypassed the gate silently — which is why the seam was
+   * removed rather than defended with a throw.
    */
-  it('the store refuses to decide a v2 line', () => {
-    expect(() => store().addLine('z1 = 3+4i')).toThrow(/app\/submit/);
-  });
-
-  it('and still owns the prototype submit path unchanged', () => {
-    store().setEngine('proto');
+  it('a line becomes state only by going through the gate', () => {
     expect(submitLine('z1 = 3+4i')).toBe(true);
-    expect(store().facts).toHaveLength(1);
+    expect(store().lines).toEqual(['z1 = 3+4i']);
+    expect(Object.keys(store())).not.toContain('addLine');
   });
 });

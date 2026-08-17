@@ -6,26 +6,30 @@
  * exact linear solve ([ADR-CX-006](../../docs/06d-decisions-complex.md#adr-cx-006)) instead of per-fact
  * iteration, which is why the systems in #607's family reach a figure at all.
  *
- * ## The bridge, and why it is deliberately throwaway
+ * ## The one way in
  *
- * The v2 engine has no parser yet — that is S4 (#621), and it must be built with span accounting and
- * the lexicon from its first rule ([ADR-CX-009](../../docs/06d-decisions-complex.md#adr-cx-009)).
- * Writing a second parser here to get something on screen sooner would be exactly the shortcut that
- * plan forbids. So this module instead **reads the prototype parser's own facts** and translates them,
- * which lets the new engine be played through the existing input box today and leaves nothing to
- * un-learn later: `bridgeFacts` is deleted whole when S4 lands, and the solver below is untouched.
+ * `foldConstraints` is the fold, and `app/deriveLines.ts` is the only sanctioned way to reach it —
+ * lines in, figure out. There was a second entry once: `bridgeFacts` + `derive2(facts)` read the
+ * prototype parser's own facts, so the exact solver could be played through the old input box before
+ * the v2 grammar existed. It was written to be deleted, and the cutover deleted it
+ * ([ADR-CX-027](../../docs/06d-decisions-complex.md#adr-cx-027)).
  *
- * A form the bridge cannot translate is REPORTED, never silently skipped — an untranslated fact would
- * otherwise vanish from a figure that still looked plausible, which is the silent-drop class the
- * siblings paid for 33 times over.
+ * Its parting lesson is kept, because it cost a slice to learn: a capability that lives on only ONE of
+ * two entry paths is invisible to tests aimed at the other. ADR-CX-021's solution set lived inside the
+ * bridge, so `?engine=v2` never had it and eight green tests described a path the product did not ship
+ * (#680, #686). One way in is the fix.
+ *
+ * A statement this layer cannot use is REPORTED, never silently skipped — it would otherwise vanish
+ * from a figure that still looked plausible, which is the silent-drop class the siblings paid for 33
+ * times over.
  */
 
 import type { Cx } from '../value/value';
-import { cPolar, evaluate, exact, formatPolar, fromCartesian } from '../value/value';
-import { type Rat, fromNumber, rat, toNumber } from '../value/rational';
+import { cPolar, evaluate, exact, formatPolar } from '../value/value';
+import { toNumber } from '../value/rational';
 import { type ExpVec, evaluate as evalMod, format as fmtMod, isOne as modIsOne } from '../value/modulus';
 import { type Angle, period as anglePeriod, toDegrees } from '../value/angle';
-import { type Expr, abs, conj, div, mul, neg, num, param, paramsOf, pow, ref, val } from '../model/expr';
+import { type Expr, paramsOf } from '../model/expr';
 import { type Branch, isTurnUnknown, solveTier1 } from '../solve/tier1';
 import type { Claim as Assertion, CheckedClaim } from '../model/claim';
 import { type FigureObject, ORIGIN, objectPoints } from '../model/figure';
@@ -38,7 +42,7 @@ import {
   measureOf,
 } from '../model/measure';
 import { type KnowledgeRow, isKnowledge, whyNotKnowledge } from '../model/knowledge';
-import { prettyName, rootsMode, solutionNames } from '../model/naming';
+import { prettyName } from '../model/naming';
 import type { SequenceKind, SequenceStatement } from '../model/sequence';
 import { type SurfacedFormula, surfacedFormulas } from '../formulas/table';
 import { type Bound, solveResiduals } from '../solve/tier2';
@@ -51,303 +55,16 @@ import {
   measureResidual,
 } from '../solve/residuals';
 import { verifyClaims } from '../solve/claims';
-import { filterBranches, quadrant } from '../solve/filter';
+import { filterBranches } from '../solve/filter';
 import { type AffineArg, describeFilter, projectWindow, statedWindow, violatesDeg } from '../solve/window';
 import type { BranchFilter, Constraint } from '../model/constraint';
 
-// The prototype PARSER's fact/expression vocabulary — no longer an import from the retiring engine
-// (it moved down to `model/` with the #624 extraction), and still the whole surface `bridgeFacts` has.
-import { factRefs, type Expr as ProtoExpr, type Fact as ProtoFact } from '../model/fact';
-
-/** A fact the bridge could not translate, with the reason — surfaced, never swallowed. */
+/** A statement the fold could not use, with the reason — surfaced, never swallowed. */
 export interface Untranslated {
   readonly factId: string;
   readonly src: string;
   readonly why: string;
 }
-
-export interface BridgeResult {
-  readonly constraints: Constraint[];
-  readonly filters: BranchFilter[];
-  /** free numbers: named, unconstrained, two degrees of freedom each */
-  readonly freeNames: string[];
-  /** angle atoms a cartesian literal introduced, with the degrees they stand for */
-  readonly sample: Map<string, number>;
-  readonly untranslated: Untranslated[];
-}
-
-const asRat = (x: number): Rat | null => fromNumber(x, 10_000, 1e-9);
-
-/**
- * The numeric value of a REF-FREE subtree, or null if it mentions a number the student named.
- *
- * This exists because `3+4i` reaches the bridge as an ADDITION — the prototype parses the cartesian
- * form structurally — and a naive "no addition ⇒ monomial" test would push every cartesian literal to
- * the numeric tier. But a constant expression is a *literal* whatever its syntax: `3+4i` is one number
- * with modulus exactly 5. Folding constants before classifying is what keeps the syntax of a literal
- * from deciding whether the engine can be exact about it.
- */
-function literalValue(e: ProtoExpr): Cx | null {
-  switch (e.t) {
-    case 'lit':
-      return e.v;
-    case 'bin': {
-      const l = literalValue(e.l);
-      const r = literalValue(e.r);
-      if (!l || !r) return null;
-      switch (e.op) {
-        case '+':
-          return { re: l.re + r.re, im: l.im + r.im };
-        case '-':
-          return { re: l.re - r.re, im: l.im - r.im };
-        case '*':
-          return { re: l.re * r.re - l.im * r.im, im: l.re * r.im + l.im * r.re };
-        case '/': {
-          const d = r.re * r.re + r.im * r.im;
-          if (d === 0) return null;
-          return { re: (l.re * r.re + l.im * r.im) / d, im: (l.im * r.re - l.re * r.im) / d };
-        }
-      }
-      return null;
-    }
-    case 'neg': {
-      const x = literalValue(e.e);
-      return x ? { re: -x.re, im: -x.im } : null;
-    }
-    case 'conj': {
-      const x = literalValue(e.e);
-      return x ? { re: x.re, im: -x.im } : null;
-    }
-    case 'abs': {
-      const x = literalValue(e.e);
-      return x ? { re: Math.hypot(x.re, x.im), im: 0 } : null;
-    }
-    case 'pow': {
-      const x = literalValue(e.base);
-      if (!x || !Number.isInteger(e.exp) || e.exp < 0) return null;
-      let acc = { re: 1, im: 0 };
-      for (let i = 0; i < e.exp; i++) acc = { re: acc.re * x.re - acc.im * x.im, im: acc.re * x.im + acc.im * x.re };
-      return acc;
-    }
-    default:
-      return null;
-  }
-}
-
-/** A prototype expression → a v2 expression, or null when it has no exact reading. */
-function bridgeExpr(e: ProtoExpr, sample: Map<string, number>, label: string): Expr | null {
-  // constants first, whatever their syntax — see literalValue
-  const konst = literalValue(e);
-  if (konst) {
-    const re = asRat(konst.re);
-    const im = asRat(konst.im);
-    if (re === null || im === null) return null;
-    const lit = fromCartesian(re, im, label);
-    if (lit.atomBinding) sample.set(lit.atomBinding.atom, lit.atomBinding.degrees);
-    return val(lit.value);
-  }
-
-  switch (e.t) {
-    case 'lit':
-      return null; // unreachable: a literal is always constant, and was folded above
-    case 'ref':
-      return ref(e.name);
-    case 'bin': {
-      const l = bridgeExpr(e.l, sample, label);
-      const r = bridgeExpr(e.r, sample, label);
-      if (!l || !r) return null;
-      return e.op === '*' ? mul(l, r) : e.op === '/' ? div(l, r) : null; // + and − are not monomial
-    }
-    case 'pow': {
-      const b = bridgeExpr(e.base, sample, label);
-      return b ? pow(b, rat(e.exp)) : null;
-    }
-    case 'neg': {
-      const x = bridgeExpr(e.e, sample, label);
-      return x ? neg(x) : null;
-    }
-    case 'conj': {
-      const x = bridgeExpr(e.e, sample, label);
-      return x ? conj(x) : null;
-    }
-    case 'abs': {
-      const x = bridgeExpr(e.e, sample, label);
-      return x ? abs(x) : null;
-    }
-    default:
-      return null; // re/im are additive projections — the numeric tier's business
-  }
-}
-
-/**
- * Every name a PROTOTYPE expression mentions. Read syntactically, before any lowering, because the one
- * thing it decides — is this equation closed? — must not depend on whether the right-hand side happened
- * to bridge into the exact tier.
- */
-function protoRefs(e: ProtoExpr): string[] {
-  switch (e.t) {
-    case 'ref':
-      return [e.name];
-    case 'bin':
-      return [...protoRefs(e.l), ...protoRefs(e.r)];
-    case 'pow':
-      return protoRefs(e.base);
-    case 'neg':
-    case 'conj':
-    case 'abs':
-      return protoRefs(e.e);
-    default:
-      return [];
-  }
-}
-
-/** Prototype facts → the tier-1 inputs. Anything untranslatable is listed, not dropped. */
-export function bridgeFacts(facts: readonly ProtoFact[]): BridgeResult {
-  const constraints: Constraint[] = [];
-  const filters: BranchFilter[] = [];
-  const freeNames: string[] = [];
-  const sample = new Map<string, number>();
-  const untranslated: Untranslated[] = [];
-
-  const give = (f: ProtoFact, why: string): void => {
-    untranslated.push({ factId: f.id, src: f.src, why });
-  };
-
-  /**
-   * Every name an EARLIER line mentioned — whether it defined the number, constrained it, or merely
-   * referred to it. Both halves of ADR-CX-005's mode question read this one set: whether the letter
-   * already exists, and whether the equation is grounded in numbers the question already gave.
-   *
-   * "Mentioned earlier" rather than "defined earlier" is the whole test. «|z₁| = 9r» introduces z₁
-   * through a relation, and the student who wrote it has plainly stated z₁. The auto-created free that
-   * a statement drags in with it contributes nothing, because it is not an earlier line — it is this
-   * one, and a number cannot ground the very statement that invented it.
-   */
-  const mentioned = new Set<string>();
-
-  for (const f of facts) {
-    // Read BEFORE the fact is lowered, so it sees the names of its predecessors and not its own, and
-    // outside the switch so a fact that cannot be lowered still reserves what it named.
-    const mode =
-      f.kind === 'roots'
-        ? rootsMode(f.varName, f.n, mentioned, protoRefs(f.rhs).every((r) => mentioned.has(r)))
-        : null;
-
-    const claims: string[] =
-      f.kind === 'free' || f.kind === 'def'
-        ? [f.name]
-        : f.kind === 'seq' && f.defines
-          ? [f.defines]
-          : f.kind === 'roots' && mode !== 'constrain'
-            ? // the bare letter is reserved by the equation that solves for it, never drawn
-              [f.varName, ...solutionNames(f.varName, f.n, mode === 'anonymous')]
-            : [];
-    if (!(f.kind === 'free' && f.implicit)) {
-      for (const n of claims) mentioned.add(n);
-      for (const n of factRefs(f)) mentioned.add(n);
-    }
-
-    switch (f.kind) {
-      case 'free':
-        freeNames.push(f.name);
-        break;
-      case 'def': {
-        const rhs = bridgeExpr(f.expr, sample, f.name);
-        if (!rhs) give(f, 'the definition is not multiplicative — it belongs to the numeric tier');
-        else constraints.push({ lhs: ref(f.name), rhs, src: f.src });
-        break;
-      }
-      case 'roots': {
-        const rhs = bridgeExpr(f.rhs, sample, f.varName);
-        if (!rhs) {
-          give(f, 'the equation’s right-hand side is not multiplicative');
-          break;
-        }
-        // Asked, never assumed — see `rootsMode` for why trusting the fact's own stamp was wrong.
-        if (mode === 'constrain') {
-          // Modes 2 and 3 (ADR-CX-005): the letter already exists, so the equation CONSTRAINS or
-          // VERIFIES it. One unknown, its turns enumerated — the solutions genuinely are the
-          // configurations here, and that is what «show another configuration» walks.
-          constraints.push({ lhs: pow(ref(f.varName), rat(f.n)), rhs, src: f.src });
-          break;
-        }
-        // Mode 1 — the exam's «פתרו את המשוואה»: the n solutions are ONE configuration containing n
-        // points, not n configurations containing one. They are pinned to each other rather than each
-        // solved independently, so the constellation is exact even when the right-hand side is not yet
-        // known: every solution shares one modulus, and consecutive ones sit exactly 1/n of a turn
-        // apart. The bare letter is reserved by `factNames`, never drawn — X is *related to* X₁..Xₙ.
-        const sols = solutionNames(f.varName, f.n, mode === 'anonymous');
-        constraints.push({ lhs: pow(ref(sols[0]), rat(f.n)), rhs, src: f.src, principal: true });
-        for (let k = 1; k < sols.length; k++) {
-          constraints.push({ kind: 'mod', lhs: abs(ref(sols[k])), rhs: abs(ref(sols[0])), src: f.src });
-          constraints.push({
-            kind: 'arg',
-            lhs: ref(sols[k]),
-            rhs: ref(sols[0]),
-            deltaTurns: rat(k, f.n),
-            src: f.src,
-          });
-        }
-        break;
-      }
-      case 'eq': {
-        const lhs = bridgeExpr(f.lhs, sample, 'eq');
-        const rhs = bridgeExpr(f.rhs, sample, 'eq');
-        if (!lhs || !rhs) give(f, 'the equation is not multiplicative on both sides');
-        else constraints.push({ lhs, rhs, src: f.src });
-        break;
-      }
-      case 'rel': {
-        const r = f.rel;
-        if (r.type === 'quad') {
-          filters.push(quadrant(r.name, r.q));
-        } else if (r.type === 'mod') {
-          const k = asRat(r.k);
-          if (k === null) {
-            give(f, 'the magnitude factor has no exact reading');
-            break;
-          }
-          const rhs = r.other
-            ? mul(num(k), abs(ref(r.other)))
-            : r.param
-              ? mul(num(k), param(r.param))
-              : num(k);
-          if (r.cmp && r.cmp !== '=') give(f, 'a modulus INEQUALITY is a numeric-tier bound, not a linear row');
-          else constraints.push({ kind: 'mod', lhs: abs(ref(r.name)), rhs, src: f.src });
-        } else {
-          // Σ sign·arg(name) = rhsDeg. Two signed terms is the corpus form (F4).
-          const plus = r.terms.filter((t) => t.sign === 1);
-          const minus = r.terms.filter((t) => t.sign === -1);
-          const delta = asRat(r.rhsDeg / 360);
-          if (r.cmp && r.cmp !== '=') {
-            filters.push(
-              r.cmp === '<' || r.cmp === '<='
-                ? { kind: 'range', name: r.terms[0]?.name ?? '', maxDeg: rat(Math.round(r.rhsDeg)) }
-                : { kind: 'range', name: r.terms[0]?.name ?? '', minDeg: rat(Math.round(r.rhsDeg)) },
-            );
-          } else if (delta === null || plus.length !== 1 || minus.length > 1) {
-            give(f, 'only one-or-two-term argument equations are linearised so far');
-          } else {
-            constraints.push({
-              kind: 'arg',
-              lhs: ref(plus[0].name),
-              rhs: minus.length ? ref(minus[0].name) : num(rat(1)),
-              deltaTurns: delta,
-              src: f.src,
-            });
-          }
-        }
-        break;
-      }
-      default:
-        give(f, `“${f.kind}” has no v2 form yet`);
-    }
-  }
-
-  return { constraints, filters, freeNames, sample, untranslated };
-}
-
-// ---------------------------------------------------------------------------
 
 export interface DerivedPoint {
   readonly name: string;
@@ -520,28 +237,6 @@ const paramSample = (name: string, seed: number): number => {
   for (const ch of `${name}@${seed}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
   return 0.6 + ((h >>> 0) % 181) / 100;
 };
-
-/**
- * Fold the facts into a figure.
- *
- * `configIndex` selects among the enumerated branches — this is what "show another configuration"
- * advances, and because the branches come out of the integer turn-unknowns it is the exam's
- * «כל האפשרויות» rather than a separate feature.
- */
-export function derive2(facts: readonly ProtoFact[], configIndex = 0, seed = 0): Derived2 {
-  const bridged = bridgeFacts(facts);
-  return foldConstraints({
-    constraints: bridged.constraints,
-    filters: bridged.filters,
-    declared: bridged.freeNames,
-    atoms: bridged.sample,
-    untranslated: bridged.untranslated,
-    configIndex,
-    seed,
-  });
-  // the bridge carries no objects: the prototype's `shape` facts are exactly what S4's grammar
-  // replaces, and translating them would keep the retiring path alive one slice longer
-}
 
 /**
  * Everything a fold reads, named rather than ordered.

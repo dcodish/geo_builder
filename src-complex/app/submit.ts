@@ -121,15 +121,15 @@ export function acceptLine(lines: readonly string[], raw: string, seed: number):
 }
 
 /**
- * THE ONE ENTRY POINT the input box uses — both engines, one place.
+ * THE ONE ENTRY POINT the input box uses.
  *
- * The prototype branch is still the store's, unchanged, because it is deleted whole by the cutover and
- * moving it first would be churn on code with a scheduled end. Everything v2 is decided here.
+ * It routed between two engines until the cutover deleted the second
+ * ([ADR-CX-027](../../docs/06d-decisions-complex.md#adr-cx-027)). One path in is not a tidy-up: a
+ * capability reachable from only one of two entry points is invisible to tests aimed at the other,
+ * which is how #680 shipped and how #686 stayed green describing it.
  */
 export function submitLine(raw: string): boolean {
   const st = () => useComplexStore.getState();
-  if (st().engine !== 'v2') return st().addLine(raw);
-
   const line = raw.trim();
   const parsed = parseLineV2(line);
   if (!parsed.ok) {

@@ -17,24 +17,24 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { useComplexStore } from '../useComplexStore';
 import { deriveLines } from '../../app/deriveLines';
 import { hydrateSession, submitLine } from '../../app/submit';
-import { parseLine } from '../../parser/parse';
 
 const store = () => useComplexStore.getState();
 
-const reset = (engine: 'proto' | 'v2'): void => {
+const reset = (): void => {
   store().clearAll();
-  store().setEngine(engine);
 };
 
-describe('the v2 submit path owns the line list (#658)', () => {
-  beforeEach(() => reset('v2'));
+describe('the submit path owns the line list (#658)', () => {
+  beforeEach(reset);
 
   /**
    * The operator's exact prod report. It is here as a store test and not a parser test on purpose:
    * the grammar always read this line correctly, and the app still refused it.
    */
   it('accepts «z1 מדומה טהור» — the line the prototype gatekept', () => {
-    expect(parseLine('z1 מדומה טהור').ok).toBe(false); // the prototype still cannot read it
+    // The prototype's grammar could not read this, and while it owned the input box the line was
+    // refused before the v2 grammar that CAN read it ever saw it (#658). The cutover removed the
+    // gatekeeper; this stays as the regression, keyed on the behaviour rather than on the old parser.
     expect(submitLine('z1 מדומה טהור')).toBe(true);
     expect(store().lines).toEqual(['z1 מדומה טהור']);
     expect(store().lastError).toBeNull();
@@ -95,31 +95,5 @@ describe('the v2 submit path owns the line list (#658)', () => {
     store().clearAll();
     expect(hydrateSession(saved)).toBe(true);
     expect(store().lines).toEqual(['z1 = 3+4i', 'z1 ו-z2 צמודים זה לזה']);
-  });
-});
-
-describe('the prototype path keeps its own semantics', () => {
-  beforeEach(() => reset('proto'));
-
-  it('records the accepted line alongside the facts it lowered to', () => {
-    // a MIXED polar declaration lowers to two facts — free z1, and the modulus it stated
-    expect(store().addLine('z1 = 2cis(theta)')).toBe(true);
-    expect(store().lines).toEqual(['z1 = 2cis(theta)']);
-    expect(store().facts.length).toBeGreaterThan(1); // one utterance, several facts
-  });
-
-  it('still refuses what the prototype grammar cannot read', () => {
-    expect(store().addLine('z1 מדומה טהור')).toBe(false);
-    expect(store().lines).toEqual([]);
-  });
-
-  /** A removed fact must take its line with it, or the next save would resurrect the statement. */
-  it('removing a fact removes the line that produced it', () => {
-    store().addLine('z1 = 3+4i');
-    store().addLine('z2 = 1+i');
-    const target = store().facts.find((f) => f.src === 'z2 = 1+i');
-    store().removeFact(target!.id);
-    expect(store().lines).toEqual(['z1 = 3+4i']);
-    expect(store().serialize().lines).toEqual(['z1 = 3+4i']);
   });
 });

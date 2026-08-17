@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { fmtNum } from './value/value';
-import { deriveScene } from './engine/model';
 import { deriveLines } from './app/deriveLines';
 import { hydrateSession, submitLine } from './app/submit';
 import { v2Claims, v2Formulas, v2Knowledge, v2Labels, v2Measures, v2Status } from './replay/scene2';
 import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
-import { GaussPlane } from './render/GaussPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
 
 const EXAMPLE_LINES = ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2', 'z^5 = w^2'];
@@ -43,15 +40,10 @@ export function App() {
   const { t, i18n } = useTranslation();
   const {
     lines,
-    facts,
-    freePos,
     seed,
     view,
-    engine,
     lastError,
-    removeFact,
     removeLine,
-    setFree,
     setView,
     nextConfig,
     clearAll,
@@ -106,18 +98,13 @@ export function App() {
   }, [i18n.language]);
 
   /**
-   * `?engine=v2` runs the REBUILT engine (#616): the exact log-polar solver instead of the prototype's
-   * per-fact sweeps. Off by default, so prod is untouched while the foundation is played
-   * (ADR-CX-008's switch). The preview surface below is temporary — S5 replaces the whole render and
-   * shell layer, and this banner with it.
+   * THE FIGURE — the student's lines, folded. One engine, no switch
+   * ([ADR-CX-027](../docs/06d-decisions-complex.md#adr-cx-027)).
    *
-   * The switch itself lives in the store, because the stored session is replayed through `addLine` at
-   * import time and the engine has to be known before that runs (#658).
+   * `?engine=v2` selected between this and the prototype's per-fact sweeps while the foundation was
+   * being played (ADR-CX-008). The cutover deleted the prototype, so the fork went with it.
    */
-  const useV2 = engine === 'v2';
-  // The v2 engine reads the student's LINES — which the store owns outright, so a line the retiring
-  // prototype cannot read still reaches the grammar that can (#658).
-  const derived2 = useMemo(() => (useV2 ? deriveLines(lines, seed, seed) : null), [useV2, lines, seed]);
+  const derived2 = useMemo(() => deriveLines(lines, seed, seed), [lines, seed]);
   /**
    * THE `n` STEPPER — display state, and nowhere else (ADR-CX-001 D3).
    *
@@ -127,33 +114,21 @@ export function App() {
    * to hold at (ADR-448 / ADR-3D-144) after learning what it costs not to.
    */
   const [stepN, setStepN] = useState(1);
-  const scene = useMemo(() => deriveScene(facts, freePos, seed), [facts, freePos, seed]);
-  // the v2 canvas is the POLAR one: a complex number as a length and a direction, not a dot on a grid
-  const polarScene = useMemo(
-    () => (derived2 ? buildScene(derived2, { n: stepN }) : null),
-    [derived2, stepN],
-  );
+  // the canvas is POLAR: a complex number as a length and a direction, not a dot on a grid
+  const polarScene = useMemo(() => buildScene(derived2, { n: stepN }), [derived2, stepN]);
 
   /**
-   * WHICH ENGINE'S VERDICT THE FACT LIST SHOWS.
+   * WHICH LINES THE FIGURE COULD NOT USE — so a row is red exactly when the engine could not read it.
    *
-   * The canvas draws v2 while the rows were still styled by the PROTOTYPE's evaluation — and the
-   * prototype is precisely what refuses `-2z1 = conj(z3)` (#607). So the figure said "built" and the
-   * row said "failed", about the same line, at the same time. One surface must not contradict another
-   * about the same fact; when v2 is driving the picture it must drive the verdict too.
-   *
-   * v2 keys its refusals by the student's LINE, so a row is red exactly when v2 could not read the
-   * line that produced it.
+   * The canvas drew v2 while the rows were styled by the PROTOTYPE's evaluation once, and the
+   * prototype is precisely what refuses `-2z1 = conj(z3)` (#607): the figure said "built" and the row
+   * said "failed", about the same line, at the same time. One surface must never contradict another
+   * about the same statement, which is the #653 class and the reason there is now one engine to ask.
    */
   const v2Failed = useMemo(
-    () => new Set((derived2?.untranslated ?? []).map((u) => u.src)),
+    () => new Set(derived2.untranslated.map((u) => u.src)),
     [derived2],
   );
-  const [calcInput, setCalcInput] = useState('');
-  const submitCalc = () => {
-    if (calcInput.trim() === '') return;
-    if (submitLine(calcInput)) setCalcInput('');
-  };
 
   const submit = () => {
     if (input.trim() === '') return;
@@ -222,41 +197,8 @@ export function App() {
           <div className="panel-actions">
             <button onClick={() => EXAMPLE_LINES.forEach((l) => submitLine(l))}>{t('example')}</button>
             <button onClick={clearAll}>{t('clearAll')}</button>
-            <span className="count">{t('factCount', { count: useV2 ? lines.length : facts.length })}</span>
+            <span className="count">{t('factCount', { count: lines.length })}</span>
           </div>
-          {/* the calculation panel reads the PROTOTYPE's scene; under v2 the polar canvas and the
-              banner carry the readings instead, and a panel fed by an idle engine would print stale
-              numbers next to live ones */}
-          {!useV2 && <div className="measures">
-            <div className="measures-title">{t('calcsLabel')}</div>
-            {scene.measures.map((m) => (
-              <div key={m.key} className="measure-row" dir="ltr">
-                <span title={m.form ? t('calcCurrent', { value: fmtNum(m.value) }) : undefined}>
-                  {m.label} = {m.form ?? fmtNum(m.value)}
-                </span>
-                <button className="del" onClick={() => removeFact(m.factId)} aria-label="delete">
-                  ✕
-                </button>
-              </div>
-            ))}
-            <div className="input-row calc-input">
-              <input
-                value={calcInput}
-                onChange={(e) => setCalcInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && submitCalc()}
-                placeholder={t('calcPlaceholder')}
-                dir="ltr"
-              />
-              <button onClick={submitCalc}>{t('calc')}</button>
-            </div>
-          </div>}
-          {!useV2 && Object.keys(scene.params).length > 0 && (
-            <div className="params" dir="ltr" title={t('paramsLabel')}>
-              {Object.entries(scene.params)
-                .map(([n, v]) => `${n} = ${fmtNum(v)}`)
-                .join('   ·   ')}
-            </div>
-          )}
           {/*
             THE STATEMENT LIST FOLLOWS THE ACTIVE ENGINE.
 
@@ -265,8 +207,8 @@ export function App() {
             well as unreachable (#658): a line the prototype refused had no row to appear in.
           */}
           <ul className="facts">
-            {useV2 && lines.length === 0 && <li className="hint">{t('emptyHint')}</li>}
-            {useV2 &&
+            {lines.length === 0 && <li className="hint">{t('emptyHint')}</li>}
+            {
               lines.map((src, i) => {
                 const failed = v2Failed.has(src);
                 return (
@@ -283,54 +225,16 @@ export function App() {
                   </li>
                 );
               })}
-            {!useV2 && facts.length === 0 && <li className="hint">{t('emptyHint')}</li>}
-            {!useV2 && facts.map((f) => (
-              <li key={f.id} className={scene.errors[f.id] ? 'fact err' : 'fact'}>
-                <code dir="ltr">{f.src}</code>
-                {f.kind === 'free' && (
-                  <span className="badge">
-                    {t(
-                      scene.points.find((p) => p.factId === f.id)?.freeName
-                        ? f.implicit
-                          ? 'implicitLabel'
-                          : 'freeLabel'
-                        : 'drivenLabel',
-                    )}
-                  </span>
-                )}
-                {scene.checks[f.id] && (
-                  <span
-                    className={scene.checks[f.id].ok ? 'check ok' : 'check bad'}
-                    title={t(
-                      scene.checks[f.id].driven
-                        ? 'relDriven'
-                        : scene.checks[f.id].ok
-                          ? 'relOk'
-                          : 'relBad',
-                    )}
-                  >
-                    {scene.checks[f.id].ok ? '✓' : '✗'}
-                  </span>
-                )}
-                {scene.errors[f.id] && (
-                  <span className="fact-error">
-                    {t(
-                      scene.errors[f.id].key === 'unknown-ref' ? 'errUnknownRef' : 'errRootsOfZero',
-                      { detail: scene.errors[f.id].detail },
-                    )}
-                  </span>
-                )}
-                <button className="del" onClick={() => removeFact(f.id)} aria-label="delete">
-                  ✕
-                </button>
-              </li>
-            ))}
           </ul>
         </section>
         <section className="canvas">
-          {derived2 && (
-            <div className="v2-banner" dir="rtl">
-              <strong>engine=v2</strong> · {v2Status(derived2)}
+          {
+            /* The readings beside the canvas. It carried an `engine=v2` badge while two engines
+               existed and the operator needed to know which one drew the figure; there is one engine
+               now (ADR-CX-027), so the badge is gone and the honest state remains. */
+          }
+          <div className="v2-banner" dir="rtl">
+              {v2Status(derived2)}
               {v2Labels(derived2).length > 0 && <div dir="ltr">{v2Labels(derived2).join('   ')}</div>}
               {derived2.points.some((p) => !p.modulusKnown || !p.argumentKnown) && (
                 <div>~ = ערך שנדגם, לא נתון — לחצו "אפשרות נוספת" כדי לראות תצורה אחרת</div>
@@ -374,9 +278,8 @@ export function App() {
                   ⚠ «{u.src}» — {u.why}
                 </div>
               ))}
-            </div>
-          )}
-          {polarScene ? (
+          </div>
+          {polarScene && (
             <>
               <PolarPlane
                 scene={polarScene}
@@ -416,8 +319,6 @@ export function App() {
                 </div>
               ))}
             </>
-          ) : (
-            <GaussPlane scene={scene} view={view} onDragFree={setFree} />
           )}
         </section>
       </main>

@@ -38,7 +38,6 @@ const store = () => useComplexStore.getState();
 
 beforeEach(() => {
   store().resetSession();
-  store().setEngine('v2');
 });
 
 describe('saved-session fixtures net', () => {
