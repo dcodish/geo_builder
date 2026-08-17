@@ -2,8 +2,8 @@
 body {
   margin: 0;
   font-family: system-ui, 'Segoe UI', sans-serif;
-  background: #f5f5f4;
-  color: #292524;
+  background: #f8fafc;
+  color: #0f172a;
 }
 .app { max-width: 1180px; margin: 0 auto; padding: 4px 16px 12px; }
 /* The suite bar, tool row, About modal and banners are the shared frame's (shell/frame, #673 +
@@ -14,29 +14,35 @@ main { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
 .figure-actions { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
 .panel { flex: 1 1 320px; min-width: 300px; }
 .canvas { flex: 1 1 480px; min-width: 320px; }
-.gauss-plane { width: 100%; height: auto; border: 1px solid #d6d3d1; border-radius: 8px; background: #fafaf9; touch-action: none; }
+.gauss-plane { width: 100%; height: auto; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; touch-action: none; }
 .input-row { display: flex; gap: 6px; }
 .input-row input {
   flex: 1; padding: 8px 10px; font-size: 0.95rem; font-family: ui-monospace, Consolas, monospace;
-  border: 1px solid #d6d3d1; border-radius: 6px;
+  border: 1px solid #cbd5e1; border-radius: 6px;
 }
+/* The ONE "do it" action gets the primary treatment (theme.ts btn.primary; the mockups' send
+   button) — the operator's B1 report: «הוסף» had the palette but not the treatment. */
+.input-row button {
+  background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600;
+}
+.input-row button:hover { background: #1d4ed8; }
 button {
-  padding: 7px 12px; font-size: 0.9rem; border: 1px solid #d6d3d1; border-radius: 6px;
+  padding: 7px 12px; font-size: 0.9rem; border: 1px solid #cbd5e1; border-radius: 6px;
   background: #fff; cursor: pointer;
 }
-button:hover { background: #f5f5f4; }
+button:hover { background: #f8fafc; }
 .symbols { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
 .sym {
   font-family: ui-monospace, Consolas, monospace; font-size: 0.92rem;
-  padding: 4px 9px; background: #fafaf9;
+  padding: 4px 9px; background: #f8fafc;
 }
 .panel-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
-.count { color: #a8a29e; font-size: 0.85rem; margin-inline-start: auto; }
+.count { color: #94a3b8; font-size: 0.85rem; margin-inline-start: auto; }
 .error { color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 6px 10px; font-size: 0.9rem; }
 .facts { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 6px; }
 .fact {
   display: flex; align-items: center; gap: 8px; padding: 6px 10px;
-  background: #fff; border: 1px solid #e7e5e4; border-radius: 6px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;
 }
 .fact.err { border-color: #fecaca; background: #fef2f2; }
 .fact code { font-size: 0.92rem; }
@@ -44,12 +50,12 @@ button:hover { background: #f5f5f4; }
 .badge { font-size: 0.72rem; color: #9a3412; background: #ffedd5; border-radius: 999px; padding: 2px 8px; }
 .measures {
   margin-top: 8px; padding: 6px 10px; background: #fff;
-  border: 1px solid #e7e5e4; border-radius: 6px;
+  border: 1px solid #e2e8f0; border-radius: 6px;
 }
-.measures-title { font-size: 0.78rem; color: #78716c; margin-bottom: 3px; }
+.measures-title { font-size: 0.78rem; color: #64748b; margin-bottom: 3px; }
 .measure-row {
   display: flex; align-items: center; gap: 6px;
-  font-family: ui-monospace, Consolas, monospace; font-size: 0.92rem; color: #1c1917;
+  font-family: ui-monospace, Consolas, monospace; font-size: 0.92rem; color: #0f172a;
 }
 .calc-input { margin-top: 6px; }
 .calc-input input { padding: 5px 8px; font-size: 0.88rem; }
@@ -62,9 +68,9 @@ button:hover { background: #f5f5f4; }
 .check { font-weight: 700; font-size: 0.95rem; }
 .check.ok { color: #15803d; }
 .check.bad { color: #b91c1c; }
-.del { border: none; background: none; color: #a8a29e; margin-inline-start: auto; padding: 2px 6px; }
+.del { border: none; background: none; color: #94a3b8; margin-inline-start: auto; padding: 2px 6px; }
 .del:hover { color: #b91c1c; background: none; }
-.hint { color: #a8a29e; font-size: 0.9rem; padding: 8px 2px; }
+.hint { color: #94a3b8; font-size: 0.9rem; padding: 8px 2px; }
 
 /* The ?engine=v2 preview banner (#616). Temporary: S5 replaces this surface with the real shell. */
 .v2-banner {
