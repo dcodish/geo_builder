@@ -145,11 +145,14 @@ export function App() {
   // the canvas is POLAR: a complex number as a length and a direction, not a dot on a grid
   const polarScene = useMemo(() => buildScene(derived2, { n: stepN }), [derived2, stepN]);
   /**
-   * THE DATA COLUMN (B2, docs/28 §4a D1): opt-in, on its own side. Display state only — like the
-   * `n` stepper, it lives here and nowhere else. What it may CONTAIN is bounded by the honesty
-   * split below: values and knowledge are opt-in; refusal surfaces never are.
+   * THE DATA COLUMN (B2, docs/28 §4a D1 as refined by the operator 2026-08-17): the column is
+   * ALWAYS VISIBLE on wide screens — its toggle lives INSIDE it and collapses only the content;
+   * on narrow screens the column hides and the launcher under the canvas opens it as the D10
+   * overlay. Display state only. The honesty split stands: refusal surfaces are never in here.
    */
-  const [showData, setShowData] = useState(false);
+  const [showData, setShowData] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1000px)').matches,
+  );
 
   /**
    * WHICH LINES THE FIGURE COULD NOT USE — so a row is red exactly when the engine could not read it.
@@ -408,16 +411,28 @@ export function App() {
               <button onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
                 {view === 'cart' ? t('viewPolar') : t('viewCart')}
               </button>
-              <button onClick={() => setShowData((s) => !s)} aria-expanded={showData}>
+              {/* the LAUNCHER — narrow screens only (CSS): opens the data overlay when the
+                  always-visible column has no room to exist */}
+              <button
+                className="data-launcher"
+                onClick={() => setShowData((s) => !s)}
+                aria-expanded={showData}
+              >
                 {showData ? t('dataHide') : t('dataShow')}
               </button>
             </div>
           </section>
-          {showData && (
-            <aside className="data" dir="rtl">
-              {/* THE DATA COLUMN (D1 opt-in half; D8's skeleton arrives in B6): what the figure
-                  KNOWS — labels, verified claims, measures, knowledge rows, the formula sheet. */}
-              <div className="data-title">{t('dataTitle')}</div>
+          <aside className={showData ? 'data open' : 'data'} dir="rtl">
+            {/* D8's skeleton arrives in B6. The column itself is permanent on wide screens; the
+                header button collapses the CONTENT (and closes the overlay on narrow). */}
+            <div className="data-head">
+              <span className="data-title">{t('dataTitle')}</span>
+              <button className="data-toggle" onClick={() => setShowData((s) => !s)} aria-expanded={showData}>
+                {showData ? t('dataHide') : t('dataShow')}
+              </button>
+            </div>
+            {showData && (
+              <>
               {v2Labels(derived2).length > 0 && <div dir="ltr">{v2Labels(derived2).join('   ')}</div>}
               {v2Claims(derived2).map((c) => (
                 <div key={c} className="v2-claim">
@@ -440,8 +455,9 @@ export function App() {
                   {f}
                 </div>
               ))}
-            </aside>
-          )}
+              </>
+            )}
+          </aside>
         </main>
       </div>
     </AppFrame>

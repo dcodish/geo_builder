@@ -10,19 +10,28 @@ body {
   background: #f8fafc;
   color: #0f172a;
 }
-.app { max-width: 1240px; margin: 0 auto; padding: 4px 16px 16px; }
+/* Full-width app (operator, 2026-08-17: "a lot of wasted space to the left and right") — the
+   canvas takes the stretch; the side columns hold their widths. The shared frame rows use the
+   same edge padding so all three levels align. */
+.app { max-width: none; margin: 0 auto; padding: 4px 20px 16px; }
 main { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
 /* RTL flex: DOM order panel → canvas → data renders right → centre → left (D1's sides). */
 .panel { flex: 1 1 340px; min-width: 320px; display: flex; flex-direction: column; gap: 12px; }
 .canvas { flex: 2 1 460px; min-width: 360px; }
+/* The data column is a PERMANENT fixture on wide screens (operator refinement of D1): the header
+   button collapses its CONTENT, never the column. On narrow screens (D10) the column hides and
+   the launcher under the canvas opens it as an overlay. */
 .data {
-  flex: 0 0 250px; min-width: 220px;
+  flex: 0 0 260px; min-width: 230px;
   background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   font-size: 13px; line-height: 1.6;
   display: flex; flex-direction: column; gap: 4px;
 }
-.data-title { font-size: 12px; font-weight: 700; color: #475569; letter-spacing: 0.2px; margin-bottom: 2px; }
+.data-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.data-title { font-size: 12px; font-weight: 700; color: #475569; letter-spacing: 0.2px; }
+.data-toggle { font-size: 12px; padding: 4px 10px; }
+.data-launcher { display: none; }
 
 /* The card surface — the mockups' grouping (one for input+palette, one for the fact list). */
 .card {
@@ -37,6 +46,9 @@ main { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
 .gauss-plane {
   width: 100%; height: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); touch-action: none;
+  /* on very wide screens the square plane must not devour the viewport — the figure actions
+     under it (D7) stay reachable without scrolling */
+  max-height: 76vh;
 }
 .input-row { display: flex; gap: 8px; }
 .input-row input {
@@ -130,9 +142,13 @@ button:hover { background: #f8fafc; }
    the canvas as a dismissable overlay (the «נתונים» button under the canvas toggles it), so the
    canvas and the input box are always both visible. Phones stay out of scope (NFR-US-4). */
 @media (max-width: 1000px) {
-  .data {
+  .data { display: none; }
+  .data.open {
+    display: flex;
     position: fixed;
-    inset-inline-start: 12px;
+    /* inline-END = the LEFT edge in RTL — the overlay covers the canvas side (D10), never the
+       input column: the student keeps typing while the data floats over the figure */
+    inset-inline-end: 12px;
     top: 84px;
     bottom: 16px;
     width: min(320px, 85vw);
@@ -140,4 +156,5 @@ button:hover { background: #f8fafc; }
     z-index: 60;
     box-shadow: 0 18px 50px rgba(15, 23, 42, 0.25);
   }
+  .data-launcher { display: inline-block; }
 }
