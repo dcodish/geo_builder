@@ -834,3 +834,35 @@ is logged with its path named (the ADR-W-007 lesson applied to the new channel).
 the one-time Apache mapping of `/geo-builder-next/api` onto the same proxy, `__BUILD__`-stamped
 usage separation, and a canonical-bytes-unchanged check. First use is deliberately the B1 (#666)
 build — a visual no-op for 2-D — so the channel is proven before any visible surface rides it.
+
+## ADR-W-021 — One machine-readable product registry, with teeth in three directions (#661)
+
+**Status:** accepted, 2026-08-17 · **Issue:** [#661](https://github.com/dcodish/geo_builder/issues/661)
+(unify A2; [ADR-W-018](#adr-w-018) decision 6)
+
+**Decision.** `products.json` at the repo root is THE roster — `id`, `labelKey`, `icon`, `url`,
+`devUrl`, `tree`, `buildTarget`, `enabled` per builder — with three consumers, each a guard:
+
+1. **The shell switcher renders it as DATA** — lit in the complex builder by this change (the A1
+   component had shipped dark on purpose, ADR-W-019). `labelKey` resolves through each consuming
+   product's OWN i18n resources, which is what keeps the registry product-neutral; `devUrl` swaps in
+   under `import.meta.env.DEV` because the dev server serves every app from one origin.
+2. **`isolation.test.ts` asserts a BIJECTION** between registry entries and the manifest's product
+   trees (declared trees whose `product` is not `server`/`workspace`): a registered tree with no
+   roster entry FAILS, and a roster entry naming a missing tree fails the other way — builder N+1
+   cannot ship missing from the switcher. `buildTarget` must name a real npm script.
+3. **`registry-consistency.test.ts` asserts the two hand-kept copies** — ci.yml's path classifier +
+   lanes, and the docs/22 §9 table — carry every registry product. Static YAML/Markdown cannot read
+   JSON, so the copies stay physically present; the assertions make forgetting one impossible.
+
+**Found by writing it, which is the argument for it:** docs/22 §9's table had NO complex column —
+a shipped, deployed product was absent from the workspace's own registry table. The bijection and
+consistency checks turn that class of drift into a red suite.
+
+**Also in this change:** the complex CI lane runs `shell/` (matching `test:run:complex` — A1 updated
+the npm script and the lane had lagged), and §9 records complex as shipped rather than planned.
+
+**Provisional, deliberately:** the `icon` glyphs (📐/🧊/ℂ) are a first pick — curation (labels,
+icons, order, visibility) is exactly what A3's admin config owns, bounded by choose-among-what-exists
+(ADR-W-018 decision 7). What is NOT configurable stays in code: which builders exist, their trees and
+URLs — this file, cross-checked.

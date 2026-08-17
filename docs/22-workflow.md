@@ -192,21 +192,32 @@ This repo is **one workspace hosting several sibling products**. Every artifact 
 
 ### Registry
 
-| | 2-D Geo Builder | 3-D Space Builder | Shared server |
-| --- | --- | --- | --- |
-| **Source** | `src/` | `src3d/` | `server/` |
-| **Entry / build** | `index.html` · `npm run build` → `dist/` | `3d.html` · `npm run build:3d` → `dist-3d/` | `npm run build:proxy` → `dist-server/` |
-| **Prod path** | `/geo-builder/` | `/3d-builder/` | proxy service `:8788` |
-| **ADR log** | [06-decisions.md](06-decisions.md) (`ADR-NNN`) | [06b-decisions-3d.md](06b-decisions-3d.md) (`ADR-3D-NNN`) | in 06 (repo-wide/infra ADRs also live here) |
-| **Plan / status** | the [06](06-decisions.md) tail + `gh issue list` ([20](20-space-vectors-tool.md)/[09](09-implementation-plan.md) for background) | the [06b](06b-decisions-3d.md) tail + `gh issue list` | RUNBOOK.md |
-| **Orientation file** | [CLAUDE.md](../CLAUDE.md) | [src3d/CLAUDE.md](../src3d/CLAUDE.md) | in the root CLAUDE.md |
-| **Issue label** | `2d` | `3d` | `server` |
-| **Tests (local)** | `npm run test:2d` (= `vitest src/ server/`) | `npm run test:3d` (= `vitest src3d/ server/`) | runs in **every** lane |
-| **CI lane** | `test-2d` | `test-3d` | both |
-| **Fixtures** | `src/__tests__/fixtures/` | `fixtures3/` | — |
-| **Save-file suffix** | `-geo` (`<name>-geo.json`, ADR-274) | `-vectors` (`<name>-vectors.json`, ADR-3D-036) | — |
+**The machine copy is [`products.json`](../products.json)** ([ADR-W-021](06w-decisions-workspace.md#adr-w-021)):
+the shell switcher renders it as data, `server/__tests__/isolation.test.ts` cross-checks it against
+`BOUNDARIES.json`, and `server/__tests__/registry-consistency.test.ts` asserts THIS table and
+`ci.yml` stay in step with it — the table below is human commentary on the one authoritative roster.
 
-Planned products, in build order (D5 ruling, [ADR-CX-001](06d-decisions-complex.md#adr-cx-001), 2026-08-14): **complex numbers** — plan ACCEPTED, decision-complete ([docs/27](27-complex-numbers-tool.md); `src-complex/`, ADR log `06d-decisions-complex.md`, ids `ADR-CX-NNN`, label `complex`) — builds **next**; **analytic geometry** — the 471 (4-pt) + 572 (5-pt) analytic-geometry questions as ONE engine with curriculum-level profiles (`src-analytic/`, ADR log `06c-decisions-analytic.md`, ids `ADR-AG-NNN`, label `analytic`) — deliberately **last** ("we will leave analytic to the end"); its doc-19 §6 decision stays parked.
+| | 2-D Geo Builder | 3-D Space Builder | Complex Builder | Shared server |
+| --- | --- | --- | --- | --- |
+| **Source** | `src/` | `src3d/` | `src-complex/` | `server/` |
+| **Entry / build** | `index.html` · `npm run build` → `dist/` | `3d.html` · `npm run build:3d` → `dist-3d/` | `complex.html` · `npm run build:complex` → `dist-complex/` | `npm run build:proxy` → `dist-server/` |
+| **Prod path** | `/geo-builder/` | `/3d-builder/` | `/complex-builder/` | proxy service `:8788` |
+| **ADR log** | [06-decisions.md](06-decisions.md) (`ADR-NNN`) | [06b-decisions-3d.md](06b-decisions-3d.md) (`ADR-3D-NNN`) | [06d-decisions-complex.md](06d-decisions-complex.md) (`ADR-CX-NNN`) | in 06 (repo-wide/infra ADRs also live here) |
+| **Plan / status** | the [06](06-decisions.md) tail + `gh issue list` ([20](20-space-vectors-tool.md)/[09](09-implementation-plan.md) for background) | the [06b](06b-decisions-3d.md) tail + `gh issue list` | the [06d](06d-decisions-complex.md) tail + `gh issue list` ([27](27-complex-numbers-tool.md) for the plan) | RUNBOOK.md |
+| **Orientation file** | [CLAUDE.md](../CLAUDE.md) | [src3d/CLAUDE.md](../src3d/CLAUDE.md) | [src-complex/CLAUDE.md](../src-complex/CLAUDE.md) | in the root CLAUDE.md |
+| **Issue label** | `2d` | `3d` | `complex` | `server` |
+| **Tests (local)** | `npm run test:2d` (= `vitest src/ server/`) | `npm run test:3d` (= `vitest src3d/ server/`) | `npm run test:complex` (= `vitest src-complex/ shell/ server/`) | runs in **every** lane |
+| **CI lane** | `test-2d` | `test-3d` | `test-complex` | all |
+| **Fixtures** | `src/__tests__/fixtures/` | `fixtures3/` | `src-complex/__tests__/fixtures/` | — |
+| **Save-file suffix** | `-geo` (`<name>-geo.json`, ADR-274) | `-vectors` (`<name>-vectors.json`, ADR-3D-036) | `-complex` (`<name>-complex.json`) | — |
+
+**Complex numbers SHIPPED 2026-08-17** (`prod/2026-08-17-4`, the log-polar engine cutover — the row
+above was added by [ADR-W-021](06w-decisions-workspace.md#adr-w-021) after this table had run a full
+product behind reality, which is the drift the machine registry exists to kill). Planned, and
+deliberately **last** (D5 ruling, [ADR-CX-001](06d-decisions-complex.md#adr-cx-001)): **analytic
+geometry** — the 471 (4-pt) + 572 (5-pt) analytic-geometry questions as ONE engine with
+curriculum-level profiles (`src-analytic/`, ADR log `06c-decisions-analytic.md`, ids `ADR-AG-NNN`,
+label `analytic`); its doc-19 §6 decision stays parked.
 
 **Cross-product decisions** — ones belonging to no single product (this registry, the isolation rule, deploy topology, documentation structure) — go in [06w-decisions-workspace.md](06w-decisions-workspace.md) as `ADR-W-nnn`, under the issue label `workspace` ([ADR-W-001](06w-decisions-workspace.md#adr-w-001)). Pre-existing workspace decisions keep their original homes and ids: [ADR-266](06-decisions.md#adr-266) stays in the 2-D log, deliberately — over 200 ADR ids are referenced from docs and code comments, and stable anchors beat tidy filing.
 

@@ -17,7 +17,11 @@ export interface RosterEntry {
   /** Translated display name — the caller resolves its own labelKey. */
   label: string;
   url: string;
+  /** Optional glyph shown before the label (the registry's `icon`; curated later by admin config). */
+  icon?: string;
 }
+
+const display = (entry: RosterEntry) => (entry.icon ? `${entry.icon} ${entry.label}` : entry.label);
 
 export function ProductSwitcher({ roster, activeId }: { roster: RosterEntry[]; activeId: string }) {
   const [open, setOpen] = useState(false);
@@ -51,7 +55,7 @@ export function ProductSwitcher({ roster, activeId }: { roster: RosterEntry[]; a
         onClick={() => setOpen((o) => !o)}
         style={trigger}
       >
-        {active?.label ?? activeId} ▾
+        {active ? display(active) : activeId} ▾
       </button>
       {open && (
         <div role="menu" style={popup}>
@@ -63,7 +67,7 @@ export function ProductSwitcher({ roster, activeId }: { roster: RosterEntry[]; a
               aria-current={entry.id === activeId ? 'page' : undefined}
               style={entry.id === activeId ? { ...itemLink, ...activeLink } : itemLink}
             >
-              {entry.label}
+              {display(entry)}
             </a>
           ))}
         </div>

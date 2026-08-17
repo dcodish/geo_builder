@@ -74,6 +74,10 @@ const he = {
   // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
   loadAuditTitle: 'הקובץ נטען חלקית: {{restored}} מתוך {{total}} שורות נוספו. שורות שלא נוספו:',
   loadAuditDismiss: 'סגור',
+  // A2 (#661): the switcher renders products.json's roster; its labelKeys resolve HERE, per product.
+  switcher2d: 'בונה גיאומטריה',
+  switcher3d: 'בונה מרחב',
+  switcherComplex: 'בונה מרוכבים',
   // S5 — the visualization layer (#622)
   stepperLabel: 'מחזור החזקות: n',
   stepBack: 'הקודם',
@@ -150,6 +154,10 @@ const en = {
   // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
   loadAuditTitle: 'The file loaded partially: {{restored}} of {{total}} lines were added. Lines not added:',
   loadAuditDismiss: 'Dismiss',
+  // A2 (#661): the switcher renders products.json's roster; its labelKeys resolve HERE, per product.
+  switcher2d: 'Geometry Builder',
+  switcher3d: 'Space Builder',
+  switcherComplex: 'Complex Builder',
   // S5 — the visualization layer (#622)
   stepperLabel: 'power cycle: n',
   stepBack: 'previous',
