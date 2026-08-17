@@ -241,6 +241,11 @@ identity is carried by the **switcher's active state**, not by the theme.
 > refuses in every position — the offered-but-unsupported asymmetry that
 > [#511](https://github.com/dcodish/geo_builder/issues/511) is blocked on.
 
+**Calibrated 2026-08-17 (#706):** the visual bar is *2-D's palette as the BASE plus a deliberate
+polish pass* — hierarchy, spacing, card surfaces, affordances — per the mockup round the operator
+ruled on (*"very functional, but not very intuitive or inviting"*). Not a redesign: the tokens and
+palette stand; B1/B2 build to the mockups' level, not to 2-D parity.
+
 ### D4 — Header: **full bar, secondary actions behind an overflow menu**
 
 The header is where "implemented-or-forgotten three times" is most visible. Measured:
@@ -265,6 +270,20 @@ even more builders"* is the case a tab strip fails. Every builder gets the **ful
 3-D gains both the language toggle and an About modal.
 
 *Cost accepted:* one extra click for save/load.
+
+> **Amended by the operator, 2026-08-17 (#706), ruled on full-page mockups (the D1–D10 method):**
+> after playing the lit dropdown the operator reported it *"something a user will easily miss"* and
+> the interface overall *"very functional, but not very intuitive or inviting."* Two amendments:
+>
+> 1. **The switcher is a VISIBLE segmented builder strip** (mockup B): every builder inline with an
+>    icon, the active one filled — the *"4 or maybe more"* objection is answered by degradation, not
+>    by hiding: at 5+ builders the tail folds into «עוד ▾».
+> 2. **שמור/טען are VISIBLE header buttons** (mockup C's utilities pattern): the one-extra-click
+>    cost fell on the most-used pair. Language / guide / about / export stay behind `⋯`.
+>
+> The empty-state direction was validated in the same round: D9b's large example chips under a
+> warm headline, with the manual link — that surface carries most of the "inviting" and stands
+> as ruled.
 
 ### D5 — Input area: **one preview doing both jobs, wrap-selection palette**
 
