@@ -13,3 +13,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Work PC / cross-machine](work-pc-cross-machine.md) — David switches work/home PCs; project syncs via git/GitHub (moved out of Dropbox 2026-07-23) — pick up cross-machine progress via git + the ADR-log tails at session start
 - [Prior rulings live in comments](prior-rulings-live-in-comments.md) — an issue body's "open question" is often already answered in a comment; scan before presenting a decision as open (2026-08-16, #509)
 - [Shared-tree branch races](shared-tree-branch-races.md) — re-verify the shared tree's branch in the SAME compound as any write git op there; a parallel session can switch it mid-flight (2026-08-13 near-miss)
+- [Gate lines are read, not matched](gate-lines-are-read-not-matched.md) — evidence produced is not evidence read; && between gates; quote the decisive lines before claiming green
