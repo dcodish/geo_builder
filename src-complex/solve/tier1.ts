@@ -140,14 +140,18 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
     const a = argumentRow(lf, rf);
     // `arg(lhs) − arg(rhs) = delta` shifts the constant; an `eq` is the delta-zero case
     const rhs = c.deltaTurns ? angAdd(a.rhs, fromTurns(c.deltaTurns)) : a.rhs;
-    // `Σ coef·t − k = const` — the integer turn unknown enters with coefficient −1
-    const k = kName(kNames.length);
     const coef = new Map(a.coef);
-    coef.set(k, rat(-1));
+    // `Σ coef·t − k = const` — the integer turn unknown enters with coefficient −1. A PRINCIPAL row
+    // omits it: the equation is read at its principal value instead of enumerating its turns, which is
+    // how a solution SET gets one canonical labelling rather than n indistinguishable ones.
+    const k = c.principal ? null : kName(kNames.length);
+    if (k) coef.set(k, rat(-1));
     // A row with no argument unknowns at all is either trivially true or a pure constant claim; the
-    // turn unknown makes the former satisfiable, so only keep rows that say something.
-    if (a.coef.size === 0 && ANG_OPS.isZero(rhs)) continue;
-    kNames.push(k);
+    // turn unknown makes the former satisfiable, so only keep rows that say something. A principal row
+    // has no such escape — with no `k` to absorb it, a constant row is a genuine claim and must be kept
+    // so the solve can refuse it.
+    if (a.coef.size === 0 && ANG_OPS.isZero(rhs) && !c.principal) continue;
+    if (k) kNames.push(k);
     argRows.push({ coef, rhs });
   }
 

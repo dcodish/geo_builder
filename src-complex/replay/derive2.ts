@@ -38,7 +38,7 @@ import {
   measureOf,
 } from '../model/measure';
 import { type KnowledgeRow, isKnowledge, whyNotKnowledge } from '../model/knowledge';
-import { prettyName } from '../model/naming';
+import { prettyName, rootsMode, solutionNames } from '../model/naming';
 import type { SequenceKind, SequenceStatement } from '../model/sequence';
 import { type SurfacedFormula, surfacedFormulas } from '../formulas/table';
 import { type Bound, solveResiduals } from '../solve/tier2';
@@ -56,7 +56,7 @@ import type { BranchFilter, Constraint } from '../model/constraint';
 
 // The prototype's fact/expression types — the ONLY import from the retiring engine, and the whole
 // surface the deletion in S4 has to touch.
-import type { Expr as ProtoExpr, Fact as ProtoFact } from '../engine/model';
+import { factRefs, type Expr as ProtoExpr, type Fact as ProtoFact } from '../engine/model';
 
 /** A fact the bridge could not translate, with the reason — surfaced, never swallowed. */
 export interface Untranslated {
@@ -178,6 +178,28 @@ function bridgeExpr(e: ProtoExpr, sample: Map<string, number>, label: string): E
   }
 }
 
+/**
+ * Every name a PROTOTYPE expression mentions. Read syntactically, before any lowering, because the one
+ * thing it decides — is this equation closed? — must not depend on whether the right-hand side happened
+ * to bridge into the exact tier.
+ */
+function protoRefs(e: ProtoExpr): string[] {
+  switch (e.t) {
+    case 'ref':
+      return [e.name];
+    case 'bin':
+      return [...protoRefs(e.l), ...protoRefs(e.r)];
+    case 'pow':
+      return protoRefs(e.base);
+    case 'neg':
+    case 'conj':
+    case 'abs':
+      return protoRefs(e.e);
+    default:
+      return [];
+  }
+}
+
 /** Prototype facts → the tier-1 inputs. Anything untranslatable is listed, not dropped. */
 export function bridgeFacts(facts: readonly ProtoFact[]): BridgeResult {
   const constraints: Constraint[] = [];
@@ -190,7 +212,40 @@ export function bridgeFacts(facts: readonly ProtoFact[]): BridgeResult {
     untranslated.push({ factId: f.id, src: f.src, why });
   };
 
+  /**
+   * Every name an EARLIER line mentioned — whether it defined the number, constrained it, or merely
+   * referred to it. Both halves of ADR-CX-005's mode question read this one set: whether the letter
+   * already exists, and whether the equation is grounded in numbers the question already gave.
+   *
+   * "Mentioned earlier" rather than "defined earlier" is the whole test. «|z₁| = 9r» introduces z₁
+   * through a relation, and the student who wrote it has plainly stated z₁. The auto-created free that
+   * a statement drags in with it contributes nothing, because it is not an earlier line — it is this
+   * one, and a number cannot ground the very statement that invented it.
+   */
+  const mentioned = new Set<string>();
+
   for (const f of facts) {
+    // Read BEFORE the fact is lowered, so it sees the names of its predecessors and not its own, and
+    // outside the switch so a fact that cannot be lowered still reserves what it named.
+    const mode =
+      f.kind === 'roots'
+        ? rootsMode(f.varName, f.n, mentioned, protoRefs(f.rhs).every((r) => mentioned.has(r)))
+        : null;
+
+    const claims: string[] =
+      f.kind === 'free' || f.kind === 'def'
+        ? [f.name]
+        : f.kind === 'seq' && f.defines
+          ? [f.defines]
+          : f.kind === 'roots' && mode !== 'constrain'
+            ? // the bare letter is reserved by the equation that solves for it, never drawn
+              [f.varName, ...solutionNames(f.varName, f.n, mode === 'anonymous')]
+            : [];
+    if (!(f.kind === 'free' && f.implicit)) {
+      for (const n of claims) mentioned.add(n);
+      for (const n of factRefs(f)) mentioned.add(n);
+    }
+
     switch (f.kind) {
       case 'free':
         freeNames.push(f.name);
@@ -203,8 +258,35 @@ export function bridgeFacts(facts: readonly ProtoFact[]): BridgeResult {
       }
       case 'roots': {
         const rhs = bridgeExpr(f.rhs, sample, f.varName);
-        if (!rhs) give(f, 'the equation’s right-hand side is not multiplicative');
-        else constraints.push({ lhs: pow(ref(f.varName), rat(f.n)), rhs, src: f.src });
+        if (!rhs) {
+          give(f, 'the equation’s right-hand side is not multiplicative');
+          break;
+        }
+        // Asked, never assumed — see `rootsMode` for why trusting the fact's own stamp was wrong.
+        if (mode === 'constrain') {
+          // Modes 2 and 3 (ADR-CX-005): the letter already exists, so the equation CONSTRAINS or
+          // VERIFIES it. One unknown, its turns enumerated — the solutions genuinely are the
+          // configurations here, and that is what «show another configuration» walks.
+          constraints.push({ lhs: pow(ref(f.varName), rat(f.n)), rhs, src: f.src });
+          break;
+        }
+        // Mode 1 — the exam's «פתרו את המשוואה»: the n solutions are ONE configuration containing n
+        // points, not n configurations containing one. They are pinned to each other rather than each
+        // solved independently, so the constellation is exact even when the right-hand side is not yet
+        // known: every solution shares one modulus, and consecutive ones sit exactly 1/n of a turn
+        // apart. The bare letter is reserved by `factNames`, never drawn — X is *related to* X₁..Xₙ.
+        const sols = solutionNames(f.varName, f.n, mode === 'anonymous');
+        constraints.push({ lhs: pow(ref(sols[0]), rat(f.n)), rhs, src: f.src, principal: true });
+        for (let k = 1; k < sols.length; k++) {
+          constraints.push({ kind: 'mod', lhs: abs(ref(sols[k])), rhs: abs(ref(sols[0])), src: f.src });
+          constraints.push({
+            kind: 'arg',
+            lhs: ref(sols[k]),
+            rhs: ref(sols[0]),
+            deltaTurns: rat(k, f.n),
+            src: f.src,
+          });
+        }
         break;
       }
       case 'eq': {

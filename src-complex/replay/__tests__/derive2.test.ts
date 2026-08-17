@@ -70,11 +70,16 @@ describe('#607 — the operator’s refused session, through the real input path
 });
 
 describe('other corpus systems through the same path', () => {
-  it('z^3 = 8 plots the three cube roots', () => {
+  it('z^3 = 8 plots the three cube roots — all at once, as ONE configuration (#680)', () => {
+    // Until #680 this read `configCount === 3` and walked the roots one per configuration. They are a
+    // SET, not three drawings of one point (ADR-CX-005 mode 1), so the exam's «פתרו את המשוואה» now
+    // shows the whole answer and there is nothing left to cycle (ADR-CX-020). Full coverage of the
+    // family lives in replay/__tests__/solution-sets.test.ts.
     const d = derive2(facts('z^3 = 8'));
-    expect(d.configCount).toBe(3);
-    const degs = [0, 1, 2].map((i) => Math.round(derive2(facts('z^3 = 8'), i).points[0].argumentDeg));
-    expect(degs.sort((a, b) => a - b)).toEqual([0, 120, 240]);
+    expect(d.configCount).toBe(1);
+    expect(d.canCycle).toBe(false);
+    const degs = d.points.map((p) => Math.round(p.argumentDeg)).sort((a, b) => a - b);
+    expect(degs).toEqual([0, 120, 240]);
   });
 
   it('a cartesian literal keeps its modulus exact: |3+4i| = 5', () => {
