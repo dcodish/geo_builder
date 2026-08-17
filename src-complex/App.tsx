@@ -194,44 +194,45 @@ export function App() {
     </Banner>
   ) : undefined;
 
+  /*
+   * THE LEVEL MODEL (docs/28 §4a, ruled 2026-08-17 on mockup D): a control lives at the level of
+   * the thing it acts on. Level 1 (suite: the builder strip, language, About) and level 2 (tool:
+   * title + שמור/טען) are the frame's. Level 3 is composed HERE: the palette with the input box,
+   * row operations with the fact list, and the FIGURE actions — cycle, the view toggle — under
+   * the canvas (D7, executed for complex ahead of B6).
+   */
   return (
-    <div className="app">
-      <AppFrame
-        title={t('title')}
-        subtitle={t('subtitle')}
-        headerActions={
-          <>
-            {/* nothing to cycle when the givens determine the figure completely (ADR-CX-020) */}
-            <button onClick={nextConfig} disabled={derived2 ? !derived2.canCycle : false}>
-              {t('anotherConfig')}
-            </button>
-            <button onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
-              {view === 'cart' ? t('viewPolar') : t('viewCart')}
-            </button>
-          </>
-        }
-        overflowItems={[
-          { key: 'save', label: t('save'), onSelect: saveFile },
-          { key: 'load', label: t('load'), onSelect: () => fileRef.current?.click() },
-          {
-            key: 'language',
-            label: t('language'),
-            onSelect: () => void i18n.changeLanguage(i18n.language === 'he' ? 'en' : 'he'),
-          },
-        ]}
-        menuLabel={t('menuLabel')}
-        roster={roster}
-        activeProductId="complex"
-        about={{
-          label: t('menuAbout'),
-          title: t('aboutTitle'),
-          body: <p style={{ marginTop: 0 }}>{t('aboutLead')}</p>,
-          privacy: t('privacy'),
-          closeLabel: t('aboutClose'),
-        }}
-        buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
-        banner={auditBanner}
-      >
+    <AppFrame
+      title={t('title')}
+      subtitle={t('subtitle')}
+      utilityActions={
+        <>
+          <button onClick={saveFile}>💾 {t('save')}</button>
+          <button onClick={() => fileRef.current?.click()}>📂 {t('load')}</button>
+        </>
+      }
+      overflowItems={[
+        {
+          key: 'language',
+          label: t('language'),
+          onSelect: () => void i18n.changeLanguage(i18n.language === 'he' ? 'en' : 'he'),
+        },
+      ]}
+      menuLabel={t('menuLabel')}
+      roster={roster}
+      activeProductId="complex"
+      switcherLabel={t('switcherAria')}
+      about={{
+        label: t('menuAbout'),
+        title: t('aboutTitle'),
+        body: <p style={{ marginTop: 0 }}>{t('aboutLead')}</p>,
+        privacy: t('privacy'),
+        closeLabel: t('aboutClose'),
+      }}
+      buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
+      banner={auditBanner}
+    >
+      <div className="app">
         {/* The load target must OUTLIVE the overflow menu (its items unmount on close), so the
             hidden input lives here and the menu item only clicks it. */}
         <input
@@ -395,9 +396,19 @@ export function App() {
                 ))}
               </>
             )}
+            {/* LEVEL 3 — figure actions under the canvas (D7): they act on the FIGURE. */}
+            <div className="figure-actions">
+              {/* nothing to cycle when the givens determine the figure completely (ADR-CX-020) */}
+              <button onClick={nextConfig} disabled={derived2 ? !derived2.canCycle : false}>
+                {t('anotherConfig')}
+              </button>
+              <button onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
+                {view === 'cart' ? t('viewPolar') : t('viewCart')}
+              </button>
+            </div>
           </section>
         </main>
-      </AppFrame>
-    </div>
+      </div>
+    </AppFrame>
   );
 }

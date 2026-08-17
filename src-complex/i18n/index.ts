@@ -14,7 +14,9 @@ import { createProductI18n } from '../../shell/i18n';
 export const complexBidi = makeBidi();
 
 const he = {
-  title: 'בונה מרוכבים',
+  // The suite's display names are the CURRICULUM's subject names (operator ruling 2026-08-17):
+  // הנדסת המישור · הנדסת המרחב · מספרים מרוכבים — not "בונה X".
+  title: 'מספרים מרוכבים',
   subtitle: 'מישור גאוס: הקלידו נתונים שורה-שורה והתבוננו בנקודות',
   inputPlaceholder: 'למשל: z1 = 3+4i או w = z1*z2 או z^3 = 8',
   add: 'הוסף',
@@ -75,9 +77,10 @@ const he = {
   loadAuditTitle: 'הקובץ נטען חלקית: {{restored}} מתוך {{total}} שורות נוספו. שורות שלא נוספו:',
   loadAuditDismiss: 'סגור',
   // A2 (#661): the switcher renders products.json's roster; its labelKeys resolve HERE, per product.
-  switcher2d: 'בונה גיאומטריה',
-  switcher3d: 'בונה מרחב',
-  switcherComplex: 'בונה מרוכבים',
+  switcher2d: 'הנדסת המישור',
+  switcher3d: 'הנדסת המרחב',
+  switcherComplex: 'מספרים מרוכבים',
+  switcherAria: 'מעבר בין הבונים',
   // S5 — the visualization layer (#622)
   stepperLabel: 'מחזור החזקות: n',
   stepBack: 'הקודם',
@@ -94,7 +97,7 @@ const he = {
 };
 
 const en = {
-  title: 'Complex Builder',
+  title: 'Complex Numbers',
   subtitle: 'The Gauss plane: enter givens line by line and watch the points',
   inputPlaceholder: 'e.g. z1 = 3+4i or w = z1*z2 or z^3 = 8',
   add: 'Add',
@@ -155,9 +158,10 @@ const en = {
   loadAuditTitle: 'The file loaded partially: {{restored}} of {{total}} lines were added. Lines not added:',
   loadAuditDismiss: 'Dismiss',
   // A2 (#661): the switcher renders products.json's roster; its labelKeys resolve HERE, per product.
-  switcher2d: 'Geometry Builder',
-  switcher3d: 'Space Builder',
-  switcherComplex: 'Complex Builder',
+  switcher2d: 'Plane Geometry',
+  switcher3d: 'Space Geometry',
+  switcherComplex: 'Complex Numbers',
+  switcherAria: 'Switch between builders',
   // S5 — the visualization layer (#622)
   stepperLabel: 'power cycle: n',
   stepBack: 'previous',

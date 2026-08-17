@@ -1,8 +1,13 @@
 /**
- * The shared app frame — the header every builder shares, per the operator's rulings:
- * docs/28 §4 ("shell/ owns the frame": a switcher in every builder's toolbar is a frame the
- * builders share) and §4a D4 (full bar; title and the switcher visible; secondary actions behind
- * the `⋯` overflow; every builder mounts the FULL action set, About/privacy included).
+ * The shared app frame — TWO of the three levels of the ruled model (docs/28 §4a, the operator's
+ * 2026-08-17 levels ruling on mockup D: *a control lives at the level of the thing it acts on*):
+ *
+ *   LEVEL 1 — the SUITE bar: which tool. The builder strip + the `⋯` menu (language, About).
+ *   Identical chrome in every builder.
+ *   LEVEL 2 — the TOOL row: this session. The product's title/subtitle beside its session
+ *   actions (שמור/טען; B3's figure-name field joins the same cluster).
+ *   LEVEL 3 — the SURFACE — is deliberately NOT here: figure actions live UNDER THE CANVAS (D7),
+ *   the palette with the input box, row operations with the fact list. The product composes those.
  *
  * Parameterized by the caller, always: every label, every menu item, the About content and the
  * privacy note arrive translated through the product's own i18n instance. `shell/` holds no
@@ -10,9 +15,8 @@
  * privacy text — NFR-SE-3's note is part of the frame precisely so no builder can ship publicly
  * without one again (complex did).
  *
- * What is deliberately NOT here: the DOF cue and the figure actions live UNDER THE CANVAS by D7
- * — a body concern the product composes (B6, #671); quick commands are B4 (#669); the fact list
- * is B5 (#670). The frame is the bar, the banners' voice, the About, and the switcher.
+ * The frame is page-level: the suite bar runs full-bleed with a bottom border, and the bar's
+ * inner content + the tool row share one centred container so the levels align with the body.
  */
 import type { CSSProperties, ReactNode } from 'react';
 import { useState } from 'react';
@@ -36,7 +40,10 @@ export interface AppFrameProps {
   subtitle?: string;
   /** The product's PRIMARY visible controls (figure actions move under the canvas in B6/D7). */
   headerActions?: ReactNode;
-  /** D4's collapsed set: save / load / export / language / guide — the frame appends About. */
+  /** VISIBLE utilities beside the switcher — שמור/טען per the #706 D4 amendment (the one-extra-click
+   *  cost fell on the most-used pair). */
+  utilityActions?: ReactNode;
+  /** The collapsed set after #706: language / guide / export — the frame appends About. */
   overflowItems?: MenuItem[];
   /** Accessible label for the `⋯` trigger. */
   menuLabel: string;
@@ -46,6 +53,10 @@ export interface AppFrameProps {
   /** The builder roster, as DATA (A2's registry lights this; <2 entries renders nothing). */
   roster?: RosterEntry[];
   activeProductId?: string;
+  /** Accessible name for the builder strip — the caller's string. */
+  switcherLabel?: string;
+  /** The strip's fold-segment label («עוד») — needed once the roster outgrows the inline cap. */
+  switcherMoreLabel?: string;
   /** A notice/error region between the header and the body (load audit, global notices). */
   banner?: ReactNode;
   children: ReactNode;
@@ -55,12 +66,15 @@ export function AppFrame({
   title,
   subtitle,
   headerActions,
+  utilityActions,
   overflowItems,
   menuLabel,
   about,
   buildStamp,
   roster,
   activeProductId,
+  switcherLabel,
+  switcherMoreLabel,
   banner,
   children,
 }: AppFrameProps) {
@@ -72,20 +86,34 @@ export function AppFrame({
 
   return (
     <>
-      <header style={headerRow}>
+      {/* LEVEL 1 — the suite: which tool. Full-bleed bar, identical in every builder. */}
+      <div style={suiteBar}>
+        <div style={{ ...container, ...suiteInner }}>
+          {roster && activeProductId ? (
+            <ProductSwitcher
+              roster={roster}
+              activeId={activeProductId}
+              ariaLabel={switcherLabel}
+              moreLabel={switcherMoreLabel}
+            />
+          ) : (
+            <span />
+          )}
+          <OverflowMenu label={menuLabel} items={items} />
+        </div>
+      </div>
+      {/* LEVEL 2 — the tool: this session. Title beside the session's actions. */}
+      <header style={{ ...container, ...toolRow }}>
         <div style={{ minWidth: 0 }}>
           <h1 style={h1Style}>{title}</h1>
           {subtitle && <p style={subtitleStyle}>{subtitle}</p>}
         </div>
         <div style={actionsRow}>
           {headerActions}
-          {roster && activeProductId ? (
-            <ProductSwitcher roster={roster} activeId={activeProductId} />
-          ) : null}
-          <OverflowMenu label={menuLabel} items={items} />
+          {utilityActions}
         </div>
       </header>
-      {banner}
+      {banner && <div style={container}>{banner}</div>}
       {children}
       <Modal
         open={aboutOpen}
@@ -105,12 +133,29 @@ export function AppFrame({
   );
 }
 
-const headerRow: CSSProperties = {
+/** One centred container so the suite bar's content, the tool row and the body align. */
+const container: CSSProperties = {
+  maxWidth: 1180,
+  margin: '0 auto',
+  paddingInline: 16,
+};
+const suiteBar: CSSProperties = {
+  background: color.surface,
+  borderBottom: `1px solid ${color.border}`,
+};
+const suiteInner: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
-  alignItems: 'flex-start',
+  alignItems: 'center',
   gap: 12,
-  marginBottom: 10,
+  paddingBlock: 7,
+};
+const toolRow: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 12,
+  paddingBlock: 12,
 };
 const h1Style: CSSProperties = { fontSize: fs.h1, margin: 0, color: color.ink };
 const subtitleStyle: CSSProperties = { margin: '2px 0 0', color: color.muted, fontSize: fs.body };

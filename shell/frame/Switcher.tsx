@@ -1,16 +1,17 @@
 /**
- * The product switcher — a dropdown of builders, rendered from DATA handed in by the caller
- * (docs/28 §4: "the roster of builders is configuration — handed in by the caller"; `shell/` may
- * not import a product tree, a forbidden edge in BOUNDARIES.json). A dropdown, not a tab strip —
- * "4 or maybe even more builders" is exactly what a tab strip fails at (D4).
+ * The product switcher — a VISIBLE segmented builder strip (docs/28 §4a D4 as amended by #706,
+ * operator ruling 2026-08-17 on full-page mockups): every builder inline with its icon, the active
+ * one filled. The original D4 dropdown was ruled *"something a user will easily miss"* — and the
+ * dropdown's own scale argument ("4 or maybe even more builders") is answered by DEGRADATION, not
+ * by hiding: past `MAX_INLINE`, the tail folds into one overflow segment («עוד ▾», label supplied
+ * by the caller — shell/ holds no strings).
  *
- * With fewer than two entries there is nothing to switch to and the control renders nothing —
- * which is also its A1 state: the component ships here, and A2's machine-readable registry
- * (#661) is what lights it, so the roster is never a hand-rolled list that drifts.
+ * Still data-driven, never import-driven (docs/28 §4): the roster arrives from the caller, who
+ * renders A2's registry (`products.json`, ADR-W-021). `shell/` may not import a product tree.
  */
 import type { CSSProperties } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { color, fs, radius } from '../theme';
+import { color, fs } from '../theme';
 
 export interface RosterEntry {
   id: string;
@@ -21,9 +22,48 @@ export interface RosterEntry {
   icon?: string;
 }
 
+/** How many builders render inline before the tail folds. */
+export const MAX_INLINE = 4;
+
+/**
+ * The fold rule, pure and testable: with ≤ max entries everything is inline and nothing folds;
+ * past that, the strip keeps registry ORDER (A3 curates it later), shows the first `max − 1`
+ * entries, and folds the rest — except that the ACTIVE builder is always visible: when it lives in
+ * the tail it takes the last inline slot and the displaced entry folds instead.
+ */
+export function stripSlices(
+  roster: RosterEntry[],
+  activeId: string,
+  max: number = MAX_INLINE,
+): { inline: RosterEntry[]; folded: RosterEntry[] } {
+  if (roster.length <= max) return { inline: roster, folded: [] };
+  const inline = roster.slice(0, max - 1);
+  const folded = roster.slice(max - 1);
+  const activeInTail = folded.findIndex((e) => e.id === activeId);
+  if (activeInTail >= 0) {
+    const displaced = inline.pop();
+    const [active] = folded.splice(activeInTail, 1);
+    inline.push(active);
+    if (displaced) folded.unshift(displaced);
+  }
+  return { inline, folded };
+}
+
 const display = (entry: RosterEntry) => (entry.icon ? `${entry.icon} ${entry.label}` : entry.label);
 
-export function ProductSwitcher({ roster, activeId }: { roster: RosterEntry[]; activeId: string }) {
+export function ProductSwitcher({
+  roster,
+  activeId,
+  ariaLabel,
+  moreLabel,
+}: {
+  roster: RosterEntry[];
+  activeId: string;
+  /** Accessible name for the strip (e.g. «מעבר בין הבונים») — the caller's string. */
+  ariaLabel?: string;
+  /** The fold segment's label (e.g. «עוד») — needed only once the roster outgrows MAX_INLINE. */
+  moreLabel?: string;
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -44,58 +84,80 @@ export function ProductSwitcher({ roster, activeId }: { roster: RosterEntry[]; a
   }, [open]);
 
   if (roster.length < 2) return null;
-  const active = roster.find((r) => r.id === activeId);
+  const { inline, folded } = stripSlices(roster, activeId);
 
   return (
-    <div ref={rootRef} style={{ position: 'relative' }}>
-      <button
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        style={trigger}
-      >
-        {active ? display(active) : activeId} ▾
-      </button>
-      {open && (
-        <div role="menu" style={popup}>
-          {roster.map((entry) => (
-            <a
-              key={entry.id}
-              role="menuitem"
-              href={entry.url}
-              aria-current={entry.id === activeId ? 'page' : undefined}
-              style={entry.id === activeId ? { ...itemLink, ...activeLink } : itemLink}
-            >
-              {display(entry)}
-            </a>
-          ))}
-        </div>
+    <nav ref={rootRef} aria-label={ariaLabel} style={strip}>
+      {inline.map((entry) =>
+        entry.id === activeId ? (
+          <span key={entry.id} aria-current="page" style={{ ...seg, ...segActive }}>
+            {display(entry)}
+          </span>
+        ) : (
+          <a key={entry.id} href={entry.url} style={seg}>
+            {display(entry)}
+          </a>
+        ),
       )}
-    </div>
+      {folded.length > 0 && (
+        <span style={{ position: 'relative' }}>
+          <button
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+            style={{ ...seg, border: 'none', cursor: 'pointer', background: 'transparent' }}
+          >
+            {moreLabel ?? '…'} ▾
+          </button>
+          {open && (
+            <span role="menu" style={popup}>
+              {folded.map((entry) => (
+                <a key={entry.id} role="menuitem" href={entry.url} style={itemLink}>
+                  {display(entry)}
+                </a>
+              ))}
+            </span>
+          )}
+        </span>
+      )}
+    </nav>
   );
 }
 
-const trigger: CSSProperties = {
-  fontSize: fs.body,
-  padding: '6px 10px',
-  border: `1px solid ${color.borderStrong}`,
-  borderRadius: radius.control,
+const strip: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 2,
   background: color.surface,
-  color: color.ink,
-  cursor: 'pointer',
+  border: `1px solid ${color.borderStrong}`,
+  borderRadius: 999,
+  padding: 4,
+};
+const seg: CSSProperties = {
+  fontSize: fs.body,
+  padding: '7px 14px',
+  borderRadius: 999,
+  color: color.muted,
+  textDecoration: 'none',
   whiteSpace: 'nowrap',
+  lineHeight: 1.2,
+};
+const segActive: CSSProperties = {
+  background: color.primary,
+  color: '#fff',
+  fontWeight: 600,
 };
 const popup: CSSProperties = {
   position: 'absolute',
-  top: 'calc(100% + 4px)',
+  top: 'calc(100% + 8px)',
   insetInlineEnd: 0,
   minWidth: 170,
   display: 'flex',
   flexDirection: 'column',
   background: color.surface,
   border: `1px solid ${color.border}`,
-  borderRadius: radius.card,
+  borderRadius: 10,
   boxShadow: '0 10px 30px rgba(15, 23, 42, 0.15)',
   padding: 4,
   zIndex: 50,
@@ -103,12 +165,7 @@ const popup: CSSProperties = {
 const itemLink: CSSProperties = {
   fontSize: fs.body,
   padding: '7px 10px',
-  borderRadius: radius.control,
+  borderRadius: 8,
   color: color.ink,
   textDecoration: 'none',
-};
-const activeLink: CSSProperties = {
-  color: color.primaryInk,
-  background: color.primarySoft,
-  fontWeight: 600,
 };

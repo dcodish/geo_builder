@@ -285,6 +285,29 @@ even more builders"* is the case a tab strip fails. Every builder gets the **ful
 > warm headline, with the manual link — that surface carries most of the "inviting" and stands
 > as ruled.
 
+> **THE LEVEL MODEL (operator ruling, 2026-08-17, on mockup D — the header's organizing
+> principle):** *a control lives at the level of the thing it acts on.*
+>
+> - **Level 1 — the SUITE bar** (acts on: which tool): the builder strip, the UI language, About.
+>   A slim full-bleed bar, identical chrome in every builder.
+> - **Level 2 — the TOOL row** (acts on: this session): the product's title/subtitle beside its
+>   session actions — **שמור/טען live here, by the title** (the document-app convention; B3's
+>   figure-name field joins the same cluster: name · save · load).
+> - **Level 3 — the SURFACE** (acts on: one surface): figure actions — cycle, the view toggle —
+>   UNDER the canvas (D7, which this ruling independently re-derived and pulled forward); the
+>   palette with the input box; row operations with the fact list.
+>
+> This composes the two #706 picks: mockup C's two-row architecture carrying mockup B's strip.
+> Executed for complex in the same change (cycle and the polar/cartesian toggle moved under the
+> canvas, ahead of B6); 2-D and 3-D adopt the same zoning via B2/B3.
+
+> **DISPLAY NAMES (operator ruling, 2026-08-17): the curriculum's subject names, not "בונה X".**
+> The suite's student-facing names are **הנדסת המישור** (2-D · Plane Geometry), **הנדסת המרחב**
+> (3-D · Space Geometry) and **מספרים מרוכבים** (complex · Complex Numbers) — the tool's title and
+> its strip label are the SAME name. Applied in complex (its title, `complex.html`, and the roster
+> labels its i18n resolves) in the level-model change; the 2-D and 3-D in-app titles are sibling
+> artifacts and adopt the new names when B3 lands their header — binding then, not optional.
+
 ### D5 — Input area: **one preview doing both jobs, wrap-selection palette**
 
 Measured, and the three builders disagree in three different ways:
