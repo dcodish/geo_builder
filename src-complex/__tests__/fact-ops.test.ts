@@ -40,7 +40,7 @@ describe('disable — out of the figure, in the list', () => {
     expect(toggleLine(1)).toBe(true); // mute z2's definition; w still references z2
     const names = deriveLines(activeLines(), 0, 0).points.map((p) => p.name);
     // The counterfactual is honest: z2 stays visible as an implicitly-created FREE number
-    // (sampled, draggable — the strip labels it), and w keeps computing over it.
+    // (sampled — «אפשרות נוספת» resamples it), and w keeps computing over it.
     expect(names).toContain('z2');
     expect(names).toContain('w');
   });
