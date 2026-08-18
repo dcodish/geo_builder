@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { Banner } from '../shell/frame/Banner';
+import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
@@ -12,7 +13,7 @@ import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/sa
 import { applySwitcherConfig, type ToolConfig } from '../shell/switcherConfig';
 import { deriveLines } from './app/deriveLines';
 import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, toggleLine } from './app/submit';
-import { v2Claims, v2Formulas, v2Knowledge, v2Labels, v2Measures, v2Status } from './replay/scene2';
+import { v2Claims, v2Contradiction, v2Formulas, v2Freedom, v2Knowledge, v2Labels, v2Measures } from './replay/scene2';
 import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
@@ -337,13 +338,17 @@ export function App() {
               /* THE HONESTY STRIP — always visible, never opt-in (B2's split of the old banner).
                  A violated, undecided or unread STATEMENT is the figure refusing to lie about
                  itself; hiding those behind the data toggle would be the tool hiding a broken
-                 given. Values/knowledge/formulas moved to the opt-in data column; refusals stay. */
+                 given. B6 (#671) narrowed it to REFUSALS ONLY, per the operator's ruling: the
+                 freedom cue and the sampled-value legend are figure DATA and moved to the data
+                 panel's head-line; the config count died outright («אפשרות נוספת» already says
+                 alternatives exist). The strip renders nothing when the figure holds clean. */
             }
-            <div className="v2-banner" dir="rtl">
-                {v2Status(derived2)}
-                {derived2.points.some((p) => !p.modulusKnown || !p.argumentKnown) && (
-                  <div>~ = ערך שנדגם, לא נתון — לחצו "אפשרות נוספת" כדי לראות תצורה אחרת</div>
-                )}
+            {(v2Contradiction(derived2) !== null ||
+              derived2.unsatisfied.length > 0 ||
+              derived2.undecided.length > 0 ||
+              derived2.untranslated.length > 0) && (
+              <div className="v2-banner" dir="rtl">
+                {v2Contradiction(derived2)}
                 {/* a relation the numeric tier could not satisfy has no row of its own — tier 1 pushed
                     it down — so without this it would simply be absent from a figure that ignores it */}
                 {derived2.unsatisfied.map((u) => (
@@ -362,7 +367,8 @@ export function App() {
                     ⚠ «{u.src}» — {u.why}
                   </div>
                 ))}
-            </div>
+              </div>
+            )}
             {polarScene && (
               <>
                 <PolarPlane
@@ -425,40 +431,35 @@ export function App() {
             </div>
           </section>
           <aside className={showData ? 'data open' : 'data'} dir="rtl">
-            {/* D8's skeleton arrives in B6. The column itself is permanent on wide screens; the
-                header button collapses the CONTENT (and closes the overlay on narrow). */}
-            <div className="data-head">
-              <span className="data-title">{t('dataTitle')}</span>
-              <button className="data-toggle" onClick={() => setShowData((s) => !s)} aria-expanded={showData}>
-                {showData ? t('dataHide') : t('dataShow')}
-              </button>
-            </div>
-            {showData && (
-              <>
-              {v2Labels(derived2).length > 0 && <div dir="ltr">{v2Labels(derived2).join('   ')}</div>}
-              {v2Claims(derived2).map((c) => (
-                <div key={c} className="v2-claim">
-                  {c}
-                </div>
-              ))}
-              {v2Measures(derived2).map((m) => (
-                <div key={m} className="v2-claim">
-                  {m}
-                </div>
-              ))}
-              {v2Knowledge(derived2).map((k) => (
-                <div key={k} className="v2-claim">
-                  {k}
-                </div>
-              ))}
+            {/* B6 (#671): the D8 SKELETON through the SHARED DataPanel — head (one title, one
+                toggle, the same in every builder — operator ruling 2026-08-18), the freedom cue as
+                the status line (a COUNT, never per-DOF resolutions, never a config count), and the
+                same sections in the same order everywhere, an empty section simply absent. The
+                column itself is permanent on wide screens; the head toggle collapses the CONTENT
+                (and closes the overlay on narrow). */}
+            <DataPanel
+              title={t('dataTitle')}
+              open={showData}
+              onToggle={() => setShowData((s) => !s)}
+              showLabel={t('panelShow')}
+              hideLabel={t('panelHide')}
+              status={v2Freedom(derived2)}
+              sections={[
+                { key: 'points', title: t('secPoints'), rows: v2Labels(derived2) },
+                // verdict rows word their WHY in prose — they follow the app's direction (#716
+                // tracks the engine-composed strings staying Hebrew in EN mode)
+                { key: 'measures', title: t('secMeasures'), rows: v2Measures(derived2), dir: 'app' },
+                { key: 'relations', title: t('secRelations'), rows: v2Claims(derived2), dir: 'app' },
+                { key: 'ask', title: t('secAsk'), rows: v2Knowledge(derived2), dir: 'app' },
+              ]}
+            >
               {/* the formula sheet, surfaced from what the figure DOES — each row names its premises */}
               {v2Formulas(derived2, i18n.language === 'he' ? 'he' : 'en').map((f) => (
                 <div key={f} className="v2-formula" dir="ltr">
                   {f}
                 </div>
               ))}
-              </>
-            )}
+            </DataPanel>
           </aside>
         </main>
       </div>

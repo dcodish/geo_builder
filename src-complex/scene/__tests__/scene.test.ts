@@ -69,7 +69,7 @@ describe('every plotted number carries a reading, and the two surfaces carry the
     // 53.13° is not a rational multiple of π, so `3+4i` has no closed polar form; both halves are
     // still FORCED by the given, so nothing here is a sample and nothing is marked `~`
     const p = buildScene(deriveLines(['z1 = 3+4i'])).points[0];
-    expect(p.reading).toBe('z₁ ≈ 5·cis53.1301°');
+    expect(p.reading).toBe('z₁ ≈ 5·cis53.13°'); // two display decimals — the #723 typography rule
     expect(p.modulusKnown && p.argumentKnown).toBe(true);
     expect(p.reading).not.toContain('~');
   });
@@ -120,9 +120,14 @@ describe('honesty travels with the geometry, not with the consumer', () => {
     expect(s.radii).toHaveLength(2);
   });
 
-  it('a sampled value still reads — as an approximation, with the sampled halves marked', () => {
-    // withholding the reading is not the honest move; saying which half was sampled is
-    expect(s.points.every((p) => p.reading.includes('≈') && p.reading.includes('~'))).toBe(true);
+  it('a sampled value does NOT read — the name stands alone (the no-guess ruling, 2026-08-18)', () => {
+    // This is the reversal of the original contract here ("saying which half was sampled"): the
+    // operator ruled that a sampled numeral IS a guess dressed as a near-value — "the system
+    // should not guess them; we just say we don't have them". An undetermined point's reading is
+    // its bare name; the PANEL row says the value is missing (v2Labels), and the ~ convention for
+    // printed point values died.
+    expect(s.points.every((p) => p.reading === p.label)).toBe(true);
+    expect(s.points.every((p) => !p.reading.includes('~'))).toBe(true);
   });
 });
 

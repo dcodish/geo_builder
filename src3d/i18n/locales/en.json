@@ -119,11 +119,17 @@
     "ex8": "A(2,-2,6) is on one of the planes"
   },
   "dataPanel": {
-    "toggle": "Organize the data",
-    "title": "Organize the data",
+    "title": "Data",
+    "show": "Show",
+    "hide": "Hide",
     "hint": "derived vector, coordinate and magnitude presentations — laid out the way you would on paper",
     "empty": "nothing stable to show yet",
     "openParam": "free parameter — pinned once more data arrives",
+    "secPoints": "Points",
+    "secMeasures": "Measures",
+    "secRelations": "Relations",
+    "secParams": "Parameters",
+    "secAsk": "Ask",
     "mutual": {
       "skew": "{{a}} and {{b}} are skew",
       "parallel": "{{a}} and {{b}} are parallel",

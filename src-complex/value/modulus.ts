@@ -136,6 +136,16 @@ const radical = (base: string, f: Rat): string => {
   return `${base}^(${fmtRat(f)})`;
 };
 
+const SUP: Record<string, string> = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+const sup = (n: bigint): string => `${n}`.split('').map((c) => SUP[c] ?? c).join('');
+
+/** `body^(1/d)` the way the exam prints it: `√74`, `∛100`, `⁵√100`. */
+const rootOf = (body: bigint, d: bigint): string => {
+  if (d === 2n) return `√${body}`;
+  if (d === 3n) return `∛${body}`;
+  return `${sup(d)}√${body}`;
+};
+
 /**
  * Student-facing text: `√2`, `2√2`, `9r`, `16r`, `∛2`, `3/4`.
  *
@@ -147,7 +157,12 @@ const radical = (base: string, f: Rat): string => {
 export function format(v: ExpVec): string {
   let numCoef = 1n;
   let denCoef = 1n;
-  const numParts: string[] = [];
+  /** root degree d → the combined body ∏ pᵏ, so equal-degree prime roots print as ONE radical:
+   *  `{2:½, 37:½}` reads `√74`, never `√2√37`, and `{2:⅖, 5:⅖}` reads `⁵√100`, never
+   *  `2^(2/5)5^(2/5)` — the #702 class, ruled again by the operator on 2026-08-18 ("we have
+   *  √74, or use decimal"). */
+  const primeRoots = new Map<bigint, bigint>();
+  const paramParts: string[] = [];
   const denParts: string[] = [];
 
   for (const atom of [...v.keys()].sort((a, b) => {
@@ -162,13 +177,18 @@ export function format(v: ExpVec): string {
       const base = BigInt(atom);
       if (whole > 0n) numCoef *= base ** whole;
       else if (whole < 0n) denCoef *= base ** -whole;
-      if (!isZero(frac)) numParts.push(radical(atom, frac));
+      if (!isZero(frac)) primeRoots.set(frac.d, (primeRoots.get(frac.d) ?? 1n) * base ** frac.n);
     } else {
-      if (whole > 0n) numParts.push(whole === 1n ? atom : `${atom}^${whole}`);
+      if (whole > 0n) paramParts.push(whole === 1n ? atom : `${atom}^${whole}`);
       else if (whole < 0n) denParts.push(-whole === 1n ? atom : `${atom}^${-whole}`);
-      if (!isZero(frac)) numParts.push(radical(atom, frac));
+      if (!isZero(frac)) paramParts.push(radical(atom, frac));
     }
   }
+
+  const numParts = [
+    ...[...primeRoots.entries()].sort((a, b) => Number(a[0] - b[0])).map(([d, body]) => rootOf(body, d)),
+    ...paramParts,
+  ];
 
   const join = (coef: bigint, parts: string[]): string => {
     if (parts.length === 0) return `${coef}`;

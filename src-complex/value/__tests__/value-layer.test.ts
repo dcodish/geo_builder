@@ -78,6 +78,19 @@ describe('modulus — a ℚ-exponent vector, closed under the multiplicative cor
     expect(M.evaluate(v)).toBeCloseTo(1 / 64, 12);
   });
 
+  it('equal-degree roots combine into ONE radical: |5+7i| is √74, never √2√37 (#702 class)', () => {
+    // operator, 2026-08-18: "we have √74 (if that is correct), or use decimal"
+    const v = M.pow(M.fromInt(74), rat(1, 2)); // 74 = 2·37 — carried factored, printed combined
+    expect(M.format(v)).toBe('√74');
+    expect(M.evaluate(v)).toBeCloseTo(Math.sqrt(74), 12);
+  });
+
+  it('…and for higher roots with exam typography: (2·5)^(2/5) is ⁵√100, never 2^(2/5)5^(2/5) (#702)', () => {
+    const v = M.pow(M.fromInt(10), rat(2, 5));
+    expect(M.format(v)).toBe('⁵√100');
+    expect(M.evaluate(v)).toBeCloseTo(10 ** 0.4, 12);
+  });
+
   it('THE §2b GATE: |z4| = |z2|²/|z1| with 12r and 9r is exactly 16r', () => {
     const z1 = M.mul(M.fromInt(9), M.fromParam('r')); //  9r
     const z2 = M.mul(M.fromInt(12), M.fromParam('r')); // 12r

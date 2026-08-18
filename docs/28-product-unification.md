@@ -441,6 +441,26 @@ you are in.
 current sample". ADR-421 was a **P1** on exactly this, and the operator ruled it again for complex on
 [#623](https://github.com/dcodish/geo_builder/issues/623). §6 family 1 row.
 
+> **Amendment — B6 executed (#671, 2026-08-18), with three operator rulings from the B5 play.**
+> The skeleton landed as a SHARED component, `shell/frame/DataPanel.tsx` (status head-line +
+> ordered sections, an empty section absent heading and all), mounted by complex and 3-D.
+> **(a) The status strip relocated into the panel head-line** — mockup round B, then simplified
+> further: the cue is a DOF **count** only («דרגות חופש: N», the 2-D way — "people who care will
+> look"), plus the ~ sampled-legend; **never** a per-DOF listing of what can move, and **the
+> configuration count died entirely** («אפשרות נוספת» already says alternatives exist). The old
+> `v2Status` split accordingly (`v2Freedom` → panel head; `v2Contradiction` → strip): a
+> contradiction is a REFUSAL and stays on the always-visible strip with unsatisfied/undecided/
+> untranslated — the strip now renders only when it has refusals to show. 3-D's under-canvas cue
+> moved into the same head-line. **(b) Canvas names-only** (the de-clutter ruling's first stage):
+> point labels carry the NAME; the full reading lives in the panel's points section (both surfaces
+> still print what stage 5d composed — the #653/#675 one-source rule). The S5 arcs staying opt-in
+> is #722; the 2-decimal cap is #723. **(c) Section mapping per product:** complex = readings /
+> measure verdicts / claim verdicts / knowledge rows (parameters section deliberately absent — see
+> (a)), formula sheet as a trailing block; 3-D = points / vectors+planes / relations+mutual /
+> params / query lane. Complex's dedicated ask INPUT is a cutover orphan (keys with no UI) — its
+> restoration rides #623. Locks: `shell/__tests__/data-panel.test.tsx` +
+> `src-complex/__tests__/b6-status-split.test.tsx`.
+
 ### D9 — Guide: **a separate manual SCREEN per builder, plus in-app quick commands**
 
 Operator ruling, 2026-08-16 — none of the three options offered:
