@@ -44,5 +44,3 @@ dist-complex
 # NOTE: .claude/memory/ is deliberately TRACKED (2026-07-23). The project moved out of
 # Dropbox to C:\projects, so git is now the ONLY cross-machine sync — auto-memory travels
 # via GitHub like docs/, not via Dropbox. (Was gitignored under the old Dropbox scheme.)
-dist-next
-dist-3d-next

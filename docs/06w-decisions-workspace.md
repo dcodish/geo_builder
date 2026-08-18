@@ -994,3 +994,31 @@ that hid on empty in one builder and showed in two.
    meaningless (no facts, nothing to undo/redo, nothing to cycle). The 2-D row un-hides; 3-D and
    complex gain the missing disabled states; the empty complex view-toggle disables (a blank canvas
    has no view to toggle).
+
+## ADR-W-025 — The `-next` channel is retired: the unified interface IS the baseline (#747)
+
+**Status:** accepted, 2026-08-18 · **Issue:** [#747](https://github.com/dcodish/geo_builder/issues/747) ·
+supersedes the temporary half of [ADR-W-020](#adr-w-020) · operator: *"i think its not longer needed
+and we can just turn this code to the baseline"*
+
+**Decision.** Track B is accepted. The unified build is deployed to the canonical
+`/geo-builder/` and `/3d-builder/` paths as an ordinary Standard deploy of `main`, and the parallel
+evaluation channel is torn down — the operator waived the grace period ADR-W-020 §4 allowed for,
+having played the channel across two `next/*` deploys.
+
+1. **`main` → canonical is once again the ONLY deploy path.** ADR-W-020's one deliberate exception —
+   a channel deploying committed `unify/ui` state — ends here. `unify/ui` is fully merged into
+   `main`, so the exception has nothing left to serve, and leaving it standing would be an invitation
+   to ship un-merged branch state to a public URL.
+2. **The channel's machinery goes with it, not just its directories.** `build:next:2d` /
+   `build:next:3d` are deleted from `package.json`: a build script whose deploy target no longer
+   exists is a trap that produces a plausible `dist-next/` for nowhere. The RUNBOOK section shrinks
+   to a historical pointer so the DEPLOY-LOG's `next/*` entries stay readable — history is kept,
+   procedure is not.
+3. **What survives as the lesson**, not as a standing structure: the channel did its job (two
+   deploys, a mobile fix found and fixed on it, canonical bytes stat-proven untouched throughout).
+   The pattern is reusable — re-create it from this ADR when the next big surface needs prod-condition
+   evaluation; do not keep an idle channel alive for a hypothetical one.
+4. **The Apache api mappings for the `-next` paths are the operator's to remove** (Plesk directives
+   field). They are inert once the directories are gone — a mapping to nothing — so the teardown is
+   complete without them, but they are noise in a field where noise is expensive.

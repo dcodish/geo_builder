@@ -615,6 +615,11 @@ accepts the whole interface.
 > switchover); the `-next` path is torn down after. [#700](https://github.com/dcodish/geo_builder/issues/700)
 > owns the deploy channel; its first use is the B1 build, a deliberate visual no-op for 2-D, so the
 > channel is proven before any visible surface rides it.
+>
+> **Closed by [ADR-W-025](06w-decisions-workspace.md#adr-w-025) (2026-08-18, [#747](https://github.com/dcodish/geo_builder/issues/747)):**
+> the switchover happened — `prod/2026-08-18` deployed the unified build to the canonical
+> `/geo-builder/` and `/3d-builder/` URLs and the `-next` channel was torn down. `main` → canonical
+> is once again the only deploy path.
 
 | item | decisions | note |
 | --- | --- | --- |

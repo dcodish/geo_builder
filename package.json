@@ -8,8 +8,6 @@
     "build": "tsc -b && vite build",
     "build:3d": "tsc -b && vite build --config vite.config.3d.ts",
     "build:complex": "tsc -b && vite build --config vite.config.complex.ts",
-    "build:next:2d": "tsc -b && vite build --base=/geo-builder-next/ --outDir dist-next",
-    "build:next:3d": "tsc -b && vite build --config vite.config.3d.ts --base=/3d-builder-next/ --outDir dist-3d-next",
     "build:proxy": "node server/build.mjs",
     "preview": "vite preview",
     "test": "vitest",
