@@ -13,8 +13,8 @@
 export interface SymbolSpec {
   /** Shown on the button. Display only — never inserted. */
   label: string;
-  /** The i18n key of the button's tooltip (translated by the product). */
-  titleKey: string;
+  /** The i18n key of the button's tooltip (translated by the product); absent = no tooltip. */
+  titleKey?: string;
   /** Inserted before the selection (or at the caret when the selection is empty). */
   before: string;
   /** Inserted after the selection — the wrapping half. Omitted = plain insert. */

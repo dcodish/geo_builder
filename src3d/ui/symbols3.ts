@@ -42,3 +42,17 @@ export const SYMBOL_PALETTE_3: readonly Symbol3[] = [
   ['ℓ', 'ℓ', 0],
   ['π', 'π', 0],
 ];
+
+/**
+ * The SAME palette in the shared wrap-selection shape (B4, shell/symbols): `caretBack` derives
+ * `before`/`after` — the caret-back mechanic is the degenerate wrap (docs/28 §4a D5), so `||`
+ * with caretBack 1 becomes the `|`…`|` wrap and gains selection-wrapping for free.
+ */
+import type { SymbolSpec } from '../../shell/symbols';
+export const SYMBOL_SPECS_3: readonly SymbolSpec[] = SYMBOL_PALETTE_3.map(
+  ([label, insert, caretBack]) => ({
+    label,
+    before: caretBack > 0 ? insert.slice(0, insert.length - caretBack) : insert,
+    ...(caretBack > 0 ? { after: insert.slice(insert.length - caretBack) } : {}),
+  }),
+);

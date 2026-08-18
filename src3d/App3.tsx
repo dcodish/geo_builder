@@ -5,11 +5,12 @@
  * src/ — docs/20 §12 rule 1).
  */
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 // The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
 import { AppFrame } from '../shell/frame/AppFrame';
 import { FigureName } from '../shell/frame/FigureName';
+import { InputArea } from '../shell/frame/InputArea';
 import { ToolButton } from '../shell/frame/ToolButton';
 import registry from '../products.json';
 import { dataView, panelIsEmpty } from './engine/dataView';
@@ -18,7 +19,7 @@ import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
 import { inputPreview3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
-import { SYMBOL_PALETTE_3 } from './ui/symbols3';
+import { SYMBOL_SPECS_3 } from './ui/symbols3';
 import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from './parser/scope3';
@@ -200,19 +201,7 @@ export default function App3() {
   // steps display: vector notation moved to src3d/render/notation.ts (#312 — the boundary-class
   // fix lives there, unit-tested; the stored utterance stays untouched).
   const factDisplay = factDisplay3;
-  const inputRef = useRef<HTMLInputElement>(null);
-  // symbol palette (the 2-D App's pattern): insert at the caret, keep focus
-  const insertSym = (sym: string, caretBack = 0) => {
-    const el = inputRef.current;
-    const start = el?.selectionStart ?? text.length;
-    const end = el?.selectionEnd ?? text.length;
-    setText(text.slice(0, start) + sym + text.slice(end));
-    requestAnimationFrame(() => {
-      el?.focus();
-      const p = start + sym.length - caretBack;
-      el?.setSelectionRange(p, p);
-    });
-  };
+  // the palette's insert lives in shell/InputArea now (wrap-selection, applySymbol — B4)
   const [busy, setBusy] = useState(false);
   // #73 (ADR-3D-040): the guidance register's what-to-do-instead note (shown in place of an error)
   const [guidanceNote, setGuidanceNote] = useState<string | null>(null);
@@ -379,8 +368,7 @@ export default function App3() {
     });
   };
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const submitText = async () => {
     if (!text.trim() || busy) return;
     setGuidanceNote(null); // a fresh submit clears the previous guidance
     setLoadNote(null); // …and the load note, which described the file as opened
@@ -467,51 +455,21 @@ export default function App3() {
       <main className="mx-auto flex max-w-screen-2xl flex-col gap-5 p-5 md:flex-row">
         {/* Input + fact list */}
         <section className="flex w-full flex-col gap-3 md:w-96">
-          <form onSubmit={onSubmit} className="flex gap-2">
-            <input
-              ref={inputRef}
-              dir="auto"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={t('input.placeholder')}
-              className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none"
-            />
-            <button type="submit" disabled={busy} className="rounded-xl bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-              {busy ? t('input.thinking') : t('input.add')}
-            </button>
-          </form>
-
-          {/* #482 half (b), operator ruling 2026-08-10 — OPTION 3 (ADR-3D-123 Am. 1): a read-only live
-              preview of the input, isolated at render, shown only while isolation would CHANGE the
-              layout (the gate lives in inputPreview3). The box itself stays raw — isolates cannot enter
-              an editable value without corrupting the caret, and dir="ltr" is what 2-D reverted (#118).
-              aria-hidden: it duplicates the input for sighted users; a screen reader has the input. */}
-          {(() => {
-            const preview = inputPreview3(text);
-            return preview === null ? null : (
-              <div
-                aria-hidden="true"
-                data-testid="bidi-preview"
-                dir={textDir3(text)}
-                className="overflow-x-auto whitespace-nowrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600"
-              >
-                {preview}
-              </div>
-            );
-          })()}
-
-          <div className="flex flex-wrap gap-1" dir="ltr">
-            {SYMBOL_PALETTE_3.map(([label, sym, back]) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => insertSym(sym, back)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-sm text-slate-600 hover:border-blue-400 hover:text-blue-700"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* THE SHARED INPUT AREA (B4, the shared-components rule): box, palette, preview seam
+              and quick strip exist ONCE in shell/. The #482 preview discipline is preserved by
+              the props: inputPreview3 gates it, textDir3 sets its base direction (#118). */}
+          <InputArea
+            value={text}
+            onChange={setText}
+            onSubmit={() => void submitText()}
+            placeholder={t('input.placeholder')}
+            submitLabel={t('input.add')}
+            busy={busy}
+            busyLabel={t('input.thinking')}
+            symbols={SYMBOL_SPECS_3}
+            preview={(s) => inputPreview3(s)}
+            previewDir={(s) => textDir3(s)}
+          />
 
           {/* #309 (ADR-3D-087): a file that deserializes cleanly but does not REBUILD must say so —
               it used to load "successfully" onto a blank canvas. Persists until the next submit. */}
