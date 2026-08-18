@@ -805,7 +805,16 @@ so the guard's fail-closed posture survives the new tree rather than being loose
 Cost accepted: complex renders two styling mechanisms until B1 (tokens inline in the frame, the
 stone-palette CSS in the body) — the same per-surface transition D2 ruled for 2-D.
 
-## ADR-W-020 — Track B acceptance runs on a PARALLEL prod URL; the canonical 2-D/3-D paths change only at switchover
+> **Amendment — both reserved flips executed.** `src3d → shell` flipped with B3-3d (#668, PR #715,
+> 2026-08-17). `src → shell` flipped with **B3-2d** (#668, 2026-08-18): the 2-D app mounts the
+> shared AppFrame (curriculum title «הנדסת המישור», suite bar, tool row with שמור/טען moved off the
+> canvas toolbar, shared FigureName, frame-owned language/dir/About; product header, footer and dir
+> effect retired — the About body, contact line included, is composed once and shared with 2-D's
+> first-load intro modal). With this every product consumes `shell/`, and
+> `scripts/visual-parity.mjs` compares all THREE tools pairwise — it caught the עזרה button
+> displacing שמור/טען from the suite position and gates the reorder: same buttons, same pixels,
+> every builder. The B4/B5/B6 2-D halves (input area, fact list, data panel) remain, per-surface
+> PRs on #669/#670/#671.
 
 **Status:** accepted, 2026-08-17 · **Operator ruling** · **Issue:**
 [#700](https://github.com/dcodish/geo_builder/issues/700) · **Amends:** [ADR-W-018](#adr-w-018)

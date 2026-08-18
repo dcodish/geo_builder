@@ -74,6 +74,11 @@
         "from": "src3d",
         "to": "shell",
         "why": "Flipped from forbidden by B3 (#668) — the deliberate Track B adoption ADR-W-019 reserved: the 3-D app mounts the shared frame (suite bar, builder strip, tool row, About/privacy). Asserted real by the isolation test, so the manifest can never advertise an adoption the code lost."
+      },
+      {
+        "from": "src",
+        "to": "shell",
+        "why": "B3-2d (#668): the LAST product joins the suite chrome — the 2-D app mounts the shared frame (and, as the B-track completes, the shared input/fact-list/data-panel components). With this edge every product consumes shell/ and the one-look goal is structural, not aspirational."
       }
     ],
     "forbidden": [
@@ -141,11 +146,6 @@
         "from": "shell",
         "to": "server",
         "why": "shell/ ships in browser bundles; importing server code would pull the key-handling path into every consumer's bundle (the same reason each product tree is forbidden from server)."
-      },
-      {
-        "from": "src",
-        "to": "shell",
-        "why": "The 2-D app adopts shell/ only in Track B of the unification programme (docs/28 section 5a), one surface per PR with the operator playing each — until that flips this edge deliberately, an accidental import must fail."
       },
       {
         "from": "server",
