@@ -78,4 +78,9 @@ describe('the NO-GUESS rule (operator, 2026-08-18): an undetermined value is nev
     const d = deriveLines(['z1 = 3+4i'], 0, 0);
     expect(d.points[0].reading).toBe('z₁ ≈ 5·cis53.13°'); // not 53.1301
   });
+
+  it('a composite-modulus reading prints the COMBINED radical: √74, never √2√37 (#702)', () => {
+    const d = deriveLines(['z1 = 5+7i'], 0, 0);
+    expect(d.points[0].reading).toBe('z₁ ≈ √74·cis54.46°');
+  });
 });

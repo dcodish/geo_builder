@@ -65,7 +65,7 @@ describe('branch enumeration IS the exam’s "all the possibilities"', () => {
     // shared argument, which pins the ratio's modulus to 2 and its argument to a quarter of a turn.
     const r = solveTier1([{ lhs: pow(ref('q'), R(4)), rhs: num(R(2)), src: 'q^4 = 2' }]);
     expect(r.inconsistent).toBeNull();
-    expect(fmtMod(r.knownModulus.get('q')!)).toBe('2^(1/4)');
+    expect(fmtMod(r.knownModulus.get('q')!)).toBe('⁴√2'); // exam typography since the #702 fix
     expect(r.branches).toHaveLength(4);
     expect(r.branches.map((b) => branchDegrees(b, 'q')).sort((a, c) => a! - c!)).toEqual([0, 90, 180, 270]);
   });
