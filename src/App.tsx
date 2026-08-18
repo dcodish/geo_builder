@@ -40,6 +40,9 @@ import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { SYMBOL_SPECS } from '@/ui/symbols';
 import { btn, card as themeCard, color as pal, fs, sectionTitle } from '@/ui/theme';
+// #743: the under-canvas row's ONE look — the style contract lives in shell (seeded from this
+// tree's own btn.accent/btn.subtle, which the operator praised); every builder's row consumes it.
+import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { autoNamedLabels, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
@@ -1124,7 +1127,7 @@ export default function App() {
               return (
                 <button
                   type="button"
-                  style={{ ...alt, ...(!canCycle || resampling ? { opacity: 0.5, cursor: 'default' } : null) }}
+                  style={!canCycle || resampling ? rowAccentOffStyle : alt}
                   disabled={!canCycle || resampling}
                   title={t('actions.anotherHint')}
                   onClick={() => void runResample()}
@@ -1153,7 +1156,7 @@ export default function App() {
             <span style={{ flex: 1 }} />
             <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => { logDebug({ kind: 'action', action: 'undo' }); undo(); }}>{t('actions.undo')}</button>
             <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => { logDebug({ kind: 'action', action: 'redo' }); redo(); }}>{t('actions.redo')}</button>
-            <button type="button" style={facts.length > 0 ? { ...subtleBtn, color: pal.danger } : subtleBtnOff} disabled={facts.length === 0} onClick={clearAll}>{t('actions.clear')}</button>
+            <button type="button" style={facts.length > 0 ? { ...subtleBtn, color: rowDangerInk } : subtleBtnOff} disabled={facts.length === 0} onClick={clearAll}>{t('actions.clear')}</button>
           </div>
         )}
         {/* #738 — the display checkboxes moved INTO the נתונים panel with the analysis buttons
@@ -1911,7 +1914,7 @@ export default function App() {
 // the same zone order as the complex tool under RTL. `stretch` + minHeight:0 lets each column
 // scroll internally inside the viewport-height page.
 /** LEVEL 3 — the figure-action rows under the canvas (D7): things done TO the figure. */
-const figureActions: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 };
+const figureActions: React.CSSProperties = figureRowStyle; // #743: the shell row contract
 // The canvas fills the space beside the sidebar and the viewport height (use the big screen);
 // it wraps below the sidebar on narrow widths. Its size is measured and passed to <Figure>.
 // `order` puts the canvas on the LEFT and the sidebar on the RIGHT under RTL (Hebrew):
@@ -1939,8 +1942,8 @@ const sideCard: React.CSSProperties = themeCard;
 const sectionLabel: React.CSSProperties = sectionTitle;
 // dofPillFree/dofPillDone retired (B6-2d): the freedom cue lives in the panel's status line.
 // Compact in-card utility buttons (undo/redo/clear in the steps header).
-const subtleBtn: React.CSSProperties = btn.subtle;
-const subtleBtnOff: React.CSSProperties = { ...btn.subtle, opacity: 0.45, cursor: 'default' };
+const subtleBtn: React.CSSProperties = rowSubtleStyle; // #743: the shell row contract
+const subtleBtnOff: React.CSSProperties = rowSubtleOffStyle;
 const displayToggle: React.CSSProperties = { display: 'flex', gap: 6, alignItems: 'center', fontSize: fs.body, color: '#475569', cursor: 'pointer' };
 // symbolsToggle / input / chip / greekBtn retired with the shared InputArea (B4-2d): the box, the
 // palette buttons and the quick chips are shell chrome now.
@@ -1985,7 +1988,7 @@ const iconBtn = (color: string): React.CSSProperties => ({
   padding: '0 2px',
 });
 // The headline explore action ("show another configuration") — the ONE loud violet button.
-const alt: React.CSSProperties = btn.accent;
+const alt: React.CSSProperties = rowAccentStyle; // #743: the shell row contract
 // The relations / shapes analysis toggles — quiet outlines beside `alt`, half-width each.
 const exploreToggle: React.CSSProperties = { ...btn.accentOutline, flex: 1 };
 // The "view relations" toggle while the layer is ON — teal, matching the on-figure tick/arc colour.

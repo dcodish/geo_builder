@@ -178,6 +178,32 @@ describe('#742 / ADR-W-024 — the canvas chrome is contracted', () => {
   });
 });
 
+describe('#743 — the row is ONE look: every builder consumes the shell style contract', () => {
+  it('the contract module exists with the seeded 2-D look', () => {
+    const src = read('shell/frame/figureRow.ts');
+    for (const m of ['figureRowStyle', 'rowAccentStyle', 'rowSubtleStyle', 'rowSpacerStyle', 'rowDangerInk']) {
+      expect(src.includes(`export const ${m}`), m).toBe(true);
+    }
+  });
+
+  it('all three rows import it — no product paints its own row buttons', () => {
+    for (const rel of ['src/App.tsx', 'src3d/App3.tsx', 'src-complex/App.tsx']) {
+      const src = read(rel);
+      expect(src.includes("shell/frame/figureRow'"), `${rel} consumes the contract`).toBe(true);
+      expect(src.includes('rowAccentStyle') || src.includes('= rowAccentStyle'), `${rel} uses the accent`).toBe(true);
+    }
+  });
+});
+
+describe('#744 — the consuming app owns the ONE font stack, form controls included', () => {
+  it('complex and 2-D both carry the form-control inherit rule (3-D gets it from Tailwind preflight)', () => {
+    for (const rel of ['src-complex/styles.css', 'src/index.css']) {
+      const css = read(rel).replace(/\s+/g, ' ');
+      expect(/(input|button)[^{}]*\{[^}]*font-family:\s*inherit/.test(css), `${rel} form controls inherit the font`).toBe(true);
+    }
+  });
+});
+
 describe('#739 — the complex clear-all sits on the row, not the fact-list footer', () => {
   const FILE = 'src-complex/App.tsx';
   const src = read(FILE);

@@ -17,6 +17,8 @@ import { Workbench } from '../shell/frame/Workbench';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { ToolButton } from '../shell/frame/ToolButton';
+// #743: the under-canvas row's ONE look — the shell contract, replacing this tree's own buttons.
+import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import registry from '../products.json';
 import { dataView, panelIsEmpty } from './engine/dataView';
 import { answerQuery } from './engine/queries';
@@ -670,21 +672,23 @@ export default function App3() {
           {/* B6 (#671): the DOF cue moved to the data panel's head-line — its generic home across
               the builders (operator: "people who care about it will look at it"). */}
           <p className="text-xs text-slate-400">{t('hint.orbit')}</p>
-          {/* #742: the row's buttons DISABLE when meaningless, never hide (operator ruling — one
-              row behaviour in every builder; disabled styling matches the 2-D grey-out). */}
-          <div className="flex flex-wrap gap-2">
+          {/* #742: the row's buttons DISABLE when meaningless, never hide. #743: ONE look — the
+              shell row contract (accent alternatives at inline-start, spacer, subtle trio at
+              inline-end), replacing this tree's own Tailwind buttons. */}
+          <div style={figureRowStyle}>
             {/* #182: each store interaction logs one lean `action` line so a reported prod session
                 replays end-to-end (the 2-D #84/#189 mirror — delete logs at its own button above). */}
-            <button type="button" disabled={facts.length === 0} onClick={() => { logDebug3({ kind: 'action', action: 'show-another' }); resample(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white">
+            <button type="button" style={facts.length === 0 ? rowAccentOffStyle : rowAccentStyle} disabled={facts.length === 0} onClick={() => { logDebug3({ kind: 'action', action: 'show-another' }); resample(); }}>
               {t('actions.another')}
             </button>
-            <button type="button" disabled={!canUndo3} onClick={() => { logDebug3({ kind: 'action', action: 'undo' }); undo3(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white">
+            <span style={rowSpacerStyle} />
+            <button type="button" style={canUndo3 ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canUndo3} onClick={() => { logDebug3({ kind: 'action', action: 'undo' }); undo3(); }}>
               {t('actions.undo')}
             </button>
-            <button type="button" disabled={!canRedo3} onClick={() => { logDebug3({ kind: 'action', action: 'redo' }); redo3(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white">
+            <button type="button" style={canRedo3 ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canRedo3} onClick={() => { logDebug3({ kind: 'action', action: 'redo' }); redo3(); }}>
               {t('actions.redo')}
             </button>
-            <button type="button" disabled={facts.length === 0} onClick={clearAll} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50 disabled:hover:bg-white">
+            <button type="button" style={facts.length > 0 ? { ...rowSubtleStyle, color: rowDangerInk } : rowSubtleOffStyle} disabled={facts.length === 0} onClick={clearAll}>
               {t('actions.clear')}
             </button>
             {/* #397's witness toggle moved INTO the נתונים panel (#739 — operator: "show

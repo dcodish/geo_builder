@@ -14,6 +14,8 @@ import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 // #742 / ADR-W-024: the shared canvas corner cluster — one look in every builder.
 import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../shell/frame/canvasControls';
+// #743: the under-canvas row's ONE look — the shell contract, replacing this tree's bare buttons.
+import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { applySwitcherConfig, type ToolConfig } from '../shell/switcherConfig';
 import { deriveLines } from './app/deriveLines';
@@ -516,21 +518,20 @@ export function App() {
                 ))}
               </>
             )}
-            {/* LEVEL 3 — figure actions under the canvas (D7): they act on the FIGURE. */}
-            <div className="figure-actions">
+            {/* LEVEL 3 — figure actions under the canvas (D7): they act on the FIGURE.
+                #743: ONE look — the shell row contract (accent alternatives at inline-start,
+                spacer before the session ops), replacing this tree's bare buttons. */}
+            <div className="figure-actions" style={figureRowStyle}>
               {/* nothing to cycle when the givens determine the figure completely (ADR-CX-020) */}
-              <button onClick={nextConfig} disabled={derived2 ? !derived2.canCycle : false}>
+              <button style={(derived2 ? !derived2.canCycle : false) ? rowAccentOffStyle : rowAccentStyle} onClick={nextConfig} disabled={derived2 ? !derived2.canCycle : false}>
                 {t('anotherConfig')}
               </button>
               {/* #742: the row's buttons DISABLE on an empty figure, never hide (operator ruling —
                   one row behaviour in every builder; the empty canvas is blank, so the view toggle
                   has nothing to show either). */}
-              <button disabled={lines.length === 0} onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
+              <button style={lines.length === 0 ? rowSubtleOffStyle : rowSubtleStyle} disabled={lines.length === 0} onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
                 {view === 'cart' ? t('viewPolar') : t('viewCart')}
               </button>
-              {/* #739: the row carries clear-all in every tool (undo/redo await store temporal —
-                  the named feature gap on the issue) */}
-              <button disabled={lines.length === 0} onClick={clearAll}>{t('clearAll')}</button>
               {/* #722 — the ENRICHMENT layers, opt-in chips (the operator's de-clutter ruling:
                   the default canvas is points + stated elements; each S5 layer is a choice).
                   A chip renders only when the figure HAS that layer to show. */}
@@ -553,6 +554,10 @@ export function App() {
                   </button>
                 ) : null,
               )}
+              <span style={rowSpacerStyle} />
+              {/* #739: the row carries clear-all in every tool (undo/redo await store temporal —
+                  the named feature gap on the issue) */}
+              <button style={lines.length > 0 ? { ...rowSubtleStyle, color: rowDangerInk } : rowSubtleOffStyle} disabled={lines.length === 0} onClick={clearAll}>{t('clearAll')}</button>
               {/* the LAUNCHER — narrow screens only (CSS): opens the data overlay when the
                   always-visible column has no room to exist */}
               <button
