@@ -92,6 +92,12 @@ export function AppFrame({
     document.documentElement.lang = i18n.language;
     document.documentElement.dir = i18n.language === 'he' ? 'rtl' : 'ltr';
   }, [i18n.language]);
+  // The suite owns the page GROUND: one background in every builder (the parity checker caught
+  // 3-D painting an inner div while complex painted body — the frame rows sat on different
+  // colors). Set once, by the one component every builder mounts.
+  useEffect(() => {
+    document.body.style.background = color.surfaceDim;
+  }, []);
 
   return (
     <>
@@ -123,9 +129,11 @@ export function AppFrame({
           </div>
         </div>
       </div>
-      {/* LEVEL 2 — the tool: this session. Title beside the session's actions. */}
+      {/* LEVEL 2 — the tool: this session. Title beside the session's actions — in a FIXED-width
+          block (operator, 2026-08-18): the actions must sit at the SAME position in every builder,
+          never drifting with the length of a tool's name. */}
       <header style={{ ...container, ...toolRow }}>
-        <div style={{ minWidth: 0 }}>
+        <div style={titleBlock}>
           <h1 style={h1Style}>{title}</h1>
           {subtitle && <p style={subtitleStyle}>{subtitle}</p>}
         </div>
@@ -154,6 +162,13 @@ export function AppFrame({
   );
 }
 
+/** The frame's OWN font metrics (the parity checker's lesson: buttons and titles measured
+ *  differently per tool because consumer CSS resets leaked into unset properties — a shell
+ *  component states everything it cares about). */
+const frameFont: CSSProperties = {
+  fontFamily: "system-ui, 'Segoe UI', sans-serif",
+  lineHeight: 1.4,
+};
 /** One container so the suite bar's content, the tool row and the body align — full width with
  *  matched edge padding (operator, 2026-08-17: the centred cap wasted the screen's sides). */
 const container: CSSProperties = {
@@ -165,6 +180,7 @@ const suiteBar: CSSProperties = {
   borderBottom: `1px solid ${color.border}`,
 };
 const suiteInner: CSSProperties = {
+  ...frameFont,
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
@@ -175,6 +191,7 @@ const suiteInner: CSSProperties = {
  *  RIGHT in Hebrew, on the LEFT in English — never flung to the far end of the row. Logical flex
  *  start gives the mirroring for free when `dir` flips. */
 const toolRow: CSSProperties = {
+  ...frameFont,
   display: 'flex',
   justifyContent: 'flex-start',
   alignItems: 'center',
@@ -183,6 +200,7 @@ const toolRow: CSSProperties = {
 };
 const suiteActionsRow: CSSProperties = { display: 'flex', gap: 6, alignItems: 'center' };
 const suiteBtn: CSSProperties = {
+  ...frameFont,
   fontSize: fs.body,
   padding: '6px 12px',
   border: `1px solid ${color.border}`,
@@ -194,8 +212,17 @@ const suiteBtn: CSSProperties = {
 // EXPLICIT weight — the operator caught the frame trusting browser defaults: complex rendered the
 // bold default while 3-D's Tailwind preflight reset headings to normal. A shell component states
 // every property it cares about; consumer stylesheets differ by construction.
-const h1Style: CSSProperties = { fontSize: fs.h1, fontWeight: 700, margin: 0, color: color.ink };
-const subtitleStyle: CSSProperties = { margin: '2px 0 0', color: color.muted, fontSize: fs.body };
+/** Constant width so the session actions anchor at ONE position across all builders. */
+const titleBlock: CSSProperties = { flex: '0 0 320px', minWidth: 0 };
+const h1Style: CSSProperties = { fontSize: fs.h1, fontWeight: 700, lineHeight: 1.3, margin: 0, color: color.ink };
+const subtitleStyle: CSSProperties = {
+  margin: '2px 0 0',
+  color: color.muted,
+  fontSize: fs.body,
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+};
 const actionsRow: CSSProperties = { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' };
 const closeBtnStyle: CSSProperties = {
   fontSize: fs.body,
