@@ -88,6 +88,10 @@ const he = {
   // B4 (D9b): the empty-canvas quick chips — the inviting first click.
   emptyTitle: 'מה בונים היום?',
   emptyHintChips: 'לחצו נתון לדוגמה — או הקלידו משלכם, והציור ייבנה מולכם',
+  // B5 (D6): the fact-list operations — disable answers "מה אם לא הייתי אומר זאת?"
+  factToggle: 'כלול בציור',
+  factEdit: 'עריכה במקום',
+  factDelete: 'מחיקה',
   // S5 — the visualization layer (#622)
   stepperLabel: 'מחזור החזקות: n',
   stepBack: 'הקודם',
@@ -176,6 +180,10 @@ const en = {
   // B4 (D9b): the empty-canvas quick chips — the inviting first click.
   emptyTitle: 'What are we building today?',
   emptyHintChips: 'Click an example given — or type your own, and the figure builds in front of you',
+  // B5 (D6): the fact-list operations — disable answers "what if I hadn't said this?"
+  factToggle: 'Include in the figure',
+  factEdit: 'Edit in place',
+  factDelete: 'Delete',
   // S5 — the visualization layer (#622)
   stepperLabel: 'power cycle: n',
   stepBack: 'previous',

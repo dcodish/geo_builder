@@ -125,6 +125,107 @@ export function acceptLine(lines: readonly string[], raw: string, seed: number):
   return { ok: false, error: { key: 'impossible', detail: raw } };
 }
 
+/** The ACTIVE lines — what the figure is folded from: every line not currently disabled (B5/D6:
+ *  a muted statement stays in the list, out of the figure). */
+const activeOf = (lines: readonly string[], disabled: readonly number[]): string[] =>
+  lines.filter((_, i) => !disabled.includes(i));
+
+export const activeLines = (): string[] => {
+  const { lines, disabled } = useComplexStore.getState();
+  return activeOf(lines, disabled);
+};
+
+/**
+ * Would replacing the ACTIVE list `before` with `after` break something? — the shared gate core
+ * of toggle-on and edit (B5). Same doctrine as acceptLine: config-search first (a change often
+ * holds in another drawing of the same figure), then the differential blame — which ACTIVE line,
+ * removed, lets the change stand — so the refusal names a statement, never internal state.
+ */
+function gateChange(
+  before: readonly string[],
+  after: readonly string[],
+  seed: number,
+  changed: string,
+): Verdict {
+  const was = violationsOf(fold(before, seed));
+  for (let ds = 0; ds < CONFIG_TRIES; ds++) {
+    if (!broke(was, violationsOf(fold(after, seed + ds)))) return { ok: true, seed: seed + ds };
+  }
+  for (const candidate of before) {
+    if (candidate === changed) continue;
+    const b2 = violationsOf(fold(before.filter((l) => l !== candidate), seed));
+    const a2 = violationsOf(fold(after.filter((l) => l !== candidate), seed));
+    if (!broke(b2, a2)) return { ok: false, error: { key: 'incompatible', detail: candidate } };
+  }
+  return { ok: false, error: { key: 'impossible', detail: changed } };
+}
+
+/**
+ * Toggle a line's enabled state (B5/D6). DISABLING is always allowed — muting a statement cannot
+ * break the figure, only relax it. RE-ENABLING faces the gate: the restored line returns AT ITS
+ * POSITION (order is meaningful), and if the figure it re-enters cannot hold it, the toggle is
+ * refused naming the conflicting statement — the row stays muted rather than lying.
+ */
+export function toggleLine(index: number): boolean {
+  const st = () => useComplexStore.getState();
+  const { lines, disabled, seed } = st();
+  if (index < 0 || index >= lines.length) return false;
+  if (!disabled.includes(index)) {
+    st().setDisabledIdx([...disabled, index]);
+    st().clearError();
+    return true;
+  }
+  const nextDisabled = disabled.filter((d) => d !== index);
+  const verdict = gateChange(
+    activeOf(lines, disabled),
+    activeOf(lines, nextDisabled),
+    seed,
+    lines[index],
+  );
+  if (!verdict.ok) {
+    st().setError(verdict.error);
+    return false;
+  }
+  // no append — the line already exists; adopt the configuration the gate found for it
+  st().setDisabledIdx(nextDisabled);
+  useComplexStore.setState({ seed: verdict.seed, lastError: null });
+  return true;
+}
+
+/**
+ * Edit a line IN PLACE (B5/D6): the statement keeps its position. The new text re-parses and —
+ * when the line is enabled — faces the gate exactly like a typed line; a refused edit changes
+ * nothing and names the refusal. Editing a MUTED line only rewrites its text: it gates when it
+ * is re-enabled, which is the moment it would touch the figure.
+ */
+export function editLine(index: number, raw: string): boolean {
+  const st = () => useComplexStore.getState();
+  const { lines, disabled, seed } = st();
+  const line = raw.trim();
+  if (index < 0 || index >= lines.length || line === '') return false;
+  const parsed = parseLineV2(line);
+  if (!parsed.ok) {
+    st().setError(
+      parsed.reason === 'unaccounted'
+        ? { key: 'unaccounted', detail: parsed.items.join(', ') }
+        : { key: 'not-handled', detail: line },
+    );
+    return false;
+  }
+  if (disabled.includes(index)) {
+    st().replaceLine(index, line, seed);
+    return true;
+  }
+  const trial = lines.map((l, i) => (i === index ? line : l));
+  const verdict = gateChange(activeOf(lines, disabled), activeOf(trial, disabled), seed, line);
+  if (!verdict.ok) {
+    st().setError(verdict.error);
+    return false;
+  }
+  st().replaceLine(index, line, verdict.seed);
+  return true;
+}
+
 /**
  * THE ONE ENTRY POINT the input box uses.
  *
@@ -146,7 +247,8 @@ export function submitLine(raw: string): boolean {
     return false;
   }
 
-  const verdict = acceptLine(st().lines, line, st().seed);
+  // the gate reads the ACTIVE figure — a muted line must not veto a new statement (B5)
+  const verdict = acceptLine(activeLines(), line, st().seed);
   if (!verdict.ok) {
     st().setError(verdict.error);
     return false;
@@ -182,12 +284,19 @@ export function hydrateSession(data: unknown): boolean {
     view: d.view === 'polar' ? 'polar' : 'cart',
     ...(typeof d.name === 'string' ? { name: d.name } : {}),
   });
+  const savedDisabled = new Set(Array.isArray(d.disabled) ? d.disabled : []);
   const failed: LoadAudit<InputError>['failed'] = [];
-  for (const raw of d.lines) {
+  d.lines.forEach((raw, i) => {
     const line = String(raw);
+    // a MUTED saved line re-enters muted, ungated — it gates when re-enabled, which is the
+    // moment it would touch the figure (B5)
+    if (savedDisabled.has(i)) {
+      st().recordDisabledLine(line);
+      return;
+    }
     if (!submitLine(line))
       failed.push({ line, reason: st().lastError ?? { key: 'not-handled', detail: line } });
-  }
+  });
   st().clearError();
   st().setLoadAudit(failed.length > 0 ? { total: d.lines.length, failed } : null);
   return true;

@@ -58,6 +58,9 @@ export interface SavedSession {
   /** The figure's name (#42 arriving here via the shared FigureName) — additive and optional, so
    *  every pre-existing file and fixture loads unchanged. */
   name?: string;
+  /** Indexes of DISABLED lines (B5/D6: a muted statement stays in the list, out of the figure) —
+   *  additive and optional; absent = everything enabled. */
+  disabled?: number[];
 }
 
 interface ComplexState {
@@ -66,6 +69,14 @@ interface ComplexState {
   /** The figure's name (#42): display + save-file naming; empty = unnamed. */
   name: string;
   setName: (name: string) => void;
+  /** Indexes of DISABLED lines (B5/D6) — the app layer decides WHEN a toggle is acceptable
+   *  (re-enabling faces the gate); the store only records. */
+  disabled: number[];
+  setDisabledIdx: (disabled: number[]) => void;
+  /** Replace line `index` in place (an accepted EDIT — position keeps its meaning, D6). */
+  replaceLine: (index: number, line: string, seed: number) => void;
+  /** Append a line WITHOUT gating, already marked disabled (hydration of a muted saved line). */
+  recordDisabledLine: (line: string) => void;
   freePos: Record<string, Cx>;
   /** configuration seed — "show another configuration" bumps it and releases drag overrides */
   seed: number;
@@ -100,23 +111,35 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
   lines: [],
   name: '',
   setName: (name) => set({ name }),
+  disabled: [],
+  setDisabledIdx: (disabled) => set({ disabled }),
+  replaceLine: (index, line, seed) =>
+    set(({ lines }) => ({ lines: lines.map((l, i) => (i === index ? line : l)), seed, lastError: null })),
+  recordDisabledLine: (line) =>
+    set(({ lines, disabled }) => ({ lines: [...lines, line], disabled: [...disabled, lines.length] })),
   freePos: {},
   seed: 0,
   view: 'cart',
   lastError: null,
   loadAudit: null,
 
-  removeLine: (index) => set(({ lines }) => ({ lines: lines.filter((_, i) => i !== index) })),
+  // a removal SHIFTS the disabled indexes above it — they name positions, not texts
+  removeLine: (index) =>
+    set(({ lines, disabled }) => ({
+      lines: lines.filter((_, i) => i !== index),
+      disabled: disabled.filter((d) => d !== index).map((d) => (d > index ? d - 1 : d)),
+    })),
   setFree: (name, z) => set(({ freePos }) => ({ freePos: { ...freePos, [name]: z } })),
   setView: (view) => set({ view }),
   // a new configuration = fresh samples for every free DOF; drag overrides are part of the
   // OLD configuration and are released (the sibling "show another configuration" semantics)
   nextConfig: () => set(({ seed }) => ({ seed: seed + 1, freePos: {} })),
-  clearAll: () => set({ lines: [], name: '', freePos: {}, seed: 0, lastError: null, loadAudit: null }),
+  clearAll: () =>
+    set({ lines: [], name: '', disabled: [], freePos: {}, seed: 0, lastError: null, loadAudit: null }),
   clearError: () => set({ lastError: null }),
 
   serialize: () => {
-    const { lines, freePos, seed, view, name } = get();
+    const { lines, freePos, seed, view, name, disabled } = get();
     return {
       app: 'complex-builder',
       version: 1,
@@ -125,6 +148,7 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
       seed,
       view,
       ...(name.trim() ? { name: name.trim() } : {}),
+      ...(disabled.length ? { disabled: [...disabled].sort((a, b) => a - b) } : {}),
     };
   },
 
@@ -132,6 +156,7 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
     set(({ lines }) => ({ lines: [...lines, line], seed, lastError: null })),
   setError: (lastError) => set({ lastError }),
   setLoadAudit: (loadAudit) => set({ loadAudit }),
-  resetSession: () => set({ lines: [], name: '', freePos: {}, seed: 0, lastError: null, loadAudit: null }),
+  resetSession: () =>
+    set({ lines: [], name: '', disabled: [], freePos: {}, seed: 0, lastError: null, loadAudit: null }),
   restoreView: ({ freePos, seed, view, name }) => set({ freePos, seed, view, ...(name !== undefined ? { name } : {}) }),
 }));
