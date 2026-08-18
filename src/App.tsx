@@ -16,6 +16,8 @@ import { useStore } from 'zustand';
 // suite chrome (ADR-W-019; BOUNDARIES.json src -> shell edge flipped with this import).
 import { AppFrame } from '../shell/frame/AppFrame';
 import { FigureName } from '../shell/frame/FigureName';
+import { InputArea } from '../shell/frame/InputArea';
+import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 import registry from '../products.json';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
@@ -32,7 +34,7 @@ import { bookUrl } from '@/shapes/shapeCatalog';
 import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES_VISIBLE } from '@/theorems';
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
-import { GREEK, SYMBOLS } from '@/ui/symbols';
+import { SYMBOL_SPECS } from '@/ui/symbols';
 import { btn, card as themeCard, color as pal, foldToggle, fs, pill, sectionTitle } from '@/ui/theme';
 import { autoNamedLabels, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
@@ -154,7 +156,6 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false); // the help modal ("עזרה") — guide + command reference
   const [helpTab, setHelpTab] = useState<'guide' | 'commands'>('guide');
   const [aboutOpen, setAboutOpen] = useState(false); // the "מה זה?" intro modal (first load + reopenable)
-  const [showSymbols, setShowSymbols] = useState(false); // the Greek/symbol insert rows — collapsed by default (advanced)
   const [examplesOpen, setExamplesOpen] = useState(false); // examples auto-show while the canvas is empty; fold once building starts
   const [displayOpen, setDisplayOpen] = useState(true); // the display-options fold — OPEN by default (operator: the discovery dial is important and must stay visible); foldable for students who want the space
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -164,7 +165,6 @@ export default function App() {
   const [discoveryLevel, setDiscoveryLevel] = useState<DiscoveryLevel>(1); // the theorem discovery dial (ADR-219) — L1 Given by default
   const [theoremSel, setTheoremSel] = useState<TheoremId | null>(null); // the theorem row whose premise is highlighted on the canvas
   const [bgOpen, setBgOpen] = useState(false); // the collapsed "background theorems" family fold is expanded
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // The ADR-242 load-audit note, DERIVED from the persistent findings against the current facts (issue #24):
   // a finding drops the moment its row is deleted / toggled off / ✎ re-lowered, so the note self-clears — no
@@ -235,26 +235,10 @@ export default function App() {
     });
   }, []);
 
-  // Insert a Greek letter (angle variables are hard to type) at the input's caret —
-  // e.g. type "זווית ABC = 2" then press α (ADR-031).
-  // `caret` (when given) is where the caret lands WITHIN the inserted text — e.g. "S_{}" inserts the
-  // template and drops the caret between the braces so the student types the vertices next. Defaults to
-  // the end of the insertion.
-  function insertSymbol(sym: string, caret?: number) {
-    const el = inputRef.current;
-    const start = el?.selectionStart ?? text.length;
-    const end = el?.selectionEnd ?? text.length;
-    setText(text.slice(0, start) + sym + text.slice(end));
-    const pos = start + (caret ?? sym.length);
-    requestAnimationFrame(() => {
-      if (el) {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      }
-    });
-  }
-  // The palette lives in `ui/symbols.ts` (#482): inline in the JSX it was invisible to everything but
-  // this render, which is how it drifted out of step with the bidi CORE class. A module can be asserted.
+  // Symbol insertion is the SHARED palette's now (B4-2d, ADR-031's caret behaviour preserved by
+  // shell/symbols.applySymbol — an empty selection lands the caret inside the template, and a
+  // SELECTION wraps). The palette data lives in `ui/symbols.ts` (#482): a module can be asserted,
+  // and the bidi CORE lock still guards every character it offers.
   const he = i18n.language === 'he';
   // A2 (#661): the switcher renders products.json's roster; labelKeys resolve in THIS product's
   // locales. In dev each product serves from its own entry html.
@@ -1008,16 +992,18 @@ export default function App() {
           {/* Empty canvas → a call to action so a new user knows what to do. The
               container ignores pointer events (so panning isn't blocked); the
               example buttons re-enable them. */}
+          {/* D9b's first half via the SHARED QuickChips (B4-2d): the inviting first click, one
+              look in every builder. The overlay div keeps pointer events off so panning is never
+              blocked; the chips re-enable them. */}
           {facts.length === 0 && (
             <div style={emptyOverlay}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#334155' }}>{t('canvas.emptyTitle')}</div>
-              <div style={{ fontSize: 14, color: '#64748b' }}>{t('canvas.emptyHint')}</div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', pointerEvents: 'auto' }}>
-                {examples.slice(0, 3).map((ex) => (
-                  <button key={ex} type="button" style={emptyChip} onClick={() => submit(ex)} dir={textDir(ex)}>
-                    {ex}
-                  </button>
-                ))}
+              <div style={{ pointerEvents: 'auto' }}>
+                <QuickChips
+                  title={t('canvas.emptyTitle')}
+                  hint={t('canvas.emptyHint')}
+                  commands={examples.slice(0, 4)}
+                  onPick={(c) => submit(c)}
+                />
               </div>
             </div>
           )}
@@ -1070,69 +1056,41 @@ export default function App() {
         </div>
 
         <aside style={sidebar}>
-          <form
-            style={sideCard}
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (text.trim()) submit(text);
-            }}
-          >
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input
-                ref={inputRef}
-                style={input}
-                placeholder={t('input.placeholder')}
-                value={text}
-                dir={textDir(text)}
-                onChange={(e) => {
-                  setText(e.target.value);
-                  if (inputNote) setInputNote('');
-                  if (llmDropped.length) setLlmDropped([]);
-                  if (renameNote) setRenameNote('');
-                }}
-                autoFocus
-              />
-              <button type="submit" style={sendBtn} disabled={!text.trim() || thinking}>
-                {thinking ? t('input.loading') : t('input.send')}
+          {/* B4-2d (#729): the SHARED InputArea — the box, submit, wrap-selection palette, live
+              preview and quick strip exist ONCE in shell/; this product passes its content. The
+              maths preview (#77 Am. / #40: √(2/3) shows a radical OVER the fraction while typing)
+              rides the shared preview seam as a rendered node; box and preview direction follow
+              the CONTENT via textDir (#118 / ADR-312 — dir="auto" keys off the first strong
+              character and «AB שווה…» would scramble). The caret-template symbols became
+              before/after WRAPS (select ABC, press S_{} → S_{ABC}). */}
+          <div style={sideCard}>
+            <InputArea
+              value={text}
+              onChange={(next) => {
+                setText(next);
+                if (inputNote) setInputNote('');
+                if (llmDropped.length) setLlmDropped([]);
+                if (renameNote) setRenameNote('');
+              }}
+              onSubmit={() => {
+                if (text.trim() && !thinking) submit(text);
+              }}
+              placeholder={t('input.placeholder')}
+              submitLabel={t('input.send')}
+              busy={thinking}
+              busyLabel={t('input.loading')}
+              symbols={SYMBOL_SPECS}
+              preview={(s) => (hasMath(s) ? <MathText text={s} /> : null)}
+              previewDir={(s) => textDir(s)}
+              boxDir={(s) => textDir(s)}
+              quickCommands={facts.length > 0 && !examplesOpen ? undefined : examples}
+              onQuickCommand={(c) => submit(c)}
+              quickDir={(c) => textDir(c)}
+            >
+            {facts.length > 0 && (
+              <button type="button" style={foldToggle} onClick={() => setExamplesOpen((v) => !v)}>
+                {examplesOpen ? '▾' : '▸'} {t('examples.title')}
               </button>
-            </div>
-            {/* Live math preview (#77 Am. / #40): render the current input's fractions/radicals/subscripts as
-                real formatted math, so the interpretation is visible while typing — `√(2/3)` shows a radical
-                OVER the fraction, `√2/3` shows `(√2)/3`, disambiguating what the parser will do. The container
-                follows the INPUT's direction (#118 / ADR-312): forcing `dir="ltr"` reversed a Hebrew sentence
-                that merely contained a radical («אורך AC גדול פי √(3) מהקטע CO» → scrambled). A pure math value
-                (`35/√32`) is LTR; a Hebrew sentence is RTL with the MathML atoms as LTR islands in place. */}
-            {hasMath(text) && (
-              <div dir={textDir(text)} style={{ marginTop: 4, padding: '4px 8px', fontSize: 18, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, overflowX: 'auto' }}>
-                <MathText text={text} />
-              </div>
-            )}
-            {/* Greek + math-symbol inserts — advanced (only for symbolic lengths / angle variables /
-                relation glyphs), so collapsed behind a toggle to keep the input area clean. */}
-            <button type="button" onClick={() => setShowSymbols((v) => !v)} style={symbolsToggle}>
-              Ω {t('input.symbols')} {showSymbols ? '▴' : '▾'}
-            </button>
-            {showSymbols && (
-              <>
-                {/* Row 1 — Greek-letter inserts for angle variables (∠ABC = 2α), hard to type. */}
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 70 }}>{t('input.greek')}:</span>
-                  {GREEK.map((g) => (
-                    <button key={g} type="button" title={t('input.insertGreek')} onClick={() => insertSymbol(g)} style={greekBtn}>
-                      {g}
-                    </button>
-                  ))}
-                </div>
-                {/* Row 2 — math symbols: roots/powers for symbolic lengths, and the ∠ ° ⊥ ∥ relation glyphs. */}
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 70 }}>{t('input.symbols')}:</span>
-                  {SYMBOLS.map((s) => (
-                    <button key={s.label} type="button" title={t('input.insertSymbol')} onClick={() => insertSymbol(s.insert, s.caret)} style={greekBtn}>
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              </>
             )}
             {thinking && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
             {thinking && llmAbortRef.current && (
@@ -1154,26 +1112,8 @@ export default function App() {
               </span>
             )}
 
-            {/* Examples live with the input (they ARE input). Fully shown while the canvas is
-                empty — the moment building starts they fold away to reclaim the space, and a
-                quiet toggle brings them back. */}
-            {facts.length === 0 ? (
-              <div style={{ ...sectionLabel, marginTop: 2 }}>{t('examples.heading')}</div>
-            ) : (
-              <button type="button" style={foldToggle} onClick={() => setExamplesOpen((v) => !v)}>
-                {examplesOpen ? '▾' : '▸'} {t('examples.title')}
-              </button>
-            )}
-            {(facts.length === 0 || examplesOpen) && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {examples.map((ex) => (
-                  <button key={ex} type="button" style={chip} onClick={() => submit(ex)} dir={textDir(ex)}>
-                    {ex}
-                  </button>
-                ))}
-              </div>
-            )}
-          </form>
+            </InputArea>
+          </div>
 
           {lastError && <div role="status" aria-live="polite" style={errorBanner}>⚠ {explainError(lastError)}</div>}
 
@@ -1993,7 +1933,7 @@ const emptyOverlay: React.CSSProperties = {
   pointerEvents: 'none',
   padding: 24,
 };
-const emptyChip: React.CSSProperties = { ...btn.chip, padding: '8px 14px', fontSize: fs.control };
+// emptyChip retired with QuickChips (B4-2d) — the empty-canvas chips are the shared component's.
 // The control column is capped to the viewport and scrolls INTERNALLY (its own overflow), so a tall stack
 // (steps + all the action buttons + the detected-shape badges/card) never pushes the whole PAGE taller than
 // the screen — the canvas and the shapes result stay on one screen (operator: "fit it all on the same screen").
@@ -2010,28 +1950,9 @@ const dofPillDone: React.CSSProperties = pill('#166534', '#dcfce7', '#86efac');
 const subtleBtn: React.CSSProperties = btn.subtle;
 const subtleBtnOff: React.CSSProperties = { ...btn.subtle, opacity: 0.45, cursor: 'default' };
 const displayToggle: React.CSSProperties = { display: 'flex', gap: 6, alignItems: 'center', fontSize: fs.body, color: '#475569', cursor: 'pointer' };
-const symbolsToggle: React.CSSProperties = { alignSelf: 'flex-start', border: 'none', background: 'none', color: pal.primary, fontSize: fs.small, cursor: 'pointer', padding: 0 };
-const input: React.CSSProperties = {
-  flex: 1,
-  padding: '10px 12px',
-  fontSize: fs.control,
-  borderRadius: 8,
-  border: `1px solid ${pal.borderStrong}`,
-  background: '#fff',
-  color: pal.ink,
-};
+// symbolsToggle / input / chip / greekBtn retired with the shared InputArea (B4-2d): the box, the
+// palette buttons and the quick chips are shell chrome now.
 const sendBtn: React.CSSProperties = btn.primary;
-const chip: React.CSSProperties = btn.chip;
-const greekBtn: React.CSSProperties = {
-  width: 26,
-  height: 26,
-  fontSize: 14,
-  borderRadius: 6,
-  border: `1px solid ${pal.borderStrong}`,
-  background: pal.surfaceDim,
-  color: '#1d4ed8',
-  cursor: 'pointer',
-};
 const helpExample: React.CSSProperties = {
   textAlign: 'start',
   border: 'none',

@@ -37,3 +37,18 @@ export const SYMBOLS: readonly MathSymbol[] = [
   { label: '<', insert: '<' }, // α < β (order between two named measures)
   { label: 'S_{}', insert: 'S_{}', caret: 3 }, // area: S_{ABC} = 13 — caret lands between the braces
 ];
+
+/**
+ * B4-2d (#729): the same vocabulary in the SHARED palette's spec shape (#525). A caret-forward
+ * template becomes a before/after WRAP, so a selection lands inside it — select `ABC`, press
+ * `S_{}`, get `S_{ABC}`; an empty selection is the old caret-between behaviour, by construction
+ * of `shell/symbols.applySymbol`.
+ */
+export const SYMBOL_SPECS: readonly import('../../shell/symbols').SymbolSpec[] = [
+  ...GREEK.map((g) => ({ label: g, before: g })),
+  ...SYMBOLS.map((s) =>
+    s.caret !== undefined
+      ? { label: s.label, before: s.insert.slice(0, s.caret), after: s.insert.slice(s.caret) }
+      : { label: s.label, before: s.insert },
+  ),
+];
