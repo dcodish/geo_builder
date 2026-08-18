@@ -282,9 +282,9 @@ export function App() {
               symbolTitle={(s) => (s.titleKey ? t(s.titleKey) : s.label)}
               preview={(s) => complexBidi.inputPreview(s)}
               previewDir={(s) => complexBidi.textDir(s)}
-              quickCommands={lines.length > 0 ? quickCommands : undefined}
-              onQuickCommand={(c) => submitLine(c)}
             >
+              {/* No quick strip above the box (operator ruling 2026-08-18: "expensive screen
+                  space") — the curated commands live on the CLEAN CANVAS (QuickChips below). */}
               {lastError && (
                 <Banner kind="error">{t(ERROR_KEY[lastError.key], { detail: lastError.detail })}</Banner>
               )}

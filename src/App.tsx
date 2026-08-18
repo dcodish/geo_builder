@@ -37,7 +37,7 @@ import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { SYMBOL_SPECS } from '@/ui/symbols';
-import { btn, card as themeCard, color as pal, foldToggle, fs, sectionTitle } from '@/ui/theme';
+import { btn, card as themeCard, color as pal, fs, sectionTitle } from '@/ui/theme';
 import { autoNamedLabels, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
@@ -159,7 +159,8 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false); // the help modal ("עזרה") — guide + command reference
   const [helpTab, setHelpTab] = useState<'guide' | 'commands'>('guide');
   const [aboutOpen, setAboutOpen] = useState(false); // the "מה זה?" intro modal (first load + reopenable)
-  const [examplesOpen, setExamplesOpen] = useState(false); // examples auto-show while the canvas is empty; fold once building starts
+  // examplesOpen retired (operator 2026-08-18): no example strip above the input — the examples
+  // live on the clean canvas (QuickChips) and in עזרה.
   // B6-2d: the נתונים panel — permanent column on wide screens (content collapsible), the same
   // default as the complex/3-D panels. Opening it PULLS the values compute (#217's pull-only rule).
   const [showData, setShowData] = useState(
@@ -1205,15 +1206,9 @@ export default function App() {
               preview={(s) => (hasMath(s) ? <MathText text={s} /> : null)}
               previewDir={(s) => textDir(s)}
               boxDir={(s) => textDir(s)}
-              quickCommands={facts.length > 0 && !examplesOpen ? undefined : examples}
-              onQuickCommand={(c) => submit(c)}
-              quickDir={(c) => textDir(c)}
             >
-            {facts.length > 0 && (
-              <button type="button" style={foldToggle} onClick={() => setExamplesOpen((v) => !v)}>
-                {examplesOpen ? '▾' : '▸'} {t('examples.title')}
-              </button>
-            )}
+            {/* No example strip above the box (operator ruling 2026-08-18: "expensive screen
+                space"): the examples live on the CLEAN CANVAS (QuickChips) and in עזרה. */}
             {thinking && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
             {thinking && llmAbortRef.current && (
               <button
@@ -1881,7 +1876,19 @@ const figureActions: React.CSSProperties = { display: 'flex', gap: 8, alignItems
 /** The canvas COLUMN — the flex item (FigureName above the drawing, B3-2d). Order 2 puts the
  *  canvas LEFT of the sidebar under RTL. B2-2d: the canvas takes the REMAINING height (flex:1
  *  inside the viewport-height page) — the fixed calc() budget died with the no-scroll ruling. */
-const canvasCol: React.CSSProperties = { order: 2, flex: '1 1 480px', minWidth: 360, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 };
+/** The middle column is a WHITE CARD like its neighbours (operator, 2026-08-18: the column read
+ *  as "lowered" because its white started only at the canvas box — the name field sat on the page
+ *  ground). One card wraps name + canvas + figure actions, so the three columns align. */
+const canvasCol: React.CSSProperties = {
+  ...themeCard,
+  order: 2,
+  flex: '1 1 480px',
+  minWidth: 360,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  minHeight: 0,
+};
 const canvasWrap: React.CSSProperties = { position: 'relative', flex: 1, minHeight: 320 };
 // Centered call-to-action shown over the blank canvas; pointer-events off so it never
 // blocks the figure (the example buttons re-enable them).

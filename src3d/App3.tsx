@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
+import { QuickChips } from '../shell/frame/QuickChips';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { ToolButton } from '../shell/frame/ToolButton';
@@ -481,10 +482,9 @@ export default function App3() {
             symbols={SYMBOL_SPECS_3}
             preview={(s) => inputPreview3(s)}
             previewDir={(s) => textDir3(s)}
-            quickCommands={EXAMPLE_KEYS.map((k) => t(`examples.${k}`))}
-            onQuickCommand={(c) => void submitText(c)}
-            quickDir={(c) => textDir3(c)}
           />
+          {/* No example strip above the box (operator ruling 2026-08-18): the examples are the
+              CLEAN-CANVAS QuickChips (below) and, with B7, the manual screen. */}
 
           {/* #309 (ADR-3D-087): a file that deserializes cleanly but does not REBUILD must say so —
               it used to load "successfully" onto a blank canvas. Persists until the next submit. */}
@@ -619,6 +619,16 @@ export default function App3() {
               component (operator: "isn't the whole idea a shared GUI component?"), one look in
               every builder. */}
           <FigureName value={figureName} onChange={setFigureName} placeholder={t('actions.namePlaceholder')} />
+          {/* D9b's first half — the SHARED empty-canvas chips (the inviting first click), the same
+              surface as 2-D/complex; a pick BUILDS through the full submit path. */}
+          {facts.length === 0 && (
+            <QuickChips
+              title={t('emptyTitle')}
+              hint={t('emptyHintChips')}
+              commands={EXAMPLE_KEYS.slice(0, 4).map((k) => t(`examples.${k}`))}
+              onPick={(c) => void submitText(c)}
+            />
+          )}
           <Figure3
             construction={derived.construction}
             resolved={derived.resolved}

@@ -118,6 +118,8 @@
     "ex7": "plane π1: z - 3 = 0",
     "ex8": "A(2,-2,6) is on one of the planes"
   },
+  "emptyTitle": "What are we building today?",
+  "emptyHintChips": "Click an example given — or type your own, and the figure builds in front of you",
   "dataPanel": {
     "title": "Data",
     "show": "Show",
