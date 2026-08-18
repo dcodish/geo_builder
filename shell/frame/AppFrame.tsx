@@ -19,7 +19,8 @@
  * inner content + the tool row share one centred container so the levels align with the body.
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { color, fs, radius } from '../theme';
 import { Modal } from './Modal';
 import { ProductSwitcher, type RosterEntry } from './Switcher';
@@ -77,6 +78,21 @@ export function AppFrame({
 }: AppFrameProps) {
   const [aboutOpen, setAboutOpen] = useState(false);
 
+  /**
+   * THE LANGUAGE TOGGLE AND THE DIRECTION FLIP ARE THE FRAME'S — suite-level chrome by the level
+   * model, implemented ONCE (the operator caught the copy: complex and 3-D each carried an
+   * identical dir-sync effect and an identical button — the "implemented-or-forgotten N times"
+   * pattern this tree exists to kill). The frame reads the CALLER's i18n instance through the
+   * provider it is mounted under — parameterized by context, never by import — and requires ONE
+   * documented locale key of every consumer: `language` (the toggle's label, naming the OTHER
+   * language). Logical CSS properties do the actual mirroring once `dir` is honest.
+   */
+  const { t, i18n } = useTranslation();
+  useEffect(() => {
+    document.documentElement.lang = i18n.language;
+    document.documentElement.dir = i18n.language === 'he' ? 'rtl' : 'ltr';
+  }, [i18n.language]);
+
   return (
     <>
       {/* LEVEL 1 — the suite: which tool. Full-bleed bar, identical in every builder. */}
@@ -94,6 +110,13 @@ export function AppFrame({
           )}
           <div style={suiteActionsRow}>
             {suiteActions}
+            <button
+              type="button"
+              style={suiteBtn}
+              onClick={() => void i18n.changeLanguage(i18n.language === 'he' ? 'en' : 'he')}
+            >
+              {t('language')}
+            </button>
             <button type="button" style={suiteBtn} onClick={() => setAboutOpen(true)}>
               {about.label}
             </button>
@@ -148,11 +171,14 @@ const suiteInner: CSSProperties = {
   gap: 12,
   paddingBlock: 7,
 };
+/** START-clustered (operator, B3 play): the session actions sit right after the title — on the
+ *  RIGHT in Hebrew, on the LEFT in English — never flung to the far end of the row. Logical flex
+ *  start gives the mirroring for free when `dir` flips. */
 const toolRow: CSSProperties = {
   display: 'flex',
-  justifyContent: 'space-between',
+  justifyContent: 'flex-start',
   alignItems: 'center',
-  gap: 12,
+  gap: 18,
   paddingBlock: 12,
 };
 const suiteActionsRow: CSSProperties = { display: 'flex', gap: 6, alignItems: 'center' };

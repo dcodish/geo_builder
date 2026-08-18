@@ -9,6 +9,8 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { useTranslation } from 'react-i18next';
 // The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
 import { AppFrame } from '../shell/frame/AppFrame';
+import { FigureName } from '../shell/frame/FigureName';
+import { ToolButton } from '../shell/frame/ToolButton';
 import registry from '../products.json';
 import { dataView, panelIsEmpty } from './engine/dataView';
 import { answerQuery } from './engine/queries';
@@ -436,54 +438,18 @@ export default function App3() {
     <AppFrame
       title={t('title')}
       subtitle={t('tagline')}
-      headerActions={
-        /* The figure's name (issue #42): an inline-editable title — session-level, so it lives in
-           the tool row beside שמור/טען (the level model). */
-        <input
-          type="text"
-          value={figureName}
-          onChange={(e) => setFigureName(e.target.value)}
-          placeholder={t('actions.namePlaceholder')}
-          dir="auto"
-          aria-label={t('actions.namePlaceholder')}
-          className="min-w-0 max-w-md rounded-lg border border-dashed border-slate-300 bg-transparent px-3 py-1.5 text-center text-base font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
-        />
-      }
       utilityActions={
+        /* ONE look for the session actions in every builder (shell/ToolButton) — the operator's
+           2026-08-18 catch: shared row, per-product buttons still rendered differently. */
         <>
-          <button
-            type="button"
-            onClick={onSaveFile}
-            disabled={facts.length === 0}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-40"
-          >
+          <ToolButton onClick={onSaveFile} disabled={facts.length === 0}>
             💾 {t('actions.save')}
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInput.current?.click()}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100"
-          >
-            📂 {t('actions.load')}
-          </button>
-          <button
-            type="button"
-            onClick={onSaveImage}
-            disabled={facts.length === 0}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-40"
-          >
+          </ToolButton>
+          <ToolButton onClick={() => fileInput.current?.click()}>📂 {t('actions.load')}</ToolButton>
+          <ToolButton onClick={onSaveImage} disabled={facts.length === 0}>
             {t('actions.saveImage')}
-          </button>
+          </ToolButton>
         </>
-      }
-      suiteActions={
-        <button
-          type="button"
-          onClick={() => void i18n.changeLanguage(i18n.language === 'he' ? 'en' : 'he')}
-          style={{ fontSize: 13, padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff', cursor: 'pointer' }}
-        >
-          {t('language')}
-        </button>
       }
       roster={roster}
       activeProductId="3d"
@@ -700,6 +666,10 @@ export default function App3() {
 
         {/* Canvas + view/session controls */}
         <section className="flex min-w-0 flex-1 flex-col gap-2" ref={canvasBox}>
+          {/* The figure's NAME (issue #42), centered above the drawing it names — the SHARED
+              component (operator: "isn't the whole idea a shared GUI component?"), one look in
+              every builder. */}
+          <FigureName value={figureName} onChange={setFigureName} placeholder={t('actions.namePlaceholder')} />
           <Figure3
             construction={derived.construction}
             resolved={derived.resolved}

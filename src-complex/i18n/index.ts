@@ -84,6 +84,7 @@ const he = {
   dataShow: 'נתונים',
   dataHide: 'הסתר נתונים',
   dataTitle: 'מה הציור יודע',
+  namePlaceholder: 'שם השרטוט (לא חובה)',
   // S5 — the visualization layer (#622)
   stepperLabel: 'מחזור החזקות: n',
   stepBack: 'הקודם',
@@ -168,6 +169,7 @@ const en = {
   dataShow: 'Data',
   dataHide: 'Hide data',
   dataTitle: 'What the figure knows',
+  namePlaceholder: 'Figure name (optional)',
   // S5 — the visualization layer (#622)
   stepperLabel: 'power cycle: n',
   stepBack: 'previous',

@@ -180,6 +180,7 @@ export function hydrateSession(data: unknown): boolean {
     freePos: d.freePos ?? {},
     seed: typeof d.seed === 'number' ? d.seed : 0,
     view: d.view === 'polar' ? 'polar' : 'cart',
+    ...(typeof d.name === 'string' ? { name: d.name } : {}),
   });
   const failed: LoadAudit<InputError>['failed'] = [];
   for (const raw of d.lines) {

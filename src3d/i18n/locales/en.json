@@ -36,10 +36,10 @@
     "another": "Show another configuration",
     "resetView": "Reset view",
     "nameCrossing": "Click to name this intersection point",
-    "save": "Save to file",
+    "save": "Save",
     "namePlaceholder": "Figure name (optional)",
     "saveNamePrompt": "Name the file — exam date, page and book, or anything else",
-    "load": "Load from file",
+    "load": "Load",
     "saveImage": "Save image"
   },
   "hint": {

@@ -301,6 +301,11 @@ even more builders"* is the case a tab strip fails. Every builder gets the **ful
 > Executed for complex in the same change (cycle and the polar/cartesian toggle moved under the
 > canvas, ahead of B6); 2-D and 3-D adopt the same zoning via B2/B3.
 >
+> **Refined on the B3-3-D play (operator, 2026-08-17):** the FIGURE NAME is centered ABOVE the
+> canvas — it names the drawing, so it lives with the drawing, not in the tool row; and the tool
+> row's session actions CLUSTER AT THE READING START beside the title (right in Hebrew, left in
+> English — logical flex-start, mirrored by `dir`), never flung to the far end.
+>
 > **The `⋯` menu is RETIRED (operator, 2026-08-17):** with שמור/טען out, it held two items — and
 > *"there are 2 options there that can be on the toolbar as is."* Language and About sit on the
 > suite bar as visible buttons. Revisit only if the suite-level set genuinely outgrows the bar;

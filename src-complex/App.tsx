@@ -3,7 +3,9 @@ import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { Banner } from '../shell/frame/Banner';
-import { readEnvelope, savedFileName } from '../shell/save';
+import { FigureName } from '../shell/frame/FigureName';
+import { ToolButton } from '../shell/frame/ToolButton';
+import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { applySwitcherConfig, type ToolConfig } from '../shell/switcherConfig';
 import { applySymbol, type SymbolSpec } from '../shell/symbols';
 import { deriveLines } from './app/deriveLines';
@@ -32,6 +34,8 @@ export function App() {
   const { t, i18n } = useTranslation();
   const {
     lines,
+    name,
+    setName,
     seed,
     view,
     lastError,
@@ -50,9 +54,9 @@ export function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    // The shared naming convention (shell/save, per-product suffix from docs/22 §9):
-    // date-stamped, so successive saves never silently overwrite each other.
-    a.download = savedFileName(undefined, new Date(), 'complex');
+    // The shared naming convention (shell/save, per-product suffix from docs/22 §9): the figure's
+    // NAME when it has one, else date-stamped — successive saves never silently overwrite.
+    a.download = savedFileName(name, new Date(), 'complex');
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -88,6 +92,8 @@ export function App() {
       }
       if (!hydrateSession(parsed))
         useComplexStore.setState({ lastError: { key: 'parse-error', detail: file.name } });
+      // the FILENAME names the figure (the #42 rule) — any name embedded in the file is provenance
+      else useComplexStore.getState().setName(figureNameFromFileName(file.name, 'complex'));
     });
   };
   const [input, setInput] = useState('');
@@ -107,10 +113,8 @@ export function App() {
     });
   };
 
-  useEffect(() => {
-    document.documentElement.lang = i18n.language;
-    document.documentElement.dir = i18n.language === 'he' ? 'rtl' : 'ltr';
-  }, [i18n.language]);
+  // the language toggle and the document-direction flip are the FRAME's now (suite-level chrome,
+  // implemented once — the operator caught the per-product copies)
 
   /**
    * THE OPERATOR'S CURATION OVERLAY (A3, #662): fetched once, applied over the static roster.
@@ -232,17 +236,13 @@ export function App() {
       title={t('title')}
       subtitle={t('subtitle')}
       utilityActions={
+        /* ONE look for the session actions in every builder (shell/ToolButton). */
         <>
-          <button onClick={saveFile}>💾 {t('save')}</button>
-          <button onClick={() => fileRef.current?.click()}>📂 {t('load')}</button>
+          <ToolButton onClick={saveFile} disabled={lines.length === 0}>
+            💾 {t('save')}
+          </ToolButton>
+          <ToolButton onClick={() => fileRef.current?.click()}>📂 {t('load')}</ToolButton>
         </>
-      }
-      suiteActions={
-        <button
-          onClick={() => void i18n.changeLanguage(i18n.language === 'he' ? 'en' : 'he')}
-        >
-          {t('language')}
-        </button>
       }
       roster={roster}
       activeProductId="complex"
@@ -331,6 +331,9 @@ export function App() {
             </ul>
           </section>
           <section className="canvas">
+            {/* The figure's NAME, centered above the drawing it names — the SHARED component,
+                one look in every builder (#42 arriving in complex). */}
+            <FigureName value={name} onChange={setName} placeholder={t('namePlaceholder')} />
             {
               /* THE HONESTY STRIP — always visible, never opt-in (B2's split of the old banner).
                  A violated, undecided or unread STATEMENT is the figure refusing to lie about
