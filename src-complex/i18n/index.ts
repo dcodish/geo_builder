@@ -36,8 +36,10 @@ const he = {
   errUnaccounted: 'הבנתי חלק מהשורה, אבל לא את: {{detail}}',
   errWrongApp: 'הקובץ שייך לכלי אחר ({{detail}}) — כאן נטענים קבצים של בונה המרוכבים בלבד',
   errNewerVersion: 'הקובץ נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב',
-  freeLabel: 'מספר חופשי (ניתן לגרירה)',
-  implicitLabel: 'נוצר מעצם האזכור — חופשי, ניתן לגרירה',
+  // #721 — the labels no longer promise dragging: the v2 canvas has no point-drag (the prototype's
+  // died at the cutover). «אפשרות נוספת» is the working affordance and the label SAYS so.
+  freeLabel: 'מספר חופשי — «אפשרות נוספת» דוגמת מחדש',
+  implicitLabel: 'נוצר מעצם האזכור — חופשי, נדגם מחדש ב«אפשרות נוספת»',
   drivenLabel: 'מכוון על-ידי הנתונים — לחלופות: "אפשרות נוספת"',
   factCount: '{{count}} משפטים',
   symConj: 'צמוד',
@@ -150,8 +152,9 @@ const en = {
   errUnaccounted: 'I read part of the line, but not: {{detail}}',
   errWrongApp: 'This file belongs to another tool ({{detail}}) — only Complex Builder files load here',
   errNewerVersion: 'This file was saved by a newer version of the tool — refresh the page and try again',
-  freeLabel: 'free number (draggable)',
-  implicitLabel: 'created by reference — free, draggable',
+  // #721 — the labels no longer promise dragging (no point-drag in the v2 canvas).
+  freeLabel: 'free number — "Another configuration" resamples it',
+  implicitLabel: 'created by reference — free, resampled by "Another configuration"',
   drivenLabel: 'driven by the givens — use "Another configuration"',
   factCount: '{{count}} statements',
   symConj: 'conjugate',
