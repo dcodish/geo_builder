@@ -15,6 +15,7 @@ import { useStore } from 'zustand';
 // The shared frame (B3-2d #668): the deliberate src -> shell adoption — the LAST product joins the
 // suite chrome (ADR-W-019; BOUNDARIES.json src -> shell edge flipped with this import).
 import { AppFrame } from '../shell/frame/AppFrame';
+import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
@@ -36,7 +37,7 @@ import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { SYMBOL_SPECS } from '@/ui/symbols';
-import { btn, card as themeCard, color as pal, foldToggle, fs, pill, sectionTitle } from '@/ui/theme';
+import { btn, card as themeCard, color as pal, fs, sectionTitle } from '@/ui/theme';
 import { autoNamedLabels, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
@@ -99,7 +100,8 @@ export default function App() {
   const relations = useGeoStore((s) => s.relations);
   const valuesState = useGeoStore((s) => s.values);
   const viewValues = useGeoStore((s) => s.viewValues);
-  const clearValues = useGeoStore((s) => s.clearValues);
+  // clearValues retired from the UI (B6-2d): the panel head hides the column; a fact change
+  // stales the layer store-side, and the in-panel button re-pulls.
   const addQuery = useGeoStore((s) => s.addQuery);
   const removeQuery = useGeoStore((s) => s.removeQuery);
   const viewRelations = useGeoStore((s) => s.viewRelations);
@@ -157,8 +159,13 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false); // the help modal ("עזרה") — guide + command reference
   const [helpTab, setHelpTab] = useState<'guide' | 'commands'>('guide');
   const [aboutOpen, setAboutOpen] = useState(false); // the "מה זה?" intro modal (first load + reopenable)
-  const [examplesOpen, setExamplesOpen] = useState(false); // examples auto-show while the canvas is empty; fold once building starts
-  const [displayOpen, setDisplayOpen] = useState(true); // the display-options fold — OPEN by default (operator: the discovery dial is important and must stay visible); foldable for students who want the space
+  // examplesOpen retired (operator 2026-08-18): no example strip above the input — the examples
+  // live on the clean canvas (QuickChips) and in עזרה.
+  // B6-2d: the נתונים panel — permanent column on wide screens (content collapsible), the same
+  // default as the complex/3-D panels. Opening it PULLS the values compute (#217's pull-only rule).
+  const [showData, setShowData] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1200px)').matches,
+  );
   // editingId/editText/editError retired with the shared FactList (B5-2d): the editor state is the
   // chrome's; commitEdit takes the text and answers with a boolean.
   const [showTheorems, setShowTheorems] = useState(false); // the live theorem feed (Phase 6a) — live in prod but OFF by default (operator 2026-07-07); the student opts in from תצוגה
@@ -832,6 +839,33 @@ export default function App() {
     </div>
   );
 
+  // "Show another configuration" — lifted out of the JSX (B6-2d moves the button under the canvas,
+  // D7). #41 (ADR-290): the seed search runs in the geometry WORKER; ADR-340 (#175): the search
+  // returns the whole COMPOSITE view, applied as ONE undo-tracked transition.
+  const runResample = async () => {
+    if (resampling) return;
+    setResampling(true);
+    try {
+      const st = useGeoStore.getState();
+      const found = await geoWork.resample(st.facts, st.seed, (k, n) => setAltProgress(`${k}/${n}`));
+      const changed = found !== null;
+      if (changed) useGeoStore.getState().applyView(found!);
+      logDebug({ kind: 'action', action: 'show-another', detail: `seed=${changed ? found!.seed : st.seed}`, result: changed ? 'changed' : 'only-config' }); // #84
+      if (changed) setAltNote('');
+      else {
+        // searched and found nothing different — tell the student something DID happen (the
+        // figure is determined), so "show another" doesn't look like a dead button (operator).
+        setAltNote(t('actions.onlyConfig'));
+        window.setTimeout(() => setAltNote(''), 4000);
+      }
+    } catch (err) {
+      if (!isCancelled(err)) throw err; // cancelled: quiet — the student chose to stop
+    } finally {
+      setResampling(false);
+      setAltProgress('');
+    }
+  };
+
   // The About content, composed ONCE: the frame's About modal shows it (suite chrome), and the
   // first-load intro modal below shows the same node (2-D pedagogy: auto-opens for a new student,
   // dismiss persisted). The old footer's contact line lives here now — the footer retired with the
@@ -1044,6 +1078,104 @@ export default function App() {
             </div>
           )}
         </div>
+
+        {/* LEVEL 3 — figure actions UNDER the canvas (D7, B6-2d): things done TO the figure, the
+            same zone as in the other builders. «הציגו תצורה אחרת» keeps its prominence (operator:
+            it "looks nice" — the look moves with it). */}
+        {facts.length > 0 && (
+          <div style={figureActions}>
+            {(branchId || hasVariant || freeDofs(construction).length > 0) && (
+              <button type="button" style={alt} disabled={resampling} title={t('actions.anotherHint')} onClick={() => void runResample()}>
+                {resampling ? t('input.loading') : t('actions.another')}
+              </button>
+            )}
+            {resampling && (
+              <span style={{ fontSize: 12, color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                {altProgress && <span>({altProgress})</span>}
+                {/* #41: real preemption — terminate the worker; the in-flight promise rejects {cancelled} */}
+                <button
+                  type="button"
+                  onClick={() => cancelGeoWork()}
+                  title={t('actions.cancelSearch')}
+                  style={{ border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 11, lineHeight: '16px', padding: '0 6px' }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            {altNote && <span style={{ fontSize: 12, color: '#64748b' }}>{altNote}</span>}
+            {/* "View relations" — the ground-truth layer (ADR-134); results show in the נתונים panel. */}
+            <button
+              type="button"
+              style={relationsLayer ? relBtnOn : exploreToggle}
+              disabled={analysing}
+              title={t('actions.relationsHint')}
+              onClick={() => {
+                if (analysing) return;
+                if (relationsLayer) {
+                  clearRelations();
+                  return;
+                }
+                setAnalysing(true);
+                setShowData(true); // the results surface is the panel — a click must show its result
+                void viewRelations().finally(() => setAnalysing(false));
+              }}
+            >
+              {analysing ? t('actions.analysing') : relationsLayer ? t('actions.hideRelations') : t('actions.viewRelations')}
+            </button>
+            {/* "Detect shapes" (FR-SH) — results (badges/similar) show in the נתונים panel. */}
+            <button
+              type="button"
+              style={shapesLayer ? shapesBtnOn : exploreToggle}
+              disabled={detecting}
+              title={t('shapes.hint')}
+              onClick={() => {
+                if (detecting) return;
+                setOpenShape(null);
+                setHoverShape(null);
+                setOpenSimilar(null);
+                setHoverSimilar(null);
+                if (shapesLayer) {
+                  clearShapes();
+                  return;
+                }
+                setDetecting(true);
+                setShowData(true);
+                void (async () => {
+                  try {
+                    await detectShapes();
+                  } finally {
+                    setDetecting(false);
+                  }
+                })();
+              }}
+            >
+              {detecting ? t('shapes.analysing') : shapesLayer ? t('shapes.hide') : t('shapes.detect')}
+            </button>
+            <span style={{ flex: 1 }} />
+            <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => { logDebug({ kind: 'action', action: 'undo' }); undo(); }}>{t('actions.undo')}</button>
+            <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => { logDebug({ kind: 'action', action: 'redo' }); redo(); }}>{t('actions.redo')}</button>
+            <button type="button" style={{ ...subtleBtn, color: pal.danger }} onClick={clearAll}>{t('actions.clear')}</button>
+          </div>
+        )}
+        {/* Figure-DISPLAY toggles (the תצוגה fold, relocated per the #729 mapping): they change how
+            the FIGURE draws, so they live with it. */}
+        {facts.length > 0 && (
+          <div style={{ ...figureActions, gap: 14 }}>
+            <label style={displayToggle}>
+              <input type="checkbox" checked={showMeasures} onChange={(e) => setShowMeasures(e.target.checked)} />
+              {t('actions.showMeasures')}
+            </label>
+            <label style={displayToggle}>
+              <input type="checkbox" checked={showCenters} onChange={(e) => setShowCenters(e.target.checked)} />
+              {t('canvas.centers')}
+            </label>
+            <label style={displayToggle}>
+              <input type="checkbox" checked={showTheorems} onChange={(e) => setShowTheorems(e.target.checked)} />
+              {t('theorems.toggle')}
+            </label>
+          </div>
+        )}
         </div>
 
         <aside style={sidebar}>
@@ -1074,15 +1206,9 @@ export default function App() {
               preview={(s) => (hasMath(s) ? <MathText text={s} /> : null)}
               previewDir={(s) => textDir(s)}
               boxDir={(s) => textDir(s)}
-              quickCommands={facts.length > 0 && !examplesOpen ? undefined : examples}
-              onQuickCommand={(c) => submit(c)}
-              quickDir={(c) => textDir(c)}
             >
-            {facts.length > 0 && (
-              <button type="button" style={foldToggle} onClick={() => setExamplesOpen((v) => !v)}>
-                {examplesOpen ? '▾' : '▸'} {t('examples.title')}
-              </button>
-            )}
+            {/* No example strip above the box (operator ruling 2026-08-18: "expensive screen
+                space"): the examples live on the CLEAN CANVAS (QuickChips) and in עזרה. */}
             {thinking && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
             {thinking && llmAbortRef.current && (
               <button
@@ -1138,21 +1264,9 @@ export default function App() {
             {/* Card header: title, the figure's remaining freedom as a compact pill (was a loose
                 line floating between buttons), and undo/redo/clear as small in-context utilities
                 (they act on the step list, so they live with it — and vanish on an empty session). */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <div style={{ ...sectionLabel, flex: 1 }}>{t('steps.title')}</div>
-              {facts.length > 0 && (
-                <span style={freeDofCount(construction) > 0 ? dofPillFree : dofPillDone}>
-                  {freeDofCount(construction) > 0 ? t('actions.dof', { count: freeDofCount(construction) }) : `✓ ${t('actions.determined')}`}
-                </span>
-              )}
-              {(facts.length > 0 || canUndo || canRedo) && (
-                <span style={{ display: 'flex', gap: 4 }}>
-                  <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => { logDebug({ kind: 'action', action: 'undo' }); undo(); }}>{t('actions.undo')}</button>
-                  <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => { logDebug({ kind: 'action', action: 'redo' }); redo(); }}>{t('actions.redo')}</button>
-                  <button type="button" style={{ ...subtleBtn, color: pal.danger }} onClick={clearAll}>{t('actions.clear')}</button>
-                </span>
-              )}
-            </div>
+            {/* B6-2d: the DOF pill moved to the panel's status line (its generic home), and
+                undo/redo/clear moved under the canvas (D7) — the header keeps the title only. */}
+            <div style={sectionLabel}>{t('steps.title')}</div>
             {facts.length === 0 ? (
               <p style={{ color: '#94a3b8', fontSize: 13, margin: 0 }}>{t('steps.empty')}</p>
             ) : (
@@ -1252,156 +1366,54 @@ export default function App() {
             }}
           />
 
-          {/* ── Explore the figure — one card for everything that interrogates the BUILT figure:
-              alternative configurations, the ground-truth relations layer, shape detection, and the
-              playable radius sliders. Replaces three identical full-width purple buttons stacked
-              with loose status lines between them. */}
-          {facts.length > 0 && (
-          <div style={sideCard}>
-            <div style={sectionLabel}>{t('explore.title')}</div>
-          {(branchId || hasVariant || freeDofs(construction).length > 0) && (
-            <button
-              type="button"
-              style={alt}
-              disabled={resampling}
-              title={t('actions.anotherHint')}
-              // Explore the WHOLE configuration space: resample the continuous free DOFs (so free
-              // points / on-circle vertices actually move) AND cycle a discrete branch if there is
-              // one. Previously this did branch-cycling EXCLUSIVELY whenever any branch existed, so a
-              // figure with both (e.g. a circle∩circle point + free secant ends) only flipped between
-              // 2 branch options and never varied its free DOFs.
-              onClick={async () => {
-                if (resampling) return;
-                // #41 (ADR-290): the seed search runs in the geometry WORKER — the main thread stays free
-                // (no page-unresponsive dialog possible), the cue shows live progress, and the ✕ beside it
-                // cancels (worker termination — real preemption). The store applies the found seed as one
-                // undo-tracked step; its fold is already warm here (same facts), so the re-render is a tail.
-                setResampling(true);
-                try {
-                  const st = useGeoStore.getState();
-                  // ADR-340 (#175): the search returns the whole COMPOSITE view — facts (possibly carrying a
-                  // branch/variant step) + seed — already validated by `meetsRequirements`. It is applied as
-                  // ONE undo-tracked transition; no post-hoc `cycleAlt`/`cycleVariant` exists to invalidate
-                  // it (the old path validated the seed alone, then mutated the facts unchecked — a green
-                  // figure could silently start violating its own givens).
-                  const found = await geoWork.resample(st.facts, st.seed, (k, n) => setAltProgress(`${k}/${n}`));
-                  const changed = found !== null;
-                  if (changed) useGeoStore.getState().applyView(found!);
-                  logDebug({ kind: 'action', action: 'show-another', detail: `seed=${changed ? found!.seed : st.seed}`, result: changed ? 'changed' : 'only-config' }); // #84
-                  if (changed) setAltNote('');
-                  else {
-                    // searched and found nothing different — tell the student something DID happen (the
-                    // figure is determined), so "show another" doesn't look like a dead button (operator).
-                    setAltNote(t('actions.onlyConfig'));
-                    window.setTimeout(() => setAltNote(''), 4000);
-                  }
-                } catch (err) {
-                  if (!isCancelled(err)) throw err; // cancelled: quiet — the student chose to stop
-                } finally {
-                  setResampling(false);
-                  setAltProgress('');
-                }
-              }}
-            >
-              {resampling ? t('input.loading') : t('actions.another')}
-            </button>
-          )}
-          {resampling && (
-            <span style={{ fontSize: 12, color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              {t('input.loading')}
-              {altProgress && <span>({altProgress})</span>}
-              {/* #41: real preemption — terminate the worker; the in-flight promise rejects {cancelled} */}
-              <button
-                type="button"
-                onClick={() => cancelGeoWork()}
-                title={t('actions.cancelSearch')}
-                style={{ border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 11, lineHeight: '16px', padding: '0 6px' }}
-              >
-                ✕
-              </button>
-            </span>
-          )}
-          {altNote && <span style={{ fontSize: 12, color: '#64748b' }}>{altNote}</span>}
+        </aside>
 
-          {/* The two analysis layers side by side — quiet outline toggles (secondary to "show
-              another configuration"); each fills with its on-canvas layer colour while active. */}
-          <div style={{ display: 'flex', gap: 6 }}>
-            {/* "View relations" — the ground-truth layer (ADR-134): on press, mark every equal side / equal
-                angle the givens FORCE (ticks / arcs). A button, not a live toggle; the detection samples the
-                figure, so we paint a busy state first. Dismiss with the same button; a new fact auto-clears it. */}
-            <button
-              type="button"
-              style={relationsLayer ? relBtnOn : exploreToggle}
-              disabled={analysing}
-              title={t('actions.relationsHint')}
-              onClick={() => {
-                if (analysing) return;
-                if (relationsLayer) {
-                  clearRelations();
-                  return;
+        {/* THE נתונים COLUMN (B6-2d, #729 — operator: "the calculate-values button is basically
+            the same data panel we have on the 3-D and the complex; it needs to be a third
+            column"): the SHARED DataPanel head/status, with 2-D's knowledge surfaces as its
+            content — the values rows (#217 ADR-410, pull-only: computed when the panel is OPENED,
+            never during build; a fact change stales the layer and the refresh button re-pulls),
+            the query lane (#477), the radius sliders, the relations/shape results and the theorem
+            feed. The figure-action BUTTONS moved under the canvas (D7). */}
+        <aside style={dataCol}>
+          <div style={sideCard}>
+            <DataPanel
+              title={t('dataTitle')}
+              open={showData}
+              onToggle={() => {
+                const opening = !showData;
+                setShowData(opening);
+                if (opening && facts.length > 0 && !valuesLayer && !computingValues) {
+                  setComputingValues(true);
+                  void viewValues().finally(() => setComputingValues(false));
                 }
-                // The detection sweep runs in the geometry WORKER (#157 / ADR-401) — the tab stays live
-                // while it samples, so this is a plain busy state around an await, no paint dance.
-                setAnalysing(true);
-                void viewRelations().finally(() => setAnalysing(false));
               }}
+              showLabel={t('panelShow')}
+              hideLabel={t('panelHide')}
+              status={
+                facts.length > 0
+                  ? freeDofCount(construction) > 0
+                    ? t('actions.dof', { count: freeDofCount(construction) })
+                    : `✓ ${t('actions.determined')}`
+                  : undefined
+              }
+              sections={[]}
             >
-              {analysing ? t('actions.analysing') : relationsLayer ? t('actions.hideRelations') : t('actions.viewRelations')}
-            </button>
-            {/* "Detect shapes" (FR-SH) — on press, classify every named shape the figure contains (forced
-                across samples) and list each as a badge that links to its page in the geometry book. A
-                button, not a live toggle (opt-in, same pedagogy boundary as "view relations"); a new fact
-                auto-clears the layer. */}
+          {facts.length === 0 && <span style={{ fontSize: 12, color: '#94a3b8' }}>{t('values.emptyFigure')}</span>}
+          {computingValues && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('values.computing')}</span>}
+          {facts.length > 0 && !valuesLayer && !computingValues && (
             <button
               type="button"
-              style={shapesLayer ? shapesBtnOn : exploreToggle}
-              disabled={detecting}
-              title={t('shapes.hint')}
-              onClick={() => {
-                if (detecting) return;
-                setOpenShape(null);
-                setHoverShape(null);
-                setOpenSimilar(null);
-                setHoverSimilar(null);
-                if (shapesLayer) {
-                  clearShapes();
-                  return;
-                }
-                setDetecting(true);
-                // `detectShapes` samples in the geometry WORKER (#157 / ADR-401), so the spinner paints and
-                // the page stays fully responsive while a coupled figure is analysed.
-                void (async () => {
-                  try {
-                    await detectShapes();
-                  } finally {
-                    setDetecting(false);
-                  }
-                })();
-              }}
-            >
-              {detecting ? t('shapes.analysing') : shapesLayer ? t('shapes.hide') : t('shapes.detect')}
-            </button>
-            {/* #217 (ADR-410): the VALUES panel — pull-only (req 4: never computed during build). The
-                worker classifies the shared sample pool; rows show only seed-invariant knowledge. */}
-            <button
-              type="button"
-              style={valuesLayer ? shapesBtnOn : exploreToggle}
-              disabled={computingValues}
+              style={exploreToggle}
               title={t('values.hint')}
               onClick={() => {
-                if (computingValues) return;
-                if (valuesLayer) {
-                  setValueHl(null);
-                  clearValues();
-                  return;
-                }
                 setComputingValues(true);
                 void viewValues().finally(() => setComputingValues(false));
               }}
             >
-              {computingValues ? t('values.computing') : valuesLayer ? t('values.hide') : t('values.compute')}
+              {t('values.compute')}
             </button>
-          </div>
+          )}
           {valuesLayer && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 10px' }}>
               {valuesLayer.rows.length === 0 && valuesLayer.areaClasses.length === 0 && (
@@ -1678,8 +1690,6 @@ export default function App() {
               })}
             </div>
           )}
-          </div>
-          )}
 
           {/* The LIVE theorem feed (Phase 6a) — the bagrut theorems the STATED givens announce, updated
               every step (help, don't reveal: only what the givens *announce*, never the derived "aha").
@@ -1769,29 +1779,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Display options — collapsed by default (settings, not workflow): measures, ⊙ centres,
-              and the theorem-feed toggle + discovery dial. Folding them reclaims permanent sidebar
-              space they used to occupy on every session, including empty ones. */}
-          <div>
-            <button type="button" style={foldToggle} onClick={() => setDisplayOpen((v) => !v)}>
-              {displayOpen ? '▾' : '▸'} {t('display.title')}
-            </button>
-            {displayOpen && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingInlineStart: 12, paddingTop: 4 }}>
-                <label style={displayToggle}>
-                  <input type="checkbox" checked={showMeasures} onChange={(e) => setShowMeasures(e.target.checked)} />
-                  {t('actions.showMeasures')}
-                </label>
-                <label style={displayToggle}>
-                  <input type="checkbox" checked={showCenters} onChange={(e) => setShowCenters(e.target.checked)} />
-                  {t('canvas.centers')}
-                </label>
-                <label style={displayToggle}>
-                  <input type="checkbox" checked={showTheorems} onChange={(e) => setShowTheorems(e.target.checked)} />
-                  {t('theorems.toggle')}
-                </label>
-              </div>
-            )}
+            </DataPanel>
           </div>
         </aside>
       </div>
@@ -1856,17 +1844,28 @@ function tabBtn(active: boolean): React.CSSProperties {
   };
 }
 
+/** B2-2d (#729, operator: "users shouldn't have to always scroll up and down"): the page is a
+ *  VIEWPORT-HEIGHT flex column under the frame's two bars — the columns scroll INTERNALLY and the
+ *  canvas takes the remaining height, so the page itself never scrolls. 112px = suite bar + tool
+ *  row (measured; the parity checker pins the bars' geometry). */
 const page: React.CSSProperties = {
-  minHeight: '100vh',
-  padding: 20,
+  height: 'calc(100vh - 126px)',
+  overflow: 'hidden',
+  padding: '14px 20px 16px',
   color: pal.ink, // font family comes from index.css — the ONE stack, never per-element
   display: 'flex',
   flexDirection: 'column',
-  gap: 14,
+  gap: 10,
 };
 // headerRow / figureNameInput / footerRow retired with the frame adoption (B3-2d): the header and
 // footer are the FRAME's, and the figure name is the shared FigureName component.
-const main: React.CSSProperties = { display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' };
+// B2-2d: three columns — input+steps (order 1) · canvas (order 2) · the נתונים panel (order 3),
+// the same zone order as the complex tool under RTL. `stretch` + minHeight:0 lets each column
+// scroll internally inside the viewport-height page.
+const main: React.CSSProperties = { display: 'flex', gap: 18, alignItems: 'stretch', flex: 1, minHeight: 0 };
+const dataCol: React.CSSProperties = { order: 3, width: 'min(340px, 26%)', flexShrink: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 };
+/** LEVEL 3 — the figure-action rows under the canvas (D7): things done TO the figure. */
+const figureActions: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 };
 // The canvas fills the space beside the sidebar and the viewport height (use the big screen);
 // it wraps below the sidebar on narrow widths. Its size is measured and passed to <Figure>.
 // `order` puts the canvas on the LEFT and the sidebar on the RIGHT under RTL (Hebrew):
@@ -1875,9 +1874,22 @@ const main: React.CSSProperties = { display: 'flex', gap: 24, alignItems: 'flex-
 // Height budget: 100vh minus the page padding, header, footer, and the inter-row gaps — so the canvas
 // fills the viewport and the whole page (header → canvas → footer) fits WITHOUT scrolling.
 /** The canvas COLUMN — the flex item (FigureName above the drawing, B3-2d). Order 2 puts the
- *  canvas LEFT of the sidebar under RTL. */
-const canvasCol: React.CSSProperties = { order: 2, flex: '1 1 480px', minWidth: 360, display: 'flex', flexDirection: 'column', gap: 8 };
-const canvasWrap: React.CSSProperties = { position: 'relative', height: 'calc(100vh - 180px)', minHeight: 460 };
+ *  canvas LEFT of the sidebar under RTL. B2-2d: the canvas takes the REMAINING height (flex:1
+ *  inside the viewport-height page) — the fixed calc() budget died with the no-scroll ruling. */
+/** The middle column is a WHITE CARD like its neighbours (operator, 2026-08-18: the column read
+ *  as "lowered" because its white started only at the canvas box — the name field sat on the page
+ *  ground). One card wraps name + canvas + figure actions, so the three columns align. */
+const canvasCol: React.CSSProperties = {
+  ...themeCard,
+  order: 2,
+  flex: '1 1 480px',
+  minWidth: 360,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  minHeight: 0,
+};
+const canvasWrap: React.CSSProperties = { position: 'relative', flex: 1, minHeight: 320 };
 // Centered call-to-action shown over the blank canvas; pointer-events off so it never
 // blocks the figure (the example buttons re-enable them).
 const emptyOverlay: React.CSSProperties = {
@@ -1898,13 +1910,11 @@ const emptyOverlay: React.CSSProperties = {
 // the screen — the canvas and the shapes result stay on one screen (operator: "fit it all on the same screen").
 // `min(400px, 100%)` (F2, tablet scope): a rigid 400px overflowed viewports narrower than the column
 // itself; on a portrait tablet the canvas wraps below and the sidebar spans the width it has.
-const sidebar: React.CSSProperties = { order: 1, width: 'min(400px, 100%)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 'calc(100vh - 110px)', overflowY: 'auto', paddingInlineEnd: 4 };
+const sidebar: React.CSSProperties = { order: 1, width: 'min(380px, 30%)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', paddingInlineEnd: 4 };
 // A sidebar section card — the visual grouping the old flat stack lacked (GUI overhaul).
 const sideCard: React.CSSProperties = themeCard;
 const sectionLabel: React.CSSProperties = sectionTitle;
-// The figure's remaining-freedom pill (steps-card header): blue while free, green when determined.
-const dofPillFree: React.CSSProperties = pill('#1d4ed8', '#dbeafe', '#93c5fd');
-const dofPillDone: React.CSSProperties = pill('#166534', '#dcfce7', '#86efac');
+// dofPillFree/dofPillDone retired (B6-2d): the freedom cue lives in the panel's status line.
 // Compact in-card utility buttons (undo/redo/clear in the steps header).
 const subtleBtn: React.CSSProperties = btn.subtle;
 const subtleBtnOff: React.CSSProperties = { ...btn.subtle, opacity: 0.45, cursor: 'default' };
