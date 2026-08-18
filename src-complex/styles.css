@@ -10,6 +10,12 @@ body {
   background: #f8fafc;
   color: #0f172a;
 }
+/* #744 — form controls don't inherit the body font by default, and the shell convention
+   (shell/theme.ts) is that the CONSUMING APP's stylesheet owns the one font stack. 2-D has this
+   rule in index.css and 3-D gets it from Tailwind's preflight; without it the shared FigureName
+   (and every unstyled-font control) rendered in the browser's default input font — the operator's
+   "different size and is bold". Class-scoped mono overrides (.input-row input, .sym…) still win. */
+input, button, textarea, select { font-family: inherit; }
 /* Full-width app (operator, 2026-08-17: "a lot of wasted space to the left and right") — the
    canvas takes the stretch; the side columns hold their widths. The shared frame rows use the
    same edge padding so all three levels align. */
