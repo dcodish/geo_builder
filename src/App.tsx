@@ -45,6 +45,9 @@ import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
 import { questionLines } from '@/export/questionLines';
+// #742: the exports live in the TOP TOOL ROW now (ADR-W-024) — App rasterises the canvas svg itself.
+import { svgToPng } from '@/export/svgToPng';
+import { QUESTION_IMAGE_WIDTH_PX } from '@/export/questionDoc';
 import { auditLoadedFigure, liveAuditFindings, refreshLoadedFigure } from '@/store/loadAudit';
 import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
@@ -195,6 +198,7 @@ export default function App() {
   // Responsive canvas: the figure fills the space beside the sidebar (use the whole screen) instead
   // of a fixed box. A ResizeObserver feeds the measured size to <Figure>, which fits isotropically.
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>(''); // #742: feedback on the top-row copy button
   const [canvasSize, setCanvasSize] = useState({ w: 640, h: 600 });
   useEffect(() => {
     const el = canvasRef.current;
@@ -415,6 +419,50 @@ export default function App() {
     a.download = questionFileName(new Date());
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // #742 / ADR-W-024: the image exports moved OUT of the canvas toolbar into the top tool row —
+  // one export home in every builder. App queries the svg from its own canvas card (the 3-D
+  // pattern) and rasterises via src/export/svgToPng; the renderer no longer knows exports exist.
+  const canvasSvg = () => canvasRef.current?.querySelector('svg') ?? null;
+  const flashExport = (v: 'ok' | 'err') => {
+    setExportFlash(v);
+    window.setTimeout(() => setExportFlash(''), 1400);
+  };
+  const copyImageTop = async () => {
+    const svg = canvasSvg();
+    if (!svg) return;
+    try {
+      const blob = await svgToPng(svg);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      flashExport('ok');
+    } catch {
+      flashExport('err');
+    }
+  };
+  const saveImageTop = async () => {
+    const svg = canvasSvg();
+    if (!svg) return;
+    try {
+      const blob = await svgToPng(svg);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'figure.png';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      flashExport('err');
+    }
+  };
+  const saveQuestionTop = async () => {
+    const svg = canvasSvg();
+    if (!svg) return;
+    try {
+      await saveQuestion(await svgToPng(svg, 2, QUESTION_IMAGE_WIDTH_PX));
+    } catch {
+      flashExport('err');
+    }
   };
 
   const noteFileProblem = (key: string, vals?: Record<string, unknown>) => {
@@ -895,6 +943,17 @@ export default function App() {
             💾 {t('file.save')}
           </ToolButton>
           <ToolButton onClick={() => fileInputRef.current?.click()}>📂 {t('file.load')}</ToolButton>
+          {/* #742 / ADR-W-024: the image exports live HERE in every builder — one home (they sat
+              on the 2-D canvas toolbar while 3-D had them up here; that drift is the defect). */}
+          <ToolButton onClick={() => void copyImageTop()} disabled={facts.length === 0}>
+            {exportFlash === 'ok' ? `✓ ${t('canvas.copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('canvas.copyImage')}`}
+          </ToolButton>
+          <ToolButton onClick={() => void saveImageTop()} disabled={facts.length === 0}>
+            ⤓ {t('canvas.saveImage')}
+          </ToolButton>
+          <ToolButton onClick={() => void saveQuestionTop()} disabled={questionLines(facts, canonLocale).length === 0}>
+            ⤓ {t('canvas.saveQuestion')}
+          </ToolButton>
           <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
         </>
       }
@@ -999,16 +1058,8 @@ export default function App() {
               rotate: t('canvas.rotate'),
               transform: t('canvas.transform'),
               alignSeg: t('canvas.alignSeg'),
-              copyImage: t('canvas.copyImage'),
-              saveImage: t('canvas.saveImage'),
-              saveQuestion: t('canvas.saveQuestion'),
-              saveFile: t('file.save'),
-              loadFile: t('file.load'),
-              copied: t('canvas.copied'),
               reset: t('canvas.reset'),
             }}
-            onSaveQuestion={saveQuestion}
-            saveQuestionDisabled={questionLines(facts, canonLocale).length === 0}
           />
           {/* Empty canvas → a call to action so a new user knows what to do. The
               container ignores pointer events (so panning isn't blocked); the
@@ -1064,13 +1115,24 @@ export default function App() {
         {/* LEVEL 3 — figure actions UNDER the canvas (D7, B6-2d): things done TO the figure, the
             same zone as in the other builders. «הציגו תצורה אחרת» keeps its prominence (operator:
             it "looks nice" — the look moves with it). */}
-        {facts.length > 0 && (
+        {/* #742: the row renders ALWAYS — buttons disable, never hide (operator ruling; the row
+            vanished on an empty canvas here while the other builders kept theirs). */}
+        {(
           <div style={figureActions}>
-            {(branchId || hasVariant || freeDofs(construction).length > 0) && (
-              <button type="button" style={alt} disabled={resampling} title={t('actions.anotherHint')} onClick={() => void runResample()}>
-                {resampling ? t('input.loading') : t('actions.another')}
-              </button>
-            )}
+            {(() => {
+              const canCycle = facts.length > 0 && (branchId || hasVariant || freeDofs(construction).length > 0);
+              return (
+                <button
+                  type="button"
+                  style={{ ...alt, ...(!canCycle || resampling ? { opacity: 0.5, cursor: 'default' } : null) }}
+                  disabled={!canCycle || resampling}
+                  title={t('actions.anotherHint')}
+                  onClick={() => void runResample()}
+                >
+                  {resampling ? t('input.loading') : t('actions.another')}
+                </button>
+              );
+            })()}
             {resampling && (
               <span style={{ fontSize: 12, color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 {altProgress && <span>({altProgress})</span>}
@@ -1091,7 +1153,7 @@ export default function App() {
             <span style={{ flex: 1 }} />
             <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => { logDebug({ kind: 'action', action: 'undo' }); undo(); }}>{t('actions.undo')}</button>
             <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => { logDebug({ kind: 'action', action: 'redo' }); redo(); }}>{t('actions.redo')}</button>
-            <button type="button" style={{ ...subtleBtn, color: pal.danger }} onClick={clearAll}>{t('actions.clear')}</button>
+            <button type="button" style={facts.length > 0 ? { ...subtleBtn, color: pal.danger } : subtleBtnOff} disabled={facts.length === 0} onClick={clearAll}>{t('actions.clear')}</button>
           </div>
         )}
         {/* #738 — the display checkboxes moved INTO the נתונים panel with the analysis buttons

@@ -12,6 +12,8 @@ import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
+// #742 / ADR-W-024: the shared canvas corner cluster — one look in every builder.
+import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../shell/frame/canvasControls';
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { applySwitcherConfig, type ToolConfig } from '../shell/switcherConfig';
 import { deriveLines } from './app/deriveLines';
@@ -67,6 +69,60 @@ export function App() {
     a.download = savedFileName(name, new Date(), 'complex');
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // #742 / ADR-W-024: the image exports — the top tool row's pair, the 3-D rasterize pattern
+  // (App queries its own canvas svg; the renderer never knows exports exist). Third product-local
+  // copy of svg→png in the workspace — flagged on #742 as a shell candidate.
+  const rasterCanvas = (): Promise<Blob> => {
+    const svg = canvasCard.current?.querySelector('svg');
+    if (!svg) return Promise.reject(new Error('no canvas'));
+    const xml = new XMLSerializer().serializeToString(svg);
+    const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml;charset=utf-8' }));
+    return new Promise<Blob>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = 2;
+        const c = document.createElement('canvas');
+        c.width = svg.clientWidth * scale;
+        c.height = svg.clientHeight * scale;
+        const ctx = c.getContext('2d');
+        if (!ctx) { URL.revokeObjectURL(url); reject(new Error('no 2d context')); return; }
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        c.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png');
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('svg load failed')); };
+      img.src = url;
+    });
+  };
+  const flashExport = (v: 'ok' | 'err') => {
+    setExportFlash(v);
+    window.setTimeout(() => setExportFlash(''), 1400);
+  };
+  const copyImage = async () => {
+    try {
+      const blob = await rasterCanvas();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      flashExport('ok');
+    } catch {
+      flashExport('err');
+    }
+  };
+  const saveImage = async () => {
+    try {
+      const blob = await rasterCanvas();
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = u;
+      a.download = 'figure.png';
+      a.click();
+      URL.revokeObjectURL(u);
+    } catch {
+      flashExport('err');
+    }
   };
 
   const onLoadFile = (e: ChangeEvent<HTMLInputElement>) => {
@@ -142,6 +198,10 @@ export function App() {
    * to hold at (ADR-448 / ADR-3D-144) after learning what it costs not to.
    */
   const [stepN, setStepN] = useState(1);
+  // #742: the corner cluster's zoom — view state, local by design (docs/20 §6.4), never stored.
+  const [canvasZoom, setCanvasZoom] = useState(1);
+  const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>(''); // top-row copy feedback
+  const canvasCard = useRef<HTMLDivElement>(null);
   // the canvas is POLAR: a complex number as a length and a direction, not a dot on a grid
   const polarScene = useMemo(() => buildScene(derived2, { n: stepN }), [derived2, stepN]);
   /**
@@ -250,6 +310,14 @@ export function App() {
             💾 {t('save')}
           </ToolButton>
           <ToolButton onClick={() => fileRef.current?.click()}>📂 {t('load')}</ToolButton>
+          {/* #742 / ADR-W-024 (operator: "3d and complex tools can have the same functionality"):
+              the image exports in the TOP ROW, the one export home in every builder. */}
+          <ToolButton onClick={() => void copyImage()} disabled={lines.length === 0}>
+            {exportFlash === 'ok' ? `✓ ${t('copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('copyImage')}`}
+          </ToolButton>
+          <ToolButton onClick={() => void saveImage()} disabled={lines.length === 0}>
+            ⤓ {t('saveImage')}
+          </ToolButton>
           <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
         </>
       }
@@ -386,17 +454,38 @@ export function App() {
             )}
             {polarScene && (
               <>
-                <PolarPlane
-                  scene={polarScene}
-                  showGrid={view === 'polar'}
-                  mode={view}
-                  layers={layers}
-                  labels={{
-                    ratio: t('seriesRatio'),
-                    limit: t('seriesLimit'),
-                    closed: t('seriesClosed'),
-                  }}
-                />
+                {/* #742 / ADR-W-024: a positioned wrapper so the canvas carries the SAME corner
+                    cluster as every builder — ↺ − + from the shell contract. Zoom is view state
+                    (docs/20 §6.4): local, never in the store, reset by ↺. */}
+                {/* the wrapper is a transparent flex conduit — same column context the svg had as
+                    the card's direct child, so .gauss-plane keeps its shrink behaviour and the
+                    actions row under the canvas stays above the fold */}
+                <div ref={canvasCard} style={{ position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                  <PolarPlane
+                    scene={polarScene}
+                    showGrid={view === 'polar'}
+                    mode={view}
+                    layers={layers}
+                    zoom={canvasZoom}
+                    empty={lines.length === 0}
+                    labels={{
+                      ratio: t('seriesRatio'),
+                      limit: t('seriesLimit'),
+                      closed: t('seriesClosed'),
+                    }}
+                  />
+                  <div style={canvasClusterStyle} dir="ltr">
+                    <button type="button" style={canvasCtrlStyle} title={t('resetView')} aria-label={t('resetView')} onClick={() => setCanvasZoom(1)}>
+                      ↺
+                    </button>
+                    <button type="button" style={canvasCtrlStyle} title="zoom out" aria-label="zoom out" onClick={() => setCanvasZoom((z) => clampZoom(z / CANVAS_ZOOM_STEP))}>
+                      −
+                    </button>
+                    <button type="button" style={canvasCtrlStyle} title="zoom in" aria-label="zoom in" onClick={() => setCanvasZoom((z) => clampZoom(z * CANVAS_ZOOM_STEP))}>
+                      +
+                    </button>
+                  </div>
+                </div>
                 {layers.cycles && polarScene.cycles.length > 0 && (
                   <div className="stepper" dir="rtl">
                     <span>
@@ -433,12 +522,15 @@ export function App() {
               <button onClick={nextConfig} disabled={derived2 ? !derived2.canCycle : false}>
                 {t('anotherConfig')}
               </button>
-              <button onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
+              {/* #742: the row's buttons DISABLE on an empty figure, never hide (operator ruling —
+                  one row behaviour in every builder; the empty canvas is blank, so the view toggle
+                  has nothing to show either). */}
+              <button disabled={lines.length === 0} onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
                 {view === 'cart' ? t('viewPolar') : t('viewCart')}
               </button>
               {/* #739: the row carries clear-all in every tool (undo/redo await store temporal —
                   the named feature gap on the issue) */}
-              <button onClick={clearAll}>{t('clearAll')}</button>
+              <button disabled={lines.length === 0} onClick={clearAll}>{t('clearAll')}</button>
               {/* #722 — the ENRICHMENT layers, opt-in chips (the operator's de-clutter ruling:
                   the default canvas is points + stated elements; each S5 layer is a choice).
                   A chip renders only when the figure HAS that layer to show. */}

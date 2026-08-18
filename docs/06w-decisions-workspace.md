@@ -958,3 +958,39 @@ ADR-W-018 ("one learned interface") the drift is a defect class, not a style cho
    sources — the one-wording rule (retired variants may not reappear in any user-facing tree) and
    the placement splits — in the import-direction/isolation pattern, so builder N+1 inherits the
    contract mechanically.
+
+## ADR-W-024 — The canvas CHROME is contracted: one empty state, one corner cluster, one export home, disabled-not-hidden (#742)
+
+**Status:** accepted, 2026-08-18 · **Issue:** [#742](https://github.com/dcodish/geo_builder/issues/742) ·
+operator: "the canvas is not the same in all tools as well… the whole idea was to get a similar look
+and feel"; rulings same day: "buttons should be disabled - not hidden", "for leg 2 - i go with the
+recommendation", "3d and complex tools can have the same functionality [as the 2-D top toolbar]".
+
+**Problem.** ADR-W-018/W-019 contracted everything AROUND the canvas; the canvas renderer stayed
+per-product on purpose (three genuinely different drawing surfaces). The canvas-adjacent chrome fell
+between the two scopes and was never specified: three empty-state wordings, a six-button 2-D canvas
+toolbar beside a complex canvas with NO controls, image export in two different homes, and a row
+that hid on empty in one builder and showed in two.
+
+**Decision — four clauses, all guard-locked in `shell/__tests__/row-parity.test.ts`:**
+
+1. **One empty state.** Title «מה בונים היום?» + one hint wording in every builder (chips CONTENT
+   stays per-product — different subjects, different examples). An empty canvas is BLANK — the
+   complex plane no longer draws its grid under the overlay; axes appear with the first point.
+2. **One corner cluster.** Every canvas carries ↺ − + at the top inline-end corner — style objects
+   and the zoom step (×1.25) exist once in `shell/frame/canvasControls.ts`; each renderer keeps its
+   own zoom RANGE (the 3-D orthographic fit tolerates [0.3, 4]; the 2-D/complex planes take
+   [0.2, 8]) and its own view state (docs/20 §6.4: never in the store, never in undo). The complex
+   canvas GAINS zoom+reset; 3-D gains the − / + buttons its wheel already implied; the 2-D trio
+   moved in from the toolbar row, which keeps only the product-specific סיבוב ויישור group.
+3. **One export home.** Image exports are TOP-TOOL-ROW buttons in every builder, in the 2-D order —
+   שמור / טען / העתיקו תמונה / הורידו תמונה / [הורידו שאלה] / מדריך. The 2-D renderer no longer
+   knows exports exist (`svgToPng` moved to `src/export/`; App queries its own canvas — the 3-D
+   pattern, now in all three). **הורידו שאלה stays 2-D-only for now:** the question-docx builder is
+   a real feature to port (product isolation forbids sharing it as-is) — flagged on #742, not
+   silently built. Also flagged: `rasterCanvas` is now the workspace's THIRD product-local svg→png
+   copy — the ADR-W-016 shell threshold; a candidate for the next shell seeding pass.
+4. **Disabled, never hidden.** The under-canvas row renders always; each button disables when
+   meaningless (no facts, nothing to undo/redo, nothing to cycle). The 2-D row un-hides; 3-D and
+   complex gain the missing disabled states; the empty complex view-toggle disables (a blank canvas
+   has no view to toggle).

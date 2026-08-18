@@ -66,6 +66,8 @@ export function PolarPlane({
   mode = 'polar',
   layers = {},
   labels,
+  zoom = 1,
+  empty = false,
 }: {
   scene: Scene;
   showGrid?: boolean;
@@ -75,8 +77,21 @@ export function PolarPlane({
   mode?: 'polar' | 'cart';
   layers?: CanvasLayers;
   labels: PlaneLabels;
+  /** #742 / ADR-W-024: the corner cluster's zoom factor — multiplies the auto-fit scale. View
+   *  state, so it lives in the HOST's local state (docs/20 §6.4), never in the store. */
+  zoom?: number;
+  /** #742: an EMPTY canvas is blank white like every builder's — the grid/axes appear with the
+   *  first point (the empty-state overlay used to sit on a full coordinate plane, colliding). */
+  empty?: boolean;
 }) {
-  const k = Math.min(W, H) / 2 / scene.extent;
+  const k = (Math.min(W, H) / 2 / scene.extent) * zoom;
+  if (empty) {
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`} className="gauss-plane" style={{ direction: 'ltr' }}>
+        <rect width={W} height={H} fill="#fafaf9" />
+      </svg>
+    );
+  }
   const X = (x: number) => W / 2 + x * k;
   const Y = (y: number) => H / 2 - y * k;
   const cart = mode === 'cart';

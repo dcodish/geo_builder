@@ -51,6 +51,11 @@ const he = {
   symPow: 'חזקה',
   symMul: 'כפל',
   anotherConfig: 'הציגו תצורה אחרת', // #739: ONE wording for the row, every tool
+  // #742 / ADR-W-024: the canvas cluster + the top-row image exports — the 2-D wording, every tool.
+  resetView: 'איפוס תצוגה',
+  copyImage: 'העתיקו תמונה',
+  saveImage: 'הורידו תמונה',
+  copied: 'הועתק',
   symRe: 'החלק הממשי',
   symIm: 'החלק המדומה',
   symTheta: 'הזווית θ (פרמטר)',
@@ -166,6 +171,11 @@ const en = {
   symPow: 'power',
   symMul: 'multiply',
   anotherConfig: 'Show another configuration',
+  // #742 / ADR-W-024: the canvas cluster + the top-row image exports — the 2-D wording, every tool.
+  resetView: 'Reset view',
+  copyImage: 'Copy image',
+  saveImage: 'Save image',
+  copied: 'Copied',
   symRe: 'real part',
   symIm: 'imaginary part',
   symTheta: 'the angle θ (parameter)',

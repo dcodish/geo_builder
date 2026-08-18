@@ -32,6 +32,7 @@ import { parse3 } from './parser/parse3';
 import Figure3 from './render/Figure3';
 import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
 import { auditLoad3 } from './store/loadAudit3';
+import { useStore } from 'zustand';
 import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
 import { factDisplay3, isVectorFact3 } from './render/notation';
 import { VecMath } from './render/VecMath';
@@ -190,6 +191,10 @@ export default function App3() {
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1000px)').matches,
   );
   const [showWitness, setShowWitness] = useState(true); // #397: distance witnesses, default on
+  // #742: the row disables (never hides) — the 2-D canUndo/canRedo mechanism, mirrored.
+  const canUndo3 = useStore(useGeo3.temporal, (s) => s.pastStates.length > 0);
+  const canRedo3 = useStore(useGeo3.temporal, (s) => s.futureStates.length > 0);
+  const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>(''); // #742: top-row copy feedback
   const lastError = useGeo3((s) => s.lastError);
   const submit = useGeo3((s) => s.submit);
   const toggle = useGeo3((s) => s.toggle);
@@ -239,32 +244,56 @@ export default function App3() {
     return () => ro.disconnect();
   }, []);
 
-  const onSaveImage = () => {
+  // #742 / ADR-W-024: the raster is a helper so the top row's copy/save pair (operator: "3d and
+  // complex tools can have the same functionality") share one path.
+  const rasterCanvas = (): Promise<Blob> => {
     const svg = canvasBox.current?.querySelector('svg');
-    if (!svg) return;
+    if (!svg) return Promise.reject(new Error('no canvas'));
     const xml = new XMLSerializer().serializeToString(svg);
     const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml;charset=utf-8' }));
-    const img = new Image();
-    img.onload = () => {
-      const scale = 2;
-      const canvas = document.createElement('canvas');
-      canvas.width = svg.clientWidth * scale;
-      canvas.height = svg.clientHeight * scale;
-      const ctx = canvas.getContext('2d')!;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `figure-3d-${new Date().toISOString().slice(0, 10)}.png`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }, 'image/png');
-    };
-    img.src = url;
+    return new Promise<Blob>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = svg.clientWidth * scale;
+        canvas.height = svg.clientHeight * scale;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { URL.revokeObjectURL(url); reject(new Error('no 2d context')); return; }
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('toBlob failed'))), 'image/png');
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('svg load failed')); };
+      img.src = url;
+    });
+  };
+  const flashExport = (v: 'ok' | 'err') => {
+    setExportFlash(v);
+    window.setTimeout(() => setExportFlash(''), 1400);
+  };
+  const onSaveImage = async () => {
+    try {
+      const blob = await rasterCanvas();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `figure-3d-${new Date().toISOString().slice(0, 10)}.png`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      flashExport('err');
+    }
+  };
+  const onCopyImage = async () => {
+    try {
+      const blob = await rasterCanvas();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      flashExport('ok');
+    } catch {
+      flashExport('err');
+    }
   };
 
   const onSaveFile = () => {
@@ -451,12 +480,16 @@ export default function App3() {
             💾 {t('actions.save')}
           </ToolButton>
           <ToolButton onClick={() => fileInput.current?.click()}>📂 {t('actions.load')}</ToolButton>
+          {/* #742 / ADR-W-024 (operator: "3d and complex tools can have the same functionality"):
+              the image exports in the 2-D order, DISABLED-not-hidden on empty (today's ruling
+              supersedes the earlier appears-when-nonempty one — stable suite positions). */}
+          <ToolButton onClick={() => void onCopyImage()} disabled={facts.length === 0}>
+            {exportFlash === 'ok' ? `✓ ${t('actions.copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('actions.copyImage')}`}
+          </ToolButton>
+          <ToolButton onClick={() => void onSaveImage()} disabled={facts.length === 0}>
+            ⤓ {t('actions.saveImage')}
+          </ToolButton>
           <ToolButton onClick={() => setManualOpen(true)}>{t('manual.button')}</ToolButton>
-          {/* image export appears only once there is something to save (operator, 2026-08-18);
-              it rides LAST so the constant buttons keep their suite positions. */}
-          {facts.length > 0 && (
-            <ToolButton onClick={onSaveImage}>{t('actions.saveImage')}</ToolButton>
-          )}
         </>
       }
       roster={roster}
@@ -637,19 +670,21 @@ export default function App3() {
           {/* B6 (#671): the DOF cue moved to the data panel's head-line — its generic home across
               the builders (operator: "people who care about it will look at it"). */}
           <p className="text-xs text-slate-400">{t('hint.orbit')}</p>
+          {/* #742: the row's buttons DISABLE when meaningless, never hide (operator ruling — one
+              row behaviour in every builder; disabled styling matches the 2-D grey-out). */}
           <div className="flex flex-wrap gap-2">
             {/* #182: each store interaction logs one lean `action` line so a reported prod session
                 replays end-to-end (the 2-D #84/#189 mirror — delete logs at its own button above). */}
-            <button type="button" onClick={() => { logDebug3({ kind: 'action', action: 'show-another' }); resample(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
+            <button type="button" disabled={facts.length === 0} onClick={() => { logDebug3({ kind: 'action', action: 'show-another' }); resample(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white">
               {t('actions.another')}
             </button>
-            <button type="button" onClick={() => { logDebug3({ kind: 'action', action: 'undo' }); undo3(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
+            <button type="button" disabled={!canUndo3} onClick={() => { logDebug3({ kind: 'action', action: 'undo' }); undo3(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white">
               {t('actions.undo')}
             </button>
-            <button type="button" onClick={() => { logDebug3({ kind: 'action', action: 'redo' }); redo3(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
+            <button type="button" disabled={!canRedo3} onClick={() => { logDebug3({ kind: 'action', action: 'redo' }); redo3(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white">
               {t('actions.redo')}
             </button>
-            <button type="button" onClick={clearAll} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50">
+            <button type="button" disabled={facts.length === 0} onClick={clearAll} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50 disabled:hover:bg-white">
               {t('actions.clear')}
             </button>
             {/* #397's witness toggle moved INTO the נתונים panel (#739 — operator: "show

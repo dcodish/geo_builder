@@ -10,7 +10,7 @@
  * and `scaleInk` touches only getAttribute/setAttribute/hasAttribute/querySelectorAll.
  */
 import { describe, expect, it } from 'vitest';
-import { scaleInkForTest } from '../../render/Figure';
+import { scaleInkForTest } from '../svgToPng';
 
 function el(attrs: Record<string, string>) {
   const m = new Map(Object.entries(attrs));

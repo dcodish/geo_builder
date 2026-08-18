@@ -12,9 +12,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
 import { ANGLE_ARC_R, angleValueOffset, buildScene, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
-// #451: the ONE print width — the renderer normalises its ink to exactly the width the docx prints at,
-// so the two can never drift apart and leave the figure faint again.
-import { QUESTION_IMAGE_WIDTH_PX } from '@/export/questionDoc';
+// #742 / ADR-W-024: the canvas corner cluster (↺ − +) — one look and one arithmetic in every
+// builder, from the shell contract. (The exports left this file for the top tool row.)
+import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../../shell/frame/canvasControls';
 import type { MeasureLabels, RelationMarks, RelationPick } from './scene';
 import type { RelationsResult, ResolvedCircle } from '@/engine';
 import { findInkCrossings, drawnPointIds, resolveDrawnLines } from '@/engine';
@@ -103,8 +103,10 @@ export interface FigureProps {
   onToggleCircleHidden?: (id: Id) => void;
   /** Localised strings for the on-canvas circle menu. */
   circleMenuText?: { hide: string; show: string };
-  /** Localised strings for the figure's own toolbar (rotate/flip/centres/export/reset).
-   *  Optional — falls back to English so the renderer stays usable standalone (tests). */
+  /** Localised strings for the figure's own controls (rotate/flip/align + the corner cluster's reset).
+   *  Optional — falls back to English so the renderer stays usable standalone (tests).
+   *  #742: the export strings left with the export buttons — they live in the host's top tool row now
+   *  (`src/export/svgToPng` serialises the svg the host queries from its canvas card). */
   toolbarText?: {
     rotate90: string;
     rotate180: string;
@@ -113,29 +115,8 @@ export interface FigureProps {
     rotate: string;
     transform: string;
     alignSeg: string;
-    copyImage: string;
-    saveImage: string;
-    saveQuestion: string;
-    saveFile: string;
-    loadFile: string;
-    copied: string;
     reset: string;
   };
-  /** Save the current construction to a portable .geo.json file (FR-HS-10) — the host wires App's
-   *  `saveFigure`. When provided, "save to file" / "load from file" buttons sit in the export toolbar
-   *  next to copy/save-image (where a student reaches for "save my work"). File I/O is a store operation,
-   *  so the host owns the logic; Figure just renders the buttons and calls back (like {@link onRename}). */
-  onSaveFile?: () => void;
-  /** Open a saved figure file — the host triggers its hidden <input type=file>. Pairs with {@link onSaveFile}. */
-  onLoadFile?: () => void;
-  /** Disable "save to file" (e.g. an empty figure has nothing to save). */
-  saveFileDisabled?: boolean;
-  /** Download the built question as a .docx (FR-HS-11): Figure rasterises the clean figure
-   *  (same svgToPng path as save-image) and hands the PNG blob up; the host builds the
-   *  document from the facts and triggers the download. Rejections show the export ✕ flash. */
-  onSaveQuestion?: (png: Blob) => Promise<void>;
-  /** Disable "download question" (no enabled utterances → nothing to print). */
-  saveQuestionDisabled?: boolean;
 }
 
 interface View {
@@ -211,11 +192,6 @@ export function Figure({
   onToggleCircleHidden,
   circleMenuText,
   toolbarText,
-  onSaveFile,
-  onLoadFile,
-  saveFileDisabled,
-  onSaveQuestion,
-  saveQuestionDisabled,
 }: FigureProps) {
   // English fallbacks so the renderer works standalone (e.g. the SSR render tests, which
   // pass no toolbarText); the host (App) supplies localized Hebrew strings.
@@ -227,12 +203,6 @@ export function Figure({
     rotate: 'Rotate',
     transform: 'Rotate & align',
     alignSeg: 'Make a segment horizontal — type its two endpoints (e.g. AB) and press Enter',
-    copyImage: 'Copy image',
-    saveImage: 'Save image',
-    saveQuestion: 'Download question',
-    saveFile: 'Save to file',
-    loadFile: 'Load from file',
-    copied: 'Copied',
     reset: 'Reset view',
     ...toolbarText,
   };
@@ -246,7 +216,6 @@ export function Figure({
   const [view, setView] = useState<View>(IDENTITY);
   const [hotCross, setHotCross] = useState<number | null>(null);
   const [hotPromote, setHotPromote] = useState<Id | null>(null); // hovered anonymous promotable dot (#32)
-  const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>('');
   const [showOrient, setShowOrient] = useState(false); // the rotate/flip/align cluster — collapsed by default (declutter)
   // The on-canvas edit menu: a point (rename / hide) or a segment (hide / dashed), where (container px),
   // and a transient note (e.g. "taken").
@@ -289,42 +258,6 @@ export function Figure({
     const res = onRename(id, to);
     if (res.ok) setMenu(null);
     else setMenuNote(res.reason === 'target-taken' ? (pointMenuText?.taken ?? 'taken') : (pointMenuText?.bad ?? ''));
-  }
-
-  async function saveImage() {
-    if (!svgRef.current) return;
-    try {
-      const blob = await svgToPng(svgRef.current);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'figure.png';
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      setExportFlash('err');
-      window.setTimeout(() => setExportFlash(''), 1400);
-    }
-  }
-  async function saveQuestion() {
-    if (!svgRef.current || !onSaveQuestion) return;
-    try {
-      await onSaveQuestion(await svgToPng(svgRef.current, 2, QUESTION_IMAGE_WIDTH_PX));
-    } catch {
-      setExportFlash('err');
-      window.setTimeout(() => setExportFlash(''), 1400);
-    }
-  }
-  async function copyImage() {
-    if (!svgRef.current) return;
-    try {
-      const blob = await svgToPng(svgRef.current);
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      setExportFlash('ok');
-    } catch {
-      setExportFlash('err');
-    }
-    window.setTimeout(() => setExportFlash(''), 1400);
   }
 
   const { scene, transform, crossings, labelDirs, oriented } = useMemo(() => {
@@ -443,7 +376,7 @@ export function Figure({
     const onWheelNative = (e: WheelEvent) => {
       e.preventDefault();
       const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-      setView((v) => ({ ...v, zoom: clamp(v.zoom * factor, 0.2, 8) }));
+      setView((v) => ({ ...v, zoom: clampZoom(v.zoom * factor) }));
     };
     el.addEventListener('wheel', onWheelNative, { passive: false });
     return () => el.removeEventListener('wheel', onWheelNative);
@@ -502,7 +435,7 @@ export function Figure({
       const p = pinchState();
       if (!p) return;
       // zoom about the fingers' midpoint: the world point under mid₀ stays under mid as it moves
-      const zoom = clamp(pz.zoom * (p.dist / pz.dist), 0.2, 8);
+      const zoom = clampZoom(pz.zoom * (p.dist / pz.dist));
       const k = zoom / pz.zoom;
       setView((v) => ({ ...v, zoom, panX: p.mid.x - k * (pz.mid.x - pz.panX), panY: p.mid.y - k * (pz.mid.y - pz.panY) }));
       return;
@@ -1090,6 +1023,21 @@ export function Figure({
         </g>
       </svg>
 
+      {/* #742 / ADR-W-024: the canvas corner cluster — ↺ − +, the SAME cluster every builder's
+          canvas carries (shared style + zoom arithmetic from shell/frame/canvasControls). The zoom
+          buttons are the touch-first fallback for wheel/pinch (F2), handy for mice. */}
+      <div style={canvasClusterStyle} dir="ltr">
+        <button type="button" style={canvasCtrlStyle} onClick={() => setView(IDENTITY)} title={tt.reset} aria-label={tt.reset}>
+          ↺
+        </button>
+        <button type="button" style={canvasCtrlStyle} title="zoom out" aria-label="zoom out" onClick={() => setView((v) => ({ ...v, zoom: clampZoom(v.zoom / CANVAS_ZOOM_STEP) }))}>
+          −
+        </button>
+        <button type="button" style={canvasCtrlStyle} title="zoom in" aria-label="zoom in" onClick={() => setView((v) => ({ ...v, zoom: clampZoom(v.zoom * CANVAS_ZOOM_STEP) }))}>
+          +
+        </button>
+      </div>
+
       {/* On-canvas edit menu (FR-RN-10): click a POINT to rename it or hide/show its label+dot, or a
           SEGMENT to hide/show it or make it dashed/solid. A transparent backdrop closes it on outside click. */}
       {menu && (menu.kind === 'point' ? editable : menu.kind === 'segment' ? segEditable : circEditable) && (
@@ -1248,162 +1196,22 @@ export function Figure({
         )}
       </div>
 
-      {/* One toolbar TRAY (GUI overhaul): file pair | image pair | zoom trio, separated by thin
-          dividers inside a single rounded container — reads as one toolbar instead of seven
-          scattered buttons of three different shapes. */}
-      <div style={{ ...toolbarTray, marginInlineStart: 'auto', justifyContent: 'flex-end' }}>
-        {/* Save / load the construction as a .geo.json file (FR-HS-10) — grouped with the image exports
-            because a student reaches for "save my work" in the same place. A slate variant marks them as
-            the file pair, distinct from the blue image pair; the host owns the actual file I/O. */}
-        {onSaveFile && (
-          <button
-            type="button"
-            style={{ ...fileBtn, ...(saveFileDisabled ? { opacity: 0.5, cursor: 'default' } : null) }}
-            title={tt.saveFile}
-            aria-label={tt.saveFile}
-            disabled={saveFileDisabled}
-            onClick={onSaveFile}
-          >
-            {tt.saveFile}
-          </button>
-        )}
-        {onLoadFile && (
-          <button type="button" style={fileBtn} title={tt.loadFile} aria-label={tt.loadFile} onClick={onLoadFile}>
-            {tt.loadFile}
-          </button>
-        )}
-        {(onSaveFile || onLoadFile) && <span style={traySep} aria-hidden />}
-        {/* Export — most-used by teachers, so these are prominent labeled buttons. */}
-        <button
-          type="button"
-          style={{ ...exportBtn, ...(exportFlash === 'ok' ? { background: '#dcfce7', borderColor: '#86efac', color: '#166534' } : exportFlash === 'err' ? { background: '#fee2e2', borderColor: '#fca5a5', color: '#991b1b' } : null) }}
-          title={tt.copyImage}
-          aria-label={tt.copyImage}
-          onClick={copyImage}
-        >
-          {exportFlash === 'ok' ? `✓ ${tt.copied}` : exportFlash === 'err' ? '✕' : `⧉ ${tt.copyImage}`}
-        </button>
-        <button type="button" style={exportBtn} title={tt.saveImage} aria-label={tt.saveImage} onClick={saveImage}>
-          ⤓ {tt.saveImage}
-        </button>
-        {/* Download the question as a Word document (FR-HS-11) — the figure beside the typed givens. */}
-        {onSaveQuestion && (
-          <button
-            type="button"
-            style={{ ...exportBtn, ...(saveQuestionDisabled ? { opacity: 0.5, cursor: 'default' } : null) }}
-            title={tt.saveQuestion}
-            aria-label={tt.saveQuestion}
-            disabled={saveQuestionDisabled}
-            onClick={saveQuestion}
-          >
-            ⤓ {tt.saveQuestion}
-          </button>
-        )}
-        <span style={traySep} aria-hidden />
-        {/* Zoom buttons (F2) — the touch-first fallback for wheel zoom (pinch works too); handy for mice. */}
-        <button type="button" style={ctrlBtn} title="zoom in" aria-label="zoom in" onClick={() => setView((v) => ({ ...v, zoom: clamp(v.zoom * 1.25, 0.2, 8) }))}>
-          +
-        </button>
-        <button type="button" style={ctrlBtn} title="zoom out" aria-label="zoom out" onClick={() => setView((v) => ({ ...v, zoom: clamp(v.zoom / 1.25, 0.2, 8) }))}>
-          −
-        </button>
-        <button type="button" onClick={() => setView(IDENTITY)} style={ctrlBtn} title={tt.reset} aria-label={tt.reset}>
-          ↺
-        </button>
-      </div>
+      {/* #742: the export tray left for the host's top tool row (one home in every builder);
+          the zoom trio moved into the canvas corner as the SHARED cluster. */}
       </div>
     </div>
   );
 }
 
-/**
- * Rasterise the live SVG figure to a PNG blob — for "save image" / "copy image".
- * Browser-only (uses Image/canvas/DOM); never called during the SSR render tests.
- * A white rect is painted first so the PNG isn't transparent; `scale` over-samples
- * for a crisp result. `encodeURIComponent` (not btoa) carries Hebrew labels safely.
- */
-/**
- * #451 — normalise the INK to the printed size.
- *
- * `r`, `stroke` and `fontSize` are absolute pixel constants in the SOURCE canvas, and the `.docx` prints
- * the PNG at a fixed physical width. So the printed line weight and label size were
- * `constant x (printedWidth / canvasWidth)` — on a ~700 px canvas printed at 8 cm that is 0.43x, i.e. a
- * 0.65 px line and a ~1.8 mm label: the operator's "not really useful". Worse, it made the printed figure
- * depend on the SIZE OF THE USER'S BROWSER WINDOW — a wide monitor exported a fainter, smaller-lettered
- * figure than a narrow one, for the same construction.
- *
- * This is [ADR-3D-098](../../docs/06b-decisions-3d.md#adr-3d-098) in the print dimension: an annotation's
- * weight is a property of the OUTPUT medium, never of the source geometry. Passing the print width makes
- * the ink deterministic — scaled by `canvasWidth / printWidth`, so after the page's downscale it lands at
- * exactly the weight the constants describe, whatever the window.
- *
- * The 2x oversample is unrelated and stays: it buys resolution, never apparent size.
- */
-export function scaleInkForTest(root: SVGSVGElement, k: number): void { scaleInk(root, k); }
-
-function scaleInk(root: SVGSVGElement, k: number): void {
-  if (!(k > 0) || Math.abs(k - 1) < 1e-6) return;
-  const num = (v: string | null) => (v === null ? null : Number.parseFloat(v));
-  for (const el of [...root.querySelectorAll<SVGElement>('*')]) {
-    const sw = num(el.getAttribute('stroke-width'));
-    if (sw !== null && Number.isFinite(sw)) el.setAttribute('stroke-width', String(sw * k));
-    const fs = num(el.getAttribute('font-size'));
-    if (fs !== null && Number.isFinite(fs)) el.setAttribute('font-size', String(fs * k));
-    const da = el.getAttribute('stroke-dasharray');
-    if (da) el.setAttribute('stroke-dasharray', da.trim().split(/[\s,]+/).map((v) => String(Number.parseFloat(v) * k)).join(' '));
-    // only a POINT DOT's radius is ink; a drawn circle's `r` is GEOMETRY and must never be touched
-    if (el.hasAttribute('data-ink-dot')) {
-      const rr = num(el.getAttribute('r'));
-      if (rr !== null && Number.isFinite(rr)) el.setAttribute('r', String(rr * k));
-    }
-  }
-}
-
-async function svgToPng(svg: SVGSVGElement, scale = 2, printWidthPx?: number): Promise<Blob> {
-  const w = Number(svg.getAttribute('width')) || svg.clientWidth || 600;
-  const h = Number(svg.getAttribute('height')) || svg.clientHeight || 600;
-  const clone = svg.cloneNode(true) as SVGSVGElement;
-  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-  // CLEAN export (F3/REN-3): the live SVG carries interaction visuals a worksheet must not bake in —
-  // crossing suggestion dots, hidden-item ghosts, hover relation marks, highlight overlays (all tagged
-  // `data-noexport`), and selection accents (tagged with their base values). Strip / revert on the CLONE.
-  for (const el of [...clone.querySelectorAll('[data-noexport]')]) el.remove();
-  const revert = (attr: string, target: string) => {
-    for (const el of clone.querySelectorAll(`[${attr}]`)) el.setAttribute(target, el.getAttribute(attr)!);
-  };
-  revert('data-export-stroke', 'stroke');
-  revert('data-export-width', 'stroke-width');
-  revert('data-export-fill', 'fill');
-  revert('data-export-r', 'r');
-  revert('data-export-weight', 'font-weight');
-  if (printWidthPx) scaleInk(clone, w / printWidthPx); // #451 — ink is a property of the PRINTED page
-  const data = new XMLSerializer().serializeToString(clone);
-  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data)}`;
-  const img = new Image();
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error('svg load failed'));
-    img.src = url;
-  });
-  const canvas = document.createElement('canvas');
-  canvas.width = w * scale;
-  canvas.height = h * scale;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('no 2d context');
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png'));
-}
+// (scaleInk + svgToPng moved to src/export/svgToPng.ts — #742: the exports are the HOST's now.)
 
 // The toolbar ROW — sits ABOVE the SVG in normal flow (visual order 1, the SVG area is order 2), wrapping so
-// that on a narrow screen the trays drop to a second line instead of overlapping / disappearing behind the
-// canvas (the operator's report). The orientation tray sits at the start; the export tray is pushed to the
-// end with `marginInlineStart:auto`, and wraps below it when there isn't room.
+// that on a narrow screen the tray drops to a second line instead of overlapping / disappearing behind the
+// canvas (the operator's report). #742: only the orientation tray remains — the exports moved to the top
+// tool row and the zoom trio into the canvas corner cluster.
 const toolbarRow: CSSProperties = { order: 1, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' };
-// The one toolbar tray container — both canvas clusters (transform at the start edge,
-// file/export/zoom at the end edge) share it so the controls read as toolbars, not
-// scattered buttons (GUI overhaul).
+// The toolbar tray container — the orientation cluster shares it so the controls read as a
+// toolbar, not scattered buttons (GUI overhaul).
 const toolbarTray: CSSProperties = {
   display: 'flex',
   gap: 4,
@@ -1415,8 +1223,6 @@ const toolbarTray: CSSProperties = {
   padding: 4,
   boxShadow: '0 1px 4px rgba(15,23,42,0.06)',
 };
-// A thin vertical divider between tray groups (file | image | zoom).
-const traySep: CSSProperties = { width: 1, alignSelf: 'stretch', background: '#e2e8f0', margin: '2px 1px' };
 const ctrlBtn: CSSProperties = {
   padding: '5px 9px',
   fontSize: 13,
@@ -1446,31 +1252,6 @@ const orientPopover: CSSProperties = {
   padding: 6,
   boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
 };
-// The export (copy / download) buttons — prominent + labeled, since teachers rely on them most.
-const exportBtn: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 5,
-  padding: '5px 10px',
-  fontSize: 12.5,
-  fontWeight: 600,
-  lineHeight: 1.2,
-  borderRadius: 6,
-  border: '1px solid #bfdbfe',
-  background: '#eff6ff',
-  color: '#1e40af',
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
-};
-// The save/load-FILE pair (FR-HS-10) — same shape as {@link exportBtn} but slate, so it reads as a
-// distinct group from the blue copy/save-IMAGE pair it sits beside in the toolbar.
-const fileBtn: CSSProperties = {
-  ...exportBtn,
-  border: '1px solid #cbd5e1',
-  background: '#f8fafc',
-  color: '#334155',
-};
-
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
 const unitVec = (v: Vec): Vec => {
   const l = Math.hypot(v.x, v.y);
