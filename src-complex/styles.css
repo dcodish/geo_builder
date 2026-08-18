@@ -13,7 +13,9 @@ body {
 /* Full-width app (operator, 2026-08-17: "a lot of wasted space to the left and right") — the
    canvas takes the stretch; the side columns hold their widths. The shared frame rows use the
    same edge padding so all three levels align. */
-.app { max-width: none; margin: 0 auto; padding: 4px 20px 16px; }
+/* #734: the page padding is the WORKBENCH's — the wrapper adds none, so the zones sit at the
+   same pixels as in every other tool. */
+.app { max-width: none; margin: 0; padding: 0; }
 main { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
 /* RTL flex: DOM order panel → canvas → data renders right → centre → left (D1's sides). */
 .panel { flex: 1 1 340px; min-width: 320px; display: flex; flex-direction: column; gap: 12px; }
