@@ -1,4 +1,4 @@
-/**
+﻿/**
  * The 3-D tool's shell (docs/20 §6.6) — V0 minimal: input → parse → fact list →
  * derived figure on the orbitable canvas. RTL Hebrew default. A deliberate
  * rewrite-following-the-template of the 2-D App (pattern-copy, no imports from
@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 // The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
 import { AppFrame } from '../shell/frame/AppFrame';
+import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
@@ -634,11 +635,8 @@ export default function App3() {
             crossingLabel={t('actions.nameCrossing')}
             onNameCrossing={onNameCrossing}
           />
-          {facts.length > 0 && (
-            <p className="text-xs text-slate-500" data-testid="dof-cue">
-              {dof === 0 ? t('cue.determined') : t('cue.free', { n: dof })}
-            </p>
-          )}
+          {/* B6 (#671): the DOF cue moved to the data panel's head-line — its generic home across
+              the builders (operator: "people who care about it will look at it"). */}
           <p className="text-xs text-slate-400">{t('hint.orbit')}</p>
           <div className="flex flex-wrap gap-2">
             {/* #182: each store interaction logs one lean `action` line so a reported prod session
@@ -673,137 +671,146 @@ export default function App3() {
             <input type="checkbox" checked={showWitness} onChange={(e) => setShowWitness(e.target.checked)} />
             {t('display.witnesses')}
           </label>
-          {showData && (
-            /* #274 (ADR-3D-057): the query lane — ask for a quantity («w·v», «|AB|», «∠SAB», «area ABC»,
-               «volume SABCD») and see it if it's genuinely determined. A question, never a fact. */
-            <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 text-sm">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  addQuery(queryText);
-                  setQueryText('');
-                }}
-                className="flex gap-1"
-              >
-                <input
-                  dir="ltr"
-                  value={queryText}
-                  onChange={(e) => setQueryText(e.target.value)}
-                  placeholder={t('query.placeholder')}
-                  className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1 text-sm"
-                />
-                <button type="submit" className="rounded-lg bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700">
-                  {t('query.add')}
-                </button>
-              </form>
-              {queryResults.length > 0 && (
-                <ul className="mt-2 flex flex-col gap-1">
-                  {/* #398 (ADR-3D-108): per-row dir="auto" — a Hebrew query («המרחק בין D למישור ABC»)
-                      lays out RTL with the math tokens as isolated LTR islands (the ADR-3D-031 Am. 2
-                      bidi rule, panel edition); a symbol-only query (|AB|, w·v) stays LTR. The old
-                      list-wide dir="ltr" scrambled every Hebrew sentence. */}
-                  {queryResults.map((r, i) => (
-                    <li key={r.text + i} dir="auto" className="flex items-center justify-between gap-2 border-b border-slate-100 pb-1 last:border-0">
-                      <span>
-                        <VecMath text={r.text} vecNames={new Set(derived.construction.vectors.keys())} />
-                        {r.answer !== null ? (
-                          <span className="font-medium">
-                            {' = '}
-                            <VecMath text={r.answer} vecNames={new Set(derived.construction.vectors.keys())} />
-                          </span>
-                        ) : (
-                          <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>
-                        )}
-                      </span>
-                      <button type="button" onClick={() => removeQuery(i)} className="shrink-0 text-slate-400 hover:text-rose-600" aria-label={t('query.remove')}>
-                        ×
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
+          {/* B6 (#671): the D8 SKELETON via the SHARED DataPanel — the same sections in the same
+              order as every builder (points · measures · relations · parameters · ask), an empty
+              section absent. The head-line is the DOF cue's generic home. The query lane
+              (#274, ADR-3D-057: a question, never a fact) IS this product's ask section. */}
           {showData && dataPanel && (
             <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
-              {panelIsEmpty(dataPanel) ? (
-                <p className="text-slate-400">{t('dataPanel.empty')}</p>
-              ) : (
-                <ul className="flex flex-col gap-1">
-                  {/* #559 (ADR-3D-156): the list carries NO `dir` — it follows the app, which is RTL
-                      by default. It used to be `dir="ltr"` list-wide, so in the Hebrew app the
-                      math-only rows hugged the LEFT edge while the Hebrew `mutual` rows (which
-                      carried their own per-row dir) hugged the right: one panel, two edges. This is
-                      the #398/ADR-3D-108 fix the query list above already got, applied to the list
-                      that predates it. */}
-                  {dataPanel.relations.map((r) => (
-                    <li key={r} className="border-b border-slate-100 pb-1 font-medium">
-                      <MathRun>{r}</MathRun>
-                    </li>
-                  ))}
-                  {/* S4 (#378): mutual positions read as WORDS in the reader's language — there is no
-                      standard symbol for skew lines. #559: the direction comes from `textDir3`, NOT
-                      `dir="auto"` — these rows routinely START with a Latin point label («AB ו-CD
-                      מצטלבים»), and auto keys off the FIRST strong character, so the Hebrew sentence
-                      would take an LTR base and reorder into garbage (the ADR-312/#118 trap). */}
-                  {/* #577 (ADR-3D-154): a LINEAR×PLANAR row words asymmetrically — «FG מקביל למישור
-                      ABCD», never the symmetric «מקבילים», which misreads for a plane. The row says
-                      which kind it is, so the key is picked, never guessed from the labels. */}
-                  {dataPanel.mutual.map((m) => {
-                    const line = t(
-                      m.mixed && (m.rel === 'parallel' || m.rel === 'perpendicular')
-                        ? `dataPanel.mutual.${m.rel === 'parallel' ? 'parallelPlane' : 'perpendicularPlane'}`
-                        : `dataPanel.mutual.${m.rel}`,
-                      { a: m.a, b: m.b },
-                    );
-                    return (
-                      <li key={`${m.rel}-${m.a}-${m.b}`} dir={textDir3(line)} className="border-b border-slate-100 pb-1 font-medium">
-                        {line}
-                      </li>
-                    );
-                  })}
-                  {dataPanel.vectors.map((v) => (
-                    <li key={v.label} className="border-b border-slate-100 pb-1 last:border-0">
-                      {v.decomp && (
-                        <div>
-                          <VecMath text={`${v.label} = ${v.decomp}`} vecNames={new Set(derived.construction.vectors.keys())} />
-                        </div>
-                      )}
-                      {v.coords && (
-                        <div>
-                          <VecMath text={`${v.label} = ${v.coords}`} vecNames={new Set(derived.construction.vectors.keys())} />
-                        </div>
-                      )}
-                      {v.mag && (
-                        <div>
-                          <MathRun>{v.mag}{v.sq ? ' \u00A0·\u00A0 ' + v.sq : ''}</MathRun>
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                  {dataPanel.points.map((p) => (
-                    <li key={p}>
-                      <MathRun>{p}</MathRun>
-                    </li>
-                  ))}
-                  {/* #325 (ADR-3D-079 Am. 2): the open symbols of B(2t,t,k) — a determined value
-                      prints, a free one reads open with a hint, so the given visibly registered */}
-                  {dataPanel.params.map((p) => (
-                    <li key={p.sym} className={p.open ? 'text-slate-500' : undefined}>
-                      <MathRun>{p.text}</MathRun>
-                      {/* #559: the hint is Hebrew and now sits in a row that follows the app's own
-                          direction, so it needs no `dir` of its own; the logical `ms-1` replaces
-                          `mr-1`, which was a physical LEFT margin in an RTL list. */}
-                      {p.open && <span className="ms-1 text-xs text-slate-400">— {t('dataPanel.openParam')}</span>}
-                    </li>
-                  ))}
-                  {dataPanel.planes.map((p) => (
-                    <li key={p} className="border-t border-slate-100 pt-1">
-                      <MathRun>{p}</MathRun>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <DataPanel
+                status={facts.length > 0 ? (dof === 0 ? t('cue.determined') : t('cue.free', { n: dof })) : undefined}
+                sections={[
+                  {
+                    key: 'points',
+                    title: t('dataPanel.secPoints'),
+                    dir: 'app',
+                    rows: dataPanel.points.map((p) => <MathRun key={p}>{p}</MathRun>),
+                  },
+                  {
+                    /* the vectors' decomp/coords/magnitude readings + the plane equations — this
+                       product's MEASURES rows. Rows follow the APP's direction with math as inner
+                       LTR islands (#559, ADR-3D-156: a list-wide dir made one panel hug two edges). */
+                    key: 'measures',
+                    title: t('dataPanel.secMeasures'),
+                    dir: 'app',
+                    rows: [
+                      ...dataPanel.vectors.map((v) => (
+                        <span key={v.label}>
+                          {v.decomp && (
+                            <div>
+                              <VecMath text={`${v.label} = ${v.decomp}`} vecNames={new Set(derived.construction.vectors.keys())} />
+                            </div>
+                          )}
+                          {v.coords && (
+                            <div>
+                              <VecMath text={`${v.label} = ${v.coords}`} vecNames={new Set(derived.construction.vectors.keys())} />
+                            </div>
+                          )}
+                          {v.mag && (
+                            <div>
+                              <MathRun>{v.mag}{v.sq ? ' · ' + v.sq : ''}</MathRun>
+                            </div>
+                          )}
+                        </span>
+                      )),
+                      ...dataPanel.planes.map((p) => <MathRun key={p}>{p}</MathRun>),
+                    ],
+                  },
+                  {
+                    /* S4 (#378): mutual positions read as WORDS in the reader's language — there is
+                       no standard symbol for skew lines. #559: their dir comes from `textDir3`, NOT
+                       `dir="auto"` — these rows routinely START with a Latin point label («AB ו-CD
+                       מצטלבים»), and auto keys off the FIRST strong character (the ADR-312/#118
+                       trap). #577 (ADR-3D-154): a LINEAR×PLANAR row words asymmetrically — «FG
+                       מקביל למישור ABCD» — the row says which kind it is, never guessed from labels. */
+                    key: 'relations',
+                    title: t('dataPanel.secRelations'),
+                    dir: 'app',
+                    rows: [
+                      ...dataPanel.relations.map((r) => (
+                        <span key={r} className="font-medium">
+                          <MathRun>{r}</MathRun>
+                        </span>
+                      )),
+                      ...dataPanel.mutual.map((m) => {
+                        const line = t(
+                          m.mixed && (m.rel === 'parallel' || m.rel === 'perpendicular')
+                            ? `dataPanel.mutual.${m.rel === 'parallel' ? 'parallelPlane' : 'perpendicularPlane'}`
+                            : `dataPanel.mutual.${m.rel}`,
+                          { a: m.a, b: m.b },
+                        );
+                        return (
+                          <span key={`${m.rel}-${m.a}-${m.b}`} dir={textDir3(line)} className="block font-medium">
+                            {line}
+                          </span>
+                        );
+                      }),
+                    ],
+                  },
+                  {
+                    /* #325 (ADR-3D-079 Am. 2): a determined value prints, a free one reads open
+                       with a hint, so the given visibly registered */
+                    key: 'parameters',
+                    title: t('dataPanel.secParams'),
+                    dir: 'app',
+                    rows: dataPanel.params.map((p) => (
+                      <span key={p.sym} className={p.open ? 'text-slate-500' : undefined}>
+                        <MathRun>{p.text}</MathRun>
+                        {p.open && <span className="ms-1 text-xs text-slate-400">— {t('dataPanel.openParam')}</span>}
+                      </span>
+                    )),
+                  },
+                  {
+                    /* #274 (ADR-3D-057): the query lane — a question, never a fact. #398
+                       (ADR-3D-108): per-ROW dir="auto" — a Hebrew query lays out RTL with the math
+                       tokens as isolated LTR islands; a symbol-only query (|AB|, w·v) stays LTR. */
+                    key: 'ask',
+                    title: t('dataPanel.secAsk'),
+                    dir: 'app',
+                    rows: queryResults.map((r, i) => (
+                      <span key={r.text + i} dir="auto" className="flex items-center justify-between gap-2">
+                        <span>
+                          <VecMath text={r.text} vecNames={new Set(derived.construction.vectors.keys())} />
+                          {r.answer !== null ? (
+                            <span className="font-medium">
+                              {' = '}
+                              <VecMath text={r.answer} vecNames={new Set(derived.construction.vectors.keys())} />
+                            </span>
+                          ) : (
+                            <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>
+                          )}
+                        </span>
+                        <button type="button" onClick={() => removeQuery(i)} className="shrink-0 text-slate-400 hover:text-rose-600" aria-label={t('query.remove')}>
+                          ×
+                        </button>
+                      </span>
+                    )),
+                  },
+                ]}
+              >
+                {panelIsEmpty(dataPanel) && queryResults.length === 0 && (
+                  <p className="text-slate-400">{t('dataPanel.empty')}</p>
+                )}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    addQuery(queryText);
+                    setQueryText('');
+                  }}
+                  className="flex gap-1"
+                >
+                  <input
+                    dir="ltr"
+                    value={queryText}
+                    onChange={(e) => setQueryText(e.target.value)}
+                    placeholder={t('query.placeholder')}
+                    className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                  />
+                  <button type="submit" className="rounded-lg bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700">
+                    {t('query.add')}
+                  </button>
+                </form>
+              </DataPanel>
             </div>
           )}
         </section>

@@ -92,6 +92,12 @@ const he = {
   factToggle: 'כלול בציור',
   factEdit: 'עריכה במקום',
   factDelete: 'מחיקה',
+  // B6 (D8): the data-panel skeleton — same sections, same order, in every builder.
+  secPoints: 'נקודות',
+  secMeasures: 'מדידות',
+  secRelations: 'יחסים',
+  secAsk: 'חישוב',
+  sampledLegend: '~ = ערך שנדגם, לא נתון — «אפשרות נוספת» דוגמת מחדש',
   // S5 — the visualization layer (#622)
   stepperLabel: 'מחזור החזקות: n',
   stepBack: 'הקודם',
@@ -184,6 +190,12 @@ const en = {
   factToggle: 'Include in the figure',
   factEdit: 'Edit in place',
   factDelete: 'Delete',
+  // B6 (D8): the data-panel skeleton — same sections, same order, in every builder.
+  secPoints: 'Points',
+  secMeasures: 'Measures',
+  secRelations: 'Relations',
+  secAsk: 'Calculate',
+  sampledLegend: '~ = sampled value, not a given — "Another configuration" resamples',
   // S5 — the visualization layer (#622)
   stepperLabel: 'power cycle: n',
   stepBack: 'previous',

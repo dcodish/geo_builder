@@ -410,32 +410,41 @@ describe('#531 (ADR-3D-144) — display-layer transforms can never reach the par
  */
 describe('#559 — the data panel follows the app direction, per-row', () => {
   const app = readFileSync(join(__dirname, '..', 'App3.tsx'), 'utf8');
-  /** The data-panel <ul> and everything under it, up to its close. */
+  /** The data-panel block — since B6 (#671) the rows live inside the shared <DataPanel>. */
   const panelBlock = (() => {
     const start = app.indexOf('{showData && dataPanel && (');
     expect(start, 'the data panel block must be findable').toBeGreaterThan(0);
-    return app.slice(start, app.indexOf('</ul>', start));
+    const end = app.indexOf('</DataPanel>', start);
+    expect(end, 'the shared DataPanel must close inside the block').toBeGreaterThan(start);
+    return app.slice(start, end);
   })();
   /** The same block with JSX comments removed — assertions about MARKUP must not read prose. */
   const panelMarkup = panelBlock.replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
 
-  it('the list carries NO list-wide dir — the whole panel follows the app (the actual bug)', () => {
-    const ul = panelBlock.slice(panelBlock.indexOf('<ul'), panelBlock.indexOf('>', panelBlock.indexOf('<ul')));
-    expect(ul).not.toContain('dir=');
+  it('no section imposes a direction — every 3-D section follows the app (the actual #559 bug)', () => {
+    // B6 moved the list into the shared DataPanel, whose rows default to dir="ltr"; a section that
+    // forgets `dir: 'app'` re-creates the list-wide override this lock exists to prevent. (The
+    // chrome side — an 'app' row rendering NO dir of its own — is locked in shell/__tests__.)
+    const sections = panelMarkup.match(/key: '[a-z]+',/g) ?? [];
+    expect(sections.length, 'the five skeleton sections').toBe(5);
+    expect(panelMarkup.match(/dir: 'app',/g) ?? []).toHaveLength(sections.length);
   });
 
   it('the Hebrew `mutual` rows use textDir3, NOT dir="auto" (the ADR-312 first-strong trap)', () => {
     // «AB ו-CD מצטלבים» STARTS with a Latin label, so `auto` would give the Hebrew sentence an LTR
-    // base and reorder it into garbage — the exact 2-D #118 lesson this tree copied as `textDir3`
+    // base and reorder it into garbage — the exact 2-D #118 lesson this tree copied as `textDir3`.
+    // The no-auto assertion scans only the MUTUAL mapping: since B6 the query lane shares this
+    // block, and ITS per-row dir="auto" is #398's own deliberate contract (symbol-only queries).
     expect(panelMarkup).toContain('dir={textDir3(line)}');
-    expect(panelMarkup, 'no row may fall back to auto').not.toContain('dir="auto"');
+    const mutual = panelMarkup.slice(panelMarkup.indexOf('dataPanel.mutual'), panelMarkup.indexOf('dataPanel.params'));
+    expect(mutual, 'a mutual row may never fall back to auto').not.toContain('dir="auto"');
   });
 
   it('math-only rows are wrapped in MathRun, so their row still aligns with the app', () => {
     for (const rows of ['dataPanel.relations', 'dataPanel.points', 'dataPanel.planes', 'dataPanel.params']) {
       const i = panelBlock.indexOf(rows);
       expect(i, `${rows} must be in the panel`).toBeGreaterThan(0);
-      expect(panelBlock.slice(i, i + 400), `${rows} rows lay their math out LTR`).toContain('<MathRun>');
+      expect(panelBlock.slice(i, i + 400), `${rows} rows lay their math out LTR`).toContain('<MathRun');
     }
   });
 

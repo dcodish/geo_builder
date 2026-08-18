@@ -330,7 +330,10 @@ export function PolarPlane({
               textAnchor={left ? 'end' : 'start'}
               style={{ userSelect: 'none' }}
             >
-              {p.reading}
+              {/* B6 (#671, operator's de-clutter ruling): the canvas carries the NAME only — the
+                  full reading (value, ~ marks) lives in the data panel's points section. Both still
+                  print what derive2's stage 5d composed (#653/#675: one source, two surfaces). */}
+              {p.label}
             </text>
           </g>
         );
