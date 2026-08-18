@@ -35,6 +35,20 @@ describe('DataPanel', () => {
     expect(without).not.toContain('דרגות חופש');
   });
 
+  it('the shared head: one title, one toggle; closed = head only (the one-trigger ruling)', () => {
+    const open = renderToStaticMarkup(
+      <DataPanel title="נתונים" open={true} onToggle={() => {}} showLabel="הצגה" hideLabel="הסתרה" sections={SECTIONS} />,
+    );
+    expect(open).toContain('נתונים');
+    expect(open).toContain('הסתרה'); // open shows the hide label
+    expect(open).toContain('נקודות');
+    const closed = renderToStaticMarkup(
+      <DataPanel title="נתונים" open={false} onToggle={() => {}} showLabel="הצגה" hideLabel="הסתרה" sections={SECTIONS} />,
+    );
+    expect(closed).toContain('הצגה'); // closed shows the show label
+    expect(closed).not.toContain('נקודות'); // ...and no content
+  });
+
   it('value rows are LTR; app-direction rows carry no dir of their own (#559)', () => {
     const html = renderToStaticMarkup(
       <DataPanel

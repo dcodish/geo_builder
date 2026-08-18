@@ -83,7 +83,10 @@ const he = {
   // B2 (#667): the opt-in data column (D1) — values/knowledge only; refusals stay on the canvas strip.
   dataShow: 'נתונים',
   dataHide: 'הסתר נתונים',
-  dataTitle: 'מה הציור יודע',
+  // B6 follow-up (operator 2026-08-18): ONE panel wording across the builders — «נתונים», הצגה/הסתרה.
+  dataTitle: 'נתונים',
+  panelShow: 'הצגה',
+  panelHide: 'הסתרה',
   namePlaceholder: 'שם השרטוט (לא חובה)',
   // B4 (D9b): the empty-canvas quick chips — the inviting first click.
   emptyTitle: 'מה בונים היום?',
@@ -97,7 +100,6 @@ const he = {
   secMeasures: 'מדידות',
   secRelations: 'יחסים',
   secAsk: 'חישוב',
-  sampledLegend: '~ = ערך שנדגם, לא נתון — «אפשרות נוספת» דוגמת מחדש',
   // S5 — the visualization layer (#622)
   stepperLabel: 'מחזור החזקות: n',
   stepBack: 'הקודם',
@@ -181,7 +183,10 @@ const en = {
   // B2 (#667): the opt-in data column (D1) — values/knowledge only; refusals stay on the canvas strip.
   dataShow: 'Data',
   dataHide: 'Hide data',
-  dataTitle: 'What the figure knows',
+  // B6 follow-up (operator 2026-08-18): ONE panel wording across the builders.
+  dataTitle: 'Data',
+  panelShow: 'Show',
+  panelHide: 'Hide',
   namePlaceholder: 'Figure name (optional)',
   // B4 (D9b): the empty-canvas quick chips — the inviting first click.
   emptyTitle: 'What are we building today?',
@@ -195,7 +200,6 @@ const en = {
   secMeasures: 'Measures',
   secRelations: 'Relations',
   secAsk: 'Calculate',
-  sampledLegend: '~ = sampled value, not a given — "Another configuration" resamples',
   // S5 — the visualization layer (#622)
   stepperLabel: 'power cycle: n',
   stepBack: 'previous',

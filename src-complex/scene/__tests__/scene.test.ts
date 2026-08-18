@@ -120,9 +120,14 @@ describe('honesty travels with the geometry, not with the consumer', () => {
     expect(s.radii).toHaveLength(2);
   });
 
-  it('a sampled value still reads — as an approximation, with the sampled halves marked', () => {
-    // withholding the reading is not the honest move; saying which half was sampled is
-    expect(s.points.every((p) => p.reading.includes('≈') && p.reading.includes('~'))).toBe(true);
+  it('a sampled value does NOT read — the name stands alone (the no-guess ruling, 2026-08-18)', () => {
+    // This is the reversal of the original contract here ("saying which half was sampled"): the
+    // operator ruled that a sampled numeral IS a guess dressed as a near-value — "the system
+    // should not guess them; we just say we don't have them". An undetermined point's reading is
+    // its bare name; the PANEL row says the value is missing (v2Labels), and the ~ convention for
+    // printed point values died.
+    expect(s.points.every((p) => p.reading === p.label)).toBe(true);
+    expect(s.points.every((p) => !p.reading.includes('~'))).toBe(true);
   });
 });
 

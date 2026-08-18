@@ -330,10 +330,12 @@ export function PolarPlane({
               textAnchor={left ? 'end' : 'start'}
               style={{ userSelect: 'none' }}
             >
-              {/* B6 (#671, operator's de-clutter ruling): the canvas carries the NAME only — the
-                  full reading (value, ~ marks) lives in the data panel's points section. Both still
-                  print what derive2's stage 5d composed (#653/#675: one source, two surfaces). */}
-              {p.label}
+              {/* B6 follow-up (operator, 2026-08-18): the reading RETURNS to the canvas — with the
+                  panel hidden it is the only check that z₁ landed right. The no-guess ruling makes
+                  it safe: `readingOf` now composes a value only when the givens determine it, so an
+                  undetermined point's reading IS the bare name — nothing sampled is ever printed.
+                  (#653/#675: one source, two surfaces — both print stage 5d's composition.) */}
+              {p.reading}
             </text>
           </g>
         );

@@ -28,17 +28,38 @@ export interface DataSection {
 }
 
 export interface DataPanelProps {
-  /** The compact status head-line (freedom cue + legend). Omitted = no head. */
+  /** The shared column head — ONE title, ONE toggle, the same in every builder (operator ruling,
+   *  2026-08-18: "the same way we trigger the ability to see this side panel"). Omit `title` for a
+   *  headless panel (always-open embeds). */
+  title?: string;
+  open?: boolean;
+  onToggle?: () => void;
+  showLabel?: string;
+  hideLabel?: string;
+  /** The compact status head-line (the freedom cue's generic home). Omitted = no status row. */
   status?: ReactNode;
   sections: DataSection[];
-  /** Extra product blocks below the skeleton (e.g. the complex formula sheet). */
+  /** Extra product blocks below the skeleton (e.g. the complex formula sheet, an ask form). */
   children?: ReactNode;
 }
 
-export function DataPanel({ status, sections, children }: DataPanelProps) {
+export function DataPanel({ title, open, onToggle, showLabel, hideLabel, status, sections, children }: DataPanelProps) {
   const filled = sections.filter((s) => s.rows.length > 0);
+  const expanded = open !== false;
   return (
     <div style={wrap}>
+      {title != null && (
+        <div style={headStyle}>
+          <span style={headTitle}>{title}</span>
+          {onToggle && (
+            <button type="button" onClick={onToggle} aria-expanded={expanded} style={headToggle}>
+              {expanded ? hideLabel : showLabel}
+            </button>
+          )}
+        </div>
+      )}
+      {!expanded ? null : (
+        <>
       {status != null && <div style={statusStyle}>{status}</div>}
       {filled.map((s) => (
         <section key={s.key} style={sectionStyle}>
@@ -57,11 +78,25 @@ export function DataPanel({ status, sections, children }: DataPanelProps) {
         </section>
       ))}
       {children}
+        </>
+      )}
     </div>
   );
 }
 
 const wrap: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 12 };
+const headStyle: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 };
+const headTitle: CSSProperties = { fontSize: '0.95rem', fontWeight: 700, color: color.ink };
+const headToggle: CSSProperties = {
+  border: `1px solid ${color.border}`,
+  background: color.surface,
+  color: color.muted,
+  borderRadius: 999,
+  padding: '3px 12px',
+  fontSize: '0.8rem',
+  fontFamily: 'inherit',
+  cursor: 'pointer',
+};
 const statusStyle: CSSProperties = {
   fontSize: '0.8rem',
   color: color.muted,

@@ -179,9 +179,12 @@ export default function App3() {
     [t],
   );
   const setFigureName = useGeo3((s) => s.setFigureName);
-  // the "organize your data" panel (ADR-3D-014): derived vector/point presentations,
-  // OPT-IN by checkbox — it shows derived results, so the student chooses to peek
-  const [showData, setShowData] = useState(false);
+  // The data panel (ADR-3D-014, reshaped by B6 #671): derived presentations, student opt-in.
+  // B6 follow-up (operator 2026-08-18, "the same way we trigger"): the trigger is the SHARED
+  // DataPanel head — open by default on wide screens, exactly like the complex column.
+  const [showData, setShowData] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1000px)').matches,
+  );
   const [showWitness, setShowWitness] = useState(true); // #397: distance witnesses, default on
   const lastError = useGeo3((s) => s.lastError);
   const submit = useGeo3((s) => s.submit);
@@ -653,38 +656,44 @@ export default function App3() {
             <button type="button" onClick={clearAll} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50">
               {t('actions.clear')}
             </button>
+            {/* #397 (ADR-3D-108): the stated-distance witness (the "height") — on by default,
+                hideable "for educational purposes". A FIGURE-display option, so it lives with the
+                figure actions (D7); moved here from the panel column's checkbox in B6's follow-up. */}
+            <button
+              type="button"
+              onClick={() => setShowWitness((s) => !s)}
+              aria-pressed={showWitness}
+              className={`rounded-xl border px-3 py-1.5 text-sm ${showWitness ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-slate-300 bg-white hover:bg-slate-100'}`}
+            >
+              {t('display.witnesses')}
+            </button>
             {/* שמור/טען/תמונה moved to the TOOL ROW (B3, the level model): they act on the
                 session, not the fact list. The load target stays here so it outlives the frame. */}
             <input ref={fileInput} type="file" accept=".geo3.json,application/json,.json" className="hidden" onChange={onLoadFile} />
           </div>
         </section>
-        {/* organize-your-data (ADR-3D-014): derived presentations, student opt-in */}
+        {/* organize-your-data (ADR-3D-014, B6 #671): the D8 SKELETON via the SHARED DataPanel —
+            the same sections in the same order as every builder (points · measures · relations ·
+            parameters · ask), an empty section absent, and the SAME head/trigger as the complex
+            column (operator ruling 2026-08-18: "the same way we trigger"). The card always shows
+            its head; the toggle collapses the content. The query lane (#274, ADR-3D-057: a
+            question, never a fact) IS this product's ask section. */}
         <section className="flex w-full flex-col gap-2 md:w-64">
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" checked={showData} onChange={(e) => setShowData(e.target.checked)} />
-            {t('dataPanel.toggle')}
-          </label>
-          {/* #397 (ADR-3D-108): the stated-distance witness (the "height") — on by default,
-              hideable "for educational purposes" per the operator's ask. Only rendered relevant
-              when a distance given exists; harmless otherwise. */}
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" checked={showWitness} onChange={(e) => setShowWitness(e.target.checked)} />
-            {t('display.witnesses')}
-          </label>
-          {/* B6 (#671): the D8 SKELETON via the SHARED DataPanel — the same sections in the same
-              order as every builder (points · measures · relations · parameters · ask), an empty
-              section absent. The head-line is the DOF cue's generic home. The query lane
-              (#274, ADR-3D-057: a question, never a fact) IS this product's ask section. */}
-          {showData && dataPanel && (
+          {(
             <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
               <DataPanel
+                title={t('dataPanel.title')}
+                open={showData}
+                onToggle={() => setShowData((s) => !s)}
+                showLabel={t('dataPanel.show')}
+                hideLabel={t('dataPanel.hide')}
                 status={facts.length > 0 ? (dof === 0 ? t('cue.determined') : t('cue.free', { n: dof })) : undefined}
                 sections={[
                   {
                     key: 'points',
                     title: t('dataPanel.secPoints'),
                     dir: 'app',
-                    rows: dataPanel.points.map((p) => <MathRun key={p}>{p}</MathRun>),
+                    rows: (dataPanel?.points ?? []).map((p) => <MathRun key={p}>{p}</MathRun>),
                   },
                   {
                     /* the vectors' decomp/coords/magnitude readings + the plane equations — this
@@ -694,7 +703,7 @@ export default function App3() {
                     title: t('dataPanel.secMeasures'),
                     dir: 'app',
                     rows: [
-                      ...dataPanel.vectors.map((v) => (
+                      ...(dataPanel?.vectors ?? []).map((v) => (
                         <span key={v.label}>
                           {v.decomp && (
                             <div>
@@ -713,7 +722,7 @@ export default function App3() {
                           )}
                         </span>
                       )),
-                      ...dataPanel.planes.map((p) => <MathRun key={p}>{p}</MathRun>),
+                      ...(dataPanel?.planes ?? []).map((p) => <MathRun key={p}>{p}</MathRun>),
                     ],
                   },
                   {
@@ -727,12 +736,12 @@ export default function App3() {
                     title: t('dataPanel.secRelations'),
                     dir: 'app',
                     rows: [
-                      ...dataPanel.relations.map((r) => (
+                      ...(dataPanel?.relations ?? []).map((r) => (
                         <span key={r} className="font-medium">
                           <MathRun>{r}</MathRun>
                         </span>
                       )),
-                      ...dataPanel.mutual.map((m) => {
+                      ...(dataPanel?.mutual ?? []).map((m) => {
                         const line = t(
                           m.mixed && (m.rel === 'parallel' || m.rel === 'perpendicular')
                             ? `dataPanel.mutual.${m.rel === 'parallel' ? 'parallelPlane' : 'perpendicularPlane'}`
@@ -753,7 +762,7 @@ export default function App3() {
                     key: 'parameters',
                     title: t('dataPanel.secParams'),
                     dir: 'app',
-                    rows: dataPanel.params.map((p) => (
+                    rows: (dataPanel?.params ?? []).map((p) => (
                       <span key={p.sym} className={p.open ? 'text-slate-500' : undefined}>
                         <MathRun>{p.text}</MathRun>
                         {p.open && <span className="ms-1 text-xs text-slate-400">— {t('dataPanel.openParam')}</span>}
@@ -788,7 +797,7 @@ export default function App3() {
                   },
                 ]}
               >
-                {panelIsEmpty(dataPanel) && queryResults.length === 0 && (
+                {(!dataPanel || panelIsEmpty(dataPanel)) && queryResults.length === 0 && (
                   <p className="text-slate-400">{t('dataPanel.empty')}</p>
                 )}
                 <form

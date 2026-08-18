@@ -1235,9 +1235,17 @@ function readingOf(p: {
 }): string {
   const label = prettyName(p.name);
   if (p.exactLabel) return `${label} = ${p.exactLabel}`;
-  const mod = p.modulusKnown ? p.modulus : `~${p.modulus}`;
-  const deg = `${round4(p.argumentDeg)}°`;
-  return `${label} ≈ ${mod}·cis${p.argumentKnown ? deg : `~${deg}`}`;
+  /**
+   * The NO-GUESS ruling (B6 follow-up, operator 2026-08-18): a numeric value prints only when the
+   * givens fully determine it. A sampled magnitude or angle is the DRAWING's freedom, not a value —
+   * «z₂ ≈ ~1.81·cis~193.68°» presented a guess as a near-value, and the operator ruled "the system
+   * should not guess them; we just say we don't have them". Undetermined → the reading is the bare
+   * name (the canvas shows the name; the panel adds its "no value" clause in `v2Labels`). The ~
+   * convention for printed numerals dies with this; a partially-known magnitude still surfaces
+   * through the measures/knowledge lanes, which gate on knowledge already.
+   */
+  if (!p.modulusKnown || !p.argumentKnown) return label;
+  return `${label} ≈ ${p.modulus}·cis${round4(p.argumentDeg)}°`;
 }
 
 function collectParams(c: Constraint): string[] {

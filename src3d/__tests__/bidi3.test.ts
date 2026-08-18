@@ -410,9 +410,11 @@ describe('#531 (ADR-3D-144) — display-layer transforms can never reach the par
  */
 describe('#559 — the data panel follows the app direction, per-row', () => {
   const app = readFileSync(join(__dirname, '..', 'App3.tsx'), 'utf8');
-  /** The data-panel block — since B6 (#671) the rows live inside the shared <DataPanel>. */
+  /** The data-panel block — since B6 (#671) the rows live inside the shared <DataPanel>, whose
+   *  card renders ALWAYS (head visible when closed — the one-trigger ruling), so the anchor is the
+   *  component itself, not a showData guard. */
   const panelBlock = (() => {
-    const start = app.indexOf('{showData && dataPanel && (');
+    const start = app.indexOf('<DataPanel');
     expect(start, 'the data panel block must be findable').toBeGreaterThan(0);
     const end = app.indexOf('</DataPanel>', start);
     expect(end, 'the shared DataPanel must close inside the block').toBeGreaterThan(start);
@@ -436,12 +438,12 @@ describe('#559 — the data panel follows the app direction, per-row', () => {
     // The no-auto assertion scans only the MUTUAL mapping: since B6 the query lane shares this
     // block, and ITS per-row dir="auto" is #398's own deliberate contract (symbol-only queries).
     expect(panelMarkup).toContain('dir={textDir3(line)}');
-    const mutual = panelMarkup.slice(panelMarkup.indexOf('dataPanel.mutual'), panelMarkup.indexOf('dataPanel.params'));
+    const mutual = panelMarkup.slice(panelMarkup.indexOf('dataPanel?.mutual'), panelMarkup.indexOf('dataPanel?.params'));
     expect(mutual, 'a mutual row may never fall back to auto').not.toContain('dir="auto"');
   });
 
   it('math-only rows are wrapped in MathRun, so their row still aligns with the app', () => {
-    for (const rows of ['dataPanel.relations', 'dataPanel.points', 'dataPanel.planes', 'dataPanel.params']) {
+    for (const rows of ['dataPanel?.relations', 'dataPanel?.points', 'dataPanel?.planes', 'dataPanel?.params']) {
       const i = panelBlock.indexOf(rows);
       expect(i, `${rows} must be in the panel`).toBeGreaterThan(0);
       expect(panelBlock.slice(i, i + 400), `${rows} rows lay their math out LTR`).toContain('<MathRun');

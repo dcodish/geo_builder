@@ -3,12 +3,14 @@
  *  - the freedom cue is a COUNT («the 2-D way»), never a per-DOF listing of what can move;
  *  - the configuration count died — «אפשרות נוספת» already says alternatives exist;
  *  - a CONTRADICTION stays a refusal (strip material), split from the freedom half;
- *  - the CANVAS carries point NAMES only — the full reading lives in the panel (de-clutter ruling).
+ *  - and the NO-GUESS rule (follow-up ruling, same day): a value prints ONLY when the givens
+ *    determine it — on canvas and panel alike; an undetermined number reads as its bare name and
+ *    the panel says the value is missing. The ~ convention for printed numerals died with this.
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { deriveLines } from '../app/deriveLines';
-import { v2Contradiction, v2Freedom } from '../replay/scene2';
+import { v2Contradiction, v2Freedom, v2Labels } from '../replay/scene2';
 import { PolarPlane } from '../render/PolarPlane';
 import { buildScene } from '../scene/scene';
 
@@ -40,11 +42,33 @@ describe('the contradiction half (strip material)', () => {
   });
 });
 
-describe('the canvas layer (names only)', () => {
-  it('point labels on the canvas carry the NAME, not the value reading', () => {
+describe('the NO-GUESS rule (operator, 2026-08-18): an undetermined value is never printed', () => {
+  it('a determined point reads its value — on the canvas too (the panel may be hidden)', () => {
     const d = deriveLines(['z1 = 3+4i'], 0, 0);
     const html = renderToStaticMarkup(<PolarPlane scene={buildScene(d)} showGrid={false} labels={LABELS} />);
-    expect(html).toContain('z₁');
-    expect(html).not.toContain('cis53.13'); // the reading lives in the panel now
+    expect(html).toContain('cis53.13'); // the only check that z₁ landed right when the panel is hidden
+  });
+
+  it('an undetermined point reads as its bare NAME — no sampled numerals, no ~ marks', () => {
+    // z2 is implicitly created free; w derives from it — neither value is determined
+    const d = deriveLines(['z1 = 3+4i', 'w = z1*z2'], 0, 0);
+    const z2 = d.points.find((p) => p.name === 'z2')!;
+    const w = d.points.find((p) => p.name === 'w')!;
+    expect(z2.reading).toBe('z₂'); // "we just say we don't have them"
+    expect(w.reading).toBe('w');
+    expect(z2.reading).not.toContain('~');
+    const html = renderToStaticMarkup(<PolarPlane scene={buildScene(d)} showGrid={false} labels={LABELS} />);
+    // no point VALUE on the canvas is a sampled guess — old formats were «~1.81·cis~193°» and
+    // «5·cis~193°». (The S5 arc layers still print sampled angle labels; they leave the default
+    // view wholesale under #722, where this rule follows them.)
+    expect(html).not.toMatch(/~\d[^°<]*·cis/);
+    expect(html).not.toContain('cis~');
+  });
+
+  it("the panel SAYS the value is missing, instead of showing a sample", () => {
+    const d = deriveLines(['z1 = 3+4i', 'w = z1*z2'], 0, 0);
+    const rows = v2Labels(d);
+    expect(rows.find((r) => r.startsWith('z₂'))).toBe('z₂ — אין ערך: הנתונים אינם קובעים אותו');
+    expect(rows.find((r) => r.startsWith('z₁'))).toBe('z₁ ≈ 5·cis53.1301°'); // determined stays a value
   });
 });

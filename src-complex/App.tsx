@@ -431,45 +431,35 @@ export function App() {
             </div>
           </section>
           <aside className={showData ? 'data open' : 'data'} dir="rtl">
-            {/* D8's skeleton arrives in B6. The column itself is permanent on wide screens; the
-                header button collapses the CONTENT (and closes the overlay on narrow). */}
-            <div className="data-head">
-              <span className="data-title">{t('dataTitle')}</span>
-              <button className="data-toggle" onClick={() => setShowData((s) => !s)} aria-expanded={showData}>
-                {showData ? t('dataHide') : t('dataShow')}
-              </button>
-            </div>
-            {showData && (
-              /* B6 (#671): the D8 SKELETON — the same sections in the same order in every builder,
-                 an empty section simply absent. The head-line is the freedom cue's generic home:
-                 the DOF COUNT and the ~ legend, never a config count, never per-DOF resolutions
-                 (operator rulings, 2026-08-18). */
-              <DataPanel
-                status={
-                  <>
-                    {v2Freedom(derived2)}
-                    {derived2.points.some((p) => !p.modulusKnown || !p.argumentKnown) && (
-                      <div>{t('sampledLegend')}</div>
-                    )}
-                  </>
-                }
-                sections={[
-                  { key: 'points', title: t('secPoints'), rows: v2Labels(derived2) },
-                  // verdict rows word their WHY in prose — they follow the app's direction (#716
-                  // tracks the engine-composed strings staying Hebrew in EN mode)
-                  { key: 'measures', title: t('secMeasures'), rows: v2Measures(derived2), dir: 'app' },
-                  { key: 'relations', title: t('secRelations'), rows: v2Claims(derived2), dir: 'app' },
-                  { key: 'ask', title: t('secAsk'), rows: v2Knowledge(derived2), dir: 'app' },
-                ]}
-              >
-                {/* the formula sheet, surfaced from what the figure DOES — each row names its premises */}
-                {v2Formulas(derived2, i18n.language === 'he' ? 'he' : 'en').map((f) => (
-                  <div key={f} className="v2-formula" dir="ltr">
-                    {f}
-                  </div>
-                ))}
-              </DataPanel>
-            )}
+            {/* B6 (#671): the D8 SKELETON through the SHARED DataPanel — head (one title, one
+                toggle, the same in every builder — operator ruling 2026-08-18), the freedom cue as
+                the status line (a COUNT, never per-DOF resolutions, never a config count), and the
+                same sections in the same order everywhere, an empty section simply absent. The
+                column itself is permanent on wide screens; the head toggle collapses the CONTENT
+                (and closes the overlay on narrow). */}
+            <DataPanel
+              title={t('dataTitle')}
+              open={showData}
+              onToggle={() => setShowData((s) => !s)}
+              showLabel={t('panelShow')}
+              hideLabel={t('panelHide')}
+              status={v2Freedom(derived2)}
+              sections={[
+                { key: 'points', title: t('secPoints'), rows: v2Labels(derived2) },
+                // verdict rows word their WHY in prose — they follow the app's direction (#716
+                // tracks the engine-composed strings staying Hebrew in EN mode)
+                { key: 'measures', title: t('secMeasures'), rows: v2Measures(derived2), dir: 'app' },
+                { key: 'relations', title: t('secRelations'), rows: v2Claims(derived2), dir: 'app' },
+                { key: 'ask', title: t('secAsk'), rows: v2Knowledge(derived2), dir: 'app' },
+              ]}
+            >
+              {/* the formula sheet, surfaced from what the figure DOES — each row names its premises */}
+              {v2Formulas(derived2, i18n.language === 'he' ? 'he' : 'en').map((f) => (
+                <div key={f} className="v2-formula" dir="ltr">
+                  {f}
+                </div>
+              ))}
+            </DataPanel>
           </aside>
         </main>
       </div>
