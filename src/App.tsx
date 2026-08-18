@@ -18,6 +18,7 @@ import { AppFrame } from '../shell/frame/AppFrame';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
 import { ManualScreen } from '../shell/frame/ManualScreen';
+import { Workbench } from '../shell/frame/Workbench';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
@@ -902,9 +903,20 @@ export default function App() {
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
     >
-      <div style={page}>
-      <div style={main}>
-        <div style={canvasCol}>
+      {/* THE WORKBENCH (#734): the three-zone GEOMETRY is the shell's — identical columns, canvas
+          card and empty-state placement in every builder; this product passes zone content only. */}
+      <Workbench
+        emptyOverlay={
+          facts.length === 0 ? (
+            <QuickChips
+              title={t('canvas.emptyTitle')}
+              hint={t('canvas.emptyHint')}
+              commands={examples.slice(0, 4)}
+              onPick={(c) => submit(c)}
+            />
+          ) : undefined
+        }
+        canvasZone={<>
         {/* The figure's NAME, centered above the drawing it names — the SHARED component (one look
             in every builder). It lived inline in the retired header. */}
         <FigureName value={figureName} onChange={setFigureName} placeholder={t('file.namePlaceholder')} />
@@ -994,21 +1006,7 @@ export default function App() {
           {/* Empty canvas → a call to action so a new user knows what to do. The
               container ignores pointer events (so panning isn't blocked); the
               example buttons re-enable them. */}
-          {/* D9b's first half via the SHARED QuickChips (B4-2d): the inviting first click, one
-              look in every builder. The overlay div keeps pointer events off so panning is never
-              blocked; the chips re-enable them. */}
-          {facts.length === 0 && (
-            <div style={emptyOverlay}>
-              <div style={{ pointerEvents: 'auto' }}>
-                <QuickChips
-                  title={t('canvas.emptyTitle')}
-                  hint={t('canvas.emptyHint')}
-                  commands={examples.slice(0, 4)}
-                  onPick={(c) => submit(c)}
-                />
-              </div>
-            </div>
-          )}
+          {/* the empty-state chips render through the WORKBENCH's one overlay slot (#734) */}
           {/* Why a figure file couldn't be loaded (FR-HS-10) — shown right under the toolbar's "load from
               file" button. `fileNote` is a transient problem/refreshed message; `auditNote` is the ADR-242
               honesty audit DERIVED from live facts (issue #24), so it self-clears when its rows are fixed
@@ -1153,9 +1151,8 @@ export default function App() {
             </label>
           </div>
         )}
-        </div>
-
-        <aside style={sidebar}>
+        </>}
+        inputZone={<>
           {/* B4-2d (#729): the SHARED InputArea — the box, submit, wrap-selection palette, live
               preview and quick strip exist ONCE in shell/; this product passes its content. The
               maths preview (#77 Am. / #40: √(2/3) shows a radical OVER the fraction while typing)
@@ -1343,16 +1340,11 @@ export default function App() {
             }}
           />
 
-        </aside>
-
-        {/* THE נתונים COLUMN (B6-2d, #729 — operator: "the calculate-values button is basically
-            the same data panel we have on the 3-D and the complex; it needs to be a third
-            column"): the SHARED DataPanel head/status, with 2-D's knowledge surfaces as its
-            content — the values rows (#217 ADR-410, pull-only: computed when the panel is OPENED,
-            never during build; a fact change stales the layer and the refresh button re-pulls),
-            the query lane (#477), the radius sliders, the relations/shape results and the theorem
-            feed. The figure-action BUTTONS moved under the canvas (D7). */}
-        <aside style={dataCol}>
+        </>}
+        dataZone={
+        /* THE נתונים COLUMN (B6-2d, #729): the SHARED DataPanel head/status, with 2-D's knowledge
+           surfaces as its content — values (#217 pull-only), the query lane (#477), the sliders,
+           the relations/shape results and the theorem feed. */
           <div style={sideCard}>
             <DataPanel
               title={t('dataTitle')}
@@ -1758,8 +1750,8 @@ export default function App() {
 
             </DataPanel>
           </div>
-        </aside>
-      </div>
+        }
+      />
 
       {/* "מה זה?" — the FIRST-LOAD intro (dismiss persisted): the same About content the frame's
           אודות button shows, auto-opened once for a new student. The footer retired with the frame
@@ -1823,8 +1815,6 @@ export default function App() {
         }))}
         onClose={() => setManualOpen(false)}
       />
-
-      </div>
     </AppFrame>
   );
 }
@@ -1835,22 +1825,12 @@ export default function App() {
  *  VIEWPORT-HEIGHT flex column under the frame's two bars — the columns scroll INTERNALLY and the
  *  canvas takes the remaining height, so the page itself never scrolls. 112px = suite bar + tool
  *  row (measured; the parity checker pins the bars' geometry). */
-const page: React.CSSProperties = {
-  height: 'calc(100vh - 126px)',
-  overflow: 'hidden',
-  padding: '14px 20px 16px',
-  color: pal.ink, // font family comes from index.css — the ONE stack, never per-element
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 10,
-};
+// page/main and the column styles retired (#734): the three-zone GEOMETRY is shell/Workbench's.
 // headerRow / figureNameInput / footerRow retired with the frame adoption (B3-2d): the header and
 // footer are the FRAME's, and the figure name is the shared FigureName component.
 // B2-2d: three columns — input+steps (order 1) · canvas (order 2) · the נתונים panel (order 3),
 // the same zone order as the complex tool under RTL. `stretch` + minHeight:0 lets each column
 // scroll internally inside the viewport-height page.
-const main: React.CSSProperties = { display: 'flex', gap: 18, alignItems: 'stretch', flex: 1, minHeight: 0 };
-const dataCol: React.CSSProperties = { order: 3, width: 'min(340px, 26%)', flexShrink: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 };
 /** LEVEL 3 — the figure-action rows under the canvas (D7): things done TO the figure. */
 const figureActions: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 };
 // The canvas fills the space beside the sidebar and the viewport height (use the big screen);
@@ -1866,38 +1846,15 @@ const figureActions: React.CSSProperties = { display: 'flex', gap: 8, alignItems
 /** The middle column is a WHITE CARD like its neighbours (operator, 2026-08-18: the column read
  *  as "lowered" because its white started only at the canvas box — the name field sat on the page
  *  ground). One card wraps name + canvas + figure actions, so the three columns align. */
-const canvasCol: React.CSSProperties = {
-  ...themeCard,
-  order: 2,
-  flex: '1 1 480px',
-  minWidth: 360,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 8,
-  minHeight: 0,
-};
 const canvasWrap: React.CSSProperties = { position: 'relative', flex: 1, minHeight: 320 };
 // Centered call-to-action shown over the blank canvas; pointer-events off so it never
 // blocks the figure (the example buttons re-enable them).
-const emptyOverlay: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 12,
-  textAlign: 'center',
-  pointerEvents: 'none',
-  padding: 24,
-};
 // emptyChip retired with QuickChips (B4-2d) — the empty-canvas chips are the shared component's.
 // The control column is capped to the viewport and scrolls INTERNALLY (its own overflow), so a tall stack
 // (steps + all the action buttons + the detected-shape badges/card) never pushes the whole PAGE taller than
 // the screen — the canvas and the shapes result stay on one screen (operator: "fit it all on the same screen").
 // `min(400px, 100%)` (F2, tablet scope): a rigid 400px overflowed viewports narrower than the column
 // itself; on a portrait tablet the canvas wraps below and the sidebar spans the width it has.
-const sidebar: React.CSSProperties = { order: 1, width: 'min(380px, 30%)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', paddingInlineEnd: 4 };
 // A sidebar section card — the visual grouping the old flat stack lacked (GUI overhaul).
 const sideCard: React.CSSProperties = themeCard;
 const sectionLabel: React.CSSProperties = sectionTitle;

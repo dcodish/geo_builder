@@ -13,6 +13,7 @@ import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
 import { ManualScreen } from '../shell/frame/ManualScreen';
 import { QuickChips } from '../shell/frame/QuickChips';
+import { Workbench } from '../shell/frame/Workbench';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { ToolButton } from '../shell/frame/ToolButton';
@@ -466,12 +467,21 @@ export default function App3() {
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
     >
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      {/* FULL WIDTH (the operator's width ruling, applied uniformly — complex went full-bleed
-          while this main kept its own cap; the p-5 edge padding matches the frame's). */}
-      <main className="flex flex-col gap-5 p-5 md:flex-row">
-        {/* Input + fact list */}
-        <section className="flex w-full flex-col gap-3 md:w-96">
+    {/* THE WORKBENCH (#734): the three-zone GEOMETRY is the shell's — identical columns, canvas
+        card and empty-state placement in every builder; this product passes zone content only.
+        (The old min-h-screen page + per-product Tailwind columns retired.) */}
+    <Workbench
+      emptyOverlay={
+        facts.length === 0 ? (
+          <QuickChips
+            title={t('emptyTitle')}
+            hint={t('emptyHintChips')}
+            commands={EXAMPLE_KEYS.slice(0, 4).map((k) => t(`examples.${k}`))}
+            onPick={(c) => void submitText(c)}
+          />
+        ) : undefined
+      }
+      inputZone={<>
           {/* THE SHARED INPUT AREA (B4, the shared-components rule): box, palette, preview seam
               and quick strip exist ONCE in shell/. The #482 preview discipline is preserved by
               the props: inputPreview3 gates it, textDir3 sets its base direction (#118). */}
@@ -596,24 +606,14 @@ export default function App3() {
 
           {/* The commands catalog graduated into the MANUAL screen (B7, D9) — the מדריך button in
               the tool row opens it; the sidebar accordion retired. */}
-        </section>
-
-        {/* Canvas + view/session controls */}
-        <section className="flex min-w-0 flex-1 flex-col gap-2" ref={canvasBox}>
+      </>}
+      canvasZone={
+        <div className="flex min-w-0 flex-1 flex-col gap-2 min-h-0" ref={canvasBox}>
           {/* The figure's NAME (issue #42), centered above the drawing it names — the SHARED
               component (operator: "isn't the whole idea a shared GUI component?"), one look in
               every builder. */}
           <FigureName value={figureName} onChange={setFigureName} placeholder={t('actions.namePlaceholder')} />
-          {/* D9b's first half — the SHARED empty-canvas chips (the inviting first click), the same
-              surface as 2-D/complex; a pick BUILDS through the full submit path. */}
-          {facts.length === 0 && (
-            <QuickChips
-              title={t('emptyTitle')}
-              hint={t('emptyHintChips')}
-              commands={EXAMPLE_KEYS.slice(0, 4).map((k) => t(`examples.${k}`))}
-              onPick={(c) => void submitText(c)}
-            />
-          )}
+          {/* the empty-state chips render through the WORKBENCH's one overlay slot (#734) */}
           <Figure3
             construction={derived.construction}
             resolved={derived.resolved}
@@ -659,15 +659,13 @@ export default function App3() {
                 session, not the fact list. The load target stays here so it outlives the frame. */}
             <input ref={fileInput} type="file" accept=".geo3.json,application/json,.json" className="hidden" onChange={onLoadFile} />
           </div>
-        </section>
-        {/* organize-your-data (ADR-3D-014, B6 #671): the D8 SKELETON via the SHARED DataPanel —
-            the same sections in the same order as every builder (points · measures · relations ·
-            parameters · ask), an empty section absent, and the SAME head/trigger as the complex
-            column (operator ruling 2026-08-18: "the same way we trigger"). The card always shows
-            its head; the toggle collapses the content. The query lane (#274, ADR-3D-057: a
-            question, never a fact) IS this product's ask section. */}
-        <section className="flex w-full flex-col gap-2 md:w-64">
-          {(
+        </div>
+      }
+      dataZone={
+        /* organize-your-data (ADR-3D-014, B6 #671): the D8 SKELETON via the SHARED DataPanel —
+           same sections, same head/trigger as every builder. The query lane (#274, ADR-3D-057: a
+           question, never a fact) IS this product's ask section. */
+        (
             <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
               <DataPanel
                 title={t('dataPanel.title')}
@@ -809,9 +807,9 @@ export default function App3() {
                 </form>
               </DataPanel>
             </div>
-          )}
-        </section>
-      </main>
+        )
+      }
+    />
       {/* NFR-SE-3's note now lives in the frame's About modal (B3) — the footer fallback retired. */}
       {/* THE MANUAL (B7 #672, D9): the catalog as a separate SCREEN — a click SUBMITS the example
           through the full path (parser → guidance → LLM lane), replacing the old fill-the-box. */}
@@ -840,7 +838,6 @@ export default function App3() {
         }))}
         onClose={() => setManualOpen(false)}
       />
-    </div>
     </AppFrame>
   );
 }

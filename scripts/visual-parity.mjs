@@ -42,6 +42,11 @@ for (const tool of TOOLS) {
     strip: await probe('strip', 'nav'),
     body: await p.evaluate(() => getComputedStyle(document.body).backgroundColor),
     inputBox: await probe('inputBox', 'form input, input[dir=auto]'),
+    // #734 — the WORKBENCH zones: identical column geometry in every tool
+    inputZone: await probe('inputZone', 'aside:first-of-type'),
+    canvasZone: await probe('canvasZone', 'main section, section[style], aside:first-of-type + section'),
+    dataZone: await probe('dataZone', 'aside:last-of-type'),
+    pageTitle: await p.title(),
   };
   await p.close();
 }
@@ -75,6 +80,8 @@ const comparePair = (idA, idB) => {
   cmpBox('english-button', a.english, b.english);
   cmpBox('title', a.title, b.title, false);
   cmpStyle('title', a.title, b.title);
+  cmpBox('input-zone', a.inputZone, b.inputZone);
+  cmpBox('data-zone', a.dataZone, b.dataZone);
   if (a.body !== b.body) { console.log(`DELTA body.bg: ${idA}=${a.body} vs ${idB}=${b.body}`); deltas++; }
   else console.log(`PASS  body.bg: ${a.body}`);
 };

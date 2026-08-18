@@ -6,6 +6,7 @@ import { Banner } from '../shell/frame/Banner';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
 import { ManualScreen } from '../shell/frame/ManualScreen';
+import { Workbench } from '../shell/frame/Workbench';
 import { manualSections } from './ui/manual';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
@@ -272,8 +273,21 @@ export function App() {
           style={{ display: 'none' }}
           onChange={onLoadFile}
         />
-        <main>
-          <section className="panel">
+        {/* THE WORKBENCH (#734): the three-zone GEOMETRY is the shell's — identical columns,
+            canvas card and empty-state placement in every builder; this product passes zone
+            content only. (The old per-product CSS grid retired.) */}
+        <Workbench
+          emptyOverlay={
+            lines.length === 0 ? (
+              <QuickChips
+                title={t('emptyTitle')}
+                hint={t('emptyHintChips')}
+                commands={quickCommands}
+                onPick={(c) => submitLine(c)}
+              />
+            ) : undefined
+          }
+          inputZone={<>
             {/* THE SHARED INPUT AREA (B4, the shared-components rule): the box, the wrap-selection
                 palette, the preview seam and the compact quick strip exist ONCE in shell/; this
                 product passes its symbols, its previewer and its handlers. */}
@@ -325,20 +339,12 @@ export function App() {
                 </>
               }
             />
-          </section>
-          <section className="canvas">
+          </>}
+          canvasZone={<>
             {/* The figure's NAME, centered above the drawing it names — the SHARED component,
                 one look in every builder (#42 arriving in complex). */}
             <FigureName value={name} onChange={setName} placeholder={t('namePlaceholder')} />
-            {/* D9b's first half: the inviting first click — large chips on the EMPTY canvas. */}
-            {lines.length === 0 && (
-              <QuickChips
-                title={t('emptyTitle')}
-                hint={t('emptyHintChips')}
-                commands={quickCommands}
-                onPick={(c) => submitLine(c)}
-              />
-            )}
+            {/* the empty-state chips render through the WORKBENCH's one overlay slot (#734) */}
             {
               /* THE HONESTY STRIP — always visible, never opt-in (B2's split of the old banner).
                  A violated, undecided or unread STATEMENT is the figure refusing to lie about
@@ -434,14 +440,11 @@ export function App() {
                 {showData ? t('dataHide') : t('dataShow')}
               </button>
             </div>
-          </section>
-          <aside className={showData ? 'data open' : 'data'} dir="rtl">
-            {/* B6 (#671): the D8 SKELETON through the SHARED DataPanel — head (one title, one
-                toggle, the same in every builder — operator ruling 2026-08-18), the freedom cue as
-                the status line (a COUNT, never per-DOF resolutions, never a config count), and the
-                same sections in the same order everywhere, an empty section simply absent. The
-                column itself is permanent on wide screens; the head toggle collapses the CONTENT
-                (and closes the overlay on narrow). */}
+          </>}
+          dataZone={
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14 }}>
+            {/* B6 (#671): the D8 SKELETON through the SHARED DataPanel — head, freedom-cue status
+                line, the same sections in the same order everywhere. */}
             <DataPanel
               title={t('dataTitle')}
               open={showData}
@@ -465,9 +468,9 @@ export function App() {
                 </div>
               ))}
             </DataPanel>
-          </aside>
-        </main>
-      </div>
+            </div>
+          }
+        />
       {/* THE MANUAL (A6 #665, D9): a separate SCREEN, catalog-backed — every supported sentence
           family with its real specimens; a click SUBMITS the example and returns to the tool. */}
       <ManualScreen
@@ -499,6 +502,7 @@ export function App() {
         }))}
         onClose={() => setManualOpen(false)}
       />
+      </div>
     </AppFrame>
   );
 }
