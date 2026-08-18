@@ -16,7 +16,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { isolateLtrRuns, RUN_CORE, RUN_DELIMS } from '../bidi';
-import { GREEK, SYMBOLS } from '@/ui/symbols';
+import { GREEK, SYMBOL_SPECS, SYMBOLS } from '@/ui/symbols';
 import he from '../locales/he.json';
 import en from '../locales/en.json';
 
@@ -172,5 +172,18 @@ describe('#482 — the isolate must COVER the run, and the alphabet must not dri
       'a palette button offers a character bidi does not know is technical — it will SPLIT the run it ' +
         'appears in. Add it to CORE in i18n/bidi.ts rather than deleting it here.',
     ).toEqual([]);
+  });
+
+  it('the SHARED palette carries the WHOLE vocabulary — nothing dropped at the B4-2d adoption', () => {
+    // Operator, playing B4-2d: "do we have all the symbols we had? It seems a bit small." The
+    // shared spec derives from GREEK + SYMBOLS, so a drop would be a derivation bug — this pins
+    // the count and every label so it cannot happen silently.
+    expect(SYMBOL_SPECS).toHaveLength(GREEK.length + SYMBOLS.length);
+    expect(SYMBOL_SPECS.map((s) => s.label)).toEqual([...GREEK, ...SYMBOLS.map((s) => s.label)]);
+    // and the caret templates became WRAPS whose halves recompose the exact old insert
+    for (const s of SYMBOLS) {
+      const spec = SYMBOL_SPECS.find((x) => x.label === s.label)!;
+      expect(spec.before + (spec.after ?? '')).toBe(s.insert);
+    }
   });
 });

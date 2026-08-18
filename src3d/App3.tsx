@@ -374,13 +374,16 @@ export default function App3() {
     });
   };
 
-  const submitText = async () => {
-    if (!text.trim() || busy) return;
+  // `raw` defaults to the box's text; a QUICK-COMMAND pick passes its command directly (D9b:
+  // click and see it BUILD, no data entry) and rides the identical path — parser, guidance
+  // short-circuits, LLM escalation, logging.
+  const submitText = async (raw = text) => {
+    if (!raw.trim() || busy) return;
     setGuidanceNote(null); // a fresh submit clears the previous guidance
     setLoadNote(null); // …and the load note, which described the file as opened
-    submit(text);
+    submit(raw);
     let err = useGeo3.getState().lastError;
-    logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
+    logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
     // out-of-grammar → escalate to the LLM proxy; the returned canonical lines re-parse deterministically
     if (err?.code === 'not-understood') {
       // #73 (ADR-3D-040): the GUIDANCE register short-circuits BEFORE the LLM — a non-constructive
@@ -388,16 +391,16 @@ export default function App3() {
       // #353: lowercase NODE labels — if reading them as uppercase makes the utterance parse, the only
       // problem was the case convention. Say so (with the corrected spelling) instead of paying for an LLM
       // call. Proof-based, so a genuine gap stays a genuine gap; checked before the pattern register.
-      const upper = upperCasedLabelCandidate3(text);
+      const upper = upperCasedLabelCandidate3(raw);
       if (upper && parse3(upper).ok) {
-        logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'scope', result: 'scope:lowercase-labels' });
+        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'scope', result: 'scope:lowercase-labels' });
         setGuidanceNote(t('scope.lowercase-labels', { corrected: upper }));
         useGeo3.setState({ lastError: null });
         return;
       }
-      const g = classifyGuidance3(text);
+      const g = classifyGuidance3(raw);
       if (g) {
-        logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'scope', result: `scope:${g.category}` });
+        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'scope', result: `scope:${g.category}` });
         setGuidanceNote(t(g.messageKey));
         useGeo3.setState({ lastError: null });
         return;
@@ -405,13 +408,13 @@ export default function App3() {
       setBusy(true);
       try {
         const ctx = `Existing points: ${[...derived.construction.points.keys()].join(', ') || '(none)'}.`;
-        const steps = await escalate3(text, ctx);
-        if (steps) submitSteps(text, steps);
+        const steps = await escalate3(raw, ctx);
+        if (steps) submitSteps(raw, steps);
         err = useGeo3.getState().lastError;
         // `commands` = the canonical lines that re-parsed onto the figure (#182): without them a prod
         // `llm, ok` submit is opaque and every later step of the session is unreplayable (`steps` stays
         // for the dev trace; the lean sink reads `commands`, mirroring the 2-D #84 field).
-        logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, result: err ? err.code : 'ok' });
+        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, result: err ? err.code : 'ok' });
       } finally {
         setBusy(false);
       }
@@ -478,6 +481,9 @@ export default function App3() {
             symbols={SYMBOL_SPECS_3}
             preview={(s) => inputPreview3(s)}
             previewDir={(s) => textDir3(s)}
+            quickCommands={EXAMPLE_KEYS.map((k) => t(`examples.${k}`))}
+            onQuickCommand={(c) => void submitText(c)}
+            quickDir={(c) => textDir3(c)}
           />
 
           {/* #309 (ADR-3D-087): a file that deserializes cleanly but does not REBUILD must say so —
@@ -516,22 +522,9 @@ export default function App3() {
             </div>
           )}
 
-          {/* Examples folded into a dropdown so they don't crowd the panel (matches the 2-D app). */}
-          <details className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-            <summary className="cursor-pointer text-sm font-medium text-slate-600">{t('examples.title')}</summary>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {EXAMPLE_KEYS.map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => setText(t(`examples.${k}`))}
-                  className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-600 hover:border-blue-400 hover:text-blue-700"
-                >
-                  {t(`examples.${k}`)}
-                </button>
-              ))}
-            </div>
-          </details>
+          {/* The examples dropdown retired (B4 completed, operator's parity catch 2026-08-18):
+              the examples are the shared quick-command STRIP inside the input card now, the same
+              place as in every builder — and a pick BUILDS (D9b), instead of only filling the box. */}
 
           {/* B5 (#670, D6): the SHARED fact-list chrome — row cards, mute checkbox, ✎ edit-in-place,
               ✕ delete, one look across the builders. The row CONTENT stays this product's:

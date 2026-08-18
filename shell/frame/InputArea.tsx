@@ -31,14 +31,22 @@ export interface InputAreaProps {
   symbols: readonly SymbolSpec[];
   /** Tooltip resolver for a palette entry (the product's own i18n). */
   symbolTitle?: (spec: SymbolSpec) => string;
-  /** The live-preview seam: return the rendered/isolated form, or null when it adds nothing. */
-  preview?: (text: string) => string | null;
+  /** The live-preview seam: return the rendered/isolated form (a string, or a rendered node —
+   *  2-D's maths renderer), or null when it adds nothing. */
+  preview?: (text: string) => ReactNode | null;
   /** Base direction for the preview by CONTENT (the #118 lesson: never dir="auto") — the
    *  product's own textDir. */
   previewDir?: (text: string) => 'rtl' | 'ltr';
+  /** Direction for the BOX itself, by content — the same #118 lesson applies while typing:
+   *  dir="auto" keys off the first strong character, and «AB שווה …» would take an LTR base.
+   *  Absent = auto (the math-first products). */
+  boxDir?: (text: string) => 'rtl' | 'ltr';
   /** The compact quick-command strip (D9b): shown when non-empty; a pick SUBMITS the command. */
   quickCommands?: readonly string[];
   onQuickCommand?: (command: string) => void;
+  /** Per-chip direction for quick commands — needed when the commands are SENTENCES (2-D's Hebrew
+   *  examples), not math tokens. Absent = the strip stays LTR. */
+  quickDir?: (command: string) => 'rtl' | 'ltr';
   /** Extra product content under the palette (errors, hints) — rendered inside the card. */
   children?: ReactNode;
 }
@@ -55,8 +63,10 @@ export function InputArea({
   symbolTitle,
   preview,
   previewDir,
+  boxDir,
   quickCommands,
   onQuickCommand,
+  quickDir,
   children,
 }: InputAreaProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -78,9 +88,15 @@ export function InputArea({
   return (
     <div style={card}>
       {quickCommands && quickCommands.length > 0 && onQuickCommand && (
-        <div style={quickRow} dir="ltr">
+        <div style={quickRow} dir={quickDir ? undefined : 'ltr'}>
           {quickCommands.map((cmd) => (
-            <button key={cmd} type="button" style={quickChip} onClick={() => onQuickCommand(cmd)}>
+            <button
+              key={cmd}
+              type="button"
+              style={quickDir ? { ...quickChip, direction: undefined } : quickChip}
+              dir={quickDir?.(cmd)}
+              onClick={() => onQuickCommand(cmd)}
+            >
               {cmd}
             </button>
           ))}
@@ -98,7 +114,7 @@ export function InputArea({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          dir="auto"
+          dir={boxDir ? boxDir(value) : 'auto'}
           style={box}
         />
         <button type="submit" disabled={busy} style={busy ? { ...send, opacity: 0.6 } : send}>
