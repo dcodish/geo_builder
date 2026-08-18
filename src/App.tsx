@@ -15,6 +15,7 @@ import { useStore } from 'zustand';
 // The shared frame (B3-2d #668): the deliberate src -> shell adoption — the LAST product joins the
 // suite chrome (ADR-W-019; BOUNDARIES.json src -> shell edge flipped with this import).
 import { AppFrame } from '../shell/frame/AppFrame';
+import { FactList } from '../shell/frame/FactList';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
@@ -158,9 +159,8 @@ export default function App() {
   const [aboutOpen, setAboutOpen] = useState(false); // the "מה זה?" intro modal (first load + reopenable)
   const [examplesOpen, setExamplesOpen] = useState(false); // examples auto-show while the canvas is empty; fold once building starts
   const [displayOpen, setDisplayOpen] = useState(true); // the display-options fold — OPEN by default (operator: the discovery dial is important and must stay visible); foldable for students who want the space
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editText, setEditText] = useState('');
-  const [editError, setEditError] = useState(false);
+  // editingId/editText/editError retired with the shared FactList (B5-2d): the editor state is the
+  // chrome's; commitEdit takes the text and answers with a boolean.
   const [showTheorems, setShowTheorems] = useState(false); // the live theorem feed (Phase 6a) — live in prod but OFF by default (operator 2026-07-07); the student opts in from תצוגה
   const [discoveryLevel, setDiscoveryLevel] = useState<DiscoveryLevel>(1); // the theorem discovery dial (ADR-219) — L1 Given by default
   const [theoremSel, setTheoremSel] = useState<TheoremId | null>(null); // the theorem row whose premise is highlighted on the canvas
@@ -267,17 +267,10 @@ export default function App() {
   // Inline step editing: open the row as a text field pre-filled with its
   // phrasing, re-parse on confirm, and replace the whole step group in place
   // (ADR-015; a step may expand to several commands, e.g. an inscribed shape).
-  function startEdit(key: string, utterance: string | undefined) {
-    setEditingId(key);
-    setEditText(utterance ?? '');
-    setEditError(false);
-  }
-  function cancelEdit() {
-    setEditingId(null);
-    setEditText('');
-    setEditError(false);
-  }
-  function commitEdit(key: string) {
+  // B5-2d: the editor is the SHARED FactList's (its internal state, Enter/Esc, stay-open-on-false).
+  // This commit takes the edited text as a parameter and returns whether it was accepted — a
+  // refusal keeps the editor open and says why through the aria-live input note.
+  function commitEdit(key: string, editText: string): boolean {
     // Parse against the PREFIX context — the figure as it stands BEFORE the edited step — because the
     // replacement is spliced back at the step's original position and replayed there (ADR-015). The
     // end-state context lied: it contains points created by LATER steps (and by the old version of this
@@ -299,8 +292,7 @@ export default function App() {
       const bind = impliedCircleBinding(r.commands, ectx);
       if (bind && 'clarify' in bind) {
         setInputNote(t('input.unknownCircle', { center: bind.center }));
-        setEditError(true);
-        return;
+        return false;
       }
       if (bind) {
         const res = nameCentre(bind.from, bind.to);
@@ -318,12 +310,13 @@ export default function App() {
       r = parse(editText, ectx);
     }
     if (!r.ok || r.commands.length === 0) {
-      setEditError(true);
-      return;
+      setInputNote(t('steps.editRefused'));
+      return false;
     }
     replaceGroup(key, r.commands, editText.trim());
     logDebug({ kind: 'action', action: 'edit', detail: `${key} → ${editText.trim()}` }); // #84: so a reported session replays edits
-    cancelEdit();
+    setInputNote('');
+    return true;
   }
 
   // The text → command[] path: the deterministic parser runs first; anything it
@@ -430,9 +423,7 @@ export default function App() {
     setRenameNote('');
     setAltNote('');
     setLlmDropped([]);
-    setEditingId(null);
-    setEditText('');
-    setEditError(false);
+    // the FactList editor state is the chrome's own (B5-2d) — a clear needs no reset here
   };
 
   const loadFigureFile = async (f: File) => {
@@ -1175,105 +1166,73 @@ export default function App() {
                   <span><span style={{ color: '#94a3b8' }}>○</span> {t('steps.statusOff')}</span>
                 </div>
               )}
-              <ul style={stepList}>
-                {groups.map((g) => {
-                  const on = g.facts.every((f) => f.enabled);
+              {/* B5-2d (#729): the SHARED fact-list chrome — row cards, mute checkbox, ✎ edit
+                  (FactList's internal editor: Enter commits, Esc cancels, a refusal keeps it open
+                  with the aria-live note saying why), ✕ delete — one look in every builder. The
+                  row CONTENT stays this product's: the tri-state mark, the CANONICAL label
+                  (ADR-428 obligation 3 / #450: the row shows what the tool UNDERSTOOD, rendered
+                  from the group's commands; the editor is seeded with the same canonical text,
+                  safe by the round-trip lock), the selected row's broken-reason (F6) and measured
+                  readout (#39). */}
+              <FactList
+                testId="step-list"
+                editDir={(s) => textDir(s)}
+                rows={groups.map((g) => {
                   const anyOn = g.facts.some((f) => f.enabled);
                   const brokenFact = g.facts.find((f) => f.enabled && status[f.id] !== 'ok');
                   const state = !anyOn ? 'disabled' : brokenFact ? 'broken' : 'ok';
                   const errText = brokenFact ? explainError(status[brokenFact.id] as string) : undefined;
-                  // ADR-428 obligation 3 (#450): the row shows the CANONICAL form of what the tool
-                  // UNDERSTOOD, not the verbatim text — so the step list teaches the same spelling the
-                  // acceptance hint does, instead of preserving a phrasing we only tolerate. Rendered
-                  // from the group's COMMANDS, never by rewriting the typed string (canonical.ts's
-                  // load-bearing rule). `canonicalText` is deliberately conservative — a compound
-                  // lowering, or one whose family has no renderer, returns null and the row keeps its
-                  // verbatim text, which is most rows today.
                   const label = stepLabel(g.facts.map((f) => f.cmd), g.facts[0].utterance, canonLocale);
-                  const editing = editingId === g.key;
-                  return (
-                    <li key={g.key} style={factRow(state, g.key === selectedId)}>
-                      <input
-                        type="checkbox"
-                        checked={on}
-                        title={t('actions.toggle')}
-                        onChange={() => setGroupEnabled(g.key, !on)}
-                        disabled={editing}
-                        style={{ cursor: editing ? 'default' : 'pointer' }}
-                      />
-                      {editing ? (
-                        <>
-                          <input
-                            autoFocus
-                            value={editText}
-                            dir={textDir(editText)}
-                            onChange={(e) => {
-                              setEditText(e.target.value);
-                              if (editError) setEditError(false);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') commitEdit(g.key);
-                              if (e.key === 'Escape') cancelEdit();
-                            }}
-                            style={{ ...editInput, borderColor: editError ? '#dc2626' : '#cbd5e1' }}
-                          />
-                          <button type="button" style={iconBtn('#16a34a')} title={t('actions.confirmEdit')} onClick={() => commitEdit(g.key)}>
-                            ✓
+                  return {
+                    id: g.key,
+                    disabled: !anyOn,
+                    selected: g.key === selectedId,
+                    content: (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        <span style={{ fontSize: 12, width: 16, textAlign: 'center', flexShrink: 0 }}>
+                          {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
+                        </span>
+                        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                          <button type="button" style={factLabel(state)} onClick={() => select(g.key)} dir={textDir(label)} title={state === 'broken' ? errText : undefined}>
+                            {hasMath(label) ? <MathText text={label} /> : label}
                           </button>
-                          <button type="button" style={iconBtn('#94a3b8')} title={t('actions.cancelEdit')} onClick={cancelEdit}>
-                            ×
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                            <button type="button" style={factLabel(state)} onClick={() => select(g.key)} dir={textDir(label)} title={state === 'broken' ? errText : undefined}>
-                              {hasMath(label) ? <MathText text={label} /> : label}
-                            </button>
-                            {/* The broken-step REASON, inline (F6): it lived only in a `title` tooltip —
-                                invisible on touch and to screen readers. Shown when the row is selected
-                                (tap the row to see why it broke), keeping unselected rows compact. */}
-                            {state === 'broken' && errText && g.key === selectedId && (
-                              <span style={{ fontSize: 11, color: '#dc2626', paddingInlineStart: 6 }} dir={textDir(errText)}>
-                                {errText}
-                              </span>
-                            )}
-                            {/* #39: the computed value of a size/ratio given, measured on the drawing —
-                                shown when the step is selected. The ratio (verdict) is the seed-invariant
-                                knowledge (green ✓ / red ✗ vs the stated given); the absolute areas/lengths
-                                are per-drawing context. Forced LTR (it's math). */}
-                            {state === 'ok' && g.key === selectedId && selectedReadout && (
-                              <span style={{ fontSize: 11, paddingInlineStart: 6, direction: 'ltr', unicodeBidi: 'isolate' }}>
-                                {selectedReadout.measured.length > 0 && (
-                                  <span style={{ color: '#64748b' }}>
-                                    {selectedReadout.measured.map((m) => `${m.label} = ${m.value}`).join(' · ')} →{' '}
-                                  </span>
-                                )}
-                                <strong style={{ color: selectedReadout.verdict.ok ? '#16a34a' : '#dc2626' }}>
-                                  {selectedReadout.verdict.label} = {selectedReadout.verdict.value} {selectedReadout.verdict.ok ? '✓' : '✗'}
-                                </strong>
-                              </span>
-                            )}
-                          </div>
-                          <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}>
-                            {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
-                          </span>
-                          {/* Edit what is DISPLAYED, not the superseded typed text (#450): the row now
-                              shows the canonical form, and seeding the editor with the old phrasing
-                              would make the ✎ box contradict the row. Safe because the canonical text
-                              re-parses to the same lowering — locked by the round-trip property. */}
-                          <button type="button" style={iconBtn('#64748b')} title={t('actions.edit')} onClick={() => startEdit(g.key, label)}>
-                            ✎
-                          </button>
-                          <button type="button" style={del} title={t('actions.delete')} onClick={() => { logDebug({ kind: 'action', action: 'delete', detail: g.key }); removeGroup(g.key); }}>
-                            ×
-                          </button>
-                        </>
-                      )}
-                    </li>
-                  );
+                          {state === 'broken' && errText && g.key === selectedId && (
+                            <span style={{ fontSize: 11, color: '#dc2626', paddingInlineStart: 6 }} dir={textDir(errText)}>
+                              {errText}
+                            </span>
+                          )}
+                          {state === 'ok' && g.key === selectedId && selectedReadout && (
+                            <span style={{ fontSize: 11, paddingInlineStart: 6, direction: 'ltr', unicodeBidi: 'isolate' }}>
+                              {selectedReadout.measured.length > 0 && (
+                                <span style={{ color: '#64748b' }}>
+                                  {selectedReadout.measured.map((m) => `${m.label} = ${m.value}`).join(' · ')} →{' '}
+                                </span>
+                              )}
+                              <strong style={{ color: selectedReadout.verdict.ok ? '#16a34a' : '#dc2626' }}>
+                                {selectedReadout.verdict.label} = {selectedReadout.verdict.value} {selectedReadout.verdict.ok ? '✓' : '✗'}
+                              </strong>
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                    ),
+                  };
                 })}
-              </ul>
+                emptyHint={t('steps.empty')}
+                onToggle={(id) => {
+                  const g = groups.find((x) => x.key === id);
+                  if (g) setGroupEnabled(id, !g.facts.every((f) => f.enabled));
+                }}
+                toggleLabel={t('actions.toggle')}
+                editValueOf={(id) => {
+                  const g = groups.find((x) => x.key === id);
+                  return g ? stepLabel(g.facts.map((f) => f.cmd), g.facts[0].utterance, canonLocale) : '';
+                }}
+                onEditCommit={(id, next) => commitEdit(id, next)}
+                editLabel={t('actions.edit')}
+                onDelete={(id) => { logDebug({ kind: 'action', action: 'delete', detail: id }); removeGroup(id); }}
+                deleteLabel={t('actions.delete')}
+              />
               </>
             )}
           </div>
@@ -1972,9 +1931,8 @@ const catHeading: React.CSSProperties = {
 };
 const cmdRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
 const legend: React.CSSProperties = { display: 'flex', gap: 12, fontSize: 11, color: '#94a3b8', margin: '0 0 6px' };
-// The steps list is the tallest variable part, so it's capped and scrolls on its own — that reclaims the
-// vertical space the action buttons + detected-shape badges/card need to stay in view (see `sidebar`).
-const stepList: React.CSSProperties = { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '32vh', overflowY: 'auto' };
+// stepList retired with the shared FactList (B5-2d); its scroll cap moves to the wrapping card if
+// tall sessions demand it again.
 const errorBanner: React.CSSProperties = {
   padding: '8px 12px',
   fontSize: 13,
@@ -1999,25 +1957,7 @@ const infoBanner: React.CSSProperties = {
   background: '#eff6ff',
   color: '#1d4ed8',
 };
-const del: React.CSSProperties = {
-  border: 'none',
-  background: 'transparent',
-  color: '#94a3b8',
-  fontSize: 18,
-  lineHeight: 1,
-  cursor: 'pointer',
-  padding: '0 2px',
-};
-const editInput: React.CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  padding: '4px 8px',
-  fontSize: fs.small,
-  borderRadius: 6,
-  border: `1px solid ${pal.borderStrong}`,
-  background: '#fff',
-  color: pal.ink,
-};
+// del / editInput retired with the shared FactList (B5-2d): row actions and the editor are chrome.
 const iconBtn = (color: string): React.CSSProperties => ({
   border: 'none',
   background: 'transparent',
@@ -2138,19 +2078,8 @@ const bookLink: React.CSSProperties = {
   textDecoration: 'none',
   fontSize: 14,
 };
-function factRow(state: 'ok' | 'disabled' | 'broken', selected: boolean): React.CSSProperties {
-  const border = selected ? '#f59e0b' : state === 'broken' ? '#fecaca' : '#e2e8f0';
-  const bg = selected ? '#fffbeb' : state === 'broken' ? '#fef2f2' : '#f8fafc';
-  return {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '6px 8px',
-    borderRadius: 6,
-    border: `1px solid ${border}`,
-    background: bg,
-  };
-}
+// factRow retired with the shared FactList (B5-2d): the row card is chrome; the SELECTED accent
+// rides the FactRow.selected flag, and brokenness reads from the ✗ mark + inline reason.
 function factLabel(state: 'ok' | 'disabled' | 'broken'): React.CSSProperties {
   return {
     flex: 1,
