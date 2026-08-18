@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 // The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
 import { AppFrame } from '../shell/frame/AppFrame';
+import { FactList } from '../shell/frame/FactList';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { ToolButton } from '../shell/frame/ToolButton';
@@ -185,6 +186,7 @@ export default function App3() {
   const submit = useGeo3((s) => s.submit);
   const toggle = useGeo3((s) => s.toggle);
   const remove = useGeo3((s) => s.remove);
+  const replaceFact = useGeo3((s) => s.replaceFact);
   const clear = useGeo3((s) => s.clear);
   const resample = useGeo3((s) => s.resample);
   const loadFigure = useGeo3((s) => s.loadFigure);
@@ -527,80 +529,69 @@ export default function App3() {
             </div>
           </details>
 
-          <ul className="flex flex-col gap-1.5" data-testid="fact-list">
-            {facts.length === 0 && <li className="py-2 text-sm text-slate-400">{t('facts.empty')}</li>}
-            {facts.map((f) => (
-              <li key={f.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                <input
-                  type="checkbox"
-                  checked={f.enabled}
-                  onChange={() => toggle(f.id)}
-                  title={t('facts.toggleTitle')}
-                  className="accent-blue-600"
-                />
-                {f.cmds.some((c) => c.type === 'claim') && derived.status[f.id] === 'ok' ? (
-                  <span className="text-xs font-bold text-emerald-600" title={t('facts.claimVerified')}>
-                    ✓
-                  </span>
-                ) : (
-                  statusDot(derived.status[f.id])
-                )}
-                {/* #482 (ADR-3D-121): the STUDENT'S OWN text needs the same bidi isolation the
-                    messages get. ADR-3D-116 registered `isolateLtrRuns3` as an i18next post-processor —
-                    one chokepoint for every translated string, and the right place for those — but an
-                    utterance never passes through `t()`, so «מישור π1 - x+(m-2)y+(m-1)z-5» rendered with
-                    its equation reversed against the Hebrew. Display-only: the stored fact is untouched,
-                    and the transform is idempotent and byte-reversible (its safety property).
-                    A VECTOR fact is left alone deliberately — `VecMath` emits one element per token, so
-                    the bidi algorithm sees structure rather than one neutral run, and injecting isolates
-                    into its input would feed the tokenizer characters it has no token for. */}
-                <span dir="auto" className="min-w-0 flex-1 truncate text-sm">
-                  {isVectorFact3(f) ? (
-                    <VecMath text={factDisplay(f, new Set(derived.construction.vectors.keys()))} vecNames={new Set(derived.construction.vectors.keys())} />
+          {/* B5 (#670, D6): the SHARED fact-list chrome — row cards, mute checkbox, ✎ edit-in-place,
+              ✕ delete, one look across the builders. The row CONTENT stays this product's:
+              claim-✓/status dot, the bidi-isolated utterance (#482 ADR-3D-121: display-only,
+              idempotent; a VECTOR fact renders through VecMath, whose tokenizer must not see
+              injected isolates), and the per-plane display-cycle chips (#318/#395 ADR-3D-108 —
+              relation-operand and claim-carrier planes cycle exactly like a stated «מישור ABC»). */}
+          <FactList
+            testId="fact-list"
+            rows={facts.map((f) => ({
+              id: f.id,
+              disabled: !f.enabled,
+              content: (
+                <span className="flex min-w-0 items-center gap-2">
+                  {f.cmds.some((c) => c.type === 'claim') && derived.status[f.id] === 'ok' ? (
+                    <span className="text-xs font-bold text-emerald-600" title={t('facts.claimVerified')}>
+                      ✓
+                    </span>
                   ) : (
-                    isolateLtrRuns3(f.utterance)
+                    statusDot(derived.status[f.id])
                   )}
+                  <span dir="auto" className="min-w-0 flex-1 truncate text-sm">
+                    {isVectorFact3(f) ? (
+                      <VecMath text={factDisplay(f, new Set(derived.construction.vectors.keys()))} vecNames={new Set(derived.construction.vectors.keys())} />
+                    ) : (
+                      isolateLtrRuns3(f.utterance)
+                    )}
+                  </span>
+                  {[...new Set(f.cmds.flatMap((cm) =>
+                    cm.type === 'plane-through' ? [cm.name]
+                    : cm.type === 'free-plane' ? [cm.name] // #487: the declaring row cycles its patch like any other plane-materialising fact
+                    : cm.type === 'plane-rel' || cm.type === 'mutual-rel' || cm.type === 'distance-rel'
+                      ? [cm.a, cm.b].flatMap((op) => (op.kind === 'plane-run' ? [op.ids.join('')] : []))
+                      : cm.type === 'line-rel' && cm.op.kind === 'plane-run' ? [cm.op.ids.join('')]
+                      : cm.type === 'claim' && (cm.claim.type === 'plane-eq' || cm.claim.type === 'coord-plane-rel') ? [cm.claim.ids.join('')]
+                      : cm.type === 'coord-plane-rel' && cm.ids.length > 0 ? [cm.ids.join('')]
+                      : cm.type === 'line-plane-angle' ? [cm.plane.join('')]
+                      : [],
+                  ))].map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      title={t('facts.planeToggleTitle', { name })}
+                      onClick={() => togglePlaneDisplay(name)}
+                      className="shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] leading-4 text-slate-500 hover:border-blue-400 hover:text-blue-700"
+                    >
+                      {(planeDisplay[name] ?? 'full') === 'full' ? t('facts.planeFace') : (planeDisplay[name] === 'face' ? t('facts.planeHide') : t('facts.planeFull'))}
+                    </button>
+                  ))}
                 </span>
-                {/* #318 + #395 (ADR-3D-108): a fact that MATERIALISES a plane patch gets the
-                    per-plane display cycle (full → face → hidden → full); the label shows the mode
-                    the click SWITCHES TO. Enumeration covers relation-operand planes too — a patch
-                    born from «המישור ABC מאונך למישור ABD» is toggleable exactly like a stated
-                    «מישור ABC» (the operator's play-1/7/8 ask). */}
-                {[...new Set(f.cmds.flatMap((cm) =>
-                  cm.type === 'plane-through' ? [cm.name]
-                  : cm.type === 'free-plane' ? [cm.name] // #487: the declaring row cycles its patch like any other plane-materialising fact
-                  : cm.type === 'plane-rel' || cm.type === 'mutual-rel' || cm.type === 'distance-rel'
-                    ? [cm.a, cm.b].flatMap((op) => (op.kind === 'plane-run' ? [op.ids.join('')] : []))
-                    : cm.type === 'line-rel' && cm.op.kind === 'plane-run' ? [cm.op.ids.join('')]
-                    // #584 (ADR-3D-148): the CLAIM carriers materialise their stated run too —
-                    // «המישור ABS: x=0», the coord-frame relation, the line↔plane angle
-                    : cm.type === 'claim' && (cm.claim.type === 'plane-eq' || cm.claim.type === 'coord-plane-rel') ? [cm.claim.ids.join('')]
-                    : cm.type === 'coord-plane-rel' && cm.ids.length > 0 ? [cm.ids.join('')]
-                    : cm.type === 'line-plane-angle' ? [cm.plane.join('')]
-                    : [],
-                ))].map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    title={t('facts.planeToggleTitle', { name })}
-                    onClick={() => togglePlaneDisplay(name)}
-                    className="shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] leading-4 text-slate-500 hover:border-blue-400 hover:text-blue-700"
-                  >
-                    {(planeDisplay[name] ?? 'full') === 'full' ? t('facts.planeFace') : (planeDisplay[name] === 'face' ? t('facts.planeHide') : t('facts.planeFull'))}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  aria-label={t('facts.delete')}
-                  title={t('facts.delete')}
-                  onClick={() => { logDebug3({ kind: 'action', action: 'delete', detail: f.id }); remove(f.id); }} // #182: so a reported session replays deletions
-                  className="text-slate-400 hover:text-rose-600"
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
+              ),
+            }))}
+            emptyHint={t('facts.empty')}
+            onToggle={toggle}
+            toggleLabel={t('facts.toggleTitle')}
+            editValueOf={(id) => facts.find((f) => f.id === id)?.utterance ?? ''}
+            onEditCommit={(id, next) => {
+              logDebug3({ kind: 'action', action: 'edit', detail: id }); // #182: a reported session replays edits
+              return replaceFact(id, next);
+            }}
+            editLabel={t('facts.edit')}
+            onDelete={(id) => { logDebug3({ kind: 'action', action: 'delete', detail: id }); remove(id); }} // #182: so a reported session replays deletions
+            deleteLabel={t('facts.delete')}
+          />
 
           {/* the commands catalog (V5) — every supported form, clickable */}
           <details className="rounded-xl border border-slate-200 bg-white px-3 py-2">

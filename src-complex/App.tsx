@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { Banner } from '../shell/frame/Banner';
+import { FactList } from '../shell/frame/FactList';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
@@ -10,7 +11,7 @@ import { ToolButton } from '../shell/frame/ToolButton';
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { applySwitcherConfig, type ToolConfig } from '../shell/switcherConfig';
 import { deriveLines } from './app/deriveLines';
-import { COMPLEX_SESSION, hydrateSession, submitLine } from './app/submit';
+import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, toggleLine } from './app/submit';
 import { v2Claims, v2Formulas, v2Knowledge, v2Labels, v2Measures, v2Status } from './replay/scene2';
 import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
@@ -36,6 +37,7 @@ export function App() {
   const { t, i18n } = useTranslation();
   const {
     lines,
+    disabled,
     name,
     setName,
     seed,
@@ -123,7 +125,10 @@ export function App() {
    * `?engine=v2` selected between this and the prototype's per-fact sweeps while the foundation was
    * being played (ADR-CX-008). The cutover deleted the prototype, so the fork went with it.
    */
-  const derived2 = useMemo(() => deriveLines(lines, seed, seed), [lines, seed]);
+  // the figure folds from the ACTIVE lines only (B5/D6): a muted statement stays in the list,
+  // out of the figure — "what if I hadn't said this?" made literal
+  const active = useMemo(() => lines.filter((_, i) => !disabled.includes(i)), [lines, disabled]);
+  const derived2 = useMemo(() => deriveLines(active, seed, seed), [active, seed]);
   /**
    * THE `n` STEPPER — display state, and nowhere else (ADR-CX-001 D3).
    *
@@ -284,40 +289,36 @@ export function App() {
               )}
             </InputArea>
             {/*
-              THE STATEMENT LIST FOLLOWS THE ACTIVE ENGINE.
-
-              Under v2 the rows ARE the student's lines — the store's source of truth — not the
-              prototype's facts. Deriving them from facts is what made every v2-only form invisible as
-              well as unreachable (#658): a line the prototype refused had no row to appear in.
+              THE STATEMENT LIST — the SHARED chrome (B5/D6: disable + edit + delete, everywhere).
+              The rows ARE the student's lines, the store's source of truth (#658's lesson); a
+              toggled or edited line goes back through the acceptance gate in app/submit, so the
+              list can never show a state the figure refuses.
             */}
-            <ul className="facts">
-              {lines.length === 0 && <li className="hint">{t('emptyHint')}</li>}
-              {
-                lines.map((src, i) => {
-                  const failed = v2Failed.has(src);
-                  return (
-                    <li key={`${i}-${src}`} className={failed ? 'fact err' : 'fact'}>
-                      <code dir="ltr">{src}</code>
-                      {failed && (
-                        <span className="fact-error">
-                          {derived2?.untranslated.find((u) => u.src === src)?.why}
-                        </span>
-                      )}
-                      <button className="del" onClick={() => removeLine(i)} aria-label="delete">
-                        ✕
-                      </button>
-                    </li>
-                  );
-                })}
-            </ul>
-            {/* fact-LIST actions live with the fact list (the level model; the operator's card
-                audit): clear acts on the list, the counter counts it. B5's shared component
-                contracts this zone for every builder. */}
-            <div className="panel-actions">
-              <button onClick={() => EXAMPLE_LINES.forEach((l) => submitLine(l))}>{t('example')}</button>
-              <button onClick={clearAll}>{t('clearAll')}</button>
-              <span className="count">{t('factCount', { count: lines.length })}</span>
-            </div>
+            <FactList
+              rows={lines.map((src, i) => ({
+                id: String(i),
+                content: <code dir="ltr">{src}</code>,
+                error: v2Failed.has(src)
+                  ? derived2?.untranslated.find((u) => u.src === src)?.why
+                  : undefined,
+                disabled: disabled.includes(i),
+              }))}
+              emptyHint={t('emptyHint')}
+              onToggle={(id) => toggleLine(Number(id))}
+              toggleLabel={t('factToggle')}
+              editValueOf={(id) => lines[Number(id)]}
+              onEditCommit={(id, next) => editLine(Number(id), next)}
+              editLabel={t('factEdit')}
+              onDelete={(id) => removeLine(Number(id))}
+              deleteLabel={t('factDelete')}
+              footer={
+                <>
+                  <button onClick={() => EXAMPLE_LINES.forEach((l) => submitLine(l))}>{t('example')}</button>
+                  <button onClick={clearAll}>{t('clearAll')}</button>
+                  <span className="count">{t('factCount', { count: lines.length })}</span>
+                </>
+              }
+            />
           </section>
           <section className="canvas">
             {/* The figure's NAME, centered above the drawing it names — the SHARED component,

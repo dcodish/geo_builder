@@ -379,6 +379,25 @@ keeps the statement's **position**, which matters because order is meaningful in
 re-parses**, so it faces the same honesty gates as a typed one; that is a §6 family 1 row, not just
 a UI behaviour.
 
+> **Amendment — B5 executed (#670, 2026-08-18).** All three operations now live in both shipped
+> non-2-D builders, mounted through one shared chrome, `shell/frame/FactList.tsx` (row cards,
+> mute checkbox, ✎ edit-in-place with Enter/Esc, ✕ delete; a handler a product does not pass
+> renders no control). Found-state correction to the table: 3-D already had `remove` — its real
+> gap was edit, landed as `store3.replaceFact` (same id, same position, the full `submit`
+> acceptance chain: parse → dropped-given gates → candidate derive → seed search). Complex gained
+> `disabled: number[]` + gated `toggleLine`/`editLine` in `app/submit.ts`, and muted lines save/load
+> muted. Two rulings the build surfaced, both honesty-model-consistent rather than uniform:
+> **(a)** re-enabling / edit-committing gates per the PRODUCT's surface — complex refuses at entry
+> naming the conflicting statement (it has no per-row status), 3-D admits and flags the affected
+> row (its `status` IS the refusal surface), so an edit that orphans a dependent commits there and
+> the dependent flags, reversibly, exactly like `toggle`'s auto-drop. **(b)** editing a MUTED line
+> rewrites text only and gates for real on re-enable (in 3-D this falls out of the model — a
+> disabled fact's candidate status is `'disabled'`, which passes). Muting a line another line
+> depends on drops nothing in complex either: the referenced name degrades to an implicitly-created
+> free number (sampled, labelled) and dependents keep computing — the honest counterfactual.
+> Locks: `src-complex/__tests__/fact-ops.test.ts` (10) + `src3d/store/__tests__/fact-edit3.test.ts`
+> (5). 2-D adopts the chrome when B3-2d/B2-2d flip its shell edge.
+
 ### D7 — Canvas controls: **every figure action lives under the canvas**
 
 Both builders have viewport control already — 2-D's `Figure.tsx` carries a pan/zoom layer with
