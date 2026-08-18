@@ -335,9 +335,10 @@ export function App() {
               onDelete={(id) => removeLine(Number(id))}
               deleteLabel={t('factDelete')}
               footer={
+                /* #739: נקה הכל moved to the under-canvas row (the one place it lives in every
+                   tool); the footer keeps the example and the count. */
                 <>
                   <button onClick={() => EXAMPLE_LINES.forEach((l) => submitLine(l))}>{t('example')}</button>
-                  <button onClick={clearAll}>{t('clearAll')}</button>
                   <span className="count">{t('factCount', { count: lines.length })}</span>
                 </>
               }
@@ -354,7 +355,7 @@ export function App() {
                  itself; hiding those behind the data toggle would be the tool hiding a broken
                  given. B6 (#671) narrowed it to REFUSALS ONLY, per the operator's ruling: the
                  freedom cue and the sampled-value legend are figure DATA and moved to the data
-                 panel's head-line; the config count died outright («אפשרות נוספת» already says
+                 panel's head-line; the config count died outright («הציגו תצורה אחרת» already says
                  alternatives exist). The strip renders nothing when the figure holds clean. */
             }
             {(v2Contradiction(derived2) !== null ||
@@ -435,6 +436,9 @@ export function App() {
               <button onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
                 {view === 'cart' ? t('viewPolar') : t('viewCart')}
               </button>
+              {/* #739: the row carries clear-all in every tool (undo/redo await store temporal —
+                  the named feature gap on the issue) */}
+              <button onClick={clearAll}>{t('clearAll')}</button>
               {/* #722 — the ENRICHMENT layers, opt-in chips (the operator's de-clutter ruling:
                   the default canvas is points + stated elements; each S5 layer is a choice).
                   A chip renders only when the figure HAS that layer to show. */}

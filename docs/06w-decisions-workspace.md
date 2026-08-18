@@ -907,3 +907,54 @@ URLs — this file, cross-checked.
 **Flagged, operator-side, one-time:** prod complex reads `/complex-builder/api/config`, so the same
 Apache api-mapping the siblings have must be added for complex before the overlay is live in prod —
 until then the degraded path serves the static roster, which is correct behaviour, not an error.
+
+## ADR-W-020 — The parallel `-next` deploy channel: Track B evaluated in prod conditions without touching prod
+
+**Status:** accepted, 2026-08-17 (operator ruling; entry backfilled 2026-08-18 — the RUNBOOK §"-next"
+and docs/28 §5a amendments shipped referencing this id, and the log entry itself had not landed) ·
+**Issue:** [#700](https://github.com/dcodish/geo_builder/issues/700)
+
+**Decision.** The unified interface (Track B, `unify/ui`) is evaluated on the REAL host under the
+REAL server without replacing what students use: each builder deploys a second copy under
+`…-next/` paths (`geo-builder-next/`, `space-builder-next/`, `complex-builder-next/`) on
+themathbible.com, built from **committed `unify/ui` state only** — the branch analogue of the
+"deploys use only committed `main`" rule.
+
+1. **The canonical deploys are byte-untouched** — proven per deploy by stat/hash comparison, not
+   asserted. The `-next` copies live BESIDE them; a student URL never changes meaning.
+2. **Same tag-and-log discipline as prod:** each push gets a `next/YYYY-MM-DD[-n]` tag and a
+   DEPLOY-LOG entry — the log records `-next` deploys as first-class history, so "what is the
+   operator actually playing on mobile" has one answer.
+3. **Degraded api is EXPECTED and recorded:** until the operator adds the Plesk api mapping for the
+   `-next` paths, the copies run without LLM fallback and without logging — the honest state is
+   written into each DEPLOY-LOG entry rather than worked around.
+4. **The channel is temporary by design:** switchover (the `-next` build becomes canonical) and
+   teardown are one operator decision, recorded when taken; nothing auto-promotes.
+
+## ADR-W-023 — The under-canvas row is a CONTRACT: shared ops only, one wording, product options live in the panel (#738, #739)
+
+**Status:** accepted, 2026-08-18 · **Issues:** [#738](https://github.com/dcodish/geo_builder/issues/738),
+[#739](https://github.com/dcodish/geo_builder/issues/739) · operator: "we need to standardize this
+between all of the tools"
+
+**Problem.** The row under the canvas was never specified, so each product grew its own: THREE
+wordings for the same show-another-configuration action («הצג אפשרות נוספת», «אפשרות נוספת»,
+«הציגו תצורה אחרת»), 2-D's analysis buttons and display checkboxes parked on it, 3-D's
+distance-witness toggle parked on it, complex's clear-all on the fact-list footer instead. After
+ADR-W-018 ("one learned interface") the drift is a defect class, not a style choice.
+
+**Decision.**
+
+1. **The row carries only what EVERY builder has:** «הציגו תצורה אחרת» + בטל / בצע שוב / נקה הכל
+   (undo/redo pending in complex — a named feature gap on #739, the store has no temporal
+   middleware; the row shows what exists honestly rather than stub buttons).
+2. **One wording per action, every product, he+en** — and prose that NAMES a button uses the
+   button's exact current label (catalogs and manual text included: they are user-facing).
+3. **Product-specific DISPLAY options live in the נתונים panel,** beside the data they toggle:
+   2-D's analysis buttons + checkboxes (#738), 3-D's witness toggle (#739 — reversing its B6
+   placement, which predates this contract). Undecided residents (complex's layer chips and view
+   toggle) stay put until the operator rules — the contract governs what is DECIDED.
+4. **Held by a guard, not by review:** `shell/__tests__/row-parity.test.ts` scans the product
+   sources — the one-wording rule (retired variants may not reappear in any user-facing tree) and
+   the placement splits — in the import-direction/isolation pattern, so builder N+1 inherits the
+   contract mechanically.

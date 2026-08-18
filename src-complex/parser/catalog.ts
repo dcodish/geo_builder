@@ -139,7 +139,7 @@ export const CATALOG: readonly CatalogEntry[] = [
     family: 'F6',
     he: 'המעגל שמרכזו O ורדיוסו r',
     en: 'the circle with centre O and radius r',
-    descHe: 'מעגל לפי מרכז ורדיוס — r נדגם, ומשתנה עם "אפשרות נוספת"',
+    descHe: 'מעגל לפי מרכז ורדיוס — r נדגם, ומשתנה עם "הציגו תצורה אחרת"',
     descEn: 'a circle by centre and radius — r is sampled, and moves on "another configuration"',
   },
   {

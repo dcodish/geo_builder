@@ -20,7 +20,7 @@ import type { Derived2 } from './derive2';
  * rulings: a CONTRADICTION is a refusal and stays on the always-visible strip; the freedom cue is
  * figure DATA and lives at the head of the data panel — as a plain COUNT («the 2-D way»: people who
  * care will look, others ignore; never a per-DOF resolution of what is fixed and what can move).
- * The config count («תצורה 1 מתוך 1») died entirely — the «אפשרות נוספת» button already says
+ * The config count («תצורה 1 מתוך 1») died entirely — the «הציגו תצורה אחרת» button already says
  * alternatives exist, and the count can be large and meaningless.
  */
 

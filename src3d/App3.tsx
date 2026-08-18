@@ -1,4 +1,4 @@
-﻿/**
+/**
  * The 3-D tool's shell (docs/20 §6.6) — V0 minimal: input → parse → fact list →
  * derived figure on the orbitable canvas. RTL Hebrew default. A deliberate
  * rewrite-following-the-template of the 2-D App (pattern-copy, no imports from
@@ -652,17 +652,9 @@ export default function App3() {
             <button type="button" onClick={clearAll} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50">
               {t('actions.clear')}
             </button>
-            {/* #397 (ADR-3D-108): the stated-distance witness (the "height") — on by default,
-                hideable "for educational purposes". A FIGURE-display option, so it lives with the
-                figure actions (D7); moved here from the panel column's checkbox in B6's follow-up. */}
-            <button
-              type="button"
-              onClick={() => setShowWitness((s) => !s)}
-              aria-pressed={showWitness}
-              className={`rounded-xl border px-3 py-1.5 text-sm ${showWitness ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-slate-300 bg-white hover:bg-slate-100'}`}
-            >
-              {t('display.witnesses')}
-            </button>
+            {/* #397's witness toggle moved INTO the נתונים panel (#739 — operator: "show
+                distances and so on, that's part of the data panel"), matching 2-D's display
+                checkboxes. The row now carries exactly what every builder has. */}
             {/* שמור/טען/תמונה moved to the TOOL ROW (B3, the level model): they act on the
                 session, not the fact list. The load target stays here so it outlives the frame. */}
             <input ref={fileInput} type="file" accept=".geo3.json,application/json,.json" className="hidden" onChange={onLoadFile} />
@@ -793,6 +785,14 @@ export default function App3() {
               >
                 {(!dataPanel || panelIsEmpty(dataPanel)) && queryResults.length === 0 && (
                   <p className="text-slate-400">{t('dataPanel.empty')}</p>
+                )}
+                {/* #739: the distance-witness display toggle — a checkbox HERE like 2-D's display
+                    toggles (#738), not a button on the figure row (reverses the B6 placement). */}
+                {facts.length > 0 && (
+                  <label className="flex items-center gap-1.5 text-sm text-slate-600">
+                    <input type="checkbox" checked={showWitness} onChange={(e) => setShowWitness(e.target.checked)} />
+                    {t('display.witnesses')}
+                  </label>
                 )}
                 <form
                   onSubmit={(e) => {

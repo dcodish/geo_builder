@@ -1,7 +1,7 @@
 /**
  * B6 (#671) — the status-strip split, per the operator's 2026-08-18 rulings:
  *  - the freedom cue is a COUNT («the 2-D way»), never a per-DOF listing of what can move;
- *  - the configuration count died — «אפשרות נוספת» already says alternatives exist;
+ *  - the configuration count died — «הציגו תצורה אחרת» already says alternatives exist;
  *  - a CONTRADICTION stays a refusal (strip material), split from the freedom half;
  *  - and the NO-GUESS rule (follow-up ruling, same day): a value prints ONLY when the givens
  *    determine it — on canvas and panel alike; an undetermined number reads as its bare name and
