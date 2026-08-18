@@ -134,6 +134,7 @@
   "steps": {
     "title": "Steps",
     "empty": "Start by describing a shape",
+    "editRefused": "The edit could not be read — phrase it like a new statement",
     "statusOk": "OK",
     "statusBroken": "problem",
     "statusOff": "excluded"
@@ -291,8 +292,8 @@
     "dof": "Degrees of freedom: {{count}}",
     "determined": "✓ Fully determined",
     "delete": "Delete",
-    "toggle": "Include / exclude this fact",
-    "edit": "Edit",
+    "toggle": "Include in the figure",
+    "edit": "Edit in place",
     "confirmEdit": "Confirm",
     "cancelEdit": "Cancel",
     "markIntersection": "Create intersection point",

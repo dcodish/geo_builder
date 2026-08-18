@@ -25,6 +25,8 @@ export interface FactRow {
   /** The row's own error/annotation (e.g. "the engine could not read this"), rendered under it. */
   error?: ReactNode;
   disabled?: boolean;
+  /** A SELECTED row (2-D: the row whose elements highlight on the canvas) gets the amber accent. */
+  selected?: boolean;
 }
 
 export interface FactListProps {
@@ -39,6 +41,10 @@ export interface FactListProps {
   editValueOf?: (id: string) => string;
   onEditCommit?: (id: string, next: string) => boolean;
   editLabel?: string;
+  /** Direction for the editor box by CONTENT (the #118 lesson: dir="auto" keys off the first
+   *  strong character, and a Hebrew edit starting with a Latin label would take an LTR base).
+   *  Absent = auto (the math-first products). */
+  editDir?: (text: string) => 'rtl' | 'ltr';
   onDelete?: (id: string) => void;
   deleteLabel?: string;
   /** The list-zone actions (clear · counter · undo/redo …) — the product's row, one place. */
@@ -55,6 +61,7 @@ export function FactList({
   editValueOf,
   onEditCommit,
   editLabel,
+  editDir,
   onDelete,
   deleteLabel,
   footer,
@@ -73,7 +80,14 @@ export function FactList({
       <ul style={list} data-testid={testId}>
         {rows.length === 0 && <li style={hint}>{emptyHint}</li>}
         {rows.map((row) => (
-          <li key={row.id} style={row.disabled ? { ...rowStyle, ...rowDisabled } : rowStyle}>
+          <li
+            key={row.id}
+            style={{
+              ...rowStyle,
+              ...(row.disabled ? rowDisabled : null),
+              ...(row.selected ? rowSelected : null),
+            }}
+          >
             {onToggle && (
               <input
                 type="checkbox"
@@ -87,7 +101,7 @@ export function FactList({
             {editing?.id === row.id ? (
               <input
                 autoFocus
-                dir="auto"
+                dir={editDir ? editDir(editing.text) : 'auto'}
                 value={editing.text}
                 onChange={(e) => setEditing({ id: row.id, text: e.target.value })}
                 onKeyDown={(e) => {
@@ -149,6 +163,7 @@ const rowStyle: CSSProperties = {
   boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)',
 };
 const rowDisabled: CSSProperties = { opacity: 0.5 };
+const rowSelected: CSSProperties = { borderColor: '#f59e0b', background: '#fffbeb' };
 const toggle: CSSProperties = { flexShrink: 0, cursor: 'pointer' };
 const content: CSSProperties = { minWidth: 0, flex: 1 };
 const errorStyle: CSSProperties = { color: color.danger, fontSize: '0.8rem' };
