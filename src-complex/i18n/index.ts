@@ -63,6 +63,9 @@ const he = {
   calcsLabel: 'חישובים',
   save: 'שמור',
   load: 'טען',
+  // #745 — the same wording as the other two builders; «נתון:» is the document's own heading
+  questionDownload: 'הורידו שאלה',
+  questionGiven: 'נתון:',
   calc: 'חשב',
   calcPlaceholder: 'הקלידו ביטוי לחישוב, למשל |z1-z2|',
   calcCurrent: 'בדגימה הנוכחית: {{value}}',
@@ -178,6 +181,8 @@ const en = {
   calcsLabel: 'Calculations',
   save: 'Save',
   load: 'Load',
+  questionDownload: 'Download question',
+  questionGiven: 'Given:',
   calc: 'Calc',
   calcPlaceholder: 'type an expression to calculate, e.g. |z1-z2|',
   calcCurrent: 'at the current sample: {{value}}',

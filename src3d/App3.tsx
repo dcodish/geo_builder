@@ -23,7 +23,9 @@ import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
-import { inputPreview3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
+import { bidiSegments3, inputPreview3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
+import { questionLines3 } from './export/questionLines3';
+import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { SYMBOL_SPECS_3 } from './ui/symbols3';
 import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
@@ -239,32 +241,49 @@ export default function App3() {
     return () => ro.disconnect();
   }, []);
 
-  const onSaveImage = () => {
-    const svg = canvasBox.current?.querySelector('svg');
+  /** The figure's own SVG — the export source for both the image and the question document. */
+  const figureSvg = () => canvasBox.current?.querySelector('svg') ?? null;
+
+  const onSaveImage = async () => {
+    const svg = figureSvg();
     if (!svg) return;
-    const xml = new XMLSerializer().serializeToString(svg);
-    const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml;charset=utf-8' }));
-    const img = new Image();
-    img.onload = () => {
-      const scale = 2;
-      const canvas = document.createElement('canvas');
-      canvas.width = svg.clientWidth * scale;
-      canvas.height = svg.clientHeight * scale;
-      const ctx = canvas.getContext('2d')!;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `figure-3d-${new Date().toISOString().slice(0, 10)}.png`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }, 'image/png');
-    };
-    img.src = url;
+    // the SHARED rasteriser (#745, shell/export/svgToPng) — the inline copy that used to live here
+    // predated it and could not honour the clean-export tagging contract
+    const blob = await svgToPng(svg);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `figure-3d-${new Date().toISOString().slice(0, 10)}.png`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  /**
+   * «הורידו שאלה» (#745) — the figure beside the student's own statements, as a real .docx. The
+   * composer is shared (`shell/export/questionDoc`, ADR-W-024) and knows nothing about geometry: this
+   * tree supplies the heading, the givens (verbatim enabled utterances), the figure PNG and THIS
+   * product's bidi segmenter, so the paper splits technical runs exactly where the screen does.
+   *
+   * The docx library is dynamically imported so it stays out of the main chunk.
+   */
+  const onSaveQuestion = async () => {
+    const svg = figureSvg();
+    if (!svg) return;
+    const { pngDimensions, questionDocxBlob, questionFileName } = await import('../shell/export/questionDoc');
+    const png = await svgToPng(svg, 2, QUESTION_IMAGE_WIDTH_PX);
+    const data = new Uint8Array(await png.arrayBuffer());
+    const blob = await questionDocxBlob({
+      title: figureName.trim() || undefined,
+      heading: t('questionDoc.given'),
+      lines: questionLines3(facts),
+      png: { data, ...pngDimensions(data) },
+      rtl: i18n.language !== 'en',
+      segments: bidiSegments3,
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = questionFileName(new Date());
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   const onSaveFile = () => {
@@ -455,7 +474,12 @@ export default function App3() {
           {/* image export appears only once there is something to save (operator, 2026-08-18);
               it rides LAST so the constant buttons keep their suite positions. */}
           {facts.length > 0 && (
-            <ToolButton onClick={onSaveImage}>{t('actions.saveImage')}</ToolButton>
+            <ToolButton onClick={() => void onSaveImage()}>{t('actions.saveImage')}</ToolButton>
+          )}
+          {/* «הורידו שאלה» (#745) — same gate as the image: an empty figure has no question to print,
+              and a figure whose every statement is muted has no givens (questionLines3 is empty). */}
+          {questionLines3(facts).length > 0 && (
+            <ToolButton onClick={() => void onSaveQuestion()}>{t('actions.saveQuestion')}</ToolButton>
           )}
         </>
       }

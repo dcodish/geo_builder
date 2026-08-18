@@ -14,6 +14,8 @@ import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { applySwitcherConfig, type ToolConfig } from '../shell/switcherConfig';
+import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
+import { questionLines } from './export/questionLines';
 import { deriveLines } from './app/deriveLines';
 import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, toggleLine } from './app/submit';
 import { v2Claims, v2Contradiction, v2Formulas, v2Freedom, v2Knowledge, v2Labels, v2Measures } from './replay/scene2';
@@ -56,6 +58,8 @@ export function App() {
     setLoadAudit,
   } = useComplexStore();
   const fileRef = useRef<HTMLInputElement | null>(null);
+  /** The live Gauss plane — the export source for the question document's figure (#745). */
+  const planeRef = useRef<SVGSVGElement | null>(null);
 
   const saveFile = () => {
     const blob = new Blob([JSON.stringify(serialize(), null, 2)], { type: 'application/json' });
@@ -67,6 +71,36 @@ export function App() {
     a.download = savedFileName(name, new Date(), 'complex');
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  /**
+   * «הורידו שאלה» (#745) — the Gauss plane beside the student's own statements, as a real .docx.
+   *
+   * The composer is shared (`shell/export/questionDoc`, ADR-W-024) and knows nothing about complex
+   * numbers: this tree supplies the heading, the givens (the enabled statements, verbatim), the plane
+   * rasterised by the shared `svgToPng`, and THIS product's bidi segmenter — so a technical run splits
+   * on paper exactly where it splits on screen. The docx library is dynamically imported, keeping it
+   * out of the main chunk.
+   */
+  const saveQuestion = async () => {
+    const svg = planeRef.current;
+    if (!svg) return;
+    const { pngDimensions, questionDocxBlob, questionFileName } = await import('../shell/export/questionDoc');
+    const png = await svgToPng(svg, 2, QUESTION_IMAGE_WIDTH_PX);
+    const data = new Uint8Array(await png.arrayBuffer());
+    const blob = await questionDocxBlob({
+      title: name.trim() || undefined,
+      heading: t('questionGiven'),
+      lines: questionLines(lines, disabled),
+      png: { data, ...pngDimensions(data) },
+      rtl: i18n.language !== 'en',
+      segments: complexBidi.segments,
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = questionFileName(new Date());
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   const onLoadFile = (e: ChangeEvent<HTMLInputElement>) => {
@@ -250,6 +284,15 @@ export function App() {
             💾 {t('save')}
           </ToolButton>
           <ToolButton onClick={() => fileRef.current?.click()}>📂 {t('load')}</ToolButton>
+          {/* «הורידו שאלה» (#745) — disabled while there is no given to print OR no plane to print it
+              beside, so the tool never offers what it cannot honour (the #511 asymmetry). An enabled
+              button whose handler quietly returns is the same broken promise in a nicer costume. */}
+          <ToolButton
+            onClick={() => void saveQuestion()}
+            disabled={!polarScene || questionLines(lines, disabled).length === 0}
+          >
+            ⤓ {t('questionDownload')}
+          </ToolButton>
           <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
         </>
       }
@@ -387,6 +430,7 @@ export function App() {
             {polarScene && (
               <>
                 <PolarPlane
+                  svgRef={planeRef}
                   scene={polarScene}
                   showGrid={view === 'polar'}
                   mode={view}

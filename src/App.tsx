@@ -45,6 +45,7 @@ import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
 import { questionLines } from '@/export/questionLines';
+import { bidiSegments } from '@/i18n/bidi';
 import { auditLoadedFigure, liveAuditFindings, refreshLoadedFigure } from '@/store/loadAudit';
 import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
@@ -399,7 +400,7 @@ export default function App() {
   // imported so the library stays out of the main chunk. Errors propagate back
   // to Figure's ✕ export flash.
   const saveQuestion = async (png: Blob) => {
-    const { pngDimensions, questionDocxBlob, questionFileName } = await import('@/export/questionDoc');
+    const { pngDimensions, questionDocxBlob, questionFileName } = await import('../shell/export/questionDoc');
     const lines = questionLines(useGeoStore.getState().facts, canonLocale);
     const data = new Uint8Array(await png.arrayBuffer());
     const blob = await questionDocxBlob({
@@ -408,6 +409,8 @@ export default function App() {
       lines,
       png: { data, ...pngDimensions(data) },
       rtl: i18n.language !== 'en',
+      // the SAME segmenter the step list renders through (#464/#465) — screen and paper cannot drift
+      segments: bidiSegments,
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

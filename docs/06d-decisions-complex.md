@@ -1775,3 +1775,25 @@ design; a stopgap panel built here would be work that programme would delete.
 - The named gaps stay named, not fixed: [#688](https://github.com/dcodish/geo_builder/issues/688)
   (claim drive-or-check), [#694](https://github.com/dcodish/geo_builder/issues/694) (selection among an
   enumerated solution set), and the rest of the 572 booklet's Q3s as fixtures.
+
+## ADR-CX-028 — «הורידו שאלה»: the statements ARE the givens, and the plane hands back its `<svg>` (#745)
+
+**Status:** accepted, 2026-08-18 · **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745)
+
+The question `.docx` export reaches this builder too, on the shared composer
+([ADR-W-024](06w-decisions-workspace.md#adr-w-024)). Three decisions are this tree's own.
+
+- **The «נתון:» list is the enabled statements, verbatim** (`src-complex/export/questionLines.ts`). Here the
+  mapping needs no judgement at all: the source of truth already is an ordered list of statements
+  (`z1 = 3+4i`, `w = z1*z2`), each of which is a given — nothing to classify, unlike 2-D where one
+  submission lowers to several commands and some are pure ink.
+- **Exclusion is by INDEX, not by text.** The store's `disabled` names positions and preserves them across
+  removals; a text match would mute both copies of a repeated statement. That is the reason this is a named
+  module with a test rather than an inline `.filter()` at the call site.
+- **`PolarPlane` takes an optional `svgRef`.** The host needs the live element to rasterise it, and a ref is
+  the honest way to say so: the plane's identity is that element, not a `document.querySelector` on a class
+  name that happens to match it today. No DOM structure changed, so no CSS could shift.
+
+This builder had **no rasteriser at all** before now, which is why [#713](https://github.com/dcodish/geo_builder/issues/713)
+filed the export gap as engine work. That half is built; #713 keeps the image-download and copy-image
+buttons, which are now two buttons and their gates.

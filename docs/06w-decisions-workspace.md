@@ -958,3 +958,64 @@ ADR-W-018 ("one learned interface") the drift is a defect class, not a style cho
    sources — the one-wording rule (retired variants may not reappear in any user-facing tree) and
    the placement splits — in the import-direction/isolation pattern, so builder N+1 inherits the
    contract mechanically.
+
+## ADR-W-024 — The question document is ONE composer, parameterized by the caller's bidi (#745)
+
+**Status:** accepted, 2026-08-18 · **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745)
+· operator: *"for the 3d and for complex tool we need the option to download question in the same way we
+do for the 2d tool"*
+
+**Problem.** «הורידו שאלה» — the figure printed beside the student's own givens as a real `.docx`
+(FR-HS-11, [ADR-251](06-decisions.md#adr-251)) — existed only in 2-D. Not by decision: it was written
+in `src/export/`, a product tree the siblings may not import ([ADR-266](06-decisions.md#adr-266),
+`BOUNDARIES.json`), so a module that reasons about nothing but headings, list items and an image was
+unreachable by two builders purely because of where it sat. `buildQuestionDoc` already took only
+`{ title, heading, lines, png, rtl }`; its single product coupling was an import of the 2-D bidi
+segmenter. The same was true one layer down: the clean-export rasteriser was a private helper inside
+`src/render/Figure.tsx`, which is why 3-D had grown a thinner inline copy and complex had none at all.
+
+**Decision.**
+
+1. **`shell/export/questionDoc.ts` and `shell/export/svgToPng.ts` are shared surfaces.** This is the
+   [ADR-W-016](#adr-w-016) seed rule applied at the moment it bites: the surface is settled (five issues
+   of hardening — #451 ink, #464/#465 bidi, ADR-252 scaffolding, ADR-428 canonical form) and is about to
+   be implemented a second and third time. Copying it would put the OOXML layout, the A4 column split,
+   the Word-bidi per-run rule and the PNG IHDR reader in three places, and the next fix in that class
+   would have to be found and applied three times — the exact failure the shell layer exists to prevent.
+   This overrides the "(COPIED, per ADR-W-003)" parenthetical in [#713](https://github.com/dcodish/geo_builder/issues/713)'s
+   triage, which predates the request that made the surface a three-product one.
+
+2. **The bidi segmenter is an INPUT, and a required one.** Word has no glyph for U+2066/U+2069 and
+   prints visible boxes, so the document cannot use the browser's isolate strategy; OOXML's mechanism is
+   per-RUN direction, which means the composer must know where a technical run begins. That knowledge is
+   the *product's* — its run alphabet is derived from its own symbol palette (#482) — so it is handed in
+   rather than imported. Required rather than optional on purpose: an optional segmenter lets builder
+   N+1 omit it and silently ship the #464 scramble, and the defect class was authors not thinking about
+   bidi. A contract that permits not thinking about it has not closed the class.
+
+3. **Each product keeps its own bidi module and gains a `segments` view of it.** `shell/bidi`'s kit,
+   `src/i18n/bidi` and `src3d/i18n/bidi` are now all segments-first, with `isolateLtrRuns` built on top —
+   one definition of a run per product, so that product's screen and its paper cannot disagree. (The 2-D
+   copy was already this shape; #464 discovered the need. The other two were rebuilt onto it here.)
+
+4. **The «נתון:» list is VERBATIM in the two new builders.** 2-D omits scaffolding
+   ([ADR-252](06-decisions.md#adr-252)) via a per-command classification over the 2-D engine. Porting it
+   would mean inventing a second and third classification, each able to DROP a given the student stated —
+   which is the honesty invariant this export exists to serve. A line too many is a cosmetic complaint;
+   a line missing is the tool lying about the question. Operator ruling, 2026-08-18. Revisit only with a
+   real figure that prints noise.
+
+5. **The printed width is one constant, and it lives with the ink normalisation** (`svgToPng`), not with
+   the composer: the document prints the PNG at that width and `scaleInk` pre-multiplies by
+   `canvasWidth / it`, so they are one decision (#451) and two constants could drift. It also keeps
+   `docx` out of the static import graph — every app imports the composer dynamically so the library
+   stays out of its main chunk, and a static import of a constant declared beside it would defeat that.
+
+**Held by.** `shell/__tests__/question-export.test.ts`: the composer is exercised with a STUB segmenter
+no product would produce (a hard-coded run rule sneaking back in fails), it may not name a product
+identity, and the three apps are source-scanned for the dynamic import, a givens source, a handed-in
+segmenter, and the button label + heading in both locales — the row-parity/isolation pattern, so builder
+N+1 inherits the capability check mechanically rather than by review.
+
+**What this does not decide.** Complex's image download and copy-image buttons stay open on #713 — the
+rasteriser now exists there, so what remains is two buttons and their gates, not an engine.

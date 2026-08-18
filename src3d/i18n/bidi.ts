@@ -82,9 +82,21 @@ const PDI = '⁩'; // POP DIRECTIONAL ISOLATE
  */
 const DECL_SPLIT = /^([lℓπ][0-9]{0,2}[′']?)(\s*:\s*|\s+-\s+)(.+)$/;
 
+/** One stretch of a line, tagged with the direction it must be laid out in. */
+export interface BidiSegment3 {
+  text: string;
+  /** True for a technical run that must read left-to-right whatever the surrounding direction. */
+  ltr: boolean;
+}
+
 /**
- * Wrap every LTR technical run of `s` in an isolate, leaving Hebrew and surrounding punctuation alone.
- * A string with no Hebrew is returned untouched; one already carrying isolates is never nested.
+ * Split `s` into directional segments — THE one place that decides where a technical run begins and ends
+ * in this tree. Both consumers are built on it, so the screen and the .docx export can never disagree
+ * about what counts as a run (the 2-D `bidiSegments` shape, copied — docs/20 §12 rule 1).
+ *
+ * `rtlParagraph` is for callers whose direction is imposed from OUTSIDE rather than derived from the
+ * text's own content: the question export forces `w:bidi`, so an all-Latin given like `|AB| = 6` sits in
+ * an RTL paragraph and scrambles although it holds no Hebrew at all.
  *
  * `liveTail` is the PREVIEW's mode (#482 Am. 2): a finished sentence's trailing non-CORE characters are
  * punctuation and stay outside the run — but a line BEING TYPED has no trailing punctuation, it has an
@@ -92,15 +104,21 @@ const DECL_SPLIT = /^([lℓπ][0-9]{0,2}[′']?)(\s*:\s*|\s+-\s+)(.+)$/;
  * post-step in `inputPreview3`, so the declaration split above sees the tail: mid-way through «l - x=»
  * the `=` is what licenses the dash split, and a post-hoc PDI move would hide it.
  */
-export function isolateLtrRuns3(s: string, liveTail = false): string {
-  if (!HEBREW_LETTER.test(s)) return s;
-  if (s.includes(LRI)) return s;
+export function bidiSegments3(s: string, rtlParagraph = false, liveTail = false): BidiSegment3[] {
+  if (!rtlParagraph && !HEBREW_LETTER.test(s)) return s ? [{ text: s, ltr: false }] : [];
 
-  let out = '';
+  const segs: BidiSegment3[] = [];
+  const push = (text: string, ltr: boolean) => {
+    if (!text) return;
+    const prev = segs[segs.length - 1];
+    if (prev && prev.ltr === ltr) prev.text += text; // coalesce, so a Hebrew word is one segment
+    else segs.push({ text, ltr });
+  };
+
   let gap = '';
   const flush = (isFinal = false) => {
     let first = [...gap].findIndex((c) => CORE.test(c));
-    if (first < 0) { out += gap; gap = ''; return; }
+    if (first < 0) { push(gap, false); gap = ''; return; }
     let last = gap.length - 1;
     if (!(liveTail && isFinal)) while (last > first && !CORE.test(gap[last])) last--;
 
@@ -143,19 +161,37 @@ export function isolateLtrRuns3(s: string, liveTail = false): string {
     }
     const span = gap.slice(first, last + 1);
     const decl = DECL_SPLIT.exec(span);
-    const body =
-      decl && (decl[2].includes(':') || decl[3].includes('='))
-        ? LRI + decl[1] + PDI + decl[2] + LRI + decl[3] + PDI // name island · separator · equation island
-        : LRI + span + PDI;
-    out += gap.slice(0, first) + body + gap.slice(last + 1);
+    push(gap.slice(0, first), false);
+    if (decl && (decl[2].includes(':') || decl[3].includes('='))) {
+      push(decl[1], true); // name island
+      push(decl[2], false); // separator — a neutral between isolates, takes its place in the RTL flow
+      push(decl[3], true); // equation island
+    } else push(span, true);
+    push(gap.slice(last + 1), false);
     gap = '';
   };
 
   for (const ch of s) {
-    if (HEBREW_LETTER.test(ch)) { flush(); out += ch; } else gap += ch;
+    if (HEBREW_LETTER.test(ch)) { flush(); push(ch, false); } else gap += ch;
   }
   flush(true);
-  return out;
+  return segs;
+}
+
+/**
+ * Wrap every LTR technical run of `s` in an isolate, leaving Hebrew and surrounding punctuation alone —
+ * the DOM rendering strategy, suitable where the renderer honours the Unicode control characters and
+ * never draws them. It is NOT true of Word: `.docx` shows U+2066/U+2069 as missing-glyph boxes, so the
+ * question export consumes `bidiSegments3` directly and marks direction per RUN instead (ADR-431 Am. 1,
+ * arriving in this tree with #745).
+ *
+ * A string with no Hebrew is returned untouched; one already carrying isolates is never nested.
+ */
+export function isolateLtrRuns3(s: string, liveTail = false): string {
+  if (s.includes(LRI)) return s;
+  return bidiSegments3(s, false, liveTail)
+    .map((g) => (g.ltr ? LRI + g.text + PDI : g.text))
+    .join('');
 }
 
 /**

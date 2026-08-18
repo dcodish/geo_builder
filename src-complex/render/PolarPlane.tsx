@@ -11,6 +11,7 @@
  * wrong.
  */
 
+import type { Ref } from 'react';
 import type { Scene } from '../scene/scene';
 
 const W = 680;
@@ -66,6 +67,7 @@ export function PolarPlane({
   mode = 'polar',
   layers = {},
   labels,
+  svgRef,
 }: {
   scene: Scene;
   showGrid?: boolean;
@@ -75,6 +77,10 @@ export function PolarPlane({
   mode?: 'polar' | 'cart';
   layers?: CanvasLayers;
   labels: PlaneLabels;
+  /** The live `<svg>`, handed back to the host so it can RASTERISE the plane (#745 — the figure that
+   *  rides beside the givens in the question document). A ref rather than a `document.querySelector`
+   *  on the class name: the plane's identity is this element, not a selector that happens to match it. */
+  svgRef?: Ref<SVGSVGElement>;
 }) {
   const k = Math.min(W, H) / 2 / scene.extent;
   const X = (x: number) => W / 2 + x * k;
@@ -98,7 +104,7 @@ export function PolarPlane({
   };
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="gauss-plane" style={{ direction: 'ltr' }}>
+    <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="gauss-plane" style={{ direction: 'ltr' }}>
       <rect width={W} height={H} fill="#fafaf9" />
 
       {showGrid && !cart && (

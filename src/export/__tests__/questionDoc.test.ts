@@ -9,6 +9,11 @@
  * (real Word numbering, not a bidi-fragile "1. " prefix), the borderless
  * bidiVisual side-by-side table. Raw-buffer text search would NOT work
  * (document.xml is deflated inside the zip), hence jszip.
+ *
+ * The composer itself moved to `shell/export/` with #745 (three builders export the same document).
+ * This file stays in the 2-D tree and stays 2-D's END-TO-END net — real facts, the real parser, the
+ * real `bidiSegments` — because that is what it always was; the shared CONTRACT (product-agnostic
+ * composition, any segmenter) is locked separately in `shell/__tests__/question-doc.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
@@ -17,7 +22,8 @@ import type { Fact } from '@/store/geoStore';
 import { replay } from '@/store/geoStore';
 import { buildParseCtx, parse } from '@/parser';
 import { questionLines } from '@/export/questionLines';
-import { buildQuestionDoc, pngDimensions, questionFileName } from '@/export/questionDoc';
+import { buildQuestionDoc, pngDimensions, questionFileName } from '../../../shell/export/questionDoc';
+import { bidiSegments } from '@/i18n/bidi';
 
 /** Real-pipeline fact builder: parse each utterance with the live figure context, exactly as the app does. */
 const factsFromUtterances = (utterances: string[]): Fact[] => {
@@ -182,6 +188,9 @@ describe('buildQuestionDoc', () => {
     lines: ['במשולש ABC הזווית ∠ABC = 37°', 'AB קוטר במעגל O'],
     png: { data: PNG_2X1, ...pngDimensions(PNG_2X1) },
     rtl: true,
+    // #745: the composer is shared, so the segmenter is handed IN — this is the 2-D one, i.e. the
+    // same function the step list renders through.
+    segments: bidiSegments,
   };
 
   it('packs a valid zip whose document.xml carries the verbatim givens, RTL and real numbering', async () => {
@@ -250,6 +259,7 @@ describe('#464/#465 — the .docx marks direction PER RUN, with no control chara
   const base = {
     heading: 'נתון:',
     png: { data: PNG_2X1, ...pngDimensions(PNG_2X1) },
+    segments: bidiSegments,
   };
   const docXml = async (over: { rtl: boolean; lines: string[] }) => {
     const buf = await Packer.toBuffer(buildQuestionDoc({ ...base, ...over }));
