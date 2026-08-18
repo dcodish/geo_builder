@@ -4,6 +4,9 @@
     "subtitle": "Build geometry step by step"
   },
   "language": "עברית",
+  "dataTitle": "Data",
+  "panelShow": "Show",
+  "panelHide": "Hide",
   "switcher2d": "Plane Geometry",
   "switcher3d": "Space Geometry",
   "switcherComplex": "Complex Numbers",
@@ -421,6 +424,7 @@
     "given": "Given",
     "derived": "Derived",
     "areaRatios": "Area ratios",
+    "emptyFigure": "Start building — the figure's values will appear here",
     "none": "No fixed values yet — add size givens (a length, an angle, a radius)",
     "radius": "radius {{c}}",
     "area": "area {{ids}}",
