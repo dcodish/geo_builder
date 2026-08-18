@@ -132,6 +132,9 @@ const strip: CSSProperties = {
   background: color.surface,
   border: `1px solid ${color.borderStrong}`,
   borderRadius: 999,
+  // phones: the strip scrolls inside itself instead of dragging the whole page sideways
+  maxWidth: '100%',
+  overflowX: 'auto',
   padding: 4,
 };
 const seg: CSSProperties = {

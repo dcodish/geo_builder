@@ -17,7 +17,27 @@
  * place in every tool.
  */
 import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { color } from '../theme';
+
+/** The one breakpoint every builder shares: below it the workbench STACKS (canvas → input →
+ *  data) and the page scrolls natively — three fixed columns on a phone collapse into slivers
+ *  (operator: "on mobile the sites look crap"). The desktop no-scroll ruling applies to
+ *  desktops; a stacked phone page scrolls by nature. */
+const NARROW_QUERY = '(max-width: 900px)';
+
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(NARROW_QUERY).matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW_QUERY);
+    const onChange = () => setNarrow(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return narrow;
+}
 
 export interface WorkbenchProps {
   /** Content of the input column (input card, fact list card, …). */
@@ -33,6 +53,27 @@ export interface WorkbenchProps {
 }
 
 export function Workbench({ inputZone, canvasZone, dataZone, emptyOverlay, barsHeight = 126 }: WorkbenchProps) {
+  const narrow = useNarrow();
+
+  if (narrow) {
+    // STACKED (phone/tablet-portrait): the figure first, then what-I-said, then the data —
+    // full-width cards, native page scroll.
+    return (
+      <div style={stackPage}>
+        <section style={{ ...canvasCard, minHeight: '58vh', flex: 'none' }}>
+          {canvasZone}
+          {emptyOverlay != null && (
+            <div style={overlay}>
+              <div style={{ pointerEvents: 'auto' }}>{emptyOverlay}</div>
+            </div>
+          )}
+        </section>
+        <div style={stackZone}>{inputZone}</div>
+        <div style={stackZone}>{dataZone}</div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ ...page, height: `calc(100vh - ${barsHeight}px)` }}>
       <div style={row}>
@@ -66,6 +107,14 @@ const page: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
 };
+const stackPage: CSSProperties = {
+  padding: '10px 12px 24px',
+  color: color.ink,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 12,
+};
+const stackZone: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 10 };
 const row: CSSProperties = { display: 'flex', gap: WORKBENCH_GEOMETRY.gap, alignItems: 'stretch', flex: 1, minHeight: 0 };
 const cardBase: CSSProperties = {
   background: color.surface,

@@ -186,6 +186,7 @@ const suiteInner: CSSProperties = {
   alignItems: 'center',
   gap: 12,
   paddingBlock: 7,
+  flexWrap: 'wrap', // phones: the strip and the suite buttons stack instead of overflowing
 };
 /** START-clustered (operator, B3 play): the session actions sit right after the title — on the
  *  RIGHT in Hebrew, on the LEFT in English — never flung to the far end of the row. Logical flex
@@ -197,6 +198,7 @@ const toolRow: CSSProperties = {
   alignItems: 'center',
   gap: 18,
   paddingBlock: 12,
+  flexWrap: 'wrap', // phones: the title block and the action buttons stack
 };
 const suiteActionsRow: CSSProperties = { display: 'flex', gap: 6, alignItems: 'center' };
 const suiteBtn: CSSProperties = {
@@ -212,8 +214,9 @@ const suiteBtn: CSSProperties = {
 // EXPLICIT weight — the operator caught the frame trusting browser defaults: complex rendered the
 // bold default while 3-D's Tailwind preflight reset headings to normal. A shell component states
 // every property it cares about; consumer stylesheets differ by construction.
-/** Constant width so the session actions anchor at ONE position across all builders. */
-const titleBlock: CSSProperties = { flex: '0 0 320px', minWidth: 0 };
+/** Constant width so the session actions anchor at ONE position across all builders — but never
+ *  wider than the viewport allows (phones: the block shrinks and the row wraps). */
+const titleBlock: CSSProperties = { flex: '0 1 320px', minWidth: 0, maxWidth: '100%' };
 const h1Style: CSSProperties = { fontSize: fs.h1, fontWeight: 700, lineHeight: 1.3, margin: 0, color: color.ink };
 const subtitleStyle: CSSProperties = {
   margin: '2px 0 0',
