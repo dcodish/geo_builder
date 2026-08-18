@@ -301,6 +301,26 @@ even more builders"* is the case a tab strip fails. Every builder gets the **ful
 > Executed for complex in the same change (cycle and the polar/cartesian toggle moved under the
 > canvas, ahead of B6); 2-D and 3-D adopt the same zoning via B2/B3.
 >
+> **Refined on the B3-3-D play (operator, 2026-08-17):** the FIGURE NAME is centered ABOVE the
+> canvas — it names the drawing, so it lives with the drawing, not in the tool row; and the tool
+> row's session actions CLUSTER AT THE READING START beside the title (right in Hebrew, left in
+> English — logical flex-start, mirrored by `dir`), never flung to the far end.
+
+> **D2 SUPERSEDED IN PART (operator, 2026-08-18): shared COMPONENTS, not shared values.** After
+> the B3 parity round the operator ruled on the remaining gap: *"the look is different so it
+> cannot be the same code base — it's not really shared, it's a different implementation and not
+> even a copy."* Correct: the frame layer (suite bar, strip, tool row, ToolButton, FigureName,
+> About, banners) is ONE code base; the bodies were three implementations sharing token VALUES —
+> D2's half-measure, which drifts exactly like the pre-programme headers did.
+>
+> The rule from here: **every remaining Track B surface lands as a `shell/` COMPONENT mounted by
+> every builder** — B4's input area (box + preview + wrap-selection palette + quick-command
+> chips), B5's fact-list chrome, B6's data-panel skeleton — with each product passing content
+> (symbols, placeholders, handlers, rows), never re-implementing chrome. Tailwind is demoted from
+> target mechanism to 3-D's interim styling for surfaces not yet moved to shell; it shrinks to
+> nothing as the B items land. The engine boundary is unchanged: canvases' internals, parsers,
+> stores stay per-product (ADR-W-003).
+>
 > **The `⋯` menu is RETIRED (operator, 2026-08-17):** with שמור/טען out, it held two items — and
 > *"there are 2 options there that can be on the toolbar as is."* Language and About sit on the
 > suite bar as visible buttons. Revisit only if the suite-level set genuinely outgrows the bar;

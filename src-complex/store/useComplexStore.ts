@@ -55,11 +55,17 @@ export interface SavedSession {
   freePos: Record<string, Cx>;
   seed: number;
   view: 'cart' | 'polar';
+  /** The figure's name (#42 arriving here via the shared FigureName) — additive and optional, so
+   *  every pre-existing file and fixture loads unchanged. */
+  name?: string;
 }
 
 interface ComplexState {
   /** THE SOURCE OF TRUTH — the student's accepted lines, in entry order. */
   lines: string[];
+  /** The figure's name (#42): display + save-file naming; empty = unnamed. */
+  name: string;
+  setName: (name: string) => void;
   freePos: Record<string, Cx>;
   /** configuration seed — "show another configuration" bumps it and releases drag overrides */
   seed: number;
@@ -82,11 +88,18 @@ interface ComplexState {
   setError: (e: InputError) => void;
   setLoadAudit: (a: LoadAudit<InputError> | null) => void;
   resetSession: () => void;
-  restoreView: (v: { freePos: Record<string, Cx>; seed: number; view: 'cart' | 'polar' }) => void;
+  restoreView: (v: {
+    freePos: Record<string, Cx>;
+    seed: number;
+    view: 'cart' | 'polar';
+    name?: string;
+  }) => void;
 }
 
 export const useComplexStore = create<ComplexState>((set, get) => ({
   lines: [],
+  name: '',
+  setName: (name) => set({ name }),
   freePos: {},
   seed: 0,
   view: 'cart',
@@ -99,18 +112,26 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
   // a new configuration = fresh samples for every free DOF; drag overrides are part of the
   // OLD configuration and are released (the sibling "show another configuration" semantics)
   nextConfig: () => set(({ seed }) => ({ seed: seed + 1, freePos: {} })),
-  clearAll: () => set({ lines: [], freePos: {}, seed: 0, lastError: null, loadAudit: null }),
+  clearAll: () => set({ lines: [], name: '', freePos: {}, seed: 0, lastError: null, loadAudit: null }),
   clearError: () => set({ lastError: null }),
 
   serialize: () => {
-    const { lines, freePos, seed, view } = get();
-    return { app: 'complex-builder', version: 1, lines: [...lines], freePos, seed, view };
+    const { lines, freePos, seed, view, name } = get();
+    return {
+      app: 'complex-builder',
+      version: 1,
+      lines: [...lines],
+      freePos,
+      seed,
+      view,
+      ...(name.trim() ? { name: name.trim() } : {}),
+    };
   },
 
   recordLine: (line, seed) =>
     set(({ lines }) => ({ lines: [...lines, line], seed, lastError: null })),
   setError: (lastError) => set({ lastError }),
   setLoadAudit: (loadAudit) => set({ loadAudit }),
-  resetSession: () => set({ lines: [], freePos: {}, seed: 0, lastError: null, loadAudit: null }),
-  restoreView: ({ freePos, seed, view }) => set({ freePos, seed, view }),
+  resetSession: () => set({ lines: [], name: '', freePos: {}, seed: 0, lastError: null, loadAudit: null }),
+  restoreView: ({ freePos, seed, view, name }) => set({ freePos, seed, view, ...(name !== undefined ? { name } : {}) }),
 }));
