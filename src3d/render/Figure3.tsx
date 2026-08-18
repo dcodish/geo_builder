@@ -40,7 +40,13 @@ export interface Figure3Props {
 /** Per-index plane patch colours (translucent — patches never occlude, docs/20 §11). */
 const PLANE_COLORS = ['#0284c7', '#7c3aed', '#d97706'];
 
-const ORBIT_SPEED = 0.011; // radians per px
+/**
+ * #724 — orbit speed NORMALIZED BY CANVAS WIDTH: a full-width drag is one full turn (2π),
+ * whatever the canvas size. The old fixed 0.011 rad/px felt right on the pre-unification ~700px
+ * canvas (≈ 7.7 rad per sweep) but turned "jumpy" when the layout went full-width (~1100px ≈ 12
+ * rad — nearly two turns per sweep). Exported pure for the lock.
+ */
+export const orbitStep = (width: number): number => (2 * Math.PI) / Math.max(400, width);
 
 /** Named vectors draw in their own colour (ADR-3D-003 Am.) so tail/head read instantly. */
 const VECTOR_COLOR = '#0d9488';
@@ -131,11 +137,12 @@ export default function Figure3({ construction, resolved, width = 640, height = 
     }
     // The first drag ADOPTS the current home view and makes it the student's (#5): orbiting from
     // `null` must start where they can see the figure, not snap back to the ¾ view.
+    const k = orbitStep(width); // #724: width-normalized — the old fixed rad/px went jumpy at full width
     setCam((c) => {
       const from = c ?? home;
       return {
-        yaw: from.yaw - dx * ORBIT_SPEED,
-        pitch: Math.max(-MAX_PITCH, Math.min(MAX_PITCH, from.pitch + dy * ORBIT_SPEED)),
+        yaw: from.yaw - dx * k,
+        pitch: Math.max(-MAX_PITCH, Math.min(MAX_PITCH, from.pitch + dy * k)),
       };
     });
   };

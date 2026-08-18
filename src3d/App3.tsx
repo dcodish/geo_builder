@@ -218,18 +218,22 @@ export default function App3() {
   const [loadNote, setLoadNote] = useState<string | null>(null); // #309: a loaded file that does not rebuild
   const fileInput = useRef<HTMLInputElement>(null);
   const canvasBox = useRef<HTMLDivElement>(null);
-  const [canvasW, setCanvasW] = useState(640);
+  /** #718 — the drawing HOST: the flex-1 area the svg must fill. Both dimensions are measured,
+   *  because deriving height from width (the old `canvasW * 0.72`) overflowed the workbench card
+   *  at wide viewports — the operator's "the cube draws very large / doesn't fit". */
+  const canvasHost = useRef<HTMLDivElement>(null);
+  const [canvasSize, setCanvasSize] = useState({ w: 640, h: 460 });
   const derived = useMemo(() => derive3(facts, seed), [facts, seed]);
   const dof = useMemo(() => freeDofCount3(derived.construction, derived.resolved), [derived]);
   const notices = derived.notices; // #305 (ADR-3D-090): non-error "here is what changed" messages
 
-  // responsive canvas: track the container's width (V5)
+  // responsive canvas: track the HOST's box (V5; #718: height too)
   useEffect(() => {
-    const el = canvasBox.current;
+    const el = canvasHost.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver((entries) => {
-      const w = Math.round(entries[0].contentRect.width);
-      if (w > 0) setCanvasW(w);
+      const r = entries[0].contentRect;
+      if (r.width > 0) setCanvasSize({ w: Math.round(r.width), h: Math.max(300, Math.round(r.height)) });
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -614,18 +618,22 @@ export default function App3() {
               every builder. */}
           <FigureName value={figureName} onChange={setFigureName} placeholder={t('actions.namePlaceholder')} />
           {/* the empty-state chips render through the WORKBENCH's one overlay slot (#734) */}
-          <Figure3
-            construction={derived.construction}
-            resolved={derived.resolved}
-            planeDisplay={planeDisplay}
-            showWitnesses={showWitness}
-            coordLabels={showData && dataPanel ? dataPanel.pointCoords : undefined}
-            width={canvasW}
-            height={Math.max(360, Math.round(canvasW * 0.72))}
-            resetLabel={t('actions.resetView')}
-            crossingLabel={t('actions.nameCrossing')}
-            onNameCrossing={onNameCrossing}
-          />
+          {/* #718 — the drawing fills the REMAINING card height (measured host), so a solid can
+              never overflow the card: the svg gets the space the layout actually has. */}
+          <div ref={canvasHost} className="min-h-0 flex-1">
+            <Figure3
+              construction={derived.construction}
+              resolved={derived.resolved}
+              planeDisplay={planeDisplay}
+              showWitnesses={showWitness}
+              coordLabels={showData && dataPanel ? dataPanel.pointCoords : undefined}
+              width={canvasSize.w}
+              height={canvasSize.h}
+              resetLabel={t('actions.resetView')}
+              crossingLabel={t('actions.nameCrossing')}
+              onNameCrossing={onNameCrossing}
+            />
+          </div>
           {/* B6 (#671): the DOF cue moved to the data panel's head-line — its generic home across
               the builders (operator: "people who care about it will look at it"). */}
           <p className="text-xs text-slate-400">{t('hint.orbit')}</p>
