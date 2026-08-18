@@ -385,6 +385,7 @@ export function App() {
                 <PolarPlane
                   scene={polarScene}
                   showGrid={view === 'polar'}
+                  mode={view}
                   labels={{
                     ratio: t('seriesRatio'),
                     limit: t('seriesLimit'),
@@ -453,7 +454,7 @@ export function App() {
               hideLabel={t('panelHide')}
               status={v2Freedom(derived2)}
               sections={[
-                { key: 'points', title: t('secPoints'), rows: v2Labels(derived2) },
+                { key: 'points', title: t('secPoints'), rows: v2Labels(derived2, view) },
                 // verdict rows word their WHY in prose — they follow the app's direction (#716
                 // tracks the engine-composed strings staying Hebrew in EN mode)
                 { key: 'measures', title: t('secMeasures'), rows: v2Measures(derived2), dir: 'app' },

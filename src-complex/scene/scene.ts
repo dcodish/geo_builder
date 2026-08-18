@@ -52,6 +52,8 @@ export interface ScenePoint {
    * `~` was made where the knowledge lives.
    */
   readonly reading: string;
+  /** #703 — the a+bi form of the same reading, for the cartesian view. */
+  readonly readingCart: string;
   readonly modulusKnown: boolean;
   readonly argumentKnown: boolean;
 }
@@ -211,6 +213,7 @@ export function buildScene(figure: SceneInput, display: SceneDisplay = {}): Scen
     label: prettyName(p.name),
     z: p.z,
     reading: p.reading,
+    readingCart: p.readingCart,
     modulusKnown: p.modulusKnown,
     argumentKnown: p.argumentKnown,
   }));

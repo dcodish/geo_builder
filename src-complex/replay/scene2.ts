@@ -69,12 +69,13 @@ export const v2Measures = (d: Derived2): string[] =>
  * none, so `z1 = 3+4i` printed here and drew as a bare name there (#675). The composition lives at
  * stage 5d in `derive2`; both surfaces print what it decided.
  */
-export const v2Labels = (d: Derived2): string[] =>
+export const v2Labels = (d: Derived2, view: 'polar' | 'cart' = 'polar'): string[] =>
   // The no-guess ruling, refined (operator 2026-08-18): an undetermined number gets NO row at all —
   // "don't show the letter and say we cannot compute it". The place that explains a missing value
   // is the ASK lane, when the student asks for that name explicitly (3-D's query lane already
   // answers that way; the complex ask input rides #623).
-  d.points.filter((p) => p.modulusKnown && p.argumentKnown).map((p) => p.reading);
+  // #703: the rows follow the VIEW — the same stage-5d compositions the canvas prints.
+  d.points.filter((p) => p.modulusKnown && p.argumentKnown).map((p) => (view === 'cart' ? p.readingCart : p.reading));
 
 /**
  * The sheet formulas this figure is using, with the lines that brought each up.

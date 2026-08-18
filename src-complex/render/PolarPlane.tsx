@@ -51,15 +51,29 @@ const polar = (r: number, deg: number): [number, number] => {
 export function PolarPlane({
   scene,
   showGrid = true,
+  mode = 'polar',
   labels,
 }: {
   scene: Scene;
   showGrid?: boolean;
+  /** #703 — the view the toggle promises: 'polar' = rings/rays + cis readings; 'cart' = an x/y
+   *  grid + a+bi readings. The prototype's cartesian Gauss plane died at the cutover with the
+   *  toggle's cartesian half; this restores it inside the ONE canvas. */
+  mode?: 'polar' | 'cart';
   labels: PlaneLabels;
 }) {
   const k = Math.min(W, H) / 2 / scene.extent;
   const X = (x: number) => W / 2 + x * k;
   const Y = (y: number) => H / 2 - y * k;
+  const cart = mode === 'cart';
+  /** The cartesian gridline positions — the same nice step the rings use, mirrored to negatives. */
+  const cartSteps = (() => {
+    if (!cart) return [];
+    const step = scene.grid.rings[0] ?? 1;
+    const out: number[] = [];
+    for (let v = step; v <= scene.extent; v += step) out.push(v, -v);
+    return out;
+  })();
 
   /** An SVG arc from `fromDeg` to `toDeg` at radius `r`, the short way round when under a half turn. */
   const arcPath = (r: number, fromDeg: number, toDeg: number): string => {
@@ -73,7 +87,7 @@ export function PolarPlane({
     <svg viewBox={`0 0 ${W} ${H}`} className="gauss-plane" style={{ direction: 'ltr' }}>
       <rect width={W} height={H} fill="#fafaf9" />
 
-      {showGrid && (
+      {showGrid && !cart && (
         <g>
           {/* concentric rings — constant modulus, the polar answer to a cartesian grid line */}
           {scene.grid.rings.map((r) => (
@@ -99,6 +113,28 @@ export function PolarPlane({
                 </text>
               );
             })}
+        </g>
+      )}
+      {cart && (
+        <g data-testid="cart-grid">
+          {/* #703 — the CARTESIAN grid: x/y gridlines at the same nice step the rings use, with
+              numeric ticks on both axes (the Im ticks read as multiples of i on the axis). */}
+          {cartSteps.map((v) => (
+            <line key={`gx${v}`} x1={X(v)} y1={0} x2={X(v)} y2={H} stroke={INK.grid} strokeWidth={1} />
+          ))}
+          {cartSteps.map((v) => (
+            <line key={`gy${v}`} x1={0} y1={Y(v)} x2={W} y2={Y(v)} stroke={INK.grid} strokeWidth={1} />
+          ))}
+          {cartSteps.map((v) => (
+            <text key={`tx${v}`} x={X(v) + 2} y={Y(0) + 12} fontSize={10} fill={INK.faint}>
+              {v}
+            </text>
+          ))}
+          {cartSteps.map((v) => (
+            <text key={`ty${v}`} x={X(0) + 4} y={Y(v) - 2} fontSize={10} fill={INK.faint}>
+              {v}i
+            </text>
+          ))}
         </g>
       )}
 
@@ -334,8 +370,9 @@ export function PolarPlane({
                   panel hidden it is the only check that z₁ landed right. The no-guess ruling makes
                   it safe: `readingOf` now composes a value only when the givens determine it, so an
                   undetermined point's reading IS the bare name — nothing sampled is ever printed.
-                  (#653/#675: one source, two surfaces — both print stage 5d's composition.) */}
-              {p.reading}
+                  (#653/#675: one source, two surfaces — both print stage 5d's composition.)
+                  #703: the reading FOLLOWS THE VIEW — a+bi in the cartesian lens. */}
+              {cart ? p.readingCart : p.reading}
             </text>
           </g>
         );

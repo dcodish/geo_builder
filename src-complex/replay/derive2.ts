@@ -88,6 +88,8 @@ export interface DerivedPoint {
    * renderer owns where the ink goes.*
    */
   readonly reading: string;
+  /** #703 — the same point in the a+bi lens, same chokepoint, same no-guess rule. */
+  readonly readingCart: string;
   /** the exact polar text, when the whole value is carried exactly — a VALUE question, not a display one */
   readonly exactLabel: string | null;
   /**
@@ -626,6 +628,16 @@ export function foldConstraints(input: FoldInput): Derived2 {
           modulusKnown: m.exact !== null,
           argumentDeg,
           argumentKnown: a.exact !== null,
+        }),
+        /**
+         * #703 — the CARTESIAN reading, composed at the same stage-5d chokepoint so the canvas
+         * and the panel can never disagree (the #653/#675 one-source rule, now per VIEW). The
+         * same no-guess rule binds: a value prints only when the givens determine it.
+         */
+        readingCart: readingCartOf({
+          name,
+          z: cPolar(m.value, a.deg),
+          known: m.exact !== null && a.exact !== null,
         }),
         exactLabel,
         cyclePeriod: cycle === null ? null : Number(cycle),
@@ -1245,6 +1257,27 @@ function readingOf(p: {
    */
   if (!p.modulusKnown || !p.argumentKnown) return label;
   return `${label} ≈ ${p.modulus}·cis${fmtNum(p.argumentDeg)}°`;
+}
+
+/**
+ * #703 — the cartesian reading («z₁ = 3+4i» / «z ≈ -1+1.73i»), stage 5d's second view of the same
+ * point. Exactness rule, deliberately conservative: when BOTH re and im land on integers (within
+ * float noise) the reading prints `=` with the integers — that covers every `a+bi` definition the
+ * curriculum types — and anything else prints `≈` at the #723 display precision. The no-guess rule
+ * binds identically to the polar reading: undetermined → the bare name.
+ */
+function readingCartOf(p: { name: string; z: Cx; known: boolean }): string {
+  const label = prettyName(p.name);
+  if (!p.known) return label;
+  const isInt = (x: number) => Math.abs(x - Math.round(x)) < 1e-9;
+  const exact = isInt(p.z.re) && isInt(p.z.im);
+  const fmt = (x: number) => (exact ? `${Math.round(x)}` : fmtNum(x));
+  const re = fmt(p.z.re);
+  const imAbs = fmt(Math.abs(p.z.im));
+  const imMag = imAbs === '1' ? '' : imAbs;
+  const im = p.z.im === 0 ? '' : `${p.z.im < 0 ? '-' : '+'}${imMag}i`;
+  const body = im === '' ? re : p.z.re === 0 ? `${p.z.im < 0 ? '-' : ''}${imMag}i` : `${re}${im}`;
+  return `${label} ${exact ? '=' : '≈'} ${body}`;
 }
 
 function collectParams(c: Constraint): string[] {
