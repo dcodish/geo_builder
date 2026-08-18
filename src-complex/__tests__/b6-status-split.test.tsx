@@ -65,10 +65,17 @@ describe('the NO-GUESS rule (operator, 2026-08-18): an undetermined value is nev
     expect(html).not.toContain('cis~');
   });
 
-  it("the panel SAYS the value is missing, instead of showing a sample", () => {
+  it('the panel OMITS an undetermined point — no letter, no "cannot compute" (refined ruling)', () => {
+    // "Don't show the letter and say we cannot compute it" — the missing-value explanation belongs
+    // to the ASK lane when the student asks for the name explicitly (3-D's query lane behaves that
+    // way; the complex ask input rides #623).
     const d = deriveLines(['z1 = 3+4i', 'w = z1*z2'], 0, 0);
     const rows = v2Labels(d);
-    expect(rows.find((r) => r.startsWith('z₂'))).toBe('z₂ — אין ערך: הנתונים אינם קובעים אותו');
-    expect(rows.find((r) => r.startsWith('z₁'))).toBe('z₁ ≈ 5·cis53.1301°'); // determined stays a value
+    expect(rows).toEqual(['z₁ ≈ 5·cis53.13°']); // determined only — z2 and w have no row at all
+  });
+
+  it('displayed decimals cap at two — the #723 typography rule, model precision untouched', () => {
+    const d = deriveLines(['z1 = 3+4i'], 0, 0);
+    expect(d.points[0].reading).toBe('z₁ ≈ 5·cis53.13°'); // not 53.1301
   });
 });

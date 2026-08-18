@@ -70,12 +70,11 @@ export const v2Measures = (d: Derived2): string[] =>
  * stage 5d in `derive2`; both surfaces print what it decided.
  */
 export const v2Labels = (d: Derived2): string[] =>
-  d.points.map((p) =>
-    // The no-guess ruling (2026-08-18): an undetermined number has NO printed value — its reading
-    // is the bare name, and this row SAYS the value is missing instead of showing a sample. "We
-    // just say we don't have them" — the honest answer, not a ~-marked guess.
-    p.modulusKnown && p.argumentKnown ? p.reading : `${p.reading} — אין ערך: הנתונים אינם קובעים אותו`,
-  );
+  // The no-guess ruling, refined (operator 2026-08-18): an undetermined number gets NO row at all —
+  // "don't show the letter and say we cannot compute it". The place that explains a missing value
+  // is the ASK lane, when the student asks for that name explicitly (3-D's query lane already
+  // answers that way; the complex ask input rides #623).
+  d.points.filter((p) => p.modulusKnown && p.argumentKnown).map((p) => p.reading);
 
 /**
  * The sheet formulas this figure is using, with the lines that brought each up.

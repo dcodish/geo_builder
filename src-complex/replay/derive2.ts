@@ -24,6 +24,7 @@
  * times over.
  */
 
+import { fmtNum } from '../../shell/format';
 import type { Cx } from '../value/value';
 import { cPolar, evaluate, exact, formatPolar } from '../value/value';
 import { toNumber } from '../value/rational';
@@ -1202,11 +1203,9 @@ const exactLabelOf = (mod: ExpVec, arg: Angle): string | null => {
   return evaluate(v) ? formatPolar(v) : null;
 };
 
-/** four places, so `53.1301°` reads as a measurement and not as a claim to more precision than that */
-const round4 = (x: number): number => {
-  const r = Math.round(x * 1e4) / 1e4;
-  return Object.is(r, -0) ? 0 : r;
-};
+// Display typography for the degree read-out comes from the SHARED formatter (shell/format,
+// #723): at most two decimals — `53.13°` — by operator rule, for every tool. The angle itself
+// stays full-precision in the model; only the reading is trimmed.
 
 /**
  * STAGE 5d — the one place a plotted number becomes the text a student reads.
@@ -1245,7 +1244,7 @@ function readingOf(p: {
    * through the measures/knowledge lanes, which gate on knowledge already.
    */
   if (!p.modulusKnown || !p.argumentKnown) return label;
-  return `${label} ≈ ${p.modulus}·cis${round4(p.argumentDeg)}°`;
+  return `${label} ≈ ${p.modulus}·cis${fmtNum(p.argumentDeg)}°`;
 }
 
 function collectParams(c: Constraint): string[] {

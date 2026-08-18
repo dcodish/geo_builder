@@ -34,7 +34,9 @@ const MAY_IMPORT: Record<string, readonly string[]> = {
   solve: ['value', 'model'],
   // `replay -> formulas` is the S6 surfacing seam: the fold publishes WHICH sheet formulas the figure
   // uses, so the canvas and the panel read one list rather than each detecting its own (#653's class).
-  replay: ['value', 'model', 'solve', 'formulas'],
+  // `shell` is the display-number formatter (shell/format, #723): stage 5d composes the reading a
+  // student sees, and the two-decimal typography rule is the workspace's, defined once.
+  replay: ['value', 'model', 'solve', 'formulas', 'shell'],
   // the store is STATE. It reaches nothing but the types it stores — the submit path, the gate and
   // session persistence all live in `app/` (ADR-CX-023), and the cutover removed the second, in-store
   // path that made this list four entries longer. `shell` is the LoadAudit type it stores

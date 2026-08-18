@@ -69,7 +69,7 @@ describe('every plotted number carries a reading, and the two surfaces carry the
     // 53.13° is not a rational multiple of π, so `3+4i` has no closed polar form; both halves are
     // still FORCED by the given, so nothing here is a sample and nothing is marked `~`
     const p = buildScene(deriveLines(['z1 = 3+4i'])).points[0];
-    expect(p.reading).toBe('z₁ ≈ 5·cis53.1301°');
+    expect(p.reading).toBe('z₁ ≈ 5·cis53.13°'); // two display decimals — the #723 typography rule
     expect(p.modulusKnown && p.argumentKnown).toBe(true);
     expect(p.reading).not.toContain('~');
   });
