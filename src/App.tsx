@@ -1079,78 +1079,17 @@ export default function App() {
               </span>
             )}
             {altNote && <span style={{ fontSize: 12, color: '#64748b' }}>{altNote}</span>}
-            {/* "View relations" — the ground-truth layer (ADR-134); results show in the נתונים panel. */}
-            <button
-              type="button"
-              style={relationsLayer ? relBtnOn : exploreToggle}
-              disabled={analysing}
-              title={t('actions.relationsHint')}
-              onClick={() => {
-                if (analysing) return;
-                if (relationsLayer) {
-                  clearRelations();
-                  return;
-                }
-                setAnalysing(true);
-                setShowData(true); // the results surface is the panel — a click must show its result
-                void viewRelations().finally(() => setAnalysing(false));
-              }}
-            >
-              {analysing ? t('actions.analysing') : relationsLayer ? t('actions.hideRelations') : t('actions.viewRelations')}
-            </button>
-            {/* "Detect shapes" (FR-SH) — results (badges/similar) show in the נתונים panel. */}
-            <button
-              type="button"
-              style={shapesLayer ? shapesBtnOn : exploreToggle}
-              disabled={detecting}
-              title={t('shapes.hint')}
-              onClick={() => {
-                if (detecting) return;
-                setOpenShape(null);
-                setHoverShape(null);
-                setOpenSimilar(null);
-                setHoverSimilar(null);
-                if (shapesLayer) {
-                  clearShapes();
-                  return;
-                }
-                setDetecting(true);
-                setShowData(true);
-                void (async () => {
-                  try {
-                    await detectShapes();
-                  } finally {
-                    setDetecting(false);
-                  }
-                })();
-              }}
-            >
-              {detecting ? t('shapes.analysing') : shapesLayer ? t('shapes.hide') : t('shapes.detect')}
-            </button>
+            {/* #738 — the relations/shapes buttons moved INTO the נתונים panel (operator: the row
+                should match the other tools, which have no such buttons here at all). */}
             <span style={{ flex: 1 }} />
             <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => { logDebug({ kind: 'action', action: 'undo' }); undo(); }}>{t('actions.undo')}</button>
             <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => { logDebug({ kind: 'action', action: 'redo' }); redo(); }}>{t('actions.redo')}</button>
             <button type="button" style={{ ...subtleBtn, color: pal.danger }} onClick={clearAll}>{t('actions.clear')}</button>
           </div>
         )}
-        {/* Figure-DISPLAY toggles (the תצוגה fold, relocated per the #729 mapping): they change how
-            the FIGURE draws, so they live with it. */}
-        {facts.length > 0 && (
-          <div style={{ ...figureActions, gap: 14 }}>
-            <label style={displayToggle}>
-              <input type="checkbox" checked={showMeasures} onChange={(e) => setShowMeasures(e.target.checked)} />
-              {t('actions.showMeasures')}
-            </label>
-            <label style={displayToggle}>
-              <input type="checkbox" checked={showCenters} onChange={(e) => setShowCenters(e.target.checked)} />
-              {t('canvas.centers')}
-            </label>
-            <label style={displayToggle}>
-              <input type="checkbox" checked={showTheorems} onChange={(e) => setShowTheorems(e.target.checked)} />
-              {t('theorems.toggle')}
-            </label>
-          </div>
-        )}
+        {/* #738 — the display checkboxes moved INTO the נתונים panel with the analysis buttons
+            (operator: "the same would be for the checkboxes... it doesn't belong at the bottom").
+            The under-canvas row now carries exactly what every tool has. */}
         </>}
         inputZone={<>
           {/* B4-2d (#729): the SHARED InputArea — the box, submit, wrap-selection palette, live
@@ -1369,6 +1308,75 @@ export default function App() {
               sections={[]}
             >
           {facts.length === 0 && <span style={{ fontSize: 12, color: '#94a3b8' }}>{t('values.emptyFigure')}</span>}
+          {/* #738 — the analysis TRIGGERS live WITH their results (operator: "when someone presses
+              Data, you should see the ability to press those buttons"): the relations and shapes
+              buttons moved here from the under-canvas row, which now matches the other tools. */}
+          {facts.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                style={relationsLayer ? relBtnOn : exploreToggle}
+                disabled={analysing}
+                title={t('actions.relationsHint')}
+                onClick={() => {
+                  if (analysing) return;
+                  if (relationsLayer) {
+                    clearRelations();
+                    return;
+                  }
+                  setAnalysing(true);
+                  void viewRelations().finally(() => setAnalysing(false));
+                }}
+              >
+                {analysing ? t('actions.analysing') : relationsLayer ? t('actions.hideRelations') : t('actions.viewRelations')}
+              </button>
+              <button
+                type="button"
+                style={shapesLayer ? shapesBtnOn : exploreToggle}
+                disabled={detecting}
+                title={t('shapes.hint')}
+                onClick={() => {
+                  if (detecting) return;
+                  setOpenShape(null);
+                  setHoverShape(null);
+                  setOpenSimilar(null);
+                  setHoverSimilar(null);
+                  if (shapesLayer) {
+                    clearShapes();
+                    return;
+                  }
+                  setDetecting(true);
+                  void (async () => {
+                    try {
+                      await detectShapes();
+                    } finally {
+                      setDetecting(false);
+                    }
+                  })();
+                }}
+              >
+                {detecting ? t('shapes.analysing') : shapesLayer ? t('shapes.hide') : t('shapes.detect')}
+              </button>
+            </div>
+          )}
+          {/* #738 — the display toggles live here too (the centers checkbox's exact home is
+              provisional — operator: "not quite sure where, but not at the bottom"). */}
+          {facts.length > 0 && (
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <label style={displayToggle}>
+                <input type="checkbox" checked={showMeasures} onChange={(e) => setShowMeasures(e.target.checked)} />
+                {t('actions.showMeasures')}
+              </label>
+              <label style={displayToggle}>
+                <input type="checkbox" checked={showCenters} onChange={(e) => setShowCenters(e.target.checked)} />
+                {t('canvas.centers')}
+              </label>
+              <label style={displayToggle}>
+                <input type="checkbox" checked={showTheorems} onChange={(e) => setShowTheorems(e.target.checked)} />
+                {t('theorems.toggle')}
+              </label>
+            </div>
+          )}
           {computingValues && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('values.computing')}</span>}
           {facts.length > 0 && !valuesLayer && !computingValues && (
             <button
