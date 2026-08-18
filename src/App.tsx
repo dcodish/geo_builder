@@ -61,8 +61,14 @@ import { humanizeError, translateParams } from '@/i18n/humanizeError';
  */
 const nextPaint = () => new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res())));
 
-// The live theorem-discovery feed (Phase 6a/6b) SHIPS LIVE (operator, 2026-07-07 — the old
-// dev-only gate is removed). OFF by default (same-day operator follow-up); the student opts in from תצוגה.
+// The live theorem-discovery feed (Phase 6a/6b) shipped live 2026-07-07, opt-in via a checkbox.
+// #740 (operator 2026-08-18): the SURFACE is disabled for now — "not ready and just confusing".
+// ONE flag: the panel checkbox and the per-step detection key off it; the feed sections stay
+// written (they gate on showTheorems, unreachable while the checkbox is gone). The theorems
+// ENGINE (src/theorems/) and its tests stay live — this hides the product surface, not the spine.
+// Re-enabling is an operator decision: flip this AND delete the lock in
+// src/__tests__/theorems-disabled.test.ts, which exists to keep the surface from returning by accident.
+const THEOREMS_SURFACE: boolean = false;
 
 export default function App() {
   const { t, i18n } = useTranslation();
@@ -643,11 +649,12 @@ export default function App() {
   // think about Y"), with intent archetypes as a boosting subspecies: the top active principles lift
   // their `boosts` ids to band 0 in the theorem feed.
   const principleFeed = useMemo(
-    () => detectPrinciples({ facts, construction, shapes: shapesLayer?.shapes }),
+    () => (THEOREMS_SURFACE ? detectPrinciples({ facts, construction, shapes: shapesLayer?.shapes }) : []),
     [facts, construction, shapesLayer],
   );
   const theoremFeed = useMemo(
     () =>
+      !THEOREMS_SURFACE ? [] :
       detectTheorems({
         facts,
         construction,
@@ -1371,10 +1378,12 @@ export default function App() {
                 <input type="checkbox" checked={showCenters} onChange={(e) => setShowCenters(e.target.checked)} />
                 {t('canvas.centers')}
               </label>
-              <label style={displayToggle}>
-                <input type="checkbox" checked={showTheorems} onChange={(e) => setShowTheorems(e.target.checked)} />
-                {t('theorems.toggle')}
-              </label>
+              {THEOREMS_SURFACE && (
+                <label style={displayToggle}>
+                  <input type="checkbox" checked={showTheorems} onChange={(e) => setShowTheorems(e.target.checked)} />
+                  {t('theorems.toggle')}
+                </label>
+              )}
             </div>
           )}
           {computingValues && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('values.computing')}</span>}
