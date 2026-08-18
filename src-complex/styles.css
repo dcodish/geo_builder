@@ -43,7 +43,13 @@ main { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
 .input-card { display: flex; flex-direction: column; gap: 10px; }
 
 /* LEVEL 3 (docs/28 §4a levels ruling): figure actions live UNDER the canvas — they act on the figure. */
-.figure-actions { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+.figure-actions { display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+/* #722 — the enrichment-layer chips: quiet outline toggles that fill while their layer is on */
+.layer-chip {
+  font-size: 12px; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid #cbd5e1; background: #fff; color: #64748b; cursor: pointer;
+}
+.layer-chip.on { border-color: #7c3aed; background: #f5f3ff; color: #6d28d9; }
 
 .gauss-plane {
   width: 100%; height: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff;

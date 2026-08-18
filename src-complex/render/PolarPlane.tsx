@@ -48,10 +48,23 @@ const polar = (r: number, deg: number): [number, number] => {
   return [r * Math.cos(t), r * Math.sin(t)];
 };
 
+/** #722 — the ENRICHMENT layers, opt-in (operator: "I don't need all the values... all the
+ *  dashed lines, the different colors — make it much simpler"). The DEFAULT canvas draws points,
+ *  their radius arrows, stated regions and the grid; each S5 visualization layer renders only
+ *  when its toggle is on. */
+export interface CanvasLayers {
+  rings?: boolean; // «where else this magnitude could sit» circles
+  angles?: boolean; // the stated/derived angle arcs near the origin
+  rotations?: boolean; // multiplication-as-rotation sweeps
+  cycles?: boolean; // the power-cycle ring and its stations
+  series?: boolean; // the series spirals / partial sums
+}
+
 export function PolarPlane({
   scene,
   showGrid = true,
   mode = 'polar',
+  layers = {},
   labels,
 }: {
   scene: Scene;
@@ -60,6 +73,7 @@ export function PolarPlane({
    *  grid + a+bi readings. The prototype's cartesian Gauss plane died at the cutover with the
    *  toggle's cartesian half; this restores it inside the ONE canvas. */
   mode?: 'polar' | 'cart';
+  layers?: CanvasLayers;
   labels: PlaneLabels;
 }) {
   const k = Math.min(W, H) / 2 / scene.extent;
@@ -145,8 +159,8 @@ export function PolarPlane({
       <text x={X(0) + 6} y={14} fontSize={12} fill={INK.axis}>Im</text>
       <text x={X(0) - 12} y={Y(0) + 15} fontSize={12} fill={INK.axis}>O</text>
 
-      {/* modulus rings: where else this magnitude could sit */}
-      {scene.rings.map((ring) => (
+      {/* modulus rings: where else this magnitude could sit — the rings LAYER (#722, opt-in) */}
+      {layers.rings && scene.rings.map((ring) => (
         <circle
           key={`mod${ring.r}`}
           cx={X(0)}
@@ -200,8 +214,8 @@ export function PolarPlane({
         ),
       )}
 
-      {/* argument arcs: the direction, drawn as an angle */}
-      {scene.arcs.map((a) => {
+      {/* argument arcs: the direction, drawn as an angle — the angles LAYER (#722, opt-in) */}
+      {layers.angles && scene.arcs.map((a) => {
         const [lx, ly] = polar(a.radius * 1.12, a.toDeg / 2);
         return (
           <g key={`arc${a.name}`}>
@@ -233,8 +247,8 @@ export function PolarPlane({
         />
       ))}
 
-      {/* the series pictures: the spiral through the terms, and the partial sums head to tail */}
-      {scene.spirals.map((sp) => (
+      {/* the series pictures — the series LAYER (#722, opt-in) */}
+      {layers.series && scene.spirals.map((sp) => (
         <g key={sp.key}>
           <polyline
             points={sp.path.map((z) => `${X(z.re)},${Y(z.im)}`).join(' ')}
@@ -293,8 +307,8 @@ export function PolarPlane({
         </g>
       ))}
 
-      {/* multiplication as rotation: the sweep from the number to its product, with the stretch */}
-      {scene.rotations.map((r) => {
+      {/* multiplication as rotation — the rotations LAYER (#722, opt-in) */}
+      {layers.rotations && scene.rotations.map((r) => {
         const [lx, ly] = polar(r.radius * 1.06, (r.fromDeg + r.toDeg) / 2);
         return (
           <g key={r.key}>
@@ -313,8 +327,8 @@ export function PolarPlane({
         );
       })}
 
-      {/* the value cycle: the finite ring of directions a power visits, and where n is standing */}
-      {scene.cycles.map((c) => (
+      {/* the value cycle — the cycles LAYER (#722, opt-in) */}
+      {layers.cycles && scene.cycles.map((c) => (
         <g key={`cycle-${c.name}`}>
           <circle
             cx={X(0)}
@@ -351,19 +365,38 @@ export function PolarPlane({
         </g>
       ))}
 
-      {/* the numbers themselves */}
-      {scene.points.map((p) => {
-        const left = p.z.re < 0;
-        return (
+      {/* the numbers themselves. #701 — the label PLACER: clamp into the viewport (w's label ran
+          off-screen; anchor flips near the edges so the text extends inward) and nudge collisions
+          apart (clustered points stacked their labels on one spot). Greedy: place in point order,
+          push a colliding label down in 16px steps. */}
+      {(() => {
+        const placed: Array<{ x: number; y: number }> = [];
+        return scene.points.map((p) => {
+          const left = p.z.re < 0;
+          let x = X(p.z.re) + (left ? -10 : 10);
+          let y = Y(p.z.im) + (p.z.im >= 0 ? -10 : 18);
+          const nearRight = x > W - 150;
+          const nearLeft = x < 150;
+          const anchor: 'start' | 'end' = nearRight ? 'end' : nearLeft ? 'start' : left ? 'end' : 'start';
+          x = Math.min(Math.max(x, 8), W - 8);
+          y = Math.min(Math.max(y, 14), H - 8);
+          for (let guard = 0; guard < 8; guard++) {
+            const hit = placed.find((q) => Math.abs(q.x - x) < 140 && Math.abs(q.y - y) < 15);
+            if (!hit) break;
+            y = Math.min(y + 16, H - 8);
+            if (y >= H - 8) break;
+          }
+          placed.push({ x, y });
+          return (
           <g key={p.name}>
             <circle cx={X(p.z.re)} cy={Y(p.z.im)} r={6} fill={INK.known} stroke="#fff" strokeWidth={1.5} />
             <text
-              x={X(p.z.re) + (left ? -10 : 10)}
-              y={Y(p.z.im) + (p.z.im >= 0 ? -10 : 18)}
+              x={x}
+              y={y}
               fontSize={13}
               fontWeight={600}
               fill={INK.known}
-              textAnchor={left ? 'end' : 'start'}
+              textAnchor={anchor}
               style={{ userSelect: 'none' }}
             >
               {/* B6 follow-up (operator, 2026-08-18): the reading RETURNS to the canvas — with the
@@ -375,8 +408,9 @@ export function PolarPlane({
               {cart ? p.readingCart : p.reading}
             </text>
           </g>
-        );
-      })}
+          );
+        });
+      })()}
     </svg>
   );
 }

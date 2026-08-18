@@ -151,6 +151,9 @@ export function App() {
    * overlay. Display state only. The honesty split stands: refusal surfaces are never in here.
    */
   const [manualOpen, setManualOpen] = useState(false); // the D9 manual SCREEN (A6) — catalog-backed
+  // #722 — the enrichment layers, OFF by default (the de-clutter ruling): each S5 visualization
+  // is a student's choice, made per layer with the chips under the canvas.
+  const [layers, setLayers] = useState({ rings: false, angles: false, rotations: false, cycles: false, series: false });
   const [showData, setShowData] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1000px)').matches,
   );
@@ -386,13 +389,14 @@ export function App() {
                   scene={polarScene}
                   showGrid={view === 'polar'}
                   mode={view}
+                  layers={layers}
                   labels={{
                     ratio: t('seriesRatio'),
                     limit: t('seriesLimit'),
                     closed: t('seriesClosed'),
                   }}
                 />
-                {polarScene.cycles.length > 0 && (
+                {layers.cycles && polarScene.cycles.length > 0 && (
                   <div className="stepper" dir="rtl">
                     <span>
                       {t('stepperLabel')} = {stepN}
@@ -431,6 +435,28 @@ export function App() {
               <button onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
                 {view === 'cart' ? t('viewPolar') : t('viewCart')}
               </button>
+              {/* #722 — the ENRICHMENT layers, opt-in chips (the operator's de-clutter ruling:
+                  the default canvas is points + stated elements; each S5 layer is a choice).
+                  A chip renders only when the figure HAS that layer to show. */}
+              {([
+                ['rings', 'layerRings', (polarScene?.rings.length ?? 0) > 0],
+                ['angles', 'layerAngles', (polarScene?.arcs.length ?? 0) > 0],
+                ['rotations', 'layerRotations', (polarScene?.rotations.length ?? 0) > 0],
+                ['cycles', 'layerCycles', (polarScene?.cycles.length ?? 0) > 0],
+                ['series', 'layerSeries', (polarScene?.spirals.length ?? 0) > 0],
+              ] as const).map(([key, tKey, has]) =>
+                has ? (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={layers[key]}
+                    className={layers[key] ? 'layer-chip on' : 'layer-chip'}
+                    onClick={() => setLayers((l) => ({ ...l, [key]: !l[key] }))}
+                  >
+                    {t(tKey)}
+                  </button>
+                ) : null,
+              )}
               {/* the LAUNCHER — narrow screens only (CSS): opens the data overlay when the
                   always-visible column has no room to exist */}
               <button

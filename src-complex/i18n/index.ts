@@ -121,6 +121,12 @@ const he = {
   showSeries: 'סדרה',
   showCycle: 'מחזור חזקות',
   showRegion: 'פנים/חוץ',
+  // #722 — the enrichment-layer chips (opt-in, under the canvas)
+  layerRings: 'טבעות |z|',
+  layerAngles: 'קשתות זווית',
+  layerRotations: 'סיבוב וכפל',
+  layerCycles: 'מחזורי חזקות',
+  layerSeries: 'טורים',
 };
 
 const en = {
@@ -229,6 +235,12 @@ const en = {
   showSeries: 'series',
   showCycle: 'power cycle',
   showRegion: 'inside/outside',
+  // #722 — the enrichment-layer chips (opt-in, under the canvas)
+  layerRings: '|z| rings',
+  layerAngles: 'angle arcs',
+  layerRotations: 'rotation & product',
+  layerCycles: 'power cycles',
+  layerSeries: 'series',
 };
 
 export const complexI18n = createProductI18n({
