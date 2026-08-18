@@ -48,7 +48,8 @@
   "facts": {
     "empty": "No givens yet — type one or click an example",
     "delete": "Delete",
-    "toggleTitle": "Include/exclude this given",
+    "edit": "Edit in place",
+    "toggleTitle": "Include in the figure",
     "claimVerified": "The claim was verified against the figure",
     "planeFace": "Face only",
     "planeFull": "Full plane",
