@@ -282,11 +282,6 @@ export function App() {
               {lastError && (
                 <Banner kind="error">{t(ERROR_KEY[lastError.key], { detail: lastError.detail })}</Banner>
               )}
-              <div className="panel-actions">
-                <button onClick={() => EXAMPLE_LINES.forEach((l) => submitLine(l))}>{t('example')}</button>
-                <button onClick={clearAll}>{t('clearAll')}</button>
-                <span className="count">{t('factCount', { count: lines.length })}</span>
-              </div>
             </InputArea>
             {/*
               THE STATEMENT LIST FOLLOWS THE ACTIVE ENGINE.
@@ -315,6 +310,14 @@ export function App() {
                   );
                 })}
             </ul>
+            {/* fact-LIST actions live with the fact list (the level model; the operator's card
+                audit): clear acts on the list, the counter counts it. B5's shared component
+                contracts this zone for every builder. */}
+            <div className="panel-actions">
+              <button onClick={() => EXAMPLE_LINES.forEach((l) => submitLine(l))}>{t('example')}</button>
+              <button onClick={clearAll}>{t('clearAll')}</button>
+              <span className="count">{t('factCount', { count: lines.length })}</span>
+            </div>
           </section>
           <section className="canvas">
             {/* The figure's NAME, centered above the drawing it names — the SHARED component,

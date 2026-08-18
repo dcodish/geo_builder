@@ -434,9 +434,10 @@ export default function App3() {
             💾 {t('actions.save')}
           </ToolButton>
           <ToolButton onClick={() => fileInput.current?.click()}>📂 {t('actions.load')}</ToolButton>
-          <ToolButton onClick={onSaveImage} disabled={facts.length === 0}>
-            {t('actions.saveImage')}
-          </ToolButton>
+          {/* image export appears only once there is something to save (operator, 2026-08-18) */}
+          {facts.length > 0 && (
+            <ToolButton onClick={onSaveImage}>{t('actions.saveImage')}</ToolButton>
+          )}
         </>
       }
       roster={roster}
@@ -452,7 +453,9 @@ export default function App3() {
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
     >
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <main className="mx-auto flex max-w-screen-2xl flex-col gap-5 p-5 md:flex-row">
+      {/* FULL WIDTH (the operator's width ruling, applied uniformly — complex went full-bleed
+          while this main kept its own cap; the p-5 edge padding matches the frame's). */}
+      <main className="flex flex-col gap-5 p-5 md:flex-row">
         {/* Input + fact list */}
         <section className="flex w-full flex-col gap-3 md:w-96">
           {/* THE SHARED INPUT AREA (B4, the shared-components rule): box, palette, preview seam

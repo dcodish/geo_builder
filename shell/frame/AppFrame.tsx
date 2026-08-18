@@ -191,7 +191,10 @@ const suiteBtn: CSSProperties = {
   color: color.ink,
   cursor: 'pointer',
 };
-const h1Style: CSSProperties = { fontSize: fs.h1, margin: 0, color: color.ink };
+// EXPLICIT weight — the operator caught the frame trusting browser defaults: complex rendered the
+// bold default while 3-D's Tailwind preflight reset headings to normal. A shell component states
+// every property it cares about; consumer stylesheets differ by construction.
+const h1Style: CSSProperties = { fontSize: fs.h1, fontWeight: 700, margin: 0, color: color.ink };
 const subtitleStyle: CSSProperties = { margin: '2px 0 0', color: color.muted, fontSize: fs.body };
 const actionsRow: CSSProperties = { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' };
 const closeBtnStyle: CSSProperties = {
