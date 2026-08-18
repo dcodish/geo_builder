@@ -17,6 +17,7 @@ import { useStore } from 'zustand';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
+import { ManualScreen } from '../shell/frame/ManualScreen';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
@@ -156,8 +157,7 @@ export default function App() {
   // timer. `×` dismisses this load's note outright; a fresh load re-audits.
   const [fileAudit, setFileAudit] = useState<LoadAuditFinding[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null); // the hidden <input type=file> behind "load figure"
-  const [helpOpen, setHelpOpen] = useState(false); // the help modal ("עזרה") — guide + command reference
-  const [helpTab, setHelpTab] = useState<'guide' | 'commands'>('guide');
+  const [manualOpen, setManualOpen] = useState(false); // the D9 manual SCREEN (B7) — catalog-backed
   const [aboutOpen, setAboutOpen] = useState(false); // the "מה זה?" intro modal (first load + reopenable)
   // examplesOpen retired (operator 2026-08-18): no example strip above the input — the examples
   // live on the clean canvas (QuickChips) and in עזרה.
@@ -813,31 +813,8 @@ export default function App() {
     );
   };
 
-  // The command reference (the coverage map): every construct grouped by category,
-  // wired ones clickable to try. Lives in the help modal's "פקודות" tab. Clicking an
-  // example also closes the modal so the figure is visible.
-  const commandCatalog = () => (
-    <div>
-      {CATEGORY_ORDER.map((cat) => {
-        const items = COMMAND_CATALOG.filter((c) => c.category === cat && c.supported);
-        if (items.length === 0) return null;
-        return (
-          <div key={cat} style={{ marginTop: 10 }}>
-            <div style={catHeading}>{he ? CATEGORY_LABELS[cat].he : CATEGORY_LABELS[cat].en}</div>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {items.map((c) => (
-                <li key={c.en} style={cmdRow}>
-                  <button type="button" style={helpExample} onClick={() => { submit(he ? c.he : c.en); setHelpOpen(false); }} dir={textDir(he ? c.he : c.en)} title={he ? c.descHe : c.descEn}>
-                    {he ? c.he : c.en}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      })}
-    </div>
-  );
+  // The command reference graduated into the MANUAL screen (B7, D9) — the catalog (the coverage
+  // map) renders through shell/ManualScreen below; the help modal and its tabs retired.
 
   // "Show another configuration" — lifted out of the JSX (B6-2d moves the button under the canvas,
   // D7). #41 (ADR-290): the seed search runs in the geometry WORKER; ADR-340 (#175): the search
@@ -910,7 +887,7 @@ export default function App() {
             💾 {t('file.save')}
           </ToolButton>
           <ToolButton onClick={() => fileInputRef.current?.click()}>📂 {t('file.load')}</ToolButton>
-          <ToolButton onClick={() => { setHelpTab('guide'); setHelpOpen(true); }}>{t('header.help')}</ToolButton>
+          <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
         </>
       }
       roster={roster}
@@ -1803,46 +1780,56 @@ export default function App() {
       </Modal>
 
       {/* "עזרה" — a short guide + the full command reference, in two tabs. */}
-      <Modal open={helpOpen} onClose={() => setHelpOpen(false)} title={t('header.help')} width={640}>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-          <button type="button" style={tabBtn(helpTab === 'guide')} onClick={() => setHelpTab('guide')}>
-            {t('help.guideTab')}
-          </button>
-          <button type="button" style={tabBtn(helpTab === 'commands')} onClick={() => setHelpTab('commands')}>
-            {t('help.commandsTab')}
-          </button>
-        </div>
-        {helpTab === 'guide' ? (
-          <div>
-            <p style={{ marginTop: 0, fontWeight: 600 }}>{t('help.guideLead')}</p>
-            <ul style={{ margin: 0, paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* THE MANUAL (B7 #672, D9): the עזרה modal graduated into the separate SCREEN — the guide
+          prose is the intro, the catalog (supported entries only) is the body, and a click
+          SUBMITS the example (context-dependent examples refuse honestly through the normal
+          submit path, naming what is missing). */}
+      <ManualScreen
+        open={manualOpen}
+        title={t('manualTitle')}
+        intro={
+          <>
+            <span style={{ fontWeight: 600 }}>{t('help.guideLead')}</span>
+            <ul style={{ margin: '8px 0 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {(t('help.guidePoints', { returnObjects: true }) as string[]).map((p) => (
                 <li key={p}>{p}</li>
               ))}
             </ul>
-          </div>
-        ) : (
-          commandCatalog()
-        )}
-      </Modal>
+            {/* the partial-list framing + the honest collection note (TRUE here: prod inputs are
+                logged and triaged — the log-triage loop is how unsupported phrasings become
+                features) */}
+            <span style={{ display: 'block', marginTop: 10 }}>{t('manualPartial')}</span>
+          </>
+        }
+        closeLabel={t('manualClose')}
+        tryHint={t('manualTry')}
+        sectionCap={6}
+        moreNote={t('manualMore')}
+        sections={CATEGORY_ORDER.map((cat) => ({
+          key: cat,
+          title: he ? CATEGORY_LABELS[cat].he : CATEGORY_LABELS[cat].en,
+          entries: COMMAND_CATALOG.filter((c) => c.category === cat && c.supported).map((c) => {
+            const raw = he ? c.he : c.en;
+            return {
+              example: raw,
+              dir: textDir(raw),
+              description: he ? c.descHe : c.descEn,
+              onTry: () => {
+                setManualOpen(false);
+                submit(raw);
+              },
+            };
+          }),
+        }))}
+        onClose={() => setManualOpen(false)}
+      />
 
       </div>
     </AppFrame>
   );
 }
 
-function tabBtn(active: boolean): React.CSSProperties {
-  return {
-    padding: '6px 14px',
-    fontSize: 13,
-    fontWeight: 600,
-    borderRadius: 8,
-    border: `1px solid ${active ? '#2563eb' : '#cbd5e1'}`,
-    background: active ? '#eff6ff' : '#fff',
-    color: active ? '#1e40af' : '#475569',
-    cursor: 'pointer',
-  };
-}
+// tabBtn retired with the help modal (B7): the manual SCREEN replaced its tabs.
 
 /** B2-2d (#729, operator: "users shouldn't have to always scroll up and down"): the page is a
  *  VIEWPORT-HEIGHT flex column under the frame's two bars — the columns scroll INTERNALLY and the
@@ -1922,24 +1909,8 @@ const displayToggle: React.CSSProperties = { display: 'flex', gap: 6, alignItems
 // symbolsToggle / input / chip / greekBtn retired with the shared InputArea (B4-2d): the box, the
 // palette buttons and the quick chips are shell chrome now.
 const sendBtn: React.CSSProperties = btn.primary;
-const helpExample: React.CSSProperties = {
-  textAlign: 'start',
-  border: 'none',
-  background: 'none',
-  color: pal.primaryInk,
-  cursor: 'pointer',
-  fontSize: fs.body,
-  padding: 0,
-};
-const catHeading: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  color: '#64748b',
-  textTransform: 'uppercase',
-  letterSpacing: 0.4,
-  marginBottom: 4,
-};
-const cmdRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
+// helpExample / catHeading / cmdRow retired with the help modal (B7): the manual screen's chrome
+// renders the catalog now.
 const legend: React.CSSProperties = { display: 'flex', gap: 12, fontSize: 11, color: '#94a3b8', margin: '0 0 6px' };
 // stepList retired with the shared FactList (B5-2d); its scroll cap moves to the wrapping card if
 // tall sessions demand it again.

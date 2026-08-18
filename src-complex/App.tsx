@@ -5,6 +5,8 @@ import { AppFrame } from '../shell/frame/AppFrame';
 import { Banner } from '../shell/frame/Banner';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
+import { ManualScreen } from '../shell/frame/ManualScreen';
+import { manualSections } from './ui/manual';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
@@ -147,6 +149,7 @@ export function App() {
    * on narrow screens the column hides and the launcher under the canvas opens it as the D10
    * overlay. Display state only. The honesty split stands: refusal surfaces are never in here.
    */
+  const [manualOpen, setManualOpen] = useState(false); // the D9 manual SCREEN (A6) — catalog-backed
   const [showData, setShowData] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1000px)').matches,
   );
@@ -236,12 +239,14 @@ export function App() {
       title={t('title')}
       subtitle={t('subtitle')}
       utilityActions={
-        /* ONE look for the session actions in every builder (shell/ToolButton). */
+        /* ONE look for the session actions in every builder (shell/ToolButton). שמור/טען FIRST
+           (the parity rule: same position in every tool); the manual rides after them. */
         <>
           <ToolButton onClick={saveFile} disabled={lines.length === 0}>
             💾 {t('save')}
           </ToolButton>
           <ToolButton onClick={() => fileRef.current?.click()}>📂 {t('load')}</ToolButton>
+          <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
         </>
       }
       roster={roster}
@@ -463,6 +468,37 @@ export function App() {
           </aside>
         </main>
       </div>
+      {/* THE MANUAL (A6 #665, D9): a separate SCREEN, catalog-backed — every supported sentence
+          family with its real specimens; a click SUBMITS the example and returns to the tool. */}
+      <ManualScreen
+        open={manualOpen}
+        title={t('manualTitle')}
+        intro={t('manualIntro')}
+        closeLabel={t('manualClose')}
+        tryHint={t('manualTry')}
+        sectionCap={6}
+        moreNote={t('manualMore')}
+        sections={manualSections(i18n.language === 'he' ? 'he' : 'en').map((s) => ({
+          key: s.family,
+          title: s.title,
+          entries: s.entries.map((e) => {
+            const raw = i18n.language === 'he' ? e.he : e.en;
+            return {
+              // #118 discipline: base direction from CONTENT, LTR math runs isolated inside a
+              // Hebrew sentence (the kit's isolation — the operator caught «המעגל שמרכזו O
+              // ורדיוסו r» reversing under a forced ltr chip).
+              example: complexBidi.inputPreview(raw) ?? raw,
+              dir: complexBidi.textDir(raw),
+              description: i18n.language === 'he' ? e.descHe : e.descEn,
+              onTry: () => {
+                setManualOpen(false);
+                submitLine(raw); // the RAW sentence is what the grammar reads — never the isolated form
+              },
+            };
+          }),
+        }))}
+        onClose={() => setManualOpen(false)}
+      />
     </AppFrame>
   );
 }

@@ -7,6 +7,12 @@
   "dataTitle": "Data",
   "panelShow": "Show",
   "panelHide": "Hide",
+  "manualButton": "Guide",
+  "manualTitle": "The Guide — Plane Geometry",
+  "manualClose": "Back to the tool",
+  "manualTry": "Click to try — the example builds on the figure",
+  "manualPartial": "This is a partial guide — only representative examples are shown, so you can see what sorts of sentences can be typed. If the tool didn't understand a sentence, try different wording — unsupported sentences are collected and reviewed by the project team for future support.",
+  "manualMore": "…and these are just examples — the tool reads more phrasings of this kind",
   "switcher2d": "Plane Geometry",
   "switcher3d": "Space Geometry",
   "switcherComplex": "Complex Numbers",
@@ -131,7 +137,7 @@
       "\"Show another configuration\" — shows a different valid drawing of the same construction, when several exist.",
       "\"Undo\" / \"Clear all\" — step back or start over.",
       "Download or copy the figure as an image from the buttons above the figure.",
-      "Couldn't understand it? Reword it, or use the \"Commands\" tab."
+      "Couldn't understand it? Reword it, or click an example from the list below."
     ]
   },
   "steps": {

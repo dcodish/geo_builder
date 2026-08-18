@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
+import { ManualScreen } from '../shell/frame/ManualScreen';
 import { QuickChips } from '../shell/frame/QuickChips';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
@@ -180,6 +181,7 @@ export default function App3() {
     [t],
   );
   const setFigureName = useGeo3((s) => s.setFigureName);
+  const [manualOpen, setManualOpen] = useState(false); // the D9 manual SCREEN (B7) — catalog-backed
   // The data panel (ADR-3D-014, reshaped by B6 #671): derived presentations, student opt-in.
   // B6 follow-up (operator 2026-08-18, "the same way we trigger"): the trigger is the SHARED
   // DataPanel head — open by default on wide screens, exactly like the complex column.
@@ -444,7 +446,9 @@ export default function App3() {
             💾 {t('actions.save')}
           </ToolButton>
           <ToolButton onClick={() => fileInput.current?.click()}>📂 {t('actions.load')}</ToolButton>
-          {/* image export appears only once there is something to save (operator, 2026-08-18) */}
+          <ToolButton onClick={() => setManualOpen(true)}>{t('manual.button')}</ToolButton>
+          {/* image export appears only once there is something to save (operator, 2026-08-18);
+              it rides LAST so the constant buttons keep their suite positions. */}
           {facts.length > 0 && (
             <ToolButton onClick={onSaveImage}>{t('actions.saveImage')}</ToolButton>
           )}
@@ -590,27 +594,8 @@ export default function App3() {
             deleteLabel={t('facts.delete')}
           />
 
-          {/* the commands catalog (V5) — every supported form, clickable */}
-          <details className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-            <summary className="cursor-pointer text-sm font-medium text-slate-600">{t('catalog.title')}</summary>
-            {['solids', 'points', 'vectors', 'planesLines', 'claims', 'drawing'].map((cat) => (
-              <div key={cat} className="mt-2">
-                <div className="text-xs font-bold text-slate-400">{t(`catalog.${cat}`)}</div>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {COMMAND_CATALOG_3D.filter((c) => c.category === cat).map((c) => (
-                    <button
-                      key={c.he}
-                      type="button"
-                      onClick={() => setText(c.he)}
-                      className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:border-blue-400 hover:text-blue-700"
-                    >
-                      {c.he}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </details>
+          {/* The commands catalog graduated into the MANUAL screen (B7, D9) — the מדריך button in
+              the tool row opens it; the sidebar accordion retired. */}
         </section>
 
         {/* Canvas + view/session controls */}
@@ -828,6 +813,33 @@ export default function App3() {
         </section>
       </main>
       {/* NFR-SE-3's note now lives in the frame's About modal (B3) — the footer fallback retired. */}
+      {/* THE MANUAL (B7 #672, D9): the catalog as a separate SCREEN — a click SUBMITS the example
+          through the full path (parser → guidance → LLM lane), replacing the old fill-the-box. */}
+      <ManualScreen
+        open={manualOpen}
+        title={t('manual.title')}
+        intro={t('manual.intro')}
+        closeLabel={t('manual.close')}
+        tryHint={t('manual.try')}
+        sectionCap={6}
+        moreNote={t('manual.more')}
+        sections={(['solids', 'points', 'vectors', 'planesLines', 'claims', 'drawing'] as const).map((cat) => ({
+          key: cat,
+          title: t(`catalog.${cat}`),
+          entries: COMMAND_CATALOG_3D.filter((c) => c.category === cat).map((c) => {
+            const raw = i18n.language === 'he' ? c.he : c.en;
+            return {
+              example: isolateLtrRuns3(raw),
+              dir: textDir3(raw),
+              onTry: () => {
+                setManualOpen(false);
+                void submitText(raw);
+              },
+            };
+          }),
+        }))}
+        onClose={() => setManualOpen(false)}
+      />
     </div>
     </AppFrame>
   );
