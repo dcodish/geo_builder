@@ -1,19 +1,24 @@
 {
   "app": {
-    "title": "Geo Builder",
+    "title": "Plane Geometry",
     "subtitle": "Build geometry step by step"
   },
+  "language": "עברית",
+  "switcher2d": "Plane Geometry",
+  "switcher3d": "Space Geometry",
+  "switcherComplex": "Complex Numbers",
+  "switcherAria": "Switch between builders",
   "footer": {
     "by": "Developed by",
     "name": "Dr. David Codish",
     "contact": "Questions"
   },
   "header": {
-    "about": "What is Geo Builder?",
+    "about": "About",
     "help": "Help"
   },
   "about": {
-    "title": "What is Geo Builder?",
+    "title": "About this tool",
     "lead": "An intuitive tool for building geometry diagrams — describe a construction in plain language and watch the figure build, step by step.",
     "points": [
       "For high-school students preparing for the geometry matriculation (bagrut), and for teachers who need to sketch a figure quickly and simply.",
@@ -303,11 +308,11 @@
     "relationsStated": "from the stated {{shape}} {{ids}} — the tool chose WHICH sides are equal; the given didn't say. Another configuration may make a different pair equal."
   },
   "file": {
-    "save": "Save to file",
+    "save": "Save",
     "namePlaceholder": "Figure name (optional)",
     "saveNamePrompt": "Name the file — exam date, page and book, or anything else",
     "saveHint": "Download the construction as a .geo.json file — open it again on any computer",
-    "load": "Load from file",
+    "load": "Load",
     "loadHint": "Open a saved figure file (replaces the current construction — undo restores it)",
     "badFile": "This file is not a saved figure from this site",
     "newerVersion": "This file was saved by a newer version of the site — refresh the page and try again",

@@ -12,6 +12,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
+// The shared frame (B3-2d #668): the deliberate src -> shell adoption — the LAST product joins the
+// suite chrome (ADR-W-019; BOUNDARIES.json src -> shell edge flipped with this import).
+import { AppFrame } from '../shell/frame/AppFrame';
+import { FigureName } from '../shell/frame/FigureName';
+import { ToolButton } from '../shell/frame/ToolButton';
+import registry from '../products.json';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, impliedCircleBinding, impliedPointBinding, buildParseCtx, stepLabel } from '@/parser';
 import { Figure } from '@/render';
@@ -250,6 +256,20 @@ export default function App() {
   // The palette lives in `ui/symbols.ts` (#482): inline in the JSX it was invisible to everything but
   // this render, which is how it drifted out of step with the bidi CORE class. A module can be asserted.
   const he = i18n.language === 'he';
+  // A2 (#661): the switcher renders products.json's roster; labelKeys resolve in THIS product's
+  // locales. In dev each product serves from its own entry html.
+  const roster = useMemo(
+    () =>
+      registry.products
+        .filter((p) => p.enabled)
+        .map((p) => ({
+          id: p.id,
+          label: t(p.labelKey),
+          icon: p.icon,
+          url: import.meta.env.DEV ? p.devUrl : p.url,
+        })),
+    [t],
+  );
   /** The locale `canonicalText` renders in — the same normalisation the submit pipeline uses (#450). */
   const canonLocale: 'he' | 'en' = i18n.language?.startsWith('he') ? 'he' : 'en';
 
@@ -746,10 +766,8 @@ export default function App() {
     void useGeoStore.getState().detectCrossings();
   }, [facts]);
 
-  useEffect(() => {
-    document.documentElement.dir = i18n.dir();
-    document.documentElement.lang = i18n.language;
-  }, [i18n, i18n.language]);
+  // The dir/lang flip is the FRAME's (B3-2d): one language toggle, one direction effect, in the
+  // one component every builder mounts — the product copy retired like 3-D's and complex's did.
 
   // When the shapes are detected, or a badge's book-link card opens, bring that section into view within the
   // scrollable control column — so the badges + link are visible without the student hunting/scrolling (the
@@ -839,37 +857,71 @@ export default function App() {
     </div>
   );
 
-  return (
-    <div style={page}>
-      <header style={headerRow}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{t('app.title')}</h1>
-          <p style={{ color: '#64748b', margin: '4px 0 0', fontSize: 13 }}>{t('app.subtitle')}</p>
-        </div>
-        <input
-          type="text"
-          value={figureName}
-          onChange={(e) => setFigureName(e.target.value)}
-          placeholder={t('file.namePlaceholder')}
-          dir="auto"
-          aria-label={t('file.namePlaceholder')}
-          style={figureNameInput}
-        />
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" style={ghost} onClick={() => { setHelpTab('guide'); setHelpOpen(true); }}>
-            {t('header.help')}
-          </button>
-          <button type="button" style={ghost} onClick={() => setAboutOpen(true)}>
-            {t('header.about')}
-          </button>
-          {/* Language toggle — the label names the OTHER language (press to switch to it). */}
-          <button type="button" style={ghost} onClick={() => i18n.changeLanguage(he ? 'en' : 'he')}>
-            {t('actions.language')}
-          </button>
-        </div>
-      </header>
+  // The About content, composed ONCE: the frame's About modal shows it (suite chrome), and the
+  // first-load intro modal below shows the same node (2-D pedagogy: auto-opens for a new student,
+  // dismiss persisted). The old footer's contact line lives here now — the footer retired with the
+  // frame adoption, like 3-D's did in B3.
+  const aboutBody = (
+    <>
+      <p style={{ marginTop: 0 }}>{t('about.lead')}</p>
+      <ul style={{ margin: '8px 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {(t('about.points', { returnObjects: true }) as string[]).map((p) => (
+          <li key={p}>{p}</li>
+        ))}
+      </ul>
+      <div style={{ fontWeight: 600, marginTop: 12 }}>{t('about.tryTitle')}</div>
+      <ol style={{ margin: '6px 0 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {(t('about.trySteps', { returnObjects: true }) as string[]).map((s) => (
+          <li key={s} dir={textDir(s)} style={{ fontSize: 13, color: pal.primaryInk }}>
+            {s}
+          </li>
+        ))}
+      </ol>
+      <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12, color: pal.muted }}>
+        {t('footer.by')} <strong style={{ color: '#334155' }}>{t('footer.name')}</strong> · {t('footer.contact')}:{' '}
+        <a href="mailto:david.codish@gmail.com" style={{ color: '#2563eb', textDecoration: 'none' }}>
+          david.codish@gmail.com
+        </a>
+      </p>
+    </>
+  );
 
+  return (
+    /* B3-2d (#668): the LAST product adopts the shared frame — suite bar (switcher, language,
+       About), tool row (title + session actions), one look across the builders. The product's
+       header, its own language toggle, its dir effect and its footer all retire here. */
+    <AppFrame
+      title={t('app.title')}
+      subtitle={t('app.subtitle')}
+      utilityActions={
+        /* שמור/טען FIRST so they sit at the same position as in every other builder (the
+           operator's parity ruling); the product's extra עזרה rides after them. */
+        <>
+          <ToolButton onClick={saveFigure} disabled={facts.length === 0}>
+            💾 {t('file.save')}
+          </ToolButton>
+          <ToolButton onClick={() => fileInputRef.current?.click()}>📂 {t('file.load')}</ToolButton>
+          <ToolButton onClick={() => { setHelpTab('guide'); setHelpOpen(true); }}>{t('header.help')}</ToolButton>
+        </>
+      }
+      roster={roster}
+      activeProductId="2d"
+      switcherLabel={t('switcherAria')}
+      about={{
+        label: t('header.about'),
+        title: t('about.title'),
+        body: aboutBody,
+        privacy: t('about.privacy'),
+        closeLabel: t('about.close'),
+      }}
+      buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
+    >
+      <div style={page}>
       <div style={main}>
+        <div style={canvasCol}>
+        {/* The figure's NAME, centered above the drawing it names — the SHARED component (one look
+            in every builder). It lived inline in the retired header. */}
+        <FigureName value={figureName} onChange={setFigureName} placeholder={t('file.namePlaceholder')} />
         <div ref={canvasRef} style={{ ...canvasWrap, ...(viewStale || searchHold ? { opacity: 0.55 } : {}) }}>
           {/* #580 (ADR-449): the two notices split by purpose. SEARCHING is a transient state that
               explains why the whole canvas is dimmed and about to change — a centred banner the
@@ -950,9 +1002,6 @@ export default function App() {
               copied: t('canvas.copied'),
               reset: t('canvas.reset'),
             }}
-            onSaveFile={saveFigure}
-            onLoadFile={() => fileInputRef.current?.click()}
-            saveFileDisabled={facts.length === 0}
             onSaveQuestion={saveQuestion}
             saveQuestionDisabled={questionLines(facts, canonLocale).length === 0}
           />
@@ -1017,6 +1066,7 @@ export default function App() {
               )}
             </div>
           )}
+        </div>
         </div>
 
         <aside style={sidebar}>
@@ -1847,20 +1897,9 @@ export default function App() {
         </aside>
       </div>
 
-      <footer style={footerRow}>
-        <span>
-          {t('footer.by')} <strong style={{ color: '#334155' }}>{t('footer.name')}</strong>
-        </span>
-        <span aria-hidden style={{ color: '#cbd5e1' }}>·</span>
-        <span>
-          {t('footer.contact')}:{' '}
-          <a href="mailto:david.codish@gmail.com" style={{ color: '#2563eb', textDecoration: 'none' }}>
-            david.codish@gmail.com
-          </a>
-        </span>
-      </footer>
-
-      {/* "מה זה?" — first-load intro (dismiss persisted), reopenable from the header. */}
+      {/* "מה זה?" — the FIRST-LOAD intro (dismiss persisted): the same About content the frame's
+          אודות button shows, auto-opened once for a new student. The footer retired with the frame
+          adoption (B3-2d) — its contact line lives inside the About body now. */}
       <Modal
         open={aboutOpen}
         onClose={dismissAbout}
@@ -1871,20 +1910,7 @@ export default function App() {
           </button>
         }
       >
-        <p style={{ marginTop: 0 }}>{t('about.lead')}</p>
-        <ul style={{ margin: '8px 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {(t('about.points', { returnObjects: true }) as string[]).map((p) => (
-            <li key={p}>{p}</li>
-          ))}
-        </ul>
-        <div style={{ fontWeight: 600, marginTop: 12 }}>{t('about.tryTitle')}</div>
-        <ol style={{ margin: '6px 0 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {(t('about.trySteps', { returnObjects: true }) as string[]).map((s) => (
-            <li key={s} dir={textDir(s)} style={{ fontSize: 13, color: pal.primaryInk }}>
-              {s}
-            </li>
-          ))}
-        </ol>
+        {aboutBody}
         {/* The in-app privacy note (NFR-SE-3 / ADR-278) — the deploy README alone is not user-facing. */}
         <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12, color: pal.muted }}>{t('about.privacy')}</p>
       </Modal>
@@ -1913,7 +1939,8 @@ export default function App() {
         )}
       </Modal>
 
-    </div>
+      </div>
+    </AppFrame>
   );
 }
 
@@ -1938,34 +1965,9 @@ const page: React.CSSProperties = {
   flexDirection: 'column',
   gap: 14,
 };
-const headerRow: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 };
-/** The figure's name (issue #42): an inline-editable title — one control is both the field and the
- *  visible name. Transparent until hovered/filled so an unnamed session stays clean. */
-const figureNameInput: React.CSSProperties = {
-  flex: '1 1 220px',
-  minWidth: 140,
-  maxWidth: 420,
-  alignSelf: 'center',
-  fontSize: 17,
-  fontWeight: 600,
-  color: '#1e293b',
-  textAlign: 'center',
-  padding: '6px 10px',
-  border: '1px dashed #cbd5e1',
-  borderRadius: 8,
-  background: 'transparent',
-};
+// headerRow / figureNameInput / footerRow retired with the frame adoption (B3-2d): the header and
+// footer are the FRAME's, and the figure name is the shared FigureName component.
 const main: React.CSSProperties = { display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' };
-const footerRow: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  gap: 8,
-  paddingTop: 10,
-  borderTop: '1px solid #e2e8f0',
-  fontSize: 13,
-  color: '#64748b',
-};
 // The canvas fills the space beside the sidebar and the viewport height (use the big screen);
 // it wraps below the sidebar on narrow widths. Its size is measured and passed to <Figure>.
 // `order` puts the canvas on the LEFT and the sidebar on the RIGHT under RTL (Hebrew):
@@ -1973,7 +1975,10 @@ const footerRow: React.CSSProperties = {
 // Hebrew the canvas should be on the left.)
 // Height budget: 100vh minus the page padding, header, footer, and the inter-row gaps — so the canvas
 // fills the viewport and the whole page (header → canvas → footer) fits WITHOUT scrolling.
-const canvasWrap: React.CSSProperties = { order: 2, position: 'relative', flex: '1 1 480px', minWidth: 360, height: 'calc(100vh - 180px)', minHeight: 460 };
+/** The canvas COLUMN — the flex item (FigureName above the drawing, B3-2d). Order 2 puts the
+ *  canvas LEFT of the sidebar under RTL. */
+const canvasCol: React.CSSProperties = { order: 2, flex: '1 1 480px', minWidth: 360, display: 'flex', flexDirection: 'column', gap: 8 };
+const canvasWrap: React.CSSProperties = { position: 'relative', height: 'calc(100vh - 180px)', minHeight: 460 };
 // Centered call-to-action shown over the blank canvas; pointer-events off so it never
 // blocks the figure (the example buttons re-enable them).
 const emptyOverlay: React.CSSProperties = {
@@ -2073,7 +2078,6 @@ const infoBanner: React.CSSProperties = {
   background: '#eff6ff',
   color: '#1d4ed8',
 };
-const ghost: React.CSSProperties = btn.ghost;
 const del: React.CSSProperties = {
   border: 'none',
   background: 'transparent',
