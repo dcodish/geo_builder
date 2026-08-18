@@ -12,6 +12,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
+// The shared frame (B3-2d #668): the deliberate src -> shell adoption — the LAST product joins the
+// suite chrome (ADR-W-019; BOUNDARIES.json src -> shell edge flipped with this import).
+import { AppFrame } from '../shell/frame/AppFrame';
+import { DataPanel } from '../shell/frame/DataPanel';
+import { FactList } from '../shell/frame/FactList';
+import { ManualScreen } from '../shell/frame/ManualScreen';
+import { Workbench } from '../shell/frame/Workbench';
+import { FigureName } from '../shell/frame/FigureName';
+import { InputArea } from '../shell/frame/InputArea';
+import { QuickChips } from '../shell/frame/QuickChips';
+import { ToolButton } from '../shell/frame/ToolButton';
+import registry from '../products.json';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, impliedCircleBinding, impliedPointBinding, buildParseCtx, stepLabel } from '@/parser';
 import { Figure } from '@/render';
@@ -26,8 +38,8 @@ import { bookUrl } from '@/shapes/shapeCatalog';
 import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES_VISIBLE } from '@/theorems';
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
-import { GREEK, SYMBOLS } from '@/ui/symbols';
-import { btn, card as themeCard, color as pal, foldToggle, fs, pill, sectionTitle } from '@/ui/theme';
+import { SYMBOL_SPECS } from '@/ui/symbols';
+import { btn, card as themeCard, color as pal, fs, sectionTitle } from '@/ui/theme';
 import { autoNamedLabels, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
@@ -90,7 +102,8 @@ export default function App() {
   const relations = useGeoStore((s) => s.relations);
   const valuesState = useGeoStore((s) => s.values);
   const viewValues = useGeoStore((s) => s.viewValues);
-  const clearValues = useGeoStore((s) => s.clearValues);
+  // clearValues retired from the UI (B6-2d): the panel head hides the column; a fact change
+  // stales the layer store-side, and the in-panel button re-pulls.
   const addQuery = useGeoStore((s) => s.addQuery);
   const removeQuery = useGeoStore((s) => s.removeQuery);
   const viewRelations = useGeoStore((s) => s.viewRelations);
@@ -145,20 +158,21 @@ export default function App() {
   // timer. `×` dismisses this load's note outright; a fresh load re-audits.
   const [fileAudit, setFileAudit] = useState<LoadAuditFinding[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null); // the hidden <input type=file> behind "load figure"
-  const [helpOpen, setHelpOpen] = useState(false); // the help modal ("עזרה") — guide + command reference
-  const [helpTab, setHelpTab] = useState<'guide' | 'commands'>('guide');
+  const [manualOpen, setManualOpen] = useState(false); // the D9 manual SCREEN (B7) — catalog-backed
   const [aboutOpen, setAboutOpen] = useState(false); // the "מה זה?" intro modal (first load + reopenable)
-  const [showSymbols, setShowSymbols] = useState(false); // the Greek/symbol insert rows — collapsed by default (advanced)
-  const [examplesOpen, setExamplesOpen] = useState(false); // examples auto-show while the canvas is empty; fold once building starts
-  const [displayOpen, setDisplayOpen] = useState(true); // the display-options fold — OPEN by default (operator: the discovery dial is important and must stay visible); foldable for students who want the space
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editText, setEditText] = useState('');
-  const [editError, setEditError] = useState(false);
+  // examplesOpen retired (operator 2026-08-18): no example strip above the input — the examples
+  // live on the clean canvas (QuickChips) and in עזרה.
+  // B6-2d: the נתונים panel — permanent column on wide screens (content collapsible), the same
+  // default as the complex/3-D panels. Opening it PULLS the values compute (#217's pull-only rule).
+  const [showData, setShowData] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1200px)').matches,
+  );
+  // editingId/editText/editError retired with the shared FactList (B5-2d): the editor state is the
+  // chrome's; commitEdit takes the text and answers with a boolean.
   const [showTheorems, setShowTheorems] = useState(false); // the live theorem feed (Phase 6a) — live in prod but OFF by default (operator 2026-07-07); the student opts in from תצוגה
   const [discoveryLevel, setDiscoveryLevel] = useState<DiscoveryLevel>(1); // the theorem discovery dial (ADR-219) — L1 Given by default
   const [theoremSel, setTheoremSel] = useState<TheoremId | null>(null); // the theorem row whose premise is highlighted on the canvas
   const [bgOpen, setBgOpen] = useState(false); // the collapsed "background theorems" family fold is expanded
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // The ADR-242 load-audit note, DERIVED from the persistent findings against the current facts (issue #24):
   // a finding drops the moment its row is deleted / toggled off / ✎ re-lowered, so the note self-clears — no
@@ -229,27 +243,25 @@ export default function App() {
     });
   }, []);
 
-  // Insert a Greek letter (angle variables are hard to type) at the input's caret —
-  // e.g. type "זווית ABC = 2" then press α (ADR-031).
-  // `caret` (when given) is where the caret lands WITHIN the inserted text — e.g. "S_{}" inserts the
-  // template and drops the caret between the braces so the student types the vertices next. Defaults to
-  // the end of the insertion.
-  function insertSymbol(sym: string, caret?: number) {
-    const el = inputRef.current;
-    const start = el?.selectionStart ?? text.length;
-    const end = el?.selectionEnd ?? text.length;
-    setText(text.slice(0, start) + sym + text.slice(end));
-    const pos = start + (caret ?? sym.length);
-    requestAnimationFrame(() => {
-      if (el) {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      }
-    });
-  }
-  // The palette lives in `ui/symbols.ts` (#482): inline in the JSX it was invisible to everything but
-  // this render, which is how it drifted out of step with the bidi CORE class. A module can be asserted.
+  // Symbol insertion is the SHARED palette's now (B4-2d, ADR-031's caret behaviour preserved by
+  // shell/symbols.applySymbol — an empty selection lands the caret inside the template, and a
+  // SELECTION wraps). The palette data lives in `ui/symbols.ts` (#482): a module can be asserted,
+  // and the bidi CORE lock still guards every character it offers.
   const he = i18n.language === 'he';
+  // A2 (#661): the switcher renders products.json's roster; labelKeys resolve in THIS product's
+  // locales. In dev each product serves from its own entry html.
+  const roster = useMemo(
+    () =>
+      registry.products
+        .filter((p) => p.enabled)
+        .map((p) => ({
+          id: p.id,
+          label: t(p.labelKey),
+          icon: p.icon,
+          url: import.meta.env.DEV ? p.devUrl : p.url,
+        })),
+    [t],
+  );
   /** The locale `canonicalText` renders in — the same normalisation the submit pipeline uses (#450). */
   const canonLocale: 'he' | 'en' = i18n.language?.startsWith('he') ? 'he' : 'en';
 
@@ -263,17 +275,10 @@ export default function App() {
   // Inline step editing: open the row as a text field pre-filled with its
   // phrasing, re-parse on confirm, and replace the whole step group in place
   // (ADR-015; a step may expand to several commands, e.g. an inscribed shape).
-  function startEdit(key: string, utterance: string | undefined) {
-    setEditingId(key);
-    setEditText(utterance ?? '');
-    setEditError(false);
-  }
-  function cancelEdit() {
-    setEditingId(null);
-    setEditText('');
-    setEditError(false);
-  }
-  function commitEdit(key: string) {
+  // B5-2d: the editor is the SHARED FactList's (its internal state, Enter/Esc, stay-open-on-false).
+  // This commit takes the edited text as a parameter and returns whether it was accepted — a
+  // refusal keeps the editor open and says why through the aria-live input note.
+  function commitEdit(key: string, editText: string): boolean {
     // Parse against the PREFIX context — the figure as it stands BEFORE the edited step — because the
     // replacement is spliced back at the step's original position and replayed there (ADR-015). The
     // end-state context lied: it contains points created by LATER steps (and by the old version of this
@@ -295,8 +300,7 @@ export default function App() {
       const bind = impliedCircleBinding(r.commands, ectx);
       if (bind && 'clarify' in bind) {
         setInputNote(t('input.unknownCircle', { center: bind.center }));
-        setEditError(true);
-        return;
+        return false;
       }
       if (bind) {
         const res = nameCentre(bind.from, bind.to);
@@ -314,12 +318,13 @@ export default function App() {
       r = parse(editText, ectx);
     }
     if (!r.ok || r.commands.length === 0) {
-      setEditError(true);
-      return;
+      setInputNote(t('steps.editRefused'));
+      return false;
     }
     replaceGroup(key, r.commands, editText.trim());
     logDebug({ kind: 'action', action: 'edit', detail: `${key} → ${editText.trim()}` }); // #84: so a reported session replays edits
-    cancelEdit();
+    setInputNote('');
+    return true;
   }
 
   // The text → command[] path: the deterministic parser runs first; anything it
@@ -426,9 +431,7 @@ export default function App() {
     setRenameNote('');
     setAltNote('');
     setLlmDropped([]);
-    setEditingId(null);
-    setEditText('');
-    setEditError(false);
+    // the FactList editor state is the chrome's own (B5-2d) — a clear needs no reset here
   };
 
   const loadFigureFile = async (f: File) => {
@@ -746,10 +749,8 @@ export default function App() {
     void useGeoStore.getState().detectCrossings();
   }, [facts]);
 
-  useEffect(() => {
-    document.documentElement.dir = i18n.dir();
-    document.documentElement.lang = i18n.language;
-  }, [i18n, i18n.language]);
+  // The dir/lang flip is the FRAME's (B3-2d): one language toggle, one direction effect, in the
+  // one component every builder mounts — the product copy retired like 3-D's and complex's did.
 
   // When the shapes are detected, or a badge's book-link card opens, bring that section into view within the
   // scrollable control column — so the badges + link are visible without the student hunting/scrolling (the
@@ -813,63 +814,112 @@ export default function App() {
     );
   };
 
-  // The command reference (the coverage map): every construct grouped by category,
-  // wired ones clickable to try. Lives in the help modal's "פקודות" tab. Clicking an
-  // example also closes the modal so the figure is visible.
-  const commandCatalog = () => (
-    <div>
-      {CATEGORY_ORDER.map((cat) => {
-        const items = COMMAND_CATALOG.filter((c) => c.category === cat && c.supported);
-        if (items.length === 0) return null;
-        return (
-          <div key={cat} style={{ marginTop: 10 }}>
-            <div style={catHeading}>{he ? CATEGORY_LABELS[cat].he : CATEGORY_LABELS[cat].en}</div>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {items.map((c) => (
-                <li key={c.en} style={cmdRow}>
-                  <button type="button" style={helpExample} onClick={() => { submit(he ? c.he : c.en); setHelpOpen(false); }} dir={textDir(he ? c.he : c.en)} title={he ? c.descHe : c.descEn}>
-                    {he ? c.he : c.en}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      })}
-    </div>
+  // The command reference graduated into the MANUAL screen (B7, D9) — the catalog (the coverage
+  // map) renders through shell/ManualScreen below; the help modal and its tabs retired.
+
+  // "Show another configuration" — lifted out of the JSX (B6-2d moves the button under the canvas,
+  // D7). #41 (ADR-290): the seed search runs in the geometry WORKER; ADR-340 (#175): the search
+  // returns the whole COMPOSITE view, applied as ONE undo-tracked transition.
+  const runResample = async () => {
+    if (resampling) return;
+    setResampling(true);
+    try {
+      const st = useGeoStore.getState();
+      const found = await geoWork.resample(st.facts, st.seed, (k, n) => setAltProgress(`${k}/${n}`));
+      const changed = found !== null;
+      if (changed) useGeoStore.getState().applyView(found!);
+      logDebug({ kind: 'action', action: 'show-another', detail: `seed=${changed ? found!.seed : st.seed}`, result: changed ? 'changed' : 'only-config' }); // #84
+      if (changed) setAltNote('');
+      else {
+        // searched and found nothing different — tell the student something DID happen (the
+        // figure is determined), so "show another" doesn't look like a dead button (operator).
+        setAltNote(t('actions.onlyConfig'));
+        window.setTimeout(() => setAltNote(''), 4000);
+      }
+    } catch (err) {
+      if (!isCancelled(err)) throw err; // cancelled: quiet — the student chose to stop
+    } finally {
+      setResampling(false);
+      setAltProgress('');
+    }
+  };
+
+  // The About content, composed ONCE: the frame's About modal shows it (suite chrome), and the
+  // first-load intro modal below shows the same node (2-D pedagogy: auto-opens for a new student,
+  // dismiss persisted). The old footer's contact line lives here now — the footer retired with the
+  // frame adoption, like 3-D's did in B3.
+  const aboutBody = (
+    <>
+      <p style={{ marginTop: 0 }}>{t('about.lead')}</p>
+      <ul style={{ margin: '8px 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {(t('about.points', { returnObjects: true }) as string[]).map((p) => (
+          <li key={p}>{p}</li>
+        ))}
+      </ul>
+      <div style={{ fontWeight: 600, marginTop: 12 }}>{t('about.tryTitle')}</div>
+      <ol style={{ margin: '6px 0 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {(t('about.trySteps', { returnObjects: true }) as string[]).map((s) => (
+          <li key={s} dir={textDir(s)} style={{ fontSize: 13, color: pal.primaryInk }}>
+            {s}
+          </li>
+        ))}
+      </ol>
+      <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12, color: pal.muted }}>
+        {t('footer.by')} <strong style={{ color: '#334155' }}>{t('footer.name')}</strong> · {t('footer.contact')}:{' '}
+        <a href="mailto:david.codish@gmail.com" style={{ color: '#2563eb', textDecoration: 'none' }}>
+          david.codish@gmail.com
+        </a>
+      </p>
+    </>
   );
 
   return (
-    <div style={page}>
-      <header style={headerRow}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{t('app.title')}</h1>
-          <p style={{ color: '#64748b', margin: '4px 0 0', fontSize: 13 }}>{t('app.subtitle')}</p>
-        </div>
-        <input
-          type="text"
-          value={figureName}
-          onChange={(e) => setFigureName(e.target.value)}
-          placeholder={t('file.namePlaceholder')}
-          dir="auto"
-          aria-label={t('file.namePlaceholder')}
-          style={figureNameInput}
-        />
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" style={ghost} onClick={() => { setHelpTab('guide'); setHelpOpen(true); }}>
-            {t('header.help')}
-          </button>
-          <button type="button" style={ghost} onClick={() => setAboutOpen(true)}>
-            {t('header.about')}
-          </button>
-          {/* Language toggle — the label names the OTHER language (press to switch to it). */}
-          <button type="button" style={ghost} onClick={() => i18n.changeLanguage(he ? 'en' : 'he')}>
-            {t('actions.language')}
-          </button>
-        </div>
-      </header>
-
-      <div style={main}>
+    /* B3-2d (#668): the LAST product adopts the shared frame — suite bar (switcher, language,
+       About), tool row (title + session actions), one look across the builders. The product's
+       header, its own language toggle, its dir effect and its footer all retire here. */
+    <AppFrame
+      title={t('app.title')}
+      subtitle={t('app.subtitle')}
+      utilityActions={
+        /* שמור/טען FIRST so they sit at the same position as in every other builder (the
+           operator's parity ruling); the product's extra עזרה rides after them. */
+        <>
+          <ToolButton onClick={saveFigure} disabled={facts.length === 0}>
+            💾 {t('file.save')}
+          </ToolButton>
+          <ToolButton onClick={() => fileInputRef.current?.click()}>📂 {t('file.load')}</ToolButton>
+          <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
+        </>
+      }
+      roster={roster}
+      activeProductId="2d"
+      switcherLabel={t('switcherAria')}
+      about={{
+        label: t('header.about'),
+        title: t('about.title'),
+        body: aboutBody,
+        privacy: t('about.privacy'),
+        closeLabel: t('about.close'),
+      }}
+      buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
+    >
+      {/* THE WORKBENCH (#734): the three-zone GEOMETRY is the shell's — identical columns, canvas
+          card and empty-state placement in every builder; this product passes zone content only. */}
+      <Workbench
+        emptyOverlay={
+          facts.length === 0 ? (
+            <QuickChips
+              title={t('canvas.emptyTitle')}
+              hint={t('canvas.emptyHint')}
+              commands={examples.slice(0, 4)}
+              onPick={(c) => submit(c)}
+            />
+          ) : undefined
+        }
+        canvasZone={<>
+        {/* The figure's NAME, centered above the drawing it names — the SHARED component (one look
+            in every builder). It lived inline in the retired header. */}
+        <FigureName value={figureName} onChange={setFigureName} placeholder={t('file.namePlaceholder')} />
         <div ref={canvasRef} style={{ ...canvasWrap, ...(viewStale || searchHold ? { opacity: 0.55 } : {}) }}>
           {/* #580 (ADR-449): the two notices split by purpose. SEARCHING is a transient state that
               explains why the whole canvas is dimmed and about to change — a centred banner the
@@ -950,28 +1000,13 @@ export default function App() {
               copied: t('canvas.copied'),
               reset: t('canvas.reset'),
             }}
-            onSaveFile={saveFigure}
-            onLoadFile={() => fileInputRef.current?.click()}
-            saveFileDisabled={facts.length === 0}
             onSaveQuestion={saveQuestion}
             saveQuestionDisabled={questionLines(facts, canonLocale).length === 0}
           />
           {/* Empty canvas → a call to action so a new user knows what to do. The
               container ignores pointer events (so panning isn't blocked); the
               example buttons re-enable them. */}
-          {facts.length === 0 && (
-            <div style={emptyOverlay}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#334155' }}>{t('canvas.emptyTitle')}</div>
-              <div style={{ fontSize: 14, color: '#64748b' }}>{t('canvas.emptyHint')}</div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', pointerEvents: 'auto' }}>
-                {examples.slice(0, 3).map((ex) => (
-                  <button key={ex} type="button" style={emptyChip} onClick={() => submit(ex)} dir={textDir(ex)}>
-                    {ex}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* the empty-state chips render through the WORKBENCH's one overlay slot (#734) */}
           {/* Why a figure file couldn't be loaded (FR-HS-10) — shown right under the toolbar's "load from
               file" button. `fileNote` is a transient problem/refreshed message; `auditNote` is the ADR-242
               honesty audit DERIVED from live facts (issue #24), so it self-clears when its rows are fixed
@@ -1019,71 +1054,135 @@ export default function App() {
           )}
         </div>
 
-        <aside style={sidebar}>
-          <form
-            style={sideCard}
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (text.trim()) submit(text);
-            }}
-          >
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input
-                ref={inputRef}
-                style={input}
-                placeholder={t('input.placeholder')}
-                value={text}
-                dir={textDir(text)}
-                onChange={(e) => {
-                  setText(e.target.value);
-                  if (inputNote) setInputNote('');
-                  if (llmDropped.length) setLlmDropped([]);
-                  if (renameNote) setRenameNote('');
-                }}
-                autoFocus
-              />
-              <button type="submit" style={sendBtn} disabled={!text.trim() || thinking}>
-                {thinking ? t('input.loading') : t('input.send')}
+        {/* LEVEL 3 — figure actions UNDER the canvas (D7, B6-2d): things done TO the figure, the
+            same zone as in the other builders. «הציגו תצורה אחרת» keeps its prominence (operator:
+            it "looks nice" — the look moves with it). */}
+        {facts.length > 0 && (
+          <div style={figureActions}>
+            {(branchId || hasVariant || freeDofs(construction).length > 0) && (
+              <button type="button" style={alt} disabled={resampling} title={t('actions.anotherHint')} onClick={() => void runResample()}>
+                {resampling ? t('input.loading') : t('actions.another')}
               </button>
-            </div>
-            {/* Live math preview (#77 Am. / #40): render the current input's fractions/radicals/subscripts as
-                real formatted math, so the interpretation is visible while typing — `√(2/3)` shows a radical
-                OVER the fraction, `√2/3` shows `(√2)/3`, disambiguating what the parser will do. The container
-                follows the INPUT's direction (#118 / ADR-312): forcing `dir="ltr"` reversed a Hebrew sentence
-                that merely contained a radical («אורך AC גדול פי √(3) מהקטע CO» → scrambled). A pure math value
-                (`35/√32`) is LTR; a Hebrew sentence is RTL with the MathML atoms as LTR islands in place. */}
-            {hasMath(text) && (
-              <div dir={textDir(text)} style={{ marginTop: 4, padding: '4px 8px', fontSize: 18, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, overflowX: 'auto' }}>
-                <MathText text={text} />
-              </div>
             )}
-            {/* Greek + math-symbol inserts — advanced (only for symbolic lengths / angle variables /
-                relation glyphs), so collapsed behind a toggle to keep the input area clean. */}
-            <button type="button" onClick={() => setShowSymbols((v) => !v)} style={symbolsToggle}>
-              Ω {t('input.symbols')} {showSymbols ? '▴' : '▾'}
+            {resampling && (
+              <span style={{ fontSize: 12, color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                {altProgress && <span>({altProgress})</span>}
+                {/* #41: real preemption — terminate the worker; the in-flight promise rejects {cancelled} */}
+                <button
+                  type="button"
+                  onClick={() => cancelGeoWork()}
+                  title={t('actions.cancelSearch')}
+                  style={{ border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 11, lineHeight: '16px', padding: '0 6px' }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            {altNote && <span style={{ fontSize: 12, color: '#64748b' }}>{altNote}</span>}
+            {/* "View relations" — the ground-truth layer (ADR-134); results show in the נתונים panel. */}
+            <button
+              type="button"
+              style={relationsLayer ? relBtnOn : exploreToggle}
+              disabled={analysing}
+              title={t('actions.relationsHint')}
+              onClick={() => {
+                if (analysing) return;
+                if (relationsLayer) {
+                  clearRelations();
+                  return;
+                }
+                setAnalysing(true);
+                setShowData(true); // the results surface is the panel — a click must show its result
+                void viewRelations().finally(() => setAnalysing(false));
+              }}
+            >
+              {analysing ? t('actions.analysing') : relationsLayer ? t('actions.hideRelations') : t('actions.viewRelations')}
             </button>
-            {showSymbols && (
-              <>
-                {/* Row 1 — Greek-letter inserts for angle variables (∠ABC = 2α), hard to type. */}
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 70 }}>{t('input.greek')}:</span>
-                  {GREEK.map((g) => (
-                    <button key={g} type="button" title={t('input.insertGreek')} onClick={() => insertSymbol(g)} style={greekBtn}>
-                      {g}
-                    </button>
-                  ))}
-                </div>
-                {/* Row 2 — math symbols: roots/powers for symbolic lengths, and the ∠ ° ⊥ ∥ relation glyphs. */}
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 70 }}>{t('input.symbols')}:</span>
-                  {SYMBOLS.map((s) => (
-                    <button key={s.label} type="button" title={t('input.insertSymbol')} onClick={() => insertSymbol(s.insert, s.caret)} style={greekBtn}>
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+            {/* "Detect shapes" (FR-SH) — results (badges/similar) show in the נתונים panel. */}
+            <button
+              type="button"
+              style={shapesLayer ? shapesBtnOn : exploreToggle}
+              disabled={detecting}
+              title={t('shapes.hint')}
+              onClick={() => {
+                if (detecting) return;
+                setOpenShape(null);
+                setHoverShape(null);
+                setOpenSimilar(null);
+                setHoverSimilar(null);
+                if (shapesLayer) {
+                  clearShapes();
+                  return;
+                }
+                setDetecting(true);
+                setShowData(true);
+                void (async () => {
+                  try {
+                    await detectShapes();
+                  } finally {
+                    setDetecting(false);
+                  }
+                })();
+              }}
+            >
+              {detecting ? t('shapes.analysing') : shapesLayer ? t('shapes.hide') : t('shapes.detect')}
+            </button>
+            <span style={{ flex: 1 }} />
+            <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => { logDebug({ kind: 'action', action: 'undo' }); undo(); }}>{t('actions.undo')}</button>
+            <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => { logDebug({ kind: 'action', action: 'redo' }); redo(); }}>{t('actions.redo')}</button>
+            <button type="button" style={{ ...subtleBtn, color: pal.danger }} onClick={clearAll}>{t('actions.clear')}</button>
+          </div>
+        )}
+        {/* Figure-DISPLAY toggles (the תצוגה fold, relocated per the #729 mapping): they change how
+            the FIGURE draws, so they live with it. */}
+        {facts.length > 0 && (
+          <div style={{ ...figureActions, gap: 14 }}>
+            <label style={displayToggle}>
+              <input type="checkbox" checked={showMeasures} onChange={(e) => setShowMeasures(e.target.checked)} />
+              {t('actions.showMeasures')}
+            </label>
+            <label style={displayToggle}>
+              <input type="checkbox" checked={showCenters} onChange={(e) => setShowCenters(e.target.checked)} />
+              {t('canvas.centers')}
+            </label>
+            <label style={displayToggle}>
+              <input type="checkbox" checked={showTheorems} onChange={(e) => setShowTheorems(e.target.checked)} />
+              {t('theorems.toggle')}
+            </label>
+          </div>
+        )}
+        </>}
+        inputZone={<>
+          {/* B4-2d (#729): the SHARED InputArea — the box, submit, wrap-selection palette, live
+              preview and quick strip exist ONCE in shell/; this product passes its content. The
+              maths preview (#77 Am. / #40: √(2/3) shows a radical OVER the fraction while typing)
+              rides the shared preview seam as a rendered node; box and preview direction follow
+              the CONTENT via textDir (#118 / ADR-312 — dir="auto" keys off the first strong
+              character and «AB שווה…» would scramble). The caret-template symbols became
+              before/after WRAPS (select ABC, press S_{} → S_{ABC}). */}
+          <div style={sideCard}>
+            <InputArea
+              value={text}
+              onChange={(next) => {
+                setText(next);
+                if (inputNote) setInputNote('');
+                if (llmDropped.length) setLlmDropped([]);
+                if (renameNote) setRenameNote('');
+              }}
+              onSubmit={() => {
+                if (text.trim() && !thinking) submit(text);
+              }}
+              placeholder={t('input.placeholder')}
+              submitLabel={t('input.send')}
+              busy={thinking}
+              busyLabel={t('input.loading')}
+              symbols={SYMBOL_SPECS}
+              preview={(s) => (hasMath(s) ? <MathText text={s} /> : null)}
+              previewDir={(s) => textDir(s)}
+              boxDir={(s) => textDir(s)}
+            >
+            {/* No example strip above the box (operator ruling 2026-08-18: "expensive screen
+                space"): the examples live on the CLEAN CANVAS (QuickChips) and in עזרה. */}
             {thinking && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
             {thinking && llmAbortRef.current && (
               <button
@@ -1104,26 +1203,8 @@ export default function App() {
               </span>
             )}
 
-            {/* Examples live with the input (they ARE input). Fully shown while the canvas is
-                empty — the moment building starts they fold away to reclaim the space, and a
-                quiet toggle brings them back. */}
-            {facts.length === 0 ? (
-              <div style={{ ...sectionLabel, marginTop: 2 }}>{t('examples.heading')}</div>
-            ) : (
-              <button type="button" style={foldToggle} onClick={() => setExamplesOpen((v) => !v)}>
-                {examplesOpen ? '▾' : '▸'} {t('examples.title')}
-              </button>
-            )}
-            {(facts.length === 0 || examplesOpen) && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {examples.map((ex) => (
-                  <button key={ex} type="button" style={chip} onClick={() => submit(ex)} dir={textDir(ex)}>
-                    {ex}
-                  </button>
-                ))}
-              </div>
-            )}
-          </form>
+            </InputArea>
+          </div>
 
           {lastError && <div role="status" aria-live="polite" style={errorBanner}>⚠ {explainError(lastError)}</div>}
 
@@ -1157,21 +1238,9 @@ export default function App() {
             {/* Card header: title, the figure's remaining freedom as a compact pill (was a loose
                 line floating between buttons), and undo/redo/clear as small in-context utilities
                 (they act on the step list, so they live with it — and vanish on an empty session). */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <div style={{ ...sectionLabel, flex: 1 }}>{t('steps.title')}</div>
-              {facts.length > 0 && (
-                <span style={freeDofCount(construction) > 0 ? dofPillFree : dofPillDone}>
-                  {freeDofCount(construction) > 0 ? t('actions.dof', { count: freeDofCount(construction) }) : `✓ ${t('actions.determined')}`}
-                </span>
-              )}
-              {(facts.length > 0 || canUndo || canRedo) && (
-                <span style={{ display: 'flex', gap: 4 }}>
-                  <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => { logDebug({ kind: 'action', action: 'undo' }); undo(); }}>{t('actions.undo')}</button>
-                  <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => { logDebug({ kind: 'action', action: 'redo' }); redo(); }}>{t('actions.redo')}</button>
-                  <button type="button" style={{ ...subtleBtn, color: pal.danger }} onClick={clearAll}>{t('actions.clear')}</button>
-                </span>
-              )}
-            </div>
+            {/* B6-2d: the DOF pill moved to the panel's status line (its generic home), and
+                undo/redo/clear moved under the canvas (D7) — the header keeps the title only. */}
+            <div style={sectionLabel}>{t('steps.title')}</div>
             {facts.length === 0 ? (
               <p style={{ color: '#94a3b8', fontSize: 13, margin: 0 }}>{t('steps.empty')}</p>
             ) : (
@@ -1185,105 +1254,73 @@ export default function App() {
                   <span><span style={{ color: '#94a3b8' }}>○</span> {t('steps.statusOff')}</span>
                 </div>
               )}
-              <ul style={stepList}>
-                {groups.map((g) => {
-                  const on = g.facts.every((f) => f.enabled);
+              {/* B5-2d (#729): the SHARED fact-list chrome — row cards, mute checkbox, ✎ edit
+                  (FactList's internal editor: Enter commits, Esc cancels, a refusal keeps it open
+                  with the aria-live note saying why), ✕ delete — one look in every builder. The
+                  row CONTENT stays this product's: the tri-state mark, the CANONICAL label
+                  (ADR-428 obligation 3 / #450: the row shows what the tool UNDERSTOOD, rendered
+                  from the group's commands; the editor is seeded with the same canonical text,
+                  safe by the round-trip lock), the selected row's broken-reason (F6) and measured
+                  readout (#39). */}
+              <FactList
+                testId="step-list"
+                editDir={(s) => textDir(s)}
+                rows={groups.map((g) => {
                   const anyOn = g.facts.some((f) => f.enabled);
                   const brokenFact = g.facts.find((f) => f.enabled && status[f.id] !== 'ok');
                   const state = !anyOn ? 'disabled' : brokenFact ? 'broken' : 'ok';
                   const errText = brokenFact ? explainError(status[brokenFact.id] as string) : undefined;
-                  // ADR-428 obligation 3 (#450): the row shows the CANONICAL form of what the tool
-                  // UNDERSTOOD, not the verbatim text — so the step list teaches the same spelling the
-                  // acceptance hint does, instead of preserving a phrasing we only tolerate. Rendered
-                  // from the group's COMMANDS, never by rewriting the typed string (canonical.ts's
-                  // load-bearing rule). `canonicalText` is deliberately conservative — a compound
-                  // lowering, or one whose family has no renderer, returns null and the row keeps its
-                  // verbatim text, which is most rows today.
                   const label = stepLabel(g.facts.map((f) => f.cmd), g.facts[0].utterance, canonLocale);
-                  const editing = editingId === g.key;
-                  return (
-                    <li key={g.key} style={factRow(state, g.key === selectedId)}>
-                      <input
-                        type="checkbox"
-                        checked={on}
-                        title={t('actions.toggle')}
-                        onChange={() => setGroupEnabled(g.key, !on)}
-                        disabled={editing}
-                        style={{ cursor: editing ? 'default' : 'pointer' }}
-                      />
-                      {editing ? (
-                        <>
-                          <input
-                            autoFocus
-                            value={editText}
-                            dir={textDir(editText)}
-                            onChange={(e) => {
-                              setEditText(e.target.value);
-                              if (editError) setEditError(false);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') commitEdit(g.key);
-                              if (e.key === 'Escape') cancelEdit();
-                            }}
-                            style={{ ...editInput, borderColor: editError ? '#dc2626' : '#cbd5e1' }}
-                          />
-                          <button type="button" style={iconBtn('#16a34a')} title={t('actions.confirmEdit')} onClick={() => commitEdit(g.key)}>
-                            ✓
+                  return {
+                    id: g.key,
+                    disabled: !anyOn,
+                    selected: g.key === selectedId,
+                    content: (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        <span style={{ fontSize: 12, width: 16, textAlign: 'center', flexShrink: 0 }}>
+                          {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
+                        </span>
+                        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                          <button type="button" style={factLabel(state)} onClick={() => select(g.key)} dir={textDir(label)} title={state === 'broken' ? errText : undefined}>
+                            {hasMath(label) ? <MathText text={label} /> : label}
                           </button>
-                          <button type="button" style={iconBtn('#94a3b8')} title={t('actions.cancelEdit')} onClick={cancelEdit}>
-                            ×
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                            <button type="button" style={factLabel(state)} onClick={() => select(g.key)} dir={textDir(label)} title={state === 'broken' ? errText : undefined}>
-                              {hasMath(label) ? <MathText text={label} /> : label}
-                            </button>
-                            {/* The broken-step REASON, inline (F6): it lived only in a `title` tooltip —
-                                invisible on touch and to screen readers. Shown when the row is selected
-                                (tap the row to see why it broke), keeping unselected rows compact. */}
-                            {state === 'broken' && errText && g.key === selectedId && (
-                              <span style={{ fontSize: 11, color: '#dc2626', paddingInlineStart: 6 }} dir={textDir(errText)}>
-                                {errText}
-                              </span>
-                            )}
-                            {/* #39: the computed value of a size/ratio given, measured on the drawing —
-                                shown when the step is selected. The ratio (verdict) is the seed-invariant
-                                knowledge (green ✓ / red ✗ vs the stated given); the absolute areas/lengths
-                                are per-drawing context. Forced LTR (it's math). */}
-                            {state === 'ok' && g.key === selectedId && selectedReadout && (
-                              <span style={{ fontSize: 11, paddingInlineStart: 6, direction: 'ltr', unicodeBidi: 'isolate' }}>
-                                {selectedReadout.measured.length > 0 && (
-                                  <span style={{ color: '#64748b' }}>
-                                    {selectedReadout.measured.map((m) => `${m.label} = ${m.value}`).join(' · ')} →{' '}
-                                  </span>
-                                )}
-                                <strong style={{ color: selectedReadout.verdict.ok ? '#16a34a' : '#dc2626' }}>
-                                  {selectedReadout.verdict.label} = {selectedReadout.verdict.value} {selectedReadout.verdict.ok ? '✓' : '✗'}
-                                </strong>
-                              </span>
-                            )}
-                          </div>
-                          <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}>
-                            {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
-                          </span>
-                          {/* Edit what is DISPLAYED, not the superseded typed text (#450): the row now
-                              shows the canonical form, and seeding the editor with the old phrasing
-                              would make the ✎ box contradict the row. Safe because the canonical text
-                              re-parses to the same lowering — locked by the round-trip property. */}
-                          <button type="button" style={iconBtn('#64748b')} title={t('actions.edit')} onClick={() => startEdit(g.key, label)}>
-                            ✎
-                          </button>
-                          <button type="button" style={del} title={t('actions.delete')} onClick={() => { logDebug({ kind: 'action', action: 'delete', detail: g.key }); removeGroup(g.key); }}>
-                            ×
-                          </button>
-                        </>
-                      )}
-                    </li>
-                  );
+                          {state === 'broken' && errText && g.key === selectedId && (
+                            <span style={{ fontSize: 11, color: '#dc2626', paddingInlineStart: 6 }} dir={textDir(errText)}>
+                              {errText}
+                            </span>
+                          )}
+                          {state === 'ok' && g.key === selectedId && selectedReadout && (
+                            <span style={{ fontSize: 11, paddingInlineStart: 6, direction: 'ltr', unicodeBidi: 'isolate' }}>
+                              {selectedReadout.measured.length > 0 && (
+                                <span style={{ color: '#64748b' }}>
+                                  {selectedReadout.measured.map((m) => `${m.label} = ${m.value}`).join(' · ')} →{' '}
+                                </span>
+                              )}
+                              <strong style={{ color: selectedReadout.verdict.ok ? '#16a34a' : '#dc2626' }}>
+                                {selectedReadout.verdict.label} = {selectedReadout.verdict.value} {selectedReadout.verdict.ok ? '✓' : '✗'}
+                              </strong>
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                    ),
+                  };
                 })}
-              </ul>
+                emptyHint={t('steps.empty')}
+                onToggle={(id) => {
+                  const g = groups.find((x) => x.key === id);
+                  if (g) setGroupEnabled(id, !g.facts.every((f) => f.enabled));
+                }}
+                toggleLabel={t('actions.toggle')}
+                editValueOf={(id) => {
+                  const g = groups.find((x) => x.key === id);
+                  return g ? stepLabel(g.facts.map((f) => f.cmd), g.facts[0].utterance, canonLocale) : '';
+                }}
+                onEditCommit={(id, next) => commitEdit(id, next)}
+                editLabel={t('actions.edit')}
+                onDelete={(id) => { logDebug({ kind: 'action', action: 'delete', detail: id }); removeGroup(id); }}
+                deleteLabel={t('actions.delete')}
+              />
               </>
             )}
           </div>
@@ -1303,156 +1340,49 @@ export default function App() {
             }}
           />
 
-          {/* ── Explore the figure — one card for everything that interrogates the BUILT figure:
-              alternative configurations, the ground-truth relations layer, shape detection, and the
-              playable radius sliders. Replaces three identical full-width purple buttons stacked
-              with loose status lines between them. */}
-          {facts.length > 0 && (
+        </>}
+        dataZone={
+        /* THE נתונים COLUMN (B6-2d, #729): the SHARED DataPanel head/status, with 2-D's knowledge
+           surfaces as its content — values (#217 pull-only), the query lane (#477), the sliders,
+           the relations/shape results and the theorem feed. */
           <div style={sideCard}>
-            <div style={sectionLabel}>{t('explore.title')}</div>
-          {(branchId || hasVariant || freeDofs(construction).length > 0) && (
-            <button
-              type="button"
-              style={alt}
-              disabled={resampling}
-              title={t('actions.anotherHint')}
-              // Explore the WHOLE configuration space: resample the continuous free DOFs (so free
-              // points / on-circle vertices actually move) AND cycle a discrete branch if there is
-              // one. Previously this did branch-cycling EXCLUSIVELY whenever any branch existed, so a
-              // figure with both (e.g. a circle∩circle point + free secant ends) only flipped between
-              // 2 branch options and never varied its free DOFs.
-              onClick={async () => {
-                if (resampling) return;
-                // #41 (ADR-290): the seed search runs in the geometry WORKER — the main thread stays free
-                // (no page-unresponsive dialog possible), the cue shows live progress, and the ✕ beside it
-                // cancels (worker termination — real preemption). The store applies the found seed as one
-                // undo-tracked step; its fold is already warm here (same facts), so the re-render is a tail.
-                setResampling(true);
-                try {
-                  const st = useGeoStore.getState();
-                  // ADR-340 (#175): the search returns the whole COMPOSITE view — facts (possibly carrying a
-                  // branch/variant step) + seed — already validated by `meetsRequirements`. It is applied as
-                  // ONE undo-tracked transition; no post-hoc `cycleAlt`/`cycleVariant` exists to invalidate
-                  // it (the old path validated the seed alone, then mutated the facts unchecked — a green
-                  // figure could silently start violating its own givens).
-                  const found = await geoWork.resample(st.facts, st.seed, (k, n) => setAltProgress(`${k}/${n}`));
-                  const changed = found !== null;
-                  if (changed) useGeoStore.getState().applyView(found!);
-                  logDebug({ kind: 'action', action: 'show-another', detail: `seed=${changed ? found!.seed : st.seed}`, result: changed ? 'changed' : 'only-config' }); // #84
-                  if (changed) setAltNote('');
-                  else {
-                    // searched and found nothing different — tell the student something DID happen (the
-                    // figure is determined), so "show another" doesn't look like a dead button (operator).
-                    setAltNote(t('actions.onlyConfig'));
-                    window.setTimeout(() => setAltNote(''), 4000);
-                  }
-                } catch (err) {
-                  if (!isCancelled(err)) throw err; // cancelled: quiet — the student chose to stop
-                } finally {
-                  setResampling(false);
-                  setAltProgress('');
+            <DataPanel
+              title={t('dataTitle')}
+              open={showData}
+              onToggle={() => {
+                const opening = !showData;
+                setShowData(opening);
+                if (opening && facts.length > 0 && !valuesLayer && !computingValues) {
+                  setComputingValues(true);
+                  void viewValues().finally(() => setComputingValues(false));
                 }
               }}
+              showLabel={t('panelShow')}
+              hideLabel={t('panelHide')}
+              status={
+                facts.length > 0
+                  ? freeDofCount(construction) > 0
+                    ? t('actions.dof', { count: freeDofCount(construction) })
+                    : `✓ ${t('actions.determined')}`
+                  : undefined
+              }
+              sections={[]}
             >
-              {resampling ? t('input.loading') : t('actions.another')}
-            </button>
-          )}
-          {resampling && (
-            <span style={{ fontSize: 12, color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              {t('input.loading')}
-              {altProgress && <span>({altProgress})</span>}
-              {/* #41: real preemption — terminate the worker; the in-flight promise rejects {cancelled} */}
-              <button
-                type="button"
-                onClick={() => cancelGeoWork()}
-                title={t('actions.cancelSearch')}
-                style={{ border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 11, lineHeight: '16px', padding: '0 6px' }}
-              >
-                ✕
-              </button>
-            </span>
-          )}
-          {altNote && <span style={{ fontSize: 12, color: '#64748b' }}>{altNote}</span>}
-
-          {/* The two analysis layers side by side — quiet outline toggles (secondary to "show
-              another configuration"); each fills with its on-canvas layer colour while active. */}
-          <div style={{ display: 'flex', gap: 6 }}>
-            {/* "View relations" — the ground-truth layer (ADR-134): on press, mark every equal side / equal
-                angle the givens FORCE (ticks / arcs). A button, not a live toggle; the detection samples the
-                figure, so we paint a busy state first. Dismiss with the same button; a new fact auto-clears it. */}
+          {facts.length === 0 && <span style={{ fontSize: 12, color: '#94a3b8' }}>{t('values.emptyFigure')}</span>}
+          {computingValues && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('values.computing')}</span>}
+          {facts.length > 0 && !valuesLayer && !computingValues && (
             <button
               type="button"
-              style={relationsLayer ? relBtnOn : exploreToggle}
-              disabled={analysing}
-              title={t('actions.relationsHint')}
-              onClick={() => {
-                if (analysing) return;
-                if (relationsLayer) {
-                  clearRelations();
-                  return;
-                }
-                // The detection sweep runs in the geometry WORKER (#157 / ADR-401) — the tab stays live
-                // while it samples, so this is a plain busy state around an await, no paint dance.
-                setAnalysing(true);
-                void viewRelations().finally(() => setAnalysing(false));
-              }}
-            >
-              {analysing ? t('actions.analysing') : relationsLayer ? t('actions.hideRelations') : t('actions.viewRelations')}
-            </button>
-            {/* "Detect shapes" (FR-SH) — on press, classify every named shape the figure contains (forced
-                across samples) and list each as a badge that links to its page in the geometry book. A
-                button, not a live toggle (opt-in, same pedagogy boundary as "view relations"); a new fact
-                auto-clears the layer. */}
-            <button
-              type="button"
-              style={shapesLayer ? shapesBtnOn : exploreToggle}
-              disabled={detecting}
-              title={t('shapes.hint')}
-              onClick={() => {
-                if (detecting) return;
-                setOpenShape(null);
-                setHoverShape(null);
-                setOpenSimilar(null);
-                setHoverSimilar(null);
-                if (shapesLayer) {
-                  clearShapes();
-                  return;
-                }
-                setDetecting(true);
-                // `detectShapes` samples in the geometry WORKER (#157 / ADR-401), so the spinner paints and
-                // the page stays fully responsive while a coupled figure is analysed.
-                void (async () => {
-                  try {
-                    await detectShapes();
-                  } finally {
-                    setDetecting(false);
-                  }
-                })();
-              }}
-            >
-              {detecting ? t('shapes.analysing') : shapesLayer ? t('shapes.hide') : t('shapes.detect')}
-            </button>
-            {/* #217 (ADR-410): the VALUES panel — pull-only (req 4: never computed during build). The
-                worker classifies the shared sample pool; rows show only seed-invariant knowledge. */}
-            <button
-              type="button"
-              style={valuesLayer ? shapesBtnOn : exploreToggle}
-              disabled={computingValues}
+              style={exploreToggle}
               title={t('values.hint')}
               onClick={() => {
-                if (computingValues) return;
-                if (valuesLayer) {
-                  setValueHl(null);
-                  clearValues();
-                  return;
-                }
                 setComputingValues(true);
                 void viewValues().finally(() => setComputingValues(false));
               }}
             >
-              {computingValues ? t('values.computing') : valuesLayer ? t('values.hide') : t('values.compute')}
+              {t('values.compute')}
             </button>
-          </div>
+          )}
           {valuesLayer && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 10px' }}>
               {valuesLayer.rows.length === 0 && valuesLayer.areaClasses.length === 0 && (
@@ -1729,8 +1659,6 @@ export default function App() {
               })}
             </div>
           )}
-          </div>
-          )}
 
           {/* The LIVE theorem feed (Phase 6a) — the bagrut theorems the STATED givens announce, updated
               every step (help, don't reveal: only what the givens *announce*, never the derived "aha").
@@ -1820,47 +1748,14 @@ export default function App() {
             </div>
           )}
 
-          {/* Display options — collapsed by default (settings, not workflow): measures, ⊙ centres,
-              and the theorem-feed toggle + discovery dial. Folding them reclaims permanent sidebar
-              space they used to occupy on every session, including empty ones. */}
-          <div>
-            <button type="button" style={foldToggle} onClick={() => setDisplayOpen((v) => !v)}>
-              {displayOpen ? '▾' : '▸'} {t('display.title')}
-            </button>
-            {displayOpen && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingInlineStart: 12, paddingTop: 4 }}>
-                <label style={displayToggle}>
-                  <input type="checkbox" checked={showMeasures} onChange={(e) => setShowMeasures(e.target.checked)} />
-                  {t('actions.showMeasures')}
-                </label>
-                <label style={displayToggle}>
-                  <input type="checkbox" checked={showCenters} onChange={(e) => setShowCenters(e.target.checked)} />
-                  {t('canvas.centers')}
-                </label>
-                <label style={displayToggle}>
-                  <input type="checkbox" checked={showTheorems} onChange={(e) => setShowTheorems(e.target.checked)} />
-                  {t('theorems.toggle')}
-                </label>
-              </div>
-            )}
+            </DataPanel>
           </div>
-        </aside>
-      </div>
+        }
+      />
 
-      <footer style={footerRow}>
-        <span>
-          {t('footer.by')} <strong style={{ color: '#334155' }}>{t('footer.name')}</strong>
-        </span>
-        <span aria-hidden style={{ color: '#cbd5e1' }}>·</span>
-        <span>
-          {t('footer.contact')}:{' '}
-          <a href="mailto:david.codish@gmail.com" style={{ color: '#2563eb', textDecoration: 'none' }}>
-            david.codish@gmail.com
-          </a>
-        </span>
-      </footer>
-
-      {/* "מה זה?" — first-load intro (dismiss persisted), reopenable from the header. */}
+      {/* "מה זה?" — the FIRST-LOAD intro (dismiss persisted): the same About content the frame's
+          אודות button shows, auto-opened once for a new student. The footer retired with the frame
+          adoption (B3-2d) — its contact line lives inside the About body now. */}
       <Modal
         open={aboutOpen}
         onClose={dismissAbout}
@@ -1871,101 +1766,73 @@ export default function App() {
           </button>
         }
       >
-        <p style={{ marginTop: 0 }}>{t('about.lead')}</p>
-        <ul style={{ margin: '8px 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {(t('about.points', { returnObjects: true }) as string[]).map((p) => (
-            <li key={p}>{p}</li>
-          ))}
-        </ul>
-        <div style={{ fontWeight: 600, marginTop: 12 }}>{t('about.tryTitle')}</div>
-        <ol style={{ margin: '6px 0 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {(t('about.trySteps', { returnObjects: true }) as string[]).map((s) => (
-            <li key={s} dir={textDir(s)} style={{ fontSize: 13, color: pal.primaryInk }}>
-              {s}
-            </li>
-          ))}
-        </ol>
+        {aboutBody}
         {/* The in-app privacy note (NFR-SE-3 / ADR-278) — the deploy README alone is not user-facing. */}
         <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12, color: pal.muted }}>{t('about.privacy')}</p>
       </Modal>
 
       {/* "עזרה" — a short guide + the full command reference, in two tabs. */}
-      <Modal open={helpOpen} onClose={() => setHelpOpen(false)} title={t('header.help')} width={640}>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-          <button type="button" style={tabBtn(helpTab === 'guide')} onClick={() => setHelpTab('guide')}>
-            {t('help.guideTab')}
-          </button>
-          <button type="button" style={tabBtn(helpTab === 'commands')} onClick={() => setHelpTab('commands')}>
-            {t('help.commandsTab')}
-          </button>
-        </div>
-        {helpTab === 'guide' ? (
-          <div>
-            <p style={{ marginTop: 0, fontWeight: 600 }}>{t('help.guideLead')}</p>
-            <ul style={{ margin: 0, paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* THE MANUAL (B7 #672, D9): the עזרה modal graduated into the separate SCREEN — the guide
+          prose is the intro, the catalog (supported entries only) is the body, and a click
+          SUBMITS the example (context-dependent examples refuse honestly through the normal
+          submit path, naming what is missing). */}
+      <ManualScreen
+        open={manualOpen}
+        title={t('manualTitle')}
+        intro={
+          <>
+            <span style={{ fontWeight: 600 }}>{t('help.guideLead')}</span>
+            <ul style={{ margin: '8px 0 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {(t('help.guidePoints', { returnObjects: true }) as string[]).map((p) => (
                 <li key={p}>{p}</li>
               ))}
             </ul>
-          </div>
-        ) : (
-          commandCatalog()
-        )}
-      </Modal>
-
-    </div>
+            {/* the partial-list framing + the honest collection note (TRUE here: prod inputs are
+                logged and triaged — the log-triage loop is how unsupported phrasings become
+                features) */}
+            <span style={{ display: 'block', marginTop: 10 }}>{t('manualPartial')}</span>
+          </>
+        }
+        closeLabel={t('manualClose')}
+        tryHint={t('manualTry')}
+        sectionCap={6}
+        moreNote={t('manualMore')}
+        sections={CATEGORY_ORDER.map((cat) => ({
+          key: cat,
+          title: he ? CATEGORY_LABELS[cat].he : CATEGORY_LABELS[cat].en,
+          entries: COMMAND_CATALOG.filter((c) => c.category === cat && c.supported).map((c) => {
+            const raw = he ? c.he : c.en;
+            return {
+              example: raw,
+              dir: textDir(raw),
+              description: he ? c.descHe : c.descEn,
+              onTry: () => {
+                setManualOpen(false);
+                submit(raw);
+              },
+            };
+          }),
+        }))}
+        onClose={() => setManualOpen(false)}
+      />
+    </AppFrame>
   );
 }
 
-function tabBtn(active: boolean): React.CSSProperties {
-  return {
-    padding: '6px 14px',
-    fontSize: 13,
-    fontWeight: 600,
-    borderRadius: 8,
-    border: `1px solid ${active ? '#2563eb' : '#cbd5e1'}`,
-    background: active ? '#eff6ff' : '#fff',
-    color: active ? '#1e40af' : '#475569',
-    cursor: 'pointer',
-  };
-}
+// tabBtn retired with the help modal (B7): the manual SCREEN replaced its tabs.
 
-const page: React.CSSProperties = {
-  minHeight: '100vh',
-  padding: 20,
-  color: pal.ink, // font family comes from index.css — the ONE stack, never per-element
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 14,
-};
-const headerRow: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 };
-/** The figure's name (issue #42): an inline-editable title — one control is both the field and the
- *  visible name. Transparent until hovered/filled so an unnamed session stays clean. */
-const figureNameInput: React.CSSProperties = {
-  flex: '1 1 220px',
-  minWidth: 140,
-  maxWidth: 420,
-  alignSelf: 'center',
-  fontSize: 17,
-  fontWeight: 600,
-  color: '#1e293b',
-  textAlign: 'center',
-  padding: '6px 10px',
-  border: '1px dashed #cbd5e1',
-  borderRadius: 8,
-  background: 'transparent',
-};
-const main: React.CSSProperties = { display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' };
-const footerRow: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  gap: 8,
-  paddingTop: 10,
-  borderTop: '1px solid #e2e8f0',
-  fontSize: 13,
-  color: '#64748b',
-};
+/** B2-2d (#729, operator: "users shouldn't have to always scroll up and down"): the page is a
+ *  VIEWPORT-HEIGHT flex column under the frame's two bars — the columns scroll INTERNALLY and the
+ *  canvas takes the remaining height, so the page itself never scrolls. 112px = suite bar + tool
+ *  row (measured; the parity checker pins the bars' geometry). */
+// page/main and the column styles retired (#734): the three-zone GEOMETRY is shell/Workbench's.
+// headerRow / figureNameInput / footerRow retired with the frame adoption (B3-2d): the header and
+// footer are the FRAME's, and the figure name is the shared FigureName component.
+// B2-2d: three columns — input+steps (order 1) · canvas (order 2) · the נתונים panel (order 3),
+// the same zone order as the complex tool under RTL. `stretch` + minHeight:0 lets each column
+// scroll internally inside the viewport-height page.
+/** LEVEL 3 — the figure-action rows under the canvas (D7): things done TO the figure. */
+const figureActions: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 };
 // The canvas fills the space beside the sidebar and the viewport height (use the big screen);
 // it wraps below the sidebar on narrow widths. Its size is measured and passed to <Figure>.
 // `order` puts the canvas on the LEFT and the sidebar on the RIGHT under RTL (Hebrew):
@@ -1973,82 +1840,37 @@ const footerRow: React.CSSProperties = {
 // Hebrew the canvas should be on the left.)
 // Height budget: 100vh minus the page padding, header, footer, and the inter-row gaps — so the canvas
 // fills the viewport and the whole page (header → canvas → footer) fits WITHOUT scrolling.
-const canvasWrap: React.CSSProperties = { order: 2, position: 'relative', flex: '1 1 480px', minWidth: 360, height: 'calc(100vh - 180px)', minHeight: 460 };
+/** The canvas COLUMN — the flex item (FigureName above the drawing, B3-2d). Order 2 puts the
+ *  canvas LEFT of the sidebar under RTL. B2-2d: the canvas takes the REMAINING height (flex:1
+ *  inside the viewport-height page) — the fixed calc() budget died with the no-scroll ruling. */
+/** The middle column is a WHITE CARD like its neighbours (operator, 2026-08-18: the column read
+ *  as "lowered" because its white started only at the canvas box — the name field sat on the page
+ *  ground). One card wraps name + canvas + figure actions, so the three columns align. */
+const canvasWrap: React.CSSProperties = { position: 'relative', flex: 1, minHeight: 320 };
 // Centered call-to-action shown over the blank canvas; pointer-events off so it never
 // blocks the figure (the example buttons re-enable them).
-const emptyOverlay: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 12,
-  textAlign: 'center',
-  pointerEvents: 'none',
-  padding: 24,
-};
-const emptyChip: React.CSSProperties = { ...btn.chip, padding: '8px 14px', fontSize: fs.control };
+// emptyChip retired with QuickChips (B4-2d) — the empty-canvas chips are the shared component's.
 // The control column is capped to the viewport and scrolls INTERNALLY (its own overflow), so a tall stack
 // (steps + all the action buttons + the detected-shape badges/card) never pushes the whole PAGE taller than
 // the screen — the canvas and the shapes result stay on one screen (operator: "fit it all on the same screen").
 // `min(400px, 100%)` (F2, tablet scope): a rigid 400px overflowed viewports narrower than the column
 // itself; on a portrait tablet the canvas wraps below and the sidebar spans the width it has.
-const sidebar: React.CSSProperties = { order: 1, width: 'min(400px, 100%)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 'calc(100vh - 110px)', overflowY: 'auto', paddingInlineEnd: 4 };
 // A sidebar section card — the visual grouping the old flat stack lacked (GUI overhaul).
 const sideCard: React.CSSProperties = themeCard;
 const sectionLabel: React.CSSProperties = sectionTitle;
-// The figure's remaining-freedom pill (steps-card header): blue while free, green when determined.
-const dofPillFree: React.CSSProperties = pill('#1d4ed8', '#dbeafe', '#93c5fd');
-const dofPillDone: React.CSSProperties = pill('#166534', '#dcfce7', '#86efac');
+// dofPillFree/dofPillDone retired (B6-2d): the freedom cue lives in the panel's status line.
 // Compact in-card utility buttons (undo/redo/clear in the steps header).
 const subtleBtn: React.CSSProperties = btn.subtle;
 const subtleBtnOff: React.CSSProperties = { ...btn.subtle, opacity: 0.45, cursor: 'default' };
 const displayToggle: React.CSSProperties = { display: 'flex', gap: 6, alignItems: 'center', fontSize: fs.body, color: '#475569', cursor: 'pointer' };
-const symbolsToggle: React.CSSProperties = { alignSelf: 'flex-start', border: 'none', background: 'none', color: pal.primary, fontSize: fs.small, cursor: 'pointer', padding: 0 };
-const input: React.CSSProperties = {
-  flex: 1,
-  padding: '10px 12px',
-  fontSize: fs.control,
-  borderRadius: 8,
-  border: `1px solid ${pal.borderStrong}`,
-  background: '#fff',
-  color: pal.ink,
-};
+// symbolsToggle / input / chip / greekBtn retired with the shared InputArea (B4-2d): the box, the
+// palette buttons and the quick chips are shell chrome now.
 const sendBtn: React.CSSProperties = btn.primary;
-const chip: React.CSSProperties = btn.chip;
-const greekBtn: React.CSSProperties = {
-  width: 26,
-  height: 26,
-  fontSize: 14,
-  borderRadius: 6,
-  border: `1px solid ${pal.borderStrong}`,
-  background: pal.surfaceDim,
-  color: '#1d4ed8',
-  cursor: 'pointer',
-};
-const helpExample: React.CSSProperties = {
-  textAlign: 'start',
-  border: 'none',
-  background: 'none',
-  color: pal.primaryInk,
-  cursor: 'pointer',
-  fontSize: fs.body,
-  padding: 0,
-};
-const catHeading: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  color: '#64748b',
-  textTransform: 'uppercase',
-  letterSpacing: 0.4,
-  marginBottom: 4,
-};
-const cmdRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
+// helpExample / catHeading / cmdRow retired with the help modal (B7): the manual screen's chrome
+// renders the catalog now.
 const legend: React.CSSProperties = { display: 'flex', gap: 12, fontSize: 11, color: '#94a3b8', margin: '0 0 6px' };
-// The steps list is the tallest variable part, so it's capped and scrolls on its own — that reclaims the
-// vertical space the action buttons + detected-shape badges/card need to stay in view (see `sidebar`).
-const stepList: React.CSSProperties = { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '32vh', overflowY: 'auto' };
+// stepList retired with the shared FactList (B5-2d); its scroll cap moves to the wrapping card if
+// tall sessions demand it again.
 const errorBanner: React.CSSProperties = {
   padding: '8px 12px',
   fontSize: 13,
@@ -2073,26 +1895,7 @@ const infoBanner: React.CSSProperties = {
   background: '#eff6ff',
   color: '#1d4ed8',
 };
-const ghost: React.CSSProperties = btn.ghost;
-const del: React.CSSProperties = {
-  border: 'none',
-  background: 'transparent',
-  color: '#94a3b8',
-  fontSize: 18,
-  lineHeight: 1,
-  cursor: 'pointer',
-  padding: '0 2px',
-};
-const editInput: React.CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  padding: '4px 8px',
-  fontSize: fs.small,
-  borderRadius: 6,
-  border: `1px solid ${pal.borderStrong}`,
-  background: '#fff',
-  color: pal.ink,
-};
+// del / editInput retired with the shared FactList (B5-2d): row actions and the editor are chrome.
 const iconBtn = (color: string): React.CSSProperties => ({
   border: 'none',
   background: 'transparent',
@@ -2213,19 +2016,8 @@ const bookLink: React.CSSProperties = {
   textDecoration: 'none',
   fontSize: 14,
 };
-function factRow(state: 'ok' | 'disabled' | 'broken', selected: boolean): React.CSSProperties {
-  const border = selected ? '#f59e0b' : state === 'broken' ? '#fecaca' : '#e2e8f0';
-  const bg = selected ? '#fffbeb' : state === 'broken' ? '#fef2f2' : '#f8fafc';
-  return {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '6px 8px',
-    borderRadius: 6,
-    border: `1px solid ${border}`,
-    background: bg,
-  };
-}
+// factRow retired with the shared FactList (B5-2d): the row card is chrome; the SELECTED accent
+// rides the FactRow.selected flag, and brokenness reads from the ✗ mark + inline reason.
 function factLabel(state: 'ok' | 'disabled' | 'broken'): React.CSSProperties {
   return {
     flex: 1,

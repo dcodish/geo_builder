@@ -301,6 +301,26 @@ even more builders"* is the case a tab strip fails. Every builder gets the **ful
 > Executed for complex in the same change (cycle and the polar/cartesian toggle moved under the
 > canvas, ahead of B6); 2-D and 3-D adopt the same zoning via B2/B3.
 >
+> **Refined on the B3-3-D play (operator, 2026-08-17):** the FIGURE NAME is centered ABOVE the
+> canvas — it names the drawing, so it lives with the drawing, not in the tool row; and the tool
+> row's session actions CLUSTER AT THE READING START beside the title (right in Hebrew, left in
+> English — logical flex-start, mirrored by `dir`), never flung to the far end.
+
+> **D2 SUPERSEDED IN PART (operator, 2026-08-18): shared COMPONENTS, not shared values.** After
+> the B3 parity round the operator ruled on the remaining gap: *"the look is different so it
+> cannot be the same code base — it's not really shared, it's a different implementation and not
+> even a copy."* Correct: the frame layer (suite bar, strip, tool row, ToolButton, FigureName,
+> About, banners) is ONE code base; the bodies were three implementations sharing token VALUES —
+> D2's half-measure, which drifts exactly like the pre-programme headers did.
+>
+> The rule from here: **every remaining Track B surface lands as a `shell/` COMPONENT mounted by
+> every builder** — B4's input area (box + preview + wrap-selection palette + quick-command
+> chips), B5's fact-list chrome, B6's data-panel skeleton — with each product passing content
+> (symbols, placeholders, handlers, rows), never re-implementing chrome. Tailwind is demoted from
+> target mechanism to 3-D's interim styling for surfaces not yet moved to shell; it shrinks to
+> nothing as the B items land. The engine boundary is unchanged: canvases' internals, parsers,
+> stores stay per-product (ADR-W-003).
+>
 > **The `⋯` menu is RETIRED (operator, 2026-08-17):** with שמור/טען out, it held two items — and
 > *"there are 2 options there that can be on the toolbar as is."* Language and About sit on the
 > suite bar as visible buttons. Revisit only if the suite-level set genuinely outgrows the bar;
@@ -359,6 +379,25 @@ keeps the statement's **position**, which matters because order is meaningful in
 re-parses**, so it faces the same honesty gates as a typed one; that is a §6 family 1 row, not just
 a UI behaviour.
 
+> **Amendment — B5 executed (#670, 2026-08-18).** All three operations now live in both shipped
+> non-2-D builders, mounted through one shared chrome, `shell/frame/FactList.tsx` (row cards,
+> mute checkbox, ✎ edit-in-place with Enter/Esc, ✕ delete; a handler a product does not pass
+> renders no control). Found-state correction to the table: 3-D already had `remove` — its real
+> gap was edit, landed as `store3.replaceFact` (same id, same position, the full `submit`
+> acceptance chain: parse → dropped-given gates → candidate derive → seed search). Complex gained
+> `disabled: number[]` + gated `toggleLine`/`editLine` in `app/submit.ts`, and muted lines save/load
+> muted. Two rulings the build surfaced, both honesty-model-consistent rather than uniform:
+> **(a)** re-enabling / edit-committing gates per the PRODUCT's surface — complex refuses at entry
+> naming the conflicting statement (it has no per-row status), 3-D admits and flags the affected
+> row (its `status` IS the refusal surface), so an edit that orphans a dependent commits there and
+> the dependent flags, reversibly, exactly like `toggle`'s auto-drop. **(b)** editing a MUTED line
+> rewrites text only and gates for real on re-enable (in 3-D this falls out of the model — a
+> disabled fact's candidate status is `'disabled'`, which passes). Muting a line another line
+> depends on drops nothing in complex either: the referenced name degrades to an implicitly-created
+> free number (sampled, labelled) and dependents keep computing — the honest counterfactual.
+> Locks: `src-complex/__tests__/fact-ops.test.ts` (10) + `src3d/store/__tests__/fact-edit3.test.ts`
+> (5). 2-D adopts the chrome when B3-2d/B2-2d flip its shell edge.
+
 ### D7 — Canvas controls: **every figure action lives under the canvas**
 
 Both builders have viewport control already — 2-D's `Figure.tsx` carries a pan/zoom layer with
@@ -401,6 +440,26 @@ you are in.
 **knowledge** — invariant across every valid configuration, with the gauge pinned — never "in the
 current sample". ADR-421 was a **P1** on exactly this, and the operator ruled it again for complex on
 [#623](https://github.com/dcodish/geo_builder/issues/623). §6 family 1 row.
+
+> **Amendment — B6 executed (#671, 2026-08-18), with three operator rulings from the B5 play.**
+> The skeleton landed as a SHARED component, `shell/frame/DataPanel.tsx` (status head-line +
+> ordered sections, an empty section absent heading and all), mounted by complex and 3-D.
+> **(a) The status strip relocated into the panel head-line** — mockup round B, then simplified
+> further: the cue is a DOF **count** only («דרגות חופש: N», the 2-D way — "people who care will
+> look"), plus the ~ sampled-legend; **never** a per-DOF listing of what can move, and **the
+> configuration count died entirely** («אפשרות נוספת» already says alternatives exist). The old
+> `v2Status` split accordingly (`v2Freedom` → panel head; `v2Contradiction` → strip): a
+> contradiction is a REFUSAL and stays on the always-visible strip with unsatisfied/undecided/
+> untranslated — the strip now renders only when it has refusals to show. 3-D's under-canvas cue
+> moved into the same head-line. **(b) Canvas names-only** (the de-clutter ruling's first stage):
+> point labels carry the NAME; the full reading lives in the panel's points section (both surfaces
+> still print what stage 5d composed — the #653/#675 one-source rule). The S5 arcs staying opt-in
+> is #722; the 2-decimal cap is #723. **(c) Section mapping per product:** complex = readings /
+> measure verdicts / claim verdicts / knowledge rows (parameters section deliberately absent — see
+> (a)), formula sheet as a trailing block; 3-D = points / vectors+planes / relations+mutual /
+> params / query lane. Complex's dedicated ask INPUT is a cutover orphan (keys with no UI) — its
+> restoration rides #623. Locks: `shell/__tests__/data-panel.test.tsx` +
+> `src-complex/__tests__/b6-status-split.test.tsx`.
 
 ### D9 — Guide: **a separate manual SCREEN per builder, plus in-app quick commands**
 
@@ -573,6 +632,12 @@ B2–B7 are otherwise independent and can be played in any order.
 **Rebase discipline:** `unify/ui` rebases on `main` whenever a track-A item lands, so drift stays
 measured in days. Complex is currently merging to `main` most days, which is exactly why track A does
 not sit on the branch.
+
+**Gate discipline on track B:** `check:siblings` diffs against the branch a change will MERGE INTO —
+for track B that is `npm run check:siblings -- --base origin/unify/ui` (the script's own `--base`
+flag), after `unify/ui` has taken the latest `main`. Diffing a B branch against `main` re-flags every
+sibling edit already gated into `unify/ui` (B1's sky→blue, forever), and re-stating an
+already-approved reason each PR is the patch the flag exists to avoid.
 
 ---
 

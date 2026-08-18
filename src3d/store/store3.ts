@@ -506,6 +506,14 @@ export interface Geo3State {
   submitSteps: (utterance: string, steps: string[]) => void;
   toggle: (factId: string) => void;
   remove: (factId: string) => void;
+  /** Edit a fact IN PLACE (B5 #670, docs/28 §4a D6): re-parse the new text and run it through the
+   *  SAME acceptance chain as `submit` (parse → dropped-given honesty gates → candidate derive →
+   *  seed search), with the candidate list replacing the fact at its position — order is meaningful
+   *  in a construction, so an edit never moves the statement. Returns false on refusal (nothing
+   *  changes; `lastError` names why — the shared FactList keeps its editor open on false).
+   *  An edit that orphans a DEPENDENT commits and the dependent flags on its own row — the same
+   *  reversible auto-drop contract as `toggle`, this product's honesty surface. */
+  replaceFact: (factId: string, utterance: string) => boolean;
   clear: () => void;
   /** Data-panel QUERIES (ADR-3D-057, #274): quantities the student asked to see («w·v», «|AB|»…).
    *  NOT facts — never replayed, never on the figure; saved with the file, undoable. */
@@ -640,6 +648,57 @@ export const useGeo3 = create<Geo3State>()(
         set({ facts: get().facts.map((f) => (f.id === factId ? { ...f, enabled: !f.enabled } : f)), lastError: null }),
 
       remove: (factId) => set({ facts: get().facts.filter((f) => f.id !== factId), lastError: null }),
+
+      replaceFact: (factId, utterance) => {
+        const { facts, seed } = get();
+        const old = facts.find((f) => f.id === factId);
+        if (!old) return false;
+        const parsed = parse3(utterance);
+        if (!parsed.ok) {
+          // the same #516 identity-preserving refusal mapping as `submit`
+          set({
+            lastError:
+              parsed.reason === 'ambiguous-vector-length'
+                ? { code: 'ambiguous-vector-length' }
+                : parsed.reason === 'param-roles-conflated'
+                  ? { code: 'param-roles-conflated', letter: parsed.letter }
+                  : { code: 'not-understood' },
+          });
+          return false;
+        }
+        // The honesty gates read "prior" as the OTHER facts — the edited statement's own old
+        // labels are exactly what the edit may be renaming, so they must count as new here.
+        const rest = facts.filter((f) => f.id !== factId);
+        const prior3 = derive3(rest, seed).construction;
+        const lostDet = [
+          ...droppedNewLabels3(utterance, parsed.commands, [...prior3.points.keys()], [...prior3.vectors.keys()]),
+          ...droppedGivenNumbers3(utterance, parsed.commands),
+          ...droppedShapeNoun3(utterance, parsed.commands),
+          ...droppedTriShape3(utterance, parsed.commands),
+          ...droppedConstructNoun3(utterance, parsed.commands),
+        ];
+        if (lostDet.length > 0) {
+          set({ lastError: { code: 'dropped-given', items: lostDet.join(', ') } });
+          return false;
+        }
+        // Same id, same position, same enabled state — only the statement changes. A MUTED fact's
+        // candidate status is 'disabled', so its rewrite passes the derive gate by construction
+        // (it gates for real when re-enabled, exactly like the complex builder's muted-edit rule).
+        const fact: Fact3 = { ...old, utterance: utterance.trim(), cmds: parsed.commands };
+        const candidate = facts.map((f) => (f.id === factId ? fact : f));
+        const st = derive3(candidate, seed).status[factId];
+        if (st !== 'ok' && st !== 'disabled') {
+          set({ lastError: st }); // keep-prior: the old statement stands
+          return false;
+        }
+        const found = seedForRequirements(candidate, seed);
+        if (found === null) {
+          set({ lastError: { code: 'bound-unsatisfiable', id: '' } });
+          return false;
+        }
+        set({ facts: candidate, seed: found, lastError: null });
+        return true;
+      },
 
       clear: () => set({ facts: [], queries: [], planeDisplay: {}, figureName: '', lastError: null }),
 

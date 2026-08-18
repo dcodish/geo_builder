@@ -3,16 +3,25 @@ import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { Banner } from '../shell/frame/Banner';
-import { readEnvelope, savedFileName } from '../shell/save';
+import { DataPanel } from '../shell/frame/DataPanel';
+import { FactList } from '../shell/frame/FactList';
+import { ManualScreen } from '../shell/frame/ManualScreen';
+import { Workbench } from '../shell/frame/Workbench';
+import { manualSections } from './ui/manual';
+import { FigureName } from '../shell/frame/FigureName';
+import { InputArea } from '../shell/frame/InputArea';
+import { QuickChips } from '../shell/frame/QuickChips';
+import { ToolButton } from '../shell/frame/ToolButton';
+import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { applySwitcherConfig, type ToolConfig } from '../shell/switcherConfig';
-import { applySymbol, type SymbolSpec } from '../shell/symbols';
 import { deriveLines } from './app/deriveLines';
-import { COMPLEX_SESSION, hydrateSession, submitLine } from './app/submit';
-import { v2Claims, v2Formulas, v2Knowledge, v2Labels, v2Measures, v2Status } from './replay/scene2';
+import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, toggleLine } from './app/submit';
+import { v2Claims, v2Contradiction, v2Formulas, v2Freedom, v2Knowledge, v2Labels, v2Measures } from './replay/scene2';
 import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
 import { SYMBOLS } from './ui/symbols';
+import { complexBidi } from './i18n';
 import registry from '../products.json';
 
 const EXAMPLE_LINES = ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2', 'z^5 = w^2'];
@@ -32,6 +41,9 @@ export function App() {
   const { t, i18n } = useTranslation();
   const {
     lines,
+    disabled,
+    name,
+    setName,
     seed,
     view,
     lastError,
@@ -50,9 +62,9 @@ export function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    // The shared naming convention (shell/save, per-product suffix from docs/22 §9):
-    // date-stamped, so successive saves never silently overwrite each other.
-    a.download = savedFileName(undefined, new Date(), 'complex');
+    // The shared naming convention (shell/save, per-product suffix from docs/22 §9): the figure's
+    // NAME when it has one, else date-stamped — successive saves never silently overwrite.
+    a.download = savedFileName(name, new Date(), 'complex');
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -88,29 +100,14 @@ export function App() {
       }
       if (!hydrateSession(parsed))
         useComplexStore.setState({ lastError: { key: 'parse-error', detail: file.name } });
+      // the FILENAME names the figure (the #42 rule) — any name embedded in the file is provenance
+      else useComplexStore.getState().setName(figureNameFromFileName(file.name, 'complex'));
     });
   };
   const [input, setInput] = useState('');
-  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // The palette applies through the shared wrap-selection core (shell/symbols, docs/28 §4a D5):
-  // wrapping symbols enclose the current selection; an empty selection is a caret insert.
-  const insertSymbol = (spec: SymbolSpec) => {
-    const el = inputRef.current;
-    const start = el?.selectionStart ?? input.length;
-    const end = el?.selectionEnd ?? start;
-    const next = applySymbol(input, start, end, spec);
-    setInput(next.value);
-    requestAnimationFrame(() => {
-      el?.focus();
-      el?.setSelectionRange(next.caret, next.caret);
-    });
-  };
-
-  useEffect(() => {
-    document.documentElement.lang = i18n.language;
-    document.documentElement.dir = i18n.language === 'he' ? 'rtl' : 'ltr';
-  }, [i18n.language]);
+  // the language toggle and the document-direction flip are the FRAME's now (suite-level chrome,
+  // implemented once — the operator caught the per-product copies)
 
   /**
    * THE OPERATOR'S CURATION OVERLAY (A3, #662): fetched once, applied over the static roster.
@@ -132,7 +129,10 @@ export function App() {
    * `?engine=v2` selected between this and the prototype's per-fact sweeps while the foundation was
    * being played (ADR-CX-008). The cutover deleted the prototype, so the fork went with it.
    */
-  const derived2 = useMemo(() => deriveLines(lines, seed, seed), [lines, seed]);
+  // the figure folds from the ACTIVE lines only (B5/D6): a muted statement stays in the list,
+  // out of the figure — "what if I hadn't said this?" made literal
+  const active = useMemo(() => lines.filter((_, i) => !disabled.includes(i)), [lines, disabled]);
+  const derived2 = useMemo(() => deriveLines(active, seed, seed), [active, seed]);
   /**
    * THE `n` STEPPER — display state, and nowhere else (ADR-CX-001 D3).
    *
@@ -144,6 +144,16 @@ export function App() {
   const [stepN, setStepN] = useState(1);
   // the canvas is POLAR: a complex number as a length and a direction, not a dot on a grid
   const polarScene = useMemo(() => buildScene(derived2, { n: stepN }), [derived2, stepN]);
+  /**
+   * THE DATA COLUMN (B2, docs/28 §4a D1 as refined by the operator 2026-08-17): the column is
+   * ALWAYS VISIBLE on wide screens — its toggle lives INSIDE it and collapses only the content;
+   * on narrow screens the column hides and the launcher under the canvas opens it as the D10
+   * overlay. Display state only. The honesty split stands: refusal surfaces are never in here.
+   */
+  const [manualOpen, setManualOpen] = useState(false); // the D9 manual SCREEN (A6) — catalog-backed
+  const [showData, setShowData] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1000px)').matches,
+  );
 
   /**
    * WHICH LINES THE FIGURE COULD NOT USE — so a row is red exactly when the engine could not read it.
@@ -162,6 +172,13 @@ export function App() {
     if (input.trim() === '') return;
     if (submitLine(input)) setInput('');
   };
+
+  /**
+   * THE QUICK COMMANDS (D9b + A3): the operator's curated list when one is saved, the built-in
+   * examples otherwise. Big chips on the empty canvas; the compact strip above the input once a
+   * figure exists — one clickable set, building with no typing.
+   */
+  const quickCommands = toolConfig?.quickCommands?.length ? toolConfig.quickCommands : EXAMPLE_LINES;
 
   /**
    * THE SWITCHER ROSTER — A2's registry rendered as DATA (ADR-W-021): the shell frame receives a
@@ -223,17 +240,15 @@ export function App() {
       title={t('title')}
       subtitle={t('subtitle')}
       utilityActions={
+        /* ONE look for the session actions in every builder (shell/ToolButton). שמור/טען FIRST
+           (the parity rule: same position in every tool); the manual rides after them. */
         <>
-          <button onClick={saveFile}>💾 {t('save')}</button>
-          <button onClick={() => fileRef.current?.click()}>📂 {t('load')}</button>
+          <ToolButton onClick={saveFile} disabled={lines.length === 0}>
+            💾 {t('save')}
+          </ToolButton>
+          <ToolButton onClick={() => fileRef.current?.click()}>📂 {t('load')}</ToolButton>
+          <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
         </>
-      }
-      suiteActions={
-        <button
-          onClick={() => void i18n.changeLanguage(i18n.language === 'he' ? 'en' : 'he')}
-        >
-          {t('language')}
-        </button>
       }
       roster={roster}
       activeProductId="complex"
@@ -258,100 +273,93 @@ export function App() {
           style={{ display: 'none' }}
           onChange={onLoadFile}
         />
-        <main>
-          <section className="panel">
-            <div className="input-row">
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && submit()}
-                placeholder={t('inputPlaceholder')}
-                dir="ltr"
+        {/* THE WORKBENCH (#734): the three-zone GEOMETRY is the shell's — identical columns,
+            canvas card and empty-state placement in every builder; this product passes zone
+            content only. (The old per-product CSS grid retired.) */}
+        <Workbench
+          emptyOverlay={
+            lines.length === 0 ? (
+              <QuickChips
+                title={t('emptyTitle')}
+                hint={t('emptyHintChips')}
+                commands={quickCommands}
+                onPick={(c) => submitLine(c)}
               />
-              <button onClick={submit}>{t('add')}</button>
-            </div>
-            <div className="symbols" dir="ltr">
-              {SYMBOLS.map((s) => (
-                <button
-                  key={s.titleKey}
-                  className="sym"
-                  title={t(s.titleKey)}
-                  onClick={() => insertSymbol(s)}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-            {lastError && (
-              <Banner kind="error">{t(ERROR_KEY[lastError.key], { detail: lastError.detail })}</Banner>
-            )}
-            <div className="panel-actions">
-              <button onClick={() => EXAMPLE_LINES.forEach((l) => submitLine(l))}>{t('example')}</button>
-              <button onClick={clearAll}>{t('clearAll')}</button>
-              <span className="count">{t('factCount', { count: lines.length })}</span>
-            </div>
+            ) : undefined
+          }
+          inputZone={<>
+            {/* THE SHARED INPUT AREA (B4, the shared-components rule): the box, the wrap-selection
+                palette, the preview seam and the compact quick strip exist ONCE in shell/; this
+                product passes its symbols, its previewer and its handlers. */}
+            <InputArea
+              value={input}
+              onChange={setInput}
+              onSubmit={submit}
+              placeholder={t('inputPlaceholder')}
+              submitLabel={t('add')}
+              symbols={SYMBOLS}
+              symbolTitle={(s) => (s.titleKey ? t(s.titleKey) : s.label)}
+              preview={(s) => complexBidi.inputPreview(s)}
+              previewDir={(s) => complexBidi.textDir(s)}
+            >
+              {/* No quick strip above the box (operator ruling 2026-08-18: "expensive screen
+                  space") — the curated commands live on the CLEAN CANVAS (QuickChips below). */}
+              {lastError && (
+                <Banner kind="error">{t(ERROR_KEY[lastError.key], { detail: lastError.detail })}</Banner>
+              )}
+            </InputArea>
             {/*
-              THE STATEMENT LIST FOLLOWS THE ACTIVE ENGINE.
-
-              Under v2 the rows ARE the student's lines — the store's source of truth — not the
-              prototype's facts. Deriving them from facts is what made every v2-only form invisible as
-              well as unreachable (#658): a line the prototype refused had no row to appear in.
+              THE STATEMENT LIST — the SHARED chrome (B5/D6: disable + edit + delete, everywhere).
+              The rows ARE the student's lines, the store's source of truth (#658's lesson); a
+              toggled or edited line goes back through the acceptance gate in app/submit, so the
+              list can never show a state the figure refuses.
             */}
-            <ul className="facts">
-              {lines.length === 0 && <li className="hint">{t('emptyHint')}</li>}
-              {
-                lines.map((src, i) => {
-                  const failed = v2Failed.has(src);
-                  return (
-                    <li key={`${i}-${src}`} className={failed ? 'fact err' : 'fact'}>
-                      <code dir="ltr">{src}</code>
-                      {failed && (
-                        <span className="fact-error">
-                          {derived2?.untranslated.find((u) => u.src === src)?.why}
-                        </span>
-                      )}
-                      <button className="del" onClick={() => removeLine(i)} aria-label="delete">
-                        ✕
-                      </button>
-                    </li>
-                  );
-                })}
-            </ul>
-          </section>
-          <section className="canvas">
+            <FactList
+              rows={lines.map((src, i) => ({
+                id: String(i),
+                content: <code dir="ltr">{src}</code>,
+                error: v2Failed.has(src)
+                  ? derived2?.untranslated.find((u) => u.src === src)?.why
+                  : undefined,
+                disabled: disabled.includes(i),
+              }))}
+              emptyHint={t('emptyHint')}
+              onToggle={(id) => toggleLine(Number(id))}
+              toggleLabel={t('factToggle')}
+              editValueOf={(id) => lines[Number(id)]}
+              onEditCommit={(id, next) => editLine(Number(id), next)}
+              editLabel={t('factEdit')}
+              onDelete={(id) => removeLine(Number(id))}
+              deleteLabel={t('factDelete')}
+              footer={
+                <>
+                  <button onClick={() => EXAMPLE_LINES.forEach((l) => submitLine(l))}>{t('example')}</button>
+                  <button onClick={clearAll}>{t('clearAll')}</button>
+                  <span className="count">{t('factCount', { count: lines.length })}</span>
+                </>
+              }
+            />
+          </>}
+          canvasZone={<>
+            {/* The figure's NAME, centered above the drawing it names — the SHARED component,
+                one look in every builder (#42 arriving in complex). */}
+            <FigureName value={name} onChange={setName} placeholder={t('namePlaceholder')} />
+            {/* the empty-state chips render through the WORKBENCH's one overlay slot (#734) */}
             {
-              /* The readings beside the canvas. It carried an `engine=v2` badge while two engines
-                 existed and the operator needed to know which one drew the figure; there is one engine
-                 now (ADR-CX-027), so the badge is gone and the honest state remains. */
+              /* THE HONESTY STRIP — always visible, never opt-in (B2's split of the old banner).
+                 A violated, undecided or unread STATEMENT is the figure refusing to lie about
+                 itself; hiding those behind the data toggle would be the tool hiding a broken
+                 given. B6 (#671) narrowed it to REFUSALS ONLY, per the operator's ruling: the
+                 freedom cue and the sampled-value legend are figure DATA and moved to the data
+                 panel's head-line; the config count died outright («אפשרות נוספת» already says
+                 alternatives exist). The strip renders nothing when the figure holds clean. */
             }
-            <div className="v2-banner" dir="rtl">
-                {v2Status(derived2)}
-                {v2Labels(derived2).length > 0 && <div dir="ltr">{v2Labels(derived2).join('   ')}</div>}
-                {derived2.points.some((p) => !p.modulusKnown || !p.argumentKnown) && (
-                  <div>~ = ערך שנדגם, לא נתון — לחצו "אפשרות נוספת" כדי לראות תצורה אחרת</div>
-                )}
-                {v2Claims(derived2).map((c) => (
-                  <div key={c} className="v2-claim">
-                    {c}
-                  </div>
-                ))}
-                {v2Measures(derived2).map((m) => (
-                  <div key={m} className="v2-claim">
-                    {m}
-                  </div>
-                ))}
-                {v2Knowledge(derived2).map((k) => (
-                  <div key={k} className="v2-claim">
-                    {k}
-                  </div>
-                ))}
-                {/* the formula sheet, surfaced from what the figure DOES — each row names its premises */}
-                {v2Formulas(derived2, i18n.language === 'he' ? 'he' : 'en').map((f) => (
-                  <div key={f} className="v2-formula" dir="ltr">
-                    {f}
-                  </div>
-                ))}
+            {(v2Contradiction(derived2) !== null ||
+              derived2.unsatisfied.length > 0 ||
+              derived2.undecided.length > 0 ||
+              derived2.untranslated.length > 0) && (
+              <div className="v2-banner" dir="rtl">
+                {v2Contradiction(derived2)}
                 {/* a relation the numeric tier could not satisfy has no row of its own — tier 1 pushed
                     it down — so without this it would simply be absent from a figure that ignores it */}
                 {derived2.unsatisfied.map((u) => (
@@ -370,7 +378,8 @@ export function App() {
                     ⚠ «{u.src}» — {u.why}
                   </div>
                 ))}
-            </div>
+              </div>
+            )}
             {polarScene && (
               <>
                 <PolarPlane
@@ -421,9 +430,78 @@ export function App() {
               <button onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
                 {view === 'cart' ? t('viewPolar') : t('viewCart')}
               </button>
+              {/* the LAUNCHER — narrow screens only (CSS): opens the data overlay when the
+                  always-visible column has no room to exist */}
+              <button
+                className="data-launcher"
+                onClick={() => setShowData((s) => !s)}
+                aria-expanded={showData}
+              >
+                {showData ? t('dataHide') : t('dataShow')}
+              </button>
             </div>
-          </section>
-        </main>
+          </>}
+          dataZone={
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14 }}>
+            {/* B6 (#671): the D8 SKELETON through the SHARED DataPanel — head, freedom-cue status
+                line, the same sections in the same order everywhere. */}
+            <DataPanel
+              title={t('dataTitle')}
+              open={showData}
+              onToggle={() => setShowData((s) => !s)}
+              showLabel={t('panelShow')}
+              hideLabel={t('panelHide')}
+              status={v2Freedom(derived2)}
+              sections={[
+                { key: 'points', title: t('secPoints'), rows: v2Labels(derived2) },
+                // verdict rows word their WHY in prose — they follow the app's direction (#716
+                // tracks the engine-composed strings staying Hebrew in EN mode)
+                { key: 'measures', title: t('secMeasures'), rows: v2Measures(derived2), dir: 'app' },
+                { key: 'relations', title: t('secRelations'), rows: v2Claims(derived2), dir: 'app' },
+                { key: 'ask', title: t('secAsk'), rows: v2Knowledge(derived2), dir: 'app' },
+              ]}
+            >
+              {/* the formula sheet, surfaced from what the figure DOES — each row names its premises */}
+              {v2Formulas(derived2, i18n.language === 'he' ? 'he' : 'en').map((f) => (
+                <div key={f} className="v2-formula" dir="ltr">
+                  {f}
+                </div>
+              ))}
+            </DataPanel>
+            </div>
+          }
+        />
+      {/* THE MANUAL (A6 #665, D9): a separate SCREEN, catalog-backed — every supported sentence
+          family with its real specimens; a click SUBMITS the example and returns to the tool. */}
+      <ManualScreen
+        open={manualOpen}
+        title={t('manualTitle')}
+        intro={t('manualIntro')}
+        closeLabel={t('manualClose')}
+        tryHint={t('manualTry')}
+        sectionCap={6}
+        moreNote={t('manualMore')}
+        sections={manualSections(i18n.language === 'he' ? 'he' : 'en').map((s) => ({
+          key: s.family,
+          title: s.title,
+          entries: s.entries.map((e) => {
+            const raw = i18n.language === 'he' ? e.he : e.en;
+            return {
+              // #118 discipline: base direction from CONTENT, LTR math runs isolated inside a
+              // Hebrew sentence (the kit's isolation — the operator caught «המעגל שמרכזו O
+              // ורדיוסו r» reversing under a forced ltr chip).
+              example: complexBidi.inputPreview(raw) ?? raw,
+              dir: complexBidi.textDir(raw),
+              description: i18n.language === 'he' ? e.descHe : e.descEn,
+              onTry: () => {
+                setManualOpen(false);
+                submitLine(raw); // the RAW sentence is what the grammar reads — never the isolated form
+              },
+            };
+          }),
+        }))}
+        onClose={() => setManualOpen(false)}
+      />
       </div>
     </AppFrame>
   );

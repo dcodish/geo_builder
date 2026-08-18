@@ -15,24 +15,32 @@
 import { FORMULA_TABLE } from '../formulas/table';
 import type { Derived2 } from './derive2';
 
-/** One line of honest state for the preview banner — what the engine knows and what it does not. */
-export function v2Status(d: Derived2): string {
-  if (d.contradiction) return `✗ הנתונים סותרים זה את זה (${d.contradiction})`;
-  const parts: string[] = [];
-  parts.push(d.configCount ? `תצורה ${d.configIndex + 1} מתוך ${d.configCount}` : 'אין תצורה תקפה');
-  /**
-   * The DOF cue must report the freedom that is LEFT, not the freedom tier 1 started with.
-   *
-   * `freeDof` is the nullspace dimension of the exact tier — the state of the figure *before* the
-   * numeric tier runs. Once «שטח OZ₁Z₂Z₃ = 150r²» consumes a direction, printing the tier-1 list tells
-   * a student the figure can still move in a direction their own given has just pinned.
-   */
+/**
+ * B6 (#671) split what was one `v2Status` banner line into its two honest halves, per the operator's
+ * rulings: a CONTRADICTION is a refusal and stays on the always-visible strip; the freedom cue is
+ * figure DATA and lives at the head of the data panel — as a plain COUNT («the 2-D way»: people who
+ * care will look, others ignore; never a per-DOF resolution of what is fixed and what can move).
+ * The config count («תצורה 1 מתוך 1») died entirely — the «אפשרות נוספת» button already says
+ * alternatives exist, and the count can be large and meaningless.
+ */
+
+/** The refusal half — null when the figure holds. Strip content, never opt-in. */
+export const v2Contradiction = (d: Derived2): string | null =>
+  d.contradiction ? `✗ הנתונים סותרים זה את זה (${d.contradiction})` : null;
+
+/**
+ * The freedom half — the panel's head-line.
+ *
+ * The count reports the freedom that is LEFT, not the freedom tier 1 started with: `freeDof` is the
+ * nullspace dimension of the exact tier, and once «שטח OZ₁Z₂Z₃ = 150r²» consumes a direction,
+ * reporting tier 1's number tells a student the figure can still move in a direction their own given
+ * has just pinned. `אין תצורה תקפה` outranks the count — a figure with no valid configuration has no
+ * freedom to report.
+ */
+export function v2Freedom(d: Derived2): string {
+  if (!d.configCount) return 'אין תצורה תקפה';
   const remaining = Math.max(0, d.freeDof.length - d.drivenDof);
-  if (remaining > 0) {
-    const shown = d.drivenDof > 0 ? `${remaining} מתוך ${d.freeDof.length}` : d.freeDof.join(', ');
-    parts.push(`דרגות חופש: ${shown}`);
-  } else parts.push('הצורה נקבעה במלואה');
-  return parts.join(' · ');
+  return remaining > 0 ? `דרגות חופש: ${remaining}` : 'הצורה נקבעה במלואה';
 }
 
 /**
@@ -61,7 +69,12 @@ export const v2Measures = (d: Derived2): string[] =>
  * none, so `z1 = 3+4i` printed here and drew as a bare name there (#675). The composition lives at
  * stage 5d in `derive2`; both surfaces print what it decided.
  */
-export const v2Labels = (d: Derived2): string[] => d.points.map((p) => p.reading);
+export const v2Labels = (d: Derived2): string[] =>
+  // The no-guess ruling, refined (operator 2026-08-18): an undetermined number gets NO row at all —
+  // "don't show the letter and say we cannot compute it". The place that explains a missing value
+  // is the ASK lane, when the student asks for that name explicitly (3-D's query lane already
+  // answers that way; the complex ask input rides #623).
+  d.points.filter((p) => p.modulusKnown && p.argumentKnown).map((p) => p.reading);
 
 /**
  * The sheet formulas this figure is using, with the lines that brought each up.

@@ -80,6 +80,34 @@ const he = {
   switcher3d: 'הנדסת המרחב',
   switcherComplex: 'מספרים מרוכבים',
   switcherAria: 'מעבר בין הבונים',
+  // B2 (#667): the opt-in data column (D1) — values/knowledge only; refusals stay on the canvas strip.
+  dataShow: 'נתונים',
+  dataHide: 'הסתר נתונים',
+  // B6 follow-up (operator 2026-08-18): ONE panel wording across the builders — «נתונים», הצגה/הסתרה.
+  dataTitle: 'נתונים',
+  panelShow: 'הצגה',
+  panelHide: 'הסתרה',
+  namePlaceholder: 'שם השרטוט (לא חובה)',
+  // B4 (D9b): the empty-canvas quick chips — the inviting first click.
+  emptyTitle: 'מה בונים היום?',
+  emptyHintChips: 'לחצו נתון לדוגמה — או הקלידו משלכם, והציור ייבנה מולכם',
+  // B5 (D6): the fact-list operations — disable answers "מה אם לא הייתי אומר זאת?"
+  factToggle: 'כלול בציור',
+  factEdit: 'עריכה במקום',
+  factDelete: 'מחיקה',
+  // A6 (D9): the manual SCREEN — catalog-backed, a click submits the example.
+  manualButton: 'מדריך',
+  manualTitle: 'המדריך — מספרים מרוכבים',
+  manualIntro:
+    'זהו מדריך חלקי — מוצגות דוגמאות מייצגות מכל סוג, כדי להראות אילו מיני משפטים אפשר להקליד. לחצו על דוגמה כדי לראות אותה נבנית, או נסחו חופשי משלכם — ואם הכלי לא הבין, נסו ניסוח אחר: אוצר המשפטים של הכלי הולך וגדל.',
+  manualClose: 'חזרה לכלי',
+  manualTry: 'לחצו כדי לנסות — הדוגמה תיבנה על הציור',
+  manualMore: '…ואלו רק דוגמאות — הכלי מבין ניסוחים נוספים מהסוג הזה',
+  // B6 (D8): the data-panel skeleton — same sections, same order, in every builder.
+  secPoints: 'נקודות',
+  secMeasures: 'מדידות',
+  secRelations: 'יחסים',
+  secAsk: 'חישוב',
   // S5 — the visualization layer (#622)
   stepperLabel: 'מחזור החזקות: n',
   stepBack: 'הקודם',
@@ -160,6 +188,34 @@ const en = {
   switcher3d: 'Space Geometry',
   switcherComplex: 'Complex Numbers',
   switcherAria: 'Switch between builders',
+  // B2 (#667): the opt-in data column (D1) — values/knowledge only; refusals stay on the canvas strip.
+  dataShow: 'Data',
+  dataHide: 'Hide data',
+  // B6 follow-up (operator 2026-08-18): ONE panel wording across the builders.
+  dataTitle: 'Data',
+  panelShow: 'Show',
+  panelHide: 'Hide',
+  namePlaceholder: 'Figure name (optional)',
+  // B4 (D9b): the empty-canvas quick chips — the inviting first click.
+  emptyTitle: 'What are we building today?',
+  emptyHintChips: 'Click an example given — or type your own, and the figure builds in front of you',
+  // B5 (D6): the fact-list operations — disable answers "what if I hadn't said this?"
+  factToggle: 'Include in the figure',
+  factEdit: 'Edit in place',
+  factDelete: 'Delete',
+  // A6 (D9): the manual SCREEN — catalog-backed, a click submits the example.
+  manualButton: 'Guide',
+  manualTitle: 'The Guide — Complex Numbers',
+  manualIntro:
+    "This is a partial guide — representative examples of each kind, to show what sorts of sentences can be typed. Click one to watch it build, or phrase your own freely — and if the tool didn't understand, try different wording: its vocabulary keeps growing.",
+  manualClose: 'Back to the tool',
+  manualTry: 'Click to try — the example builds on the figure',
+  manualMore: '…and these are just examples — the tool reads more phrasings of this kind',
+  // B6 (D8): the data-panel skeleton — same sections, same order, in every builder.
+  secPoints: 'Points',
+  secMeasures: 'Measures',
+  secRelations: 'Relations',
+  secAsk: 'Calculate',
   // S5 — the visualization layer (#622)
   stepperLabel: 'power cycle: n',
   stepBack: 'previous',

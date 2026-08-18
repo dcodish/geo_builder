@@ -1,19 +1,30 @@
-/**
+﻿/**
  * The 3-D tool's shell (docs/20 §6.6) — V0 minimal: input → parse → fact list →
  * derived figure on the orbitable canvas. RTL Hebrew default. A deliberate
  * rewrite-following-the-template of the 2-D App (pattern-copy, no imports from
  * src/ — docs/20 §12 rule 1).
  */
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+// The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
+import { AppFrame } from '../shell/frame/AppFrame';
+import { DataPanel } from '../shell/frame/DataPanel';
+import { FactList } from '../shell/frame/FactList';
+import { ManualScreen } from '../shell/frame/ManualScreen';
+import { QuickChips } from '../shell/frame/QuickChips';
+import { Workbench } from '../shell/frame/Workbench';
+import { FigureName } from '../shell/frame/FigureName';
+import { InputArea } from '../shell/frame/InputArea';
+import { ToolButton } from '../shell/frame/ToolButton';
+import registry from '../products.json';
 import { dataView, panelIsEmpty } from './engine/dataView';
 import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
 import { inputPreview3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
-import { SYMBOL_PALETTE_3 } from './ui/symbols3';
+import { SYMBOL_SPECS_3 } from './ui/symbols3';
 import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from './parser/scope3';
@@ -156,15 +167,34 @@ export default function App3() {
   const facts = useGeo3((s) => s.facts);
   const seed = useGeo3((s) => s.seed);
   const figureName = useGeo3((s) => s.figureName);
+  /** The switcher roster — A2's registry as DATA (ADR-W-021); labels resolve through THIS
+   *  product's own locales, devUrl under the one-origin dev server. */
+  const roster = useMemo(
+    () =>
+      registry.products
+        .filter((p) => p.enabled)
+        .map((p) => ({
+          id: p.id,
+          label: t(p.labelKey),
+          icon: p.icon,
+          url: import.meta.env.DEV ? p.devUrl : p.url,
+        })),
+    [t],
+  );
   const setFigureName = useGeo3((s) => s.setFigureName);
-  // the "organize your data" panel (ADR-3D-014): derived vector/point presentations,
-  // OPT-IN by checkbox — it shows derived results, so the student chooses to peek
-  const [showData, setShowData] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false); // the D9 manual SCREEN (B7) — catalog-backed
+  // The data panel (ADR-3D-014, reshaped by B6 #671): derived presentations, student opt-in.
+  // B6 follow-up (operator 2026-08-18, "the same way we trigger"): the trigger is the SHARED
+  // DataPanel head — open by default on wide screens, exactly like the complex column.
+  const [showData, setShowData] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1000px)').matches,
+  );
   const [showWitness, setShowWitness] = useState(true); // #397: distance witnesses, default on
   const lastError = useGeo3((s) => s.lastError);
   const submit = useGeo3((s) => s.submit);
   const toggle = useGeo3((s) => s.toggle);
   const remove = useGeo3((s) => s.remove);
+  const replaceFact = useGeo3((s) => s.replaceFact);
   const clear = useGeo3((s) => s.clear);
   const resample = useGeo3((s) => s.resample);
   const loadFigure = useGeo3((s) => s.loadFigure);
@@ -181,19 +211,7 @@ export default function App3() {
   // steps display: vector notation moved to src3d/render/notation.ts (#312 — the boundary-class
   // fix lives there, unit-tested; the stored utterance stays untouched).
   const factDisplay = factDisplay3;
-  const inputRef = useRef<HTMLInputElement>(null);
-  // symbol palette (the 2-D App's pattern): insert at the caret, keep focus
-  const insertSym = (sym: string, caretBack = 0) => {
-    const el = inputRef.current;
-    const start = el?.selectionStart ?? text.length;
-    const end = el?.selectionEnd ?? text.length;
-    setText(text.slice(0, start) + sym + text.slice(end));
-    requestAnimationFrame(() => {
-      el?.focus();
-      const p = start + sym.length - caretBack;
-      el?.setSelectionRange(p, p);
-    });
-  };
+  // the palette's insert lives in shell/InputArea now (wrap-selection, applySymbol — B4)
   const [busy, setBusy] = useState(false);
   // #73 (ADR-3D-040): the guidance register's what-to-do-instead note (shown in place of an error)
   const [guidanceNote, setGuidanceNote] = useState<string | null>(null);
@@ -360,14 +378,16 @@ export default function App3() {
     });
   };
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!text.trim() || busy) return;
+  // `raw` defaults to the box's text; a QUICK-COMMAND pick passes its command directly (D9b:
+  // click and see it BUILD, no data entry) and rides the identical path — parser, guidance
+  // short-circuits, LLM escalation, logging.
+  const submitText = async (raw = text) => {
+    if (!raw.trim() || busy) return;
     setGuidanceNote(null); // a fresh submit clears the previous guidance
     setLoadNote(null); // …and the load note, which described the file as opened
-    submit(text);
+    submit(raw);
     let err = useGeo3.getState().lastError;
-    logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
+    logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
     // out-of-grammar → escalate to the LLM proxy; the returned canonical lines re-parse deterministically
     if (err?.code === 'not-understood') {
       // #73 (ADR-3D-040): the GUIDANCE register short-circuits BEFORE the LLM — a non-constructive
@@ -375,16 +395,16 @@ export default function App3() {
       // #353: lowercase NODE labels — if reading them as uppercase makes the utterance parse, the only
       // problem was the case convention. Say so (with the corrected spelling) instead of paying for an LLM
       // call. Proof-based, so a genuine gap stays a genuine gap; checked before the pattern register.
-      const upper = upperCasedLabelCandidate3(text);
+      const upper = upperCasedLabelCandidate3(raw);
       if (upper && parse3(upper).ok) {
-        logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'scope', result: 'scope:lowercase-labels' });
+        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'scope', result: 'scope:lowercase-labels' });
         setGuidanceNote(t('scope.lowercase-labels', { corrected: upper }));
         useGeo3.setState({ lastError: null });
         return;
       }
-      const g = classifyGuidance3(text);
+      const g = classifyGuidance3(raw);
       if (g) {
-        logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'scope', result: `scope:${g.category}` });
+        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'scope', result: `scope:${g.category}` });
         setGuidanceNote(t(g.messageKey));
         useGeo3.setState({ lastError: null });
         return;
@@ -392,13 +412,13 @@ export default function App3() {
       setBusy(true);
       try {
         const ctx = `Existing points: ${[...derived.construction.points.keys()].join(', ') || '(none)'}.`;
-        const steps = await escalate3(text, ctx);
-        if (steps) submitSteps(text, steps);
+        const steps = await escalate3(raw, ctx);
+        if (steps) submitSteps(raw, steps);
         err = useGeo3.getState().lastError;
         // `commands` = the canonical lines that re-parsed onto the figure (#182): without them a prod
         // `llm, ok` submit is opaque and every later step of the session is unreplayable (`steps` stays
         // for the dev trace; the lean sink reads `commands`, mirroring the 2-D #84 field).
-        logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, result: err ? err.code : 'ok' });
+        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, result: err ? err.code : 'ok' });
       } finally {
         setBusy(false);
       }
@@ -416,72 +436,69 @@ export default function App3() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="flex items-center gap-4 border-b border-slate-200 bg-white px-5 py-3">
-        <h1 className="text-xl font-bold">
-          {t('title')} <span className="ms-2 align-middle text-xs font-normal text-slate-400">{t('tagline')}</span>
-        </h1>
-        {/* The figure's name (issue #42): an inline-editable title - one control is both the field and
-            the visible name. */}
-        <input
-          type="text"
-          value={figureName}
-          onChange={(e) => setFigureName(e.target.value)}
-          placeholder={t('actions.namePlaceholder')}
-          dir="auto"
-          aria-label={t('actions.namePlaceholder')}
-          className="min-w-0 max-w-md flex-1 rounded-lg border border-dashed border-slate-300 bg-transparent px-3 py-1.5 text-center text-base font-semibold text-slate-800 focus:border-sky-500 focus:outline-none"
-        />
-      </header>
-
-      <main className="mx-auto flex max-w-screen-2xl flex-col gap-5 p-5 md:flex-row">
-        {/* Input + fact list */}
-        <section className="flex w-full flex-col gap-3 md:w-96">
-          <form onSubmit={onSubmit} className="flex gap-2">
-            <input
-              ref={inputRef}
-              dir="auto"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={t('input.placeholder')}
-              className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 focus:border-sky-500 focus:outline-none"
-            />
-            <button type="submit" disabled={busy} className="rounded-xl bg-sky-600 px-4 py-2 font-medium text-white hover:bg-sky-700 disabled:opacity-50">
-              {busy ? t('input.thinking') : t('input.add')}
-            </button>
-          </form>
-
-          {/* #482 half (b), operator ruling 2026-08-10 — OPTION 3 (ADR-3D-123 Am. 1): a read-only live
-              preview of the input, isolated at render, shown only while isolation would CHANGE the
-              layout (the gate lives in inputPreview3). The box itself stays raw — isolates cannot enter
-              an editable value without corrupting the caret, and dir="ltr" is what 2-D reverted (#118).
-              aria-hidden: it duplicates the input for sighted users; a screen reader has the input. */}
-          {(() => {
-            const preview = inputPreview3(text);
-            return preview === null ? null : (
-              <div
-                aria-hidden="true"
-                data-testid="bidi-preview"
-                dir={textDir3(text)}
-                className="overflow-x-auto whitespace-nowrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600"
-              >
-                {preview}
-              </div>
-            );
-          })()}
-
-          <div className="flex flex-wrap gap-1" dir="ltr">
-            {SYMBOL_PALETTE_3.map(([label, sym, back]) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => insertSym(sym, back)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-sm text-slate-600 hover:border-sky-400 hover:text-sky-700"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+    <AppFrame
+      title={t('title')}
+      subtitle={t('tagline')}
+      utilityActions={
+        /* ONE look for the session actions in every builder (shell/ToolButton) — the operator's
+           2026-08-18 catch: shared row, per-product buttons still rendered differently. */
+        <>
+          <ToolButton onClick={onSaveFile} disabled={facts.length === 0}>
+            💾 {t('actions.save')}
+          </ToolButton>
+          <ToolButton onClick={() => fileInput.current?.click()}>📂 {t('actions.load')}</ToolButton>
+          <ToolButton onClick={() => setManualOpen(true)}>{t('manual.button')}</ToolButton>
+          {/* image export appears only once there is something to save (operator, 2026-08-18);
+              it rides LAST so the constant buttons keep their suite positions. */}
+          {facts.length > 0 && (
+            <ToolButton onClick={onSaveImage}>{t('actions.saveImage')}</ToolButton>
+          )}
+        </>
+      }
+      roster={roster}
+      activeProductId="3d"
+      switcherLabel={t('switcherAria')}
+      about={{
+        label: t('aboutLabel'),
+        title: t('aboutTitle'),
+        body: <p style={{ marginTop: 0 }}>{t('aboutLead')}</p>,
+        privacy: t('privacy'),
+        closeLabel: t('aboutClose'),
+      }}
+      buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
+    >
+    {/* THE WORKBENCH (#734): the three-zone GEOMETRY is the shell's — identical columns, canvas
+        card and empty-state placement in every builder; this product passes zone content only.
+        (The old min-h-screen page + per-product Tailwind columns retired.) */}
+    <Workbench
+      emptyOverlay={
+        facts.length === 0 ? (
+          <QuickChips
+            title={t('emptyTitle')}
+            hint={t('emptyHintChips')}
+            commands={EXAMPLE_KEYS.slice(0, 4).map((k) => t(`examples.${k}`))}
+            onPick={(c) => void submitText(c)}
+          />
+        ) : undefined
+      }
+      inputZone={<>
+          {/* THE SHARED INPUT AREA (B4, the shared-components rule): box, palette, preview seam
+              and quick strip exist ONCE in shell/. The #482 preview discipline is preserved by
+              the props: inputPreview3 gates it, textDir3 sets its base direction (#118). */}
+          <InputArea
+            value={text}
+            onChange={setText}
+            onSubmit={() => void submitText()}
+            placeholder={t('input.placeholder')}
+            submitLabel={t('input.add')}
+            busy={busy}
+            busyLabel={t('input.thinking')}
+            symbols={SYMBOL_SPECS_3}
+            preview={(s) => inputPreview3(s)}
+            previewDir={(s) => textDir3(s)}
+          />
+          {/* No example strip above the box (operator ruling 2026-08-18): the examples are the
+              CLEAN-CANVAS QuickChips (below) and, with B7, the manual screen. */}
 
           {/* #309 (ADR-3D-087): a file that deserializes cleanly but does not REBUILD must say so —
               it used to load "successfully" onto a blank canvas. Persists until the next submit. */}
@@ -494,7 +511,7 @@ export default function App3() {
               adjusted so the statement could hold («ישרה» over a non-cyclic base). Distinct from the
               amber error strip: nothing failed, so it reads as information, not a warning. */}
           {!busy && notices.map((n, i) => (
-            <div key={`notice-${i}`} role="note" className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            <div key={`notice-${i}`} role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {n.kind === 'base-constrained'
                 ? t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
                 : n.kind === 'shape-redundant'
@@ -509,7 +526,7 @@ export default function App3() {
             </div>
           ))}
           {guidanceNote && !lastError && !busy && (
-            <div role="note" className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {guidanceNote}
             </div>
           )}
@@ -519,123 +536,84 @@ export default function App3() {
             </div>
           )}
 
-          {/* Examples folded into a dropdown so they don't crowd the panel (matches the 2-D app). */}
-          <details className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-            <summary className="cursor-pointer text-sm font-medium text-slate-600">{t('examples.title')}</summary>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {EXAMPLE_KEYS.map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => setText(t(`examples.${k}`))}
-                  className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-600 hover:border-sky-400 hover:text-sky-700"
-                >
-                  {t(`examples.${k}`)}
-                </button>
-              ))}
-            </div>
-          </details>
+          {/* The examples dropdown retired (B4 completed, operator's parity catch 2026-08-18):
+              the examples are the shared quick-command STRIP inside the input card now, the same
+              place as in every builder — and a pick BUILDS (D9b), instead of only filling the box. */}
 
-          <ul className="flex flex-col gap-1.5" data-testid="fact-list">
-            {facts.length === 0 && <li className="py-2 text-sm text-slate-400">{t('facts.empty')}</li>}
-            {facts.map((f) => (
-              <li key={f.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                <input
-                  type="checkbox"
-                  checked={f.enabled}
-                  onChange={() => toggle(f.id)}
-                  title={t('facts.toggleTitle')}
-                  className="accent-sky-600"
-                />
-                {f.cmds.some((c) => c.type === 'claim') && derived.status[f.id] === 'ok' ? (
-                  <span className="text-xs font-bold text-emerald-600" title={t('facts.claimVerified')}>
-                    ✓
-                  </span>
-                ) : (
-                  statusDot(derived.status[f.id])
-                )}
-                {/* #482 (ADR-3D-121): the STUDENT'S OWN text needs the same bidi isolation the
-                    messages get. ADR-3D-116 registered `isolateLtrRuns3` as an i18next post-processor —
-                    one chokepoint for every translated string, and the right place for those — but an
-                    utterance never passes through `t()`, so «מישור π1 - x+(m-2)y+(m-1)z-5» rendered with
-                    its equation reversed against the Hebrew. Display-only: the stored fact is untouched,
-                    and the transform is idempotent and byte-reversible (its safety property).
-                    A VECTOR fact is left alone deliberately — `VecMath` emits one element per token, so
-                    the bidi algorithm sees structure rather than one neutral run, and injecting isolates
-                    into its input would feed the tokenizer characters it has no token for. */}
-                <span dir="auto" className="min-w-0 flex-1 truncate text-sm">
-                  {isVectorFact3(f) ? (
-                    <VecMath text={factDisplay(f, new Set(derived.construction.vectors.keys()))} vecNames={new Set(derived.construction.vectors.keys())} />
+          {/* B5 (#670, D6): the SHARED fact-list chrome — row cards, mute checkbox, ✎ edit-in-place,
+              ✕ delete, one look across the builders. The row CONTENT stays this product's:
+              claim-✓/status dot, the bidi-isolated utterance (#482 ADR-3D-121: display-only,
+              idempotent; a VECTOR fact renders through VecMath, whose tokenizer must not see
+              injected isolates), and the per-plane display-cycle chips (#318/#395 ADR-3D-108 —
+              relation-operand and claim-carrier planes cycle exactly like a stated «מישור ABC»). */}
+          <FactList
+            testId="fact-list"
+            rows={facts.map((f) => ({
+              id: f.id,
+              disabled: !f.enabled,
+              content: (
+                <span className="flex min-w-0 items-center gap-2">
+                  {f.cmds.some((c) => c.type === 'claim') && derived.status[f.id] === 'ok' ? (
+                    <span className="text-xs font-bold text-emerald-600" title={t('facts.claimVerified')}>
+                      ✓
+                    </span>
                   ) : (
-                    isolateLtrRuns3(f.utterance)
+                    statusDot(derived.status[f.id])
                   )}
-                </span>
-                {/* #318 + #395 (ADR-3D-108): a fact that MATERIALISES a plane patch gets the
-                    per-plane display cycle (full → face → hidden → full); the label shows the mode
-                    the click SWITCHES TO. Enumeration covers relation-operand planes too — a patch
-                    born from «המישור ABC מאונך למישור ABD» is toggleable exactly like a stated
-                    «מישור ABC» (the operator's play-1/7/8 ask). */}
-                {[...new Set(f.cmds.flatMap((cm) =>
-                  cm.type === 'plane-through' ? [cm.name]
-                  : cm.type === 'free-plane' ? [cm.name] // #487: the declaring row cycles its patch like any other plane-materialising fact
-                  : cm.type === 'plane-rel' || cm.type === 'mutual-rel' || cm.type === 'distance-rel'
-                    ? [cm.a, cm.b].flatMap((op) => (op.kind === 'plane-run' ? [op.ids.join('')] : []))
-                    : cm.type === 'line-rel' && cm.op.kind === 'plane-run' ? [cm.op.ids.join('')]
-                    // #584 (ADR-3D-148): the CLAIM carriers materialise their stated run too —
-                    // «המישור ABS: x=0», the coord-frame relation, the line↔plane angle
-                    : cm.type === 'claim' && (cm.claim.type === 'plane-eq' || cm.claim.type === 'coord-plane-rel') ? [cm.claim.ids.join('')]
-                    : cm.type === 'coord-plane-rel' && cm.ids.length > 0 ? [cm.ids.join('')]
-                    : cm.type === 'line-plane-angle' ? [cm.plane.join('')]
-                    : [],
-                ))].map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    title={t('facts.planeToggleTitle', { name })}
-                    onClick={() => togglePlaneDisplay(name)}
-                    className="shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] leading-4 text-slate-500 hover:border-sky-400 hover:text-sky-700"
-                  >
-                    {(planeDisplay[name] ?? 'full') === 'full' ? t('facts.planeFace') : (planeDisplay[name] === 'face' ? t('facts.planeHide') : t('facts.planeFull'))}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  aria-label={t('facts.delete')}
-                  title={t('facts.delete')}
-                  onClick={() => { logDebug3({ kind: 'action', action: 'delete', detail: f.id }); remove(f.id); }} // #182: so a reported session replays deletions
-                  className="text-slate-400 hover:text-rose-600"
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          {/* the commands catalog (V5) — every supported form, clickable */}
-          <details className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-            <summary className="cursor-pointer text-sm font-medium text-slate-600">{t('catalog.title')}</summary>
-            {['solids', 'points', 'vectors', 'planesLines', 'claims', 'drawing'].map((cat) => (
-              <div key={cat} className="mt-2">
-                <div className="text-xs font-bold text-slate-400">{t(`catalog.${cat}`)}</div>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {COMMAND_CATALOG_3D.filter((c) => c.category === cat).map((c) => (
+                  <span dir="auto" className="min-w-0 flex-1 truncate text-sm">
+                    {isVectorFact3(f) ? (
+                      <VecMath text={factDisplay(f, new Set(derived.construction.vectors.keys()))} vecNames={new Set(derived.construction.vectors.keys())} />
+                    ) : (
+                      isolateLtrRuns3(f.utterance)
+                    )}
+                  </span>
+                  {[...new Set(f.cmds.flatMap((cm) =>
+                    cm.type === 'plane-through' ? [cm.name]
+                    : cm.type === 'free-plane' ? [cm.name] // #487: the declaring row cycles its patch like any other plane-materialising fact
+                    : cm.type === 'plane-rel' || cm.type === 'mutual-rel' || cm.type === 'distance-rel'
+                      ? [cm.a, cm.b].flatMap((op) => (op.kind === 'plane-run' ? [op.ids.join('')] : []))
+                      : cm.type === 'line-rel' && cm.op.kind === 'plane-run' ? [cm.op.ids.join('')]
+                      : cm.type === 'claim' && (cm.claim.type === 'plane-eq' || cm.claim.type === 'coord-plane-rel') ? [cm.claim.ids.join('')]
+                      : cm.type === 'coord-plane-rel' && cm.ids.length > 0 ? [cm.ids.join('')]
+                      : cm.type === 'line-plane-angle' ? [cm.plane.join('')]
+                      : [],
+                  ))].map((name) => (
                     <button
-                      key={c.he}
+                      key={name}
                       type="button"
-                      onClick={() => setText(c.he)}
-                      className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:border-sky-400 hover:text-sky-700"
+                      title={t('facts.planeToggleTitle', { name })}
+                      onClick={() => togglePlaneDisplay(name)}
+                      className="shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] leading-4 text-slate-500 hover:border-blue-400 hover:text-blue-700"
                     >
-                      {c.he}
+                      {(planeDisplay[name] ?? 'full') === 'full' ? t('facts.planeFace') : (planeDisplay[name] === 'face' ? t('facts.planeHide') : t('facts.planeFull'))}
                     </button>
                   ))}
-                </div>
-              </div>
-            ))}
-          </details>
-        </section>
+                </span>
+              ),
+            }))}
+            emptyHint={t('facts.empty')}
+            onToggle={toggle}
+            toggleLabel={t('facts.toggleTitle')}
+            editValueOf={(id) => facts.find((f) => f.id === id)?.utterance ?? ''}
+            onEditCommit={(id, next) => {
+              logDebug3({ kind: 'action', action: 'edit', detail: id }); // #182: a reported session replays edits
+              return replaceFact(id, next);
+            }}
+            editLabel={t('facts.edit')}
+            onDelete={(id) => { logDebug3({ kind: 'action', action: 'delete', detail: id }); remove(id); }} // #182: so a reported session replays deletions
+            deleteLabel={t('facts.delete')}
+          />
 
-        {/* Canvas + view/session controls */}
-        <section className="flex min-w-0 flex-1 flex-col gap-2" ref={canvasBox}>
+          {/* The commands catalog graduated into the MANUAL screen (B7, D9) — the מדריך button in
+              the tool row opens it; the sidebar accordion retired. */}
+      </>}
+      canvasZone={
+        <div className="flex min-w-0 flex-1 flex-col gap-2 min-h-0" ref={canvasBox}>
+          {/* The figure's NAME (issue #42), centered above the drawing it names — the SHARED
+              component (operator: "isn't the whole idea a shared GUI component?"), one look in
+              every builder. */}
+          <FigureName value={figureName} onChange={setFigureName} placeholder={t('actions.namePlaceholder')} />
+          {/* the empty-state chips render through the WORKBENCH's one overlay slot (#734) */}
           <Figure3
             construction={derived.construction}
             resolved={derived.resolved}
@@ -648,11 +626,8 @@ export default function App3() {
             crossingLabel={t('actions.nameCrossing')}
             onNameCrossing={onNameCrossing}
           />
-          {facts.length > 0 && (
-            <p className="text-xs text-slate-500" data-testid="dof-cue">
-              {dof === 0 ? t('cue.determined') : t('cue.free', { n: dof })}
-            </p>
-          )}
+          {/* B6 (#671): the DOF cue moved to the data panel's head-line — its generic home across
+              the builders (operator: "people who care about it will look at it"). */}
           <p className="text-xs text-slate-400">{t('hint.orbit')}</p>
           <div className="flex flex-wrap gap-2">
             {/* #182: each store interaction logs one lean `action` line so a reported prod session
@@ -669,183 +644,200 @@ export default function App3() {
             <button type="button" onClick={clearAll} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50">
               {t('actions.clear')}
             </button>
-            <span className="mx-1 self-center text-slate-300">|</span>
+            {/* #397 (ADR-3D-108): the stated-distance witness (the "height") — on by default,
+                hideable "for educational purposes". A FIGURE-display option, so it lives with the
+                figure actions (D7); moved here from the panel column's checkbox in B6's follow-up. */}
             <button
               type="button"
-              onClick={onSaveFile}
-              disabled={facts.length === 0}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-40"
+              onClick={() => setShowWitness((s) => !s)}
+              aria-pressed={showWitness}
+              className={`rounded-xl border px-3 py-1.5 text-sm ${showWitness ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-slate-300 bg-white hover:bg-slate-100'}`}
             >
-              {t('actions.save')}
+              {t('display.witnesses')}
             </button>
-            <button
-              type="button"
-              onClick={() => fileInput.current?.click()}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100"
-            >
-              {t('actions.load')}
-            </button>
+            {/* שמור/טען/תמונה moved to the TOOL ROW (B3, the level model): they act on the
+                session, not the fact list. The load target stays here so it outlives the frame. */}
             <input ref={fileInput} type="file" accept=".geo3.json,application/json,.json" className="hidden" onChange={onLoadFile} />
-            <button
-              type="button"
-              onClick={onSaveImage}
-              disabled={facts.length === 0}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-40"
-            >
-              {t('actions.saveImage')}
-            </button>
           </div>
-        </section>
-        {/* organize-your-data (ADR-3D-014): derived presentations, student opt-in */}
-        <section className="flex w-full flex-col gap-2 md:w-64">
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" checked={showData} onChange={(e) => setShowData(e.target.checked)} />
-            {t('dataPanel.toggle')}
-          </label>
-          {/* #397 (ADR-3D-108): the stated-distance witness (the "height") — on by default,
-              hideable "for educational purposes" per the operator's ask. Only rendered relevant
-              when a distance given exists; harmless otherwise. */}
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" checked={showWitness} onChange={(e) => setShowWitness(e.target.checked)} />
-            {t('display.witnesses')}
-          </label>
-          {showData && (
-            /* #274 (ADR-3D-057): the query lane — ask for a quantity («w·v», «|AB|», «∠SAB», «area ABC»,
-               «volume SABCD») and see it if it's genuinely determined. A question, never a fact. */
-            <div className="rounded-xl border border-sky-200 bg-sky-50/40 p-3 text-sm">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  addQuery(queryText);
-                  setQueryText('');
-                }}
-                className="flex gap-1"
-              >
-                <input
-                  dir="ltr"
-                  value={queryText}
-                  onChange={(e) => setQueryText(e.target.value)}
-                  placeholder={t('query.placeholder')}
-                  className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1 text-sm"
-                />
-                <button type="submit" className="rounded-lg bg-sky-600 px-2 py-1 text-sm text-white hover:bg-sky-700">
-                  {t('query.add')}
-                </button>
-              </form>
-              {queryResults.length > 0 && (
-                <ul className="mt-2 flex flex-col gap-1">
-                  {/* #398 (ADR-3D-108): per-row dir="auto" — a Hebrew query («המרחק בין D למישור ABC»)
-                      lays out RTL with the math tokens as isolated LTR islands (the ADR-3D-031 Am. 2
-                      bidi rule, panel edition); a symbol-only query (|AB|, w·v) stays LTR. The old
-                      list-wide dir="ltr" scrambled every Hebrew sentence. */}
-                  {queryResults.map((r, i) => (
-                    <li key={r.text + i} dir="auto" className="flex items-center justify-between gap-2 border-b border-slate-100 pb-1 last:border-0">
-                      <span>
-                        <VecMath text={r.text} vecNames={new Set(derived.construction.vectors.keys())} />
-                        {r.answer !== null ? (
-                          <span className="font-medium">
-                            {' = '}
-                            <VecMath text={r.answer} vecNames={new Set(derived.construction.vectors.keys())} />
-                          </span>
-                        ) : (
-                          <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>
-                        )}
-                      </span>
-                      <button type="button" onClick={() => removeQuery(i)} className="shrink-0 text-slate-400 hover:text-rose-600" aria-label={t('query.remove')}>
-                        ×
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-          {showData && dataPanel && (
+        </div>
+      }
+      dataZone={
+        /* organize-your-data (ADR-3D-014, B6 #671): the D8 SKELETON via the SHARED DataPanel —
+           same sections, same head/trigger as every builder. The query lane (#274, ADR-3D-057: a
+           question, never a fact) IS this product's ask section. */
+        (
             <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
-              {panelIsEmpty(dataPanel) ? (
-                <p className="text-slate-400">{t('dataPanel.empty')}</p>
-              ) : (
-                <ul className="flex flex-col gap-1">
-                  {/* #559 (ADR-3D-156): the list carries NO `dir` — it follows the app, which is RTL
-                      by default. It used to be `dir="ltr"` list-wide, so in the Hebrew app the
-                      math-only rows hugged the LEFT edge while the Hebrew `mutual` rows (which
-                      carried their own per-row dir) hugged the right: one panel, two edges. This is
-                      the #398/ADR-3D-108 fix the query list above already got, applied to the list
-                      that predates it. */}
-                  {dataPanel.relations.map((r) => (
-                    <li key={r} className="border-b border-slate-100 pb-1 font-medium">
-                      <MathRun>{r}</MathRun>
-                    </li>
-                  ))}
-                  {/* S4 (#378): mutual positions read as WORDS in the reader's language — there is no
-                      standard symbol for skew lines. #559: the direction comes from `textDir3`, NOT
-                      `dir="auto"` — these rows routinely START with a Latin point label («AB ו-CD
-                      מצטלבים»), and auto keys off the FIRST strong character, so the Hebrew sentence
-                      would take an LTR base and reorder into garbage (the ADR-312/#118 trap). */}
-                  {/* #577 (ADR-3D-154): a LINEAR×PLANAR row words asymmetrically — «FG מקביל למישור
-                      ABCD», never the symmetric «מקבילים», which misreads for a plane. The row says
-                      which kind it is, so the key is picked, never guessed from the labels. */}
-                  {dataPanel.mutual.map((m) => {
-                    const line = t(
-                      m.mixed && (m.rel === 'parallel' || m.rel === 'perpendicular')
-                        ? `dataPanel.mutual.${m.rel === 'parallel' ? 'parallelPlane' : 'perpendicularPlane'}`
-                        : `dataPanel.mutual.${m.rel}`,
-                      { a: m.a, b: m.b },
-                    );
-                    return (
-                      <li key={`${m.rel}-${m.a}-${m.b}`} dir={textDir3(line)} className="border-b border-slate-100 pb-1 font-medium">
-                        {line}
-                      </li>
-                    );
-                  })}
-                  {dataPanel.vectors.map((v) => (
-                    <li key={v.label} className="border-b border-slate-100 pb-1 last:border-0">
-                      {v.decomp && (
-                        <div>
-                          <VecMath text={`${v.label} = ${v.decomp}`} vecNames={new Set(derived.construction.vectors.keys())} />
-                        </div>
-                      )}
-                      {v.coords && (
-                        <div>
-                          <VecMath text={`${v.label} = ${v.coords}`} vecNames={new Set(derived.construction.vectors.keys())} />
-                        </div>
-                      )}
-                      {v.mag && (
-                        <div>
-                          <MathRun>{v.mag}{v.sq ? ' \u00A0·\u00A0 ' + v.sq : ''}</MathRun>
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                  {dataPanel.points.map((p) => (
-                    <li key={p}>
-                      <MathRun>{p}</MathRun>
-                    </li>
-                  ))}
-                  {/* #325 (ADR-3D-079 Am. 2): the open symbols of B(2t,t,k) — a determined value
-                      prints, a free one reads open with a hint, so the given visibly registered */}
-                  {dataPanel.params.map((p) => (
-                    <li key={p.sym} className={p.open ? 'text-slate-500' : undefined}>
-                      <MathRun>{p.text}</MathRun>
-                      {/* #559: the hint is Hebrew and now sits in a row that follows the app's own
-                          direction, so it needs no `dir` of its own; the logical `ms-1` replaces
-                          `mr-1`, which was a physical LEFT margin in an RTL list. */}
-                      {p.open && <span className="ms-1 text-xs text-slate-400">— {t('dataPanel.openParam')}</span>}
-                    </li>
-                  ))}
-                  {dataPanel.planes.map((p) => (
-                    <li key={p} className="border-t border-slate-100 pt-1">
-                      <MathRun>{p}</MathRun>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <DataPanel
+                title={t('dataPanel.title')}
+                open={showData}
+                onToggle={() => setShowData((s) => !s)}
+                showLabel={t('dataPanel.show')}
+                hideLabel={t('dataPanel.hide')}
+                status={facts.length > 0 ? (dof === 0 ? t('cue.determined') : t('cue.free', { n: dof })) : undefined}
+                sections={[
+                  {
+                    key: 'points',
+                    title: t('dataPanel.secPoints'),
+                    dir: 'app',
+                    rows: (dataPanel?.points ?? []).map((p) => <MathRun key={p}>{p}</MathRun>),
+                  },
+                  {
+                    /* the vectors' decomp/coords/magnitude readings + the plane equations — this
+                       product's MEASURES rows. Rows follow the APP's direction with math as inner
+                       LTR islands (#559, ADR-3D-156: a list-wide dir made one panel hug two edges). */
+                    key: 'measures',
+                    title: t('dataPanel.secMeasures'),
+                    dir: 'app',
+                    rows: [
+                      ...(dataPanel?.vectors ?? []).map((v) => (
+                        <span key={v.label}>
+                          {v.decomp && (
+                            <div>
+                              <VecMath text={`${v.label} = ${v.decomp}`} vecNames={new Set(derived.construction.vectors.keys())} />
+                            </div>
+                          )}
+                          {v.coords && (
+                            <div>
+                              <VecMath text={`${v.label} = ${v.coords}`} vecNames={new Set(derived.construction.vectors.keys())} />
+                            </div>
+                          )}
+                          {v.mag && (
+                            <div>
+                              <MathRun>{v.mag}{v.sq ? ' · ' + v.sq : ''}</MathRun>
+                            </div>
+                          )}
+                        </span>
+                      )),
+                      ...(dataPanel?.planes ?? []).map((p) => <MathRun key={p}>{p}</MathRun>),
+                    ],
+                  },
+                  {
+                    /* S4 (#378): mutual positions read as WORDS in the reader's language — there is
+                       no standard symbol for skew lines. #559: their dir comes from `textDir3`, NOT
+                       `dir="auto"` — these rows routinely START with a Latin point label («AB ו-CD
+                       מצטלבים»), and auto keys off the FIRST strong character (the ADR-312/#118
+                       trap). #577 (ADR-3D-154): a LINEAR×PLANAR row words asymmetrically — «FG
+                       מקביל למישור ABCD» — the row says which kind it is, never guessed from labels. */
+                    key: 'relations',
+                    title: t('dataPanel.secRelations'),
+                    dir: 'app',
+                    rows: [
+                      ...(dataPanel?.relations ?? []).map((r) => (
+                        <span key={r} className="font-medium">
+                          <MathRun>{r}</MathRun>
+                        </span>
+                      )),
+                      ...(dataPanel?.mutual ?? []).map((m) => {
+                        const line = t(
+                          m.mixed && (m.rel === 'parallel' || m.rel === 'perpendicular')
+                            ? `dataPanel.mutual.${m.rel === 'parallel' ? 'parallelPlane' : 'perpendicularPlane'}`
+                            : `dataPanel.mutual.${m.rel}`,
+                          { a: m.a, b: m.b },
+                        );
+                        return (
+                          <span key={`${m.rel}-${m.a}-${m.b}`} dir={textDir3(line)} className="block font-medium">
+                            {line}
+                          </span>
+                        );
+                      }),
+                    ],
+                  },
+                  {
+                    /* #325 (ADR-3D-079 Am. 2): a determined value prints, a free one reads open
+                       with a hint, so the given visibly registered */
+                    key: 'parameters',
+                    title: t('dataPanel.secParams'),
+                    dir: 'app',
+                    rows: (dataPanel?.params ?? []).map((p) => (
+                      <span key={p.sym} className={p.open ? 'text-slate-500' : undefined}>
+                        <MathRun>{p.text}</MathRun>
+                        {p.open && <span className="ms-1 text-xs text-slate-400">— {t('dataPanel.openParam')}</span>}
+                      </span>
+                    )),
+                  },
+                  {
+                    /* #274 (ADR-3D-057): the query lane — a question, never a fact. #398
+                       (ADR-3D-108): per-ROW dir="auto" — a Hebrew query lays out RTL with the math
+                       tokens as isolated LTR islands; a symbol-only query (|AB|, w·v) stays LTR. */
+                    key: 'ask',
+                    title: t('dataPanel.secAsk'),
+                    dir: 'app',
+                    rows: queryResults.map((r, i) => (
+                      <span key={r.text + i} dir="auto" className="flex items-center justify-between gap-2">
+                        <span>
+                          <VecMath text={r.text} vecNames={new Set(derived.construction.vectors.keys())} />
+                          {r.answer !== null ? (
+                            <span className="font-medium">
+                              {' = '}
+                              <VecMath text={r.answer} vecNames={new Set(derived.construction.vectors.keys())} />
+                            </span>
+                          ) : (
+                            <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>
+                          )}
+                        </span>
+                        <button type="button" onClick={() => removeQuery(i)} className="shrink-0 text-slate-400 hover:text-rose-600" aria-label={t('query.remove')}>
+                          ×
+                        </button>
+                      </span>
+                    )),
+                  },
+                ]}
+              >
+                {(!dataPanel || panelIsEmpty(dataPanel)) && queryResults.length === 0 && (
+                  <p className="text-slate-400">{t('dataPanel.empty')}</p>
+                )}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    addQuery(queryText);
+                    setQueryText('');
+                  }}
+                  className="flex gap-1"
+                >
+                  <input
+                    dir="ltr"
+                    value={queryText}
+                    onChange={(e) => setQueryText(e.target.value)}
+                    placeholder={t('query.placeholder')}
+                    className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                  />
+                  <button type="submit" className="rounded-lg bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700">
+                    {t('query.add')}
+                  </button>
+                </form>
+              </DataPanel>
             </div>
-          )}
-        </section>
-      </main>
-      {/* The in-app privacy note (NFR-SE-3 / ADR-278) — this app has no about modal, so it lives in a footer. */}
-      <footer className="px-5 pb-4 text-center text-xs text-slate-400">{t('privacy')}</footer>
-    </div>
+        )
+      }
+    />
+      {/* NFR-SE-3's note now lives in the frame's About modal (B3) — the footer fallback retired. */}
+      {/* THE MANUAL (B7 #672, D9): the catalog as a separate SCREEN — a click SUBMITS the example
+          through the full path (parser → guidance → LLM lane), replacing the old fill-the-box. */}
+      <ManualScreen
+        open={manualOpen}
+        title={t('manual.title')}
+        intro={t('manual.intro')}
+        closeLabel={t('manual.close')}
+        tryHint={t('manual.try')}
+        sectionCap={6}
+        moreNote={t('manual.more')}
+        sections={(['solids', 'points', 'vectors', 'planesLines', 'claims', 'drawing'] as const).map((cat) => ({
+          key: cat,
+          title: t(`catalog.${cat}`),
+          entries: COMMAND_CATALOG_3D.filter((c) => c.category === cat).map((c) => {
+            const raw = i18n.language === 'he' ? c.he : c.en;
+            return {
+              example: isolateLtrRuns3(raw),
+              dir: textDir3(raw),
+              onTry: () => {
+                setManualOpen(false);
+                void submitText(raw);
+              },
+            };
+          }),
+        }))}
+        onClose={() => setManualOpen(false)}
+      />
+    </AppFrame>
   );
 }

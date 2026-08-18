@@ -1,7 +1,16 @@
 {
-  "title": "Space Builder",
+  "title": "Space Geometry",
   "tagline": "Build in 3-D space — solids, points, vectors",
   "privacy": "Privacy: no sign-up and no personal details are collected; typed instructions (math text only) are kept for a few days with an anonymous visitor id — your IP address is never stored.",
+  "language": "עברית",
+  "switcherAria": "Switch between builders",
+  "switcher2d": "Plane Geometry",
+  "switcher3d": "Space Geometry",
+  "switcherComplex": "Complex Numbers",
+  "aboutLabel": "About",
+  "aboutTitle": "About this tool",
+  "aboutLead": "A tool for building the figure of a space-geometry question: enter the givens line by line — solids, points, vectors — and the figure builds and orbits in front of you. It draws and verifies the givens; it never solves the question.",
+  "aboutClose": "Close",
   "input": {
     "placeholder": "Type a given, e.g.: cube ABCD",
     "add": "Add",
@@ -27,10 +36,10 @@
     "another": "Show another configuration",
     "resetView": "Reset view",
     "nameCrossing": "Click to name this intersection point",
-    "save": "Save to file",
+    "save": "Save",
     "namePlaceholder": "Figure name (optional)",
     "saveNamePrompt": "Name the file — exam date, page and book, or anything else",
-    "load": "Load from file",
+    "load": "Load",
     "saveImage": "Save image"
   },
   "hint": {
@@ -39,7 +48,8 @@
   "facts": {
     "empty": "No givens yet — type one or click an example",
     "delete": "Delete",
-    "toggleTitle": "Include/exclude this given",
+    "edit": "Edit in place",
+    "toggleTitle": "Include in the figure",
     "claimVerified": "The claim was verified against the figure",
     "planeFace": "Face only",
     "planeFull": "Full plane",
@@ -108,12 +118,28 @@
     "ex7": "plane π1: z - 3 = 0",
     "ex8": "A(2,-2,6) is on one of the planes"
   },
+  "manual": {
+    "button": "Guide",
+    "title": "The Guide — Space Geometry",
+    "intro": "This is a partial guide — only representative examples are shown, so you can see what sorts of sentences can be typed. Click one to watch it build, or phrase freely — if the tool didn't understand, try different wording; unsupported sentences are collected and reviewed by the project team for future support.",
+    "close": "Back to the tool",
+    "try": "Click to try — the example builds on the figure",
+    "more": "…and these are just examples — the tool reads more phrasings of this kind"
+  },
+  "emptyTitle": "What are we building today?",
+  "emptyHintChips": "Click an example given — or type your own, and the figure builds in front of you",
   "dataPanel": {
-    "toggle": "Organize the data",
-    "title": "Organize the data",
+    "title": "Data",
+    "show": "Show",
+    "hide": "Hide",
     "hint": "derived vector, coordinate and magnitude presentations — laid out the way you would on paper",
     "empty": "nothing stable to show yet",
     "openParam": "free parameter — pinned once more data arrives",
+    "secPoints": "Points",
+    "secMeasures": "Measures",
+    "secRelations": "Relations",
+    "secParams": "Parameters",
+    "secAsk": "Ask",
     "mutual": {
       "skew": "{{a}} and {{b}} are skew",
       "parallel": "{{a}} and {{b}} are parallel",
