@@ -29,6 +29,9 @@ export function ToolButton({
 }
 
 const base: CSSProperties = {
+  // explicit metrics — consumer CSS resets differ per tool (the parity checker's finding)
+  fontFamily: "system-ui, 'Segoe UI', sans-serif",
+  lineHeight: 1.4,
   fontSize: fs.body,
   padding: '8px 14px',
   border: `1px solid ${color.borderStrong}`,

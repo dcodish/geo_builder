@@ -4,10 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { Banner } from '../shell/frame/Banner';
 import { FigureName } from '../shell/frame/FigureName';
+import { InputArea } from '../shell/frame/InputArea';
+import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { applySwitcherConfig, type ToolConfig } from '../shell/switcherConfig';
-import { applySymbol, type SymbolSpec } from '../shell/symbols';
 import { deriveLines } from './app/deriveLines';
 import { COMPLEX_SESSION, hydrateSession, submitLine } from './app/submit';
 import { v2Claims, v2Formulas, v2Knowledge, v2Labels, v2Measures, v2Status } from './replay/scene2';
@@ -15,6 +16,7 @@ import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
 import { SYMBOLS } from './ui/symbols';
+import { complexBidi } from './i18n';
 import registry from '../products.json';
 
 const EXAMPLE_LINES = ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2', 'z^5 = w^2'];
@@ -97,21 +99,6 @@ export function App() {
     });
   };
   const [input, setInput] = useState('');
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  // The palette applies through the shared wrap-selection core (shell/symbols, docs/28 §4a D5):
-  // wrapping symbols enclose the current selection; an empty selection is a caret insert.
-  const insertSymbol = (spec: SymbolSpec) => {
-    const el = inputRef.current;
-    const start = el?.selectionStart ?? input.length;
-    const end = el?.selectionEnd ?? start;
-    const next = applySymbol(input, start, end, spec);
-    setInput(next.value);
-    requestAnimationFrame(() => {
-      el?.focus();
-      el?.setSelectionRange(next.caret, next.caret);
-    });
-  };
 
   // the language toggle and the document-direction flip are the FRAME's now (suite-level chrome,
   // implemented once — the operator caught the per-product copies)
@@ -175,6 +162,13 @@ export function App() {
     if (input.trim() === '') return;
     if (submitLine(input)) setInput('');
   };
+
+  /**
+   * THE QUICK COMMANDS (D9b + A3): the operator's curated list when one is saved, the built-in
+   * examples otherwise. Big chips on the empty canvas; the compact strip above the input once a
+   * figure exists — one clickable set, building with no typing.
+   */
+  const quickCommands = toolConfig?.quickCommands?.length ? toolConfig.quickCommands : EXAMPLE_LINES;
 
   /**
    * THE SWITCHER ROSTER — A2's registry rendered as DATA (ADR-W-021): the shell frame receives a
@@ -269,39 +263,26 @@ export function App() {
         />
         <main>
           <section className="panel">
-            <div className="card input-card">
-            <div className="input-row">
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && submit()}
-                placeholder={t('inputPlaceholder')}
-                dir="ltr"
-              />
-              <button onClick={submit}>{t('add')}</button>
-            </div>
-            <div className="symbols" dir="ltr">
-              {SYMBOLS.map((s) => (
-                <button
-                  key={s.titleKey}
-                  className="sym"
-                  title={t(s.titleKey)}
-                  onClick={() => insertSymbol(s)}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-            {lastError && (
-              <Banner kind="error">{t(ERROR_KEY[lastError.key], { detail: lastError.detail })}</Banner>
-            )}
-            <div className="panel-actions">
-              <button onClick={() => EXAMPLE_LINES.forEach((l) => submitLine(l))}>{t('example')}</button>
-              <button onClick={clearAll}>{t('clearAll')}</button>
-              <span className="count">{t('factCount', { count: lines.length })}</span>
-            </div>
-            </div>
+            {/* THE SHARED INPUT AREA (B4, the shared-components rule): the box, the wrap-selection
+                palette, the preview seam and the compact quick strip exist ONCE in shell/; this
+                product passes its symbols, its previewer and its handlers. */}
+            <InputArea
+              value={input}
+              onChange={setInput}
+              onSubmit={submit}
+              placeholder={t('inputPlaceholder')}
+              submitLabel={t('add')}
+              symbols={SYMBOLS}
+              symbolTitle={(s) => (s.titleKey ? t(s.titleKey) : s.label)}
+              preview={(s) => complexBidi.inputPreview(s)}
+              previewDir={(s) => complexBidi.textDir(s)}
+              quickCommands={lines.length > 0 ? quickCommands : undefined}
+              onQuickCommand={(c) => submitLine(c)}
+            >
+              {lastError && (
+                <Banner kind="error">{t(ERROR_KEY[lastError.key], { detail: lastError.detail })}</Banner>
+              )}
+            </InputArea>
             {/*
               THE STATEMENT LIST FOLLOWS THE ACTIVE ENGINE.
 
@@ -329,11 +310,28 @@ export function App() {
                   );
                 })}
             </ul>
+            {/* fact-LIST actions live with the fact list (the level model; the operator's card
+                audit): clear acts on the list, the counter counts it. B5's shared component
+                contracts this zone for every builder. */}
+            <div className="panel-actions">
+              <button onClick={() => EXAMPLE_LINES.forEach((l) => submitLine(l))}>{t('example')}</button>
+              <button onClick={clearAll}>{t('clearAll')}</button>
+              <span className="count">{t('factCount', { count: lines.length })}</span>
+            </div>
           </section>
           <section className="canvas">
             {/* The figure's NAME, centered above the drawing it names — the SHARED component,
                 one look in every builder (#42 arriving in complex). */}
             <FigureName value={name} onChange={setName} placeholder={t('namePlaceholder')} />
+            {/* D9b's first half: the inviting first click — large chips on the EMPTY canvas. */}
+            {lines.length === 0 && (
+              <QuickChips
+                title={t('emptyTitle')}
+                hint={t('emptyHintChips')}
+                commands={quickCommands}
+                onPick={(c) => submitLine(c)}
+              />
+            )}
             {
               /* THE HONESTY STRIP — always visible, never opt-in (B2's split of the old banner).
                  A violated, undecided or unread STATEMENT is the figure refusing to lie about

@@ -47,7 +47,9 @@ describe('the symbol palette parses — every offered button, through the real g
 
   for (const spec of SYMBOLS) {
     it(`${spec.titleKey} (“${spec.label}”) lands in a parsing utterance`, () => {
-      const tpl = TEMPLATES[spec.titleKey];
+      // complex's palette always carries titleKey (the tooltip i18n key); shell made it optional
+      // for products without per-symbol tooltips (3-D)
+      const tpl = TEMPLATES[spec.titleKey as string];
       expect(tpl, `no template for ${spec.titleKey}`).toBeDefined();
       const applied = applySymbol(tpl.value, tpl.sel[0], tpl.sel[1], spec);
       const final = applied.value + (tpl.complete ?? '');
