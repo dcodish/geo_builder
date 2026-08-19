@@ -8,10 +8,14 @@
  * ruler showing centimetres over an exact length. Exact symbolic forms (5, 1/2, √2, cis120°) never
  * pass through here — the rule is about decimal EXPANSIONS.
  *
- * EVERY product's display formatter delegates here (#723): 2-D `formatMeasure`, 3-D `cleanNum`'s decimal
- * fallback, and the complex value layer's `fmtNum`. Each keeps its own product-specific tiers above the
- * decimal fallback — an exact fraction, a surd, a π form — because those are not decimal expansions and
- * the rule does not touch them; what none of them keeps is a private rounder.
+ * The products' display formatters delegate here (#723): 2-D `formatMeasure`, 3-D `cleanNum`'s decimal
+ * fallback, and the complex builder's reading composition. Each keeps its own product-specific tiers ABOVE
+ * the decimal fallback — an exact fraction, a surd, a π form — because those are not decimal expansions
+ * and the rule does not touch them; what none of them keeps is a private rounder.
+ *
+ * One holdout, deliberately: `src-complex/value/value.ts` keeps a private 3-decimal `fmtNum`. It CANNOT
+ * import this file — `value/` is the declared bottom of its own tree and `import-direction.test.ts`
+ * enforces that — so the delegation was reverted rather than the layering test weakened (#723, escalated).
  *
  * `DISPLAY_DECIMALS` is the house precision the operator's ruling names. It is a DEFAULT, not a ceiling
  * the signature can express: `maxDecimals` stays a parameter because one surface asks for more (the 3-D
