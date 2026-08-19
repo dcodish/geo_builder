@@ -354,3 +354,53 @@ describe('#518 — an undetermined scale is never knowledge', () => {
     expect(ans(exam, '|AB|').answer).toBe('12');
   });
 });
+
+/**
+ * #642 — the SUBJECT NOUN in the query lane. «נקודה A» answered «לא זוהה» while bare «A» answered: the
+ * point head listed the two COORDINATE nouns («שיעורי», «קואורדינטות») and forgot the noun that names the
+ * subject itself. Same defect shape as #640 in `parse3.ts`, one file over — which is why the fix is the
+ * gate (`Q_SUBJ`), and why its siblings are swept here rather than waiting for their own report.
+ *
+ * A student who writes the noun is asking the same question as one who does not. The lock is EQUALITY
+ * with the bare form, not merely "it answers".
+ */
+describe('#642 — naming the subject is the same question', () => {
+  beforeEach(reset);
+
+  const CUBE_PINNED = ["קובייה ABCDA'B'C'D'", 'A(0,0,0)', 'B(4,0,0)'];
+
+  it('the point head admits the subject noun, He and En', () => {
+    const bare = ans(CUBE_PINNED, 'A');
+    expect(bare.answer).not.toBeNull();
+    for (const q of ['נקודה A', 'הנקודה A', 'קודקוד A', 'point A', 'vertex A'])
+      expect(ans(CUBE_PINNED, q).answer, q).toBe(bare.answer);
+  });
+
+  it('the coordinate-noun forms answer, INCLUDING the plurals a student types', () => {
+    // the sweep's second find: the suffix gate was `\w*`, which is ASCII — so «קואורדינטות» (the plural
+    // form the panel itself prints) could never match it while «קואורדינט» could. Same class, same head.
+    const bare = ans(CUBE_PINNED, 'A');
+    for (const q of ['שיעורי A', 'שיעורים של A', 'קואורדינט A', 'קואורדינטות A', 'קואורדינטים של A', 'coordinates of A'])
+      expect(ans(CUBE_PINNED, q).answer, q).toBe(bare.answer);
+  });
+
+  it('a letter that is NOT a point of the figure still refuses', () => {
+    const r = ans(CUBE_PINNED, 'נקודה Z');
+    expect(r.answer).toBeNull();
+    expect(r.note).toBe('notUnderstood');
+  });
+
+  it('the plane head is unchanged', () => {
+    const steps = [...CUBE_PINNED, 'C(4,4,0)'];
+    expect(ans(steps, 'מישור ABC').text).toBe(ans(steps, 'מישור ABC').text);
+    expect(ans(steps, 'נקודה A').answer).toBe(ans(steps, 'A').answer);
+  });
+
+  it('the sibling heads take their noun too — length and volume', () => {
+    const prism = ['מנסרה משולשת ישרה', 'זוית CAB=90', 'AB=u', 'AC=v', "AA'=w", '|u|=3', '|v|=4'];
+    expect(ans(prism, 'אורך הקטע AB').answer).toBe(ans(prism, 'אורך AB').answer);
+    expect(ans(prism, 'אורך צלע AB').answer).toBe(ans(prism, 'אורך AB').answer);
+    expect(ans(prism, 'the length of segment AB').answer).toBe(ans(prism, 'אורך AB').answer);
+    expect(ans(prism, 'אורך AB').answer).not.toBeNull();
+  });
+});

@@ -4173,3 +4173,77 @@ spellings — both orientations of both pairs across bars, `אורך` and colon,
 a prism edge (the class is the rider, not the parallelepiped); stability — adding the ratio moves E and
 nothing else; and the honesty set — a contradicting ratio still refuses, an agreeing one verifies, «אמצע»
 stays determined, the non-chain form refuses instead of guessing, and a bare membership still invents no `t`.
+
+## ADR-3D-160 — the head of a defining statement is READ ONCE: noun, article, name, separator (#640, #642, #504)
+
+**Context.** The operator typed the exam's own line into prod:
+
+```
+ישר l x=(-1,5,-11)+t(m-1,5-m,-2)
+```
+
+It appeared in the fact list — built by the **LLM fallback**. The deterministic parser refused it, so a
+capability shipped in 2024-Q2 (ADR-3D-006) was reachable in production only through a paid, unchecked guess.
+Measured, the body was never the problem: `הישר l: …` and `l: …` parse, `ישר l: …` and `הישר l …` do not.
+`parametricLine` had spelled its own head — `(?:הישר\s+|line\s+)?…\s*:\s*` — with the definite article
+baked in as a literal and the separator fixed at a colon, while the shared `HE_LINE` token exists in the same
+file for exactly this reason.
+
+The measurement also turned up a **second, worse defect the report did not name.** `planeByEquation` was
+believed tolerant of the dash form; it is not. The dash fell *into* the equation and became a unary minus, so
+
+```
+מישור π1 - x+(m-2)y+(m-1)z-5=0     built  −x+(m-2)y+(m-1)z-5=0
+```
+
+— a different plane from the one the student wrote, echoed back to them as their own words. A silent
+misreading is worse than a refusal, and no test had ever compared the dash form against the colon form.
+
+**Decision.** A statement that names an object and then carries its **defining body** reads its head through
+ONE shared reader — `matchDefHead` + `defBody` — never a per-rule spelling. The head is: an optional noun
+(article included, via the shared `HE_PLANE` / `HE_LINE` gates), the name, and a separator drawn from one
+list: `:` · a spaced dash · the copula `הוא`/`is` · nothing at all. `parametricLine` and `planeByEquation`
+now consume it, so their tolerance cannot drift apart again.
+
+Two rules follow from the reading, and both are typography rather than per-input special cases:
+
+- **A spaced dash after a NAME is a separator; a glued minus is the student's sign.** `π1 - x+…` is a
+  labelled body, `π1 -x+…` is a negative coefficient. A leading negative is written glued or after a colon.
+- **An equation stated without `= 0` means `= 0`** (#504's remainder). `parseLinearEq` stays the gate — it is
+  all-or-nothing and demands a real x/y/z term — so a point-run plane (`מישור ABC`) and a bare free-plane
+  declaration (`מישור π2`) can never be read as equations.
+
+**Why a permissive head is safe against first-match-wins.** `parametricLine` runs before `planeByEquation`
+and `freeLineDecl`, and the audit comment on #640 flagged widening the separator as the risky half. It is
+safe by construction and not by ordering luck: each rule's BODY stays its own strict gate, and a rule whose
+body does not match returns null, so the registry simply moves on. A head with no body at all (`ישר l`) is
+still the free-line declaration.
+
+**The class, swept.** Every other site that spelled a noun gate inline now uses the shared token: the
+line-⟂-plane given and the never-parallel claim both demanded the article (`ישר ℓ ניצב למישור π` was
+refused); the never-parallel claim's plane operand rejected the articled form.
+
+**The query lane had the same defect one file over (#642).** `engine/queries.ts` re-spells the Hebrew gates
+because it cannot import from `parser/`, and its point head listed the two *coordinate* nouns and forgot the
+**subject** noun — so «נקודה A» answered «לא זוהה» while bare «A» answered. Fixed at the gate (`Q_SUBJ`), and
+the sweep the plan asked for found three more cells: the length head refused the segment noun
+(«אורך הקטע AB»), the volume head refused the solid noun before a vertex run, and the coordinate noun's
+suffix gate was `\w*` — **ASCII**, so «קואורדינטות» (the plural the panel itself prints) could never match
+while «קואורדינט» could.
+
+**Deliberately NOT done: hoisting the Hebrew gates to a module both trees import.** That is a layering
+decision the operator reserved on #642, so the duplication is recorded in code where it lives rather than
+resolved by a third copy. It has a real cost: the AREA head still refuses «שטח המשולש ABC», because fixing
+that cell needs the polygon vocabulary that only `parser/` holds — filed as #753 rather than copied.
+
+**Consequences.** #504 is closed by this work, not by #509. Its filed premise — *"the component parser
+accepts numerics only"* — is disproven: symbolic components have parsed since ADR-3D-006, and what escalated
+in prod was the head. It was blocked on #509's scalar carrier since 2026-08-10 and skipped by round #596 on
+that basis; nothing in #509 was needed.
+
+Locks: the full article × separator × (numeric | symbolic) matrix, He + En, every cell reaching the *same*
+`line3` command and asserted as **deterministic parse, not merely "builds"** (`parse3-v3.test.ts`); the plane
+head's separator-vs-sign pair and the `= 0`-less form; the neighbours the permissive head must never steal
+(`מישור ABC`, `מישור π2`, `ישר l`); the query lane's noun equality with the bare form, both languages, plus
+the plural coordinate nouns and a stray letter still refusing (`queries.test.ts`); and the fixture
+`param-line-2024-q2.geo3.json` — the operator's exam session, typed the way the book prints it.

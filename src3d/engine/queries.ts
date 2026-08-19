@@ -58,6 +58,20 @@ export interface QueryResult {
 
 const PT = String.raw`[A-Z]\d*'?`;
 
+/**
+ * #642 — the SUBJECT NOUN, in the query lane. `parseQuery`'s heads spell their noun gates inline and
+ * came out one entry short exactly as `parse3.ts` did (#640): the point head listed the two COORDINATE
+ * nouns and forgot the subject one, so the bare label answered and the named form was «not recognised».
+ * A student names the thing they are asking about; that is a gate, not a per-head synonym list.
+ *
+ * These MIRROR `parse3.ts`'s `HE_SUBJ` / `HE_SEG` and are a second copy — the real debt. `engine/`
+ * cannot import from `parser/` (the layering forbids it), so the same Hebrew gates are maintained in
+ * two files and have now drifted twice. Hoisting them to a module both may import is a layering
+ * decision the operator reserved (#642), so it is recorded rather than taken: see #753.
+ */
+const Q_SUBJ = String.raw`(?:ה?(?:נקוד[הת]|קודקוד)\s+|(?:the\s+)?(?:point|vertex)\s+)?`;
+const Q_SEG = String.raw`(?:ה?(?:קטע|צלע|מקצוע)\s+|(?:the\s+)?(?:segment|edge|side)\s+)?`;
+
 /** Resolve a token string to an operand against the figure: a declared vector, or a two-point pair. */
 function atomOf(c: Construction3, s: string): Atom | null {
   const t = s.trim();
@@ -131,7 +145,7 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
   // LENGTH: «|AB|» / «|w|» / «אורך AB» / «length w» — the bars/word mark the MAGNITUDE. A BARE «AB» is
   // the vector itself (handled last), following the math convention |AB| = length, AB = the vector.
   const barM = s.match(/^\|\s*(.+?)\s*\|$/);
-  const lenWord = s.match(/^(?:אורך|length|the\s+length\s+of|גודל|norm)\s+(.+)$/i);
+  const lenWord = s.match(new RegExp(`^(?:אורך|length|the\\s+length\\s+of|גודל|norm)\\s+${Q_SEG}(.+)$`, 'i'));
   const lenTok = barM?.[1] ?? lenWord?.[1];
   if (lenTok) {
     const a = atomOf(c, lenTok);
@@ -145,8 +159,13 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
     if (ids.length >= 3) return { kind: 'area', ids };
   }
 
+  // #642 — the solid noun, shared by the two volume forms below: the DEFINITE bare reference
+  // («volume of the prism») and the vertex-run form, which listed the run alone and so refused the
+  // noun a student naturally writes in front of it.
+  const Q_SOLID_NOUNS = String.raw`ה?מנסרה|ה?פירמידה|ה?קובייה|ה?תיבה|ה?מקבילון|prism|pyramid|cube|box|parallelepiped`;
+
   // VOLUME: «volume SABCD» / «נפח SABCD»
-  const volM = s.match(/^(?:נפח|volume|the\s+volume\s+of)\s+([A-Z0-9'\s]+)$/i);
+  const volM = s.match(new RegExp(`^(?:נפח|volume|the\\s+volume\\s+of)\\s+(?:${Q_SOLID_NOUNS}\\s+)?([A-Z0-9'\\s]+)$`, 'i'));
   if (volM) {
     const ids = volM[1].match(new RegExp(PT, 'g')) ?? [];
     if (ids.length >= 4) return { kind: 'volume', ids };
@@ -154,7 +173,7 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
   // #328: a DEFINITE bare solid NOUN with no vertex run — «נפח המנסרה» / «volume of the prism» — resolves to
   // THE one solid of that kind (the ADR-029 / ADR-3D-048 definite-reference pattern). Zero or several of that
   // kind → fall through to the honest "not recognized" note, never a silent guess.
-  const defVolM = s.match(/^(?:נפח|volume(?:\s+of\s+the)?)\s+(ה?מנסרה|ה?פירמידה|ה?קובייה|ה?תיבה|ה?מקבילון|prism|pyramid|cube|box|parallelepiped)$/i);
+  const defVolM = s.match(new RegExp(`^(?:נפח|volume(?:\\s+of\\s+the)?)\\s+(${Q_SOLID_NOUNS})$`, 'i'));
   if (defVolM) {
     const noun = defVolM[1];
     const kindRe =
@@ -187,7 +206,7 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
   // the vector lane is possible: `atomOf` reads a named vector only from a LOWERCASE letter, and a pair
   // needs two labels — an uppercase single letter can only be a point.
   {
-    const m = s.match(new RegExp(`^(?:ה?שיעורי(?:ם)?\\s+(?:של\\s+)?|ה?קואורדינ[טת]\\w*\\s+(?:של\\s+)?|coordinates\\s+of\\s+)?(${PT})\\s*(?:=\\s*\\?)?$`, 'i'));
+    const m = s.match(new RegExp(`^(?:ה?שיעורי[א-ת]*\\s+(?:של\\s+)?|ה?קואורדינ[טת][א-ת]*\\s+(?:של\\s+)?|coordinates\\s+of\\s+)?${Q_SUBJ}(${PT})\\s*(?:=\\s*\\?)?$`, 'i'));
     if (m && c.points.has(m[1])) return { kind: 'point', id: m[1] };
   }
 

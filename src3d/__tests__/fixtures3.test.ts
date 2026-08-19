@@ -41,6 +41,15 @@ const SEEDED: Record<string, string[]> = {
   ],
   // #552 — the operator's free-line request, exact notation: bare/⊥-created convention names,
   // a noun-declared arbitrary name, and both ∥ and membership pins on one figure.
+  // #640/#504/#639 — bagrut 35582 חורף תשפ"ד Q2, typed the way the EXAM prints it: the line with no
+  // definite article and no colon (the form that used to reach the paid LLM lane), then the parameterised
+  // plane, the ⟂ given that pins m, and the crossing point the exam asks for.
+  'param-line-2024-q2.geo3.json': [
+    'ישר l x=(-1,5,-11)+t(m-1,5-m,-2)',
+    'מישור π: 3x+my+(m+6)z+4=0',
+    'l ⊥ π',
+    'A נקודת החיתוך של l עם π',
+  ],
   'free-line-552.geo3.json': [
     'פירמידה BCKS',
     'l⊥BCK',

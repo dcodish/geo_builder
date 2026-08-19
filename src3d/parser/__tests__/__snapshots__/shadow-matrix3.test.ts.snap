@@ -745,6 +745,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "plane π1 - x + 2y + 3z - 5",
+    "winner": "planeByEquation",
+  },
+  {
+    "lang": "he",
+    "text": "מישור π1 - x + 2y + 3z - 5",
+    "winner": "planeByEquation",
+  },
+  {
+    "lang": "en",
     "text": "plane π2",
     "winner": "freePlaneDecl",
   },
@@ -851,6 +861,26 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   {
     "lang": "he",
     "text": "הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)",
+    "winner": "parametricLine",
+  },
+  {
+    "lang": "en",
+    "text": "line l x=(-1,5,-11)+t(m-1,5-m,-2)",
+    "winner": "parametricLine",
+  },
+  {
+    "lang": "he",
+    "text": "ישר l x=(-1,5,-11)+t(m-1,5-m,-2)",
+    "winner": "parametricLine",
+  },
+  {
+    "lang": "en",
+    "text": "line l - x = (1,2,3) + t(m+2, m, m-2)",
+    "winner": "parametricLine",
+  },
+  {
+    "lang": "he",
+    "text": "הישר l - x = (1,2,3) + t(m+2, m, m-2)",
     "winner": "parametricLine",
   },
   {

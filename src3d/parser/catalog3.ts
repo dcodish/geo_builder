@@ -106,6 +106,9 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'vectors', he: 'נתון: v = (10,-5,0), u = (5,5,-5)', en: 'given: v = (10,-5,0), u = (5,5,-5)' },
   // --- planes & lines ---
   { category: 'planesLines', he: 'המישור π1: z - 3 = 0', en: 'plane π1: z - 3 = 0' },
+  // #504: the same head, plane edition — a spaced dash is the separator (it used to fall into the
+  // equation as a unary minus), and the «= 0» may be left off.
+  { category: 'planesLines', he: 'מישור π1 - x + 2y + 3z - 5', en: 'plane π1 - x + 2y + 3z - 5' },
   // #487 (ADR-3D-124): a FREE plane — declared by name alone, orientation sampled until later givens pin it
   { category: 'planesLines', he: 'מישור π2', en: 'plane π2' },
   { category: 'planesLines', he: 'π2', en: 'π2' }, // Am. 1: the bare notation declares too — deterministic, no LLM call
@@ -120,6 +123,10 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'הישר k מאונך למישור BCK', en: 'line k is perpendicular to plane BCK' },
   { category: 'planesLines', he: 'B על הישר l1', en: 'B is on line l1' },
   { category: 'planesLines', he: 'הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)', en: 'line ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)' },
+  // #640: the head is the noun + the name + a separator, and all three are optional or interchangeable —
+  // the book prints the line with no article and no colon, which is what the operator typed in prod.
+  { category: 'planesLines', he: 'ישר l x=(-1,5,-11)+t(m-1,5-m,-2)', en: 'line l x=(-1,5,-11)+t(m-1,5-m,-2)' },
+  { category: 'planesLines', he: 'הישר l - x = (1,2,3) + t(m+2, m, m-2)', en: 'line l - x = (1,2,3) + t(m+2, m, m-2)' },
   {
     // ADR-3D-031: a pair-named parametric line also puts A,B ON the line (riders / verified givens)
     category: 'planesLines',
