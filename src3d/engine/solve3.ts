@@ -19,7 +19,7 @@
 import type { Construction3, Id, Positions3, ScalarPin } from './types';
 import { distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
-import { add3, cross3, dist3, dot3, newellNormal, norm3, scale3, sub3, v3, type Vec3 } from './vec3';
+import { add3, cross3, dist3, dot3, runNormal, norm3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 export interface GaugeParams {
   /** [tx, ty, tz, rx, ry, rz (axis-angle), logScale, ...dims] */
@@ -403,7 +403,7 @@ export function solvePivot(
       } else if (pin.mode === 'zero') {
         for (const p of ring) out.push(p[pin.axis] / ext);
       } else {
-        const n = newellNormal(ring);
+        const n = runNormal(ring);
         const nn = Math.max(norm3(n), 1e-12);
         out.push(n[pin.axis] / nn);
         if (pin.mode === 'contains') out.push(dot3(n, ring[0]) / (nn * ext));
@@ -421,7 +421,7 @@ export function solvePivot(
         out.push(10);
         continue;
       }
-      const n = newellNormal(pts as Vec3[]);
+      const n = runNormal(pts as Vec3[]);
       const nn = norm3(n);
       const dn = norm3(ln.dir);
       if (nn < 1e-12 || dn < 1e-12) {
@@ -735,7 +735,7 @@ export function solvePivot(
         continue;
       }
       const ring = pts as Vec3[];
-      const n = newellNormal(ring);
+      const n = runNormal(ring);
       let extent = 0;
       for (let i = 1; i < ring.length; i++) extent = Math.max(extent, dist3(ring[i], ring[0]));
       out.push((dot3(n, q) - dot3(n, ring[0])) / (Math.max(norm3(n), 1e-12) * Math.max(extent, 1e-9)));

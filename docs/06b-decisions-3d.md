@@ -4076,6 +4076,296 @@ zoom-about-pointer invariant asserted as "the point under the cursor maps to its
 no-op, and in/out being exact inverses; exactly one pan group wrapping ALL figure content; the reset
 button outside it; and the load-bearing one — `buildScene3` takes no pan parameter and emits identical
 scenes, so nothing derived from the scene can drift when the frame moves.
+## ADR-3D-159 — a ratio belongs to the RIDER, not to the sentence that declared it (#748)
+
+**Operator report (2026-08-19, prod).** «מקבילון» / «E על AA'» / «AE=2*EA'» — the third line came back
+*«הטענה לא מתקיימת בציור — בדקו את החישוב»*. `AE = 2·EA'` is not merely satisfiable, it is **closed-form
+determined**: E sits at t = ⅔. The tool refused a correct given and told the student to check their
+arithmetic, on the strength of a configuration **it had sampled itself** — the ADR-052 cardinal sin, and
+exactly the false accusation ADR-3D-138 exists to kill.
+
+**Root cause — a capability bound to one code path rather than to the concept.** The reading existed and
+was correct. `ratioT` had computed `AE = c·EA' ⇒ t = c/(c+1)` since the first 3-D commit (ADR-3D-001/002/003),
+and «K על AA' כך ש-AK = 2KA'» is both a locked scenario (2020 קיץ Q2) and an in-app example (`he.json`
+`examples.ex4`). But `ratioT` was called **only from inside the `onSegment` parser rule, against the
+declaration string**. The same ratio typed as its own fact never reached it: it was claimed by the
+`vec-rel` rule, and the M1 claim-vs-drive fork chose *claim*, which refuted.
+
+So the defect was not a missing DOF. A bare «E על AA'» correctly emits `t` **absent** — the free 1-DOF
+rider `types.ts` documents — and the seed search samples it. The gap was that no **stated** constraint
+could retarget it. Three spellings, three failure registers, one cause:
+
+| stated on its own line | lowered to | before |
+| --- | --- | --- |
+| `AE=2*EA'`, `AE = 2EA'`, `AE=2EA'` | `vec-rel` | `claim-refuted` |
+| `AE:EA' = 2:1` | `length-ratio` claim | `claim-refuted` |
+| `\|AE\| = 2\|EA'\|`, `אורך AE = 2*EA'` | `length-rel` (the *drive* path) | `givens-contradict`, `others: []` |
+
+The third row is worth its own note: it reached the drive path and still failed, because `solve3`'s unknown
+vector is the 7 gauge unknowns plus free dims and open symbols — an on-segment `t` is not among them, so
+the solver reshaped the *box* while E stayed put. **This ADR does not add `t` to the solver**, and does not
+need to (below).
+
+**The decision.** The ratio reading belongs to the rider. Two changes, both at chokepoints:
+
+1. **`src3d/engine/onSegmentRatio.ts` — `riderPairsT`, one home for the arithmetic**, imported by both
+   parse3 and the apply reducer, so the declaration clause and the standalone fact cannot drift apart.
+2. **`applyCommand3Inner` normalizes a rider ratio into the `point-on-segment3` given it is** — at the one
+   entry point every command passes through, the ADR-3D-089 `parallelepiped` precedent. `ratioHalves` reads
+   all three command shapes into `(pair1, pair2, k)`; one retarget serves them. And inside
+   `point-on-segment3`, an existing **free** rider of the same host now takes a stated `t` as a *definition
+   update* rather than delegating to the `vec-rel` dual — that dual asked "does it hold?" of a point whose
+   whole point is that it has not been placed yet, and refuted the given that was about to place it. An
+   enumeration one member short (ADR-3D-095/097/100/#517), in the branch added for ADR-3D-047.
+
+**Why no solver change is needed, and why that is not a shortcut.** `AE = 2·EA'` on a rider of AA' is a
+**definition**, not a constraint to satisfy: it fixes `t` in closed form. Adding `t` to the least-squares
+unknowns would make a determined quantity into something *searched for*, which is strictly worse — slower,
+and approximate where exact arithmetic exists.
+
+**A LENGTH pair is unordered; only a VECTOR pair is directed.** The arithmetic is the same two formulas
+either way — for rider R between the host's a and b (`d = b − a`):
+
+- `|aR| = k·|Rb|` ⇒ `t = k/(k+1)`, and the directed `a→R = k·(R→b)`: `t·d = k(1−t)·d` gives the same t
+- `|bR| = k·|Ra|` ⇒ `t = 1/(k+1)`, likewise from `b→R = k·(R→a)`
+
+What differs is *which spellings are the same statement*. `|A'E|` and `|EA'|` are the same number, so a
+length statement must accept either spelling of either side; `A→E` and `A'→E` are different vectors, so a
+`vec-rel` may not. Orientation is therefore the **caller's** business: `riderPairsT` matches both pairs as
+sets, and `ratioHalves` marks only `vec-rel` as `directed`, which narrows the candidate rider to the shared
+middle letter before the arithmetic runs. The parser's clause is a *length* clause — there is no vector
+reading inside «X על YZ כך ש-…» — so it is unordered too.
+
+The non-chain **vector** spelling `AE = 2·A'E` is still not read: as vectors it means t = 2 (E off the
+segment), as lengths t = ⅔, and believing either would be a guess. It refuses.
+
+`k > 0` is required, which is also why this family can never drive `t` outside the segment — `k/(k+1)` and
+`1/(k+1)` are both in `(0,1)` for every positive k. `not-on-segment` is therefore unreachable from here by
+construction, and no dead guard was added to pretend otherwise.
+
+**Amendment (same day, operator play).** The first cut got exactly this wrong: it demanded the directed
+chain everywhere, so «|AE| = 2|A'E|» was refused while «|AE| = 2|EA'|» — *the same statement* — built. The
+defect was an orientation requirement applied to shapes where orientation carries no meaning, and it hit
+every length spelling: `|AE| = 2|A'E|`, `|A'E| = 0.5|AE|`, `אורך AE = 2*A'E`, `AE:A'E = 2:1`, `A'E:AE = 1:2`.
+A narrower reading of the honesty argument (*"the vector and length readings disagree, so refuse"*) had been
+carried over to spellings that are unambiguously about lengths — the bars, the `אורך` head and the colon
+ratio all say so — where there was nothing to disambiguate. All six are now locked, as is the clause twin
+«כך ש-AE = 2A'E».
+
+**A rider whose `t` is already stated is left alone.** It falls through to the ordinary claim lane, so
+«כך ש-AE = 2EA'» followed by «AE = 3EA'» still refuses — that second statement genuinely contradicts the
+first, and `claim-refuted` is the honest register for it. Only a *free* rider is retargeted.
+
+**One thing the triage got wrong, recorded so it is not re-filed.** The `length-rel` row's raw error carries
+`others: []`, which looked like a second honesty defect — the student accused of conflicting with nothing.
+It is not: `App3` already branches on an empty list and renders `err.givensContradictAlone` («…אין גוף
+שמקיים את «{{stated}}» יחד עם שאר הנתונים»), which is accurate. The raw shape is fine and nothing was
+changed there.
+
+**Left unbuilt, deliberately:** making `t` a genuine solver unknown. Only a non-closed-form driver would
+need it — an angle at the rider, a distance to it — and no such input has been reported. The ratio family,
+which is what bagrut questions actually state, is exact without it.
+
+Locks (`issue-748-rider-ratio.test.ts`, 26): the operator's exact three lines with **|AE|/|EA'| asserted at
+2**, not merely "no error"; the split form landing every vertex on the one-line form's figure; all fourteen
+spellings — both orientations of both pairs across bars, `אורך` and colon, the rider-first
+`|EA'| = 0.5|AE|`, the reversed host `A'E = 2EA`; the clause twin; the English mirror;
+a prism edge (the class is the rider, not the parallelepiped); stability — adding the ratio moves E and
+nothing else; and the honesty set — a contradicting ratio still refuses, an agreeing one verifies, «אמצע»
+stays determined, the non-chain form refuses instead of guessing, and a bare membership still invents no `t`.
+
+## ADR-3D-160 — the head of a defining statement is READ ONCE: noun, article, name, separator (#640, #642, #504)
+
+**Context.** The operator typed the exam's own line into prod:
+
+```
+ישר l x=(-1,5,-11)+t(m-1,5-m,-2)
+```
+
+It appeared in the fact list — built by the **LLM fallback**. The deterministic parser refused it, so a
+capability shipped in 2024-Q2 (ADR-3D-006) was reachable in production only through a paid, unchecked guess.
+Measured, the body was never the problem: `הישר l: …` and `l: …` parse, `ישר l: …` and `הישר l …` do not.
+`parametricLine` had spelled its own head — `(?:הישר\s+|line\s+)?…\s*:\s*` — with the definite article
+baked in as a literal and the separator fixed at a colon, while the shared `HE_LINE` token exists in the same
+file for exactly this reason.
+
+The measurement also turned up a **second, worse defect the report did not name.** `planeByEquation` was
+believed tolerant of the dash form; it is not. The dash fell *into* the equation and became a unary minus, so
+
+```
+מישור π1 - x+(m-2)y+(m-1)z-5=0     built  −x+(m-2)y+(m-1)z-5=0
+```
+
+— a different plane from the one the student wrote, echoed back to them as their own words. A silent
+misreading is worse than a refusal, and no test had ever compared the dash form against the colon form.
+
+**Decision.** A statement that names an object and then carries its **defining body** reads its head through
+ONE shared reader — `matchDefHead` + `defBody` — never a per-rule spelling. The head is: an optional noun
+(article included, via the shared `HE_PLANE` / `HE_LINE` gates), the name, and a separator drawn from one
+list: `:` · a spaced dash · the copula `הוא`/`is` · nothing at all. `parametricLine` and `planeByEquation`
+now consume it, so their tolerance cannot drift apart again.
+
+Two rules follow from the reading, and both are typography rather than per-input special cases:
+
+- **A spaced dash after a NAME is a separator; a glued minus is the student's sign.** `π1 - x+…` is a
+  labelled body, `π1 -x+…` is a negative coefficient. A leading negative is written glued or after a colon.
+- **An equation stated without `= 0` means `= 0`** (#504's remainder). `parseLinearEq` stays the gate — it is
+  all-or-nothing and demands a real x/y/z term — so a point-run plane (`מישור ABC`) and a bare free-plane
+  declaration (`מישור π2`) can never be read as equations.
+
+**Why a permissive head is safe against first-match-wins.** `parametricLine` runs before `planeByEquation`
+and `freeLineDecl`, and the audit comment on #640 flagged widening the separator as the risky half. It is
+safe by construction and not by ordering luck: each rule's BODY stays its own strict gate, and a rule whose
+body does not match returns null, so the registry simply moves on. A head with no body at all (`ישר l`) is
+still the free-line declaration.
+
+**The class, swept.** Every other site that spelled a noun gate inline now uses the shared token: the
+line-⟂-plane given and the never-parallel claim both demanded the article (`ישר ℓ ניצב למישור π` was
+refused); the never-parallel claim's plane operand rejected the articled form.
+
+**The query lane had the same defect one file over (#642).** `engine/queries.ts` re-spells the Hebrew gates
+because it cannot import from `parser/`, and its point head listed the two *coordinate* nouns and forgot the
+**subject** noun — so «נקודה A» answered «לא זוהה» while bare «A» answered. Fixed at the gate (`Q_SUBJ`), and
+the sweep the plan asked for found three more cells: the length head refused the segment noun
+(«אורך הקטע AB»), the volume head refused the solid noun before a vertex run, and the coordinate noun's
+suffix gate was `\w*` — **ASCII**, so «קואורדינטות» (the plural the panel itself prints) could never match
+while «קואורדינט» could.
+
+**Deliberately NOT done: hoisting the Hebrew gates to a module both trees import.** That is a layering
+decision the operator reserved on #642, so the duplication is recorded in code where it lives rather than
+resolved by a third copy. It has a real cost: the AREA head still refuses «שטח המשולש ABC», because fixing
+that cell needs the polygon vocabulary that only `parser/` holds — filed as #753 rather than copied.
+
+**Consequences.** #504 is closed by this work, not by #509. Its filed premise — *"the component parser
+accepts numerics only"* — is disproven: symbolic components have parsed since ADR-3D-006, and what escalated
+in prod was the head. It was blocked on #509's scalar carrier since 2026-08-10 and skipped by round #596 on
+that basis; nothing in #509 was needed.
+
+Locks: the full article × separator × (numeric | symbolic) matrix, He + En, every cell reaching the *same*
+`line3` command and asserted as **deterministic parse, not merely "builds"** (`parse3-v3.test.ts`); the plane
+head's separator-vs-sign pair and the `= 0`-less form; the neighbours the permissive head must never steal
+(`מישור ABC`, `מישור π2`, `ישר l`); the query lane's noun equality with the bare form, both languages, plus
+the plural coordinate nouns and a stray letter still refusing (`queries.test.ts`); and the fixture
+`param-line-2024-q2.geo3.json` — the operator's exam session, typed the way the book prints it.
+
+## ADR-3D-161 — the knowledge frame-gate asks the placement funnel's question, not a list of absolute kinds (#639)
+
+**Context.** The operator built the exam's figure in prod — a parametric line, an equation plane, `ℓ ⟂ π`,
+and their crossing `A` — and reported: *"point A is not defined or there is no way for me to get point A.
+Now we did have an issue like that reported. I thought we fixed it."*
+
+They were right on both counts. The panel derives `m = −5` correctly, `resolve3` holds
+`A = (2, 0, −10)` **identically at every seed**, and `src3d/engine/__tests__/lines3.test.ts` has asserted
+that number since ADR-3D-006 — while `dataView().pointCoords` was `{}`, the canvas drew no coordinate label,
+and the query lane answered **«נקודה A — לא נקבע על ידי הנתונים»**. On the exam's part ג — *«מצאו את שיעורי
+הנקודה A»* — the tool held the answer and stated the opposite. The plane equation the student typed was
+denied the same way.
+
+**Root cause.** `translationPinned3` gated every point-coordinate and plane surface, and it was
+`c.pins.length > 0 || absolutePointCount(c) > 0` — an **enumeration of the absolute sources that happened to
+be in front of us when #517 was fixed**. The operator's figure has neither: its absolute frame is an equation
+plane and a parametric line. Twelve lines above it sat `hasAbsoluteFrameObject`, which answers correctly, and
+which the SOLVER already consults — that is why it samples the placement instead of freezing it. Only the
+knowledge gate did not. `src3d/CLAUDE.md`, verbatim: *"An enumeration is not a rule. Repeatedly, a correct
+rule was applied to a whitelist one member short."* This is #517's own class, recurring on the members that
+were not in the room that day.
+
+**Decision.** The gate asks the question it actually depends on — *is a drawn position CHOSEN or DERIVED?* —
+and asks it of the construction:
+
+1. a stated absolute POSITION determines the placement outright (today's first arm, unchanged);
+2. with **no** absolute frame object, translation is a pure gauge the funnel freezes, so nothing
+   translation-dependent is knowledge (#315's figures are byte-identical);
+3. otherwise the frame is absolute, and the only remaining question is whether the figure's **gauge-placed
+   content** is being sampled — `placementSampled3(c)` — or whether there is none, which is exactly the
+   operator's figure: every object is Lane-A absolute and no vertex was ever placed by convention.
+
+Seed-stability stays the per-quantity arbiter underneath. What changed is *when that arbiter is sound*, and
+that is now the funnel's own predicate rather than a second opinion about it.
+
+**One predicate, one definition.** `translationGaugeFree3`, `gaugePlacedIds3`, `freePlaneOffsetPinned3` and
+`freePlaneFigurePinned3` were hoisted out of `resolve3`'s body, and `resolve3` now consumes them. The solver
+and the knowledge gate therefore cannot drift apart about what "sampled" means — the drift that produced this
+bug. (`rotationFree` needs resolved lines and stays inside `resolve3`; it is not needed here, because every
+pin it names is also named by `translationGaugeFree3` — rotation-free strictly implies translation-free, so
+the funnel's `translationFree || rotationFree` reduces to the pure half.)
+
+**What this deliberately does NOT do.** It does not open the gate figure-wide the moment an equation plane
+exists. In the mixed figure — a cube plus the line and the plane — the cube's vertices roam with the sampled
+placement and the per-point stability test drops them, while the crossing point is identical at every seed and
+prints. A figure whose placement is pinned by a MEMBERSHIP is neither stated nor sampled but **frozen**, so
+its coordinates are seed-stable without being knowledge, and the gate stays shut: that case is #611's defect
+in the opposite direction, and it is the reason the predicate asks the funnel's question instead of "is there
+an absolute object anywhere".
+
+`vectorFramePinned3` rides the same predicate (it already ORed the old one), so the vector family inherits the
+correction: a vector between two Lane-A points is knowledge, a cube edge under a sampled placement is not.
+
+Locks (`frame-gates.test.ts`): the operator's exact sequence — `A` reads `(2, 0, −10)` in the panel and from
+the query box at seeds 0, 1, 2, 7 and 99, and `מישור π` answers `3x − 5y + z + 4 = 0`; **the over-reach
+guard** — in the mixed figure the cube prints nothing while `A1` prints, with the mechanism asserted (the
+cube's `A` moves more than 1e-2 between seeds, `A1` less than 1e-9); a figure with no absolute object
+unchanged (#315); and the membership-pinned figure staying silent. The exam session itself is a fixture
+(`param-line-2024-q2.geo3.json`, ADR-3D-160).
+
+## ADR-3D-162 — a plane named by POINTS is a SET: the run normal is order-free (#571)
+
+**Context.** On a cube, «מישור BB'DD'» — the diagonal plane, named the way a student naturally names it,
+by its two vertical edges BB' and DD' — was refused **`not-coplanar`**. The same four points in a
+non-crossing order («מישור BB'D'D», «מישור BDD'B'») build fine. B, B', D and D' are perfectly coplanar, so
+the message asserted a geometric fact that does not hold: an honesty violation, not a missing convenience.
+
+**Root cause.** `planeFromPointRun` computed `newellNormal` over the **stated** vertex order. The Newell
+normal is twice the polygon's SIGNED-AREA vector, so B→B'→D→D' traces a self-intersecting bowtie whose two
+triangles have equal and opposite signed area and the normal comes out **exactly 0** (measured on the
+cube's coordinates). Resolution returned null, and the store's plane-through verifier reported
+`not-coplanar` for want of a resolved plane.
+
+The class: **an order-SENSITIVE computation answering an order-FREE question.** A plane named by points is
+a set; every stated order must resolve to the same plane. The verifier's actual honesty guard — every named
+point lies on the resolved plane — is order-free already and is untouched.
+
+**Decision.** One shared order-free run normal, `runNormal` in `vec3.ts`, consumed by every student-run call
+site: `planeFromPointRun`, the ⟂-pin residuals and the membership residual in `solve3`, the S1 plane-run
+operand, the plane claims, the right-apex base and the height's foot in `evaluate`, and the display lane
+(`linePlaneAngleAt`, the plane-angle query, the plane query's ring). It takes the largest triple cross
+product, which is a function of the point SET, so every ordering gives the same plane.
+
+Two properties are kept deliberately, and they are what make this a replacement rather than a new
+behaviour:
+
+- **Orientation.** The stated order still decides the normal's SIGN whenever it says anything (the
+  right-hand rule), so every figure that resolves today keeps its exact normal direction — which is what
+  «above/below the plane» and the solver's signed residuals read. A self-crossing order says nothing about
+  orientation, and there the sign is fixed deterministically by making the dominant component positive
+  (stable across iterations and seeds, unlike a first-non-zero rule). No figure that converges today can be
+  destabilised, because for all of them the sign still comes from Newell.
+- **Refusals.** Collinear and coincident runs still return the zero vector, so every caller's degeneracy
+  guard fires exactly as before, and coplanarity is still verified separately — «מישור ABCA'» still refuses.
+
+**Canonical rings keep `newellNormal`.** A solid's faces and a polygon's own ring are built in non-crossing
+order, and for those the order IS the shape: it names the edges. Only a run used to NAME A PLANE is the
+order-free question.
+
+**The drawn ink (operator ruling, 2026-08-16).** `runRingOrder` reorders the run into the non-crossing ring
+around that plane, and the #318 `'face'` patch draws that. Inking B→B'→D→D' would draw a crossed bowtie —
+asserting a self-crossing the student never stated. The angles are measured in [0, 2π) from the run's first
+point, so a run already stated non-crossing comes back byte-identical and every existing face patch draws
+exactly as before.
+
+**Semantic ruling recorded (2026-08-16):** *"a plane between 2 parallel lines is possible and should be
+supported."* This is the same plane #532 capability 1 names another way («π1 עובר דרך BB' ו-DD'»); they must
+agree, and neither may be half-supported.
+
+Locks (`issue-571-plane-run-order.test.ts`, 9): the operator's exact sequence building with every fact ok;
+**stated-order invariance** — six orderings of the coplanar run resolving to one plane identity; the honest
+refusal surviving on a genuinely non-coplanar run, which never enters the fact list; a canonical face
+keeping its old orientation; the primitives (a bowtie's Newell normal is zero while its run normal is
+sound, a non-crossing order keeps its stated orientation and the reversed order is genuinely opposite,
+degenerate runs still return zero); and the drawn patch being a SIMPLE ring — with the stated order proven
+to self-cross, so the reorder is load-bearing rather than decorative. Fixture:
+`plane-run-order-571.geo3.json`.
+
 ## ADR-3D-163 — «הורידו שאלה» arrives, and the list is the student's own words (#745)
 
 **Status:** accepted, 2026-08-18 · **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745)

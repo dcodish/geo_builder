@@ -21,6 +21,7 @@ import { readOperand, readRelationSides } from './operandToken';
 import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
+import { riderPairsT } from '../engine/onSegmentRatio';
 
 export type ParseResult3 =
   | { ok: true; commands: Command3[] }
@@ -145,6 +146,49 @@ const HE_LINE = String.raw`ה?ישר`;
 const HE_SEG = String.raw`ה?(?:קטע|צלע|מקצוע)`;
 /** An optional «the point» / «the vertex» before a label. */
 const HE_SUBJ = String.raw`(?:ה?(?:נקוד[הת]|קודקוד)\s+)?`;
+/**
+ * #640 — the DEFINING-BODY separator, shared. A rule of the shape «<noun> <name><sep><body>» — a
+ * parametric line, a plane equation — reads three optional things before the body: the noun, its
+ * definite article (both above), and the SEPARATOR between the name and the body. The separator was
+ * spelled privately by each rule and the two drifted apart: `parametricLine` demanded a literal `:`
+ * (so «ישר l x=…», the form the book prints, was a paid LLM call), while `planeByEquation` accepted a
+ * spaced dash by ACCIDENT — it fell into the equation and became a unary minus, so «מישור π1 - x+y+z=1»
+ * silently built the plane «-x+y+z=1». One reader, so the tolerance and the reading are the same
+ * everywhere.
+ *
+ * A spaced dash counts as a separator only AFTER a name («π1 - x+…»); a glued minus («π1 -x+…», or a
+ * dash with no name before it) is the student's sign and is left in the body. That is typography, not
+ * a per-input rule: a leading negative is written glued or after a colon, and a name-then-dash is how
+ * a book labels a defining line.
+ */
+/**
+ * The head of a defining statement: an optional noun (article included), the object's NAME, and the
+ * separator `defBody` reads. Returns `[full, name, body]` so a rule reads its two halves positionally.
+ * The BODY stays each rule's own strict gate — a permissive head can therefore never steal an utterance
+ * from a later rule: a rule whose body does not match declines and the registry moves on.
+ */
+function matchDefHead(s: string, nounSrc: string, nameSrc: string): RegExpMatchArray | null {
+  const m = s.match(new RegExp(`^${nounSrc}${nameSrc}([\\s\\S]*)$`));
+  if (!m) return null;
+  const name = m[1];
+  const body = defBody(m[m.length - 1] ?? '', !!name);
+  if (body === null) return null;
+  return [m[0], name, body] as unknown as RegExpMatchArray;
+}
+
+function defBody(rest: string, named: boolean): string | null {
+  const colon = rest.match(/^\s*:\s*(\S.*)$/); // `:` — always a separator
+  if (colon) return colon[1];
+  const copula = rest.match(/^\s+(?:הוא|is)\s+(\S.*)$/i); // the copula
+  if (copula) return copula[1];
+  if (named) {
+    const dash = rest.match(/^\s+[-–—]\s+(\S.*)$/); // a SPACED dash after a NAME
+    if (dash) return dash[1];
+  }
+  const bare = rest.match(/^\s*(\S.*)$/); // nothing at all: the body follows the name directly
+  return bare ? bare[1] : null;
+}
+
 /** The optional «is / lies» copula that can precede a membership verb, in either language. */
 const IS_AT = String.raw`(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?`;
 
@@ -840,26 +884,20 @@ const midpoint: Rule = (s) => {
  * silently dropped); undefined when no clause is stated.
  */
 function ratioT(s: string, id: Id, a: Id, b: Id): number | 'invalid' | undefined {
+  // #748: the letters-and-arithmetic reading lives in `riderPairsT`, shared with the apply reducer, so
+  // this clause and the same ratio typed as its OWN fact cannot drift apart. Here we only find the
+  // numbers; `undefined` means "no ratio clause was stated" (a free slider), never "it is false".
+  // A ratio CLAUSE is about lengths — there is no vector reading inside «X על YZ כך ש-…» — so either
+  // spelling of either pair is the same statement («כך ש-AE = 2A'E» is «כך ש-AE = 2EA'»).
   const colon = s.match(/([A-Z]\d*'?)([A-Z]\d*'?)\s*:\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/);
   if (colon) {
     const [, p1, x, y, q1, pNum, qNum] = colon;
-    if (x !== id || y !== id) return 'invalid';
-    const p = parseFloat(pNum);
-    const q = parseFloat(qNum);
-    if (!(p > 0) || !(q > 0)) return 'invalid';
-    if (p1 === a && q1 === b) return p / (p + q);
-    if (p1 === b && q1 === a) return q / (p + q);
-    return 'invalid';
+    return riderPairsT(id, a, b, p1, x, y, q1, parseFloat(pNum) / parseFloat(qNum));
   }
   const m = s.match(/([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*(\d+(?:\.\d+)?)\s*[·×*]?\s*([A-Z]\d*'?)([A-Z]\d*'?)/);
   if (!m) return undefined;
   const [, p, x, num, y, q] = m;
-  if (x !== id || y !== id) return 'invalid';
-  const c = parseFloat(num);
-  if (!(c > 0)) return 'invalid';
-  if (p === a && q === b) return c / (c + 1);
-  if (p === b && q === a) return 1 / (c + 1);
-  return 'invalid';
+  return riderPairsT(id, a, b, p, x, y, q, parseFloat(num));
 }
 
 /** `K על AA'` (+ optional `כך ש-AK = 2KA'`) / `K on AA' such that AK = 2KA'`. No ratio ⇒ a free slider. */
@@ -1733,15 +1771,20 @@ const planeByEquation: Rule = (s) => {
   // `הוא`/`is` (`המישור x-y+z=1`, `המישור π2 x-y+z=1`, `מישור π1 הוא z-3=0`); the tail
   // must contain `=` so a point-run plane (`מישור ABC`, no `=`) is never stolen, and
   // parseLinearEq strictly validates it (all-or-nothing).
-  const m = s.match(new RegExp(`^(?:ה?מישור\\s+|(?:the\\s+)?plane\\s+)?(${PLANE_NAME.source})?\\s*(?::|הוא\\s|is\\s)?\\s*([^:]*=[^:]*)$`));
+  const m = matchDefHead(s, `(?:${HE_PLANE}\\s+|(?:the\\s+)?plane\\s+)?`, `(${PLANE_NAME.source})?`);
   if (!m) return null;
-  const eq = parseLinearEq(m[m.length - 1]);
+  // #504: the equation may be stated with the `= 0` LEFT OFF — the book prints a plane both ways and
+  // they name the same plane. `parseLinearEq` stays the gate: it is all-or-nothing and demands a real
+  // x/y/z term, so a point-run plane (uppercase labels) and a bare free-plane declaration (no body at
+  // all) can never be read as one.
+  const src = m[2].includes('=') ? m[2] : `${m[2]}=0`;
+  const eq = parseLinearEq(src);
   if (!eq) return null;
   return [
     {
       type: 'plane3',
       name: m[1] ? canonicalPlane(m[1]) : 'π',
-      plane: { cx: eq.cx, cy: eq.cy, cz: eq.cz, d: eq.d, src: m[m.length - 1].trim() },
+      plane: { cx: eq.cx, cy: eq.cy, cz: eq.cz, d: eq.d, src: src.trim() },
       param: eq.param,
     },
   ];
@@ -1964,7 +2007,7 @@ const angleBetweenPlanes: Rule = (s) => {
 /** `מ-A מורידים אנך למישור π1 החותך אותו בנקודה B` / `from A drop a perpendicular to plane π1, it cuts it at B`. */
 const dropPerpToPlane: Rule = (s) => {
   const he = s.match(
-    new RegExp(`^מ-?([A-Z]\\d*'?)\\s+(?:מורידים|הורידו|מוריד|מעבירים|העבירו)\\s+אנך\\s+למישור\\s+(${PLANE_NAME.source})\\b.*?${AT_POINT}([A-Z]\\d*'?)$`),
+    new RegExp(`^מ-?([A-Z]\\d*'?)\\s+(?:מורידים|הורידו|מוריד|מעבירים|העבירו)\\s+אנך\\s+ל${HE_PLANE}\\s+(${PLANE_NAME.source})\\b.*?${AT_POINT}([A-Z]\\d*'?)$`),
   );
   const en =
     he ??
@@ -2169,7 +2212,7 @@ const dropPerpToLine: Rule = (s) => {
 const parametricLine: Rule = (s) => {
   const NAME = `(${LINE_NAME.source}|[A-Z]\\d*'?[A-Z]\\d*'?)`;
   const head =
-    s.match(new RegExp(`^(?:הישר\\s+|line\\s+)?${NAME}\\s*:\\s*(.+)$`)) ??
+    matchDefHead(s, `(?:${HE_LINE}\\s+|line\\s+)?`, NAME) ??
     s.match(
       new RegExp(
         `^(?:נתון\\s+(?:כי\\s+|ש))?(?:משוואת|ה?משוואה\\s+של|ה?הצגה\\s+ה?פרמטרית\\s+של)\\s+(?:ה?ישר\\s+)?${NAME}\\s+(?:היא|הוא)\\s*:?\\s*(.+)$`,
@@ -2242,7 +2285,7 @@ const parametricLine: Rule = (s) => {
 /** `הישר ℓ ניצב למישור π` — a GIVEN that pins the parameter (line ⟂ plane). */
 const linePerpPlane: Rule = (s) => {
   const m =
-    s.match(new RegExp(`^(?:הישר\\s+)?(${LINE_NAME.source})\\s+(?:ניצב|מאונך)\\s+למישור\\s+(${PLANE_NAME.source})$`)) ??
+    s.match(new RegExp(`^(?:${HE_LINE}\\s+)?(${LINE_NAME.source})\\s+(?:ניצב|מאונך)\\s+ל${HE_PLANE}\\s+(${PLANE_NAME.source})$`)) ??
     s.match(new RegExp(`^(?:line\\s+)?(${LINE_NAME.source})\\s+is\\s+perpendicular\\s+to\\s+(?:the\\s+)?plane\\s+(${PLANE_NAME.source})$`));
   if (!m) return null;
   return [{ type: 'line-perp-plane', line: canonicalLine(m[1]), plane: canonicalPlane(m[2]) }];
@@ -2359,7 +2402,7 @@ const lineCutsPlane: Rule = (s) => {
 const neverParallelClaim: Rule = (s) => {
   const m =
     s.match(
-      new RegExp(`^(?:הישר\\s+)?(${LINE_NAME.source})\\s+אינו\\s+מקביל\\s+ל-?(?:מישור\\s+)?(${PLANE_NAME.source})\\s+לכל\\s+([a-w])$`),
+      new RegExp(`^(?:${HE_LINE}\\s+)?(${LINE_NAME.source})\\s+אינו\\s+מקביל\\s+ל-?(?:${HE_PLANE}\\s+)?(${PLANE_NAME.source})\\s+לכל\\s+([a-w])$`),
     ) ??
     s.match(
       new RegExp(

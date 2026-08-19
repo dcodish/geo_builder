@@ -8,6 +8,7 @@ import { isAbsolute, lineDirCarriesParam, planeNormalCarriesParam, sameOperand }
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
+import { riderPairsT } from './onSegmentRatio';
 import { isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { pinSymsOf } from './types';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
@@ -474,6 +475,83 @@ function materializePlaneRun(next: Construction3, ids: Id[]): void {
   if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...ids]);
 }
 
+/**
+ * #748: the two halves of an on-segment rider's host, as stated by a ratio — `(pair1, pair2, k)`
+ * meaning `|pair1| = k·|pair2|`. Reads the THREE command shapes the same statement can arrive as, so
+ * the utterance family has ONE semantics:
+ *
+ * - `AE = 2*EA'`    → `vec-rel` (single pair term, no π, no symbol)
+ * - `|AE| = 2|EA'|` → `length-rel`
+ * - `AE:EA' = 2:1`  → the `length-ratio` claim
+ */
+function ratioHalves(
+  c: Construction3,
+  cmd: Command3,
+): { pair1: [Id, Id]; pair2: [Id, Id]; k: number; directed: boolean } | null {
+  if (cmd.type === 'vec-rel') {
+    const [term] = cmd.terms;
+    if (cmd.symbol || cmd.terms.length !== 1 || term.atom.kind !== 'pair' || term.coeff.p !== 0) return null;
+    // DIRECTED: `AE = 2·A'E` is a different statement from `AE = 2·EA'` (t = 2 vs t = ⅔), so the rider
+    // must be the shared MIDDLE letter — the one shape where the vector and length readings agree.
+    return { pair1: [cmd.from, cmd.to], pair2: [term.atom.from, term.atom.to], k: term.coeff.k, directed: true };
+  }
+  if (cmd.type === 'length-rel') {
+    const pair2: [Id, Id] | null =
+      'pair' in cmd.rhs
+        ? cmd.rhs.pair
+        : (() => {
+            const d = c.vectors.get(cmd.rhs.vec);
+            return d ? ([d.from, d.to] as [Id, Id]) : null;
+          })();
+    return pair2 ? { pair1: [cmd.a1, cmd.b1], pair2, k: cmd.c, directed: false } : null;
+  }
+  if (cmd.type === 'claim' && cmd.claim.type === 'length-ratio') {
+    const { a1, b1, a2, b2, p, q } = cmd.claim;
+    return { pair1: [a1, b1], pair2: [a2, b2], k: p / q, directed: false };
+  }
+  return null;
+}
+
+/**
+ * #748: a ratio over the two HALVES of a FREE rider's host DETERMINES that rider — rewrite the
+ * statement into the `point-on-segment3` given it actually is.
+ *
+ * The arithmetic (and the chain-form contract that makes the vector and length readings agree) lives in
+ * {@link riderChainT}, shared with parse3's «כך ש-AE = 2EA'» clause. Before this, only that clause could
+ * reach it: the same ratio typed as its OWN fact fell to the M1 claim-vs-drive fork, which chose *claim*
+ * and refuted a satisfiable given — the tool accusing the student over a configuration it had picked
+ * itself (ADR-052). The reading belongs to the RIDER, not to the utterance that happened to declare it
+ * (docs/17 — a capability bound to one code path rather than to the concept).
+ *
+ * Deliberately narrow; every guard is load-bearing:
+ * - the rider must be the shared MIDDLE letter and the outer letters its host's endpoints (`riderChainT`)
+ * - the rider's `t` must be **absent**. A rider whose `t` is already stated is genuinely being *claimed*
+ *   about, so it falls through to the ordinary claim lane, where an inconsistent ratio still refuses.
+ * - `k > 0`, which is also why a driven `t` can never leave the segment (`riderChainT`)
+ */
+function riderRatioRetarget(c: Construction3, cmd: Command3): Command3 | null {
+  const halves = ratioHalves(c, cmd);
+  if (!halves) return null;
+  const { pair1, pair2, k, directed } = halves;
+  // either side may carry the rider's half first — «|EA'| = ½|AE|» is «|AE| = 2|EA'|»
+  for (const [P, Q, kk] of [
+    [pair1, pair2, k],
+    [pair2, pair1, 1 / k],
+  ] as const) {
+    // The rider is a label the two pairs SHARE. A directed statement additionally fixes where it must
+    // sit (`X→R` against `R→Y`); for a LENGTH statement a pair is an unordered set, so every shared
+    // label is a candidate — «|AE| = 2|A'E|» must reach the same given as «|AE| = 2|EA'|».
+    const candidates = directed ? (P[1] === Q[0] ? [P[1]] : []) : P.filter((l) => Q.includes(l));
+    for (const rider of candidates) {
+      const def = c.points.get(rider);
+      if (def?.kind !== 'on-segment' || def.t !== undefined) continue;
+      const t = riderPairsT(rider, def.a, def.b, P[0], P[1], Q[0], Q[1], kk);
+      if (t !== 'invalid') return { type: 'point-on-segment3', id: rider, a: def.a, b: def.b, t };
+    }
+  }
+  return null;
+}
+
 /** The public reducer (#322): run the case reducer, then idempotently dedup the ScalarPin list so a
  *  re-typed macro utterance is a true no-op (mirrors ADR-3D-047's solid re-declare). Claims are left
  *  untouched — derive3 attributes them by COUNT-DELTA, and a re-verify of the same claim is harmless. */
@@ -484,6 +562,11 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
 }
 
 function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
+  // #748: normalize a ratio stated over a free rider's two halves into the point-on-segment given it
+  // is — HERE, at the one entry point every command passes through (the ADR-3D-089 `parallelepiped`
+  // precedent), so all three spellings share one path instead of three routing sites.
+  const retarget = riderRatioRetarget(c, cmd);
+  if (retarget) return applyCommand3(c, retarget);
   switch (cmd.type) {
     case 'solid': {
       // #349 (ADR-3D-089): `parallelepiped` is the legacy spelling of `prism4` + `oblique` — normalize it
@@ -633,6 +716,20 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // betweenness is deliberately not asserted without a stated t).
         const missingSeg = missingPoint(c, [cmd.a, cmd.b]);
         if (missingSeg) return { ok: false, error: missingSeg };
+        // #748: the point is ALREADY a free rider of THIS host, so a stated `t` is the given that
+        // DETERMINES it — a definition update, not a claim about a position it does not yet have.
+        // (The vec-rel dual below would ask "does it hold?" of a point whose whole point is that it
+        // has not been placed yet, and refute the given that was about to place it.) A rider whose
+        // `t` is already stated falls through: that IS a claim, and it is verified as one.
+        const rider = c.points.get(cmd.id);
+        if (cmd.t !== undefined && rider?.kind === 'on-segment' && rider.t === undefined) {
+          const flipped = rider.a === cmd.b && rider.b === cmd.a; // the host named the other way round
+          if ((rider.a === cmd.a && rider.b === cmd.b) || flipped) {
+            const next = clone(c);
+            next.points.set(cmd.id, { kind: 'on-segment', a: rider.a, b: rider.b, t: flipped ? 1 - cmd.t : cmd.t });
+            return { ok: true, next };
+          }
+        }
         if (cmd.t !== undefined) {
           return applyCommand3(c, {
             type: 'vec-rel',

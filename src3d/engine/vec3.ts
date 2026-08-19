@@ -62,6 +62,85 @@ export function newellNormal(pts: Vec3[]): Vec3 {
   return n;
 }
 
+/**
+ * #571 — the normal of the plane a point RUN spans, ORDER-FREE.
+ *
+ * A plane named by points is a SET: «מישור BB'DD'» and «מישור BB'D'D» name one plane, and any stated
+ * order must resolve to it. `newellNormal` cannot answer that question — it is twice the polygon's
+ * SIGNED-AREA vector, so the order B→B'→D→D' traces a self-crossing bowtie whose two triangles cancel
+ * exactly, the normal comes out 0, and the figure was refused `not-coplanar` on four points that are
+ * perfectly coplanar. An order-sensitive computation was answering an order-free question.
+ *
+ * The largest triple cross product is a function of the point SET, so every ordering gives the same
+ * plane. Two properties are kept deliberately:
+ *
+ *  - **Orientation.** The stated order decides the normal's SIGN whenever it says anything (the
+ *    right-hand rule), so every figure that resolves today keeps its exact normal direction — which is
+ *    what «above/below the plane» and the solver's signed residuals read. A self-crossing order says
+ *    nothing about orientation (its signed areas cancel), and there the sign is fixed deterministically
+ *    by making the dominant component positive — stable across iterations and seeds, unlike a
+ *    first-non-zero rule.
+ *  - **Refusals.** Collinear or coincident runs still return the zero vector, so every caller's
+ *    degeneracy guard fires exactly as before; and being coplanar is still verified separately, so a
+ *    genuinely non-coplanar run is refused as it always was.
+ *
+ * Canonical rings — a solid's faces, a polygon's own ring — are built in non-crossing order and keep
+ * `newellNormal`: for those the order IS the shape (it names the edges), not a way of naming a plane.
+ */
+/**
+ * #571 — the same point RUN, ordered so it can be DRAWN: the non-crossing ring around the plane the
+ * set spans. «מישור BB'DD'» names two parallel edges, and drawing the stated order would ink a crossed
+ * bowtie — asserting a self-crossing the student never stated (operator ruling, 2026-08-16: the drawn
+ * patch takes the convex reorder; the plane's identity is unaffected either way, this is ink only).
+ * A run whose stated order is already non-crossing is returned untouched.
+ */
+export function runRingOrder(pts: Vec3[]): Vec3[] {
+  if (pts.length < 4) return pts;
+  const n = runNormal(pts);
+  if (norm3(n) < 1e-12) return pts;
+  const k = normalize3(n);
+  const c = centroid3(pts);
+  const e1raw = sub3(pts[0], c);
+  const e1n = sub3(e1raw, scale3(k, dot3(e1raw, k)));
+  if (norm3(e1n) < 1e-12) return pts;
+  const e1 = normalize3(e1n);
+  const e2 = cross3(k, e1);
+  // angles in [0, 2π) FROM pts[0], so a run already stated non-crossing comes back byte-identical:
+  // `runNormal` takes its sign from the stated order, which makes that order the ascending one.
+  const withAngle = pts.map((p) => {
+    const q = sub3(p, c);
+    const a = Math.atan2(dot3(q, e2), dot3(q, e1));
+    return { p, a: a < 0 ? a + 2 * Math.PI : a };
+  });
+  withAngle.sort((x, y) => x.a - y.a);
+  return withAngle.map((x) => x.p);
+}
+
+export function runNormal(pts: Vec3[]): Vec3 {
+  if (pts.length < 3) return v3(0, 0, 0);
+  let best = v3(0, 0, 0);
+  let bestMag = 0;
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      for (let k = j + 1; k < pts.length; k++) {
+        const n = cross3(sub3(pts[j], pts[i]), sub3(pts[k], pts[i]));
+        const m = norm3(n);
+        if (m > bestMag) {
+          bestMag = m;
+          best = n;
+        }
+      }
+    }
+  }
+  if (bestMag === 0) return best; // collinear or coincident — no plane, and the callers refuse as before
+  const stated = newellNormal(pts);
+  const agree = dot3(best, stated);
+  if (Math.abs(agree) > 1e-9 * bestMag * Math.max(norm3(stated), 1e-30)) return agree < 0 ? scale3(best, -1) : best;
+  // a self-crossing order carries no orientation — choose one deterministically
+  const ax = Math.abs(best.x) >= Math.abs(best.y) && Math.abs(best.x) >= Math.abs(best.z) ? best.x : Math.abs(best.y) >= Math.abs(best.z) ? best.y : best.z;
+  return ax < 0 ? scale3(best, -1) : best;
+}
+
 // ---------------------------------------------------------------------------
 // #305 (ADR-3D-090): the circumcentre of a RING — where a right pyramid's apex sits above
 // ---------------------------------------------------------------------------

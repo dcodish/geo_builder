@@ -14,8 +14,9 @@
  * which is why the App gates it behind an explicit student checkbox.
  */
 
-import { resolve3, scaleKnown3, translationPinned3, vectorFramePinned3 } from './evaluate';
-import { cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
+import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
+import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
+import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { figureSymbolsOf } from './types';
 import { angleBetweenOperands, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import type { Construction3, Id, MutualRel3, Operand3, Positions3 } from './types';
@@ -113,7 +114,7 @@ function trySurd(x: number, tol: number): string | null {
 
 /** Render a number cleanly: integers plain, small fractions as p/q, an opt-in SURD tier (#269), else
  *  `decimals` places (default 2 — the panel's house precision; #491 lets a roomier surface ask for more). */
-export function cleanNum(x: number, tol = 1e-5, surd = false, decimals = 2): string {
+export function cleanNum(x: number, tol = 1e-5, surd = false, decimals = DISPLAY_DECIMALS): string {
   // default tolerance sized for the pivot's numeric floor (~1e-7), far under display
   // grain; coefficients from a DOUBLE-ROOT solve carry the intrinsic √noise (~1e-4)
   // and pass tol = 2e-3 (cleanCoef) — claims still guard correctness at 2e-5
@@ -123,7 +124,8 @@ export function cleanNum(x: number, tol = 1e-5, surd = false, decimals = 2): str
     if (Math.abs(p - Math.round(p)) < tol && Math.abs(Math.round(p)) <= 400) return `${Math.round(p)}/${q}`;
   }
   if (surd) { const s = trySurd(x, tol); if (s) return s; }
-  return x.toFixed(decimals);
+  // #723: the decimal fallback is the SHARED formatter — the exact tiers above are 3-D's own and untouched
+  return fmtNum(x, decimals);
 }
 /** A magnitude / coordinate value — the same tiers as `cleanNum` plus the surd tier (#269).
  *  `decimals` (#491) is the DECIMAL FALLBACK only: every exact tier above it is unaffected, so a caller
@@ -267,7 +269,7 @@ export function linePlaneAngleAt(pos: Positions3, a: Id, b: Id, plane: Id[]): nu
   const pts = plane.map((id) => pos.get(id));
   if (!p || !q || pts.some((x) => !x)) return null;
   const u = { x: q.x - p.x, y: q.y - p.y, z: q.z - p.z };
-  const n = newellNormal(pts as Vec3[]);
+  const n = runNormal(pts as Vec3[]);
   const den = Math.hypot(n.x, n.y, n.z) * Math.hypot(u.x, u.y, u.z);
   if (den < 1e-12) return null;
   return (Math.asin(Math.min(1, Math.abs(n.x * u.x + n.y * u.y + n.z * u.z) / den)) * 180) / Math.PI;
@@ -483,7 +485,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // #517: both anchors are the SHARED predicates in evaluate.ts — a fresh `C(2,1,0)` lands in
   // `c.points` as kind 'coord', never in `c.pins`, and the private `c.pins.length > 0` enumeration
   // here suppressed every knowledge family for a figure of bare injected points.
-  const translationPinned = translationPinned3(c);
+  const translationPinned = translationKnown3(c);
   // Vector coordinates (a difference — translation cancels) keep the FRAME + seed-stability gate:
   // the seeds VARY the rotation/dims gauge (operator-validated 2026-07-25: with only DE=(0,2,0)
   // pinned, u's coords correctly do NOT print while v = 3·DE — parallel to the pin, genuinely

@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "app": "3d-builder",
+  "savedAt": "2026-08-19T10:54:32.642Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "ישר l x=(-1,5,-11)+t(m-1,5-m,-2)",
+      "cmds": [
+        {
+          "type": "line3",
+          "name": "ℓ",
+          "anchor": [
+            {
+              "k": -1,
+              "p": 0
+            },
+            {
+              "k": 5,
+              "p": 0
+            },
+            {
+              "k": -11,
+              "p": 0
+            }
+          ],
+          "dir": [
+            {
+              "k": -1,
+              "p": 1
+            },
+            {
+              "k": 5,
+              "p": -1
+            },
+            {
+              "k": -2,
+              "p": 0
+            }
+          ],
+          "src": "x = (-1,5,-11) + t·(m-1,5-m,-2)",
+          "param": "m"
+        }
+      ]
+    },
+    {
+      "utterance": "מישור π: 3x+my+(m+6)z+4=0",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π",
+          "plane": {
+            "cx": {
+              "k": 3,
+              "p": 0
+            },
+            "cy": {
+              "k": 0,
+              "p": 1
+            },
+            "cz": {
+              "k": 6,
+              "p": 1
+            },
+            "d": {
+              "k": 4,
+              "p": 0
+            },
+            "src": "3x+my+(m+6)z+4=0"
+          },
+          "param": "m"
+        }
+      ]
+    },
+    {
+      "utterance": "l ⊥ π",
+      "cmds": [
+        {
+          "type": "line-perp-plane",
+          "line": "ℓ",
+          "plane": "π"
+        }
+      ]
+    },
+    {
+      "utterance": "A נקודת החיתוך של l עם π",
+      "cmds": [
+        {
+          "type": "line-plane-point",
+          "id": "A",
+          "line": "ℓ",
+          "plane": "π"
+        }
+      ]
+    }
+  ]
+}

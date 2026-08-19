@@ -16,7 +16,7 @@ import { cleanMag } from '../engine/dataView';
 import { freeDofCount3, hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
 import { distanceWitness, resolveOperand } from '../engine/operands';
 import type { Construction3, Id, Positions3 } from '../engine/types';
-import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
+import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
 import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
 import { isRightAngleValue, rightAngles3 } from './rightAngles';
@@ -384,14 +384,18 @@ export function buildScene3(
     // #395 (ADR-3D-108): a HIDDEN plane draws no patch (and no label/seam below) — the RELATION
     // stays enforced in the engine; only the ink is suppressed, per the operator's show/hide ask.
     if (planeDisplay[name] === 'hidden') continue;
-    // #318 'face' display: the patch IS the defining point-run polygon, in the stated order —
-    // no growing extents, no fold-anchored frame. Only a point-run plane has a face to show;
-    // an equation plane (or an unplaced run) falls through to the 'full' patch unchanged.
+    // #318 'face' display: the patch IS the defining point-run polygon — no growing extents, no
+    // fold-anchored frame. Only a point-run plane has a face to show; an equation plane (or an
+    // unplaced run) falls through to the 'full' patch unchanged.
+    // #571: drawn in the NON-CROSSING order, not the stated one. «מישור BB'DD'» names two parallel
+    // edges and is a legitimate plane (operator ruling), but inking B→B'→D→D' would draw a crossed
+    // bowtie — a self-crossing the student never stated. A run stated in a non-crossing order is
+    // unchanged by the reorder, so every existing face patch draws exactly as before.
     if (planeDisplay[name] === 'face') {
       const run = c.pointPlanes.get(name);
       const facePts = run?.map((id) => positions.get(id));
       if (facePts && facePts.length >= 3 && facePts.every((p): p is Vec3 => p !== undefined)) {
-        wPlanes.push({ name, corners: facePts });
+        wPlanes.push({ name, corners: runRingOrder(facePts) });
         facePatches.add(name);
         continue;
       }
