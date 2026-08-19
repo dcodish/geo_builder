@@ -27,7 +27,7 @@
  * the IHDR header bytes, not decoded via Image/canvas, so the same code is
  * unit-tested in node.
  *
- * SHARED (#745, ADR-W-026). It began in `src/export/` and was therefore unreachable by the sibling
+ * SHARED (#745, ADR-W-027). It began in `src/export/` and was therefore unreachable by the sibling
  * builders, who may not import a product tree — a module that knows nothing about geometry, kept from
  * two products by where it happened to sit. Nothing here branches on product identity: the caller hands
  * in its own heading, its own givens, its own figure PNG and its own bidi segmenter, which is what makes

@@ -1023,7 +1023,7 @@ having played the channel across two `next/*` deploys.
    field). They are inert once the directories are gone — a mapping to nothing — so the teardown is
    complete without them, but they are noise in a field where noise is expensive.
 
-## ADR-W-026 — The question document is ONE composer, parameterized by the caller's bidi (#745)
+## ADR-W-027 — The question document is ONE composer, parameterized by the caller's bidi (#745)
 
 **Status:** accepted, 2026-08-18 · **Amended 2026-08-19** (scope: 3-D only, see *Scope amendment*)
 · **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745) · operator: *"for the 3d and for

@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
 import { ANGLE_ARC_R, angleValueOffset, buildScene, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
-// #742 / ADR-W-026: the canvas corner cluster (↺ − +) — one look and one arithmetic in every
+// #742 / ADR-W-024: the canvas corner cluster (↺ − +) — one look and one arithmetic in every
 // builder, from the shell contract. (The exports left this file for the top tool row.)
 import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../../shell/frame/canvasControls';
 import type { MeasureLabels, RelationMarks, RelationPick } from './scene';

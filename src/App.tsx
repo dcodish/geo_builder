@@ -49,7 +49,7 @@ import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
 import { questionLines } from '@/export/questionLines';
 import { bidiSegments } from '@/i18n/bidi';
-// #742: the exports live in the TOP TOOL ROW now (ADR-W-026) — App rasterises the canvas svg itself.
+// #742: the exports live in the TOP TOOL ROW now (ADR-W-024) — App rasterises the canvas svg itself.
 // #745: the rasteriser and the printed width are SHARED (shell/export/svgToPng), so every builder that
 // prints a figure prints it at one width and one ink weight. Two copies could drift; one cannot.
 import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';

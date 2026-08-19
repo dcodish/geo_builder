@@ -252,7 +252,7 @@ export default function App3() {
   const figureSvg = () => canvasBox.current?.querySelector('svg') ?? null;
 
   /**
-   * #742 / ADR-W-026: ONE raster path behind the top row's copy/save pair. #745 makes that path the
+   * #742 / ADR-W-024: ONE raster path behind the top row's copy/save pair. #745 makes that path the
    * SHARED rasteriser (`shell/export/svgToPng`) instead of an inline copy — the copy that lived here
    * predated the clean-export contract, so it baked interaction-only visuals into the exported image
    * and took its ink weight from the size of the browser window. One implementation, or the builders
@@ -291,7 +291,7 @@ export default function App3() {
 
   /**
    * «הורידו שאלה» (#745) — the figure beside the student's own statements, as a real .docx. The
-   * composer is shared (`shell/export/questionDoc`, ADR-W-026) and knows nothing about geometry: this
+   * composer is shared (`shell/export/questionDoc`, ADR-W-027) and knows nothing about geometry: this
    * tree supplies the heading, the givens (verbatim enabled utterances), the figure PNG and THIS
    * product's bidi segmenter, so the paper splits technical runs exactly where the screen does.
    *

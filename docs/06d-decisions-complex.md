@@ -1782,7 +1782,7 @@ design; a stopgap panel built here would be work that programme would delete.
 · operator ruling, 2026-08-19: *"הורידו שאלה should be in 3d but not in complex"*
 
 **Context.** #745 moved the question-document composer and the clean-export rasteriser into `shell/`
-([ADR-W-026](06w-decisions-workspace.md#adr-w-026)) so a capability that had been trapped in `src/`
+([ADR-W-027](06w-decisions-workspace.md#adr-w-027)) so a capability that had been trapped in `src/`
 could reach the sibling builders. The issue as filed carried this builder too, and the first
 implementation shipped it here: a `questionLines` module, a `.docx` handler, the button, and both
 locale strings. The operator ruled during play-and-approve that the complex builder does not get it.
