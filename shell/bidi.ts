@@ -50,6 +50,44 @@ const CLOSE = ')]}"';
 const LRI = '⁦'; // LEFT-TO-RIGHT ISOLATE
 const PDI = '⁩'; // POP DIRECTIONAL ISOLATE
 
+/**
+ * THE invisible format controls — the ONE definition of the set, for every product.
+ *
+ * These are characters the APP injects for DISPLAY (`isolateLtrRuns` wraps LTR runs in
+ * U+2066/U+2069 so an RTL paragraph lays out correctly), plus the controls a paste from a PDF or
+ * another RTL editor carries. A student never types one.
+ *
+ * Written by CODE POINT, never literally: typed as themselves they are invisible in this source
+ * file, so a later edit cannot see what it is changing — the same discipline the vector arrow
+ * above is built under.
+ *
+ *   U+061C            ARABIC LETTER MARK
+ *   U+200B .. U+200F  ZWSP, ZWNJ, ZWJ, LRM, RLM
+ *   U+202A .. U+202E  LRE, RLE, PDF, LRO, RLO
+ *   U+2066 .. U+2069  LRI, RLI, FSI, PDI   ← what `isolateLtrRuns` emits
+ *   U+FEFF            BOM / ZWNBSP
+ */
+const FORMAT_CONTROLS = /[\u061C\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+
+/**
+ * Strip every invisible format control from a string.
+ *
+ * WHY THIS IS SHARED AND NOT THREE REGEXES: the set had three copies (2-D `normalizeUtterance`,
+ * 3-D `normalize3`, and nothing at all on the store side), and a set spelled per site is a set
+ * that drifts. Both parsers now read it from here, and so does every product store.
+ *
+ * WHERE IT BELONGS — two different jobs, deliberately both:
+ *   - at the PARSER boundary, so a display transform can never reach the grammar (#531,
+ *     ADR-3D-144);
+ *   - at the STORE boundary, so a display transform can never reach the FACT LIST — the source of
+ *     truth that is saved, logged, exported and compared (#751, ADR-W-029).
+ * Cleaning only for the parser leaves the stored copy dirty, which is exactly the defect #751
+ * reports: the .docx printed U+2066/U+2069 as missing-glyph boxes from a chip-seeded fact.
+ */
+export function stripFormatControls(s: string): string {
+  return s.replace(FORMAT_CONTROLS, '');
+}
+
 /** Escape a character for safe inclusion in a regex character class. */
 const escapeForClass = (s: string) => s.replace(/[\\\]^-]/g, (c) => `\\${c}`);
 

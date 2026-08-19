@@ -539,10 +539,13 @@ export default function App3() {
     <Workbench
       emptyOverlay={
         facts.length === 0 ? (
+          /* #751 (ADR-W-029): RAW commands (`postProcess: []` = the value BEFORE the
+             bidi-isolate post-processor); the chip isolates for DISPLAY only. */
           <QuickChips
             title={t('emptyTitle')}
             hint={t('emptyHintChips')}
-            commands={EXAMPLE_KEYS.slice(0, 4).map((k) => t(`examples.${k}`))}
+            commands={EXAMPLE_KEYS.slice(0, 4).map((k) => t(`examples.${k}`, { postProcess: [] }))}
+            display={isolateLtrRuns3}
             onPick={(c) => void submitText(c)}
           />
         ) : undefined

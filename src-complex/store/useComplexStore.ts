@@ -24,6 +24,7 @@
 import { create } from 'zustand';
 import type { LoadAudit } from '../../shell/save';
 import type { Cx } from '../value/value';
+import { stripFormatControls } from '../../shell/bidi';
 
 export type InputError =
   | { key: 'not-handled' | 'parse-error'; detail: string }
@@ -107,6 +108,16 @@ interface ComplexState {
   }) => void;
 }
 
+/**
+ * THE store-side ingest invariant (#751, ADR-W-029): a stored line holds WHAT THE STUDENT STATED —
+ * never presentation characters. `lines` is this product's source of truth (saved, replayed,
+ * exported, logged), and the app wraps LTR runs in Unicode isolates for DISPLAY; a `t()`-derived
+ * string submitted as a command used to carry those isolates straight into the list. Stripped at
+ * the boundary of the module that owns the list, with the shared definition of the set — the
+ * grammar strips the same set at its own boundary, for its own reason.
+ */
+const cleanLine = (line: string): string => stripFormatControls(line);
+
 export const useComplexStore = create<ComplexState>((set, get) => ({
   lines: [],
   name: '',
@@ -114,9 +125,9 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
   disabled: [],
   setDisabledIdx: (disabled) => set({ disabled }),
   replaceLine: (index, line, seed) =>
-    set(({ lines }) => ({ lines: lines.map((l, i) => (i === index ? line : l)), seed, lastError: null })),
+    set(({ lines }) => ({ lines: lines.map((l, i) => (i === index ? cleanLine(line) : l)), seed, lastError: null })),
   recordDisabledLine: (line) =>
-    set(({ lines, disabled }) => ({ lines: [...lines, line], disabled: [...disabled, lines.length] })),
+    set(({ lines, disabled }) => ({ lines: [...lines, cleanLine(line)], disabled: [...disabled, lines.length] })),
   freePos: {},
   seed: 0,
   view: 'cart',
@@ -153,7 +164,7 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
   },
 
   recordLine: (line, seed) =>
-    set(({ lines }) => ({ lines: [...lines, line], seed, lastError: null })),
+    set(({ lines }) => ({ lines: [...lines, cleanLine(line)], seed, lastError: null })),
   setError: (lastError) => set({ lastError }),
   setLoadAudit: (loadAudit) => set({ loadAudit }),
   resetSession: () =>

@@ -3,6 +3,17 @@
  * the empty canvas — a first click that needs no reading and no typing — with a warm headline and
  * a manual link slot. One component, every builder; the commands and every string are the
  * caller's (the A3 config's curated list rides in where the operator saved one).
+ *
+ * LABEL AND COMMAND ARE TWO VALUES, NOT ONE (#751, ADR-W-029). The chip used to render the same
+ * string it submitted, so a caller passing a post-processed `t()` value shipped the DISPLAY form —
+ * Unicode isolates and all — into the fact list, the saved file, the prod log and the `.docx`
+ * (where Word draws U+2066/U+2069 as missing-glyph boxes). `commands` are RAW: what a student
+ * would have typed, and exactly what `onPick` receives. `display` is presentation only, applied on
+ * the way to the screen and nowhere else — pass the product's bidi kit so an LTR run inside a
+ * Hebrew chip still lays out correctly.
+ *
+ * The split lives HERE rather than at the two call sites deliberately: fixing the callers would
+ * have left the shared component still able to conflate the two, which is the defect.
  */
 import type { CSSProperties } from 'react';
 import { color, fs } from '../theme';
@@ -12,13 +23,18 @@ export function QuickChips({
   hint,
   commands,
   onPick,
+  display,
   manualLabel,
   manualHref,
 }: {
   title: string;
   hint: string;
+  /** RAW commands — what the student would have typed. Never a post-processed display string. */
   commands: readonly string[];
+  /** Always receives the RAW command, whatever `display` did to the label. */
   onPick: (command: string) => void;
+  /** Presentation only (the product's bidi isolation). Identity when omitted. */
+  display?: (command: string) => string;
   manualLabel?: string;
   manualHref?: string;
 }) {
@@ -29,7 +45,7 @@ export function QuickChips({
       <div style={chipRow}>
         {commands.map((cmd) => (
           <button key={cmd} type="button" style={chip} onClick={() => onPick(cmd)}>
-            {cmd}
+            {display ? display(cmd) : cmd}
           </button>
         ))}
       </div>

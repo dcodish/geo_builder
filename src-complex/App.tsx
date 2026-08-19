@@ -341,10 +341,13 @@ export function App() {
         <Workbench
           emptyOverlay={
             lines.length === 0 ? (
+              /* #751 (ADR-W-029): these were already RAW (config / EXAMPLE_LINES, never `t()`);
+                 the shared contract now also isolates them for display, as the siblings do. */
               <QuickChips
                 title={t('emptyTitle')}
                 hint={t('emptyHintChips')}
                 commands={quickCommands}
+                display={(c) => complexBidi.inputPreview(c) ?? c}
                 onPick={(c) => submitLine(c)}
               />
             ) : undefined

@@ -25,6 +25,7 @@ import type { PlaneDisplayMode3Map } from './figureFile3';
 import { buildNotices3, type BuildNotice3 } from '../engine/notices';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
+import { stripFormatControls } from '../../shell/bidi';
 import { applyCommand3 } from '../engine/apply';
 import { checkInSpan, firstSatisfyingSeed3, memberHolds3, pinningGivens, resolve3, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
@@ -549,6 +550,7 @@ export const useGeo3 = create<Geo3State>()(
       lastError: null,
 
       submit: (utterance) => {
+        utterance = stripFormatControls(utterance); // #751 (ADR-W-029) — the store-side ingest invariant
         const parsed = parse3(utterance);
         if (!parsed.ok) {
           // #516: every TYPED refusal keeps its identity — only a genuine `not-handled` may read as
@@ -602,6 +604,7 @@ export const useGeo3 = create<Geo3State>()(
       },
 
       submitSteps: (utterance, steps) => {
+        utterance = stripFormatControls(utterance); // #751 (ADR-W-029)
         const all: Command3[] = [];
         for (const step of steps) {
           const p = parse3(step);
@@ -650,6 +653,7 @@ export const useGeo3 = create<Geo3State>()(
       remove: (factId) => set({ facts: get().facts.filter((f) => f.id !== factId), lastError: null }),
 
       replaceFact: (factId, utterance) => {
+        utterance = stripFormatControls(utterance); // #751 (ADR-W-029)
         const { facts, seed } = get();
         const old = facts.find((f) => f.id === factId);
         if (!old) return false;

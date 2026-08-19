@@ -48,7 +48,7 @@ import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
 import { questionLines } from '@/export/questionLines';
-import { bidiSegments } from '@/i18n/bidi';
+import { bidiSegments, isolateLtrRuns } from '@/i18n/bidi';
 // #742: the exports live in the TOP TOOL ROW now (ADR-W-024) — App rasterises the canvas svg itself.
 // #745: the rasteriser and the printed width are SHARED (shell/export/svgToPng), so every builder that
 // prints a figure prints it at one width and one ink weight. Two copies could drift; one cannot.
@@ -844,7 +844,11 @@ export default function App() {
   // A kite/isosceles whose equal-pair is a cyclable VARIANT (ADR-138) — so "show another configuration"
   // offers to flip which sides are equal even when the shape is otherwise determined.
   const hasVariant = facts.some((f) => f.enabled && f.cmd.type === 'shape-variant' && VARIANT_COUNT[f.cmd.shape] > 1);
-  const examples = t('examples.items', { returnObjects: true }) as string[];
+  // #751 (ADR-W-029): the chips submit what they show, so what they hold must be the RAW command.
+  // `postProcess: []` asks i18next for the value BEFORE the bidi-isolate post-processor; the chip
+  // re-applies isolation for DISPLAY only. Without this the fact list, the saved file, the prod log
+  // and the .docx all received U+2066/U+2069.
+  const examples = t('examples.items', { returnObjects: true, postProcess: [] }) as string[];
 
   // One theorem-feed row: a tier dot (green certain / amber possible), the statement in the current
   // locale, and a ● "new this step" badge. Clicking toggles the premise highlight on the canvas.
@@ -985,6 +989,7 @@ export default function App() {
               title={t('canvas.emptyTitle')}
               hint={t('canvas.emptyHint')}
               commands={examples.slice(0, 4)}
+              display={isolateLtrRuns}
               onPick={(c) => submit(c)}
             />
           ) : undefined

@@ -22,6 +22,7 @@
  */
 
 import { nanoid } from 'nanoid';
+import { stripFormatControls } from '../../shell/bidi';
 import type { AnyCommand, Id } from '@/engine';
 import type { Fact } from './geoStore';
 
@@ -104,7 +105,10 @@ function sanitizeFactIn(v: unknown): Fact | null {
   if (!isRecord(cmd) || typeof cmd.type !== 'string') return null;
   return {
     id: typeof v.id === 'string' && v.id ? v.id : nanoid(),
-    ...(typeof v.utterance === 'string' ? { utterance: v.utterance } : {}),
+    // #751 (ADR-W-029): a file saved before the ingest invariant carries the app's display
+    // isolates in its utterances — clean on the way IN, which is what protects the saves
+    // already in the wild (the fix upstream only stops NEW ones being made).
+    ...(typeof v.utterance === 'string' ? { utterance: stripFormatControls(v.utterance) } : {}),
     ...(typeof v.group === 'string' ? { group: v.group } : {}),
     cmd: cmd as unknown as AnyCommand,
     // A hand-edited file may omit `enabled` — default to on (a saved fact was entered to be used).

@@ -1204,3 +1204,78 @@ and the P1 / stale-`in-round` preconditions. Only the composition size and its s
 policy (bugs direct-to-`main` vs one-PR-per-round) — remains open. This ADR consumes the Phase-1
 escalation-rate data for the cap question only; unattended running is a separate risk argument, since every
 round measured here had a human at the keyboard.
+
+---
+
+## ADR-W-029 — A stored utterance holds what the STUDENT stated: display transforms stop at the store (#751)
+
+**Context.** Playing #746 the operator's exported `.docx` printed the first given as
+«קובייה ⟦PDI⟧ABCD⟦LRI⟧» — two missing-glyph boxes — while lines 2–3 of the same document were clean.
+Line 1 had been entered by clicking an **example chip**; lines 2–3 were typed by hand.
+
+Every product registers an i18next post-processor that wraps LTR technical runs in Unicode isolates
+(U+2066 LRI / U+2069 PDI) so Hebrew UI strings lay out correctly on screen. That is correct for
+**display**. The empty-canvas chips then built their command list out of those post-processed strings
+and submitted the chip's own label as the utterance — `shell/frame/QuickChips` passed ONE string to
+both the button label and `onPick`, so **the thing rendered was the thing stored**.
+
+The pollution was already in production in 2-D and 3-D and predates the PR that revealed it. The
+exporter and `bidiSegments` were behaving correctly; they were handed dirty data. Blast radius, all of
+it invisible on screen: saved `.geo.json`/`.geo3.json` files, the production usage logs that
+`/log-triage` re-runs and clusters (two identical-looking utterances differing by invisible characters
+cluster separately), and every exact-match comparison over utterances — dedup, idempotence, fixtures,
+drift nets.
+
+**Decision.**
+
+1. **The invariant: an utterance entering the fact list holds what the student stated, never
+   presentation characters.** Enforced at the boundary of the module that OWNS the list — each
+   product's store — over every path that sets a fact's text and over the load path:
+   - 2-D `src/store/geoStore.ts` (`foldFact`, `update`, `replaceGroup`) + `figureFile.ts`
+     (`deserializeFigure`);
+   - 3-D `src3d/store/store3.ts` (`submit`, `submitSteps`, `replaceFact`) + `figureFile3.ts`
+     (`deserializeFigure3`);
+   - complex `src-complex/store/useComplexStore.ts` (`recordLine`, `recordDisabledLine`,
+     `replaceLine`), which `hydrateSession` already routes through.
+
+   **Cleaning on LOAD is not optional and is not belt-and-braces:** it is what protects the saves
+   already in the wild. Fixing only the seam stops new dirt being made and leaves every file a student
+   has already saved carrying it.
+
+2. **The seam: `QuickChips` takes a RAW command and an optional `display` transform.** `commands` are
+   what a student would have typed and are exactly what `onPick` receives; `display` is presentation
+   only. The callers ask i18next for the pre-post-processor value (`t(key, { postProcess: [] })`) and
+   hand the product's own bidi kit in as `display`, so the rendering is unchanged. The fix is in the
+   shared component deliberately: a one-line fix at each of the two call sites would have left the
+   component still able to conflate the two, and that conflation IS the defect.
+
+3. **One definition of the control set.** `shell/bidi.ts` exports `stripFormatControls` — U+061C,
+   U+200B–U+200F, U+202A–U+202E, U+2066–U+2069, U+FEFF, written by code point. The set previously had
+   three copies; both parsers now read it from here, as do all three stores.
+
+**Amends [ADR-3D-144](06b-decisions-3d.md) (#531).** That decision stripped the same controls at the
+PARSER boundary and recorded, as part of its reasoning, that *"the stored fact stays RAW and re-parses
+through this same seam"* — i.e. that cleaning in the UI was unnecessary. The first half stands and is
+untouched: a display transform must never reach the grammar, and the parser keeps its own strip because
+a paste from a PDF or another RTL editor carries the same controls and never passes through a store
+action. The second half does not survive contact with the other consumers: the parser's copy protects
+the *grammar*, and the fact list is separately saved, logged, exported and compared. Two boundaries,
+two different things being protected, one shared definition of the set.
+
+**Why not in the exporter.** Stripping isolates on the way out would treat the messenger: the same
+characters would still sit in the fact list, and the next consumer would meet them again. The `.docx`
+lock is nevertheless kept (`src/export/__tests__/questionDoc.test.ts`) — it is the assertion that would
+have caught this, and it fails if a future seam re-introduces a display transform upstream.
+
+**The sweep (plan part 3), and its result.** Every other affordance where a value reaches a submit path
+rather than a DOM node was audited: the manual "click to try" in all three products already separates
+display from command (2-D and 3-D submit `raw` from `COMMAND_CATALOG`/`COMMAND_CATALOG_3D` while
+rendering an isolated copy; complex does the same with `complexBidi.inputPreview(raw) ?? raw`). The
+chips were the only conflation. *An enumeration is not a rule* — which is why the invariant is enforced
+at the store rather than at the list of places that happened to be dirty.
+
+**Coverage.** `shell/__tests__/bidi.test.ts` (the set, the isolate→strip identity, idempotence);
+`shell/__tests__/quick-chips.test.tsx` (label ≠ command, at the component); per-product ingest locks
+(`src/store/__tests__/ingest-invariant.test.ts`, `src3d/store/__tests__/ingest-invariant3.test.ts`,
+`src-complex/store/__tests__/ingest-invariant.test.ts`) each covering the chip source, the store's
+write paths and a pre-fix saved file loading clean; and the end-to-end `.docx` lock.

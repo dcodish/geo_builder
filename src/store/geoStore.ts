@@ -18,6 +18,7 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
+import { stripFormatControls } from '../../shell/bidi';
 import type { ValuesPanelResult } from '@/engine/valuesPanel';
 import type { AnyCommand, Id, RelationsResult, ShapesResult, StatedShapeEquality } from '@/engine';
 import { branchCount, cyclableVariant, deepEqual, variantCountOf, withVariant } from '@/engine';
@@ -404,12 +405,31 @@ export interface GeoState {
 
 
 /**
+ * THE store-side ingest invariant (#751, ADR-W-029): a fact's `utterance` holds WHAT THE STUDENT
+ * STATED — never presentation characters.
+ *
+ * The app wraps LTR technical runs in Unicode isolates so Hebrew UI strings lay out correctly; that
+ * is a DISPLAY transform, and it used to reach the fact list whenever a `t()`-derived string was
+ * submitted as a command (the empty-canvas chips). The fact list is the source of truth — it is
+ * saved to `.geo.json`, logged to the prod corpus, exported to `.docx` (where Word draws U+2066 as
+ * a missing-glyph box), and compared byte-for-byte by dedup and drift nets. So the strip belongs
+ * HERE, at the boundary of the module that owns the list, and not in any one consumer.
+ *
+ * The parser strips the same set at ITS boundary for its own reason (#531/ADR-3D-144: a display
+ * transform must never reach the grammar). Two boundaries, one shared definition of the set
+ * (`shell/bidi`), because the two copies protect different things.
+ */
+const cleanUtterance = (u: string | undefined): string | undefined =>
+  u === undefined ? undefined : stripFormatControls(u);
+
+/**
  * Fold ONE command into the fact list per the execute policy: idempotent duplicate (FR-EN-9 — re-issuing
  * re-enables a deselected twin, never stacks), a free-point move updates its fact in place (ADR-011), and
  * re-stating a STANDALONE circle resizes it in place (a circle inside a bigger step falls through to an
  * override append, keeping that step's label intact). Returns the same array when nothing changed.
  */
 function foldFact(facts: Fact[], cmd: AnyCommand, utterance?: string, group?: string): Fact[] {
+  utterance = cleanUtterance(utterance);
   const dup = facts.find((f) => deepEqual(f.cmd, cmd));
   if (dup) return dup.enabled ? facts : facts.map((f) => (f.id === dup.id ? { ...f, enabled: true } : f));
   if (cmd.type === 'free-point') {
@@ -512,6 +532,7 @@ export const useGeoStore = create<GeoState>()(
       },
 
       update: (id, cmd, utterance) => {
+        utterance = cleanUtterance(utterance);
         // Replace the fact's command at its existing position. Because replay
         // applies it where it already sits (before any dependents), changing a
         // parameter just re-derives downstream; an incompatible change makes
@@ -549,6 +570,7 @@ export const useGeoStore = create<GeoState>()(
       },
 
       replaceGroup: (key, cmds, utterance) => {
+        utterance = cleanUtterance(utterance);
         const facts = get().facts;
         const start = facts.findIndex((f) => groupKey(f) === key);
         if (start < 0) return;

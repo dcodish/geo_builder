@@ -4,7 +4,7 @@
  * partner-debt growth, balanced-hug absorption, liveTail, and the never-nest guard.
  */
 import { describe, expect, it } from 'vitest';
-import { makeBidi } from '../bidi';
+import { makeBidi, stripFormatControls } from '../bidi';
 
 const LRI = '⁦';
 const PDI = '⁩';
@@ -79,5 +79,44 @@ describe('makeBidi — the shared isolation core', () => {
     const p = kit.postProcessor('bidiTest');
     expect(p.process('z3 ברביע הראשון')).toContain(LRI);
     expect(p.process(42 as unknown as string)).toBe(42);
+  });
+});
+
+/**
+ * #751 (ADR-W-029) — the invisible format controls, and the ONE definition of the set.
+ *
+ * The set had three copies (the two parsers, and nothing at all on the store side). These lock the
+ * shared one: what it removes, what it must NOT touch, and that it is idempotent — the stores apply
+ * it to text the parsers may already have seen.
+ */
+describe('stripFormatControls', () => {
+  // Built by code point: typed as themselves these are invisible in this file, so a later edit
+  // could not see what it was changing.
+  const ALM = String.fromCharCode(0x061c);
+  const ZWSP = String.fromCharCode(0x200b);
+  const RLM = String.fromCharCode(0x200f);
+  const LRE = String.fromCharCode(0x202a);
+  const RLO = String.fromCharCode(0x202e);
+  const RLI = String.fromCharCode(0x2067);
+  const BOM = String.fromCharCode(0xfeff);
+
+  it('removes every control in the set', () => {
+    for (const c of [ALM, ZWSP, RLM, LRE, RLO, LRI, RLI, PDI, BOM])
+      expect(stripFormatControls(`קובייה ${c}ABCD${c}`)).toBe('קובייה ABCD');
+  });
+
+  it('is exactly what isolateLtrRuns adds — isolate, then strip, is the identity', () => {
+    for (const s of ['טרפז ABCD חסום במעגל', '|BC| = 10', 'z1 = 3+4i', 'מישור x+2y-2z+28=0'])
+      expect(stripFormatControls(kit.isolateLtrRuns(s))).toBe(s);
+  });
+
+  it('leaves ordinary text alone, including the characters a student really types', () => {
+    for (const s of ["תיבה ABCDA'B'C'D'", 'זווית ABC = 90°', 'point G on AD', '√2 · π', ''])
+      expect(stripFormatControls(s)).toBe(s);
+  });
+
+  it('is idempotent — the stores run it over text the parser may already have cleaned', () => {
+    const once = stripFormatControls(`${LRI}AB${PDI} ו-${LRI}CD${PDI}`);
+    expect(stripFormatControls(once)).toBe(once);
   });
 });

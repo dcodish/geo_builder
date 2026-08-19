@@ -21,6 +21,7 @@
 
 import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
 import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx } from './lexicon';
+import { stripFormatControls } from '../../shell/bidi';
 
 export type ParseResult =
   | { ok: true; commands: AnyCommand[] }
@@ -9100,9 +9101,9 @@ export function normalizeUtterance(raw: string): string {
   // עיגול (disk) ≡ מעגל (circle): the everyday Hebrew synonym students use interchangeably. Normalising it
   // to the canonical circle word HERE — at the one boundary every rule reads — means the whole circle
   // vocabulary (creation, sizing, chord, tangent, inscribe…) accepts it without touching each rule.
-  const orth = raw
+  // #751 (ADR-W-029): the control set is the SHARED one (shell/bidi) — it had three copies.
+  const orth = stripFormatControls(raw)
     .replace(/־/g, '-')
-    .replace(/[؜​-‏‪-‮⁦-⁩﻿]/g, '')
     // #531 (ADR-3D-144's 2-D half): NBSP → space — the isolates above were already stripped here
     // (the 3-D seam was the gap), but an NBSP from the same paste paths still broke literal-space
     // gates. Folded at this one boundary like everything else.

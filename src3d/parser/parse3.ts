@@ -18,6 +18,7 @@
  */
 
 import { readOperand, readRelationSides } from './operandToken';
+import { stripFormatControls } from '../../shell/bidi';
 import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
@@ -66,8 +67,9 @@ function upliftLowercaseLabels(s: string): string {
  *  arrows (AB→ ≡ AB), unify minus/maqaf to `-`, collapse whitespace, uplift anchored lowercase
  *  labels (#181). */
 export function normalize3(s: string): string {
+  // #751 (ADR-W-029): the control set is the SHARED one (shell/bidi) — it had three copies.
   return upliftLowercaseLabels(
-    s
+    stripFormatControls(s)
       // #531 ([ADR-3D-144](../../docs/06b-decisions-3d.md)): INVISIBLE bidi/format controls are not
       // something the student typed — the APP injects them (`isolateLtrRuns3` isolates LTR runs for
       // display, ADR-3D-116/121), and the rendered fact list is text the student SELECTS AND COPIES
@@ -75,10 +77,13 @@ export function normalize3(s: string): string {
       // made the fully-supported «מישור x+2y-2z+28=0» refuse and burn a paid LLM call, with nothing
       // visible to act on. Stripped HERE — the one boundary every rule, honesty gate, scope register
       // and LLM lane reads (the prime's seam) — never per-rule and never in the UI: paste from a PDF
-      // or another RTL editor carries the same controls. The stored fact stays RAW and re-parses
-      // through this same seam, so save/load round-trips to the same parse. The invariant this
-      // restores: display-layer transforms can never reach the parser.
-      .replace(/[​-‏‪-‮⁦-⁩؜﻿]/g, '')
+      // or another RTL editor carries the same controls. The invariant this restores: display-layer
+      // transforms can never reach the parser.
+      // AMENDED by #751 (ADR-W-029): "the stored fact stays RAW" was the half that did not hold up.
+      // Cleaning only here protects the GRAMMAR; the fact list is also saved, logged, exported and
+      // compared, and a chip-seeded utterance carried U+2066/U+2069 into all four (the .docx printed
+      // them as missing-glyph boxes). The store now strips at its own boundary with the SAME shared
+      // set, so both copies are clean and save/load still round-trips to the same parse.
       // NBSP → space + collapse doubled spaces — the same paste paths carry both (the prod log's
       // «מישור  x+…» double space), and a literal-space gate must not care which space arrived.
       .replace(/ /g, ' ')

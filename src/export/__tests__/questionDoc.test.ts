@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
 import { Packer } from 'docx';
 import type { Fact } from '@/store/geoStore';
-import { replay } from '@/store/geoStore';
+import { replay, useGeoStore } from '@/store/geoStore';
 import { buildParseCtx, parse } from '@/parser';
 import { questionLines } from '@/export/questionLines';
 import { buildQuestionDoc, pngDimensions, questionFileName } from '../../../shell/export/questionDoc';
@@ -307,5 +307,50 @@ describe('#464/#465 — the .docx marks direction PER RUN, with no control chara
     const xml = await docXml({ rtl: false, lines: ['|BC| = 10'] });
     expect(xml).toContain('|BC| = 10');
     expect(xml).not.toContain('<w:rtl/>');
+  });
+});
+
+/**
+ * #751 (ADR-W-029) — the END-TO-END lock the operator's report started.
+ *
+ * Playing #746 the exported `.docx` printed «קובייה ⟦PDI⟧ABCD⟦LRI⟧» — two missing-glyph boxes — on
+ * the ONE line that had been entered by clicking an example chip. The exporter was innocent: it was
+ * handed a stored utterance that already held the app's display isolates.
+ *
+ * The fix is upstream (the chip contract + the store-side ingest invariant), and this lock stays
+ * anyway, because it is the assertion that would have caught it: it drives the STORE, exports what
+ * the store kept, and asserts the document holds no format controls. A future seam that
+ * re-introduces a display transform into the fact list fails here even if it slips past the store
+ * tests.
+ */
+describe('#751 — a chip-seeded fact exports with no format controls', () => {
+  const LRI = String.fromCharCode(0x2066);
+  const PDI = String.fromCharCode(0x2069);
+  const CONTROLS = /[؜​-‏‪-‮⁦-⁩﻿]/;
+
+  it('the .docx carries the given verbatim and no U+2066/U+2069', async () => {
+    const store = useGeoStore.getState();
+    store.clear();
+    // exactly what the chip used to submit: the DISPLAY string, isolates and all
+    const chipDisplayText = `טרפז ${LRI}ABCD${PDI} חסום במעגל`;
+    expect(CONTROLS.test(chipDisplayText)).toBe(true);
+
+    const { construction, positions } = replay([]);
+    const r = parse('טרפז ABCD חסום במעגל', buildParseCtx(construction, positions));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    useGeoStore.getState().executeMany(r.commands, chipDisplayText);
+
+    const lines = questionLines(useGeoStore.getState().facts);
+    expect(lines.every((l) => !CONTROLS.test(l))).toBe(true);
+
+    const buf = await Packer.toBuffer(
+      buildQuestionDoc({ heading: 'נתון:', lines, png: { data: PNG_2X1, ...pngDimensions(PNG_2X1) }, rtl: true, segments: bidiSegments }),
+    );
+    const xml = await (await JSZip.loadAsync(buf)).file('word/document.xml')!.async('string');
+    const body = [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join('');
+
+    expect(CONTROLS.test(body)).toBe(false);
+    expect(body).toContain('טרפז ABCD חסום במעגל');
   });
 });

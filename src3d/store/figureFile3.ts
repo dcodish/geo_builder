@@ -11,6 +11,7 @@
  */
 
 import { nanoid } from 'nanoid';
+import { stripFormatControls } from '../../shell/bidi';
 import type { Command3 } from '../engine/types';
 import type { Fact3 } from './store3';
 
@@ -172,7 +173,9 @@ export function deserializeFigure3(text: string): LoadResult3 {
       }
     }
     // ids are session-local — always minted fresh on load
-    facts.push({ id: nanoid(8), utterance: f.utterance, cmds: f.cmds, enabled: f.enabled !== false });
+    // #751 (ADR-W-029): clean on LOAD too — a file saved before the invariant carries the
+    // app's display isolates, and those saves are already in the wild.
+    facts.push({ id: nanoid(8), utterance: stripFormatControls(f.utterance), cmds: f.cmds, enabled: f.enabled !== false });
   }
   const queries = Array.isArray(file.queries) ? file.queries.filter((q): q is string => typeof q === 'string') : [];
   // #318: lenient like `queries` — keep only well-formed entries; anything else falls back to 'full'
