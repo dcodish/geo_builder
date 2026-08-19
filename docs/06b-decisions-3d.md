@@ -4247,3 +4247,63 @@ head's separator-vs-sign pair and the `= 0`-less form; the neighbours the permis
 (`מישור ABC`, `מישור π2`, `ישר l`); the query lane's noun equality with the bare form, both languages, plus
 the plural coordinate nouns and a stray letter still refusing (`queries.test.ts`); and the fixture
 `param-line-2024-q2.geo3.json` — the operator's exam session, typed the way the book prints it.
+
+## ADR-3D-161 — the knowledge frame-gate asks the placement funnel's question, not a list of absolute kinds (#639)
+
+**Context.** The operator built the exam's figure in prod — a parametric line, an equation plane, `ℓ ⟂ π`,
+and their crossing `A` — and reported: *"point A is not defined or there is no way for me to get point A.
+Now we did have an issue like that reported. I thought we fixed it."*
+
+They were right on both counts. The panel derives `m = −5` correctly, `resolve3` holds
+`A = (2, 0, −10)` **identically at every seed**, and `src3d/engine/__tests__/lines3.test.ts` has asserted
+that number since ADR-3D-006 — while `dataView().pointCoords` was `{}`, the canvas drew no coordinate label,
+and the query lane answered **«נקודה A — לא נקבע על ידי הנתונים»**. On the exam's part ג — *«מצאו את שיעורי
+הנקודה A»* — the tool held the answer and stated the opposite. The plane equation the student typed was
+denied the same way.
+
+**Root cause.** `translationPinned3` gated every point-coordinate and plane surface, and it was
+`c.pins.length > 0 || absolutePointCount(c) > 0` — an **enumeration of the absolute sources that happened to
+be in front of us when #517 was fixed**. The operator's figure has neither: its absolute frame is an equation
+plane and a parametric line. Twelve lines above it sat `hasAbsoluteFrameObject`, which answers correctly, and
+which the SOLVER already consults — that is why it samples the placement instead of freezing it. Only the
+knowledge gate did not. `src3d/CLAUDE.md`, verbatim: *"An enumeration is not a rule. Repeatedly, a correct
+rule was applied to a whitelist one member short."* This is #517's own class, recurring on the members that
+were not in the room that day.
+
+**Decision.** The gate asks the question it actually depends on — *is a drawn position CHOSEN or DERIVED?* —
+and asks it of the construction:
+
+1. a stated absolute POSITION determines the placement outright (today's first arm, unchanged);
+2. with **no** absolute frame object, translation is a pure gauge the funnel freezes, so nothing
+   translation-dependent is knowledge (#315's figures are byte-identical);
+3. otherwise the frame is absolute, and the only remaining question is whether the figure's **gauge-placed
+   content** is being sampled — `placementSampled3(c)` — or whether there is none, which is exactly the
+   operator's figure: every object is Lane-A absolute and no vertex was ever placed by convention.
+
+Seed-stability stays the per-quantity arbiter underneath. What changed is *when that arbiter is sound*, and
+that is now the funnel's own predicate rather than a second opinion about it.
+
+**One predicate, one definition.** `translationGaugeFree3`, `gaugePlacedIds3`, `freePlaneOffsetPinned3` and
+`freePlaneFigurePinned3` were hoisted out of `resolve3`'s body, and `resolve3` now consumes them. The solver
+and the knowledge gate therefore cannot drift apart about what "sampled" means — the drift that produced this
+bug. (`rotationFree` needs resolved lines and stays inside `resolve3`; it is not needed here, because every
+pin it names is also named by `translationGaugeFree3` — rotation-free strictly implies translation-free, so
+the funnel's `translationFree || rotationFree` reduces to the pure half.)
+
+**What this deliberately does NOT do.** It does not open the gate figure-wide the moment an equation plane
+exists. In the mixed figure — a cube plus the line and the plane — the cube's vertices roam with the sampled
+placement and the per-point stability test drops them, while the crossing point is identical at every seed and
+prints. A figure whose placement is pinned by a MEMBERSHIP is neither stated nor sampled but **frozen**, so
+its coordinates are seed-stable without being knowledge, and the gate stays shut: that case is #611's defect
+in the opposite direction, and it is the reason the predicate asks the funnel's question instead of "is there
+an absolute object anywhere".
+
+`vectorFramePinned3` rides the same predicate (it already ORed the old one), so the vector family inherits the
+correction: a vector between two Lane-A points is knowledge, a cube edge under a sampled placement is not.
+
+Locks (`frame-gates.test.ts`): the operator's exact sequence — `A` reads `(2, 0, −10)` in the panel and from
+the query box at seeds 0, 1, 2, 7 and 99, and `מישור π` answers `3x − 5y + z + 4 = 0`; **the over-reach
+guard** — in the mixed figure the cube prints nothing while `A1` prints, with the mechanism asserted (the
+cube's `A` moves more than 1e-2 between seeds, `A1` less than 1e-9); a figure with no absolute object
+unchanged (#315); and the membership-pinned figure staying silent. The exam session itself is a fixture
+(`param-line-2024-q2.geo3.json`, ADR-3D-160).

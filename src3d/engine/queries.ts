@@ -12,7 +12,7 @@
  * WHY it can't be answered — never a sampled number dressed as a fact (ADR-052).
  */
 
-import { resolve3, scaleKnown3, translationPinned3, vectorFramePinned3 } from './evaluate';
+import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
 import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, decompStr, formatBranches, linePlaneAngleAt, newellNormal, parametricDecomp, parametricPlaneForm, planeEqStr } from './dataView';
 import { centroid3, cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
 import { distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
@@ -474,7 +474,7 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
     // #315: the d-term is translation-dependent, so an equation is gauge until a real point injection
     // anchors the frame. The panel carries this same explicit gate — cross-sample agreement alone does
     // not catch it, because an unanchored figure can still be placed identically at every seed.
-    if (!translationPinned3(c)) return { text, answer: null, note: 'undetermined' };
+    if (!translationKnown3(c)) return { text, answer: null, note: 'undetermined' };
     const resolvedPer = seeds.map((sd) => resolve3(c, sd));
     const per = resolvedPer.map((r) => {
       if (q.name) return r.planes.get(q.name);

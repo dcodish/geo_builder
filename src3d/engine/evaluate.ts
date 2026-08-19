@@ -992,26 +992,102 @@ export function hasAbsoluteFrameObject(c: Construction3): boolean {
 }
 
 /**
- * #517 — is the figure's TRANSLATION anchored by a stated absolute POSITION? The knowledge gates
- * (canvas coordinate labels, the data panel's point/plane families) need this because translation is
- * a deterministic gauge the sample seeds never vary (#315): without an anchor, the pivot roots the
- * figure at a fixed origin and an unpinned coordinate would read seed-stable — gauge printing as
- * data, the ADR-052 cardinal sin. The anchoring sources are `c.pins` (coords stated for an EXISTING
- * point) and the absolute points of `c.points` (a FRESH `C(2,1,0)` never reaches a pin list —
- * apply stores it as kind 'coord'). dataView asked `c.pins.length > 0` alone, so a figure of bare
- * injected points had every knowledge family suppressed while the engine held the exact positions
- * (operator, 2026-08-11). Pure pair/vector injections deliberately do NOT count — they fix
- * direction+scale, never translation (#315, operator-validated 2026-07-25).
+ * #508 — a free plane whose OFFSET is pinned by a stated distance to a figure POINT, and #487 — a free
+ * plane pinned to figure CONTENT. Both are read by the placement funnel and by the knowledge gate below,
+ * so they are defined once here rather than recomputed per caller.
  */
-export function translationPinned3(c: Construction3): boolean {
-  return c.pins.length > 0 || absolutePointCount(c) > 0;
+export function freePlaneOffsetPinned3(c: Construction3): boolean {
+  return c.claims.some(
+    (cl) =>
+      cl.type === 'distance-rel' &&
+      [cl.a, cl.b].some((op) => op.kind === 'plane-named' && c.planes.get(op.name)?.free) &&
+      [cl.a, cl.b].some((op) => op.kind === 'point'),
+  );
+}
+
+export function freePlaneFigurePinned3(c: Construction3): boolean {
+  return c.claims.some(
+    (cl) =>
+      cl.type === 'plane-rel' &&
+      (cl.rel === 'parallel' || cl.rel === 'perp') &&
+      [cl.a, cl.b].some((op) => op.kind === 'plane-named' && c.planes.get(op.name)?.free) &&
+      [cl.a, cl.b].some((op) => op.kind === 'plane-run'),
+  );
+}
+
+/**
+ * Is the figure's TRANSLATION a free gauge component — the ADR-3D-101 funnel's own question, asked once.
+ * `resolve3` samples the placement exactly when this holds (rotation-free is strictly stronger: every
+ * pin it names, this one names too), and the knowledge gate below asks the same question, so the two can
+ * never disagree about whether a drawn position was CHOSEN or DERIVED.
+ */
+export function translationGaugeFree3(c: Construction3): boolean {
+  return (
+    c.pins.length === 0 &&
+    c.planePins.length === 0 &&
+    c.memberships.length === 0 &&
+    !freePlaneOffsetPinned3(c) &&
+    !c.coordPlanePins.some((cp) => cp.mode === 'zero' || cp.mode === 'contains')
+  );
+}
+
+/** The points the placement funnel MOVES — the figure's gauge-placed content (its own scan, shared). */
+export function gaugePlacedIds3(c: Construction3): Id[] {
+  const ids: Id[] = [];
+  for (const [id, def] of c.points) {
+    if (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane))) ids.push(id);
+  }
+  return ids;
+}
+
+/** Does `resolve3` SAMPLE the placement (rather than freeze it at the canonical gauge)? */
+export function placementSampled3(c: Construction3): boolean {
+  return c.solids.length > 0 && hasAbsoluteFrameObject(c) && translationGaugeFree3(c);
+}
+
+/**
+ * #517/#639 — may a TRANSLATION-DEPENDENT quantity (a point coordinate, a plane equation's d-term) be
+ * read as knowledge? The gates behind this are the canvas coordinate labels, the ארגון נתונים panel and
+ * the query lane, and they decide it by SEED-STABILITY — a value identical in every sampled configuration.
+ * That test is only sound where the placement is actually sampled: where it is frozen at the canonical
+ * gauge, an arbitrary position reads perfectly stable and prints as data, which is ADR-052's cardinal sin
+ * (#315, the operator's «why does setting DE=(0,2,0) place A in (0,0,0)»).
+ *
+ * #639 — this used to be `c.pins.length > 0 || absolutePointCount(c) > 0`: an ENUMERATION of the absolute
+ * sources that happened to be in front of us in #517, and it was one member short again. A figure whose
+ * absolute frame comes from an EQUATION PLANE and a PARAMETRIC LINE — the whole algebraic lane, the exam's
+ * own 2024-Q2 figure — has neither a pin nor a coordinate point, so every knowledge surface was withheld
+ * while the engine held A = (2, 0, −10) exactly and seed-invariantly, and the query lane answered
+ * «לא נקבע על ידי הנתונים» about a point the givens determine. `src3d/CLAUDE.md`: an enumeration is not a
+ * rule.
+ *
+ * The rule, asked of the construction rather than listed:
+ *
+ *  1. a stated absolute POSITION determines the placement outright — knowledge, as before;
+ *  2. with no absolute frame object at all, translation is a pure gauge the funnel freezes — nothing is
+ *     knowledge, and #315's figures are untouched;
+ *  3. otherwise the frame is absolute, and the question is only whether the figure's GAUGE-PLACED content
+ *     is being sampled. It is sampled (`placementSampled3`) — or there is none to hide, which is exactly
+ *     the operator's figure, where every object is Lane-A absolute and no vertex was ever placed by
+ *     convention.
+ *
+ * What case 3 deliberately does NOT do is open the gate figure-wide: in the mixed figure (a cube plus the
+ * line and the plane) the cube's vertices roam with the sampled placement and the per-point stability test
+ * drops them, while the crossing point is identical at every seed and prints. A membership-pinned cube —
+ * placement neither stated nor sampled, so frozen — stays silent, which is the #611 defect in the opposite
+ * direction and the reason the funnel's own predicate is what is asked here.
+ */
+export function translationKnown3(c: Construction3): boolean {
+  if (c.pins.length > 0 || absolutePointCount(c) > 0) return true;
+  if (!hasAbsoluteFrameObject(c)) return false;
+  return placementSampled3(c) || gaugePlacedIds3(c).length === 0;
 }
 
 /** #517 — the frame gate for VECTOR coordinates (a difference — translation cancels), shared by the
  *  data panel and the query lane so they can never disagree: any absolute position, or a pinned
  *  orientation source (vector/pair/plane pins). Seed-stability stays the per-quantity arbiter. */
 export function vectorFramePinned3(c: Construction3): boolean {
-  return translationPinned3(c) || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
+  return translationKnown3(c) || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
 }
 
 /**
@@ -1428,31 +1504,15 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   // sampled only when PROVABLY free, and here neither is. (Only the slide PARALLEL to the plane is
   // genuinely free; partial freedoms stay conservatively pinned, the documented ADR-3D-101 deferral.
   // The plane's own normal is still sampled, so the configuration visibly varies.)
-  const freePlaneOffsetPinned = c.claims.some(
-    (cl) =>
-      cl.type === 'distance-rel' &&
-      [cl.a, cl.b].some((op) => op.kind === 'plane-named' && c.planes.get(op.name)?.free) &&
-      [cl.a, cl.b].some((op) => op.kind === 'point'),
-  );
-  const translationFree =
-    c.pins.length === 0 &&
-    c.planePins.length === 0 &&
-    c.memberships.length === 0 &&
-    !freePlaneOffsetPinned &&
-    !c.coordPlanePins.some((cp) => cp.mode === 'zero' || cp.mode === 'contains');
+  const freePlaneOffsetPinned = freePlaneOffsetPinned3(c);
+  const translationFree = translationGaugeFree3(c);
   // #487 (ADR-3D-124): a FREE plane pinned to FIGURE CONTENT (a plane-rel claim against a point-run)
   // resolves BEFORE this block, reading the figure's current positions — sampling the rotation after
   // that would rotate the run out from under the pin and refute the very claim the resolution honoured.
   // The funnel's own doctrine decides it: a component is sampled only when PROVABLY free, and here it
   // is provably NOT. (A free plane pinned to an ABSOLUTE line, or pure-sampled, is unaffected — nothing
   // it reads moves with the figure.) Memberships already pin both components via the existing lists.
-  const freePlaneFigurePinned = c.claims.some(
-    (cl) =>
-      cl.type === 'plane-rel' &&
-      (cl.rel === 'parallel' || cl.rel === 'perp') &&
-      [cl.a, cl.b].some((op) => op.kind === 'plane-named' && c.planes.get(op.name)?.free) &&
-      [cl.a, cl.b].some((op) => op.kind === 'plane-run'),
-  );
+  const freePlaneFigurePinned = freePlaneFigurePinned3(c);
   const rotationFree =
     c.pins.length === 0 &&
     c.vectorPins.length === 0 &&
@@ -1513,10 +1573,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   // of a wrong statement on the strength of an arbitrary choice — ADR-3D-138's class exactly.
   const placementSampled = (translationFree || rotationFree) && c.solids.length > 0 && hasAbsoluteFrameObject(c);
   if ((translationFree || rotationFree || spinAxis) && c.solids.length > 0 && hasAbsoluteFrameObject(c)) {
-    const gaugeIds: Id[] = [];
-    for (const [id, def] of c.points) {
-      if (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane))) gaugeIds.push(id);
-    }
+    const gaugeIds = gaugePlacedIds3(c);
     if (gaugeIds.length > 0) {
       const pts = gaugeIds.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
       const mid = pts.length ? centroid3(pts) : v3(0, 0, 0);

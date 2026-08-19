@@ -14,7 +14,7 @@
  * which is why the App gates it behind an explicit student checkbox.
  */
 
-import { resolve3, scaleKnown3, translationPinned3, vectorFramePinned3 } from './evaluate';
+import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
 import { cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
 import { figureSymbolsOf } from './types';
 import { angleBetweenOperands, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
@@ -483,7 +483,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // #517: both anchors are the SHARED predicates in evaluate.ts — a fresh `C(2,1,0)` lands in
   // `c.points` as kind 'coord', never in `c.pins`, and the private `c.pins.length > 0` enumeration
   // here suppressed every knowledge family for a figure of bare injected points.
-  const translationPinned = translationPinned3(c);
+  const translationPinned = translationKnown3(c);
   // Vector coordinates (a difference — translation cancels) keep the FRAME + seed-stability gate:
   // the seeds VARY the rotation/dims gauge (operator-validated 2026-07-25: with only DE=(0,2,0)
   // pinned, u's coords correctly do NOT print while v = 3·DE — parallel to the pin, genuinely
