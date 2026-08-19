@@ -37,6 +37,13 @@ describe('span-accounting shadow sweep (catalog corpus)', () => {
     }
     expect(swept).toBeGreaterThan(100); // non-vacuity — the sweep really ran over the corpus
     const hardRows = rows.filter((r) => r.hard.length);
+    // ENFORCING since ADR-453 (#659 step 3): a hard span on a SUPPORTED catalog example is no longer
+    // a divergence to review — it is a FALSE REFUSAL of input the tool promises to accept. This sweep
+    // is therefore the accountant's false-positive net, and it asserts rather than reports.
+    expect(
+      hardRows.map((r) => `${r.utterance} → ${r.hard.join(', ')}`),
+      'span accounting would REFUSE a supported catalog example — a false refusal, not a divergence',
+    ).toEqual([]);
     // Print the summary into the test log every run (the shadow's heartbeat).
     console.log(
       `span-shadow: swept ${swept} catalog utterances — ${hardRows.length} with HARD divergences, ` +

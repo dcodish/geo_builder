@@ -51,7 +51,7 @@ import { isGeoPoint } from '@/engine';
 import type { Construction, Id, Vec } from '@/engine';
 import { autoNamedLabels, deferralWorthwhile, dryRunOutcome, primeFoldFor, replay, trialFacts, useGeoStore } from '@/store/geoStore';
 import { geoWork, isCancelled } from '@/store/geoWork';
-import { spanShadow } from '@/parser/spanAccounting';
+import { spanShadow, unaccountedSpans } from '@/parser/spanAccounting';
 import { logDebug } from '@/debug/sessionLog';
 
 export interface SubmitUi {
@@ -296,6 +296,13 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   let weak: 'error' | 'empty' | 'dropped' | null = null;
   if (r.ok) {
     const pts = pctx.points ?? [];
+    // The accountant's context — the same exemptions the label gate takes (an EXISTING point, a bound
+    // radius symbol, an angle alias are all legitimately unclaimed by a new command).
+    const actx = {
+      existingPoints: pts,
+      radiusSymbols: (pctx.radiusSymbols ?? []).map((x) => x.name),
+      angleAliases: (pctx.angleAliases ?? []).map((x) => x.name),
+    };
     // A typo in a keyword (e.g. "מנוקדה" for "מנקודה") can make a rule match PARTIALLY, silently dropping
     // a NEW label it introduced ("from D …") — committing a wrong/partial figure. When the parse leaves a
     // new input label unused, escalate to the LLM (whose job is freeform/typo input) instead of committing
@@ -327,7 +334,19 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     // shape («מלבן ABCD עם אלכסונים» → a bare rectangle, ✓). Every gate above asks about labels, numbers,
     // relations, verbs, compounds, words and comparisons — none asks whether a stated OBJECT materialised.
     const droppedConstruct = droppedConstructNoun(utterance, r.commands);
-    if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0 && droppedVerbs.length === 0 && droppedCompound.length === 0 && droppedWordRels.length === 0 && !droppedCmp && droppedConstruct.length === 0) {
+    // SPAN ACCOUNTING — ENFORCING since 2026-08-19 (#659 step 3, ADR-453, docs/24 §4.2). The TOTAL
+    // mechanism the gates above approximate one category at a time: every significant token span must
+    // be accounted for by the winning parse, or the rule claimed the utterance while leaving stated
+    // content unread. Hard spans only (label/number/relation); `unknown-word` stays a report bucket.
+    //
+    // It JOINS the gate family rather than replacing it — deliberately, and against this issue's own
+    // first instinct. The retirement differential (`span-gate-differential.test.ts`) measured what
+    // replacement would actually cost today: the accountant does not carry the ADR-250 count-quantifier
+    // exemption (it would refuse «מנקודה A יוצאים 2 משיקים למעגל»), and its single global `hasConstraint`
+    // flag cannot see the ADR-264 class at all (a relation between points that ALL already exist).
+    // Each gate retires when that differential proves the accountant reproduces its exemption set — #758.
+    const unaccounted = unaccountedSpans(utterance, r.commands, actx);
+    if (unaccounted.length === 0 && dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0 && droppedVerbs.length === 0 && droppedCompound.length === 0 && droppedWordRels.length === 0 && !droppedCmp && droppedConstruct.length === 0) {
       const st = store();
       // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
       // the commit, and every later replay of this content then run at TAIL speed on the main thread
@@ -418,7 +437,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
       logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:${outcome.reason}`, detail: outcome.detail, commands: r.commands, intermediate: true });
     } else {
       weak = 'dropped'; // a typo dropped a stated label/number/relation/verb/compound-structure/object → escalate rather than commit the partial parse
-      logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct].join(',')}`, commands: r.commands, intermediate: true });
+      logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct, ...unaccounted.map((x) => `${x.kind}:${x.text}`)].join(',')}`, commands: r.commands, intermediate: true });
     }
   }
   // A magnitude written with the WORD «שורש N» that reached the escalation seam — the #105 `שורש→√`
@@ -579,6 +598,13 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     // emits only the bare shape must name what it lost. Bound to the commit EVENT on both paths, not to a
     // code path — the reported 3-D twins were GRAMMAR drops, where the LLM-seam gates never run at all.
     ...droppedConstructNoun(utterance, llmCmds),
+    // and SPAN ACCOUNTING (ADR-453): the enforcing verdict the grammar path takes must hold on the
+    // second attempt too — the two seams ask the identical question, or the LLM path becomes the
+    // weaker one by drift (the ADR-240 pattern this whole battery exists to keep).
+    ...unaccountedSpans(utterance, llmCmds, {
+      existingPoints: llmFig.objects.filter(isGeoPoint).map((o) => o.id),
+      radiusSymbols: llmFig.objects.flatMap((o) => (o.kind === 'circle' && o.radiusSymbol ? [o.radiusSymbol] : [])),
+    }).map((x) => x.text),
   ];
   if (stillDropped.length > 0) {
     logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `dropped-labels:${stillDropped.join(',')}`, commands: llmCmds });

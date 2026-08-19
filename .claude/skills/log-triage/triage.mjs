@@ -23,7 +23,7 @@
  * session re-checking by hand. So this file now mirrors `App.tsx#submit`, in its order:
  *
  *   store ops (nameCentre/rename/merge/swap) → parse(u, buildParseCtx(figure)) → clarify (ambiguous-*)
- *   → PRE_LLM out-of-scope short-circuit (ADR-289) → honesty gates (ADR-089/250/264/292 + #153)
+ *   → PRE_LLM out-of-scope short-circuit (ADR-289) → honesty gates (ADR-089/250/264/292 + #153 + span accounting, ADR-453)
  *   → replay → built / refused
  *
  * `buildParseCtx` is IMPORTED, never re-implemented — that mirror drifting is what this file is a fix for,
@@ -74,6 +74,7 @@ import {
   looksLikeLatex, wordRootMagnitude, statedNegation,
   droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs, droppedCompoundRelation,
 } from '../../../src/parser/index.ts';
+import { unaccountedSpans } from '../../../src/parser/spanAccounting.ts';
 import { replay, nameCentreFacts, renameFacts, autoNamedLabels } from '../../../src/store/geoStore.ts';
 import { parse3 } from '../../../src3d/parser/parse3.ts';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from '../../../src3d/parser/scope3.ts';
@@ -226,10 +227,18 @@ const OPEN = new Set(['not-handled', 'would-escalate', 'refused', 'error', 'unve
 // (ADR-289 / #43). Not gaps — the tool answering on purpose. Keep in sync with App.tsx's PRE_LLM.
 const PRE_LLM = new Set(['analytic', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point', 'unnamed-sides', 'compound-relation']);
 
-/** The five honesty gates of App.tsx#submit, in its order. Any hit ⇒ the App escalates to the LLM
- *  instead of committing the partial parse — so the deterministic grammar does NOT own this utterance. */
+/** The honesty gates of the submit pipeline, in its order. Any hit ⇒ the App escalates to the LLM
+ *  instead of committing the partial parse — so the deterministic grammar does NOT own this utterance.
+ *  `triage-mirror.test.ts` fails if this list drifts from `src/app/submitPipeline.ts`. */
 function droppedBy(u, cmds, pctx) {
   const hits = [
+    // SPAN ACCOUNTING, enforcing since ADR-453 (#659 step 3) — the total mechanism, alongside the
+    // per-category gates it will eventually retire (#758).
+    ...unaccountedSpans(u, cmds, {
+      existingPoints: pctx.points ?? [],
+      radiusSymbols: (pctx.radiusSymbols ?? []).map((x) => x.name),
+      angleAliases: (pctx.angleAliases ?? []).map((x) => x.name),
+    }).map((x) => x.text),
     ...droppedNewLabels(u, cmds, pctx.points ?? [], (pctx.radiusSymbols ?? []).map((x) => x.name)), // ADR-089
     ...droppedGivenNumbers(u, cmds),      // ADR-250
     ...droppedGivenRelations(u, cmds),    // ADR-264
