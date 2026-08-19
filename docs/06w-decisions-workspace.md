@@ -1022,3 +1022,46 @@ having played the channel across two `next/*` deploys.
 4. **The Apache api mappings for the `-next` paths are the operator's to remove** (Plesk directives
    field). They are inert once the directories are gone — a mapping to nothing — so the teardown is
    complete without them, but they are noise in a field where noise is expensive.
+
+## ADR-W-026 — Displayed numbers have ONE rounder, and precision-per-surface is still open (#723)
+
+**Operator ruling (2026-08-18, B5 play):** *"decimal points, only two numbers after the point. This is a
+rule that should be for all of the tools we have."* The trigger was the complex canvas printing
+«w ≈ ~9.3·cis~254.4101°».
+
+**Decision.** `shell/format.ts` is the ONE place a computed number becomes the digits a student reads, and
+every product's display formatter delegates to it: 2-D's `formatMeasure` and 3-D's `cleanNum` decimal
+fallback both dropped their private rounders in favour of `fmtNum`. `DISPLAY_DECIMALS = 2` is the house
+precision the ruling names. The complex builder's reading composition had already adopted it, which is
+what the report was about.
+
+**Nothing visible changed in 2-D or 3-D — and that is the point.** Both already *printed* two decimals;
+what they no longer own is a private rounder, so the next precision decision is made once instead of three
+times. Rounding scattered across call sites is how two surfaces start printing the same number differently
+(the #653 class), and a chokepoint that agrees with the old behaviour today is the only kind worth
+installing before it is needed.
+
+**Deliberately NOT collapsed: the exact tiers.** An integer, `1/2`, `√2`, a π-form, `cis120°` are not
+decimal expansions and never pass through the rounder. Each product keeps its own tiers above the fallback
+— they encode what that product's students write on paper — and the rule reaches only the decimals below
+them. `formatMeasure`'s non-finite dash likewise stays 2-D's.
+
+**Two cells escalated rather than assumed** (round #752 → `needs-operator` on #723):
+
+1. **The 3-D canvas asks for THREE decimals under [#491]**, whose recorded reasoning is that *precision is
+   a property of the SURFACE* — a canvas has room a panel row does not, and #481's coarsening of `-0.586`
+   to `-0.59` was collateral #491 deliberately reversed. Reading #723 as an absolute ceiling would overturn
+   an earlier ruling on a surface the operator was not looking at when they gave it. So `maxDecimals`
+   stays a parameter with a default rather than becoming a hard cap, and which ruling governs the canvas is
+   the operator's to say.
+2. **The complex `value/` layer keeps a private 3-decimal `fmtNum`** because it *cannot* import `shell/`:
+   `value/` is the declared BOTTOM of its tree and `src-complex/__tests__/import-direction.test.ts`
+   enforces it. The round reverted the one-line delegation rather than weaken the layering test. The
+   duplicate has no consumers outside its own barrel, so deleting it is the recommended resolution — but
+   that is a `src-complex` decision, not a workspace one.
+
+**The guard is PER PRODUCT, by necessity and by design.** A single cross-product test would have to live in
+`shell/` and import the products, and `shell → src` / `shell → src3d` are forbidden edges
+(`BOUNDARIES.json`) — the isolation test caught exactly that during this work. Each product locks its own
+routing (`src/__tests__/display-format.test.ts`, `src3d/__tests__/display-format.test.ts`) against values
+where two plausible rounders disagree; `shell/__tests__/display-format.test.ts` locks the chokepoint itself.

@@ -14,6 +14,7 @@
  * which is why the App gates it behind an explicit student checkbox.
  */
 
+import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
 import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { figureSymbolsOf } from './types';
@@ -113,7 +114,7 @@ function trySurd(x: number, tol: number): string | null {
 
 /** Render a number cleanly: integers plain, small fractions as p/q, an opt-in SURD tier (#269), else
  *  `decimals` places (default 2 — the panel's house precision; #491 lets a roomier surface ask for more). */
-export function cleanNum(x: number, tol = 1e-5, surd = false, decimals = 2): string {
+export function cleanNum(x: number, tol = 1e-5, surd = false, decimals = DISPLAY_DECIMALS): string {
   // default tolerance sized for the pivot's numeric floor (~1e-7), far under display
   // grain; coefficients from a DOUBLE-ROOT solve carry the intrinsic √noise (~1e-4)
   // and pass tol = 2e-3 (cleanCoef) — claims still guard correctness at 2e-5
@@ -123,7 +124,8 @@ export function cleanNum(x: number, tol = 1e-5, surd = false, decimals = 2): str
     if (Math.abs(p - Math.round(p)) < tol && Math.abs(Math.round(p)) <= 400) return `${Math.round(p)}/${q}`;
   }
   if (surd) { const s = trySurd(x, tol); if (s) return s; }
-  return x.toFixed(decimals);
+  // #723: the decimal fallback is the SHARED formatter — the exact tiers above are 3-D's own and untouched
+  return fmtNum(x, decimals);
 }
 /** A magnitude / coordinate value — the same tiers as `cleanNum` plus the surd tier (#269).
  *  `decimals` (#491) is the DECIMAL FALLBACK only: every exact tier above it is unaffected, so a caller

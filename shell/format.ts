@@ -8,11 +8,22 @@
  * ruler showing centimetres over an exact length. Exact symbolic forms (5, 1/2, √2, cis120°) never
  * pass through here — the rule is about decimal EXPANSIONS.
  *
- * Adopted by the complex builder's reading composition first; 2-D and 3-D sweep onto it under #723.
+ * EVERY product's display formatter delegates here (#723): 2-D `formatMeasure`, 3-D `cleanNum`'s decimal
+ * fallback, and the complex value layer's `fmtNum`. Each keeps its own product-specific tiers above the
+ * decimal fallback — an exact fraction, a surd, a π form — because those are not decimal expansions and
+ * the rule does not touch them; what none of them keeps is a private rounder.
+ *
+ * `DISPLAY_DECIMALS` is the house precision the operator's ruling names. It is a DEFAULT, not a ceiling
+ * the signature can express: `maxDecimals` stays a parameter because one surface asks for more (the 3-D
+ * canvas coordinate label, #491 — "precision is a property of the surface"), and that collision between
+ * two rulings is the operator's to settle, not a round's to assume. Every other caller takes the default.
  */
 
+/** The house display precision (operator ruling, 2026-08-18). */
+export const DISPLAY_DECIMALS = 2;
+
 /** Format for display: at most `maxDecimals` digits after the point, trailing zeros trimmed. */
-export function fmtNum(x: number, maxDecimals = 2): string {
+export function fmtNum(x: number, maxDecimals = DISPLAY_DECIMALS): string {
   const r = Math.round(x * 10 ** maxDecimals) / 10 ** maxDecimals;
   return (Object.is(r, -0) ? 0 : r).toString();
 }

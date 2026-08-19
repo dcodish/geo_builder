@@ -1,3 +1,4 @@
+import { fmtNum } from '../shell/format';
 /**
  * THE shared student-facing measure formatter (#164, ADR-393) — one place, so a length prints IDENTICALLY
  * whether STATED or DERIVED, on the canvas or in the readout panel. Before this, five ad-hoc formatters
@@ -12,7 +13,9 @@
  * `computedValue.ts`) — imports it without an import-direction violation.
  */
 export function formatMeasure(v: number): string {
-  return Number.isFinite(v) ? String(Number(v.toFixed(2))) : '—';
+  // #723 — the rounding itself is the shared chokepoint's; this function keeps only what is 2-D's own
+  // (the non-finite dash). A private rounder here is how two tools start printing one number two ways.
+  return Number.isFinite(v) ? fmtNum(v) : '—';
 }
 
 /** The same value with the degree sign — for angle displays. */
