@@ -492,3 +492,72 @@ describe('ADR-362 (#192) — the ordinal circle reference', () => {
     if (r.ok) expect(r.commands.some((c) => c.type === 'point-on-circle')).toBe(false);
   });
 });
+
+/**
+ * #757 (P1) — the ADR-024 LEFTOVER GUARD on `circlesTangent`.
+ *
+ * The rule reads a tangency KIND and a circle PAIR. Everything else it discarded in SILENCE, so
+ * «שני מעגלים משיקים מבחוץ ברדיוסים שווים» committed two circles with a green ✓ and the student's
+ * equal-radii relation gone (r = 5 and 3.6 on the canvas). No honesty gate saw it: the `dropped*`
+ * family enumerates categories, and a magnitude equality between two implied objects is a category
+ * none of them has — the docs/23 G1 shape verbatim.
+ *
+ * The class fix is all-or-nothing: strip exactly what the rule consumes, decline whole if anything
+ * geometry-significant remains. So this locks the CLASS (any unread modifier), not the instance —
+ * plus the working forms, because a leftover guard's real risk is false-blocking (#138/#140).
+ */
+describe('#757 — a two-circle tangency declines rather than swallowing a modifier it cannot read', () => {
+  const refuses = (u: string) => expect(parse(u).ok, `must NOT commit: ${u}`).toBe(false);
+  const builds = (u: string) => {
+    const r = parse(u);
+    expect(r.ok, `must still build: ${u}`).toBe(true);
+    if (r.ok) expect(r.commands.some((c) => c.type === 'circles-tangent'), u).toBe(true);
+  };
+
+  it('the reported utterance, and its whole spelling matrix', () => {
+    // {external, internal} × {ב-, עם} × {he, en} — the class, not the one sentence the operator typed.
+    refuses('שני מעגלים משיקים מבחוץ ברדיוסים שווים');
+    refuses('שני מעגלים משיקים מבחוץ עם רדיוסים שווים');
+    refuses('שני מעגלים משיקים מבפנים ברדיוסים שווים');
+    refuses('שני מעגלים משיקים מבפנים עם רדיוסים שווים');
+    refuses('two circles tangent externally with equal radii');
+    refuses('two circles tangent internally with equal radii');
+  });
+
+  it('the class beyond equal radii — unread modifiers nobody reported also decline', () => {
+    // The docs/17 test of a real class fix: it closes siblings that were never filed.
+    refuses('שני מעגלים משיקים מבחוץ שרדיוסו של האחד 5');
+    refuses('שני מעגלים משיקים מבחוץ שקוטרם שווה');
+    refuses('שני מעגלים משיקים מבחוץ והזווית ABC');
+    // Scope boundary, stated rather than assumed: a modifier that another rule CLAIMS
+    // («…ואלכסון AB» → a lone `segment`; «…with a chord AB» → the chord rule) never reaches this
+    // guard, and those rules drop the tangency in their own right. That is a different rule's
+    // contract and a separate class — filed, not silently folded in here.
+  });
+
+  it('RESIDUAL, recorded rather than hidden: an AREA modifier still commits', () => {
+    // `SHAPE_LEFTOVER` is a denylist and has no area/perimeter token, so «ששטחם שווה» survives it —
+    // the same class as the reported bug, still open. Widening that denylist touches all 13 of its
+    // consumers, so it is scoped separately rather than smuggled into a P1 fix. This test asserts the
+    // CURRENT state deliberately: when the denylist grows, it fails and points at the follow-up.
+    expect(parse('שני מעגלים משיקים מבחוץ ששטחם שווה').ok).toBe(true);
+  });
+
+  it('every form the rule DOES read still builds — the false-block risk a leftover guard carries', () => {
+    builds('שני מעגלים משיקים');
+    builds('שני מעגלים משיקים מבחוץ');
+    builds('שני מעגלים משיקים מבפנים');
+    builds('שני מעגלים משיקים מבחוץ בנקודה T');
+    builds('המעגלים משיקים זה לזה');
+    builds('מעגל O ומעגל P משיקים מבחוץ בנקודה M');
+    builds('circle O and circle P are tangent internally at M');
+    builds('two circles are tangent externally');
+  });
+
+  it('the refusal is HONEST — nothing is committed, so nothing contradicts the given', () => {
+    // The P1 was not "it refused"; it was that it BUILT while dropping the relation. The contract is
+    // that the statement never commits a figure asserting the opposite of what the student said.
+    const r = parse('שני מעגלים משיקים מבחוץ ברדיוסים שווים');
+    expect(r.ok).toBe(false);
+  });
+});

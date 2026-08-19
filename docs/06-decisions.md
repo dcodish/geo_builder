@@ -7453,3 +7453,61 @@ answering "is this still a gap?" the way the product answers a student.
 
 Open, deliberately: the vocabulary work that would let the word bucket enforce (#757's sibling question),
 and the retirement itself (#758).
+
+## ADR-454 — a two-circle tangency declines rather than swallowing a modifier it cannot read (#757)
+
+**The P1.** «שני מעגלים משיקים מבחוץ ברדיוסים שווים» built **green** with radii 5 and 3.6 — visibly
+unequal. The stated «ברדיוסים שווים» was dropped: no constraint, no refusal, no notice. The honesty
+invariant CLAUDE.md states verbatim ("no stated magnitude is ever silently dropped — a given parses to
+a constraint, escalates, or errors, but never vanishes") was violated, in the drawing-contradicts-the-
+givens form.
+
+**Class, not instance.** `circlesTangent` reads exactly two things — a tangency KIND and a circle PAIR
+— and discarded everything else in the utterance without looking at it. So the class is *"a modifier
+clause on a two-circle statement is swallowed unread"*, of which equal-radii is one member; a stated
+radius, a diameter equality and an angle were all silently dropped the same way, none of them reported.
+
+**Why no gate caught it.** The `dropped*` family enumerates categories (labels → numbers → relations →
+verbs → compounds → comparisons → objects), and *a magnitude equality between two implied objects* is a
+category none of them has. This is the docs/23 G1 finding in its predicted shape — and it is why the
+fix is NOT a nineteenth gate: growing that family is the chokepoint-list smell docs/17 §3 names, and
+[ADR-453](#adr-453) had just measured that span accounting cannot absorb this case either (the relation
+is a WORD, so it lands in the accountant's report-only `unknown-word` bucket).
+
+**Decision: the ADR-024 leftover guard**, which is the mechanism docs/17 §2 tripwire 4 explicitly names
+for this shape ("the fix is compound parsing or precedence with a leftover guard, never dropping a
+stated magnitude"), and which four other rules in `parse.ts` already apply. `circlesTangent` now strips
+exactly what it CONSUMES — the tangency word, the circle nouns, the kind marker, the «זה לזה» reciprocal,
+the «בנקודה M» touch, labels, request words, filler — and declines whole if anything geometry-significant
+remains. Declining is honest: the statement escalates instead of committing a figure that contradicts it.
+
+The capability half (actually lowering «רדיוסים שווים» to the equality) is deliberately NOT here: the
+engine can already express it (`set-radius-ratio` with k=1), so it is a missing *parser reading*, i.e. a
+feature, and CLAUDE.md forbids building one under a bug's banner. Filed as #761.
+
+**The fail-closed closure was tried first and rejected, with reason.** `shapeLeftover` (#497) is the
+stronger predicate — a denylist fails OPEN on vocabulary it has never met. But this rule's own
+vocabulary includes the plural quantifier `resolveCirclePair` reads («שני מעגלים…»), and a fail-closed
+gate flags every Hebrew token it does not positively recognise, so it refused the plain supported forms
+(7 existing tests). Making it work would mean growing an allowlist to defend a denylist. So the
+denylist it is — with its gap recorded rather than hidden.
+
+**Residuals, stated because a silent residual is how a class re-opens:**
+
+1. `SHAPE_LEFTOVER` has no AREA/PERIMETER token, so «שני מעגלים משיקים מבחוץ ששטחם שווה» is a member of
+   this very class that **still commits**. Widening that denylist touches all 13 of its consumers, so it
+   is scoped on its own rather than smuggled into a P1 — #762. The test asserts the current state
+   deliberately, so the day the denylist grows it fails and points at the follow-up.
+2. A modifier that ANOTHER rule claims never reaches this guard, and those rules drop the tangency in
+   their own right: «שני מעגלים משיקים מבחוץ ואלכסון AB» commits a lone `segment` — both circles and the
+   tangency gone. That is a wider and arguably worse class than the one fixed here — #763.
+
+**Sibling product (ADR-W-004): 3-D does NOT have this class.** `src3d/` has no two-circle statement
+family at all — the 3-D circle exists only in the tangent form (`circles3`), and there is no plural
+«מעגלים» rule to swallow a modifier. Checked by grep, stated here either way per the rule.
+
+Locks: `two-circle-family.test.ts` — the reported utterance plus its full spelling matrix
+({external, internal} × {ב-, עם} × {he, en}), the unreported class members (a stated radius, a diameter
+equality, an angle), the eight supported forms that must still build (a leftover guard's real risk is
+false-blocking — #138/#140 are both that failure), and the residual, asserted as-is with a pointer.
+Full suite 496 files / 9057 tests, 0 failed.

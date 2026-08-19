@@ -6455,6 +6455,37 @@ const circlesTangent: Rule = (s, ctx) => {
   // external point A as a TOUCH on an invented circle. Defer whole — the apex rule (or, until it
   // lands, the LLM) owns the statement; a silent claim is never the answer.
   if (/מנקודה|מהנקודה|\bfrom\b/i.test(s)) return null;
+  // ADR-024 LEFTOVER GUARD (#757, the P1) — all-or-nothing, the discipline the rest of this file
+  // already applies (the standalone-circle guard, `sizeStatementLeftover`, the shape macros).
+  //
+  // This rule reads exactly two things: a tangency KIND and a circle PAIR. Everything else in the
+  // utterance was discarded in SILENCE, so «שני מעגלים משיקים מבחוץ ברדיוסים שווים» committed two
+  // circles with a green ✓ and the student's equal-radii relation simply gone — no constraint, no
+  // refusal, no notice (r = 5 and 3.6 on the canvas). No honesty gate saw it either: the `dropped*`
+  // family enumerates categories, and a magnitude equality between two implied objects is a category
+  // none of them has (the docs/23 G1 shape, verbatim).
+  //
+  // The fix is the CLASS one: strip exactly what this rule CONSUMES and decline whole if anything
+  // geometry-significant remains. That closes every unread modifier on a two-circle statement, not
+  // just the reported one — a stated radius, an area, a perpendicular, a further relation. Declining
+  // is honest: the statement escalates instead of committing a figure that contradicts it.
+  const tangentLeftover = s
+    .replace(/tangents?|משיק\w*/gi, ' ')
+    .replace(/circles?|מעגל\w*/gi, ' ')
+    .replace(/\b(?:internal|external)\w*\b|\binside\b|\boutside\b|פנימ\w*|חיצונ\w*|מבפנים|מבחוץ/gi, ' ')
+    .replace(/זה\s+ל?זה|אחד\s+לשני|\beach\s+other\b|\bone\s+another\b/gi, ' ')
+    .replace(/(?:\bat\b|בנקוד\S*)\s*[A-Za-z]\d*/gi, ' ')
+    .replace(/[A-Z]\d*/g, ' ')
+    .replace(REQUEST_WORDS, ' ')
+    .replace(FILLER, ' ');
+  // The DENYLIST (`SHAPE_LEFTOVER`), not the #497 fail-closed closure. Fail-closed is the stronger
+  // predicate and was tried first — but this rule's own vocabulary includes the plural quantifier that
+  // `resolveCirclePair` reads («שני מעגלים…»), and a fail-closed gate flags every Hebrew token it does
+  // not positively recognise, so it refused the plain supported forms. Making it work would mean
+  // teaching the gate this rule's quantifier vocabulary, i.e. growing an allowlist to defend a
+  // denylist. Recorded honestly: the denylist has no AREA token, so «…ששטחם שווה» is a member of this
+  // class that still commits — see the residual in ADR-454 and its follow-up issue.
+  if (SHAPE_LEFTOVER.test(tangentLeftover)) return null;
   // Pair resolution at the shared #215 chokepoint: two NAMED circles ("circle O and circle P …" /
   // the ADR-228 Am. plural-list) bind by letter; a plural reference with exactly TWO circles in the
   // figure binds THOSE («המעגלים משיקים זה לזה» — the definite statement about the drawn pair used to
