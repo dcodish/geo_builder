@@ -109,8 +109,10 @@ reason the report exists as a habit. Its four sub-lists:
 **The recommendation** is a concrete next-round composition, not a restatement of the tables:
 - Every open P1 goes first, always, each with one line on why it can't wait.
 - Then a **mix** of P2 and P3 — the operator explicitly wants both, not a pure-P2 diet. Aim for
-  2–3 P2s that form a coherent theme (same module or mechanism — shared context makes a batch cheaper
-  than its parts) plus 1–2 quick P3 wins riding along. Say WHY this particular mix: theme affinity,
+  3–5 P2s that form a coherent theme (same module or mechanism — shared context makes a batch cheaper
+  than its parts) plus 2–3 quick P3 wins riding along, landing inside the fix-round band of **5–8 items,
+  ceiling 10** ([ADR-W-028](../../../docs/06w-decisions-workspace.md)) — and no more than ~2 items on one
+  chokepoint, since those rebase over each other inside a round. Say WHY this particular mix: theme affinity,
   an operator ruling already given (an unblocked, scoped issue beats an unscoped one), value density
   (H-value S-complexity first), or risk isolation (don't put two L-risk solver items in one round).
 - Name what you deliberately deferred and why, in one line — the operator should see the shape of the

@@ -92,7 +92,9 @@ decides how much can be closed in one session.
 The operator-invoked batch loop that replaces one-at-a-time fix dispatch. Full procedure:
 **`.claude/skills/fix-round/SKILL.md`**; the contract in one paragraph:
 
-A round picks **3–5 work items** (a bundle of issues sharing one root cause counts as one item) from
+A round picks **5–8 work items**, hard ceiling 10 (a bundle of issues sharing one root cause counts as
+one item; fewer is always fine — the band is not a quota — [ADR-W-028](06w-decisions-workspace.md), which
+consumed the six-round measured escalation rate of 8% to replace ADR-W-012's untested Phase-1 3–5) from
 the open issues labeled **`auto-ok`** — the label records an **operator approval** of the issue's fix
 plan; `needs-operator` disqualifies. The approval is the operator's alone, but its *application* may be
 transcription ([ADR-W-014](06w-decisions-workspace.md)): when a session has presented a concrete batch
@@ -113,10 +115,14 @@ is fixed **at the root, per its plan**, in its own worktree under the full gates
 regression lock + full suite + `tsc` + build). Bugs land on `main` (`Fixes #NN` + `round #RR`, §3)
 after a fetch confirms `origin/main` has not moved externally mid-round; features become PRs the round
 **never merges** (§4). A plan that fails contact with the code is **escalated, never patched**: the
-docs/17 escalation template goes on the issue, `auto-ok` → `needs-operator`, and the round moves on.
+docs/17 escalation template goes on the issue, `auto-ok` → `needs-operator`, and the round moves on —
+and the **second** escalation in one round finalizes it (land what is done, the rest to Skipped), because
+two stale plans in a round is a triage signal rather than something to grind through. More than ~2 items
+on one chokepoint is composed into the next round instead, since they rebase over each other.
 The round finishes by finalizing the round issue — per-item evidence (commit, ADR ids, gate record, a
 required *deviations-from-plan* line), landed/PR'd/escalated/**skipped** sections, the batch play sheet
-(Hebrew utterances per item), and a machine-greppable
+(Hebrew utterances per item, **split into batch/landed-on-`main` and individual/PR sections** — the PRs
+were always played one at a time under §4, so only the landed half is genuinely a batch), and a machine-greppable
 `stats: picked= landed= prs= escalated= skipped=` line (the Phase-2 data, aggregated by listing round
 issues) — and swapping **`in-round` → `awaiting-play`**; the operator plays the batch in one sitting
 and **closes the round issue as the validation signal**. Open P1s or a stale `in-round` issue stop a
@@ -126,6 +132,8 @@ awaiting play, rounds in flight, rounds awaiting validation.
 
 **Phase 2 (not yet built, not yet decided):** scheduled unattended rounds and their landing policy
 (bugs direct-to-main vs one-PR-per-round) wait on Phase 1's measured escalation rate ([ADR-W-012](06w-decisions-workspace.md)).
+[ADR-W-028](06w-decisions-workspace.md) spent that data on the *cap* only — every round measured so far had
+a human at the keyboard, so unattended running remains a separate risk argument.
 
 ## 3. The bug route (operator reports something broken)
 

@@ -1,6 +1,6 @@
 ---
 name: fix-round
-description: Execute a batch of operator-approved (auto-ok) fix plans autonomously — pick 3–5 work items off the queue by priority, fix each at the root in its own worktree under the full gates, land bugs on main and features as PRs, escalate instead of patching when a plan fails contact with the code, and finish with ONE round issue (awaiting-play) carrying the batch play sheet. Use when the operator says to run a fix round, "run the loop", clear the queue, or work through the auto-ok'd issues. Never run uninvoked, and never as a substitute for triage — it executes plans, it does not write them.
+description: Execute a batch of operator-approved (auto-ok) fix plans autonomously — pick 5–8 work items off the queue by priority, fix each at the root in its own worktree under the full gates, land bugs on main and features as PRs, escalate instead of patching when a plan fails contact with the code, and finish with ONE round issue (awaiting-play) carrying the batch play sheet. Use when the operator says to run a fix round, "run the loop", clear the queue, or work through the auto-ok'd issues. Never run uninvoked, and never as a substitute for triage — it executes plans, it does not write them.
 ---
 
 # Fix round — autonomous execution of triaged, operator-approved fix plans
@@ -45,8 +45,13 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
 - **Bundle** issues sharing one root cause or mechanism into a single work item (the plans say
   so when it's true — same class, same chokepoint). Bundling is encouraged when it is the right
   fix shape; the cap below never forbids a correct bundle.
-- **Cap: 3–5 work items** per round (a bundle counts as ONE item). Priority order P2 → P3
-  within eligibility; value density (per the /status-update rubric) breaks ties.
+- **Cap: 5–8 work items** per round, **hard ceiling 10** (a bundle counts as ONE item) —
+  [ADR-W-028](../../../docs/06w-decisions-workspace.md). **Fewer is always fine**: the band is not a
+  quota, and a round with two eligible items runs rather than waits to fill up. Priority order
+  P2 → P3 within eligibility; value density (per the /status-update rubric) breaks ties.
+- **Spread one chokepoint across rounds:** more than ~2 items touching the same chokepoint — they
+  rebase over each other and each one's full-suite run can break the previous one's scenario — means
+  composing the rest into the NEXT round, not reconciling repeatedly inside this one.
 - **Announce the composition** — one line per item (issues, plan gist, route bug/feature) —
   before any code. This is the round's contract; anything not listed is not touched.
 - **Open the round issue NOW, not at the end** ([ADR-W-013](../../../docs/06w-decisions-workspace.md)) —
@@ -118,6 +123,13 @@ escaped item is a GOOD outcome — it is the mechanism working. The stats line (
 accumulates the escalation rate across rounds; it is the data the Phase-2 (unattended runs)
 landing-policy decision needs (#543).
 
+**Stop condition — the SECOND escalation in one round finalizes it**
+([ADR-W-028](../../../docs/06w-decisions-workspace.md)). Land what is already done, finalize the
+ledger honestly (remaining picked items go to **Skipped** with "round stopped after 2 escalations"),
+and report. Two plans failing contact with the code in one round says the QUEUE's plans are going
+stale — that is a triage signal, and grinding through the rest is exactly the loop pressure the
+escalation exit exists to relieve. This is a stop, not a failure; the stats line records it.
+
 ## Step 5 — finalize the round issue: ledger → play sheet + validation marker
 
 Fixes auto-close their issues on push, so the round issue (opened in Step 1) is the ONE
@@ -136,9 +148,13 @@ Final body, in order:
 - **Escalated** — issue → why, one line each (the template lives on the issue itself).
 - **Skipped** — anything eligible the round did not resolve (labeling errors, mid-round
   drops), with the reason. Chat-only skips under-report the round.
-- **The play sheet** — per item: the exact utterances to type **in Hebrew**, one per line in
-  a code block, what to look for, and the before/after note (prod runs the previous deploy —
-  a free "before").
+- **The play sheet, split by route** ([ADR-W-028](../../../docs/06w-decisions-workspace.md)) — two
+  sections, because they are two different sittings: **batch (landed on `main`)**, played in one
+  pass on the dev server, and **individual (PRs)**, each played under its own play-and-approve gate
+  (docs/22 §4) whether it shipped in this round or not. Per item in both: the exact utterances to
+  type **in Hebrew**, one per line in a code block, what to look for, and the before/after note
+  (prod runs the previous deploy — a free "before"). Omit a section that is empty rather than
+  printing an empty heading.
 - **The stats line**, exactly this machine-greppable form, always last:
   `stats: picked=N landed=N prs=N escalated=N skipped=N`
   — the Phase-2 landing-policy decision (#543) aggregates these by listing round issues,
