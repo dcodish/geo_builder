@@ -575,6 +575,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "AE = 2EA'",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "he",
+    "text": "AE = 2EA'",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "en",
     "text": "E is the centroid of triangle BC'D",
     "winner": "centroidRule",
   },
