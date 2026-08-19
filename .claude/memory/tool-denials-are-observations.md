@@ -27,8 +27,15 @@ without redoing my work.
 2. **Retry the canonical minimal form** — one command, no env prefix, no extra flags, no `;`/`&&` chains,
    no pipes. Compound commands get split and classified separately, so a chain defeats a rule that the
    bare command matches. For deploys use the exact strings in `docs/RUNBOOK.md`.
+2b. **Retry it MORE THAN ONCE.** Denials here are transient. On 2026-08-19 I repeated the 2026-08-09
+   mistake exactly: the allowlisted `scp -r dist-3d/*` was refused four times — I again asserted a
+   mechanism ("auto mode gates production writes independently of the allowlist"), wrote it up for the
+   operator as a finding, and then the identical command succeeded on the next attempt with no config
+   change. Twice now the invented mechanism has been the wrong answer and patience the right one.
 3. **Only then report** — stating what I attempted and what the config says, with observation and
    inference clearly separated. Never assert a mechanism for a denial I have not tested.
+
+Corollary: never let a denial become a hand-back either — see [[deploys-are-mine-to-run]].
 
 Corollary: this is the same failure as writing a plausible-but-unverified diagnosis into a bug report.
 The rule is `docs/17`'s "state the root cause" applied to my own tooling — do not narrate a cause I have
