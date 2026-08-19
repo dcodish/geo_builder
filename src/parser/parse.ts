@@ -5795,6 +5795,27 @@ const parallelCircleIntersection: Rule = (s, ctx) => {
  * Shared by circlesTangent / commonTangent / twoCirclesPosition / twoCirclesMeet so the class cannot
  * re-open per rule.
  */
+/**
+ * The EQUAL-SIZE modifier on a two-circle statement (#761, ADR-455) — «ברדיוסים שווים» / «עם רדיוסים
+ * שווים» / «שקוטרם שווה» / "with equal radii" / "of the same radius".
+ *
+ * Equal diameters ⇔ equal radii ⇔ the ratio k = 1, which `set-radius-ratio` already expresses, so this
+ * is a PARSER READING and nothing else — no engine work, no new command. It rides the whole two-circle
+ * family (tangency, disjoint, contained, meeting, bare) rather than one rule, because every member
+ * resolves its pair at the same `resolveCirclePair` chokepoint and the class would otherwise re-open
+ * one rule at a time — the #215 lesson.
+ *
+ * ADR-052 note: an unstated size is a free DOF, seeded APART so a pair reads as two circles. A STATED
+ * equality removes that DOF — which is exactly the difference between a default and a given.
+ */
+const EQUAL_SIZE =
+  /(?:[ובשלכמ]|עם\s+)?ה?(?:רדיוס|קוטר)(?:ים|יהם|יהן|ם|ן|י)?\s+(?:שווים|שוות|שווה|שוים|זהים|זהות)|\b(?:with\s+|having\s+|of\s+)?(?:equal|the\s+same)\s+(?:radii|radius|radiuses|diameters?)\b/i;
+const EQUAL_SIZE_G = rx(EQUAL_SIZE.source, 'gi');
+/** Append the equality when the statement carries the modifier. Callers pass the pair they resolved,
+ *  so the constraint always lands on the circles the sentence is actually about. */
+const withEqualRadii = (s: string, cmds: AnyCommand[], id1: Id, id2: Id): AnyCommand[] =>
+  EQUAL_SIZE.test(s) ? [...cmds, { type: 'set-radius-ratio', c1: id1, c2: id2, k: 1 } as AnyCommand] : cmds;
+
 const resolveCirclePair = (
   s: string,
   ctx: ParseContext,
@@ -5941,7 +5962,7 @@ const twoCirclesPosition: Rule = (s, ctx) => {
       ? { type: 'set-circle-position', relation, a: id1, b: id2 }
       : { type: 'set-circle-position', relation, a: isNamed ? id2 : id1, b: isNamed ? id1 : id2 },
   );
-  return cmds;
+  return withEqualRadii(s, cmds, id1, id2); // #761
 };
 
 /**
@@ -5960,11 +5981,11 @@ const twoCirclesBare: Rule = (s, ctx) => {
   if (leftover) return null;
   const c1 = 'O';
   const c2 = freeLabel([c1, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
-  return [
+  return withEqualRadii(s, [
     { type: 'circle', id: circleId(c1), center: c1, radius: RADIUS_DEFAULT, freeRadius: true, autoCenter: true, ifAbsent: true },
     { type: 'circle', id: circleId(c2), center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, autoCenter: true, ifAbsent: true },
     { type: 'set-circle-position', relation: 'any', a: circleId(c1), b: circleId(c2), variant: 0 },
-  ];
+  ], circleId(c1), circleId(c2)); // #761
 };
 
 const twoCirclesMeet: Rule = (s, ctx) => {
@@ -6470,6 +6491,7 @@ const circlesTangent: Rule = (s, ctx) => {
   // just the reported one — a stated radius, an area, a perpendicular, a further relation. Declining
   // is honest: the statement escalates instead of committing a figure that contradicts it.
   const tangentLeftover = s
+    .replace(EQUAL_SIZE_G, ' ') // #761: the rule READS this now, so it is its own vocabulary
     .replace(/tangents?|משיק\w*/gi, ' ')
     .replace(/circles?|מעגל\w*/gi, ' ')
     .replace(/\b(?:internal|external)\w*\b|\binside\b|\boutside\b|פנימ\w*|חיצונ\w*|מבפנים|מבחוץ/gi, ' ')
@@ -6499,6 +6521,19 @@ const circlesTangent: Rule = (s, ctx) => {
     pair === 'introduce' ? ['O', freeLabel(['O', ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])] : pair.centres;
   if (c1 === c2) return null;
   const internal = /\binternal\w*\b|\bfrom\s+inside\b|\binside\b|פנימ|מבפנים/i.test(s);
+  // #761, operator ruling 2026-08-19 («we should not support 2 equal circles tangents from inside —
+  // this is an easy refusal as it doesn't make sense»): INTERNAL tangency + equal radii is a
+  // CONTRADICTION IN THE WORDS — two internally tangent circles of equal radius are the same circle.
+  // Refused from the STATEMENT, with no geometry consulted, so this is not the parser judging
+  // satisfiability. It is the same shape as this family's existing contradictory-words bail («זרים» +
+  // «מוכל» → 'stop' in `twoCirclesPosition`) and uses the same mechanism for the same reason:
+  // recognised but unreadable, so escalate whole rather than half-parse.
+  //
+  // It is an HONESTY guard, not tidiness. Lowered anyway, the pair collapses to coincident circles and
+  // every stated relation holds AT the collapse — the ratio IS 1, and coincident circles are
+  // internally tangent in the limit — so neither `verifyGivens` nor the radius-ratio check can see it,
+  // and the figure draws degenerate under a green ✓ (measured: both radii 0.7, no error).
+  if (internal && EQUAL_SIZE.test(s)) return 'stop';
   // Touch point: a named "at M"/"בנקודה M", else AUTO-name it (the student drew "two tangent circles"
   // without naming the touch) — avoiding the centres and existing points. («מנקודה» is a FROM-marker,
   // deferred above — it is never in this alternation, #215.)
@@ -6513,7 +6548,12 @@ const circlesTangent: Rule = (s, ctx) => {
   if (!have.has(c1)) cmds.push({ type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, ...(!isNamed ? { autoCenter: true } : {}) });
   if (!have.has(c2)) cmds.push({ type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ifAbsent: true, ...(!isNamed ? { autoCenter: true } : {}) });
   cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: !internal });
-  return cmds;
+  // #761: «…ברדיוסים שווים». INTERNAL tangency + equal radii is a CONTRADICTION (two internally
+  // tangent circles of equal radius are the same circle: |c1c2| = |r1 - r2| = 0). It is lowered
+  // anyway, deliberately — the engine then refuses it as an unsatisfiable given set, naming the
+  // conflicting statement, which is the honest answer. Refusing it HERE would make the parser judge
+  // satisfiability, which is the solver's job (and a parser-side special case besides).
+  return withEqualRadii(s, cmds, id1, id2);
 };
 
 /**
