@@ -15,7 +15,7 @@
  */
 
 import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
-import { cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
+import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { figureSymbolsOf } from './types';
 import { angleBetweenOperands, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import type { Construction3, Id, MutualRel3, Operand3, Positions3 } from './types';
@@ -267,7 +267,7 @@ export function linePlaneAngleAt(pos: Positions3, a: Id, b: Id, plane: Id[]): nu
   const pts = plane.map((id) => pos.get(id));
   if (!p || !q || pts.some((x) => !x)) return null;
   const u = { x: q.x - p.x, y: q.y - p.y, z: q.z - p.z };
-  const n = newellNormal(pts as Vec3[]);
+  const n = runNormal(pts as Vec3[]);
   const den = Math.hypot(n.x, n.y, n.z) * Math.hypot(u.x, u.y, u.z);
   if (den < 1e-12) return null;
   return (Math.asin(Math.min(1, Math.abs(n.x * u.x + n.y * u.y + n.z * u.z) / den)) * 180) / Math.PI;

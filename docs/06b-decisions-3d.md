@@ -4307,3 +4307,61 @@ guard** — in the mixed figure the cube prints nothing while `A1` prints, with 
 cube's `A` moves more than 1e-2 between seeds, `A1` less than 1e-9); a figure with no absolute object
 unchanged (#315); and the membership-pinned figure staying silent. The exam session itself is a fixture
 (`param-line-2024-q2.geo3.json`, ADR-3D-160).
+
+## ADR-3D-162 — a plane named by POINTS is a SET: the run normal is order-free (#571)
+
+**Context.** On a cube, «מישור BB'DD'» — the diagonal plane, named the way a student naturally names it,
+by its two vertical edges BB' and DD' — was refused **`not-coplanar`**. The same four points in a
+non-crossing order («מישור BB'D'D», «מישור BDD'B'») build fine. B, B', D and D' are perfectly coplanar, so
+the message asserted a geometric fact that does not hold: an honesty violation, not a missing convenience.
+
+**Root cause.** `planeFromPointRun` computed `newellNormal` over the **stated** vertex order. The Newell
+normal is twice the polygon's SIGNED-AREA vector, so B→B'→D→D' traces a self-intersecting bowtie whose two
+triangles have equal and opposite signed area and the normal comes out **exactly 0** (measured on the
+cube's coordinates). Resolution returned null, and the store's plane-through verifier reported
+`not-coplanar` for want of a resolved plane.
+
+The class: **an order-SENSITIVE computation answering an order-FREE question.** A plane named by points is
+a set; every stated order must resolve to the same plane. The verifier's actual honesty guard — every named
+point lies on the resolved plane — is order-free already and is untouched.
+
+**Decision.** One shared order-free run normal, `runNormal` in `vec3.ts`, consumed by every student-run call
+site: `planeFromPointRun`, the ⟂-pin residuals and the membership residual in `solve3`, the S1 plane-run
+operand, the plane claims, the right-apex base and the height's foot in `evaluate`, and the display lane
+(`linePlaneAngleAt`, the plane-angle query, the plane query's ring). It takes the largest triple cross
+product, which is a function of the point SET, so every ordering gives the same plane.
+
+Two properties are kept deliberately, and they are what make this a replacement rather than a new
+behaviour:
+
+- **Orientation.** The stated order still decides the normal's SIGN whenever it says anything (the
+  right-hand rule), so every figure that resolves today keeps its exact normal direction — which is what
+  «above/below the plane» and the solver's signed residuals read. A self-crossing order says nothing about
+  orientation, and there the sign is fixed deterministically by making the dominant component positive
+  (stable across iterations and seeds, unlike a first-non-zero rule). No figure that converges today can be
+  destabilised, because for all of them the sign still comes from Newell.
+- **Refusals.** Collinear and coincident runs still return the zero vector, so every caller's degeneracy
+  guard fires exactly as before, and coplanarity is still verified separately — «מישור ABCA'» still refuses.
+
+**Canonical rings keep `newellNormal`.** A solid's faces and a polygon's own ring are built in non-crossing
+order, and for those the order IS the shape: it names the edges. Only a run used to NAME A PLANE is the
+order-free question.
+
+**The drawn ink (operator ruling, 2026-08-16).** `runRingOrder` reorders the run into the non-crossing ring
+around that plane, and the #318 `'face'` patch draws that. Inking B→B'→D→D' would draw a crossed bowtie —
+asserting a self-crossing the student never stated. The angles are measured in [0, 2π) from the run's first
+point, so a run already stated non-crossing comes back byte-identical and every existing face patch draws
+exactly as before.
+
+**Semantic ruling recorded (2026-08-16):** *"a plane between 2 parallel lines is possible and should be
+supported."* This is the same plane #532 capability 1 names another way («π1 עובר דרך BB' ו-DD'»); they must
+agree, and neither may be half-supported.
+
+Locks (`issue-571-plane-run-order.test.ts`, 9): the operator's exact sequence building with every fact ok;
+**stated-order invariance** — six orderings of the coplanar run resolving to one plane identity; the honest
+refusal surviving on a genuinely non-coplanar run, which never enters the fact list; a canonical face
+keeping its old orientation; the primitives (a bowtie's Newell normal is zero while its run normal is
+sound, a non-crossing order keeps its stated orientation and the reversed order is genuinely opposite,
+degenerate runs still return zero); and the drawn patch being a SIMPLE ring — with the stated order proven
+to self-cross, so the reorder is load-bearing rather than decorative. Fixture:
+`plane-run-order-571.geo3.json`.

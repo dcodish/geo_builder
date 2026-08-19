@@ -50,6 +50,9 @@ const SEEDED: Record<string, string[]> = {
     'l ⊥ π',
     'A נקודת החיתוך של l עם π',
   ],
+  // #571 — the operator's diagonal plane, named by its two vertical edges. A plane named by points is
+  // a SET: this stated order traces a bowtie and used to be refused `not-coplanar` on coplanar points.
+  'plane-run-order-571.geo3.json': ["קובייה ABCDA'B'C'D'", "מישור BB'DD'", "מישור BB'D'D"],
   'free-line-552.geo3.json': [
     'פירמידה BCKS',
     'l⊥BCK',

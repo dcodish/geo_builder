@@ -13,8 +13,8 @@
  */
 
 import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
-import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, decompStr, formatBranches, linePlaneAngleAt, newellNormal, parametricDecomp, parametricPlaneForm, planeEqStr } from './dataView';
-import { centroid3, cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
+import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, decompStr, formatBranches, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr } from './dataView';
+import { centroid3, cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
 import { readOperand } from '../parser/operandToken';
 import { figureSymbolsOf } from './types';
@@ -325,8 +325,8 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCt
       const ps1 = q.p1.map((id) => pos.get(id));
       const ps2 = q.p2.map((id) => pos.get(id));
       if (ps1.some((x) => !x) || ps2.some((x) => !x)) return null;
-      const n1 = newellNormal(ps1 as { x: number; y: number; z: number }[]);
-      const n2 = newellNormal(ps2 as { x: number; y: number; z: number }[]);
+      const n1 = runNormal(ps1 as { x: number; y: number; z: number }[]);
+      const n2 = runNormal(ps2 as { x: number; y: number; z: number }[]);
       const den = norm3(n1) * norm3(n2);
       if (den < 1e-12) return null;
       return (Math.acos(Math.min(1, Math.abs(dot3(n1, n2)) / den)) * 180) / Math.PI; // acute dihedral
@@ -481,7 +481,7 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
       const pts = q.ids!.map((id) => r.positions.get(id));
       if (pts.some((p) => !p)) return undefined;
       const ring = pts as Vec3[];
-      const n = newellNormal(ring);
+      const n = runNormal(ring);
       return norm3(n) < 1e-9 ? undefined : { n, d: -dot3(n, ring[0]) };
     });
     const eq = canonicalPlaneEq(per);

@@ -30,7 +30,7 @@ import { absolutePointCount, pinSymsOf } from './types';
 import { resolveFreePlane } from './freePlane';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
-import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
+import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3} from './vec3';
 import { quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
@@ -929,7 +929,7 @@ function planeFromPointRun(c: Construction3, name: string, pos: Positions3): Res
   if (!ids) return null;
   const pts = ids.map((id) => pos.get(id)).filter((p): p is Vec3 => p !== undefined);
   if (pts.length < 3) return null;
-  const n = newellNormal(pts);
+  const n = runNormal(pts);
   if (norm3(n) < 1e-10) return null;
   return { n, d: -dot3(n, pts[0]) };
 }
@@ -1358,7 +1358,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
           const ring = pin.ids.map((id) => pos.get(id));
           const ln = lines.get(pin.line);
           if (ring.some((p) => !p) || !ln) return true;
-          const n = newellNormal(ring as Vec3[]);
+          const n = runNormal(ring as Vec3[]);
           const den = norm3(n) * norm3(ln.dir);
           return den < 1e-12 || norm3(cross3(n, ln.dir)) / den > 1e-4;
         }) ||
@@ -2103,7 +2103,7 @@ function evaluateSolidsAndPoints(
       const bp = def.base.map((q) => pos.get(q)).filter((q): q is Vec3 => q !== undefined);
       if (A && B && bp.length === def.base.length) {
         const centroid = centroid3(bp);
-        const nn = newellNormal(bp);
+        const nn = runNormal(bp);
         if (norm3(nn) > 1e-10) {
           const n = normalize3(nn);
           const inplane = (v: Vec3) => sub3(v, scale3(n, dot3(v, n)));
@@ -2141,7 +2141,7 @@ function evaluateSolidsAndPoints(
       const from = pos.get(def.from);
       const pts = def.face.map((q) => pos.get(q)).filter((q): q is Vec3 => q !== undefined);
       if (from && pts.length >= 3) {
-        const nn = newellNormal(pts);
+        const nn = runNormal(pts);
         if (norm3(nn) > 1e-10) pos.set(id, footOnPlane(from, { n: nn, d: -dot3(nn, pts[0]) }));
       }
     } else if (def.kind === 'line-plane') {

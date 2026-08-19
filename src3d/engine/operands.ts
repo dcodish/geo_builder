@@ -17,7 +17,7 @@
 
 import type { Construction3, Id, MutualRel3, Operand3 } from './types';
 import type { ResolvedLine, ResolvedPlane } from './evaluate';
-import { cross3, dot3, newellNormal, norm3, sub3, v3, type Vec3 } from './vec3';
+import { cross3, dot3, runNormal, norm3, sub3, v3, type Vec3 } from './vec3';
 
 /** What an operand contributes to a residual: a location, a direction, and/or an oriented plane. */
 export interface OperandGeom {
@@ -122,7 +122,7 @@ export function resolveOperand(op: Operand3, c: Construction3, abs: AbsoluteCtx)
         const pts = op.ids.map(at);
         if (pts.some((p) => !p)) return null;
         const ring = pts as Vec3[];
-        const n = newellNormal(ring);
+        const n = runNormal(ring);
         if (norm3(n) < 1e-12) return null; // the run does not span a plane at these positions
         return { point: ring[0], normal: n, d: -(n.x * ring[0].x + n.y * ring[0].y + n.z * ring[0].z) };
       };

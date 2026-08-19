@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "app": "3d-builder",
+  "savedAt": "2026-08-19T11:15:23.037Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מישור BB'DD'",
+      "cmds": [
+        {
+          "type": "plane-through",
+          "name": "BB'DD'",
+          "ids": [
+            "B",
+            "B'",
+            "D",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מישור BB'D'D",
+      "cmds": [
+        {
+          "type": "plane-through",
+          "name": "BB'D'D",
+          "ids": [
+            "B",
+            "B'",
+            "D'",
+            "D"
+          ]
+        }
+      ]
+    }
+  ]
+}
