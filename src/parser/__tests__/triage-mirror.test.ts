@@ -81,6 +81,7 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
       'droppedGivenRelations',  // ADR-264
       'droppedGivenVerbs',      // ADR-292
       'droppedCompoundRelation', // #153/#145
+      'unaccountedSpans',       // ADR-453 (#659 step 3) — span accounting, enforcing on hard spans
     ];
     // Guard the guard: if the submit pipeline stops calling one of these, this list is stale and must be
     // revisited (a silently-shrinking expectation would pass forever while proving nothing).

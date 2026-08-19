@@ -7379,3 +7379,77 @@ Locks: `issue-595-auto-labels.test.ts` — the PROPERTY (for `n` in 1..6 against
 result is length `n`, distinct, and disjoint from `used`), which *is* the contract the 13 untouched
 callers rely on and therefore the load-bearing assertion; plus the reported cases at 23 and 26 points,
 a second exhausted cycle reaching `A2`, and the ordinary small-figure cases pinned unchanged.
+
+## ADR-453 — span accounting ENFORCES on hard spans; it joins the gate family rather than replacing it (#659)
+
+`spanAccounting.ts` has been **shadow-only since 2026-07-25** (S3.1 of docs/24): it classifies every
+significant token of an utterance and reports which ones the winning parse does not account for, and it
+never refuses. docs/24 §4.2 made the enforcing flip an operator decision. The operator took it on
+2026-08-19; this ADR records what shipped, and — more usefully — what the flip **measured on the way**.
+
+**Why enforce.** The mechanism it replaces is the honesty-gate family: ~16 `dropped*` gates, one per
+syntactic category (labels → numbers → relations → verbs → compounds → comparisons → subjects…). The
+docs/23 G1 finding is that this family grows **monotonically** — each gate validates one category's
+token presence, so every newly discovered category of stated content needs a fresh gate, and the record
+carries two P1s from missing categories in a single week (ADR-387, ADR-390). Span accounting asks the
+total question once: *is every significant span accounted for?* — no category enumeration.
+
+**Decision 1 — enforce on HARD spans.** A label, number or relation symbol left unaccounted now makes
+the parse weak, exactly as a gate does: it escalates to the LLM rather than committing the partial
+parse. `unaccountedSpans` is that verdict, wired at **both** submit seams — the grammar path and the
+ADR-240 second attempt — because two seams asking different questions is how the LLM path becomes the
+weaker one by drift.
+
+**Decision 2 — `unknown-word` stays a REPORT bucket.** It never refuses. The flip probed off-corpus
+input and found the accountant's vocabulary complete on the corpus but *not* beyond it: it flags
+«מבחוץ» in «שני מעגלים משיקים מבחוץ ברדיוסים שווים» although that kind IS carried (`circles-tangent`'s
+own `external` field). Enforcing on words would refuse working input. (The same sentence turned out to
+drop «ברדיוסים שווים» silently, which no gate and no hard span catches — filed as the P1 #757.)
+
+**Decision 3 — it JOINS the gate family; the gates stay.** This reverses the instinct written into the
+issue ("if it merely joins them, 2-D carries both mechanisms forever"), and the reversal is the flip's
+real finding. Replacement was implemented, measured, and backed out:
+
+- The three gates whose *category* the accountant claims — `droppedNewLabels` (ADR-089),
+  `droppedGivenNumbers` (ADR-250), `droppedGivenRelations` (ADR-264) — were removed from both submit
+  seams. The full suite came back **green except one registry test**, which reads as subsumption.
+- It is not. The gates' exemption sets are ~10 ADRs of accumulated knowledge (count quantifiers #160,
+  occurrence-vs-value accounting #437, diameter halving, ratio pairs, radical fractions), and the
+  accountant reproduces only some of them. The measured hole: `accountUtterance` decides relation
+  symbols with ONE global `hasConstraint` flag, so the entire ADR-264 class — a relation between points
+  that **all already exist** («CE⊥AB» on a figure holding A, B, C, E) — is invisible to it, while
+  `droppedGivenRelations` names it exactly. The suite stayed green only because nothing exercises that
+  combination through the pipeline.
+
+So "clean in shadow" was never evidence of subsumption: shadow mode reports what the accountant *would*
+flag, and nothing ever compared that against what the gates *do* flag.
+
+**Decision 4 — retirement gets a criterion instead of an intention.**
+`span-gate-differential.test.ts` runs each retirable gate against the accountant over the real parse of
+the whole supported catalog, in both directions:
+
+| direction | meaning | treatment |
+| --- | --- | --- |
+| accountant flags, gate clean | a FALSE REFUSAL of input we promise to accept | asserted empty — enforcement is live, so a row here ships a defect |
+| gate flags, accountant clean | a coverage hole in the accountant | recorded as a ratchet; **blocks that gate's retirement** |
+
+A gate may be deleted when its column is empty *and* its hand-authored class case passes. Tracked by
+#758, one gate per PR. The differential also carries the method lesson that cost this session an hour:
+it must run over the **real parse output** — probing a gate with hand-written commands invents
+divergences that do not exist (a bare `segment` accounts nothing, so the accountant appears to refuse a
+count quantifier that the real lowering accounts structurally). Synthetic commands lie.
+
+**Measured before shipping.** Enforcement additive, full suite: **495 files / 9038 tests, 0 failed**.
+Catalog sweep (300 supported utterances, both locales) and scenario-corpus sweep (1205 string steps with
+real prefix contexts): **zero hard divergences** — so enforcement refuses nothing the corpus covers.
+
+Locks: `span-gate-differential.test.ts` (both directions + the ADR-264 class case); the catalog sweep in
+`span-shadow-report.test.ts` now **asserts** zero hard spans rather than reporting them — under
+enforcement a hard span on a supported example is a false refusal, not a divergence to review;
+`span-accounting.test.ts` gains the enforcing-verdict block (hard buckets refuse, `unknown-word` never
+does, and each retired-candidate category keeps a lock on the new mechanism);
+`triage-mirror.test.ts` + `triage.mjs` carry `unaccountedSpans` so the log-triage verifier keeps
+answering "is this still a gap?" the way the product answers a student.
+
+Open, deliberately: the vocabulary work that would let the word bucket enforce (#757's sibling question),
+and the retirement itself (#758).

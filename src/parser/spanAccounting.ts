@@ -1,5 +1,5 @@
 /**
- * SPAN ACCOUNTING — SHADOW MODE (S3.1 of docs/24; the mechanism ADR-250 named and deferred).
+ * SPAN ACCOUNTING — ENFORCING (S3.1 of docs/24; the mechanism ADR-250 named and deferred).
  *
  * The docs/23 review's G1 finding: the honesty-gate family (~16 `dropped*` gates, one per syntactic
  * category — labels → numbers → words → verbs → relations → compounds → comparisons → subjects…)
@@ -8,13 +8,31 @@
  * The TOTAL mechanism: every significant token span of the utterance must be ACCOUNTED for by the
  * winning parse, or the parse is weak — one function, no category enumeration.
  *
- * THIS MODULE IS SHADOW-ONLY (docs/24 §4.2 — the enforcing flip is an operator decision): it never
- * refuses anything. `accountUtterance` classifies the utterance's tokens and reports which
- * significant ones the committed commands do not account for; the submit pipeline logs the result
- * in dev (`spanShadow` on the debug event), and `span-shadow-report` (env-gated) sweeps the catalog
- * + scenario corpus into reports/span-accounting-shadow.md for the operator's divergence review.
- * When the shadow log shows zero false flags on real traffic, enforcement replaces the gate family
- * (each gate deleted one by one, its tests retargeted at this accountant).
+ * ENFORCING ON HARD SPANS since 2026-08-19 (the operator's flip, #659 step 3 / docs/24 §4.2 —
+ * ADR-453). `accountUtterance` classifies the utterance's tokens and reports which significant ones
+ * the committed commands do not account for. A LABEL / NUMBER / RELATION left unaccounted now makes
+ * the parse weak, exactly as a `dropped*` gate does — that is `unaccountedSpans`, the enforcing
+ * verdict, wired at both submit seams (grammar and the ADR-240 LLM second attempt).
+ *
+ * `unknown-word` spans stay a REPORT bucket and never refuse: the flip evidence showed the
+ * accountant's vocabulary is complete on the corpus but not off it (it flags «מבחוץ» on a sentence
+ * whose kind IS carried, in `circles-tangent.external`), so enforcing on words would false-refuse
+ * working input. Growing that bucket into an enforcing one needs the vocabulary work #757 scopes.
+ *
+ * IT JOINS THE GATE FAMILY, IT HAS NOT REPLACED IT — deliberately, and against the flip's own first
+ * instinct ("if it merely joins them, 2-D carries both mechanisms forever"). The flip session measured
+ * what replacement would cost and the answer was: not yet. The gates' exemption sets are ~10 ADRs of
+ * accumulated knowledge, and "clean in shadow" never tested any of it, because shadow mode reports
+ * what the accountant WOULD flag and nothing ever compared that against what the gates DO flag.
+ * Measured hole: `accountUtterance` decides relation symbols with ONE global `hasConstraint` flag, so
+ * the whole ADR-264 class — a relation between points that ALL already exist («CE⊥AB» on a figure
+ * that has A, B, C, E) — is invisible to it while `droppedGivenRelations` names it exactly.
+ *
+ * `span-gate-differential.test.ts` is that comparison, and it is the retirement criterion: a gate may
+ * be deleted when its column there is empty. Retirement is tracked by #758, one gate per PR.
+ *
+ * `span-shadow-report` (env-gated) still sweeps the catalog + scenario corpus into
+ * reports/span-accounting-shadow.md — now a FALSE-REFUSAL net rather than a divergence review.
  *
  * Honest boundary: true span accounting needs per-RULE claimed-extent reporting; this accountant
  * approximates at TOKEN level (labels / numbers / relation symbols / keyword-vs-unknown words),
@@ -205,6 +223,20 @@ export function accountUtterance(utterance: string, commands: AnyCommand[], actx
     if (!wordAccounted(word)) out.push({ kind: 'unknown-word', text: word });
   }
   return out;
+}
+
+/**
+ * The ENFORCING verdict (#659 step 3, ADR-453): the HARD unaccounted spans — a label, a number or a
+ * relation symbol the student stated that the winning parse does not account for. Non-empty means the
+ * rule claimed the utterance while leaving stated content unread, so the parse is weak and escalates,
+ * exactly as the `dropped*` gates make it weak. One function, no category enumeration — which is the
+ * whole point (docs/23 G1: the gate family grows monotonically, one gate per syntactic category).
+ *
+ * `unknown-word` is deliberately NOT here: it is the accountant's own vocabulary debt, not the
+ * parse's, and refusing on it would false-refuse working input (see the module header).
+ */
+export function unaccountedSpans(utterance: string, commands: AnyCommand[], actx: AccountCtx = {}): UnaccountedSpan[] {
+  return accountUtterance(utterance, commands, actx).filter((x) => x.kind !== 'unknown-word');
 }
 
 /** The shadow verdict for logging: null when fully accounted (labels/numbers/relations — the
