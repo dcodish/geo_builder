@@ -6521,6 +6521,19 @@ const circlesTangent: Rule = (s, ctx) => {
     pair === 'introduce' ? ['O', freeLabel(['O', ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])] : pair.centres;
   if (c1 === c2) return null;
   const internal = /\binternal\w*\b|\bfrom\s+inside\b|\binside\b|פנימ|מבפנים/i.test(s);
+  // #761, operator ruling 2026-08-19 («we should not support 2 equal circles tangents from inside —
+  // this is an easy refusal as it doesn't make sense»): INTERNAL tangency + equal radii is a
+  // CONTRADICTION IN THE WORDS — two internally tangent circles of equal radius are the same circle.
+  // Refused from the STATEMENT, with no geometry consulted, so this is not the parser judging
+  // satisfiability. It is the same shape as this family's existing contradictory-words bail («זרים» +
+  // «מוכל» → 'stop' in `twoCirclesPosition`) and uses the same mechanism for the same reason:
+  // recognised but unreadable, so escalate whole rather than half-parse.
+  //
+  // It is an HONESTY guard, not tidiness. Lowered anyway, the pair collapses to coincident circles and
+  // every stated relation holds AT the collapse — the ratio IS 1, and coincident circles are
+  // internally tangent in the limit — so neither `verifyGivens` nor the radius-ratio check can see it,
+  // and the figure draws degenerate under a green ✓ (measured: both radii 0.7, no error).
+  if (internal && EQUAL_SIZE.test(s)) return 'stop';
   // Touch point: a named "at M"/"בנקודה M", else AUTO-name it (the student drew "two tangent circles"
   // without naming the touch) — avoiding the centres and existing points. («מנקודה» is a FROM-marker,
   // deferred above — it is never in this alternation, #215.)

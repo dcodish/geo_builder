@@ -7511,3 +7511,63 @@ Locks: `two-circle-family.test.ts` — the reported utterance plus its full spel
 equality, an angle), the eight supported forms that must still build (a leftover guard's real risk is
 false-blocking — #138/#140 are both that failure), and the residual, asserted as-is with a pointer.
 Full suite 496 files / 9057 tests, 0 failed.
+
+## ADR-455 — the equal-size modifier on a two-circle statement, and why its internal case is refused from the WORDS (#761)
+
+The capability half of #757. [ADR-454](#adr-454) stopped «שני מעגלים משיקים מבחוץ ברדיוסים שווים»
+from committing a figure that contradicted it; the statement then refused honestly but still could not
+be drawn. This reads it.
+
+**Decision 1 — a parser reading, on the family, not the rule.** «ברדיוסים שווים» / «עם רדיוסים שווים» /
+«שקוטרם שווה» / «שרדיוסיהם שווים» / "with equal radii" / "with the same radius" lower to
+`set-radius-ratio(k = 1)`. Equal diameters ⇔ equal radii ⇔ ratio 1, and that command already existed
+with a full lowering (`apply.ts` drives it as an ordinary `ratio` over centre↔on-circle-witness pairs),
+so **no engine work was needed** — the gap was entirely that nothing read the words.
+
+It is wired at the shared `resolveCirclePair` chokepoint's consumers — `circlesTangent`,
+`twoCirclesPosition`, `twoCirclesBare` — rather than in the one rule the operator's sentence happened
+to hit. The #215 lesson: a class resolved per rule re-opens per rule. So «שני מעגלים זרים ברדיוסים
+שווים» works for the same reason the tangency case does.
+
+ADR-052 reading: an unstated size is a free DOF, and the pair is deliberately seeded APART so two
+circles read as two. A STATED equality removes that DOF — which is precisely the difference between a
+default and a given, and why the seeds may differ while the constraint still binds.
+
+**Decision 2 — INTERNAL tangency + equal radii is refused from the STATEMENT.** Operator ruling,
+2026-08-19: *"we should not support 2 equal circles tangents from inside — this is an easy refusal as it
+doesn't make sense."* Two internally tangent circles of equal radius are the same circle.
+
+The refusal reads the words and consults no geometry, so this is **not the parser judging
+satisfiability** (which would be the tripwire). It is the same shape as this family's existing
+contradictory-words bail — `twoCirclesPosition` already returns `'stop'` for «זרים» + «מוכל» — and uses
+the same mechanism for the same reason: recognised but unreadable, escalate whole rather than
+half-parse.
+
+**Why it could not be left to the solver, which is the finding worth recording.** Lowered anyway, the
+pair collapses to coincident circles and **every stated relation holds AT the collapse**: the ratio
+genuinely is 1, and coincident circles are internally tangent in the limit. Measured — both radii 0.7,
+`verifyGivens` clean, no error. So `verify.ts`'s radius-ratio check (which re-derives from resolved
+radii, ADR-053-independent) cannot see it, and neither can the tangency check: there is nothing
+dishonest downstream for them to catch. A contradiction whose *degenerate* solution satisfies its own
+constraints is invisible to any verifier that asks "do the givens hold?" — it has to be caught where the
+contradiction is stated.
+
+Recorded as the general lesson: **the verifier answers "does the drawing satisfy the givens", never
+"is this drawing worth showing"**. A collapse that satisfies everything is the blind spot, and the
+`collapsedPolygon` gate in `stepAccepted` exists because the polygon family met the same wall. A
+`collapsedCirclePair` sibling there would catch the class rather than this member, and is the right
+follow-up if another member appears (#764); the operator's ruling closes the reported one at lower cost
+and with a better message path.
+
+Known gap, recorded rather than hidden: «שני מעגלים ברדיוסים שווים» — a bare pair with no stated
+position — is still `not-handled`; an earlier rule claims it before `twoCirclesBare` is reached. It is
+an honest refusal, not a drop.
+
+Sibling product (ADR-W-004): not applicable — `src3d/` has no two-circle statement family (stated in
+ADR-454 and unchanged).
+
+Locks (`two-circle-family.test.ts`): the six supported spellings each assert the `set-radius-ratio` k=1
+actually lands; the four internal-contradiction spellings refuse while internal tangency ALONE still
+builds; the family check that «זרים» carries the equality too; and the invariant that spans both fixes —
+*carried or refused, never dropped* — asserted as a property over the whole history rather than as a
+snapshot of either state. Full suite 496 files / 9059 tests, 0 failed.

@@ -514,20 +514,49 @@ describe('#757 — a two-circle tangency declines rather than swallowing a modif
     if (r.ok) expect(r.commands.some((c) => c.type === 'circles-tangent'), u).toBe(true);
   };
 
-  it('the reported utterance, and its whole spelling matrix', () => {
-    // {external, internal} × {ב-, עם} × {he, en} — the class, not the one sentence the operator typed.
-    refuses('שני מעגלים משיקים מבחוץ ברדיוסים שווים');
-    refuses('שני מעגלים משיקים מבחוץ עם רדיוסים שווים');
+  it('the reported utterance now CARRIES the relation (#761) — the refusal was only the interim state', () => {
+    // #757 stopped the silent drop; #761 read the modifier. The contract that matters is unchanged
+    // throughout: the stated relation is carried or refused, NEVER dropped.
+    for (const u of [
+      'שני מעגלים משיקים מבחוץ ברדיוסים שווים',
+      'שני מעגלים משיקים מבחוץ עם רדיוסים שווים',
+      'שני מעגלים משיקים מבחוץ שקוטרם שווה',
+      'שני מעגלים משיקים מבחוץ שרדיוסיהם שווים',
+      'two circles tangent externally with equal radii',
+      'two circles tangent externally with the same radius',
+    ]) {
+      const r = parse(u);
+      expect(r.ok, u).toBe(true);
+      if (r.ok) expect(r.commands.some((c) => c.type === 'set-radius-ratio' && (c as { k: number }).k === 1), u).toBe(true);
+    }
+  });
+
+  it('INTERNAL tangency + equal radii is refused as a contradiction in the WORDS (operator ruling)', () => {
+    // Two internally tangent circles of equal radius ARE the same circle. Refused from the statement,
+    // no geometry consulted — the family's existing contradictory-words bail («זרים» + «מוכל»).
+    // Lowered anyway it collapses to coincident circles with EVERY stated relation holding at the
+    // collapse (ratio = 1; internal tangency in the limit), so no verifier could catch it downstream.
     refuses('שני מעגלים משיקים מבפנים ברדיוסים שווים');
     refuses('שני מעגלים משיקים מבפנים עם רדיוסים שווים');
-    refuses('two circles tangent externally with equal radii');
+    refuses('שני מעגלים משיקים מבפנים שקוטרם שווה');
     refuses('two circles tangent internally with equal radii');
+    // …while internal tangency ALONE is untouched.
+    builds('שני מעגלים משיקים מבפנים');
+    builds('two circles are tangent internally');
+  });
+
+  it('the equality rides the whole family, not one rule (#215: the class must not re-open per rule)', () => {
+    const r = parse('שני מעגלים זרים ברדיוסים שווים');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.commands.some((c) => c.type === 'set-circle-position')).toBe(true);
+      expect(r.commands.some((c) => c.type === 'set-radius-ratio' && (c as { k: number }).k === 1)).toBe(true);
+    }
   });
 
   it('the class beyond equal radii — unread modifiers nobody reported also decline', () => {
     // The docs/17 test of a real class fix: it closes siblings that were never filed.
     refuses('שני מעגלים משיקים מבחוץ שרדיוסו של האחד 5');
-    refuses('שני מעגלים משיקים מבחוץ שקוטרם שווה');
     refuses('שני מעגלים משיקים מבחוץ והזווית ABC');
     // Scope boundary, stated rather than assumed: a modifier that another rule CLAIMS
     // («…ואלכסון AB» → a lone `segment`; «…with a chord AB» → the chord rule) never reaches this
@@ -554,10 +583,17 @@ describe('#757 — a two-circle tangency declines rather than swallowing a modif
     builds('two circles are tangent externally');
   });
 
-  it('the refusal is HONEST — nothing is committed, so nothing contradicts the given', () => {
-    // The P1 was not "it refused"; it was that it BUILT while dropping the relation. The contract is
-    // that the statement never commits a figure asserting the opposite of what the student said.
-    const r = parse('שני מעגלים משיקים מבחוץ ברדיוסים שווים');
-    expect(r.ok).toBe(false);
+  it('the invariant across BOTH fixes: carried or refused, never dropped', () => {
+    // The P1 was never "it refused" — it was that it BUILT while dropping the relation. #757 made the
+    // drop impossible; #761 made the statement build. What must never be true, at any point in that
+    // history, is a committed figure that omits what the student stated.
+    for (const u of [
+      'שני מעגלים משיקים מבחוץ ברדיוסים שווים',
+      'שני מעגלים משיקים מבפנים ברדיוסים שווים',
+      'שני מעגלים משיקים מבחוץ שרדיוסו של האחד 5',
+    ]) {
+      const r = parse(u);
+      if (r.ok) expect(r.commands.some((c) => c.type === 'set-radius-ratio'), `${u} committed while dropping the relation`).toBe(true);
+    }
   });
 });
