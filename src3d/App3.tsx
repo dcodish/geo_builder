@@ -17,6 +17,8 @@ import { Workbench } from '../shell/frame/Workbench';
 import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { ToolButton } from '../shell/frame/ToolButton';
+// #743: the under-canvas row's ONE look — the shell contract, replacing this tree's own buttons.
+import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import registry from '../products.json';
 import { dataView, panelIsEmpty } from './engine/dataView';
 import { answerQuery } from './engine/queries';
@@ -34,6 +36,7 @@ import { parse3 } from './parser/parse3';
 import Figure3 from './render/Figure3';
 import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
 import { auditLoad3 } from './store/loadAudit3';
+import { useStore } from 'zustand';
 import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
 import { factDisplay3, isVectorFact3 } from './render/notation';
 import { VecMath } from './render/VecMath';
@@ -192,6 +195,10 @@ export default function App3() {
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1000px)').matches,
   );
   const [showWitness, setShowWitness] = useState(true); // #397: distance witnesses, default on
+  // #742: the row disables (never hides) — the 2-D canUndo/canRedo mechanism, mirrored.
+  const canUndo3 = useStore(useGeo3.temporal, (s) => s.pastStates.length > 0);
+  const canRedo3 = useStore(useGeo3.temporal, (s) => s.futureStates.length > 0);
+  const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>(''); // #742: top-row copy feedback
   const lastError = useGeo3((s) => s.lastError);
   const submit = useGeo3((s) => s.submit);
   const toggle = useGeo3((s) => s.toggle);
@@ -241,25 +248,50 @@ export default function App3() {
     return () => ro.disconnect();
   }, []);
 
-  /** The figure's own SVG — the export source for both the image and the question document. */
+  /** The figure's own SVG — the export source for the image, the clipboard and the question document. */
   const figureSvg = () => canvasBox.current?.querySelector('svg') ?? null;
 
-  const onSaveImage = async () => {
+  /**
+   * #742 / ADR-W-026: ONE raster path behind the top row's copy/save pair. #745 makes that path the
+   * SHARED rasteriser (`shell/export/svgToPng`) instead of an inline copy — the copy that lived here
+   * predated the clean-export contract, so it baked interaction-only visuals into the exported image
+   * and took its ink weight from the size of the browser window. One implementation, or the builders
+   * drift apart again exactly as they had.
+   */
+  const rasterCanvas = (): Promise<Blob> => {
     const svg = figureSvg();
-    if (!svg) return;
-    // the SHARED rasteriser (#745, shell/export/svgToPng) — the inline copy that used to live here
-    // predated it and could not honour the clean-export tagging contract
-    const blob = await svgToPng(svg);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `figure-3d-${new Date().toISOString().slice(0, 10)}.png`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    if (!svg) return Promise.reject(new Error('no canvas'));
+    return svgToPng(svg);
+  };
+  const flashExport = (v: 'ok' | 'err') => {
+    setExportFlash(v);
+    window.setTimeout(() => setExportFlash(''), 1400);
+  };
+  const onSaveImage = async () => {
+    try {
+      const blob = await rasterCanvas();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `figure-3d-${new Date().toISOString().slice(0, 10)}.png`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      flashExport('err');
+    }
+  };
+  const onCopyImage = async () => {
+    try {
+      const blob = await rasterCanvas();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      flashExport('ok');
+    } catch {
+      flashExport('err');
+    }
   };
 
   /**
    * «הורידו שאלה» (#745) — the figure beside the student's own statements, as a real .docx. The
-   * composer is shared (`shell/export/questionDoc`, ADR-W-024) and knows nothing about geometry: this
+   * composer is shared (`shell/export/questionDoc`, ADR-W-026) and knows nothing about geometry: this
    * tree supplies the heading, the givens (verbatim enabled utterances), the figure PNG and THIS
    * product's bidi segmenter, so the paper splits technical runs exactly where the screen does.
    *
@@ -470,17 +502,23 @@ export default function App3() {
             💾 {t('actions.save')}
           </ToolButton>
           <ToolButton onClick={() => fileInput.current?.click()}>📂 {t('actions.load')}</ToolButton>
+          {/* #742 / ADR-W-024 (operator: "3d and complex tools can have the same functionality"):
+              the image exports in the 2-D order, DISABLED-not-hidden on empty (today's ruling
+              supersedes the earlier appears-when-nonempty one — stable suite positions). */}
+          <ToolButton onClick={() => void onCopyImage()} disabled={facts.length === 0}>
+            {exportFlash === 'ok' ? `✓ ${t('actions.copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('actions.copyImage')}`}
+          </ToolButton>
+          <ToolButton onClick={() => void onSaveImage()} disabled={facts.length === 0}>
+            ⤓ {t('actions.saveImage')}
+          </ToolButton>
+          {/* «הורידו שאלה» (#745) — DISABLED-not-hidden like its neighbours (ADR-W-024), so the row
+              keeps stable suite positions. Gated on there being a GIVEN to print rather than on the
+              fact count: a figure whose every statement is muted has no question, and an enabled
+              button whose handler quietly returns is the #511 broken promise in a nicer costume. */}
+          <ToolButton onClick={() => void onSaveQuestion()} disabled={questionLines3(facts).length === 0}>
+            ⤓ {t('actions.saveQuestion')}
+          </ToolButton>
           <ToolButton onClick={() => setManualOpen(true)}>{t('manual.button')}</ToolButton>
-          {/* image export appears only once there is something to save (operator, 2026-08-18);
-              it rides LAST so the constant buttons keep their suite positions. */}
-          {facts.length > 0 && (
-            <ToolButton onClick={() => void onSaveImage()}>{t('actions.saveImage')}</ToolButton>
-          )}
-          {/* «הורידו שאלה» (#745) — same gate as the image: an empty figure has no question to print,
-              and a figure whose every statement is muted has no givens (questionLines3 is empty). */}
-          {questionLines3(facts).length > 0 && (
-            <ToolButton onClick={() => void onSaveQuestion()}>{t('actions.saveQuestion')}</ToolButton>
-          )}
         </>
       }
       roster={roster}
@@ -661,19 +699,23 @@ export default function App3() {
           {/* B6 (#671): the DOF cue moved to the data panel's head-line — its generic home across
               the builders (operator: "people who care about it will look at it"). */}
           <p className="text-xs text-slate-400">{t('hint.orbit')}</p>
-          <div className="flex flex-wrap gap-2">
+          {/* #742: the row's buttons DISABLE when meaningless, never hide. #743: ONE look — the
+              shell row contract (accent alternatives at inline-start, spacer, subtle trio at
+              inline-end), replacing this tree's own Tailwind buttons. */}
+          <div style={figureRowStyle}>
             {/* #182: each store interaction logs one lean `action` line so a reported prod session
                 replays end-to-end (the 2-D #84/#189 mirror — delete logs at its own button above). */}
-            <button type="button" onClick={() => { logDebug3({ kind: 'action', action: 'show-another' }); resample(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
+            <button type="button" style={facts.length === 0 ? rowAccentOffStyle : rowAccentStyle} disabled={facts.length === 0} onClick={() => { logDebug3({ kind: 'action', action: 'show-another' }); resample(); }}>
               {t('actions.another')}
             </button>
-            <button type="button" onClick={() => { logDebug3({ kind: 'action', action: 'undo' }); undo3(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
+            <span style={rowSpacerStyle} />
+            <button type="button" style={canUndo3 ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canUndo3} onClick={() => { logDebug3({ kind: 'action', action: 'undo' }); undo3(); }}>
               {t('actions.undo')}
             </button>
-            <button type="button" onClick={() => { logDebug3({ kind: 'action', action: 'redo' }); redo3(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
+            <button type="button" style={canRedo3 ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canRedo3} onClick={() => { logDebug3({ kind: 'action', action: 'redo' }); redo3(); }}>
               {t('actions.redo')}
             </button>
-            <button type="button" onClick={clearAll} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50">
+            <button type="button" style={facts.length > 0 ? { ...rowSubtleStyle, color: rowDangerInk } : rowSubtleOffStyle} disabled={facts.length === 0} onClick={clearAll}>
               {t('actions.clear')}
             </button>
             {/* #397's witness toggle moved INTO the נתונים panel (#739 — operator: "show

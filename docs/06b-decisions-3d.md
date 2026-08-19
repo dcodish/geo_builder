@@ -4076,12 +4076,12 @@ zoom-about-pointer invariant asserted as "the point under the cursor maps to its
 no-op, and in/out being exact inverses; exactly one pan group wrapping ALL figure content; the reset
 button outside it; and the load-bearing one — `buildScene3` takes no pan parameter and emits identical
 scenes, so nothing derived from the scene can drift when the frame moves.
-## ADR-3D-156 — «הורידו שאלה» arrives, and the list is the student's own words (#745)
+## ADR-3D-159 — «הורידו שאלה» arrives, and the list is the student's own words (#745)
 
 **Status:** accepted, 2026-08-18 · **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745)
 
 The question `.docx` export reaches this builder. The composer is shared and product-agnostic
-([ADR-W-024](06w-decisions-workspace.md#adr-w-024)); what is decided *here* is what this tree feeds it.
+([ADR-W-026](06w-decisions-workspace.md#adr-w-026)); what is decided *here* is what this tree feeds it.
 
 - **The givens are the enabled facts' utterances, verbatim, in entry order** (`src3d/export/questionLines3.ts`).
   The 2-D export omits scaffolding ([ADR-252](06-decisions.md#adr-252)) — a bare segment states no given —

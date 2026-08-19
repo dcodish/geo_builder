@@ -13,6 +13,8 @@ import { HOME_CAMERA, MAX_PITCH, type Camera3 } from './camera';
 import { faceOnView, planarNormal } from '../engine/defaultView';
 import { buildScene3, type SceneCrossing3 } from './scene3';
 import { dragModeFor, panForZoom } from './viewGauge';
+// #742 / ADR-W-024: the shared canvas corner cluster — one look in every builder.
+import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle } from '../../shell/frame/canvasControls';
 
 export interface Figure3Props {
   construction: Construction3;
@@ -152,19 +154,24 @@ export default function Figure3({ construction, resolved, width = 640, height = 
     drag.current = null;
     if (pointers.current.size === 0) dragMode.current = 'orbit';
   };
+  /** Zoom by a factor about a screen point (the #533 framing math). The wheel aims at the pointer;
+      the cluster's − / + buttons (#742) aim at the canvas centre. */
+  const zoomAbout = (q: { x: number; y: number }, factor: number) => {
+    setZoom((z) => {
+      const next = Math.max(0.3, Math.min(4, z * factor));
+      const r = next / z; // the ACTUAL ratio — at the clamp it is 1, so a clamped zoom pans nothing
+      setPan((p) => panForZoom(q, p, r));
+      return next;
+    });
+  };
+  const zoomBy = (factor: number) => zoomAbout({ x: width / 2, y: height / 2 }, factor);
   const onWheel = (e: RWheelEvent<SVGSVGElement>) => {
     // #533: zoom ABOUT THE POINTER. Without this, `k` grows while the fit stays centred on the content
     // bbox, so zooming in magnifies about a point that may be nowhere near the solid and drives it
     // further off-canvas — the gesture that LOSES the figure. Keeping whatever is under the cursor
     // under the cursor is what turns zoom into a framing tool: q = (q − pan)·r + pan' ⇒ pan' = q − (q − pan)·r.
     const rect = e.currentTarget.getBoundingClientRect();
-    const q = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    setZoom((z) => {
-      const next = Math.max(0.3, Math.min(4, z * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
-      const r = next / z; // the ACTUAL ratio — at the clamp it is 1, so a clamped zoom pans nothing
-      setPan((p) => panForZoom(q, p, r));
-      return next;
-    });
+    zoomAbout({ x: e.clientX - rect.left, y: e.clientY - rect.top }, e.deltaY < 0 ? 1.12 : 1 / 1.12);
   };
 
   return (
@@ -423,19 +430,31 @@ export default function Figure3({ construction, resolved, width = 640, height = 
         ))}
         </g>
       </svg>
-      <button
-        type="button"
-        aria-label={resetLabel}
-        title={resetLabel}
-        className="absolute top-2 end-2 rounded-lg border border-slate-300 bg-white/90 px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
-        onClick={() => {
-          setCam(null); // back to following the figure's own home view (#5)
-          setZoom(1);
-          setPan({ x: 0, y: 0 }); // #533: ONE button returns to a known-good frame — this is what
-        }} //            makes free panning safe to hand a student
-      >
-        ↺
-      </button>
+      {/* #742 / ADR-W-024: the canvas corner cluster — ↺ − +, the SAME cluster every builder's
+          canvas carries (shared style + step from shell/frame/canvasControls). The zoom buttons
+          reuse the wheel's about-a-point math, aimed at the canvas centre; the clamp stays this
+          renderer's own [0.3, 4] — an orthographic fit tolerates less range than the 2-D plane. */}
+      <div style={canvasClusterStyle} dir="ltr">
+        <button
+          type="button"
+          aria-label={resetLabel}
+          title={resetLabel}
+          style={canvasCtrlStyle}
+          onClick={() => {
+            setCam(null); // back to following the figure's own home view (#5)
+            setZoom(1);
+            setPan({ x: 0, y: 0 }); // #533: ONE button returns to a known-good frame — this is what
+          }} //            makes free panning safe to hand a student
+        >
+          ↺
+        </button>
+        <button type="button" style={canvasCtrlStyle} title="zoom out" aria-label="zoom out" onClick={() => zoomBy(1 / CANVAS_ZOOM_STEP)}>
+          −
+        </button>
+        <button type="button" style={canvasCtrlStyle} title="zoom in" aria-label="zoom in" onClick={() => zoomBy(CANVAS_ZOOM_STEP)}>
+          +
+        </button>
+      </div>
     </div>
   );
 }

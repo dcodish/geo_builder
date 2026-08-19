@@ -12,10 +12,14 @@ import { FigureName } from '../shell/frame/FigureName';
 import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
+// #742 / ADR-W-024: the shared canvas corner cluster — one look in every builder.
+// #745: and the shared RASTERISER — one svg→png in the workspace, not one per product.
+import { svgToPng } from '../shell/export/svgToPng';
+import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../shell/frame/canvasControls';
+// #743: the under-canvas row's ONE look — the shell contract, replacing this tree's bare buttons.
+import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { applySwitcherConfig, type ToolConfig } from '../shell/switcherConfig';
-import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
-import { questionLines } from './export/questionLines';
 import { deriveLines } from './app/deriveLines';
 import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, toggleLine } from './app/submit';
 import { v2Claims, v2Contradiction, v2Formulas, v2Freedom, v2Knowledge, v2Labels, v2Measures } from './replay/scene2';
@@ -58,8 +62,6 @@ export function App() {
     setLoadAudit,
   } = useComplexStore();
   const fileRef = useRef<HTMLInputElement | null>(null);
-  /** The live Gauss plane — the export source for the question document's figure (#745). */
-  const planeRef = useRef<SVGSVGElement | null>(null);
 
   const saveFile = () => {
     const blob = new Blob([JSON.stringify(serialize(), null, 2)], { type: 'application/json' });
@@ -73,34 +75,45 @@ export function App() {
     URL.revokeObjectURL(url);
   };
 
-  /**
-   * «הורידו שאלה» (#745) — the Gauss plane beside the student's own statements, as a real .docx.
-   *
-   * The composer is shared (`shell/export/questionDoc`, ADR-W-024) and knows nothing about complex
-   * numbers: this tree supplies the heading, the givens (the enabled statements, verbatim), the plane
-   * rasterised by the shared `svgToPng`, and THIS product's bidi segmenter — so a technical run splits
-   * on paper exactly where it splits on screen. The docx library is dynamically imported, keeping it
-   * out of the main chunk.
-   */
-  const saveQuestion = async () => {
-    const svg = planeRef.current;
-    if (!svg) return;
-    const { pngDimensions, questionDocxBlob, questionFileName } = await import('../shell/export/questionDoc');
-    const png = await svgToPng(svg, 2, QUESTION_IMAGE_WIDTH_PX);
-    const data = new Uint8Array(await png.arrayBuffer());
-    const blob = await questionDocxBlob({
-      title: name.trim() || undefined,
-      heading: t('questionGiven'),
-      lines: questionLines(lines, disabled),
-      png: { data, ...pngDimensions(data) },
-      rtl: i18n.language !== 'en',
-      segments: complexBidi.segments,
-    });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = questionFileName(new Date());
-    a.click();
-    URL.revokeObjectURL(a.href);
+  // #742 / ADR-W-024: the image exports — the top tool row's pair, the 3-D rasterize pattern
+  // (App queries its own canvas svg; the renderer never knows exports exist).
+  //
+  // #745: the product-local svg→png copy that #742 flagged as "a shell candidate" is GONE — this now
+  // calls the shared rasteriser. It is behaviour-neutral here (this renderer tags nothing, so the
+  // clean-export contract is a no-op, and `sourceSize` reads the Gauss plane's viewBox exactly as the
+  // inline copy read its client box) and it retires the third of three copies. No «הורידו שאלה»
+  // button follows it into this tool — operator ruling, 2026-08-19: the question document is 2-D and
+  // 3-D only.
+  const rasterCanvas = (): Promise<Blob> => {
+    const svg = canvasCard.current?.querySelector('svg');
+    if (!svg) return Promise.reject(new Error('no canvas'));
+    return svgToPng(svg);
+  };
+  const flashExport = (v: 'ok' | 'err') => {
+    setExportFlash(v);
+    window.setTimeout(() => setExportFlash(''), 1400);
+  };
+  const copyImage = async () => {
+    try {
+      const blob = await rasterCanvas();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      flashExport('ok');
+    } catch {
+      flashExport('err');
+    }
+  };
+  const saveImage = async () => {
+    try {
+      const blob = await rasterCanvas();
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = u;
+      a.download = 'figure.png';
+      a.click();
+      URL.revokeObjectURL(u);
+    } catch {
+      flashExport('err');
+    }
   };
 
   const onLoadFile = (e: ChangeEvent<HTMLInputElement>) => {
@@ -176,6 +189,10 @@ export function App() {
    * to hold at (ADR-448 / ADR-3D-144) after learning what it costs not to.
    */
   const [stepN, setStepN] = useState(1);
+  // #742: the corner cluster's zoom — view state, local by design (docs/20 §6.4), never stored.
+  const [canvasZoom, setCanvasZoom] = useState(1);
+  const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>(''); // top-row copy feedback
+  const canvasCard = useRef<HTMLDivElement>(null);
   // the canvas is POLAR: a complex number as a length and a direction, not a dot on a grid
   const polarScene = useMemo(() => buildScene(derived2, { n: stepN }), [derived2, stepN]);
   /**
@@ -284,14 +301,13 @@ export function App() {
             💾 {t('save')}
           </ToolButton>
           <ToolButton onClick={() => fileRef.current?.click()}>📂 {t('load')}</ToolButton>
-          {/* «הורידו שאלה» (#745) — disabled while there is no given to print OR no plane to print it
-              beside, so the tool never offers what it cannot honour (the #511 asymmetry). An enabled
-              button whose handler quietly returns is the same broken promise in a nicer costume. */}
-          <ToolButton
-            onClick={() => void saveQuestion()}
-            disabled={!polarScene || questionLines(lines, disabled).length === 0}
-          >
-            ⤓ {t('questionDownload')}
+          {/* #742 / ADR-W-024 (operator: "3d and complex tools can have the same functionality"):
+              the image exports in the TOP ROW, the one export home in every builder. */}
+          <ToolButton onClick={() => void copyImage()} disabled={lines.length === 0}>
+            {exportFlash === 'ok' ? `✓ ${t('copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('copyImage')}`}
+          </ToolButton>
+          <ToolButton onClick={() => void saveImage()} disabled={lines.length === 0}>
+            ⤓ {t('saveImage')}
           </ToolButton>
           <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
         </>
@@ -429,18 +445,38 @@ export function App() {
             )}
             {polarScene && (
               <>
-                <PolarPlane
-                  svgRef={planeRef}
-                  scene={polarScene}
-                  showGrid={view === 'polar'}
-                  mode={view}
-                  layers={layers}
-                  labels={{
-                    ratio: t('seriesRatio'),
-                    limit: t('seriesLimit'),
-                    closed: t('seriesClosed'),
-                  }}
-                />
+                {/* #742 / ADR-W-024: a positioned wrapper so the canvas carries the SAME corner
+                    cluster as every builder — ↺ − + from the shell contract. Zoom is view state
+                    (docs/20 §6.4): local, never in the store, reset by ↺. */}
+                {/* the wrapper is a transparent flex conduit — same column context the svg had as
+                    the card's direct child, so .gauss-plane keeps its shrink behaviour and the
+                    actions row under the canvas stays above the fold */}
+                <div ref={canvasCard} style={{ position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                  <PolarPlane
+                    scene={polarScene}
+                    showGrid={view === 'polar'}
+                    mode={view}
+                    layers={layers}
+                    zoom={canvasZoom}
+                    empty={lines.length === 0}
+                    labels={{
+                      ratio: t('seriesRatio'),
+                      limit: t('seriesLimit'),
+                      closed: t('seriesClosed'),
+                    }}
+                  />
+                  <div style={canvasClusterStyle} dir="ltr">
+                    <button type="button" style={canvasCtrlStyle} title={t('resetView')} aria-label={t('resetView')} onClick={() => setCanvasZoom(1)}>
+                      ↺
+                    </button>
+                    <button type="button" style={canvasCtrlStyle} title="zoom out" aria-label="zoom out" onClick={() => setCanvasZoom((z) => clampZoom(z / CANVAS_ZOOM_STEP))}>
+                      −
+                    </button>
+                    <button type="button" style={canvasCtrlStyle} title="zoom in" aria-label="zoom in" onClick={() => setCanvasZoom((z) => clampZoom(z * CANVAS_ZOOM_STEP))}>
+                      +
+                    </button>
+                  </div>
+                </div>
                 {layers.cycles && polarScene.cycles.length > 0 && (
                   <div className="stepper" dir="rtl">
                     <span>
@@ -471,18 +507,20 @@ export function App() {
                 ))}
               </>
             )}
-            {/* LEVEL 3 — figure actions under the canvas (D7): they act on the FIGURE. */}
-            <div className="figure-actions">
+            {/* LEVEL 3 — figure actions under the canvas (D7): they act on the FIGURE.
+                #743: ONE look — the shell row contract (accent alternatives at inline-start,
+                spacer before the session ops), replacing this tree's bare buttons. */}
+            <div className="figure-actions" style={figureRowStyle}>
               {/* nothing to cycle when the givens determine the figure completely (ADR-CX-020) */}
-              <button onClick={nextConfig} disabled={derived2 ? !derived2.canCycle : false}>
+              <button style={(derived2 ? !derived2.canCycle : false) ? rowAccentOffStyle : rowAccentStyle} onClick={nextConfig} disabled={derived2 ? !derived2.canCycle : false}>
                 {t('anotherConfig')}
               </button>
-              <button onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
+              {/* #742: the row's buttons DISABLE on an empty figure, never hide (operator ruling —
+                  one row behaviour in every builder; the empty canvas is blank, so the view toggle
+                  has nothing to show either). */}
+              <button style={lines.length === 0 ? rowSubtleOffStyle : rowSubtleStyle} disabled={lines.length === 0} onClick={() => setView(view === 'cart' ? 'polar' : 'cart')}>
                 {view === 'cart' ? t('viewPolar') : t('viewCart')}
               </button>
-              {/* #739: the row carries clear-all in every tool (undo/redo await store temporal —
-                  the named feature gap on the issue) */}
-              <button onClick={clearAll}>{t('clearAll')}</button>
               {/* #722 — the ENRICHMENT layers, opt-in chips (the operator's de-clutter ruling:
                   the default canvas is points + stated elements; each S5 layer is a choice).
                   A chip renders only when the figure HAS that layer to show. */}
@@ -505,6 +543,10 @@ export function App() {
                   </button>
                 ) : null,
               )}
+              <span style={rowSpacerStyle} />
+              {/* #739: the row carries clear-all in every tool (undo/redo await store temporal —
+                  the named feature gap on the issue) */}
+              <button style={lines.length > 0 ? { ...rowSubtleStyle, color: rowDangerInk } : rowSubtleOffStyle} disabled={lines.length === 0} onClick={clearAll}>{t('clearAll')}</button>
               {/* the LAUNCHER — narrow screens only (CSS): opens the data overlay when the
                   always-visible column has no room to exist */}
               <button

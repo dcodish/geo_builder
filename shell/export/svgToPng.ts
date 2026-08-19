@@ -2,7 +2,7 @@
  * Rasterise a live SVG figure to a PNG blob — the shared export path behind "save image" and behind the
  * figure that rides beside the givens in the question document.
  *
- * SHARED (#745, ADR-W-024). It was a private helper inside `src/render/Figure.tsx`, so the 3-D builder
+ * SHARED (#745, ADR-W-026). It was a private helper inside `src/render/Figure.tsx`, so the 3-D builder
  * grew a thinner copy inline in `App3.tsx` and the complex builder had none at all — which is why the
  * question export could not reach either of them. Nothing in here reasons about geometry: it takes an
  * `<svg>` element and returns pixels, which is the definition of chrome.

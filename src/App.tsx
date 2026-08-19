@@ -40,12 +40,19 @@ import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { SYMBOL_SPECS } from '@/ui/symbols';
 import { btn, card as themeCard, color as pal, fs, sectionTitle } from '@/ui/theme';
+// #743: the under-canvas row's ONE look — the style contract lives in shell (seeded from this
+// tree's own btn.accent/btn.subtle, which the operator praised); every builder's row consumes it.
+import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { autoNamedLabels, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
 import { questionLines } from '@/export/questionLines';
 import { bidiSegments } from '@/i18n/bidi';
+// #742: the exports live in the TOP TOOL ROW now (ADR-W-026) — App rasterises the canvas svg itself.
+// #745: the rasteriser and the printed width are SHARED (shell/export/svgToPng), so every builder that
+// prints a figure prints it at one width and one ink weight. Two copies could drift; one cannot.
+import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { auditLoadedFigure, liveAuditFindings, refreshLoadedFigure } from '@/store/loadAudit';
 import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
@@ -196,6 +203,7 @@ export default function App() {
   // Responsive canvas: the figure fills the space beside the sidebar (use the whole screen) instead
   // of a fixed box. A ResizeObserver feeds the measured size to <Figure>, which fits isotropically.
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>(''); // #742: feedback on the top-row copy button
   const [canvasSize, setCanvasSize] = useState({ w: 640, h: 600 });
   useEffect(() => {
     const el = canvasRef.current;
@@ -418,6 +426,50 @@ export default function App() {
     a.download = questionFileName(new Date());
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // #742 / ADR-W-024: the image exports moved OUT of the canvas toolbar into the top tool row —
+  // one export home in every builder. App queries the svg from its own canvas card (the 3-D
+  // pattern) and rasterises via shell/export/svgToPng; the renderer no longer knows exports exist.
+  const canvasSvg = () => canvasRef.current?.querySelector('svg') ?? null;
+  const flashExport = (v: 'ok' | 'err') => {
+    setExportFlash(v);
+    window.setTimeout(() => setExportFlash(''), 1400);
+  };
+  const copyImageTop = async () => {
+    const svg = canvasSvg();
+    if (!svg) return;
+    try {
+      const blob = await svgToPng(svg);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      flashExport('ok');
+    } catch {
+      flashExport('err');
+    }
+  };
+  const saveImageTop = async () => {
+    const svg = canvasSvg();
+    if (!svg) return;
+    try {
+      const blob = await svgToPng(svg);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'figure.png';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      flashExport('err');
+    }
+  };
+  const saveQuestionTop = async () => {
+    const svg = canvasSvg();
+    if (!svg) return;
+    try {
+      await saveQuestion(await svgToPng(svg, 2, QUESTION_IMAGE_WIDTH_PX));
+    } catch {
+      flashExport('err');
+    }
   };
 
   const noteFileProblem = (key: string, vals?: Record<string, unknown>) => {
@@ -898,6 +950,17 @@ export default function App() {
             💾 {t('file.save')}
           </ToolButton>
           <ToolButton onClick={() => fileInputRef.current?.click()}>📂 {t('file.load')}</ToolButton>
+          {/* #742 / ADR-W-024: the image exports live HERE in every builder — one home (they sat
+              on the 2-D canvas toolbar while 3-D had them up here; that drift is the defect). */}
+          <ToolButton onClick={() => void copyImageTop()} disabled={facts.length === 0}>
+            {exportFlash === 'ok' ? `✓ ${t('canvas.copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('canvas.copyImage')}`}
+          </ToolButton>
+          <ToolButton onClick={() => void saveImageTop()} disabled={facts.length === 0}>
+            ⤓ {t('canvas.saveImage')}
+          </ToolButton>
+          <ToolButton onClick={() => void saveQuestionTop()} disabled={questionLines(facts, canonLocale).length === 0}>
+            ⤓ {t('canvas.saveQuestion')}
+          </ToolButton>
           <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
         </>
       }
@@ -1002,16 +1065,8 @@ export default function App() {
               rotate: t('canvas.rotate'),
               transform: t('canvas.transform'),
               alignSeg: t('canvas.alignSeg'),
-              copyImage: t('canvas.copyImage'),
-              saveImage: t('canvas.saveImage'),
-              saveQuestion: t('canvas.saveQuestion'),
-              saveFile: t('file.save'),
-              loadFile: t('file.load'),
-              copied: t('canvas.copied'),
               reset: t('canvas.reset'),
             }}
-            onSaveQuestion={saveQuestion}
-            saveQuestionDisabled={questionLines(facts, canonLocale).length === 0}
           />
           {/* Empty canvas → a call to action so a new user knows what to do. The
               container ignores pointer events (so panning isn't blocked); the
@@ -1067,13 +1122,24 @@ export default function App() {
         {/* LEVEL 3 — figure actions UNDER the canvas (D7, B6-2d): things done TO the figure, the
             same zone as in the other builders. «הציגו תצורה אחרת» keeps its prominence (operator:
             it "looks nice" — the look moves with it). */}
-        {facts.length > 0 && (
+        {/* #742: the row renders ALWAYS — buttons disable, never hide (operator ruling; the row
+            vanished on an empty canvas here while the other builders kept theirs). */}
+        {(
           <div style={figureActions}>
-            {(branchId || hasVariant || freeDofs(construction).length > 0) && (
-              <button type="button" style={alt} disabled={resampling} title={t('actions.anotherHint')} onClick={() => void runResample()}>
-                {resampling ? t('input.loading') : t('actions.another')}
-              </button>
-            )}
+            {(() => {
+              const canCycle = facts.length > 0 && (branchId || hasVariant || freeDofs(construction).length > 0);
+              return (
+                <button
+                  type="button"
+                  style={!canCycle || resampling ? rowAccentOffStyle : alt}
+                  disabled={!canCycle || resampling}
+                  title={t('actions.anotherHint')}
+                  onClick={() => void runResample()}
+                >
+                  {resampling ? t('input.loading') : t('actions.another')}
+                </button>
+              );
+            })()}
             {resampling && (
               <span style={{ fontSize: 12, color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 {altProgress && <span>({altProgress})</span>}
@@ -1094,7 +1160,7 @@ export default function App() {
             <span style={{ flex: 1 }} />
             <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => { logDebug({ kind: 'action', action: 'undo' }); undo(); }}>{t('actions.undo')}</button>
             <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => { logDebug({ kind: 'action', action: 'redo' }); redo(); }}>{t('actions.redo')}</button>
-            <button type="button" style={{ ...subtleBtn, color: pal.danger }} onClick={clearAll}>{t('actions.clear')}</button>
+            <button type="button" style={facts.length > 0 ? { ...subtleBtn, color: rowDangerInk } : subtleBtnOff} disabled={facts.length === 0} onClick={clearAll}>{t('actions.clear')}</button>
           </div>
         )}
         {/* #738 — the display checkboxes moved INTO the נתונים panel with the analysis buttons
@@ -1852,7 +1918,7 @@ export default function App() {
 // the same zone order as the complex tool under RTL. `stretch` + minHeight:0 lets each column
 // scroll internally inside the viewport-height page.
 /** LEVEL 3 — the figure-action rows under the canvas (D7): things done TO the figure. */
-const figureActions: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 };
+const figureActions: React.CSSProperties = figureRowStyle; // #743: the shell row contract
 // The canvas fills the space beside the sidebar and the viewport height (use the big screen);
 // it wraps below the sidebar on narrow widths. Its size is measured and passed to <Figure>.
 // `order` puts the canvas on the LEFT and the sidebar on the RIGHT under RTL (Hebrew):
@@ -1880,8 +1946,8 @@ const sideCard: React.CSSProperties = themeCard;
 const sectionLabel: React.CSSProperties = sectionTitle;
 // dofPillFree/dofPillDone retired (B6-2d): the freedom cue lives in the panel's status line.
 // Compact in-card utility buttons (undo/redo/clear in the steps header).
-const subtleBtn: React.CSSProperties = btn.subtle;
-const subtleBtnOff: React.CSSProperties = { ...btn.subtle, opacity: 0.45, cursor: 'default' };
+const subtleBtn: React.CSSProperties = rowSubtleStyle; // #743: the shell row contract
+const subtleBtnOff: React.CSSProperties = rowSubtleOffStyle;
 const displayToggle: React.CSSProperties = { display: 'flex', gap: 6, alignItems: 'center', fontSize: fs.body, color: '#475569', cursor: 'pointer' };
 // symbolsToggle / input / chip / greekBtn retired with the shared InputArea (B4-2d): the box, the
 // palette buttons and the quick chips are shell chrome now.
@@ -1926,7 +1992,7 @@ const iconBtn = (color: string): React.CSSProperties => ({
   padding: '0 2px',
 });
 // The headline explore action ("show another configuration") — the ONE loud violet button.
-const alt: React.CSSProperties = btn.accent;
+const alt: React.CSSProperties = rowAccentStyle; // #743: the shell row contract
 // The relations / shapes analysis toggles — quiet outlines beside `alt`, half-width each.
 const exploreToggle: React.CSSProperties = { ...btn.accentOutline, flex: 1 };
 // The "view relations" toggle while the layer is ON — teal, matching the on-figure tick/arc colour.

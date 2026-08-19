@@ -41,7 +41,9 @@
     "saveNamePrompt": "Name the file — exam date, page and book, or anything else",
     "load": "Load",
     "saveImage": "Save image",
-    "saveQuestion": "Download question"
+    "saveQuestion": "Download question",
+    "copyImage": "Copy image",
+    "copied": "Copied"
   },
   "hint": {
     "orbit": "Drag the figure to orbit · Shift-drag or right-drag to pan · scroll to zoom"

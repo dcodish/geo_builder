@@ -959,17 +959,81 @@ ADR-W-018 ("one learned interface") the drift is a defect class, not a style cho
    the placement splits — in the import-direction/isolation pattern, so builder N+1 inherits the
    contract mechanically.
 
-## ADR-W-024 — The question document is ONE composer, parameterized by the caller's bidi (#745)
+## ADR-W-024 — The canvas CHROME is contracted: one empty state, one corner cluster, one export home, disabled-not-hidden (#742)
 
-**Status:** accepted, 2026-08-18 · **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745)
-· operator: *"for the 3d and for complex tool we need the option to download question in the same way we
-do for the 2d tool"*
+**Status:** accepted, 2026-08-18 · **Issue:** [#742](https://github.com/dcodish/geo_builder/issues/742) ·
+operator: "the canvas is not the same in all tools as well… the whole idea was to get a similar look
+and feel"; rulings same day: "buttons should be disabled - not hidden", "for leg 2 - i go with the
+recommendation", "3d and complex tools can have the same functionality [as the 2-D top toolbar]".
+
+**Problem.** ADR-W-018/W-019 contracted everything AROUND the canvas; the canvas renderer stayed
+per-product on purpose (three genuinely different drawing surfaces). The canvas-adjacent chrome fell
+between the two scopes and was never specified: three empty-state wordings, a six-button 2-D canvas
+toolbar beside a complex canvas with NO controls, image export in two different homes, and a row
+that hid on empty in one builder and showed in two.
+
+**Decision — four clauses, all guard-locked in `shell/__tests__/row-parity.test.ts`:**
+
+1. **One empty state.** Title «מה בונים היום?» + one hint wording in every builder (chips CONTENT
+   stays per-product — different subjects, different examples). An empty canvas is BLANK — the
+   complex plane no longer draws its grid under the overlay; axes appear with the first point.
+2. **One corner cluster.** Every canvas carries ↺ − + at the top inline-end corner — style objects
+   and the zoom step (×1.25) exist once in `shell/frame/canvasControls.ts`; each renderer keeps its
+   own zoom RANGE (the 3-D orthographic fit tolerates [0.3, 4]; the 2-D/complex planes take
+   [0.2, 8]) and its own view state (docs/20 §6.4: never in the store, never in undo). The complex
+   canvas GAINS zoom+reset; 3-D gains the − / + buttons its wheel already implied; the 2-D trio
+   moved in from the toolbar row, which keeps only the product-specific סיבוב ויישור group.
+3. **One export home.** Image exports are TOP-TOOL-ROW buttons in every builder, in the 2-D order —
+   שמור / טען / העתיקו תמונה / הורידו תמונה / [הורידו שאלה] / מדריך. The 2-D renderer no longer
+   knows exports exist (`svgToPng` moved to `src/export/`; App queries its own canvas — the 3-D
+   pattern, now in all three). **הורידו שאלה stays 2-D-only for now:** the question-docx builder is
+   a real feature to port (product isolation forbids sharing it as-is) — flagged on #742, not
+   silently built. Also flagged: `rasterCanvas` is now the workspace's THIRD product-local svg→png
+   copy — the ADR-W-016 shell threshold; a candidate for the next shell seeding pass.
+4. **Disabled, never hidden.** The under-canvas row renders always; each button disables when
+   meaningless (no facts, nothing to undo/redo, nothing to cycle). The 2-D row un-hides; 3-D and
+   complex gain the missing disabled states; the empty complex view-toggle disables (a blank canvas
+   has no view to toggle).
+
+## ADR-W-025 — The `-next` channel is retired: the unified interface IS the baseline (#747)
+
+**Status:** accepted, 2026-08-18 · **Issue:** [#747](https://github.com/dcodish/geo_builder/issues/747) ·
+supersedes the temporary half of [ADR-W-020](#adr-w-020) · operator: *"i think its not longer needed
+and we can just turn this code to the baseline"*
+
+**Decision.** Track B is accepted. The unified build is deployed to the canonical
+`/geo-builder/` and `/3d-builder/` paths as an ordinary Standard deploy of `main`, and the parallel
+evaluation channel is torn down — the operator waived the grace period ADR-W-020 §4 allowed for,
+having played the channel across two `next/*` deploys.
+
+1. **`main` → canonical is once again the ONLY deploy path.** ADR-W-020's one deliberate exception —
+   a channel deploying committed `unify/ui` state — ends here. `unify/ui` is fully merged into
+   `main`, so the exception has nothing left to serve, and leaving it standing would be an invitation
+   to ship un-merged branch state to a public URL.
+2. **The channel's machinery goes with it, not just its directories.** `build:next:2d` /
+   `build:next:3d` are deleted from `package.json`: a build script whose deploy target no longer
+   exists is a trap that produces a plausible `dist-next/` for nowhere. The RUNBOOK section shrinks
+   to a historical pointer so the DEPLOY-LOG's `next/*` entries stay readable — history is kept,
+   procedure is not.
+3. **What survives as the lesson**, not as a standing structure: the channel did its job (two
+   deploys, a mobile fix found and fixed on it, canonical bytes stat-proven untouched throughout).
+   The pattern is reusable — re-create it from this ADR when the next big surface needs prod-condition
+   evaluation; do not keep an idle channel alive for a hypothetical one.
+4. **The Apache api mappings for the `-next` paths are the operator's to remove** (Plesk directives
+   field). They are inert once the directories are gone — a mapping to nothing — so the teardown is
+   complete without them, but they are noise in a field where noise is expensive.
+
+## ADR-W-026 — The question document is ONE composer, parameterized by the caller's bidi (#745)
+
+**Status:** accepted, 2026-08-18 · **Amended 2026-08-19** (scope: 3-D only, see *Scope amendment*)
+· **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745) · operator: *"for the 3d and for
+complex tool we need the option to download question in the same way we do for the 2d tool"*
 
 **Problem.** «הורידו שאלה» — the figure printed beside the student's own givens as a real `.docx`
 (FR-HS-11, [ADR-251](06-decisions.md#adr-251)) — existed only in 2-D. Not by decision: it was written
 in `src/export/`, a product tree the siblings may not import ([ADR-266](06-decisions.md#adr-266),
 `BOUNDARIES.json`), so a module that reasons about nothing but headings, list items and an image was
-unreachable by two builders purely because of where it sat. `buildQuestionDoc` already took only
+unreachable by the sibling builders purely because of where it sat. `buildQuestionDoc` already took only
 `{ title, heading, lines, png, rtl }`; its single product coupling was an import of the 2-D bidi
 segmenter. The same was true one layer down: the clean-export rasteriser was a private helper inside
 `src/render/Figure.tsx`, which is why 3-D had grown a thinner inline copy and complex had none at all.
@@ -979,9 +1043,12 @@ segmenter. The same was true one layer down: the clean-export rasteriser was a p
 1. **`shell/export/questionDoc.ts` and `shell/export/svgToPng.ts` are shared surfaces.** This is the
    [ADR-W-016](#adr-w-016) seed rule applied at the moment it bites: the surface is settled (five issues
    of hardening — #451 ink, #464/#465 bidi, ADR-252 scaffolding, ADR-428 canonical form) and is about to
-   be implemented a second and third time. Copying it would put the OOXML layout, the A4 column split,
-   the Word-bidi per-run rule and the PNG IHDR reader in three places, and the next fix in that class
-   would have to be found and applied three times — the exact failure the shell layer exists to prevent.
+   be implemented a second time. Copying it would put the OOXML layout, the A4 column split, the
+   Word-bidi per-run rule and the PNG IHDR reader in two places, and the next fix in that class would
+   have to be found and applied twice — the exact failure the shell layer exists to prevent. The
+   rasteriser carries the sharper version of the argument: it had already been copied THREE times
+   (`src/render/Figure.tsx`, an inline copy in `App3.tsx`, a third in complex that #742 itself flagged
+   as *"a shell candidate"*), and all three are retired here.
    This overrides the "(COPIED, per ADR-W-003)" parenthetical in [#713](https://github.com/dcodish/geo_builder/issues/713)'s
    triage, which predates the request that made the surface a three-product one.
 
@@ -998,9 +1065,9 @@ segmenter. The same was true one layer down: the clean-export rasteriser was a p
    one definition of a run per product, so that product's screen and its paper cannot disagree. (The 2-D
    copy was already this shape; #464 discovered the need. The other two were rebuilt onto it here.)
 
-4. **The «נתון:» list is VERBATIM in the two new builders.** 2-D omits scaffolding
+4. **The «נתון:» list is VERBATIM in 3-D.** 2-D omits scaffolding
    ([ADR-252](06-decisions.md#adr-252)) via a per-command classification over the 2-D engine. Porting it
-   would mean inventing a second and third classification, each able to DROP a given the student stated —
+      would mean inventing a second classification, able to DROP a given the student stated —
    which is the honesty invariant this export exists to serve. A line too many is a cosmetic complaint;
    a line missing is the tool lying about the question. Operator ruling, 2026-08-18. Revisit only with a
    real figure that prints noise.
@@ -1011,11 +1078,23 @@ segmenter. The same was true one layer down: the clean-export rasteriser was a p
    `docx` out of the static import graph — every app imports the composer dynamically so the library
    stays out of its main chunk, and a static import of a constant declared beside it would defeat that.
 
-**Held by.** `shell/__tests__/question-export.test.ts`: the composer is exercised with a STUB segmenter
-no product would produce (a hard-coded run rule sneaking back in fails), it may not name a product
-identity, and the three apps are source-scanned for the dynamic import, a givens source, a handed-in
-segmenter, and the button label + heading in both locales — the row-parity/isolation pattern, so builder
-N+1 inherits the capability check mechanically rather than by review.
+**Scope amendment (operator ruling, 2026-08-19): the question document is 2-D and 3-D only.**
+*"הורידו שאלה should be in 3d but not in complex"*, given during play-and-approve. The complex leg —
+its givens module, handler, button and locale strings — is removed, not flagged off. Everything above
+stands unchanged: the composer is shared because 2-D and 3-D both print through it, and the argument
+was never a headcount. Complex keeps the shared **rasteriser**, which is the part it always needed:
+the n/a is the DOCUMENT, not the export layer. Recorded in
+[ADR-CX-028](06d-decisions-complex.md#adr-cx-028); the rationale is the operator's and is recorded as
+given, not inferred.
 
-**What this does not decide.** Complex's image download and copy-image buttons stay open on #713 — the
-rasteriser now exists there, so what remains is two buttons and their gates, not an engine.
+**Held by.** `shell/__tests__/question-export.test.ts`, which locks the matrix in BOTH directions: the
+composer is exercised with a STUB segmenter no product would produce (a hard-coded run rule sneaking
+back in fails) and may not name a product identity; the two builders that print are source-scanned for
+the dynamic import, a givens source, a handed-in segmenter and the strings; and **complex is scanned for
+their absence** while still being required to rasterise through the shared path. That negative half is
+the load-bearing one — a deliberate n/a and a forgotten cell look identical in a passing suite, and
+without it the next "complete the matrix" pass silently reverses an operator ruling.
+
+**What this does not decide.** Complex's remaining export questions stay on
+[#713](https://github.com/dcodish/geo_builder/issues/713). Image download and copy-image already
+shipped there with #742 and are untouched here beyond the rasteriser swap.

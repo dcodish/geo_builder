@@ -1776,24 +1776,37 @@ design; a stopgap panel built here would be work that programme would delete.
   (claim drive-or-check), [#694](https://github.com/dcodish/geo_builder/issues/694) (selection among an
   enumerated solution set), and the rest of the 572 booklet's Q3s as fixtures.
 
-## ADR-CX-028 — «הורידו שאלה»: the statements ARE the givens, and the plane hands back its `<svg>` (#745)
+## ADR-CX-028 — «הורידו שאלה» is NOT built here: the question document is 2-D and 3-D only (#745)
 
-**Status:** accepted, 2026-08-18 · **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745)
+**Status:** accepted, 2026-08-19 · **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745)
+· operator ruling, 2026-08-19: *"הורידו שאלה should be in 3d but not in complex"*
 
-The question `.docx` export reaches this builder too, on the shared composer
-([ADR-W-024](06w-decisions-workspace.md#adr-w-024)). Three decisions are this tree's own.
+**Context.** #745 moved the question-document composer and the clean-export rasteriser into `shell/`
+([ADR-W-026](06w-decisions-workspace.md#adr-w-026)) so a capability that had been trapped in `src/`
+could reach the sibling builders. The issue as filed carried this builder too, and the first
+implementation shipped it here: a `questionLines` module, a `.docx` handler, the button, and both
+locale strings. The operator ruled during play-and-approve that the complex builder does not get it.
 
-- **The «נתון:» list is the enabled statements, verbatim** (`src-complex/export/questionLines.ts`). Here the
-  mapping needs no judgement at all: the source of truth already is an ordered list of statements
-  (`z1 = 3+4i`, `w = z1*z2`), each of which is a given — nothing to classify, unlike 2-D where one
-  submission lowers to several commands and some are pure ink.
-- **Exclusion is by INDEX, not by text.** The store's `disabled` names positions and preserves them across
-  removals; a text match would mute both copies of a repeated statement. That is the reason this is a named
-  module with a test rather than an inline `.filter()` at the call site.
-- **`PolarPlane` takes an optional `svgRef`.** The host needs the live element to rasterise it, and a ref is
-  the honest way to say so: the plane's identity is that element, not a `document.querySelector` on a class
-  name that happens to match it today. No DOM structure changed, so no CSS could shift.
+**Decision.** The complex builder does **not** offer «הורידו שאלה». The leg is removed rather than
+hidden behind a flag — an unused surface is a surface that rots, and a flag would leave the reader
+guessing whether the gap is a decision or a defect.
 
-This builder had **no rasteriser at all** before now, which is why [#713](https://github.com/dcodish/geo_builder/issues/713)
-filed the export gap as engine work. That half is built; #713 keeps the image-download and copy-image
-buttons, which are now two buttons and their gates.
+**What it keeps.** The shared **rasteriser**. This tree's `rasterCanvas` was the third product-local
+copy of svg→png in the workspace — #742's own comment flagged it as *"a shell candidate"* — and it now
+calls `shell/export/svgToPng`. Behaviour-neutral here (this renderer tags nothing, so the clean-export
+contract is a no-op, and `sourceSize` reads the Gauss plane's viewBox exactly as the inline copy read
+its client box), and it retires the copy the workspace had already named. **The n/a is the document,
+not the export layer** — the distinction this ADR exists to keep straight.
+
+**How the decision is held.** `shell/__tests__/question-export.test.ts` asserts the negative directly:
+this tree reaches no question composer, offers no button, defines no question strings, and has no
+givens module — while still rasterising through the shared path. A deliberate n/a and a forgotten cell
+are indistinguishable in a passing suite, so the n/a is the thing under test. This is the
+[#664](https://github.com/dcodish/geo_builder/issues/664) conformance-matrix discipline applied before
+the matrix exists: an unexamined cell fails, and a declared one says so out loud.
+
+**What is NOT decided here.** The rationale is the operator's and is recorded as given, not inferred.
+Image download and copy-image already exist in this builder (#742) and are untouched;
+[#713](https://github.com/dcodish/geo_builder/issues/713) keeps whatever export work remains. If the
+ruling is ever revisited, the shared composer is already in place — re-adding the leg is a givens rule,
+a handler, a button and two strings, which is exactly what was removed.

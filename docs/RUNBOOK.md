@@ -57,55 +57,20 @@ scp dist-server/proxy.mjs root@themathbible.com:/var/www/geo-proxy/
 ssh root@themathbible.com 'systemctl restart geo-proxy'
 ```
 
-## The parallel `-next` channel ([ADR-W-020](06w-decisions-workspace.md#adr-w-020), #700) — Track B evaluation without touching prod
+## The `-next` channel — RETIRED 2026-08-18 ([ADR-W-025](06w-decisions-workspace.md#adr-w-025), #747)
 
-**What it is.** During the UI unification's Track B, each shipped builder gets a parallel URL —
-`/geo-builder-next/`, `/3d-builder-next/` — serving the **`unify/ui`** build, while the canonical
-URLs keep the untouched current builds. Students can only ever be on the canonical URL; the
-operator evaluates `-next` at leisure; the switchover (one ordinary Standard deploy per builder of
-the accepted build) happens once, at acceptance, and the `-next` paths are torn down after.
+Track B was evaluated on parallel URLs (`/geo-builder-next/`, `/3d-builder-next/`) serving committed
+`unify/ui` state while the canonical URLs kept the old builds ([ADR-W-020](06w-decisions-workspace.md#adr-w-020),
+#700). At the operator's acceptance the unified build was deployed to the canonical paths as an
+ordinary Standard deploy of `main` (`prod/2026-08-18`), the `-next` directories were removed from the
+server, and the `build:next:*` scripts were deleted. **There is no parallel channel today: `main` →
+canonical is the only deploy path, with no exceptions.**
 
-**The one deliberate exception to "deploy only committed `main`":** the `-next` paths deploy
-**committed `unify/ui`** state — that is their entire purpose (ADR-W-020). The canonical paths keep
-the main-only rule unchanged. Complex has no `-next` path: it evolves on `main` directly as the
-programme's proving ground.
-
-**One-time server prep (operator):**
-
-```sh
-ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs && mkdir -p geo-builder-next 3d-builder-next && chown root:root geo-builder-next 3d-builder-next && chmod 755 geo-builder-next 3d-builder-next'
-# Apache: map /geo-builder-next/api and /3d-builder-next/api onto the SAME proxy as the canonical
-# /geo-builder/api mapping (the client resolves its API under import.meta.env.BASE_URL, so no code
-# changes). Until this mapping exists, the -next builds run with the degraded path: no logging, no
-# LLM fallback, static roster — usable for layout/interaction evaluation, flagged in the deploy log.
-```
-
-**Per `-next` deploy:**
-
-```sh
-git checkout unify/ui && git pull --ff-only   # the channel deploys COMMITTED unify/ui state
-npx vitest run                                # suite green on the exact tree being deployed
-npm run build:next:2d
-scp -r dist-next/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/geo-builder-next/
-npm run build:next:3d
-scp -r dist-3d-next/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/3d-builder-next/
-ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/3d-builder-next && mv -f 3d.html index.html'
-```
-
-**Canonical-untouched proof (every `-next` deploy):** the canonical dirs' bytes must not change —
-
-```sh
-ssh root@themathbible.com 'stat -c "%y %n" /var/www/vhosts/themathbible.com/httpdocs/geo-builder/index.html /var/www/vhosts/themathbible.com/httpdocs/3d-builder/index.html'
-# timestamps identical before and after the -next deploy
-```
-
-**Every `-next` deploy is a deploy**: it gets a DEPLOY-LOG entry naming the `-next` path (the
-ADR-W-007 lesson — an undocumented deployment surface is invisible after a machine switch). Tag
-scheme `next/YYYY-MM-DD[-n]`.
-
-**Switchover + teardown (per builder, at the operator's acceptance):** merge `unify/ui` → `main`,
-run the Standard deploy of the canonical path, then after a grace period
-`rm -rf` the `-next` dir and remove its Apache api mapping.
+Kept here only so the DEPLOY-LOG's `next/YYYY-MM-DD` entries stay readable. To evaluate a future big
+surface under prod conditions, re-create the channel from ADR-W-020's mechanism (a `--base=` +
+`--outDir` CLI override per builder, a separate scp target, canonical bytes stat-proven untouched,
+its own tag scheme) — do not keep an idle one alive. The Plesk api mapping for `-next` paths must be
+re-added then. Removing the existing `/geo-builder-next/api` + `/3d-builder-next/api` mappings is the operator's remaining teardown step (flagged on #747) — they are inert once the directories are gone.
 
 ## Verify (every deploy)
 

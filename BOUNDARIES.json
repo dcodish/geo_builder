@@ -199,7 +199,6 @@
 
     "src-complex": "shell",
     "src-complex/engine": "engine",
-    "src-complex/export": "shell",
     "src-complex/parser": "engine",
     "src-complex/render": "engine",
     "src-complex/store": "engine",
