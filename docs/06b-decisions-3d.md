@@ -4387,3 +4387,89 @@ The question `.docx` export reaches this builder. The composer is shared and pro
   travel the same path, so a `data-noexport` element cannot leak into one export and not the other.
 - The button sits in the tool row beside the image export, gated on there being a given to print — the
   #511 rule that a tool never offers what it cannot honour.
+
+---
+
+## ADR-3D-164 — ONE rule owns the line∩plane crossing, and the offer's candidates are DRAWN INK (#755, #756)
+
+**Context.** Operator, 2026-08-19, prod. Two reports on the same figure:
+
+```
+תיבה ABCDA'B'C'D'
+E אמצע BB'
+מישור ADE
+אלכסון AC'
+G נקודת חיתוך של AC' עם מישור ADE     ← not-understood
+```
+
+and *"when a line intersects with a plane, we have the mechanism of a dot the user can press and give
+a letter. this is not triggered here."* One root under both: **the crossing capability was written
+against NAMED tokens, while a student's crossing line is drawn ink** — an edge or a diagonal of the
+solid, against three of its vertices.
+
+**Part 1 — the parser cell (#755).** Three rules split it, and each generalised one side:
+
+| rule (retired) | line side | plane side | frames |
+| --- | --- | --- | --- |
+| `lineCutsPlane` | `ℓ`/`l1` only | π-name **or** point run | verb + noun, he + en |
+| `planeCut` | two-point segment | π-name only | verb + noun, he + en |
+| `segLineCutsPointPlane` | two-point segment, `הישר` REQUIRED | point run only | verb only |
+
+Their union left exactly one square empty — **segment × point-run in the noun frame** — which is the
+common case; the named-token forms the grammar did cover are the rarer half. The engine had the
+capability all along (`plane-cut` accepts an equation plane, a point-run plane or a rel-plane), so
+this was a silent drop on a built capability: the #485 shape again.
+
+The class: *the crossing rules decided their operands by hand-written token shape PER RULE, so each
+reached only the operands its author happened to spell.* `lineCutsPlane`'s own header recorded this
+one level up — "the vocabulary was centralised but the FRAMES stayed enumerated per rule" — and it was
+just as true of the OPERANDS.
+
+**Decision:** one rule, `crossingPoint`, splits on the shared crossing vocabulary and classifies BOTH
+operands through `readOperand` — kinds decide, nouns never ([ADR-3D-100](#adr-3d-100)). Roles are
+assigned by kind rather than by position, so **either order works without a frame for it**, and the
+whole matrix {named line, segment} × {π-name, point run} × {verb, noun} × {he, en} × {either order} is
+reachable. A pair that is not line×plane returns `null`, so the segment∩segment and plane∩plane rules
+keep their cells — the decline is structural now, by kind, rather than by rule ordering. This REMOVES
+two hand-spelled operand vocabularies rather than growing one (docs/17 §3).
+
+**Lowering is deliberately NOT unified.** The two shipped lowerings differ in what they DRAW —
+`plane-cut` records the point against a referenced segment; the run-plane path also names the carrier
+line, which is what makes a referenced edge or diagonal visible on the figure it was stated about —
+and both are asserted by existing tests. Unifying the MATCHING is what fixes the reported defect;
+unifying the DRAWING would change shipped figures and wants the operator's eye, so it is filed
+separately rather than taken here.
+
+**Part 2 — the offer (#756).** `openCrossings3` looped `resolved.lines × resolved.planes`, and
+`resolved.lines` holds only NAMED lines. In a solid figure — nearly every 3-D question — it is empty,
+so the mechanism was **structurally dead** however determined the figure was. The plane side was
+already general. 2-D's sibling (`resolveDrawnLines`, [ADR-379](06-decisions.md#adr-379)) always derived
+its candidates from drawn ink; that is the half the pattern copy left behind.
+
+**Decision:** the candidate set is DERIVED — named lines, plus the solids' own edges, plus the
+auxiliary segments, all of them straight carriers already on the canvas. Nothing enumerates the ways a
+segment can be born, because both collections live on `Construction3` and every path that draws one
+writes there. A named line stays **unbounded** (it is drawn as a full line); a segment is **bounded**,
+offered only for `0 < t < 1`, because a crossing outside the ink is not on the figure and a dot there
+would name a point the drawing does not show. Every honesty gate is untouched: the unpinned-parameter
+gate, position-based "already named" suppression, one dot per location. The clicked utterance is the
+segment noun form, which part 1 makes parse — so a clicked crossing stays an ordinary undoable,
+savable, replayable fact.
+
+**One correction to the report, measured.** On the operator's own figure the diagonal `AC'` does
+**not** cross plane `ADE`: `A` is one of the plane's three defining points, so the segment meets it at
+its own endpoint (signed distance of `A` to `ADE` is exactly 0). The dot that was missing there is on
+edge `CC'`, which genuinely passes through the plane at its midpoint — and `BB'` crosses too, at `E`,
+where the "already named" gate correctly suppresses the offer. The report's diagnosis was right; only
+its expected location was wrong, and the tests assert the measured geometry rather than the report's.
+
+**Surfaced, filed, not fixed here:** «G נקודת חיתוך של AC' עם מישור ADE» now parses and builds, and
+places `G` exactly on `A` — a point stacked on an existing one, accepted silently. That is the
+`line-plane-point` distinctness question (the 2-D [ADR-378](06-decisions.md#adr-378) class), not the
+matching defect this ADR fixes.
+
+**Coverage.** `src3d/parser/__tests__/crossing-cell.test.ts` asserts the whole matrix as a product
+rather than as instances, plus the operator's exact line and byte-for-byte preservation of the shipped
+π-name lowerings; `src3d/__tests__/crossing-dots.test.ts` covers the solid figure end-to-end, the
+bounded rule, the surviving honesty gates and a no-dot-explosion bound; and
+`fixtures3/crossing-cell-755.geo3.json` locks the operator's session through the real load path.

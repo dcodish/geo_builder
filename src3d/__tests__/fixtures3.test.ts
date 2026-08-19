@@ -50,6 +50,17 @@ const SEEDED: Record<string, string[]> = {
     'l ⊥ π',
     'A נקודת החיתוך של l עם π',
   ],
+  // #755/#756 — the operator's prod session, 2026-08-19: a solid, a midpoint, a point-run plane, a
+  // drawn diagonal, and the crossing point named in the NOUN frame with a SEGMENT on the line side —
+  // the one square the three old crossing rules left empty, and the shape of nearly every 3-D
+  // question (an edge or diagonal against three of the solid's vertices).
+  'crossing-cell-755.geo3.json': [
+    "תיבה ABCDA'B'C'D'",
+    "E אמצע BB'",
+    'מישור ADE',
+    "אלכסון AC'",
+    "G נקודת חיתוך של CC' עם מישור ADE",
+  ],
   // #571 — the operator's diagonal plane, named by its two vertical edges. A plane named by points is
   // a SET: this stated order traces a bowtie and used to be refused `not-coplanar` on coplanar points.
   'plane-run-order-571.geo3.json': ["קובייה ABCDA'B'C'D'", "מישור BB'DD'", "מישור BB'D'D"],

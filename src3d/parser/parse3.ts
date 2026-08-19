@@ -2346,61 +2346,90 @@ const planeLinePerp: Rule = (s0) => {
 };
 
 /**
- * The line∩plane point, in BOTH frames a student writes it (#485, #401):
+ * THE crossing point where a LINE-ish operand meets a PLANE-ish operand — one rule, every cell
+ * (#755, ADR-3D-164).
  *
- * - **verb**, line-first: `ℓ חותך את π בנקודה A` · `ℓ cuts plane π at A`
- * - **noun**, point-first: `A נקודת החיתוך של ℓ עם π` · `A = חיתוך ℓ עם π` ·
- *   `A is the intersection of ℓ and π`
+ * Three rules used to split this cell, and each generalised one side while leaving the other
+ * name-only, so their union still had an empty square:
  *
- * Only the first existed, so the operator's «A נקודת חיתוך של l עם π1» was a silent drop on a capability
- * the engine had all along. The *file already learned this* for the diagonal crossing, whose comments
- * record the same lesson ("the intersection verb, in EVERY form the student writes it") — the vocabulary
- * was centralised there but the FRAMES stayed enumerated per rule, so each new rule re-paid the tuition.
- * `CROSS_HE` / `CROSS_EN` are that vocabulary, shared, and both frames are lowered here.
+ * | rule (retired) | line side | plane side | frames |
+ * | --- | --- | --- | --- |
+ * | `lineCutsPlane` | `ℓ`/`l1` only | π-name **or** point run | verb + noun, he + en |
+ * | `planeCut` | two-point segment | π-name only | verb + noun, he + en |
+ * | `segLineCutsPointPlane` | two-point segment, `הישר` REQUIRED | point run only | verb only |
  *
- * The plane side takes a π-name **or** a point run (#401 — `הישר l1 חותך את מישור ACD בנקודה E`), which
- * the engine already accepted; a run additionally materialises the plane, exactly as the two-point-line
- * sibling rule does, so referencing it also draws it.
+ * The hole was **segment × point-run plane in the noun frame** — «G נקודת חיתוך של AC' עם מישור ADE»,
+ * which is the COMMON case: a student's crossing line is nearly always an edge or a diagonal of the
+ * solid, and their plane is nearly always three of its vertices. The named-token forms the grammar
+ * did cover are the rarer half. The engine had the capability all along (`plane-cut` accepts an
+ * equation plane, a point-run plane or a rel-plane), so this was a silent drop — the #485 shape again.
+ *
+ * The class: *the crossing rules decided their operands by hand-written token shape PER RULE, so each
+ * reached only the operands its author happened to spell.* `lineCutsPlane`'s own header recorded this
+ * one level up ("the vocabulary was centralised but the FRAMES stayed enumerated per rule"); it was
+ * just as true of the OPERANDS. Both sides now read through `readOperand` — kinds decide, nouns never
+ * (ADR-3D-100) — so the matrix {named line, segment} × {π-name, point run} × {verb, noun} × {he, en} ×
+ * {either order} is reachable, and order-freedom is a consequence of classifying rather than a frame
+ * anyone had to spell.
+ *
+ * LOWERING IS DELIBERATELY UNCHANGED per cell. The two shipped lowerings differ in what they DRAW —
+ * `plane-cut` records the point against a referenced segment, while the run-plane path also names the
+ * carrier line — and both are asserted by existing tests. Unifying the MATCHING is this fix; unifying
+ * the DRAWING is a visible change to shipped figures and is filed separately rather than taken here.
  */
-const lineCutsPlane: Rule = (s) => {
-  // NAMED groups, not positions: `PLANE_NAME` carries its own inner capture, so the operand indices
-  // shift under the plane alternation — the trap the old `m[m.length - 1]` idiom was dodging rather
-  // than fixing, and which silently read a point id of "1" out of «π1» the moment a second frame
-  // widened the pattern.
-  const PLANE_SIDE = `(?<plane>${RUN_3_4}|${PLANE_NAME.source})`;
-  const LINE_SIDE = `(?<line>${LINE_NAME.source})`;
+const crossingPoint: Rule = (s) => {
+  if (!/חות|חיתוך|נחתך|חוצה|פוגש|מפגש|\bcuts?\b|intersect|\bmeets?\b|\bcrosses\b/i.test(s)) return null;
+
   const ID = `(?<id>${LBL})`;
   const m =
-    // verb frame — Hebrew / English
-    s.match(
-      new RegExp(`^(?:${HE_LINE}\\s+)?${LINE_SIDE}\\s+(?:${CROSS_HE_VERB})\\s+(?:את\\s+)?(?:${HE_PLANE}\\s+)?${PLANE_SIDE}\\s+${AT_POINT}${ID}$`),
-    ) ??
-    s.match(
-      new RegExp(`^(?:line\\s+)?${LINE_SIDE}\\s+(?:${CROSS_EN_VERB})\\s+(?:the\\s+)?plane\\s+${PLANE_SIDE}\\s+at\\s+${ID}$`, 'i'),
-    ) ??
+    // verb frame — «X חותך את Y בנקודה P» / «X cuts Y at P». Either operand may be the line side.
+    s.match(new RegExp(`^(?<x>.+?)\\s+(?:${CROSS_HE_VERB})\\s+(?:את\\s+)?(?<y>.+?)\\s+(?:${AT_POINT}|ב-?)${ID}$`)) ??
+    s.match(new RegExp(`^(?<x>.+?)\\s+(?:${CROSS_EN_VERB})\\s+(?<y>.+?)\\s+at\\s+${ID}$`, 'i')) ??
     // noun frame — the point is named first and DEFINED as the crossing
     s.match(
-      new RegExp(
-        `^${HE_SUBJ}${ID}\\s*(?:היא\\s+|הוא\\s+|=\\s*)?(?:${CROSS_HE_NOUN})\\s+(?:של\\s+)?(?:${HE_LINE}\\s+)?${LINE_SIDE}\\s+(?:עם|ו|[לו])-?\\s*(?:${HE_PLANE}\\s+)?${PLANE_SIDE}$`,
-      ),
+      new RegExp(`^${HE_SUBJ}${ID}\\s*(?:היא\\s+|הוא\\s+|=\\s*)?(?:${CROSS_HE_NOUN})\\s+(?:של\\s+)?(?<x>.+?)\\s+(?:עם|ו)-?\\s*(?<y>.+?)$`),
     ) ??
     s.match(
       new RegExp(
-        `^(?:point\\s+)?${ID}\\s*(?:is\\s+|=\\s*)?(?:the\\s+)?(?:${CROSS_EN_NOUN})\\s+(?:of\\s+)?(?:line\\s+)?${LINE_SIDE}\\s+(?:and|with)\\s+(?:the\\s+)?(?:plane\\s+)?${PLANE_SIDE}$`,
+        `^(?:point\\s+)?${ID}\\s*(?:is\\s+|=\\s*)?(?:the\\s+)?(?:${CROSS_EN_NOUN})\\s+(?:of\\s+)?(?<x>.+?)\\s+(?:and|with)\\s+(?<y>.+?)$`,
         'i',
       ),
     );
   if (!m?.groups) return null;
-  const { line, plane: planeTok, id } = m.groups as { line: string; plane: string; id: string };
-  const ids = planeTok.match(/[A-Z]\d*'?/g);
-  const cmds: Command3[] = [];
-  if (ids && ids.length >= 3) {
-    // a POINT-RUN plane must exist before it can be cut (#401) — idempotent, like every plane-through
-    cmds.push({ type: 'plane-through', name: planeTok, ids });
-    cmds.push({ type: 'line-plane-point', id, line: canonicalLine(line), plane: planeTok });
-    return cmds;
-  }
-  return [{ type: 'line-plane-point', id, line: canonicalLine(line), plane: canonicalPlane(planeTok) }];
+  const { x, y, id } = m.groups as { x: string; y: string; id: string };
+
+  const ox = readOperand(x);
+  const oy = readOperand(y);
+  if (!ox || !oy) return null;
+
+  // Roles by KIND, not by position — which is what makes both orders work without a frame each.
+  const isLine = (o: Operand3) => o.kind === 'line' || o.kind === 'segment';
+  const isPlane = (o: Operand3) => o.kind === 'plane-named' || o.kind === 'plane-run';
+  const [lineOp, planeOp] =
+    isLine(ox.op) && isPlane(oy.op) ? [ox.op, oy.op]
+    : isPlane(ox.op) && isLine(oy.op) ? [oy.op, ox.op]
+    : [null, null];
+  // Anything else is another rule's cell (segment∩segment, plane∩plane…) — decline, never guess.
+  if (!lineOp || !planeOp) return null;
+
+  const planeName = planeOp.kind === 'plane-named' ? canonicalPlane(planeOp.name) : planeOp.ids.join('');
+  // A POINT-RUN plane must exist before it can be cut (#401) — idempotent, like every plane-through.
+  const materialisePlane: Command3[] =
+    planeOp.kind === 'plane-run' ? [{ type: 'plane-through', name: planeName, ids: planeOp.ids }] : [];
+
+  if (lineOp.kind === 'line')
+    return [...materialisePlane, { type: 'line-plane-point', id, line: canonLineName(lineOp.name), plane: planeName }];
+
+  // segment side. π-name → `plane-cut` (the shipped V8-b lowering: the segment is a reference, not a
+  // new object). Point run → name the carrier line first, then cut it — the shipped #333-era lowering,
+  // which is also what makes the referenced edge/diagonal VISIBLE on the figure it was stated about.
+  if (planeOp.kind === 'plane-named') return [{ type: 'plane-cut', id, plane: planeName, a: lineOp.a, b: lineOp.b }];
+  const carrier = `${lineOp.a}${lineOp.b}`;
+  return [
+    { type: 'line-through', name: carrier, a: lineOp.a, b: lineOp.b },
+    ...materialisePlane,
+    { type: 'line-plane-point', id, line: carrier, plane: planeName },
+  ];
 };
 
 /** `ℓ אינו מקביל ל-π לכל m` / `ℓ is not parallel to plane π for every m` — the 2024-א probe, a CLAIM. */
@@ -2704,21 +2733,6 @@ const planeThroughBare: Rule = (s) => {
 // V5 corpus additions (2019 gate) + V6 solids of revolution (ADR-3D-008/009)
 // ---------------------------------------------------------------------------
 
-/** `הישר A'C חותך את המישור BC'D בנקודה K` — a line through two points cutting a point-plane. */
-const segLineCutsPointPlane: Rule = (s) => {
-  const RUN = `(?:[A-Z]\\d*'?){3,4}`;
-  const m =
-    s.match(new RegExp(`^הישר\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+חותך\\s+(?:את\\s+)?המישור\\s+(${RUN})\\s+${AT_POINT}([A-Z]\\d*'?)$`)) ??
-    s.match(new RegExp(`^line\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+cuts\\s+(?:the\\s+)?plane\\s+(${RUN})\\s+at\\s+([A-Z]\\d*'?)$`));
-  if (!m) return null;
-  const [, a, b, run, id] = m;
-  const lineName = `${a}${b}`;
-  return [
-    { type: 'line-through', name: lineName, a, b },
-    { type: 'plane-through', name: run, ids: run.match(/[A-Z]\d*'?/g)! },
-    { type: 'line-plane-point', id, line: lineName, plane: run },
-  ];
-};
 
 /** `הזווית בין A'C לבין BC' היא 90` / the exam's `גודל הזווית שבין הישר AB ובין הישר AM
  *  הוא 60` — the angle between two SEGMENT-lines (≤90°), a claim. */
@@ -3273,24 +3287,6 @@ const relPlaneRule: Rule = (s) => {
 };
 
 /**
- * V8-b (G2): a point where a plane crosses an edge/segment. `המישור π חותך את SA בנקודה E`
- * / `plane π cuts SA at E` / `E חיתוך המישור π עם SA` / `E is the intersection of plane π with SA`.
- */
-const planeCut: Rule = (s) => {
-  if (!/מישור|\bplane\b/i.test(s)) return null;
-  if (!/חות|חיתוך|נחתך|\bcuts?\b|intersect|\bmeets?\b/i.test(s)) return null;
-  let m =
-    s.match(new RegExp(`(?:ה?מישור)\\s+(${PN})\\s+חות[ךכ]\\s+(?:את\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+(?:${AT_POINT}|ב-?)([A-Z]\\d*'?)$`)) ??
-    s.match(new RegExp(`plane\\s+(${PN})\\s+(?:cuts|intersects|meets)\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+at\\s+([A-Z]\\d*'?)$`, "i"));
-  if (m) return [{ type: "plane-cut", id: m[4], plane: canonicalPlane(m[1]), a: m[2], b: m[3] }];
-  m =
-    s.match(new RegExp(`^([A-Z]\\d*'?)\\s+(?:היא\\s+)?(?:נקודת\\s+ה?חיתוך\\s+של\\s+|ה?חיתוך\\s+(?:של\\s+)?)?(?:ה?מישור)\\s+(${PN})\\s+(?:עם|ו)\\s+(?:ה?מקצוע\\s+|ה?קטע\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)$`)) ??
-    s.match(new RegExp(`^([A-Z]\\d*'?)\\s+is\\s+the\\s+intersection\\s+of\\s+plane\\s+(${PN})\\s+with\\s+(?:the\\s+edge\\s+|edge\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)$`, "i"));
-  if (m) return [{ type: "plane-cut", id: m[1], plane: canonicalPlane(m[2]), a: m[3], b: m[4] }];
-  return null;
-};
-
-/**
  * V8-g: a FLAT polygon of free points in the plane (the 2-D vector lane) — `משולש ABC`
  * (triangle), `מרובע MKNL` (quadrilateral), `מחומש ABCDE` (pentagon). Excludes the 3-D
  * solid words (a prism/pyramid rule owns those). Label-less ⇒ default lettering.
@@ -3692,15 +3688,18 @@ export const RULES: Rule[] = [
   freeLineDecl, // #552: the line twin — after parametricLine for the same reason (demands END after the name)
   planeEqClaim, // plane named by POINTS + an equation — a claim, not a definition
   relPlaneRule, // `מישור π דרך F וניצב ל-SC` — before planeThroughBare (which is bare points)
-  planeCut, // `המישור π חותך את SA בנקודה E` — before onSegment/coordPoint grab the tokens
+  // #755 (ADR-3D-164): ONE rule owns the whole line∩plane crossing cell — both operands read
+  // through `readOperand`, so every {named line, segment} × {π-name, point run} × {verb, noun} ×
+  // {he, en} × {either order} square is reachable. It replaces `planeCut`, `lineCutsPlane` and
+  // `segLineCutsPointPlane`, and keeps their slot: before onSegment/coordPoint grab the tokens.
+  crossingPoint,
   planeThroughBare, // bare `מישור ABC` — after the `:`-carrying plane rules
   injectionList,
   signGiven,
   // #333 (ADR-3D-153): ONE intersection-line rule, at the slot its point-run half used to hold —
-  // it must precede `segLineCutsPointPlane`, which would otherwise read the second plane's run as
-  // the crossing target. Its head is specific (`ישר/קו החיתוך`), so it can claim nothing else.
+  // its head is specific (`ישר/קו החיתוך`), so it can claim nothing else. `crossingPoint` (above)
+  // declines a plane×plane pair by KIND, so the old ordering hazard against it is structural now.
   intersectionLine,
-  segLineCutsPointPlane, // `הישר A'C חותך את המישור BC'D בנקודה K` — before the ℓ-name cut rule
   coordPoint,
   paramSign, // ADR-3D-032: `k הוא פרמטר חיובי` — before generic rules can misread the letter
   vectorInjection,
@@ -3722,7 +3721,6 @@ export const RULES: Rule[] = [
   linePerpPlane,
   planeLinePerp, // #375: after linePerpPlane (named plane) — this one takes the POINT-RUN plane
   neverParallelClaim,
-  lineCutsPlane,
   dropPerpToPlane,
   commonPerp, // V8-h: common perpendicular of two lines — before the ⟂-to-a-line rules; tight two-line-target regex
   lineProjection, // V8-h: `היטל הישר TB על המישור ABCD`

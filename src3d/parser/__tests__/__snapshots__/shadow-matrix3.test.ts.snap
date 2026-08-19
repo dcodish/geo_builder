@@ -1026,12 +1026,12 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   {
     "lang": "en",
     "text": "plane π cuts SA at E",
-    "winner": "planeCut",
+    "winner": "crossingPoint",
   },
   {
     "lang": "he",
     "text": "המישור π חותך את SA בנקודה E",
-    "winner": "planeCut",
+    "winner": "crossingPoint",
   },
   {
     "lang": "en",
@@ -1116,42 +1116,42 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   {
     "lang": "en",
     "text": "ℓ cuts plane π1 at A",
-    "winner": "lineCutsPlane",
+    "winner": "crossingPoint",
   },
   {
     "lang": "he",
     "text": "ℓ חותך את π1 בנקודה A",
-    "winner": "lineCutsPlane",
+    "winner": "crossingPoint",
   },
   {
     "lang": "en",
     "text": "A is the intersection of ℓ and π1",
-    "winner": "lineCutsPlane",
+    "winner": "crossingPoint",
   },
   {
     "lang": "he",
     "text": "A נקודת החיתוך של ℓ עם π1",
-    "winner": "lineCutsPlane",
+    "winner": "crossingPoint",
   },
   {
     "lang": "en",
     "text": "line ℓ1 cuts plane ACD at E",
-    "winner": "lineCutsPlane",
+    "winner": "crossingPoint",
   },
   {
     "lang": "he",
     "text": "הישר ℓ1 חותך את מישור ACD בנקודה E",
-    "winner": "lineCutsPlane",
+    "winner": "crossingPoint",
   },
   {
     "lang": "en",
     "text": "line A'C cuts plane BC'D at K",
-    "winner": "segLineCutsPointPlane",
+    "winner": "crossingPoint",
   },
   {
     "lang": "he",
     "text": "הישר A'C חותך את המישור BC'D בנקודה K",
-    "winner": "segLineCutsPointPlane",
+    "winner": "crossingPoint",
   },
   {
     "lang": "en",

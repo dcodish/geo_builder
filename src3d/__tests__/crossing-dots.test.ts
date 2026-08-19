@@ -15,6 +15,7 @@ import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
 import { crossingUtterance3, nextFreeLabel3, openCrossings3 } from '../engine/crossings3';
 import { dist3 } from '../engine/vec3';
+import { parse3 } from '../parser/parse3';
 
 const submit = (u: string) => useGeo3.getState().submit(u);
 const state = () => useGeo3.getState();
@@ -155,5 +156,92 @@ describe('#483 — label allocation', () => {
     const free = nextFreeLabel3(at().construction)!;
     expect(at().construction.points.has(free)).toBe(false);
     expect(['A', 'B', 'C', 'D']).not.toContain(free);
+  });
+});
+
+/**
+ * #756 (ADR-3D-164) — the offer's candidate set is DRAWN INK, not the algebra.
+ *
+ * Operator, 2026-08-19, prod, reported alongside #755: *"when a line intersects with a plane, we have
+ * the mechanism of a dot the user can press and give a letter. this is not triggered here."*
+ *
+ * `openCrossings3` looped `resolved.lines × resolved.planes`, and `resolved.lines` holds only NAMED
+ * lines (`ℓ`, `ℓ1`). In a solid figure — nearly every 3-D question — it is empty, so the mechanism was
+ * structurally dead however determined the figure was. The plane side was already general; the line
+ * side was written against the equation-line figures #483 was built on, and 2-D's sibling
+ * (`resolveDrawnLines`, ADR-379) had always derived its candidates from drawn ink.
+ *
+ * ONE CORRECTION TO THE REPORT, measured: on the operator's own figure the diagonal `AC'` does NOT
+ * cross plane `ADE` — `A` is one of the plane's three defining points, so the segment MEETS it at its
+ * own endpoint (signed distance of A to ADE is exactly 0). The dot that was missing there is on edge
+ * `CC'`, which genuinely passes through the plane. Asserted below rather than glossed, because the
+ * report's expected location was the one part of it that was wrong.
+ */
+describe('#756 — a drawn edge or diagonal crossing a plane is offered', () => {
+  beforeEach(() => state().clear());
+
+  /** The operator's figure: a box, a midpoint, a point-run plane, and a drawn diagonal. */
+  const solidFigure = () => {
+    submit("תיבה ABCDA'B'C'D'");
+    submit("E אמצע BB'");
+    submit('מישור ADE');
+    submit("אלכסון AC'");
+  };
+
+  it('the mechanism is alive on a solid figure — it used to offer nothing at all', () => {
+    solidFigure();
+    expect(at().resolved.lines.size).toBe(0); // no NAMED line anywhere: the old candidate set was empty
+    expect(offers().length).toBeGreaterThan(0);
+  });
+
+  it('exactly one dot, on the edge that really crosses the plane', () => {
+    solidFigure();
+    const o = offers();
+    expect(o).toHaveLength(1);
+    expect(o[0].line).toBe("CC'");
+    expect(o[0].plane).toBe('ADE');
+
+    // it lies ON the plane, and strictly INSIDE the drawn edge
+    const d = at();
+    const pl = d.resolved.planes.get('ADE')!;
+    const p = o[0].point;
+    expect(Math.abs(pl.n.x * p.x + pl.n.y * p.y + pl.n.z * p.z + pl.d)).toBeLessThan(1e-9);
+    const C = d.resolved.positions.get('C')!;
+    const Cp = d.resolved.positions.get("C'")!;
+    expect(dist3(C, p) + dist3(p, Cp)).toBeCloseTo(dist3(C, Cp), 9);
+  });
+
+  it('the clicked utterance parses — the #755 segment form is what a click produces', () => {
+    solidFigure();
+    const u = crossingUtterance3(offers()[0], nextFreeLabel3(at().construction)!, true);
+    expect(u).toContain("CC'");
+    const r = parse3(u);
+    expect(r.ok).toBe(true);
+  });
+
+  it('BOUNDED: no dot where the plane crosses a segment only beyond its ends', () => {
+    submit("תיבה ABCDA'B'C'D'");
+    submit('מישור ABC'); // the base plane — the top edge A'B' is parallel above it, never crossing
+    submit("קטע A'B'");
+    expect(offers().every((o) => o.line !== "A'B'")).toBe(true);
+  });
+
+  it('the "already named" gate still bites for segments — E sits exactly on BB\' ∩ ADE', () => {
+    solidFigure();
+    // BB' DOES cross plane ADE — at E, which the student already named. No dot may be offered there.
+    expect(offers().every((o) => o.line !== "BB'")).toBe(true);
+  });
+
+  it('no dot explosion: a plain box plus one point-run plane stays at a countable number', () => {
+    submit("תיבה ABCDA'B'C'D'");
+    submit("E אמצע BB'");
+    submit('מישור ADE');
+    expect(offers().length).toBeLessThanOrEqual(2);
+  });
+
+  it('the unpinned-parameter gate still suppresses everything (#483 honesty, unchanged)', () => {
+    submit('הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)');
+    submit('המישור π: 3x + my + (m+6)z + 4 = 0');
+    expect(offers()).toHaveLength(0); // m unforced ⇒ nothing here is knowledge
   });
 });

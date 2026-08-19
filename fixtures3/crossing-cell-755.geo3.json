@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "app": "3d-builder",
+  "savedAt": "2026-08-19T20:18:39.699Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "תיבה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "box",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "E אמצע BB'",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "E",
+          "a": "B",
+          "b": "B'",
+          "t": 0.5
+        }
+      ]
+    },
+    {
+      "utterance": "מישור ADE",
+      "cmds": [
+        {
+          "type": "plane-through",
+          "name": "ADE",
+          "ids": [
+            "A",
+            "D",
+            "E"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "אלכסון AC'",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "C'"
+        }
+      ]
+    },
+    {
+      "utterance": "G נקודת חיתוך של CC' עם מישור ADE",
+      "cmds": [
+        {
+          "type": "line-through",
+          "name": "CC'",
+          "a": "C",
+          "b": "C'"
+        },
+        {
+          "type": "plane-through",
+          "name": "ADE",
+          "ids": [
+            "A",
+            "D",
+            "E"
+          ]
+        },
+        {
+          "type": "line-plane-point",
+          "id": "G",
+          "line": "CC'",
+          "plane": "ADE"
+        }
+      ]
+    }
+  ]
+}
