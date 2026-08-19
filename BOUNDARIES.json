@@ -167,6 +167,7 @@
     "$comment": "TOTAL over every directory in every declared tree. A tree's own key covers the files sitting directly in it. An unclassified directory fails the isolation test — that is the copy tripwire made mechanical.",
 
     "shell": "shell",
+    "shell/export": "shell",
     "shell/frame": "shell",
 
     "src": "shell",
@@ -186,6 +187,7 @@
 
     "src3d": "shell",
     "src3d/debug": "shell",
+    "src3d/export": "shell",
     "src3d/ui": "shell",
     "src3d/engine": "engine",
     "src3d/i18n": "shell",

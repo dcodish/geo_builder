@@ -106,7 +106,7 @@ export interface FigureProps {
   /** Localised strings for the figure's own controls (rotate/flip/align + the corner cluster's reset).
    *  Optional — falls back to English so the renderer stays usable standalone (tests).
    *  #742: the export strings left with the export buttons — they live in the host's top tool row now
-   *  (`src/export/svgToPng` serialises the svg the host queries from its canvas card). */
+   *  (`shell/export/svgToPng` serialises the svg the host queries from its canvas card). */
   toolbarText?: {
     rotate90: string;
     rotate180: string;
@@ -1203,7 +1203,9 @@ export function Figure({
   );
 }
 
-// (scaleInk + svgToPng moved to src/export/svgToPng.ts — #742: the exports are the HOST's now.)
+// (scaleInk + svgToPng left this file with the export buttons — #742. #745 then moved them out of
+// `src/` altogether, to `shell/export/svgToPng`, so 3-D rasterises through the same code and the
+// clean-export contract has one implementation instead of one per builder.)
 
 // The toolbar ROW — sits ABOVE the SVG in normal flow (visual order 1, the SVG area is order 2), wrapping so
 // that on a narrow screen the tray drops to a second line instead of overlapping / disappearing behind the

@@ -68,7 +68,24 @@ export interface BidiOptions {
   declSplit?: (span: string) => [string, string, string] | null;
 }
 
+/** One stretch of a line, tagged with the direction it must be laid out in. */
+export interface BidiSegment {
+  text: string;
+  /** True for a technical run that must read left-to-right whatever the surrounding direction. */
+  ltr: boolean;
+}
+
 export interface BidiKit {
+  /**
+   * Split a line into directional segments — THE one place that decides where a technical run
+   * begins and ends. Every other member here is built on it, so no two surfaces of the same
+   * product can disagree about what counts as a run.
+   *
+   * `rtlParagraph` is for callers whose direction is imposed from OUTSIDE rather than derived from
+   * the text's own content: the .docx export forces `w:bidi`, so an all-Latin given like
+   * `|BC| = 10` sits in an RTL paragraph and scrambles although it holds no Hebrew at all.
+   */
+  segments: (s: string, rtlParagraph?: boolean, liveTail?: boolean) => BidiSegment[];
   /** Wrap every LTR technical run in an isolate; Hebrew and surrounding punctuation untouched. */
   isolateLtrRuns: (s: string, liveTail?: boolean) => string;
   /** Base direction by CONTENT — any Hebrew letter ⇒ RTL (`dir="auto"` keys off the FIRST strong
@@ -91,16 +108,30 @@ export function makeBidi(options: BidiOptions = {}): BidiKit {
   const CORE = new RegExp(`[${BASE_CORE}${escapeForClass(options.extraCore ?? '')}]`);
   const declSplit = options.declSplit;
 
-  function isolateLtrRuns(s: string, liveTail = false): string {
-    if (!HEBREW_LETTER.test(s)) return s;
-    if (s.includes(LRI)) return s; // never nest isolates
+  /**
+   * THE run-boundary decision, and the only copy of it. `isolateLtrRuns` renders these segments as
+   * Unicode isolates for a browser; the .docx export renders the SAME segments as OOXML runs with
+   * per-run direction, because Word draws U+2066/U+2069 as missing-glyph boxes (ADR-431 Am. 1).
+   */
+  function segments(s: string, rtlParagraph = false, liveTail = false): BidiSegment[] {
+    // The Hebrew test is a proxy for "this text will be laid out RTL", which is right for a UI
+    // message whose direction comes from its own content and WRONG where the paragraph direction is
+    // imposed from outside. Those callers pass `rtlParagraph`.
+    if (!rtlParagraph && !HEBREW_LETTER.test(s)) return s ? [{ text: s, ltr: false }] : [];
 
-    let out = '';
-    let gap = '';
+    const segs: BidiSegment[] = [];
+    const push = (text: string, ltr: boolean) => {
+      if (!text) return;
+      const prev = segs[segs.length - 1];
+      if (prev && prev.ltr === ltr) prev.text += text; // coalesce, so a Hebrew word is one segment
+      else segs.push({ text, ltr });
+    };
+
+    let gap = ''; // the current non-Hebrew span, accumulated until a Hebrew letter closes it
     const flush = (isFinal = false) => {
       let first = [...gap].findIndex((c) => CORE.test(c));
       if (first < 0) {
-        out += gap;
+        push(gap, false);
         gap = '';
         return;
       }
@@ -152,24 +183,36 @@ export function makeBidi(options: BidiOptions = {}): BidiKit {
 
       const span = gap.slice(first, last + 1);
       const parts = declSplit?.(span) ?? null;
-      const body = parts
-        ? LRI + parts[0] + PDI + parts[1] + LRI + parts[2] + PDI // name island · separator · equation island
-        : LRI + span + PDI;
-      out += gap.slice(0, first) + body + gap.slice(last + 1);
+      push(gap.slice(0, first), false);
+      if (parts) {
+        // name island · separator · equation island (the 3-D «הישר l: x=…» textbook layout)
+        push(parts[0], true);
+        push(parts[1], false);
+        push(parts[2], true);
+      } else push(span, true);
+      push(gap.slice(last + 1), false);
       gap = '';
     };
 
     for (const ch of s) {
       if (HEBREW_LETTER.test(ch)) {
         flush();
-        out += ch;
+        push(ch, false);
       } else gap += ch;
     }
     flush(true);
-    return out;
+    return segs;
+  }
+
+  function isolateLtrRuns(s: string, liveTail = false): string {
+    if (s.includes(LRI)) return s; // never nest isolates
+    return segments(s, false, liveTail)
+      .map((g) => (g.ltr ? LRI + g.text + PDI : g.text))
+      .join('');
   }
 
   return {
+    segments,
     isolateLtrRuns,
     textDir: (s) => (HEBREW_LETTER.test(s) ? 'rtl' : 'ltr'),
     inputPreview: (s) => {

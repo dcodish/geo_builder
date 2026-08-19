@@ -48,9 +48,11 @@ import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
 import { questionLines } from '@/export/questionLines';
+import { bidiSegments } from '@/i18n/bidi';
 // #742: the exports live in the TOP TOOL ROW now (ADR-W-024) — App rasterises the canvas svg itself.
-import { svgToPng } from '@/export/svgToPng';
-import { QUESTION_IMAGE_WIDTH_PX } from '@/export/questionDoc';
+// #745: the rasteriser and the printed width are SHARED (shell/export/svgToPng), so every builder that
+// prints a figure prints it at one width and one ink weight. Two copies could drift; one cannot.
+import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { auditLoadedFigure, liveAuditFindings, refreshLoadedFigure } from '@/store/loadAudit';
 import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
@@ -406,7 +408,7 @@ export default function App() {
   // imported so the library stays out of the main chunk. Errors propagate back
   // to Figure's ✕ export flash.
   const saveQuestion = async (png: Blob) => {
-    const { pngDimensions, questionDocxBlob, questionFileName } = await import('@/export/questionDoc');
+    const { pngDimensions, questionDocxBlob, questionFileName } = await import('../shell/export/questionDoc');
     const lines = questionLines(useGeoStore.getState().facts, canonLocale);
     const data = new Uint8Array(await png.arrayBuffer());
     const blob = await questionDocxBlob({
@@ -415,6 +417,8 @@ export default function App() {
       lines,
       png: { data, ...pngDimensions(data) },
       rtl: i18n.language !== 'en',
+      // the SAME segmenter the step list renders through (#464/#465) — screen and paper cannot drift
+      segments: bidiSegments,
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -426,7 +430,7 @@ export default function App() {
 
   // #742 / ADR-W-024: the image exports moved OUT of the canvas toolbar into the top tool row —
   // one export home in every builder. App queries the svg from its own canvas card (the 3-D
-  // pattern) and rasterises via src/export/svgToPng; the renderer no longer knows exports exist.
+  // pattern) and rasterises via shell/export/svgToPng; the renderer no longer knows exports exist.
   const canvasSvg = () => canvasRef.current?.querySelector('svg') ?? null;
   const flashExport = (v: 'ok' | 'err') => {
     setExportFlash(v);

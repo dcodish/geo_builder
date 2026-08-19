@@ -13,6 +13,8 @@ import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 // #742 / ADR-W-024: the shared canvas corner cluster — one look in every builder.
+// #745: and the shared RASTERISER — one svg→png in the workspace, not one per product.
+import { svgToPng } from '../shell/export/svgToPng';
 import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../shell/frame/canvasControls';
 // #743: the under-canvas row's ONE look — the shell contract, replacing this tree's bare buttons.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
@@ -74,31 +76,18 @@ export function App() {
   };
 
   // #742 / ADR-W-024: the image exports — the top tool row's pair, the 3-D rasterize pattern
-  // (App queries its own canvas svg; the renderer never knows exports exist). Third product-local
-  // copy of svg→png in the workspace — flagged on #742 as a shell candidate.
+  // (App queries its own canvas svg; the renderer never knows exports exist).
+  //
+  // #745: the product-local svg→png copy that #742 flagged as "a shell candidate" is GONE — this now
+  // calls the shared rasteriser. It is behaviour-neutral here (this renderer tags nothing, so the
+  // clean-export contract is a no-op, and `sourceSize` reads the Gauss plane's viewBox exactly as the
+  // inline copy read its client box) and it retires the third of three copies. No «הורידו שאלה»
+  // button follows it into this tool — operator ruling, 2026-08-19: the question document is 2-D and
+  // 3-D only.
   const rasterCanvas = (): Promise<Blob> => {
     const svg = canvasCard.current?.querySelector('svg');
     if (!svg) return Promise.reject(new Error('no canvas'));
-    const xml = new XMLSerializer().serializeToString(svg);
-    const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml;charset=utf-8' }));
-    return new Promise<Blob>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const scale = 2;
-        const c = document.createElement('canvas');
-        c.width = svg.clientWidth * scale;
-        c.height = svg.clientHeight * scale;
-        const ctx = c.getContext('2d');
-        if (!ctx) { URL.revokeObjectURL(url); reject(new Error('no 2d context')); return; }
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, c.width, c.height);
-        ctx.drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(url);
-        c.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png');
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('svg load failed')); };
-      img.src = url;
-    });
+    return svgToPng(svg);
   };
   const flashExport = (v: 'ok' | 'err') => {
     setExportFlash(v);

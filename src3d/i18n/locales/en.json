@@ -41,6 +41,7 @@
     "saveNamePrompt": "Name the file — exam date, page and book, or anything else",
     "load": "Load",
     "saveImage": "Save image",
+    "saveQuestion": "Download question",
     "copyImage": "Copy image",
     "copied": "Copied"
   },
@@ -199,5 +200,8 @@
   },
   "display": {
     "witnesses": "Show the distance witness segment (the height)"
+  },
+  "questionDoc": {
+    "given": "Given:"
   }
 }

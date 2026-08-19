@@ -4365,3 +4365,25 @@ sound, a non-crossing order keeps its stated orientation and the reversed order 
 degenerate runs still return zero); and the drawn patch being a SIMPLE ring — with the stated order proven
 to self-cross, so the reorder is load-bearing rather than decorative. Fixture:
 `plane-run-order-571.geo3.json`.
+
+## ADR-3D-163 — «הורידו שאלה» arrives, and the list is the student's own words (#745)
+
+**Status:** accepted, 2026-08-18 · **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745)
+
+The question `.docx` export reaches this builder. The composer is shared and product-agnostic
+([ADR-W-027](06w-decisions-workspace.md#adr-w-027)); what is decided *here* is what this tree feeds it.
+
+- **The givens are the enabled facts' utterances, verbatim, in entry order** (`src3d/export/questionLines3.ts`).
+  The 2-D export omits scaffolding ([ADR-252](06-decisions.md#adr-252)) — a bare segment states no given —
+  but that rule is a per-command classification over the *2-D* engine. A second one over `Command3` would
+  be new, untested judgement standing between the student's statement and the printed page, and when it is
+  wrong it DROPS a given. Operator ruling: verbatim. Revisit with a real figure that prints noise.
+- **`bidiSegments3` is now the tree's run-boundary core,** with `isolateLtrRuns3` built on it. The document
+  cannot use isolates (Word draws U+2066/U+2069 as boxes) and needs per-run direction instead, so both
+  surfaces read the same segmentation — including the #482 Am. 3 declaration split, which reaches the page
+  as two islands exactly as it reaches the screen.
+- **The inline rasteriser in `App3.tsx` is retired** for the shared `shell/export/svgToPng`. It predated the
+  clean-export tagging contract (F3/REN-3) and honoured none of it; image-save and the question figure now
+  travel the same path, so a `data-noexport` element cannot leak into one export and not the other.
+- The button sits in the tool row beside the image export, gated on there being a given to print — the
+  #511 rule that a tool never offers what it cannot honour.

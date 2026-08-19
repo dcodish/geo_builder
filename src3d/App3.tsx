@@ -25,7 +25,9 @@ import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
-import { inputPreview3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
+import { bidiSegments3, inputPreview3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
+import { questionLines3 } from './export/questionLines3';
+import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { SYMBOL_SPECS_3 } from './ui/symbols3';
 import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
@@ -246,31 +248,20 @@ export default function App3() {
     return () => ro.disconnect();
   }, []);
 
-  // #742 / ADR-W-024: the raster is a helper so the top row's copy/save pair (operator: "3d and
-  // complex tools can have the same functionality") share one path.
+  /** The figure's own SVG — the export source for the image, the clipboard and the question document. */
+  const figureSvg = () => canvasBox.current?.querySelector('svg') ?? null;
+
+  /**
+   * #742 / ADR-W-024: ONE raster path behind the top row's copy/save pair. #745 makes that path the
+   * SHARED rasteriser (`shell/export/svgToPng`) instead of an inline copy — the copy that lived here
+   * predated the clean-export contract, so it baked interaction-only visuals into the exported image
+   * and took its ink weight from the size of the browser window. One implementation, or the builders
+   * drift apart again exactly as they had.
+   */
   const rasterCanvas = (): Promise<Blob> => {
-    const svg = canvasBox.current?.querySelector('svg');
+    const svg = figureSvg();
     if (!svg) return Promise.reject(new Error('no canvas'));
-    const xml = new XMLSerializer().serializeToString(svg);
-    const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml;charset=utf-8' }));
-    return new Promise<Blob>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const scale = 2;
-        const canvas = document.createElement('canvas');
-        canvas.width = svg.clientWidth * scale;
-        canvas.height = svg.clientHeight * scale;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { URL.revokeObjectURL(url); reject(new Error('no 2d context')); return; }
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(url);
-        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('toBlob failed'))), 'image/png');
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('svg load failed')); };
-      img.src = url;
-    });
+    return svgToPng(svg);
   };
   const flashExport = (v: 'ok' | 'err') => {
     setExportFlash(v);
@@ -296,6 +287,35 @@ export default function App3() {
     } catch {
       flashExport('err');
     }
+  };
+
+  /**
+   * «הורידו שאלה» (#745) — the figure beside the student's own statements, as a real .docx. The
+   * composer is shared (`shell/export/questionDoc`, ADR-W-027) and knows nothing about geometry: this
+   * tree supplies the heading, the givens (verbatim enabled utterances), the figure PNG and THIS
+   * product's bidi segmenter, so the paper splits technical runs exactly where the screen does.
+   *
+   * The docx library is dynamically imported so it stays out of the main chunk.
+   */
+  const onSaveQuestion = async () => {
+    const svg = figureSvg();
+    if (!svg) return;
+    const { pngDimensions, questionDocxBlob, questionFileName } = await import('../shell/export/questionDoc');
+    const png = await svgToPng(svg, 2, QUESTION_IMAGE_WIDTH_PX);
+    const data = new Uint8Array(await png.arrayBuffer());
+    const blob = await questionDocxBlob({
+      title: figureName.trim() || undefined,
+      heading: t('questionDoc.given'),
+      lines: questionLines3(facts),
+      png: { data, ...pngDimensions(data) },
+      rtl: i18n.language !== 'en',
+      segments: bidiSegments3,
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = questionFileName(new Date());
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   const onSaveFile = () => {
@@ -490,6 +510,13 @@ export default function App3() {
           </ToolButton>
           <ToolButton onClick={() => void onSaveImage()} disabled={facts.length === 0}>
             ⤓ {t('actions.saveImage')}
+          </ToolButton>
+          {/* «הורידו שאלה» (#745) — DISABLED-not-hidden like its neighbours (ADR-W-024), so the row
+              keeps stable suite positions. Gated on there being a GIVEN to print rather than on the
+              fact count: a figure whose every statement is muted has no question, and an enabled
+              button whose handler quietly returns is the #511 broken promise in a nicer costume. */}
+          <ToolButton onClick={() => void onSaveQuestion()} disabled={questionLines3(facts).length === 0}>
+            ⤓ {t('actions.saveQuestion')}
           </ToolButton>
           <ToolButton onClick={() => setManualOpen(true)}>{t('manual.button')}</ToolButton>
         </>

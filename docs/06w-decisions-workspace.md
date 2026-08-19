@@ -1023,6 +1023,7 @@ having played the channel across two `next/*` deploys.
    field). They are inert once the directories are gone — a mapping to nothing — so the teardown is
    complete without them, but they are noise in a field where noise is expensive.
 
+
 ## ADR-W-026 — Displayed numbers have ONE rounder, and precision-per-surface is still open (#723)
 
 **Operator ruling (2026-08-18, B5 play):** *"decimal points, only two numbers after the point. This is a
@@ -1065,3 +1066,79 @@ them. `formatMeasure`'s non-finite dash likewise stays 2-D's.
 (`BOUNDARIES.json`) — the isolation test caught exactly that during this work. Each product locks its own
 routing (`src/__tests__/display-format.test.ts`, `src3d/__tests__/display-format.test.ts`) against values
 where two plausible rounders disagree; `shell/__tests__/display-format.test.ts` locks the chokepoint itself.
+
+## ADR-W-027 — The question document is ONE composer, parameterized by the caller's bidi (#745)
+
+**Status:** accepted, 2026-08-18 · **Amended 2026-08-19** (scope: 3-D only, see *Scope amendment*)
+· **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745) · operator: *"for the 3d and for
+complex tool we need the option to download question in the same way we do for the 2d tool"*
+
+**Problem.** «הורידו שאלה» — the figure printed beside the student's own givens as a real `.docx`
+(FR-HS-11, [ADR-251](06-decisions.md#adr-251)) — existed only in 2-D. Not by decision: it was written
+in `src/export/`, a product tree the siblings may not import ([ADR-266](06-decisions.md#adr-266),
+`BOUNDARIES.json`), so a module that reasons about nothing but headings, list items and an image was
+unreachable by the sibling builders purely because of where it sat. `buildQuestionDoc` already took only
+`{ title, heading, lines, png, rtl }`; its single product coupling was an import of the 2-D bidi
+segmenter. The same was true one layer down: the clean-export rasteriser was a private helper inside
+`src/render/Figure.tsx`, which is why 3-D had grown a thinner inline copy and complex had none at all.
+
+**Decision.**
+
+1. **`shell/export/questionDoc.ts` and `shell/export/svgToPng.ts` are shared surfaces.** This is the
+   [ADR-W-016](#adr-w-016) seed rule applied at the moment it bites: the surface is settled (five issues
+   of hardening — #451 ink, #464/#465 bidi, ADR-252 scaffolding, ADR-428 canonical form) and is about to
+   be implemented a second time. Copying it would put the OOXML layout, the A4 column split, the
+   Word-bidi per-run rule and the PNG IHDR reader in two places, and the next fix in that class would
+   have to be found and applied twice — the exact failure the shell layer exists to prevent. The
+   rasteriser carries the sharper version of the argument: it had already been copied THREE times
+   (`src/render/Figure.tsx`, an inline copy in `App3.tsx`, a third in complex that #742 itself flagged
+   as *"a shell candidate"*), and all three are retired here.
+   This overrides the "(COPIED, per ADR-W-003)" parenthetical in [#713](https://github.com/dcodish/geo_builder/issues/713)'s
+   triage, which predates the request that made the surface a three-product one.
+
+2. **The bidi segmenter is an INPUT, and a required one.** Word has no glyph for U+2066/U+2069 and
+   prints visible boxes, so the document cannot use the browser's isolate strategy; OOXML's mechanism is
+   per-RUN direction, which means the composer must know where a technical run begins. That knowledge is
+   the *product's* — its run alphabet is derived from its own symbol palette (#482) — so it is handed in
+   rather than imported. Required rather than optional on purpose: an optional segmenter lets builder
+   N+1 omit it and silently ship the #464 scramble, and the defect class was authors not thinking about
+   bidi. A contract that permits not thinking about it has not closed the class.
+
+3. **Each product keeps its own bidi module and gains a `segments` view of it.** `shell/bidi`'s kit,
+   `src/i18n/bidi` and `src3d/i18n/bidi` are now all segments-first, with `isolateLtrRuns` built on top —
+   one definition of a run per product, so that product's screen and its paper cannot disagree. (The 2-D
+   copy was already this shape; #464 discovered the need. The other two were rebuilt onto it here.)
+
+4. **The «נתון:» list is VERBATIM in 3-D.** 2-D omits scaffolding
+   ([ADR-252](06-decisions.md#adr-252)) via a per-command classification over the 2-D engine. Porting it
+      would mean inventing a second classification, able to DROP a given the student stated —
+   which is the honesty invariant this export exists to serve. A line too many is a cosmetic complaint;
+   a line missing is the tool lying about the question. Operator ruling, 2026-08-18. Revisit only with a
+   real figure that prints noise.
+
+5. **The printed width is one constant, and it lives with the ink normalisation** (`svgToPng`), not with
+   the composer: the document prints the PNG at that width and `scaleInk` pre-multiplies by
+   `canvasWidth / it`, so they are one decision (#451) and two constants could drift. It also keeps
+   `docx` out of the static import graph — every app imports the composer dynamically so the library
+   stays out of its main chunk, and a static import of a constant declared beside it would defeat that.
+
+**Scope amendment (operator ruling, 2026-08-19): the question document is 2-D and 3-D only.**
+*"הורידו שאלה should be in 3d but not in complex"*, given during play-and-approve. The complex leg —
+its givens module, handler, button and locale strings — is removed, not flagged off. Everything above
+stands unchanged: the composer is shared because 2-D and 3-D both print through it, and the argument
+was never a headcount. Complex keeps the shared **rasteriser**, which is the part it always needed:
+the n/a is the DOCUMENT, not the export layer. Recorded in
+[ADR-CX-028](06d-decisions-complex.md#adr-cx-028); the rationale is the operator's and is recorded as
+given, not inferred.
+
+**Held by.** `shell/__tests__/question-export.test.ts`, which locks the matrix in BOTH directions: the
+composer is exercised with a STUB segmenter no product would produce (a hard-coded run rule sneaking
+back in fails) and may not name a product identity; the two builders that print are source-scanned for
+the dynamic import, a givens source, a handed-in segmenter and the strings; and **complex is scanned for
+their absence** while still being required to rasterise through the shared path. That negative half is
+the load-bearing one — a deliberate n/a and a forgotten cell look identical in a passing suite, and
+without it the next "complete the matrix" pass silently reverses an operator ruling.
+
+**What this does not decide.** Complex's remaining export questions stay on
+[#713](https://github.com/dcodish/geo_builder/issues/713). Image download and copy-image already
+shipped there with #742 and are untouched here beyond the rasteriser swap.

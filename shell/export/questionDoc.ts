@@ -15,17 +15,25 @@
  *
  * The browser's remedy — U+2066/U+2069 isolates — does NOT port here: Word has no glyph for them and
  * prints visible boxes in the givens list. OOXML's own mechanism is per-RUN direction, so a given is
- * SPLIT (`bidiSegments`, shared with the browser so the two agree on where a run begins) and each
- * technical run is emitted as a run without `w:rtl`. What the original stance got RIGHT and is unchanged: list numbers use REAL Word
- * numbering, never a literal "1. " prefix — a European digit + neutral period at an RTL run boundary is
- * the classic scramble (renders ".1"), and Word's list number is layout chrome resolved by paragraph
- * direction, outside the bidi text stream entirely.
+ * SPLIT — by the CALLER's own segmenter (`segments` below), so the paper and that product's screen
+ * agree on where a run begins — and each technical run is emitted as a run without `w:rtl`.
+ *
+ * What the original stance got RIGHT and is unchanged: list numbers use REAL Word numbering, never a
+ * literal "1. " prefix — a European digit + neutral period at an RTL run boundary is the classic
+ * scramble (renders ".1"), and Word's list number is layout chrome resolved by paragraph direction,
+ * outside the bidi text stream entirely.
  *
  * This module is browser- and node-safe (no DOM): PNG dimensions are read from
  * the IHDR header bytes, not decoded via Image/canvas, so the same code is
  * unit-tested in node.
+ *
+ * SHARED (#745, ADR-W-027). It began in `src/export/` and was therefore unreachable by the sibling
+ * builders, who may not import a product tree — a module that knows nothing about geometry, kept from
+ * two products by where it happened to sit. Nothing here branches on product identity: the caller hands
+ * in its own heading, its own givens, its own figure PNG and its own bidi segmenter, which is what makes
+ * it shell rather than a fork wearing a shared file's name (ADR-W-003).
  */
-import { bidiSegments } from '@/i18n/bidi';
+import { QUESTION_IMAGE_WIDTH_PX } from './svgToPng';
 import {
   AlignmentType,
   BorderStyle,
@@ -42,6 +50,13 @@ import {
   WidthType,
 } from 'docx';
 
+/** One stretch of a given, tagged with the direction it must be laid out in — each product's bidi
+ *  module produces these (`bidiSegments`, `bidiSegments3`, `makeBidi().segments`). */
+export interface QuestionDocSegment {
+  text: string;
+  ltr: boolean;
+}
+
 export interface QuestionDocInput {
   /** The figure's name (issue #42) — an optional document title above the givens. */
   title?: string;
@@ -53,6 +68,19 @@ export interface QuestionDocInput {
   png: { data: Uint8Array; width: number; height: number };
   /** Hebrew (or any RTL) document — flips paragraph direction and the table's visual order. */
   rtl: boolean;
+  /**
+   * The CALLER's run segmenter — the same one its screen uses, so the paper and the display can never
+   * disagree about where a technical run begins (see the bidi note above). Called with
+   * `rtlParagraph = true`, because this document imposes `w:bidi` on the paragraph rather than deriving
+   * direction from the line's own content: an all-Latin given like `|BC| = 10` scrambles in here although
+   * it holds no Hebrew at all.
+   *
+   * REQUIRED, not optional. An optional segmenter would let a new consumer omit it and silently ship the
+   * #464 scramble — the defect class was authors not thinking about bidi, and a contract that lets them
+   * not think about it has not closed the class. An LTR document never splits, so it is unused there,
+   * but the caller still has to name one.
+   */
+  segments: (line: string, rtlParagraph: boolean) => QuestionDocSegment[];
 }
 
 /**
@@ -88,16 +116,17 @@ const NO_BORDERS = {
 const TEXT_COL_DXA = 3800;
 const IMAGE_COL_DXA = 5226;
 /**
- * Printed figure width in px@96dpi (docx transformation units). 9.5 cm ≈ 360 px — up from 8 cm/302 px
- * (#451). Exported ALSO as the print width the renderer normalises its ink to: `svgToPng` scales stroke
- * weights and label sizes by `canvasWidth / this`, so the printed figure reads the same whatever the size
- * of the user's browser window. The two must therefore stay the SAME number — hence one constant, shared.
+ * Printed figure width in px@96dpi (docx transformation units). Defined by the RASTERISER, not here:
+ * `svgToPng` scales stroke weights and label sizes by `canvasWidth / this`, so the printed figure reads
+ * the same whatever the size of the user's browser window, and the two numbers must therefore be the
+ * SAME one. Importing it from there additionally keeps `docx` out of every caller's main chunk — a
+ * static import of a constant declared in THIS module would drag the library in and defeat the dynamic
+ * import each app uses.
  */
-export const QUESTION_IMAGE_WIDTH_PX = 360;
 const IMAGE_WIDTH_PX = QUESTION_IMAGE_WIDTH_PX;
 
 export function buildQuestionDoc(input: QuestionDocInput): Document {
-  const { heading, lines, png } = input;
+  const { heading, lines, png, segments } = input;
   // Pass `undefined`, never `false`: docx serializes false as an explicit
   // w:val="false" attribute; an LTR document should simply carry no bidi marks.
   const rtl = input.rtl || undefined;
@@ -134,7 +163,7 @@ export function buildQuestionDoc(input: QuestionDocInput): Document {
             // OOXML's own mechanism is per-RUN direction, so the line is split and each technical run is
             // emitted as a run WITHOUT `w:rtl`. Same segmentation as the browser, different expression.
             children: rtl
-              ? bidiSegments(line, true).map(
+              ? segments(line, true).map(
                   (seg) => new TextRun({ text: seg.text, rightToLeft: seg.ltr ? undefined : true }),
                 )
               : [new TextRun({ text: line })],
