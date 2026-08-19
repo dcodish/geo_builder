@@ -19,7 +19,6 @@ const reset = () => {
   useGeo3.temporal.getState().clear();
 };
 const submit = (u: string) => useGeo3.getState().submit(u);
-const err = () => useGeo3.getState().lastError;
 const build = (lines: string[]) => {
   reset();
   for (const u of lines) submit(u);
@@ -63,6 +62,14 @@ describe('#748 — the ratio determines the rider, stated on its own line', () =
     ["|EA'| = 0.5|AE|", 2], // the rider stated FIRST
     ["A'E = 2EA", 0.5], // the host named the other way round ⇒ t = ⅓
     ["AE:EA' = 3:2", 1.5],
+    // a LENGTH pair is unordered — the operator's report on the first cut: every one of these is the
+    // SAME statement as its EA' twin above, and each was refused for writing the pair the other way
+    ["|AE|=2|A'E|", 2],
+    ["|AE| = 2|A'E|", 2],
+    ["|A'E| = 0.5|AE|", 2],
+    ["אורך AE = 2*A'E", 2],
+    ["AE:A'E = 2:1", 2],
+    ["A'E:AE = 1:2", 2],
   ])('«%s» builds and gives |AE|/|EA\'| = %s', (utterance, expected) => {
     const { err: e, pos } = build(['מקבילון', "E על AA'", utterance as string]);
     expect(e).toBeNull();
@@ -121,6 +128,14 @@ describe('#748 — honesty: what must still refuse, and what must not move', () 
       expect(after.pos.get(id)!.z).toBeCloseTo(before.pos.get(id)!.z, 6);
     }
     expect(ratio(after.pos)).toBeCloseTo(2, 6);
+  });
+
+  it("the CLAUSE is about lengths too — «כך ש-AE = 2A'E» is the same given as «כך ש-AE = 2EA'»", () => {
+    const reversed = build(['מקבילון', "E על AA' כך ש-AE = 2A'E"]);
+    const chain = build(['מקבילון', "E על AA' כך ש-AE = 2EA'"]);
+    expect(reversed.err).toBeNull();
+    expect(ratio(reversed.pos)).toBeCloseTo(2, 6);
+    expect(reversed.pos.get('E')!.z).toBeCloseTo(chain.pos.get('E')!.z, 6);
   });
 
   it('the one-line clause still parses to a determined t (the 2020 קיץ Q2 form must not regress)', () => {

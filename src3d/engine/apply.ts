@@ -8,7 +8,7 @@ import { isAbsolute, lineDirCarriesParam, planeNormalCarriesParam, sameOperand }
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
-import { riderChainT } from './onSegmentRatio';
+import { riderPairsT } from './onSegmentRatio';
 import { isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { pinSymsOf } from './types';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
@@ -487,11 +487,13 @@ function materializePlaneRun(next: Construction3, ids: Id[]): void {
 function ratioHalves(
   c: Construction3,
   cmd: Command3,
-): { pair1: [Id, Id]; pair2: [Id, Id]; k: number } | null {
+): { pair1: [Id, Id]; pair2: [Id, Id]; k: number; directed: boolean } | null {
   if (cmd.type === 'vec-rel') {
     const [term] = cmd.terms;
     if (cmd.symbol || cmd.terms.length !== 1 || term.atom.kind !== 'pair' || term.coeff.p !== 0) return null;
-    return { pair1: [cmd.from, cmd.to], pair2: [term.atom.from, term.atom.to], k: term.coeff.k };
+    // DIRECTED: `AE = 2·A'E` is a different statement from `AE = 2·EA'` (t = 2 vs t = ⅔), so the rider
+    // must be the shared MIDDLE letter — the one shape where the vector and length readings agree.
+    return { pair1: [cmd.from, cmd.to], pair2: [term.atom.from, term.atom.to], k: term.coeff.k, directed: true };
   }
   if (cmd.type === 'length-rel') {
     const pair2: [Id, Id] | null =
@@ -501,11 +503,11 @@ function ratioHalves(
             const d = c.vectors.get(cmd.rhs.vec);
             return d ? ([d.from, d.to] as [Id, Id]) : null;
           })();
-    return pair2 ? { pair1: [cmd.a1, cmd.b1], pair2, k: cmd.c } : null;
+    return pair2 ? { pair1: [cmd.a1, cmd.b1], pair2, k: cmd.c, directed: false } : null;
   }
   if (cmd.type === 'claim' && cmd.claim.type === 'length-ratio') {
     const { a1, b1, a2, b2, p, q } = cmd.claim;
-    return { pair1: [a1, b1], pair2: [a2, b2], k: p / q };
+    return { pair1: [a1, b1], pair2: [a2, b2], k: p / q, directed: false };
   }
   return null;
 }
@@ -530,17 +532,22 @@ function ratioHalves(
 function riderRatioRetarget(c: Construction3, cmd: Command3): Command3 | null {
   const halves = ratioHalves(c, cmd);
   if (!halves) return null;
-  const { pair1, pair2, k } = halves;
-  // either side may carry the rider first — «|EA'| = ½|AE|» is «|AE| = 2|EA'|»
-  for (const [[p1, x], [y, q1], kk] of [
+  const { pair1, pair2, k, directed } = halves;
+  // either side may carry the rider's half first — «|EA'| = ½|AE|» is «|AE| = 2|EA'|»
+  for (const [P, Q, kk] of [
     [pair1, pair2, k],
     [pair2, pair1, 1 / k],
   ] as const) {
-    if (x !== y) continue;
-    const def = c.points.get(x);
-    if (def?.kind !== 'on-segment' || def.t !== undefined) continue;
-    const t = riderChainT(x, def.a, def.b, p1, x, y, q1, kk);
-    if (t !== 'invalid') return { type: 'point-on-segment3', id: x, a: def.a, b: def.b, t };
+    // The rider is a label the two pairs SHARE. A directed statement additionally fixes where it must
+    // sit (`X→R` against `R→Y`); for a LENGTH statement a pair is an unordered set, so every shared
+    // label is a candidate — «|AE| = 2|A'E|» must reach the same given as «|AE| = 2|EA'|».
+    const candidates = directed ? (P[1] === Q[0] ? [P[1]] : []) : P.filter((l) => Q.includes(l));
+    for (const rider of candidates) {
+      const def = c.points.get(rider);
+      if (def?.kind !== 'on-segment' || def.t !== undefined) continue;
+      const t = riderPairsT(rider, def.a, def.b, P[0], P[1], Q[0], Q[1], kk);
+      if (t !== 'invalid') return { type: 'point-on-segment3', id: rider, a: def.a, b: def.b, t };
+    }
   }
   return null;
 }

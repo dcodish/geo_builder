@@ -4108,7 +4108,7 @@ need to (below).
 
 **The decision.** The ratio reading belongs to the rider. Two changes, both at chokepoints:
 
-1. **`src3d/engine/onSegmentRatio.ts` — `riderChainT`, one home for the arithmetic**, imported by both
+1. **`src3d/engine/onSegmentRatio.ts` — `riderPairsT`, one home for the arithmetic**, imported by both
    parse3 and the apply reducer, so the declaration clause and the standalone fact cannot drift apart.
 2. **`applyCommand3Inner` normalizes a rider ratio into the `point-on-segment3` given it is** — at the one
    entry point every command passes through, the ADR-3D-089 `parallelepiped` precedent. `ratioHalves` reads
@@ -4123,18 +4123,34 @@ need to (below).
 unknowns would make a determined quantity into something *searched for*, which is strictly worse — slower,
 and approximate where exact arithmetic exists.
 
-**The CHAIN form is the whole contract, and the boundary is deliberate.** The rider must be the shared
-middle letter and the outer letters its host's endpoints. That is precisely the shape where the vector and
-the length readings **agree**:
+**A LENGTH pair is unordered; only a VECTOR pair is directed.** The arithmetic is the same two formulas
+either way — for rider R between the host's a and b (`d = b − a`):
 
-- `a→R = k·(R→b)`: `t·d = k(1−t)·d` ⇒ `t = k/(k+1)` — and `|aR| = k·|Rb|` gives the same t
-- `b→R = k·(R→a)`: `(t−1)·d = −k·t·d` ⇒ `t = 1/(k+1)`
+- `|aR| = k·|Rb|` ⇒ `t = k/(k+1)`, and the directed `a→R = k·(R→b)`: `t·d = k(1−t)·d` gives the same t
+- `|bR| = k·|Ra|` ⇒ `t = 1/(k+1)`, likewise from `b→R = k·(R→a)`
 
-The non-chain spelling `AE = 2·A'E` is **not** read: as vectors it means t = 2 (E off the segment), as
-lengths t = ⅔. Believing either would be a guess, so it refuses. `k > 0` is required, which is also why
-this family can never drive `t` outside the segment — `k/(k+1)` and `1/(k+1)` are both in `(0,1)` for every
-positive k. `not-on-segment` is therefore unreachable from here by construction, and no dead guard was
-added to pretend otherwise.
+What differs is *which spellings are the same statement*. `|A'E|` and `|EA'|` are the same number, so a
+length statement must accept either spelling of either side; `A→E` and `A'→E` are different vectors, so a
+`vec-rel` may not. Orientation is therefore the **caller's** business: `riderPairsT` matches both pairs as
+sets, and `ratioHalves` marks only `vec-rel` as `directed`, which narrows the candidate rider to the shared
+middle letter before the arithmetic runs. The parser's clause is a *length* clause — there is no vector
+reading inside «X על YZ כך ש-…» — so it is unordered too.
+
+The non-chain **vector** spelling `AE = 2·A'E` is still not read: as vectors it means t = 2 (E off the
+segment), as lengths t = ⅔, and believing either would be a guess. It refuses.
+
+`k > 0` is required, which is also why this family can never drive `t` outside the segment — `k/(k+1)` and
+`1/(k+1)` are both in `(0,1)` for every positive k. `not-on-segment` is therefore unreachable from here by
+construction, and no dead guard was added to pretend otherwise.
+
+**Amendment (same day, operator play).** The first cut got exactly this wrong: it demanded the directed
+chain everywhere, so «|AE| = 2|A'E|» was refused while «|AE| = 2|EA'|» — *the same statement* — built. The
+defect was an orientation requirement applied to shapes where orientation carries no meaning, and it hit
+every length spelling: `|AE| = 2|A'E|`, `|A'E| = 0.5|AE|`, `אורך AE = 2*A'E`, `AE:A'E = 2:1`, `A'E:AE = 1:2`.
+A narrower reading of the honesty argument (*"the vector and length readings disagree, so refuse"*) had been
+carried over to spellings that are unambiguously about lengths — the bars, the `אורך` head and the colon
+ratio all say so — where there was nothing to disambiguate. All six are now locked, as is the clause twin
+«כך ש-AE = 2A'E».
 
 **A rider whose `t` is already stated is left alone.** It falls through to the ordinary claim lane, so
 «כך ש-AE = 2EA'» followed by «AE = 3EA'» still refuses — that second statement genuinely contradicts the
@@ -4150,9 +4166,10 @@ changed there.
 need it — an angle at the rider, a distance to it — and no such input has been reported. The ratio family,
 which is what bagrut questions actually state, is exact without it.
 
-Locks (`issue-748-rider-ratio.test.ts`, 19): the operator's exact three lines with **|AE|/|EA'| asserted at
-2**, not merely "no error"; the split form landing every vertex on the one-line form's figure; all eight
-spellings including the rider-first `|EA'| = 0.5|AE|` and the reversed host `A'E = 2EA`; the English mirror;
+Locks (`issue-748-rider-ratio.test.ts`, 26): the operator's exact three lines with **|AE|/|EA'| asserted at
+2**, not merely "no error"; the split form landing every vertex on the one-line form's figure; all fourteen
+spellings — both orientations of both pairs across bars, `אורך` and colon, the rider-first
+`|EA'| = 0.5|AE|`, the reversed host `A'E = 2EA`; the clause twin; the English mirror;
 a prism edge (the class is the rider, not the parallelepiped); stability — adding the ratio moves E and
 nothing else; and the honesty set — a contradicting ratio still refuses, an agreeing one verifies, «אמצע»
 stays determined, the non-chain form refuses instead of guessing, and a bare membership still invents no `t`.
