@@ -75,6 +75,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'claims', he: 'זווית O ישרה', en: 'angle at O is right' },
   { category: 'points', he: "K על AA' כך ש-AK = 2KA'", en: "K on AA' such that AK = 2KA'" },
   { category: 'points', he: 'E על AC כך ש-AE:EC = 2:1', en: 'E on AC such that AE:EC = 2:1' },
+  // #748 (ADR-3D-159): the same ratio as its OWN fact — the rider is already on the segment
+  { category: 'points', he: "AE = 2EA'", en: "AE = 2EA'" },
   { category: 'points', he: "E מפגש התיכונים של משולש BC'D", en: "E is the centroid of triangle BC'D" },
   { category: 'points', he: 'O מפגש האלכסונים של הפאה ABCD', en: 'O is the intersection of the diagonals of face ABCD' },
   { category: 'points', he: 'A(2,-2,6)', en: 'A(2,-2,6)' },

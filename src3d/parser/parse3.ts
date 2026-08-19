@@ -21,6 +21,7 @@ import { readOperand, readRelationSides } from './operandToken';
 import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
+import { riderChainT } from '../engine/onSegmentRatio';
 
 export type ParseResult3 =
   | { ok: true; commands: Command3[] }
@@ -840,26 +841,18 @@ const midpoint: Rule = (s) => {
  * silently dropped); undefined when no clause is stated.
  */
 function ratioT(s: string, id: Id, a: Id, b: Id): number | 'invalid' | undefined {
+  // #748: the letters-and-arithmetic reading lives in `riderChainT`, shared with the apply reducer, so
+  // this clause and the same ratio typed as its OWN fact cannot drift apart. Here we only find the
+  // numbers; `undefined` means "no ratio clause was stated" (a free slider), never "it is false".
   const colon = s.match(/([A-Z]\d*'?)([A-Z]\d*'?)\s*:\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/);
   if (colon) {
     const [, p1, x, y, q1, pNum, qNum] = colon;
-    if (x !== id || y !== id) return 'invalid';
-    const p = parseFloat(pNum);
-    const q = parseFloat(qNum);
-    if (!(p > 0) || !(q > 0)) return 'invalid';
-    if (p1 === a && q1 === b) return p / (p + q);
-    if (p1 === b && q1 === a) return q / (p + q);
-    return 'invalid';
+    return riderChainT(id, a, b, p1, x, y, q1, parseFloat(pNum) / parseFloat(qNum));
   }
   const m = s.match(/([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*(\d+(?:\.\d+)?)\s*[·×*]?\s*([A-Z]\d*'?)([A-Z]\d*'?)/);
   if (!m) return undefined;
   const [, p, x, num, y, q] = m;
-  if (x !== id || y !== id) return 'invalid';
-  const c = parseFloat(num);
-  if (!(c > 0)) return 'invalid';
-  if (p === a && q === b) return c / (c + 1);
-  if (p === b && q === a) return 1 / (c + 1);
-  return 'invalid';
+  return riderChainT(id, a, b, p, x, y, q, parseFloat(num));
 }
 
 /** `K על AA'` (+ optional `כך ש-AK = 2KA'`) / `K on AA' such that AK = 2KA'`. No ratio ⇒ a free slider. */

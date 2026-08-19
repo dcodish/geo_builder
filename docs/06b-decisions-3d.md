@@ -4076,3 +4076,83 @@ zoom-about-pointer invariant asserted as "the point under the cursor maps to its
 no-op, and in/out being exact inverses; exactly one pan group wrapping ALL figure content; the reset
 button outside it; and the load-bearing one — `buildScene3` takes no pan parameter and emits identical
 scenes, so nothing derived from the scene can drift when the frame moves.
+## ADR-3D-159 — a ratio belongs to the RIDER, not to the sentence that declared it (#748)
+
+**Operator report (2026-08-19, prod).** «מקבילון» / «E על AA'» / «AE=2*EA'» — the third line came back
+*«הטענה לא מתקיימת בציור — בדקו את החישוב»*. `AE = 2·EA'` is not merely satisfiable, it is **closed-form
+determined**: E sits at t = ⅔. The tool refused a correct given and told the student to check their
+arithmetic, on the strength of a configuration **it had sampled itself** — the ADR-052 cardinal sin, and
+exactly the false accusation ADR-3D-138 exists to kill.
+
+**Root cause — a capability bound to one code path rather than to the concept.** The reading existed and
+was correct. `ratioT` had computed `AE = c·EA' ⇒ t = c/(c+1)` since the first 3-D commit (ADR-3D-001/002/003),
+and «K על AA' כך ש-AK = 2KA'» is both a locked scenario (2020 קיץ Q2) and an in-app example (`he.json`
+`examples.ex4`). But `ratioT` was called **only from inside the `onSegment` parser rule, against the
+declaration string**. The same ratio typed as its own fact never reached it: it was claimed by the
+`vec-rel` rule, and the M1 claim-vs-drive fork chose *claim*, which refuted.
+
+So the defect was not a missing DOF. A bare «E על AA'» correctly emits `t` **absent** — the free 1-DOF
+rider `types.ts` documents — and the seed search samples it. The gap was that no **stated** constraint
+could retarget it. Three spellings, three failure registers, one cause:
+
+| stated on its own line | lowered to | before |
+| --- | --- | --- |
+| `AE=2*EA'`, `AE = 2EA'`, `AE=2EA'` | `vec-rel` | `claim-refuted` |
+| `AE:EA' = 2:1` | `length-ratio` claim | `claim-refuted` |
+| `\|AE\| = 2\|EA'\|`, `אורך AE = 2*EA'` | `length-rel` (the *drive* path) | `givens-contradict`, `others: []` |
+
+The third row is worth its own note: it reached the drive path and still failed, because `solve3`'s unknown
+vector is the 7 gauge unknowns plus free dims and open symbols — an on-segment `t` is not among them, so
+the solver reshaped the *box* while E stayed put. **This ADR does not add `t` to the solver**, and does not
+need to (below).
+
+**The decision.** The ratio reading belongs to the rider. Two changes, both at chokepoints:
+
+1. **`src3d/engine/onSegmentRatio.ts` — `riderChainT`, one home for the arithmetic**, imported by both
+   parse3 and the apply reducer, so the declaration clause and the standalone fact cannot drift apart.
+2. **`applyCommand3Inner` normalizes a rider ratio into the `point-on-segment3` given it is** — at the one
+   entry point every command passes through, the ADR-3D-089 `parallelepiped` precedent. `ratioHalves` reads
+   all three command shapes into `(pair1, pair2, k)`; one retarget serves them. And inside
+   `point-on-segment3`, an existing **free** rider of the same host now takes a stated `t` as a *definition
+   update* rather than delegating to the `vec-rel` dual — that dual asked "does it hold?" of a point whose
+   whole point is that it has not been placed yet, and refuted the given that was about to place it. An
+   enumeration one member short (ADR-3D-095/097/100/#517), in the branch added for ADR-3D-047.
+
+**Why no solver change is needed, and why that is not a shortcut.** `AE = 2·EA'` on a rider of AA' is a
+**definition**, not a constraint to satisfy: it fixes `t` in closed form. Adding `t` to the least-squares
+unknowns would make a determined quantity into something *searched for*, which is strictly worse — slower,
+and approximate where exact arithmetic exists.
+
+**The CHAIN form is the whole contract, and the boundary is deliberate.** The rider must be the shared
+middle letter and the outer letters its host's endpoints. That is precisely the shape where the vector and
+the length readings **agree**:
+
+- `a→R = k·(R→b)`: `t·d = k(1−t)·d` ⇒ `t = k/(k+1)` — and `|aR| = k·|Rb|` gives the same t
+- `b→R = k·(R→a)`: `(t−1)·d = −k·t·d` ⇒ `t = 1/(k+1)`
+
+The non-chain spelling `AE = 2·A'E` is **not** read: as vectors it means t = 2 (E off the segment), as
+lengths t = ⅔. Believing either would be a guess, so it refuses. `k > 0` is required, which is also why
+this family can never drive `t` outside the segment — `k/(k+1)` and `1/(k+1)` are both in `(0,1)` for every
+positive k. `not-on-segment` is therefore unreachable from here by construction, and no dead guard was
+added to pretend otherwise.
+
+**A rider whose `t` is already stated is left alone.** It falls through to the ordinary claim lane, so
+«כך ש-AE = 2EA'» followed by «AE = 3EA'» still refuses — that second statement genuinely contradicts the
+first, and `claim-refuted` is the honest register for it. Only a *free* rider is retargeted.
+
+**One thing the triage got wrong, recorded so it is not re-filed.** The `length-rel` row's raw error carries
+`others: []`, which looked like a second honesty defect — the student accused of conflicting with nothing.
+It is not: `App3` already branches on an empty list and renders `err.givensContradictAlone` («…אין גוף
+שמקיים את «{{stated}}» יחד עם שאר הנתונים»), which is accurate. The raw shape is fine and nothing was
+changed there.
+
+**Left unbuilt, deliberately:** making `t` a genuine solver unknown. Only a non-closed-form driver would
+need it — an angle at the rider, a distance to it — and no such input has been reported. The ratio family,
+which is what bagrut questions actually state, is exact without it.
+
+Locks (`issue-748-rider-ratio.test.ts`, 19): the operator's exact three lines with **|AE|/|EA'| asserted at
+2**, not merely "no error"; the split form landing every vertex on the one-line form's figure; all eight
+spellings including the rider-first `|EA'| = 0.5|AE|` and the reversed host `A'E = 2EA`; the English mirror;
+a prism edge (the class is the rider, not the parallelepiped); stability — adding the ratio moves E and
+nothing else; and the honesty set — a contradicting ratio still refuses, an agreeing one verifies, «אמצע»
+stays determined, the non-chain form refuses instead of guessing, and a bare membership still invents no `t`.
