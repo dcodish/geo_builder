@@ -39,6 +39,12 @@ const FILLER = new Set([
   'נתון', 'נתונים', 'נתונה', 'נסמן', 'יהי', 'תהי', 'בבקשה', 'עוד', 'אחר', 'אחרת', 'כל', 'שני', 'שתי',
   'זר', 'זרה', 'אחד', 'אחת', 'so', 'that', 'the', 'a', 'an', 'of', 'and', 'is', 'are', 'to', 'in',
   'on', 'at', 'with', 'given', 'let', 'we', 'denote', 'such', 'it', 'its', 'be', 'by', 'from',
+  // #659 — the maqaf PARTICLES. «ו-», «מ-», «ל-», «ב-», «כ-» are the bound prepositions written with a
+  // hyphen («מ-A», «ל-AB»); peeling leaves nothing, so they must be filler in their own right.
+  'ו-', 'מ-', 'ל-', 'ב-', 'כ-', 'עליו',
+  // #659 — quantifiers, relatives and unit words: they carry no geometric content, the number does
+  'two', 'both', 'each', 'as', 'where', 'whose', 'different', 'degrees', 'shared',
+  'שונים', 'שונות', 'בעלי', 'בעלת',
 ]);
 
 /** Keyword STEMS (prefix-match after stripping ה/ב/ל/ו/ש/מ/כ prefixes) — the construct vocabulary.
@@ -51,26 +57,59 @@ const KEYWORD_STEMS = [
   'triangle', 'square', 'rectangle', 'rhombus', 'trapezoid', 'parallelogram', 'kite', 'quadrilateral',
   'pentagon', 'hexagon', 'circle', 'segment', 'line', 'side', 'vertex', 'point', 'diagonal', 'chord',
   'diameter', 'radius', 'arc', 'angle', 'area', 'perimeter', 'height', 'altitude', 'median',
-  'bisector', 'midpoint', 'extension', 'center', 'centre', 'tangent', 'regular',
+  'bisect', 'midpoint', 'exten', 'center', 'centre', 'tangen', 'regular',
   // verbs / relations
   'חסום', 'חוסם', 'חותך', 'נחתך', 'נפגש', 'פוגש', 'פגש', 'עובר', 'מונח', 'נמצא', 'יוצא', 'מחבר',
   'שוקיים', 'שוק', 'צלעות', 'מקביל', 'מאונך', 'ניצב', 'שוה', 'שווה', 'ישרה', 'חד', 'קהה', 'בסיס',
   'ראשי', 'משני', 'חיצוני', 'פנימי', 'גדול', 'קטן', 'ימני', 'שמאלי', 'עליון', 'תחתון', 'הזה', 'ההוא',
-  'inscribed', 'circumscribed', 'meets', 'intersect', 'cuts', 'crosses', 'passes', 'through', 'lies',
-  'outside', 'inside', 'equal', 'equals', 'isosceles', 'equilateral', 'right', 'acute', 'obtuse',
+  'inscrib', 'circumscrib', 'meet', 'intersect', 'cut', 'cross', 'pass', 'through', 'lie',
+  'outside', 'inside', 'equal', 'isosceles', 'equilateral', 'right', 'acute', 'obtuse',
   'perpendicular', 'parallel', 'base', 'external', 'internal', 'bigger', 'smaller', 'larger',
   'מחוץ', 'בתוך', 'מעל', 'מתחת', 'פי', 'יחס', 'חצי', 'רבע', 'שליש', 'כפול', 'half', 'quarter',
   'third', 'twice', 'ratio', 'times', 'draw', 'צייר', 'העבר', 'העבירו', 'סמן', 'בנה',
+  // #659 — the vocabulary the shadow report proved the accountant could not classify, added one word
+  // at a time and CLASSIFIED as construct vocabulary (the report's own rule: grow the lists
+  // deliberately, never auto-treat an unknown as filler — that is how an accountant stops being honest)
+  'משותף', 'חיתוך', 'חוצי', 'זוויות', 'דרך', 'רגל', 'קו', 'סביב', 'נוגע', 'משוכלל', 'מחלק', 'מבפנים',
+  'חסימה', 'גזרה', 'צדד', 'מרחק', 'מידות', 'גבה', 'זרים', 'בר',
+  'semicircle', 'midsegment', 'contain', 'touch', 'sector', 'foot', 'divide', 'disjoint', 'cyclic',
+  'circumference', 'central', 'common',
 ];
 
-const stripHePrefixes = (w: string): string => w.replace(/^[ובלכשמה]{0,3}-?/, '');
+/**
+ * #659 — the Hebrew prefix particles, peeled EVERY way rather than greedily.
+ *
+ * The first cut took the longest run of prefix letters it could («[ובלכשמה]{0,3}»), and Hebrew stems
+ * BEGIN with those same letters: «במעגל» stripped to «עגל», «במשולש» to «ולש», so four whole word
+ * families were unknown while their stems sat in the list. Greedy stripping cannot work here — only the
+ * stem list knows where the prefix ends, so every peeling is offered and any match accounts the word.
+ */
+const hePeelings = (w: string): string[] => {
+  const out = [w, w.replace(/^-/, '')];
+  for (let n = 1; n <= 3; n++) {
+    const m = w.match(new RegExp(`^[ובלכשמה]{${n}}-?(.+)$`));
+    if (m) out.push(m[1]);
+  }
+  return out;
+};
+
+/**
+ * #659 — the FINAL-LETTER trap (the register in `src3d/CLAUDE.md`, 2-D edition). A Hebrew letter takes
+ * its final form only at a word's END, so adding a suffix flips it: «תיכון» → «תיכונים», «אלכסון» →
+ * «אלכסונים», «אנך» → «אנכים». A stem ending in a final letter can therefore never prefix-match its own
+ * plural, which is why the accountant knew «תיכון» and not «התיכונים». Normalizing the stem's last
+ * letter to its medial form fixes the whole inflection family instead of listing each plural.
+ */
+const MEDIAL: Record<string, string> = { 'ך': 'כ', 'ם': 'מ', 'ן': 'נ', 'ף': 'פ', 'ץ': 'צ' };
+const medialStem = (stem: string): string => stem.replace(/[ךםןףץ]$/, (c) => MEDIAL[c]);
 
 const wordAccounted = (word: string): boolean => {
   const w = word.toLowerCase();
-  if (FILLER.has(w)) return true;
-  const stripped = stripHePrefixes(w);
-  if (FILLER.has(stripped)) return true;
-  return KEYWORD_STEMS.some((stem) => w.startsWith(stem) || stripped.startsWith(stem));
+  for (const p of hePeelings(w)) {
+    if (FILLER.has(p)) return true;
+    if (KEYWORD_STEMS.some((stem) => p.startsWith(stem) || p.startsWith(medialStem(stem)))) return true;
+  }
+  return false;
 };
 
 /**

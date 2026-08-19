@@ -53,3 +53,41 @@ describe('span accounting (shadow) — hard buckets', () => {
     expect(shadow!.words.length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * #659 — the unknown-word debt was never 76 missing words: it was three defects in the MATCHER,
+ * each of which would have produced false refusals the moment enforcement was flipped on — and which
+ * shadow mode structurally cannot reveal, because nothing refuses in shadow.
+ *
+ * These lock the mechanisms, not the vocabulary. A word list can be regrown from the report; a matcher
+ * that eats its own stems cannot be noticed without asking it directly.
+ */
+describe('#659 — the matcher, not the word list', () => {
+  const accounted = (utterance: string, commands: AnyCommand[] = []) =>
+    accountUtterance(utterance, commands).filter((u) => u.kind === 'unknown-word').map((u) => u.text);
+
+  it('a Hebrew prefix never eats the stem it precedes (greedy stripping did)', () => {
+    // «במעגל» stripped to «עגל» and «במשולש» to «ולש» — four word families unknown while their stems
+    // sat in the list. Every peeling is offered now, so the stem list decides where the prefix ends.
+    for (const w of ['במעגל', 'למעגל', 'המעגל', 'ומעגל', 'למעגלים', 'במשולש', 'המשולש', 'למשולש', 'במרובע', 'המשיק', 'והמשיק'])
+      expect(accounted(`נתון ${w} O`), w).toEqual([]);
+  });
+
+  it('a stem ending in a FINAL letter matches its own plural (the ך/ם/ן trap)', () => {
+    // adding a suffix flips the final form to medial, so «תיכון» could never prefix-match «תיכונים»
+    for (const w of ['התיכונים', 'האלכסונים', 'האנכים', 'נחתכים'])
+      expect(accounted(`M מפגש ${w} ABC`), w).toEqual([]);
+  });
+
+  it('an English stem covers its inflections (the list held inflected FORMS)', () => {
+    // 'cuts' never matched 'cutting', 'circumscribed' never matched 'circumscribes'
+    for (const w of ['cuts', 'cutting', 'meet', 'meets', 'touch', 'touches', 'bisects', 'bisector',
+                     'circumscribes', 'circumscribed', 'extension', 'extended', 'divides'])
+      expect(accounted(`the line ${w} the circle`), w).toEqual([]);
+  });
+
+  it('an unknown word is STILL reported — the fixes widened the matcher, never the silence', () => {
+    expect(accounted('משולש ABC פלרגון')).toContain('פלרגון');
+    expect(accounted('triangle ABC flarnge')).toContain('flarnge');
+  });
+});
