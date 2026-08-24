@@ -1279,3 +1279,91 @@ at the store rather than at the list of places that happened to be dirty.
 (`src/store/__tests__/ingest-invariant.test.ts`, `src3d/store/__tests__/ingest-invariant3.test.ts`,
 `src-complex/store/__tests__/ingest-invariant.test.ts`) each covering the chip source, the store's
 write paths and a pre-fix saved file loading clean; and the end-to-end `.docx` lock.
+
+## ADR-W-030 — Non-canonical input is TAUGHT, never silently accepted, and the teaching names the exact sentence (#778)
+
+**Context.** Triaging the prod window 2026-08-17…08-24, two unrelated 3-D users ran near-identical
+pyramid lessons and both talked to the tool in commands — «הוסף אלכסוני בסיס», «הדגש משולש SEC» — while
+2-D showed «סמן BK גובה המקבילית מקודקוד B». The operator's ruling: *"when a user enters a command like
+add a line, draw a shape, we need to tell him to add the input as a textbook would — so we need to guide
+them so they learn. I don't want the tool to support the wrong text input because it teaches them
+wrong,"* extended in the same session to **all tools**, not the one the report happened to surface.
+
+Measuring what the products actually do found three different answers to the same two questions:
+
+| | An imperative wrapper | A label in the other case | Guidance register | Canonical renderer |
+| --- | --- | --- | --- | --- |
+| 2-D | **builds silently** — all of הוסף/שרטט/בנה/העבר/סמן/הדגש/צייר | **silently upper-cases** (`משולש abc` → `triangle A,B,C`) | ✓ ADR-289 `ui-command` | ✓ `canonicalText` / `teachCanonical` |
+| 3-D | builds some incidentally (`שרטט גובה הפירמידה` → `perp-to-base`) | ✓ refuses with a nudge that works | ✓ ADR-3D-040 `classifyGuidance3` | ✗ none |
+| complex | refuses, with **no teaching** | accepts `z1` and `Z1` alike, silently | ✗ **none** | ✗ none |
+
+2-D's acceptance was deliberate — `src/parser/scope.ts` states it: *"an imperative that names a real
+CONSTRUCT parses via its own rule and never reaches this classifier."* This ADR **reverses that note**.
+
+The silent case-rewrite is not merely a teaching problem: it punches a hole through the honesty gates.
+The build path upper-cases while the dropped-given gates match `[A-Z]`, so the same defective lowering
+escalates honestly in uppercase and commits GREEN in lowercase (#779) — the case the student typed
+decides whether a stated given may vanish.
+
+**Decision.** Three invariants, for every product now and every product added later.
+
+1. **No silent acceptance of a register the product does not teach.** A command-to-the-tool phrasing,
+   or a label convention the product does not use, must not build. This is deliberately stated as *the
+   product's own convention*, not a uniform one: complex's convention **is** lowercase (`z1`, `w`), and a
+   rule saying "uppercase" would be wrong there. The invariant is that input is never silently rewritten
+   into a different register — what varies per product is which register is canonical.
+
+2. **The teaching names the exact sentence, and derives it from the commands.** Never a hand-written
+   nudge table: a table can name a phrasing the parser rejects, and drifts the moment a rule moves —
+   which is exactly how a guidance register rots. Deriving the text from the lowering buys a property a
+   table cannot: **the tool can never teach a form it would not accept.** Where the product can derive
+   it, the canonical sentence is **pre-filled into the input** and the student presses Enter.
+
+   Pre-fill rather than auto-build, because auto-building has no honest answer to *what gets stored*:
+   storing the student's imperative makes the fact list, the saved file and the `.docx` export teach the
+   wrong form back at them, and storing a rewrite stores a sentence they never typed — the second
+   directly violating [ADR-W-029](#adr-w-029). Pre-fill dissolves the dilemma: the student submits the
+   canonical sentence, so what is stored is what they stated, truthfully and in the right form. It also
+   costs one keypress rather than a retype, and reading-then-confirming is a stronger learning beat than
+   a banner.
+
+3. **Pre-fill means certainty; suggest means guess — and they must never look alike.** Only the
+   deterministic path pre-fills: strip the wrapper, parse the remainder, render it. When the remainder
+   does not parse we do not know what the student meant, and fabricating a canonical sentence there
+   would assert a given they never stated — [ADR-052](06-decisions.md#adr-052), one Enter away from the
+   figure. In that branch the LLM may **suggest** a phrasing, at visibly lower weight and click-to-insert,
+   never pre-filled and never committed.
+
+**Why not let the LLM decide the policy.** The alternative considered was routing imperative-looking
+input to the LLM and letting it rule on whether the phrasing should be supported. Rejected on three
+counts. Detection is a closed verb lexicon — deterministic, free, and exact — so the model adds nothing
+to it. A paid, nondeterministic model as the arbiter of a pedagogical policy gives the same utterance
+different verdicts across runs, which is both untestable (the scenario corpus cannot lock a behaviour
+re-decided per call) and pedagogically self-defeating: a student learning from inconsistent feedback
+learns nothing. And an LLM asked to help tends to *build* the thing, which is what the ruling forbids —
+so a deterministic gate is needed regardless, leaving the code layer plus a paid call.
+
+The measurement settled the cost question that prompted the alternative: imperative-prefixed input was
+**3/162 submits in 2-D (1.9%)** and **7/54 in 3-D (13%)**, and nine of those ten already reached the LLM
+or the scope register. Of the ten, only two have a stripped remainder that parses. Routing to the LLM
+would add nearly nothing — and gain nearly nothing, because for eight of ten the model's answer is the
+`not-understood` they already received. Cost was never the deciding argument; **who owns the policy** was.
+
+**Consequences — the enabling debt is real.** The renderer this depends on exists in **one** product
+(`src/parser/canonical.ts`, consumed by `submitPipeline` and the `.docx` export), and complex has no
+guidance register at all. So invariant 2 costs a canonical renderer in 3-D and complex before it can be
+honoured there; until it is, those products can satisfy invariants 1 and 3 with a refusal that teaches
+the register in general terms, and must not fake a specific sentence they cannot derive. Adopting per
+product is the slice discipline, one PR each — the invariants are workspace-wide from today, the
+machinery arrives per product.
+
+**Coverage.** Per product: an imperative wrapper over a supported construct returns the teaching, never
+commands; the pre-filled sentence re-parses to the same lowering as the stripped remainder (the property
+that makes "we never teach a form we reject" mechanical rather than reviewed); a suggestion from the LLM
+branch is never auto-submitted. Workspace-wide: the case-parity assertion from #779 — for every catalog
+line, the other-case variant produces the *same* honesty verdict as the original — which is what stops
+invariant 1 from being re-opened by a normalisation added later.
+
+Related: #778 (the umbrella), #779 (the P1 the case half exposes), #777 (the same "teach what is missing
+rather than guess" spine on an incomplete comparative), [ADR-289](06-decisions.md#adr-289) and
+ADR-3D-040 (the guidance registers), [ADR-W-029](#adr-w-029), [ADR-052](06-decisions.md#adr-052).
