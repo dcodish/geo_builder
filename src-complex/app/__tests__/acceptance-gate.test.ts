@@ -90,7 +90,20 @@ describe("a CLAIM is the student's answer — it lands and is marked, never refu
     expect(submitLine('z1 = 1+i')).toBe(true);
     expect(submitLine('z1 מדומה טהור')).toBe(true); // a claim: lands, marked ✗
     expect(submitLine('arg z1 < 30')).toBe(false); // a given: refused
-    expect(store().lastError?.key).toBe('incompatible');
+    /**
+     * #688 (ADR-CX-029) changed WHICH refusal this is, and the reason is worth stating.
+     *
+     * The blame differential asks "which earlier line, removed, lets the new one in". Removing
+     * «z1 = 1+i» leaves «z1 מדומה טהור» — and a claim whose subject the givens now leave FREE is a
+     * constraint, so that counterfactual figure genuinely forces arg z1 ∈ {90°, 270°} and the
+     * inequality still cannot hold. Removing the claim leaves arg z1 = 45°, which also fails. No
+     * single earlier line explains the refusal, so the doctrine's own answer is `impossible`.
+     *
+     * The FIGURE is unaffected: with «z1 = 1+i» present the subject is pinned, the claim does not
+     * drive, and it is still marked ✗ (locked in `claim-drive-688.test.ts`). What moved is only the
+     * blame message on a line that contradicts BOTH earlier statements independently.
+     */
+    expect(store().lastError?.key).toBe('impossible');
   });
 });
 

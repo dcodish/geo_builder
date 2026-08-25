@@ -1810,3 +1810,88 @@ Image download and copy-image already exist in this builder (#742) and are untou
 [#713](https://github.com/dcodish/geo_builder/issues/713) keeps whatever export work remains. If the
 ruling is ever revisited, the shared composer is already in place — re-adding the leg is a givens rule,
 a handler, a button and two strings, which is exactly what was removed.
+
+## ADR-CX-029 — A claim over an UNDETERMINED number drives; over a determined one it still only checks (#688)
+
+**Operator report (2026-08-17), one line, `?engine=v2`:**
+
+```
+z1 מדומה טהור
+```
+
+**Drawn:** z₁ at `189.12°`, modulus ≈ 2.4 — nowhere near the imaginary axis. **Panel:** the claim reads
+`unknown` («הארגומנט של z1 עדיין לא נקבע מהנתונים»). **freeDof:** `|z1|`, `arg z1`. Same for «z1 ממשי»,
+«z1 ו-z2 צמודים זה לזה», the English mirrors, and `|z1| = 5` + «z1 מדומה טהור» (modulus honoured,
+direction sampled at 189°).
+
+**`verifyClaim` was not the defect.** It is honest: with `arg z1` free there is nothing to verify, and
+`unknown` is a first-class answer, deliberately distinct from `refuted`. The defect is that the tool had
+no reading for *"the student stated a property of a number that nothing else determines"*, and both
+readings it did have are wrong:
+
+- as a **claim** → verdict `unknown`, and then the sampler places z₁ at 189° anyway. **That sampled
+  direction is not neutral: it ASSERTS `arg z1 ≈ 189°`, contradicting what the student just typed.**
+  [ADR-052](../06-decisions.md#adr-052)'s conformance smell in its worst form — not a default
+  masquerading as fixed, but a default **contradicting** something stated. It is also the #653 class:
+  the panel says "not yet determined" while the canvas says "z₁ is at 189°, plainly not imaginary".
+- **ignoring it** → a silently dropped statement.
+
+**Decision — give the claim families the half they never got: `driveOrCheck`.** F3/F4 relations do it;
+ADR-CX-005's roots modes do it. A claim whose relevant DOF is FREE lowers to a constraint; over a
+determined subject it stays a check.
+
+| claim | when the DOF is free, lowers to |
+| --- | --- |
+| `real` | `arg(z²) = arg(1)` ⇒ `2·arg z = 0 + k` ⇒ **{0°, 180°}** |
+| `imaginary` | `arg(z²) = arg(−1)` ⇒ `2·arg z = ½ + k` ⇒ **{90°, 270°}** |
+| `conjugates` | a `mod` row `\|z2\| = \|z1\|` **+** an `arg` row `arg z2 = arg(1/z1)` |
+| `forall-power`, `minimal-power` | **unchanged, check-only** — they answer «prove/find n», and driving them would let a guess reshape the figure |
+
+Squaring the subject is what turns a modular claim into an ordinary row, so the integer turn unknown —
+which IS the branch set ([ADR-CX-006](#adr-cx-006)) — yields the two configurations for free and
+«show another configuration» walks 90° ↔ 270°. **No new solver concept, and no claim kinds enumerated
+inside the solver.**
+
+**The seam is `foldConstraints`, and that is the architectural half of this fix.** `parseLineV2(raw)` is
+stateless by construction, so a per-line lowering structurally CANNOT decide "is my subject already
+pinned?" — v2 had no place where a lowering may ask what earlier lines established. `foldConstraints`
+is that place: it already holds tier 1's `freeDof` and `knownModulus`. It now solves tier 1 once to
+learn what the other lines determined, collects the rows the claims may contribute, and re-solves only
+when there are any. [#680](https://github.com/dcodish/geo_builder/issues/680) hits the same wall with
+`rootsMode`, so the seam serves both.
+
+**The guard is the whole safety argument, and it is subtler than "ask tier 1".** Two measurements
+shaped it:
+
+1. **Absent is maximally free, not determined.** `freeDof` is built from the solver's `free` basis, and
+   a name no constraint mentions never enters the system — so the LONE claim, which is the reported
+   case, read as "not free" and never drove. The test is therefore *pinned*: determined, with every
+   residual coefficient a turn unknown (mirroring how `knownModulus` is built from the modulus half).
+2. **Tier 1 is not the only lane that can pin a subject.** Only MONOMIAL rows reach it, so a name fixed
+   by a deferred constraint would read as free and the claim would drive it — a claim overriding a
+   given, the one thing this must never do. A name mentioned in any deferred constraint is therefore
+   treated as determined. Conservative on purpose: a false "determined" costs the old behaviour (a
+   check, verdict `unknown`), while a false "free" costs a figure that contradicts a stated given.
+
+So *"a claim that could move the figure would make every answer correct"* survives intact: a claim can
+only move a figure the givens left open, i.e. where there was no answer to get wrong. «z1 = 3+4i» then
+«z1 מדומה טהור» is unchanged — accepted, `refuted`, still drawn at 53.13°.
+
+**One user-visible CONSEQUENCE, recorded rather than absorbed.** A driving claim is a figure-shaping
+statement, so it now participates in the acceptance gate's blame differential. On
+«z1 = 1+i» → «z1 מדומה טהור» → «arg z1 < 30», the inequality is still refused, but the refusal is now
+`impossible` rather than `incompatible`: removing «z1 = 1+i» leaves a claim that genuinely forces
+arg z1 ∈ {90°, 270°}, so the inequality fails in that counterfactual too, and no single earlier line
+explains the refusal. The FIGURE is unaffected (z₁ stays at 1+i, the claim still marked ✗) — what moved
+is the blame message on a line that contradicts both earlier statements independently. Flagged for the
+operator rather than assumed; refining blame to prefer naming a GIVEN over a claim would be a change to
+the acceptance doctrine, which wants its own ruling.
+
+The ordering asymmetry the issue raised is [ADR-276](../06-decisions.md#adr-276) working as designed
+(the earlier statement wins): «z1 מדומה טהור» then «z1 = 3+4i» refuses, while the reverse order accepts
+both and marks the claim ✗.
+
+Locks: `claim-drive-688.test.ts` (14 tests — the operator's line, both configurations, the real axis,
+a stated modulus honoured while the direction is driven, the conjugate family, the determined-subject
+guards including the acceptance-gate figure, and a corpus-wide invariant: **no plotted point may sit
+where it refutes a claim the panel has not refuted**).

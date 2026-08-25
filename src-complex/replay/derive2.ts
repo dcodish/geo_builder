@@ -56,6 +56,7 @@ import {
   measureResidual,
 } from '../solve/residuals';
 import { verifyClaims } from '../solve/claims';
+import { claimDriveRows } from '../solve/claimDrive';
 import { filterBranches } from '../solve/filter';
 import { type AffineArg, describeFilter, projectWindow, statedWindow, violatesDeg } from '../solve/window';
 import type { BranchFilter, Constraint } from '../model/constraint';
@@ -294,7 +295,19 @@ export function foldConstraints(input: FoldInput): Derived2 {
     exprQueries = [],
     sequences = [],
   } = input;
-  const t1 = solveTier1(constraints);
+  /**
+   * #688 — DRIVE OR CHECK. Tier 1 is solved once to learn what the OTHER lines determined; a claim whose
+   * subject that solve left FREE then contributes its constraint rows and tier 1 is re-solved with them.
+   * A claim over a determined subject contributes nothing and is verified exactly as before.
+   *
+   * This is why the seam is here rather than in the parser: `parseLineV2` is stateless by construction,
+   * so a per-line lowering structurally CANNOT decide "is my subject already pinned?". `foldConstraints`
+   * is the one place that knows — it already holds tier 1's `freeDof` and `knownModulus` — and #680 hits
+   * the same wall with `rootsMode`, so fixing the seam once serves both. See `solve/claimDrive.ts`.
+   */
+  const t1Base = solveTier1(constraints);
+  const driveRows = claimDriveRows(assertions, t1Base);
+  const t1 = driveRows.length ? solveTier1([...constraints, ...driveRows]) : t1Base;
 
   const sample = new Map(literalSample);
   for (const c of constraints) {
