@@ -7571,3 +7571,74 @@ actually lands; the four internal-contradiction spellings refuse while internal 
 builds; the family check that «זרים» carries the equality too; and the invariant that spans both fixes —
 *carried or refused, never dropped* — asserted as a property over the whole history rather than as a
 snapshot of either state. Full suite 496 files / 9059 tests, 0 failed.
+
+## ADR-456 — labels are counted case-blind, lowercase is TAUGHT rather than silently rewritten, and the circle DEFINITION path asks the leftover question (#779, P1)
+
+Prod session `qouua77n`: «מרכזו o. שתי נקודות על המעגל a ו b» committed GREEN with the two stated
+points gone, while the uppercase twin escalated honestly. Same defective lowering, opposite honesty
+outcome, decided purely by the case the student typed. Root cause: the grammar's label captures accept
+`[A-Za-z]` and upper-case on the way in (`up()`, `labelRun`'s lowercase fallback), while every
+label-counting gate extracted `[A-Z]` — so a lowercase-stated label was invisible to the whole
+dropped-given family. Three independent repairs, per the issue's plan:
+
+**1 — The gate layer is case-blind at ONE chokepoint.** `statedLabelTokens` is now the single answer
+to "which labels does this text state", read by `droppedNewLabels`, `introducedNewLabels`' stated
+side, the accountant's label classifier, and the pipeline's no-op check. Script-scoped, which is what
+makes case-blindness honest in both languages: in HEBREW text every standalone Latin run is notation —
+singles included, units (cm/mm) excluded, digit-glued expression tokens («18r/7») excluded by the
+boundary; LATIN-ONLY text keeps the uppercase read, because English lowercase words ("a point on the
+circle") are words — the 3-D single-letter stance. The claim side gained the mirror: a case-preserving
+command VALUE (the bound radius symbol `name:"r"`, #54) accounts its canonical form, so the binding
+utterance «נתון מעגל שרדיוסו r» stays clean. Defence in depth by design — this half holds even if a
+future path re-adds a case-normalizing read somewhere else.
+
+**2 — Lowercase labels are TAUGHT, never silently rewritten** (the operator's ruling, log-triage
+2026-08-24, the ADR-W-030 family; mirrors 3-D `scope:lowercase-labels`). Where 3-D refuses at the
+failed parse, 2-D's rules ACCEPT lowercase — so the mirror sits at the COMMIT seams:
+`lowercaseLabelFold` detects, from the parse's own evidence (a stated lowercase run whose upper-cased
+letters the commands reference — command VALUES only, since the raw-JSON read would donate `freeRadius`'s
+R and false-nudge the legitimate «שרדיוסו r»), that a fold happened, refuses, and shows the corrected
+sentence (`input.scope.lowercase-labels`, He+En). Wired on all three commit seams — the grammar path,
+the ADR-240 LLM second attempt (without which the rewrite would launder through the model's uppercase
+canonical lines), and the ✎ edit path — plus the direct 3-D mirror on a FAILED parse
+(`upperCasedLabelCandidate`, proof-based: the note fires only if the lifted candidate parses). In
+Hebrew the corrected sentence lifts every notation run, so the suggestion is never half-lowercase; in
+Latin text only proven runs lift (an English word is never shouted into uppercase), and the article
+"a" never fires the nudge (FILLER-excluded from detection) — the one documented boundary: an English
+line whose ONLY label is a lowercase "a" cannot be told from the article at token level.
+
+**3 — The compound-clause audit.** The circle rule's DEFINITION path (`centered && named` /
+numeric/symbolic radius) claimed the utterance on its local signals without the ADR-024 leftover
+question the standalone and through paths already ask — that is what let the compound lower to ONE
+circle. It now strips exactly what it reads (circle/centre/radius vocabulary, single-letter tokens,
+numbers, size adjectives, request words, filler, connectives, punctuation) and defers whole on ANY
+residue, fail-closed (#497 discipline). The through path gained the sibling guard the catalog property
+below immediately demanded: a residual standalone letter token defers («circle through a b c» had
+slipped past the declined 3-point rule into `through: A` with b, c silently gone). Audited residual,
+recorded rather than hidden: a rule can still claim a clause-compound whose OTHER clause carries only
+existing labels and keyword words («מרכזו O. AB מיתר» — the chord rule commits, the redundant centre
+clause vanishes); non-redundant content trips the case-blind gates, and the general cure is the
+accountant's per-rule claimed-extent evolution (its own documented boundary), not more per-rule
+denylists.
+
+Sibling product (ADR-W-004): 3-D already refuses lowercase at the parse (`upperCasedLabelCandidate3`);
+its gates never see committed lowercase, so no port is needed. The #778 pre-fill work will reuse the
+2-D register nudge's corrected-sentence machinery.
+
+Locks (`lowercase-labels-779.test.ts`): the reported compound's lowercase/uppercase twins produce the
+IDENTICAL gate verdict; the measure-letter regressions; fold/candidate behaviour in both scripts; the
+circle-guard forms; the qouua77n sequence pipeline-faithful (parse → nudge → gates order — it lives
+there rather than in the scenario corpus because the corpus schema has no refusal step, and this lock
+is ALL refusals); and the catalog-wide property that keeps the asymmetry from returning: no supported
+example's lowercased variant can silently commit — it fails, trips a case-blind gate, or lands in the
+nudge.
+
+**Amendment (operator play, 2026-08-25).** Two rulings from playing the fix on the round's dev server:
+(1) **A lowercase measure letter gets a NOTE, not silence** — «נתון מעגל שרדיוסו r» still builds (r is
+the small-radius measure; refusing it would make the exam's R>r figures untypeable), but the acceptance
+now says why lowercase passed there (`input.measureCaseNote`, the ADR-428 teach-on-acceptance slot;
+`lowercaseMeasureLetters` reads the case-preserved radius-symbol bindings). (2) **The suggestion is the
+student's own text** — `corrected` (and the failed-parse candidate) is built from the RAW utterance with
+only the case lift applied, so normalization folds (עיגול→מעגל) never leak into what the student is told
+to type; the message itself is one short reason + the corrected line, and the i18n bidi post-processor
+(#464) isolates its Latin runs at render.

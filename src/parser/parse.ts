@@ -3882,16 +3882,50 @@ const circle: Rule = (s, ctx) => {
   if (thrM) {
     const rest = s
       .replace(/circles?|מעגל\w*/gi, ' ')
-      .replace(/cent(?:er|re)d?|around|מרכז\w*|סביב/gi, ' ')
+      // #779: consume "centered" WHOLE — the old `d?` tail left the fragment "ed", harmless before,
+      // read as residue by the lowercase-token guard below ("circle centered at M through B").
+      .replace(/cent(?:er|re)(?:e?d)?(?:\s+at)?|around|מרכז\w*|סביב/gi, ' ')
       .replace(/(?:that\s+)?(?:pass(?:es|ing)?\s+)?(?:ו-?)?(?:ה?עוברת?\s*)?(?:through|דרך)\s+[A-Za-z]\d*\b/gi, ' ')
       .replace(named ? new RegExp(String.raw`\b${named}\b`, 'gi') : /,^/, ' ')
       .replace(FILLER, ' ');
     if (SHAPE_LEFTOVER.test(rest) || INTERSECT_KW.test(rest) || /הישר|(?<![א-ת])ישר(?![א-ת])|\bline\b|(?<![א-ת])קו(?![א-ת])/i.test(rest)) return null;
+    // #779 — a residual LOWERCASE letter token is a label this path would silently CASE-FOLD and drop
+    // («circle through a b c» reached here after the 3-point rule declined the lowercase run, and
+    // committed `through: A` with b, c gone). UPPERCASE residue stays allowed — «circle through
+    // A, B, C» deliberately leaves B, C here for the membership post-passes to claim (the shipped
+    // circumcircle route), so only the case-fold class defers.
+    if (/(?<![A-Za-zא-ת\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/.test(rest)) return null;
   }
   // `centered` alone is NOT a circle definition unless a centre is actually NAMED ("מעגל שמרכזו O"):
   // a REFERENCE to an existing circle's centre — "מרכז המעגל" / "the centre of the circle", no letter —
   // must not auto-create a phantom circle (operator: "ישר AD עובר דרך מרכז המעגל" built a stray circle P).
   const isDef = r.numeric || r.symbolic || !!thrM || (centered && !!named);
+  // #779 (compound-clause audit) — the DEFINITION path claimed the utterance on its local signals (a
+  // named centre, a radius) without ever asking the ADR-024 question the standalone and through paths
+  // ask: does anything geometry-significant REMAIN? «מרכזו O. שתי נקודות על המעגל A ו B» matched here
+  // and lowered to ONE circle, dropping the whole second clause — honest only by the grace of the label
+  // gates. Strip everything this path actually reads — circle/centre/radius vocabulary, single-letter
+  // tokens (the centre / the radius symbol), numbers, size adjectives, request words, filler,
+  // connectives, punctuation; ANY residue (a second clause's words, a multi-letter label run) means
+  // another rule owns part of the utterance → defer whole (fail-closed, the #497 discipline).
+  if (isDef && !thrM) {
+    const rest = s
+      .replace(/circles?|מעגל\w*/gi, ' ')
+      .replace(/cent(?:er|re)(?:e?d)?(?:\s+at)?|around|סביב|[ושה]{0,2}מרכז[והי]?|עם\s+מרכז|ב?נקודה/gi, ' ')
+      // the full SIZE vocabulary parseRadius reads — radius, circumference/perimeter, area, diameter
+      // (each with the ש/ו/ב prefixes and possessive suffixes — «היק[פף]» covers the final-pe bare form,
+      // the 3-D final-letter trap), the π of «6π», the √ of a radical value, and unit words
+      .replace(/[ושב]{0,2}(?:רדיוס|היק[פף]|שטח|קוטר)[והם]?|radius|circumference|perimeter|diameter|area|π|√|(?<![A-Za-z])pi(?![A-Za-z])|ס["״']?מ|מ["״']?מ/gi, ' ')
+      .replace(/קטן|גדול|small(?:er)?|big(?:ger)?|larger?/gi, ' ')
+      .replace(REQUEST_WORDS, ' ')
+      .replace(FILLER, ' ')
+      .replace(rx(String.raw`(?<![A-Za-zא-ת\d])${LABEL}(?![A-Za-z\d])`, 'g'), ' ')
+      .replace(rx(NUM, 'g'), ' ')
+      .replace(/(?<![א-ת])(?:ו|ה|הוא|היא|של)(?![א-ת])/g, ' ')
+      .replace(/[.,:;·=?!/-]/g, ' ')
+      .trim();
+    if (rest) return null;
+  }
   if (!isDef) {
     // No radius/centre/through given. A STANDALONE "circle" / "מעגל" / "circle O" is a circle request →
     // draw a default one — including the request-wrapped «נתון מעגל» / "given a circle" (#184). But
@@ -9837,6 +9871,52 @@ function augmentParseCtx(ctx: ParseContext, cmds: AnyCommand[]): ParseContext {
 }
 
 /**
+ * #779 — stated-label extraction, CASE-BLIND at one chokepoint.
+ *
+ * The dropped-given gates matched `[A-Z]` while the grammar's label captures accept `[A-Za-z]` and
+ * upper-case on the way in (`up()`, `labelRun`'s lowercase fallback) — so a label the student wrote in
+ * lowercase was invisible to every gate that counts labels, and a defective lowering could commit GREEN
+ * exactly where its uppercase twin escalated (the P1: «… על המעגל a ו b», prod session qouua77n). This
+ * is the one place "which labels does this text STATE" is answered; every counting gate reads it, so a
+ * future case-normalizing path can never reopen the hole for one gate but not another.
+ *
+ * Script scope keeps the extension honest in both languages:
+ *  - a HEBREW utterance has no incidental Latin words, so EVERY standalone Latin run is notation —
+ *    singles included («a ו b»); unit tokens (cm/mm) are the one exclusion. A run glued to a digit
+ *    («18r/7», «2r») is an expression, not a label — the boundary excludes it.
+ *  - a LATIN-ONLY utterance is full of real lowercase words ("a point on the circle"), so lowercase
+ *    runs are NOT read as stated labels here (the 3-D single-letter stance, upperCasedLabelCandidate3).
+ *    The commit-seam fold nudge ({@link lowercaseLabelFold}) still covers folded ones by command
+ *    evidence, so English lowercase labels teach rather than silently commit too.
+ */
+const UNIT_WORDS = new Set(['cm', 'mm']);
+const hasHebrewScript = (s: string): boolean => /[א-ת]/.test(s);
+/** Standalone Latin runs that CONTAIN a lowercase letter (boundaries exclude digit-glued expression
+ *  tokens like «18r»). The raw runs, case preserved — callers decide scope and canonicalization. */
+const lowercaseLabelRuns = (s: string): string[] =>
+  (s.match(/(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g) ?? []).filter((run) => !UNIT_WORDS.has(run.toLowerCase()));
+export function statedLabelTokens(s: string): Id[] {
+  const out = [...(s.match(/[A-Z]\d*/g) ?? [])];
+  if (hasHebrewScript(s)) for (const run of lowercaseLabelRuns(s)) out.push(...(run.toUpperCase().match(/[A-Z]\d*/g) ?? []));
+  return [...new Set(out)];
+}
+/** Canonical labels the commands actually carry, case-blind over label-shaped VALUES: an id like
+ *  `circle-P` contributes P via the uppercase-JSON read, and a case-preserving field like the bound
+ *  radius symbol `name: "r"` (#54) contributes R here — without it, the case-blind input extraction
+ *  above would read the BINDING utterance «מעגל שרדיוסו r» as having dropped the label R. */
+function commandLabelTokens(commands: AnyCommand[]): Set<string> {
+  const used = new Set(JSON.stringify(commands).match(/[A-Z]\d*/g) ?? []);
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') {
+      if (rx(String.raw`^${LABEL}$`, '').test(v)) used.add(v.toUpperCase());
+    } else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => k !== 'type' && walk(x));
+  };
+  commands.forEach(walk);
+  return used;
+}
+
+/**
  * Uppercase point labels that the utterance NAMES but the parsed commands neither reference nor already
  * have in the figure — a sign the deterministic parse silently DROPPED part of the input (ADR-089).
  * Almost always a TYPO in a keyword (e.g. "מנוקדה" for "מנקודה") that made a rule match partially: the
@@ -9844,6 +9924,7 @@ function augmentParseCtx(ctx: ParseContext, cmds: AnyCommand[]): ParseContext {
  * (App.submit) treats a non-empty result as a weak parse and ESCALATES to the LLM (whose job is exactly
  * freeform/typo input) instead of committing. A label that ALREADY EXISTS but a command doesn't re-name
  * is NOT dropped (it's context, e.g. a tangent at an existing point) — only genuinely NEW labels count.
+ * Case-blind since #779 (see {@link statedLabelTokens}) — a lowercase-stated label counts as stated.
  */
 export function droppedNewLabels(utterance: string, commands: AnyCommand[], existingPoints: Id[] = [], measureSymbols: string[] = []): Id[] {
   const have = new Set(existingPoints.map((p) => p.toUpperCase()));
@@ -9853,7 +9934,7 @@ export function droppedNewLabels(utterance: string, commands: AnyCommand[], exis
   // nothing (the operator's play-test: `weak:dropped:R` → LLM → not-understood). The caller passes the
   // figure's bound symbol names (ctx.radiusSymbols) — semantic, never a guess from utterance shape.
   for (const m of measureSymbols) have.add(m.toUpperCase());
-  const used = new Set(JSON.stringify(commands).match(/[A-Z]\d*/g) ?? []); // every label the commands reference (incl. inside ids like circle-P / tan-B)
+  const used = commandLabelTokens(commands); // every label the commands reference (incl. inside ids like circle-P / tan-B)
   // Extract labels from the SAME text the rules parsed (subscripts glued, maqaf/bidi fixed — PAR-7 /
   // ADR-228: the raw "O_1" reads as label "O" while the commands carry "O1", a guaranteed false drop),
   // then blank the ADR-118 AREA MARKER: the `S` of the (normalized) glued `SABC` is notation, not a
@@ -9863,7 +9944,7 @@ export function droppedNewLabels(utterance: string, commands: AnyCommand[], exis
   // measure command, so it lands in `used` and never tripped this. The residual risk (an S-led 4-letter
   // POINT run like "STUV" masking a genuinely dropped S) only ever suppresses a warning, never corrupts.
   const s = normalizeUtterance(utterance).replace(/(?<![A-Za-z])S(?=(?:[A-Z]\d*){3,4}(?![A-Za-z\d]))/g, ' ');
-  const inputLabels = [...new Set(s.match(/[A-Z]\d*/g) ?? [])];
+  const inputLabels = statedLabelTokens(s);
   return inputLabels.filter((L) => !have.has(L) && !used.has(L));
 }
 
@@ -9894,14 +9975,118 @@ export function droppedNewLabels(utterance: string, commands: AnyCommand[], exis
  * false flag would refuse a working decomposition.
  */
 export function introducedNewLabels(utterance: string, canonicalLines: string[], existingPoints: Id[] = []): Id[] {
+  // The STATED side is case-blind (#779): a label the student wrote in lowercase and the LLM echoed
+  // uppercase is the student's own label, not an invention. The LINE side stays uppercase — canonical
+  // lines are canonical, and lowercase glyphs there are never labels.
   const labelsOf = (s: string): Set<string> => new Set(normalizeUtterance(s).match(/[A-Z]\d*/g) ?? []);
-  const stated = labelsOf(utterance);
+  const stated = new Set(statedLabelTokens(normalizeUtterance(utterance)));
   const have = new Set(existingPoints.map((p) => p.toUpperCase()));
   const out = new Set<Id>();
   for (const line of canonicalLines) {
     for (const L of labelsOf(line)) if (!stated.has(L) && !have.has(L)) out.add(L);
   }
   return [...out];
+}
+
+/** English function words — never label candidates in Latin-only text (the article "a" in "a point D
+ *  on AB" must not read as the label A). Mirrors the FILLER regex, as a word set. */
+const EN_FILLER_WORDS = new Set(['a', 'an', 'to', 'the', 'and', 'of', 'is', 'are', 'at', 'on', 'in', 'with', 'from', 'that', 'so', 'such']);
+
+/**
+ * #779 — the commit-seam CONVENTION nudge (operator ruling, log-triage 2026-08-24, the ADR-W-030
+ * family): a parse that READ a lowercase label — the grammar's captures accept `[A-Za-z]` and
+ * upper-case on the way in — must TEACH the uppercase convention instead of silently rewriting what
+ * the student typed. Mirrors 3-D's `upperCasedLabelCandidate3` / `scope:lowercase-labels`; where 3-D
+ * refuses at the failed parse, 2-D rules ACCEPT lowercase, so the mirror sits at the commit seams.
+ *
+ * Evidence-based, which is what keeps it honest: a run is flagged only when the COMMANDS reference its
+ * upper-cased letters — so a lowercase measure letter whose command preserves its case («שרדיוסו r» →
+ * `radius-symbol name:"r"`) is never flagged, and an English function word never coincides with the
+ * whole folded run (FILLER-excluded besides). Returns the folded labels plus the corrected sentence to
+ * suggest, or null when the parse read no lowercase label.
+ */
+export function lowercaseLabelFold(utterance: string, commands: AnyCommand[]): { folded: Id[]; corrected: string } | null {
+  const s = normalizeUtterance(utterance);
+  // Labels the commands reference, from string VALUES only — the raw-JSON read would donate field
+  // names' letters (`freeRadius` contains R), and a phantom R false-nudges the legitimate lowercase
+  // measure «שרדיוסו r» (the "TYPE contains E" trap, field-name edition).
+  const referenced = new Set<string>();
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') for (const tok of v.match(/[A-Z]\d*/g) ?? []) referenced.add(tok);
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => k !== 'type' && walk(x));
+  };
+  commands.forEach(walk);
+  const heb = hasHebrewScript(s);
+  const RUN = /(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g;
+  const foldToks = (run: string): Id[] | null => {
+    const toks = run.toUpperCase().match(/[A-Z]\d*/g) ?? [];
+    return toks.length > 0 && toks.every((tok) => referenced.has(tok)) ? toks : null;
+  };
+  // Pass 1 — DETECT on unambiguous runs only: in Latin text an English function word never proves a
+  // fold on its own (the article "a" vs the label A is undecidable at token level).
+  const folded = new Set<Id>();
+  for (const run of s.match(RUN) ?? []) {
+    const low = run.toLowerCase();
+    if (UNIT_WORDS.has(low) || (!heb && EN_FILLER_WORDS.has(low))) continue;
+    foldToks(run)?.forEach((tok) => folded.add(tok));
+  }
+  if (folded.size === 0) return null;
+  // Pass 2 — the corrected sentence teaches the WHOLE line, and it is built from the RAW text the
+  // student typed (operator ruling, 2026-08-25: the suggestion is "just as the user wrote, just with
+  // upper case" — normalization folds like עיגול→מעגל must not leak into it; the i18n bidi
+  // post-processor isolates the Latin runs at render). In Hebrew every standalone Latin run is
+  // notation (the script rule), so all of them lift — a dropped clause's «a ו b» corrects alongside
+  // the referenced «o», and the student is never handed a half-lowercase suggestion. In Latin text
+  // only proven runs lift, plus filler-coincident labels ("points a and b" corrects both letters
+  // once "b" proved the fold) — an English word must never be shouted into uppercase.
+  const corrected = utterance.replace(RUN, (run) => {
+    if (UNIT_WORDS.has(run.toLowerCase())) return run;
+    if (heb) return run.toUpperCase();
+    const toks = foldToks(run);
+    if (!toks) return run;
+    toks.forEach((tok) => folded.add(tok));
+    return run.toUpperCase();
+  });
+  return { folded: [...folded], corrected };
+}
+
+/**
+ * #779 Am. (operator ruling, 2026-08-25) — a lowercase MEASURE letter that a successful parse BOUND
+ * case-preserved (the radius symbol «שרדיוסו r», #54) gets a non-blocking NOTE on acceptance rather
+ * than silence or a refusal: the student asked why lowercase passed there, and the answer — measure
+ * letters keep their case because the exam distinguishes R from r — is worth saying exactly when it
+ * happens. Returns the bound lowercase measure letters, or [] when there is nothing to say.
+ */
+export function lowercaseMeasureLetters(commands: AnyCommand[]): string[] {
+  const out: string[] = [];
+  for (const c of commands as Array<Record<string, unknown>>) {
+    if (c.type === 'radius-symbol' && typeof c.name === 'string' && /[a-z]/.test(c.name)) out.push(c.name);
+  }
+  return [...new Set(out)];
+}
+
+/**
+ * #779 — the FAILED-parse half of the same nudge, the direct 3-D mirror: lift the lowercase runs and
+ * let the caller PROOF re-parse the candidate (the note fires only if the candidate parses, so a
+ * genuine gap stays a genuine gap). Hebrew text lifts every standalone run, singles included; Latin
+ * text lifts non-filler runs of at most 4 letters (the 3-D cap — real English words stay words).
+ */
+export function upperCasedLabelCandidate(utterance: string): string | null {
+  // Lifted from the RAW text (same fidelity ruling as the fold's corrected sentence) — the candidate
+  // is both re-parsed (parse normalizes internally) and SHOWN, so it must read as what the student
+  // typed, case aside.
+  const s = utterance;
+  const heb = hasHebrewScript(s);
+  let changed = false;
+  const out = s.replace(/(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g, (run) => {
+    const low = run.toLowerCase();
+    if (UNIT_WORDS.has(low)) return run;
+    if (!heb && (EN_FILLER_WORDS.has(low) || run.replace(/\d/g, '').length > 4)) return run;
+    changed = true;
+    return run.toUpperCase();
+  });
+  return changed ? out : null;
 }
 
 /**

@@ -143,14 +143,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
-      "circle",
-    ],
-    "text": "two circles with a common center O",
-    "winner": "concentricCircles",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
       "circlesTangent",
       "tangentLine",
     ],

@@ -39,6 +39,10 @@ import {
   statedNegation,
   wordRootMagnitude,
   splitGuidance,
+  statedLabelTokens,
+  lowercaseLabelFold,
+  lowercaseMeasureLetters,
+  upperCasedLabelCandidate,
   parse,
   parseMerge,
   parseNameCenter,
@@ -293,6 +297,21 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
       return;
     }
   }
+  // #779 — the CONVENTION nudge (operator ruling: lowercase labels are TAUGHT, never silently
+  // rewritten). The grammar's captures accept lowercase and upper-case on the way in; a parse that
+  // did that must refuse and show the corrected sentence, or the tool teaches the wrong notation —
+  // and the silent rewrite is exactly what blinded the dropped-label gates to lowercase input (the
+  // P1's mechanism). Runs BEFORE the honesty battery so no lowercase-label utterance reaches any
+  // commit path, deterministic or LLM. Mirrors 3-D's `scope:lowercase-labels`.
+  if (r.ok) {
+    const fold = lowercaseLabelFold(utterance, r.commands);
+    if (fold) {
+      logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:lowercase-labels', commands: r.commands });
+      ui.setInputNote(t('input.scope.lowercase-labels', { corrected: fold.corrected }));
+      ui.setBusy(false);
+      return;
+    }
+  }
   let weak: 'error' | 'empty' | 'dropped' | null = null;
   if (r.ok) {
     const pts = pctx.points ?? [];
@@ -375,6 +394,13 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
         // one we can promise to honour. A note on a SUCCESSFUL step, never a refusal.
         const teach = teachCanonical(utterance, r.commands, locale);
         if (teach) ui.setInputNote(t('input.canonicalHint', { canonical: teach }));
+        // #779 Am. (operator ruling 2026-08-25): a lowercase MEASURE letter the parse bound
+        // case-preserved («שרדיוסו r») gets a non-blocking note saying WHY lowercase passed here —
+        // measure letters keep their case (the exam's R vs r), point labels are uppercase.
+        else {
+          const lm = lowercaseMeasureLetters(r.commands);
+          if (lm.length) ui.setInputNote(t('input.measureCaseNote', { letter: lm.join(', ') }));
+        }
         ui.clearText();
         deps.resolveAfterCommit();
         return;
@@ -421,7 +447,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
           return;
         }
         const existing = new Set(pts.map((p) => p.toUpperCase()));
-        const newLabels = [...new Set(utterance.match(/[A-Z]\d*/g) ?? [])].filter((l) => !existing.has(l));
+        const newLabels = statedLabelTokens(utterance).filter((l) => !existing.has(l)); // case-blind (#779)
         if (newLabels.length === 0) {
           logDebug({ kind: 'input', utterance, locale, source: 'parser', result: 'noop-exists', commands: r.commands });
           ui.setInputNote(t('input.alreadyDrawn'));
@@ -462,6 +488,22 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     ui.setInputNote(t(split.messageKey, split.params));
     ui.setBusy(false);
     return;
+  }
+  // #779 — the FAILED-parse half of the convention nudge, the direct 3-D mirror: if upper-casing the
+  // lowercase runs yields a sentence the grammar DOES parse, the input was a supported construction in
+  // the wrong case — teach the convention instead of a paid LLM call. Proof-based: the note fires only
+  // when the candidate actually parses, so a genuine gap stays a genuine gap and escalates as before.
+  if (!r.ok) {
+    const lifted = upperCasedLabelCandidate(utterance);
+    if (lifted) {
+      const lr = parse(lifted, parseCtxNow());
+      if (lr.ok && lr.commands.length > 0) {
+        logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:lowercase-labels' });
+        ui.setInputNote(t('input.scope.lowercase-labels', { corrected: lifted }));
+        ui.setBusy(false);
+        return;
+      }
+    }
   }
   // out of grammar, OR a deterministic parse that built nothing → ask the LLM (a SECOND try),
   // using the current figure as context. The spinner is already up (painted at the top of submit) and
@@ -550,6 +592,20 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     ui.setInputNote(t(weak ? 'input.producedNothing' : 'input.notUnderstood'));
     ui.setBusy(false);
     return;
+  }
+  // #779 — the convention nudge holds on the LLM path too (the ADR-240 pattern: the second attempt
+  // never commits what the first refused). Without it, a lowercase-label utterance the grammar
+  // declined would launder its rewrite through the LLM: the model emits uppercase canonical lines,
+  // the case-blind gates see every label accounted, and the commit stores labels the student never
+  // typed in that case — the silent rewrite again, one seam over.
+  {
+    const fold = lowercaseLabelFold(utterance, llmCmds);
+    if (fold) {
+      logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:lowercase-labels', commands: llmCmds });
+      ui.setInputNote(t('input.scope.lowercase-labels', { corrected: fold.corrected }));
+      ui.setBusy(false);
+      return;
+    }
   }
   // HONESTY GATE on the LLM path (ADR-240): the grammar path refuses to commit a parse that leaves a
   // NEW input label unused (droppedNewLabels, ADR-089) — the second attempt must hold the same line.

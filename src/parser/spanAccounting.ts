@@ -157,10 +157,14 @@ export function accountUtterance(utterance: string, commands: AnyCommand[], actx
   const collect = (v: unknown): void => {
     if (typeof v === 'string') strVals.push(v);
     else if (Array.isArray(v)) v.forEach(collect);
-    else if (v && typeof v === 'object') Object.values(v).forEach(collect);
+    else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => k !== 'type' && collect(x));
   };
   commands.forEach(collect);
   const valueLabels = new Set(strVals.flatMap((v) => v.match(/[A-Z]\d*/g) ?? []));
+  // #779: a WHOLE value that is one label token claims its canonical form case-blind — the bound
+  // radius symbol `name: "r"` (#54) accounts a lowercase-stated «r» without letting a type string's
+  // letters account anything (values only, `type` excluded above).
+  for (const v of strVals) if (/^[A-Za-z]\d*$/.test(v)) valueLabels.add(v.toUpperCase());
   const cmdNumbers = (JSON.stringify(commands).match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
   const out: UnaccountedSpan[] = [];
 
@@ -170,11 +174,25 @@ export function accountUtterance(utterance: string, commands: AnyCommand[], actx
   const areaMarker = /(?<![A-Za-z])S(?=[A-Z]{3,4}(?![A-Z]))/.test(s) || /S_/.test(utterance);
   const existing = new Set((actx.existingPoints ?? []).map((x) => x.toUpperCase()));
   const symbols = new Set([...(actx.radiusSymbols ?? []), ...(actx.angleAliases ?? [])]);
-  for (const run of s.match(/(?:[A-Z]\d*)+/g) ?? []) {
-    for (const label of run.match(/[A-Z]\d*/g) ?? []) {
-      if (label === 'S' && areaMarker) continue;
-      if (existing.has(label) || symbols.has(label)) continue;
-      if (!valueLabels.has(label)) out.push({ kind: 'label', text: label });
+  // #779: symbol masks compare case-blind — a bound «r» masks the canonical R the case-blind
+  // extraction below produces, exactly as droppedNewLabels' mask does.
+  const symbolsUpper = new Set([...symbols].map((x) => x.toUpperCase()));
+  const account = (label: string): void => {
+    if (label === 'S' && areaMarker) return;
+    if (existing.has(label) || symbols.has(label) || symbolsUpper.has(label)) return;
+    if (!valueLabels.has(label)) out.push({ kind: 'label', text: label });
+  };
+  for (const run of s.match(/(?:[A-Z]\d*)+/g) ?? []) for (const label of run.match(/[A-Z]\d*/g) ?? []) account(label);
+  // #779: in HEBREW text a standalone Latin run is notation regardless of case — the parser's own
+  // captures accept lowercase, so the accountant must too, or «… על המעגל a ו b» commits green while
+  // its uppercase twin refuses (the P1). Latin-only text keeps the uppercase-only read: lowercase
+  // words there are English, not labels (the word loop reports them instead). Unit tokens excluded.
+  const labelWords = new Set<string>();
+  if (/[א-ת]/.test(s)) {
+    for (const run of s.match(/(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g) ?? []) {
+      if (['cm', 'mm'].includes(run.toLowerCase())) continue;
+      labelWords.add(run.toLowerCase());
+      for (const label of run.toUpperCase().match(/[A-Z]\d*/g) ?? []) account(label);
     }
   }
   // numbers — the divergence classes the first catalog sweep surfaced (reports/span-accounting-shadow.md):
@@ -217,9 +235,10 @@ export function accountUtterance(utterance: string, commands: AnyCommand[], actx
   for (const sym of s.match(REL) ?? []) {
     if (!hasConstraint) out.push({ kind: 'relation', text: sym });
   }
-  // words
+  // words — a run the label pass above classified as notation is not a word (#779)
   for (const word of s.match(/[֐-׿a-z][֐-׿a-z'"-]*/g) ?? []) {
     if (word.length < 2) continue;
+    if (labelWords.has(word.toLowerCase())) continue;
     if (!wordAccounted(word)) out.push({ kind: 'unknown-word', text: word });
   }
   return out;

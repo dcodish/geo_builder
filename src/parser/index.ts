@@ -1,7 +1,8 @@
 /** Public surface of the grammar parser (Phase 4). The `utterance → command[]` boundary. */
 
 export { parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, impliedPointBinding, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedWordRelations, droppedCompoundRelation, droppedGivenVerbs,
-  droppedComparison, droppedRadiusSymbol, introducedNewLabels, droppedRegionSubject, droppedMidsegment, droppedConstructNoun, normalizeUtterance } from './parse';
+  droppedComparison, droppedRadiusSymbol, introducedNewLabels, droppedRegionSubject, droppedMidsegment, droppedConstructNoun, normalizeUtterance,
+  statedLabelTokens, lowercaseLabelFold, lowercaseMeasureLetters, upperCasedLabelCandidate } from './parse';
 export type { ParseResult, ParseContext } from './parse';
 export { buildParseCtx } from './context';
 export { classifyOutOfScope, looksCompound, looksLikeLatex, splitGuidance, statedNegation, wordRootMagnitude } from './scope';

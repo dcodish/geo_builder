@@ -25,7 +25,7 @@ import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 import registry from '../products.json';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, impliedCircleBinding, impliedPointBinding, buildParseCtx, stepLabel } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, impliedCircleBinding, impliedPointBinding, buildParseCtx, stepLabel, lowercaseLabelFold } from '@/parser';
 import { Figure } from '@/render';
 import { crossingCommands } from '@/engine';
 import type { Crossing } from '@/engine';
@@ -334,6 +334,13 @@ export default function App() {
     }
     if (!r.ok || r.commands.length === 0) {
       setInputNote(t('steps.editRefused'));
+      return false;
+    }
+    // #779 — the convention nudge holds on the EDIT seam too (a commit seam is a commit seam):
+    // an edited step whose parse read a lowercase label refuses with the corrected sentence.
+    const fold = lowercaseLabelFold(editText, r.commands);
+    if (fold) {
+      setInputNote(t('input.scope.lowercase-labels', { corrected: fold.corrected }));
       return false;
     }
     replaceGroup(key, r.commands, editText.trim());
