@@ -4539,3 +4539,55 @@ visible record of the behaviour change this ADR authorises.
 Locks: `typed-crossing-ink-780.test.ts` (5 tests — no line object minted, the plane's form no longer
 decides how the operand is read, «הקטע» confirms rather than changes, a declared line stays unbounded,
 and the operator's figure end to end with `G` strictly inside `CC'`) plus the regenerated fixture.
+
+## ADR-3D-166 — Named view presets: the ALIGN half orbit does not give (#714)
+
+**Operator (2026-08-17):** *"2-D has the rotate and align options. 3-D doesn't — maybe it should."*
+
+**Context.** [docs/28](../docs/28-unification.md) §4a D7 recorded the viewport controls as differing
+**by nature** between the builders — 2-D pan/zoom/rotate/flips vs 3-D orbit/pan/zoom/reset (#533) — and
+that framing is right as far as it goes: orbit already gives free rotation, so 3-D does not need a
+rotate control. What it does not give is the **align** half: snapping to a canonical orientation. A
+student reproducing a textbook figure wants the drawing oriented the way the book prints it, and
+hunting for "straight on" by dragging is exactly the fiddly thing a preset removes.
+
+**Decision — four named views, defined once, in the orbit's own coordinates.** `VIEW_PRESETS` in
+`render/camera.ts` states them as `(yaw, pitch)` pairs, so a preset is literally a camera the student
+could have dragged to and nothing downstream needs to know a preset happened.
+
+| preset | camera | what you see |
+| --- | --- | --- |
+| `front` | eye (0,−1,0) | the **xz** plane — x rightward, z up |
+| `side` | eye (1,0,0) | the **yz** plane — y rightward, z up |
+| `top` | pitch = `MAX_PITCH` | the ground plane, from nearly straight above |
+| `iso` | yaw −45°, pitch atan(1/√2) | true isometric — all three axes equally foreshortened |
+
+Two of those deserve their reasoning recorded:
+
+- **`top` is clamped, not 90°.** Straight down degenerates the frame: `right` is built as
+  `forward × ẑ`, which is the cross product of two parallel vectors there. Clamping to `MAX_PITCH` —
+  the same limit the UI already imposes on dragging — keeps it a valid frame and, better, keeps it a
+  camera the student could have reached by hand, rather than a special case the renderer would have to
+  know about.
+- **`iso` is not `HOME_CAMERA`.** Home is the ¾ textbook view (−60°, 20°) that the ENGINE also scores
+  unstated placements against (#372); isometric is the specific angle at which the three axes are
+  equally foreshortened. They are different things and both are offered — and the test asserts the
+  equal-foreshortening property rather than the numbers, so it keeps holding if the angles are
+  re-expressed.
+
+**Placement.** Beside `↺` in the canvas control cluster, not in the figure-actions row under the
+canvas. The camera state lives in `Figure3`, so this keeps the feature where its state already is
+instead of lifting camera state into `App3` for a purely visual grouping. Zoom and pan are deliberately
+**kept** when a preset is chosen: a student who framed the figure did so on purpose and only asked to
+turn it — unlike `↺`, which is the one button that returns everything to a known-good frame (#533).
+
+The labels are i18n-**injected** exactly as `resetLabel` is, and the buttons render only when labels are
+supplied, so `Figure3` stays translation-free. The glyphs are decorative; the accessible name is always
+the translated label on `title`/`aria-label`.
+
+**Sibling products:** complex needs neither rotate nor align — that becomes an explicit **n/a** cell in
+the conformance matrix (family 2), not a forgotten one (#664).
+
+Locks: `view-presets-714.test.ts` (6 tests — each preset asserted on the FRAME it produces rather than
+on its angles, the top clamp and its orthonormality, the isometric equal-foreshortening property, and
+the set being complete, in-clamp and mutually DISTINCT so a preset can never become a dead button).

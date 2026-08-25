@@ -43,7 +43,11 @@
     "saveImage": "Save image",
     "saveQuestion": "Download question",
     "copyImage": "Copy image",
-    "copied": "Copied"
+    "copied": "Copied",
+    "viewFront": "Front view",
+    "viewTop": "Top view",
+    "viewSide": "Side view",
+    "viewIso": "Isometric view"
   },
   "hint": {
     "orbit": "Drag the figure to orbit · Shift-drag or right-drag to pan · scroll to zoom"

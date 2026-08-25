@@ -703,6 +703,12 @@ export default function App3() {
               width={canvasSize.w}
               height={canvasSize.h}
               resetLabel={t('actions.resetView')}
+              presetLabels={{
+                front: t('actions.viewFront'),
+                top: t('actions.viewTop'),
+                side: t('actions.viewSide'),
+                iso: t('actions.viewIso'),
+              }}
               crossingLabel={t('actions.nameCrossing')}
               onNameCrossing={onNameCrossing}
             />

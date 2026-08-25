@@ -9,7 +9,7 @@ import { useMemo, useRef, useState, type PointerEvent as RPointerEvent, type Whe
 import type { PlaneDisplayMode3Map } from '../store/figureFile3';
 import type { Resolved3 } from '../engine/evaluate';
 import type { Construction3 } from '../engine/types';
-import { HOME_CAMERA, MAX_PITCH, type Camera3 } from './camera';
+import { HOME_CAMERA, MAX_PITCH, VIEW_PRESETS, VIEW_PRESET_ORDER, type Camera3, type ViewPreset } from './camera';
 import { faceOnView, planarNormal } from '../engine/defaultView';
 import { buildScene3, type SceneCrossing3 } from './scene3';
 import { dragModeFor, panForZoom } from './viewGauge';
@@ -37,7 +37,14 @@ export interface Figure3Props {
   onNameCrossing?: (c: SceneCrossing3) => void;
   /** Tooltip on a crossing dot (i18n-injected, like `resetLabel` — this component stays translation-free). */
   crossingLabel?: string;
+  /** #714 — labels for the named view presets (i18n-injected). Absent = the presets are not offered,
+   *  which keeps this component usable without a translation layer, exactly like `resetLabel`. */
+  presetLabels?: Partial<Record<ViewPreset, string>>;
 }
+
+/** #714 — one glyph per named view. Text, not icons: the control cluster is already glyph-based (↺, ±),
+ *  and the accessible NAME is the i18n label on `title`/`aria-label`, never the glyph. */
+const PRESET_GLYPH: Record<ViewPreset, string> = { front: '⬒', top: '⬓', side: '◧', iso: '⬔' };
 
 /** Per-index plane patch colours (translucent — patches never occlude, docs/20 §11). */
 const PLANE_COLORS = ['#0284c7', '#7c3aed', '#d97706'];
@@ -78,7 +85,7 @@ const ltr = (s: string) => `⁦${s}⁩`;
  */
 const CANVAS_DIR = { direction: 'ltr' } as const;
 
-export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay, showWitnesses = true, onNameCrossing, crossingLabel }: Figure3Props) {
+export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay, showWitnesses = true, onNameCrossing, crossingLabel, presetLabels }: Figure3Props) {
   /**
    * #5 — the HOME camera for THIS figure. A purely planar figure is read face-on (`planarNormal` /
    * `faceOnView`, engine/defaultView); everything else keeps the ¾ textbook view. Derived from the
@@ -448,6 +455,23 @@ export default function Figure3({ construction, resolved, width = 640, height = 
         >
           ↺
         </button>
+        {/* #714 — the ALIGN half orbit does not give: snap to a canonical orientation. Beside ↺ because
+            that is where the view controls already live and where the camera state IS; zoom and pan are
+            deliberately KEPT, since a student who framed the figure did so on purpose and only asked to
+            turn it. Rendered only when labels are supplied, so the component stays translation-free. */}
+        {presetLabels &&
+          VIEW_PRESET_ORDER.filter((k) => presetLabels[k]).map((k) => (
+            <button
+              key={k}
+              type="button"
+              style={canvasCtrlStyle}
+              title={presetLabels[k]}
+              aria-label={presetLabels[k]}
+              onClick={() => setCam(VIEW_PRESETS[k])}
+            >
+              {PRESET_GLYPH[k]}
+            </button>
+          ))}
         <button type="button" style={canvasCtrlStyle} title="zoom out" aria-label="zoom out" onClick={() => zoomBy(1 / CANVAS_ZOOM_STEP)}>
           −
         </button>
