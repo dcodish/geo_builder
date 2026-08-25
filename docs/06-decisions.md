@@ -7812,3 +7812,103 @@ Locks: `radius-symbol-slot-772.test.ts` (18 tests — the reported hole, the nin
 number/symbol equivalence, the lowercase bagrut letter, and each of the three separations above) plus
 the corpus scenario `copula-less-symbolic-radius-binds-existing-circle-772`, which replays the prod
 session's own rows with the workaround replaced by the statement the student first tried.
+## ADR-460 — an utterance packing INDEPENDENT constructs is taught, never decomposed (#763)
+
+**Operator ruling (2026-08-19):** *"what we should do in such cases is ask user to input one fact at a
+time and refuse to draw this shape. it will be similar in other cases like «משולש ABC וריבוע WERT»."*
+
+**Context — and the corrected diagnosis.** «שני מעגלים משיקים מבחוץ ואלכסון AB» drew two tangent
+circles AND a floating segment AB belonging to nothing, committed as ONE step with a green ✓. The
+issue's original body blamed the grammar; the debug log says otherwise:
+
+```
+source=parser  result=weak:dropped:משיק/tangent   cmds=[{segment A B}]
+source=llm     result=ok                          cmds=[circle, circle, circles-tangent, segment, …]
+```
+
+The deterministic lane behaved **perfectly** — it produced only `[segment]`, the ADR-292 verb gate
+caught the dropped tangency, and the partial parse was refused. What built the figure is the **LLM
+fallback**, which decomposed the compound into two independent statements and built both. So this is
+neither a grammar bug nor an honesty-gate gap: it is a **policy question at the escalation seam**.
+
+**Why the guidance that already exists never fired.** `splitGuidance` / `looksCompound` produce exactly
+the right message, but `looksCompound`'s separator is a hand-listed noun set —
+`ו(?=מעגל|עיגול|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|נקוד|זווי|ישר|קטע|מחומש|משושה)` — and «אלכסון» is not
+in it. That is a docs/17 §3 chokepoint enumeration: it fails OPEN on every noun nobody thought of.
+
+**Decision — derive the judgement from the tool itself.** `src/app/independence.ts`: **a clause
+"stands alone" when it parses in an EMPTY context and its commands then BUILD from an empty figure.**
+The grammar and the engine decide what a construct is, so a construct added tomorrow is covered the
+same day, with no list to maintain. Separators are deliberately liberal (`,;.\n`, וגם/ואז/and/then/with,
+and a bare «ו» glued to ANY Hebrew word — no noun lookahead at all), because over-splitting is free:
+a piece that is not a standalone statement can never trigger a refusal.
+
+Independence is then: a clause after the first that shares **no label** with its predecessors and makes
+**no definite back-reference** to them. Both halves are load-bearing — the shared label is what makes
+«ריבוע ABCD, נקודה G על AD» one statement, and the back-reference is what makes «מעגל O, נקודה A על
+המעגל» one. The back-reference test is itself derived from the text (a definite word whose stem appears
+earlier), not from a noun list, and is deliberately generous: a false "yes" only ever SUPPRESSES a
+refusal, which is the safe direction.
+
+**Two measurements worth recording.**
+
+1. **The BUILD half is not redundant with the parse half.** «מעגל P משיקים זה לזה בנקודה M» — the TAIL
+   of a supported catalog form — *parses*, because the tangency rule matches with one circle in hand.
+   A fragment that parses is still a fragment; only the engine could tell them apart. Adding the build
+   requirement took catalog false positives 10 → 4 while taking the reported forms caught 3/4 → 4/4.
+2. **A bare label run is a conjoined SUBJECT, not a construct.** "AB and CD are chords in circle O" is
+   one sentence about two chords; without excluding label-only clauses it is refused. Structural test
+   (strip the label runs, see whether words remain), not a word list. This is the fifth false positive,
+   a different family from the four below, and it is closed rather than allowlisted.
+
+**The residual, shipped KNOWN, on the operator's approval (2026-08-24: "I'm ok with the
+recommendation").** Four supported catalog forms would be refused — one family, twice, in two
+languages:
+
+```
+מעגל O ומעגל P משיקים זה לזה בנקודה M
+מעגל O ומעגל P משיקים מבפנים בנקודה M
+circle O and circle P are tangent at M
+circle O and circle P are tangent internally at M
+```
+
+Both halves genuinely stand alone by every derived test available: each parses, each builds from an
+empty figure, and their labels are disjoint (O vs P, M). What actually binds them is a **reciprocal
+relation spanning the split point** («משיקים זה לזה» / "are tangent"). Detecting that needs either a
+word list — the very thing this ADR retires — or a real clause parser, which is a mechanism wanting
+its own ADR; that is filed as follow-on debt rather than blocking the ruling.
+
+**Why shipping them is safe, and how that safety is maintained rather than asserted.** This check runs
+at the escalation seam, beside `looksLikeLatex` / `wordRootMagnitude` / `splitGuidance`, so it only
+ever sees input the deterministic grammar **already declined**. All four are catalog forms the grammar
+parses, so none can reach it: the false positives exist in the FUNCTION, not in the PRODUCT.
+
+That argument rests entirely on the grammar continuing to parse them — so the test asserts exactly
+that, per the operator's two conditions on approval: the four are recorded **explicitly, with their
+reasoning** (an invisible false positive is indistinguishable from one nobody checked), and the net
+**goes red if any becomes reachable**, on the same commit that would make it so.
+
+**The BOUNDARY this ADR does not cross, measured rather than assumed (#786).** Testing the ruling
+through the real submit pipeline — not on the discriminator in isolation — showed that the placement
+which makes the residual safe also limits the reach. The ADR-264 **clause fallback** treats `,` and
+" and " as clause separators and builds each clause independently, so those compounds are BUILT by the
+grammar and never reach this seam:
+
+| utterance | grammar | today |
+| --- | --- | --- |
+| «משולש ABC וריבוע WERT» / «…. ריבוע WERT» / «ריבוע ABCD ומשולש WER» | refused | taught ✓ |
+| «משולש ABC, ריבוע WERT» · «triangle ABC and square WERT» · «circle O and square WERT» | `triangle+square` | still builds ✗ |
+
+It is **not** an English quirk — the Hebrew comma form goes the same way; what differs is the
+separator, not the language. `independentConstructs` returns the right answer for all of them; only
+placement stops it. And placement cannot simply move: consulting this check inside the deterministic
+lane would make the four residual false positives **reachable**, breaking the exact condition the
+operator approved them under. So the second lane is filed as **#786** (`needs-operator`), whose
+recommended order is "close the residual with the reciprocal-relation guard, then move the check" —
+the same follow-on debt this ADR already records, now with a reason to schedule it.
+
+Locks: `independence-763.test.ts` (18 tests — the four reported compounds split correctly, the seven
+at-risk supported compounds clean, the conjoined-subject family, the catalog net pinned to exactly the
+four recorded forms, and the reachability guard) and `submitPipeline.test.ts` (the seam end to end:
+the teaching fires, nothing commits, **the paid LLM is never called** — plus a block pinning #786's
+lane so its resolution goes red rather than passing silently).

@@ -49,6 +49,7 @@ import {
   parseRename,
   parseSwap,
 } from '@/parser';
+import { independentConstructs } from './independence';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { isGeoPoint } from '@/engine';
@@ -495,6 +496,20 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   if (split) {
     logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${split.category}` });
     ui.setInputNote(t(split.messageKey, split.params));
+    ui.setBusy(false);
+    return;
+  }
+  // #763 (operator ruling 2026-08-19) — the same teaching, for the compounds `splitGuidance` cannot
+  // see. Its separator is a hand-listed noun set, so «…ואלכסון AB» sailed past it and the LLM
+  // DECOMPOSED the line and built both halves: two tangent circles plus a segment belonging to
+  // nothing, one green ✓. `independentConstructs` derives the same judgement from the tool itself —
+  // each clause must PARSE and BUILD standalone — instead of from a noun list. Same seam, same
+  // reason, and the seam is the safety property: it only ever sees input the grammar already
+  // declined, which is what keeps ADR-460's four residual catalog false positives unreachable.
+  const independent = independentConstructs(utterance);
+  if (independent) {
+    logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${independent.category}:independent` });
+    ui.setInputNote(t(independent.messageKey, independent.params));
     ui.setBusy(false);
     return;
   }

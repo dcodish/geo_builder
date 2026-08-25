@@ -254,3 +254,91 @@ describe('#447 (ADR-428) — the canonical form is TAUGHT on a successful commit
     expect(hint, 'no isolate characters at this layer').not.toMatch(/[⁦⁩]/);
   });
 });
+
+/**
+ * #763 (ADR-460) — the operator's ruling, verified through the REAL pipeline rather than on the
+ * discriminator in isolation: an utterance packing independent constructs must be TAUGHT, and the
+ * paid LLM must never be reached. The unit-level behaviour lives in `independence-763.test.ts`;
+ * what this file adds is the part that actually broke — the seam, and the LLM call behind it.
+ *
+ * TWO LANES, and only one of them is this issue's. The discriminator sits at the ESCALATION seam, so
+ * it can only act on utterances the deterministic grammar DECLINED — which is the property that keeps
+ * ADR-460's four residual false positives unreachable. An utterance the grammar BUILDS never gets
+ * there, and the clause fallback builds some of these compounds on its own (see the last describe).
+ * That lane is #786, deliberately not closed here: moving this check into the deterministic lane
+ * would make the four residuals reachable, i.e. it would break the exact condition the operator
+ * attached to approving them.
+ */
+describe('submit pipeline — independent constructs are taught, never decomposed (#763)', () => {
+  it.each([
+    ['שני מעגלים משיקים מבחוץ ואלכסון AB'],  // the operator's own report
+    ['משולש ABC וריבוע WERT'],               // the ruling's second example
+    ['two circles tangent externally with a chord AB'],
+    ['ריבוע ABCD ומשולש WER'],
+    ['משולש ABC. ריבוע WERT'],
+  ])('«%s» is split back to the student, commits nothing, and never reaches the LLM', async (utterance) => {
+    const { deps, calls, notes } = makeDeps();
+    await runSubmit(utterance, deps);
+    expect(notes()[0], 'the split-statements teaching is shown').toContain('input.scope.split-statements');
+    expect(useGeoStore.getState().facts, 'nothing is drawn').toEqual([]);
+    expect(calls.resolved, 'no commit, so no auto-resolve').toBe(0);
+    // The whole point of the ruling: the figure that shipped was the LLM's decomposition.
+    expect(llmParseMock, 'the paid LLM is never called').not.toHaveBeenCalled();
+    expect(calls.busy.at(-1), 'the spinner is cleared').toBe(false);
+  });
+
+  it('the reported utterance no longer draws a segment belonging to nothing', async () => {
+    const { deps } = makeDeps();
+    // Before ADR-460 the LLM built [circle, circle, circles-tangent, segment A B] — two tangent
+    // circles plus a floating AB — as ONE green step.
+    llmParseMock.mockResolvedValue({ built: [], dropped: [] });
+    await runSubmit('שני מעגלים משיקים מבחוץ ואלכסון AB', deps);
+    expect(useGeoStore.getState().facts).toEqual([]);
+  });
+
+  it('a SUPPORTED compound still commits — the false-refusal direction, end to end', async () => {
+    const { deps, calls, notes } = makeDeps();
+    await runSubmit('ריבוע ABCD, נקודה G על AD', deps);
+    expect(notes(), 'no teaching note: this is one statement').toEqual([]);
+    expect(useGeoStore.getState().facts.length, 'the compound is built').toBeGreaterThan(0);
+    expect(calls.resolved).toBe(1);
+    expect(llmParseMock).not.toHaveBeenCalled();
+  });
+
+  it('a definite BACK-REFERENCE keeps a two-clause line together («מעגל O, נקודה A על המעגל»)', async () => {
+    const { deps, notes } = makeDeps();
+    await runSubmit('מעגל O, נקודה A על המעגל', deps);
+    expect(notes()).toEqual([]);
+    expect(useGeoStore.getState().facts.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * #786 — the SECOND lane, measured here so it is a recorded boundary rather than a silent gap.
+ *
+ * The ADR-264 clause fallback treats `,` and " and " as clause separators and builds each clause
+ * independently. When the clauses are one statement that is exactly right («ריבוע ABCD, נקודה G על
+ * AD»); when they are two independent constructs it is the behaviour the operator's ruling forbids,
+ * arriving through the deterministic lane instead of the LLM. Note it is NOT an English quirk — the
+ * Hebrew comma form goes the same way; what differs is the separator, not the language.
+ *
+ * These assertions pin TODAY's behaviour on purpose. The day #786 is decided they go red, which is
+ * the signal to update them — a documented boundary that cannot rot into an assumption.
+ */
+describe('#786 — the clause-fallback lane still builds these (recorded, not fixed here)', () => {
+  it.each([
+    ['triangle ABC and square WERT'],
+    ['triangle ABC, square WERT'],
+    ['משולש ABC, ריבוע WERT'],
+    ['circle O and square WERT'],
+  ])('«%s» is built by the grammar, so the seam never sees it', async (utterance) => {
+    const { deps } = makeDeps();
+    await runSubmit(utterance, deps);
+    expect(
+      useGeoStore.getState().facts.length,
+      `«${utterance}» no longer commits — if that is #786 being fixed, update this block; ` +
+        `if not, a supported compound may have regressed`,
+    ).toBeGreaterThan(0);
+    expect(llmParseMock, 'the deterministic lane owns it — no LLM cost either way').not.toHaveBeenCalled();
+  });
+});
