@@ -20,7 +20,7 @@
  */
 
 import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
-import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx } from './lexicon';
+import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF } from './lexicon';
 import { stripFormatControls } from '../../shell/bidi';
 
 export type ParseResult =
@@ -10238,12 +10238,59 @@ export function restoreStatedSequences(
  * meaning, incl. the ADR-115 tangency-as-⟂ lowering) so a legitimate alternative lowering never
  * false-blocks; the gate aims at the verb being entirely unrepresented.
  */
-const VERB_GATES: { verb: string; present: RegExp; satisfied: RegExp }[] = [
-  { verb: 'משיק/tangent', present: /משיק|tangent/i, satisfied: /tangent|circles-tangent|set-perpendicular|"tan-|tanaux-|tanmid-/ }, // "tan- : a REFERENCE to a drawn tangent line ("המשיק חותך…" → line:"tan-A"); tanaux-/tanmid- : the Thales AUX-CIRCLE construction of an external tangent (tangentFromExternal / tangentsFromExternal, which emit no literal `tangent` object) — issue #138, ADR-292 regressed the singular form
+/**
+ * #771 — a gate's PRESENT pattern, bounded. Composed from the lexicon's {@link heWord}/{@link enWord}
+ * so the morphological boundary is defined in ONE place for the whole tree (see `lexicon.ts` →
+ * `HE_END`): a stem matches its own inflections and never inside a longer word.
+ *
+ * The gates declare their stems here rather than adopting the lexicon's `PERP_KW`/`TANGENT_KW` whole,
+ * because a gate's vocabulary is a policy decision, not a synonym list — `PERP_KW` includes `ניצב`,
+ * which is also the NOUN for a right triangle's leg, and gating on it would demand perpendicularity
+ * evidence from «הניצב AB = 3». Same boundary, deliberately different word sets.
+ */
+const gatePresent = (he: string[], en: [string, string?][]): RegExp =>
+  new RegExp([...he.map(heWord), ...en.map(([stem, suffix]) => enWord(stem, suffix))].join('|'), 'i');
 
-  { verb: 'חוצה/bisect', present: /חוצ[הי]|bisect/i, satisfied: /bisector|midpoint|set-angle-ratio|set-equal|arc-midpoint|set-line/ },
-  { verb: 'מקביל/parallel', present: /מקביל|parallel/i, satisfied: /parallel/ },
-  { verb: 'מאונך/perpendicular', present: /מאונ[כך]|perpendicular/i, satisfied: /perpendicular|foot|right-triangle|altitude/ },
+/**
+ * #771 — a family token is evidence only as a WHOLE type/id token.
+ *
+ * `verbEvidence` tests these against `JSON.stringify(command)`, so a bare alternation matches inside a
+ * longer type name: `"parallelogram"` satisfied `/parallel/`, which is how the parallelogram macro
+ * escaped its own gate's false block — by luck, not by evidence. A token now has to end at a
+ * non-alphanumeric character (in JSON: the closing quote, or the `-` inside a compound type such as
+ * `circles-tangent`). Tokens written as an id PREFIX (`"tan-`, `tanaux-`) end in `-` and stay prefixes
+ * by construction.
+ */
+const family = (...tokens: string[]): RegExp =>
+  new RegExp(tokens.map((t) => (t.endsWith('-') ? t : `${t}(?![A-Za-z0-9])`)).join('|'));
+
+interface VerbGate {
+  verb: string;
+  /** The Hebrew stems this gate owns, as declared — the row's vocabulary, readable by tests. */
+  he: string[];
+  /** The English stems, each with its own derivation suffix (`bisect` must reach `bisector`). */
+  en: [string, string?][];
+  present: RegExp;
+  satisfied: RegExp;
+  /** Selects the structural tangency-evidence pass in {@link verbEvidence} (#226). */
+  tangency?: true;
+}
+
+const gate = (g: Omit<VerbGate, 'present'>): VerbGate => ({ ...g, present: gatePresent(g.he, g.en) });
+
+export const VERB_GATES: VerbGate[] = [
+  // "tan- : a REFERENCE to a drawn tangent line ("המשיק חותך…" → line:"tan-A"); tanaux-/tanmid- : the
+  // Thales AUX-CIRCLE construction of an external tangent (tangentFromExternal / tangentsFromExternal,
+  // which emit no literal `tangent` object) — issue #138, ADR-292 regressed the singular form.
+  // `tangency: true` selects the structural evidence pass; it used to be selected by sniffing
+  // `present.source` for a substring, which is the same substring-stands-for-identity defect this
+  // issue closes — and would have broken silently the moment the source was recomposed.
+  gate({ verb: 'משיק/tangent', he: ['משיק'], en: [['tangent']], satisfied: family('tangent', 'circles-tangent', 'set-perpendicular', '"tan-', 'tanaux-', 'tanmid-'), tangency: true }),
+  gate({ verb: 'חוצה/bisect', he: ['חוצ'], en: [['bisect', 's|ed|ing|ors|or|ion']], satisfied: family('bisector', 'midpoint', 'set-angle-ratio', 'set-equal', 'arc-midpoint', 'set-line') }),
+  // `parallelogram` is listed EXPLICITLY: the macro does encode the parallel pairs, so it is genuine
+  // evidence — it simply has to be evidence by intent rather than by substring coincidence (#771).
+  gate({ verb: 'מקביל/parallel', he: ['מקביל'], en: [['parallel']], satisfied: family('parallel', 'parallelogram') }),
+  gate({ verb: 'מאונך/perpendicular', he: [`מאונ${KAF}`], en: [['perpendicular']], satisfied: family('perpendicular', 'foot', 'right-triangle', 'altitude') }),
 ];
 /**
  * WORD-form RELATION givens (#210, ADR-360) — the fourth dropped-given sibling: a relation stated as a
@@ -10304,7 +10351,7 @@ export function droppedWordRelations(utterance: string, commands: AnyCommand[]):
  *  and escalated it to the LLM (prod 0yqufnuv 11:39 — the P1's first half). */
 function verbEvidence(g: (typeof VERB_GATES)[number], commands: AnyCommand[]): AnyCommand[] {
   const ev = commands.filter((c) => g.satisfied.test(JSON.stringify(c)));
-  if (g.present.source.includes('משיק')) {
+  if (g.tangency) {
     const feet = new Map(
       commands.filter((c): c is Extract<AnyCommand, { type: 'foot' }> => c.type === 'foot').map((c) => [c.id, c]),
     );

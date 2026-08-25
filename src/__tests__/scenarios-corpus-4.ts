@@ -2233,4 +2233,24 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs(crossD) / (r * dist(F, E) + 1e-9), 'E on the diameter from F').toBeLessThan(1e-2);
     },
   },
+  {
+    id: 'parallelogram-altitude-not-false-blocked-771',
+    title: '#771: «גובה המקבילית מקודקוד B» commits — the parallel VERB GATE must not fire inside «מקבילית»',
+    guards:
+      "prod window 2026-08-17…24 (log-triage): one user, three submits, all lost. `VERB_GATES.present` was the bare substring /מקביל|parallel/, and the Hebrew for PARALLELOGRAM contains the Hebrew for PARALLEL — so every parallelogram utterance was read as *stating a parallel relation*, and any correct lowering that emitted no `parallel`-typed command was judged to have dropped a given and escalated to the paid LLM, which returned not-understood. The grammar had parsed «גובה המקבילית מקודקוד B» correctly the whole time; the identical משולש twin committed silently. ADR-458 puts the boundary in the lexicon (`HE_END` / `heWord` — the one place Hebrew morphology is defined, and necessary because JS \b is inert around Hebrew letters) and composes the gate rows from it. NOTE the lock that BITES is the harness's corpus-wide gate battery (`gateProps`, widened by this issue from one gate to the whole context-free set): `parse` alone SUCCEEDED before the fix, so a plain scenario would have passed green while the app refused the step.",
+    steps: ['מקבילית ABCD', 'גובה המקבילית מקודקוד B'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), F = at(fig, 'F');
+      const par = (p: Vec, q: Vec, r: Vec, t: Vec) =>
+        Math.abs((q.x - p.x) * (t.y - r.y) - (q.y - p.y) * (t.x - r.x)) / (dist(p, q) * dist(r, t));
+      expect(par(A, B, D, C), 'AB ∥ DC').toBeLessThan(1e-2);
+      expect(par(A, D, B, C), 'AD ∥ BC').toBeLessThan(1e-2);
+      // the altitude from B: F on line CD, and BF ⟂ CD
+      const onCD = Math.abs((D.x - C.x) * (F.y - C.y) - (D.y - C.y) * (F.x - C.x)) / dist(C, D);
+      expect(onCD / dist(A, B), 'F on line CD').toBeLessThan(1e-2);
+      const dot = (F.x - B.x) * (D.x - C.x) + (F.y - B.y) * (D.y - C.y);
+      expect(Math.abs(dot) / (dist(B, F) * dist(C, D)), 'BF ⟂ CD').toBeLessThan(1e-2);
+    },
+  },
 ];

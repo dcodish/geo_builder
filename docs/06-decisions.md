@@ -7682,3 +7682,81 @@ Locks: `diag-shape-noun-770.test.ts` (13 tests — the refusal matrix, the two-q
 the letters run, the kite/cyclic stamps, the compound, end-to-end replay) and the corpus scenario
 `diag-shape-noun-binds-declared-kind` replaying the prod route (inscribed trapezoid + square, each
 crossing asserted on its own shape's diagonals).
+
+## ADR-458 — a gate WORD carries a morphological boundary, and it is defined once in the lexicon (#771)
+
+**Context.** The ADR-292 verb gate's rows were bare substring tests: `{ verb: 'מקביל/parallel',
+present: /מקביל|parallel/i, satisfied: /parallel/ }`. The Hebrew for **parallelogram** is `מקבילית`,
+which *contains* the Hebrew for **parallel** (`מקביל`). So every parallelogram utterance was read as
+*stating a parallel relation*, and any correct lowering that did not happen to emit a `parallel`-typed
+command was judged to have dropped a given — escalated to the paid LLM, which in prod answered
+`not-understood` three times running for «גובה המקבילית מקודקוד B», a sentence the grammar had parsed
+correctly the entire time. The identical `משולש` twin, same two commands, committed silently.
+
+The gate was unsound in **both** directions. «מקבילית ABCD» itself escaped only because its command
+type string is `"parallelogram"`, which contains `parallel` and so satisfied the evidence test — the
+same substring coincidence that caused the bug, working the other way.
+
+This is the **#138/#140 class verbatim** — "a gate validated against some of the constructions carrying
+its word". #140's answer was the catalog-wide false-positive net; that net could not see this, because
+the false block needs a shape noun containing a gate word *and* a construction over that shape, and the
+catalog never puts both in one line.
+
+**Root cause, and why it is not a regex typo.** JavaScript's `\b` is defined over `[A-Za-z0-9_]`, so it
+is **inert around Hebrew letters**: there is no word boundary anywhere inside — or at either end of — a
+Hebrew word, and `/\bמקביל\b/` silently never matches at all. Every Hebrew word pattern in this tree is
+therefore a substring test by default, and the only correct spelling of a Hebrew boundary is an explicit
+lookaround. That is a property of the language and the regex engine, not of this row, so the fix belongs
+where Hebrew morphology is already declared once.
+
+**Decision.**
+
+**1 — The boundary lives in `src/parser/lexicon.ts`** (a docs/17 §3 registered chokepoint whose stated
+job is "morphology handled ONCE"): `HE_END` / `EN_END`, and the `heWord` / `enWord` / `wordForm`
+builders every keyword atom is now composed from. Only the **trailing** side is guarded, deliberately:
+Hebrew clitics (ה/ו/ב/ל/כ/מ/ש) attach at the FRONT, so `המקביל` is the same word, and a leading guard
+would create false NEGATIVES — a dropped given going unnoticed, the dangerous direction. `HE_SUFFIX`
+widened to carry the inflections the boundary now makes load-bearing (`ה` fem sg, `י` construct state),
+so `מקבילה`/`מקבילים`/`מקבילות` keep matching while `מקבילית` does not.
+
+**2 — The gate rows declare their stems and compose `present` from those builders.** They do *not*
+adopt `PERP_KW`/`TANGENT_KW` wholesale: a gate's vocabulary is a policy decision, not a synonym list —
+`PERP_KW` includes `ניצב`, which is also the NOUN for a right triangle's leg, and gating on it would
+demand perpendicularity evidence from «הניצב AB = 3». Same boundary, deliberately different word sets.
+(The atoms had **zero consumers** before this — that is #361, and this is not it: the gates adopting
+the boundary builders is the opportunistic sweep the lexicon's own registry rules call for, not the
+grammar-rule adoption #361 tracks.)
+
+**3 — `satisfied` matches whole tokens.** `parallelogram` satisfying `/parallel/` was luck. A family
+token must now end at a non-alphanumeric character; tokens written as id PREFIXES (`"tan-`, `tanaux-`)
+end in `-` and stay prefixes by construction. `parallelogram` is now listed **explicitly** on the
+parallel row — the macro genuinely does encode the parallel pairs, so it is evidence by intent.
+
+**4 — The structural tangency pass is selected by a declared flag,** not by sniffing `present.source`
+for a substring. That sniff was the same defect in miniature and would have broken silently the moment
+the source was recomposed — as this ADR recomposes it.
+
+**Nets, both widened, because neither would have caught this.**
+
+- `gate-false-positives.test.ts` gains the missing cell as a property over the *patterns*: no gate's
+  `present` may match any shape noun or its inflections. Both vocabularies are imported from the code
+  that owns them (`scope.ts` now exports `SHAPE_NOUNS_HE`/`SHAPE_NOUNS_EN` as lists, `parse.ts` exports
+  `VERB_GATES`), per ADR-W-006 — a hand-listed property cannot fail on the noun nobody thought of.
+- `scenarios-harness.ts`'s `gateProps` ran **one** gate (`droppedConstructNoun`) over the corpus. It now
+  runs the whole **context-free** battery — every gate that is a pure function of `(utterance, commands)`,
+  which is exactly how `submitPipeline` calls them. This is the net that actually bites for #771: `parse`
+  SUCCEEDED before the fix, so the corpus scenario alone would have been green while the app refused.
+  The context-carrying gates (`droppedNewLabels`, `introducedNewLabels`) stay out — they need the
+  figure's points / the LLM's canonical lines, which are not this net's inputs.
+
+**What the widened corpus net found immediately — filed, not fixed here.** «היקף מעגל O1 הוא 6pi»
+parses correctly to `set-radius value:3` and `droppedGivenNumbers` reports `[6]`, so a working,
+operator-reported construct escalates to the paid LLM. The class is *derived* magnitudes: a
+circumference or area given lowers to the radius it implies, and the gate looks for the literal stated
+number among the commands. («6π» with the SYMBOL escapes; «6pi» and a plain «6» do not.) Recorded as a
+NAMED, non-vacuous exemption in the harness — each entry asserts it still fails, so it is deleted by
+whoever fixes it — and filed as its own issue rather than smuggled into this fix.
+
+Locks: `gate-word-boundary-771.test.ts` (13 tests — the reported case, the triangle-twin parity, the
+released family, the English mirror, non-vacuity per row, and the class stated on the mechanism) plus
+the corpus scenario `parallelogram-altitude-not-false-blocked-771` replaying the prod sequence.

@@ -2,10 +2,10 @@
 
 export { parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, impliedPointBinding, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedWordRelations, droppedCompoundRelation, droppedGivenVerbs,
   droppedComparison, droppedRadiusSymbol, introducedNewLabels, droppedRegionSubject, droppedMidsegment, droppedConstructNoun, normalizeUtterance,
-  statedLabelTokens, lowercaseLabelFold, lowercaseMeasureLetters, upperCasedLabelCandidate } from './parse';
+  statedLabelTokens, lowercaseLabelFold, lowercaseMeasureLetters, upperCasedLabelCandidate, VERB_GATES } from './parse';
 export type { ParseResult, ParseContext } from './parse';
 export { buildParseCtx } from './context';
-export { classifyOutOfScope, looksCompound, looksLikeLatex, splitGuidance, statedNegation, wordRootMagnitude } from './scope';
+export { classifyOutOfScope, looksCompound, looksLikeLatex, splitGuidance, statedNegation, wordRootMagnitude, SHAPE_NOUNS_HE, SHAPE_NOUNS_EN } from './scope';
 export type { ScopeCategory, ScopeMatch } from './scope';
 export { COMMAND_CATALOG, CATEGORY_ORDER, CATEGORY_LABELS } from './catalog';
 export type { CommandDoc, Category } from './catalog';

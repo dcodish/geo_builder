@@ -34,7 +34,18 @@
  */
 
 import { expect } from 'vitest';
-import { droppedConstructNoun } from '@/parser';
+import {
+  droppedComparison,
+  droppedCompoundRelation,
+  droppedConstructNoun,
+  droppedGivenNumbers,
+  droppedGivenRelations,
+  droppedGivenVerbs,
+  droppedMidsegment,
+  droppedRadiusSymbol,
+  droppedRegionSubject,
+  droppedWordRelations,
+} from '@/parser';
 import { replay, meetsRequirements, useGeoStore } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { freeDofs } from '@/engine';
@@ -306,17 +317,90 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 };
 
 /**
- * Corpus-wide FALSE-POSITIVE net for the construct-noun honesty gate (#456, ADR-430).
+ * Corpus-wide FALSE-POSITIVE net for the honesty-gate BATTERY (#456/ADR-430; widened by #771).
  *
  * A honesty gate is only as good as its generosity: one that refuses working input is strictly worse
- * than the silent drop it replaces, and 3-D's first draft of this gate false-flagged 28 working inputs.
- * Every committed step of every reported-bug scenario is, by definition, input that must keep working —
- * so the whole corpus doubles as the net. Runs against the fact list the shard already built, so it
- * costs no extra solve (ADR-394: a corpus-wide property lives HERE, called per-scenario, never in a new
- * file that would re-pay every cold replay).
+ * than the silent drop it replaces, and 3-D's first draft of the construct-noun gate false-flagged 28
+ * working inputs. Every committed step of every reported-bug scenario is, by definition, input that
+ * must keep working — so the whole corpus doubles as the net. Runs against the fact list the shard
+ * already built, so it costs no extra solve (ADR-394: a corpus-wide property lives HERE, called
+ * per-scenario, never in a new file that would re-pay every cold replay).
  *
- * Counts the steps it actually examined so a signature change can't make it pass vacuously.
+ * #771 WIDENED IT FROM ONE GATE TO THE WHOLE CONTEXT-FREE BATTERY. The parallelogram false block
+ * (`מקביל` matching inside `מקבילית`) was invisible to every net we had: `gate-false-positives.test.ts`
+ * only reaches lines that appear in the CATALOG, and this net only ran `droppedConstructNoun` — so a
+ * corpus scenario could commit a step the submit path would have refused, and nothing said so. The
+ * membership rule is mechanical: every gate that is a pure function of `(utterance, commands)` runs
+ * here. The context-carrying gates (`droppedNewLabels`, `introducedNewLabels`) are deliberately out —
+ * they need the figure's existing points / the LLM's canonical lines, which are not this net's inputs.
+ *
+ * Counts the steps AND the gate calls it actually made, so a signature change cannot make it pass
+ * vacuously.
  */
+const CONTEXT_FREE_GATES: Record<string, (u: string, cmds: AnyCommand[]) => unknown[] | boolean> = {
+  droppedComparison,
+  droppedCompoundRelation,
+  droppedConstructNoun,
+  droppedGivenNumbers,
+  droppedGivenRelations,
+  droppedGivenVerbs,
+  droppedMidsegment,
+  droppedRadiusSymbol,
+  droppedRegionSubject,
+  droppedWordRelations,
+};
+
+/**
+ * #771 — the KNOWN, PRE-EXISTING false blocks the widened net surfaced on its first run.
+ *
+ * Every entry is a step that PARSES correctly and is then refused by an honesty gate, i.e. a supported
+ * construct escalating to the paid LLM. All four were measured to behave identically on `main` before
+ * this issue's fix, so none is a regression from it — they are what the net was blind to while it ran
+ * a single gate. They are NOT fixed here: this round item is #771, and inventing a diagnosis for four
+ * more gates to keep the loop moving is exactly what the escalation rule forbids. They are filed.
+ *
+ * The entry is a LEDGER, not a mute: an exemption asserts that the step still FAILS, so whoever fixes
+ * one is told by a red test to delete its row. A silenced cell is indistinguishable from a cell nobody
+ * checked — the lesson #140 was filed to record.
+ */
+const KNOWN_GATE_FALSE_BLOCKS: { scenario: string; gate: string; utterance: string; issue: string; why: string }[] = [
+  {
+    scenario: 'tangent-circles-named-then-circumference',
+    gate: 'droppedGivenNumbers',
+    utterance: 'היקף מעגל O1 הוא 6pi',
+    issue: '#784',
+    why: 'a DERIVED magnitude: the circumference given lowers to the radius it implies (set-radius value:3), so the stated 6 appears in no command. «6π» with the SYMBOL escapes; the word «6pi» and a plain «6» do not.',
+  },
+  {
+    scenario: 'tangent-from-external-D-then-pinned-by-extension',
+    gate: 'droppedGivenVerbs',
+    utterance: 'המשך CA נפגש עם המשיק בנקודה D',
+    issue: '#785',
+    why: 'the tangent is REFERENCED, not stated: the lowering is a bare set-line onto the already-drawn tangent, so no tangency token is minted and the family-presence fallback finds no evidence.',
+  },
+  {
+    scenario: 'incremental-midsegment-resolves-triangle-from-figure',
+    gate: 'droppedGivenVerbs',
+    utterance: 'GE קטע אמצעים מקביל ל AB',
+    issue: '#785',
+    why: 'the midsegment lowering (midpoint, midpoint, segment) ENCODES the parallelism by construction — the midsegment theorem — so no `parallel` command is emitted and the gate reads the stated «מקביל» as dropped.',
+  },
+  {
+    scenario: 'corner-tangent-circle',
+    gate: 'droppedGivenVerbs',
+    utterance: 'AB ו- AD משיקים למעגל O',
+    issue: '#785',
+    why: 'the corner-tangent lowering encodes tangency STRUCTURALLY (bisector + two feet + circle-through). The #226 structural pass covers foot+point-on-circle, not foot+circle-through, so the evidence walk finds nothing.',
+  },
+  {
+    scenario: 'corner-tangent-circle-grows-to-vertex',
+    gate: 'droppedGivenVerbs',
+    utterance: 'AB ו- AD משיקים למעגל O',
+    issue: '#785',
+    why: 'same utterance and same lowering as `corner-tangent-circle`.',
+  },
+];
+
 export function gateProps(sc: Scenario, facts: Fact[], c: { gateChecked: number }): void {
   const key = (f: Fact) => f.group ?? f.id;
   const order: string[] = [];
@@ -329,10 +413,24 @@ export function gateProps(sc: Scenario, facts: Fact[], c: { gateChecked: number 
   for (const g of order) {
     const { utterance, cmds } = byGroup.get(g)!;
     c.gateChecked++;
-    expect(
-      droppedConstructNoun(utterance, cmds),
-      `[${sc.id}] droppedConstructNoun must not refuse a working step: «${utterance}»`,
-    ).toEqual([]);
+    for (const [name, gate] of Object.entries(CONTEXT_FREE_GATES)) {
+      const v = gate(utterance, cmds);
+      const clean = typeof v === 'boolean' ? !v : v.length === 0;
+      const known = KNOWN_GATE_FALSE_BLOCKS.find((k) => k.scenario === sc.id && k.gate === name && k.utterance === utterance);
+      if (known) {
+        // Non-vacuous by construction: the ledger entry must still be TRUE, so a fix turns this red
+        // and the row gets deleted rather than quietly outliving the defect it documents.
+        expect(
+          clean,
+          `[${sc.id}] ${name} on «${utterance}» is a KNOWN false block (${known.issue}) that now PASSES — delete its row from KNOWN_GATE_FALSE_BLOCKS`,
+        ).toBe(false);
+        continue;
+      }
+      expect(
+        clean,
+        `[${sc.id}] ${name} must not refuse a working step: «${utterance}» → ${JSON.stringify(v)}`,
+      ).toBe(true);
+    }
   }
 }
 

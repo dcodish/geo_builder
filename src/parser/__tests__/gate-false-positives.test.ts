@@ -35,6 +35,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   COMMAND_CATALOG,
+  SHAPE_NOUNS_EN,
+  SHAPE_NOUNS_HE,
+  VERB_GATES,
   droppedCompoundRelation,
   droppedComparison,
   droppedConstructNoun,
@@ -120,5 +123,54 @@ describe('#140 — no supported catalog example trips ANY honesty gate', () => {
     // the verb is stated, the commands carry no tangency — exactly the #138 shape, inverted.
     const ex = 'מנקודה E משיק נוגע במעגל O בנקודה D';
     expect(droppedGivenVerbs(ex, [{ type: 'segment', a: 'E', b: 'D' } as AnyCommand]).length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * #771 — THE CELL THIS NET WAS MISSING: a shape NOUN that CONTAINS a gate word.
+ *
+ * The catalog net above runs the gates over every supported example, and it still shipped #771,
+ * because the false block needs two things the catalog never puts in one line: a shape whose noun
+ * contains a gate word, and a construction over that shape whose correct lowering does not happen to
+ * emit the gate's own command. «מקבילית ABCD» alone escaped — its command type is `parallelogram`,
+ * which used to satisfy `/parallel/` on the same substring coincidence that caused the bug — so the
+ * gate looked clean while every OTHER parallelogram utterance (altitude, diagonal, area, angle) was
+ * being escalated to the paid LLM.
+ *
+ * So the property is stated on the PATTERNS, not on sampled sentences: a gate's `present` may match
+ * its own word and its own inflections, and must not match inside a shape noun. Both vocabularies are
+ * imported from the code that owns them (ADR-W-006 — the nouns are `scope.ts`'s list, the gates are
+ * `parse.ts`'s array), so a noun or a gate added later is covered here without anyone remembering to
+ * come back.
+ */
+describe('#771 — no gate word matches inside a shape noun', () => {
+  const NOUNS = [
+    ...SHAPE_NOUNS_HE.flatMap((n) => [n, `ה${n}`, `${n}ים`, `${n}ות`]),
+    ...SHAPE_NOUNS_EN.flatMap((n) => [n, `${n}s`]),
+  ];
+
+  it('every gate present-pattern is clean over every shape noun and its inflections', () => {
+    const hits: string[] = [];
+    for (const g of VERB_GATES) for (const n of NOUNS) if (g.present.test(n)) hits.push(`${g.verb} matches «${n}»`);
+    expect(hits, `a gate word matches inside a shape noun — the #771 class:\n  ${hits.join('\n  ')}`).toEqual([]);
+  });
+
+  it('the property is not vacuous — the pre-fix pattern would fail it', () => {
+    // The exact row as it shipped: no boundary, so the Hebrew for parallelogram matches inside.
+    const unbounded = /מקביל|parallel/i;
+    expect(NOUNS.some((n) => unbounded.test(n))).toBe(true);
+    // …and every gate carries a real word, so the patterns are not empty.
+    expect(VERB_GATES.length).toBeGreaterThanOrEqual(4);
+    for (const g of VERB_GATES) expect(g.present.source.length).toBeGreaterThan(4);
+  });
+
+  it('a family token is evidence only as a WHOLE token — `parallelogram` is listed, never sniffed', () => {
+    const parallel = VERB_GATES.find((g) => g.verb.includes('parallel'))!;
+    // Listed on purpose: the macro really does encode the parallel pairs.
+    expect(parallel.satisfied.test('{"type":"parallelogram"}')).toBe(true);
+    // But a longer type that merely CONTAINS a family token is not evidence.
+    const perp = VERB_GATES.find((g) => g.verb.includes('perpendicular'))!;
+    expect(perp.satisfied.test('{"type":"footballer"}')).toBe(false);
+    expect(perp.satisfied.test('{"type":"foot","from":"B"}')).toBe(true);
   });
 });

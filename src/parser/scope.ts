@@ -256,8 +256,14 @@ export function looksCompound(utterance: string): boolean {
  */
 const SENTENCE_SPLIT = /(?:\.\s+|\s*;\s*|\s*\n\s*|\.\s*$)/;
 const RELATION_OP = /=|≠|⟂|⊥|∥|>|<|שווה\s+ל|שווים|מקביל|מאונך|ניצב|ישרה/;
-const SHAPE_NOUN =
-  /(?:משולש|מרובע|ריבוע|מלבן|מעוין|מעויין|טרפז|מקבילית|דלתון|מחומש|משושה)|\b(?:triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite|pentagon|hexagon)\b/i;
+/** The polygon nouns, as a LIST and not only as a regex — #771 needs to iterate them. The honesty
+ *  gates' catalog net asserts that no gate WORD matches inside one of these (the Hebrew for
+ *  parallelogram CONTAINS the Hebrew for parallel, and `parallel` is a prefix of `parallelogram` in
+ *  English — the pair that shipped the bug), and a property whose nouns were hand-listed in the test
+ *  could not fail on the noun nobody thought of. Derived, per ADR-W-006. */
+export const SHAPE_NOUNS_HE = ['משולש', 'מרובע', 'ריבוע', 'מלבן', 'מעוין', 'מעויין', 'טרפז', 'מקבילית', 'דלתון', 'מחומש', 'משושה'];
+export const SHAPE_NOUNS_EN = ['triangle', 'quadrilateral', 'square', 'rectangle', 'rhombus', 'trapezoid', 'parallelogram', 'kite', 'pentagon', 'hexagon'];
+const SHAPE_NOUN = new RegExp(`(?:${SHAPE_NOUNS_HE.join('|')})|\\b(?:${SHAPE_NOUNS_EN.join('|')})\\b`, 'i');
 const tidy = (p: string) => p.replace(/\s+/g, ' ').trim().replace(/[.,;]+$/, '');
 
 export function splitGuidance(utterance: string): ScopeMatch | null {

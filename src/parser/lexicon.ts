@@ -40,21 +40,68 @@ export const NUM = String.raw`-?\d+(?:\.\d+)?`;
 /** Hebrew kaf in both positional forms — the ADR-3D-035 recorded trap (`מאונ[ךכ]` — a final-ך-only
  *  gate silently rejects the plural `מאונכים`, where kaf is medial). */
 export const KAF = String.raw`[כך]`;
-/** Hebrew optional plural/feminine verb suffix (masc pl / fem pl / fem sg). */
-export const HE_SUFFIX = String.raw`(?:ים|ות|ת)?`;
+/** Hebrew optional inflection on an adjective/participle stem: masc pl (`מקבילים`), fem pl
+ *  (`מקבילות`), fem sg (`מאונכת`, `מקבילה`), and the CONSTRUCT state (`חוצי זווית`, `משיקי המעגל`).
+ *  Longest-first so a greedy read takes `ים` before `י`; the {@link HE_END} boundary makes the order
+ *  immaterial, but it keeps the intent readable. */
+export const HE_SUFFIX = String.raw`(?:יים|ים|ות|ה|ת|י)?`;
+
+/**
+ * #771 — THE MORPHOLOGICAL BOUNDARY, the thing every Hebrew word pattern in this tree was missing.
+ *
+ * JavaScript's `\b` is defined over `[A-Za-z0-9_]`, so it is **inert around Hebrew letters**: there
+ * is no word boundary anywhere inside — or at either end of — a Hebrew word, and `/\bמקביל\b/`
+ * silently never matches at all. Every Hebrew keyword pattern therefore behaves as a bare SUBSTRING
+ * test, and a stem that is the prefix of a longer, unrelated word matches inside it.
+ *
+ * Not hypothetical: the Hebrew for **parallelogram** is `מקבילית`, which contains the Hebrew for
+ * **parallel** (`מקביל`), so the ADR-292 verb gate read every parallelogram utterance as *stating a
+ * parallel relation* and false-blocked the tool's own correct parses to the paid LLM (#771).
+ *
+ * Only the TRAILING side is guarded, deliberately: Hebrew clitics (ה/ו/ב/ל/כ/מ/ש) attach at the
+ * FRONT of a stem, so `המקביל` / `ולמקביל` are the same word, and a leading guard would create false
+ * NEGATIVES — a dropped given going unnoticed, which is the dangerous direction. A stem may be
+ * followed by its own inflection ({@link HE_SUFFIX}) and by nothing else Hebrew.
+ */
+export const HE_END = String.raw`(?![א-ת])`;
+/** The English twin. `\b` does work for Latin, but spelling it as a lookahead keeps the two halves of
+ *  a bilingual pattern symmetrical — and `parallel` ⊂ `parallelogram` is the same trap in English. */
+export const EN_END = String.raw`(?![A-Za-z])`;
+
+/** A Hebrew stem plus its own inflection, bounded: matches the word and its forms, never inside a
+ *  longer word. NO capture group — wrap at the use site. */
+export const heWord = (stem: string): string => String.raw`(?:${stem})${HE_SUFFIX}${HE_END}`;
+/** The English twin. `suffix` is per-word because English derivation is not uniform: `bisect` must
+ *  still reach `bisector`, while `parallel` must NOT reach `parallelogram`. */
+export const enWord = (stem: string, suffix = String.raw`s?`): string => String.raw`(?:${stem})(?:${suffix})${EN_END}`;
+/**
+ * A bilingual WORD-form keyword — {@link heWord} | {@link enWord}, the shape every atom below uses.
+ *
+ * The honesty battery's `VERB_GATES` (`parse.ts`) composes through these same helpers, which is what
+ * makes #771's class closed rather than its one row fixed: one boundary rule, one place.
+ */
+export const wordForm = (he: string, en: string, enSuffix = String.raw`s?`): string =>
+  String.raw`${heWord(he)}|${enWord(en, enSuffix)}`;
+
 /** The angle noun — single-vav and double-vav spellings (the ADR-3D-032 class: `זוית` keystrokes are
- *  as common as the full `זווית`), plus the symbol and the English word. */
-export const ANGLE_KW = String.raw`(?:∠|זו?וית|angle)`;
+ *  as common as the full `זווית`), plus the symbol and the English word. The stem stops before the
+ *  ת so {@link HE_SUFFIX} supplies both the singular (`זווית`) and the plural (`זוויות`). */
+export const ANGLE_KW = String.raw`(?:∠|${wordForm(String.raw`זו?וי`, 'angle')})`;
 /** Perpendicular (word forms): מאונך/מאונכת/מאונכים/מאונכות + English. Symbol ⟂/⊥ handled where
- *  symbols are read. */
-export const PERP_KW = String.raw`(?:מאונ${KAF}${HE_SUFFIX}|ניצב${HE_SUFFIX}|perpendicular)`;
-/** Parallel (word forms). */
-export const PARALLEL_KW = String.raw`(?:מקביל${HE_SUFFIX}|parallel)`;
+ *  symbols are read. NOTE `ניצב` is also the NOUN for a right triangle's LEG («הניצב AB»), so a
+ *  consumer that must not read a leg as a stated perpendicularity picks its own stems (the honesty
+ *  gates do exactly that) rather than taking this atom whole. */
+export const PERP_KW = String.raw`(?:${heWord(`מאונ${KAF}`)}|${heWord('ניצב')}|${enWord('perpendicular')})`;
+/** Parallel (word forms). The `מקביל` ⊂ `מקבילית` / `parallel` ⊂ `parallelogram` pair is #771's. */
+export const PARALLEL_KW = String.raw`(?:${wordForm('מקביל', 'parallel')})`;
 /** Meet/cut verbs — the ADR-3D-055 lesson: BOTH nun forms (`נפגש` meet, `פוגש`), both cut families
  *  (`חותך`, `נחתך`), medial-kaf plurals included via KAF+suffix. */
-export const MEET_KW = String.raw`(?:נ?פגש${HE_SUFFIX}|פוגש${HE_SUFFIX}|נ?חת${KAF}${HE_SUFFIX}|חות${KAF}${HE_SUFFIX}|meets?|intersects?|cuts?|crosses)`;
+export const MEET_KW = String.raw`(?:${heWord(String.raw`נ?פגש`)}|${heWord('פוגש')}|${heWord(`נ?חת${KAF}`)}|${heWord(`חות${KAF}`)}|${enWord('meet')}|${enWord('intersect')}|${enWord('cut')}|${enWord('cross', String.raw`es`)})`;
 /** Tangent (word forms): משיק/משיקים/tangent. */
-export const TANGENT_KW = String.raw`(?:משיק${HE_SUFFIX}|tangent)`;
+export const TANGENT_KW = String.raw`(?:${wordForm('משיק', 'tangent')})`;
+/** Bisect (word forms): חוצה/חוצי/חוצים/חוצות + the English derivation family — `bisector` included,
+ *  which is why this stem declares its own `enSuffix`. */
+export const BISECT_KW = String.raw`(?:${wordForm('חוצ', 'bisect', String.raw`s|ed|ing|ors|or|ion`)})`;
 
 // ── Gate-neutral vocabulary (#497 — the fail-closed leftover gate) ───────────────────────────────
 /** Hebrew tokens a shape rule may legitimately leave unconsumed: bare connectives/copulas a construct
