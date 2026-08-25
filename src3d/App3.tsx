@@ -202,6 +202,7 @@ export default function App3() {
   const canRedo3 = useStore(useGeo3.temporal, (s) => s.futureStates.length > 0);
   const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>(''); // #742: top-row copy feedback
   const lastError = useGeo3((s) => s.lastError);
+  const lastNotice = useGeo3((s) => s.lastNotice); // #613 — the statement succeeded and added nothing
   const submit = useGeo3((s) => s.submit);
   const toggle = useGeo3((s) => s.toggle);
   const remove = useGeo3((s) => s.remove);
@@ -596,6 +597,11 @@ export default function App3() {
                       : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
             </div>
           ))}
+          {lastNotice && !lastError && !busy && (
+            <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+              {t('notice.alreadyStated', { utterance: lastNotice.utterance })}
+            </div>
+          )}
           {guidanceNote && !lastError && !busy && (
             <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {guidanceNote}

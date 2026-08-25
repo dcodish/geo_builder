@@ -1367,3 +1367,60 @@ invariant 1 from being re-opened by a normalisation added later.
 Related: #778 (the umbrella), #779 (the P1 the case half exposes), #777 (the same "teach what is missing
 rather than guess" spine on an incomplete comparative), [ADR-289](06-decisions.md#adr-289) and
 ADR-3D-040 (the guidance registers), [ADR-W-029](#adr-w-029), [ADR-052](06-decisions.md#adr-052).
+
+## ADR-W-031 — A restated fact SUCCEEDS, appends no row, and says so — in every product (#613)
+
+**Operator ruling (2026-08-16):** *"if a fact is already known - it should not be added. this is true to
+all tools."*
+
+**Context.** In 3-D, restating a fact that is already true added a **second identical row**:
+
+| sequence | rows |
+| --- | --- |
+| «פירמידה SABC» + «משולש ABC» + «משולש ABC» | **3** |
+| «פירמידה SABC» + «זווית ABC = 90» ×2 | **3** |
+
+M1 idempotency is implemented at **apply** — a statement about existing objects correctly returns the
+construction unchanged — but the **store** appended any utterance that applied `ok`, and an idempotent
+no-op applies `ok`. So the engine was right and the fact list still grew.
+
+Nothing is geometrically wrong: the figure is identical and deleting either row leaves the other. It
+matters because **the fact list is the tool's record of the student's own reasoning**, and it is what
+`.geo3.json` saves and replays. A student who restates a given three times while exploring gets a list
+that reads as three givens, and every replay re-pays their solve cost.
+
+**Decision — option (b), as ruled: the submit SUCCEEDS, no row is appended, and a notice says the
+statement was already stated.** Option (a) (refuse, naming the row it repeats) is rejected: a refusal
+for something that is not an error reads harshly, and restating a given while exploring is not a
+mistake. Option (c) (today's behaviour, on the reasoning that the list mirrors what was typed) is
+rejected by the ruling.
+
+**Two facts are the same STATEMENT when their lowered commands are structurally equal.** Compared on
+the commands and never on the utterance — «משולש ABC» and «triangle ABC» are one statement in two
+languages — and the round-trip serializer already relies on exactly this equality. It is a **store-level
+rule about restating a fact, NOT a per-command check**: putting it in a command is the enumeration habit
+this workspace keeps paying for.
+
+**What each product had to do, measured before building (the ruling required it).**
+
+- **2-D — already conformant, and nothing was changed.** `foldFact` has deduped a restated command since
+  FR-EN-9 (`commitCommands` does not even `set` when the fold returns the same array), and the submit
+  path already answers «זה כבר קיים באיור — אין מה להוסיף». That is option (b) exactly. What it lacked
+  was a TEST tying it to this rule, which it now has: an invariant with a conformant product and no
+  test is one refactor away from a non-conformant product with no test.
+- **3-D — the port.** The store now finds a structurally-equal twin before appending, succeeds without
+  a row, and publishes `lastNotice: { code: 'already-stated', utterance }` — a NOTICE channel distinct
+  from `lastError`, because this is a success. A **disabled** twin is re-enabled rather than duplicated,
+  mirroring 2-D's FR-EN-9. The notice names the row it repeats and is cleared by the next statement.
+- **complex — nothing yet, deliberately.** Its line list is not the same structure (lines, not lowered
+  facts), and #613's comparison is defined on commands. Recorded here as the open cell rather than
+  invented: it joins the conformance matrix (unify A5, #664) as a known n/a-or-todo, not as a silent gap.
+
+**Why the notice is not an error.** The three surfaces now agree: the figure is unchanged, the list is
+unchanged, and the student is told why — instead of a repeat producing either a silent no-op (which
+reads as "the tool ignored me") or a red refusal (which reads as "you were wrong").
+
+Locks: `src3d/__tests__/restate-dedupe-613.test.ts` (8 tests — the three reported sequences, the notice
+and what it names, the notice being cleared by the next statement, the disabled-twin re-enable, a
+DIFFERENT statement still appending, and the cross-language identity) and the 2-D conformance block in
+`src/app/__tests__/submitPipeline.test.ts`.

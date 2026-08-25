@@ -289,7 +289,11 @@ describe('#552 — honesty boundaries', () => {
 
   it('re-declaring is idempotent; a clash with a DEFINED line refuses', () => {
     build(['ישר l1', 'ישר l1']);
-    expect(state().facts, 're-declaring is a no-op fact, not an error').toHaveLength(2);
+    // #613 (ADR-W-031): still NOT an error — the restatement succeeds — but it no longer appends a
+    // second row. M1 idempotency was already right at apply; the store was the half that leaked.
+    expect(state().lastError, 're-declaring is not an error').toBeNull();
+    expect(state().facts, 'and it adds no row: the figure already says it').toHaveLength(1);
+    expect(state().lastNotice?.code, 'the success is announced, not silent').toBe('already-stated');
     state().clear();
     build(['הישר l1: x=(0,0,0)+t(1,0,0)']);
     submit('ישר l1');

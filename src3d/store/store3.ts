@@ -522,6 +522,13 @@ export interface Geo3State {
   facts: Fact3[];
   seed: number;
   lastError: StoreError3;
+  /**
+   * #613 (ADR-W-031) — the statement SUCCEEDED and added nothing, because the figure already says it.
+   * Not an error: the student is not wrong, they repeated themselves, and a refusal for something that
+   * is not a mistake reads harshly (option (a), rejected by the operator's ruling). Cleared by every
+   * other submit, so it never lingers over an unrelated line.
+   */
+  lastNotice: { code: 'already-stated'; utterance: string } | null;
   submit: (utterance: string) => void;
   /** Add ONE fact from LLM-normalised canonical lines (each re-parsed deterministically; all-or-nothing). */
   submitSteps: (utterance: string, steps: string[]) => void;
@@ -559,6 +566,16 @@ export interface Geo3State {
   reportLoadError: (reason: 'bad-file' | 'newer-schema') => void;
 }
 
+/**
+ * #613 — two facts are the SAME STATEMENT when their lowered commands are structurally equal.
+ *
+ * Compared on the COMMANDS, never on the utterance: «משולש ABC» and «triangle ABC» are one statement in
+ * two languages, and the round-trip serializer already relies on structural equality of commands. Order
+ * matters — a command list is a sequence, and two different orderings are not obviously the same claim.
+ */
+const sameStatement = (a: readonly Command3[], b: readonly Command3[]): boolean =>
+  a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
+
 export const useGeo3 = create<Geo3State>()(
   temporal(
     (set, get) => ({
@@ -568,6 +585,7 @@ export const useGeo3 = create<Geo3State>()(
       planeDisplay: {},
       figureName: '',
       lastError: null,
+      lastNotice: null,
 
       submit: (utterance) => {
         utterance = stripFormatControls(utterance); // #751 (ADR-W-029) — the store-side ingest invariant
@@ -605,6 +623,22 @@ export const useGeo3 = create<Geo3State>()(
           set({ lastError: { code: 'dropped-given', items: lostDet.join(', ') } });
           return;
         }
+        // #613 (ADR-W-031, operator ruling 2026-08-16: "if a fact is already known - it should not be
+        // added. this is true to all tools") — a RESTATED fact succeeds and appends no row. M1
+        // idempotency is at APPLY, where a statement about existing objects correctly returns the
+        // construction unchanged; the STORE then appended anyway, so the fact list — the record of what
+        // the student stated, and what `.geo3.json` saves and replays — grew entries that state nothing.
+        // This is the store-level rule 2-D has always had in `foldFact`, which is why this is a port and
+        // not a new mechanism. A disabled twin is RE-ENABLED rather than duplicated (2-D's FR-EN-9).
+        const twin = facts.find((f) => sameStatement(f.cmds, parsed.commands));
+        if (twin) {
+          set({
+            facts: twin.enabled ? facts : facts.map((f) => (f.id === twin.id ? { ...f, enabled: true } : f)),
+            lastError: null,
+            lastNotice: { code: 'already-stated', utterance: twin.utterance },
+          });
+          return;
+        }
         const fact: Fact3 = { id: nanoid(8), utterance: utterance.trim(), cmds: parsed.commands, enabled: true };
         const candidate = [...facts, fact];
         const st = derive3(candidate, seed).status[fact.id];
@@ -620,7 +654,7 @@ export const useGeo3 = create<Geo3State>()(
           set({ lastError: { code: 'bound-unsatisfiable', id: '' } });
           return;
         }
-        set({ facts: candidate, seed: found, lastError: null });
+        set({ facts: candidate, seed: found, lastError: null, lastNotice: null });
       },
 
       submitSteps: (utterance, steps) => {
@@ -664,7 +698,7 @@ export const useGeo3 = create<Geo3State>()(
           set({ lastError: st });
           return;
         }
-        set({ facts: candidate, lastError: null });
+        set({ facts: candidate, lastError: null, lastNotice: null });
       },
 
       toggle: (factId) =>
@@ -724,7 +758,7 @@ export const useGeo3 = create<Geo3State>()(
         return true;
       },
 
-      clear: () => set({ facts: [], queries: [], planeDisplay: {}, figureName: '', lastError: null }),
+      clear: () => set({ facts: [], queries: [], planeDisplay: {}, figureName: '', lastError: null, lastNotice: null }),
 
       // A query is a QUESTION about the figure, never a fact (ADR-3D-057): it never enters replay.
       // Duplicates are dropped (asking twice adds nothing); trimmed; capped so the panel stays sane.

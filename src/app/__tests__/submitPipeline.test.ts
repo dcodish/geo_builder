@@ -342,3 +342,42 @@ describe('#786 — the clause-fallback lane still builds these (recorded, not fi
     expect(llmParseMock, 'the deterministic lane owns it — no LLM cost either way').not.toHaveBeenCalled();
   });
 });
+
+/**
+ * #613 (ADR-W-031) — the 2-D CONFORMANCE lock for the cross-product rule.
+ *
+ * The operator's ruling ("if a fact is already known - it should not be added. this is true to all
+ * tools") widened #613 from a 3-D fix to a workspace rule, and the ruling required measuring 2-D for
+ * the same defect before building. Measured: 2-D does NOT have it. `foldFact` has deduped a restated
+ * command since FR-EN-9, and the submit path already answers with «זה כבר קיים באיור» — succeed, no
+ * row, and say so, which is exactly option (b).
+ *
+ * So nothing was changed here, and these tests exist to keep it that way: the rule is now a workspace
+ * invariant, and an invariant with a conformant product and no test is one refactor from being a
+ * non-conformant product with no test.
+ */
+describe('submit pipeline — a restated fact succeeds, adds no row, and says so (#613)', () => {
+  it('the second «ריבוע ABCD» adds nothing and answers with the already-drawn note', async () => {
+    const { deps: d1 } = makeDeps();
+    await runSubmit('ריבוע ABCD', d1);
+    const before = useGeoStore.getState().facts;
+    expect(before.length).toBeGreaterThan(0);
+
+    const { deps, calls, notes } = makeDeps();
+    await runSubmit('ריבוע ABCD', deps);
+    expect(useGeoStore.getState().facts, 'the fact list is untouched').toBe(before);
+    expect(notes()[0], 'the success is legible, not silent').toContain('input.alreadyDrawn');
+    expect(calls.cleared, 'the input is cleared — this SUCCEEDED').toBe(1);
+    expect(llmParseMock, 'never a paid call for a repeat').not.toHaveBeenCalled();
+  });
+
+  it('an ordinary new statement is unaffected — no note, and the row lands', async () => {
+    const { deps: d1 } = makeDeps();
+    await runSubmit('ריבוע ABCD', d1);
+    const before = useGeoStore.getState().facts.length;
+    const { deps, notes } = makeDeps();
+    await runSubmit('נקודה G על AD', deps);
+    expect(notes()).toEqual([]);
+    expect(useGeoStore.getState().facts.length).toBeGreaterThan(before);
+  });
+});
