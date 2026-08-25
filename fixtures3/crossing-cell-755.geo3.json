@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "app": "3d-builder",
-  "savedAt": "2026-08-19T20:18:39.699Z",
+  "savedAt": "2026-08-25T20:05:46.494Z",
   "seed": 0,
   "facts": [
     {
@@ -63,12 +63,6 @@
       "utterance": "G נקודת חיתוך של CC' עם מישור ADE",
       "cmds": [
         {
-          "type": "line-through",
-          "name": "CC'",
-          "a": "C",
-          "b": "C'"
-        },
-        {
           "type": "plane-through",
           "name": "ADE",
           "ids": [
@@ -78,10 +72,11 @@
           ]
         },
         {
-          "type": "line-plane-point",
+          "type": "plane-cut",
           "id": "G",
-          "line": "CC'",
-          "plane": "ADE"
+          "plane": "ADE",
+          "a": "C",
+          "b": "C'"
         }
       ]
     }

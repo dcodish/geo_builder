@@ -1137,6 +1137,10 @@ export type EngineError3 =
   | { code: 'wrong-side-of-plane'; id: Id } // a stated above/below does not hold for the point
   | { code: 'not-on-line'; id: Id } // a stated on-line membership does not hold
   | { code: 'line-misses-plane'; id: Id } // ℓ ∥ π at the chosen parameter — no crossing point
+  // #780: the plane crosses the LINE through the stated segment, but outside the drawn ink. The
+  // student pointed at an edge, so a crossing beyond its endpoints is not on the figure — refuse
+  // honestly rather than silently extending their segment into a line (which is what used to happen).
+  | { code: 'crossing-off-segment'; id: Id }
   | { code: 'symbolic-new-point'; id: Id } // a NEW point with symbolic components is under-determined
   | { code: 'injection-unsatisfiable' } // no placement of the figure matches the injected COORDINATES
   // #425: the same "no placement" finding on a figure whose pins are not coordinates (angles, equal

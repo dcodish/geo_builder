@@ -2420,16 +2420,25 @@ const crossingPoint: Rule = (s) => {
   if (lineOp.kind === 'line')
     return [...materialisePlane, { type: 'line-plane-point', id, line: canonLineName(lineOp.name), plane: planeName }];
 
-  // segment side. π-name → `plane-cut` (the shipped V8-b lowering: the segment is a reference, not a
-  // new object). Point run → name the carrier line first, then cut it — the shipped #333-era lowering,
-  // which is also what makes the referenced edge/diagonal VISIBLE on the figure it was stated about.
-  if (planeOp.kind === 'plane-named') return [{ type: 'plane-cut', id, plane: planeName, a: lineOp.a, b: lineOp.b }];
-  const carrier = `${lineOp.a}${lineOp.b}`;
-  return [
-    { type: 'line-through', name: carrier, a: lineOp.a, b: lineOp.b },
-    ...materialisePlane,
-    { type: 'line-plane-point', id, line: carrier, plane: planeName },
-  ];
+  // SEGMENT side → `plane-cut` (the V8-b lowering: the segment is a REFERENCE, not a new object),
+  // whatever form the plane took.
+  //
+  // #780 — this used to fork on the PLANE's form, which had nothing to do with the operand: a π-name
+  // referenced the segment, while a point-run plane first minted `line-through` for the carrier. On a
+  // solid that is catastrophic — «G נקודת חיתוך של CC' עם מישור ADE» on a תיבה grew a full-height
+  // vertical line through an EDGE the student was merely pointing at, and «הקטע» made no difference
+  // because both spellings produced byte-identical commands.
+  //
+  // ADR-3D-164 (#755) taught the MATCHER that a student's crossing line is drawn ink; the lowering
+  // then converted it back into an unbounded line object, undoing the fix at the last step. #756's
+  // own offer half already gets this right — it derives candidates from the solids' edges and bounds
+  // segments to 0 < t < 1, "because a crossing outside the ink is not on the figure". One definition
+  // of the lines in this figure, now used by BOTH paths.
+  //
+  // A named line the student declared themselves (`ישר ℓ`) keeps the unbounded `line-plane-point`
+  // route above: that is the drawn-ink-vs-declared-line distinction #755 taught the matcher, and the
+  // lowering now asks the same question the matcher already answers.
+  return [...materialisePlane, { type: 'plane-cut', id, plane: planeName, a: lineOp.a, b: lineOp.b }];
 };
 
 /** `ℓ אינו מקביל ל-π לכל m` / `ℓ is not parallel to plane π for every m` — the 2024-א probe, a CLAIM. */

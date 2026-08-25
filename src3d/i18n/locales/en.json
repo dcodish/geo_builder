@@ -92,6 +92,7 @@
     "freeSizeClaim": "The '{{id}}' has no stated sizes — give a radius/height before a volume or area claim",
     "twoUnknowns": "A vector relation may define only one unknown point ('{{id}}' is a second)",
     "lineMissesPlane": "The line is parallel to the plane at the chosen parameter value — no crossing point '{{id}}'",
+    "crossingOffSegment": "The crossing point '{{id}}' falls outside the stated segment — the plane cuts the line through it, but not the segment itself",
     "sizeOnSolid": "A numeric size on a free-dimension solid isn't supported here yet",
     "boundUnsatisfiable": "No configuration of the figure puts the angle at {{id}} inside the stated bound",
     "incircleNeedsTriangle": "An inscribed circle can only be drawn in a triangle — a general quadrilateral has none.",

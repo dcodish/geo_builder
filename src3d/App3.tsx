@@ -113,6 +113,8 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.notOnLine', { id: err.id });
     case 'line-misses-plane':
       return t('err.lineMissesPlane', { id: err.id });
+    case 'crossing-off-segment':
+      return t('err.crossingOffSegment', { id: err.id });
     case 'symbolic-new-point':
       return t('err.symbolicNewPoint', { id: err.id });
     case 'injection-unsatisfiable':

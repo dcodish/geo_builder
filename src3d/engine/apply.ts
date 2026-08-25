@@ -877,6 +877,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (missing) return { ok: false, error: missing };
       const next = clone(c);
       next.points.set(cmd.id, { kind: 'plane-cut', plane: cmd.plane, a: cmd.a, b: cmd.b });
+      // #780 — the student REFERENCED a straight carrier. If it is not already ink (a solid's edge or a
+      // drawn segment), draw it as a SEGMENT so the crossing has something to sit on. That visibility is
+      // the one thing the retired `line-through` lowering did right, kept here BOUNDED: the referenced
+      // edge/diagonal becomes visible without an edge being misrepresented as an infinite line.
+      // `hasSegment` already looks in both the solids' edges and the segment list, so this is idempotent.
+      if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]);
       return { ok: true, next };
     }
 

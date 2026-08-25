@@ -52,9 +52,13 @@ describe('#755 — the line∩plane crossing cell is total', () => {
     for (const u of phrasings('SA', 'π', 'E', 'המישור ', 'plane ')) expect(types(u)).toEqual(['plane-cut']);
   });
 
-  it('segment × point run → the carrier is named, the run materialised, then the crossing', () => {
+  // #780 (ADR-3D-165): this cell used to name a CARRIER LINE first — `line-through` + `line-plane-point`
+  // — which drew a full unbounded line through an operand that was already an edge of the solid. The
+  // operand's reading must not depend on how the student named the PLANE, so the segment side now takes
+  // the same `plane-cut` lowering the π-name case above has always had: a reference, not a new object.
+  it('segment × point run → the run is materialised, then the segment is CUT (no line minted)', () => {
     for (const u of phrasings("AC'", 'ADE', 'G', 'מישור ', 'plane '))
-      expect(types(u)).toEqual(['line-through', 'plane-through', 'line-plane-point']);
+      expect(types(u)).toEqual(['plane-through', 'plane-cut']);
   });
 
   it("the operator's exact line, and the variants the report lists", () => {
@@ -65,15 +69,14 @@ describe('#755 — the line∩plane crossing cell is total', () => {
       "G חיתוך המישור ADE עם AC'",
     ])
       expect(cmds(u)).toEqual([
-        { type: 'line-through', name: "AC'", a: 'A', b: "C'" },
         { type: 'plane-through', name: 'ADE', ids: ['A', 'D', 'E'] },
-        { type: 'line-plane-point', id: 'G', line: "AC'", plane: 'ADE' },
+        { type: 'plane-cut', id: 'G', plane: 'ADE', a: 'A', b: "C'" },
       ]);
   });
 
   it('the noun is optional on the line side — the #333 form no longer needs «הישר»', () => {
-    expect(types("הישר A'C חותך את המישור BC'D בנקודה K")).toEqual(['line-through', 'plane-through', 'line-plane-point']);
-    expect(types("A'C חותך את המישור BC'D בנקודה K")).toEqual(['line-through', 'plane-through', 'line-plane-point']);
+    expect(types("הישר A'C חותך את המישור BC'D בנקודה K")).toEqual(['plane-through', 'plane-cut']);
+    expect(types("A'C חותך את המישור BC'D בנקודה K")).toEqual(['plane-through', 'plane-cut']);
   });
 
   it('the shipped π-name lowerings are byte-for-byte what they were (V8-b)', () => {

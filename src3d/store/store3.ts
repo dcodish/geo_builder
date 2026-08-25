@@ -396,6 +396,26 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
           status[f.id] = { code: 'line-misses-plane', id: cmd.id }; // parallel at the chosen parameter
           break;
         }
+      } else if (cmd.type === 'plane-cut') {
+        // #780 — BOUND THE CROSSING TO THE INK, matching #756's offer half ("a crossing outside the
+        // ink is not on the figure"). The operand is a drawn segment — a solid's edge or an auxiliary
+        // segment — so a crossing beyond its endpoints means the plane misses what the student pointed
+        // at. The point is still placed (the evaluator solves the line/plane pair); this is the honest
+        // status that used to be hidden by lowering the segment to an unbounded line.
+        const P = positions.get(cmd.id);
+        const A = positions.get(cmd.a);
+        const B = positions.get(cmd.b);
+        if (!P || !A || !B) {
+          status[f.id] = { code: 'line-misses-plane', id: cmd.id }; // ∥ to the plane — no crossing at all
+          break;
+        }
+        const dir = sub3(B, A);
+        const len2 = dot3(dir, dir);
+        const t = len2 > 1e-18 ? dot3(sub3(P, A), dir) / len2 : -1;
+        if (!(t > -1e-9 && t < 1 + 1e-9)) {
+          status[f.id] = { code: 'crossing-off-segment', id: cmd.id };
+          break;
+        }
       } else if (cmd.type === 'on-line') {
         const p = positions.get(cmd.id);
         const ln = resolved.lines.get(cmd.line);

@@ -4473,3 +4473,69 @@ rather than as instances, plus the operator's exact line and byte-for-byte prese
 π-name lowerings; `src3d/__tests__/crossing-dots.test.ts` covers the solid figure end-to-end, the
 bounded rule, the surviving honesty gates and a no-dot-explosion bound; and
 `fixtures3/crossing-cell-755.geo3.json` locks the operator's session through the real load path.
+
+## ADR-3D-165 — the TYPED crossing binds drawn ink and is bounded by it (#780)
+
+**Context — the operator, playing round #768.** The clickable half of #756 validated. The **typed**
+half did not:
+
+```
+תיבה ABCDA'B'C'D'
+E אמצע BB'
+מישור ADE
+G נקודת חיתוך של CC' עם מישור ADE
+```
+
+`G` landed correctly on the edge — and the canvas grew a **full-height vertical line** labelled `CC'`,
+running far above `C'` and far below `C`. `CC'` is already an **edge of the תיבה**; the student was
+pointing at drawn ink, not asking for a new object. And «הקטע CC'» — the student explicitly BOUNDING
+the operand — produced byte-identical commands, so a stated word was consumed and discarded.
+
+**Root cause: the lowering forked on the PLANE's form, which has nothing to do with the operand.**
+
+```
+G … של CC' עם מישור π     → plane-cut                        ← references the segment (correct)
+G … של CC' עם מישור ADE   → line-through + line-plane-point  ← mints an unbounded line
+```
+
+The `plane-cut` branch was written for π-named planes and the `line-through` branch for point-run
+planes, so an accident of how the student named the PLANE decided whether their SEGMENT was
+re-created as an infinite line.
+
+That is the [ADR-3D-164](#adr-3d-164) class one step further on. #755 taught the **matcher** that a
+student's crossing line is drawn ink; the lowering then converted it back into a named line object,
+undoing the fix at the last step. The ADR recorded that unifying the drawing "changes shipped figures
+and wants the operator's eye" — this is that eye, and the answer is that it should not draw a new
+line. The sharpest evidence was internal: **#756's own offer half already gets it right**, deriving
+candidates from the solids' edges and bounding segments to `0 < t < 1` "because a crossing outside the
+ink is not on the figure". The two halves of one round disagreed about the same operand.
+
+**Decision.**
+
+1. **A SEGMENT operand lowers to `plane-cut`, whatever form the plane took.** The segment is a
+   reference; no line object is minted. One definition of "the lines in this figure", used by both
+   paths — which is what #756 built and what the typed path was ignoring.
+2. **The crossing is bounded to the ink.** A new status `crossing-off-segment` fires when the crossing
+   parameter falls outside the stated segment: the plane cuts the LINE through it, but not the segment
+   the student pointed at. Matching the offer's `0 < t < 1` exactly. Previously this could not even be
+   detected, because lowering to an unbounded line made every crossing "on" the carrier by definition —
+   the honest refusal was hidden by the bug.
+3. **A line the student DECLARED (`ישר ℓ`) keeps the unbounded `line-plane-point` route.** Drawing it
+   as a full line is correct there. The distinction is drawn-ink-vs-declared-line — exactly the
+   question #755 taught the matcher, now asked by the lowering too.
+
+**On «הקטע», and why it is no longer dropped.** The issue asked that the word reach the lowering. It
+now does, in the only way that is honest: the bounded, segment-referencing reading it states IS the
+default for a segment operand, so the two spellings agreeing is the word being **confirmed**, not
+discarded — and the lowering they agree on is the one «הקטע» describes. Before this ADR they agreed on
+the lowering it *contradicts*, which is what made the silence a drop. A test asserts both halves (the
+spellings match, and what they match on is `plane-cut`).
+
+**Shipped-figure change, recorded rather than absorbed:** `fixtures3/crossing-cell-755.geo3.json` — the
+seeded session for #755, which contains the operator's exact sequence — is regenerated. Its stored
+lowering loses the `line-through` and its `line-plane-point` becomes `plane-cut`. That diff is the
+visible record of the behaviour change this ADR authorises.
+
+Locks: `typed-crossing-ink-780.test.ts` (5 tests — no line object minted, the plane's form no longer
+decides how the operand is read, «הקטע» confirms rather than changes, a declared line stays unbounded,
+and the operator's figure end to end with `G` strictly inside `CC'`) plus the regenerated fixture.
