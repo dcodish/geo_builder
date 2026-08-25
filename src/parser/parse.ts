@@ -4074,23 +4074,58 @@ const setRadius: Rule = (s, ctx) => {
  * the single circle in context. Only the radius-of-circle reference may precede the copula — anything
  * else is a compound (defer).
  */
+/** A circle NOUN standing before the size keyword — the shape of a circle CREATION description
+ *  («circle O with radius 5», «מעגל O שרדיוסו R») as opposed to a statement ABOUT a circle
+ *  («רדיוס מעגל O הוא R»). Extracted so `setRadius` and `radiusSymbolStatement` ask it the same way. */
+const nounFirst = (s: string): boolean => {
+  const noun = s.search(/circle|מעגל/i);
+  return noun >= 0 && noun < s.search(/radius|רדיוס/i);
+};
+
 const radiusSymbolStatement: Rule = (s, ctx) => {
   if (!/radius|רדיוס/i.test(s)) return null;
   if (sizeStatementLeftover(s)) return null; // a construction carrying a size clause — not a naming statement
-  const m = s.match(/(?:הוא|היא|=|\bis\b)\s*([A-Za-z])\s*\.?\s*$/);
+  // #772 — THE VALUE SLOT, read the way the NUMERIC lane reads it: the copula is OPTIONAL.
+  // «רדיוס המעגל 5» has always built without one (`setRadius` just looks for a number anywhere), while
+  // the symbolic twin «רדיוס המעגל R» demanded «הוא»/«=» and went not-handled — so a student stating an
+  // R-parameterised circle, which is the bagrut norm, had to re-declare the whole circle to attach its
+  // radius (prod session ah1kqxz5). One slot, two value KINDS; not a fifth radius rule.
+  //
+  // The lookbehind is what keeps the copula-less form honest: the letter must start its own token, so a
+  // glued run («רדיוס OB» — a drawn radius segment, `radiusSegment`'s) is never read as a symbol name.
+  const m = s.match(/(?:(?:הוא|היא|=|\bis\b)\s*)?(?<![A-Za-z\d])([A-Za-z])\s*\.?\s*$/);
   if (!m || m.index === undefined) return null;
   const head = s.slice(0, m.index);
+  // Without a copula, a trailing letter after a BARE circle noun is the circle's NAME, not its radius's
+  // («רדיוס מעגל P» = "the radius of circle P", still awaiting a value). A DEFINITE noun is already a
+  // complete reference, so the letter after it is the value («רדיוס המעגל R», "radius of the circle R").
+  // (Hebrew glues the article — «המעגל» is one token, so the `(?:^|\s)` anchor already excludes it;
+  // English needs "the" spelled out.)
+  const bareCircleTail = /(?:^|\s)(?:circle|מעגל)\s*(?:של\s*)?$/i.test(head) && !/\bthe\s+circles?\s*$/i.test(head);
+  if (!/(?:הוא|היא|=|\bis\b)\s*$/.test(head)) {
+    if (bareCircleTail) return null;
+    // …and the copula-less form claims only the KEYWORD-FIRST shape this rule is written for — "a
+    // statement ABOUT a circle". A NOUN-FIRST description («circle O with radius R», «מעגל O שרדיוסו R»)
+    // is a circle CREATION and belongs to `circle`, in every context. The copula used to supply that
+    // separation for free; without one it has to be stated, or the catalog's own creation form flips
+    // owner the moment its circle exists (caught by the shadow-matrix hard gate).
+    if (nounFirst(head)) return null;
+  }
   // A NAMED «מעגל X» form may be FRESH (#538 — the reference flows to the implied-creation + naming-by-
   // use binding) when the radius keyword LEADS («רדיוס מעגל O1 הוא R»); a noun-first creation
   // («מעגל O שרדיוסו R») stays with `circle`. The lone-circle fallback requires that one circle to exist.
   const center = circleCenter(head) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
   if (!center) return null;
+  // The letter must not BE the circle — «רדיוס המעגל O» on circle O names the circle, not a fresh
+  // measure, and binding it would quietly turn a point label into a radius symbol (#772).
+  if (up(m[1]) === up(center)) return null;
   if (!(ctx.circles ?? []).some((c) => up(c) === up(center))) {
     const noun = head.search(/circle|מעגל/i);
     if (noun >= 0 && noun < head.search(/radius|רדיוס/i)) return null;
   }
   const leftover = head
-    .replace(/radius|רדיוס\S*|circles?|ה?מעגל\w*|של/gi, ' ')
+    .replace(/(?:הוא|היא|=|\bis\b)\s*$/, ' ') // the optional copula, when the slot took one (#772)
+    .replace(/radius|ה?רדיוס\S*|circles?|ה?מעגל\w*|של/gi, ' ')
     .replace(new RegExp(String.raw`\b${center}\b`, 'gi'), ' ')
     .replace(FILLER, ' ')
     .trim();

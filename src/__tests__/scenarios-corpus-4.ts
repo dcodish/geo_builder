@@ -2253,4 +2253,36 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs(dot) / (dist(B, F) * dist(C, D)), 'BF ⟂ CD').toBeLessThan(1e-2);
     },
   },
+  {
+    id: 'copula-less-symbolic-radius-binds-existing-circle-772',
+    title: '#772: «רדיוס המעגל R» binds R to the circle already drawn — the prod session without its re-declaration workaround',
+    guards:
+      "prod session ah1kqxz5 (log-triage window 2026-08-17…24): a bagrut circle problem that was otherwise almost entirely deterministic — 12 of 14 submits parsed — lost «רדיוס המעגל R» to the LLM, which built nothing, and the student RE-DECLARED the whole circle («מעגל שרדיוסו R ומרכזו O») to attach its radius. Root cause: the radius statement's value slot was number-only when the copula was absent — `setRadius` never needed one (it looks for a number anywhere in the line), while the symbolic twin demanded «הוא»/«היא»/«=»/is. Every neighbouring form took a symbol; only this one spelling did not, and an R-parameterised circle is the bagrut norm. ADR-459 reads the value slot once for both KINDS, with the separation the copula used to supply now stated explicitly (a NOUN-FIRST description is still a circle CREATION — caught by the shadow-matrix hard gate during the fix; a BARE circle noun is awaiting its name; the letter may not be the circle's own centre). These are the session's own rows with the workaround replaced by the statement the student first tried.",
+    steps: [
+      'מעגל שמרכזו O',
+      'רדיוס המעגל R', // the row prod lost — the whole point of the scenario
+      'B ו C על המעגל',
+      'המשיק בנקודה C והמשך BO נפגשים בנקודה A',
+      'נקודה D היא מפגש המעגל עם AB',
+      'AD = 18R/7',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // ONE circle: the student never had to re-declare it, which is the workaround this fix removes
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles.length, 'no second circle was minted').toBe(1);
+      expect((circles[0] as { radiusSymbol?: string }).radiusSymbol, 'R is bound to the DRAWN circle').toBe('R');
+      const r = fig.circles.get('circle-O')!.r;
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      for (const [id, P] of [['B', B], ['C', C], ['D', D]] as const) {
+        expect(dist(O, P) / r, `${id} on the circle`).toBeCloseTo(1, 3);
+      }
+      expect(dist(O, A) / r, 'A is OUTSIDE the circle (the tangent/extension meeting point)').toBeGreaterThan(1);
+      // the tangent at C really is tangent: OC ⟂ CA
+      const dot = (A.x - C.x) * (O.x - C.x) + (A.y - C.y) * (O.y - C.y);
+      expect(Math.abs(dot) / (dist(A, C) * r), 'OC ⟂ CA (tangent at C)').toBeLessThan(1e-2);
+      // and R is genuinely PARAMETRIC: the later measure is honoured in units of the circle's radius
+      expect(dist(A, D) / r, '|AD| = 18R/7').toBeCloseTo(18 / 7, 2);
+    },
+  },
 ];

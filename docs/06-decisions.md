@@ -7760,3 +7760,55 @@ whoever fixes it — and filed as its own issue rather than smuggled into this f
 Locks: `gate-word-boundary-771.test.ts` (13 tests — the reported case, the triangle-twin parity, the
 released family, the English mirror, non-vacuity per row, and the class stated on the mechanism) plus
 the corpus scenario `parallelogram-altitude-not-false-blocked-771` replaying the prod sequence.
+
+## ADR-459 — the radius statement's VALUE SLOT is read once, for both value KINDS (#772)
+
+**Context.** «רדיוס המעגל 5» built; «רדיוס המעגל R» did not. Every neighbouring form took a symbol —
+«רדיוס המעגל הוא R», «רדיוס המעגל = R», «רדיוס = R», «רדיוס מעגל O הוא R», "the radius of circle O is
+R" — and only the copula-less spelling was `not-handled`. The cause is a plain asymmetry between two
+rules that split the same statement: `setRadius` (numeric) never needed a copula, because it simply
+looks for a number anywhere in the line; `radiusSymbolStatement` (symbolic) demanded
+«הוא»/«היא»/«=»/"is" before the letter. Dropping the copula was therefore fine for a number and fatal
+for a symbol.
+
+In prod (session ah1kqxz5) that cost a student a turn on a bagrut circle problem that was otherwise
+almost entirely deterministic — 12 of 14 submits parsed — and their recovery was to **re-declare the
+whole circle** («מעגל שרדיוסו R ומרכזו O») just to attach its radius. That is the incremental-building
+premise failing at its most ordinary step, on the R-parameterised circle that is the bagrut norm.
+
+**Decision — fix the slot, not the phrasing.** The copula is OPTIONAL in the symbolic lane, exactly as
+it always was in the numeric one, so the two value KINDS take the same path. This adds no rule: a fifth
+radius rule for one more spelling is the enumeration habit, and it would have left «הרדיוס R» (which
+also failed, and which the issue asked us to check) still broken.
+
+**What the copula was silently doing, now stated.** A required copula was separating three things by
+accident, so removing it means saying them:
+
+1. **A NOUN-FIRST description is a circle CREATION.** «circle O with radius R» / «מעגל O שרדיוסו R»
+   describe a circle being introduced; «רדיוס … R» is a statement ABOUT one. The rule's own doc already
+   drew that line, but only enforced it for a FRESH name. The copula-less slot must respect it in
+   **every** context — otherwise the catalog's own creation form flips owner the moment its circle
+   exists. Caught by the `shadow-matrix` hard gate mid-fix (`radiusSymbolStatement → circle`, on
+   "circle O with radius R"), which is exactly what that gate is for; the test is now `nounFirst`,
+   shared with `setRadius`'s fresh-name guard.
+2. **A BARE circle noun is awaiting its NAME, not a value.** «רדיוס מעגל P» means "the radius of circle
+   P" and states no magnitude, so it stays `not-handled`. A DEFINITE noun is already a complete
+   reference, so the letter after it IS the value — «רדיוס המעגל R», "radius of the circle R". Hebrew
+   glues the article, so `המעגל` is one token and the anchor excludes it for free; English needs "the"
+   spelled out.
+3. **The letter may not BE the circle.** «רדיוס המעגל O» on circle O names the circle, not a fresh
+   measure; binding it would quietly turn a point label into a radius symbol.
+
+A lookbehind keeps the value letter to its own token, so a glued run («רדיוס OB» — a drawn radius
+segment, `radiusSegment`'s) is never read as a symbol name. The leftover strip also learned the Hebrew
+definite article on the radius keyword itself (`ה?רדיוס`, mirroring the `ה?מעגל` entry beside it) —
+which is why «הרדיוס הוא R» was failing even WITH a copula.
+
+**Not in scope, deliberately:** #54's binding and #198's "a bound radius letter is PARAMETRIC, never a
+node" are unchanged — this ADR only widens which spellings reach them. The scenario proves the reach:
+the stated `AD = 18R/7` is honoured in units of the circle's own radius.
+
+Locks: `radius-symbol-slot-772.test.ts` (18 tests — the reported hole, the nine-form slot parity, the
+number/symbol equivalence, the lowercase bagrut letter, and each of the three separations above) plus
+the corpus scenario `copula-less-symbolic-radius-binds-existing-circle-772`, which replays the prod
+session's own rows with the workaround replaced by the statement the student first tried.
