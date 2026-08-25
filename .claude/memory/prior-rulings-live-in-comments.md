@@ -1,25 +1,36 @@
 ---
 name: prior-rulings-live-in-comments
-description: An issue body's "open question" is often already answered in a comment on it or a sibling issue — scan before presenting a decision as open
+description: An issue body is written once and never revised — the ruling may be in a comment, and the WORK may already have shipped; verify against comments AND git before presenting anything as open
 metadata:
   type: feedback
 ---
 
-Before surfacing an issue's "open design question" to the operator as undecided, read the issue's
-COMMENTS and those of its siblings. Issue bodies are written once at triage and never revised, so a
-question the body poses may already have been ruled on — sometimes months earlier, sometimes on a
-related issue rather than this one.
+Issue bodies are written once at triage and never revised. Before surfacing an issue's "open
+question" as undecided, check two things — the comments, **and the code**.
 
-On 2026-08-16 I presented #509's A/B/C option list as an open decision and recommended B (the issue
-body's own recommendation). The operator replied *"I already said in the past that option A is the
-right way to go"* — the ruling existed; my report re-litigated it and pushed the opposite answer.
+**1 — the ruling may already be in a comment.** On 2026-08-16 I presented #509's A/B/C options as
+open and recommended B (the body's own recommendation). The operator replied *"I already said in the
+past that option A is the right way to go."* The ruling existed; my report re-litigated it and pushed
+the opposite answer.
 
-**Why:** re-asking a settled question wastes the operator's turn and, worse, a recommendation that
-contradicts an earlier ruling can talk them out of their own decision. The whole point of the
-status report is that they decide once.
+**2 — the WORK may already have shipped, and comments alone will not tell you.** On 2026-08-25 I
+listed #659 ("span accounting has been SHADOW-ONLY, blocked on unknown-word debt and a stale report")
+as a live decision. Every clause was false: the flip merged 2026-08-19 (PR #759, ADR-453) and had
+been in prod six days, the report was re-run, and the 76-word debt was zero — it had been three
+matcher defects, not missing vocabulary. I had read the newest comment; it argued *for* the flip
+(evidence from #779), so it read as still-pending. The announcement was an OLDER comment, and the
+decisive proof was `git log -- <the module>`, which I only ran because a follow-up question made me
+look again.
 
-**How to apply:** when a body says "needs a ruling" / "operator to decide", fetch
-`gh issue view N --json comments` for that issue AND the ones it cross-references before listing it
-under Decisions. If a ruling is found, record it as decided and arm the issue instead. Several
-issues in this queue (#537, #342, #370, #364, #578) show the pattern — bodies still posing questions
-that comments answered. Related: [[status-update-arming]].
+**Why:** re-asking a settled question wastes the operator's turn, and a recommendation that
+contradicts an earlier ruling can talk them out of their own decision. Presenting shipped work as
+pending is worse — it makes the whole report untrustworthy, since the operator cannot tell which
+other rows are stale.
+
+**How to apply:** for any issue you are about to list under Decisions or grade as open work —
+`gh issue view N --json comments` for it and its cross-references (newest comment is NOT enough —
+read the run), **and** `git log --oneline -- <the file or module it names>` plus a `grep` for the
+mechanism. If it shipped, say so, close the issue, and note the discrepancy rather than quietly
+correcting the report. When a body and the code disagree, **the code wins** — then post a comment
+saying the body is stale, so the next reader is not caught by the same thing. Related:
+[[gate-lines-are-read-not-matched]] (the sibling rule: evidence produced is not evidence read).
