@@ -28,10 +28,12 @@ export const VARIANT_COUNT: Record<VariantShape, number> = { kite: 2, isosceles:
 /** A `set-equal` argument tuple `[a,b,c,d]` meaning |ab| = |cd|. */
 type EqTuple = [Id, Id, Id, Id];
 
-/** The base shape command (the polygon the equalities flex into the named shape). */
+/** The base shape command (the polygon the equalities flex into the named shape). `declaredAs` carries
+ *  the variant's NOUN through to the polygon stamp (#770) — a kite's ring is declared «דלתון», not a
+ *  generic quad, so «אלכסוני הדלתון» can resolve on it. */
 function baseCommand(shape: VariantShape, ids: Id[]): Command {
   return shape === 'kite'
-    ? { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] }
+    ? { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]], declaredAs: 'kite' }
     : { type: 'triangle', ids: [ids[0], ids[1], ids[2]] };
 }
 

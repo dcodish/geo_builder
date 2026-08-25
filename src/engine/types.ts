@@ -435,6 +435,10 @@ export interface Polygon {
   kind: 'polygon';
   id: Id;
   vertices: Id[];
+  /** The shape KIND the student DECLARED this ring as («טרפז ABCD» → 'trapezoid') — #770: a definite
+   *  shape reference («אלכסוני הריבוע») resolves on the stated noun, so the figure must remember what
+   *  each polygon was declared to be. Absent on generic rings (the bare `polygon` command). */
+  declaredAs?: string;
 }
 
 /**
@@ -972,12 +976,12 @@ export interface Construction {
 /** Commands the engine applies. The parser (Phase 4) will produce these. */
 export type Command =
   | { type: 'square'; ids: [Id, Id, Id, Id]; side?: number }
-  | { type: 'quadrilateral'; ids: [Id, Id, Id, Id] }
+  | { type: 'quadrilateral'; ids: [Id, Id, Id, Id]; declaredAs?: string } // declaredAs: the variant noun a shape-variant lowering carries through its base command ('kite', #770)
   | { type: 'parallelogram'; ids: [Id, Id, Id, Id] }
   | { type: 'rectangle'; ids: [Id, Id, Id, Id] }
   | { type: 'rhombus'; ids: [Id, Id, Id, Id] }
   | { type: 'trapezoid'; ids: [Id, Id, Id, Id] }
-  | { type: 'triangle'; ids: [Id, Id, Id] }
+  | { type: 'triangle'; ids: [Id, Id, Id]; declaredAs?: string }
   // Right angle at the LAST id. `rot` (#566, ADR-445) is the SOLVE-CHOSEN seat of the unstated right
   // angle — like `branch`, never parser-emitted: the config search sets it when the default seat admits
   // only a degenerate figure and another vertex admits a real one (1 → the first id, 2 → the second).

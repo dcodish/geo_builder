@@ -210,6 +210,15 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     pctx = buildParseCtx(d.construction, d.positions);
     r = parse(utterance, pctx);
   }
+  // #770 — a definite SHAPE reference whose named kind is not in the figure («אלכסוני הריבוע» on a
+  // trapezoid-only figure): refuse naming the statement, keep the text. Deterministic — the LLM could
+  // only bind something the student did not say (ADR-052).
+  if (!r.ok && r.reason === 'shape-not-found') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `shape-not-found:${r.noun}` });
+    ui.setInputNote(t('input.shapeNotFound', { noun: r.noun }));
+    ui.setBusy(false);
+    return;
+  }
   // A single-vertex angle ("∠B = 90") the parser flagged as ambiguous (the vertex has ≠2 edges, so WHICH
   // angle is meant is unclear) — ask the student to name all three letters instead of escalating to the LLM
   // (which would only guess). Keep the text so they can edit it into the three-letter form.

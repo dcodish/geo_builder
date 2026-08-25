@@ -2153,6 +2153,27 @@ export const SCENARIOS_4: Scenario[] = [
     },
   },
   {
+    id: 'diag-shape-noun-binds-declared-kind',
+    title: '#770 P1: «אלכסוני ה<shape>» binds the ring DECLARED that kind — inscribed trapezoid + square, each crossing on its own shape',
+    guards:
+      "prod session ejvpktqh (log-triage 2026-08-24): «אלכסוני הריבוע נפגשים בנקודה M» on a trapezoid figure drew the TRAPEZOID's diagonals with a green ✓ — the resolver bound 'the unique quadrilateral' and read the stated noun as decoration — and with TWO quads both statements deferred to the LLM (which lost them: invented-labels). ADR-457: polygons are stamped with the declared kind at creation (incl. the cyclic route's generic-quadrilateral base, which carries it via declaredAs), the resolver matches the stated noun against declared kinds, refuses BY NAME (shape-not-found) when the named kind is absent, and a noun that matches exactly one of several quads BINDS it.",
+    steps: ['טרפז ABCD חסום במעגל', 'ריבוע CDFG', 'אלכסוני הטרפז נפגשים בנקודה K', 'אלכסוני הריבוע נפגשים בנקודה M'],
+    check(fig) {
+      allStepsOk(fig);
+      const on = (p: Vec, a: Vec, b: Vec, label: string) => {
+        const cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+        expect(Math.abs(cross) / (dist(a, b) || 1), label).toBeLessThan(1e-6);
+      };
+      // K is the TRAPEZOID's diagonal crossing (AC × BD)...
+      on(at(fig, 'K'), at(fig, 'A'), at(fig, 'C'), 'K on AC');
+      on(at(fig, 'K'), at(fig, 'B'), at(fig, 'D'), 'K on BD');
+      // ...and M is the SQUARE's (CDFG: diagonals C–F and D–G) — never the trapezoid's under the square's name.
+      on(at(fig, 'M'), at(fig, 'C'), at(fig, 'F'), 'M on CF');
+      on(at(fig, 'M'), at(fig, 'D'), at(fig, 'G'), 'M on DG');
+      expect(dist(at(fig, 'K'), at(fig, 'M')), 'the two crossings are distinct points').toBeGreaterThan(0.1);
+    },
+  },
+  {
     id: 'bare-label-run-declares-quadrilateral',
     title: '#505: the bare «Abcd» opener declares quadrilateral ABCD deterministically',
     guards:

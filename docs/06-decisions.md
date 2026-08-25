@@ -7642,3 +7642,43 @@ student's own text** — `corrected` (and the failed-parse candidate) is built f
 only the case lift applied, so normalization folds (עיגול→מעגל) never leak into what the student is told
 to type; the message itself is one short reason + the corrected line, and the i18n bidi post-processor
 (#464) isolates its Latin runs at render.
+
+## ADR-457 — a definite shape reference resolves on the DECLARED kind, and the figure remembers what each ring was declared to be (#770, P1)
+
+Prod session `ejvpktqh`: «אלכסוני הריבוע נפגשים בנקודה M» on a trapezoid-only figure drew the
+TRAPEZOID's diagonals with a green ✓ — a wrong-but-plausible figure, the stated noun silently
+discarded — and beside a second quad both diagonal statements deferred to the LLM, which lost them
+(`invented-labels`). Root cause: `specialPointMeet` resolved the shape by DOF-shape ("the unique
+quadrilateral in the figure"), so the noun the student wrote was decoration.
+
+**1 — The figure carries the declaration.** `Polygon.declaredAs` stamps the shape KIND the student
+named, threaded through every declaration route: the shape cases (`square`/`rectangle`/`rhombus`/
+`trapezoid`/`parallelogram`/`quadrilateral`/`triangle`/`right-triangle`), the M1 constraint-lowering
+path, the kite's `shape-variant` base command (`declaredAs: 'kite'` on the generic quadrilateral it
+expands to), and the CYCLIC route — whose generic-quadrilateral base carries the noun via the new
+optional `declaredAs` on the `quadrilateral`/`triangle` commands (measured: «טרפז ABCD חסום במעגל»
+lowers to `quadrilateral` + `set-parallel`, so without the stamp an inscribed trapezoid was
+unresolvable by name). `buildParseCtx` exposes `declaredPolygons`, and the clause-fallback context
+augmentation carries kinds too, so a compound behaves like two lines.
+
+**2 — The resolver matches the noun.** For the diagonals family: a lettered qualifier keeps its
+precedence; a LETTERS run after the construct noun («אלכסוני ABCD») binds directly (two quads used to
+defer a fully-determined statement); a DEFINITE kind noun binds the single declared ring of that kind,
+REFUSES BY NAME when none exists — the new typed refusal `shape-not-found`, surfaced as
+`input.shapeNotFound` naming the student's own word (the honesty invariant: the message names the
+conflicting statement), deterministic and pre-LLM — and defers only when two rings of the SAME named
+kind exist. The generic nouns («המרובע»/quadrilateral) and the n=3 families keep the unique-ring
+behaviour, as does a context without kind info (hand-built test contexts).
+
+**3 — A #779-class bug inside the qualifier, found by the En mirror.** `shapeM`'s label capture was
+`[A-Za-z]`, so "the diagonals of the square MEET at M" read the word "meet" as the four labels
+M,E,E,T and bound a phantom ring. The capture is now uppercase-run only — a lowercase qualifier takes
+the #779 candidate nudge instead, one convention everywhere.
+
+Sibling product (ADR-W-004): 3-D resolution is at apply over typed operands (no definite-noun
+resolver of this shape); no port needed.
+
+Locks: `diag-shape-noun-770.test.ts` (13 tests — the refusal matrix, the two-quad disambiguation,
+the letters run, the kite/cyclic stamps, the compound, end-to-end replay) and the corpus scenario
+`diag-shape-noun-binds-declared-kind` replaying the prod route (inscribed trapezoid + square, each
+crossing asserted on its own shape's diagonals).

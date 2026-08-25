@@ -135,6 +135,9 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // idempotent construct reuse
     tangentAuxes: construction.objects.flatMap((o) => (o.kind === 'circle' && o.id.startsWith('tanaux-') ? [o.id] : [])), // existing Thales tangent-aux circles — a 2nd single tangent from the SAME apex takes the OTHER branch (issue #142)
     polygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])), // definite "the quad" binds to the existing one
+    // #770: the DECLARED kind travels with each ring, so a definite shape noun («אלכסוני הריבוע»)
+    // resolves on what the student named, never on "whichever quad exists".
+    declaredPolygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [{ vertices: o.vertices, kind: o.declaredAs }] : [])),
     // Every circle pair's MUTUAL POSITION (from the drawn seed, tangency tol-based) — the two-touch
     // common-tangent CAPACITY depends on it (#197 Am. 4): disjoint 4, externally tangent / intersecting
     // 2 (the remaining tangents pass through the touch / don't exist), internally tangent or contained 0.

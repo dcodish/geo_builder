@@ -30,6 +30,10 @@ export type ParseResult =
   // WHICH angle is meant is ambiguous (or its arms don't exist yet). Surfaced as a clarification — "name all
   // three letters" — NOT escalated to the LLM (which would only guess). `vertex` is the named vertex.
   | { ok: false; reason: 'ambiguous-angle'; vertex: string }
+  // #770: a definite SHAPE reference («אלכסוני הריבוע») whose named kind has no declared match in the
+  // figure — the statement is refused BY NAME (the honesty invariant: name the conflicting statement),
+  // never bound to "whichever quad exists" and never guessed by the LLM. `noun` is the student's word.
+  | { ok: false; reason: 'shape-not-found'; noun: string }
   // The utterance references a circle at a centre that carries a CONCENTRIC PAIR (ADR-244) with no
   // outer/inner qualifier and no disambiguating stated membership — WHICH circle is meant is the
   // student's to say ("המעגל החיצוני"/"the inner circle"), never a silent pick or an LLM guess.
@@ -106,6 +110,9 @@ export interface ParseContext {
    *  ("במרובע חסום מעגל" typed after מרובע ABCD exists) bind to THE existing polygon instead of minting
    *  a fresh auto-named one (the ADR-029 implicit-reference pattern, polygon edition). */
   polygons?: string[][];
+  /** #770: each ring with the shape KIND the student DECLARED it as — a definite shape noun
+   *  («אלכסוני הריבוע») resolves on this, never on "whichever quad exists". */
+  declaredPolygons?: { vertices: string[]; kind?: string }[];
   /** Centre letters that were AUTO-assigned to an unnamed circle (hidden until named) — «מרכז המעגל
    *  הוא P» renames one of these to P and reveals it, instead of creating a second circle (issue #112). */
   autoCenters?: string[];
@@ -209,7 +216,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string };
+type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -1265,13 +1272,52 @@ const specialPointMeet: Rule = (s, ctx) => {
   const before = s.match(/^\s*([A-Za-z]\d*)\s+(?:היא\s+|הוא\s+|is\s+)?(?:ה?נקודת\s+)?(?:מפגש|the\s+(?:intersection|meeting|concurrency)\b)/i);
   const named = after ? up(after[1]) : leadingNamedPoint(s) ?? (before ? up(before[1]) : null);
   // Resolve the shape: a named qualifier's label run of the right size, else the figure's single polygon.
+  // #770: the qualifier's labels are UPPERCASE runs — the old `[A-Za-z]` read the English word after
+  // the noun as labels ("the square MEET at M" → a phantom poly M,E,E,T), which is the #779 case-fold
+  // class inside a qualifier regex. A lowercase qualifier now takes the #779 candidate nudge instead.
   const shapeM = s.match(
-    /(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite)\s+((?:[A-Za-z]\d*\s*){3,4})/i,
+    /(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite)\s+((?:[A-Z]\d*\s*){3,4})(?![A-Za-z])/,
   );
   let poly: Id[] | null = null;
   if (shapeM) {
     const ids = (shapeM[1].match(/[A-Za-z]\d*/g) ?? []).map(up);
     if (ids.length === fam.n) poly = ids;
+  }
+  // #770: a LETTERS run right after the construct noun («אלכסוני ABCD») names the ring directly —
+  // it used to fall through to the unique-quad fallback, so two quads deferred a fully-determined
+  // statement. Diag family only (the demonstrated class; the n=3 heads name their triangle via the
+  // shape qualifier above).
+  if (!poly && fam.key === 'diag') {
+    const runM = s.match(/(?:אלכסוני|diagonals\s+of)\s+((?:[A-Z]\d*\s*){4})(?![A-Za-z])/i);
+    const ids = runM ? (runM[1].match(/[A-Z]\d*/g) ?? []).map(up) : [];
+    if (ids.length === 4) poly = ids;
+  }
+  // #770 — the DEFINITE SHAPE NOUN is a reference, not decoration: «אלכסוני הריבוע» binds the ring the
+  // student DECLARED a square, exactly one of which must exist. Binding "the unique quadrilateral"
+  // regardless of its kind drew the TRAPEZOID's diagonals for a stated «הריבוע» with a green ✓ (the
+  // P1 honesty class), and two quads deferred even when the noun disambiguated. A named kind with NO
+  // declared match refuses BY NAME (the honesty invariant: the message names the conflicting
+  // statement) — never a plausible fallback, never an LLM guess. The generic nouns («המרובע» /
+  // "quadrilateral") keep the unique-ring behaviour, as does a figure context without kind info.
+  if (!poly && fam.key === 'diag') {
+    const QUAD_NOUNS: [RegExp, string][] = [
+      [/(?<![א-ת])ה?ריבוע(?![א-ת])|\bsquare\b/i, 'square'],
+      [/(?<![א-ת])ה?מלבן(?![א-ת])|\brectangle\b/i, 'rectangle'],
+      [/(?<![א-ת])ה?מעוין(?![א-ת])|\brhombus\b/i, 'rhombus'],
+      [/(?<![א-ת])ה?טרפז(?![א-ת])|\btrapezoid\b/i, 'trapezoid'],
+      [/(?<![א-ת])ה?מקבילית(?![א-ת])|\bparallelogram\b/i, 'parallelogram'],
+      [/(?<![א-ת])ה?דלתון(?![א-ת])|\bkite\b/i, 'kite'],
+    ];
+    const named = QUAD_NOUNS.map(([re, kind]) => ({ m: s.match(re), kind })).find((x) => x.m);
+    if (named) {
+      const declared = ctx.declaredPolygons;
+      if (declared) {
+        const cands = declared.filter((p) => p.vertices.length === 4 && p.kind === named.kind);
+        if (cands.length === 1) poly = cands[0].vertices.map(up);
+        else if (cands.length === 0) return { clarify: 'shape-not-found', noun: named.m![0].replace(/^ה/, '') };
+        else return null; // two declared rings of the SAME named kind — genuinely ambiguous, defer (ADR-052)
+      }
+    }
   }
   if (!poly) {
     const cands = (ctx.polygons ?? []).filter((v) => v.length === fam.n);
@@ -4321,7 +4367,10 @@ const inscribedPolygon: Rule = (s, ctx) => {
       : [
           isTri
             ? { type: 'triangle', ids: [v[0], v[1], v[2]] }
-            : { type: 'quadrilateral', ids: [v[0], v[1], v[2], v[3]] },
+            : // #770: the cyclic route lowers a named quad to the GENERIC quadrilateral base (its shape
+              // relations ride as constraints — the trapezoid's AB∥CD above), so the DECLARED noun must
+              // travel via declaredAs or «אלכסוני הטרפז» cannot resolve an inscribed trapezoid.
+              { type: 'quadrilateral', ids: [v[0], v[1], v[2], v[3]], ...(kind && kind !== 'quad' ? { declaredAs: kind } : {}) },
           ...shapeCmds(v),
         ];
   // No centre named ⇒ create one: a fresh label that doesn't clash with the vertices OR with any
@@ -9743,6 +9792,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
       return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
     }
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).
+    if (res.clarify === 'shape-not-found') return { ok: false, reason: 'shape-not-found', noun: res.noun };
     if (res.clarify === 'ambiguous-angle') return { ok: false, reason: 'ambiguous-angle', vertex: res.vertex };
     if (res.clarify === 'ambiguous-circle-ref') return { ok: false, reason: 'ambiguous-circle-ref', centers: res.centers };
     if (res.clarify === 'ambiguous-container') return { ok: false, reason: 'ambiguous-container', centers: res.centers };
@@ -9858,16 +9908,25 @@ function augmentParseCtx(ctx: ParseContext, cmds: AnyCommand[]): ParseContext {
     neighbors[b] = [...(neighbors[b] ?? [])];
     if (!neighbors[b].includes(a)) neighbors[b].push(a);
   };
+  const declaredPolygons = [...(ctx.declaredPolygons ?? [])];
+  const SHAPE_TYPES = new Set(['square', 'rectangle', 'rhombus', 'trapezoid', 'parallelogram', 'quadrilateral', 'triangle', 'right-triangle']);
   for (const c of cmds as Array<Record<string, unknown>>) {
     const ids = c.ids;
     if (Array.isArray(ids) && ids.length >= 3 && ids.every((x) => typeof x === 'string')) {
       polygons.push(ids as string[]);
+      // #770: the clause-fallback context carries the declared KIND too, so «טרפז ABCD, אלכסוני
+      // הריבוע נפגשים ב-M» refuses inside a compound exactly as it does across two lines.
+      const kind = typeof c.declaredAs === 'string' ? c.declaredAs
+        : c.type === 'shape-variant' && c.shape === 'kite' ? 'kite'
+        : c.type === 'right-triangle' ? 'triangle'
+        : SHAPE_TYPES.has(String(c.type)) ? String(c.type) : undefined;
+      declaredPolygons.push({ vertices: ids as string[], kind });
       for (let i = 0; i < ids.length; i++) link(ids[i] as string, ids[(i + 1) % ids.length] as string);
     }
     if (c.type === 'segment' && typeof c.a === 'string' && typeof c.b === 'string') link(c.a, c.b);
     if (typeof c.center === 'string') circles.add(c.center);
   }
-  return { ...ctx, points: [...points], polygons, circles: [...circles], neighbors };
+  return { ...ctx, points: [...points], polygons, declaredPolygons, circles: [...circles], neighbors };
 }
 
 /**

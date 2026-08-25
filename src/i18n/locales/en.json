@@ -70,6 +70,7 @@
       "word-root": "Write the root value with the √ symbol — there's a √() button in the toolbar. E.g. \"√27\" instead of the word \"root 27\".",
       "lowercase-labels": "Point labels are written in UPPERCASE letters. Try: {{corrected}}"
     },
+    "shapeNotFound": "There is no {{noun}} in this figure — check the shape name, or declare it first (e.g. \"{{noun}} ABCD\").",
     "producedNothing": "I understood that but it didn't build anything on the figure — I tried rephrasing it too. Check the names/relations, or word it differently.",
     "alreadyDrawn": "That's already on the figure — nothing to add.",
     "ambiguousAngle": "There's more than one angle at {{vertex}}, so I can't tell which one you mean. Name all three letters of the angle — e.g. \"∠A{{vertex}}C = 90\" — or give it a name: \"denote angle A{{vertex}}C as {{vertex}}1\".",

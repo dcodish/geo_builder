@@ -5,100 +5,108 @@
     "share": 0.75,
     "minMeanMult": 3
   },
-  "measuredCutoffMs": 104055,
+  "measuredCutoffMs": 64647,
   "updatedAt": "2026-08-25",
   "slow": [
     {
       "file": "src3d/__tests__/adr-3d-032.test.ts",
-      "ms": 420097
+      "ms": 327507
     },
     {
       "file": "src3d/__tests__/right-apex.test.ts",
-      "ms": 401519
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-6.test.ts",
-      "ms": 304220
+      "ms": 310085
     },
     {
       "file": "src3d/__tests__/book-coordinate-givens.test.ts",
-      "ms": 293651
+      "ms": 240446
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-6.test.ts",
+      "ms": 230685
     },
     {
       "file": "src/theorems/__tests__/b-corpus.test.ts",
-      "ms": 227516
+      "ms": 175461
     },
     {
       "file": "src3d/__tests__/named-parametric-line.test.ts",
-      "ms": 198366
+      "ms": 160424
     },
     {
       "file": "src/engine/__tests__/membership-conversion.test.ts",
-      "ms": 197224
+      "ms": 159044
     },
     {
       "file": "src/__tests__/scenarios-e2e-1.test.ts",
-      "ms": 179224
-    },
-    {
-      "file": "src/__tests__/scenarios-props-submit-gate.test.ts",
-      "ms": 171092
-    },
-    {
-      "file": "src3d/__tests__/member-drive.test.ts",
-      "ms": 162063
+      "ms": 145516
     },
     {
       "file": "src/__tests__/scenarios-props-budget.test.ts",
-      "ms": 160933
+      "ms": 133093
+    },
+    {
+      "file": "src3d/__tests__/member-drive.test.ts",
+      "ms": 122649
     },
     {
       "file": "src/__tests__/scenarios-e2e-5.test.ts",
-      "ms": 151954
+      "ms": 120926
     },
     {
       "file": "src3d/__tests__/exam-2026-2.test.ts",
-      "ms": 146000
+      "ms": 119227
     },
     {
       "file": "src/__tests__/issue-566.test.ts",
-      "ms": 137186
+      "ms": 117613
     },
     {
-      "file": "src/__tests__/scenarios-props-resample.test.ts",
-      "ms": 131994
+      "file": "src/__tests__/scenarios-props-submit-gate.test.ts",
+      "ms": 109123
     },
     {
       "file": "src/__tests__/scenarios-e2e-4.test.ts",
-      "ms": 129851
-    },
-    {
-      "file": "src/replay/__tests__/basin-ownership.test.ts",
-      "ms": 124446
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-8.test.ts",
-      "ms": 123258
-    },
-    {
-      "file": "src/engine/__tests__/obligation-preservation.test.ts",
-      "ms": 113849
+      "ms": 103794
     },
     {
       "file": "src3d/__tests__/plane-eq-drive.test.ts",
-      "ms": 112231
+      "ms": 101793
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-8.test.ts",
+      "ms": 98956
     },
     {
       "file": "src/__tests__/scenarios-e2e-7.test.ts",
-      "ms": 110463
+      "ms": 93177
+    },
+    {
+      "file": "src/replay/__tests__/basin-ownership.test.ts",
+      "ms": 87445
+    },
+    {
+      "file": "src/engine/__tests__/obligation-preservation.test.ts",
+      "ms": 87217
+    },
+    {
+      "file": "src/__tests__/scenarios-props-resample.test.ts",
+      "ms": 79961
     },
     {
       "file": "src/engine/__tests__/inscribe-joint-solve.test.ts",
-      "ms": 108798
+      "ms": 78937
     },
     {
       "file": "src/engine/__tests__/issue-541.test.ts",
-      "ms": 104055
+      "ms": 73207
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-3.test.ts",
+      "ms": 66009
+    },
+    {
+      "file": "src/app/__tests__/resolve-view.test.ts",
+      "ms": 64647
     }
   ]
 }

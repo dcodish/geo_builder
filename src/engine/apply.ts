@@ -852,16 +852,17 @@ function segment(x: Id, y: Id): GeoObject {
   return { kind: 'segment', id: `seg-${p}${q}`, a: p, b: q };
 }
 
-/** The 4 boundary segments + the polygon for a quad a→b→c→d. */
-function quadEdges(objects: GeoObject[], a: Id, b: Id, c: Id, d: Id): void {
+/** The 4 boundary segments + the polygon for a quad a→b→c→d. `declaredAs` stamps the shape KIND the
+ *  student named (#770) so a definite reference («אלכסוני הריבוע») can resolve on the noun. */
+function quadEdges(objects: GeoObject[], a: Id, b: Id, c: Id, d: Id, declaredAs?: string): void {
   for (const [x, y] of [[a, b], [b, c], [c, d], [d, a]] as const) addObj(objects, segment(x, y));
-  addObj(objects, { kind: 'polygon', id: `poly-${a}${b}${c}${d}`, vertices: [a, b, c, d] });
+  addObj(objects, { kind: 'polygon', id: `poly-${a}${b}${c}${d}`, vertices: [a, b, c, d], ...(declaredAs ? { declaredAs } : {}) });
 }
 
 /** The 3 boundary segments + the polygon for a triangle a→b→c. */
-function triEdges(objects: GeoObject[], a: Id, b: Id, c: Id): void {
+function triEdges(objects: GeoObject[], a: Id, b: Id, c: Id, declaredAs?: string): void {
   for (const [x, y] of [[a, b], [b, c], [c, a]] as const) addObj(objects, segment(x, y));
-  addObj(objects, { kind: 'polygon', id: `poly-${a}${b}${c}`, vertices: [a, b, c] });
+  addObj(objects, { kind: 'polygon', id: `poly-${a}${b}${c}`, vertices: [a, b, c], ...(declaredAs ? { declaredAs } : {}) });
 }
 
 /** The n boundary segments + the polygon for an n-gon v0→v1→…→v(n-1)→v0 (generalises quadEdges/triEdges). */
@@ -917,7 +918,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     // any not-yet-existing vertex is created (reuse-or-create), fitted to the existing anchors;
     // the template is a generic quad seed — the shape's own constraints drive the final form
     placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 6, y: 4 }, { id: d, x: 0, y: 4 }], pos);
-    quadEdges(objects, a, b, c, d);
+    quadEdges(objects, a, b, c, d, cmd.type);
     let acc: Construction = { ...prev, objects, constraints };
     for (const sub of shapeConstraints(cmd.type as Parameters<typeof shapeConstraints>[0], ids)) acc = applyCommand(acc, sub, pos);
     return acc;
@@ -971,7 +972,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: side, y: 0 }], pos);
       addObj(objects, { kind: 'derived', id: c, rule: 'square-c', a, b });
       addObj(objects, { kind: 'derived', id: d, rule: 'square-d', a, b });
-      quadEdges(objects, a, b, c, d);
+      quadEdges(objects, a, b, c, d, 'square');
       break;
     }
 
@@ -984,7 +985,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 5, y: 5 }, { id: d, x: 1, y: 4 }],
         pos,
       );
-      quadEdges(objects, a, b, c, d);
+      quadEdges(objects, a, b, c, d, cmd.declaredAs ?? 'quadrilateral');
       break;
     }
 
@@ -995,7 +996,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       const [a, b, c, d] = cmd.ids;
       placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 8, y: 4 }], pos);
       addObj(objects, { kind: 'parallelogram-vertex', id: d, a, b, c });
-      quadEdges(objects, a, b, c, d);
+      quadEdges(objects, a, b, c, d, 'parallelogram');
       break;
     }
 
@@ -1007,7 +1008,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }], pos);
       addObj(objects, { kind: 'perp-offset', id: c, anchor: b, from: a, to: b, dist: 4 });
       addObj(objects, { kind: 'parallelogram-vertex', id: d, a, b, c }); // D = A + C − B
-      quadEdges(objects, a, b, c, d);
+      quadEdges(objects, a, b, c, d, 'rectangle');
       break;
     }
 
@@ -1017,7 +1018,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 5, y: 0 }], pos);
       addObj(objects, { kind: 'rotated', id: d, pivot: a, from: a, to: b, angleDeg: 60, scale: 1 });
       addObj(objects, { kind: 'parallelogram-vertex', id: c, a: b, b: a, c: d }); // C = B + D − A
-      quadEdges(objects, a, b, c, d);
+      quadEdges(objects, a, b, c, d, 'rhombus');
       break;
     }
 
@@ -1027,7 +1028,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       const [a, b, c, d] = cmd.ids;
       placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: d, x: 1, y: 4 }], pos);
       addObj(objects, { kind: 'scaled-offset', id: c, anchor: d, from: a, to: b, k: 0.6 });
-      quadEdges(objects, a, b, c, d);
+      quadEdges(objects, a, b, c, d, 'trapezoid');
       break;
     }
 
@@ -1040,7 +1041,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // bar; this apex measures ≥0.55 across seeds 0-4 — see ADR-335 before "rounding" it).
       const [a, b, c] = cmd.ids;
       placeBase(objects, [{ id: a, x: 2, y: 3.6 }, { id: b, x: 6, y: 0 }, { id: c, x: 0, y: 0 }], pos);
-      triEdges(objects, a, b, c);
+      triEdges(objects, a, b, c, cmd.declaredAs ?? 'triangle');
       break;
     }
 
@@ -1084,7 +1085,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
           driveOrCheck(objects, constraints, con);
         }
       }
-      triEdges(objects, a, b, c);
+      triEdges(objects, a, b, c, 'triangle');
       break;
     }
 
