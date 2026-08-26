@@ -40,6 +40,7 @@
 
 import { readEnvelope, type LoadAudit } from '../../shell/save';
 import { parseLineV2 } from '../parser/rules';
+import { askArtifacts } from './deriveLines';
 import type { Derived2 } from '../replay/derive2';
 import { type InputError, type SavedSession, useComplexStore } from '../store/useComplexStore';
 import { deriveLines } from './deriveLines';
@@ -244,13 +245,9 @@ export type AskReading =
 export function readAsk(raw: string): AskReading {
   const parsed = parseLineV2(raw.trim());
   if (!parsed.ok) return { kind: 'unreadable' };
-  const l = parsed.line;
-  const askCount = l.queries.length + l.ratios.length + l.exprQueries.length;
-  const states =
-    l.constraints.length + l.filters.length + l.assertions.length +
-    l.objects.length + l.measures.length + l.sequences.length + l.roots.length;
-  if (askCount === 0 || states > 0) return { kind: 'statement' };
-  return { kind: l.queries.length ? 'measure' : l.ratios.length ? 'ratio' : 'expr' };
+  const a = askArtifacts(parsed.line);
+  if (!a) return { kind: 'statement' };
+  return { kind: a.queries.length ? 'measure' : a.ratios.length ? 'ratio' : 'expr' };
 }
 
 /**

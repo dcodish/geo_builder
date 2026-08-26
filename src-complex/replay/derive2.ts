@@ -72,6 +72,12 @@ export interface Untranslated {
 
 export interface DerivedPoint {
   readonly name: string;
+  /**
+   * #791 — the point's DISPLAY name, composed once here (the ADR-CX-015 rule): the bare pretty name
+   * («z₁», «A»), or the dual form «A (z₁)» when a binding names the same point twice. Every surface
+   * prints this; none re-derives it.
+   */
+  readonly display: string;
   readonly z: Cx;
   readonly modulus: string;
   readonly argumentDeg: number;
@@ -271,6 +277,12 @@ export interface FoldInput {
   readonly exprQueries?: readonly ExprQuery[];
   /** stated sequences, kept as STATEMENTS as well as constraints — the spiral is drawn from these */
   readonly sequences?: readonly SequenceStatement[];
+  /**
+   * #791 — «z1 = A» bindings: number name → point label. The tie itself is an ordinary eq
+   * constraint (two refs, solved exactly); this map is the DISPLAY half — the label node hides and
+   * the number's display name becomes «A (z₁)» at the stage-5d chokepoint.
+   */
+  readonly aliases?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -296,6 +308,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     ratios = [],
     exprQueries = [],
     sequences = [],
+    aliases = new Map<string, string>(),
   } = input;
   /**
    * #688 — DRIVE OR CHECK. Tier 1 is solved once to learn what the OTHER lines determined; a claim whose
@@ -612,7 +625,10 @@ export function foldConstraints(input: FoldInput): Derived2 {
   if (!t1.inconsistent) {
     // the union: names the constraints mention PLUS bare declarations, so a number the student merely
     // named is still on the canvas (always-visualise) rather than waiting for a constraint to earn it
+    const boundLabels = new Set(aliases.values());
     for (const name of drawnNames) {
+      // #791: a bound label is the SAME point as its number — one dot, one dual-named reading
+      if (boundLabels.has(name)) continue;
       const m = modulusOf(name, state);
       const a = argumentOf(name, state);
       if (!Number.isFinite(m.value) || !Number.isFinite(a.deg)) continue;
@@ -622,8 +638,11 @@ export function foldConstraints(input: FoldInput): Derived2 {
       // a DIRECTION, folded into one turn — see the note on `argumentDeg` below
       const argumentDeg = ((a.deg % 360) + 360) % 360;
       const exactLabel = m.exact && a.exact ? exactLabelOf(m.exact, a.exact) : null;
+      const alias = aliases.get(name);
+      const display = alias ? `${alias} (${prettyName(name)})` : prettyName(name);
       points.push({
         name,
+        display,
         z: cPolar(m.value, a.deg),
         modulus,
         /**
@@ -637,7 +656,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
          */
         argumentDeg,
         reading: readingOf({
-          name,
+          display,
           exactLabel,
           modulus,
           modulusKnown: m.exact !== null,
@@ -650,7 +669,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
          * same no-guess rule binds: a value prints only when the givens determine it.
          */
         readingCart: readingCartOf({
-          name,
+          display,
           z: cPolar(m.value, a.deg),
           known: m.exact !== null && a.exact !== null,
         }),
@@ -1269,14 +1288,14 @@ const exactLabelOf = (mod: ExpVec, arg: Angle): string | null => {
  * silence read as "nothing to say" when what was missing was only a symbolic rendering.
  */
 function readingOf(p: {
-  name: string;
+  display: string;
   exactLabel: string | null;
   modulus: string;
   modulusKnown: boolean;
   argumentDeg: number;
   argumentKnown: boolean;
 }): string {
-  const label = prettyName(p.name);
+  const label = p.display;
   if (p.exactLabel) return `${label} = ${p.exactLabel}`;
   /**
    * The NO-GUESS ruling (B6 follow-up, operator 2026-08-18): a numeric value prints only when the
@@ -1298,8 +1317,8 @@ function readingOf(p: {
  * curriculum types — and anything else prints `≈` at the #723 display precision. The no-guess rule
  * binds identically to the polar reading: undetermined → the bare name.
  */
-function readingCartOf(p: { name: string; z: Cx; known: boolean }): string {
-  const label = prettyName(p.name);
+function readingCartOf(p: { display: string; z: Cx; known: boolean }): string {
+  const label = p.display;
   if (!p.known) return label;
   const isInt = (x: number) => Math.abs(x - Math.round(x)) < 1e-9;
   const exact = isInt(p.z.re) && isInt(p.z.im);

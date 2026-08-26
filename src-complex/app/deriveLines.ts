@@ -10,7 +10,8 @@
  * The import-direction guard caught the first version doing it inside `replay/` and was right to.
  */
 
-import { parseLineV2 } from '../parser/rules';
+import { type ParsedLine, parseLineV2 } from '../parser/rules';
+import { isPointLabel } from '../parser/exprParse';
 import type { BranchFilter, Constraint } from '../model/constraint';
 import type { Claim as Assertion } from '../model/claim';
 import type { FigureObject } from '../model/figure';
@@ -79,18 +80,46 @@ export function lowerAsks(asks: readonly string[]): {
   for (const raw of asks) {
     const r = parseLineV2(raw.trim());
     if (!r.ok) continue;
-    const l = r.line;
-    // `declares` deliberately uncounted AND unenacted: a question never creates a point (readAsk's
-    // doctrine note) — a name it mentions must exist from the givens or the answer reads open
-    const states =
-      l.constraints.length + l.filters.length + l.assertions.length +
-      l.objects.length + l.measures.length + l.sequences.length + l.roots.length;
-    if (states > 0) continue;
-    queries.push(...l.queries);
-    ratios.push(...l.ratios);
-    exprQueries.push(...l.exprQueries);
+    const a = askArtifacts(r.line);
+    if (!a) continue;
+    queries.push(...a.queries);
+    ratios.push(...a.ratios);
+    exprQueries.push(...a.exprQueries);
   }
   return { queries, ratios, exprQueries };
+}
+
+/**
+ * How one PARSED line reads as a question — the one definition (`readAsk`, the lane lowering and
+ * the panel's row model all call this, so they cannot disagree).
+ *
+ * `null` when the line STATES something. `declares` is deliberately uncounted and unenacted: a
+ * question never creates a point — a name it mentions must exist from the givens or the answer
+ * reads open. One conversion (#791, the operator's «AB» ruling): a bare two-point run — «AB»,
+ * «z1z2» — is F6's segment STATEMENT in the givens box, but in the ask register it is the length
+ * question about that segment, so here it reads as «אורך AB» does.
+ */
+export function askArtifacts(l: ParsedLine): {
+  queries: MeasureQuery[];
+  ratios: RatioQuery[];
+  exprQueries: ExprQuery[];
+} | null {
+  const bareSegment =
+    l.objects.length === 1 &&
+    l.objects[0].kind === 'segment' &&
+    l.constraints.length + l.filters.length + l.assertions.length + l.measures.length +
+      l.sequences.length + l.roots.length + l.queries.length + l.ratios.length +
+      l.exprQueries.length === 0;
+  if (bareSegment) {
+    const seg = l.objects[0] as { kind: 'segment'; points: readonly string[]; src: string };
+    return { queries: [{ kind: 'length', points: seg.points, src: seg.src }], ratios: [], exprQueries: [] };
+  }
+  const states =
+    l.constraints.length + l.filters.length + l.assertions.length +
+    l.objects.length + l.measures.length + l.sequences.length + l.roots.length;
+  if (states > 0) return null;
+  if (l.queries.length + l.ratios.length + l.exprQueries.length === 0) return null;
+  return { queries: [...l.queries], ratios: [...l.ratios], exprQueries: [...l.exprQueries] };
 }
 
 /**
@@ -114,6 +143,8 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
   const sequences: SequenceStatement[] = [];
   const atoms = new Map<string, number>();
   const untranslated: Untranslated[] = [];
+  /** #791 — «z1 = A» / «A = z1» bindings, read off the equation shape: number name → label */
+  const aliases = new Map<string, string>();
 
   /**
    * Every name an EARLIER line mentioned — defined, constrained, or merely referred to.
@@ -177,6 +208,20 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
     for (const n of [...r.line.declares, ...r.line.roots.flatMap((e) => refsOf(e.rhs))]) {
       mentioned.add(n);
     }
+    /**
+     * #791 — a BINDING is an equation of two bare refs, one z/w number and one point label:
+     * «z1 = A» (either order). The tie constraint stays — the exact tier makes the two names one
+     * value — and the alias records the DISPLAY half: the label node hides, the number shows
+     * «A (z₁)». Detected on the parsed shape rather than by a bespoke rule, so every spelling the
+     * equation grammar reads is a binding spelling.
+     */
+    for (const c of r.line.constraints) {
+      if ((c.kind ?? 'eq') !== 'eq' || c.lhs.t !== 'ref' || c.rhs.t !== 'ref') continue;
+      const names = [c.lhs.name, c.rhs.name];
+      const label = names.find((n) => isPointLabel(n));
+      const number = names.find((n) => /^[zw]\d*$/.test(n));
+      if (label !== undefined && number !== undefined) aliases.set(number, label);
+    }
     constraints.push(...r.line.constraints);
     filters.push(...r.line.filters);
     declared.push(...r.line.declares);
@@ -196,6 +241,7 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
     declared,
     atoms,
     untranslated,
+    aliases,
     assertions,
     objects,
     measures,

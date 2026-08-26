@@ -210,7 +210,7 @@ export function buildScene(figure: SceneInput, display: SceneDisplay = {}): Scen
 
   const scenePoints: ScenePoint[] = points.map((p) => ({
     name: p.name,
-    label: prettyName(p.name),
+    label: p.display, // #791: composed once at stage 5d — «A (z₁)» when a binding dual-names the point
     z: p.z,
     reading: p.reading,
     readingCart: p.readingCart,

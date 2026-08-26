@@ -2019,3 +2019,43 @@ Locks: `ask-lane-789.test.ts` (15 — classification, routing, dedupe/removal, s
 old-file and muted-line migration, the operator's exact ask answered, a lane «|z1| = 7» proven
 inert on the figure, the row model's four voices); the §2b capstone and fixtures nets updated to
 fold with the lane, as the app does.
+
+## ADR-CX-033 — Capital letters are POINTS: the exam's figure register (#791)
+
+**Status:** Accepted (2026-08-26) · **Ladder:** stage 0 (naming) + stage 5d (display) · **Operator rulings:** same day, transcribed on the issue
+
+The exam's own typography — «הנקודות A ו-B מציגות את המספרים z₁ ו-z₂» — was untypeable: `isComplexName`
+hard-coded z/w, `RUN_ATOM` hard-coded o/z/w, and the grammar folded case at every rule, while lowercase
+single letters carry the REAL-PARAMETER register («הביעו באמצעות a ו-b»). `A = 5+i` refused; «אורך AB»
+was structurally unreachable.
+
+**Decision — case decides the register, at ONE seam.** `isPointLabel` (`[A-NP-VXY]\d*` — capitals
+minus O the origin and minus Z/W whose family has always case-folded) and `canonName` (labels keep
+their capital; everything else folds) live in `exprParse`; every rule's `.toLowerCase()` became
+`canonName`, so no rule decides case again. Then:
+
+- **`A = 5+i` defines a point** — labels pass `isComplexName`, so every definition form (cartesian,
+  polar, derived) works for them unchanged.
+- **«AB» is a DISTANCE, `A*B` a product** (operator ruling): a glued capital pair in an expression
+  lowers to `|A−B|`; multiplication requires the explicit star. In the measure register the widened
+  run alphabet reads «אורך AB», «שטח OAB» — matched case-insensitively by the grammar's flags, then
+  VALIDATED case-sensitively in `splitRun`, so «אורך ab» stays refused instead of silently becoming
+  points. A bare pair line («AB») keeps F6's segment meaning in the givens box; in the ASK register
+  (`askArtifacts`, one definition shared by the router, the lane lowering and the row model) it reads
+  as the length question about that segment.
+- **`d_{z1z2}` / `d_{AB}`** — the textbook distance form, one lexer token: exactly two distinct point
+  atoms inside the braces (origin included: `d_{Oz1}` is `|z1|`), anything else refuses the span. The
+  panel displays it as `d` with the run subscripted (`ui/askText.tsx`) — display only, the stored
+  text stays as typed (ADR-W-029).
+- **«z1 = A» binds** — detected on the PARSED shape (an eq of two bare refs, one z/w + one label), so
+  every spelling the equation grammar reads is a binding spelling and no bespoke rule exists. The tie
+  constraint stays and the exact tier makes the two names one value; the alias map is the DISPLAY
+  half: the label node is not drawn (one dot, never two coincident), and the number's display name —
+  composed once at stage 5d, `DerivedPoint.display`, the scene consumes it — becomes **«A (z₁)»**,
+  the operator's chosen format. Asks reach the point through either name (the hidden node still
+  solves and sits in the eval env).
+
+Locks: `point-labels-791.test.ts` (18) — the four rulings each way, the case-sensitivity boundary
+(`a = 5+i` defines nothing; «אורך ab» refuses; `Z1` still folds), the product/distance split, the
+origin form, garbage-in-braces refusal, cold and reversed bindings, and asks through both names.
+Catalog entries added (coverage-map rule: absence from the catalog is absence from coverage).
