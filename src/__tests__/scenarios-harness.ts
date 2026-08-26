@@ -34,18 +34,7 @@
  */
 
 import { expect } from 'vitest';
-import {
-  droppedComparison,
-  droppedCompoundRelation,
-  droppedConstructNoun,
-  droppedGivenNumbers,
-  droppedGivenRelations,
-  droppedGivenVerbs,
-  droppedMidsegment,
-  droppedRadiusSymbol,
-  droppedRegionSubject,
-  droppedWordRelations,
-} from '@/parser';
+import { CONTEXT_FREE_GATES } from '@/app/honestyGates';
 import { replay, meetsRequirements, useGeoStore } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { freeDofs } from '@/engine';
@@ -337,18 +326,12 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
  * Counts the steps AND the gate calls it actually made, so a signature change cannot make it pass
  * vacuously.
  */
-const CONTEXT_FREE_GATES: Record<string, (u: string, cmds: AnyCommand[]) => unknown[] | boolean> = {
-  droppedComparison,
-  droppedCompoundRelation,
-  droppedConstructNoun,
-  droppedGivenNumbers,
-  droppedGivenRelations,
-  droppedGivenVerbs,
-  droppedMidsegment,
-  droppedRadiusSymbol,
-  droppedRegionSubject,
-  droppedWordRelations,
-};
+/**
+ * #782 — the gate list is IMPORTED from the shared battery (`@/app/honestyGates`), never re-listed here.
+ * A net with its own copy measures the gates it happens to know about; this one measures the gates the
+ * app actually runs, so a gate cannot be born un-netted and the two cannot drift apart.
+ */
+export { CONTEXT_FREE_GATES };
 
 /**
  * #771 — the KNOWN, PRE-EXISTING false blocks the widened net surfaced on its first run.

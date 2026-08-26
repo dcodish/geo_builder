@@ -7936,3 +7936,64 @@ fallback split into ≥2 clauses that each built, independent by this ADR's test
 residual forms parse as single catalog rules and never take that path at all. The remaining work
 on #786 is the advisory note: reclassified **feature P3** (was bug P2) — the drawing behaviour it
 pinned as wrong is now the sanctioned behaviour.
+
+## ADR-461 — the honesty-gate battery is a FUNCTION, and every commit seam calls it (#782)
+
+**Operator ruling (2026-08-25):** *"The ✎ seam refuses inline and does NOT escalate to the LLM."*
+On a gate trip: the note explains, the editor stays open, `return false`.
+
+**Context.** The battery grew inside `submitPipeline.ts` one gate at a time — labels (ADR-089),
+numbers (ADR-250), relations (ADR-264), verbs (ADR-292), compounds (#153/#145), word relations
+(ADR-360), comparisons (ADR-390), construct nouns (ADR-430), and finally the total span accountant
+(ADR-453). All nine defend one invariant: **nothing the student stated is silently dropped.** They
+defended it at ONE seam. `App.commitEdit` parsed the edited text against the prefix context, ran the
+#186/#539 binding loops, and committed straight to `replaceGroup` — no `dropped*`, no
+`unaccountedSpans`. So the ✎ path committed partial parses silently for as long as the gates have
+existed: editing a step to «מרכזו O. שתי נקודות על המעגל A ו B» landed with the two stated points
+gone, which is precisely the class the gates refuse one seam over.
+
+ADR-453 describes enforcement "at both submit seams". The two it wired were the grammar commit and
+the LLM second attempt — **both inside `runSubmit`**. The edit seam was never in that set, and
+nothing said so, because a block of code cannot be asked whether some other seam contains it.
+
+**Decision — stop shipping the battery as a code block.**
+
+1. `src/app/honestyGates.ts` owns it: `honestyGateReport(utterance, commands, ctx)` returns the full
+   account (every gate runs; no first-failure short-circuit) plus `clean` and `items` — everything
+   left unread, as **the student's own tokens**, never a gate name (an error names the statement, not
+   the machinery).
+2. `runSubmit`'s inline block **is** that call now, so the submit path is unchanged by construction —
+   which the whole scenario corpus asserts.
+3. `src/app/editPipeline.ts` — `runEditCommit` — is the edit seam, moved out of the component. CLAUDE.md
+   has always said submit-path behaviour lives in `src/app/`, "never inline in the component"; the submit
+   path was extracted for exactly this reason (S0.4, docs/24) and the edit seam stayed behind. A seam
+   nothing can call directly is a seam nothing tests, and a seam nothing tests drifts from its sibling.
+   That drift *is* this issue. `App.commitEdit` is now a four-line adapter passing `t` and `setInputNote`.
+4. On a trip the edit seam refuses **inline**, with `steps.editDropped` naming what was left unread.
+   No LLM call on the edit path: an edit is a student refining a step, not freeform input — and this is
+   the *third* refusal of the same shape the editor already shipped (`steps.editRefused`,
+   `input.scope.lowercase-labels`), not a new behaviour.
+5. The corpus-wide false-positive net (`scenarios-harness.ts`) imports `CONTEXT_FREE_GATES` from the
+   shared module instead of re-listing the gates. A net with its own copy measures the gates it happens
+   to know about; this one measures the gates the app actually runs, so a gate cannot be born un-netted.
+
+**What this buys, beyond the reported edit.** The next gate added to the battery reaches every commit
+seam the day it is written, with nobody having to remember a second seam exists. That is the point —
+ADR-W-006's derive-don't-duplicate — and it is why the fix is an extraction rather than a second copy
+of nine gate calls inside `commitEdit`.
+
+**Deliberately out of scope** (operator, same ruling): whether an *unparseable* edit escalates. A
+student can delete the step and retype the same text into the main box, where it does escalate. That
+asymmetry is real and is its own UX question — not a rider on a P2 honesty fix.
+
+**Not covered by the shared function, on purpose.** The LLM second attempt runs a deliberate superset —
+`droppedRadiusSymbol`, `droppedRegionSubject`, `droppedMidsegment`, `introducedNewLabels` — because
+those classes are reachable only when a model, not the grammar, produced the commands.
+
+Locks: `src/app/__tests__/edit-pipeline-782.test.ts` runs the REAL seam against the real store, parser
+and engine — the canonical edit refuses and leaves the fact list untouched; a clean edit still commits
+(the gate must not have turned the editor into a wall); the older unreadable-edit and lowercase-label
+refusals still fire in their original order; and, the generalisation that stops recurrence, **the seam
+commits exactly when the shared battery reports clean**, asserted directly rather than re-derived.
+`src/app/__tests__/honesty-gates-782.test.ts` locks the battery's own contract and the gate-map
+membership the net iterates.

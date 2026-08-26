@@ -57,6 +57,7 @@ import type { Construction, Id, Vec } from '@/engine';
 import { autoNamedLabels, deferralWorthwhile, dryRunOutcome, primeFoldFor, replay, trialFacts, useGeoStore } from '@/store/geoStore';
 import { geoWork, isCancelled } from '@/store/geoWork';
 import { spanShadow, unaccountedSpans } from '@/parser/spanAccounting';
+import { honestyGateReport } from './honestyGates';
 import { logDebug } from '@/debug/sessionLog';
 
 export interface SubmitUi {
@@ -324,58 +325,14 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   }
   let weak: 'error' | 'empty' | 'dropped' | null = null;
   if (r.ok) {
-    const pts = pctx.points ?? [];
-    // The accountant's context — the same exemptions the label gate takes (an EXISTING point, a bound
-    // radius symbol, an angle alias are all legitimately unclaimed by a new command).
-    const actx = {
-      existingPoints: pts,
-      radiusSymbols: (pctx.radiusSymbols ?? []).map((x) => x.name),
-      angleAliases: (pctx.angleAliases ?? []).map((x) => x.name),
-    };
-    // A typo in a keyword (e.g. "מנוקדה" for "מנקודה") can make a rule match PARTIALLY, silently dropping
-    // a NEW label it introduced ("from D …") — committing a wrong/partial figure. When the parse leaves a
-    // new input label unused, escalate to the LLM (whose job is freeform/typo input) instead of committing
-    // the partial parse (ADR-089). An EXISTING label a command doesn't re-name is fine (context).
-    const dropped = droppedNewLabels(utterance, r.commands, pts, (pctx.radiusSymbols ?? []).map((x) => x.name));
-    // The NUMERIC sibling (ADR-250): a stated magnitude the commands don't account for means the rule
-    // consumed only part of the utterance (usually a typo'd keyword mid-sentence) — escalate, never
-    // commit the partial meaning (a "שטח… פי 2.25 משוטח…" typo used to commit as a bare triangle, ✓).
-    const droppedNums = droppedGivenNumbers(utterance, r.commands);
-    // The RELATION sibling (ADR-264): a stated `AB=CD`/`AB⊥CD`/`AB∥CD` between points that all already
-    // appear on the shape trips neither older gate — never commit a figure missing the student's given.
-    const droppedRels = droppedGivenRelations(utterance, r.commands);
-    // The VERB sibling (ADR-292, the #82 P1): a stated tangency/bisection/… verb entirely absent
-    // from the lowering means a rule claimed a compound and dropped a given — never commit it.
-    const droppedVerbs = droppedGivenVerbs(utterance, r.commands);
-    // The STRUCTURAL sibling (#153/#145): a compound measure relation («X + Y = Z + W», «DM·ME=BM·DR»)
-    // whose lowering doesn't carry the FULL term list was truncated to a different, wrong constraint —
-    // the labels all land, so the older gates never fire. Never commit it.
-    const droppedCompound = droppedCompoundRelation(utterance, r.commands);
-    // The WORD sibling (ADR-360, #210): a relation stated as a word between circle nouns («שני
-    // מעגלים זרים») that the lowering doesn't encode — never commit the unrelated pair.
-    const droppedWordRels = droppedWordRelations(utterance, r.commands);
-    // The COMPARISON sibling (ADR-390, the #277 P1): a measure compared to a NUMBER states a REGION.
-    // A lowering with no bound/order constraint read it as the EQUALITY at the bound — every label and
-    // the number itself land, so no older gate fires. Never commit the student's ">" as an "=".
-    const droppedCmp = droppedComparison(utterance, r.commands);
-    // The OBJECT sibling (ADR-430, #456 — the 3-D ADR-3D-113 class, ported as a pattern): the utterance
-    // states a shape AND a construct on it, and the rule that recognised its own noun emitted only the
-    // shape («מלבן ABCD עם אלכסונים» → a bare rectangle, ✓). Every gate above asks about labels, numbers,
-    // relations, verbs, compounds, words and comparisons — none asks whether a stated OBJECT materialised.
-    const droppedConstruct = droppedConstructNoun(utterance, r.commands);
-    // SPAN ACCOUNTING — ENFORCING since 2026-08-19 (#659 step 3, ADR-453, docs/24 §4.2). The TOTAL
-    // mechanism the gates above approximate one category at a time: every significant token span must
-    // be accounted for by the winning parse, or the rule claimed the utterance while leaving stated
-    // content unread. Hard spans only (label/number/relation); `unknown-word` stays a report bucket.
-    //
-    // It JOINS the gate family rather than replacing it — deliberately, and against this issue's own
-    // first instinct. The retirement differential (`span-gate-differential.test.ts`) measured what
-    // replacement would actually cost today: the accountant does not carry the ADR-250 count-quantifier
-    // exemption (it would refuse «מנקודה A יוצאים 2 משיקים למעגל»), and its single global `hasConstraint`
-    // flag cannot see the ADR-264 class at all (a relation between points that ALL already exist).
-    // Each gate retires when that differential proves the accountant reproduces its exemption set — #758.
-    const unaccounted = unaccountedSpans(utterance, r.commands, actx);
-    if (unaccounted.length === 0 && dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0 && droppedVerbs.length === 0 && droppedCompound.length === 0 && droppedWordRels.length === 0 && !droppedCmp && droppedConstruct.length === 0) {
+    // THE HONESTY-GATE BATTERY. Every gate, its rationale and its ADR now live in one place —
+    // `@/app/honestyGates` — because this block used to BE the battery, and a seam that did not
+    // contain it therefore had none (#782: the ✎ edit path committed partial parses for as long as
+    // the gates have existed). Both commit seams call the same function; adding a gate there reaches
+    // both the day it is written (ADR-W-006 — derive, don't duplicate).
+    const gates = honestyGateReport(utterance, r.commands, pctx);
+    const { dropped, droppedNums, droppedRels, droppedVerbs, droppedCompound, droppedConstruct, unaccounted } = gates;
+    if (gates.clean) {
       const st = store();
       // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
       // the commit, and every later replay of this content then run at TAIL speed on the main thread
@@ -456,7 +413,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
           ui.setBusy(false);
           return;
         }
-        const existing = new Set(pts.map((p) => p.toUpperCase()));
+        const existing = new Set((pctx.points ?? []).map((p) => p.toUpperCase()));
         const newLabels = statedLabelTokens(utterance).filter((l) => !existing.has(l)); // case-blind (#779)
         if (newLabels.length === 0) {
           logDebug({ kind: 'input', utterance, locale, source: 'parser', result: 'noop-exists', commands: r.commands });

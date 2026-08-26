@@ -147,6 +147,7 @@
     "title": "Steps",
     "empty": "Start by describing a shape",
     "editRefused": "The edit could not be read — phrase it like a new statement",
+    "editDropped": "The edit was not read in full — left unused: {{items}}",
     "statusOk": "OK",
     "statusBroken": "problem",
     "statusOff": "excluded"
