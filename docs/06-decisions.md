@@ -7912,3 +7912,27 @@ at-risk supported compounds clean, the conjoined-subject family, the catalog net
 four recorded forms, and the reachability guard) and `submitPipeline.test.ts` (the seam end to end:
 the teaching fires, nothing commits, **the paid LLM is never called** — plus a block pinning #786's
 lane so its resolution goes red rather than passing silently).
+
+**Amendment (2026-08-26, #786) — drawing wins wherever the tool can faithfully build.** Operator
+ruling on the boundary above: *"as long as we know how to build what the user asked for — I'm ok. If
+the engine fails to create it because the command includes several items, we should tell the user to
+enter one at a time. In reality, the user entered two items and we understand them — we can also give
+them a message saying that it is better to enter one at a time. But still, we can draw… if we can draw
+what he did, we should."*
+
+This refines the 2026-08-19 ruling's "refuse to draw" to its actual intent: **the one-at-a-time
+teaching is for compounds the tool cannot faithfully build** (the grammar-declined forms at the
+escalation seam — #763's behaviour stands unchanged). Where the deterministic grammar builds every
+clause — the ADR-264 clause-fallback rows this amendment covers — the figure IS what the student
+asked for, so it **draws**, accompanied by an **advisory note** ("better one fact at a time"), never
+a refusal.
+
+Consequences: **the reciprocal-relation guard is no longer a prerequisite for #786** — no refusal
+check moves into the deterministic lane, so the four residual false positives stay unreachable and
+the reachability net stands as-is (the guard remains recorded follow-on debt on its own merits, not
+on this issue's path). The advisory should key off the clause-fallback path itself (an utterance the
+fallback split into ≥2 clauses that each built, independent by this ADR's test) — a false
+"independent" there costs a spurious tip, not a refusal, which is the safe direction; the four
+residual forms parse as single catalog rules and never take that path at all. The remaining work
+on #786 is the advisory note: reclassified **feature P3** (was bug P2) — the drawing behaviour it
+pinned as wrong is now the sanctioned behaviour.
