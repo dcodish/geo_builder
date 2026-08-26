@@ -95,7 +95,10 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
       untranslated.push({
         factId: `line-${idx}`,
         src: raw,
-        why: r.reason === 'unaccounted' ? `לא הובן: ${r.items.join(', ')}` : 'הדקדוק לא מזהה את השורה הזו',
+        why:
+          r.reason === 'unaccounted'
+            ? { code: 'line-unaccounted', items: r.items.join(', ') }
+            : { code: 'line-unrecognized' },
       });
       return;
     }
@@ -104,7 +107,7 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
       untranslated.push({
         factId: `line-${idx}`,
         src: raw,
-        why: `${clash} מסמן את פתרונות המשוואה «${reserved.get(clash)}» — התייחסו לפתרונות עצמם`,
+        why: { code: 'reserved-letter', letter: clash, equation: reserved.get(clash)! },
       });
       return;
     }

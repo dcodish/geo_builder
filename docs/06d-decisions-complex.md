@@ -1895,3 +1895,52 @@ Locks: `claim-drive-688.test.ts` (14 tests — the operator's line, both configu
 a stated modulus honoured while the direction is driven, the conjugate family, the determined-subject
 guards including the acceptance-gate figure, and a corpus-wide invariant: **no plotted point may sit
 where it refutes a claim the panel has not refuted**).
+
+## ADR-CX-030 — A why is a CODE: the engine publishes reasons, the reading layer words them (#716)
+
+**Status:** Accepted (2026-08-26) · **Ladder:** stage 5d (the reading seam) · **Fixes:** [#716](https://github.com/dcodish/geo_builder/issues/716)
+
+**The report (B3 parity round, 2026-08-18):** with the UI toggled to English, the honesty strip and
+the panel readings still rendered Hebrew — «אין תצורה תקפה · הצורה נקבעה במלואה», the ✗/?/⚠ row
+suffixes. The scope measurement on the issue found the class engine-wide: Hebrew display prose was
+COMPOSED at the point of decision in `solve/claims.ts` (~15 verdict whys), `model/knowledge.ts`
+(`whyNotKnowledge`), the stage-3e measure verdicts and `v2Status`'s heirs in `replay/scene2.ts`,
+`solve/window.ts` (`describeFilter`), `solve/residuals.ts` (the `'משוואה'` fallback),
+`app/deriveLines.ts` (the untranslated-line reasons) and the App's hardcoded strip suffixes. No
+language toggle could reach any of it, because by the time the UI ran, the words were already chosen.
+
+**Decision — the docs/17 chokepoint move, in three parts:**
+
+1. **The engine publishes WHAT happened, never how to say it.** `model/why.ts` defines `Why`, a
+   discriminated union of reason codes with the parameters that make each about the student's own
+   statement (`{ code: 'minimal-refuted', name, prop, least }`). `ClaimVerdict.why`,
+   `KnowledgeRow.why`, `CheckedMeasure.why` and `Untranslated.why` all carry `Why` now (`null` on a
+   knowledge row exactly when a value prints — a number needs no excuse). `whyNotKnowledge` returns a
+   code. `Derived2.contradiction` was already a code and now stops leaking raw into prose.
+2. **One translator at the reading seam.** `whyText(why, t)` in `replay/scene2.ts` — beside the
+   ADR-CX-015 chokepoint, for the same reason — words a code through the product i18n, received as an
+   argument the way `v2Formulas` already receives `lang`, so `replay/` stays pure and imports no
+   i18next instance. The v2 readers (`v2Freedom`, `v2Contradiction`, `v2Knowledge`, `v2Measures`,
+   `v2Claims`) take the same `Translate`; the App passes its `t`, and the strip suffixes and its
+   `dir` follow the UI language. The switch is exhaustive over `Why` — a new code without an arm or a
+   key is a type error, not a silently-untranslated row. All wordings, both languages, live in
+   `i18n/index.ts`; the Hebrew renderings are byte-identical to what the product always showed (one
+   deliberate exception: the contradiction parenthetical now words the axis — «ערך מוחלט»/«ארגומנט» —
+   where it used to print the raw engine token `modulus`/`argument`).
+3. **`src` is REQUIRED on `Constraint` and `BranchFilter` — the root of the two solver fallbacks.**
+   `describeFilter` and `'משוואה'` existed only because `src` was optional while every real
+   constructor sets it. Making the type tell the truth deletes both: a refusal always quotes the
+   student's own line (the `unsatisfied`/`undecided` channels stay language-neutral source text),
+   and the test-only filter constructors carry math-notation `src`. Names, sources and power texts
+   interpolate through `whyText` untranslated for the same reason — they are the student's words or
+   math, correct in every language.
+
+**The locks moved with the strings, as the issue's plan required.** Engine-level tests now assert
+codes and params (`claims`, `knowledge`, `knowledge-in-r`, `tier2`, `window`, `tier1`); the rendering
+locks (`b6-status-split`, and the new `i18n-readings-716.test.ts` regression) drive the readers
+through the REAL resources via `getFixedT` — Hebrew wordings exact, and an English sweep asserting no
+reading surface emits a Hebrew codepoint over English input, which locks the CLASS rather than the
+reported strings. Bidi isolates are stripped before comparison (ADR-W-029's display/content line).
+
+**Consequence for the conformance matrix:** the interaction family's «error voice / language» row is
+green for complex — every student-facing reason the engine produces now follows the UI language.

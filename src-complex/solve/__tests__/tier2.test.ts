@@ -89,7 +89,7 @@ describe('F7 — the SAME sentence CHECKS when the figure is already determined'
   it('refuses to pretend: a FALSE measure on a determined figure is reported violated', () => {
     const d = deriveLines(['z1 = 3+4i', 'z2 = 3', 'אורך z1z2 = 99']);
     expect(d.measures[0].status).toBe('violated');
-    expect(d.measures[0].why).toContain('99');
+    expect(d.measures[0].why).toEqual({ code: 'measure-violated', src: 'אורך z1z2 = 99' });
   });
 });
 

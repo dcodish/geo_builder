@@ -145,7 +145,7 @@ describe('a bare expression is a QUESTION, answered by the knowledge rule', () =
   it('and withholds a value the givens do not force, saying why', () => {
     const d = deriveLines(['z1 = 3', 'z2', '|z1-z2|']);
     expect(d.knowledge[0].value).toBeNull();
-    expect(d.knowledge[0].why).not.toBe('');
+    expect(d.knowledge[0].why).not.toBeNull();
   });
 
   it('a bare expression states nothing — it declares its names and constrains nothing', () => {

@@ -158,7 +158,7 @@ export function deferredResidual(c: Constraint, i: number): ResidualSpec {
   const kind = c.kind ?? 'eq';
   return {
     key: `deferred-${i}`,
-    describe: c.src ?? 'משוואה',
+    describe: c.src,
     strength: 'required',
     refs: [...refsOfExpr(c.lhs), ...refsOfExpr(c.rhs)],
     values: (env) => {

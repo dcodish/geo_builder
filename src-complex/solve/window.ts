@@ -102,27 +102,9 @@ export function violatesDeg(f: BranchFilter, deg: number): boolean {
   return true;
 }
 
-/**
- * A filter in the student's register, for when it carries no source text of its own.
- *
- * The parser sets `src` from the line as typed, which is what a refusal should quote. This is the
- * fallback for a filter built in code — never internal state, because a violated filter is reported to
- * the student and «`{"kind":"quadrant"}`» is not a sentence about their figure.
- */
-export function describeFilter(f: BranchFilter): string {
-  switch (f.kind) {
-    case 'quadrant':
-      return `${f.name} ברביע ה${['ראשון', 'שני', 'שלישי', 'רביעי'][f.q - 1]}`;
-    case 'range': {
-      const parts: string[] = [];
-      if (f.minDeg !== undefined) parts.push(`> ${Number(f.minDeg.n) / Number(f.minDeg.d)}°`);
-      if (f.maxDeg !== undefined) parts.push(`< ${Number(f.maxDeg.n) / Number(f.maxDeg.d)}°`);
-      return `arg ${f.name} ${parts.join(' ו-')}`;
-    }
-    case 'exact':
-      return `arg ${f.name} = ${Number(f.deg.n) / Number(f.deg.d)}°`;
-  }
-}
+// `describeFilter` — a Hebrew fallback sentence for a filter with no `src` — is GONE (#716):
+// `BranchFilter.src` is required now, so a violated filter is always quoted in the student's own
+// words and the solver holds no display prose in any language.
 
 /** Overlap of two windows, treating infinities as the open ends they are. */
 const overlap = (a: Window, b: Window): number =>

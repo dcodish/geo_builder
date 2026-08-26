@@ -37,9 +37,15 @@ export interface KnowledgeRow {
    * `null` means "the givens do not determine this", which is an ANSWER and is shown as one.
    */
   readonly value: string | null;
-  /** why it is not knowledge, when it is not — never internal state, always the student's situation */
-  readonly why: string;
+  /**
+   * Why it is not knowledge, when it is not — a structured code (#716), worded by the reading
+   * layer in the UI's language; never internal state, always the student's situation. `null`
+   * exactly when `value` is present: a printed number needs no excuse.
+   */
+  readonly why: Why | null;
 }
+
+import type { Why } from './why';
 
 /** The structural inputs the predicate reads. One definition, so no caller can ask a different question. */
 export interface FigureClosure {
@@ -59,12 +65,8 @@ export const isKnowledge = (carriedExactly: boolean, c: FigureClosure): boolean 
   carriedExactly || (c.remainingDof === 0 && c.configCount === 1);
 
 /** The student-facing reason a value is withheld — their situation, never our internals. */
-export const whyNotKnowledge = (c: FigureClosure): string => {
-  if (c.remainingDof > 0) {
-    return `הערך תלוי בדרגות החופש שנותרו — הוסיפו נתון שיקבע אותן`;
-  }
-  if (c.configCount > 1) {
-    return `הערך משתנה בין ${c.configCount} התצורות — הוסיפו נתון שיבחר אחת מהן`;
-  }
-  return `הערך אינו נקבע מהנתונים שניתנו`;
+export const whyNotKnowledge = (c: FigureClosure): Why => {
+  if (c.remainingDof > 0) return { code: 'free-dof-remain' };
+  if (c.configCount > 1) return { code: 'multi-config', configs: c.configCount };
+  return { code: 'undetermined' };
 };

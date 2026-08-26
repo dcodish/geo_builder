@@ -22,7 +22,7 @@ import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/sa
 import { applySwitcherConfig, type ToolConfig } from '../shell/switcherConfig';
 import { deriveLines } from './app/deriveLines';
 import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, toggleLine } from './app/submit';
-import { v2Claims, v2Contradiction, v2Formulas, v2Freedom, v2Knowledge, v2Labels, v2Measures } from './replay/scene2';
+import { v2Claims, v2Contradiction, v2Formulas, v2Freedom, v2Knowledge, v2Labels, v2Measures, whyText } from './replay/scene2';
 import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
@@ -384,7 +384,10 @@ export function App() {
                 id: String(i),
                 content: <code dir="ltr">{src}</code>,
                 error: v2Failed.has(src)
-                  ? derived2?.untranslated.find((u) => u.src === src)?.why
+                  ? (() => {
+                      const why = derived2?.untranslated.find((u) => u.src === src)?.why;
+                      return why ? whyText(why, t) : undefined;
+                    })()
                   : undefined,
                 disabled: disabled.includes(i),
               }))}
@@ -420,28 +423,29 @@ export function App() {
                  panel's head-line; the config count died outright («הציגו תצורה אחרת» already says
                  alternatives exist). The strip renders nothing when the figure holds clean. */
             }
-            {(v2Contradiction(derived2) !== null ||
+            {(v2Contradiction(derived2, t) !== null ||
               derived2.unsatisfied.length > 0 ||
               derived2.undecided.length > 0 ||
               derived2.untranslated.length > 0) && (
-              <div className="v2-banner" dir="rtl">
-                {v2Contradiction(derived2)}
+              /* #716: the strip's prose follows the UI language, so its direction does too */
+              <div className="v2-banner" dir={i18n.dir()}>
+                {v2Contradiction(derived2, t)}
                 {/* a relation the numeric tier could not satisfy has no row of its own — tier 1 pushed
                     it down — so without this it would simply be absent from a figure that ignores it */}
                 {derived2.unsatisfied.map((u) => (
                   <div key={u} className="v2-skip">
-                    ✗ «{u}» — לא מתקיים בתצורה הזו
+                    ✗ «{u}» — {t('stripUnsatisfied')}
                   </div>
                 ))}
                 {/* a relation the engine could not EVALUATE — undecided, and said so rather than dropped */}
                 {derived2.undecided.map((u) => (
                   <div key={`und-${u}`} className="v2-skip">
-                    ? «{u}» — לא ניתן להכריע מהנתונים שניתנו
+                    ? «{u}» — {t('stripUndecided')}
                   </div>
                 ))}
                 {derived2.untranslated.map((u) => (
                   <div key={u.factId} className="v2-skip">
-                    ⚠ «{u.src}» — {u.why}
+                    ⚠ «{u.src}» — {whyText(u.why, t)}
                   </div>
                 ))}
               </div>
@@ -571,14 +575,14 @@ export function App() {
               onToggle={() => setShowData((s) => !s)}
               showLabel={t('panelShow')}
               hideLabel={t('panelHide')}
-              status={v2Freedom(derived2)}
+              status={v2Freedom(derived2, t)}
               sections={[
                 { key: 'points', title: t('secPoints'), rows: v2Labels(derived2, view) },
-                // verdict rows word their WHY in prose — they follow the app's direction (#716
-                // tracks the engine-composed strings staying Hebrew in EN mode)
-                { key: 'measures', title: t('secMeasures'), rows: v2Measures(derived2), dir: 'app' },
-                { key: 'relations', title: t('secRelations'), rows: v2Claims(derived2), dir: 'app' },
-                { key: 'ask', title: t('secAsk'), rows: v2Knowledge(derived2), dir: 'app' },
+                // verdict rows word their WHY in prose, in the UI's language (#716: the engine
+                // publishes codes; whyText words them) — they follow the app's direction
+                { key: 'measures', title: t('secMeasures'), rows: v2Measures(derived2, t), dir: 'app' },
+                { key: 'relations', title: t('secRelations'), rows: v2Claims(derived2, t), dir: 'app' },
+                { key: 'ask', title: t('secAsk'), rows: v2Knowledge(derived2, t), dir: 'app' },
               ]}
             >
               {/* the formula sheet, surfaced from what the figure DOES — each row names its premises */}

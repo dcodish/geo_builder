@@ -49,7 +49,7 @@ describe('a measure over a shape-fixed figure is knowledge, expressed in the uni
   it('a figure with a pinned size prints NOTHING — r is an unknown there, not a unit', () => {
     const row = rowFor(['z1 = 3', 'z2', '|z2| = 4r', 'אורך z1z2'], 'אורך');
     expect(row.value).toBeNull();
-    expect(row.why).not.toBe('');
+    expect(row.why).not.toBeNull();
   });
 
   /** With no parameter at all, a shape fixed up to rotation still determines the number itself. */
@@ -101,7 +101,7 @@ describe('F12 — the minimal n: the student answers, the tool checks', () => {
     // n = 6 does make w⁶ = cis270° pure imaginary; it is simply not minimal
     const d = deriveLines(['w = 1cis45', 'ה-n המינימלי שעבורו w^n מדומה טהור הוא 6']);
     expect(d.claims[0].verdict.status).toBe('refuted');
-    expect(d.claims[0].verdict.why).toContain('2');
+    expect(d.claims[0].verdict.why).toMatchObject({ code: 'minimal-refuted', least: 2 });
   });
 
   it('reads the English form too', () => {

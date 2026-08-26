@@ -28,13 +28,13 @@ describe('the predicate itself', () => {
     [{ remainingDof: 2, configCount: 3 }],
   ])('%o is NOT knowledge', (closure) => {
     expect(isKnowledge(false, closure)).toBe(false);
-    expect(whyNotKnowledge(closure)).not.toBe('');
+    expect(whyNotKnowledge(closure).code).toBeTruthy();
   });
 
   /** The reason has to describe the student's situation, so it can tell them what to do next. */
   it('names remaining freedom and multiple configurations differently', () => {
-    expect(whyNotKnowledge({ remainingDof: 1, configCount: 1 })).toContain('דרגות החופש');
-    expect(whyNotKnowledge({ remainingDof: 0, configCount: 4 })).toContain('4');
+    expect(whyNotKnowledge({ remainingDof: 1, configCount: 1 })).toEqual({ code: 'free-dof-remain' });
+    expect(whyNotKnowledge({ remainingDof: 0, configCount: 4 })).toEqual({ code: 'multi-config', configs: 4 });
   });
 });
 
@@ -74,7 +74,7 @@ describe('answers are given only when the figure forces them', () => {
   it('WITHHOLDS the area while a degree of freedom remains, and says why', () => {
     const d = deriveLines(['z1 = 4', 'z2', 'שטח Oz1z2']);
     expect(d.knowledge[0].value).toBeNull();
-    expect(d.knowledge[0].why).toContain('דרגות החופש');
+    expect(d.knowledge[0].why).toEqual({ code: 'free-dof-remain' });
   });
 
   /** Invariance is across EVERY valid configuration, not the one on screen. */
@@ -84,7 +84,7 @@ describe('answers are given only when the figure forces them', () => {
     // its own solutions, so `z1 = 4` would contradict it — ADR-CX-021.)
     const d = deriveLines(['z', 'z^3 = 8', 'w = 4', 'אורך wz']);
     expect(d.knowledge[0].value).toBeNull();
-    expect(d.knowledge[0].why).toContain('תצורות');
+    expect(d.knowledge[0].why?.code).toBe('multi-config');
   });
 
   it('a driving measure closes the figure, and the panel then answers', () => {

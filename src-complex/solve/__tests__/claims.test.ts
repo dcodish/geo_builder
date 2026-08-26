@@ -67,7 +67,7 @@ describe('UNKNOWN is a first-class answer, not a failure', () => {
   it('a claim about a direction the givens leave free is unanswered, not wrong', () => {
     const c = only('z1 ברביע הראשון', 'z1 ממשי');
     expect(c.verdict.status).toBe('unknown');
-    expect(c.verdict.why).toContain('לא נקבע');
+    expect(c.verdict.why).toEqual({ code: 'undecided-arg', name: 'z1' });
   });
 
   it('conjugacy is unknown while either magnitude is still open', () => {

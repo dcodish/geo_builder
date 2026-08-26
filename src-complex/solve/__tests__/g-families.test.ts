@@ -94,6 +94,6 @@ describe('G8 — a RATIO is knowable where neither of its halves is', () => {
   it('a ratio the givens do not determine still prints nothing', () => {
     const d = deriveLines(['z1 = 3', 'z2', 'z3', 'היחס בין אורך Oz2 לאורך Oz3']);
     expect(d.knowledge[0].value).toBeNull();
-    expect(d.knowledge[0].why).not.toBe('');
+    expect(d.knowledge[0].why).not.toBeNull();
   });
 });

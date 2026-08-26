@@ -92,9 +92,26 @@ export function filterBranches(
   return { kept, undecided, emptiedBy };
 }
 
+// The convenience constructors carry a math-notation `src` (#716: src is required — a refusal
+// always quotes a statement, and these are code-built, so the notation IS the statement).
 /** `ברביע הראשון` and friends, as a filter. */
-export const quadrant = (name: string, q: 1 | 2 | 3 | 4): BranchFilter => ({ kind: 'quadrant', name, q });
+export const quadrant = (name: string, q: 1 | 2 | 3 | 4): BranchFilter => ({
+  kind: 'quadrant',
+  name,
+  q,
+  src: `arg ${name} ∈ (${(q - 1) * 90}°, ${q * 90}°)`,
+});
 /** `arg z < 45°`, as a filter. */
-export const argBelow = (name: string, deg: number): BranchFilter => ({ kind: 'range', name, maxDeg: rat(deg) });
+export const argBelow = (name: string, deg: number): BranchFilter => ({
+  kind: 'range',
+  name,
+  maxDeg: rat(deg),
+  src: `arg ${name} < ${deg}°`,
+});
 /** `arg z > 45°`, as a filter. */
-export const argAbove = (name: string, deg: number): BranchFilter => ({ kind: 'range', name, minDeg: rat(deg) });
+export const argAbove = (name: string, deg: number): BranchFilter => ({
+  kind: 'range',
+  name,
+  minDeg: rat(deg),
+  src: `arg ${name} > ${deg}°`,
+});

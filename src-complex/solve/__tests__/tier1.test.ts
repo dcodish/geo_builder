@@ -71,13 +71,13 @@ describe('branch enumeration IS the exam’s "all the possibilities"', () => {
   });
 
   it('z³ = 8 is the three cube roots, 120° apart', () => {
-    const r = solveTier1([{ lhs: pow(ref('z'), R(3)), rhs: num(R(8)) }]);
+    const r = solveTier1([{ lhs: pow(ref('z'), R(3)), rhs: num(R(8)), src: 'z^3 = 8' }]);
     expect(fmtMod(r.knownModulus.get('z')!)).toBe('2');
     expect(r.branches.map((b) => branchDegrees(b, 'z')).sort((a, c) => a! - c!)).toEqual([0, 120, 240]);
   });
 
   it('z⁶ = 1 with a quadrant given selects one root (2023 קיץ א א)', () => {
-    const r = solveTier1([{ lhs: pow(ref('z'), R(6)), rhs: num(R(1)) }]);
+    const r = solveTier1([{ lhs: pow(ref('z'), R(6)), rhs: num(R(1)), src: 'z^6 = 1' }]);
     expect(r.branches).toHaveLength(6);
     const { kept } = filterBranches(r.branches, [quadrant('z', 4)]);
     expect(kept).toHaveLength(1);
@@ -86,7 +86,7 @@ describe('branch enumeration IS the exam’s "all the possibilities"', () => {
 
   it('a whole extra turn is the SAME direction, so it is one branch and not many', () => {
     // z = i states one direction; nothing is multi-valued, so there is exactly one configuration
-    const r = solveTier1([{ lhs: ref('z'), rhs: I }]);
+    const r = solveTier1([{ lhs: ref('z'), rhs: I, src: 'z = i' }]);
     expect(r.branches).toHaveLength(1);
     expect(branchDegrees(r.branches[0], 'z')).toBe(90);
   });
@@ -104,13 +104,13 @@ describe('modulus relations are linear too — the corpus’s commonest given', 
   });
 
   it('a modulus given leaves the ARGUMENT free — under-determination is reported, not invented', () => {
-    const r = solveTier1([{ lhs: abs(ref('z')), rhs: num(R(5)) }]);
+    const r = solveTier1([{ lhs: abs(ref('z')), rhs: num(R(5)), src: '|z| = 5' }]);
     expect(fmtMod(r.knownModulus.get('z')!)).toBe('5');
     expect(r.freeDof).toEqual(['arg z']); // |z| is pinned, the direction is not — exactly right
   });
 
   it('2|z_A| = |z_M| relates two moduli without determining either', () => {
-    const r = solveTier1([{ lhs: mul(num(R(2)), abs(ref('zA'))), rhs: abs(ref('zM')) }]);
+    const r = solveTier1([{ lhs: mul(num(R(2)), abs(ref('zA'))), rhs: abs(ref('zM')), src: '2|zA| = |zM|' }]);
     expect(r.inconsistent).toBeNull();
     expect(r.knownModulus.size).toBe(0); // a RELATION, not a value — nothing is printable yet
     expect(r.modulus.rank).toBe(1); // ...but one degree of freedom was genuinely removed
@@ -119,16 +119,16 @@ describe('modulus relations are linear too — the corpus’s commonest given', 
 
 describe('the free-DOF count is the nullspace dimension, not a heuristic', () => {
   it('an unconstrained number has two degrees of freedom, modulus and argument', () => {
-    const r = solveTier1([{ lhs: ref('w'), rhs: ref('w') }]);
+    const r = solveTier1([{ lhs: ref('w'), rhs: ref('w'), src: 'w = w' }]);
     expect([...r.freeDof].sort()).toEqual(['arg w', '|w|']);
   });
 
   it('each independent equation removes exactly one, and the count is published once', () => {
-    const one = solveTier1([{ lhs: abs(ref('z')), rhs: num(R(3)) }]);
+    const one = solveTier1([{ lhs: abs(ref('z')), rhs: num(R(3)), src: '|z| = 3' }]);
     expect(one.freeDof).toEqual(['arg z']);
     const both = solveTier1([
-      { lhs: abs(ref('z')), rhs: num(R(3)) },
-      { lhs: ref('z'), rhs: mul(num(R(3)), I) },
+      { lhs: abs(ref('z')), rhs: num(R(3)), src: '|z| = 3' },
+      { lhs: ref('z'), rhs: mul(num(R(3)), I), src: 'z = 3i' },
     ]);
     expect(both.freeDof).toEqual([]);
   });
@@ -154,8 +154,8 @@ describe('honesty', () => {
   it('an equation dependent modulo a WHOLE TURN is consistent, not a contradiction', () => {
     // z^2 = 1 and z^4 = 1 agree; a naive "residual must be exactly zero" would refuse this
     const r = solveTier1([
-      { lhs: pow(ref('z'), R(2)), rhs: num(R(1)) },
-      { lhs: pow(ref('z'), R(4)), rhs: num(R(1)) },
+      { lhs: pow(ref('z'), R(2)), rhs: num(R(1)), src: 'z^2 = 1' },
+      { lhs: pow(ref('z'), R(4)), rhs: num(R(1)), src: 'z^4 = 1' },
     ]);
     expect(r.inconsistent).toBeNull();
     expect(r.branches.map((b) => branchDegrees(b, 'z')).sort((a, c) => a! - c!)).toEqual([0, 180]);
@@ -163,7 +163,7 @@ describe('honesty', () => {
 
   it('a NON-MONOMIAL constraint is deferred to the numeric tier, listed rather than dropped', () => {
     const sum = { lhs: ref('w'), rhs: { t: 'add', l: ref('z1'), r: ref('z2') } as const, src: 'w = z1 + z2' };
-    const r = solveTier1([{ lhs: abs(ref('z1')), rhs: num(R(2)) }, sum]);
+    const r = solveTier1([{ lhs: abs(ref('z1')), rhs: num(R(2)), src: '|z1| = 2' }, sum]);
     expect(r.deferred).toHaveLength(1);
     expect(r.deferred[0].src).toBe('w = z1 + z2');
     // and the monomial half still solved — deferral is routing, not failure
@@ -171,15 +171,15 @@ describe('honesty', () => {
   });
 
   it('a filter that empties the branch set REFUSES rather than relaxing itself', () => {
-    const r = solveTier1([{ lhs: pow(ref('z'), R(2)), rhs: num(R(1)) }]); // 0° and 180°
+    const r = solveTier1([{ lhs: pow(ref('z'), R(2)), rhs: num(R(1)), src: 'z^2 = 1' }]); // 0° and 180°
     const res = filterBranches(r.branches, [quadrant('z', 2)]); // neither is strictly inside Q2
     expect(res.kept).toEqual([]);
-    expect(res.emptiedBy).toEqual({ kind: 'quadrant', name: 'z', q: 2 });
+    expect(res.emptiedBy).toMatchObject({ kind: 'quadrant', name: 'z', q: 2 });
   });
 
   it('an UNDECIDABLE filter keeps the branch and says so — it never prunes on ignorance', () => {
     // arg z is free, so no branch fixes it; the filter cannot decide and must not silently drop it
-    const r = solveTier1([{ lhs: abs(ref('z')), rhs: num(R(1)) }]);
+    const r = solveTier1([{ lhs: abs(ref('z')), rhs: num(R(1)), src: '|z| = 1' }]);
     const res = filterBranches(r.branches, [argBelow('z', 45)]);
     expect(res.emptiedBy).toBeNull();
     expect(res.kept.length).toBe(r.branches.length);

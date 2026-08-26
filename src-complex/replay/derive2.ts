@@ -58,14 +58,16 @@ import {
 import { verifyClaims } from '../solve/claims';
 import { claimDriveRows } from '../solve/claimDrive';
 import { filterBranches } from '../solve/filter';
-import { type AffineArg, describeFilter, projectWindow, statedWindow, violatesDeg } from '../solve/window';
+import { type AffineArg, projectWindow, statedWindow, violatesDeg } from '../solve/window';
 import type { BranchFilter, Constraint } from '../model/constraint';
+import type { Why } from '../model/why';
 
 /** A statement the fold could not use, with the reason — surfaced, never swallowed. */
 export interface Untranslated {
   readonly factId: string;
   readonly src: string;
-  readonly why: string;
+  /** a structured code (#716) — worded by the reading layer in the UI's language */
+  readonly why: Why;
 }
 
 export interface DerivedPoint {
@@ -669,14 +671,14 @@ export function foldConstraints(input: FoldInput): Derived2 {
   const checkedMeasures: CheckedMeasure[] = measures.map((m, i) => {
     const spec = measureResidual(m, i);
     const v = spec.values(finalEnv);
-    if (v === null) return { relation: m, status: 'undecided', why: `לא ניתן לחשב את «${m.src}»` };
+    if (v === null) return { relation: m, status: 'undecided', why: { code: 'measure-uncomputable', src: m.src } };
     // RELATIVE, because an area of 150r² and a length of 15r are not accurate to the same absolute
     // amount — a fixed epsilon would call the big one violated and the small one satisfied for the
     // same quality of solve.
     const want = evalReal(m.rhs, finalEnv) ?? 1;
     return Math.abs(v[0]) <= 1e-6 * Math.max(1, Math.abs(want))
-      ? { relation: m, status: 'holds', why: `«${m.src}» — מתקיים בציור` }
-      : { relation: m, status: 'violated', why: `«${m.src}» — אינו מתקיים בתצורה הזו` };
+      ? { relation: m, status: 'holds', why: { code: 'measure-holds', src: m.src } }
+      : { relation: m, status: 'violated', why: { code: 'measure-violated', src: m.src } };
   });
 
   /**
@@ -715,7 +717,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
           const p = points.find((q) => q.name === f.name);
           return p !== undefined && violatesDeg(f, p.argumentDeg);
         })
-        .map((f) => f.src ?? describeFilter(f));
+        .map((f) => f.src);
 
   const unsatisfied = [...unsatisfiedRelations, ...violatedFilters];
 
@@ -864,7 +866,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     const real = Math.abs(here.im) <= 1e-9 * Math.max(1, Math.hypot(here.re, here.im));
     const show = (z: Cx): string =>
       real ? round2(z.re) : `${round2(z.re)}${z.im < 0 ? '-' : '+'}${round2(Math.abs(z.im))}i`;
-    if (isKnowledge(false, closure)) return { label: q.src, value: show(here), why: '' };
+    if (isKnowledge(false, closure)) return { label: q.src, value: show(here), why: null };
     if (!shapeFixed || !gaugeName || !real) {
       return { label: q.src, value: null, why: whyNotKnowledge(closure) };
     }
@@ -885,21 +887,21 @@ export function foldConstraints(input: FoldInput): Derived2 {
     }
     const unit = state.par.get(gaugeName);
     if (!unit || !Number.isFinite(unit)) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
-    if (degree === 0) return { label: q.src, value: round2(here.re), why: '' };
+    if (degree === 0) return { label: q.src, value: round2(here.re), why: null };
     const power = degree === 1 ? '' : degree === 2 ? '²' : `^${degree}`;
     return {
       label: q.src,
       value: `${fmtCoefficient(here.re / unit ** degree)}${gaugeName}${power}`,
-      why: '',
+      why: null,
     };
   });
 
   const knowledge: KnowledgeRow[] = queries.map((q) => {
     const value = measureAt(finalEnv, q);
     if (value === null) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
-    if (isKnowledge(false, closure)) return { label: q.src, value: round2(value), why: '' };
+    if (isKnowledge(false, closure)) return { label: q.src, value: round2(value), why: null };
     const expressed = expressMeasure(q.kind, q.points, value);
-    if (expressed) return { label: q.src, value: expressed, why: '' };
+    if (expressed) return { label: q.src, value: expressed, why: null };
     return { label: q.src, value: null, why: whyNotKnowledge(closure) };
   });
 
@@ -919,7 +921,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
       return { label: r.src, value: null, why: whyNotKnowledge(closure) };
     }
     const value = top / bottom;
-    if (isKnowledge(false, closure)) return { label: r.src, value: round2(value), why: '' };
+    if (isKnowledge(false, closure)) return { label: r.src, value: round2(value), why: null };
     const invariant =
       shapeFixed &&
       symmetries.every((s) => {
@@ -929,7 +931,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
         return Math.abs(a / b - value) <= 1e-6 * Math.max(1, Math.abs(value));
       });
     return invariant
-      ? { label: r.src, value: round2(value), why: '' }
+      ? { label: r.src, value: round2(value), why: null }
       : { label: r.src, value: null, why: whyNotKnowledge(closure) };
   });
 

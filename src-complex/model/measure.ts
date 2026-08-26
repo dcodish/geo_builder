@@ -22,6 +22,7 @@
  */
 
 import type { Expr } from './expr';
+import type { Why } from './why';
 
 export type MeasureKind = 'length' | 'perimeter' | 'area';
 
@@ -94,8 +95,11 @@ export type MeasureStatus =
 export interface CheckedMeasure {
   readonly relation: MeasureRelation;
   readonly status: MeasureStatus;
-  /** the student-facing reason, naming their own statement rather than internal state */
-  readonly why: string;
+  /**
+   * The student-facing reason, naming their own statement rather than internal state — a
+   * structured code (#716), worded by the reading layer in the UI's language.
+   */
+  readonly why: Why;
 }
 
 /** The plane geometry each noun means. Kept here so the solver reads relations, not formulas. */

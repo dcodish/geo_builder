@@ -16,6 +16,8 @@
  * therefore an answer that holds for every configuration rather than for the one on screen.
  */
 
+import type { Why } from './why';
+
 export type Claim =
   /** «w ממשי» — the number is real */
   | { readonly kind: 'real'; readonly name: string; readonly src: string }
@@ -53,12 +55,17 @@ export type Claim =
       readonly src: string;
     };
 
-/** How a claim came out. `unknown` is a first-class answer, not a failure. */
+/**
+ * How a claim came out. `unknown` is a first-class answer, not a failure.
+ *
+ * The `why` is a structured code (#716): the engine states WHAT happened; the reading layer
+ * words it in the UI's language. See `model/why.ts`.
+ */
 export type ClaimVerdict =
   /** the givens FORCE it — decided exactly, true in every configuration */
-  | { readonly status: 'holds'; readonly why: string }
+  | { readonly status: 'holds'; readonly why: Why }
   /** the givens forbid it — decided exactly */
-  | { readonly status: 'refuted'; readonly why: string }
+  | { readonly status: 'refuted'; readonly why: Why }
   /**
    * Not decidable from what has been stated.
    *
@@ -66,7 +73,7 @@ export type ClaimVerdict =
    * wrong, it is unanswered, and marking it ✗ would tell a student their correct answer was incorrect
    * because they had not finished entering the question.
    */
-  | { readonly status: 'unknown'; readonly why: string };
+  | { readonly status: 'unknown'; readonly why: Why };
 
 export interface CheckedClaim {
   readonly claim: Claim;

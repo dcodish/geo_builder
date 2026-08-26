@@ -10,6 +10,7 @@
  */
 
 import type { CheckedClaim, Claim, ClaimVerdict } from '../model/claim';
+import type { Why } from '../model/why';
 import {
   type Angle,
   isExactRational,
@@ -35,10 +36,7 @@ const known = (t1: Tier1Result, branch: Branch | undefined, name: string): Known
   arg: branch?.angles.get(name) ?? null,
 });
 
-const undecided = (what: string): ClaimVerdict => ({
-  status: 'unknown',
-  why: `${what} עדיין לא נקבע מהנתונים`,
-});
+const undecided = (why: Why): ClaimVerdict => ({ status: 'unknown', why });
 
 /**
  * Verify one claim against the solved figure.
@@ -53,21 +51,20 @@ export function verifyClaim(claim: Claim, t1: Tier1Result, branch: Branch | unde
       case 'real':
       case 'imaginary': {
         const { arg } = known(t1, branch, claim.name);
-        if (!arg) return undecided(`הארגומנט של ${claim.name}`);
+        if (!arg) return undecided({ code: 'undecided-arg', name: claim.name });
         const wanted = claim.kind === 'real' ? isReal(arg) : isImaginary(arg);
-        const noun = claim.kind === 'real' ? 'ממשי' : 'מדומה טהור';
         return wanted
-          ? { status: 'holds', why: `${claim.name} ${noun} — נובע מהנתונים` }
-          : { status: 'refuted', why: `${claim.name} אינו ${noun}` };
+          ? { status: 'holds', why: { code: 'prop-holds', name: claim.name, prop: claim.kind } }
+          : { status: 'refuted', why: { code: 'prop-refuted', name: claim.name, prop: claim.kind } };
       }
       case 'conjugates': {
         const a = known(t1, branch, claim.a);
         const b = known(t1, branch, claim.b);
         // conjugates: equal moduli AND opposite arguments. BOTH halves must be forced, or the answer
         // is unknown — equal moduli alone is not conjugacy, and saying so would be a guess.
-        if (!a.mod || !b.mod) return undecided(`הערך המוחלט של ${claim.a} או של ${claim.b}`);
-        if (!a.arg || !b.arg) return undecided(`הארגומנט של ${claim.a} או של ${claim.b}`);
-        if (!modEq(a.mod, b.mod)) return { status: 'refuted', why: `הערכים המוחלטים שונים` };
+        if (!a.mod || !b.mod) return undecided({ code: 'undecided-mod-pair', a: claim.a, b: claim.b });
+        if (!a.arg || !b.arg) return undecided({ code: 'undecided-arg-pair', a: claim.a, b: claim.b });
+        if (!modEq(a.mod, b.mod)) return { status: 'refuted', why: { code: 'moduli-differ' } };
         /**
          * PROVE IT FIRST, and only then ask whether the angles were decidable at all.
          *
@@ -78,16 +75,16 @@ export function verifyClaim(claim: Claim, t1: Tier1Result, branch: Branch | unde
          * answer withheld rather than a false one given, but still the wrong verdict.
          */
         if (sameDirection(a.arg, angNeg(b.arg))) {
-          return { status: 'holds', why: `${claim.a} ו-${claim.b} צמודים — נובע מהנתונים` };
+          return { status: 'holds', why: { code: 'conjugates-hold', a: claim.a, b: claim.b } };
         }
         // Now opacity does matter. Two INDEPENDENT opaque angles — `3+4i` and `3-4i`, each carrying its
         // own atom — cannot be proved opposite, and undecidable must not be reported as refuted:
         // refuting a TRUE claim tells a student their correct answer is wrong, which is the one
         // direction of this error that actually costs something.
         if (!isExactRational(a.arg) || !isExactRational(b.arg)) {
-          return undecided(`הארגומנטים של ${claim.a} ו-${claim.b} (זווית לא־רציונלית)`);
+          return undecided({ code: 'undecided-arg-pair-irrational', a: claim.a, b: claim.b });
         }
-        return { status: 'refuted', why: `הארגומנטים אינם הפוכים` };
+        return { status: 'refuted', why: { code: 'args-not-opposite' } };
       }
       /**
        * F12 — «לכל n טבעי, w^(kn+c) ממשי», decided by CONGRUENCE and never by trying values of n.
@@ -100,9 +97,8 @@ export function verifyClaim(claim: Claim, t1: Tier1Result, branch: Branch | unde
        */
       case 'forall-power': {
         const { arg } = known(t1, branch, claim.name);
-        if (!arg) return undecided(`הארגומנט של ${claim.name}`);
-        if (!isExactRational(arg)) return undecided(`הארגומנט של ${claim.name} (זווית לא־רציונלית)`);
-        const noun = claim.prop === 'real' ? 'ממשי' : 'מדומה טהור';
+        if (!arg) return undecided({ code: 'undecided-arg', name: claim.name });
+        if (!isExactRational(arg)) return undecided({ code: 'undecided-arg-irrational', name: claim.name });
         const twice = ratMul(arg.turns, rat(2));
         const varies = ratMul(twice, rat(claim.k)); // the n-dependent part
         const constant = ratMul(twice, rat(claim.c));
@@ -110,8 +106,8 @@ export function verifyClaim(claim: Claim, t1: Tier1Result, branch: Branch | unde
         const holds = isInt(varies) && isInt(ratSub(constant, target));
         const power = `${claim.name}^(${claim.k}n${claim.c === 0 ? '' : claim.c > 0 ? `+${claim.c}` : claim.c})`;
         return holds
-          ? { status: 'holds', why: `${power} ${noun} לכל n — נובע מהנתונים` }
-          : { status: 'refuted', why: `${power} אינו ${noun} לכל n` };
+          ? { status: 'holds', why: { code: 'forall-holds', power, prop: claim.prop } }
+          : { status: 'refuted', why: { code: 'forall-refuted', power, prop: claim.prop } };
       }
       /**
        * F12 — «ה-n המינימלי שעבורו wⁿ מדומה טהור הוא 5».
@@ -122,16 +118,18 @@ export function verifyClaim(claim: Claim, t1: Tier1Result, branch: Branch | unde
        */
       case 'minimal-power': {
         const { arg } = known(t1, branch, claim.name);
-        if (!arg) return undecided(`הארגומנט של ${claim.name}`);
-        if (!isExactRational(arg)) return undecided(`הארגומנט של ${claim.name} (זווית לא־רציונלית)`);
-        const noun = claim.prop === 'real' ? 'ממשי' : 'מדומה טהור';
+        if (!arg) return undecided({ code: 'undecided-arg', name: claim.name });
+        if (!isExactRational(arg)) return undecided({ code: 'undecided-arg-irrational', name: claim.name });
         const least = smallestPower(angScale(arg, rat(2)), claim.prop === 'real' ? ZERO : rat(1, 2));
         if (least === null) {
-          return { status: 'refuted', why: `אין n שעבורו ${claim.name}^n ${noun}` };
+          return { status: 'refuted', why: { code: 'minimal-none', name: claim.name, prop: claim.prop } };
         }
         return Number(least) === claim.stated
-          ? { status: 'holds', why: `n = ${claim.stated} הוא אכן המינימלי שעבורו ${claim.name}^n ${noun}` }
-          : { status: 'refuted', why: `ה-n המינימלי שעבורו ${claim.name}^n ${noun} הוא ${least}` };
+          ? { status: 'holds', why: { code: 'minimal-holds', name: claim.name, prop: claim.prop, n: claim.stated } }
+          : {
+              status: 'refuted',
+              why: { code: 'minimal-refuted', name: claim.name, prop: claim.prop, least: Number(least) },
+            };
       }
     }
   })();

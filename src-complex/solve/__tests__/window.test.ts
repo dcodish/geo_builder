@@ -10,8 +10,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { deriveLines } from '../../app/deriveLines';
-import { rat } from '../../value/rational';
-import { type AffineArg, describeFilter, projectWindow, statedWindow, violatesDeg } from '../window';
+import { argAbove, argBelow, quadrant } from '../filter';
+import { type AffineArg, projectWindow, statedWindow, violatesDeg } from '../window';
 
 const fig = (lines: string[], seed = 0) => deriveLines(lines, seed, seed);
 const argOf = (lines: string[], name: string, seed = 0): number =>
@@ -19,15 +19,15 @@ const argOf = (lines: string[], name: string, seed = 0): number =>
 
 describe('the window a filter states', () => {
   it('a quadrant is the open sector the exam numbers', () => {
-    expect(statedWindow({ kind: 'quadrant', name: 'z', q: 1 })).toEqual({ min: 0, max: 90 });
-    expect(statedWindow({ kind: 'quadrant', name: 'z', q: 3 })).toEqual({ min: 180, max: 270 });
+    expect(statedWindow(quadrant('z', 1))).toEqual({ min: 0, max: 90 });
+    expect(statedWindow(quadrant('z', 3))).toEqual({ min: 180, max: 270 });
   });
 
   it('a ONE-SIDED range is bounded at its turn, not a half-line', () => {
     // the property the change of basis depends on: an unbounded end has no turn to be a
     // representative of, and shifting it by one silently admits different directions
-    expect(statedWindow({ kind: 'range', name: 'z', maxDeg: rat(45) })).toEqual({ min: 0, max: 45 });
-    expect(statedWindow({ kind: 'range', name: 'z', minDeg: rat(100) })).toEqual({ min: 100, max: 360 });
+    expect(statedWindow(argBelow('z', 45))).toEqual({ min: 0, max: 45 });
+    expect(statedWindow(argAbove('z', 100))).toEqual({ min: 100, max: 360 });
   });
 });
 
@@ -76,18 +76,19 @@ describe('projecting a window onto the basis coordinate that carries it', () => 
 
 describe('the stage-3e backstop reads the DRAWN direction', () => {
   it('accepts a direction inside the stated sector, modulo a turn', () => {
-    expect(violatesDeg({ kind: 'quadrant', name: 'z', q: 1 }, 45)).toBe(false);
-    expect(violatesDeg({ kind: 'quadrant', name: 'z', q: 1 }, -315)).toBe(false); // ≡ 45°
+    expect(violatesDeg(quadrant('z', 1), 45)).toBe(false);
+    expect(violatesDeg(quadrant('z', 1), -315)).toBe(false); // ≡ 45°
   });
 
   it('catches one outside it', () => {
-    expect(violatesDeg({ kind: 'quadrant', name: 'z', q: 1 }, 219.52)).toBe(true);
-    expect(violatesDeg({ kind: 'range', name: 'z', maxDeg: rat(45) }, 66.28)).toBe(true);
+    expect(violatesDeg(quadrant('z', 1), 219.52)).toBe(true);
+    expect(violatesDeg(argBelow('z', 45), 66.28)).toBe(true);
   });
 
-  it('a filter names itself in the student’s register, never as internal state', () => {
-    expect(describeFilter({ kind: 'quadrant', name: 'z2', q: 1 })).toBe('z2 ברביע הראשון');
-    expect(describeFilter({ kind: 'range', name: 'z2', maxDeg: rat(45) })).toContain('45');
+  it('a filter always carries the statement that made it — src is required, so a refusal quotes it (#716)', () => {
+    // the parser sets src from the typed line; the code-built constructors carry math notation
+    expect(quadrant('z2', 1).src).toBe('arg z2 ∈ (0°, 90°)');
+    expect(argBelow('z2', 45).src).toContain('45');
   });
 });
 
