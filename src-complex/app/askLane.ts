@@ -12,6 +12,7 @@
  * questions that normalize alike each get their own row.
  */
 import { parseLineV2 } from '../parser/rules';
+import { askArtifacts } from './deriveLines';
 import type { KnowledgeRow } from '../model/knowledge';
 
 export interface AskRow {
@@ -28,13 +29,11 @@ export function askRowsOf(asks: readonly string[], knowledge: readonly Knowledge
   return asks.map((text) => {
     const r = parseLineV2(text.trim());
     if (!r.ok) return { text, note: 'unreadable', row: null };
-    const l = r.line;
-    // `declares` uncounted, matching readAsk — a question's mentioned names are span bookkeeping
-    const states =
-      l.constraints.length + l.filters.length + l.assertions.length +
-      l.objects.length + l.measures.length + l.sequences.length + l.roots.length;
-    const srcs = [...l.queries, ...l.ratios, ...l.exprQueries].map((a) => a.src);
-    if (srcs.length === 0 || states > 0) return { text, note: 'statement', row: null };
+    // the ONE reading of a line as a question (askArtifacts) — the lane lowering uses the same,
+    // so the row model and the fold cannot disagree about what was asked
+    const a = askArtifacts(r.line);
+    if (!a) return { text, note: 'statement', row: null };
+    const srcs = [...a.queries, ...a.ratios, ...a.exprQueries].map((q) => q.src);
     const at = knowledge.findIndex((k, i) => !consumed.has(i) && srcs.includes(k.label));
     // no match can only mean the fold was not given this lane (a caller bug) — read as unreadable
     // rather than inventing an answer

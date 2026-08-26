@@ -21,11 +21,39 @@ import { evaluate, exact, fromCartesian } from '../value/value';
 import { fromDegrees } from '../value/angle';
 import { one as modOne } from '../value/modulus';
 
-/** A z/w-family name is complex by the exam's convention; anything else is a real parameter. */
-export const isComplexName = (name: string): boolean => /^[zw]\d*$/i.test(name);
+/**
+ * A CAPITAL letter is a POINT LABEL (#791, ADR-CX-033) — the exam's figure register: «הנקודות A ו-B
+ * מציגות את המספרים». Case-SENSITIVE by the operator's ruling: `A` is a point, `a` stays the real
+ * parameter the «הביעו באמצעות a ו-b» register needs. `O` is excluded (the origin), and `Z`/`W` are
+ * excluded because the z/w family has always been case-folded (`Z1` means `z1` and keeps meaning it).
+ */
+export const isPointLabel = (raw: string): boolean => /^[A-NP-VXY]\d*$/.test(raw);
+
+/**
+ * The canonical spelling of a name: the z/w family and parameters fold to lowercase (the register
+ * that always held), a point label keeps its capital — the ONE place case decides, so no rule
+ * lowercases a capture directly any more.
+ */
+export const canonName = (raw: string): string => (isPointLabel(raw) ? raw : raw.toLowerCase());
+
+/** A z/w-family name or a point label is complex; anything else is a real parameter. */
+export const isComplexName = (name: string): boolean => /^[zw]\d*$/i.test(name) || isPointLabel(name);
+
+/**
+ * Two glued point labels are a DISTANCE (#791, operator ruling): «AB» is |A−B|, never a product —
+ * *"if a user wanted to multiply, they would write A * B"*. Only the capital-label pair reads this
+ * way; `z1z2` in an expression stays the product it always was (that register's ruling lives with
+ * the measure nouns, which is where z-runs mean segments).
+ */
+const labelPair = (raw: string): [string, string] | null => {
+  const m = raw.match(/^([A-NP-VXY]\d*)([A-NP-VXY]\d*)$/);
+  return m ? [m[1], m[2]] : null;
+};
 
 const nameExpr = (raw: string): Expr => {
-  const name = raw.toLowerCase();
+  const pair = labelPair(raw);
+  if (pair) return abs(sub(ref(pair[0]), ref(pair[1])));
+  const name = canonName(raw);
   return isComplexName(name) ? ref(name) : param(name);
 };
 
@@ -36,12 +64,31 @@ type Tok =
   | { t: 'cis'; at: number; len: number }
   | { t: 'conj'; at: number; len: number }
   | { t: 'proj'; v: 're' | 'im'; at: number; len: number }
+  /** `d_{z1z2}` / `d_{AB}` — the textbook's distance form (#791): exactly two point atoms */
+  | { t: 'dist'; a: string; b: string; at: number; len: number }
   | { t: 'op'; v: string; at: number; len: number };
 
 // `cis` and `conj` end on a non-LETTER, not on a word boundary. `\b` does not fire between `cis` and
 // `150`, so `2cis150` lexed the tail as the NAME `cis150` — a polar literal silently became a product
 // with an invented parameter, and printed as `2cis150`.
-const TOKEN = /\s+|conj(?![A-Za-z])|cis(?![A-Za-z])|re(?=\s*\()|im(?=\s*\()|[A-Za-z][A-Za-z]*\d*|\d+(?:\.\d+)?|[()|^*/+\-]/giu;
+// `d_{…}` sits BEFORE the general name alternative, or the lexer would read the bare `d` as a
+// parameter and refuse the line at the `_`.
+const TOKEN = /\s+|conj(?![A-Za-z])|cis(?![A-Za-z])|re(?=\s*\()|im(?=\s*\()|d_\{[^{}]*\}|[A-Za-z][A-Za-z]*\d*|\d+(?:\.\d+)?|[()|^*/+\-]/giu;
+
+/**
+ * The two point atoms inside `d_{…}`, or null when the braces hold anything else. Atoms are the run
+ * alphabet plus the labels: the origin, the z/w family (any case, canonical lowercase), a capital
+ * label (case-sensitive). `d_{z1z2}` and `d_{AB}` — the operator's ruled entry form: a glued run,
+ * no comma.
+ */
+function distAtoms(inner: string): [string, string] | null {
+  const m = inner.match(/^([oO]|[ZzWw]\d*|[A-NP-VXY]\d*)([oO]|[ZzWw]\d*|[A-NP-VXY]\d*)$/);
+  if (!m) return null;
+  const canon = (t: string): string => (isPointLabel(t) ? t : t.toLowerCase());
+  const a = canon(m[1]);
+  const b = canon(m[2]);
+  return a === b ? null : [a, b];
+}
 
 function lex(src: string, from: number, to: number): Tok[] | null {
   const out: Tok[] = [];
@@ -59,7 +106,11 @@ function lex(src: string, from: number, to: number): Tok[] | null {
     else if (low === 're' || low === 'im') out.push({ t: 'proj', v: low, at, len });
     else if (low === 'cis') out.push({ t: 'cis', at, len });
     else if (low === 'i') out.push({ t: 'i', at, len });
-    else if (/^\d/.test(text)) {
+    else if (/^d_\{/i.test(text)) {
+      const atoms = distAtoms(text.slice(3, -1));
+      if (!atoms) return null; // braces holding anything but two distinct points refuse the span
+      out.push({ t: 'dist', a: atoms[0], b: atoms[1], at, len });
+    } else if (/^\d/.test(text)) {
       const [w, f = ''] = text.split('.');
       out.push({ t: 'num', v: rat(BigInt(w + f), 10n ** BigInt(f.length)), at, len });
     } else if (/^[A-Za-z]/.test(text)) out.push({ t: 'name', v: text, at, len });
@@ -204,6 +255,14 @@ export function parseExpr(
     if (t.t === 'name') {
       i++;
       return nameExpr(t.v);
+    }
+    if (t.t === 'dist') {
+      i++;
+      // the origin has no engine node — `d_{oX}` is |X| by definition, not a subtraction from a name
+      const side = (n: string): Expr | null => (n === 'o' ? null : ref(n));
+      const a = side(t.a);
+      const b = side(t.b);
+      return a && b ? abs(sub(a, b)) : abs((a ?? b)!);
     }
     if (t.t === 'conj') {
       i++;

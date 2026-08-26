@@ -32,7 +32,7 @@ import {
   type ExprQuery,
 } from '../model/measure';
 import { rat } from '../value/rational';
-import { isComplexName, parseExpr } from './exprParse';
+import { canonName, isComplexName, isPointLabel, parseExpr } from './exprParse';
 import {
   ACCUSATIVE_KW,
   AND_KW,
@@ -168,7 +168,7 @@ type Rule = (s: string) => ParsedLine | null;
 const declaration: Rule = (s) => {
   const bare = s.match(rx(`^(${NAME})$`));
   if (bare) {
-    const name = bare[1].toLowerCase();
+    const name = canonName(bare[1]);
     if (!isComplexName(name)) return null; // a bare parameter declares nothing to draw
     return { ...empty(), declares: [name], claims: [claimAll(s)] };
   }
@@ -177,7 +177,7 @@ const declaration: Rule = (s) => {
     rx(`^(${NAME}(?:\\s*(?:,|${AND_KW})\\s*${NAME})*)\\s+${COPULA_KW}${OF_A}${COMPLEX_KW}$`),
   );
   if (!spelled) return null;
-  const names = (spelled[1].match(rx(NAME, 'giu')) ?? []).map((n) => n.toLowerCase());
+  const names = (spelled[1].match(rx(NAME, 'giu')) ?? []).map((n) => canonName(n));
   if (!names.length) return null;
   return { ...empty(), declares: names, claims: [claimAll(s)] };
 };
@@ -204,7 +204,7 @@ const quadrantGiven: Rule = (s) => {
   const restAt = placement.restAt;
   const kw = rest.match(rx(QUADRANT_KW));
   if (!kw) return null;
-  const name = placement.raw.toLowerCase();
+  const name = canonName(placement.raw);
   const found = ORDINALS.find(([re]) => re.test(rest));
   if (!found) return null;
   const ord = rest.match(found[0]);
@@ -237,9 +237,9 @@ const argumentRelation: Rule = (s) => {
     if (sign === '-') {
       return {
         ...empty(),
-        declares: [a.toLowerCase(), b.toLowerCase()],
+        declares: [canonName(a), canonName(b)],
         constraints: [
-          { kind: 'arg', lhs: ref(a.toLowerCase()), rhs: ref(b.toLowerCase()), deltaTurns: rat(Number(deg), 360), src: s },
+          { kind: 'arg', lhs: ref(canonName(a)), rhs: ref(canonName(b)), deltaTurns: rat(Number(deg), 360), src: s },
         ],
         claims: [claimAll(s)],
       };
@@ -247,12 +247,12 @@ const argumentRelation: Rule = (s) => {
     // arg a + arg b = c  ⟺  arg(a) − arg(conj b) = c
     return {
       ...empty(),
-      declares: [a.toLowerCase(), b.toLowerCase()],
+      declares: [canonName(a), canonName(b)],
       constraints: [
         {
           kind: 'arg',
-          lhs: ref(a.toLowerCase()),
-          rhs: { t: 'conj', e: ref(b.toLowerCase()) },
+          lhs: ref(canonName(a)),
+          rhs: { t: 'conj', e: ref(canonName(b)) },
           deltaTurns: rat(Number(deg), 360),
           src: s,
         },
@@ -262,7 +262,7 @@ const argumentRelation: Rule = (s) => {
   }
   const one = s.match(rx(`^${ARG_KW}\\s*(${NAME})\\s*=\\s*(-?\\d+)$`));
   if (!one) return null;
-  const name = one[1].toLowerCase();
+  const name = canonName(one[1]);
   return {
     ...empty(),
     declares: [name],
@@ -291,9 +291,9 @@ const genericPolar: Rule = (s) => {
   const HALF = `(?:${NUM}|${NAME})`;
   const m = s.match(rx(`^(${NAME})\\s*=\\s*(${HALF})?\\s*cis\\s*\\(?\\s*(${HALF})\\s*\\)?$`));
   if (!m) return null;
-  const name = m[1].toLowerCase();
+  const name = canonName(m[1]);
   if (!isComplexName(name)) return null;
-  const angle = m[3].toLowerCase();
+  const angle = canonName(m[3]);
   if (isComplexName(angle)) return null; // `z1 = 2cis z2` is not an angle, it is a product
   const isNumeric = (t: string): boolean => rx(`^${NUM}$`).test(t);
   const modIsNum = m[2] !== undefined && isNumeric(m[2]);
@@ -302,7 +302,7 @@ const genericPolar: Rule = (s) => {
   if (modIsNum && angIsNum) return null;
   // a magnitude is not negative; `-2 cis θ` is not this sentence, so it goes to the equation rule
   if (modIsNum && Number(m[2]) < 0) return null;
-  if (m[2] !== undefined && !modIsNum && isComplexName(m[2].toLowerCase())) return null;
+  if (m[2] !== undefined && !modIsNum && isComplexName(canonName(m[2]))) return null;
 
   /**
    * What the sentence actually STATES — never more (ADR-052: an unstated magnitude is a free DOF).
@@ -356,15 +356,15 @@ const argumentInequality: Rule = (s) => {
     if (!isBelow(opLo) !== !isBelow(opHi)) return null; // «90 < arg z > 180» is not a window
     return {
       ...empty(),
-      declares: [name.toLowerCase()],
-      filters: [{ kind: 'range', name: name.toLowerCase(), minDeg: rat(low, 1), maxDeg: rat(high, 1), src: s }],
+      declares: [canonName(name)],
+      filters: [{ kind: 'range', name: canonName(name), minDeg: rat(low, 1), maxDeg: rat(high, 1), src: s }],
       claims: [claimAll(s)],
     };
   }
   const one = s.match(rx(`^${ARG_KW}\\s*(${NAME})\\s*(${CMP})\\s*(-?\\d+)$`));
   if (!one) return null;
   const [, raw, op, deg] = one;
-  const name = raw.toLowerCase();
+  const name = canonName(raw);
   return {
     ...empty(),
     declares: [name],
@@ -499,8 +499,8 @@ const conjugatesClaim: Rule = (s) => {
   if (!m) return null;
   return {
     ...empty(),
-    declares: [m[1].toLowerCase(), m[2].toLowerCase()],
-    assertions: [{ kind: 'conjugates' as const, a: m[1].toLowerCase(), b: m[2].toLowerCase(), src: s }],
+    declares: [canonName(m[1]), canonName(m[2])],
+    assertions: [{ kind: 'conjugates' as const, a: canonName(m[1]), b: canonName(m[2]), src: s }],
     claims: [claimAll(s)],
   };
 };
@@ -508,7 +508,7 @@ const conjugatesClaim: Rule = (s) => {
 const typeClaim: Rule = (s) => {
   const m = s.match(rx(`^(${NAME})\\s+${COPULA_KW}(.*)$`));
   if (!m) return null;
-  const name = m[1].toLowerCase();
+  const name = canonName(m[1]);
   const tail = m[2];
   // the imaginary test runs FIRST: «מדומה טהור» contains no real-keyword, but an English
   // "pure imaginary" must not be caught by a laxer real rule if one is ever added above it
@@ -523,9 +523,25 @@ const typeClaim: Rule = (s) => {
 
 // --- F6: objects ------------------------------------------------------------
 
-/** The point names inside a run, in order. `z1*z2` and `z1z2` split identically. */
-const splitRun = (text: string): string[] =>
-  (text.toLowerCase().match(rx(RUN_ATOM, 'giu')) ?? []).map((s) => s);
+/**
+ * The point names inside a run, in order. `z1*z2` and `z1z2` split identically.
+ *
+ * #791: capital point labels join the run alphabet CASE-SENSITIVELY — «אורך AB», «שטח OAB» — while
+ * the o/z/w family keeps folding («Oz1Z2» is o,z1,z2 as it always was). The sentence-level RUN
+ * pattern matches case-insensitively (the grammar's flags), so validation lives here: any atom that
+ * is neither run-alphabet nor a label rejects the whole run, and the rule declines the line instead
+ * of silently reading «אורך ab» as points.
+ */
+const splitRun = (text: string): string[] => {
+  const out: string[] = [];
+  for (const a of text.match(rx(String.raw`[A-Za-z]\d*`, 'gu')) ?? []) {
+    const low = a.toLowerCase();
+    if (low === 'o' || /^[zw]\d*$/.test(low)) out.push(low);
+    else if (isPointLabel(a)) out.push(a);
+    else return [];
+  }
+  return out;
+};
 
 /** The shape nouns, with the arity each one promises. `null` = any arity from three up. */
 const SHAPES: readonly (readonly [string, number | null])[] = [
@@ -625,7 +641,7 @@ const circleByCenterRadius: Rule = (s) => {
   // the radius text is anchored to the end of the line, so its span starts exactly that far back
   const radius = parseExpr(s, s.length - m[2].length, s.length);
   if (!radius) return null;
-  return objectLine({ kind: 'circle', center: m[1].toLowerCase(), radius, src: s }, s);
+  return objectLine({ kind: 'circle', center: canonName(m[1]), radius, src: s }, s);
 };
 
 // --- F7: measures -----------------------------------------------------------
@@ -800,7 +816,7 @@ const sequenceFirstTerms: Rule = (s) => {
   if (!m) return null;
   const at = ordinalOf(m[3] ?? m[4] ?? '');
   if (at === null) return null;
-  const [a, b, c] = [m[1], m[2], m[5]].map((n) => n.toLowerCase());
+  const [a, b, c] = [m[1], m[2], m[5]].map((n) => canonName(n));
   if (![a, b, c].every(isComplexName)) return null;
   return sequenceLine(
     kindOf(s),
@@ -852,7 +868,7 @@ const forallPower: Rule = (s) => {
     s.match(rx(`^${quantifier}\\s*,?\\s*${power}\\s+${COPULA_KW}(.+)$`)) ??
     s.match(rx(`^${power}\\s+${COPULA_KW}(.+?)\\s+${quantifier}$`));
   if (!m) return null;
-  const name = m[1].toLowerCase();
+  const name = canonName(m[1]);
   if (!isComplexName(name)) return null;
   const exp = exponentKN(m[2]);
   const prop = propertyOf(m[3]);
@@ -881,7 +897,7 @@ const minimalPower: Rule = (s) => {
     ),
   );
   if (!m) return null;
-  const name = m[1].toLowerCase();
+  const name = canonName(m[1]);
   if (!isComplexName(name)) return null;
   const prop = propertyOf(m[2]);
   if (!prop) return null;

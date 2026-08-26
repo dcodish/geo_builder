@@ -240,6 +240,35 @@ export const CATALOG: readonly CatalogEntry[] = [
     descHe: 'ביטוי בשורה משלו — שאלה, שנענית רק אם הנתונים קובעים את הערך',
     descEn: 'a bare expression — a question, answered only when the givens force the value',
   },
+  // #791 (ADR-CX-033) — the point-label register: capitals are points, case-sensitively
+  {
+    family: 'F2',
+    he: 'A = 5+i',
+    en: 'A = 5+i',
+    descHe: 'אות גדולה היא נקודה — A מרוכב; a (קטנה) נשארת פרמטר ממשי',
+    descEn: 'a capital letter is a point — A is complex; lowercase a stays a real parameter',
+  },
+  {
+    family: 'F2',
+    he: 'z1 = A',
+    en: 'z1 = A',
+    descHe: 'שיוך אות לנקודה קיימת — נקודה אחת, מוצגת כ-A (z₁)',
+    descEn: 'bind a letter to an existing number — one point, shown as A (z₁)',
+  },
+  {
+    family: 'F7',
+    he: 'אורך AB',
+    en: 'length AB',
+    descHe: 'מרחק בין נקודות באותיות — AB הוא מרחק, לא מכפלה (למכפלה: A*B)',
+    descEn: 'the distance between lettered points — AB is a distance, never a product (A*B multiplies)',
+  },
+  {
+    family: 'F7',
+    he: 'd_{z1z2}',
+    en: 'd_{AB}',
+    descHe: 'צורת המרחק מהספר — שני שמות צמודים בתוך הסוגריים',
+    descEn: "the textbook's distance form — two glued point names inside the braces",
+  },
 ];
 
 /** Group for the in-app panel; the family table is the ordering, not the insertion order. */

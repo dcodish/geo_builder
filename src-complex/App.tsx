@@ -28,6 +28,7 @@ import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
 import { SYMBOLS } from './ui/symbols';
+import { AskText } from './ui/askText';
 import { complexBidi } from './i18n';
 import registry from '../products.json';
 
@@ -598,7 +599,7 @@ export function App() {
                   rows: askRows.map((r, i) => (
                     <span key={`${r.text}-${i}`} dir="auto" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
                       <span>
-                        {complexBidi.inputPreview(r.text) ?? r.text}
+                        <AskText text={r.text} />
                         {r.note !== null ? (
                           <span style={{ color: '#94a3b8' }}> — {t(r.note === 'statement' ? 'askIsStatement' : 'askUnreadable')}</span>
                         ) : r.row!.value !== null ? (

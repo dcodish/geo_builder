@@ -156,7 +156,7 @@ export const EN_COUNT = String.raw`(?:two|three|four|five)`;
  * ends a name, so the orthography chokepoint inserts the product), so after a shape keyword the
  * separator must be tolerated — «הקטע Z₁Z₂» and «הקטע z1z2» are the same statement.
  */
-export const RUN_ATOM = String.raw`(?:o|[zw]\d*)`;
+export const RUN_ATOM = String.raw`(?:o|[zw]\d*|[A-Z]\d*)`; // #791: labels join the alphabet; splitRun validates case
 export const RUN = String.raw`(?:${RUN_ATOM}(?:\s*\*?\s*${RUN_ATOM})+)`;
 /** The same run with NO separator permitted — a bare line, where `z1*z2` means the product instead. */
 export const RUN_GLUED = String.raw`(?:${RUN_ATOM}{2,})`;
