@@ -124,6 +124,9 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.signUnsatisfiable', { id: err.id });
     case 'no-such-solid':
       return t('err.noSuchSolid', { id: err.id });
+    // #766: several declared solids answer the sentence — ask for more specific letters, never guess.
+    case 'ambiguous-solid':
+      return t('err.ambiguousSolid', { id: err.id, count: err.count });
     case 'free-size-claim':
       return t('err.freeSizeClaim', { id: err.id });
     case 'two-unknowns':

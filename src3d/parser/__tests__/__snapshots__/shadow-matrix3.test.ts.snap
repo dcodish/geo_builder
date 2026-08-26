@@ -475,6 +475,26 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "the volume of the pyramid ABCDS = 11",
+    "winner": "volumePolyClaim",
+  },
+  {
+    "lang": "he",
+    "text": "נפח הפירמידה ABCDS = 11",
+    "winner": "volumePolyClaim",
+  },
+  {
+    "lang": "en",
+    "text": "the volume of the pyramid is 11",
+    "winner": "volumePolyClaim",
+  },
+  {
+    "lang": "he",
+    "text": "נפח הפירמידה שווה ל 11",
+    "winner": "volumePolyClaim",
+  },
+  {
+    "lang": "en",
     "text": "∠SAB = ∠SAD",
     "winner": "angleEquality3",
   },

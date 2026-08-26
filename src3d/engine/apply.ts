@@ -9,6 +9,7 @@ import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
 import { riderPairsT } from './onSegmentRatio';
+import { resolveSolidSubject } from './solidSubject';
 import { isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { pinSymsOf } from './types';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
@@ -439,8 +440,19 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
     case 'length-ratio':
       return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
-    case 'volume-poly':
-      return claim.ids.length === 4 ? missingPoint(c, claim.ids) : { code: 'no-such-solid', id: claim.ids.join('') };
+    case 'volume-poly': {
+      // #766/#765 (ADR-3D-169): WHICH solid the sentence denotes is decided HERE, against the declared
+      // figure — never assumed from the letter count. The old line read «4 letters ⇒ a tetrahedron», so
+      // «נפח הפירמידה ABCD» on a square-base pyramid named the coplanar BASE and was refuted arithmetically
+      // (a true given told it was false), while «= 0» on the same run was accepted as true.
+      const subject = resolveSolidSubject(c, claim.noun, claim.ids);
+      if (subject.kind === 'tetra') return missingPoint(c, claim.ids);
+      // Several candidates: ASK for more specific letters. Picking one would assert a given the student
+      // never stated (ADR-052) — the operator's ruling, and the 2-D ADR-164 shape.
+      if (subject.kind === 'ambiguous') return { code: 'ambiguous-solid', id: claim.ids.join(''), count: subject.count };
+      if (subject.kind === 'none') return { code: 'no-such-solid', id: claim.ids.join('') || claim.noun };
+      return null;
+    }
     case 'volume-eq':
     case 'lateral-area-eq': {
       const matches = c.revolutions.filter((r) => r.kind === claim.solid);

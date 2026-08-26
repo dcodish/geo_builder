@@ -7676,7 +7676,13 @@ M,E,E,T and bound a phantom ring. The capture is now uppercase-run only — a lo
 the #779 candidate nudge instead, one convention everywhere.
 
 Sibling product (ADR-W-004): 3-D resolution is at apply over typed operands (no definite-noun
-resolver of this shape); no port needed.
+resolver of this shape); no port needed. **CORRECTED 2026-08-26 — that conclusion was wrong.**
+Measured on #766: «נפח הפירמידה ABCD» on a square-base pyramid resolved by LETTER COUNT (four
+letters ⇒ a tetrahedron), named the coplanar base, and refuted a true given arithmetically — while
+«= 0» was accepted. 3-D needed exactly this ADR's rule and now has it:
+[ADR-3D-169](06b-decisions-3d.md#adr-3d-169). The audit asked whether 3-D had a definite-noun
+resolver and found none; the question it should have asked is whether 3-D RESOLVED ITS SUBJECTS
+against the declared figure at all.
 
 Locks: `diag-shape-noun-770.test.ts` (13 tests — the refusal matrix, the two-quad disambiguation,
 the letters run, the kite/cyclic stamps, the compound, end-to-end replay) and the corpus scenario

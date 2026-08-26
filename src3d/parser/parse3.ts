@@ -20,7 +20,7 @@
 import { readOperand, readRelationSides } from './operandToken';
 import { stripFormatControls } from '../../shell/bidi';
 import { isPlanar, sameOperand } from '../engine/operands';
-import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
+import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 import { riderPairsT } from '../engine/onSegmentRatio';
 
@@ -855,13 +855,70 @@ const pairInjection: Rule = (s) => {
   return [{ type: 'inject-pair', a: m[1], b: m[2], x: comps[0].num, y: comps[1].num, z: comps[2].num, ...(symExprs ? { symExprs } : {}) }];
 };
 
-/** `נפח הפירמידה ABCD = 64` — a tetrahedron volume claim (V7 T2). */
+/**
+ * A solid's stated VOLUME (V7 T2) — «נפח הפירמידה ABCD = 11», «נפח SABCD שווה ל 11», «נפח הפירמידה = 11».
+ *
+ * #766/#765 (ADR-3D-169). The rule used to gate on "exactly 4 uppercase tokens + `=`", which read one
+ * spelling of one shape: on «פירמידה ישרה מרובעת ABCDS» — the commonest bagrut solid — the student had NO
+ * working form at all, because the only accepted run named the coplanar base and was then refuted
+ * arithmetically. Three things it could not read, each already solved elsewhere in this file:
+ *
+ *  1. the «שווה ל-» copula (the twin rule `volumeEqPoly` one screen away already takes it);
+ *  2. runs of other lengths — `SABCD` / `ABCDS`, apex-first and base-last;
+ *  3. the definite solid NOUN, which the operator's ruling makes a first-class subject.
+ *
+ * The #642 sweep (ADR-3D-160) fixed exactly this class on the point, length and coordinate heads and left
+ * the volume head behind. WHICH solid the sentence denotes is not decided here — `parse3` is context-free,
+ * so the claim carries the noun and the run as the student wrote them and `resolveSolidSubject` answers at
+ * apply, where the declared figure is known.
+ */
+const SOLID_NOUNS_HE: [string, SolidNoun][] = [
+  [String.raw`ה?פירמיד[הות]+`, 'pyramid'],
+  [String.raw`ה?(?:טטר[אה]?ה?דר(?:ון)?|ארבעון)`, 'tetra'],
+  [String.raw`ה?קוביי?[הות]+`, 'cube'],
+  [String.raw`ה?תיב[הות]+`, 'box'],
+  [String.raw`ה?מנסר[הות]+`, 'prism'],
+  [String.raw`ה?גוף`, 'any'],
+];
+const SOLID_NOUNS_EN: [string, SolidNoun][] = [
+  [String.raw`pyramids?`, 'pyramid'],
+  [String.raw`tetrahedr(?:on|a)?`, 'tetra'],
+  [String.raw`cubes?`, 'cube'],
+  [String.raw`(?:box(?:es)?|cuboids?)`, 'box'],
+  [String.raw`prisms?`, 'prism'],
+  [String.raw`solids?`, 'any'],
+];
+/**
+ * The noun is matched by an EXPLICIT alternation of the solid vocabulary, never by a generic `\S+`.
+ * A generic word-slot swallows the letter run — «נפח SABCD שווה ל 11» reads `SABCD` as the noun and the
+ * rule then declines, with no backtracking to the noun-less reading, so the widening would have missed the
+ * very spelling #765 was filed for. Matching the vocabulary itself makes the two readings disjoint.
+ */
+const solidNounOf = (word: string | undefined, en: boolean): SolidNoun | null => {
+  if (word === undefined) return 'any';
+  const table = en ? SOLID_NOUNS_EN : SOLID_NOUNS_HE;
+  for (const [src, noun] of table) {
+    if (new RegExp(`^(?:the\s+)?(?:${src})$`, en ? 'i' : '').test(word.trim())) return noun;
+  }
+  return null;
+};
+const NOUN_HE = SOLID_NOUNS_HE.map(([src]) => src).join('|');
+const NOUN_EN = SOLID_NOUNS_EN.map(([src]) => src).join('|');
+
 const volumePolyClaim: Rule = (s) => {
-  const m =
-    s.match(/^נפח\s+הפירמידה\s+((?:[A-Z]\d*'?){4})\s*=\s*(-?\d+(?:\.\d+)?)$/) ??
-    s.match(/^the\s+volume\s+of\s+(?:the\s+)?pyramid\s+((?:[A-Z]\d*'?){4})\s*=\s*(-?\d+(?:\.\d+)?)$/);
+  const RUN = String.raw`(?:[A-Z]\d*'?){3,}`;
+  const VAL = String.raw`(-?\d+(?:\.\d+)?)`;
+  const he = s.match(new RegExp(String.raw`^נפח\s+(?:(${NOUN_HE})\s*)?(${RUN})?\s*(?:=|שווה\s+ל-?\s*|הוא\s+)\s*${VAL}$`));
+  const en = he ? null : s.match(new RegExp(String.raw`^(?:the\s+)?volume\s+of\s+(?:(?:the\s+)?(${NOUN_EN})\s*)?(${RUN})?\s*(?:=|is|equals?)\s*${VAL}$`, 'i'));
+  const m = he ?? en;
   if (!m) return null;
-  return [{ type: 'claim', claim: { type: 'volume-poly', ids: m[1].match(/[A-Z]\d*'?/g)!, value: +m[2] } }];
+  const noun = solidNounOf(m[1], !he);
+  if (noun === null) return null;
+  const ids = m[2] ? m[2].match(/[A-Z]\d*'?/g)! : [];
+  // A statement must name SOMETHING: «נפח = 11» and «נפח הגוף = 11» (a noun that denotes no family)
+  // identify nothing in the figure, so they are not claims — decline rather than invent a subject.
+  if (ids.length === 0 && noun === 'any') return null;
+  return [{ type: 'claim', claim: { type: 'volume-poly', noun, ids, value: +m[3] } }];
 };
 
 /** `M אמצע BC` / `M is the midpoint of BC` → on-segment t = ½.

@@ -63,6 +63,11 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // #510: a coordinate takes the same VALUE literals as a stated magnitude — √, fractions, the palette's ½
   { category: 'points', he: 'C(√2,1,0)', en: 'C(√2,1,0)' },
   { category: 'claims', he: 'נפח הפירמידה SENB שווה לנפח הפירמידה CENB', en: 'volume of pyramid SENB equals volume of pyramid CENB' },
+  // #765/#766 (ADR-3D-169): a solid's stated VOLUME. The subject is the definite noun and/or the letter
+  // run, resolved against the DECLARED figure — the base run of a pyramid names the pyramid, and on a
+  // figure with exactly one, the letters can be left off entirely.
+  { category: 'claims', he: 'נפח הפירמידה ABCDS = 11', en: 'the volume of the pyramid ABCDS = 11' },
+  { category: 'claims', he: 'נפח הפירמידה שווה ל 11', en: 'the volume of the pyramid is 11' },
   { category: 'claims', he: '∠SAB = ∠SAD', en: '∠SAB = ∠SAD' }, // #271: a general angle equality (drives a free-dim solid / verifies a determined one)
   // #337: the SAME relation in the corpus's between-form wording (vector / line / segment nouns all accepted)
   { category: 'claims', he: 'הזווית שבין AB לבין AC שווה לזווית שבין AB לבין AD', en: 'the angle between AB and AC = the angle between AB and AD' },

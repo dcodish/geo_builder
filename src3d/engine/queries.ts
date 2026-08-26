@@ -14,7 +14,8 @@
 
 import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
 import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, decompStr, formatBranches, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr } from './dataView';
-import { centroid3, cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
+import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
+import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
 import { readOperand } from '../parser/operandToken';
 import { figureSymbolsOf } from './types';
@@ -256,29 +257,16 @@ function solveSymbol(c: Construction3, sym: string, pos: Positions3): number | n
   return d2 < 1e-12 ? null : dot3(lhs, dir) / d2;
 }
 
-/** The convex-solid volume from its face rings (centroid fan → tetra sum; orientation-free). */
+/**
+ * A queried solid's volume — through the SHARED subject resolver (#766, ADR-3D-169).
+ *
+ * This lane already looked the solid up by vertex SET and summed its own faces, which is right; what it
+ * could not do is read a BASE run («נפח הפירמידה ABCD» on ABCDS), so the query and claim lanes gave two
+ * different answers to one sentence. One resolver now serves both — a query names no noun, so it asks
+ * with `'any'` and the letters decide.
+ */
 function solidVolume(c: Construction3, ids: Id[], pos: Positions3): number | null {
-  // a named solid whose vertex SET matches `ids`, else a bare 4-point tetrahedron
-  const key = [...ids].sort().join('|');
-  const solid = c.solids.find((sd) => [...sd.ids].sort().join('|') === key);
-  if (!solid) {
-    if (ids.length !== 4) return null;
-    const ps = ids.map((id) => pos.get(id));
-    if (ps.some((p) => !p)) return null;
-    return Math.abs(dot3(sub3(ps[1]!, ps[0]!), cross3(sub3(ps[2]!, ps[0]!), sub3(ps[3]!, ps[0]!)))) / 6;
-  }
-  const verts = solid.ids.map((id) => pos.get(id));
-  if (verts.some((p) => !p)) return null;
-  const ctr = centroid3(verts as Vec3[]);
-  let V = 0;
-  for (const face of solid.faces) {
-    const fp = face.map((id) => pos.get(id));
-    if (fp.some((p) => !p)) return null;
-    for (let i = 1; i + 1 < fp.length; i++) {
-      V += Math.abs(dot3(sub3(fp[0]!, ctr), cross3(sub3(fp[i]!, ctr), sub3(fp[i + 1]!, ctr)))) / 6;
-    }
-  }
-  return V;
+  return subjectVolume(resolveSolidSubject(c, 'any', ids), pos);
 }
 
 /** The raw numeric value of a query at one configuration; null when a referenced object is unplaced. */

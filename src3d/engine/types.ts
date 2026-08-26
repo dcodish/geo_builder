@@ -84,7 +84,10 @@ export type Claim3 =
   | { type: 'volume-eq'; solid: string; value: number } // נפח החרוט = 100π (value in world units³, π parsed)
   | { type: 'lateral-area-eq'; solid: string; value: number } // שטח המעטפת של החרוט = 65π
   | { type: 'lines-rel'; a1: Id; b1: Id; a2: Id; b2: Id; rel: 'skew' | 'parallel' | 'intersect' } // NK ו-PL מצטלבים (V7 T3)
-  | { type: 'volume-poly'; ids: Id[]; value: number } // נפח הפירמידה ABCD = 64 (tetra: |triple|/6; V7 T2)
+  // #766/#765 (ADR-3D-169): the SUBJECT is resolved against the declared figure, not assumed from the
+  // letter count. `noun` is the definite noun the student wrote ('any' when they wrote none); `ids` is
+  // their letter run and may be EMPTY («נפח הפירמידה = 11» on a figure with exactly one pyramid).
+  | { type: 'volume-poly'; noun: SolidNoun; ids: Id[]; value: number } // נפח הפירמידה ABCD = 64 (V7 T2)
   // V8-f (G6/G9/G10) — vector-relation givens VERIFIED on a determined figure. Each
   // operand is a VecAtom (a declared vector or a point pair), so `cos∠ACB` (vertex →
   // pairs) and `cos(u,v)` (named vectors) share one form.
@@ -243,6 +246,13 @@ export type RelPlaneDef =
 /** The solid family. `cube`/`box`: 8 ids (base then primed tops); `prism3`: 6 ids (right triangular
  *  prism); `pyramid4`/`pyramid3`: base ring then the APEX LAST — a RIGHT pyramid (apex above the
  *  base's circumcentre, so the lateral edges are equal; stated `ישרה` required, ADR-052). */
+/**
+ * The definite noun a student writes in front of a solid's letter run («נפח **הפירמידה** ABCD»).
+ * `'any'` means no noun was stated. Resolution against the declared figure lives in `solidSubject.ts`
+ * (#766/#765, ADR-3D-169); the vocabulary lives here because the CLAIM carries it.
+ */
+export type SolidNoun = 'pyramid' | 'tetra' | 'cube' | 'box' | 'prism' | 'any';
+
 export type SolidKind =
   | 'cube' | 'box' | 'prism3' | 'pyramid4' | 'pyramid3' | 'tetra' | 'prism4r' | 'pyramid4g' | 'pyramid4r' | 'pyramid4gr'
   // V8-d: equilateral-triangle-base right prism/pyramid, and a free-apex parallelogram-base pyramid
@@ -1173,6 +1183,9 @@ export type EngineError3 =
   | { code: 'ambiguous-angle'; id: Id } // #251: a single-vertex angle whose arms cannot be resolved (≠2 edges at the vertex)
   | { code: 'no-prism-to-make-right' } // #289: `המנסרה ישרה` but the figure has no prism-like solid to make right
   | { code: 'ambiguous-prism' } // #289: `המנסרה ישרה` with more than one oblique prism — "the prism" is ambiguous
+  // #766: «נפח הפירמידה = 11» where the figure holds more than one pyramid — the operator's ruling is
+  // to ASK for more specific letters, never to pick one (ADR-052: picking asserts an unstated given).
+  | { code: 'ambiguous-solid'; id: string; count: number }
   | { code: 'bound-unsatisfiable'; id: Id } // #273: no sampled configuration puts the measure inside the stated bound
   | { code: 'vacuous-relation' } // S4 (#378): a mutual position stated between an object and itself
   | { code: 'plane-not-determined'; id: string } // #487: this construct needs a plane with a stated equation — π is still free

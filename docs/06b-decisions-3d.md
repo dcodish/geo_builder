@@ -4731,3 +4731,83 @@ the conformance matrix (family 2), not a forgotten one (#664).
 Locks: `view-presets-714.test.ts` (6 tests — each preset asserted on the FRAME it produces rather than
 on its angles, the top clamp and its orthonormality, the isometric equal-foreshortening property, and
 the set being complete, in-clamp and mutually DISTINCT so a preset can never become a dead button).
+
+## ADR-3D-169 — a solid statement's SUBJECT is resolved against the declared figure (#766, #765)
+
+**Operator ruling (2026-08-26):** *"If there is only one pyramid, just says the pyramid volume is 11
+should be understood. if there is more than one option of a pyramid, we can ask user to be more
+specific with the letters they use"*
+
+**Context — a true given told it was false.** On «פירמידה ישרה מרובעת ABCDS», the commonest solid a
+bagrut question opens with, the student had **no working spelling at all** for its volume:
+
+| utterance | before |
+| --- | --- |
+| «נפח הפירמידה ABCD = 11» | ❌ `claim-refuted` — `tetraVol(ABCD)` = 0 |
+| **«נפח הפירמידה ABCD = 0»** | ⚠️ **ACCEPTED** — the tool agreed the pyramid has zero volume |
+| «נפח SABCD שווה ל 11» | ❌ `not-understood` — the «שווה ל-» copula |
+| «נפח הפירמידה ABCDS = 11» | ❌ `not-understood` — noun + 5-letter run |
+
+The refusal message is «הטענה לא מתקיימת בציור — בדקו את החישוב» — *check your arithmetic* — about a
+given that is correct. Two honesty invariants inverted at once: a true given called false, and the
+degenerate reading accepted as true.
+
+**Root cause.** `volumePolyClaim` gated on *"exactly 4 uppercase tokens + `=`"*, and `claims.ts`
+computed `|triple product| / 6`. That formula is correct only for an **actual tetrahedron**, and it
+was selected **by letter count**. ABCD is the pyramid's coplanar BASE, so its triple product is 0 by
+construction — no value could ever have been accepted, and 0 always was.
+
+The class had already been ruled in 2-D: [ADR-457](06-decisions.md#adr-457) — *a definite shape
+reference resolves on the DECLARED kind*. That ADR's sibling-audit line concluded 3-D needed no port
+("resolution is at apply over typed operands"); **the measurements above refute it**, and the line is
+corrected there as part of this change.
+
+**Decision — one resolver, over the vocabulary, for both consumers.**
+
+`src3d/engine/solidSubject.ts` answers *which solid did the student mean?*, and the CLAIM lane and the
+QUERY lane both ask it. They had drifted into two different readings of one sentence: the query lane
+already looked a solid up by vertex set and summed its own faces (correct), while the claim lane
+assumed a tetra.
+
+- A run identifies a solid when it is that solid's **full vertex run OR one of its faces**. The base
+  run is how a question names a pyramid, and reading only the full run is the whole defect.
+- **No letters at all** resolves against the noun: one candidate is the answer, several is a question.
+  The ambiguity branch **asks for more specific letters and never picks one** — picking would assert a
+  given the student never stated (ADR-052), the same shape as 2-D's omitted-vertex angle (ADR-164 /
+  ADR-261). New error `ambiguous-solid`, carrying the count.
+- Letters naming nothing declared refuse with `no-such-solid`, **naming the student's statement**.
+- A four-point run matching no declared solid is **still a tetrahedron** — the pre-existing reading,
+  preserved byte-for-byte.
+- Nouns map to kind FAMILIES by the kind's own name (`kind.startsWith('pyramid')`), not by a hand-kept
+  list, so a `SolidKind` added tomorrow is classified the same day — *an enumeration is not a rule*.
+- The volume itself comes from the resolved solid's **own face rings** (centroid fan → tetra sum), one
+  computation shared by both lanes.
+
+**The grammar (#765).** The head is read the ADR-3D-160 way: the definite noun (article included), any
+run length, and the copula `=` / «שווה ל-» / «הוא». The #642 sweep fixed exactly this class on the
+point, length and coordinate heads and left the volume head behind.
+
+One trap, recorded because the first draft fell into it: the noun slot must be an **explicit
+alternation of the solid vocabulary**, never a generic `\S+`. A generic word-slot swallows the letter
+run — «נפח SABCD שווה ל 11» reads `SABCD` as the noun, the rule then declines, and there is no
+backtracking to the noun-less reading — so the widening would have missed the very spelling #765 was
+filed for.
+
+**What this does NOT do — and where it goes.** A stated volume still only CHECKS; it does not yet
+DRIVE the figure's size, so on a free-scale solid it can still refuse. That is [#754](https://github.com/dcodish/geo_builder/issues/754)'s
+half, ruled the same day: a stated magnitude on a gauge-frozen solid PINS the scale, and volume/area
+are the same mechanism at a different power. Recorded here so the boundary is not mistaken for an
+oversight. Deliberately **not** taken: giving `volume-poly` the `free-size-claim` guard — under that
+ruling it would install a refusal for exactly the input the operator has said must be accepted.
+
+**Not ruled, defaulted rather than guessed:** whether the resolved reading is echoed back (the fact
+list showing «נפח הפירמידה ABCDS = 11» instead of the student's words). The operator's *"just …
+should be understood"* reads as *do not make a fuss*, so the default is **no echo** — the fact list
+keeps the student's own words.
+
+Locks: `src3d/__tests__/volume-subject-766.test.ts` — every spelling parses to one claim; the
+pre-existing bare 4-letter tetra form is asserted byte-identical; «נפח החרוט» still belongs to its own
+rule (the widened head steals nothing); «נפח = 11» names nothing and is not a claim; the base run
+resolves to the declared pyramid with a non-zero volume (**the defect, stated**); «= 0» no longer
+reads as true; unknown letters refuse by name; two pyramids ask; and the base run and the full run
+value identically, which is the two-lanes-one-answer property.

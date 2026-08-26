@@ -10,6 +10,7 @@
 import { lineAtParam, planeAtParam, resolve3, type Resolved3 } from './evaluate';
 import { lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { atomVec, evalExpr } from './vecExpr';
+import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { cross3, dot3, runNormal, norm3, sub3, v3, type Vec3 } from './vec3';
 import type { Claim3, Construction3 } from './types';
 
@@ -195,9 +196,12 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       return Math.abs(actual - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
     }
     case 'volume-poly': {
-      const ps = claim.ids.map((id) => pos.get(id));
-      if (ps.length !== 4 || ps.some((p) => !p)) return false;
-      const vol = Math.abs(dot3(sub3(ps[1]!, ps[0]!), cross3(sub3(ps[2]!, ps[0]!), sub3(ps[3]!, ps[0]!)))) / 6;
+      // #766 (ADR-3D-169): the subject is RESOLVED against the declared figure and its volume comes from
+      // that solid's own faces. The old body was `|triple product| / 6` over exactly four ids — correct
+      // only for an actual tetrahedron, and selected by LETTER COUNT, which is why a square-base pyramid's
+      // base run evaluated to 0 and a true given came back refuted.
+      const vol = subjectVolume(resolveSolidSubject(c, claim.noun, claim.ids), pos);
+      if (vol === null) return false;
       return Math.abs(vol - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
     }
     case 'length-rel': {
