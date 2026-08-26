@@ -4811,3 +4811,67 @@ rule (the widened head steals nothing); «נפח = 11» names nothing and is not
 resolves to the declared pyramid with a non-zero volume (**the defect, stated**); «= 0» no longer
 reads as true; unknown letters refuse by name; two pyramids ask; and the base run and the full run
 value identically, which is the two-lanes-one-answer property.
+## ADR-3D-170 — a Hebrew↔Latin SCRIPT TRANSITION is a token boundary, at the normaliser (#773)
+
+**Context — found by `/log-triage` on the prod window 2026-08-19…24.** What production saw:
+
+```
+[parser/ok]                     קובייה ⁦ABCD⁩
+[llm/ok]                        Eעל bb'          ← only the PAID LLM read it
+[scope:lowercase-labels] ×3     מישור ace
+[parser/ok]                     מישור ACE
+```
+
+Measured at HEAD, prefix `קובייה ABCD`: «E על BB'» → `point-on-segment3`; «Eעל BB'» → `not-handled`.
+The lowercase labels are a separate, deliberate refusal; the missing SPACE is not deliberate.
+
+And it is not a typo the student can see. Hebrew and Latin runs carry no separator of their own, so
+in an RTL box «Eעל BB'» renders indistinguishably from «E על BB'». The tool was refusing something
+that looks correct, and paying a model to guess at it.
+
+**Root cause — the #530 class, not generalised.** #530 (a P1) fixed exactly this for «נחתכים
+בנקודהS», *at the rule*, by making that rule's own marker separator optional (`בנקוד[הת]\s*`). One
+site. Every other He↔Latin boundary in the grammar stayed broken. #494 fixed the MIRROR direction —
+a detached clitic, «מקביל ל π1» — at the **normaliser**, and that is the shape that generalises:
+`normalize3` is the one boundary every rule, honesty gate, scope register and LLM lane reads.
+
+**Decision.** `normalize3` inserts the boundary, both directions, before the vector-word strip and the
+clitic fold (both of those read a space they can only see once the boundary exists — «וקטורSE» must
+become «וקטור SE» before the word «וקטור» can be recognised and dropped):
+
+```js
+.replace(/([A-Za-z][A-Za-z0-9']*)(?=[א-ת])/g, '$1 ')   // Latin → Hebrew
+.replace(/([א-ת]{2,})(?=[A-Za-z])/g, '$1 ')             // Hebrew → Latin
+```
+
+**The one guard, and why it is a length bound rather than a word list.** Hebrew's prefixes
+ל/ב/מ/ה/ש/כ/ו are written glued to their operand, the whole grammar spells them that way (`ל?מישור`,
+`ב-?`), and #494 deliberately GLUES a detached one — so «לAB» must survive. A prefix is **one
+letter**, so requiring two adjacent Hebrew letters protects every glued clitic and leaves every WORD
+to split.
+
+Recorded because it is the interesting part: the first draft exempted runs composed only of clitic
+letters, which reads as the more careful rule and is quietly catastrophic — **«משולש» is spelled
+entirely from that set** (מ‑ש‑ו‑ל‑ש), as are «במשולש», «של» and «לכל». The exemption silently
+swallowed the commonest noun in the corpus. Nothing about the rule's *statement* revealed that; the
+**catalog-wide despacing property** did, on its first run.
+
+Digits are deliberately untouched: «אורך 5ס"מ» is not a label boundary.
+
+**Locks.** `src3d/parser/__tests__/script-boundary-773.test.ts`:
+
+- the reported case builds the identical command to its spaced twin;
+- #530's own case is produced by the general rule now, not by the rule-local tolerance;
+- both directions split; a glued clitic does NOT (asserted directly, because splitting it would undo
+  the #494 fold one line above);
+- and the property that makes this a rule rather than a spelling: **for every catalog line, removing
+  the space at a Hebrew↔Latin transition parses to the identical commands.** A rule that grows its own
+  separator tolerance passes its own test and leaves the class open; this one cannot. The property
+  asserts it is non-vacuous (>20 catalog lines actually change under despacing).
+
+**Rule-local tolerances, audited and KEPT.** `AT_POINT`'s `בנקוד[הת]\s*` (#530) and the sibling
+optional separators now describe a case the normaliser has already removed, so they are inert rather
+than wrong. They are left in place deliberately: they run on the same normalised text, so retiring
+them changes no behaviour that any test can observe, while touching a P1's guard for tidiness is
+non-zero risk for zero value. The general rule is the one that must hold, and it is the one under
+test.

@@ -91,6 +91,31 @@ export function normalize3(s: string): string {
       .replace(/[′’‘`]/g, "'")
       .replace(/[→⃗⟶]/g, '')
       .replace(/[−־]/g, '-')
+      // #773 — a SCRIPT TRANSITION is a token boundary, in both directions.
+      //
+      // Hebrew and Latin runs carry no separator of their own, so a missing space between them is not a
+      // typo the student can see: «Eעל BB'» renders identically to «E על BB'» in an RTL box, and only
+      // the second one parsed. #530 (a P1) fixed exactly this for «נחתכים בנקודהS» — but AT THE RULE,
+      // by making that rule's own marker separator optional, so every other He/Latin boundary in the
+      // grammar stayed broken. #494 fixed the mirror direction (a DETACHED clitic) HERE, at the
+      // normaliser, which is the shape that generalises. This is that fix's other half.
+      //
+      // Prod, 2026-08-19…24: «Eעל bb'» reached the paid LLM, and only the LLM read it.
+      //
+      // Placed BEFORE the vector-word strip and the clitic fold, because both of those read a SPACE
+      // they can only see once the boundary exists («וקטורSE» must become «וקטור SE» before the word
+      // «וקטור» can be recognised and dropped).
+      //
+      // The single guard, and why it is a length bound rather than a word list: Hebrew's prefixes
+      // ל/ב/מ/ה/ש/כ/ו are written GLUED to their operand, the whole grammar spells them that way
+      // (`ל?מישור`, `ב-?`), and #494 deliberately glues a detached one — so «לAB» must survive. A
+      // prefix is ONE letter, so requiring two adjacent Hebrew letters protects every glued clitic
+      // while leaving every WORD to split. A first draft exempted runs made only of clitic letters
+      // instead; «משולש» is spelled entirely from that set (מ‑ש‑ו‑ל‑ש), so the exemption silently
+      // swallowed the commonest noun in the corpus. Measured, not reasoned: the catalog-wide property
+      // below is what caught it.
+      .replace(/([A-Za-z][A-Za-z0-9']*)(?=[א-ת])/g, '$1 ')
+      .replace(/([א-ת]{2,})(?=[A-Za-z])/g, '$1 ')
       .replace(/(?:^|(?<=[\s:,]))(?:ה?ו?וקטור|vectors?)\s+/gi, '') // the vector WORD marks vector meaning (recorded before normalize), then reads as decoration
       // #494 — a DETACHED clitic re-binds to its operand. Hebrew's ל/ב/מ/ה/ש/כ are prefixes, and every
       // gate in this tree spells them glued (`ל?מישור`, `ב-?`), so «מקביל ל π1» was not-handled while
