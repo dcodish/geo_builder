@@ -24,19 +24,52 @@ describe('the נתון injection list', () => {
   it('a standalone vector injection', () => {
     expect(cmds('u = (5,5,-5)')).toEqual([{ type: 'inject-vector', name: 'u', x: 5, y: 5, z: -5 }]);
   });
-  it('a vector value must be numeric', () => {
-    expect(parse3('נתון: v = (10,n,0)')).toEqual({ ok: false, reason: 'not-handled' });
+  // #794 (ADR-3D-168): the numeric-only gate is LIFTED — vector components take the same COMP
+  // grammar as point components. A bare distinct letter is a placeholder (that component does
+  // not constrain), exactly the #325 point register.
+  it('a bare letter in a vector value is a placeholder component (#794)', () => {
+    expect(cmds('נתון: v = (10,n,0)')).toEqual([{ type: 'inject-vector', name: 'v', x: 10, y: null, z: 0 }]);
+  });
+  it('a vector value with affine symbolic components carries symExprs (#794)', () => {
+    expect(cmds('נתון: v = (k-1, k, 3)')).toEqual([
+      {
+        type: 'inject-vector', name: 'v', x: null, y: null, z: 3,
+        symExprs: [{ sym: 'k', k: 1, c: -1 }, { sym: 'k', k: 1, c: 0 }, null],
+      },
+    ]);
   });
   // #793: the harvest requires FULL coverage — residue anywhere (leading, between, trailing) defers
   // the whole utterance, and an item can never start mid-run. A pair-vector given must not be
   // reinterpreted as point coordinates, and no stated text may be silently dropped.
-  it('«נתון: AB = (1,2,3)» is a pair-vector given, not point B — defers, never misreads (#793)', () => {
-    expect(parse3('נתון: AB = (1,2,3)')).toEqual({ ok: false, reason: 'not-handled' });
+  // #794 (ADR-3D-168): what #793 turned from a misparse into an honest refusal now BUILDS —
+  // the pair item exists, in the standalone rule and in the «נתון:» list.
+  it("«AA' = (k-1, k-7, k+1)» — the operator's exact utterance is a symbolic pair-vector injection (#794)", () => {
+    const expected = [
+      {
+        type: 'inject-pair', a: 'A', b: "A'", x: null, y: null, z: null,
+        symExprs: [{ sym: 'k', k: 1, c: -1 }, { sym: 'k', k: 1, c: -7 }, { sym: 'k', k: 1, c: 1 }],
+      },
+    ];
+    expect(cmds("AA'=(k-1,k-7, k+1)")).toEqual(expected);
+    expect(cmds("נתון: AA' = (k-1, k-7, k+1)")).toEqual(expected);
   });
-  it("«נתון: AA' = (k-1, k-7, k+1)» — the leading A is stated text, never silently dropped (#793)", () => {
-    expect(parse3("נתון: AA' = (k-1, k-7, k+1)")).toEqual({ ok: false, reason: 'not-handled' });
-    // the operator's exact standalone utterance stays an honest refusal
-    expect(parse3("AA'=(k-1,k-7, k+1)").ok).toBe(false);
+  it('«נתון: AB = (1,2,3)» is a pair-vector given, never point B (#793 → #794)', () => {
+    expect(cmds('נתון: AB = (1,2,3)')).toEqual([{ type: 'inject-pair', a: 'A', b: 'B', x: 1, y: 2, z: 3 }]);
+  });
+  it('a «נתון:» list mixes pair items with vector and point items (#794)', () => {
+    expect(cmds('נתון: AB = (k-1, k, 3), AC = (k+1, 0, k-3)')).toEqual([
+      {
+        type: 'inject-pair', a: 'A', b: 'B', x: null, y: null, z: 3,
+        symExprs: [{ sym: 'k', k: 1, c: -1 }, { sym: 'k', k: 1, c: 0 }, null],
+      },
+      {
+        type: 'inject-pair', a: 'A', b: 'C', x: null, y: 0, z: null,
+        symExprs: [{ sym: 'k', k: 1, c: 1 }, null, { sym: 'k', k: 1, c: -3 }],
+      },
+    ]);
+  });
+  it('the numeric pair injection is byte-identical to before (#794)', () => {
+    expect(cmds('BD = (-4,5,12)')).toEqual([{ type: 'inject-pair', a: 'B', b: 'D', x: -4, y: 5, z: 12 }]);
   });
   it('residue between items defers the whole utterance (#793)', () => {
     expect(parse3('נתון: v = (1,2,3) junk u = (4,5,6)')).toEqual({ ok: false, reason: 'not-handled' });

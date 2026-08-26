@@ -4635,6 +4635,96 @@ defers — the sanction is the bare conjunction token, nothing after it.
 green (`parse3-v4.test.ts`, `book-coordinate-givens.test.ts`); the operator's exact standalone
 utterance stays an honest refusal.
 
+## ADR-3D-168 — one tuple-component grammar: pair/vector injections take SYMBOLIC components (#794; the #325 widening reaching the vector lanes)
+
+**Report (operator, 2026-08-26, the same bagrut Q2 as [ADR-3D-167](#adr-3d-167)).** `AA'=(k-1,k-7, k+1)`
+was not-handled (LLM lane also failed), and the exam's remaining vector givens `AB = (k-1, k, 3)`,
+`AC = (k+1, 0, k-3)` were equally inexpressible. Missing capability ⇒ feature, PR route.
+
+**The class.** Tuple-component givens must accept the SAME component grammar everywhere. #325
+(ADR-3D-079) gave coordinate points the affine `COMP` grammar (`B(2t, t, k)` — each open symbol an
+extra pivot unknown), but the widening never reached the vector lanes: the standalone pair rule and
+`vectorInjection` still took `VAL` literals, and `injectionList` hard-coded "a vector value must be
+numeric". Which tuple accepted a symbol was an accident of which rule read it — the #493/#510
+asymmetry, one level up.
+
+**Decision — widen at the existing chokepoints, no new machinery:**
+
+1. **Parser.** All three tuple lanes read components through the ONE `parseComp` / `symStructure` /
+   `unreadableComp` path: the standalone pair rule, `vectorInjection`, and `injectionList` — which
+   also gains the **pair item** (`AB = (…)`, two labels, `=` mandatory as in the standalone rule),
+   tried before the single-label point item and safe only because ADR-3D-167's full-coverage +
+   no-mid-run laws hold. The item alternation moved to **named groups** (the shifting-index trap).
+   `inject-pair` / `inject-vector` commands carry `x/y/z: number | null` + optional `symExprs`,
+   the `point3` shape. Bare distinct letters are PLACEHOLDERS (that component does not constrain) —
+   the #325 point register, now uniform: `נתון: v = (10,n,0)`, which used to refuse, parses with
+   `y` unconstrained.
+2. **Engine.** `vectorPins`/`pairPins` components are `number | null | SymComp`, exactly as `pins`.
+   One derivation everywhere (the *enumeration-is-not-a-rule* discipline): `pinSymsOf` spans all
+   three pin families — so `param-sign` reaches a pair symbol, the DOF cue counts its unknowns, and
+   the params panel prints it; `solvePivot` collects pin symbols from all three lists and evaluates
+   vector/pair residual targets through the same `compTarget` (a null component contributes no
+   residual). Apply mirrors point3's combine and its one-namespace-per-role guard (a pin symbol
+   that is also the figure's coord-sym parameter refuses `two-params`).
+3. **DOF accounting made uniform.** `freeDofCount3` counted `vectorPins.length * 3` and did not
+   count `pairPins` at all (a pre-existing gap); all three families now count per non-null
+   component, and open pin symbols add unknowns as before.
+4. **Catalog.** The numeric pair injection (`BD = (-4,5,12)`) was never cataloged — added, with the
+   symbolic standalone and list forms; the LLM prompt derives from the catalog, so the fallback
+   lane learns the forms for free.
+
+**Why the figure is determined (the exam's own logic):** right prism ⇒ AA'⊥AB and AA'⊥AC ⇒
+2k²−6k+4 = 0 ∧ 2k²−2k−4 = 0 ⇒ k = 2 — the structure pins the parameter through the pivot exactly
+as `AB=7` pins `t` for point pins. A LONE symbolic pair given leaves its symbol OPEN and
+seed-varying (ADR-052; the Am. 2 seed-anchor mechanism applies unchanged).
+
+**Locks:** `issue-794.test.ts` (k = 2 at every seed, exact vector landings, panel `k = 2`,
+sign-given pass/refuse, lone-given openness); fixture `prism-sym-pair-794.geo3.json` — the
+operator's exact Q2 session; per-lane parser tests in `parse3-v4.test.ts`.
+
+**Out of scope (already filed):** nonlinear components (#509), two symbols in one vec-rel (#301).
+
+### ADR-3D-168 Am. 1 — a discrete root the pool does not carry is invisible to every honesty gate (#797)
+
+**Report (operator, PR #796 play, 2026-08-26).** After two of Q2's three vectors the structure gives
+2k²−6k+4 = 0 ⇒ k ∈ {1, 2} — the panel printed **k = 1** as determined, and «show another
+configuration» could never show k = 2. Operator ruling: **only a fully determined symbol shows a
+value; otherwise «k = ?».**
+
+**Root cause.** The panel's determinedness proxy is seed-invariance, and its ADR-052 safeguard (the
+Am. 2 seed-varying anchor) only moves a *continuously* open symbol — a symbol restricted to discrete
+roots cannot be pulled off a root, and the solver deterministically landed the near root every seed.
+`collectAll` (keep every distinct converged solution) was gated on a sign given being present, so the
+pool held one root's gauge variants only. Measured at seed 0: **14 cold solutions, all k ≈ 1** —
+and cold wide symbol starts (±1.5/2.5/4) changed nothing, because the gauge-basin skew dominates
+regardless of where the symbol coordinate starts.
+
+**Decision — four moves at the solve, all scoped to `nPinSym > 0`:**
+
+1. **`collectAll` for any open pin symbol**, sign given or not — the pool is the admissible set, and
+   every honesty gate downstream reads it.
+2. **Symbol-axis CONTINUATION, warm and hard-pinned** (the `parkScale` pattern): from one base per
+   distinct symbol vector, restart with the symbol displaced (±0.75/1.5/3), first HARD-pinned
+   (weight 1e3, 40 iterations — a 1e-4 anchor cannot hold one DOF against the primary gradients)
+   so gauge/dims adapt, then RELEASED anchored at wherever the pinned stage settled. A probe
+   displacement runs first: a symbol admissible OFF its converged value is continuous — the fan is
+   skipped (its openness is already seed-varied by the Am. 2 anchor), so only genuinely discrete
+   symbols pay the full fan.
+3. **The pool is interleaved round-robin across distinct symbol vectors**, so configuration cycling
+   (`pool[seed % n]`) alternates the roots instead of exhausting one root's gauge variants first.
+4. **`pivot.symRoots`** exposes the admissible pool's distinct values per symbol (post
+   sign-filtering — a sign given that narrows to one root correctly makes it determined), and the
+   params panel prints a value only when seed-stable AND a singleton at every sampled seed.
+
+The residual function became per-target (`fFor`) for the continuation's release stage; the cold
+starts still use the Am. 2 seed targets unchanged. Honest perf note: symbolic-pin figures pay the
+exploration (the heavy book/Am. 3 tests run ~2–3× their prior time); nPinSym = 0 figures are
+byte-identical to before.
+
+**Locks:** `issue-797.test.ts` — two vectors read «k = ?» with both roots in every seed's pool and
+both reachable across configurations; the third vector returns «k = 2»; the Am. 2/Am. 3 and
+issue-794 locks stay green.
+
 **Sibling products:** complex needs neither rotate nor align — that becomes an explicit **n/a** cell in
 the conformance matrix (family 2), not a forgotten one (#664).
 

@@ -1249,8 +1249,14 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
 
     case 'inject-vector': {
       if (!c.vectors.has(cmd.name)) return { ok: false, error: { code: 'unknown-vector', id: cmd.name } };
+      // #794 (ADR-3D-168): symbolic components join exactly as point3 pins do — same
+      // combine, same one-namespace-per-role guard (a pin symbol that is ALSO the
+      // figure's coord-sym parameter would be resolved by two mechanisms — refused).
+      const exprs = cmd.symExprs ?? [null, null, null];
+      if (c.param && exprs.some((e) => e !== null && e.sym === c.param)) return { ok: false, error: { code: 'two-params' } };
       const next = clone(c);
-      next.vectorPins.push({ name: cmd.name, x: cmd.x, y: cmd.y, z: cmd.z });
+      const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
+      next.vectorPins.push({ name: cmd.name, x: comp(cmd.x, exprs[0]), y: comp(cmd.y, exprs[1]), z: comp(cmd.z, exprs[2]) });
       return { ok: true, next };
     }
 
@@ -1826,8 +1832,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     case 'inject-pair': {
       const missing = missingPoint(c, [cmd.a, cmd.b]);
       if (missing) return { ok: false, error: missing };
+      // #794 (ADR-3D-168): same symbolic-component path as inject-vector / point3 pins.
+      const exprs = cmd.symExprs ?? [null, null, null];
+      if (c.param && exprs.some((e) => e !== null && e.sym === c.param)) return { ok: false, error: { code: 'two-params' } };
       const next = clone(c);
-      next.pairPins.push({ a: cmd.a, b: cmd.b, x: cmd.x, y: cmd.y, z: cmd.z });
+      const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
+      next.pairPins.push({ a: cmd.a, b: cmd.b, x: comp(cmd.x, exprs[0]), y: comp(cmd.y, exprs[1]), z: comp(cmd.z, exprs[2]) });
       return { ok: true, next };
     }
 

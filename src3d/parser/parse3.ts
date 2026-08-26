@@ -842,14 +842,17 @@ const dotGiven: Rule = (s) => {
   return [{ type: 'dot-given', v1: m[1], v2: m[2], value: +m[3] }];
 };
 
-/** `BD = (-4,5,12)` — a PAIR-vector injection (V7 T2). */
+/** `BD = (-4,5,12)` — a PAIR-vector injection (V7 T2).
+ *  #794 (ADR-3D-168): components take `COMP`, the ONE tuple-component grammar (#325's shape) —
+ *  `AA' = (k-1, k-7, k+1)` rides the same parseComp/symStructure chokepoints as `B(2t,t,k)`,
+ *  so the exam's symbolic pair-vector given parses instead of burning an LLM call. */
 const pairInjection: Rule = (s) => {
-  // #510: the shared VALUE atom + reader — a pair injection reads «√2» exactly as a coordinate does.
-  const m = s.match(new RegExp(String.raw`^(${LBL})(${LBL})\s*=\s*\(\s*(${VAL})\s*,\s*(${VAL})\s*,\s*(${VAL})\s*\)$`));
+  const m = s.match(new RegExp(String.raw`^(${LBL})(${LBL})\s*=\s*\(\s*(${COMP})\s*,\s*(${COMP})\s*,\s*(${COMP})\s*\)$`));
   if (!m) return null;
-  const [x, y, z] = [m[3], m[4], m[5]].map(literalValue);
-  if (x === null || y === null || z === null) return null;
-  return [{ type: 'inject-pair', a: m[1], b: m[2], x, y, z }];
+  const comps = [m[3], m[4], m[5]].map(parseComp);
+  if (comps.some(unreadableComp)) return null; // #510: a malformed literal is never an unknown component
+  const symExprs = symStructure(comps);
+  return [{ type: 'inject-pair', a: m[1], b: m[2], x: comps[0].num, y: comps[1].num, z: comps[2].num, ...(symExprs ? { symExprs } : {}) }];
 };
 
 /** `נפח הפירמידה ABCD = 64` — a tetrahedron volume claim (V7 T2). */
@@ -2579,9 +2582,11 @@ const injectionList: Rule = (s) => {
   if (!m) return null;
   // #793 (ADR-3D-167): a label inside a longer run must never START an item — without the
   // lookbehind, `AA' = (…)` bound `A' = (…)` and `AB = (…)` bound `B = (…)`, reinterpreting a stated
-  // pair-vector as point coordinates.
+  // pair-vector as point coordinates. #794 (ADR-3D-168): the PAIR item (`AB = (…)` — two labels, `=`
+  // mandatory as in the standalone rule) now exists, tried before the single-label point item; named
+  // groups because the alternation carries several operands (the src3d/CLAUDE.md shifting-index trap).
   const itemRe = new RegExp(
-    `(?<![A-Za-z\\d'])(?:([a-w])\\s*=\\s*|([A-Z]\\d*'?)\\s*=?\\s*)\\(\\s*(${COMP})\\s*,\\s*(${COMP})\\s*,\\s*(${COMP})\\s*\\)`,
+    `(?<![A-Za-z\\d'])(?:(?<vec>[a-w])\\s*=\\s*|(?<pa>[A-Z]\\d*'?)(?<pb>[A-Z]\\d*'?)\\s*=\\s*|(?<pt>[A-Z]\\d*'?)\\s*=?\\s*)\\(\\s*(?<c1>${COMP})\\s*,\\s*(?<c2>${COMP})\\s*,\\s*(?<c3>${COMP})\\s*\\)`,
     'g',
   );
   // #793 (ADR-3D-167): a gap between harvested items (or before the first) may hold only separators and a bare
@@ -2594,22 +2599,26 @@ const injectionList: Rule = (s) => {
   for (const g of m[1].matchAll(itemRe)) {
     if (!SEP_GAP.test(m[1].slice(lastEnd, g.index ?? 0))) return null; // all-or-nothing, never a partial read
     lastEnd = (g.index ?? 0) + g[0].length;
-    const comps = [g[3], g[4], g[5]].map(parseComp);
+    const gr = g.groups!;
+    const comps = [gr.c1, gr.c2, gr.c3].map(parseComp);
     if (comps.some(unreadableComp)) return null; // #510, as above — all-or-nothing, never a partial read
     const [x, y, z] = comps.map((t) => t.num);
-    if (g[1]) {
-      if (x === null || y === null || z === null) return null; // a vector value must be numeric
-      cmds.push({ type: 'inject-vector', name: g[1], x, y, z });
+    // #794 (ADR-3D-168): one component grammar for every item kind — vector and pair items take
+    // symbolic affine components exactly as point items do (the lifted "must be numeric" gate).
+    const symExprs = symStructure(comps);
+    if (gr.vec) {
+      cmds.push({ type: 'inject-vector', name: gr.vec, x, y, z, ...(symExprs ? { symExprs } : {}) });
+    } else if (gr.pa) {
+      cmds.push({ type: 'inject-pair', a: gr.pa, b: gr.pb!, x, y, z, ...(symExprs ? { symExprs } : {}) });
     } else if (comps.some((t) => t.expr !== null)) {
       // #325: symbolic affine components ride the list too (`נתונות הנקודות: B(2t, t, k)`)
-      const symExprs = symStructure(comps);
       cmds.push({
-        type: 'point3', id: g[2], x, y, z,
+        type: 'point3', id: gr.pt!, x, y, z,
         syms: comps.map((t) => t.expr?.sym ?? null) as [string | null, string | null, string | null],
         ...(symExprs ? { symExprs } : {}),
       });
     } else {
-      cmds.push({ type: 'point3', id: g[2], x, y, z });
+      cmds.push({ type: 'point3', id: gr.pt!, x, y, z });
     }
   }
   if (cmds.length === 0) return null;
@@ -2699,13 +2708,15 @@ const paramSign: Rule = (s) => {
   return [{ type: 'param-sign', sym: m[1], positive: /^(?:חיובי|positive|>)$/i.test(m[2]) }];
 };
 
-/** Standalone `v = (10,-5,0)` — a single vector injection. */
+/** Standalone `v = (10,-5,0)` — a single vector injection.
+ *  #794 (ADR-3D-168): components take `COMP` — the #325 widening reaching the vector lane. */
 const vectorInjection: Rule = (s) => {
-  const m = s.match(new RegExp(`^([a-w])\\s*=\\s*\\(\\s*(${VAL})\\s*,\\s*(${VAL})\\s*,\\s*(${VAL})\\s*\\)$`));
+  const m = s.match(new RegExp(`^([a-w])\\s*=\\s*\\(\\s*(${COMP})\\s*,\\s*(${COMP})\\s*,\\s*(${COMP})\\s*\\)$`));
   if (!m) return null;
-  const [x, y, z] = [m[2], m[3], m[4]].map(literalValue); // #510: the shared reader, never a bare `+`
-  if (x === null || y === null || z === null) return null;
-  return [{ type: 'inject-vector', name: m[1], x, y, z }];
+  const comps = [m[2], m[3], m[4]].map(parseComp); // #510: the shared reader, never a bare `+`
+  if (comps.some(unreadableComp)) return null;
+  const symExprs = symStructure(comps);
+  return [{ type: 'inject-vector', name: m[1], x: comps[0].num, y: comps[1].num, z: comps[2].num, ...(symExprs ? { symExprs } : {}) }];
 };
 
 /** `שיעור ה-z של C' חיובי` / `the z-coordinate of C' is positive` — a sign branch given.

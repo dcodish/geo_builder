@@ -977,7 +977,14 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     }
     const vals = resolved.map((r) => r.pivot?.pinSymbols?.[sym]);
     const nums = vals.filter((v): v is number => v !== undefined && Number.isFinite(v));
+    // #797 (ADR-3D-168 Am. 1): seed-stability alone is not determinedness — a symbol restricted to
+    // DISCRETE roots (k ∈ {1,2} after two of Q2's three vectors) cannot be moved off a root by the
+    // Am. 2 anchor, and a deterministic root pick reads seed-stable. The admissible pool's distinct
+    // values must ALSO be a singleton at every sampled seed (operator ruling: only a fully
+    // determined symbol shows a value; otherwise «? »).
+    const singleRoot = resolved.every((r) => (r.pivot?.symRoots?.[sym]?.length ?? 1) <= 1);
     const stable =
+      singleRoot &&
       nums.length === resolved.length && nums.every((v) => Math.abs(v - nums[0]) <= 1e-4 * Math.max(1, Math.abs(nums[0])));
     params.push(stable ? { sym, text: `${sym} = ${cleanNum(nums[0], 1e-4)}`, open: false } : { sym, text: `${sym} = ?`, open: true });
   }

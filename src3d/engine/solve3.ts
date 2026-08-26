@@ -268,7 +268,9 @@ export function solvePivot(
   // #325 (ADR-3D-079): the pins' OPEN symbols (`B(2t,t,k)` → t, k) are pivot unknowns too,
   // appended AFTER the coupled symbols. Unknown layout: [gauge 7 | dims | coupled | pinSyms].
   const pinSyms: string[] = [];
-  for (const pin of pointPins) {
+  // #794 (ADR-3D-168): vector and pair pins carry the same component grammar as point pins,
+  // so their open symbols are pivot unknowns by the same collection — one derivation, three lists.
+  for (const pin of [...pointPins, ...vecPins, ...c.pairPins]) {
     for (const comp of [pin.x, pin.y, pin.z]) {
       if (comp !== null && typeof comp === 'object' && !pinSyms.includes(comp.sym)) pinSyms.push(comp.sym);
     }
@@ -348,7 +350,14 @@ export function solvePivot(
       }
       // a vector transforms without the translation
       const w = sub3(applyGauge(b, g), applyGauge(a, g));
-      out.push(w.x - pin.x, w.y - pin.y, w.z - pin.z);
+      // #794: a component's target may be symbolic (evaluated at the trial pin-symbol
+      // values) or null (a placeholder letter — unconstrained), exactly as point pins.
+      const tx = compTarget(pin.x, x);
+      const ty = compTarget(pin.y, x);
+      const tz = compTarget(pin.z, x);
+      if (tx !== null) out.push(w.x - tx);
+      if (ty !== null) out.push(w.y - ty);
+      if (tz !== null) out.push(w.z - tz);
     }
     for (const pin of c.pairPins) {
       const a = pos.get(pin.a);
@@ -358,7 +367,12 @@ export function solvePivot(
         continue;
       }
       const w = sub3(applyGauge(b, g), applyGauge(a, g));
-      out.push(w.x - pin.x, w.y - pin.y, w.z - pin.z);
+      const tx = compTarget(pin.x, x);
+      const ty = compTarget(pin.y, x);
+      const tz = compTarget(pin.z, x);
+      if (tx !== null) out.push(w.x - tx);
+      if (ty !== null) out.push(w.y - ty);
+      if (tz !== null) out.push(w.z - tz);
     }
     // plane-equation givens (ADR-3D-030): each named point lies on cx·x+cy·y+cz·z+d = 0,
     // normalized by |n| so the residual is O(1) in coordinate units. A point the pivot
@@ -834,6 +848,11 @@ export function solvePivot(
     const pinSymStart = Array.from({ length: nPinSym }, () => (k < 4 ? 1 : -1) * (0.3 + 0.3 * (k % 3)));
     starts.push([0, 0, 0, axes[k].x * angles[k], axes[k].y * angles[k], axes[k].z * angles[k], 0, ...dims0, ...symStart, ...pinSymStart]);
   }
+  // #797 (ADR-3D-168 Am. 1): the ±0.3–0.9 pin-symbol spread explores only the near-origin
+  // basins — a discrete root beyond it (Q2's k ∈ {1,2}) was structurally unreachable, so the
+  // pool undercounted the admissible set and a picked branch printed as knowledge. EXTRA
+  // starts widen the symbol axis (never shifted ones — the #518 lesson: moving existing
+  // starts costs hard figures real solution branches). Only when pin symbols exist.
   // the warm start (a prior solve's exact solution) goes FIRST so a drive perturbs the
   // pinned figure's own basin before gambling on the rotation spread (ADR-3D-033)
   if (warmStart && warmStart.length === 7 + nDims + nSym + nPinSym) starts.unshift([...warmStart]);
@@ -865,7 +884,11 @@ export function solvePivot(
   // #325 (ADR-3D-079 Am. 3): a sign given on a PIN SYMBOL selects the same way — `AB=7`
   // with `B(2t,t,k)` roots t at 4 OR −1.6 (discrete), and best-per-mirror may keep only
   // the wrong-signed root, refusing `t > 0` although a positive root exists.
-  const collectAll = c.signGivens.length > 0 || (nPinSym > 0 && c.paramSigns.length > 0);
+  // #797 (ADR-3D-168 Am. 1): ANY open pin symbol keeps the full pool, sign given or not —
+  // a discrete root the pool does not carry is invisible to every honesty gate downstream:
+  // the params panel printed «k = 1» as determined while k ∈ {1,2} (two of Q2's three
+  // vectors), and «show another configuration» could never reach the other root.
+  const collectAll = c.signGivens.length > 0 || nPinSym > 0;
   for (const mirror of [false, true]) {
     const fPrimary = residualsFor(mirror);
     if (scaleFree) {
@@ -897,13 +920,17 @@ export function solvePivot(
     // with open symbols is `anchored`, and its acceptance moves to the PRIMARY residuals
     // (the anchor equilibrium floors the full error above the raw thresholds).
     const anchored = planeDrive || nPinSym > 0;
-    const symAnchorTerms = (x: number[]): number[] =>
-      symAnchorTargets.map((tgt, i) => REG_SF * (x[7 + nDims + nSym + i] - tgt));
-    const f = anchored
+    const symAnchorTerms = (x: number[], targets: number[]): number[] =>
+      targets.map((tgt, i) => REG_SF * (x[7 + nDims + nSym + i] - tgt));
+    // #797 (ADR-3D-168 Am. 1): the residual function is parameterized by its symbol-anchor
+    // targets — the cold starts use the Am. 2 seed targets, while the symbol-axis continuation
+    // below anchors each warm restart at its own displaced value, so which discrete root it
+    // converges to is decided by the primary landscape near it, never by one shared target.
+    const fFor = (targets: number[]) => anchored
       ? (x: number[]) => [
           ...fPrimary(x),
           ...(planeDrive ? [REG_SF * x[6], ...x.slice(7, 7 + nDims).map((v, i) => REG_SF * (v - dims0[i]))] : []),
-          ...symAnchorTerms(x),
+          ...symAnchorTerms(x, targets),
         ]
       : fPrimary;
     // best-selection stays on the FULL error (the anchor's pull punishes the collapse
@@ -932,40 +959,89 @@ export function solvePivot(
     };
     let best: { x: number[]; err: number } | null = null;
     const seen = new Set<string>();
+    /** Accept/dedup/push one converged candidate into the pool (collectAll only). */
+    const collect = (cand: { x: number[]; err: number }): void => {
+      if (degenerate(cand.x)) return; // a collapsed solid is not a figure (general position)
+      const rAccept = anchored ? primaryErr(cand.x) : cand.err;
+      if (!collectAll || rAccept >= ACCEPT) return;
+      const parked = parkScale(cand.x); // #518: an undriven scale parks at the seed target, exactly
+      const cx = parked ?? cand.x;
+      const g = { ...unpack(cx), mirror };
+      // dedupe by the transform's ACTION (probe frame), not its parameters (axis-angle wraps).
+      // Am. 3: two pin-symbol ROOTS can share one gauge (t = 4 vs −1.6 moves only B) — the
+      // symbol values join the signature so the sign selector sees both (nPinSym = 0 ⇒ the
+      // signature is byte-identical to before).
+      const sig =
+        [v3(0, 0, 0), v3(1, 0, 0), v3(0, 1, 0), v3(0, 0, 1)]
+          .map((p) => applyGauge(p, g))
+          .map((q) => `${q.x.toFixed(5)},${q.y.toFixed(5)},${q.z.toFixed(5)}`)
+          .join('|') +
+        (nPinSym > 0 ? '#' + cx.slice(7 + nDims + nSym).map((v) => v.toFixed(4)).join(',') : '');
+      if (seen.has(sig)) return;
+      seen.add(sig);
+      const dims = cx.slice(7, 7 + nDims);
+      const symbols = coupled ? cx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
+      const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((s, i) => [s, cx[7 + nDims + nSym + i]])) : undefined;
+      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, err: rAccept, x: [...cx] });
+    };
+    const fSeed = fFor(symAnchorTargets);
     for (const x0 of starts) {
-      let r0 = leastSquares(f, x0);
+      let r0 = leastSquares(fSeed, x0);
       // polish: restart LM (fresh damping) from the found point until it stops improving
       for (let polish = 0; polish < 3 && r0.err > 1e-24 && r0.err < 1e-4; polish++) {
-        const r2 = leastSquares(f, r0.x);
+        const r2 = leastSquares(fSeed, r0.x);
         if (r2.err >= r0.err * 0.99) break;
         r0 = r2;
       }
-      if (degenerate(r0.x)) continue; // a collapsed solid is not a figure (general position)
-      const rAccept = anchored ? primaryErr(r0.x) : r0.err;
-      if (collectAll && rAccept < ACCEPT) {
-        const parked = parkScale(r0.x); // #518: an undriven scale parks at the seed target, exactly
-        if (parked) r0 = { x: parked, err: r0.err };
-        const g = { ...unpack(r0.x), mirror };
-        // dedupe by the transform's ACTION (probe frame), not its parameters (axis-angle wraps).
-        // Am. 3: two pin-symbol ROOTS can share one gauge (t = 4 vs −1.6 moves only B) — the
-        // symbol values join the signature so the sign selector sees both (nPinSym = 0 ⇒ the
-        // signature is byte-identical to before).
-        const sig =
-          [v3(0, 0, 0), v3(1, 0, 0), v3(0, 1, 0), v3(0, 0, 1)]
-            .map((p) => applyGauge(p, g))
-            .map((q) => `${q.x.toFixed(5)},${q.y.toFixed(5)},${q.z.toFixed(5)}`)
-            .join('|') +
-          (nPinSym > 0 ? '#' + r0.x.slice(7 + nDims + nSym).map((v) => v.toFixed(4)).join(',') : '');
-        if (!seen.has(sig)) {
-          seen.add(sig);
-          const dims = r0.x.slice(7, 7 + nDims);
-          const symbols = coupled ? r0.x.slice(7 + nDims, 7 + nDims + nSym) : undefined;
-          const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((s, i) => [s, r0.x[7 + nDims + nSym + i]])) : undefined;
-          results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, err: rAccept, x: [...r0.x] });
-        }
-      }
+      if (degenerate(r0.x)) continue;
+      collect(r0);
       if (!best || r0.err < best.err) best = r0; // FULL err — the anchor punishes collapse
       if (!collectAll && best.err < 1e-22) break;
+    }
+    // #797 (ADR-3D-168 Am. 1): symbol-axis CONTINUATION — a discrete root the cold starts miss
+    // is reached WARM: restart from each found solution with one symbol displaced (gauge and
+    // dims kept) and anchored AT the displaced value, so LM walks into the neighboring basin.
+    // Cold wide symbol starts cannot do this (the gauge-basin skew dominates: at seed 0 all 14
+    // cold solutions landed k ≈ 1 while k = 2 was equally admissible — a root the pool does not
+    // carry is invisible to every honesty gate downstream). One round, from one base per
+    // distinct symbol vector; roots within ±3 of a found one join the pool.
+    if (collectAll && nPinSym > 0) {
+      const seenSym = new Set<string>();
+      const bases = results.filter((r) => {
+        if (r.mirror !== mirror || !r.pinSymbols) return false;
+        const key = pinSyms.map((s) => r.pinSymbols![s].toFixed(3)).join(',');
+        if (seenSym.has(key)) return false;
+        seenSym.add(key);
+        return true;
+      });
+      for (const sol of bases) {
+        for (let i = 0; i < nPinSym; i++) {
+          const idx = 7 + nDims + nSym + i;
+          // two-step walk (the parkScale pattern): a 1e-4 anchor cannot hold the displaced
+          // symbol against the primary gradients (one DOF snaps back long before the gauge
+          // rotates), so first HARD-pin the symbol at the displaced value while gauge and
+          // dims adapt, then RELEASE anchored at wherever the pinned solve settled.
+          // Returns whether the DISPLACED value itself was admissible.
+          const explore = (d: number): boolean => {
+            const target = sol.x[idx] + d;
+            const x0 = [...sol.x];
+            x0[idx] = target;
+            const fPin = (y: number[]) => [...fPrimary(y), 1e3 * (y[idx] - target)];
+            // the pinned stage only steers the gauge into the target's basin — 40 iterations
+            // suffice (warm start, and the RELEASE solve carries the precision)
+            const rp = leastSquares(fPin, x0, 40);
+            collect(leastSquares(fFor(rp.x.slice(7 + nDims + nSym)), rp.x));
+            return primaryErr(rp.x) < ACCEPT;
+          };
+          // Probe first: a symbol admissible OFF its converged value is CONTINUOUS — its
+          // openness is already honest (the Am. 2 seed anchor varies it), so the fan is
+          // skipped and the walk costs 2 LM solves instead of 12. Only a symbol the probe
+          // shows DISCRETE pays the full fan. (A second root exactly at the probe offset is
+          // still collected by the probe's own release, so no root is lost to this exit.)
+          if (explore(0.75)) continue;
+          for (const d of [-3, -1.5, -0.75, 1.5, 3]) explore(d);
+        }
+      }
     }
     // acceptance: per-residual ~1e-6 — far under the 2e-5 claim tolerance (the numeric-
     // Jacobian floor rises with mixed scalar residuals; 1e-16 was V4-era point-pins-only)
@@ -978,6 +1054,26 @@ export function solvePivot(
       const symbols = coupled ? bx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
       const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((s, i) => [s, bx[7 + nDims + nSym + i]])) : undefined;
       results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, err: bestAccept, x: [...bx] });
+    }
+  }
+  // #797 (ADR-3D-168 Am. 1): interleave the pool round-robin across DISTINCT symbol vectors —
+  // the cold starts fill the pool with one root's gauge/dims variants first, so configuration
+  // cycling (pool[seed % n] downstream) would exhaust those before ever showing another root.
+  // Interleaved, consecutive configurations alternate the discrete roots.
+  if (nPinSym > 0 && results.length > 1) {
+    const groups = new Map<string, PivotResult[]>();
+    for (const r of results) {
+      const key = r.pinSymbols ? pinSyms.map((s) => r.pinSymbols![s].toFixed(3)).join(',') : '';
+      const list = groups.get(key) ?? [];
+      if (list.length === 0) groups.set(key, list);
+      list.push(r);
+    }
+    if (groups.size > 1) {
+      const lists = [...groups.values()];
+      const out: PivotResult[] = [];
+      for (let i = 0; out.length < results.length; i++) for (const l of lists) if (i < l.length) out.push(l[i]);
+      results.length = 0;
+      results.push(...out);
     }
   }
   return results;
