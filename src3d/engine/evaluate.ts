@@ -748,10 +748,14 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   // #552: a FREE line's remaining sampled DOFs, same discipline.
   for (const dof of resolved.freeLineDofs.values()) freeT += dof;
   if (resolved.pivot && resolved.pivot.solutions > 0) {
-    let pinCount = c.vectorPins.length * 3;
+    let pinCount = 0;
     // #325: a symbolic component (`B(2t,t,k)`) constrains like a numeric one, and each distinct
     // OPEN symbol is an extra unknown — B(2t,t,k) nets ONE constraint (3 comps − 2 symbols).
-    for (const p of c.pins) pinCount += (p.x !== null ? 1 : 0) + (p.y !== null ? 1 : 0) + (p.z !== null ? 1 : 0);
+    // #794 (ADR-3D-168): point, vector and pair pins share one component grammar, so they share
+    // one accounting — a null component (placeholder letter) does not constrain; pair pins were
+    // previously absent from this count altogether.
+    for (const p of [...c.pins, ...c.vectorPins, ...c.pairPins])
+      pinCount += (p.x !== null ? 1 : 0) + (p.y !== null ? 1 : 0) + (p.z !== null ? 1 : 0);
     dims += pinSymsOf(c).length;
     // #324: a coordinate-plane relation consumes DOF like pins (its residual count)
     for (const cp of c.coordPlanePins)

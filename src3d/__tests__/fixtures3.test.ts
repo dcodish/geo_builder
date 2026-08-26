@@ -98,6 +98,18 @@ const SEEDED: Record<string, string[]> = {
   // #579 (ADR-3D-146) — the operator's prod figure: «SO גובה הפירמידה» names the NEW foot O,
   // and the ⟂-to-base disposition must create it (not refuse it as an unknown reference).
   'named-foot-579.geo3.json': ['פירמידה ABCDS שבסיסה ריבוע', 'SO גובה הפירמידה'],
+  // #794 (ADR-3D-168) — the operator's bagrut Q2 (2026-08-26): a right prism whose three edge
+  // vectors are stated in a parameter k. The right-prism structure (AA'⊥AB, AA'⊥AC) pins k = 2 —
+  // the symbolic pair pins join the pivot exactly like `B(2t,t,k)` point pins. The first line is
+  // the operator's EXACT utterance (spacing included); the sign given locks the param-sign gate
+  // over a PAIR symbol (pinSymsOf across all three pin families).
+  'prism-sym-pair-794.geo3.json': [
+    'מנסרה ישרה משולשת ABC',
+    "AA'=(k-1,k-7, k+1)",
+    'AB = (k-1, k, 3)',
+    'AC = (k+1, 0, k-3)',
+    'k חיובי',
+  ],
   'planes-2022-q2.geo3.json': [
     'המישור π1: z - 3 = 0',
     'המישור π2: ay + z - 8 = 0',

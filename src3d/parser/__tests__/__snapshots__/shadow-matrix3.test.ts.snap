@@ -735,6 +735,36 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "BD = (-4,5,12)",
+    "winner": "pairInjection",
+  },
+  {
+    "lang": "he",
+    "text": "BD = (-4,5,12)",
+    "winner": "pairInjection",
+  },
+  {
+    "lang": "en",
+    "text": "AA' = (k-1, k-7, k+1)",
+    "winner": "pairInjection",
+  },
+  {
+    "lang": "he",
+    "text": "AA' = (k-1, k-7, k+1)",
+    "winner": "pairInjection",
+  },
+  {
+    "lang": "en",
+    "text": "given: AB = (k-1, k, 3), AC = (k+1, 0, k-3)",
+    "winner": "injectionList",
+  },
+  {
+    "lang": "he",
+    "text": "נתון: AB = (k-1, k, 3), AC = (k+1, 0, k-3)",
+    "winner": "injectionList",
+  },
+  {
+    "lang": "en",
     "text": "plane π1: z - 3 = 0",
     "winner": "planeByEquation",
   },

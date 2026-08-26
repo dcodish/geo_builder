@@ -104,6 +104,12 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // --- vectors ---
   { category: 'vectors', he: "נסמן: AB = u, AD = v, AA' = w", en: "denote AB = u, AD = v, AA' = w" },
   { category: 'vectors', he: 'נתון: v = (10,-5,0), u = (5,5,-5)', en: 'given: v = (10,-5,0), u = (5,5,-5)' },
+  // #794 (ADR-3D-168): pair-vector injections — numeric (V7 T2, was never cataloged) and symbolic
+  // affine components (the #325 COMP grammar reaching the vector lanes; the symbols stay OPEN until
+  // data pins them). The «נתון:» list takes pair items too.
+  { category: 'vectors', he: 'BD = (-4,5,12)', en: 'BD = (-4,5,12)' },
+  { category: 'vectors', he: "AA' = (k-1, k-7, k+1)", en: "AA' = (k-1, k-7, k+1)" },
+  { category: 'vectors', he: 'נתון: AB = (k-1, k, 3), AC = (k+1, 0, k-3)', en: 'given: AB = (k-1, k, 3), AC = (k+1, 0, k-3)' },
   // --- planes & lines ---
   { category: 'planesLines', he: 'המישור π1: z - 3 = 0', en: 'plane π1: z - 3 = 0' },
   // #504: the same head, plane edition — a spaced dash is the separator (it used to fall into the

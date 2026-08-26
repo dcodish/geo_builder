@@ -431,13 +431,18 @@ export interface ParamSignCommand {
   positive: boolean;
 }
 
-/** `נתון: v = (10,-5,0)` — inject a numeric value for a DECLARED vector (the V4 pivot). */
+/** `נתון: v = (10,-5,0)` — inject a value for a DECLARED vector (the V4 pivot).
+ *  #794 (ADR-3D-168): components take the SAME grammar as point3 — a number, a null
+ *  (a bare placeholder letter: that component does not constrain), or an affine
+ *  symbolic expression via `symExprs` (`v = (k-1, k, 3)` — the symbol joins the pivot
+ *  as an open unknown, exactly like a `B(2t,t,k)` pin). */
 export interface InjectVectorCommand {
   type: 'inject-vector';
   name: string;
-  x: number;
-  y: number;
-  z: number;
+  x: number | null;
+  y: number | null;
+  z: number | null;
+  symExprs?: [SymComp | null, SymComp | null, SymComp | null];
 }
 
 /** `שיעור ה-z של C' חיובי` — a SIGN branch given (selects among pivot solutions). */
@@ -783,7 +788,10 @@ export type Command3 =
   // about existing points, lowered the same way and M1-routed to verification.
   | { type: 'quad-shape'; base: QuadBase; ids: [Id, Id, Id, Id] }
   | { type: 'dot-given'; v1: string; v2: string; value: number } // u·v = 24 (V7 T2)
-  | { type: 'inject-pair'; a: Id; b: Id; x: number; y: number; z: number } // BD = (-4,5,12) — a pair-vector injection (V7 T2)
+  // BD = (-4,5,12) — a pair-vector injection (V7 T2). #794 (ADR-3D-168): components take the same
+  // grammar as point3 — number | null (placeholder letter) | affine symbolic via symExprs
+  // (`AA' = (k-1, k-7, k+1)` — the symbol joins the pivot as an open unknown).
+  | { type: 'inject-pair'; a: Id; b: Id; x: number | null; y: number | null; z: number | null; symExprs?: [SymComp | null, SymComp | null, SymComp | null] }
   | { type: 'rel-plane'; name: string; rel: 'perp' | 'par'; through: Id[]; a: Id; b: Id } // V8-b (G1): plane ⟂/∥ edge a–b
   | { type: 'plane-cut'; id: Id; plane: string; a: Id; b: Id } // V8-b (G2): a point = plane ∩ segment a–b
   | { type: 'height-to-face'; id: Id; from: Id; face: Id[] } // V8-e (G5): `AF גובה … לפאה BDC` — F = foot of ⟂ from A onto plane BDC
@@ -934,8 +942,10 @@ export interface Construction3 {
    *  #325 (ADR-3D-079): a component may be a symbolic AFFINE expression (`B(2t,t,k)`) —
    *  each distinct symbol joins the pivot as an extra unknown, OPEN until data pins it. */
   pins: { id: Id; x: number | null | SymComp; y: number | null | SymComp; z: number | null | SymComp }[];
-  /** V4 — injected numeric values for declared vectors. */
-  vectorPins: { name: string; x: number; y: number; z: number }[];
+  /** V4 — injected values for declared vectors. #794 (ADR-3D-168): a component is a number,
+   *  null (placeholder — does not constrain), or a symbolic AFFINE expression, exactly as in
+   *  `pins` — the #325 widening reaching the vector lane. */
+  vectorPins: { name: string; x: number | null | SymComp; y: number | null | SymComp; z: number | null | SymComp }[];
   /** V4 — sign branch givens (select among pivot solutions). */
   signGivens: SignGivenCommand[];
   /** V4 — planes through points, name → ids (resolved from positions after the pivot). */
@@ -967,8 +977,9 @@ export interface Construction3 {
   claims: Claim3[];
   /** V7 T2 — scalar givens driving the figure (residuals in the global solve). */
   scalarPins: ScalarPin[];
-  /** V7 T2 — pair-vector injections (`BD = (-4,5,12)`), residuals like vectorPins. */
-  pairPins: { a: Id; b: Id; x: number; y: number; z: number }[];
+  /** V7 T2 — pair-vector injections (`BD = (-4,5,12)`), residuals like vectorPins.
+   *  #794 (ADR-3D-168): components carry the same number | null | SymComp grammar as `pins`. */
+  pairPins: { a: Id; b: Id; x: number | null | SymComp; y: number | null | SymComp; z: number | null | SymComp }[];
   /** ADR-3D-030 (M1) — a stated plane EQUATION on a solid-bearing figure is a GIVEN:
    *  each named point must satisfy cx·x + cy·y + cz·z + d = 0 (pivot residuals, like
    *  coordinate injections — it drives the free gauge/dims, verifies when determined). */
@@ -1074,7 +1085,14 @@ export function absolutePointCount(c: Construction3): number {
 
 export function pinSymsOf(c: Construction3): string[] {
   const out: string[] = [];
-  for (const pin of c.pins) {
+  // #794 (ADR-3D-168): every pin family with symbolic components contributes — point pins,
+  // vector pins and pair pins share one component grammar, so they must share one symbol
+  // derivation (the `figureSymbolsOf` discipline: an enumeration one list short is how a
+  // param-sign on a pair symbol would refuse `unknown-symbol` while the figure carries it).
+  const lists: { x: number | null | SymComp; y: number | null | SymComp; z: number | null | SymComp }[] = [
+    ...c.pins, ...c.vectorPins, ...c.pairPins,
+  ];
+  for (const pin of lists) {
     for (const comp of [pin.x, pin.y, pin.z]) {
       if (comp !== null && typeof comp === 'object' && !out.includes(comp.sym)) out.push(comp.sym);
     }

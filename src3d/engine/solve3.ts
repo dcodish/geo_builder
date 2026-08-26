@@ -268,7 +268,9 @@ export function solvePivot(
   // #325 (ADR-3D-079): the pins' OPEN symbols (`B(2t,t,k)` → t, k) are pivot unknowns too,
   // appended AFTER the coupled symbols. Unknown layout: [gauge 7 | dims | coupled | pinSyms].
   const pinSyms: string[] = [];
-  for (const pin of pointPins) {
+  // #794 (ADR-3D-168): vector and pair pins carry the same component grammar as point pins,
+  // so their open symbols are pivot unknowns by the same collection — one derivation, three lists.
+  for (const pin of [...pointPins, ...vecPins, ...c.pairPins]) {
     for (const comp of [pin.x, pin.y, pin.z]) {
       if (comp !== null && typeof comp === 'object' && !pinSyms.includes(comp.sym)) pinSyms.push(comp.sym);
     }
@@ -348,7 +350,14 @@ export function solvePivot(
       }
       // a vector transforms without the translation
       const w = sub3(applyGauge(b, g), applyGauge(a, g));
-      out.push(w.x - pin.x, w.y - pin.y, w.z - pin.z);
+      // #794: a component's target may be symbolic (evaluated at the trial pin-symbol
+      // values) or null (a placeholder letter — unconstrained), exactly as point pins.
+      const tx = compTarget(pin.x, x);
+      const ty = compTarget(pin.y, x);
+      const tz = compTarget(pin.z, x);
+      if (tx !== null) out.push(w.x - tx);
+      if (ty !== null) out.push(w.y - ty);
+      if (tz !== null) out.push(w.z - tz);
     }
     for (const pin of c.pairPins) {
       const a = pos.get(pin.a);
@@ -358,7 +367,12 @@ export function solvePivot(
         continue;
       }
       const w = sub3(applyGauge(b, g), applyGauge(a, g));
-      out.push(w.x - pin.x, w.y - pin.y, w.z - pin.z);
+      const tx = compTarget(pin.x, x);
+      const ty = compTarget(pin.y, x);
+      const tz = compTarget(pin.z, x);
+      if (tx !== null) out.push(w.x - tx);
+      if (ty !== null) out.push(w.y - ty);
+      if (tz !== null) out.push(w.z - tz);
     }
     // plane-equation givens (ADR-3D-030): each named point lies on cx·x+cy·y+cz·z+d = 0,
     // normalized by |n| so the residual is O(1) in coordinate units. A point the pivot
