@@ -1451,3 +1451,68 @@ joins complex's bidi expression core so `d_{AB}` isolates as one LTR run.
 
 Locks: `shell/__tests__/symbol-row.test.tsx` (mount contract), each product's existing palette
 drift locks (complex gains the `symDist` template), and the three product lanes green.
+
+## ADR-W-033 — The suite writes a VERDICT; "green" is read, never inferred from an exit code (#750)
+
+**Status:** Accepted (2026-08-26) · **Products:** workspace (all lanes)
+
+`npm run test:full` is the bar before every commit and every deploy, and until now "was it green?"
+could only be answered by a human reading two summary lines. The obvious mechanical answer — the
+exit status — is honest at the source and destroyed at the call site: a POSIX pipeline reports its
+LAST command's status, so the ubiquitous `npm run test:full 2>&1 | tail -40` reads `tail`'s `0`
+whatever the suite did. That exact line gated the `prod/2026-08-25-2` deploy (the suite genuinely
+was green, and nothing in the mechanism would have said so had it not been). Its sibling — a gate
+chain composed with `;` instead of `&&` — had already burned a session and is recorded in the
+`gate-lines-are-read-not-matched` memory. Two failures of discipline at one seam is a design signal,
+not a reminder to try harder.
+
+Note what is **not** the defect: round #768 escalated this issue rather than patching, having measured
+that `scripts/test-tiers.mjs` already calls `process.exit(status)` on every path of every mode
+(`EXIT_CODE=1` end-to-end on a deliberately red suite). The script was correct. Its verdict was
+thrown away by the invocation.
+
+**Decision.** Every run that executes tests writes `reports/suite-verdict.json`:
+
+```json
+{ "green": false, "mode": "full", "at": "…",
+  "files": { "passed": 502, "failed": 1, "skipped": 2 },
+  "tests": { "passed": 9139, "failed": 1, "skipped": 4 },
+  "failingFiles": ["src/render/__tests__/shadow-matrix3.test.ts"],
+  "sha": "13edd1d", "dirty": false }
+```
+
+Claiming green becomes: read the file, `green === true`, `mode === 'full'`, `sha === HEAD`, `!dirty`.
+No exit code sits in that path, so no pipeline can corrupt it.
+
+Five properties carry the weight:
+
+- **The sha and `dirty` stamp are the point, not decoration** — they answer "green for *this* tree
+  state?", which is the question, and they are sampled BEFORE vitest starts (a full run may rewrite
+  the tracked `reports/test-tiers.json`, so sampling after would report the run's own bookkeeping as
+  a modified tree). A verdict from an earlier tree cannot masquerade as current.
+- **Every mode stamps its own `mode`.** `test:fast` is explicitly never a gate, so its verdict must
+  never be mistakable for a full one — including on `fast`'s no-membership fallback, where it really
+  does run every file and still stamps `"fast"`. Under-claiming is the safe direction.
+- **The counts are per FILE, read from `testResults`** — not from the reporter's `num*TestSuites`,
+  which counts `describe` BLOCKS and reads 2085 on a suite of 520 files. A verdict whose numbers
+  disagree with the `Test Files` line a human reads is a verdict nobody will trust.
+- **A crashed run reads `green: false`**, with the detail fields explicitly `null` and a note, rather
+  than leaving an absent file a consumer could read as "no news".
+- **It is written first**, before the tier/catch bookkeeping, so a fault there cannot cost the record;
+  and it is best-effort, because this artifact must never itself fail a suite run.
+- **It is gitignored.** Per-machine, per-run local evidence. Committing it would churn every run and
+  let the other PC's verdict be read as this one's — the precise staleness the sha stamp exists to
+  catch. (Contrast `reports/test-tiers.json`, which IS shared state and stays committed.)
+
+`node scripts/test-tiers.mjs report` prints the newest verdict and judges it against the current tree
+("Valid green gate for this tree" / why not). It deliberately writes nothing: `report` runs no tests,
+so a `mode: "report"` record would be a verdict about nothing and would destroy the real one.
+
+**Deliberately not taken:** the enforcement hook (blocking a commit when no fresh matching green
+verdict exists). Build the artifact first; enforcement can follow on evidence, and a hook that can
+wedge a session needs its own fail-open design like `scripts/ensure-test-server.mjs`.
+
+Locks: `server/__tests__/test-tiers.test.ts` asserts the RECORD — red → `green:false` naming the
+failing file, green → `green:true`, dirty tree → `dirty:true`, crash → `green:false` with details
+`null`, mode stamped, and the JSON landing parseable on disk. Deliberately not the printed summary
+(always correct — which is what made the hole invisible) and not the exit code (which nobody kept).

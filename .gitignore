@@ -35,6 +35,10 @@ reports/*
 # row keys + dates — no utterance text — so the privacy posture that keeps `logs/triage-state-*.json`
 # out of git is preserved while the "was this already put in front of the operator" answer travels.
 !reports/triage-surfaced.json
+# #750: reports/suite-verdict.json is deliberately NOT allowlisted. It is per-machine, per-RUN evidence
+# ("was the suite green for this exact tree state?"), stamped with the sha it ran against. Committing it
+# would churn on every run and — worse — let the other PC's verdict be read as this one's, which is the
+# staleness the sha stamp exists to catch.
 dist-3d
 dist-complex
 

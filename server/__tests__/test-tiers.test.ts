@@ -69,3 +69,113 @@ describe('#484 — the rule still picks the heavy few, and degrades honestly', (
     expect(names([...SUITE].reverse())).toEqual(names(SUITE));
   });
 });
+
+/**
+ * #750 — "is the suite green?" must be answerable MECHANICALLY.
+ *
+ * The exit status was never the defect: `test-tiers.mjs` has always called `process.exit(status)` on every
+ * path (round #768 measured `EXIT_CODE=1` on a red suite end-to-end). It is destroyed at the CALL SITE — a
+ * POSIX pipeline reports its LAST command's status, so `npm run test:full 2>&1 | tail -40` reads `tail`'s 0
+ * whatever the suite did. That form gated a real deploy on 2026-08-25; the `;`-instead-of-`&&` sibling had
+ * already burned a session before it. Discipline has now failed twice at the same seam.
+ *
+ * So the run records a verdict instead, and claiming green means READING it. These assert the RECORD — not
+ * the printed summary (which was always correct, and is exactly what made the hole invisible) and not the
+ * exit code (which nobody kept).
+ */
+// @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
+import { buildVerdict, writeVerdict } from '../../scripts/test-tiers.mjs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+type Assertion = { status: string; fullName: string };
+const suite = (name: string, assertions: Assertion[]) => ({
+  name: join(process.cwd(), name),
+  startTime: 0,
+  endTime: 10,
+  assertionResults: assertions,
+});
+const PASSING = suite('src/engine/__tests__/ok.test.ts', [{ status: 'passed', fullName: 'a' }]);
+const FAILING = suite('src/render/__tests__/shadow-matrix3.test.ts', [{ status: 'failed', fullName: 'b' }]);
+
+// A SKIPPED file: no failures, every assertion pending. Vitest prints these on the "Test Files" line.
+const SKIPPED = suite('src/__tests__/parked.test.ts', [{ status: 'pending', fullName: 'c' }]);
+
+// `num*TestSuites` counts `describe` BLOCKS, not files — deliberately absurd here (99) so the
+// assertions below prove the verdict reads FILES from `testResults` and ignores it. On the real suite
+// that field read 2085 against 520 files, which is what made the first draft of this artifact wrong.
+const REPORT_RED = {
+  testResults: [PASSING, FAILING, SKIPPED],
+  numPassedTestSuites: 99, numFailedTestSuites: 99, numPendingTestSuites: 99,
+  numPassedTests: 99, numFailedTests: 99, numPendingTests: 99,
+};
+const REPORT_GREEN = { testResults: [PASSING, SKIPPED] };
+const at = '2026-08-26T00:00:00.000Z';
+
+describe('#750 — the suite verdict is the machine-readable answer', () => {
+  it('a RED run reads green:false and NAMES the failing file', () => {
+    const v = buildVerdict({ mode: 'full', status: 1, report: REPORT_RED, at, sha: '13edd1d', dirty: false });
+    expect(v.green).toBe(false);
+    expect(v.failingFiles).toEqual(['src/render/__tests__/shadow-matrix3.test.ts']);
+    expect(v.files).toEqual({ passed: 1, failed: 1, skipped: 1 });
+    expect(v.tests).toEqual({ passed: 1, failed: 1, skipped: 1 });
+  });
+
+  it('a GREEN run reads green:true with nothing failing', () => {
+    const v = buildVerdict({ mode: 'full', status: 0, report: REPORT_GREEN, at, sha: 'cdd8150', dirty: false });
+    expect(v.green).toBe(true);
+    expect(v.failingFiles).toEqual([]);
+  });
+
+  it('a run against a DIRTY tree says so — a verdict over a modified tree is not a verdict about what would be committed', () => {
+    expect(buildVerdict({ mode: 'full', status: 0, report: REPORT_GREEN, at, sha: 'cdd8150', dirty: true }).dirty).toBe(true);
+  });
+
+  it('the sha it ran against is stamped — an EARLIER tree\u2019s verdict cannot pass as this one\u2019s', () => {
+    expect(buildVerdict({ mode: 'full', status: 0, report: REPORT_GREEN, at, sha: 'cdd8150', dirty: false }).sha).toBe('cdd8150');
+  });
+
+  it('a CRASHED run (no JSON report) is green:false with details marked unavailable — never a missing file reading as "no news"', () => {
+    const v = buildVerdict({ mode: 'full', status: 1, report: null, at, sha: 'cdd8150', dirty: false });
+    expect(v.green).toBe(false);
+    expect(v.files).toBeNull();
+    expect(v.tests).toBeNull();
+    expect(v.failingFiles).toBeNull();
+    expect(v.note).toMatch(/exit status/);
+  });
+
+  it('the MODE is stamped, so a `fast` verdict can never be mistaken for the gate', () => {
+    expect(buildVerdict({ mode: 'fast', status: 0, report: REPORT_GREEN, at, sha: 'cdd8150', dirty: false }).mode).toBe('fast');
+    expect(buildVerdict({ mode: 'full', status: 0, report: REPORT_GREEN, at, sha: 'cdd8150', dirty: false }).mode).toBe('full');
+  });
+
+  it('it lands on DISK as parseable JSON — the whole point is that another process can read it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'geo-verdict-'));
+    const dest = join(dir, 'suite-verdict.json');
+    try {
+      writeVerdict(buildVerdict({ mode: 'full', status: 1, report: REPORT_RED, at, sha: '13edd1d', dirty: false }), dest);
+      const onDisk = JSON.parse(readFileSync(dest, 'utf8'));
+      expect(onDisk.green).toBe(false);
+      expect(onDisk.mode).toBe('full');
+      expect(onDisk.sha).toBe('13edd1d');
+      expect(onDisk.failingFiles).toEqual(['src/render/__tests__/shadow-matrix3.test.ts']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('FILE counts come from testResults, never from `num*TestSuites` — that field counts describe BLOCKS', () => {
+    // The fixture sets every `num*` field to 99. A verdict reading them would print numbers that do not
+    // match the `Test Files` line a human reads — which is exactly how the first draft shipped 2085.
+    const v = buildVerdict({ mode: 'full', status: 1, report: REPORT_RED, at, sha: '13edd1d', dirty: false });
+    expect(v.files.passed + v.files.failed + v.files.skipped).toBe(REPORT_RED.testResults.length);
+    expect(v.files.failed).toBe(1);
+    expect(v.files.skipped).toBe(1); // the all-pending file
+  });
+
+  it('writing is BEST-EFFORT — an unwritable destination must never fail the suite run itself', () => {
+    const v = buildVerdict({ mode: 'full', status: 0, report: REPORT_GREEN, at, sha: 'cdd8150', dirty: false });
+    expect(() => writeVerdict(v, join(tmpdir(), 'geo-verdict-nope', 'a', '\u0000bad'))).not.toThrow();
+  });
+});
