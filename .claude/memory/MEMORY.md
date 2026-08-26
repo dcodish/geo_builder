@@ -15,3 +15,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Shared-tree branch races](shared-tree-branch-races.md) — re-verify the shared tree's branch in the SAME compound as any write git op there; a parallel session can switch it mid-flight (2026-08-13 near-miss)
 - [Gate lines are read, not matched](gate-lines-are-read-not-matched.md) — evidence produced is not evidence read; && between gates; quote the decisive lines before claiming green
 - [Deploys are mine to run](deploys-are-mine-to-run.md) — never hand a deploy back to the operator; the permissions are already in place, so run it and finish the tag + DEPLOY-LOG record
+- [PR items need their own server](pr-items-need-their-own-server.md) — an unmerged PR can't be played on the `main` dev server; give each PR item its own port (round #783, 2026-08-26)
