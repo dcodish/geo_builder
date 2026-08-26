@@ -23,3 +23,10 @@ misleading, and the failure looks like a broken feature rather than a broken ins
 branch's worktree — `npm run dev -- --port 5174` (the `dev` script sets `--strictPort`, so a second
 server needs an explicit port) — and put **that** URL in the play line and in the PR body. State
 plainly which URL is `main` and which is the branch. Landed batch → `:5173`; each PR → its own port.
+
+**Cleanup half (learned 2026-08-26, hit twice in one session):** a TaskStop'd/killed vite can leave a
+zombie `node` that still LISTENS on the port (serving 404s from a deleted worktree) and holds a file
+handle that makes `git worktree remove` / `rm -rf` fail with "Device or resource busy". Before reusing
+a port or blaming vite: `Get-NetTCPConnection -LocalPort <p> -State Listen` → `Stop-Process` the PID.
+Never pipe the dev server through `| head` in a background command — the closed pipe kills vite at
+startup while npm exits 0, which reads as "server up" when nothing is listening.
