@@ -209,5 +209,8 @@
   },
   "questionDoc": {
     "given": "Given:"
+  },
+  "palette": {
+    "show": "Symbols"
   }
 }

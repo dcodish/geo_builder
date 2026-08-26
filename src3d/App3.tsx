@@ -29,6 +29,7 @@ import { bidiSegments3, inputPreview3, isolateLtrRuns3, textDir3 } from './i18n/
 import { questionLines3 } from './export/questionLines3';
 import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { SYMBOL_SPECS_3 } from './ui/symbols3';
+import { SymbolRow } from '../shell/frame/SymbolRow';
 import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from './parser/scope3';
@@ -391,6 +392,7 @@ export default function App3() {
     [showData, queries, derived, seed],
   );
   const [queryText, setQueryText] = useState('');
+  const queryRef = useRef<HTMLInputElement | null>(null);
 
   /**
    * #336 — "clear the session" has TWO OWNERS: the store (facts / queries / plane display / figure
@@ -677,6 +679,8 @@ export default function App3() {
               return replaceFact(id, next);
             }}
             editLabel={t('facts.edit')}
+            symbols={SYMBOL_SPECS_3}
+            symbolsToggleTitle={t('palette.show')}
             onDelete={(id) => { logDebug3({ kind: 'action', action: 'delete', detail: id }); remove(id); }} // #182: so a reported session replays deletions
             deleteLabel={t('facts.delete')}
           />
@@ -886,6 +890,7 @@ export default function App3() {
                   className="flex gap-1"
                 >
                   <input
+                    ref={queryRef}
                     dir="ltr"
                     value={queryText}
                     onChange={(e) => setQueryText(e.target.value)}
@@ -896,6 +901,16 @@ export default function App3() {
                     {t('query.add')}
                   </button>
                 </form>
+                {/* #525: the palette reaches the query box — collapsed, the product's own vocabulary */}
+                <SymbolRow
+                  symbols={SYMBOL_SPECS_3}
+                  value={queryText}
+                  onChange={setQueryText}
+                  inputRef={queryRef}
+                  startCollapsed
+                  compact
+                  toggleTitle={t('palette.show')}
+                />
               </DataPanel>
             </div>
         )

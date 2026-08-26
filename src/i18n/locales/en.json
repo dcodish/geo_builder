@@ -447,7 +447,8 @@
     "q.not-understood": "Not recognised — try ∠ABC, AB, area ABC or perimeter ABC",
     "q.unavailable": "Those points are not in the figure",
     "q.undetermined": "Not determined by the givens",
-    "q.scale": "Depends on the scale — state one size in the figure"
+    "q.scale": "Depends on the scale — state one size in the figure",
+    "paletteShow": "Symbols"
   },
   "shapeName": {
     "kite": "kite",

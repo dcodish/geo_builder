@@ -39,6 +39,7 @@ import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { SYMBOL_SPECS } from '@/ui/symbols';
+import { SymbolRow } from '../shell/frame/SymbolRow';
 import { btn, card as themeCard, color as pal, fs, sectionTitle } from '@/ui/theme';
 // #743: the under-canvas row's ONE look — the style contract lives in shell (seeded from this
 // tree's own btn.accent/btn.subtle, which the operator praised); every builder's row consumes it.
@@ -140,6 +141,7 @@ export default function App() {
   const [text, setText] = useState('');
   const [inputNote, setInputNote] = useState(''); // a problem message under the input (not-understood / built-nothing)
   const [queryText, setQueryText] = useState(''); // #477: the values-panel query box
+  const queryRef = useRef<HTMLInputElement | null>(null);
   const [thinking, setThinking] = useState(false); // LLM fallback in flight (Phase 7)
   // Re-entry gate + abort for the submit pipeline (E3/STO-3). `busyRef` is the SYNCHRONOUS truth —
   // React state lags a render, so two rapid example-chip clicks could both enter `submit` and race
@@ -1345,6 +1347,8 @@ export default function App() {
                 }}
                 onEditCommit={(id, next) => commitEdit(id, next)}
                 editLabel={t('actions.edit')}
+                symbols={SYMBOL_SPECS}
+                symbolsToggleTitle={t('values.paletteShow')}
                 onDelete={(id) => { logDebug({ kind: 'action', action: 'delete', detail: id }); removeGroup(id); }}
                 deleteLabel={t('actions.delete')}
               />
@@ -1557,6 +1561,7 @@ export default function App() {
                   style={{ display: 'flex', gap: 4, marginTop: 3 }}
                 >
                   <input
+                    ref={queryRef}
                     value={queryText}
                     onChange={(e) => setQueryText(e.target.value)}
                     placeholder={t('values.queryPlaceholder')}
@@ -1568,6 +1573,16 @@ export default function App() {
                     {t('values.queryAdd')}
                   </button>
                 </form>
+                {/* #525: the palette reaches the query box — collapsed, the product's own vocabulary */}
+                <SymbolRow
+                  symbols={SYMBOL_SPECS}
+                  value={queryText}
+                  onChange={setQueryText}
+                  inputRef={queryRef}
+                  startCollapsed
+                  compact
+                  toggleTitle={t('values.paletteShow')}
+                />
               </div>
               {valuesLayer.areaClasses.length > 0 && (
                 <div>
