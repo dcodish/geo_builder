@@ -27,6 +27,27 @@ describe('the נתון injection list', () => {
   it('a vector value must be numeric', () => {
     expect(parse3('נתון: v = (10,n,0)')).toEqual({ ok: false, reason: 'not-handled' });
   });
+  // #793: the harvest requires FULL coverage — residue anywhere (leading, between, trailing) defers
+  // the whole utterance, and an item can never start mid-run. A pair-vector given must not be
+  // reinterpreted as point coordinates, and no stated text may be silently dropped.
+  it('«נתון: AB = (1,2,3)» is a pair-vector given, not point B — defers, never misreads (#793)', () => {
+    expect(parse3('נתון: AB = (1,2,3)')).toEqual({ ok: false, reason: 'not-handled' });
+  });
+  it("«נתון: AA' = (k-1, k-7, k+1)» — the leading A is stated text, never silently dropped (#793)", () => {
+    expect(parse3("נתון: AA' = (k-1, k-7, k+1)")).toEqual({ ok: false, reason: 'not-handled' });
+    // the operator's exact standalone utterance stays an honest refusal
+    expect(parse3("AA'=(k-1,k-7, k+1)").ok).toBe(false);
+  });
+  it('residue between items defers the whole utterance (#793)', () => {
+    expect(parse3('נתון: v = (1,2,3) junk u = (4,5,6)')).toEqual({ ok: false, reason: 'not-handled' });
+  });
+  it('a bare list conjunction between items is a separator, not residue (#793)', () => {
+    expect(cmds('נתון: v = (1,2,3) ו-u = (4,5,6)')).toEqual([
+      { type: 'inject-vector', name: 'v', x: 1, y: 2, z: 3 },
+      { type: 'inject-vector', name: 'u', x: 4, y: 5, z: 6 },
+    ]);
+    expect(cmds('given: v = (1,2,3) and u = (4,5,6)')).toHaveLength(2);
+  });
 });
 
 describe('symbolic point components', () => {

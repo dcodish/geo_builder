@@ -4600,6 +4600,41 @@ The labels are i18n-**injected** exactly as `resetLabel` is, and the buttons ren
 supplied, so `Figure3` stays translation-free. The glyphs are decorative; the accessible name is always
 the translated label on `title`/`aria-label`.
 
+## ADR-3D-167 — a harvest rule must consume the WHOLE utterance: `injectionList` full coverage + no mid-run binding (#793, P1)
+
+**Report (operator, 2026-08-26, transcribing bagrut Q2).** «נתון: AB = (1,2,3)» committed
+`point3 B (1,2,3)` — the stated **pair-vector** given was silently reinterpreted as point coordinates,
+and the leading `A` silently dropped. Likewise «נתון: AA' = (k-1, k-7, k+1)» pinned `A'` at symbolic
+coords with the first `A` gone, and «נתון: v = (1,2,3) junk u = (4,5,6)` harvested both vectors around
+the residue. Both honesty invariants inverted at once, on an existing figure, with no error — P1.
+
+**Root cause (the class, docs/17).** `injectionList` was a **scan-and-harvest rule with no
+total-coverage requirement**: it `matchAll`ed items and validated only the *trailing* tail
+([ADR-3D-079](#adr-3d-079) Am. 2), so text before the first item and between items was never checked —
+silent drop *by construction*. And the item alternation could bind **mid-run**: in `AA' = (…)` the
+regex engine skips the first `A` and matches `A' = (…)`; in `AB = (…)` it matches `B = (…)`. The class:
+**any harvest rule that commits matched fragments without requiring the whole utterance be consumed
+will silently drop or reinterpret stated givens.** Am. 2 had fixed one edge (the tail) of this hole.
+
+**Decision — two laws at the rule, not per-symptom:**
+
+1. **Full coverage.** Every gap — leading, between items, trailing — must be only separators
+   (`[\s.,;:]`, plus a bare list conjunction «ו-»/"and", plus Am. 2's sanctioned trailing `paramSign`
+   clause). Any other residue ⇒ the rule returns `null` and the whole utterance defers — never a
+   partial read. This is Am. 2's own principle extended from the tail to the whole string.
+2. **No mid-run binding.** The item regex opens with `(?<![A-Za-z\d'])`, so a label inside a longer
+   run can never start an item. «נתון: AB = (1,2,3)» now defers honestly (the standalone form already
+   emits `inject-pair`; the prefixed pair item form is the companion feature **#794**).
+
+The conjunction sanction in (1) is deliberate: `נתון: v = (1,2,3) ו-u = (4,5,6)` harvested correctly
+before this fix only because the gap was unchecked; a coverage law that refused the natural Hebrew
+list conjunction would have turned a working honest input into a refusal. `וגם <residue>` still
+defers — the sanction is the bare conjunction token, nothing after it.
+
+**Locks:** the three misparse rows above as refusal unit tests + the conjunction and Am. 2 forms
+green (`parse3-v4.test.ts`, `book-coordinate-givens.test.ts`); the operator's exact standalone
+utterance stays an honest refusal.
+
 **Sibling products:** complex needs neither rotate nor align — that becomes an explicit **n/a** cell in
 the conformance matrix (family 2), not a forgotten one (#664).
 

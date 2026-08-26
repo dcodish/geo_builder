@@ -2577,13 +2577,22 @@ const injectionList: Rule = (s) => {
     /^(?:(?:נתון|נתונים|נתונות|given)\s*:?\s*(?:ה?נקודות|the\s+points)?\s*:?\s+|ה?נקודות\s+|the\s+points\s+)(.+)$/i,
   );
   if (!m) return null;
+  // #793 (ADR-3D-167): a label inside a longer run must never START an item — without the
+  // lookbehind, `AA' = (…)` bound `A' = (…)` and `AB = (…)` bound `B = (…)`, reinterpreting a stated
+  // pair-vector as point coordinates.
   const itemRe = new RegExp(
-    `(?:([a-w])\\s*=\\s*|([A-Z]\\d*'?)\\s*=?\\s*)\\(\\s*(${COMP})\\s*,\\s*(${COMP})\\s*,\\s*(${COMP})\\s*\\)`,
+    `(?<![A-Za-z\\d'])(?:([a-w])\\s*=\\s*|([A-Z]\\d*'?)\\s*=?\\s*)\\(\\s*(${COMP})\\s*,\\s*(${COMP})\\s*,\\s*(${COMP})\\s*\\)`,
     'g',
   );
+  // #793 (ADR-3D-167): a gap between harvested items (or before the first) may hold only separators and a bare
+  // list conjunction («ו-», "and") — any other residue is stated text this rule cannot read, and
+  // harvesting around it would silently drop a given. Same principle as Am. 2's tail check, extended
+  // from the tail to the whole string.
+  const SEP_GAP = /^[\s.,;:]*(?:(?:ו|and)[-־‑]?[\s.,;:]*)?$/i;
   const cmds: Command3[] = [];
   let lastEnd = 0;
   for (const g of m[1].matchAll(itemRe)) {
+    if (!SEP_GAP.test(m[1].slice(lastEnd, g.index ?? 0))) return null; // all-or-nothing, never a partial read
     lastEnd = (g.index ?? 0) + g[0].length;
     const comps = [g[3], g[4], g[5]].map(parseComp);
     if (comps.some(unreadableComp)) return null; // #510, as above — all-or-nothing, never a partial read
