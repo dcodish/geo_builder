@@ -171,6 +171,12 @@ const he = {
   freedomPinned: 'הצורה נקבעה במלואה',
   stripUnsatisfied: 'לא מתקיים בתצורה הזו',
   stripUndecided: 'לא ניתן להכריע מהנתונים שניתנו',
+  // #789 — the data-panel ask lane (the ADR-3D-057 shape): a question is never a fact
+  askPlaceholder: 'למשל: שטח Oz1z2 או |z1-z2|',
+  askAdd: 'שאלו',
+  askRemove: 'הסרת השאלה',
+  askUnreadable: 'הכלי לא הבין את השאלה — נסו ניסוח אחר',
+  askIsStatement: 'זהו נתון, לא שאלה — הקלידו אותו בתיבת הנתונים',
 };
 
 const en = {
@@ -327,6 +333,12 @@ const en = {
   freedomPinned: 'the figure is fully determined',
   stripUnsatisfied: 'does not hold in this configuration',
   stripUndecided: 'cannot be decided from the givens',
+  // #789 — the data-panel ask lane (the ADR-3D-057 shape): a question is never a fact
+  askPlaceholder: 'e.g. area Oz1z2 or |z1-z2|',
+  askAdd: 'Ask',
+  askRemove: 'Remove question',
+  askUnreadable: 'the tool could not read this question — try another phrasing',
+  askIsStatement: 'this is a given, not a question — enter it in the givens box',
 };
 
 export const complexI18n = createProductI18n({

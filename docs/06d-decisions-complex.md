@@ -1981,3 +1981,41 @@ and remain accepted-and-✗. The panel's verdict row stays — the strip and gat
 Locks: `measure-refusal-788.test.ts` — the operator's exact sequence refused at the gate (Hebrew and
 English mirrors), the load path carrying the given on the strip channel, and the two must-not-change
 paths: a driving measure still drives, a true measure still holds with nothing unsatisfied.
+
+## ADR-CX-032 — The ask lane: a question is never a fact, and it is asked in the panel (#789)
+
+**Status:** Accepted (2026-08-26) · **Slice:** the S6 UI half (#623) · **Ladder:** stage 5d consumers
+
+**Operator report + rulings (2026-08-26):** «the complex data panel doesn't have an input box — when
+I want to see the area of Oz1z2 I have nowhere to enter that. This needs to be in the DATA PANEL,
+not in the input panel.» Scoped to **Cut B — full 3-D parity** (per-question choice put to the
+operator): questions move OUT of the fact list into their own lane.
+
+**Decision — the ADR-3D-057 shape, arriving whole:**
+
+1. **The store grows an ask lane.** `queries: string[]` beside `lines` — saved with the file
+   (optional field, envelope version unchanged: old files load, old apps ignore), deduped on the
+   cleaned text, deletable per row. `addQuery` has no gate (the 3-D posture): any text lands and
+   the row explains itself.
+2. **The panel asks and answers.** The ask box lives in the DataPanel beside the «חישוב» section it
+   feeds; each saved question resolves against the current figure through the existing stage-5d
+   knowledge machinery — a value only when the givens force one, the WHY when withheld, and a note
+   when the text is unreadable or is actually a STATEMENT («this is a given — enter it in the
+   givens box»). Row model in `app/askLane.ts`, matched to knowledge rows by the query `src`
+   (the normalized line), with consumption.
+3. **The givens box routes.** `submitLine` files a pure question (`readAsk`: only query artifacts,
+   nothing stated) into the lane instead of recording a fact. One entry point stays true — every
+   utterance that worked keeps working; what moved is where a question LIVES. The same routing IS
+   the migration: an old save file's ask lines replay through `submitLine` and land in the lane
+   (muted saved asks migrate too — a question has no mute), with the fixtures drift-net updated to
+   assert *moved, never dropped*.
+4. **A question can never constrain.** `lowerAsks` feeds the fold ONLY query artifacts and enacts
+   nothing else — deliberately including `declares`: the query grammar declares its mentioned
+   points as span bookkeeping, and the lane does not create points from questions. A name a
+   question mentions must exist from the givens, or the answer honestly reads open. The acceptance
+   gate is untouched (questions produce no violations to read).
+
+Locks: `ask-lane-789.test.ts` (15 — classification, routing, dedupe/removal, serialize round-trip,
+old-file and muted-line migration, the operator's exact ask answered, a lane «|z1| = 7» proven
+inert on the figure, the row model's four voices); the §2b capstone and fixtures nets updated to
+fold with the lane, as the app does.

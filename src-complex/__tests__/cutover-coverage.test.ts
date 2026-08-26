@@ -30,7 +30,7 @@ beforeEach(() => {
   store().resetSession();
 });
 
-const figure = (seed = store().seed) => deriveLines(store().lines, seed, seed);
+const figure = (seed = store().seed) => deriveLines(store().lines, seed, seed, store().queries);
 const feed = (lines: readonly string[]): void => {
   for (const l of lines) expect(submitLine(l), `refused «${l}»`).toBe(true);
 };

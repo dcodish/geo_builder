@@ -25,7 +25,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { deriveLines } from '../app/deriveLines';
-import { hydrateSession } from '../app/submit';
+import { hydrateSession, readAsk } from '../app/submit';
 import { type SavedSession, useComplexStore } from '../store/useComplexStore';
 
 const files = import.meta.glob('./fixtures/*.complex.json', {
@@ -61,7 +61,11 @@ describe('saved-session fixtures net', () => {
       it('replays every saved line — none silently dropped', () => {
         const saved = JSON.parse(text) as SavedSession;
         expect(hydrateSession(JSON.parse(text))).toBe(true);
-        expect(store().lines).toEqual(saved.lines);
+        // #789: an ask line MIGRATES to the query lane — moved, never dropped. Every saved line
+        // is accounted for across the two lists, order preserved within each.
+        const isAsk = (l: string) => ['measure', 'ratio', 'expr'].includes(readAsk(l).kind);
+        expect(store().lines).toEqual(saved.lines.filter((l) => !isAsk(l)));
+        expect(store().queries).toEqual(saved.lines.filter(isAsk));
       });
 
       /**
@@ -71,7 +75,7 @@ describe('saved-session fixtures net', () => {
        */
       it('builds green — nothing unread, contradicted, unsatisfied or emptied', () => {
         expect(hydrateSession(JSON.parse(text))).toBe(true);
-        const d = deriveLines(store().lines, store().seed, store().seed);
+        const d = deriveLines(store().lines, store().seed, store().seed, store().queries);
         expect(d.untranslated.map((u) => u.src)).toEqual([]);
         expect(d.contradiction).toBeNull();
         expect(d.unsatisfied).toEqual([]);

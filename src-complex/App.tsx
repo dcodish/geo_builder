@@ -21,8 +21,9 @@ import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowS
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { applySwitcherConfig, type ToolConfig } from '../shell/switcherConfig';
 import { deriveLines } from './app/deriveLines';
-import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, toggleLine } from './app/submit';
-import { v2Claims, v2Contradiction, v2Formulas, v2Freedom, v2Knowledge, v2Labels, v2Measures, whyText } from './replay/scene2';
+import { askRowsOf } from './app/askLane';
+import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, submitQuery, toggleLine } from './app/submit';
+import { v2Claims, v2Contradiction, v2Formulas, v2Freedom, v2Labels, v2Measures, whyText } from './replay/scene2';
 import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
@@ -47,6 +48,8 @@ export function App() {
   const { t, i18n } = useTranslation();
   const {
     lines,
+    queries,
+    removeQuery,
     disabled,
     name,
     setName,
@@ -179,7 +182,11 @@ export function App() {
   // the figure folds from the ACTIVE lines only (B5/D6): a muted statement stays in the list,
   // out of the figure — "what if I hadn't said this?" made literal
   const active = useMemo(() => lines.filter((_, i) => !disabled.includes(i)), [lines, disabled]);
-  const derived2 = useMemo(() => deriveLines(active, seed, seed), [active, seed]);
+  // #789: the ask lane rides the fold as QUESTIONS — its entries can never constrain the figure
+  const derived2 = useMemo(() => deriveLines(active, seed, seed, queries), [active, seed, queries]);
+  // …and each saved question resolves to its answer (or its reason) against the current figure
+  const askRows = useMemo(() => askRowsOf(queries, derived2.knowledge), [queries, derived2]);
+  const [askText, setAskText] = useState('');
   /**
    * THE `n` STEPPER — display state, and nowhere else (ADR-CX-001 D3).
    *
@@ -582,9 +589,57 @@ export function App() {
                 // publishes codes; whyText words them) — they follow the app's direction
                 { key: 'measures', title: t('secMeasures'), rows: v2Measures(derived2, t), dir: 'app' },
                 { key: 'relations', title: t('secRelations'), rows: v2Claims(derived2, t), dir: 'app' },
-                { key: 'ask', title: t('secAsk'), rows: v2Knowledge(derived2, t), dir: 'app' },
+                {
+                  /* #789 — the ASK LANE (ADR-3D-057 arriving here): saved questions with their
+                     answers, each row deletable; the box that feeds it is in the children below */
+                  key: 'ask',
+                  title: t('secAsk'),
+                  dir: 'app',
+                  rows: askRows.map((r, i) => (
+                    <span key={`${r.text}-${i}`} dir="auto" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                      <span>
+                        {complexBidi.inputPreview(r.text) ?? r.text}
+                        {r.note !== null ? (
+                          <span style={{ color: '#94a3b8' }}> — {t(r.note === 'statement' ? 'askIsStatement' : 'askUnreadable')}</span>
+                        ) : r.row!.value !== null ? (
+                          <span style={{ fontWeight: 600 }}> = {r.row!.value}</span>
+                        ) : (
+                          <span style={{ color: '#94a3b8' }}> — {r.row!.why ? whyText(r.row!.why, t) : ''}</span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeQuery(i)}
+                        aria-label={t('askRemove')}
+                        style={{ flexShrink: 0, border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )),
+                },
               ]}
             >
+              {/* #789 — the ask box: questions enter HERE, in the panel that answers them (the
+                  operator's placement ruling, 2026-08-26) — never as facts */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (submitQuery(askText)) setAskText('');
+                }}
+                style={{ display: 'flex', gap: 6, marginTop: 10 }}
+              >
+                <input
+                  value={askText}
+                  onChange={(e) => setAskText(e.target.value)}
+                  placeholder={t('askPlaceholder')}
+                  dir="auto"
+                  style={{ minWidth: 0, flex: 1, border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', font: 'inherit' }}
+                />
+                <button type="submit" style={{ flexShrink: 0 }}>
+                  {t('askAdd')}
+                </button>
+              </form>
               {/* the formula sheet, surfaced from what the figure DOES — each row names its premises */}
               {v2Formulas(derived2, i18n.language === 'he' ? 'he' : 'en').map((f) => (
                 <div key={f} className="v2-formula" dir="ltr">

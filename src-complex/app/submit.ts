@@ -227,6 +227,44 @@ export function editLine(index: number, raw: string): boolean {
 }
 
 /**
+ * How one line READS as a question (#789, the ADR-3D-057 doctrine arriving here).
+ *
+ * A PURE ask parses and yields ONLY query artifacts — it states nothing and constrains nothing.
+ * Anything it states makes it a GIVEN ('statement'), and a line the grammar cannot read at all is
+ * 'unreadable'. `declares` is deliberately NOT counted: the query rules declare their mentioned
+ * points as span bookkeeping, and the lane does not enact them — a question never creates a point
+ * (the ADR-3D-057 doctrine); a name a question mentions must exist from the givens, or the row
+ * honestly reads "not determined".
+ */
+export type AskReading =
+  | { readonly kind: 'measure' | 'ratio' | 'expr' }
+  | { readonly kind: 'statement' }
+  | { readonly kind: 'unreadable' };
+
+export function readAsk(raw: string): AskReading {
+  const parsed = parseLineV2(raw.trim());
+  if (!parsed.ok) return { kind: 'unreadable' };
+  const l = parsed.line;
+  const askCount = l.queries.length + l.ratios.length + l.exprQueries.length;
+  const states =
+    l.constraints.length + l.filters.length + l.assertions.length +
+    l.objects.length + l.measures.length + l.sequences.length + l.roots.length;
+  if (askCount === 0 || states > 0) return { kind: 'statement' };
+  return { kind: l.queries.length ? 'measure' : l.ratios.length ? 'ratio' : 'expr' };
+}
+
+/**
+ * The ask box's entry point: any text lands in the lane (the 3-D posture — `addQuery` has no
+ * gate); the panel row explains itself, answered or not. The store dedupes repeats.
+ */
+export function submitQuery(raw: string): boolean {
+  const q = raw.trim();
+  if (q === '') return false;
+  useComplexStore.getState().addQuery(q);
+  return true;
+}
+
+/**
  * THE ONE ENTRY POINT the input box uses.
  *
  * It routed between two engines until the cutover deleted the second
@@ -245,6 +283,19 @@ export function submitLine(raw: string): boolean {
         : { key: 'not-handled', detail: line },
     );
     return false;
+  }
+
+  /**
+   * #789 — a QUESTION typed in the givens box is routed to the ask lane, never recorded as a fact.
+   * One entry point stays true: every utterance the student can type still works here — what moved
+   * is where a question LIVES. This routing is also the load-path migration: old save files carry
+   * ask lines in `lines`, and replaying them through this very function files them in the lane.
+   */
+  const ask = readAsk(line).kind;
+  if (ask === 'measure' || ask === 'ratio' || ask === 'expr') {
+    st().addQuery(line);
+    st().clearError();
+    return true;
   }
 
   // the gate reads the ACTIVE figure — a muted line must not veto a new statement (B5)
@@ -289,14 +340,22 @@ export function hydrateSession(data: unknown): boolean {
   d.lines.forEach((raw, i) => {
     const line = String(raw);
     // a MUTED saved line re-enters muted, ungated — it gates when re-enabled, which is the
-    // moment it would touch the figure (B5)
+    // moment it would touch the figure (B5). #789: unless it is a QUESTION — a question has no
+    // mute in the lane model, so a muted saved ask migrates like an enabled one.
     if (savedDisabled.has(i)) {
-      st().recordDisabledLine(line);
+      const kind = readAsk(line).kind;
+      if (kind === 'measure' || kind === 'ratio' || kind === 'expr') st().addQuery(line);
+      else st().recordDisabledLine(line);
       return;
     }
     if (!submitLine(line))
       failed.push({ line, reason: st().lastError ?? { key: 'not-handled', detail: line } });
   });
+  // #789 — the lane's own saved field (files written by this version onward); lenient like 3-D:
+  // keep well-formed entries, ignore anything else
+  if (Array.isArray(d.queries)) {
+    for (const q of d.queries) if (typeof q === 'string') st().addQuery(q);
+  }
   st().clearError();
   st().setLoadAudit(failed.length > 0 ? { total: d.lines.length, failed } : null);
   return true;
