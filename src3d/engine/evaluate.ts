@@ -366,8 +366,10 @@ export interface Resolved3 {
    */
   param: { name: string; value: number; roots: number[]; branches: number[] } | null;
   /** The V4 pivot's outcome, when injections exist: how many placements converged and which was chosen.
-   *  #325: `pinSymbols` carries the chosen solution's values for the pins' OPEN symbols (`B(2t,t,k)`). */
-  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number> } | null;
+   *  #325: `pinSymbols` carries the chosen solution's values for the pins' OPEN symbols (`B(2t,t,k)`).
+   *  #797 (ADR-3D-168 Am. 1): `symRoots` carries the ADMISSIBLE pool's distinct values per pin symbol
+   *  (post sign-filtering) — a symbol is determined only when its set is a singleton at every seed. */
+  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]> } | null;
   /** V6 — resolved solids of revolution (world centre/apex + numeric radius/height) for the renderer. */
   revolutions: { kind: 'cylinder' | 'cone' | 'sphere'; center: Vec3; apex?: Vec3; r: number; h: number }[];
   /** V8-i — resolved circles in R³ (world centre + unit normal + radius + in-plane basis) for the renderer + on-circle checks. */
@@ -1295,6 +1297,17 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       const pool = satisfying.length > 0 ? satisfying : solutions;
       if (pool.length > 0) {
         const chosen = pool[seed % pool.length];
+        // #797 (ADR-3D-168 Am. 1): the ADMISSIBLE pool's distinct values per pin symbol —
+        // post sign-filtering, so a sign given that narrows to one root makes it determined.
+        // The panel prints a value only when this set is a singleton at every sampled seed:
+        // «k = 1» while k ∈ {1,2} was a branch choice masquerading as knowledge.
+        const symRoots: Record<string, number[]> = {};
+        for (const sol of pool) {
+          for (const [s, v] of Object.entries(sol.pinSymbols ?? {})) {
+            const list = (symRoots[s] ??= []);
+            if (!list.some((r) => Math.abs(r - v) <= 1e-3 * Math.max(1, Math.abs(r)))) list.push(v);
+          }
+        }
         warm.x = [...chosen.x];
         const finalCanonical = evalCanonical(chosen.dims, false, overrideOf(chosen));
         for (const [id, q] of finalCanonical) {
@@ -1305,7 +1318,10 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
           if (gauge) pos.set(id, chosen.transform(q));
           else pos.set(id, q);
         }
-        pivot = { solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err, pinSymbols: chosen.pinSymbols };
+        pivot = {
+          solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err, pinSymbols: chosen.pinSymbols,
+          ...(Object.keys(symRoots).length > 0 ? { symRoots } : {}),
+        };
       } else {
         pivot = { solutions: 0, chosen: -1, err: Infinity };
       }

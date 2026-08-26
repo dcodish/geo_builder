@@ -4684,6 +4684,47 @@ operator's exact Q2 session; per-lane parser tests in `parse3-v4.test.ts`.
 
 **Out of scope (already filed):** nonlinear components (#509), two symbols in one vec-rel (#301).
 
+### ADR-3D-168 Am. 1 — a discrete root the pool does not carry is invisible to every honesty gate (#797)
+
+**Report (operator, PR #796 play, 2026-08-26).** After two of Q2's three vectors the structure gives
+2k²−6k+4 = 0 ⇒ k ∈ {1, 2} — the panel printed **k = 1** as determined, and «show another
+configuration» could never show k = 2. Operator ruling: **only a fully determined symbol shows a
+value; otherwise «k = ?».**
+
+**Root cause.** The panel's determinedness proxy is seed-invariance, and its ADR-052 safeguard (the
+Am. 2 seed-varying anchor) only moves a *continuously* open symbol — a symbol restricted to discrete
+roots cannot be pulled off a root, and the solver deterministically landed the near root every seed.
+`collectAll` (keep every distinct converged solution) was gated on a sign given being present, so the
+pool held one root's gauge variants only. Measured at seed 0: **14 cold solutions, all k ≈ 1** —
+and cold wide symbol starts (±1.5/2.5/4) changed nothing, because the gauge-basin skew dominates
+regardless of where the symbol coordinate starts.
+
+**Decision — four moves at the solve, all scoped to `nPinSym > 0`:**
+
+1. **`collectAll` for any open pin symbol**, sign given or not — the pool is the admissible set, and
+   every honesty gate downstream reads it.
+2. **Symbol-axis CONTINUATION, warm and hard-pinned** (the `parkScale` pattern): from one base per
+   distinct symbol vector, restart with the symbol displaced (±0.75/1.5/3), first HARD-pinned
+   (weight 1e3, 40 iterations — a 1e-4 anchor cannot hold one DOF against the primary gradients)
+   so gauge/dims adapt, then RELEASED anchored at wherever the pinned stage settled. A probe
+   displacement runs first: a symbol admissible OFF its converged value is continuous — the fan is
+   skipped (its openness is already seed-varied by the Am. 2 anchor), so only genuinely discrete
+   symbols pay the full fan.
+3. **The pool is interleaved round-robin across distinct symbol vectors**, so configuration cycling
+   (`pool[seed % n]`) alternates the roots instead of exhausting one root's gauge variants first.
+4. **`pivot.symRoots`** exposes the admissible pool's distinct values per symbol (post
+   sign-filtering — a sign given that narrows to one root correctly makes it determined), and the
+   params panel prints a value only when seed-stable AND a singleton at every sampled seed.
+
+The residual function became per-target (`fFor`) for the continuation's release stage; the cold
+starts still use the Am. 2 seed targets unchanged. Honest perf note: symbolic-pin figures pay the
+exploration (the heavy book/Am. 3 tests run ~2–3× their prior time); nPinSym = 0 figures are
+byte-identical to before.
+
+**Locks:** `issue-797.test.ts` — two vectors read «k = ?» with both roots in every seed's pool and
+both reachable across configurations; the third vector returns «k = 2»; the Am. 2/Am. 3 and
+issue-794 locks stay green.
+
 **Sibling products:** complex needs neither rotate nor align — that becomes an explicit **n/a** cell in
 the conformance matrix (family 2), not a forgotten one (#664).
 
