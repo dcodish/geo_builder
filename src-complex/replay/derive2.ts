@@ -719,7 +719,24 @@ export function foldConstraints(input: FoldInput): Derived2 {
         })
         .map((f) => f.src);
 
-  const unsatisfied = [...unsatisfiedRelations, ...violatedFilters];
+  /**
+   * #788 — a VIOLATED MEASURE joins `unsatisfied`, the same sentence through the same channel.
+   *
+   * Stage 3e always computed the verdict, but it reached only the data panel's verdict rows — an
+   * opt-in surface — while the always-visible strip and ADR-CX-023's acceptance gate both read
+   * `unsatisfied`. So «אורך z1z2 = 99» on a determined 5-length figure was ACCEPTED and listed as an
+   * ordinary fact, with its ✗ hidden behind the data toggle — precisely what the B6 ruling forbids,
+   * and the opposite of 2-D, which refuses the class at submit (ADR-417). A measure with a stated
+   * value is a GIVEN (F7 drive-or-check), not a claim: when it can drive it drives and reads
+   * `holds`; when no reachable configuration satisfies it, it refuses like a filter that cannot
+   * hold (#690's precedent, one line above). `undecided` stays out — "could not evaluate" is a
+   * different sentence from "false", per the gate's own doctrine.
+   */
+  const violatedMeasures = checkedMeasures
+    .filter((m) => m.status === 'violated')
+    .map((m) => m.relation.src);
+
+  const unsatisfied = [...unsatisfiedRelations, ...violatedMeasures, ...violatedFilters];
 
   /**
    * STAGE 5d — the only place a number the engine computed reaches a string.

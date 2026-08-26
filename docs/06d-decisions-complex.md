@@ -1944,3 +1944,40 @@ reported strings. Bidi isolates are stripped before comparison (ADR-W-029's disp
 
 **Consequence for the conformance matrix:** the interaction family's «error voice / language» row is
 green for complex — every student-facing reason the engine produces now follows the UI language.
+
+## ADR-CX-031 — A violated measure GIVEN refuses like any other given (#788)
+
+**Status:** Accepted (2026-08-26) · **Ladder:** stage 3e → the `unsatisfied` channel · **Fixes:** [#788](https://github.com/dcodish/geo_builder/issues/788)
+
+**The report (operator, playing the #716 build):** «z1 = 3+4i» · «z2 = 3» · «אורך z1z2 = 99» — a
+length no configuration can satisfy — was ACCEPTED. The line sat in the fact list as an ordinary
+given, nothing appeared on the always-visible strip or beside the input, and the ✗ verdict rendered
+only in the data panel — an opt-in surface, hidden on narrow screens. The other tools refuse this
+class at submit (2-D: [ADR-417](../06-decisions.md), «AB = 4, BC = 4, AC = 9» → impossible), and
+cross-tool mimicry is the operator's guiding principle.
+
+**Root cause — the measure-verdict channel never joined the refusal surfaces.** Stage 3e always
+computed `checkedMeasures` honestly, but `unsatisfied` was composed from live residuals filtered to
+`deferred-*` keys, so violated measure residuals were excluded. Both refusal consumers — the honesty
+strip and ADR-CX-023's acceptance gate — read `unsatisfied`, so the verdict existed with no surface
+that could refuse or shout it. This is the asymmetry ADR-CX-025 closed for FILTERS (#690), one
+channel over: the filter fix's own words — *reported through `unsatisfied` rather than a new channel
+because it is the same sentence, and the acceptance gate already reads that signal* — applied verbatim
+to measures.
+
+**Decision:** stage 3e's violated measures join `unsatisfied` by their `src`. One composition site in
+`foldConstraints`; both behaviors follow from the existing consumers, with no new mechanism:
+
+- the **acceptance gate** refuses a newly-unsatisfiable measure with the standard
+  incompatible/impossible blame beside the input — the 2-D parity behavior;
+- the **strip** carries «✗ «…» — לא מתקיים בתצורה הזו» for figures that arrive violated (load, edit,
+  toggle), so the broken given can never hide behind the data toggle (the B6 ruling).
+
+The boundaries hold: a measure that can DRIVE still drives (its residual is satisfied, so it never
+enters the violated set — F7 drive-or-check untouched); `undecided` stays out of the channel («could
+not evaluate» is a different sentence from «false», the gate's own doctrine); F10 CLAIMS are answers
+and remain accepted-and-✗. The panel's verdict row stays — the strip and gate are additive.
+
+Locks: `measure-refusal-788.test.ts` — the operator's exact sequence refused at the gate (Hebrew and
+English mirrors), the load path carrying the given on the strip channel, and the two must-not-change
+paths: a driving measure still drives, a true measure still holds with nothing unsatisfied.
