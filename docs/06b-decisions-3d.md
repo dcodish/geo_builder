@@ -4575,11 +4575,26 @@ Two of those deserve their reasoning recorded:
   equal-foreshortening property rather than the numbers, so it keeps holding if the angles are
   re-expressed.
 
-**Placement.** Beside `↺` in the canvas control cluster, not in the figure-actions row under the
-canvas. The camera state lives in `Figure3`, so this keeps the feature where its state already is
-instead of lifting camera state into `App3` for a purely visual grouping. Zoom and pan are deliberately
-**kept** when a preset is chosen: a student who framed the figure did so on purpose and only asked to
-turn it — unlike `↺`, which is the one button that returns everything to a known-good frame (#533).
+**Placement — settled by the operator (2026-08-26), and worth recording because the obvious
+cross-product answer was the wrong one.** The presets sit **beside `↺` in the canvas control cluster**,
+not in the figure-actions row and not in a toolbar tray above the canvas.
+
+The ruling as given: *"any orientation buttons for the shape should appear in the same place."* The
+tempting reading was cross-product symmetry — 2-D keeps reset+zoom in the canvas overlay but puts
+rotate/flip/align behind a «⟳ transform ▾» toggle in a toolbar row above the canvas
+(`src/render/Figure.tsx`), so "the same place" could have meant *2-D's orientation home*. Presented
+with all three layouts, the operator chose the canvas cluster: the rule is **all of a figure's
+orientation controls in ONE place**, not *3-D copies 2-D's tray*. In 3-D the view controls are `↺`,
+zoom and now the presets, and they belong together.
+
+That also happens to be the cheap answer, which is why it needed asking rather than assuming: the
+camera state lives in `Figure3`, so the cluster keeps the feature where its state already is, while a
+toolbar tray would have meant a new layout row (2-D's `toolbarRow`/`toolbarTray` have no 3-D
+counterpart). The decision is the operator's rule, not the implementation's convenience.
+
+Zoom and pan are deliberately **kept** when a preset is chosen: a student who framed the figure did so
+on purpose and only asked to turn it — unlike `↺`, which is the one button that returns everything to a
+known-good frame (#533).
 
 The labels are i18n-**injected** exactly as `resetLabel` is, and the buttons render only when labels are
 supplied, so `Figure3` stays translation-free. The glyphs are decorative; the accessible name is always
