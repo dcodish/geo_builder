@@ -21,7 +21,7 @@ beforeEach(() => {
   store().clearAll();
 });
 
-const figure = () => deriveLines(store().lines, store().seed, store().seed);
+const figure = () => deriveLines(store().lines, store().seed, store().seed, store().queries);
 
 describe('a contradicting statement is refused, and the refusal NAMES the earlier one', () => {
   it.each([
@@ -146,7 +146,9 @@ describe('the corpus is not disturbed — the §2b capstone builds line by line'
       'שטח Oz1z2z3 הוא 150r^2',
       'היקף Oz1z2z3',
     ].forEach((l) => expect(submitLine(l), `refused «${l}»`).toBe(true));
-    expect(store().lines).toHaveLength(10);
+    // #789: the ask «היקף Oz1z2z3» routes to the lane — nine facts, one question
+    expect(store().lines).toHaveLength(9);
+    expect(store().queries).toEqual(['היקף Oz1z2z3']);
   });
 
   it('a restatement that AGREES is not a contradiction', () => {

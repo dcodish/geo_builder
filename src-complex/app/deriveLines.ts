@@ -41,8 +41,56 @@ import { type Derived2, type FoldInput, type Untranslated, foldConstraints } fro
  * bridge, and on this path `z³ = 8` was one point with three configurations while `w = z1 * 2` invented
  * `z1` as a free number and printed a sampled position for it.
  */
-export function deriveLines(lines: readonly string[], configIndex = 0, seed = 0): Derived2 {
-  return foldConstraints({ ...lowerLines(lines), configIndex, seed });
+export function deriveLines(
+  lines: readonly string[],
+  configIndex = 0,
+  seed = 0,
+  asks: readonly string[] = [],
+): Derived2 {
+  const lowered = lowerLines(lines);
+  const lane = lowerAsks(asks);
+  return foldConstraints({
+    ...lowered,
+    queries: [...(lowered.queries ?? []), ...lane.queries],
+    ratios: [...(lowered.ratios ?? []), ...lane.ratios],
+    exprQueries: [...(lowered.exprQueries ?? []), ...lane.exprQueries],
+    configIndex,
+    seed,
+  });
+}
+
+/**
+ * The ASK LANE, lowered (#789) — panel questions joining the fold's query channels.
+ *
+ * A lane entry that does not read as a pure question contributes nothing here: the panel row
+ * explains it in place (unreadable / actually-a-statement), and feeding a statement into the fold
+ * from the lane would let a "question" constrain the figure — the one thing ADR-3D-057's doctrine
+ * exists to forbid. Grammar unchanged: the fact list still lowers query LINES (legacy saved files
+ * replay through the router in `submit.ts`, which files them here instead).
+ */
+export function lowerAsks(asks: readonly string[]): {
+  queries: MeasureQuery[];
+  ratios: RatioQuery[];
+  exprQueries: ExprQuery[];
+} {
+  const queries: MeasureQuery[] = [];
+  const ratios: RatioQuery[] = [];
+  const exprQueries: ExprQuery[] = [];
+  for (const raw of asks) {
+    const r = parseLineV2(raw.trim());
+    if (!r.ok) continue;
+    const l = r.line;
+    // `declares` deliberately uncounted AND unenacted: a question never creates a point (readAsk's
+    // doctrine note) — a name it mentions must exist from the givens or the answer reads open
+    const states =
+      l.constraints.length + l.filters.length + l.assertions.length +
+      l.objects.length + l.measures.length + l.sequences.length + l.roots.length;
+    if (states > 0) continue;
+    queries.push(...l.queries);
+    ratios.push(...l.ratios);
+    exprQueries.push(...l.exprQueries);
+  }
+  return { queries, ratios, exprQueries };
 }
 
 /**

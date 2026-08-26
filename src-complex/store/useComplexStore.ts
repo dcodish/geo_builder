@@ -62,11 +62,24 @@ export interface SavedSession {
   /** Indexes of DISABLED lines (B5/D6: a muted statement stays in the list, out of the figure) —
    *  additive and optional; absent = everything enabled. */
   disabled?: number[];
+  /** Data-panel questions (#789, the ADR-3D-057 shape arriving here) — «שטח Oz1z2», «|z1-z2|»:
+   *  questions about the figure, never facts. Additive and optional, so every pre-existing file
+   *  loads unchanged and an OLD app ignores the field rather than refusing the file. */
+  queries?: string[];
 }
 
 interface ComplexState {
   /** THE SOURCE OF TRUTH — the student's accepted lines, in entry order. */
   lines: string[];
+  /** THE ASK LANE (#789) — questions about the figure, in entry order. A question is never a
+   *  fact (ADR-3D-057): it states nothing, constrains nothing, and lives beside the fact list,
+   *  not in it. Answered against the current figure by the stage-5d knowledge machinery. */
+  queries: string[];
+  /** Add a question to the lane. The store records; whether the text READS as a question is the
+   *  panel's per-row concern (the 3-D posture: any text lands, the row explains itself). */
+  addQuery: (text: string) => void;
+  /** Remove one question by its position. */
+  removeQuery: (index: number) => void;
   /** The figure's name (#42): display + save-file naming; empty = unnamed. */
   name: string;
   setName: (name: string) => void;
@@ -120,6 +133,14 @@ const cleanLine = (line: string): string => stripFormatControls(line);
 
 export const useComplexStore = create<ComplexState>((set, get) => ({
   lines: [],
+  queries: [],
+  // a repeated question adds nothing — the lane dedupes on the cleaned text (the 3-D posture)
+  addQuery: (text) => {
+    const q = cleanLine(text).trim();
+    if (q === '' || get().queries.includes(q)) return;
+    set(({ queries }) => ({ queries: [...queries, q] }));
+  },
+  removeQuery: (index) => set(({ queries }) => ({ queries: queries.filter((_, i) => i !== index) })),
   name: '',
   setName: (name) => set({ name }),
   disabled: [],
@@ -146,11 +167,11 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
   // OLD configuration and are released (the sibling "show another configuration" semantics)
   nextConfig: () => set(({ seed }) => ({ seed: seed + 1, freePos: {} })),
   clearAll: () =>
-    set({ lines: [], name: '', disabled: [], freePos: {}, seed: 0, lastError: null, loadAudit: null }),
+    set({ lines: [], queries: [], name: '', disabled: [], freePos: {}, seed: 0, lastError: null, loadAudit: null }),
   clearError: () => set({ lastError: null }),
 
   serialize: () => {
-    const { lines, freePos, seed, view, name, disabled } = get();
+    const { lines, queries, freePos, seed, view, name, disabled } = get();
     return {
       app: 'complex-builder',
       version: 1,
@@ -160,6 +181,7 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
       view,
       ...(name.trim() ? { name: name.trim() } : {}),
       ...(disabled.length ? { disabled: [...disabled].sort((a, b) => a - b) } : {}),
+      ...(queries.length ? { queries: [...queries] } : {}),
     };
   },
 
@@ -168,6 +190,6 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
   setError: (lastError) => set({ lastError }),
   setLoadAudit: (loadAudit) => set({ loadAudit }),
   resetSession: () =>
-    set({ lines: [], name: '', disabled: [], freePos: {}, seed: 0, lastError: null, loadAudit: null }),
+    set({ lines: [], queries: [], name: '', disabled: [], freePos: {}, seed: 0, lastError: null, loadAudit: null }),
   restoreView: ({ freePos, seed, view, name }) => set({ freePos, seed, view, ...(name !== undefined ? { name } : {}) }),
 }));
