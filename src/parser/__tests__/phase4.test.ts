@@ -462,10 +462,14 @@ describe('parser — a NAMED midsegment honours its endpoint labels', () => {
     expect(r.ok, `"${input}" should parse`).toBe(true);
     return r.ok ? r.commands : [];
   };
+  // #785 (ADR-462): the macro DECLARES that it encoded the stated «מקביל» by construction — joining the
+  // two midpoints IS the midsegment theorem, so no `parallel` command is emitted and the verb gate asks
+  // the lowering instead of looking for a token that should not exist.
+  const enc = { consumed: { verbs: ['מקביל/parallel'] } };
   const namedPQ = [
-    { type: 'midpoint', id: 'P', a: 'A', b: 'B' },
-    { type: 'midpoint', id: 'Q', a: 'A', b: 'C' },
-    { type: 'segment', a: 'P', b: 'Q' },
+    { type: 'midpoint', id: 'P', a: 'A', b: 'B', ...enc },
+    { type: 'midpoint', id: 'Q', a: 'A', b: 'C', ...enc },
+    { type: 'segment', a: 'P', b: 'Q', ...enc },
   ];
   it('"PQ קטע אמצעים לצלע BC במשולש ABC" → midpoints named P,Q (not M,N)', () =>
     expect(cmds('PQ קטע אמצעים לצלע BC במשולש ABC', { points: ['A', 'B', 'C'] })).toEqual(namedPQ));
@@ -475,9 +479,9 @@ describe('parser — a NAMED midsegment honours its endpoint labels', () => {
     expect(cmds('PQ is the midsegment to BC in triangle ABC', { points: ['A', 'B', 'C'] })).toEqual(namedPQ));
   it('the unnamed "the midsegment to BC in triangle ABC" still auto-names M,N (connector "to" is not a name)', () =>
     expect(cmds('the midsegment to BC in triangle ABC', { points: ['A', 'B', 'C'] })).toEqual([
-      { type: 'midpoint', id: 'M', a: 'A', b: 'B' },
-      { type: 'midpoint', id: 'N', a: 'A', b: 'C' },
-      { type: 'segment', a: 'M', b: 'N' },
+      { type: 'midpoint', id: 'M', a: 'A', b: 'B', ...enc },
+      { type: 'midpoint', id: 'N', a: 'A', b: 'C', ...enc },
+      { type: 'segment', a: 'M', b: 'N', ...enc },
     ]));
 });
 

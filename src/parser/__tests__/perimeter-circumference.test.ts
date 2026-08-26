@@ -122,7 +122,7 @@ describe('tangent circles: stated names + circumference on an existing circle (A
   it('circumference on an EXISTING circle → set-radius (not a duplicate circle), with the "pi" word', () => {
     // circle O1 already exists in context ⇒ "היקף מעגל O1 הוא 6pi" flexes it via set-radius.
     const r = parse('היקף מעגל O1 הוא 6pi', { circles: ['O1'] });
-    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O1', value: 3 }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O1', value: 3, consumed: { numbers: [6] } }]);
   });
   it('circumference on a NON-existing circle still CREATES it (via the circle rule)', () => {
     const r = parse('מעגל O1 שהיקפו 6pi', { circles: [] });
@@ -130,14 +130,14 @@ describe('tangent circles: stated names + circumference on an existing circle (A
   });
   it('AREA on an existing circle → set-radius (√(A/π)): "שטח מעגל O2 הוא 81π" ⇒ r=9', () => {
     const r = parse('שטח מעגל O2 הוא 81π', { circles: ['O2'] });
-    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9 }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9, consumed: { numbers: [81] } }]);
   });
   it('area on an existing circle WITHOUT the "מעגל" word (bare known-circle label): "שטח O2 הוא 81π"', () => {
     const r = parse('שטח O2 הוא 81π', { circles: ['O2'] });
-    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9 }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9, consumed: { numbers: [81] } }]);
   });
   it('a bare "שטח O2" whose label is NOT a known circle bows out (does not set a radius)', () => {
-    expect(cmds('שטח O2 הוא 81π')).not.toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9 }]);
+    expect(cmds('שטח O2 הוא 81π')).not.toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9, consumed: { numbers: [81] } }]);
   });
   it('a POLYGON area "שטח ABC = 13" stays an area even when a circle O exists (not a circle size)', () => {
     const r = parse('שטח המשולש ABC הוא 13', { circles: ['O'] });
@@ -147,11 +147,11 @@ describe('tangent circles: stated names + circumference on an existing circle (A
   // the LLM because the value reader needed the number right after the keyword or after a copula).
   it('copula-less "היקף מעגל O1 6pi" on an existing circle → set-radius 3', () => {
     const r = parse('היקף מעגל O1 6pi', { circles: ['O1'] });
-    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O1', value: 3 }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O1', value: 3, consumed: { numbers: [6] } }]);
   });
   it('copula-less "שטח מעגל O2 81π" on an existing circle → set-radius 9', () => {
     const r = parse('שטח מעגל O2 81π', { circles: ['O2'] });
-    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9 }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9, consumed: { numbers: [81] } }]);
   });
   it('copula-less creation "מעגל O1 שהיקפו 6π" unaffected (still a radius-3 circle)', () => {
     const r = parse('מעגל O1 שהיקפו 6π', { circles: [] });

@@ -8003,3 +8003,73 @@ refusals still fire in their original order; and, the generalisation that stops 
 commits exactly when the shared battery reports clean**, asserted directly rather than re-derived.
 `src/app/__tests__/honesty-gates-782.test.ts` locks the battery's own contract and the gate-map
 membership the net iterates.
+
+## ADR-462 — the lowering DECLARES what it consumed; the gate ASKS (#784, #785)
+
+**Context.** The corpus-wide gate net that #771 widened (ADR-458) found, on its first run, four steps
+that PARSE correctly and are then refused at the commit seam — i.e. supported, operator-reported,
+corpus-locked constructions escalating to the paid LLM. Measured at HEAD, and measured identical on
+`main` *before* #771's fix, so none was a regression from it: they are what the net was blind to while
+it ran a single gate.
+
+| prefix | utterance | lowering | gate |
+| --- | --- | --- | --- |
+| `שני מעגלים O1 ו O2 משיקים מבחוץ` | «היקף מעגל O1 הוא 6» | `set-radius value:0.9549` | `[6]` ✗ |
+| `משולש ABC` | «GE קטע אמצעים מקביל ל AB» | `midpoint, midpoint, segment` | `[מקביל]` ✗ |
+| `מלבן ABCD` | «AB ו- AD משיקים למעגל O» | `bisector, point-on-line, foot, foot, circle-through` | `[משיק]` ✗ |
+| `…חסום במעגל` + `…משיק למעגל בנקודה B` | «המשך CA נפגש עם המשיק בנקודה D» | `set-line` | `[משיק]` ✗ |
+
+Every figure is drawn **correctly** — the scenarios assert exactly that. The student never sees the
+figure, because the seam refuses it.
+
+**Root cause — one class, two faces.** Both gates answered *"is everything the student stated accounted
+for?"* by **pattern-matching the lowering's output**:
+
+- `droppedGivenNumbers` (ADR-250) hunted for the literal stated number among the payloads. That question
+  is wrong for every lowering that TRANSFORMS the value — circumference→radius, area→radius,
+  diameter→radius, and any unit or ratio conversion. Only «6π» escaped, and it escaped through the `nπ`
+  candidate list: **an exemption for one symbol, not a handled class**, which is exactly why the
+  ordinary plain-number circumference was the broken spelling.
+- `droppedGivenVerbs` (ADR-292) had two ways to find evidence: a token FAMILY, and **one bespoke
+  structural pass added for the one case that bit** (#226, tangency). Every construction encoding its
+  verb a third way is a false block waiting to be reported — the docs/17 §3 enumeration smell, in the
+  honesty layer. Three of them were sitting in the corpus.
+
+Each new evidence SHAPE would have been another special case inside the gate. The gate cannot keep
+inferring what the lowering already knows.
+
+**Decision.** A command carries `consumed?: { numbers?: number[]; verbs?: string[] }` — what this
+lowering read from the student's sentence and transformed or encoded. The rule declares; the gate asks.
+
+- `circleSizeRadius` returns the derived radius **and** `stated`, the coefficient the student typed, and
+  `set-radius` carries `consumed.numbers: [6]`. It is the only place that knows 6 became 0.9549.
+- The midsegment macro, the corner-tangent construction and the referenced-tangent `set-line` declare
+  `consumed.verbs` — on **every** command they emit, so the gate's #226 operand accounting still sees
+  all the labels the student named.
+- Verb ids are exported constants (`VERB_TANGENT`, `VERB_PARALLEL`): the declaration and the gate must
+  name the same thing, and two spellings of one id would be a silent false block — the failure mode this
+  mechanism exists to end.
+
+**Why it rides on the COMMAND rather than the parse result.** The gates are pure functions of
+`(utterance, commands)`, and so is the corpus-wide false-positive net (ADR-458). A declaration the net
+could not see would be a gate the app runs and the net does not measure — which is how #771's four rows
+came to exist in the first place. The engine ignores the field entirely.
+
+**What is NOT weakened.** A declaration says *"I encoded this verb"*, never *"stop checking"*:
+
+- declared numbers are credited as ordinary accounts in the same multiset, so the ADR-437 discipline
+  holds — one declaration pays for ONE occurrence, and «היקף 6 ורדיוס 6» still needs two;
+- the #226 operand accounting runs unchanged, so a lowering that declares tangency while referencing the
+  wrong labels still reads as dropped;
+- a verb with no evidence and no declaration still trips, which is the original #82 class.
+
+**The ledger is empty, not silenced.** `KNOWN_GATE_FALSE_BLOCKS` in `scenarios-harness.ts` held these
+four rows as assertions that each step still FAILS — deliberately, so whoever fixed one would be told by
+a red test to delete its row. That is what happened. The array stays, empty and typed: a future false
+block gets a row, not a mute. A silenced cell is indistinguishable from a cell nobody checked (#140).
+
+Locks: `src/parser/__tests__/consumed-declaration-784.test.ts` — all three circumference spellings gate
+clean and lower identically; the `set-radius` carries the student's 6 while its value is a different
+number; the multiset still refuses a second unaccounted 6; each of the three structural verbs gates
+clean; and, the two that stop this becoming a blunt instrument, an undeclared verb with no evidence
+still trips and a declaration with the wrong operands still trips.

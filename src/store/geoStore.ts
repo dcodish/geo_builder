@@ -224,7 +224,7 @@ export type MergeResult = { ok: true } | { ok: false; reason: 'same' | 'no-sourc
  * an `angle EFG` → `EEG`). Such facts are dropped during a merge so the figure stays clean.
  */
 function collapsedDegenerate(cmd: AnyCommand): boolean {
-  const c = cmd as Record<string, Id | undefined>;
+  const c = cmd as unknown as Record<string, Id | undefined>; // #784: the union now carries an optional `consumed` object, so the direct cast no longer overlaps
   switch (cmd.type) {
     case 'segment':
     case 'set-distance':

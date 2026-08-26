@@ -1233,9 +1233,15 @@ const midsegment: Rule = (s, ctx) => {
   const have = new Set(ctx.points ?? []);
   const out: AnyCommand[] = [];
   if (!tri.every((v) => have.has(v))) out.push({ type: 'triangle', ids: [tri[0], tri[1], tri[2]] });
-  out.push({ type: 'midpoint', id: m1, a: apex, b: base[0] });
-  out.push({ type: 'midpoint', id: m2, a: apex, b: base[1] });
-  out.push({ type: 'segment', a: m1, b: m2 });
+  // #785 (ADR-462): the midsegment THEOREM is the parallelism. Joining the two midpoints ENCODES
+  // «מקביל ל AB» by construction, so emitting a `set-parallel` would double-state a relation the figure
+  // already forces — arguably wrong, and certainly redundant. The gate read the stated word as dropped
+  // and escalated a corpus-locked construction to the paid LLM. Declared on every command of the macro
+  // so the gate's operand accounting (#226) sees the base labels the student named.
+  const enc = { consumed: { verbs: [VERB_PARALLEL] } };
+  out.push({ type: 'midpoint', id: m1, a: apex, b: base[0], ...enc });
+  out.push({ type: 'midpoint', id: m2, a: apex, b: base[1], ...enc });
+  out.push({ type: 'segment', a: m1, b: m2, ...enc });
   return out;
 };
 
@@ -3759,7 +3765,7 @@ const RADIUS_WORD = String.raw`(?:radius|רדיוס\S*)`;
  * radius symbol — ADR-034). A symbol pins the variable R to the concrete default radius via
  * a `set-var`, so a later "AC = 1.6R" resolves to |AC| = 1.6·radius while still labelling "1.6R".
  */
-const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: boolean; sym?: string; varCmd?: SymbolicCommand } => {
+const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: boolean; sym?: string; varCmd?: SymbolicCommand; statedSize?: number } => {
   // A QUOTIENT radius — "רדיוס 35/√32", "שרדיוסו √32/5" (#77, the shared NUMEXPR atom). Checked BEFORE the
   // bare-number form, which would otherwise read "רדיוס 35" and silently drop the "/√32".
   const rFrac = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*(?:=|:|הוא|שווה|\bis\b)?\s*${NUMEXPR('r')}`, 'i'));
@@ -3775,7 +3781,7 @@ const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: b
   const rVar = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*(?:is\s+|הוא\s+)?(?:=\s*)?([A-Za-z])(?![A-Za-z\d])`));
   if (rVar) return { radius: RADIUS_DEFAULT, numeric: false, symbolic: true, sym: rVar[1], varCmd: { type: 'set-var', name: RADIUS_VAR, value: RADIUS_DEFAULT } };
   const sized = circleSizeRadius(s);
-  if (sized !== null) return { radius: sized, numeric: true, symbolic: false };
+  if (sized !== null) return { radius: sized.r, numeric: true, symbolic: false, statedSize: sized.stated };
   return { radius: RADIUS_DEFAULT, numeric: false, symbolic: false };
 };
 
@@ -3789,10 +3795,26 @@ const AREA_WORD = String.raw`(?:ששטחו|שטחו|שטח|area)`;
  * "שהיקפו 6π" → r = C/2π; "area 9π" / "ששטחו 9π" → r = √(A/π). Both reduce to a NUMERIC radius (a circle's
  * size IS its radius), so they flow through the same fixed-radius path as "radius 5". The stated value may
  * carry a π factor ("6π") or be a plain number, and may follow a copula ("= 6π", "הוא 6π", "is 6π") or sit
- * glued right after the possessive ("שהיקפו 6π"). Returns the derived radius, or null when absent. Only ever
- * called from the `circle` rule (circle context guaranteed; a POLYGON area/perimeter is claimed earlier).
+ * glued right after the possessive ("שהיקפו 6π"). Only ever called from the `circle` rule (circle context
+ * guaranteed; a POLYGON area/perimeter is claimed earlier).
+ *
+ * #784 (ADR-462) — returns the derived radius AND `stated`, the number the STUDENT wrote. The lowering is
+ * the only place that knows «6» became r = 0.9549; without carrying it out, `droppedGivenNumbers` can only
+ * hunt for the literal 6 among the payloads, find nothing, and refuse a correct parse.
  */
-const circleSizeRadius = (s: string): number | null => {
+const circleSizeRadius = (s: string): { r: number; stated: number } | null => {
+  /**
+   * The COEFFICIENT the student actually typed, before the π factor and before the transform — the «6»
+   * of «6π» and of a bare «6». `readVal` returns the evaluated magnitude (6π ≈ 18.85), which is not what
+   * appears in their sentence, and the gate accounts what appears in their sentence.
+   */
+  const statedCoef = (after: string): number | null => {
+    const m =
+      after.match(new RegExp(String.raw`(?:=|הוא|שווה|\bis\b|\bequals?\b|:)\s*(${COEF})`, 'i')) ??
+      after.match(new RegExp(String.raw`^\s*(${COEF})`, 'i')) ??
+      after.match(new RegExp(String.raw`^\s*(?:circle|מעגל)?\s*[A-Z]\d*\s+(${COEF})`, 'i'));
+    return m ? parseFloat(m[1]) : null;
+  };
   const readVal = (after: string): number | null => {
     // copula-anchored first — skips a digit-bearing circle label ("circle O2 is 6π") the glued form would
     // misread; else the number glued right after the possessive suffix ("שהיקפו 6π").
@@ -3817,17 +3839,19 @@ const circleSizeRadius = (s: string): number | null => {
   );
   if (dm) {
     const v = parseFloat(dm[1]) * (dm[2] ? Math.PI : 1);
-    if (v > 0) return v / 2;
+    if (v > 0) return { r: v / 2, stated: parseFloat(dm[1]) };
   }
   const cm = s.match(new RegExp(CIRCUMFERENCE_WORD, 'i'));
   if (cm) {
-    const v = readVal(s.slice(cm.index! + cm[0].length));
-    if (v !== null && v > 0) return v / (2 * Math.PI);
+    const after = s.slice(cm.index! + cm[0].length);
+    const v = readVal(after);
+    if (v !== null && v > 0) return { r: v / (2 * Math.PI), stated: statedCoef(after) ?? v };
   }
   const am = s.match(new RegExp(AREA_WORD, 'i'));
   if (am) {
-    const v = readVal(s.slice(am.index! + am[0].length));
-    if (v !== null && v > 0) return Math.sqrt(v / Math.PI);
+    const after = s.slice(am.index! + am[0].length);
+    const v = readVal(after);
+    if (v !== null && v > 0) return { r: Math.sqrt(v / Math.PI), stated: statedCoef(after) ?? v };
   }
   return null;
 };
@@ -4181,8 +4205,8 @@ const radiusRelation: Rule = (s, ctx) => {
  * must not be claimed). Runs before `circle`.
  */
 const circleSizeExisting: Rule = (s, ctx) => {
-  const r = circleSizeRadius(s);
-  if (r === null) return null; // no circumference/area value present
+  const sized = circleSizeRadius(s);
+  if (sized === null) return null; // no circumference/area value present
   if (sizeStatementLeftover(s)) return null; // a construction carrying a size clause — not a size statement
   // Resolve the target circle: "מעגל X" (known or fresh — #538), else a bare label that is a KNOWN
   // circle — so "שטח O2 הוא 81π" (the area of circle O2, no "מעגל" word) also sets its radius. A polygon
@@ -4203,7 +4227,9 @@ const circleSizeExisting: Rule = (s, ctx) => {
     const noun = s.search(/circle|מעגל/i);
     if (noun >= 0 && noun < s.search(/שהיקפו|היקפו|היקף|circumference|perimeter|ששטחו|שטחו|שטח|area/i)) return null;
   }
-  return [{ type: 'set-radius', circle: circleId(center), value: r }];
+  // #784 (ADR-462): the lowering DECLARES the number it read, because it is the only thing that knows
+  // «6» became r = 0.9549. The gate then asks instead of hunting for a literal that cannot be there.
+  return [{ type: 'set-radius', circle: circleId(center), value: sized.r, consumed: { numbers: [sized.stated] } }];
 };
 
 /**
@@ -5216,12 +5242,18 @@ const cornerTangentCircle: Rule = (s, ctx) => {
   const E = tp ? up(tp[1]) : freeLabel(taken, ['E', 'F', 'G']); // tangency on side 1 (also the circle's through-point)
   const K = tp ? up(tp[2]) : freeLabel([...taken, E], ['K', 'M', 'N']); // tangency on side 2
   const bisId = `bis-${arm1}${vertex}${arm2}`;
+  // #785 (ADR-462): this lowering encodes tangency STRUCTURALLY — the centre rides the corner's bisector
+  // and the radius IS the perpendicular distance to each side, so no `tangent` command is emitted and
+  // none should be. The verb gate's #226 structural pass covers `foot` + `point-on-circle` from the
+  // centre; this shape is `foot` + `circle-through`, one encoding past it. The rule declares what it
+  // encoded on EVERY command it emits, so the gate's operand accounting sees all the stated labels.
+  const enc = { consumed: { verbs: [VERB_TANGENT] } };
   return [
-    { type: 'bisector', id: bisId, vertex, p: arm1, q: arm2 },
-    { type: 'point-on-line', id: center, line: bisId, offset: 2 }, // the centre — a FREE DOF sliding along the bisector (seed kept small so resample stays within the sides)
-    { type: 'foot', id: E, from: center, a: vertex, b: arm1 }, // tangency point on side 1
-    { type: 'foot', id: K, from: center, a: vertex, b: arm2 }, // tangency point on side 2
-    { type: 'circle-through', id: circleId(center), center, through: E }, // r = dist(centre, side) ⇒ tangent to both
+    { type: 'bisector', id: bisId, vertex, p: arm1, q: arm2, ...enc },
+    { type: 'point-on-line', id: center, line: bisId, offset: 2, ...enc }, // the centre — a FREE DOF sliding along the bisector (seed kept small so resample stays within the sides)
+    { type: 'foot', id: E, from: center, a: vertex, b: arm1, ...enc }, // tangency point on side 1
+    { type: 'foot', id: K, from: center, a: vertex, b: arm2, ...enc }, // tangency point on side 2
+    { type: 'circle-through', id: circleId(center), center, through: E, ...enc }, // r = dist(centre, side) ⇒ tangent to both
   ];
 };
 
@@ -6319,7 +6351,13 @@ const extensionMeetsExistingPoint: Rule = (s, ctx) => {
   if (!segM) return null;
   const [X, Y] = [up(segM[1]), up(segM[2])];
   if (X === D || Y === D) return null;
-  return [{ type: 'set-line', points: [X, Y, D] }]; // D on the extension of XY, in order X→Y→D
+  // #785 (ADR-462): «המשיק» here is a REFERENCE to tangent ink already on the canvas, not a new given —
+  // the rule resolved it (the guard above demands the tangent/line noun), and the whole lowering is the
+  // one `set-line` that drives D to the crossing. Nothing mints a tangency token, so the verb gate's
+  // family walk found no evidence and refused a corpus-locked construction to the paid LLM. The rule
+  // knows it read the word and what it did with it, so it says so.
+  const refsTangent = /tangent|משיק/i.test(s);
+  return [{ type: 'set-line', points: [X, Y, D], ...(refsTangent ? { consumed: { verbs: [VERB_TANGENT] } } : {}) }]; // D on the extension of XY, in order X→Y→D
 };
 
 /**
@@ -8927,6 +8965,17 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
   // candidate that has already paid for an earlier occurrence can no longer pay for this one.
   const acc = new Map<number, number>();
   const add = (n: number): void => { acc.set(q(n), (acc.get(q(n)) ?? 0) + 1); };
+  // #784 (ADR-462) — DECLARED accounts, credited first and in the same multiset.
+  //
+  // A lowering that TRANSFORMS a stated magnitude leaves no trace of it in the payloads: «היקף מעגל O1
+  // הוא 6» lowers to `set-radius value:0.9549`, so hunting for a literal 6 finds nothing and refuses a
+  // correct parse. Only the rule knows that 6 became 0.9549, so the rule says so and this asks. The
+  // «6π» spelling escaped before purely by the nπ candidate list — an exemption for one SYMBOL, not a
+  // handled class, which is why the ordinary «6» was the broken one.
+  //
+  // Credited as ordinary accounts rather than as a bypass, so the ADR-437 multiset discipline still
+  // holds: a declaration pays for ONE occurrence, and «היקף 6 ורדיוס 6» still needs two of them.
+  for (const c of commands) for (const n of c.consumed?.numbers ?? []) add(n);
   const walk = (v: unknown): void => {
     if (typeof v === 'number' && Number.isFinite(v)) add(v);
     else if (typeof v === 'string') {
@@ -8938,7 +8987,8 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
       for (const x of Object.values(v)) walk(x);
     }
   };
-  for (const c of commands) walk(c);
+  // the declaration above is already accounted; walking it again would let one statement pay twice
+  for (const c of commands) walk({ ...c, consumed: undefined });
   /** Account this occurrence against the first candidate lowering still unspent — and SPEND it. */
   const ok = (cands: number[]): boolean => {
     for (const v of cands) {
@@ -10313,6 +10363,15 @@ interface VerbGate {
 
 const gate = (g: Omit<VerbGate, 'present'>): VerbGate => ({ ...g, present: gatePresent(g.he, g.en) });
 
+/**
+ * The verb ids a lowering can DECLARE (#785, ADR-462). Exported as constants because the declaration and
+ * the gate must name the same thing: a rule that encodes tangency structurally says `VERB_TANGENT`, and
+ * `droppedGivenVerbs` looks for exactly that. Two spellings of one id would be a silent false block, which
+ * is the failure mode this whole mechanism exists to end.
+ */
+export const VERB_TANGENT = 'משיק/tangent';
+export const VERB_PARALLEL = 'מקביל/parallel';
+
 export const VERB_GATES: VerbGate[] = [
   // "tan- : a REFERENCE to a drawn tangent line ("המשיק חותך…" → line:"tan-A"); tanaux-/tanmid- : the
   // Thales AUX-CIRCLE construction of an external tangent (tangentFromExternal / tangentsFromExternal,
@@ -10320,11 +10379,11 @@ export const VERB_GATES: VerbGate[] = [
   // `tangency: true` selects the structural evidence pass; it used to be selected by sniffing
   // `present.source` for a substring, which is the same substring-stands-for-identity defect this
   // issue closes — and would have broken silently the moment the source was recomposed.
-  gate({ verb: 'משיק/tangent', he: ['משיק'], en: [['tangent']], satisfied: family('tangent', 'circles-tangent', 'set-perpendicular', '"tan-', 'tanaux-', 'tanmid-'), tangency: true }),
+  gate({ verb: VERB_TANGENT, he: ['משיק'], en: [['tangent']], satisfied: family('tangent', 'circles-tangent', 'set-perpendicular', '"tan-', 'tanaux-', 'tanmid-'), tangency: true }),
   gate({ verb: 'חוצה/bisect', he: ['חוצ'], en: [['bisect', 's|ed|ing|ors|or|ion']], satisfied: family('bisector', 'midpoint', 'set-angle-ratio', 'set-equal', 'arc-midpoint', 'set-line') }),
   // `parallelogram` is listed EXPLICITLY: the macro does encode the parallel pairs, so it is genuine
   // evidence — it simply has to be evidence by intent rather than by substring coincidence (#771).
-  gate({ verb: 'מקביל/parallel', he: ['מקביל'], en: [['parallel']], satisfied: family('parallel', 'parallelogram') }),
+  gate({ verb: VERB_PARALLEL, he: ['מקביל'], en: [['parallel']], satisfied: family('parallel', 'parallelogram') }),
   gate({ verb: 'מאונך/perpendicular', he: [`מאונ${KAF}`], en: [['perpendicular']], satisfied: family('perpendicular', 'foot', 'right-triangle', 'altitude') }),
 ];
 /**
@@ -10385,7 +10444,20 @@ export function droppedWordRelations(utterance: string, commands: AnyCommand[]):
  *  not `tan-…`). Without this the gate FALSE-BLOCKED the correct deterministic parse of «AD משיק למעגל»
  *  and escalated it to the LLM (prod 0yqufnuv 11:39 — the P1's first half). */
 function verbEvidence(g: (typeof VERB_GATES)[number], commands: AnyCommand[]): AnyCommand[] {
-  const ev = commands.filter((c) => g.satisfied.test(JSON.stringify(c)));
+  // #785 (ADR-462) — DECLARED evidence, first.
+  //
+  // The walk had two ways to find a verb: a token FAMILY, and one bespoke structural pass added for the
+  // one case that bit (#226, tangency). Every construction that encodes its verb a THIRD way was a false
+  // block waiting to be reported — the docs/17 §3 enumeration smell, in the honesty layer — and three
+  // were: a REFERENCED tangent (a bare `set-line` onto tangent ink already drawn), the midsegment (whose
+  // `midpoint, midpoint, segment` IS the parallelism, so emitting `parallel` would double-state a forced
+  // relation), and the corner-tangent (tangency as equal perpendicular distances: `foot` + `circle-through`,
+  // one shape past #226's `foot` + `point-on-circle`). All three are operator-reported, fixed,
+  // corpus-locked constructions that the app refused at the commit seam and sent to the paid LLM.
+  //
+  // So a lowering that satisfies a stated verb BY CONSTRUCTION says so, and this asks. A fourth encoding
+  // shape now costs the rule one field instead of costing the gate another special case.
+  const ev = commands.filter((c) => c.consumed?.verbs?.includes(g.verb) || g.satisfied.test(JSON.stringify(c)));
   if (g.tangency) {
     const feet = new Map(
       commands.filter((c): c is Extract<AnyCommand, { type: 'foot' }> => c.type === 'foot').map((c) => [c.id, c]),

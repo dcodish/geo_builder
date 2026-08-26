@@ -1209,8 +1209,39 @@ export type SymbolicCommand =
   // reuse the existing one (M1).
   | { type: 'inscribe'; shape: 'rhombus' | 'rectangle' | 'square' | 'parallelogram'; ids: Id[]; container: Id[]; containerKind: 'triangle' | 'quad'; variant: number };
 
+/**
+ * #784/#785 (ADR-462) — WHAT THIS LOWERING CONSUMED from the student's sentence.
+ *
+ * The honesty gates ask *"is everything the student stated accounted for?"* and used to answer it by
+ * PATTERN-MATCHING the lowering's output: a stated number must appear literally among the payloads, a
+ * stated verb must produce a command from that verb's token family. That question is wrong for every
+ * lowering that TRANSFORMS what it read, and there are two whole families of them:
+ *
+ *  - a DERIVED magnitude — «היקף מעגל O1 הוא 6» lowers to `set-radius value:0.9549`, so the stated 6
+ *    appears nowhere and a correct parse was refused (only the «6π» spelling escaped, by an exemption
+ *    for the symbol rather than because the class was handled);
+ *  - a relation encoded STRUCTURALLY — the midsegment lowering (`midpoint, midpoint, segment`) IS the
+ *    parallelism the student stated, so emitting a `parallel` command would be redundant; the
+ *    corner-tangent lowering encodes tangency as equal perpendicular distances.
+ *
+ * Both were operator-reported, fixed, corpus-locked constructions that the app nonetheless refused at
+ * the commit seam and escalated to the paid LLM. Each new evidence SHAPE would have been another
+ * special case inside the gate — the docs/17 §3 enumeration smell, in the honesty layer.
+ *
+ * So the rule DECLARES what it encoded, and the gate ASKS. This rides on the command rather than on the
+ * parse result deliberately: the gates are pure functions of `(utterance, commands)`, and so is the
+ * corpus-wide false-positive net (ADR-458) — a declaration the net could not see would be a gate the
+ * app runs and the net does not measure. The engine ignores the field entirely.
+ */
+export interface Consumed {
+  /** Stated numbers this command read and transformed (the raw 6 behind `set-radius value:0.9549`). */
+  numbers?: number[];
+  /** Verb ids from `VERB_GATES` this command satisfies BY CONSTRUCTION rather than by token. */
+  verbs?: string[];
+}
+
 /** What the parser produces and a `Fact` stores: engine commands plus the symbolic layer. */
-export type AnyCommand = Command | SymbolicCommand;
+export type AnyCommand = (Command | SymbolicCommand) & { consumed?: Consumed };
 
 /** Tolerances. */
 export const LEN_EPS = 1e-6; // coordinate closeness (units)

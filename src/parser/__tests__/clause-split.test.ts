@@ -129,10 +129,12 @@ describe('dropped-shape-noun guard — a lax relation rule must not swallow a ba
     // a chord equality's מיתר is a carrier (ADR-119), not a polygon noun
     expect(cmds('מיתר AB = מיתר CD')).toContainEqual({ type: 'set-equal', a: 'A', b: 'B', c: 'C', d: 'D' });
     // "…במשולש ABC" whose letters the commands account for is a reference, not a dropped declaration
+    // #785 (ADR-462): the macro declares that its structure encodes the stated «מקביל».
+    const enc = { consumed: { verbs: ['מקביל/parallel'] } };
     expect(cmds('קטע האמצעים PQ לצלע BC במשולש ABC', { points: ['A', 'B', 'C'] })).toEqual([
-      { type: 'midpoint', id: 'P', a: 'A', b: 'B' },
-      { type: 'midpoint', id: 'Q', a: 'A', b: 'C' },
-      { type: 'segment', a: 'P', b: 'Q' },
+      { type: 'midpoint', id: 'P', a: 'A', b: 'B', ...enc },
+      { type: 'midpoint', id: 'Q', a: 'A', b: 'C', ...enc },
+      { type: 'segment', a: 'P', b: 'Q', ...enc },
     ]);
     // a bare noun with a polygon already on the figure is a definite reference — the guard defers to it
     const r = parse('גובה מ A', { points: ['A', 'B', 'C'], polygons: [['A', 'B', 'C']], neighbors: { A: ['B', 'C'], B: ['A', 'C'], C: ['A', 'B'] } });

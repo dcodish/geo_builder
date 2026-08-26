@@ -334,55 +334,20 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 export { CONTEXT_FREE_GATES };
 
 /**
- * #771 — the KNOWN, PRE-EXISTING false blocks the widened net surfaced on its first run.
+ * #771's ledger of KNOWN false blocks is EMPTY — #784/#785 (ADR-462) closed every row it held.
  *
- * Every entry is a step that PARSES correctly and is then refused by an honesty gate, i.e. a supported
- * construct escalating to the paid LLM. All four were measured to behave identically on `main` before
- * this issue's fix, so none is a regression from it — they are what the net was blind to while it ran
- * a single gate. They are NOT fixed here: this round item is #771, and inventing a diagnosis for four
- * more gates to keep the loop moving is exactly what the escalation rule forbids. They are filed.
+ * The four entries were steps that PARSED correctly and were then refused by an honesty gate, i.e.
+ * supported constructions escalating to the paid LLM: a DERIVED magnitude («היקף … 6» → `set-radius`,
+ * so the stated 6 appeared in no payload) and three verbs encoded STRUCTURALLY (a referenced tangent,
+ * the midsegment theorem, the corner-tangent circle). The ledger was written as an assertion that each
+ * step still FAILS — deliberately, so whoever fixed one would be told by a red test to delete its row.
+ * That is what happened; the rows are gone rather than silenced.
  *
- * The entry is a LEDGER, not a mute: an exemption asserts that the step still FAILS, so whoever fixes
- * one is told by a red test to delete its row. A silenced cell is indistinguishable from a cell nobody
- * checked — the lesson #140 was filed to record.
+ * The array stays, empty and typed, because the mechanism is the point: a future false block gets a row
+ * here, not a mute. A silenced cell is indistinguishable from a cell nobody checked — the lesson #140
+ * was filed to record.
  */
-const KNOWN_GATE_FALSE_BLOCKS: { scenario: string; gate: string; utterance: string; issue: string; why: string }[] = [
-  {
-    scenario: 'tangent-circles-named-then-circumference',
-    gate: 'droppedGivenNumbers',
-    utterance: 'היקף מעגל O1 הוא 6pi',
-    issue: '#784',
-    why: 'a DERIVED magnitude: the circumference given lowers to the radius it implies (set-radius value:3), so the stated 6 appears in no command. «6π» with the SYMBOL escapes; the word «6pi» and a plain «6» do not.',
-  },
-  {
-    scenario: 'tangent-from-external-D-then-pinned-by-extension',
-    gate: 'droppedGivenVerbs',
-    utterance: 'המשך CA נפגש עם המשיק בנקודה D',
-    issue: '#785',
-    why: 'the tangent is REFERENCED, not stated: the lowering is a bare set-line onto the already-drawn tangent, so no tangency token is minted and the family-presence fallback finds no evidence.',
-  },
-  {
-    scenario: 'incremental-midsegment-resolves-triangle-from-figure',
-    gate: 'droppedGivenVerbs',
-    utterance: 'GE קטע אמצעים מקביל ל AB',
-    issue: '#785',
-    why: 'the midsegment lowering (midpoint, midpoint, segment) ENCODES the parallelism by construction — the midsegment theorem — so no `parallel` command is emitted and the gate reads the stated «מקביל» as dropped.',
-  },
-  {
-    scenario: 'corner-tangent-circle',
-    gate: 'droppedGivenVerbs',
-    utterance: 'AB ו- AD משיקים למעגל O',
-    issue: '#785',
-    why: 'the corner-tangent lowering encodes tangency STRUCTURALLY (bisector + two feet + circle-through). The #226 structural pass covers foot+point-on-circle, not foot+circle-through, so the evidence walk finds nothing.',
-  },
-  {
-    scenario: 'corner-tangent-circle-grows-to-vertex',
-    gate: 'droppedGivenVerbs',
-    utterance: 'AB ו- AD משיקים למעגל O',
-    issue: '#785',
-    why: 'same utterance and same lowering as `corner-tangent-circle`.',
-  },
-];
+const KNOWN_GATE_FALSE_BLOCKS: { scenario: string; gate: string; utterance: string; issue: string; why: string }[] = [];
 
 export function gateProps(sc: Scenario, facts: Fact[], c: { gateChecked: number }): void {
   const key = (f: Fact) => f.group ?? f.id;
