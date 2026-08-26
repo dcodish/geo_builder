@@ -16,7 +16,8 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useRef } from 'react';
 import { color, fs, radius } from '../theme';
-import { applySymbol, type SymbolSpec } from '../symbols';
+import type { SymbolSpec } from '../symbols';
+import { SymbolRow } from './SymbolRow';
 
 export interface InputAreaProps {
   value: string;
@@ -71,18 +72,6 @@ export function InputArea({
 }: InputAreaProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const insert = (spec: SymbolSpec) => {
-    const el = inputRef.current;
-    const start = el?.selectionStart ?? value.length;
-    const end = el?.selectionEnd ?? start;
-    const next = applySymbol(value, start, end, spec);
-    onChange(next.value);
-    requestAnimationFrame(() => {
-      el?.focus();
-      el?.setSelectionRange(next.caret, next.caret);
-    });
-  };
-
   const previewText = preview ? preview(value) : null;
 
   return (
@@ -132,19 +121,9 @@ export function InputArea({
           {previewText}
         </div>
       )}
-      <div style={palette} dir="ltr">
-        {symbols.map((s) => (
-          <button
-            key={s.label + s.before}
-            type="button"
-            title={symbolTitle?.(s)}
-            style={sym}
-            onClick={() => insert(s)}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+      {/* #525: the palette row is the SHARED mechanism now (SymbolRow) — this surface mounts it
+          expanded, the secondary surfaces (query boxes, the fact-list editor) mount it collapsed */}
+      <SymbolRow symbols={symbols} symbolTitle={symbolTitle} value={value} onChange={onChange} inputRef={inputRef} />
       {children}
     </div>
   );
@@ -189,16 +168,6 @@ const previewStyle: CSSProperties = {
   border: `1px solid ${color.primaryBorder}`,
   borderRadius: radius.control,
   padding: '5px 10px',
-};
-const palette: CSSProperties = { display: 'flex', gap: 5, flexWrap: 'wrap' };
-const sym: CSSProperties = {
-  fontFamily: 'ui-monospace, Consolas, monospace',
-  fontSize: '0.92rem',
-  padding: '6px 10px',
-  background: color.surfaceDim,
-  border: `1px solid ${color.border}`,
-  borderRadius: 8,
-  cursor: 'pointer',
 };
 const quickRow: CSSProperties = { display: 'flex', gap: 6, flexWrap: 'wrap' };
 const quickChip: CSSProperties = {

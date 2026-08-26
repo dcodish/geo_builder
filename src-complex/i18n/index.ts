@@ -11,7 +11,8 @@ import { makeBidi } from '../../shell/bidi';
 import { createProductI18n } from '../../shell/i18n';
 
 /** The bidi kit — exported for composed (non-`t()`) strings and for the palette drift lock. */
-export const complexBidi = makeBidi();
+// #525: `_` joins the expression core — the d_{…} distance form must isolate as one LTR run
+export const complexBidi = makeBidi({ extraCore: '_' });
 
 const he = {
   // The suite's display names are the CURRICULUM's subject names (operator ruling 2026-08-17):
@@ -50,6 +51,7 @@ const he = {
   symDeg: 'מעלות',
   symPow: 'חזקה',
   symMul: 'כפל',
+  symDist: 'מרחק בין שתי נקודות',
   anotherConfig: 'הציגו תצורה אחרת', // #739: ONE wording for the row, every tool
   // #742 / ADR-W-024: the canvas cluster + the top-row image exports — the 2-D wording, every tool.
   resetView: 'איפוס תצוגה',
@@ -171,6 +173,7 @@ const he = {
   freedomPinned: 'הצורה נקבעה במלואה',
   stripUnsatisfied: 'לא מתקיים בתצורה הזו',
   stripUndecided: 'לא ניתן להכריע מהנתונים שניתנו',
+  paletteShow: 'סמלים',
   // #789 — the data-panel ask lane (the ADR-3D-057 shape): a question is never a fact
   askPlaceholder: 'למשל: שטח Oz1z2 או |z1-z2|',
   askAdd: 'שאלו',
@@ -213,6 +216,7 @@ const en = {
   symDeg: 'degrees',
   symPow: 'power',
   symMul: 'multiply',
+  symDist: 'distance between two points',
   anotherConfig: 'Show another configuration',
   // #742 / ADR-W-024: the canvas cluster + the top-row image exports — the 2-D wording, every tool.
   resetView: 'Reset view',
@@ -333,6 +337,7 @@ const en = {
   freedomPinned: 'the figure is fully determined',
   stripUnsatisfied: 'does not hold in this configuration',
   stripUndecided: 'cannot be decided from the givens',
+  paletteShow: 'Symbols',
   // #789 — the data-panel ask lane (the ADR-3D-057 shape): a question is never a fact
   askPlaceholder: 'e.g. area Oz1z2 or |z1-z2|',
   askAdd: 'Ask',

@@ -209,5 +209,8 @@
   },
   "questionDoc": {
     "given": "נתון:"
+  },
+  "palette": {
+    "show": "סמלים"
   }
 }

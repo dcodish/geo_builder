@@ -16,8 +16,10 @@
  * fakes an affordance).
  */
 import type { CSSProperties, ReactNode } from 'react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { color } from '../theme';
+import type { SymbolSpec } from '../symbols';
+import { SymbolRow } from './SymbolRow';
 
 export interface FactRow {
   id: string;
@@ -51,6 +53,12 @@ export interface FactListProps {
   footer?: ReactNode;
   /** Hook for the product's smoke/e2e scripts, applied to the list element. */
   testId?: string;
+  /** #525: the product's symbol palette, mounted (collapsed) under the ACTIVE edit box — a step
+   *  created with a glyph must be correctable without re-typing a character the UI refuses to
+   *  offer. Absent = no palette (the pre-#525 look). */
+  symbols?: readonly SymbolSpec[];
+  symbolTitle?: (spec: SymbolSpec) => string;
+  symbolsToggleTitle?: string;
 }
 
 export function FactList({
@@ -66,8 +74,12 @@ export function FactList({
   deleteLabel,
   footer,
   testId,
+  symbols,
+  symbolTitle,
+  symbolsToggleTitle,
 }: FactListProps) {
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const editRef = useRef<HTMLInputElement | null>(null);
 
   const commit = () => {
     if (!editing || !onEditCommit) return;
@@ -99,18 +111,33 @@ export function FactList({
               />
             )}
             {editing?.id === row.id ? (
-              <input
-                autoFocus
-                dir={editDir ? editDir(editing.text) : 'auto'}
-                value={editing.text}
-                onChange={(e) => setEditing({ id: row.id, text: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commit();
-                  if (e.key === 'Escape') setEditing(null);
-                }}
-                onBlur={commit}
-                style={editBox}
-              />
+              <div style={editWrap}>
+                <input
+                  ref={editRef}
+                  autoFocus
+                  dir={editDir ? editDir(editing.text) : 'auto'}
+                  value={editing.text}
+                  onChange={(e) => setEditing({ id: row.id, text: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commit();
+                    if (e.key === 'Escape') setEditing(null);
+                  }}
+                  onBlur={commit}
+                  style={editBox}
+                />
+                {symbols && (
+                  <SymbolRow
+                    symbols={symbols}
+                    symbolTitle={symbolTitle}
+                    value={editing.text}
+                    onChange={(text) => setEditing({ id: row.id, text })}
+                    inputRef={editRef}
+                    startCollapsed
+                    compact
+                    toggleTitle={symbolsToggleTitle}
+                  />
+                )}
+              </div>
             ) : (
               <div style={content}>
                 {row.content}
@@ -167,6 +194,7 @@ const rowSelected: CSSProperties = { borderColor: '#f59e0b', background: '#fffbe
 const toggle: CSSProperties = { flexShrink: 0, cursor: 'pointer' };
 const content: CSSProperties = { minWidth: 0, flex: 1 };
 const errorStyle: CSSProperties = { color: color.danger, fontSize: '0.8rem' };
+const editWrap: CSSProperties = { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 };
 const editBox: CSSProperties = {
   flex: 1,
   minWidth: 0,

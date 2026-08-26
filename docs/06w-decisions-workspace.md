@@ -1424,3 +1424,30 @@ Locks: `src3d/__tests__/restate-dedupe-613.test.ts` (8 tests — the three repor
 and what it names, the notice being cleared by the next statement, the disabled-twin re-enable, a
 DIFFERENT statement still appending, and the cross-language identity) and the 2-D conformance block in
 `src/app/__tests__/submitPipeline.test.ts`.
+
+## ADR-W-032 — The palette is how the app TYPES MATH: one SymbolRow, every text surface (#525)
+
+**Status:** Accepted (2026-08-26) · **Products:** 2d + 3d + complex + shell
+
+#525's diagnosis, now executed: the palette was bound to one `<input>`'s JSX rather than to "how
+this app types math", so every later text surface — both query boxes, the fact-list editor, the
+complex ask box — was born without it, and `∠ ° √ α d_{…}` were untypeable exactly where a student
+checks their own answer.
+
+**Decision.** The insert MECHANISM — chips, wrap-selection insert (`shell/symbols.applySymbol`),
+keep-focus/caret-restore, and a mousedown guard so a palette click never blurs its target (a blur
+COMMITS the fact-list edit, so without the guard the insert would land after the editor closed) —
+is one shared control, `shell/frame/SymbolRow`. The VOCABULARY stays each product's own
+(`SYMBOL_SPECS` / `SYMBOL_SPECS_3` / complex `SYMBOLS`), with its own parse/bidi drift locks, per
+the operator's original #525 ruling ("only relevant symbols appear per tool").
+
+Mounted: the shell InputArea (refactored onto it — the mains keep their exact look), the 2-D and
+3-D query boxes, the complex ask box, and the shared FactList editor (one mount, three products —
+the worst case the issue named: *"a step created with α cannot be corrected without re-typing a
+character the UI itself refuses to offer"*). Secondary surfaces mount COLLAPSED behind a small
+toggle (the issue's constraint), full vocabulary (its recommendation — trim only if it proves
+noisy). The complex palette gains the operator's distance chip `d_{}` (#791's grammar), and `_`
+joins complex's bidi expression core so `d_{AB}` isolates as one LTR run.
+
+Locks: `shell/__tests__/symbol-row.test.tsx` (mount contract), each product's existing palette
+drift locks (complex gains the `symDist` template), and the three product lanes green.

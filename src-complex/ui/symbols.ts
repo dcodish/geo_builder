@@ -25,6 +25,8 @@ export const SYMBOLS: readonly SymbolSpec[] = [
   { label: '°', titleKey: 'symDeg', before: '°' },
   { label: 'xⁿ', titleKey: 'symPow', before: '^' },
   { label: '·', titleKey: 'symMul', before: '*' },
+  // #791/#525 — the operator's distance chip: wraps the selection (or leaves the caret) inside
+  { label: 'd_{}', titleKey: 'symDist', before: 'd_{', after: '}' },
   { label: 'θ', titleKey: 'symTheta', before: 'θ' },
   { label: 'α', titleKey: 'symAlpha', before: 'α' },
   { label: 'β', titleKey: 'symBeta', before: 'β' },

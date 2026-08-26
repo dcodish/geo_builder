@@ -16,6 +16,7 @@ import { ToolButton } from '../shell/frame/ToolButton';
 // #745: and the shared RASTERISER — one svg→png in the workspace, not one per product.
 import { svgToPng } from '../shell/export/svgToPng';
 import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../shell/frame/canvasControls';
+import { SymbolRow } from '../shell/frame/SymbolRow';
 // #743: the under-canvas row's ONE look — the shell contract, replacing this tree's bare buttons.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
@@ -188,6 +189,7 @@ export function App() {
   // …and each saved question resolves to its answer (or its reason) against the current figure
   const askRows = useMemo(() => askRowsOf(queries, derived2.knowledge), [queries, derived2]);
   const [askText, setAskText] = useState('');
+  const askRef = useRef<HTMLInputElement | null>(null);
   /**
    * THE `n` STEPPER — display state, and nowhere else (ADR-CX-001 D3).
    *
@@ -407,6 +409,9 @@ export function App() {
               editLabel={t('factEdit')}
               onDelete={(id) => removeLine(Number(id))}
               deleteLabel={t('factDelete')}
+              symbols={SYMBOLS}
+              symbolTitle={(sy) => (sy.titleKey ? t(sy.titleKey) : sy.label)}
+              symbolsToggleTitle={t('paletteShow')}
               footer={
                 /* #739: נקה הכל moved to the under-canvas row (the one place it lives in every
                    tool); the footer keeps the example and the count. */
@@ -628,18 +633,32 @@ export function App() {
                   e.preventDefault();
                   if (submitQuery(askText)) setAskText('');
                 }}
-                style={{ display: 'flex', gap: 6, marginTop: 10 }}
+                style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}
               >
-                <input
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    ref={askRef}
+                    value={askText}
+                    onChange={(e) => setAskText(e.target.value)}
+                    placeholder={t('askPlaceholder')}
+                    dir="auto"
+                    style={{ minWidth: 0, flex: 1, border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', font: 'inherit' }}
+                  />
+                  <button type="submit" style={{ flexShrink: 0 }}>
+                    {t('askAdd')}
+                  </button>
+                </div>
+                {/* #525: the palette reaches every text surface — collapsed here (a cramped box) */}
+                <SymbolRow
+                  symbols={SYMBOLS}
+                  symbolTitle={(sy) => (sy.titleKey ? t(sy.titleKey) : sy.label)}
                   value={askText}
-                  onChange={(e) => setAskText(e.target.value)}
-                  placeholder={t('askPlaceholder')}
-                  dir="auto"
-                  style={{ minWidth: 0, flex: 1, border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', font: 'inherit' }}
+                  onChange={setAskText}
+                  inputRef={askRef}
+                  startCollapsed
+                  compact
+                  toggleTitle={t('paletteShow')}
                 />
-                <button type="submit" style={{ flexShrink: 0 }}>
-                  {t('askAdd')}
-                </button>
               </form>
               {/* the formula sheet, surfaced from what the figure DOES — each row names its premises */}
               {v2Formulas(derived2, i18n.language === 'he' ? 'he' : 'en').map((f) => (

@@ -35,6 +35,7 @@ const TEMPLATES: Record<
   symDeg: { value: 'z1 = 2cis30', sel: [11, 11], expected: 'z1 = 2cis30°' },
   symPow: { value: 'w = z1', sel: [6, 6], complete: '2', expected: 'w = z1^2' },
   symMul: { value: 'w = z1', sel: [6, 6], complete: 'z2', expected: 'w = z1*z2' },
+  symDist: { value: 'z1z2', sel: [0, 4], expected: 'd_{z1z2}' },
   symTheta: { value: 'z1 = 2cis(', sel: [10, 10], complete: ')', expected: 'z1 = 2cis(θ)' },
   symAlpha: { value: 'z1 = 2cis(', sel: [10, 10], complete: ')', expected: 'z1 = 2cis(α)' },
   symBeta: { value: 'z1 = 2cis(', sel: [10, 10], complete: ')', expected: 'z1 = 2cis(β)' },
