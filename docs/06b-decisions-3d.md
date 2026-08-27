@@ -4954,3 +4954,43 @@ makes it rarer.
 
 Locks: `src3d/parser/__tests__/issue-555.test.ts` (restored vertex-angle run, reversal, primes,
 ambiguity, pair exemption, superset exemption, byte-identical pass-through).
+## ADR-3D-172 — a MIXED shape-declaration run has an owner: bind the known, mint the undeclared (#774)
+
+**2026-08-27 · round #800.** Prod (sessions `bg01evje`, `sce6w3j4`): «משולש SEC» on a pyramid whose S
+and C exist refused `already-defined: S` — the shape rule claimed the line, the store rejected the
+first label that already existed, and the message blamed the apex the student had referenced
+CORRECTLY while the actual situation was one undeclared label (E). All-existing bound fine (#116),
+all-new declared fine; only the mixed run had no owner, and its accidental failure violated the
+honesty invariant that an error names the conflicting statement, never internal state.
+
+**Ruling (2026-08-25) and the class check (2026-08-26)** are on the issue: the mixed run BUILDS —
+«משולש XYZ» already builds three free points, so one free point in a partially-bound run is the same
+mechanism, and both 2-D (whole family) and 3-D's own «מלבן» lane (quad-shape ARM 2) already behave
+this way. The ownership table is now explicit and total in the `solid` case for FLAT kinds:
+
+| the label run is… | behaviour |
+| --- | --- |
+| all-new | declare a free shape (unchanged) |
+| all-existing | bind, positions unchanged (unchanged, #116) |
+| **mixed** | **bind the known labels, mint the undeclared ones as free points** |
+
+**The minted point is genuinely free (ADR-052).** A new `PointDef` kind `free3` — three sampled DOFs,
+spread-scaled off the placed figure (the `partial` pattern), riding the gauge, counted by
+`freeDofCount3` (+3, consistent with #370's count-them ruling) and moving on «show another
+configuration» — the conformance lock asserts the seed-spread. For a QUAD/PENTAGON the shape is flat
+by its own definition, so a single minted corner is an `on-plane` rider of the known corners' plane
+(2 DOFs — planarity is the shape's meaning, not an invented given; `materializePlaneRun` +
+the existing rider machinery, per ADR-W-006 hoisted rather than duplicated). A run whose fresh
+labels cannot be minted (a flat quad with two unknown corners) refuses naming the UNDECLARED label
+(`unknown-point`), never a label that was fine. The ring leaves its ink; sides already drawn as solid
+edges are not duplicated.
+
+**Scope honestly bounded:** the mixed arm covers the flat kinds (`polygon3/4/5` — «משולש», «מרובע»,
+«מחומש»). A mixed run on a GENUINE solid (a cube's letter run partially colliding) keeps the
+`already-defined` conflict — there the collision with the existing figure IS the problem. A shaped
+mixed run («משולש ישר זווית SEC») builds the triangle and routes its constraint through the ordinary
+M1 lanes; constraints that would need to DRIVE a `free3` point are not yet wired to it — recorded
+here rather than half-built.
+
+2-D measured and untouched (its family already builds these; the branch diff carries no `src/` file).
+Locks: `src3d/__tests__/issue-774.test.ts`.

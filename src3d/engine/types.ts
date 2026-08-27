@@ -903,7 +903,11 @@ export type PointDef =
   | { kind: 'right-pyramid-apex'; a: Id; b: Id; base: Id[] }
   | { kind: 'rev-point'; rev: number; role: 'center' | 'apex' }
   | { kind: 'vec-defined'; def: number } // solved from construction.vecDefs[def]
-  | { kind: 'vec-pair'; def1: number; def2: number }; // the cevian intersection (two symbol relations)
+  | { kind: 'vec-pair'; def1: number; def2: number } // the cevian intersection (two symbol relations)
+  // #774 (ADR-3D-172): a point minted by a MIXED shape-declaration run («משולש SEC» where S, C
+  // exist and E does not) — genuinely free: 3 sampled DOFs (ADR-052), counted by freeDofCount3,
+  // moving on «show another configuration», riding the gauge like every figure-side point.
+  | { kind: 'free3' };
 
 export interface Construction3 {
   solids: SolidObj[];

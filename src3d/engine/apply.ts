@@ -600,6 +600,41 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // NEW points still builds; a genuine SOLID (cube/prism/…) re-declaration keeps the conflict error.
       const flat = polygonN(cmd.kind) !== null;
       if (flat && cmd.ids.every((id) => c.points.has(id))) return { ok: true, next: c };
+      // #774 (ADR-3D-172): the MIXED run — some labels exist, some are new. Ownership is explicit
+      // and total (docs/17: one rule owns the form, never an accident downstream): all-new declares
+      // a free shape (below), all-existing binds (above), and a mixed run BINDS the known labels
+      // and MINTS the undeclared ones as genuinely free points. The old path walked into the
+      // `already-defined` refusal below and blamed the FIRST existing label («משולש SEC» → "S") —
+      // an error message naming an operand that was never the problem. Ruling 2026-08-25: the
+      // consistency argument — «משולש XYZ» already builds three free points, so one free point in
+      // a partially-bound run is the same mechanism; 2-D and 3-D's own «מלבן» lane already behave
+      // this way.
+      if (flat && cmd.ids.some((id) => c.points.has(id))) {
+        const fresh = cmd.ids.filter((id) => !c.points.has(id));
+        const known = cmd.ids.filter((id) => c.points.has(id));
+        const next = clone(c);
+        if (polygonN(cmd.kind) === 3) {
+          // a triangle is planar whatever its corners: each minted point is free3 (3 sampled DOFs,
+          // ADR-052 — counted by freeDofCount3, moving on «show another configuration»)
+          for (const id of fresh) next.points.set(id, { kind: 'free3' });
+        } else if (fresh.length === 1 && known.length >= 3) {
+          // a quad/pentagon is FLAT by its own definition — the one minted corner rides the plane
+          // of the known ones (2 free DOFs; planarity is the shape's meaning, not an invented given)
+          materializePlaneRun(next, known);
+          next.points.set(fresh[0], { kind: 'on-plane', plane: known.join('') });
+        } else {
+          // not mintable (a flat quad with two unknown corners has no owner yet): the refusal
+          // names the UNDECLARED label — never a label that was fine (the honesty invariant)
+          return { ok: false, error: { code: 'unknown-point', id: fresh[0] } };
+        }
+        // the ring's ink — the minted point's only visible meaning is the shape it closes
+        const ringN = cmd.ids.length;
+        for (let j = 0; j < ringN; j++) {
+          const [a, b] = [cmd.ids[j], cmd.ids[(j + 1) % ringN]];
+          if (!hasSegment(next, a, b)) next.segments.push([a, b]);
+        }
+        return { ok: true, next };
+      }
       // #199 M1 (ADR-3D-047): re-DECLARING an existing solid (same kind, same ids) is a statement
       // about the figure, not a re-creation — idempotent no-op (the solid-shaped sibling of the
       // #116 flat-polygon path above and the segment3 convention below). A different kind or a
