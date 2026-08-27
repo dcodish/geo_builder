@@ -82,10 +82,22 @@ describe('#775 — the isosceles roles, and the honest refusals', () => {
     }
   });
 
-  it('an AMBIGUOUS role (which leg?) refuses naming the role, never guesses', () => {
-    const r = parse('תיכון לשוק', iso);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r).toEqual({ ok: false, reason: 'role-side-unresolved', role: 'שוק' });
+  it('«גובה לשוק» / «תיכון לשוק» DRAW ONE leg deterministically (#805 play, ADR-465 Am. 1)', () => {
+    // the one isosceles' two legs are congruent by the declaring constraint — the drawing is
+    // symmetric in them, so the pick is pure gauge (the parallelogram-height precedent)
+    for (const u of ['גובה לשוק', 'תיכון לשוק']) {
+      const r = parse(u, iso);
+      expect(r.ok, u).toBe(true);
+      if (r.ok) {
+        const target = r.commands.find((c) => c.type === 'midpoint' || c.type === 'foot') as { a: string; b: string };
+        const edge = [target.a, target.b].sort().join('');
+        expect(['AB', 'AC'], u).toContain(edge); // one of THE legs, never the base
+      }
+    }
+    // determinism: the same utterance always picks the same leg
+    const a = parse('גובה לשוק', iso);
+    const b = parse('גובה לשוק', iso);
+    if (a.ok && b.ok) expect(a.commands).toEqual(b.commands);
   });
 
   it('a role with NO referent refuses naming the role — a plain triangle has no hypotenuse', () => {

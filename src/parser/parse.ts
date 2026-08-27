@@ -7601,8 +7601,17 @@ const roleSideLine: Rule = (s, ctx) => {
   const noun = m[1] ?? m[2] ?? '';
   const role = /יתר|hypotenuse/i.test(noun) ? 'hypotenuse' : /בסיס|base/i.test(noun) ? 'base' : 'leg';
   const cands = (ctx.roleSides ?? []).filter((r) => r.role === role);
-  if (cands.length !== 1) return { clarify: 'role-side-unresolved', role: noun };
-  const [p, q] = cands[0].edge;
+  // #805 play (ADR-465 Am. 1): «גובה לשוק» on ONE isosceles has two candidates, but the legs are
+  // CONGRUENT by the very constraint that makes them legs — the drawing is symmetric in them, so
+  // which leg is pure gauge, and drawing one deterministically beats refusing (the parallelogram-
+  // height precedent: ambiguous-but-real draws one, it does not refuse). More than one declaring
+  // triangle (4+ legs) stays a genuine ambiguity — clarify.
+  const pick =
+    cands.length === 1 ? cands[0]
+    : role === 'leg' && cands.length === 2 ? cands[0]
+    : null;
+  if (!pick) return { clarify: 'role-side-unresolved', role: noun };
+  const [p, q] = pick.edge;
   const heb = /[א-ת]/.test(s);
   // a run restating the side right after the role noun («תיכון ליתר AB») folds into the rewrite;
   // any other letters stay untouched for the letter-form rules to read

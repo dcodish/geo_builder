@@ -8163,3 +8163,9 @@ Locks: `src/parser/__tests__/issue-775.test.ts` — the `ks1up71f` replay (right
 median lands on AB from C), the altitude parity, the restated-run fold, «על צלע» ≡ «לצלע», the
 isosceles base for both heads, the ambiguous-leg and no-referent refusals, and the CLASS lock: a
 later-declared «זווית ABC = 90» induces the hypotenuse exactly like the macro.
+
+**Am. 1 (2026-08-27, #805 play).** The operator: «גובה לשוק» on «משולש שווה שוקיים» refused. With ONE
+declaring isosceles the two leg candidates are CONGRUENT by the very constraint that makes them legs —
+the drawing is symmetric in them, so which leg is pure gauge, and the resolver now draws one
+deterministically instead of refusing (the parallelogram-height precedent: an ambiguous-but-real
+construct draws one). More than one declaring triangle stays a genuine clarification.
