@@ -8169,3 +8169,14 @@ declaring isosceles the two leg candidates are CONGRUENT by the very constraint 
 the drawing is symmetric in them, so which leg is pure gauge, and the resolver now draws one
 deterministically instead of refusing (the parallelogram-height precedent: an ambiguous-but-real
 construct draws one). More than one declaring triangle stays a genuine clarification.
+
+**Am. 2 (2026-08-27, #805 play, second pass).** The operator: repeating «גובה לשוק» stacked
+auto-named feet on one spot. Three mechanisms, one behaviour: (1) letters after the role noun SELECT
+the candidate — «גובה לשוק AC» names which leg; (2) the leg pick ROTATES — a leg already carrying
+this head's construct (a foot for the altitude head, a midpoint for the median head) yields to the
+free one, so the second «גובה לשוק» lands on the other leg (the repeated-tangent avoid pattern);
+(3) the auto-named median/altitude lowerings REUSE an existing midpoint/foot of the resolved side
+(`ctx.midpointOf` + the new `ctx.feet`) at every freeLabel site, so a repeat re-lowers to the
+IDENTICAL commands and the #613 restate-dedupe reads it as «already stated» — no new row, no
+stacked points. The reuse is the CLASS fix: it serves the letter forms («גובה לצלע BC» repeated)
+exactly as the role forms.

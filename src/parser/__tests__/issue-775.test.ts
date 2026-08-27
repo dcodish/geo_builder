@@ -82,22 +82,48 @@ describe('#775 — the isosceles roles, and the honest refusals', () => {
     }
   });
 
-  it('«גובה לשוק» / «תיכון לשוק» DRAW ONE leg deterministically (#805 play, ADR-465 Am. 1)', () => {
-    // the one isosceles' two legs are congruent by the declaring constraint — the drawing is
-    // symmetric in them, so the pick is pure gauge (the parallelogram-height precedent)
-    for (const u of ['גובה לשוק', 'תיכון לשוק']) {
-      const r = parse(u, iso);
+  it('«גובה לשוק» repetition semantics (#805 play, ADR-465 Am. 1+2): first leg, then the OTHER, then dedupe', () => {
+    // The operator's exact complaint: repeating «גובה לשוק» stacked auto-named feet on one spot.
+    // Now: the 1st takes a leg, the 2nd ROTATES to the unoccupied leg, and the 3rd re-lowers
+    // IDENTICALLY to the 1st (foot reuse), which the #613 restate-dedupe reads as «already stated».
+    const facts: Fact[] = [];
+    let g = 0;
+    const lower = (u: string) => {
+      const { construction, positions } = replay(facts, 0);
+      const r = parse(u, buildParseCtx(construction, positions));
       expect(r.ok, u).toBe(true);
-      if (r.ok) {
-        const target = r.commands.find((c) => c.type === 'midpoint' || c.type === 'foot') as { a: string; b: string };
-        const edge = [target.a, target.b].sort().join('');
-        expect(['AB', 'AC'], u).toContain(edge); // one of THE legs, never the base
-      }
-    }
-    // determinism: the same utterance always picks the same leg
-    const a = parse('גובה לשוק', iso);
-    const b = parse('גובה לשוק', iso);
-    if (a.ok && b.ok) expect(a.commands).toEqual(b.commands);
+      return r.ok ? r.commands : [];
+    };
+    const commit = (u: string) => {
+      const cmds = lower(u);
+      const grp = `g${g++}`;
+      cmds.forEach((cmd) => facts.push({ id: `${grp}.${facts.length}`, utterance: u, group: grp, cmd, enabled: true }));
+      return cmds;
+    };
+    commit('משולש שווה שוקיים ABC');
+    const first = commit('גובה לשוק');
+    const second = commit('גובה לשוק');
+    const sideOf = (cmds: unknown[]): string => {
+      const f = (cmds as { type: string; a: string; b: string }[]).find((c) => c.type === 'foot')!;
+      return [f.a, f.b].sort().join('');
+    };
+    expect(['AB', 'AC']).toContain(sideOf(first));
+    expect(['AB', 'AC']).toContain(sideOf(second));
+    expect(sideOf(second), 'the repeat rotates to the OTHER leg').not.toBe(sideOf(first));
+    // the 3rd re-lowers byte-identically to the 1st — the #613 dedupe's trigger, so no pile-up
+    expect(lower('גובה לשוק')).toEqual(first);
+    // explicit selection: letters after the role noun name WHICH leg
+    const r = parse('גובה לשוק AC', buildParseCtx(replay(facts, 0).construction, replay(facts, 0).positions));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(sideOf(r.commands)).toBe('AC');
+    // the median head keeps its own independent rotation
+    const m1 = commit('תיכון לשוק');
+    const m2 = lower('תיכון לשוק');
+    const midSide = (cmds: unknown[]): string => {
+      const f = (cmds as { type: string; a: string; b: string }[]).find((c) => c.type === 'midpoint')!;
+      return [f.a, f.b].sort().join('');
+    };
+    expect(midSide(m2), 'the median rotates independently of the altitude').not.toBe(midSide(m1));
   });
 
   it('a role with NO referent refuses naming the role — a plain triangle has no hypotenuse', () => {

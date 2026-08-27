@@ -132,6 +132,8 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
       construction.objects.flatMap((o) => (o.kind === 'midpoint' ? [[o.id, [o.a, o.b]] as [Id, [Id, Id]]] : [])),
     ), // which side an existing midpoint bisects — lets a base-less named midsegment anchor on it (ADR-199 Am.)
     parallels: parallelEdgePairs(construction, positions), // "height from C" drops to a trapezoid's opposite base (ADR-169)
+    // #805 play (ADR-465 Am. 2): existing altitude feet — repeated auto-named altitudes reuse them
+    feet: construction.objects.flatMap((o) => (o.kind === 'foot' ? [{ id: o.id, from: o.from, a: o.a, b: o.b }] : [])),
     lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // idempotent construct reuse
     tangentAuxes: construction.objects.flatMap((o) => (o.kind === 'circle' && o.id.startsWith('tanaux-') ? [o.id] : [])), // existing Thales tangent-aux circles — a 2nd single tangent from the SAME apex takes the OTHER branch (issue #142)
     polygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])), // definite "the quad" binds to the existing one
