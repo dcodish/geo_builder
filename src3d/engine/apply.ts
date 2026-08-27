@@ -599,7 +599,23 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // `solid-vertex` points) so the accompanying constraint (e.g. the ∠=90) applies. A polygon that adds
       // NEW points still builds; a genuine SOLID (cube/prism/…) re-declaration keeps the conflict error.
       const flat = polygonN(cmd.kind) !== null;
-      if (flat && cmd.ids.every((id) => c.points.has(id))) return { ok: true, next: c };
+      if (flat && cmd.ids.every((id) => c.points.has(id))) {
+        // #774 Am. (#807 play): a stated flat shape must leave its VISIBLE trace (ADR-3D-035) even
+        // when it only references existing points — «מרובע ABCE» after «משולש SEC» was green with
+        // the AE side missing. Draw the boundary ring idempotently (sides already drawn as solid
+        // edges or segments are skipped); with nothing to draw this stays the #116 pure no-op.
+        const nextRef = clone(c);
+        let drew = false;
+        const nRef = cmd.ids.length;
+        for (let j = 0; j < nRef; j++) {
+          const [a, b] = [cmd.ids[j], cmd.ids[(j + 1) % nRef]];
+          if (!hasSegment(nextRef, a, b)) {
+            nextRef.segments.push([a, b]);
+            drew = true;
+          }
+        }
+        return { ok: true, next: drew ? nextRef : c };
+      }
       // #774 (ADR-3D-172): the MIXED run — some labels exist, some are new. Ownership is explicit
       // and total (docs/17: one rule owns the form, never an accident downstream): all-new declares
       // a free shape (below), all-existing binds (above), and a mixed run BINDS the known labels

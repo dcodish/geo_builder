@@ -103,4 +103,21 @@ describe('#774 — «מרובע ABCE»: the quad stays a QUAD — flat by defini
     submit('מרובע ABXY'); // two unknown corners of a flat quad — no owner yet
     expect(err()).toEqual({ code: 'unknown-point', id: 'X' });
   });
+
+  it('the operator sequence (#807 play): «מרובע ABCE» AFTER «משולש SEC» draws the missing AE side', () => {
+    // E already exists (minted by the triangle), so the quad takes the ALL-EXISTING reference path —
+    // which used to be a pure no-op: green, with the AE side simply absent until typed by hand.
+    // A stated shape leaves its visible trace (ADR-3D-035), idempotently.
+    submit(PYRAMID);
+    submit('משולש SEC');
+    submit('מרובע ABCE');
+    expect(err()).toBeNull();
+    const d = derive3(state().facts, 0);
+    const segs = d.construction.segments.map((s) => [...s].sort().join('-'));
+    expect(segs).toContain('A-E'); // the side the operator had to draw by hand
+    // and idempotent: restating adds nothing
+    const before = derive3(state().facts, 0).construction.segments.length;
+    submit('מרובע ABCE');
+    expect(derive3(state().facts, 0).construction.segments.length).toBe(before);
+  });
 });

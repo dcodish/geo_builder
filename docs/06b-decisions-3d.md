@@ -4993,4 +4993,11 @@ M1 lanes; constraints that would need to DRIVE a `free3` point are not yet wired
 here rather than half-built.
 
 2-D measured and untouched (its family already builds these; the branch diff carries no `src/` file).
-Locks: `src3d/__tests__/issue-774.test.ts`.
+
+**Am. 1 (2026-08-27, #807 play).** The operator: «מרובע ABCE» after «משולש SEC» was green with the AE
+side missing until typed by hand — E already existed, so the quad took the ALL-EXISTING reference
+path, a pure no-op since #116. A stated flat shape leaves its VISIBLE trace (ADR-3D-035): the
+reference path now draws the boundary ring idempotently (sides already present as solid edges or
+segments are skipped, so «משולש SAB» over three pyramid edges stays the byte-identical no-op).
+
+Locks: `src3d/__tests__/issue-774.test.ts` (incl. the operator's exact #807 sequence + idempotency).
