@@ -73,6 +73,7 @@
     "shapeNotFound": "There is no {{noun}} in this figure — check the shape name, or declare it first (e.g. \"{{noun}} ABCD\").",
     "producedNothing": "I understood that but it didn't build anything on the figure — I tried rephrasing it too. Check the names/relations, or word it differently.",
     "alreadyDrawn": "That's already on the figure — nothing to add.",
+    "roleSideUnresolved": "The figure has no single side matching \"{{role}}\" — declare the matching triangle first (e.g. \"right triangle ABC\" for the hypotenuse, \"isosceles triangle ABC\" for the base), or name the side by its letters (e.g. \"median to side AB\").",
     "ambiguousAngle": "There's more than one angle at {{vertex}}, so I can't tell which one you mean. Name all three letters of the angle — e.g. \"∠A{{vertex}}C = 90\" — or give it a name: \"denote angle A{{vertex}}C as {{vertex}}1\".",
     "aliasTaken": "The name {{name}} is already taken on this figure, so it can't name an angle. Pick another name — e.g. a letter with a different digit.",
     "reservedSymbol": "The letter {{symbol}} denotes the circle's radius, not a point. Pick another letter for a point on the circle.",

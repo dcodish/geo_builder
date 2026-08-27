@@ -8132,3 +8132,34 @@ is exactly the intended preemption (the compound runs before the membership rule
 the magnitude). Locks: `src/parser/__tests__/issue-760.test.ts` (the class battery + fall-through)
 and fixture `issue-760-point-at-distance.geo.json` (builds green; |AB| = 8, |AD| = 3 verified in
 the drawing).
+## ADR-465 — a side named by its ROLE resolves against the DECLARED shape (#775)
+
+**2026-08-27 · round #800.** Prod (session `ks1up71f`): «תיכון ליתר» — the median to the hypotenuse,
+the phrasing a textbook uses for the right-triangle chapter's most common construction — escalated
+to the paid LLM twice. The special-line side matchers accepted «צלע XY» + «ל» and nothing else, and
+the hole demonstrably sat in the SHARED slot: the median and the altitude heads failed identically.
+
+**Decision — one resolver, rewrite-and-re-parse.** `buildParseCtx` derives `roleSides`
+SEMANTICALLY, off declared structure only (the right-triangle macro's structural perp-offset, a
+⟂/90° constraint at a triangle vertex, the isosceles variant's equal-sides constraint) — never off
+drawn coordinates, so a side that merely measures equal at this seed can never become «הבסיס»
+(ADR-052, the #770 neighbouring-resolver defect deliberately not copied). A new early rule
+(`roleSideLine`) fires on a special-line head + a role noun (היתר / הבסיס / השוק·שוקיים, En
+hypotenuse/base/leg), resolves the unique referent, and REWRITES the utterance to the letter form
+(«תיכון לצלע AB») for the ordinary re-parse — so both heads, and any future special line sharing
+the side matchers, are served by one resolver; a run restating the side folds in («תיכון ליתר AB»).
+No unique referent → a typed clarification `role-side-unresolved` NAMING THE ROLE — never an
+arbitrary side, and never an escalation the LLM would have to invent a side for. A QUALIFIED base
+(«הבסיס הגדול») is deliberately excluded — the qualifier means the student is more specific than
+this resolver. The «על» preposition joined the three letter-form side matchers («תיכון על צלע BC»,
+the carried-over prod row).
+
+**The catalog contract grew a truthful cell:** a figure-dependent example cannot `.ok` standalone,
+so `CommandDoc.needsFigure` marks it and the coverage harnesses assert DETERMINISTIC RECOGNITION
+(a typed reason, never a silent `not-handled`) — the PAR-10 map now pins typed refusals as
+`<reason>`, keeping the silent-degrade ban intact.
+
+Locks: `src/parser/__tests__/issue-775.test.ts` — the `ks1up71f` replay (right triangle → the
+median lands on AB from C), the altitude parity, the restated-run fold, «על צלע» ≡ «לצלע», the
+isosceles base for both heads, the ambiguous-leg and no-referent refusals, and the CLASS lock: a
+later-declared «זווית ABC = 90» induces the hypotenuse exactly like the macro.

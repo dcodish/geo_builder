@@ -40,7 +40,9 @@ describe('PAR-10 (a) — every PROMPT_EXAMPLES step parses (the prompt teaches o
 describe('PAR-10 (b) — supported catalog examples parse to stable command types (He + En)', () => {
   const typesOf = (u: string): string[] => {
     const r = parse(u);
-    return r.ok ? r.commands.map((c) => c.type) : ['<not-handled>'];
+    // #775: a typed refusal is a RECOGNIZED, pinned outcome (a figure-dependent example clarifies
+    // standalone); only the silent `not-handled` degrade stays banned below.
+    return r.ok ? r.commands.map((c) => c.type) : [`<${r.reason}>`];
   };
   it('the {example → command types} map is pinned — a rule shadow that flips a line while still `.ok` breaks this', () => {
     const map: Record<string, { en: string[]; he: string[] }> = {};

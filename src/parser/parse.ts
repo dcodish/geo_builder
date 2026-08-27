@@ -58,7 +58,10 @@ export type ParseResult =
   // A BOUND radius SYMBOL (ctx.radiusSymbols — «רדיוס מעגל O הוא R») reused as a POINT label («מיתר AR»):
   // once bound, the letter IS the parametric measure, never a node (operator ruling 2026-07-18, #198). The
   // student picks another letter — a deterministic clarification, never a paid LLM call that mints a node R.
-  | { ok: false; reason: 'reserved-symbol'; symbol: string };
+  | { ok: false; reason: 'reserved-symbol'; symbol: string }
+  /** #775: a side named by its ROLE («ליתר», «לבסיס») with no unique referent in the figure —
+   *  clarify rather than guess a side or burn an escalation on a form the LLM must not invent for. */
+  | { ok: false; reason: 'role-side-unresolved'; role: string };
 
 /**
  * Figure context the parser may consult to resolve implicit references — chiefly
@@ -154,6 +157,11 @@ export interface ParseContext {
   /** Each referenceable centre's drawn x-position — «המעגל הימני/השמאלי» (right/left) resolves a
    *  POINTING gesture against the drawing the student sees (#188 / ADR-349). */
   circleXs?: { center: string; x: number }[];
+  /** #775: side ROLES the figure's declarations induce («היתר» — the right triangle's hypotenuse,
+   *  «הבסיס»/«השוק» — the isosceles base/legs), derived SEMANTICALLY from declared structure in
+   *  `buildParseCtx`, never from drawn coordinates. A role noun with no unique referent refuses
+   *  naming the statement — it never falls back to an arbitrary side (ADR-052). */
+  roleSides?: { role: 'hypotenuse' | 'base' | 'leg'; edge: [string, string] }[];
 }
 
 /** The centre of a circle that contains EVERY point in `pts` (preferring `prefer` if it qualifies), else null. */
@@ -216,7 +224,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string };
+type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -7573,6 +7581,39 @@ const APEX_FROM = String.raw`(?:\bfrom\s+(?:the\s+)?(?:point\s+|vertex\s+)?|מ-?
 const LOCATIVE_APEX = String.raw`(?:%KW%)\s+(?:ב-?\s*(?:ה?נקודה|ה?קודקוד)\s+|at\s+(?:the\s+)?(?:point|vertex)\s+)(${LABEL})\b`;
 
 /**
+ * #775 — a special line to a side named by its ROLE: «תיכון ליתר» (the median to the hypotenuse),
+ * «גובה ליתר», «תיכון לבסיס», En "median to the hypotenuse". The role noun resolves against the
+ * figure's DECLARED structure (`ctx.roleSides` — the right triangle's hypotenuse, the isosceles
+ * base/legs) and the utterance is REWRITTEN to the letter form («תיכון לצלע AB»), then re-parsed —
+ * so every head sharing the side matchers (median AND altitude, and any future special line) is
+ * served by one resolver, and the tested letter-form lowering derives the semantics. A role noun
+ * with no unique referent CLARIFIES, naming the role — never an arbitrary side (ADR-052), and never
+ * an escalation the LLM would have to guess a side for. «הבסיס הגדול/הקטן» (a qualified trapezoid
+ * base) is deliberately left to richer rules/the LLM — the qualifier means the student is being
+ * more specific than this resolver.
+ */
+const SPECIAL_LINE_HEAD = /תיכון|גובה|\bmedian\b|\bheight\b|\baltitude\b/i;
+const ROLE_NOUN_RX = /(?<![א-ת])(?:ל|על\s+|אל\s+)ה?(יתר|בסיס(?!\s*ה?(?:גדול|קטן))|שוקיים|שוק)(?![א-ת])|\b(?:to|onto|on)\s+the\s+(hypotenuse|base|legs?)\b/i;
+const roleSideLine: Rule = (s, ctx) => {
+  if (!SPECIAL_LINE_HEAD.test(s)) return null;
+  const m = s.match(ROLE_NOUN_RX);
+  if (!m) return null;
+  const noun = m[1] ?? m[2] ?? '';
+  const role = /יתר|hypotenuse/i.test(noun) ? 'hypotenuse' : /בסיס|base/i.test(noun) ? 'base' : 'leg';
+  const cands = (ctx.roleSides ?? []).filter((r) => r.role === role);
+  if (cands.length !== 1) return { clarify: 'role-side-unresolved', role: noun };
+  const [p, q] = cands[0].edge;
+  const heb = /[א-ת]/.test(s);
+  // a run restating the side right after the role noun («תיכון ליתר AB») folds into the rewrite;
+  // any other letters stay untouched for the letter-form rules to read
+  const restated = rx(String.raw`(?:${ROLE_NOUN_RX.source})\s*(?:${p}${q}|${q}${p})(?![A-Za-z\d])`, 'i');
+  const target = heb ? ` לצלע ${p}${q} ` : ` to side ${p}${q} `;
+  const rewritten = (restated.test(s) ? s.replace(restated, target) : s.replace(ROLE_NOUN_RX, target)).replace(/\s+/g, ' ').trim();
+  const r = parse(rewritten, ctx);
+  return r.ok ? r.commands : null;
+};
+
+/**
  * "median from A in ABC" / "תיכון מ-A במשולש ABC" — the median from a vertex to the
  * midpoint of the opposite side. Emits the triangle (idempotent if it exists),
  * the opposite-side midpoint, and the segment to it.
@@ -7580,8 +7621,8 @@ const LOCATIVE_APEX = String.raw`(?:%KW%)\s+(?:ב-?\s*(?:ה?נקודה|ה?קוד
 const median: Rule = (s, ctx) => {
   if (!/\bmedian\b|תיכון/i.test(s)) return null;
 
-  // An explicitly named opposite side: "to side BC" / "to BC" / "לצלע BC" / "אל BC" / "ל-BC".
-  const sideM = s.match(/(?:\bto\s+(?:side\s+)?|לצלע\s*|אל\s*|ל-?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  // An explicitly named opposite side: "to side BC" / "to BC" / "לצלע BC" / "על צלע BC" / "אל BC" / "ל-BC".
+  const sideM = s.match(/(?:\bto\s+(?:side\s+)?|\bon\s+side\s+|לצלע\s*|על\s+ה?צלע\s+|אל\s*|ל-?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   const side = sideM ? ([up(sideM[1]), up(sideM[2])] as [Id, Id]) : null;
 
   // Named form "AD תיכון" / "median AD": the median segment is named apex-first,
@@ -7775,7 +7816,7 @@ const altitude: Rule = (s, ctx) => {
     // determinate apex).
     if (!isHeight) return null;
     const sideOnly = s.match(
-      /(?:\bto\s+(?:the\s+)?(?:side\s+)?|אל\s*(?:ה?צלע\s+)?|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+      /(?:\bto\s+(?:the\s+)?(?:side\s+)?|\bon\s+side\s+|אל\s*(?:ה?צלע\s+)?|על\s+ה?צלע\s+|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
     );
     if (!sideOnly) return null;
     const sd: [Id, Id] = [up(sideOnly[1]), up(sideOnly[2])];
@@ -7791,8 +7832,8 @@ const altitude: Rule = (s, ctx) => {
       { type: 'segment', a: apx, b: foot2 },
     ];
   }
-  // Opposite side: "to BC" / "to side BC" / "ל BC" / "ל-BC" / "לצלע BC" / "לקטע BC" (descriptor noun tolerated).
-  const sideM = s.match(/(?:\bto\s+(?:the\s+)?(?:side\s+)?|אל\s*(?:ה?צלע\s+)?|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // explicit opposite side "to BC"
+  // Opposite side: "to BC" / "to side BC" / "ל BC" / "ל-BC" / "לצלע BC" / "על צלע BC" / "לקטע BC" (descriptor noun tolerated).
+  const sideM = s.match(/(?:\bto\s+(?:the\s+)?(?:side\s+)?|\bon\s+side\s+|אל\s*(?:ה?צלע\s+)?|על\s+ה?צלע\s+|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // explicit opposite side "to BC"
   let p: string, q: string;
   let tri: Id[] | null = null;
   if (sideM && up(sideM[1]) !== apex) {
@@ -8358,6 +8399,7 @@ const showCenter: Rule = (s, ctx) => {
 export const RULES: Rule[] = [
   compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
   compoundAtDistance, // #760: "<point> on <carrier> at distance N from X" — membership + set-distance, composed
+  roleSideLine, // #775: «תיכון ליתר» — role noun → the declared side, rewritten and re-parsed
   multiStatement, // "AB = 4, BC = 6" — split comma/and-joined GIVENS, parse each all-or-nothing (PAR-2)
   setRadius, // "radius of circle P is 4" — set an EXISTING circle's radius; before `circle` (creation) and the shape rules (which 'stop' on רדיוס)
   radiusSymbolStatement, // "רדיוס מעגל O הוא R" — NAME an existing circle's radius with a letter (#54); after setRadius (numeric wins), before the shape rules
@@ -9920,6 +9962,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
     if (res.clarify === 'ambiguous-container') return { ok: false, reason: 'ambiguous-container', centers: res.centers };
     if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };
     if (res.clarify === 'alias-taken') return { ok: false, reason: 'alias-taken', name: res.name };
+    if (res.clarify === 'role-side-unresolved') return { ok: false, reason: 'role-side-unresolved', role: res.role };
     return { ok: false, reason: 'ambiguous-circle', center: res.center };
   }
   return { ok: false, reason: 'not-handled' };

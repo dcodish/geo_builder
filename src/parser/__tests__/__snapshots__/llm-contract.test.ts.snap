@@ -1318,6 +1318,14 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "segment",
     ],
   },
+  "median to the hypotenuse": {
+    "en": [
+      "<role-side-unresolved>",
+    ],
+    "he": [
+      "<role-side-unresolved>",
+    ],
+  },
   "midpoint of AB": {
     "en": [
       "segment",

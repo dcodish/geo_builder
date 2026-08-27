@@ -11,7 +11,7 @@
  * reuses one `replay` for both the context and its own `before` figure.
  */
 
-import type { Construction, Id, Vec } from '@/engine';
+import type { Construction, GeoObject, Id, Vec } from '@/engine';
 import { isGeoPoint, circleMembers, pointNeighbors, parallelEdgePairs } from '@/engine';
 import type { ParseContext } from './parse';
 
@@ -138,6 +138,55 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     // #770: the DECLARED kind travels with each ring, so a definite shape noun («אלכסוני הריבוע»)
     // resolves on what the student named, never on "whichever quad exists".
     declaredPolygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [{ vertices: o.vertices, kind: o.declaredAs }] : [])),
+    // #775: side ROLES the figure's declarations induce — «תיכון ליתר» resolves the hypotenuse of the
+    // right triangle, «לבסיס» the isosceles base. SEMANTIC on purpose: read off the declared structure
+    // (the perp-offset the right-triangle macro builds, a ⟂/90° constraint at a triangle vertex, the
+    // equal-sides constraint the isosceles variant lowers to) — never off drawn coordinates, so a side
+    // that merely MEASURES equal at this seed never becomes «the base» (ADR-052).
+    roleSides: (() => {
+      const out: { role: 'hypotenuse' | 'base' | 'leg'; edge: [Id, Id] }[] = [];
+      const push = (role: 'hypotenuse' | 'base' | 'leg', edge: [Id, Id]): void => {
+        if (!out.some((r) => r.role === role && ((r.edge[0] === edge[0] && r.edge[1] === edge[1]) || (r.edge[0] === edge[1] && r.edge[1] === edge[0])))) out.push({ role, edge });
+      };
+      const tris = construction.objects.filter((o): o is Extract<GeoObject, { kind: 'polygon' }> => o.kind === 'polygon' && o.vertices.length === 3);
+      /** The vertex both segments share, when segments (a,b) and (c,d) meet at one point. */
+      const sharedVertex = (a: Id, b: Id, c: Id, d: Id): Id | null => {
+        const shared = [a, b].filter((x) => x === c || x === d);
+        return shared.length === 1 ? shared[0] : null;
+      };
+      for (const t of tris) {
+        const vs = t.vertices;
+        const inTri = (id: Id): boolean => vs.includes(id);
+        const rightAt = new Set<Id>();
+        for (const o of construction.objects) {
+          // the right-triangle macro's structural build: the perp-offset anchored at the right-angle vertex
+          if (o.kind === 'perp-offset' && inTri(o.anchor) && inTri(o.to) && inTri(o.id) && o.anchor === o.from) rightAt.add(o.anchor);
+        }
+        for (const con of construction.constraints) {
+          if (con.type === 'perpendicular') {
+            const v = sharedVertex(con.a, con.b, con.c, con.d);
+            if (v && inTri(v) && [con.a, con.b, con.c, con.d].every(inTri)) rightAt.add(v);
+          }
+          if (con.type === 'angle' && con.value === 90 && inTri(con.vertex) && inTri(con.ray1) && inTri(con.ray2)) rightAt.add(con.vertex);
+        }
+        if (rightAt.size === 1) {
+          const [v] = rightAt;
+          push('hypotenuse', vs.filter((x) => x !== v) as [Id, Id]);
+        }
+        for (const con of construction.constraints) {
+          const isEq = con.type === 'equal' || (con.type === 'ratio' && con.k === 1 && !con.add);
+          if (!isEq) continue;
+          const c4 = con as { a: Id; b: Id; c: Id; d: Id };
+          if (![c4.a, c4.b, c4.c, c4.d].every(inTri)) continue;
+          const apex = sharedVertex(c4.a, c4.b, c4.c, c4.d);
+          if (!apex) continue;
+          push('leg', [c4.a, c4.b].sort() as [Id, Id]);
+          push('leg', [c4.c, c4.d].sort() as [Id, Id]);
+          push('base', vs.filter((x) => x !== apex) as [Id, Id]);
+        }
+      }
+      return out;
+    })(),
     // Every circle pair's MUTUAL POSITION (from the drawn seed, tangency tol-based) — the two-touch
     // common-tangent CAPACITY depends on it (#197 Am. 4): disjoint 4, externally tangent / intersecting
     // 2 (the remaining tangents pass through the touch / don't exist), internally tangent or contained 0.
