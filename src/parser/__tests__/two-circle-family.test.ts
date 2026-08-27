@@ -564,12 +564,12 @@ describe('#757 — a two-circle tangency declines rather than swallowing a modif
     // contract and a separate class — filed, not silently folded in here.
   });
 
-  it('RESIDUAL, recorded rather than hidden: an AREA modifier still commits', () => {
-    // `SHAPE_LEFTOVER` is a denylist and has no area/perimeter token, so «ששטחם שווה» survives it —
-    // the same class as the reported bug, still open. Widening that denylist touches all 13 of its
-    // consumers, so it is scoped separately rather than smuggled into a P1 fix. This test asserts the
-    // CURRENT state deliberately: when the denylist grows, it fails and points at the follow-up.
-    expect(parse('שני מעגלים משיקים מבחוץ ששטחם שווה').ok).toBe(true);
+  it('the ADR-454 residual is closed (#762): an AREA/PERIMETER modifier declines whole', () => {
+    // `SHAPE_LEFTOVER` now carries שטח/היקף/area/perimeter, so the unread modifier escalates instead
+    // of committing a figure that omits it — the same invariant as the equal-radii P1, area edition.
+    refuses('שני מעגלים משיקים מבחוץ ששטחם שווה');
+    refuses('שני מעגלים משיקים מבחוץ שהיקפם שווה');
+    refuses('two circles are tangent externally with equal areas');
   });
 
   it('every form the rule DOES read still builds — the false-block risk a leftover guard carries', () => {

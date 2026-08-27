@@ -8073,3 +8073,30 @@ clean and lower identically; the `set-radius` carries the student's 6 while its 
 number; the multiset still refuses a second unaccounted 6; each of the three structural verbs gates
 clean; and, the two that stop this becoming a blunt instrument, an undeclared verb with no evidence
 still trips and a declaration with the wrong operands still trips.
+
+## ADR-463 — SHAPE_LEFTOVER carries the SIZE vocabulary too: area and perimeter (#762)
+
+**2026-08-27 · round #800.** The ADR-454 residual, closed. `SHAPE_LEFTOVER` — the shared denylist
+answering *"does anything geometry-significant remain?"* for the ADR-024 leftover guards — enumerated
+shapes, circles, tangents, chords, angles, special lines… but no area or perimeter token, so an area
+modifier survived every guard that consults it: «שני מעגלים משיקים מבחוץ ששטחם שווה» COMMITTED with
+the equal-areas relation silently dropped (the honesty invariant's cardinal violation, docs/23 G1).
+
+**Decision.** The denylist gains `areas?|perimeters?` (word-bounded, En) and `שטח|היק[פף]` (He). The
+Hebrew tokens are substrings on purpose — the bound forms «ששטחם»/«שהיקפם» carry prefixes the He-prefix
+strip does not reach, and substring matching is how every Hebrew entry in this regex already works. The
+perimeter token is a character class because a possessive suffix demotes the final ף to medial פ
+(«שהיקפם») — the naive «היקף» spelling misses exactly the form prod saw, which the new lock caught on
+first run.
+
+**Blast radius, measured rather than assumed** (the reason ADR-454 deferred this): the widening reaches
+all 13 denylist consumers and can only cause FALSE BLOCKS. The catalog false-positive net
+(`gate-false-positives.test.ts`) and the full parser suite (131 files, 1882 tests) came back green with
+zero new refusals — rules that legitimately read area statements (`set-area`, sector area) match before
+these guards or strip their own vocabulary first, and the #497 fail-closed closure was already refusing
+area leftovers at the macro sites, so the denylist-only sites (the two-circle family, the tangent
+deferral, the tail guards) are the only behaviour change, and there the refusal is the fix.
+
+Locks: `two-circle-family.test.ts` — the residual assertion flipped to refusals (He area, He perimeter
+with the medial-פ bound form, En area), alongside the existing "every form the rule DOES read still
+builds" battery.

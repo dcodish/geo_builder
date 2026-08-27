@@ -678,9 +678,14 @@ const namesVertices = (s: string): boolean => /[A-Z]/.test(s);
  * rows ✓. Every user of this guard strips its OWN vocabulary first, so a polygon noun/side word that
  * survives always means a compound the rule cannot express — escalate, never half-parse. (The compound
  * shape phrases שווה־צלעות / שווה־שוקיים are stripped as UNITS by their owners before the test.)
+ *
+ * AREA/PERIMETER joined with issue #762 (the ADR-454 residual): «שני מעגלים משיקים מבחוץ ששטחם שווה»
+ * survived every leftover guard and committed with the equal-areas relation dropped. The Hebrew tokens
+ * are substrings on purpose — «ששטחם»/«שהיקפם» carry prefixes the He-prefix strip does not reach, and
+ * substring matching is how every other Hebrew entry here already works.
  */
 const SHAPE_LEFTOVER =
-  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?|sides?|every|each|triangles?|squares?|rectangles?|rhombus(?:es)?|trapezoids?|kites?|parallelograms?|quadrilaterals?)\b|[=⊥⟂∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונ[כך]|אנ[כך]|מקביל|חוצ|אמצע|תיכון|גובה|המש(?:ך|כי(?:ם|הם|הן)?)|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ|צלע|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|מקבילית|(?<![א-ת])[ובשלמכ]?כל(?![א-ת])/i;
+  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?|sides?|every|each|triangles?|squares?|rectangles?|rhombus(?:es)?|trapezoids?|kites?|parallelograms?|quadrilaterals?|areas?|perimeters?)\b|[=⊥⟂∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונ[כך]|אנ[כך]|מקביל|חוצ|אמצע|תיכון|גובה|המש(?:ך|כי(?:ם|הם|הן)?)|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ|צלע|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|מקבילית|שטח|היק[פף]|(?<![א-ת])[ובשלמכ]?כל(?![א-ת])/i;
 
 /**
  * The fail-closed half of the leftover discipline (#497). `SHAPE_LEFTOVER` above enumerates the KNOWN
@@ -6662,8 +6667,8 @@ const circlesTangent: Rule = (s, ctx) => {
   // `resolveCirclePair` reads («שני מעגלים…»), and a fail-closed gate flags every Hebrew token it does
   // not positively recognise, so it refused the plain supported forms. Making it work would mean
   // teaching the gate this rule's quantifier vocabulary, i.e. growing an allowlist to defend a
-  // denylist. Recorded honestly: the denylist has no AREA token, so «…ששטחם שווה» is a member of this
-  // class that still commits — see the residual in ADR-454 and its follow-up issue.
+  // denylist. The ADR-454 residual — no AREA token, so «…ששטחם שווה» committed with the relation
+  // dropped — is closed by #762: the denylist now carries שטח/היקף/area/perimeter.
   if (SHAPE_LEFTOVER.test(tangentLeftover)) return null;
   // Pair resolution at the shared #215 chokepoint: two NAMED circles ("circle O and circle P …" /
   // the ADR-228 Am. plural-list) bind by letter; a plural reference with exactly TWO circles in the
