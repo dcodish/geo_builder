@@ -470,8 +470,10 @@ const leadingNamedPoint = (s: string): string | null => {
   const m =
     s.match(/(?:^|\s)(?:ה?נקוד[הת]|point)\s+([A-Za-z]\d*)\b/i) ??
     s.match(/^\s*([A-Za-z]\d*)\s*(?:\bis\b|היא|הוא|=)/i) ??
-    // #71 (log-triage): the appositive NOUN form, no copula — "E נקודת החיתוך של המעגל עם AD"
-    s.match(/^\s*([A-Za-z]\d*)\s+נקודת\s+ה?(?:חיתוך|מפגש)/) ??
+    // #71 (log-triage): the appositive NOUN form, no copula — "E נקודת החיתוך של המעגל עם AD".
+    // #776 (prod ah1kqxz5): the TERSE spelling drops «נקודת» too — «D מפגש המעגל עם AB» — so the
+    // descriptor noun is optional; the bare short heads «מפגש»/«חיתוך» carry the same meaning.
+    s.match(/^\s*([A-Za-z]\d*)\s+(?:נקודת\s+)?ה?(?:חיתוך|מפגש)/) ??
     s.match(/^\s*([A-Za-z]\d*)\s+(?:is\s+)?the\s+(?:intersection|meeting)\s+point\b/i);
   return m ? up(m[1]) : null;
 };
@@ -1561,8 +1563,10 @@ const lineLineIntersection: Rule = (s, ctx) => {
   if (/\bperpendicular\b|\bparallel\b|מאונ[כך]|אנ[כך]|מקביל|[⊥⟂∥]/i.test(s)) return 'stop';
   // Drop filler words so they aren't mistaken for two-letter line labels ("of"!).
   const t = s.replace(/\b(?:is|the|of|between|at|point|הוא|בין|בנקודה|נקודה)\b/gi, ' ');
+  // #776: «מפגש» (and En "meeting") join the label-first slot — «M מפגש AB ו-CD» is the same
+  // statement as «M חיתוך AB ו-CD», and the terse spelling is what prod typed (session ah1kqxz5).
   const pointFirst = t.match(
-    /\b([A-Za-z]\d*)\b.*?(?:intersection|∩|חיתוך|נחתך).*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+    /\b([A-Za-z]\d*)\b.*?(?:intersection|meeting|∩|חיתוך|נחתך|מפגש).*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
   );
   // PER-OPERAND reference semantics (issue #22, the ADR-077 principle generalized): each pair operand is,
   // independently, a bare SEGMENT reference (crossing must land WITHIN it), a "המשך"/extension (directional
