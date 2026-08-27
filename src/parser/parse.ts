@@ -5979,9 +5979,16 @@ const parallelCircleIntersection: Rule = (s, ctx) => {
  *
  * ADR-052 note: an unstated size is a free DOF, seeded APART so a pair reads as two circles. A STATED
  * equality removes that DOF — which is exactly the difference between a default and a given.
+ *
+ * #808 (ADR-467) — the AREA and PERIMETER spellings join the same lane: for circles, equal areas ⇔
+ * equal perimeters ⇔ equal radii, so «ששטחם שווה» / «שהיקפם שווה» / "with equal areas" carry the
+ * SAME k = 1 and nothing else. Circles-only BY CONSTRUCTION: this vocabulary is consumed exclusively
+ * inside the circle-pair rules, so a polygon area equality (a genuine ADR-118 area constraint, not a
+ * size equality) can never be claimed by it. The perimeter stem is «היק[פף]» — a possessive suffix
+ * demotes the final ף to medial פ («שהיקפם»), the ADR-463 trap.
  */
 const EQUAL_SIZE =
-  /(?:[ובשלכמ]|עם\s+)?ה?(?:רדיוס|קוטר)(?:ים|יהם|יהן|ם|ן|י)?\s+(?:שווים|שוות|שווה|שוים|זהים|זהות)|\b(?:with\s+|having\s+|of\s+)?(?:equal|the\s+same)\s+(?:radii|radius|radiuses|diameters?)\b/i;
+  /(?:[ובשלכמ]|עם\s+)?ה?(?:רדיוס|קוטר|שטח|היק[פף])(?:ים|יהם|יהן|ם|ן|י)?\s+(?:שווים|שוות|שווה|שוים|זהים|זהות)|\b(?:with\s+|having\s+|of\s+)?(?:equal|the\s+same)\s+(?:radii|radius|radiuses|diameters?|areas?|perimeters?|circumferences?)\b/i;
 const EQUAL_SIZE_G = rx(EQUAL_SIZE.source, 'gi');
 /** Append the equality when the statement carries the modifier. Callers pass the pair they resolved,
  *  so the constraint always lands on the circles the sentence is actually about. */
