@@ -4929,3 +4929,28 @@ Locks: `src3d/__tests__/issue-754.test.ts` (the operator's cube sequence at seve
 agreement incl. the vector route, knowledge gating both before and after, the contradiction and the
 consistent second edge, the volume-exact-while-proportions-vary acceptance property, prism route
 unchanged); fixture `fixtures3/cube-stated-size-754.geo3.json`.
+## ADR-3D-173 — the 3-D LLM seam gains the SEQUENCE gate (#555; the ADR-441 port)
+
+**2026-08-27 · round #800.** Class, from the #536/ADR-441 sibling audit: a statement whose
+point-letter SEQUENCE is its semantics, escalated through the LLM lane, was committed with whatever
+sequence the model emitted — `honesty3.ts`'s gate family asks what a decomposition LOST (`dropped*`)
+and what it ADDED, never whether it REORDERED. In 2-D this let Haiku alphabetize «ADB» into
+«ישר ABD», committing the NEGATION of a stated betweenness under a green ✓ (prod `s0cr31nw`, P1).
+3-D order-semantic families: vertex-angle forms (∠SAB — vertex at A), face/plane point-runs
+(«פאה SBC»), quad cycle order (ABDC ≠ ABCD), and pyramid runs (apex by position).
+
+**Decision — restore, never refuse, at the one seam.** `restoreStatedSequences3` (in
+`parser/honesty3.ts`, beside its sibling gates) is the ADR-441 shape on the 3-D token vocabulary
+(`[A-Z]\d*'?` — primes are part of the label, so a respelled top-face run «A'B'C'D'» restores with
+its primes intact): a line-run using EXACTLY the labels of a run the student wrote (same multiset)
+in a different sequence is the model respelling the student's token — restore the student's spelling
+on the CANONICAL LINES before the re-parse and let `parse3` re-derive the semantics. Text-level on
+purpose (a command-level comparison cannot tell a grammar-derived reorder from an LLM rewrite);
+reversal tolerated (names the same object); an ambiguous multiset restores nothing; pairs exempt.
+Applied in `App3.tsx` at the single `escalate3 → submitSteps` seam, with `restored` logged to the
+debug sink (the 2-D `restored` field's mirror), and the never-reorder rule added to
+`llmShared3.ts`'s prompt with 3-D examples — the gate makes the wrong output harmless, the rule
+makes it rarer.
+
+Locks: `src3d/parser/__tests__/issue-555.test.ts` (restored vertex-angle run, reversal, primes,
+ambiguity, pair exemption, superset exemption, byte-identical pass-through).
