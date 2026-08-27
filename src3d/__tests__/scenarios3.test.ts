@@ -212,11 +212,19 @@ describe('GATE — 2022 חורף Q2 (the algebraic lane: planes, parameter, feet
     expect(derived().resolved.param?.value).toBe(1);
   });
 
-  it('a numeric size claim on a free-dim SOLID figure is refused with a clear boundary message', () => {
+  it('a numeric size on a SOLID is a GIVEN that pins the scale (#754/ADR-3D-171 — was: size-on-solid)', () => {
+    // The 2026-08-26 ruling reversed the shipped refusal this scenario used to lock: «AB = 3» on a
+    // cube now BUILDS — the magnitude acts on the frozen gauge's scale, uniformly. The refusal
+    // survives only where a magnitude genuinely has nothing to attach to (issue-754.test.ts locks
+    // both directions; this gate keeps the algebraic-lane figure's neighbourhood honest).
     submit('קובייה ABCD');
     submit('AB = 3');
-    expect(state().facts).toHaveLength(1);
-    expect(state().lastError).toEqual({ code: 'size-on-solid' });
+    expect(state().lastError).toBeNull();
+    expect(state().facts).toHaveLength(2);
+    const d = derived();
+    const A = d.positions.get('A')!;
+    const B = d.positions.get('B')!;
+    expect(Math.hypot(A.x - B.x, A.y - B.y, A.z - B.z)).toBeCloseTo(3, 6);
   });
 });
 
