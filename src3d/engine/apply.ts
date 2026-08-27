@@ -9,6 +9,7 @@ import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
 import { riderPairsT } from './onSegmentRatio';
+import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
 import { isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { pinSymsOf } from './types';
@@ -163,6 +164,7 @@ function clone(c: Construction3): Construction3 {
     vecDefs: [...c.vecDefs],
     symbolPins: [...c.symbolPins],
     claims: [...c.claims],
+    scaleGivens: [...c.scaleGivens],
     scalarPins: [...c.scalarPins],
     pairPins: [...c.pairPins],
     planePins: [...c.planePins],
@@ -202,7 +204,7 @@ const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism
  *  counts its w, being oblique by definition). */
 export const solidDimCount = (s: { kind: SolidCommand['kind']; oblique?: true }): number =>
   DIM_COUNT[s.kind] + (s.oblique && s.kind !== 'parallelepiped' ? 2 : 0);
-function freeDims(c: Construction3): number {
+export function freeDims(c: Construction3): number {
   let n = 0;
   for (const s of c.solids) n += solidDimCount(s);
   for (const r of c.revolutions) {
@@ -987,6 +989,25 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         next.claims.push(cmd.claim);
         return { ok: true, next };
       }
+      // #754 (ADR-3D-171): a stated MAGNITUDE on a gauge-frozen figure pins the SCALE — a given,
+      // never a refusal («size-on-solid») and never a false accusation («claim-refuted» about a
+      // size the tool invented). The FIRST eligible magnitude becomes the scale given; the
+      // resolver applies it as one uniform factor per configuration, so the shape DOFs stay
+      // free. Recorded as a claim too — the final verification stays the arbiter (it holds
+      // exactly on the rescaled figure). A length on a figure with free dims keeps its existing
+      // scalar-pin route below (byte-identical prism/pyramid behaviour, and the pivot honours
+      // it through the same gauge scale); volume and area have no pin kind, so they take this
+      // lane at any dim count.
+      if (
+        isScaleGivenClaim(cmd.claim) &&
+        scaleGivenSafe(c) &&
+        c.scaleGivens.length === 0 &&
+        (cmd.claim.type !== 'length-eq' || freeDims(c) === 0)
+      ) {
+        next.scaleGivens.push(cmd.claim);
+        next.claims.push(cmd.claim);
+        return { ok: true, next };
+      }
       // M1 (V7 T2): a scalar statement on a figure with FREE dims is a GIVEN — it
       // drives the solve instead of being "checked" against an arbitrary sample.
       if (freeDims(c) > 0) {
@@ -1012,7 +1033,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           next.claims.push(cl);
           return { ok: true, next };
         }
-        if (cmd.claim.type === 'length-eq') {
+        // #754: once a scale given is in force the rescale owns the figure's size — a second
+        // length must not ALSO enter the pivot as a scale-fixing pin (the two mechanisms would
+        // double-apply); it falls through to the claim lane, where the store refuses it honestly
+        // against still-free dims and checks it exactly against a rigid one.
+        if (cmd.claim.type === 'length-eq' && c.scaleGivens.length === 0) {
           next.scalarPins.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
           return { ok: true, next };
         }

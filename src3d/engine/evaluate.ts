@@ -25,6 +25,7 @@ import {
   resolveOperand,
 } from './operands';
 import { applyGauge, scalePinned, solvePivot, type MemberPin, type PivotResult } from './solve3';
+import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3 } from './vecExpr';
 import { absolutePointCount, pinSymsOf } from './types';
 import { resolveFreePlane } from './freePlane';
@@ -1106,6 +1107,10 @@ export function vectorFramePinned3(c: Construction3): boolean {
  * `|CB|` on two injected points behind a 'scale' refusal (2026-08-11).
  */
 export function scaleKnown3(c: Construction3): boolean {
+  // #754 (ADR-3D-171): a stated magnitude pinned the scale — the figure has a REAL size, and the
+  // data panel / query lane may print real numbers. Gated by the same predicate the resolver's
+  // rescale uses, so "we print sizes" and "the drawing honours the stated size" cannot disagree.
+  if (scaleGivenActive(c)) return true;
   if (scalePinned(c)) return true;
   // TWO absolute points state the distances among them — but only a figure with NO solid can take
   // that as figure-wide scale knowledge: a solid's first dim is the frozen similarity gauge, so a
@@ -1870,6 +1875,24 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     const from = pos.get(def.from);
     const line = lines.get(def.line);
     if (from && line) pos.set(id, footOnLine(from, line));
+  }
+
+  // ---- #754 (ADR-3D-171): the stated magnitude pins the SCALE. Measured on the fully resolved
+  // figure at the frozen gauge, then applied as ONE uniform factor to every position — length by
+  // k, area by k², volume by k³ — so the stated size holds EXACTLY in this configuration while
+  // the shape DOFs it did not touch keep varying with the seed. Everything still resolved at this
+  // point is position-derived (`scaleGivenSafe` admits no absolute object), so the derived plane
+  // offsets scale with the same factor and every incidence survives verbatim.
+  if (scaleGivenActive(c)) {
+    const g = c.scaleGivens[0];
+    const m0 = scaleGivenMagnitude(g, c, pos);
+    const power = scaleGivenPower(g);
+    const stated = scaleGivenValue(g);
+    if (m0 !== null && m0 > 1e-9 && power !== null && stated !== null) {
+      const k = Math.pow(stated / m0, 1 / power);
+      for (const [id, p] of pos) pos.set(id, v3(p.x * k, p.y * k, p.z * k));
+      for (const [name, pl] of planes) planes.set(name, { n: pl.n, d: pl.d * k });
+    }
   }
 
   return {
