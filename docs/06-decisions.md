@@ -8100,3 +8100,35 @@ deferral, the tail guards) are the only behaviour change, and there the refusal 
 Locks: `two-circle-family.test.ts` — the residual assertion flipped to refusals (He area, He perimeter
 with the medial-פ bound form, En area), alongside the existing "every form the rule DOES read still
 builds" battery.
+
+## ADR-464 — a membership and its stated magnitude LOWER TOGETHER (#760)
+
+**2026-08-27 · round #800.** Operator (2026-08-19, playing PR #759): *«"D על AB במרחק 3 מ-A" —
+doesn't work, the rest do.»* Both halves were fully supported alone — «D על AB» lowers the
+membership, «AD = 3» lowers `set-distance` — but nothing lowered them together: the membership rule
+claimed the utterance, the trailing distance clause was never read, and the ADR-250 gate honestly
+refused the partial parse. The student got a paid, unreliable escalation for ordinary bagrut
+phrasing («נקודה על הקטע במרחק … מ…»).
+
+**Decision — compose through the tested grammar, per class.** A new compound rule
+(`compoundAtDistance`, registered beside `compoundSuchThat`): match «<left> במרחק <n> מ-<X>» /
+"<left> at (a) distance (of) <n> from <X>", require the left to be a point-on-carrier statement
+about a single subject point, parse the LEFT through the real grammar, and parse the SYNTHESIZED
+distance statement «<X><point> = <n>» through the real `set-distance` lane. Because both halves go
+through the grammar, every carrier the membership lane supports — a segment, an extension («על
+המשך AB»), a circle («על מעגל O») — is supported here by construction, and the rider's `t` is
+DETERMINED by the distance rather than sampled (the ADR-052 shape: a stated magnitude removes a DOF
+that was free). Falls through whole when either half doesn't parse.
+
+**The second hole, same fix:** `SUCH_THAT`'s ש-lookahead admitted only whitespace or a Latin label,
+so the hyphenated «כך ש-AD = 3» — the operator's own spelling — never split: the membership rule
+dropped the 3, and the ratio member «כך ש-AD = 2·DB» was claimed by the ratio rule with the
+MEMBERSHIP silently dropped (a stated relation loss no gate categorized). The splitter now consumes
+an optional hyphen; the spaced and hyphenated spellings lower identically.
+
+Registered in the catalog (drives the commands panel and the shadow corpus); the deliberate new
+shadow pair `compoundAtDistance → pointOnSegment` joined `shadow-allowlist.json` after review — it
+is exactly the intended preemption (the compound runs before the membership rule that would drop
+the magnitude). Locks: `src/parser/__tests__/issue-760.test.ts` (the class battery + fall-through)
+and fixture `issue-760-point-at-distance.geo.json` (builds green; |AB| = 8, |AD| = 3 verified in
+the drawing).

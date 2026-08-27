@@ -1,0 +1,94 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-08-27T12:00:00.000Z",
+  "name": "issue-760",
+  "seed": 0,
+  "radiusOverrides": {},
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.0",
+      "utterance": "AB = 8",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "AB = 8",
+      "group": "g1",
+      "cmd": {
+        "type": "set-distance",
+        "a": "A",
+        "b": "B",
+        "value": 8
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.0",
+      "utterance": "D על AB במרחק 3 מ-A",
+      "group": "g2",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.1",
+      "utterance": "D על AB במרחק 3 מ-A",
+      "group": "g2",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "D",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.2",
+      "utterance": "D על AB במרחק 3 מ-A",
+      "group": "g2",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.3",
+      "utterance": "D על AB במרחק 3 מ-A",
+      "group": "g2",
+      "cmd": {
+        "type": "set-distance",
+        "a": "A",
+        "b": "D",
+        "value": 3
+      },
+      "enabled": true
+    }
+  ]
+}

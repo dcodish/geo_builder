@@ -340,6 +340,20 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-on-line",
     ],
   },
+  "D on AB at a distance of 3 from A": {
+    "en": [
+      "segment",
+      "point-on-segment",
+      "segment",
+      "set-distance",
+    ],
+    "he": [
+      "segment",
+      "point-on-segment",
+      "segment",
+      "set-distance",
+    ],
+  },
   "DM*ME = BM*DR": {
     "en": [
       "segment",

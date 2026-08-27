@@ -10,6 +10,7 @@
     "circumcircleMeetsSegment → lineLineIntersection",
     "circumcircleMeetsSegment → lineMeetsCircle",
     "commonTangent → circlesTangent",
+    "compoundAtDistance → pointOnSegment",
     "commonTangent → tangentLine",
     "commonTangent → tangentsFromExternal",
     "cornerTangentCircle → tangentLine",
