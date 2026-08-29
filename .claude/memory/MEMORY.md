@@ -17,3 +17,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Deploys are mine to run](deploys-are-mine-to-run.md) — never hand a deploy back to the operator; the permissions are already in place, so run it and finish the tag + DEPLOY-LOG record
 - [PR items need their own server](pr-items-need-their-own-server.md) — an unmerged PR can't be played on the `main` dev server; give each PR item its own port (round #783, 2026-08-26)
 - [gh --body @- eats issue bodies](gh-body-at-dash-eats-issues.md) — `--body @-` files the literal characters, not stdin; it has destroyed three issue bodies (#361, #765, #766) — always `--body-file`
+- [Stacked PR merge order](stacked-pr-merge-order.md) — never `--delete-branch` mid-stack: it auto-closes the next PR, and a closed PR can't be reopened while its base is gone (round #800, 2026-08-29)
