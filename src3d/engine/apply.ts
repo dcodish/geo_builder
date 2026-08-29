@@ -355,6 +355,53 @@ function lineRelRefsError(c: Construction3, op: Operand3, line: string): EngineE
   return c.lines.has(line) || c.pointLines.has(line) ? null : { code: 'unknown-line', id: line };
 }
 
+/**
+ * #801 (ADR-3D-174) — WHICH MECHANISM OWNS THE LETTER an equation carries. The figure has two
+ * symbol-resolving mechanisms and a letter belongs to exactly one of them: a letter the figure
+ * ALREADY carries as a pin symbol (`pinSymsOf` — the point/vector/pair injections, solved jointly
+ * inside the pivot) is that symbol, and only a letter no mechanism owns opens the algebraic lane
+ * (`c.param`, the `chooseParam` root-find).
+ *
+ * #794 guarded one direction of this (an injection may not steal `c.param`); the equation side was
+ * unguarded, so «משוואת הישר AC היא x=(8,-1,-1)+t(k+1,0,k-3)» after `AB=(k-1,k,3)` opened a SECOND
+ * mechanism for k — the root-find lane then sampled k ≈ 0 for the line while the pivot held k = 2
+ * for the figure, and the same letter had two values in one drawing. Asked in ONE place so a third
+ * equation kind cannot answer it differently.
+ */
+const paramLane = (c: Construction3, param: string | undefined): { sym?: string; figureParam?: string } =>
+  param === undefined ? {} : pinSymsOf(c).includes(param) ? { sym: param } : { figureParam: param };
+
+/**
+ * #801 (ADR-3D-174) — the same one-owner question arriving in the OTHER ORDER, answered by M2
+ * RE-HOMING rather than by entry order. «x = (8,-1,-1) + t(k+1,0,k-3)» typed FIRST makes k the
+ * algebraic lane's parameter; the injection «AB=(k-1,k,3)» that follows would then be the second
+ * mechanism, and #794 refuses it. But the set of statements is the same one that builds in the other
+ * order, and satisfiability must not depend on the order they were typed in (docs/17 M2, law i).
+ *
+ * So the letter is handed to the mechanism that can DETERMINE it — the pivot — whenever the algebraic
+ * lane holds nothing capable of pinning it: no angle / ⟂ / line-relation given to root-find over, and
+ * no coord-sym point (there the letter DEFINES the point's coordinates and the lane cannot be left).
+ * Each equation written in it is re-marked pin-symbol-parametric and `c.param` is released.
+ *
+ * `null` = refuse (the #794 answer), kept for exactly the case where both lanes have a real claim to
+ * the letter: which one the student meant is not something a silent choice may decide.
+ */
+function adoptParamAsPinSym(c: Construction3, exprs: (SymComp | null)[]): Construction3 | null {
+  const sym = c.param;
+  if (!sym || !exprs.some((e) => e !== null && e.sym === sym)) return c; // nothing to re-home
+  if (c.planeAngles.length > 0 || c.linePerps.length > 0 || c.lineRels.length > 0 || c.paramGivens.length > 0) return null;
+  for (const def of c.points.values()) if (def.kind === 'coord-sym') return null;
+  const next = clone(c);
+  delete next.param;
+  for (const [name, def] of next.lines) {
+    if (def.kind === 'parametric' && [...def.anchor, ...def.dir].some((e) => e.p !== 0)) next.lines.set(name, { ...def, sym });
+  }
+  for (const [name, def] of next.planes) {
+    if ([def.cx, def.cy, def.cz, def.d].some((e) => e.p !== 0)) next.planes.set(name, { ...def, sym });
+  }
+  return next;
+}
+
 /** #552 (the on-planes ruling-1 mirror): a relation or membership naming an UNDECLARED line CREATES
  *  it as a free line — bounded to the CONVENTION token (canonical `ℓ<digits?>`), which cannot collide
  *  with a point (uppercase), a plane (π…) or a vector (`[a-w]`), so no bare-symbol ambiguity exists.
@@ -1125,8 +1172,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // The letters share one namespace per role: a pin symbol that is ALSO the figure's
         // coord-sym parameter would be resolved by two different mechanisms — refused.
         const exprs = cmd.symExprs ?? [null, null, null];
-        if (c.param && exprs.some((e) => e !== null && e.sym === c.param)) return { ok: false, error: { code: 'two-params' } };
-        const next = clone(c);
+        const adopted = adoptParamAsPinSym(c, exprs); // #801: the letter re-homes to the pivot when it can
+        if (!adopted) return { ok: false, error: { code: 'two-params' } };
+        const next = clone(adopted);
         const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
         next.pins.push({ id: cmd.id, x: comp(cmd.x, exprs[0]), y: comp(cmd.y, exprs[1]), z: comp(cmd.z, exprs[2]) });
         return { ok: true, next };
@@ -1151,6 +1199,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (letters.length === 1) {
           const sym = letters[0];
           if (c.param && c.param !== sym) return { ok: false, error: { code: 'two-params' } };
+          // #801: the third site of the one-owner-per-letter rule. A coord-sym point DEFINES its letter
+          // as the figure parameter, so unlike a line/plane equation (whose numbers the owner can simply
+          // supply) it cannot be routed — a letter the pivot already owns is refused rather than reborn
+          // in a second mechanism. The mirror of #794's injection guard.
+          if (pinSymsOf(c).includes(sym)) return { ok: false, error: { code: 'two-params' } };
           // #325: a coefficient/const on the symbol (`M(2k,1,3)`) flows into the LinExpr
           const exprs = cmd.symExprs ?? [null, null, null];
           const comp = (v: number | null, s: string | null, e: SymComp | null): { k: number; p: number } =>
@@ -1337,12 +1390,14 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
 
     case 'inject-vector': {
       if (!c.vectors.has(cmd.name)) return { ok: false, error: { code: 'unknown-vector', id: cmd.name } };
-      // #794 (ADR-3D-168): symbolic components join exactly as point3 pins do — same
-      // combine, same one-namespace-per-role guard (a pin symbol that is ALSO the
-      // figure's coord-sym parameter would be resolved by two mechanisms — refused).
+      // #794 (ADR-3D-168): symbolic components join exactly as point3 pins do — same combine, same
+      // one-namespace-per-role guard. #801: the letter RE-HOMES to the pivot when the algebraic lane
+      // has no claim on it, so the same statements build in either order; refused only when both lanes
+      // genuinely resolve it.
       const exprs = cmd.symExprs ?? [null, null, null];
-      if (c.param && exprs.some((e) => e !== null && e.sym === c.param)) return { ok: false, error: { code: 'two-params' } };
-      const next = clone(c);
+      const adopted = adoptParamAsPinSym(c, exprs);
+      if (!adopted) return { ok: false, error: { code: 'two-params' } };
+      const next = clone(adopted);
       const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
       next.vectorPins.push({ name: cmd.name, x: comp(cmd.x, exprs[0]), y: comp(cmd.y, exprs[1]), z: comp(cmd.z, exprs[2]) });
       return { ok: true, next };
@@ -1377,10 +1432,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // it is the given that PINS it. The free placeholder yields to the stated equation.
       const existing = c.planes.get(cmd.name);
       if (existing && !existing.free) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
-      if (cmd.param && c.param && cmd.param !== c.param) return { ok: false, error: { code: 'two-params' } };
+      // #801: the line3 routing, verbatim — the same letter question, the same owner.
+      const lane = paramLane(c, cmd.param);
+      if (lane.figureParam && c.param && lane.figureParam !== c.param) return { ok: false, error: { code: 'two-params' } };
       const next = clone(c);
-      next.planes.set(cmd.name, cmd.plane);
-      if (cmd.param) next.param = cmd.param;
+      next.planes.set(cmd.name, lane.sym ? { ...cmd.plane, sym: lane.sym } : cmd.plane);
+      if (lane.figureParam) next.param = lane.figureParam;
       return { ok: true, next };
     }
 
@@ -1532,10 +1589,16 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
 
     case 'line3': {
       if (c.lines.has(cmd.name)) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
-      if (cmd.param && c.param && cmd.param !== c.param) return { ok: false, error: { code: 'two-params' } };
+      // #801: the letter routes to its OWNER (`paramLane`) — a pin symbol stays the pivot's, and only
+      // an unowned letter is a new figure parameter. Two figure parameters are still refused.
+      const lane = paramLane(c, cmd.param);
+      if (lane.figureParam && c.param && lane.figureParam !== c.param) return { ok: false, error: { code: 'two-params' } };
       const next = clone(c);
-      next.lines.set(cmd.name, { kind: 'parametric', anchor: cmd.anchor, dir: cmd.dir, src: cmd.src, ...(cmd.runner ? { runner: cmd.runner } : {}) });
-      if (cmd.param) next.param = cmd.param;
+      next.lines.set(cmd.name, {
+        kind: 'parametric', anchor: cmd.anchor, dir: cmd.dir, src: cmd.src,
+        ...(cmd.runner ? { runner: cmd.runner } : {}), ...(lane.sym ? { sym: lane.sym } : {}),
+      });
+      if (lane.figureParam) next.param = lane.figureParam;
       return { ok: true, next };
     }
 
@@ -1920,10 +1983,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     case 'inject-pair': {
       const missing = missingPoint(c, [cmd.a, cmd.b]);
       if (missing) return { ok: false, error: missing };
-      // #794 (ADR-3D-168): same symbolic-component path as inject-vector / point3 pins.
+      // #794 (ADR-3D-168): same symbolic-component path as inject-vector / point3 pins — and the same
+      // #801 re-homing, so a pair injection after a line equation in the same letter is not order-bound.
       const exprs = cmd.symExprs ?? [null, null, null];
-      if (c.param && exprs.some((e) => e !== null && e.sym === c.param)) return { ok: false, error: { code: 'two-params' } };
-      const next = clone(c);
+      const adopted = adoptParamAsPinSym(c, exprs);
+      if (!adopted) return { ok: false, error: { code: 'two-params' } };
+      const next = clone(adopted);
       const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
       next.pairPins.push({ a: cmd.a, b: cmd.b, x: comp(cmd.x, exprs[0]), y: comp(cmd.y, exprs[1]), z: comp(cmd.z, exprs[2]) });
       return { ok: true, next };

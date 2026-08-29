@@ -16,7 +16,7 @@
  * (`שיעור ה-z של C' חיובי`) select among the surviving solutions, else the seed.
  */
 
-import type { Construction3, Id, Positions3, ScalarPin } from './types';
+import type { Construction3, Id, LinExpr, Positions3, ScalarPin } from './types';
 import { distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, cross3, dist3, dot3, runNormal, norm3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -151,7 +151,21 @@ export interface MemberPin {
   frozen?: Vec3;
   plane?: { n: Vec3; d: number };
   run?: Id[];
+  /**
+   * #801 (ADR-3D-174) — a carrier whose OWN NUMBERS are a function of a PIN SYMBOL this very solve is
+   * choosing («x = (8,-1,-1) + t(k+1, 0, k-3)» while the pivot solves k). It cannot be lowered to fixed
+   * coefficients beforehand: at every candidate k it is a different line, so the equation is evaluated
+   * INSIDE the residual and the gauge, the dims and k are solved jointly — which is also the physics,
+   * since an absolute line is exactly what pins a gauge the injections left free.
+   */
+  symLine?: { anchor: [LinExpr, LinExpr, LinExpr]; dir: [LinExpr, LinExpr, LinExpr]; sym: string };
+  /** #801: the plane edition of `symLine` — the same equation-at-the-trial-value rule. */
+  symPlane?: { cx: LinExpr; cy: LinExpr; cz: LinExpr; d: LinExpr; sym: string };
 }
+
+/** A LinExpr's value at a symbol value — solve3's copy of the evaluator's `linVal` (evaluate imports
+ *  solve3, never the reverse, so the one-line formula is duplicated rather than the direction inverted). */
+const linAt = (e: LinExpr, t: number): number => e.k + e.p * t;
 
 export interface PivotResult {
   /** Canonical → absolute transform to apply to every position. */
@@ -312,7 +326,7 @@ export function solvePivot(
     gaugeLineRels.length === 0 &&
     // an all-gauge run-carrier membership is similarity-invariant (extent-normalized);
     // a frozen member or a fixed equation plane pins the gauge instead
-    memberPins.every((m) => !m.frozen && !m.plane) &&
+    memberPins.every((m) => !m.frozen && !m.plane && !m.symLine && !m.symPlane) && // #801: a pin-symbol carrier is absolute
     !scalePinned(c);
 
   // ADR-3D-030: ids whose in-solve placement is provisional (symbol-defined points —
@@ -736,7 +750,35 @@ export function solvePivot(
     for (const m of memberPins) {
       const q = m.frozen ?? at(m.id);
       if (!q) {
-        out.push(10);
+        out.push(10); // the residual COUNT is fixed per member (a line carrier contributes three)
+        if (m.symLine) out.push(10, 10);
+        continue;
+      }
+      // #801: a carrier stated in a PIN SYMBOL — evaluate its equation at the trial value of that
+      // symbol, so the member's distance to it and the symbol itself are one joint problem.
+      if (m.symLine || m.symPlane) {
+        const sym = (m.symLine ?? m.symPlane)!.sym;
+        const i = pinSyms.indexOf(sym);
+        const t = i < 0 ? null : x[7 + nDims + nSym + i];
+        if (t === null) {
+          out.push(10);
+          if (m.symLine) out.push(10, 10);
+          continue;
+        }
+        if (m.symLine) {
+          const anchor = v3(linAt(m.symLine.anchor[0], t), linAt(m.symLine.anchor[1], t), linAt(m.symLine.anchor[2], t));
+          const dir = v3(linAt(m.symLine.dir[0], t), linAt(m.symLine.dir[1], t), linAt(m.symLine.dir[2], t));
+          const dn = norm3(dir);
+          // ON the line ⟺ the offset from its anchor is PARALLEL to its direction ⟺ the cross vanishes.
+          // |cross|/|dir| IS the distance, so the three components carry length units exactly like the
+          // plane-pin residual — and a direction vector's arbitrary scale never weights the drive.
+          const w = dn < 1e-12 ? v3(10, 10, 10) : scale3(cross3(sub3(q, anchor), dir), 1 / dn);
+          out.push(w.x, w.y, w.z);
+        } else {
+          const pl = m.symPlane!;
+          const n = v3(linAt(pl.cx, t), linAt(pl.cy, t), linAt(pl.cz, t));
+          out.push((dot3(n, q) + linAt(pl.d, t)) / Math.max(norm3(n), 1e-12));
+        }
         continue;
       }
       if (m.plane) {

@@ -194,6 +194,9 @@ export interface PlaneDef {
    * KNOWLEDGE (the equation claim, the parameter machinery, printing) must gate on this flag instead.
    */
   free?: true;
+  /** #801 (ADR-3D-174) — the pin-symbol lane marker, exactly as on a parametric line: present ⇒ the
+   *  `p` coefficients are in this PIN symbol (pivot-solved), absent ⇒ in `c.param` (root-found). */
+  sym?: string;
 }
 
 export type Line3Def =
@@ -209,6 +212,14 @@ export type Line3Def =
       src: string;
       /** #422 — the student's own running-parameter letter, when not `t`. Display only. */
       runner?: string;
+      /**
+       * #801 (ADR-3D-174) — WHICH LANE owns the letter the `p` coefficients are in. Absent: the
+       * algebraic lane's single figure parameter (`c.param`, root-found by `chooseParam`). Present:
+       * a PIN SYMBOL, solved jointly inside the pivot (`pinSymsOf`) — so the line's numbers are the
+       * pivot's to supply, and reading them at the other lane's value would draw the student's own
+       * equation at a value the same figure denies.
+       */
+      sym?: string;
     }
   | {
       /** A line THROUGH two existing points (V5 — `הישר A'C`), resolved from final positions. */

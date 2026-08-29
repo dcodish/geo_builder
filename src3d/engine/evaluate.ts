@@ -18,11 +18,14 @@ import {
   isAbsolute,
   lineDirCarriesParam,
   lineRelDeviation,
+  lineSym3,
   mutualHolds,
   mutualSides,
   MUTUAL_VERIFY_TOL,
   planeNormalCarriesParam,
+  planeSym3,
   resolveOperand,
+  symMemberDrives,
 } from './operands';
 import { applyGauge, scalePinned, solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
@@ -574,7 +577,11 @@ function satisfiesAllPins(c: Construction3, a: number): boolean {
  *  #552 extends it symmetrically: a FREE line's relation pins the LINE (`resolveFreeLine`), and its
  *  placeholder-less def has no direction for the residual to read. */
 const paramLinePerps = (c: Construction3): Construction3['linePerps'] =>
-  c.linePerps.filter((g) => !c.planes.get(g.plane)?.free && !isFreeLine3(c, g.line));
+  // #801 (ADR-3D-174) joins the same filter for the same reason: an object whose numbers are in a PIN
+  // symbol is the pivot's, so rooting the algebraic parameter over it would read the wrong lane's letter.
+  c.linePerps.filter(
+    (g) => !c.planes.get(g.plane)?.free && !isFreeLine3(c, g.line) && !planeSym3(c, g.plane) && !lineSym3(c, g.line),
+  );
 
 /** How many givens pin the parameter (none ⇒ it is a free sampled DOF). */
 export const pinningGivens = (c: Construction3): number =>
@@ -632,6 +639,12 @@ const onPlane = (p: Vec3, pl: ResolvedPlane): boolean => Math.abs(dot3(pl.n, p) 
 export const memberHolds3 = (p: Vec3, pl: ResolvedPlane): boolean =>
   Math.abs(dot3(pl.n, p) + pl.d) / Math.max(norm3(pl.n), 1e-12) <= 1e-4 * Math.max(1, norm3(p));
 
+/** #801 (ADR-3D-174) — the LINE edition of {@link memberHolds3}, extracted from the store's verify pass
+ *  so the stage-4 drive aims at exactly the bar the verifier judges by (the memberHolds3 discipline: a
+ *  drive that stops short of the verifier's tolerance produces a refusal nothing can clear). */
+export const onLineHolds3 = (p: Vec3, ln: ResolvedLine): boolean =>
+  norm3(cross3(sub3(p, ln.anchor), ln.dir)) <= 1e-7 * Math.max(norm3(sub3(p, ln.anchor)) * norm3(ln.dir), 1);
+
 /**
  * Pick the parameter's value for this seed: an explicit `branch` on a plane-angle
  * wins; otherwise a membership given (`on one of the planes`) SELECTS the root
@@ -674,7 +687,9 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number): { va
       // only EQUATION planes depend on the parameter — point-run plane names are skipped, and so is
       // a FREE plane (#487): its placeholder carries no parameter and must never select a root
       const names = (m.plane === 'any' ? [...c.planes.keys()] : [m.plane]).filter(
-        (name) => c.planes.has(name) && !c.planes.get(name)!.free,
+        // #801: ...and never a PIN-SYMBOL plane — `planeAt(name, root)` would evaluate the pivot's
+        // letter at the algebraic lane's candidate, which is the two-mechanisms bug in miniature.
+        (name) => c.planes.has(name) && !c.planes.get(name)!.free && !c.planes.get(name)!.sym,
       );
       if (names.some((name) => onPlane(p, planeAt(c, name, root)))) return pick([root], root);
     }
@@ -1034,6 +1049,11 @@ export function translationGaugeFree3(c: Construction3): boolean {
     c.pins.length === 0 &&
     c.planePins.length === 0 &&
     c.memberships.length === 0 &&
+    // #801 (ADR-3D-174): a membership on a PIN-SYMBOL carrier pins the placement exactly as the plane
+    // list and the numeric on-line lowering (`planePins`) do — it was simply not in any list the funnel
+    // enumerated, so the funnel re-sampled the placement and slid the figure straight back off the line
+    // the drive had just put it on (an enumeration standing in for the question, docs/17 §2.1).
+    symMemberDrives(c).length === 0 &&
     !freePlaneOffsetPinned3(c) &&
     !c.coordPlanePins.some((cp) => cp.mode === 'zero' || cp.mode === 'contains')
   );
@@ -1139,11 +1159,17 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     if (def.kind === 'coord-sym') pos.set(id, v3(linVal(def.x, a), linVal(def.y, a), linVal(def.z, a)));
   }
 
+  // #801 (ADR-3D-174): an object whose coefficients are in a PIN SYMBOL is resolved by the PIVOT, which
+  // has not run yet — so it is left OUT of the maps here rather than evaluated at this lane's `a`. That
+  // omission is the honest state: there is no value for it to have until the pivot chooses one, and the
+  // alternative (evaluating the student's equation at a number another mechanism owns) is what drew ℓ at
+  // k ≈ 0 while the same figure held k = 2. `resolveSymObjects` below fills them the moment k is known.
   const planes = new Map<string, ResolvedPlane>();
-  for (const name of c.planes.keys()) planes.set(name, planeAt(c, name, a));
+  for (const name of c.planes.keys()) if (!c.planes.get(name)!.sym) planes.set(name, planeAt(c, name, a));
 
   const lines = new Map<string, ResolvedLine>();
   for (const [name] of c.lines) {
+    if (lineSym3(c, name)) continue;
     const line = lineAtParam(c, name, a);
     if (line) lines.set(name, line);
   }
@@ -1254,6 +1280,37 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
 
   // ---- the V4 pivot: injected coordinates pin the gauge (ADR-3D-007)
   let pivot: Resolved3['pivot'] = null;
+
+  /**
+   * #801 (ADR-3D-174) — the pin-symbol objects, resolved at the value their OWNER just solved. Called
+   * from `applySolutions` (and after a rollback), so every accepted pivot solution leaves the lines and
+   * planes stated in that symbol agreeing with the figure it produced — the property whose absence let
+   * a green-checked drawing contradict the panel's own «k = 2».
+   *
+   * A rider created BY such a statement is seated here too: it is placed from the line, and the line
+   * did not exist when the point pass ran (the FINAL-fill pattern, same sample key, so it is stable).
+   */
+  const resolveSymObjects = (): void => {
+    const vals = pivot?.pinSymbols;
+    if (!vals) return;
+    for (const [name, def] of c.planes) {
+      const t = def.sym === undefined ? undefined : vals[def.sym];
+      if (t !== undefined && Number.isFinite(t)) planes.set(name, planeAt(c, name, t));
+    }
+    for (const [name, def] of c.lines) {
+      if (def.kind !== 'parametric' || def.sym === undefined) continue;
+      const t = vals[def.sym];
+      if (t === undefined || !Number.isFinite(t)) continue;
+      const line = lineAtParam(c, name, t);
+      if (line) lines.set(name, line);
+    }
+    for (const [id, def] of c.points) {
+      if (def.kind === 'on-line' && !pos.has(id) && lineSym3(c, def.line)) seatOnLineRider(seed, pos, lines, id, def);
+    }
+  };
+
+  // #801: the memberships a pin-symbol carrier owns — drivable only INSIDE the pivot (operands.ts)
+  const symDrives = symMemberDrives(c);
   const warm: { x?: number[] } = {}; // the applied solution's vector — the drive's warm start (ADR-3D-033)
   if (
     (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0 ||
@@ -1331,6 +1388,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       } else {
         pivot = { solutions: 0, chosen: -1, err: Infinity };
       }
+      resolveSymObjects(); // #801: the lines/planes written in a pin symbol follow the solution, always
     };
 
     // ADR-3D-030: the normal solve EXCLUDES plane-equation pins — on a figure the other
@@ -1416,25 +1474,48 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     //    drives at its PINNED value, never a provisional one (the ADR-3D-030 poison),
     //    and re-pins the parameter afterwards. If the joint solve finds nothing the
     //    pinned figure stands and the verify pass refuses honestly (`not-on-plane`).
-    if (drivableMemberships.length > 0) {
+    //
+    //    #801 (ADR-3D-174): the drive is about MEMBERSHIP, not about planes — so the pin-symbol
+    //    carriers («A on ℓ» where ℓ's own numbers are in the pivot's k) enter here, through the same
+    //    stage, the same experiment and the same rollback. Their residual is the only one that cannot
+    //    be lowered beforehand: the carrier is re-derived from the CANDIDATE symbol value each
+    //    evaluation, exactly as a run carrier is re-derived from the candidate positions.
+    if (drivableMemberships.length > 0 || symDrives.length > 0) {
       pinParam();
       resolveLatePlanes();
-      const unmetMembership = drivableMemberships.some((m) => {
-        const p = pos.get(m.id);
-        const pl = planes.get(m.plane);
-        return !p || !pl || !memberHolds3(p, pl);
-      });
-      if (unmetMembership) {
+      const unmetMembership = (): boolean =>
+        drivableMemberships.some((m) => {
+          const p = pos.get(m.id);
+          const pl = planes.get(m.plane);
+          return !p || !pl || !memberHolds3(p, pl);
+        }) ||
+        symDrives.some((d) => {
+          const p = pos.get(d.id);
+          if (!p) return true;
+          if (d.line !== undefined) {
+            const ln = lines.get(d.line);
+            return !ln || !onLineHolds3(p, ln);
+          }
+          const pl = planes.get(d.plane!);
+          return !pl || !memberHolds3(p, pl);
+        });
+      if (unmetMembership()) {
         const members: MemberPin[] = [];
-        for (const m of drivableMemberships) {
-          const def = c.points.get(m.id);
-          // mirror applySolutions' lane rule: a gauge-frame member is evaluated inside
-          // the solve; an absolute-lane member (typed coords / coord-sym at the pinned
-          // parameter / an equation-plane rider) is FROZEN at its final position
+        // mirror applySolutions' lane rule: a gauge-frame member is evaluated inside
+        // the solve; an absolute-lane member (typed coords / coord-sym at the pinned
+        // parameter / an equation-plane rider) is FROZEN at its final position
+        const frozenOf = (id: Id): { ok: boolean; frozen?: Vec3 } => {
+          const def = c.points.get(id);
           const gauge = def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
-          const fin = pos.get(m.id);
-          if (!gauge && !(fin && Number.isFinite(fin.x) && Number.isFinite(fin.y) && Number.isFinite(fin.z))) continue;
-          const frozen = gauge ? undefined : fin;
+          const fin = pos.get(id);
+          if (gauge) return { ok: true };
+          return fin && Number.isFinite(fin.x) && Number.isFinite(fin.y) && Number.isFinite(fin.z)
+            ? { ok: true, frozen: fin }
+            : { ok: false };
+        };
+        for (const m of drivableMemberships) {
+          const { ok, frozen } = frozenOf(m.id);
+          if (!ok) continue;
           if (c.pointPlanes.has(m.plane)) {
             members.push({ id: m.id, frozen, run: c.pointPlanes.get(m.plane)! });
           } else {
@@ -1442,6 +1523,17 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
             // a symbolic-parameter equation plane stays selection/verify-only (chooseParam)
             if ([pd.cx, pd.cy, pd.cz, pd.d].every((e) => e.p === 0))
               members.push({ id: m.id, frozen, plane: { n: v3(pd.cx.k, pd.cy.k, pd.cz.k), d: pd.d.k } });
+          }
+        }
+        for (const d of symDrives) {
+          const { ok, frozen } = frozenOf(d.id);
+          if (!ok) continue;
+          const ld = d.line !== undefined ? c.lines.get(d.line) : undefined;
+          const pd = d.plane !== undefined ? c.planes.get(d.plane) : undefined;
+          if (ld?.kind === 'parametric' && ld.sym !== undefined) {
+            members.push({ id: d.id, frozen, symLine: { anchor: ld.anchor, dir: ld.dir, sym: ld.sym } });
+          } else if (pd?.sym !== undefined && pd !== undefined) {
+            members.push({ id: d.id, frozen, symPlane: { cx: pd.cx, cy: pd.cy, cz: pd.cz, d: pd.d, sym: pd.sym } });
           }
         }
         if (members.length > 0) {
@@ -1468,11 +1560,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
             applySolutions([sol]);
             pinParam();
             resolveLatePlanes();
-            const stillUnmet = drivableMemberships.some((m) => {
-              const p = pos.get(m.id);
-              const pl = planes.get(m.plane);
-              return !p || !pl || !memberHolds3(p, pl);
-            });
+            const stillUnmet = unmetMembership();
             const paramBroke =
               paramBefore !== null && Number.isFinite(paramBefore.value) && !(paramOut !== null && Number.isFinite(paramOut.value));
             if (!stillUnmet && !paramBroke && (!signsBefore || signsHold())) {
@@ -1486,6 +1574,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
             paramOut = paramBefore;
             pivot = pivotBefore;
             resolveLatePlanes();
+            resolveSymObjects(); // #801: the restored pivot's symbol values, not the rejected candidate's
           }
         }
       }
@@ -1547,6 +1636,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     gaugeLineRels.length === 0 && // S2 (#378): a driven line relation pinned the orientation
     c.planePins.length === 0 &&
     c.memberships.length === 0 &&
+    symDrives.length === 0 && // #801: a membership on an absolute pin-symbol carrier orients the figure too
     !freePlaneFigurePinned &&
     !freePlaneOffsetPinned && // #508: rotation about the gauge origin moves the distance-pinned point
 
@@ -1577,7 +1667,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     if (rotationFree) return null; // already fully free — the ordinary sampler owns it
     const rotPinnedElsewhere =
       c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0 ||
-      c.memberships.length > 0 || freePlaneFigurePinned || freePlaneOffsetPinned ||
+      c.memberships.length > 0 || symDrives.length > 0 || freePlaneFigurePinned || freePlaneOffsetPinned ||
       c.coordPlanePins.some((cp) => cp.mode === 'share' || cp.mode === 'perp' || cp.mode === 'contains' || cp.mode === 'zero');
     if (rotPinnedElsewhere) return null;
     const names = [...gaugeLineRels.map((r) => r.line), ...figPlanePerps.map((g) => g.line)];

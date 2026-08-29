@@ -5001,3 +5001,102 @@ reference path now draws the boundary ring idempotently (sides already present a
 segments are skipped, so «משולש SAB» over three pyramid edges stays the byte-identical no-op).
 
 Locks: `src3d/__tests__/issue-774.test.ts` (incl. the operator's exact #807 sequence + idempotency).
+
+## ADR-3D-174 — ONE SYMBOL, ONE OWNER: an equation's letter routes to the mechanism that resolves it (#801, P1)
+
+**2026-08-29 · round #801.** Operator, 2026-08-27, the bagrut prism continued from #794. On the figure
+whose panel correctly reads **k = 2** (`מנסרה ישרה משולשת ABCA'B'C'` + `AA'=(k-1,k-7,k+1)`,
+`AC=(k+1,0,k-3)`, `AB=(k-1,k,3)`), the exercise's own line:
+
+- **named** — «משוואת הישר AC היא x=(8,-1,-1)+t(k+1,0,k-3)» → refused **`not-on-line: A`**. A *is* on that
+  line at k = 2; the tool blamed a correct given.
+- **bare** — «x=(8,-1,-1)+t(k+1,0,k-3)» → **green**, with ℓ drawn at `dir ≈ (0.994, 0, −3.006)`, i.e.
+  **k ≈ 0**, while the same figure held k = 2 — and the params panel, which had read «k = 2», flipped to
+  «k = ?». A green-checked drawing contradicting the student's own equation at the value the figure
+  itself declares: prod honesty, hence P1.
+
+**Class.** *A statement introducing a letter that one mechanism already owns is routed to a SECOND,
+independent mechanism instead of to the owner — so one letter carries two values in one figure.* The
+3-D engine has exactly two symbol-resolving mechanisms: the **algebraic lane** (`c.param`, a 1-DOF
+root-find in `chooseParam`, born from coord-sym points and parameter-carrying equations) and the
+**pin-symbol namespace** (`pinSymsOf`, solved jointly inside the pivot, born from point/vector/pair
+injections — #794/ADR-3D-168). #794 guarded one direction only (an injection may not steal `c.param`);
+the equation side was unguarded, so `line3`/`plane3` set `c.param` for a letter the pivot already held.
+Everything else followed mechanically: lines resolve pre-pivot, where the algebraic lane — finding no
+given that pins its "new" parameter — **sampled** k as a free DOF (ADR-052, correct for a letter nobody
+owns, catastrophic for one already determined); and the existing-point on-line drive (ADR-3D-031 Am.)
+is an apply-time lowering to two numeric plane pins gated on the anchor/dir being **literal constants**
+— a gate that pattern-matches "is it a literal" instead of asking "will it be known", so it silently
+skipped, nothing drove A and C, and the honest verifier then accused the student.
+
+**Mechanism (the fix).**
+
+1. **The letter routes to its OWNER, in one place.** `paramLane(c, letter)` in `apply.ts`: a letter in
+   `pinSymsOf(c)` is that pin symbol; only an unowned letter opens the algebraic lane. `line3` and
+   `plane3` record it as `sym` on the def (`Line3Def.parametric.sym`, `PlaneDef.sym` — "the `p`
+   coefficients are in THIS pin symbol"), and never touch `c.param`. Two *figure* parameters are still
+   refused. The third `c.param` site, a NEW coord-sym point, cannot route (there the letter *defines*
+   the point's coordinates) and refuses `two-params` — the deliberate asymmetry, stated.
+2. **M2 re-homing, so entry order does not decide.** Typed in the other order the equation comes first
+   and owns the letter; #794 would then refuse the injection, though the same statements build in the
+   other order — satisfiability must not depend on typing order (docs/17 M2 law i). `adoptParamAsPinSym`
+   hands the letter to the mechanism that can DETERMINE it whenever the algebraic lane holds nothing to
+   root-find over (no plane-angle / ⟂ / line-relation / paramGiven, no coord-sym point): the equations
+   are re-marked `sym`, `c.param` is released. Both lanes with a real claim still refuses.
+3. **Resolution at the owner's value.** A `sym` object is left OUT of the pre-pivot line/plane maps —
+   the honest state, since it has no value until the pivot chooses one — and `resolveSymObjects()`
+   fills it from `pivot.pinSymbols` at the end of **every** `applySolutions` (and after a rollback), so
+   no accepted solution can disagree with the figure it produced. Riders of such a line are seated
+   there too (the FINAL-fill pattern). The algebraic lane's predicates (`lineDirCarriesParam`,
+   `planeNormalCarriesParam`, `paramLinePerps`, `chooseParam`'s membership selection) now exclude `sym`
+   objects: "carries the figure parameter" means the algebraic lane's letter.
+4. **The drive, inside the pivot** (LADDER stage 4 — the ADR-3D-033 membership drive, which was about
+   *membership* and merely enumerated planes). `MemberPin` gains `symLine`/`symPlane`: the carrier's
+   equation is evaluated at the trial symbol value on every LM iteration, so gauge, dims and k solve
+   **jointly** — which is the physics too, an absolute line being exactly what pins a gauge the
+   injections left free. On-line residual = `(P − anchor) × dir / |dir|` (three components, length
+   units, scale-free). Failure path only, exactly like the plane pins: a figure whose memberships
+   already hold never enters, so every other figure is bit-identical.
+5. **The funnel learns the same fact.** `translationGaugeFree3` / the `rotationFree` and `spinAxis`
+   gates enumerated the lists that pin placement; a pin-symbol membership was in none of them, so the
+   landing funnel re-sampled the placement and slid the figure straight back off the line the drive had
+   just put it on. They now ask `symMemberDrives(c)` too. (An enumeration standing in for the question
+   — docs/17 §2.1; the numeric on-line case was covered only because its lowering happened to land in
+   `planePins`.)
+6. **One predicate for drive and verify.** The store's on-line check is extracted as `onLineHolds3` and
+   the stage-4 trigger aims at it, so a driven membership cannot land inside the drive's tolerance and
+   outside the verifier's (the `memberHolds3` discipline).
+7. **Display.** The canvas echo asked `paramUnforced`, which reads the algebraic lane; for a `sym` line
+   it now echoes the student's own `src` unless the figure is determined (`numbersAreKnowledge`) — the
+   #611 rule, one lane over. Prod's display for this figure is unchanged.
+
+**New capability:** an equation may be written in a letter the injections already carry — it resolves at
+that letter's solved value, and the memberships it states DRIVE the figure. The two lanes may now also
+coexist in one figure (a `c.param` line beside a pin-symbol line).
+
+**Sibling audit.** *3-D:* the plane cell of the same hole was unreported and is fixed with the line
+(`מישור π: x+(k-1)y+z-4=0` + «A על המישור π» now resolves at k = 2 and drives A onto it — locked). The
+`point3` coord-sym cell refuses, stated above. *2-D (`src/`):* the class needs two mechanisms sharing one
+namespace; `src/` has one — `radius-symbol` binds a letter to a circle's radius DOF (`grep symbol
+src/engine/apply.ts` → the single `radius-symbol` case; no `c.param`/root-find lane exists). Not present.
+*Complex (`src-complex/`):* `param` is an expression-tree node inside one algebra evaluator, no second
+resolver. Not present.
+
+**Known limits, recorded not hidden:**
+
+- The re-homing refuses (rather than migrating) when the algebraic lane holds a pinning given for the
+  letter — moving a root-find given into the pivot is a real mechanism and is not attempted silently.
+- Re-homing acts on the fact SET (a loaded file, a batch derive). Typed INTERACTIVELY in that order the
+  equation is still refused at its own step: at that moment k belongs to the algebraic lane, and **that
+  lane has no membership drive at all** — «A על הישר ℓ» against a `c.param`-carrying line can only be
+  verified, never satisfied. That is the same class one lane over, and it is the algebraic lane's own
+  gap (a letter the equations carry is not a pivot unknown), so it is FILED rather than half-built here.
+- The remaining slide ALONG a driving line stays unsampled, the funnel's documented conservatism for
+  partially-pinned placement (same as today's numeric plane-pin case).
+
+**Perf:** the drive is failure-path only and adds no solve to a figure that already holds; the operator's
+figure resolves in ~0.3 s (`derive3`, seed 0). Full 3-D lane 166 files / 3382 tests green.
+
+Locks: `src3d/__tests__/issue-801.test.ts` (the operator's exact named + bare sequences at three seeds,
+the order permutation, the apply gate, the plane sibling, the preserved `two-params` refusal) and
+`fixtures3/prism-sym-line-801.geo3.json` (the named sequence through the real load path).

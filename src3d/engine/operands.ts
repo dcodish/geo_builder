@@ -152,7 +152,10 @@ export function resolveOperand(op: Operand3, c: Construction3, abs: AbsoluteCtx)
  *  cannot change a direction relation, so it deliberately does not count.) */
 export const planeNormalCarriesParam = (c: Construction3, name: string): boolean => {
   const def = c.planes.get(name);
-  return !!def && (def.cx.p !== 0 || def.cy.p !== 0 || def.cz.p !== 0);
+  // #801 (ADR-3D-174): "carries THE FIGURE PARAMETER" means the ALGEBRAIC lane's letter. A plane whose
+  // coefficients are in a PIN symbol carries a letter the pivot owns, so it neither pins nor is pinned
+  // BY the root-find — routing it there would root-find over a value another mechanism already fixed.
+  return !!def && !def.sym && (def.cx.p !== 0 || def.cy.p !== 0 || def.cz.p !== 0);
 };
 
 /** S2 (#378): does this named line's DIRECTION carry the figure parameter? A parametric line's
@@ -162,10 +165,48 @@ export const planeNormalCarriesParam = (c: Construction3, name: string): boolean
 export const lineDirCarriesParam = (c: Construction3, name: string): boolean => {
   const def = c.lines.get(name);
   if (!def) return false;
-  if (def.kind === 'parametric') return def.dir.some((e) => e.p !== 0);
+  if (def.kind === 'parametric') return !def.sym && def.dir.some((e) => e.p !== 0); // #801: the pin-symbol lane is not this one
   if (def.kind === 'plane-plane') return planeNormalCarriesParam(c, def.p1) || planeNormalCarriesParam(c, def.p2);
   return false;
 };
+
+/** #801 (ADR-3D-174): the PIN SYMBOL a named line's numbers are written in — null when the line is not
+ *  pin-symbol parametric (numeric, the algebraic lane's, or a derived kind). */
+export const lineSym3 = (c: Construction3, name: string): string | null => {
+  const def = c.lines.get(name);
+  return def?.kind === 'parametric' ? (def.sym ?? null) : null;
+};
+
+/** #801: the plane edition of {@link lineSym3}. */
+export const planeSym3 = (c: Construction3, name: string): string | null => c.planes.get(name)?.sym ?? null;
+
+/**
+ * #801 (ADR-3D-174) — the stated MEMBERSHIPS whose carrier is a pin-symbol object («A on ℓ» where ℓ is
+ * «x = (8,-1,-1) + t(k+1,0,k-3)» and the pivot owns k). They can only be driven INSIDE the pivot: the
+ * carrier's numbers are a function of the very symbol being solved, so no apply-time lowering to fixed
+ * coefficients exists — which is why the ADR-3D-031 Am. drive, gated on the coefficients being literal
+ * constants, silently skipped them and the verifier then blamed the student's correct statement.
+ *
+ * A point that RIDES the carrier (created by this very statement) is seated on it by construction and
+ * is never driven — only a point that already existed is.
+ */
+export function symMemberDrives(c: Construction3): { id: Id; sym: string; line?: string; plane?: string }[] {
+  const out: { id: Id; sym: string; line?: string; plane?: string }[] = [];
+  for (const m of c.onLines) {
+    const sym = lineSym3(c, m.line);
+    const def = c.points.get(m.id);
+    if (!sym || !def || (def.kind === 'on-line' && def.line === m.line)) continue;
+    out.push({ id: m.id, sym, line: m.line });
+  }
+  for (const m of c.memberships) {
+    if (m.side || m.plane === 'any') continue; // a side given is an inequality (sampled + verified)
+    const sym = planeSym3(c, m.plane);
+    const def = c.points.get(m.id);
+    if (!sym || !def || (def.kind === 'on-plane' && def.plane === m.plane)) continue;
+    out.push({ id: m.id, sym, plane: m.plane });
+  }
+  return out;
+}
 
 /**
  * S2 (#378, ADR-3D-103): the scalar MISALIGNMENT of a line-rel instance — 0 ⟺ the relation holds

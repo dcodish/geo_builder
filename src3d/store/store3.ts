@@ -29,9 +29,9 @@ import { stripFormatControls } from '../../shell/bidi';
 import { applyCommand3, freeDims } from '../engine/apply';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { scalePinned } from '../engine/solve3';
-import { checkInSpan, firstSatisfyingSeed3, memberHolds3, pinningGivens, resolve3, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, firstSatisfyingSeed3, memberHolds3, onLineHolds3, pinningGivens, resolve3, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
-import { cross3, dot3, norm3, sub3 } from '../engine/vec3';
+import { dot3, norm3, sub3 } from '../engine/vec3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
 import { parse3 } from '../parser/parse3';
@@ -438,10 +438,9 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
       } else if (cmd.type === 'on-line') {
         const p = positions.get(cmd.id);
         const ln = resolved.lines.get(cmd.line);
-        const holds =
-          p !== undefined &&
-          ln !== undefined &&
-          norm3(cross3(sub3(p, ln.anchor), ln.dir)) <= 1e-7 * Math.max(norm3(sub3(p, ln.anchor)) * norm3(ln.dir), 1);
+        // #801 (ADR-3D-174): the predicate is `onLineHolds3` — the SAME one the stage-4 drive aims at,
+        // so a driven membership can never land inside the drive's bar and outside the verifier's.
+        const holds = p !== undefined && ln !== undefined && onLineHolds3(p, ln);
         if (!holds) {
           status[f.id] = { code: 'not-on-line', id: cmd.id };
           break;

@@ -110,6 +110,17 @@ const SEEDED: Record<string, string[]> = {
     'AC = (k+1, 0, k-3)',
     'k חיובי',
   ],
+  // #801 (ADR-3D-174) — the operator's 2026-08-27 continuation of that same exam figure: the exercise's
+  // LINE, whose direction is the same vector in the same letter k. The equation must route to the letter's
+  // OWNER (the pivot) instead of opening the root-find lane beside it, and the two point memberships the
+  // named form carries must DRIVE the prism onto the line — every fact green at k = 2.
+  'prism-sym-line-801.geo3.json': [
+    "מנסרה ישרה משולשת ABCA'B'C'",
+    "AA'=(k-1,k-7,k+1)",
+    'AC=(k+1,0,k-3)',
+    'AB=(k-1,k,3)',
+    'משוואת הישר AC היא x=(8,-1,-1)+t(k+1,0,k-3)',
+  ],
   'planes-2022-q2.geo3.json': [
     'המישור π1: z - 3 = 0',
     'המישור π2: ay + z - 8 = 0',

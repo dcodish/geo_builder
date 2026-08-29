@@ -592,6 +592,12 @@ export function buildScene3(
     const def = c.lines.get(name);
     const carriesParam =
       def?.kind === 'parametric' && [...def.anchor, ...def.dir].some((e) => e.p !== 0);
+    // #801 (ADR-3D-174): the SAME question for a line written in a PIN symbol — `paramUnforced` reads
+    // the algebraic lane and cannot answer for the pivot's letter. Same rule, one lane over: the
+    // resolved numbers are the student's given only when the figure is determined; otherwise their own
+    // equation is echoed, never a configuration's version of it.
+    const echoSrc =
+      def?.kind === 'parametric' && (def.sym !== undefined ? !numbersAreKnowledge : carriesParam && paramUnforced);
     wLines.push({
       name,
       a: sub3(mid, scale3(dir, reach)),
@@ -601,7 +607,7 @@ export function buildScene3(
         // the figure's DOF, because those numbers came from them, not from a sample. Everything else
         // is DERIVED and echoes numbers only when they are forced; otherwise the bare name, which is
         // what #552 already did for free lines and what the free PLANE precedent does with its patch.
-        carriesParam && paramUnforced && def?.kind === 'parametric'
+        echoSrc && def?.kind === 'parametric'
           ? `${name}: ${def.src}`
           : def?.kind === 'parametric' || numbersAreKnowledge
           // #422: the student's own running letter, when they chose one — the numeric echo used to
