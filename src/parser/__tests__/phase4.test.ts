@@ -549,9 +549,17 @@ describe('parser — coverage on the in-grammar sample', () => {
   // The catalog is the user-facing reference *and* the coverage map: an entry
   // marked supported must parse in both locales, or the help panel lies.
   it('every supported catalog example parses (He + En)', () => {
-    for (const c of COMMAND_CATALOG.filter((c) => c.supported)) {
+    for (const c of COMMAND_CATALOG.filter((c) => c.supported && !c.needsFigure)) {
       expect(parse(c.en).ok, `EN catalog example should parse: "${c.en}"`).toBe(true);
       expect(parse(c.he).ok, `HE catalog example should parse: "${c.he}"`).toBe(true);
+    }
+    // #775: a figure-dependent example (a role noun) cannot `.ok` standalone — the contract for it
+    // is DETERMINISTIC RECOGNITION: a typed clarification, never a silent not-handled escalation.
+    for (const c of COMMAND_CATALOG.filter((c) => c.supported && c.needsFigure)) {
+      for (const [lang, u] of [['EN', c.en], ['HE', c.he]] as const) {
+        const r = parse(u);
+        expect(r.ok || r.reason !== 'not-handled', `${lang} catalog example must be recognized: "${u}"`).toBe(true);
+      }
     }
   });
 });

@@ -27,6 +27,11 @@ export interface CommandDoc {
   supported: boolean;
   /** For unbuilt items: the sub-phase that delivers it (e.g. '5b'), shown as a tag. */
   phase?: string;
+  /** #775: the example resolves against the FIGURE (a role noun like «ליתר» needs a declared right
+   *  triangle), so standalone it yields a typed CLARIFICATION rather than commands. The coverage
+   *  harnesses assert it is deterministically recognized (never a silent LLM escalation) instead of
+   *  demanding a standalone `.ok` parse. */
+  needsFigure?: true;
 }
 
 /** Display order + bilingual heading for each category. */
@@ -96,6 +101,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'lines', supported: true, en: 'line ABE', he: 'ישר ABE', descEn: 'Three or more points collinear AND in the named order (B between A and E) — the order picks the side.', descHe: 'שלוש נקודות או יותר על ישר אחד ולפי הסדר שנכתב (B בין A ל-E) — הסדר קובע את הצד.' },
   { category: 'lines', supported: true, en: 'median from A in ABC', he: 'תיכון מ-A במשולש ABC', descEn: 'A median (to the opposite midpoint).', descHe: 'תיכון (לאמצע הצלע שממול).' },
   { category: 'lines', supported: true, en: 'AD median to BC', he: 'AD תיכון לצלע BC', descEn: 'A median you name (D = midpoint of BC).', descHe: 'תיכון בשם שתבחרו (D = אמצע BC).' },
+  { category: 'lines', supported: true, needsFigure: true, en: 'median to the hypotenuse', he: 'תיכון ליתר', descEn: 'A side named by its ROLE — the right triangle’s hypotenuse, the isosceles base — resolves against the declared shape; works for altitudes too (#775).', descHe: 'צלע לפי תפקידה — היתר של משולש ישר-זווית, הבסיס של שווה-שוקיים — נפתרת מול הצורה שהוצהרה; עובד גם לגובה.' },
   { category: 'lines', supported: true, en: 'height from A in ABC', he: 'גובה מ-A במשולש ABC', descEn: 'An altitude and its foot.', descHe: 'גובה והרגל שלו.' },
   { category: 'lines', supported: true, en: 'perpendicular bisector of AB', he: 'אנך אמצעי ל-AB', descEn: 'The perpendicular bisector of a segment.', descHe: 'האנך האמצעי של הקטע.' },
   { category: 'lines', supported: true, en: 'midsegment to BC in triangle ABC', he: 'קטע האמצעים לצלע BC במשולש ABC', descEn: 'The triangle midsegment — joins the midpoints of the two sides meeting at the apex.', descHe: 'קטע האמצעים במשולש — מחבר את אמצעי שתי הצלעות הנפגשות בקודקוד שממול.' },

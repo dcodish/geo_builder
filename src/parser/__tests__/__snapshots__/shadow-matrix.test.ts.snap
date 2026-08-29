@@ -1029,6 +1029,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "median to the hypotenuse",
+    "winner": "roleSideLine",
+  },
+  {
+    "lang": "he",
+    "text": "תיכון ליתר",
+    "winner": "roleSideLine",
+  },
+  {
+    "lang": "en",
     "text": "height from A in ABC",
     "winner": "altitude",
   },

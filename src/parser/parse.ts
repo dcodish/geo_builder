@@ -58,7 +58,10 @@ export type ParseResult =
   // A BOUND radius SYMBOL (ctx.radiusSymbols — «רדיוס מעגל O הוא R») reused as a POINT label («מיתר AR»):
   // once bound, the letter IS the parametric measure, never a node (operator ruling 2026-07-18, #198). The
   // student picks another letter — a deterministic clarification, never a paid LLM call that mints a node R.
-  | { ok: false; reason: 'reserved-symbol'; symbol: string };
+  | { ok: false; reason: 'reserved-symbol'; symbol: string }
+  /** #775: a side named by its ROLE («ליתר», «לבסיס») with no unique referent in the figure —
+   *  clarify rather than guess a side or burn an escalation on a form the LLM must not invent for. */
+  | { ok: false; reason: 'role-side-unresolved'; role: string };
 
 /**
  * Figure context the parser may consult to resolve implicit references — chiefly
@@ -154,6 +157,15 @@ export interface ParseContext {
   /** Each referenceable centre's drawn x-position — «המעגל הימני/השמאלי» (right/left) resolves a
    *  POINTING gesture against the drawing the student sees (#188 / ADR-349). */
   circleXs?: { center: string; x: number }[];
+  /** #775: side ROLES the figure's declarations induce («היתר» — the right triangle's hypotenuse,
+   *  «הבסיס»/«השוק» — the isosceles base/legs), derived SEMANTICALLY from declared structure in
+   *  `buildParseCtx`, never from drawn coordinates. A role noun with no unique referent refuses
+   *  naming the statement — it never falls back to an arbitrary side (ADR-052). */
+  roleSides?: { role: 'hypotenuse' | 'base' | 'leg'; edge: [string, string] }[];
+  /** #805 play (ADR-465 Am. 2): existing altitude FEET — lets a repeated auto-named altitude REUSE
+   *  its foot (identical re-lowering → the #613 restate-dedupe reads the repeat as the same
+   *  statement) and lets the leg-role pick rotate to the leg not yet carrying one. */
+  feet?: { id: string; from: string; a: string; b: string }[];
 }
 
 /** The centre of a circle that contains EVERY point in `pts` (preferring `prefer` if it qualifies), else null. */
@@ -216,7 +228,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string };
+type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -7573,6 +7585,74 @@ const APEX_FROM = String.raw`(?:\bfrom\s+(?:the\s+)?(?:point\s+|vertex\s+)?|מ-?
 const LOCATIVE_APEX = String.raw`(?:%KW%)\s+(?:ב-?\s*(?:ה?נקודה|ה?קודקוד)\s+|at\s+(?:the\s+)?(?:point|vertex)\s+)(${LABEL})\b`;
 
 /**
+ * #775 — a special line to a side named by its ROLE: «תיכון ליתר» (the median to the hypotenuse),
+ * «גובה ליתר», «תיכון לבסיס», En "median to the hypotenuse". The role noun resolves against the
+ * figure's DECLARED structure (`ctx.roleSides` — the right triangle's hypotenuse, the isosceles
+ * base/legs) and the utterance is REWRITTEN to the letter form («תיכון לצלע AB»), then re-parsed —
+ * so every head sharing the side matchers (median AND altitude, and any future special line) is
+ * served by one resolver, and the tested letter-form lowering derives the semantics. A role noun
+ * with no unique referent CLARIFIES, naming the role — never an arbitrary side (ADR-052), and never
+ * an escalation the LLM would have to guess a side for. «הבסיס הגדול/הקטן» (a qualified trapezoid
+ * base) is deliberately left to richer rules/the LLM — the qualifier means the student is being
+ * more specific than this resolver.
+ */
+/** #805 play (ADR-465 Am. 2) — the reuse pair: an existing midpoint of side [a,b] / an existing foot
+ *  onto [a,b] (optionally from a given apex). Lets a repeated auto-named median/altitude re-lower to
+ *  the IDENTICAL commands, so the #613 restate-dedupe reads the repeat as the same statement
+ *  («כבר נאמר», no new row) instead of minting F, G, H… stacked on one spot. */
+const sameSide = (x: string, y: string, a: string, b: string): boolean => (x === a && y === b) || (x === b && y === a);
+const existingMidpointOf = (ctx: ParseContext, a: Id, b: Id): Id | null => {
+  for (const [id, [x, y]] of Object.entries(ctx.midpointOf ?? {})) if (sameSide(x, y, a, b)) return id;
+  return null;
+};
+const existingFootOf = (ctx: ParseContext, from: Id | null, a: Id, b: Id): Id | null => {
+  for (const f of ctx.feet ?? []) if ((from === null || f.from === from) && sameSide(f.a, f.b, a, b)) return f.id;
+  return null;
+};
+
+const SPECIAL_LINE_HEAD = /תיכון|גובה|\bmedian\b|\bheight\b|\baltitude\b/i;
+const ROLE_NOUN_RX = /(?<![א-ת])(?:ל|על\s+|אל\s+)ה?(יתר|בסיס(?!\s*ה?(?:גדול|קטן))|שוקיים|שוק)(?![א-ת])|\b(?:to|onto|on)\s+the\s+(hypotenuse|base|legs?)\b/i;
+const roleSideLine: Rule = (s, ctx) => {
+  if (!SPECIAL_LINE_HEAD.test(s)) return null;
+  const m = s.match(ROLE_NOUN_RX);
+  if (!m) return null;
+  const noun = m[1] ?? m[2] ?? '';
+  const role = /יתר|hypotenuse/i.test(noun) ? 'hypotenuse' : /בסיס|base/i.test(noun) ? 'base' : 'leg';
+  const cands = (ctx.roleSides ?? []).filter((r) => r.role === role);
+  // #805 play, second pass (ADR-465 Am. 2): letters right after the role noun SELECT among the
+  // candidates — «גובה לשוק AC» is the student naming WHICH leg, and it must win outright.
+  const afterNoun = s.slice((m.index ?? 0) + m[0].length).match(/^\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)(?![A-Za-z\d])/);
+  const selected = afterNoun
+    ? cands.find((r) => sameSide(r.edge[0], r.edge[1], up(afterNoun[1]), up(afterNoun[2]))) ?? null
+    : null;
+  // #805 play (ADR-465 Am. 1 + Am. 2): «גובה לשוק» on ONE isosceles has two candidates, but the
+  // legs are CONGRUENT by the very constraint that makes them legs — which leg is pure gauge, so
+  // draw one rather than refuse (the parallelogram-height precedent). Am. 2 makes the choice
+  // ROTATE: a leg already carrying this head's construct (a foot for the altitude head, a midpoint
+  // for the median head) yields to the free one, so a REPEATED «גובה לשוק» lands on the other leg;
+  // with both occupied the first is re-picked and the reuse below re-lowers identically, which the
+  // #613 dedupe reads as «already stated». More than one declaring triangle stays a clarification.
+  const isHeightHead = /גובה|\bheight\b|\baltitude\b/i.test(s);
+  const occupied = (e: [Id, Id]): boolean =>
+    isHeightHead ? existingFootOf(ctx, null, e[0], e[1]) !== null : existingMidpointOf(ctx, e[0], e[1]) !== null;
+  const pick =
+    selected ??
+    (cands.length === 1 ? cands[0]
+    : role === 'leg' && cands.length === 2 ? (cands.find((r) => !occupied(r.edge)) ?? cands[0])
+    : null);
+  if (!pick) return { clarify: 'role-side-unresolved', role: noun };
+  const [p, q] = pick.edge;
+  const heb = /[א-ת]/.test(s);
+  // a run restating the side right after the role noun («תיכון ליתר AB») folds into the rewrite;
+  // any other letters stay untouched for the letter-form rules to read
+  const restated = rx(String.raw`(?:${ROLE_NOUN_RX.source})\s*(?:${p}${q}|${q}${p})(?![A-Za-z\d])`, 'i');
+  const target = heb ? ` לצלע ${p}${q} ` : ` to side ${p}${q} `;
+  const rewritten = (restated.test(s) ? s.replace(restated, target) : s.replace(ROLE_NOUN_RX, target)).replace(/\s+/g, ' ').trim();
+  const r = parse(rewritten, ctx);
+  return r.ok ? r.commands : null;
+};
+
+/**
  * "median from A in ABC" / "תיכון מ-A במשולש ABC" — the median from a vertex to the
  * midpoint of the opposite side. Emits the triangle (idempotent if it exists),
  * the opposite-side midpoint, and the segment to it.
@@ -7580,8 +7660,8 @@ const LOCATIVE_APEX = String.raw`(?:%KW%)\s+(?:ב-?\s*(?:ה?נקודה|ה?קוד
 const median: Rule = (s, ctx) => {
   if (!/\bmedian\b|תיכון/i.test(s)) return null;
 
-  // An explicitly named opposite side: "to side BC" / "to BC" / "לצלע BC" / "אל BC" / "ל-BC".
-  const sideM = s.match(/(?:\bto\s+(?:side\s+)?|לצלע\s*|אל\s*|ל-?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  // An explicitly named opposite side: "to side BC" / "to BC" / "לצלע BC" / "על צלע BC" / "אל BC" / "ל-BC".
+  const sideM = s.match(/(?:\bto\s+(?:side\s+)?|\bon\s+side\s+|לצלע\s*|על\s+ה?צלע\s+|אל\s*|ל-?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   const side = sideM ? ([up(sideM[1]), up(sideM[2])] as [Id, Id]) : null;
 
   // Named form "AD תיכון" / "median AD": the median segment is named apex-first,
@@ -7636,7 +7716,7 @@ const median: Rule = (s, ctx) => {
       .filter((p) => p.length === 3 && p.includes(side[0]) && p.includes(side[1]));
     const apexes = [...new Set(tris.map((t) => t.find((x) => x !== side[0] && x !== side[1])!))];
     if (apexes.length !== 1) return null;
-    const foot = freeLabel([apexes[0], ...side, ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']);
+    const foot = existingMidpointOf(ctx, side[0], side[1]) ?? freeLabel([apexes[0], ...side, ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']); // reuse → identical re-lowering → #613 dedupe (Am. 2)
     return [
       { type: 'midpoint', id: foot, a: side[0], b: side[1] },
       { type: 'segment', a: apexes[0], b: foot },
@@ -7646,7 +7726,7 @@ const median: Rule = (s, ctx) => {
   // An explicit opposite side ("...to side AB") with a from-apex fully determines the median —
   // the foot is that side's midpoint (no triangle to name/re-emit; the figure already has the points).
   if (side && side[0] !== apex && side[1] !== apex) {
-    const foot = freeLabel([apex, ...side], ['M', 'N', 'P', 'Q']);
+    const foot = existingMidpointOf(ctx, side[0], side[1]) ?? freeLabel([apex, ...side], ['M', 'N', 'P', 'Q']); // reuse (Am. 2)
     return [
       { type: 'midpoint', id: foot, a: side[0], b: side[1] },
       { type: 'segment', a: apex, b: foot },
@@ -7660,7 +7740,7 @@ const median: Rule = (s, ctx) => {
     // polygon the apex belongs to (exactly one non-touching edge = a triangle; else defer).
     const edges = oppositePolygonEdges(apex, ctx.polygons, null);
     if (edges.length !== 1) return null;
-    const mid = freeLabel([apex, ...edges[0], ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']);
+    const mid = existingMidpointOf(ctx, edges[0][0], edges[0][1]) ?? freeLabel([apex, ...edges[0], ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']); // reuse (Am. 2)
     return [
       { type: 'midpoint', id: mid, a: edges[0][0], b: edges[0][1] },
       { type: 'segment', a: apex, b: mid },
@@ -7668,7 +7748,7 @@ const median: Rule = (s, ctx) => {
   }
   const others = tri.filter((x) => x !== apex);
   if (others.length !== 2) return null;
-  const mid = freeLabel(tri, ['M', 'N', 'P', 'Q']);
+  const mid = existingMidpointOf(ctx, others[0], others[1]) ?? freeLabel(tri, ['M', 'N', 'P', 'Q']); // reuse (Am. 2)
   return [
     { type: 'triangle', ids: [tri[0], tri[1], tri[2]] },
     { type: 'midpoint', id: mid, a: others[0], b: others[1] },
@@ -7775,7 +7855,7 @@ const altitude: Rule = (s, ctx) => {
     // determinate apex).
     if (!isHeight) return null;
     const sideOnly = s.match(
-      /(?:\bto\s+(?:the\s+)?(?:side\s+)?|אל\s*(?:ה?צלע\s+)?|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+      /(?:\bto\s+(?:the\s+)?(?:side\s+)?|\bon\s+side\s+|אל\s*(?:ה?צלע\s+)?|על\s+ה?צלע\s+|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
     );
     if (!sideOnly) return null;
     const sd: [Id, Id] = [up(sideOnly[1]), up(sideOnly[2])];
@@ -7785,14 +7865,14 @@ const altitude: Rule = (s, ctx) => {
     const apexes = [...new Set(tris.map((t) => t.find((x) => x !== sd[0] && x !== sd[1])!))];
     if (apexes.length !== 1) return null;
     const apx = apexes[0];
-    const foot2 = freeLabel([apx, ...sd, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']);
+    const foot2 = existingFootOf(ctx, apx, sd[0], sd[1]) ?? freeLabel([apx, ...sd, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']); // reuse (Am. 2)
     return [
       { type: 'foot', id: foot2, from: apx, a: sd[0], b: sd[1] },
       { type: 'segment', a: apx, b: foot2 },
     ];
   }
-  // Opposite side: "to BC" / "to side BC" / "ל BC" / "ל-BC" / "לצלע BC" / "לקטע BC" (descriptor noun tolerated).
-  const sideM = s.match(/(?:\bto\s+(?:the\s+)?(?:side\s+)?|אל\s*(?:ה?צלע\s+)?|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // explicit opposite side "to BC"
+  // Opposite side: "to BC" / "to side BC" / "ל BC" / "ל-BC" / "לצלע BC" / "על צלע BC" / "לקטע BC" (descriptor noun tolerated).
+  const sideM = s.match(/(?:\bto\s+(?:the\s+)?(?:side\s+)?|\bon\s+side\s+|אל\s*(?:ה?צלע\s+)?|על\s+ה?צלע\s+|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // explicit opposite side "to BC"
   let p: string, q: string;
   let tri: Id[] | null = null;
   if (sideM && up(sideM[1]) !== apex) {
@@ -7848,7 +7928,7 @@ const altitude: Rule = (s, ctx) => {
   }
   // Auto-name the foot avoiding EVERY existing figure point, not just the apex/base — otherwise a second
   // altitude re-picks 'F' and silently REDEFINES the first altitude's foot (a §6-honesty collision).
-  const f = namedFoot ?? freeLabel([apex, p, q, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']);
+  const f = namedFoot ?? existingFootOf(ctx, apex, p, q) ?? freeLabel([apex, p, q, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']); // reuse (Am. 2)
   const cmds: Command[] = [];
   if (tri) cmds.push({ type: 'triangle', ids: [tri[0], tri[1], tri[2]] });
   cmds.push({ type: 'foot', id: f, from: apex, a: p, b: q });
@@ -8358,6 +8438,7 @@ const showCenter: Rule = (s, ctx) => {
 export const RULES: Rule[] = [
   compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
   compoundAtDistance, // #760: "<point> on <carrier> at distance N from X" — membership + set-distance, composed
+  roleSideLine, // #775: «תיכון ליתר» — role noun → the declared side, rewritten and re-parsed
   multiStatement, // "AB = 4, BC = 6" — split comma/and-joined GIVENS, parse each all-or-nothing (PAR-2)
   setRadius, // "radius of circle P is 4" — set an EXISTING circle's radius; before `circle` (creation) and the shape rules (which 'stop' on רדיוס)
   radiusSymbolStatement, // "רדיוס מעגל O הוא R" — NAME an existing circle's radius with a letter (#54); after setRadius (numeric wins), before the shape rules
@@ -9920,6 +10001,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
     if (res.clarify === 'ambiguous-container') return { ok: false, reason: 'ambiguous-container', centers: res.centers };
     if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };
     if (res.clarify === 'alias-taken') return { ok: false, reason: 'alias-taken', name: res.name };
+    if (res.clarify === 'role-side-unresolved') return { ok: false, reason: 'role-side-unresolved', role: res.role };
     return { ok: false, reason: 'ambiguous-circle', center: res.center };
   }
   return { ok: false, reason: 'not-handled' };
