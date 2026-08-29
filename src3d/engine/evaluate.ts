@@ -740,6 +740,7 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   let freeT = 0;
   for (const def of c.points.values()) {
     if (def.kind === 'on-segment' && def.t === undefined) freeT++;
+    if (def.kind === 'free3') freeT += 3; // #774: a mixed-run minted point — three genuine free DOFs
     if (def.kind === 'on-plane') freeT += def.side ? 3 : 2; // a plane rider slides in-plane; a side point also floats
     if (def.kind === 'on-line') freeT += 1; // a line rider slides along its line (ADR-3D-031)
     if (def.kind === 'partial') freeT += [def.x, def.y, def.z].filter((v) => v === null).length; // each unstated component is a free DOF (ADR-3D-094)
@@ -971,7 +972,7 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 }
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'right-apex']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'right-apex', 'free3']);
 
 /**
  * #367: is anything in the figure stated in ABSOLUTE coordinates — a typed parametric line, a plane
@@ -1986,6 +1987,18 @@ function evaluateSolidsAndPoints(
         return sgn * mag;
       };
       pos.set(id, v3(comp('x'), comp('y'), comp('z')));
+    } else if (def.kind === 'free3') {
+      // #774 (ADR-3D-172): a mixed-run minted point — all three components are free sampled DOFs,
+      // spread-scaled off the placed figure for general position (the `partial` pattern with no
+      // fixed component), so it varies with the seed and never parks at a default (ADR-052).
+      const placed = [...pos.values()];
+      let spread = 1.2;
+      for (const q of placed) spread = Math.max(spread, Math.abs(q.x), Math.abs(q.y), Math.abs(q.z));
+      const comp3 = (ax: 'x' | 'y' | 'z'): number => {
+        const mag = sample(seed, `free3-${ax}-${id}`, 0.3, 1.05) * spread;
+        return (sample(seed, `free3sgn-${ax}-${id}`, -1, 1) >= 0 ? 1 : -1) * mag;
+      };
+      pos.set(id, v3(comp3('x'), comp3('y'), comp3('z')));
     } else if (def.kind === 'on-line') {
       seatOnLineRider(seed, pos, lines, id, def);
     } else if (def.kind === 'plane-cut') {
