@@ -2665,10 +2665,45 @@ export function meetsRequirements3(c: Construction3, seed: number): boolean {
  * must still draw — so this gates WHICH valid drawing is shown, and yields the moment no drawing
  * satisfies it. Made a hard requirement instead, it refused that figure outright.
  */
+/**
+ * #817 (ADR-3D-176) — is any face of a solid drawn with NO AREA? A ring corner whose two incident
+ * edges are (near-)parallel means three consecutive vertices are collinear: the "parallelogram" base
+ * of «פירמידה SABCD שבסיסה מקבילית» sampled as `A(0,0,0) B(0,5,0) C(0,9.74,0) D(0,4.74,0)` — the
+ * operator's "collapsed 2-D", and the zero face normal that crashed the renderer.
+ *
+ * Judged per CORNER on |sin| between the incident edges, which is scale-free and, unlike an
+ * area-over-extent ratio, does not punish a legitimately thin face (a long narrow rectangle is a fine
+ * drawing; a flattened one is not). Derived by walking `c.solids`, so this covers every solid kind and
+ * every way of declaring a base — the gate it joins was reachable only by a STATED quad, which is why
+ * a solid that names its own base («שבסיסה מקבילית») had no general-position guarantee at all.
+ */
+export function solidFaceCollapsed(c: Construction3, positions: Positions3, tol = 0.02): boolean {
+  for (const solid of c.solids) {
+    for (const face of solid.faces) {
+      const ring = face.map((id) => positions.get(id));
+      if (ring.some((p) => !p)) continue; // unresolvable: nothing to judge, never a veto
+      const r = ring as Vec3[];
+      for (let i = 0; i < r.length; i++) {
+        const v = r[i];
+        const u = sub3(r[(i - 1 + r.length) % r.length], v);
+        const w = sub3(r[(i + 1) % r.length], v);
+        const den = norm3(u) * norm3(w);
+        if (den <= 1e-12) return true; // a zero-length edge is a collapsed corner too
+        if (norm3(cross3(u, w)) / den <= tol) return true;
+      }
+    }
+  }
+  return false;
+}
+
 export function meetsShapePreferences3(c: Construction3, seed: number): boolean {
   const prefs = c.requirements.filter((req) => req.kind === 'quad-general');
-  if (prefs.length === 0) return true;
+  // #817: ...and the preference no utterance states — a solid's faces should have real area. It joins
+  // the PREFERENCE tier deliberately: a figure whose givens genuinely force a flat face must still
+  // draw (the #615 fallback), it just must not be chosen while a real configuration is available.
+  if (prefs.length === 0 && c.solids.length === 0) return true;
   const r = resolve3(c, seed);
+  if (solidFaceCollapsed(c, r.positions)) return false;
   return prefs.every((req) => {
     if (req.kind !== 'quad-general') return true;
     const ring = req.ids.map((id) => r.positions.get(id));

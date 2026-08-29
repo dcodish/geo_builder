@@ -5169,3 +5169,68 @@ Locks: `src3d/__tests__/issue-814.test.ts` (the operator's exact sequence He + E
 selection holding at five seeds, all three injection lanes, the still-refused unknown letter, the
 ADR-052 resampling guarantee, the parser's name-vs-register split, and **both exam gates reproduced**)
 and `fixtures3/pyramid-named-comp-814.geo3.json` (the figure through the real load path).
+
+## ADR-3D-176 — A COLLAPSED FACE IS NOT A CONFIGURATION, AND NEVER A CRASH (#817, P1)
+
+**The class.** *A free shape DOF is sampled with no general-position guarantee, and the guarantee that
+does exist is bound to one WAY OF STATING the shape rather than to the shape itself.*
+
+«פירמידה SABCD שבסיסה מקבילית» + the height + `A(0,0,0) B(0,5,0) S(0,0,6)` drew its base collinear —
+`C(0, 9.74, 0)`, `D(0, 4.74, 0)`, every base vertex at `x = 0`, `AD ∥ AB`. A "parallelogram" with zero
+area: the operator's *"collapsed 2-D"*. Pressing «הציגו תצורה אחרת» then **crashed the app**.
+
+**Root cause, in three stacked parts.**
+
+1. `requirements` / `quad-general` — the general-position gate — is pushed only by `recordShape`, which
+   runs for a **stated quad** («ABCD מקבילית»). A solid that declares the same parallelogram base
+   through its own noun («שבסיסה מקבילית») registered nothing: measured on the operator's figure,
+   `requirements = []` and `quadShapes = []` beside `solids = [{kind: 'pyramidPar', …}]`. The gate was
+   attached to an utterance form instead of to the figure — the tree's recurring class, *an enumeration
+   is not a rule*.
+2. With `requirements` empty, `seedForRequirements` short-circuited (`length === 0 ⇒ return from`), so
+   «show another configuration» was a bare `seed + 1` that could not skip a bad drawing because it was
+   never asked to judge one.
+3. `auxSegmentHidden` normalized the zero face normal and **threw** (`normalize3: zero vector`), on the
+   code path of every resample — turning a bad drawing into a dead app.
+
+Note what part 3 was NOT: `quadDrawnDegenerate`, despite its name, tests only *over-specialisation* (a
+parallelogram that reads as a rectangle). It has no zero-area test, so even a registered `quad-general`
+would not have caught this. The missing predicate did not exist anywhere.
+
+**The decision.** `solidFaceCollapsed` walks `c.solids` and asks, per face corner, whether the two
+incident edges are (near-)parallel — |sin| ≤ 0.02 between them, or a zero-length edge. Judged per corner
+rather than by area-over-extent because that is scale-free **and** does not punish a legitimately thin
+face: a long narrow rectangle is a fine drawing, a flattened one is not. Derived from the solids, so it
+covers every solid kind and every way a base is declared, with nothing to remember.
+
+It joins the **preference** tier (`meetsShapePreferences3`), not the hard one, deliberately: a figure
+whose givens genuinely force a flat face must still draw — the #615 two-tier fallback — it just must
+not be *chosen* while a real configuration is available. A hard veto here would convert a poor drawing
+into `bound-unsatisfiable`, refusing figures the tool can perfectly well show.
+
+And the renderer is made **total**: a face with no area occludes nothing, so it decides nothing and is
+skipped. The sibling `hiddenEdgeKeys` already degrades this way (it takes only the normal's sign), and
+four other `normalize3` sites in `scene3.ts` are already guarded — this one was missed. The renderer is
+a pure consumer of engine output and must survive anything the engine can produce; a bad drawing is a
+bug to fix upstream, never grounds to crash. The two halves are independent on purpose: the preference
+keeps the drawing honest, the guard keeps it survivable if the preference is ever weakened or a
+degenerate figure arrives from another source.
+
+**Perf.** `seedForRequirements` judges collapse on the resolution `derive3` has **already** computed,
+so the common (non-degenerate) case still returns `from` without one extra solve; the sweep pays only
+when the first candidate really is collapsed. The operator's figure lands on seed 4 instead of 0.
+
+**Not caused by #814.** A/B confirmed: the identical throw at the identical seeds with `src3d/` checked
+out at `HEAD~1`. It was live in prod.
+
+**Sibling audit.** *3-D:* the fix is derived from `c.solids`, so the whole quad-base family is covered
+at once — locked as a family (parallelogram / rhombus / kite / trapezoid / general-quad pyramids, the
+right prism on a parallelogram, and `מקבילון`), none of which registered the gate before. *2-D
+(`src/`):* has no solids and no face normals; its degeneracy question is the collinear-triangle one,
+already handled by its own requirement machinery. Class not present. *Complex (`src-complex/`):* no
+solids. Not present.
+
+Locks: `src3d/__tests__/issue-817.test.ts` — the operator's exact sequence, twelve resamples asserting
+both non-degeneracy and no throw, a real-parallelogram assertion, the solid family as a class, and the
+render guard exercised against seeds that ARE collapsed (with a companion test asserting at least one of
+them really is, so the guard test cannot quietly stop proving anything).

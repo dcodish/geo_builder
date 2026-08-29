@@ -29,7 +29,7 @@ import { stripFormatControls } from '../../shell/bidi';
 import { applyCommand3, freeDims } from '../engine/apply';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { scalePinned } from '../engine/solve3';
-import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLineHolds3, pinningGivens, resolve3, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
 import { dot3, norm3, sub3 } from '../engine/vec3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
@@ -83,8 +83,15 @@ export type StoreError3 =
  *  within budget (ADR-3D-053). Requirement-free figures return `from` immediately — the search costs
  *  nothing for the figures that state no inequality. */
 function seedForRequirements(facts: Fact3[], from: number): number | null {
-  const { construction } = derive3(facts, from);
-  if (construction.requirements.length === 0) return from;
+  const d = derive3(facts, from);
+  const construction = d.construction;
+  // #817 (ADR-3D-176): the short-circuit used to be «no stated requirements ⇒ any seed will do», which
+  // is how «הציגו תצורה אחרת» could step straight onto a drawing with a COLLAPSED face — a zero-area
+  // parallelogram base — and take the renderer down with it. A solid carries a general-position
+  // preference nothing has to state, so the sweep must be consulted whenever the figure has solids.
+  // Judged first on the resolution we ALREADY have, so the common (non-degenerate) case still returns
+  // `from` without a single extra solve.
+  if (construction.requirements.length === 0 && !solidFaceCollapsed(construction, d.positions)) return from;
   return firstSatisfyingSeed3(construction, from);
 }
 

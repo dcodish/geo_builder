@@ -228,7 +228,16 @@ export function auxSegmentHidden(c: Construction3, positions: Positions3, a: Id,
     let onAnyFace = false;
     for (const face of solid.faces) {
       const ring = face.map((id) => positions.get(id)!);
-      const n = normalize3(outwardNormal(ring, center));
+      // #817 (ADR-3D-176): a COLLAPSED face (zero area) has no normal to speak of — `normalize3` throws
+      // on it, and this call sat on the path of every «הציגו תצורה אחרת», so one degenerate sample took
+      // the whole app down. A face with no area occludes nothing, so it decides nothing here: skip it.
+      // The sibling `hiddenEdgeKeys` already degrades this way by taking only the normal's SIGN, and
+      // several normalize sites in this file are guarded — this one was missed. The renderer is a pure
+      // consumer of engine output (CLAUDE.md) and must be TOTAL over it: a bad drawing is a bug to fix
+      // upstream (the seed preference), never grounds to crash.
+      const raw = outwardNormal(ring, center);
+      if (norm3(raw) < 1e-12) continue;
+      const n = normalize3(raw);
       const d = dot3(n, sub3(mid, ring[0]));
       if (d > EPS) {
         inside = false;
