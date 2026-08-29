@@ -8199,3 +8199,28 @@ construct, so every carrier pairing the copula form resolves (circle×line, line
 segment×segment) is served by the same code. Locks: `src/parser/__tests__/issue-776.test.ts` —
 the `ah1kqxz5` replay asserting the terse forms lower BYTE-identically to the copula/long forms on
 both carriers.
+
+## ADR-467 — equal AREAS/PERIMETERS on a circle pair ARE the equal-radii given (#808)
+
+**2026-08-27 · round #800, operator-directed while playing it.** The operator, meeting the #762
+refusal: *"why would we want שני מעגלים משיקים מבחוץ ששטחם שווה to fail?"* — correctly. The #762
+step closed the HONESTY hole (the modifier used to be silently dropped; it then declined whole);
+this closes the loop with the CAPABILITY: for circles, equal areas ⇔ equal perimeters ⇔ equal
+radii, so the statement carries exactly the k = 1 that «ברדיוסים שווים» already lowers to.
+
+**Decision.** The #761 `EQUAL_SIZE` lane gains the area/perimeter nouns — He stems «שטח» and
+«היק[פף]» (the ADR-463 medial-פ trap: a possessive suffix demotes the final ף — «שהיקפם») under the
+same prefix/suffix morphology as the radius stem, En `areas?|perimeters?|circumferences?`. No new
+rule, no engine work: `withEqualRadii` emits the existing `set-radius-ratio k=1`, the whole
+two-circle family inherits at its shared chokepoint (#215 — the disjoint member reads it too), and
+the #761 internal-tangency contradiction guard inherits verbatim (internally tangent circles of
+equal size are the same circle — refused from the words).
+
+**Circles-only BY CONSTRUCTION**, not by carve-out: the vocabulary is consumed exclusively inside
+the circle-pair rules, so a polygon area equality — a genuine ADR-118 area constraint, a different
+object — can never be claimed by this lane (locked).
+
+Locks: `two-circle-family.test.ts` — the five spellings build with k = 1, the disjoint member
+inherits, the internal-tangency member refuses, «שני משולשים ששטחם שווה» stays out of the lane. The
+ADR-463 refusal locks flipped to builds; the family invariant held at every step of this history:
+carried or refused, never dropped — now carried.

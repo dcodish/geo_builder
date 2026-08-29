@@ -564,12 +564,34 @@ describe('#757 — a two-circle tangency declines rather than swallowing a modif
     // contract and a separate class — filed, not silently folded in here.
   });
 
-  it('the ADR-454 residual is closed (#762): an AREA/PERIMETER modifier declines whole', () => {
-    // `SHAPE_LEFTOVER` now carries שטח/היקף/area/perimeter, so the unread modifier escalates instead
-    // of committing a figure that omits it — the same invariant as the equal-radii P1, area edition.
-    refuses('שני מעגלים משיקים מבחוץ ששטחם שווה');
-    refuses('שני מעגלים משיקים מבחוץ שהיקפם שווה');
-    refuses('two circles are tangent externally with equal areas');
+  it('the AREA/PERIMETER equality BUILDS (#808): for circles it IS the equal-radii given', () => {
+    // The #762 step made the unread modifier decline instead of committing with the relation dropped;
+    // #808 (operator, playing round #800: «why would we want this to fail?») closes the loop — the
+    // EQUAL_SIZE lane reads the area/perimeter spellings, so the statement lowers to the same
+    // set-radius-ratio k=1 as «ברדיוסים שווים». The invariant held at every step: carried or refused,
+    // never dropped — now carried.
+    for (const u of [
+      'שני מעגלים משיקים מבחוץ ששטחם שווה',
+      'שני מעגלים משיקים מבחוץ שהיקפם שווה', // the medial-פ bound form (ADR-463's trap)
+      'שני מעגלים משיקים מבחוץ ששטחיהם שווים',
+      'two circles are tangent externally with equal areas',
+      'two circles are tangent externally with equal circumferences',
+    ]) {
+      const r = parse(u);
+      expect(r.ok, u).toBe(true);
+      if (r.ok) {
+        expect(r.commands.some((c) => c.type === 'circles-tangent'), u).toBe(true);
+        expect(r.commands.some((c) => c.type === 'set-radius-ratio' && (c as { k: number }).k === 1), u).toBe(true);
+      }
+    }
+    // the family, not the rule (#215): the disjoint member reads it too
+    const dj = parse('שני מעגלים זרים ששטחם שווה');
+    expect(dj.ok).toBe(true);
+    if (dj.ok) expect(dj.commands.some((c) => c.type === 'set-radius-ratio' && (c as { k: number }).k === 1)).toBe(true);
+    // the #761 contradiction guard inherits: internally tangent circles of equal size are the same circle
+    refuses('שני מעגלים משיקים מבפנים ששטחם שווה');
+    // circles-only by construction: a polygon area equality never reaches this lane
+    refuses('שני משולשים ששטחם שווה');
   });
 
   it('every form the rule DOES read still builds — the false-block risk a leftover guard carries', () => {
