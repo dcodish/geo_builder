@@ -1075,6 +1075,56 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "through AC pass a plane parallel to SD",
+    "winner": "relPlaneRule",
+  },
+  {
+    "lang": "he",
+    "text": "דרך AC העבירו מישור המקביל ל-SD",
+    "winner": "relPlaneRule",
+  },
+  {
+    "lang": "en",
+    "text": "through AC pass a plane parallel to SD and cuts SB at K",
+    "winner": "relPlaneRule",
+  },
+  {
+    "lang": "he",
+    "text": "דרך AC העבירו מישור המקביל ל-SD וחותך את SB בנקודה K",
+    "winner": "relPlaneRule",
+  },
+  {
+    "lang": "en",
+    "text": "plane ACD is parallel to AB",
+    "winner": "segPlaneRel",
+  },
+  {
+    "lang": "he",
+    "text": "המישור ACD מקביל ל-AB",
+    "winner": "segPlaneRel",
+  },
+  {
+    "lang": "en",
+    "text": "plane ACD is perpendicular to AB",
+    "winner": "segPlaneRel",
+  },
+  {
+    "lang": "he",
+    "text": "המישור ACD מאונך ל-AB",
+    "winner": "segPlaneRel",
+  },
+  {
+    "lang": "en",
+    "text": "AB∥ACD",
+    "winner": "segPlaneRel",
+  },
+  {
+    "lang": "he",
+    "text": "AB∥ACD",
+    "winner": "segPlaneRel",
+  },
+  {
+    "lang": "en",
     "text": "plane π cuts SA at E",
     "winner": "crossingPoint",
   },
@@ -1386,12 +1436,12 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   {
     "lang": "en",
     "text": "CA' is perpendicular to plane BC'D",
-    "winner": "perpPlaneClaim",
+    "winner": "segPlaneRel",
   },
   {
     "lang": "he",
     "text": "CA' מאונך למישור BC'D",
-    "winner": "perpPlaneClaim",
+    "winner": "segPlaneRel",
   },
   {
     "lang": "en",
@@ -1556,12 +1606,12 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   {
     "lang": "en",
     "text": "EF is parallel to plane ABC",
-    "winner": "segParallelPlane",
+    "winner": "segPlaneRel",
   },
   {
     "lang": "he",
     "text": "EF מקביל למישור ABC",
-    "winner": "segParallelPlane",
+    "winner": "segPlaneRel",
   },
   {
     "lang": "en",

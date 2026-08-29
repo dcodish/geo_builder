@@ -232,8 +232,10 @@ const CROSS_HE_VERB = String.raw`חותך|חותכת|פוגש|פוגשת|נחת�
 const CROSS_HE_NOUN = String.raw`נקודת\s+ה?חיתוך|נקודת\s+ה?מפגש|ה?חיתוך|ה?מפגש`;
 const CROSS_EN_VERB = String.raw`cuts|intersects|meets|crosses`;
 const CROSS_EN_NOUN = String.raw`intersection\s+point|point\s+of\s+intersection|intersection|meeting\s+point`;
-/** A plane written as a point RUN — three or four labels («ABC», «BC'D»). */
-const RUN_3_4 = String.raw`(?:[A-Z]\d*'?){3,4}`;
+// #819 (ADR-3D-177): the inline `RUN_3_4` plane atom is gone — the last rules spelling a plane run
+// by hand (`perpPlaneClaim`/`segParallelPlane`) were replaced by `segPlaneRel`, which classifies its
+// operands through `readOperand`. The plane-run shape now lives once, in `operandToken.ts` (S2.1: the
+// lexical-ratchet counts may only go DOWN).
 /** A label RUN: starts an uppercase letter not embedded in a latin word (so `Cube` yields nothing). */
 const RUN = /(?<![A-Za-z])[A-Z][A-Z0-9']*(?![a-z])/g;
 
@@ -1239,35 +1241,56 @@ const diagIntersection: Rule = (s) => {
   return null;
 };
 
-/** `CA' מאונך למישור BC'D` / `CA' is perpendicular to plane BC'D` — a CLAIM; draws the segment + the plane triangle.
- *  The plane keyword is optional when the target run is 3–4 points (`MO ⊥ABCD`, issue #14) —
- *  a run of ≥3 points can only be a plane (a segment is exactly 2), so the symbol form is unambiguous. */
-const perpPlaneClaim: Rule = (s0) => {
+/**
+ * #819 (ADR-3D-177) — the SEGMENT × PLANE-RUN cell of ⟂/∥: either relation, either ORDER, either
+ * NOTATION, read through the shared operand seam (ADR-3D-140's `readRelationSides`).
+ *
+ * This replaces two hand-written rules that each spelled their own operand order and notation, and had
+ * drifted apart in the process: the ⟂ one accepted the `⊥` symbol, an optional plane keyword and the
+ * «בסיס» sentinel, while its ∥ twin demanded the literal «מקביל למישור» and so refused «AB∥ACD» and
+ * «AB מקביל ל-ACD» outright. Neither accepted the PLANE-FIRST order, so «המישור ACD מקביל ל-SB» was
+ * not-handled while its own mirror «SB מקביל למישור ACD» built — a relation the engine resolves
+ * symmetrically, readable in one frame only. That is the trap `src3d/CLAUDE.md` names: a rule carrying
+ * one frame silently drops the other on a capability the engine already has.
+ *
+ * Classifying instead of spelling makes order-freedom, the symbol forms, the plural/noun morphology
+ * («המישורים», «פאה», «בסיס») and He+En consequences rather than cases anyone has to remember. The
+ * split regexes (`PERP_SPLIT`/`PAR_SPLIT`) already carried every predicate spelling; only the operand
+ * halves were enumerated.
+ *
+ * The ring's edges are drawn for whatever arity the student named (#380), and a run of ≥3 labels can
+ * only be a plane (a segment is exactly 2), which is why the plane keyword may be omitted.
+ */
+const segPlaneRel: Rule = (s0) => {
   const s = stripStatementPrefix(s0);
-  // #380: the plane run is the SHARED 3–4-label atom, and every one of its labels reaches the command.
-  // This rule used to match an optional 4th label and then DISCARD it — «A'B' מאונך למישור ABCD» parsed
-  // green while the committed plane was the TRIANGLE ABC, a stated point silently gone from a figure
-  // whose most common plane is a box FACE. (The filed diagnosis blamed primed labels; measurement says
-  // primes were always fine — `A'B' ⟂ ABC` parses — and the real cause is the run's arity.)
-  const m = s.match(
-    new RegExp(String.raw`^(${LBL})(${LBL})\s*(?:מאונך|ניצב|אנך|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור|plane)?\s*(?<run>${RUN_3_4})\s*$`),
-  );
-  if (!m) {
-    // "AS ניצב לבסיס / למישור הבסיס" / "AS is perpendicular to the base" — the base
-    // sentinel plane: [] (resolved by apply from the figure's single solid)
-    const mb = s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:מאונך|ניצב|אנך|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור\s+)?ה?(?:בסיס|base)\s*$/);
-    if (!mb) return null;
-    return [{ type: 'seg-plane-rel', rel: 'perp', a: mb[1], b: mb[2], plane: [] }];
+  for (const [split, rel] of [[PERP_SPLIT, 'perp'], [PAR_SPLIT, 'parallel']] as const) {
+    const parts = s.split(split);
+    if (parts.length !== 2) continue;
+    // the BASE sentinel: «AS ניצב לבסיס» / «AB מקביל לבסיס» — a bare role noun heads no token, so it
+    // never reaches the operand reader; plane [] is resolved by apply from the figure's single solid.
+    const seg = readOperand(parts[0]);
+    if (/^(?:מישור\s+|plane\s+(?:of\s+the\s+)?)?(?:ה?בסיס|the\s+base|base)$/i.test(parts[1].trim()) && seg?.op.kind === 'segment') {
+      return [{ type: 'seg-plane-rel', rel, a: seg.op.a, b: seg.op.b, plane: [] }];
+    }
+    const sides = readRelationSides(parts[0], parts[1]);
+    if (!sides) continue;
+    const [a, b] = sides;
+    const segSide = a.op.kind === 'segment' ? a : b.op.kind === 'segment' ? b : null;
+    const planeSide = a.op.kind === 'plane-run' ? a : b.op.kind === 'plane-run' ? b : null;
+    if (segSide?.op.kind !== 'segment' || planeSide?.op.kind !== 'plane-run') continue;
+    const ring = planeSide.op.ids;
+    // lowered as a RELATION: the engine decides — a symbol PIN when an endpoint is a symbolic
+    // vec-defined point (V7), else the V1 claim (segments drawn by apply).
+    //
+    // The ring's edges are DRAWN for ⟂ and not for ∥ — each relation keeps exactly the figure it drew
+    // before this rule unified their parsing. Unifying how a statement is READ must not silently change
+    // what it DRAWS; whether ∥ should also show the plane it names is a separate question about the
+    // figure (#821, awaiting an operator ruling), not something to smuggle in behind a parser fix.
+    const edges: Command3[] =
+      rel === 'perp' ? ring.map((q, i) => ({ type: 'segment3', a: q, b: ring[(i + 1) % ring.length] })) : [];
+    return [...edges, { type: 'seg-plane-rel', rel, a: segSide.op.a, b: segSide.op.b, plane: ring }];
   }
-  const [, s1, s2] = m;
-  const ring = m.groups!.run.match(TOKEN) ?? [];
-  // lowered as a RELATION: the engine decides — a symbol PIN when an endpoint is a
-  // symbolic vec-defined point (V7), else the V1 perp-plane claim (segments drawn by apply).
-  // The ring's edges are drawn for whatever arity the student named (#380).
-  return [
-    ...ring.map((p, i): Command3 => ({ type: 'segment3', a: p, b: ring[(i + 1) % ring.length] })),
-    { type: 'seg-plane-rel', rel: 'perp', a: s1, b: s2, plane: ring },
-  ];
+  return null;
 };
 
 /** A ⟂-operand: a point PAIR (`SM`) or a named vector (`u`). Strict case — a single
@@ -1283,7 +1306,7 @@ const perpOperand = (tok: string): VecAtom | null => {
  * `SM is perpendicular to DB` / `u ⊥ v` / plural `SM ו-DB מאונכים זה לזה`. Lowers to the
  * V8-f `cos-angle` with cos = 0 (no new engine construct) — M1 at apply: a driving scalar
  * pin on a free-dim solid, a verified claim on a determined figure; both operands auto-draw.
- * A target run of 3–4 points is a PLANE and stays with perpPlaneClaim (which runs first).
+ * A target run of 3–4 points is a PLANE and stays with segPlaneRel (which runs first).
  */
 const perpSegGiven: Rule = (s0) => {
   const s = stripStatementPrefix(s0);
@@ -1597,23 +1620,6 @@ const vecEqClaim: Rule = (s0) => {
   const rhs = parseVecExpr(parts[1]);
   if (!lhs || !rhs) return null;
   return [...segmentsOf(lhs), ...segmentsOf(rhs), { type: 'claim', claim: { type: 'vec-eq', lhs, rhs } }];
-};
-
-/** `EF מקביל למישור ABC` / `EF is parallel to plane ABC` — pins a symbol or (⟂ only) claims. */
-const segParallelPlane: Rule = (s) => {
-  // #380: the shared 3–4-label plane atom, like its ⟂ twin. Spelling THREE labels inline rejected the
-  // 4-label box FACE outright — «AB מקביל למישור ABCD» was not-handled and paid for an LLM call.
-  const m =
-    s.match(new RegExp(String.raw`^(${LBL})(${LBL})\s+מקביל\s+למישור\s+(?<run>${RUN_3_4})\s*$`)) ??
-    s.match(new RegExp(String.raw`^(${LBL})(${LBL})\s+(?:is\s+)?parallel\s+to\s+(?:the\s+)?plane\s+(?<run>${RUN_3_4})\s*$`, 'i'));
-  if (!m) {
-    const mb =
-      s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+מקביל\s+ל(?:מישור\s+)?ה?בסיס\s*$/) ??
-      s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:is\s+)?parallel\s+to\s+(?:the\s+)?base\s*$/i);
-    if (!mb) return null;
-    return [{ type: 'seg-plane-rel', rel: 'parallel', a: mb[1], b: mb[2], plane: [] }];
-  }
-  return [{ type: 'seg-plane-rel', rel: 'parallel', a: m[1], b: m[2], plane: m.groups!.run.match(TOKEN) ?? [] }];
 };
 
 /** `AS גובה (הפירמידה)` / `AS אנך` / `AS is the height` — a solid's stated height: the
@@ -2579,7 +2585,7 @@ const onLineMembership: Rule = (s) => {
  * Ownership boundaries (first-match-wins): `linePerpPlane` keeps line⟂π (this rule emits the SAME
  * frozen lowering for the flipped order); `planeLinePerp` keeps plane-run⟂line (runs earlier; the
  * plane-run⟂ combination here defers to it); a statement with NO line-kind side returns null, so
- * the segment/vector rules (perpSegGiven, segParallelPlane, …) keep their cells untouched.
+ * the segment/vector rules (perpSegGiven, segPlaneRel, …) keep their cells untouched.
  */
 const lineRelGiven: Rule = (s0) => {
   const s = stripStatementPrefix(s0).trim();
@@ -3400,15 +3406,38 @@ const relPlaneRule: Rule = (s) => {
   const perp = /ניצב|מאונך|אנך|perpendicular|⊥/.test(s);
   const par = /מקביל|parallel|∥/.test(s);
   if (perp === par) return null; // exactly one relation
-  const through = s.match(/(?:דרך|through)\s+([A-Z]\d*'?)(?:\s*(?:ו-?|and|,)\s*([A-Z]\d*'?))?/);
+  // #819 (ADR-3D-177): «דרך AC» — the exam writes the two through-points as a SEGMENT, glued, the way
+  // it writes every other pair. The rule read only «דרך A ו-C», so «דרך AC העבירו מישור המקביל ל-SD»
+  // captured one point, found no second, and refused a plane the engine builds from the other frame.
+  const through =
+    s.match(/(?:דרך|through)\s+([A-Z]\d*'?)\s*(?:(?:ו-?|and|,)\s*([A-Z]\d*'?))(?![A-Z0-9'])/) ??
+    s.match(/(?:דרך|through)\s+([A-Z]\d*'?)([A-Z]\d*'?)(?![A-Z0-9'])/) ??
+    s.match(/(?:דרך|through)\s+([A-Z]\d*'?)(?![A-Z0-9'])/);
   if (!through) return null;
   const edge = s.match(/(?:ניצב|מאונך|אנך|מקביל|perpendicular|parallel)\s*(?:ל|to)?\s*-?\s*(?:ה?מקצוע\s+|ה?קטע\s+|ה?ישר\s+|the\s+edge\s+|edge\s+|line\s+)?([A-Z]\d*'?)\s*([A-Z]\d*'?)(?![A-Z0-9'])/);
   if (!edge || !edge[1] || !edge[2]) return null;
   const nameM = s.match(new RegExp(`(?:מישור|plane)\\s+(${PN})`, 'i'));
   const name = nameM ? canonicalPlane(nameM[1]) : 'π';
-  if (perp) return [{ type: 'rel-plane', name, rel: 'perp', through: [through[1]], a: edge[1], b: edge[2] }];
+  // #819: the exam states the plane and the point it cuts out in ONE sentence — «…וחותך את SB בנקודה K».
+  // Read as a compound so the whole sentence is one utterance; a tail that is PRESENT but unreadable
+  // refuses the rule outright rather than committing the plane and dropping the point the student named
+  // (docs/17 §2.4 / the honesty invariant: a stated given never vanishes).
+  // Composed from the SHARED crossing atoms, never re-spelled (the #333/#755 discipline), and with no
+  // `` after a Hebrew word: Hebrew letters are not `\w`, so a word boundary there never matches and
+  // the tail would be silently dropped — the same trap `src3d/CLAUDE.md` records for `ℓ`.
+  const tailM = s.match(new RegExp(String.raw`[\s,]+ו?(?:${CROSS_HE_VERB})(.*)$|[\s,]+and\s+(?:it\s+)?(?:${CROSS_EN_VERB})(.*)$`));
+  let cut: Command3 | null = null;
+  if (tailM) {
+    const t = (tailM[1] ?? tailM[2] ?? '').match(
+      /^\s*(?:את\s+)?(?:ה?מקצוע\s+|ה?קטע\s+|ה?ישר\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:ב(?:ה?נקודה)?\s*|at\s+(?:the\s+)?(?:point\s+)?)([A-Z]\d*'?)\s*$/,
+    );
+    if (!t) return null;
+    cut = { type: 'plane-cut', id: t[3], plane: name, a: t[1], b: t[2] };
+  }
+  const withCut = (c: Command3): Command3[] => (cut ? [c, cut] : [c]);
+  if (perp) return withCut({ type: 'rel-plane', name, rel: 'perp', through: [through[1]], a: edge[1], b: edge[2] });
   if (!through[2]) return null; // ∥ an edge needs TWO through-points to fix the plane (1-DOF otherwise — deferred)
-  return [{ type: 'rel-plane', name, rel: 'par', through: [through[1], through[2]], a: edge[1], b: edge[2] }];
+  return withCut({ type: 'rel-plane', name, rel: 'par', through: [through[1], through[2]], a: edge[1], b: edge[2] });
 };
 
 /**
@@ -3666,7 +3695,7 @@ const tetraAltitude: Rule = (s) => {
  *
  * Ownership (first-match-wins): every rule with a FROZEN lowering runs earlier and keeps its cell —
  * `linePerpPlane` (ℓ⟂π), `planeLinePerp` (point-run ⟂ ℓ), `angleBetweenPlanes` (π×π angle, the
- * param-root 2022-Q2 form), `perpPlaneClaim` and `segParallelPlane` (segment × point-run). What
+ * param-root 2022-Q2 form) and `segPlaneRel` (segment × point-run, either order). What
  * reaches here is exactly the matrix's unfilled plane cells, so the rule DEFERS unless a plane is
  * present and no earlier owner applies.
  */
@@ -3859,9 +3888,8 @@ export const RULES: Rule[] = [
   centroidRule,
   diagIntersection, // `מפגש האלכסונים` — before onSegment/midpoint grab the tokens
   bisectorPoint, // V8-f (G11): `D על AC כך ש-OD חוצה זווית AOC` — before onSegment grabs `D על AC`
-  perpPlaneClaim,
-  perpSegGiven, // issue #14: `SM ⊥ DB` / `u ⊥ v` — after perpPlaneClaim (3–4-point targets are planes)
-  segParallelPlane,
+  segPlaneRel, // #819: segment × plane-run, ⟂ and ∥, either order, either notation
+  perpSegGiven, // issue #14: `SM ⊥ DB` / `u ⊥ v` — after segPlaneRel (3–4-point targets are planes)
   collinearClaim,
   midpoint,
   spanPoint, // MUST precede onSegment: Greek scalars would otherwise parse as a free point, silently dropping the condition

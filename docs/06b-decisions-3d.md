@@ -5234,3 +5234,76 @@ Locks: `src3d/__tests__/issue-817.test.ts` — the operator's exact sequence, tw
 both non-degeneracy and no throw, a real-parallelogram assertion, the solid family as a class, and the
 render guard exercised against seeds that ARE collapsed (with a companion test asserting at least one of
 them really is, so the guard test cannot quietly stop proving anything).
+
+## ADR-3D-177 — THE RELATION READS EVERY FRAME: segment × plane-run ⟂/∥, classified not spelled (#819)
+
+**The class.** *A relation whose operands the engine resolves symmetrically is readable in only ONE
+frame, because its rule enumerates operand ORDER and NOTATION instead of deriving them from the shared
+operand seam.*
+
+The operator could not state the bagrut construction «דרך AC העבירו מישור המקביל ל-SD וחותך את SB
+בנקודה K», nor any rewording of it — `ACK∥SD`, `המישור ACK מקביל ל-SD`, `המישור ACD מקביל ל-SB` all
+refused `not-understood`, while the mirror `SB מקביל למישור ACD` built and the named form
+`מישור π דרך A ו-C ומקביל ל-SD` built. Nothing was missing in the engine: it resolves this relation
+symmetrically and lands K on SB's midpoint, `(0, 5/2, 3)`.
+
+**Root cause, two enumerations.**
+
+1. The segment × plane-run cell was owned by two hand-written rules that each spelled their own operand
+   order and notation — `^(LBL)(LBL) מקביל למישור (RUN)$` and its ⟂ twin. Segment first, always. And in
+   spelling their own, the twins had **drifted**: the ⟂ rule accepted the `⊥` symbol, an optional plane
+   keyword and the «בסיס» sentinel; the ∥ rule demanded the literal «מקביל למישור» and so refused
+   `AB∥ACD` outright. Two rules for one symmetric relation is how one of them silently loses a frame the
+   other has.
+2. `relPlaneRule` read «דרך A ו-C» but not the exam's glued «דרך AC» — the exam writes its two
+   through-points as a segment, the way it writes every other pair.
+
+The first is the sharper failure because **the fix already existed**: ADR-3D-140 built
+`readOperand`/`readRelationSides` precisely so angle, ⟂, ∥ and distance would stop enumerating operand
+shapes. This cell never migrated onto it.
+
+**The decision.** One rule, `segPlaneRel`, owns the cell: it splits on the existing `PERP_SPLIT`/
+`PAR_SPLIT` (which already carried every predicate spelling, symbols included) and classifies both
+sides through `readRelationSides`, accepting {segment} × {plane-run} in either order. Order-freedom,
+the `⊥`/`∥` symbol forms, the plural/noun vocabulary («המישורים», «פאה», «בסיס») and He+En are then
+*consequences of classifying*, not cases anyone must remember — which is the whole point of the seam.
+`relPlaneRule` additionally reads a glued «דרך AC», and reads the exam's crossing tail as a COMPOUND so
+the whole printed sentence is one utterance.
+
+**Honesty on the compound.** A crossing tail that is present but unreadable **refuses the rule** rather
+than committing the plane and dropping the point the student named. Getting there took one bug worth
+recording: the first tail regex ended the verb with `\b`, and Hebrew letters are not `\w`, so the
+boundary never matched and the tail was silently dropped — a stated given vanishing into a green ✓.
+That is the trap `src3d/CLAUDE.md` already records for `ℓ`, and it applies to every Hebrew keyword. The
+tail is now composed from the shared `CROSS_HE_VERB`/`CROSS_EN_VERB` atoms, never re-spelled.
+
+**The lexical ratchet went DOWN.** `RUN_3_4`, parse3's inline plane-run atom, has no users left — the
+plane-run shape now lives once, in `operandToken.ts` (S2.1: counts may only decrease).
+
+**New capability:** the exam's own construction sentence, in either language, in one utterance; and the
+⟂/∥ segment–plane relation in either order and either notation, with the ∥ side gaining everything its
+⟂ twin had.
+
+**Sibling audit.** *3-D:* the plane×plane (`planeRelGiven`) and plane×named-line (`planeLinePerp`) cells
+were already on the seam and are asserted untouched (a plane pair still lowers to `plane-rel`, a
+plane×line pair to `plane-line-perp`). The crossing family migrated in #755/ADR-3D-164. What remains
+enumerated after this is the distance family's operand pair, which reads through `readOperand` already.
+*2-D (`src/`):* no plane operands — the class needs a plane×line relation and `src/` is planar. Not
+present. *Complex (`src-complex/`):* no geometric relations of this kind. Not present.
+
+**Deliberately NOT fixed here — #820.** With the frames open, «SD מקביל למישור ACK» after «K על SB» is
+now reachable in more phrasings, and it refuses `givens-contradict` on a satisfiable figure: an
+on-segment rider's `t` is a SAMPLED free DOF, and the pivot's unknown layout is
+`[gauge 7 | dims | coupled | pinSyms]` — `t` is not in it, so the relation is verified against the
+rider's sample instead of driving it. That is a new solver capability (rider parameters as pivot
+unknowns, a LADDER stage), not a widening of this rule, and it is filed rather than guessed at.
+
+**One behaviour deliberately NOT harmonised.** ⟂ draws the named plane's ring; ∥ never did. Unifying how
+a statement is READ must not silently change what it DRAWS, so each relation keeps the figure it drew
+before — filed as #821 for an operator ruling (the honesty invariant argues the ∥ side is the wrong one,
+but that is a decision about the figure, not a consequence of this fix).
+
+Locks: `src3d/__tests__/issue-819.test.ts` — the exam sentence He + En building to `K(0, 5/2, 3)`, the
+compound lowering to both commands, «דרך AC» ≡ «דרך A ו-C», and the MATRIX asserted on lowered commands
+(order × notation × noun × locale, the 4-label face, the «בסיס» sentinel, and the two neighbouring cells
+proven unclaimed) plus a same-verdict-either-order check on a true and a false statement.

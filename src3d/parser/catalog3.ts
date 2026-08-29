@@ -160,6 +160,15 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: "המישור BC'D", en: "plane BC'D" },
   { category: 'planesLines', he: 'מישור π דרך F וניצב ל-SC', en: 'plane π through F perpendicular to SC' },
   { category: 'planesLines', he: 'מישור π דרך K ו-P ומקביל ל-CD', en: 'plane π through K and P parallel to CD' },
+  // #819 (ADR-3D-177): the exam's own construction frame — the through-points written as a SEGMENT,
+  // the plane unnamed, and the point it cuts out stated in the same sentence.
+  { category: 'planesLines', he: 'דרך AC העבירו מישור המקביל ל-SD', en: 'through AC pass a plane parallel to SD' },
+  { category: 'planesLines', he: 'דרך AC העבירו מישור המקביל ל-SD וחותך את SB בנקודה K', en: 'through AC pass a plane parallel to SD and cuts SB at K' },
+  // #819: the segment × plane-run cell in the PLANE-FIRST order and in the symbol notation — the
+  // mirror of «AB מקביל למישור ACD», which the grammar carried alone.
+  { category: 'planesLines', he: 'המישור ACD מקביל ל-AB', en: 'plane ACD is parallel to AB' },
+  { category: 'planesLines', he: 'המישור ACD מאונך ל-AB', en: 'plane ACD is perpendicular to AB' },
+  { category: 'planesLines', he: 'AB∥ACD', en: 'AB∥ACD' },
   { category: 'planesLines', he: 'המישור π חותך את SA בנקודה E', en: 'plane π cuts SA at E' },
   { category: 'planesLines', he: 'AF גובה הפירמידה לפאה BDC', en: 'AF is the height of the pyramid to face BDC' },
   // #448: the same height stated by its APEX instead of its segment — the foot is auto-minted, so the
