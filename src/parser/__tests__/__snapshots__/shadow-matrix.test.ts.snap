@@ -23,6 +23,22 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
+      "pointOnSegment",
+    ],
+    "text": "D on AB at a distance of 3 from A",
+    "winner": "compoundAtDistance",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "pointOnSegment",
+    ],
+    "text": "D על AB במרחק 3 מ-A",
+    "winner": "compoundAtDistance",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
       "diagonals",
     ],
     "text": "G is the intersection of the diagonals of quadrilateral ABCD",
@@ -770,6 +786,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "lang": "he",
     "text": "C במרחק 5 מ-A ו-5 מ-B",
     "winner": "pointByDistances",
+  },
+  {
+    "lang": "en",
+    "text": "D on AB at a distance of 3 from A",
+    "winner": "compoundAtDistance",
+  },
+  {
+    "lang": "he",
+    "text": "D על AB במרחק 3 מ-A",
+    "winner": "compoundAtDistance",
   },
   {
     "lang": "en",

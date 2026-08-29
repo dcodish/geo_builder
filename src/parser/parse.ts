@@ -8134,7 +8134,11 @@ const similarity: Rule = (s, ctx) => {
  * (the point first, so the condition can reference it). Runs FIRST. Falls through if either half
  * doesn't parse, so a stray "where"/"such that" never blocks the normal rules.
  */
-const SUCH_THAT = /\bsuch that\b|\bso that\b|\bsuch_that\b|כך\s*ש(?=\s|[A-Za-z]\d*)/i;
+// #760: the ש may glue to its clause with a HYPHEN — «כך ש-AD = 3» is the operator's own spelling.
+// The old lookahead admitted only whitespace or a Latin label, so the hyphenated form fell past this
+// rule to the membership rule, which read only its own clause and DROPPED the stated magnitude (the
+// ratio member «כך ש-AD = 2·DB» lost the membership instead — same hole, opposite half surviving).
+const SUCH_THAT = /\bsuch that\b|\bso that\b|\bsuch_that\b|כך\s*ש-?(?=\s|[A-Za-z]\d*)/i;
 const compoundSuchThat: Rule = (s, ctx) => {
   const parts = s.split(SUCH_THAT);
   if (parts.length < 2) return null;
@@ -8144,6 +8148,33 @@ const compoundSuchThat: Rule = (s, ctx) => {
   const lr = parse(left, ctx);
   const rr = parse(right, ctx);
   if (!lr.ok || !rr.ok) return null; // either half unreadable → let the other rules / LLM handle it
+  return [...lr.commands, ...rr.commands];
+};
+
+/**
+ * #760 — «<point> על <carrier> במרחק <n> מ-<endpoint>» / "<point> on <carrier> at a distance of
+ * <n> from <X>": a 1-DOF membership whose parameter the stated magnitude pins. Each half is fully
+ * supported alone («D על AB» → membership; «AD = 3» → `set-distance`), but nothing lowered them
+ * together, so the membership rule claimed the utterance, the trailing distance was never read, and
+ * the `droppedGivenNumbers` gate (ADR-250) honestly refused a sentence both of whose halves work.
+ * The `compoundSuchThat` shape: parse the LEFT through the real grammar (so every carrier that
+ * lane supports — a segment, an extension, a circle — is supported here by construction), then
+ * parse the SYNTHESIZED distance statement «<X><point> = <n>» the same way. Falls through whole
+ * whenever either half doesn't parse or the subject isn't a point-on-carrier statement.
+ */
+const AT_DISTANCE = rx(String.raw`^(?<left>.+?)\s+(?:במרחק|at\s+(?:a\s+)?distance(?:\s+of)?)\s+(?<num>${NUM})\s+(?:מ-?\s*|from\s+)(?<from>[A-Z]\d*)\s*$`, 'i');
+const compoundAtDistance: Rule = (s, ctx) => {
+  const m = s.match(AT_DISTANCE);
+  if (!m) return null;
+  const { left, num, from } = m.groups as { left: string; num: string; from: string };
+  // the LEFT must be a point-on-carrier statement about a single subject point — anything else
+  // (a tangent length, a chord distance) belongs to richer rules or the LLM
+  const subj = left.trim().match(/^(?:ה?נקודה\s+|the\s+point\s+|point\s+)?([A-Z]\d*)\s+(?:על|\bon\b)/i);
+  if (!subj || subj[1].toUpperCase() === from.toUpperCase()) return null;
+  const lr = parse(left.trim(), ctx);
+  if (!lr.ok) return null;
+  const rr = parse(`${from}${subj[1]} = ${num}`, ctx);
+  if (!rr.ok) return null;
   return [...lr.commands, ...rr.commands];
 };
 
@@ -8326,6 +8357,7 @@ const showCenter: Rule = (s, ctx) => {
 // shadowing class behind ADR-119/077/166. Not part of the runtime API; `parse()` is the only entry point.
 export const RULES: Rule[] = [
   compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
+  compoundAtDistance, // #760: "<point> on <carrier> at distance N from X" — membership + set-distance, composed
   multiStatement, // "AB = 4, BC = 6" — split comma/and-joined GIVENS, parse each all-or-nothing (PAR-2)
   setRadius, // "radius of circle P is 4" — set an EXISTING circle's radius; before `circle` (creation) and the shape rules (which 'stop' on רדיוס)
   radiusSymbolStatement, // "רדיוס מעגל O הוא R" — NAME an existing circle's radius with a letter (#54); after setRadius (numeric wins), before the shape rules
