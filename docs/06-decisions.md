@@ -8180,3 +8180,22 @@ free one, so the second «גובה לשוק» lands on the other leg (the repeat
 IDENTICAL commands and the #613 restate-dedupe reads it as «already stated» — no new row, no
 stacked points. The reuse is the CLASS fix: it serves the letter forms («גובה לצלע BC» repeated)
 exactly as the role forms.
+## ADR-466 — the TERSE label-first intersection joins its owning rules (#776)
+
+**2026-08-27 · round #800.** Prod (session `ah1kqxz5`): «D מפגש המעגל עם AB» → LLM →
+not-understood, and the student found the copula workaround themselves mid-problem — a lost turn in
+an otherwise almost fully deterministic bagrut session (12 of 14 submits parsed). The construct was
+fully supported; only the terse spelling was missing, and in exactly two owning rules:
+
+1. the circle-crossing lane's `leadingNamedPoint` demanded the «נקודת» descriptor in its appositive
+   pattern — it is now optional, so «D מפגש/חיתוך המעגל עם AB» names the crossing exactly like
+   «D נקודת המפגש של…»;
+2. `lineLineIntersection`'s label-first slot knew «חיתוך/נחתך/intersection/∩» but not «מפגש»
+   (or "meeting") — added, so «M מפגש AB ו-CD» lowers exactly like «M חיתוך AB ו-CD», both joiner
+   spellings.
+
+Per the issue's own direction, no new rule: the spelling joined the rules that already own the
+construct, so every carrier pairing the copula form resolves (circle×line, line×line,
+segment×segment) is served by the same code. Locks: `src/parser/__tests__/issue-776.test.ts` —
+the `ah1kqxz5` replay asserting the terse forms lower BYTE-identically to the copula/long forms on
+both carriers.
