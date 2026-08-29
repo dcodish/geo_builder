@@ -401,3 +401,60 @@ export function droppedGivenNumbers3(utterance: string, commands: Command3[]): s
   }
   return dropped;
 }
+
+/**
+ * #555 (ADR-3D-173) — the SEQUENCE honesty gate, ported from the 2-D #536 fix (ADR-441): every
+ * `dropped*` gate above asks what the LLM decomposition LOST; none asks whether a surviving
+ * point-run was REORDERED — yet in 3-D the sequence IS the statement wherever order is semantic:
+ * «∠SAB» puts the vertex at A, «פאה SBC» names a face cycle, a quad run «ABDC» is a different ring
+ * from «ABCD», and a pyramid run carries its apex by position. In 2-D this exact hole let the model
+ * alphabetize a stated betweenness («ADB» → «ישר ABD») and commit its NEGATION under a green ✓
+ * (prod s0cr31nw, P1 #536).
+ *
+ * Like the 2-D gate it RESTORES rather than refuses — the student's own text carries the intended
+ * sequence, and «I reordered your letters» is our fault, not theirs. Text-level on the canonical
+ * lines, before the re-parse, because a command-level comparison cannot tell a grammar-derived
+ * reorder from an LLM rewrite. A line-run using EXACTLY the labels of a stated run (same multiset)
+ * in a different sequence is the model respelling the student's token → restore the stated
+ * spelling and let `parse3` re-derive the semantics. A REVERSED run is left alone (it names the
+ * same object), an ambiguous multiset (stated twice with different sequences) restores nothing,
+ * and 2-token runs are exempt (a pair carries no order). Labels here are the 3-D token —
+ * uppercase + digits + optional prime («A'», «O1») — the one vocabulary `labelTokens` reads.
+ */
+export function restoreStatedSequences3(
+  utterance: string,
+  lines: string[],
+): { lines: string[]; restored: string[] } {
+  const sameSeq = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+  const rev = (a: readonly string[]) => [...a].reverse();
+  const RUN = () => /(?<![A-Za-z])(?:[A-Z]\d*'?){3,}(?![a-z\d])/g;
+  const split = (run: string): string[] => run.match(/[A-Z]\d*'?/g) ?? [];
+  // the LINE side needs INDEX-STABLE matching, so only the length-preserving prime canonicalisation
+  // is applied there; the student side takes the full normaliser (its indices are never used)
+  const canonPrimes = (s: string) => s.replace(/[′’]/g, "'");
+  const stated = new Map<string, string[] | null>();
+  for (const m of normalize3(utterance).matchAll(RUN())) {
+    const labels = split(m[0]);
+    const key = [...labels].sort().join(',');
+    const prev = stated.get(key);
+    if (prev === undefined) stated.set(key, labels);
+    else if (prev !== null && !sameSeq(prev, labels) && !sameSeq(prev, rev(labels))) stated.set(key, null);
+  }
+  if (stated.size === 0) return { lines, restored: [] };
+  const restored: string[] = [];
+  const out = lines.map((line) => {
+    const canon = canonPrimes(line);
+    let result = '';
+    let last = 0;
+    for (const m of canon.matchAll(RUN())) {
+      const labels = split(m[0]);
+      const want = stated.get([...labels].sort().join(','));
+      if (!want || sameSeq(labels, want) || sameSeq(labels, rev(want))) continue;
+      restored.push(`${labels.join('')}→${want.join('')}`);
+      result += canon.slice(last, m.index) + want.join('');
+      last = m.index! + m[0].length;
+    }
+    return result ? result + canon.slice(last) : line;
+  });
+  return { lines: out, restored };
+}

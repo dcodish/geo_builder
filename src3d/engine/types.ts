@@ -985,6 +985,13 @@ export interface Construction3 {
    *  attributes them to facts by count-delta and verifies them all; a claim can
    *  never escape verification by being created indirectly. */
   claims: Claim3[];
+  /** #754 (ADR-3D-171) — the stated MAGNITUDE that pins a gauge-frozen figure's SCALE
+   *  («|AB| = 4» on a cube, «נפח הפירמידה ABCD = 11»). The first eligible magnitude
+   *  statement lands here (by reference — it is ALSO in `claims`, which stays the final
+   *  arbiter); the resolver applies it as ONE uniform factor k per configuration
+   *  (length k, area k², volume k³), so the shape DOFs stay free and sampled while the
+   *  stated size holds exactly. Gated everywhere by `scaleGivenActive` (engine/scaleGiven.ts). */
+  scaleGivens: Claim3[];
   /** V7 T2 — scalar givens driving the figure (residuals in the global solve). */
   scalarPins: ScalarPin[];
   /** V7 T2 — pair-vector injections (`BD = (-4,5,12)`), residuals like vectorPins.
@@ -1048,6 +1055,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   vecDefs: [],
   symbolPins: [],
   claims: [],
+  scaleGivens: [],
   scalarPins: [],
   pairPins: [],
   planePins: [],

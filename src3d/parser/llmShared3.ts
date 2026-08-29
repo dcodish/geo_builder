@@ -85,6 +85,13 @@ export function buildSystemPrompt3(): string {
     '  (e.g. a prism with no base shape given), return an EMPTY list rather than guessing.',
     '- A statement about EXISTING objects is not a re-construction: never re-declare an existing point or solid.',
     '  If you cannot express it with a supported NON-constructing form, return an empty list.',
+    // #555 (ADR-3D-173): the 2-D #536 P1 — the model alphabetized a stated point sequence, negating the
+    // student's given. The client-side sequence gate now restores the stated order regardless; this rule
+    // exists so the model gets it right in the first place (the llmShared.ts twin, 3-D vocabulary).
+    '- NEVER reorder the letters of a point sequence the student wrote — the sequence IS the statement:',
+    '  "∠SAB" has its vertex at A (never emit "∠ASB" for it), face SBC is that cycle, quadrilateral ABDC',
+    '  is a different ring from ABCD, and a pyramid run carries its apex by position. Copy every letter',
+    '  run exactly as typed, primes included.',
     '- Decompose multi-part requests into several lines, in build order.',
     '- If the request cannot be expressed with the supported forms, return an empty list.',
     '',
