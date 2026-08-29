@@ -4875,3 +4875,129 @@ than wrong. They are left in place deliberately: they run on the same normalised
 them changes no behaviour that any test can observe, while touching a P1's guard for tidiness is
 non-zero risk for zero value. The general rule is the one that must hold, and it is the one under
 test.
+
+## ADR-3D-171 — a stated MAGNITUDE pins the gauge-frozen figure's SCALE, uniformly (#754; amends ADR-3D-054)
+
+**2026-08-27 · round #800.** Operator ruling (2026-08-26, on the issue): *"I dont see any reason to
+refuse this case. a cube can have |AB|=4… the shape might not change at all since the proportion of 1
+or 4 are the same."* Until now «קובייה ABCDA'B'C'D'» + «|AB| = 4» refused `size-on-solid` in every
+spelling (direct, «אורך», and the declared-vector route), while «נפח הפירמידה ABCD = 11» — after
+ADR-3D-169 resolved its subject correctly — fell into the claim lane and was REFUTED: a true given
+told the student to check their arithmetic, judged against a size the sampler invented. Both are one
+defect: ADR-3D-054 froze a solid's first dimension as the unitless similarity gauge, so a stated
+magnitude had nothing to attach to; the claim lane's `freeDims > 0` pin conversion covered `length-eq`
+only, so volumes and areas fell through to verification.
+
+**The mechanism — the gauge takes a VALUE, and the value acts on the scale alone.**
+
+1. A new engine seam, `engine/scaleGiven.ts`: the FIRST eligible magnitude statement (`length-eq`,
+   `area-eq` over a triangle, `volume-poly`; value > 0) on a gauge-frozen solid figure is recorded in
+   `Construction3.scaleGivens` (and in `claims` — the final verification stays the arbiter). At the
+   end of `resolve3`, the magnitude is measured on the fully resolved figure and applied as ONE
+   uniform factor k to every position (and every position-derived plane offset): a length scales by
+   k, an area by k², a volume by k³ (`k = (stated/measured)^(1/power)`).
+2. **The shape DOFs are untouched — the binding half of the ruling.** k is recomputed per
+   configuration, so «show another configuration» still varies the pyramid's proportions while the
+   drawn volume stays exactly 11. The rejected alternative — a scalar pin the solver satisfies — lets
+   the residual be absorbed by whichever dim moves easiest (V = 11 at base 1 is a needle of height
+   33), silently asserting a proportion the student never stated: ADR-052's cardinal sin. The lock
+   asserts the base edge VARIES across seeds while the volume holds.
+3. **Eligibility is one shared predicate** (`scaleGivenActive` = recorded given + `scaleGivenSafe`),
+   asked identically by the apply-time routing, the resolver's rescale, and the store's refusal
+   ladder, so "we print sizes", "the drawing honours the size", and "we refuse" can never disagree.
+   `scaleGivenSafe` is deliberately conservative: any absolute object (equation plane, parametric
+   line, coordinate/partial point, coordinate-frame pin), a revolution solid, a circle, or any
+   scale-fixing pin keeps today's behaviour — that corner is the placement design's (#551), recorded
+   there rather than half-solved here.
+4. **A second magnitude is CHECKED, never silently accepted.** On a rigid solid the check is exact:
+   «|AB| = 4» then «|AC| = 10» on the cube refuses `claim-refuted` naming that statement (the face
+   diagonal is 4√2), and a consistent «|CD| = 4» verifies. Against still-free shape dims the check
+   would judge the student on a sampled proportion (the #508 false-accusation class), so it refuses
+   `size-on-solid` honestly instead — «נפח = 11» then «|AB| = 4» is satisfiable but unbuilt, recorded
+   as the surviving corner of that refusal. Once a scale given exists, a later `length-eq` no longer
+   enters the pivot as a scale-fixing pin (the two mechanisms would double-apply).
+5. **`scaleKnown3` opens on the same predicate**, so the data panel and query lane print real
+   numbers the moment the figure has a real size — the exposure #517 built the gate for and the
+   refused statement was starving.
+
+**What did not change:** the declared-vector prism route (`|u| = 3` → `mag-val` pin) is byte-identical
+— its figures are `scalePinned` and never mint a scale given (locked); the paramGivens (coord-sym)
+lane is exempt as before; `size-on-solid` survives — correctly — where a magnitude genuinely cannot
+attach (absolute frame present, second magnitude over free dims), so its strings stay.
+
+Locks: `src3d/__tests__/issue-754.test.ts` (the operator's cube sequence at several seeds, spelling
+agreement incl. the vector route, knowledge gating both before and after, the contradiction and the
+consistent second edge, the volume-exact-while-proportions-vary acceptance property, prism route
+unchanged); fixture `fixtures3/cube-stated-size-754.geo3.json`.
+## ADR-3D-173 — the 3-D LLM seam gains the SEQUENCE gate (#555; the ADR-441 port)
+
+**2026-08-27 · round #800.** Class, from the #536/ADR-441 sibling audit: a statement whose
+point-letter SEQUENCE is its semantics, escalated through the LLM lane, was committed with whatever
+sequence the model emitted — `honesty3.ts`'s gate family asks what a decomposition LOST (`dropped*`)
+and what it ADDED, never whether it REORDERED. In 2-D this let Haiku alphabetize «ADB» into
+«ישר ABD», committing the NEGATION of a stated betweenness under a green ✓ (prod `s0cr31nw`, P1).
+3-D order-semantic families: vertex-angle forms (∠SAB — vertex at A), face/plane point-runs
+(«פאה SBC»), quad cycle order (ABDC ≠ ABCD), and pyramid runs (apex by position).
+
+**Decision — restore, never refuse, at the one seam.** `restoreStatedSequences3` (in
+`parser/honesty3.ts`, beside its sibling gates) is the ADR-441 shape on the 3-D token vocabulary
+(`[A-Z]\d*'?` — primes are part of the label, so a respelled top-face run «A'B'C'D'» restores with
+its primes intact): a line-run using EXACTLY the labels of a run the student wrote (same multiset)
+in a different sequence is the model respelling the student's token — restore the student's spelling
+on the CANONICAL LINES before the re-parse and let `parse3` re-derive the semantics. Text-level on
+purpose (a command-level comparison cannot tell a grammar-derived reorder from an LLM rewrite);
+reversal tolerated (names the same object); an ambiguous multiset restores nothing; pairs exempt.
+Applied in `App3.tsx` at the single `escalate3 → submitSteps` seam, with `restored` logged to the
+debug sink (the 2-D `restored` field's mirror), and the never-reorder rule added to
+`llmShared3.ts`'s prompt with 3-D examples — the gate makes the wrong output harmless, the rule
+makes it rarer.
+
+Locks: `src3d/parser/__tests__/issue-555.test.ts` (restored vertex-angle run, reversal, primes,
+ambiguity, pair exemption, superset exemption, byte-identical pass-through).
+## ADR-3D-172 — a MIXED shape-declaration run has an owner: bind the known, mint the undeclared (#774)
+
+**2026-08-27 · round #800.** Prod (sessions `bg01evje`, `sce6w3j4`): «משולש SEC» on a pyramid whose S
+and C exist refused `already-defined: S` — the shape rule claimed the line, the store rejected the
+first label that already existed, and the message blamed the apex the student had referenced
+CORRECTLY while the actual situation was one undeclared label (E). All-existing bound fine (#116),
+all-new declared fine; only the mixed run had no owner, and its accidental failure violated the
+honesty invariant that an error names the conflicting statement, never internal state.
+
+**Ruling (2026-08-25) and the class check (2026-08-26)** are on the issue: the mixed run BUILDS —
+«משולש XYZ» already builds three free points, so one free point in a partially-bound run is the same
+mechanism, and both 2-D (whole family) and 3-D's own «מלבן» lane (quad-shape ARM 2) already behave
+this way. The ownership table is now explicit and total in the `solid` case for FLAT kinds:
+
+| the label run is… | behaviour |
+| --- | --- |
+| all-new | declare a free shape (unchanged) |
+| all-existing | bind, positions unchanged (unchanged, #116) |
+| **mixed** | **bind the known labels, mint the undeclared ones as free points** |
+
+**The minted point is genuinely free (ADR-052).** A new `PointDef` kind `free3` — three sampled DOFs,
+spread-scaled off the placed figure (the `partial` pattern), riding the gauge, counted by
+`freeDofCount3` (+3, consistent with #370's count-them ruling) and moving on «show another
+configuration» — the conformance lock asserts the seed-spread. For a QUAD/PENTAGON the shape is flat
+by its own definition, so a single minted corner is an `on-plane` rider of the known corners' plane
+(2 DOFs — planarity is the shape's meaning, not an invented given; `materializePlaneRun` +
+the existing rider machinery, per ADR-W-006 hoisted rather than duplicated). A run whose fresh
+labels cannot be minted (a flat quad with two unknown corners) refuses naming the UNDECLARED label
+(`unknown-point`), never a label that was fine. The ring leaves its ink; sides already drawn as solid
+edges are not duplicated.
+
+**Scope honestly bounded:** the mixed arm covers the flat kinds (`polygon3/4/5` — «משולש», «מרובע»,
+«מחומש»). A mixed run on a GENUINE solid (a cube's letter run partially colliding) keeps the
+`already-defined` conflict — there the collision with the existing figure IS the problem. A shaped
+mixed run («משולש ישר זווית SEC») builds the triangle and routes its constraint through the ordinary
+M1 lanes; constraints that would need to DRIVE a `free3` point are not yet wired to it — recorded
+here rather than half-built.
+
+2-D measured and untouched (its family already builds these; the branch diff carries no `src/` file).
+
+**Am. 1 (2026-08-27, #807 play).** The operator: «מרובע ABCE» after «משולש SEC» was green with the AE
+side missing until typed by hand — E already existed, so the quad took the ALL-EXISTING reference
+path, a pure no-op since #116. A stated flat shape leaves its VISIBLE trace (ADR-3D-035): the
+reference path now draws the boundary ring idempotently (sides already present as solid edges or
+segments are skipped, so «משולש SAB» over three pyramid edges stays the byte-identical no-op).
+
+Locks: `src3d/__tests__/issue-774.test.ts` (incl. the operator's exact #807 sequence + idempotency).

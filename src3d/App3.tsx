@@ -32,6 +32,7 @@ import { SYMBOL_SPECS_3 } from './ui/symbols3';
 import { SymbolRow } from '../shell/frame/SymbolRow';
 import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
+import { restoreStatedSequences3 } from './parser/honesty3';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from './parser/scope3';
 import { parse3 } from './parser/parse3';
 import Figure3 from './render/Figure3';
@@ -475,13 +476,18 @@ export default function App3() {
       setBusy(true);
       try {
         const ctx = `Existing points: ${[...derived.construction.points.keys()].join(', ') || '(none)'}.`;
-        const steps = await escalate3(raw, ctx);
+        const rawSteps = await escalate3(raw, ctx);
+        // #555 (ADR-3D-173) — the SEQUENCE gate, applied to the canonical lines BEFORE the re-parse:
+        // a stated point-run the model respelled is restored to the student's own spelling, so the
+        // tested grammar derives the semantics from what the student wrote (the 2-D #536 shape).
+        const seq = rawSteps ? restoreStatedSequences3(raw, rawSteps) : null;
+        const steps = seq ? seq.lines : rawSteps;
         if (steps) submitSteps(raw, steps);
         err = useGeo3.getState().lastError;
         // `commands` = the canonical lines that re-parsed onto the figure (#182): without them a prod
         // `llm, ok` submit is opaque and every later step of the session is unreplayable (`steps` stays
         // for the dev trace; the lean sink reads `commands`, mirroring the 2-D #84 field).
-        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, result: err ? err.code : 'ok' });
+        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, ...(seq && seq.restored.length > 0 ? { restored: seq.restored } : {}), result: err ? err.code : 'ok' });
       } finally {
         setBusy(false);
       }

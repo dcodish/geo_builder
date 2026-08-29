@@ -9,6 +9,7 @@ import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
 import { riderPairsT } from './onSegmentRatio';
+import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
 import { isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { pinSymsOf } from './types';
@@ -163,6 +164,7 @@ function clone(c: Construction3): Construction3 {
     vecDefs: [...c.vecDefs],
     symbolPins: [...c.symbolPins],
     claims: [...c.claims],
+    scaleGivens: [...c.scaleGivens],
     scalarPins: [...c.scalarPins],
     pairPins: [...c.pairPins],
     planePins: [...c.planePins],
@@ -202,7 +204,7 @@ const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism
  *  counts its w, being oblique by definition). */
 export const solidDimCount = (s: { kind: SolidCommand['kind']; oblique?: true }): number =>
   DIM_COUNT[s.kind] + (s.oblique && s.kind !== 'parallelepiped' ? 2 : 0);
-function freeDims(c: Construction3): number {
+export function freeDims(c: Construction3): number {
   let n = 0;
   for (const s of c.solids) n += solidDimCount(s);
   for (const r of c.revolutions) {
@@ -597,7 +599,58 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // `solid-vertex` points) so the accompanying constraint (e.g. the ∠=90) applies. A polygon that adds
       // NEW points still builds; a genuine SOLID (cube/prism/…) re-declaration keeps the conflict error.
       const flat = polygonN(cmd.kind) !== null;
-      if (flat && cmd.ids.every((id) => c.points.has(id))) return { ok: true, next: c };
+      if (flat && cmd.ids.every((id) => c.points.has(id))) {
+        // #774 Am. (#807 play): a stated flat shape must leave its VISIBLE trace (ADR-3D-035) even
+        // when it only references existing points — «מרובע ABCE» after «משולש SEC» was green with
+        // the AE side missing. Draw the boundary ring idempotently (sides already drawn as solid
+        // edges or segments are skipped); with nothing to draw this stays the #116 pure no-op.
+        const nextRef = clone(c);
+        let drew = false;
+        const nRef = cmd.ids.length;
+        for (let j = 0; j < nRef; j++) {
+          const [a, b] = [cmd.ids[j], cmd.ids[(j + 1) % nRef]];
+          if (!hasSegment(nextRef, a, b)) {
+            nextRef.segments.push([a, b]);
+            drew = true;
+          }
+        }
+        return { ok: true, next: drew ? nextRef : c };
+      }
+      // #774 (ADR-3D-172): the MIXED run — some labels exist, some are new. Ownership is explicit
+      // and total (docs/17: one rule owns the form, never an accident downstream): all-new declares
+      // a free shape (below), all-existing binds (above), and a mixed run BINDS the known labels
+      // and MINTS the undeclared ones as genuinely free points. The old path walked into the
+      // `already-defined` refusal below and blamed the FIRST existing label («משולש SEC» → "S") —
+      // an error message naming an operand that was never the problem. Ruling 2026-08-25: the
+      // consistency argument — «משולש XYZ» already builds three free points, so one free point in
+      // a partially-bound run is the same mechanism; 2-D and 3-D's own «מלבן» lane already behave
+      // this way.
+      if (flat && cmd.ids.some((id) => c.points.has(id))) {
+        const fresh = cmd.ids.filter((id) => !c.points.has(id));
+        const known = cmd.ids.filter((id) => c.points.has(id));
+        const next = clone(c);
+        if (polygonN(cmd.kind) === 3) {
+          // a triangle is planar whatever its corners: each minted point is free3 (3 sampled DOFs,
+          // ADR-052 — counted by freeDofCount3, moving on «show another configuration»)
+          for (const id of fresh) next.points.set(id, { kind: 'free3' });
+        } else if (fresh.length === 1 && known.length >= 3) {
+          // a quad/pentagon is FLAT by its own definition — the one minted corner rides the plane
+          // of the known ones (2 free DOFs; planarity is the shape's meaning, not an invented given)
+          materializePlaneRun(next, known);
+          next.points.set(fresh[0], { kind: 'on-plane', plane: known.join('') });
+        } else {
+          // not mintable (a flat quad with two unknown corners has no owner yet): the refusal
+          // names the UNDECLARED label — never a label that was fine (the honesty invariant)
+          return { ok: false, error: { code: 'unknown-point', id: fresh[0] } };
+        }
+        // the ring's ink — the minted point's only visible meaning is the shape it closes
+        const ringN = cmd.ids.length;
+        for (let j = 0; j < ringN; j++) {
+          const [a, b] = [cmd.ids[j], cmd.ids[(j + 1) % ringN]];
+          if (!hasSegment(next, a, b)) next.segments.push([a, b]);
+        }
+        return { ok: true, next };
+      }
       // #199 M1 (ADR-3D-047): re-DECLARING an existing solid (same kind, same ids) is a statement
       // about the figure, not a re-creation — idempotent no-op (the solid-shaped sibling of the
       // #116 flat-polygon path above and the segment3 convention below). A different kind or a
@@ -987,6 +1040,25 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         next.claims.push(cmd.claim);
         return { ok: true, next };
       }
+      // #754 (ADR-3D-171): a stated MAGNITUDE on a gauge-frozen figure pins the SCALE — a given,
+      // never a refusal («size-on-solid») and never a false accusation («claim-refuted» about a
+      // size the tool invented). The FIRST eligible magnitude becomes the scale given; the
+      // resolver applies it as one uniform factor per configuration, so the shape DOFs stay
+      // free. Recorded as a claim too — the final verification stays the arbiter (it holds
+      // exactly on the rescaled figure). A length on a figure with free dims keeps its existing
+      // scalar-pin route below (byte-identical prism/pyramid behaviour, and the pivot honours
+      // it through the same gauge scale); volume and area have no pin kind, so they take this
+      // lane at any dim count.
+      if (
+        isScaleGivenClaim(cmd.claim) &&
+        scaleGivenSafe(c) &&
+        c.scaleGivens.length === 0 &&
+        (cmd.claim.type !== 'length-eq' || freeDims(c) === 0)
+      ) {
+        next.scaleGivens.push(cmd.claim);
+        next.claims.push(cmd.claim);
+        return { ok: true, next };
+      }
       // M1 (V7 T2): a scalar statement on a figure with FREE dims is a GIVEN — it
       // drives the solve instead of being "checked" against an arbitrary sample.
       if (freeDims(c) > 0) {
@@ -1012,7 +1084,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           next.claims.push(cl);
           return { ok: true, next };
         }
-        if (cmd.claim.type === 'length-eq') {
+        // #754: once a scale given is in force the rescale owns the figure's size — a second
+        // length must not ALSO enter the pivot as a scale-fixing pin (the two mechanisms would
+        // double-apply); it falls through to the claim lane, where the store refuses it honestly
+        // against still-free dims and checks it exactly against a rigid one.
+        if (cmd.claim.type === 'length-eq' && c.scaleGivens.length === 0) {
           next.scalarPins.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
           return { ok: true, next };
         }

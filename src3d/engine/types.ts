@@ -903,7 +903,11 @@ export type PointDef =
   | { kind: 'right-pyramid-apex'; a: Id; b: Id; base: Id[] }
   | { kind: 'rev-point'; rev: number; role: 'center' | 'apex' }
   | { kind: 'vec-defined'; def: number } // solved from construction.vecDefs[def]
-  | { kind: 'vec-pair'; def1: number; def2: number }; // the cevian intersection (two symbol relations)
+  | { kind: 'vec-pair'; def1: number; def2: number } // the cevian intersection (two symbol relations)
+  // #774 (ADR-3D-172): a point minted by a MIXED shape-declaration run («משולש SEC» where S, C
+  // exist and E does not) — genuinely free: 3 sampled DOFs (ADR-052), counted by freeDofCount3,
+  // moving on «show another configuration», riding the gauge like every figure-side point.
+  | { kind: 'free3' };
 
 export interface Construction3 {
   solids: SolidObj[];
@@ -985,6 +989,13 @@ export interface Construction3 {
    *  attributes them to facts by count-delta and verifies them all; a claim can
    *  never escape verification by being created indirectly. */
   claims: Claim3[];
+  /** #754 (ADR-3D-171) — the stated MAGNITUDE that pins a gauge-frozen figure's SCALE
+   *  («|AB| = 4» on a cube, «נפח הפירמידה ABCD = 11»). The first eligible magnitude
+   *  statement lands here (by reference — it is ALSO in `claims`, which stays the final
+   *  arbiter); the resolver applies it as ONE uniform factor k per configuration
+   *  (length k, area k², volume k³), so the shape DOFs stay free and sampled while the
+   *  stated size holds exactly. Gated everywhere by `scaleGivenActive` (engine/scaleGiven.ts). */
+  scaleGivens: Claim3[];
   /** V7 T2 — scalar givens driving the figure (residuals in the global solve). */
   scalarPins: ScalarPin[];
   /** V7 T2 — pair-vector injections (`BD = (-4,5,12)`), residuals like vectorPins.
@@ -1048,6 +1059,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   vecDefs: [],
   symbolPins: [],
   claims: [],
+  scaleGivens: [],
   scalarPins: [],
   pairPins: [],
   planePins: [],

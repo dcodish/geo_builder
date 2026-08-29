@@ -26,7 +26,9 @@ import { buildNotices3, type BuildNotice3 } from '../engine/notices';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { stripFormatControls } from '../../shell/bidi';
-import { applyCommand3 } from '../engine/apply';
+import { applyCommand3, freeDims } from '../engine/apply';
+import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
+import { scalePinned } from '../engine/solve3';
 import { checkInSpan, firstSatisfyingSeed3, memberHolds3, pinningGivens, resolve3, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
 import { cross3, dot3, norm3, sub3 } from '../engine/vec3';
@@ -275,11 +277,28 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
       if (status[owner.factId] !== 'ok') continue;
       for (let i = owner.from; i < owner.to; i++) {
         const claim = c.claims[i];
-        // V2 honest boundary: a numeric size on a free-dim solid figure is a SCALE
-        // statement, not a check — refuse with a clear message rather than "refute" it.
-        if (!c.paramGivens.includes(claim) && (claim.type === 'length-eq' || claim.type === 'area-eq') && c.solids.length > 0) {
-          status[owner.factId] = { code: 'size-on-solid' };
-          break;
+        // V2 honest boundary, narrowed by #754 (ADR-3D-171): a magnitude statement on a solid
+        // figure. The FIRST eligible one is the SCALE GIVEN (exempt here — the resolver's uniform
+        // rescale makes it hold exactly, and the ordinary verification below confirms it). A LATER
+        // magnitude is CHECKED where the check is honest — the scale is stated and no shape DOF is
+        // being sampled (a rigid solid, e.g. the cube: «|AB| = 4» then «|AC| = 10» refuses naming
+        // that statement, since the face diagonal is 4√2) — and refused `size-on-solid` where it is
+        // not (still-free dims: refuting against a sampled proportion would accuse the student of
+        // the tool's own choice, the #508 class). A volume claim on a figure whose scale absolute
+        // data pins (`scalePinned`) keeps its existing verify-your-answer register untouched.
+        const magPower = scaleGivenPower(claim);
+        if (
+          magPower !== null &&
+          !c.paramGivens.includes(claim) &&
+          c.solids.length > 0 &&
+          !(c.scaleGivens.includes(claim) && scaleGivenActive(c))
+        ) {
+          const exactlyCheckable = scaleGivenActive(c) && freeDims(c) === 0;
+          const pivotLane = claim.type === 'volume-poly' && c.scaleGivens.length === 0 && scalePinned(c);
+          if (!exactlyCheckable && !pivotLane) {
+            status[owner.factId] = { code: 'size-on-solid' };
+            break;
+          }
         }
         if (!verifyClaim(claim, c, seed)) {
           // #508 — a claim about a FREE plane whose relevant DOF is still SAMPLED cannot be refuted:

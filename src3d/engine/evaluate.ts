@@ -25,6 +25,7 @@ import {
   resolveOperand,
 } from './operands';
 import { applyGauge, scalePinned, solvePivot, type MemberPin, type PivotResult } from './solve3';
+import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3 } from './vecExpr';
 import { absolutePointCount, pinSymsOf } from './types';
 import { resolveFreePlane } from './freePlane';
@@ -739,6 +740,7 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   let freeT = 0;
   for (const def of c.points.values()) {
     if (def.kind === 'on-segment' && def.t === undefined) freeT++;
+    if (def.kind === 'free3') freeT += 3; // #774: a mixed-run minted point — three genuine free DOFs
     if (def.kind === 'on-plane') freeT += def.side ? 3 : 2; // a plane rider slides in-plane; a side point also floats
     if (def.kind === 'on-line') freeT += 1; // a line rider slides along its line (ADR-3D-031)
     if (def.kind === 'partial') freeT += [def.x, def.y, def.z].filter((v) => v === null).length; // each unstated component is a free DOF (ADR-3D-094)
@@ -970,7 +972,7 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 }
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'right-apex']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'right-apex', 'free3']);
 
 /**
  * #367: is anything in the figure stated in ABSOLUTE coordinates — a typed parametric line, a plane
@@ -1106,6 +1108,10 @@ export function vectorFramePinned3(c: Construction3): boolean {
  * `|CB|` on two injected points behind a 'scale' refusal (2026-08-11).
  */
 export function scaleKnown3(c: Construction3): boolean {
+  // #754 (ADR-3D-171): a stated magnitude pinned the scale — the figure has a REAL size, and the
+  // data panel / query lane may print real numbers. Gated by the same predicate the resolver's
+  // rescale uses, so "we print sizes" and "the drawing honours the stated size" cannot disagree.
+  if (scaleGivenActive(c)) return true;
   if (scalePinned(c)) return true;
   // TWO absolute points state the distances among them — but only a figure with NO solid can take
   // that as figure-wide scale knowledge: a solid's first dim is the frozen similarity gauge, so a
@@ -1872,6 +1878,24 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     if (from && line) pos.set(id, footOnLine(from, line));
   }
 
+  // ---- #754 (ADR-3D-171): the stated magnitude pins the SCALE. Measured on the fully resolved
+  // figure at the frozen gauge, then applied as ONE uniform factor to every position — length by
+  // k, area by k², volume by k³ — so the stated size holds EXACTLY in this configuration while
+  // the shape DOFs it did not touch keep varying with the seed. Everything still resolved at this
+  // point is position-derived (`scaleGivenSafe` admits no absolute object), so the derived plane
+  // offsets scale with the same factor and every incidence survives verbatim.
+  if (scaleGivenActive(c)) {
+    const g = c.scaleGivens[0];
+    const m0 = scaleGivenMagnitude(g, c, pos);
+    const power = scaleGivenPower(g);
+    const stated = scaleGivenValue(g);
+    if (m0 !== null && m0 > 1e-9 && power !== null && stated !== null) {
+      const k = Math.pow(stated / m0, 1 / power);
+      for (const [id, p] of pos) pos.set(id, v3(p.x * k, p.y * k, p.z * k));
+      for (const [name, pl] of planes) planes.set(name, { n: pl.n, d: pl.d * k });
+    }
+  }
+
   return {
     positions: pos,
     planes,
@@ -1963,6 +1987,18 @@ function evaluateSolidsAndPoints(
         return sgn * mag;
       };
       pos.set(id, v3(comp('x'), comp('y'), comp('z')));
+    } else if (def.kind === 'free3') {
+      // #774 (ADR-3D-172): a mixed-run minted point — all three components are free sampled DOFs,
+      // spread-scaled off the placed figure for general position (the `partial` pattern with no
+      // fixed component), so it varies with the seed and never parks at a default (ADR-052).
+      const placed = [...pos.values()];
+      let spread = 1.2;
+      for (const q of placed) spread = Math.max(spread, Math.abs(q.x), Math.abs(q.y), Math.abs(q.z));
+      const comp3 = (ax: 'x' | 'y' | 'z'): number => {
+        const mag = sample(seed, `free3-${ax}-${id}`, 0.3, 1.05) * spread;
+        return (sample(seed, `free3sgn-${ax}-${id}`, -1, 1) >= 0 ? 1 : -1) * mag;
+      };
+      pos.set(id, v3(comp3('x'), comp3('y'), comp3('z')));
     } else if (def.kind === 'on-line') {
       seatOnLineRider(seed, pos, lines, id, def);
     } else if (def.kind === 'plane-cut') {
