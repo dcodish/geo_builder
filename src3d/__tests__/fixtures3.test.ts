@@ -121,6 +121,23 @@ const SEEDED: Record<string, string[]> = {
     'AB=(k-1,k,3)',
     'משוואת הישר AC היא x=(8,-1,-1)+t(k+1,0,k-3)',
   ],
+  // #814 (ADR-3D-175) — the operator's prod figure (2026-08-29): a pyramid on a parallelogram base
+  // whose base vertex is stated with a BARE parameter, «D(3,p,0)». The letter NAMES D's free y
+  // component (it is not a pivot unknown — that is the partial injection the exam gates rely on),
+  // and «p חיובי» selects among its roots, so |AB| = |AD| lands the figure on p = +4 at every seed
+  // and the panel prints coordinates instead of «?».
+  'pyramid-named-comp-814.geo3.json': [
+    'פירמידה SABCD שבסיסה מקבילית',
+    'המקצוע SA הוא גובה בפירמידה',
+    'M אמצע אלכסון BD',
+    'נסמן: AB = u, AD = v, AS = w',
+    'A(0,0,0)',
+    'B(0,5,0)',
+    'S(0,0,6)',
+    'D(3,p,0)',
+    '|u| = |v|',
+    'p חיובי',
+  ],
   'planes-2022-q2.geo3.json': [
     'המישור π1: z - 3 = 0',
     'המישור π2: ay + z - 8 = 0',

@@ -27,14 +27,20 @@ describe('the נתון injection list', () => {
   // #794 (ADR-3D-168): the numeric-only gate is LIFTED — vector components take the same COMP
   // grammar as point components. A bare distinct letter is a placeholder (that component does
   // not constrain), exactly the #325 point register.
-  it('a bare letter in a vector value is a placeholder component (#794)', () => {
-    expect(cmds('נתון: v = (10,n,0)')).toEqual([{ type: 'inject-vector', name: 'v', x: 10, y: null, z: 0 }]);
+  // #814 (ADR-3D-175): it stays a placeholder — no `symExprs`, so nothing about the solve changes —
+  // but the LETTER now rides in `syms`, the name-only channel `point3` always had, so «n חיובי» can
+  // address the component the student named instead of refusing it.
+  it('a bare letter in a vector value is a placeholder component, and its NAME rides (#794/#814)', () => {
+    expect(cmds('נתון: v = (10,n,0)')).toEqual([
+      { type: 'inject-vector', name: 'v', x: 10, y: null, z: 0, syms: [null, 'n', null] },
+    ]);
   });
   it('a vector value with affine symbolic components carries symExprs (#794)', () => {
     expect(cmds('נתון: v = (k-1, k, 3)')).toEqual([
       {
         type: 'inject-vector', name: 'v', x: null, y: null, z: 3,
         symExprs: [{ sym: 'k', k: 1, c: -1 }, { sym: 'k', k: 1, c: 0 }, null],
+        syms: ['k', 'k', null], // #814: the name rides alongside the solver register
       },
     ]);
   });
@@ -48,6 +54,7 @@ describe('the נתון injection list', () => {
       {
         type: 'inject-pair', a: 'A', b: "A'", x: null, y: null, z: null,
         symExprs: [{ sym: 'k', k: 1, c: -1 }, { sym: 'k', k: 1, c: -7 }, { sym: 'k', k: 1, c: 1 }],
+        syms: ['k', 'k', 'k'],
       },
     ];
     expect(cmds("AA'=(k-1,k-7, k+1)")).toEqual(expected);
@@ -61,10 +68,12 @@ describe('the נתון injection list', () => {
       {
         type: 'inject-pair', a: 'A', b: 'B', x: null, y: null, z: 3,
         symExprs: [{ sym: 'k', k: 1, c: -1 }, { sym: 'k', k: 1, c: 0 }, null],
+        syms: ['k', 'k', null],
       },
       {
         type: 'inject-pair', a: 'A', b: 'C', x: null, y: 0, z: null,
         symExprs: [{ sym: 'k', k: 1, c: 1 }, null, { sym: 'k', k: 1, c: -3 }],
+        syms: ['k', null, 'k'],
       },
     ]);
   });

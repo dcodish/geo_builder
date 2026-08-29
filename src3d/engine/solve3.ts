@@ -930,7 +930,10 @@ export function solvePivot(
   // a discrete root the pool does not carry is invisible to every honesty gate downstream:
   // the params panel printed «k = 1» as determined while k ∈ {1,2} (two of Q2's three
   // vectors), and «show another configuration» could never reach the other root.
-  const collectAll = c.signGivens.length > 0 || nPinSym > 0;
+  // #814 (ADR-3D-175): a sign on a NAMED free component («p חיובי» after «D(3,p,0)») selects a branch
+  // exactly as a coordinate sign given does, so it must widen the pool the same way. Enforced in the
+  // same filter; a statement collected in one place and honoured in another is honoured by luck.
+  const collectAll = c.signGivens.length > 0 || c.componentSigns.length > 0 || nPinSym > 0;
   for (const mirror of [false, true]) {
     const fPrimary = residualsFor(mirror);
     if (scaleFree) {

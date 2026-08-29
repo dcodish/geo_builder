@@ -877,7 +877,8 @@ const pairInjection: Rule = (s) => {
   const comps = [m[3], m[4], m[5]].map(parseComp);
   if (comps.some(unreadableComp)) return null; // #510: a malformed literal is never an unknown component
   const symExprs = symStructure(comps);
-  return [{ type: 'inject-pair', a: m[1], b: m[2], x: comps[0].num, y: comps[1].num, z: comps[2].num, ...(symExprs ? { symExprs } : {}) }];
+  const syms = symNames(comps);
+  return [{ type: 'inject-pair', a: m[1], b: m[2], x: comps[0].num, y: comps[1].num, z: comps[2].num, ...(symExprs ? { symExprs } : {}), ...(syms ? { syms } : {}) }];
 };
 
 /**
@@ -1955,6 +1956,17 @@ function symStructure(
   return structured ? (comps.map((t) => t.expr) as [SymComp | null, SymComp | null, SymComp | null]) : undefined;
 }
 
+/** #814 (ADR-3D-175): the letters as NAMES, for the lanes that carry a `syms` channel. Emitted
+ *  whenever the tuple names anything — unlike `symStructure`, which decides whether the letters
+ *  become solver unknowns. A name changes nothing about how a component solves; it only lets a
+ *  later statement address the component the student named. */
+const symNames = (
+  comps: { num: number | null; expr: SymComp | null }[],
+): [string | null, string | null, string | null] | undefined =>
+  comps.some((t) => t.expr !== null)
+    ? (comps.map((t) => t.expr?.sym ?? null) as [string | null, string | null, string | null])
+    : undefined;
+
 /** Parse one component: a plain number, or {sym, k, c} for k·sym + c. */
 function parseComp(t: string): { num: number | null; expr: SymComp | null } {
   const s = t.replace(/\s+/g, '');
@@ -2688,10 +2700,11 @@ const injectionList: Rule = (s) => {
     // #794 (ADR-3D-168): one component grammar for every item kind — vector and pair items take
     // symbolic affine components exactly as point items do (the lifted "must be numeric" gate).
     const symExprs = symStructure(comps);
+    const syms = symNames(comps);
     if (gr.vec) {
-      cmds.push({ type: 'inject-vector', name: gr.vec, x, y, z, ...(symExprs ? { symExprs } : {}) });
+      cmds.push({ type: 'inject-vector', name: gr.vec, x, y, z, ...(symExprs ? { symExprs } : {}), ...(syms ? { syms } : {}) });
     } else if (gr.pa) {
-      cmds.push({ type: 'inject-pair', a: gr.pa, b: gr.pb!, x, y, z, ...(symExprs ? { symExprs } : {}) });
+      cmds.push({ type: 'inject-pair', a: gr.pa, b: gr.pb!, x, y, z, ...(symExprs ? { symExprs } : {}), ...(syms ? { syms } : {}) });
     } else if (comps.some((t) => t.expr !== null)) {
       // #325: symbolic affine components ride the list too (`נתונות הנקודות: B(2t, t, k)`)
       cmds.push({
@@ -2798,7 +2811,8 @@ const vectorInjection: Rule = (s) => {
   const comps = [m[2], m[3], m[4]].map(parseComp); // #510: the shared reader, never a bare `+`
   if (comps.some(unreadableComp)) return null;
   const symExprs = symStructure(comps);
-  return [{ type: 'inject-vector', name: m[1], x: comps[0].num, y: comps[1].num, z: comps[2].num, ...(symExprs ? { symExprs } : {}) }];
+  const syms = symNames(comps);
+  return [{ type: 'inject-vector', name: m[1], x: comps[0].num, y: comps[1].num, z: comps[2].num, ...(symExprs ? { symExprs } : {}), ...(syms ? { syms } : {}) }];
 };
 
 /** `שיעור ה-z של C' חיובי` / `the z-coordinate of C' is positive` — a sign branch given.

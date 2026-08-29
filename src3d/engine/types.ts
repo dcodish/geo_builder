@@ -464,6 +464,10 @@ export interface InjectVectorCommand {
   y: number | null;
   z: number | null;
   symExprs?: [SymComp | null, SymComp | null, SymComp | null];
+  /** #814 (ADR-3D-175): the letters, NAME-ONLY — the channel `point3` always had (`syms`). A bare
+   *  letter still lowers to a null (free) component; this only records what the student CALLED it,
+   *  so `param-sign` can address it. Emitting `symExprs` instead would change how it solves. */
+  syms?: [string | null, string | null, string | null];
 }
 
 /** `שיעור ה-z של C' חיובי` — a SIGN branch given (selects among pivot solutions). */
@@ -472,6 +476,22 @@ export interface SignGivenCommand {
   id: Id;
   axis: 'x' | 'y' | 'z';
   positive: boolean;
+}
+
+/**
+ * #814 (ADR-3D-175) — a letter bound to one free component of one injected object. The three
+ * injection lanes share one target vocabulary so the sign check is written once (`componentValue`),
+ * never enumerated per lane.
+ */
+export type ComponentTarget =
+  | { kind: 'point'; id: Id }
+  | { kind: 'vector'; name: string }
+  | { kind: 'pair'; a: Id; b: Id };
+
+export interface PartialName {
+  sym: string;
+  target: ComponentTarget;
+  axis: 'x' | 'y' | 'z';
 }
 
 /** `המישור BC'D` — a plane through existing points (resolved from their positions). */
@@ -812,7 +832,7 @@ export type Command3 =
   // BD = (-4,5,12) — a pair-vector injection (V7 T2). #794 (ADR-3D-168): components take the same
   // grammar as point3 — number | null (placeholder letter) | affine symbolic via symExprs
   // (`AA' = (k-1, k-7, k+1)` — the symbol joins the pivot as an open unknown).
-  | { type: 'inject-pair'; a: Id; b: Id; x: number | null; y: number | null; z: number | null; symExprs?: [SymComp | null, SymComp | null, SymComp | null] }
+  | { type: 'inject-pair'; a: Id; b: Id; x: number | null; y: number | null; z: number | null; symExprs?: [SymComp | null, SymComp | null, SymComp | null]; syms?: [string | null, string | null, string | null] } // #814: `syms` is name-only (see InjectVectorCommand)
   | { type: 'rel-plane'; name: string; rel: 'perp' | 'par'; through: Id[]; a: Id; b: Id } // V8-b (G1): plane ⟂/∥ edge a–b
   | { type: 'plane-cut'; id: Id; plane: string; a: Id; b: Id } // V8-b (G2): a point = plane ∩ segment a–b
   | { type: 'height-to-face'; id: Id; from: Id; face: Id[] } // V8-e (G5): `AF גובה … לפאה BDC` — F = foot of ⟂ from A onto plane BDC
@@ -973,6 +993,26 @@ export interface Construction3 {
   vectorPins: { name: string; x: number | null | SymComp; y: number | null | SymComp; z: number | null | SymComp }[];
   /** V4 — sign branch givens (select among pivot solutions). */
   signGivens: SignGivenCommand[];
+  /**
+   * #814 (ADR-3D-175) — WHICH LETTER NAMES WHICH FREE COMPONENT.
+   *
+   * «D(3,p,0)» on an existing D means "D's y is unknown" — the exam idiom, lowered (correctly, per
+   * ADR-3D-032 / ADR-3D-094) to a null pin component: a free sampled DOF, resampled by "show another
+   * configuration" and selectable by a sign given. What was missing is that the student NAMED it: the
+   * letter was discarded, so «p חיובי» refused «הפרמטר p לא הוגדר בסרטוט» — the tool denying a
+   * statement it had just been given.
+   *
+   * This records the name and nothing else. The component still solves exactly as before (that is the
+   * point — promoting these letters to pivot unknowns instead breaks the partial-injection exam gates),
+   * so the binding is INERT until a `param-sign` addresses the letter, at which point it lowers to the
+   * component branch selection the engine already performs for a coordinate sign given.
+   */
+  partialNames: PartialName[];
+  /** #814 (ADR-3D-175) — a sign stated on a NAMED free component («p חיובי» after «D(3,p,0)»). The
+   *  coordinate sign given (`signGivens`) one lane wider: the same branch selection, keyed on the
+   *  component the letter names rather than on a point+axis, so the vector and pair lanes are not a
+   *  second mechanism. Evaluated by `componentValue`. */
+  componentSigns: { target: ComponentTarget; axis: 'x' | 'y' | 'z'; positive: boolean }[];
   /** V4 — planes through points, name → ids (resolved from positions after the pivot). */
   pointPlanes: Map<string, Id[]>;
   /** V5 — named lines through two points, resolved from final positions. */
@@ -1062,6 +1102,8 @@ export const emptyConstruction3 = (): Construction3 => ({
   pins: [],
   vectorPins: [],
   signGivens: [],
+  partialNames: [],
+  componentSigns: [],
   pointPlanes: new Map(),
   pointLines: new Map(),
   relPlanes: new Map(),

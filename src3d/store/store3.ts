@@ -29,7 +29,7 @@ import { stripFormatControls } from '../../shell/bidi';
 import { applyCommand3, freeDims } from '../engine/apply';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { scalePinned } from '../engine/solve3';
-import { checkInSpan, firstSatisfyingSeed3, memberHolds3, onLineHolds3, pinningGivens, resolve3, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLineHolds3, pinningGivens, resolve3, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
 import { dot3, norm3, sub3 } from '../engine/vec3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
@@ -368,7 +368,16 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
         // ADR-3D-032: the chosen parameter value must honour the stated sign.
         // #325 (ADR-3D-079): the sign may name a PIN symbol (`B(2t,t,k)` → t) — read the
         // pivot's solved value for it instead of the coord-sym parameter.
-        const v = resolved.param?.name === cmd.sym ? resolved.param.value : resolved.pivot?.pinSymbols?.[cmd.sym];
+        // #814 (ADR-3D-175): ...and the THIRD thing a letter can be — a NAME for a free component
+        // («D(3,p,0)» → D's y). Its value is that component's, read from the final positions. The
+        // verifier has to know every kind of letter apply routes, or a correctly-applied sign reports
+        // `sign-unsatisfiable` against a figure that honours it.
+        const bound = c.partialNames.find((b) => b.sym === cmd.sym);
+        const v =
+          resolved.param?.name === cmd.sym
+            ? resolved.param.value
+            : (resolved.pivot?.pinSymbols?.[cmd.sym] ??
+               (bound ? componentValue(c, bound.target, bound.axis, (id) => positions.get(id)) : undefined));
         if (v === undefined || !Number.isFinite(v) || (cmd.positive ? v <= 1e-9 : v >= -1e-9)) {
           status[f.id] = { code: 'sign-unsatisfiable', id: cmd.sym };
           break;

@@ -13,7 +13,7 @@ import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
 import { isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { pinSymsOf } from './types';
-import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
+import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PartialName, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
   // #305 (ADR-3D-090): every quad pyramid is a 4-ring + apex, whatever its base or top
@@ -156,6 +156,8 @@ function clone(c: Construction3): Construction3 {
     pins: [...c.pins],
     vectorPins: [...c.vectorPins],
     signGivens: [...c.signGivens],
+    partialNames: [...c.partialNames],
+    componentSigns: [...c.componentSigns],
     pointPlanes: new Map(c.pointPlanes),
     pointLines: new Map(c.pointLines),
     relPlanes: new Map(c.relPlanes),
@@ -370,6 +372,35 @@ function lineRelRefsError(c: Construction3, op: Operand3, line: string): EngineE
  */
 const paramLane = (c: Construction3, param: string | undefined): { sym?: string; figureParam?: string } =>
   param === undefined ? {} : pinSymsOf(c).includes(param) ? { sym: param } : { figureParam: param };
+
+/**
+ * #814 (ADR-3D-175) — RECORD WHAT THE STUDENT CALLED A FREE COMPONENT, for all three injection lanes
+ * at once. A bare letter still lowers to a null component (it does not constrain, and it must not:
+ * promoting these letters to pivot unknowns is what breaks the partial-injection exam gates). This
+ * only binds the NAME, so `param-sign` can address the component afterwards.
+ *
+ * Bound only where the component actually ended up FREE — a letter the tuple resolved to a number or
+ * to a pivot symbol already has an owner, and a second binding would be the two-mechanisms bug (#801)
+ * arriving through the naming door. One recorder for the three lanes: the `pinSymsOf` discipline.
+ */
+function bindPartialNames(
+  next: Construction3,
+  target: ComponentTarget,
+  syms: [string | null, string | null, string | null] | undefined,
+  comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp],
+): void {
+  if (!syms) return;
+  const axes = ['x', 'y', 'z'] as const;
+  syms.forEach((sym, i) => {
+    if (!sym || comps[i] !== null) return; // named a number, or a pivot symbol that owns it already
+    if (next.partialNames.some((b) => b.sym === sym)) return; // first binding wins; a re-use is not a re-bind
+    next.partialNames.push({ sym, target, axis: axes[i] });
+  });
+}
+
+/** #814 — the letter's binding, if it names a free component. Derived, never enumerated. */
+const partialNameOf = (c: Construction3, sym: string): PartialName | undefined =>
+  c.partialNames.find((b) => b.sym === sym);
 
 /**
  * #801 (ADR-3D-174) — the same one-owner question arriving in the OTHER ORDER, answered by M2
@@ -1176,7 +1207,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (!adopted) return { ok: false, error: { code: 'two-params' } };
         const next = clone(adopted);
         const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
-        next.pins.push({ id: cmd.id, x: comp(cmd.x, exprs[0]), y: comp(cmd.y, exprs[1]), z: comp(cmd.z, exprs[2]) });
+        const comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp] =
+          [comp(cmd.x, exprs[0]), comp(cmd.y, exprs[1]), comp(cmd.z, exprs[2])];
+        next.pins.push({ id: cmd.id, x: comps[0], y: comps[1], z: comps[2] });
+        bindPartialNames(next, { kind: 'point', id: cmd.id }, cmd.syms, comps); // #814
         return { ok: true, next };
       }
       if (cmd.x === null || cmd.y === null || cmd.z === null) {
@@ -1382,7 +1416,18 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     case 'param-sign': {
       // #325: the sign given also applies to a PIN symbol (`t פרמטר חיובי` after `B(2t,t,k)`) —
       // it selects among pivot solutions the way it selects among root branches for c.param.
-      if (c.param !== cmd.sym && !pinSymsOf(c).includes(cmd.sym)) return { ok: false, error: { code: 'unknown-symbol', id: cmd.sym } };
+      // #814 (ADR-3D-175): the THIRD thing a letter can be. Beside the figure parameter and a pin
+      // symbol, a letter may NAME a free component («D(3,p,0)» — D's y is unknown and the student
+      // called it p). That letter is not a solver unknown and never was; the sign it carries is the
+      // component branch selection the engine already performs, so it lowers to exactly that rather
+      // than refusing a given the student made.
+      if (c.param !== cmd.sym && !pinSymsOf(c).includes(cmd.sym)) {
+        const bound = partialNameOf(c, cmd.sym);
+        if (!bound) return { ok: false, error: { code: 'unknown-symbol', id: cmd.sym } };
+        const next = clone(c);
+        next.componentSigns.push({ target: bound.target, axis: bound.axis, positive: cmd.positive });
+        return { ok: true, next };
+      }
       const next = clone(c);
       next.paramSigns.push(cmd);
       return { ok: true, next };
@@ -1399,7 +1444,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (!adopted) return { ok: false, error: { code: 'two-params' } };
       const next = clone(adopted);
       const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
-      next.vectorPins.push({ name: cmd.name, x: comp(cmd.x, exprs[0]), y: comp(cmd.y, exprs[1]), z: comp(cmd.z, exprs[2]) });
+      const comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp] =
+        [comp(cmd.x, exprs[0]), comp(cmd.y, exprs[1]), comp(cmd.z, exprs[2])];
+      next.vectorPins.push({ name: cmd.name, x: comps[0], y: comps[1], z: comps[2] });
+      bindPartialNames(next, { kind: 'vector', name: cmd.name }, cmd.syms, comps); // #814
       return { ok: true, next };
     }
 
@@ -1990,7 +2038,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (!adopted) return { ok: false, error: { code: 'two-params' } };
       const next = clone(adopted);
       const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
-      next.pairPins.push({ a: cmd.a, b: cmd.b, x: comp(cmd.x, exprs[0]), y: comp(cmd.y, exprs[1]), z: comp(cmd.z, exprs[2]) });
+      const comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp] =
+        [comp(cmd.x, exprs[0]), comp(cmd.y, exprs[1]), comp(cmd.z, exprs[2])];
+      next.pairPins.push({ a: cmd.a, b: cmd.b, x: comps[0], y: comps[1], z: comps[2] });
+      bindPartialNames(next, { kind: 'pair', a: cmd.a, b: cmd.b }, cmd.syms, comps); // #814
       return { ok: true, next };
     }
 

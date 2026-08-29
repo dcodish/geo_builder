@@ -5100,3 +5100,72 @@ figure resolves in ~0.3 s (`derive3`, seed 0). Full 3-D lane 166 files / 3382 te
 Locks: `src3d/__tests__/issue-801.test.ts` (the operator's exact named + bare sequences at three seeds,
 the order permutation, the apply gate, the plane sibling, the preserved `two-params` refusal) and
 `fixtures3/prism-sym-line-801.geo3.json` (the named sequence through the real load path).
+
+## ADR-3D-175 — A NAMED FREE COMPONENT: the letter is a name, not a second solver (#814)
+
+**The class.** *A component the student NAMED is stored as an anonymous free DOF — the name is
+discarded at the parser boundary, so no later statement can address it.*
+
+«D(3,p,0)» on a D the solid already made pinned `{3, null, 0}`. The `null` is **right**: the exam
+idiom means "D's y is unknown", and ADR-3D-032 / ADR-3D-094 lower it to a free sampled DOF that
+resamples with the seed and yields to a stated sign — ADR-052 read exactly. What was thrown away is
+that the student called it `p`. With no record of the name, «p חיובי» refused
+«הפרמטר p לא הוגדר בסרטוט»: the tool denying a given it had just been given, and an error message
+describing its own internal state rather than any conflict in what was said.
+
+**Root cause.** A letter can be three things in this tree, and only two were representable: the
+figure parameter (`c.param`, the algebraic root-find), a pin symbol (solved inside the pivot), and —
+missing — **a name for a component that is simply unknown**. `param-sign` enumerated the two it knew
+and refused everything else, so the third kind reported as non-existent.
+
+**The decision.** Bind the name; change nothing about the solve. `partialNames` records letter →
+(object, component) for the free components of all three injection lanes, and «p חיובי» lowers to
+`componentSigns` — the branch selection the engine already performs for a coordinate sign given,
+keyed on the component the letter names instead of on a point+axis. The parser gains a **name-only**
+channel (`syms`) on the vector and pair lanes, the one `point3` always had; `symExprs`, which decides
+whether a letter becomes a solver unknown, is untouched.
+
+**The rejected fix, recorded because it is the tempting one.** The obvious reading is that
+`symStructure` (#325) withholds `symExprs` for bare distinct letters by lexical accident, and that
+emitting them always is the root fix. It is not: it promotes these letters to pivot unknowns and
+**breaks the partial-injection exam gates** — 2023 קיץ א Q2 ג–ד («A(3,n,p)», `scenarios3`) and
+2023 קיץ מועד ב Q2 («B(p,3,0), C(0,n,0)», `v7-t2`) — because `solvePivot` cannot solve those systems
+with two symbols and reports **`givens-contradict` on satisfiable givens**. Measured: 8 failures on
+the full suite. That solver weakness is pre-existing and independent of the letter question — the
+structured form `B(2p,3,0), C(0,2n,0)`, which always took the pin-symbol lane, fails identically at
+HEAD, seed-dependently (seeds 1–3 pass; 0 and 7 do not). #814's regression file reproduces both gates
+next to the feature, so the cost of that change is visible where it would be made.
+
+**New capability:** a coordinate stated with a plain parameter — «D(3,p,0)», «v = (3,p,0)»,
+«AD = (3,p,0)» — names an unknown the student can then address: «p חיובי» / «p שלילי» / «p > 0» and
+the English mirrors select among its roots, and the determined value prints on the figure instead of
+«?». Previously only a letter dressed in arithmetic could be referred to at all.
+
+**Naming is not pinning.** An unaddressed named component still resamples across seeds and still
+prints «?» — a sample is not knowledge (ADR-052). The binding is inert until a `param-sign` uses it.
+
+**One statement, honoured everywhere its sibling is.** `componentSigns` joins `signGivens` at all
+three sites, not one: the pivot's solution filter, the drive's rollback check, and `collectAll` in
+`solvePivot` — that last one is what makes the selection hold at EVERY seed rather than wherever the
+pool happened to carry both branches. A statement collected in one place and enforced in another is
+honoured by luck. The store's `param-sign` verifier likewise learns the third kind of letter, or a
+correctly-applied sign reports `sign-unsatisfiable` against a figure that honours it.
+
+**Sibling audit.** *3-D:* the three injection lanes are fixed together through one recorder
+(`bindPartialNames`) and one evaluator (`componentValue`, which folds the pair and vector cases into
+one since a named vector is a point pair). The coord-sym and pin-symbol lanes are untouched.
+*2-D (`src/`):* no symbolic coordinate-component machinery — `grep -rn 'SymComp|symExprs|coord-sym'
+src/` is empty; coordinate tuples are a 3-D construct. Not present. *Complex (`src-complex/`):*
+likewise empty. Not present.
+
+**Found while fixing, filed not folded:** #816 — with «|u| = |v|» typed *before* the coordinates,
+«S(0,0,6)» is refused `injection-unsatisfiable` on plainly satisfiable geometry. Pre-existing at HEAD
+(A/B confirmed), a different class (entry-order, docs/17 M2 law i).
+
+**Perf:** no new solve. `collectAll` widens the pool only for figures that state a component sign,
+which is the same condition `signGivens` already imposed.
+
+Locks: `src3d/__tests__/issue-814.test.ts` (the operator's exact sequence He + En, both roots, the
+selection holding at five seeds, all three injection lanes, the still-refused unknown letter, the
+ADR-052 resampling guarantee, the parser's name-vs-register split, and **both exam gates reproduced**)
+and `fixtures3/pyramid-named-comp-814.geo3.json` (the figure through the real load path).

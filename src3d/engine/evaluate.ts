@@ -33,7 +33,7 @@ import { decompose3 } from './vecExpr';
 import { absolutePointCount, pinSymsOf } from './types';
 import { resolveFreePlane } from './freePlane';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
-import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
+import type { ComponentTarget, Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3} from './vec3';
 import { quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
@@ -642,6 +642,34 @@ export const memberHolds3 = (p: Vec3, pl: ResolvedPlane): boolean =>
 /** #801 (ADR-3D-174) — the LINE edition of {@link memberHolds3}, extracted from the store's verify pass
  *  so the stage-4 drive aims at exactly the bar the verifier judges by (the memberHolds3 discipline: a
  *  drive that stops short of the verifier's tolerance produces a refusal nothing can clear). */
+/**
+ * #814 (ADR-3D-175) — the value of ONE component of an injected object, for the three target kinds a
+ * letter can name. A named vector is a point pair (`c.vectors`), so the pair and vector cases are the
+ * same computation — written once here so the sign check below is not three enumerated cases (and so a
+ * fourth injection lane cannot answer it differently). `undefined` = not placeable yet.
+ */
+export function componentValue(
+  c: Construction3,
+  target: ComponentTarget,
+  axis: 'x' | 'y' | 'z',
+  at: (id: Id) => Vec3 | undefined,
+): number | undefined {
+  if (target.kind === 'point') return at(target.id)?.[axis];
+  const seg = target.kind === 'pair' ? { from: target.a, to: target.b } : c.vectors.get(target.name);
+  if (!seg) return undefined;
+  const from = at(seg.from);
+  const to = at(seg.to);
+  return from && to ? to[axis] - from[axis] : undefined;
+}
+
+/** #814 — do the stated component signs hold under a given placement? Shared by the pivot's solution
+ *  filter and the drive's rollback check, so one statement cannot be enforced in one and not the other. */
+export const componentSignsHold = (c: Construction3, at: (id: Id) => Vec3 | undefined): boolean =>
+  c.componentSigns.every((g) => {
+    const v = componentValue(c, g.target, g.axis, at);
+    return v === undefined ? false : g.positive ? v > 1e-9 : v < -1e-9;
+  });
+
 export const onLineHolds3 = (p: Vec3, ln: ResolvedLine): boolean =>
   norm3(cross3(sub3(p, ln.anchor), ln.dir)) <= 1e-7 * Math.max(norm3(sub3(p, ln.anchor)) * norm3(ln.dir), 1);
 
@@ -1345,6 +1373,9 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
           return v === undefined ? true : s.positive ? v > 1e-9 : v < -1e-9;
         });
         if (!symsOk) return false;
+        // #814: the same selection for a letter that NAMES a free component («p חיובי» after
+        // «D(3,p,0)») — judged on the transformed positions, exactly as the coordinate given below.
+        if (!componentSignsHold(c, (id) => { const q = p2.get(id); return q ? sol.transform(q) : undefined; })) return false;
         return c.signGivens.every((g) => {
           // ADR-3D-094: a `partial` point's sign is honored at SAMPLE time and the point is
           // Lane-A absolute — the gauge transform below doesn't apply to it, so judging it
@@ -1547,7 +1578,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
             c.signGivens.every((g) => {
               const q = pos.get(g.id);
               return !!q && (g.positive ? q[g.axis] > 1e-9 : q[g.axis] < -1e-9);
-            });
+            }) && componentSignsHold(c, (id) => pos.get(id)); // #814: named components ride the same check
           const signsBefore = signsHold();
           // warm-started from the pinned figure's own solution so the drive PERTURBS it
           // (branch choices preserved, minimal movement) instead of re-rolling the basins
