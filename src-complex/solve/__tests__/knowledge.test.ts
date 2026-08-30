@@ -15,17 +15,17 @@ import { parseLineV2 } from '../../parser/rules';
 
 describe('the predicate itself', () => {
   it('an exactly carried value is knowledge however much else is free', () => {
-    expect(isKnowledge(true, { remainingDof: 3, configCount: 7 })).toBe(true);
+    expect(isKnowledge(true, { remainingDof: 3, enumeratedConfigCount: 7 })).toBe(true);
   });
 
   it('a closed figure with one configuration is knowledge', () => {
-    expect(isKnowledge(false, { remainingDof: 0, configCount: 1 })).toBe(true);
+    expect(isKnowledge(false, { remainingDof: 0, enumeratedConfigCount: 1 })).toBe(true);
   });
 
   it.each([
-    [{ remainingDof: 1, configCount: 1 }],
-    [{ remainingDof: 0, configCount: 2 }],
-    [{ remainingDof: 2, configCount: 3 }],
+    [{ remainingDof: 1, enumeratedConfigCount: 1 }],
+    [{ remainingDof: 0, enumeratedConfigCount: 2 }],
+    [{ remainingDof: 2, enumeratedConfigCount: 3 }],
   ])('%o is NOT knowledge', (closure) => {
     expect(isKnowledge(false, closure)).toBe(false);
     expect(whyNotKnowledge(closure).code).toBeTruthy();
@@ -33,8 +33,8 @@ describe('the predicate itself', () => {
 
   /** The reason has to describe the student's situation, so it can tell them what to do next. */
   it('names remaining freedom and multiple configurations differently', () => {
-    expect(whyNotKnowledge({ remainingDof: 1, configCount: 1 })).toEqual({ code: 'free-dof-remain' });
-    expect(whyNotKnowledge({ remainingDof: 0, configCount: 4 })).toEqual({ code: 'multi-config', configs: 4 });
+    expect(whyNotKnowledge({ remainingDof: 1, enumeratedConfigCount: 1 })).toEqual({ code: 'free-dof-remain' });
+    expect(whyNotKnowledge({ remainingDof: 0, enumeratedConfigCount: 4 })).toEqual({ code: 'multi-config', configs: 4 });
   });
 });
 

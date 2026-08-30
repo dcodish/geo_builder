@@ -51,8 +51,11 @@ import type { Why } from './why';
 export interface FigureClosure {
   /** free degrees of freedom tier 1 published, minus what the numeric tier consumed */
   readonly remainingDof: number;
-  /** how many valid configurations the givens leave */
-  readonly configCount: number;
+  /**
+   * How many branches the enumeration kept — a SIZE, not an existence claim (#698). 0 is the ordinary
+   * state of an under-determined figure, so no caller may read it as "there are none".
+   */
+  readonly enumeratedConfigCount: number;
 }
 
 /**
@@ -62,11 +65,11 @@ export interface FigureClosure {
  * by construction, so a figure with free directions can still *know* a magnitude stated in a parameter.
  */
 export const isKnowledge = (carriedExactly: boolean, c: FigureClosure): boolean =>
-  carriedExactly || (c.remainingDof === 0 && c.configCount === 1);
+  carriedExactly || (c.remainingDof === 0 && c.enumeratedConfigCount === 1);
 
 /** The student-facing reason a value is withheld — their situation, never our internals. */
 export const whyNotKnowledge = (c: FigureClosure): Why => {
   if (c.remainingDof > 0) return { code: 'free-dof-remain' };
-  if (c.configCount > 1) return { code: 'multi-config', configs: c.configCount };
+  if (c.enumeratedConfigCount > 1) return { code: 'multi-config', configs: c.enumeratedConfigCount };
   return { code: 'undetermined' };
 };

@@ -84,7 +84,7 @@ describe('#716 — the Hebrew wordings are unchanged', () => {
   it('the freedom cue', () => {
     expect(v2Freedom(deriveLines(['z1 = 3+4i'], 0, 0), tHe)).toBe('הצורה נקבעה במלואה');
     expect(v2Freedom(deriveLines(['z1 = 3+4i', 'w = z1*z2'], 0, 0), tHe)).toBe('דרגות חופש: 2');
-    // a filter that empties the enumerated branch set is the configCount-0 case
+    // a filter that empties the enumerated branch set is the enumeratedConfigCount-0 case
     expect(v2Freedom(deriveLines(['z', 'z^2 = 1', 'z ברביע השני'], 0, 0), tHe)).toBe('אין תצורה תקפה');
   });
 

@@ -106,10 +106,13 @@ export const v2Contradiction = (d: Derived2, t: Translate): string | null =>
  * nullspace dimension of the exact tier, and once «שטח OZ₁Z₂Z₃ = 150r²» consumes a direction,
  * reporting tier 1's number tells a student the figure can still move in a direction their own given
  * has just pinned. `אין תצורה תקפה` outranks the count — a figure with no valid configuration has no
- * freedom to report.
+ * freedom to report, and that verdict comes from {@link Derived2.hasConfiguration}: an enumeration
+ * SIZE cannot answer whether a figure exists, which is the #698 defect.
  */
 export function v2Freedom(d: Derived2, t: Translate): string {
-  if (!d.configCount) return t('freedomNone');
+  // EXISTENCE, not the enumeration's size (#698): «אין תצורה תקפה» was printed over every drawn
+  // under-determined figure — «|z1| = 5» among them — because a count of 0 was read as "none exist".
+  if (!d.hasConfiguration) return t('freedomNone');
   const remaining = Math.max(0, d.freeDof.length - d.drivenDof);
   return remaining > 0 ? t('freedomCount', { n: remaining }) : t('freedomPinned');
 }
