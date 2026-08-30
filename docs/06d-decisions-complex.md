@@ -2059,3 +2059,56 @@ Locks: `point-labels-791.test.ts` (18) — the four rulings each way, the case-s
 (`a = 5+i` defines nothing; «אורך ab» refuses; `Z1` still folds), the product/distance split, the
 origin form, garbage-in-braces refusal, cold and reversed bindings, and asks through both names.
 Catalog entries added (coverage-map rule: absence from the catalog is absence from coverage).
+
+## ADR-CX-034 — An enumeration SIZE is not an existence claim: the freedom head-line asks `hasConfiguration` (#698)
+
+**Status:** Accepted (2026-08-30) · **Ladder:** stage 1d (branch enumeration IS the configuration set) + stage 5d (display) · **Round:** #824
+
+The panel's always-visible head-line told the student **«אין תצורה תקפה» while drawing their figure**,
+for input as ordinary as «|z1| = 5». Measured at `61aa3eb`:
+
+| input | `configCount` | figure drawn | head-line |
+| --- | --- | --- | --- |
+| «z1 מספר מרוכב» | 0 | ✅ 1 point | ❌ «אין תצורה תקפה» |
+| «\|z1\| = 5» | 0 | ✅ 1 point | ❌ «אין תצורה תקפה» |
+| «z1 מספר מרוכב» · «z2 מספר מרוכב» | 0 | ✅ 2 points | ❌ «אין תצורה תקפה» |
+| «arg z1 = 30» | 1 | ✅ | ✅ «דרגות חופש: 1» |
+| «z1 = 3+4i» | 1 | ✅ | ✅ «הצורה נקבעה במלואה» |
+
+**Root cause — one number answering two different questions.** `v2Freedom` read `if (!d.configCount)
+return t('freedomNone')`, i.e. it read an enumeration's *size* as an *existence* claim. Three
+unrelated states share the count 0, and only two of them mean "no figure":
+
+- **nothing to enumerate** — `tier1` returns `branches: []` the moment no argument is determined
+  (`tier1.ts:225`), which is the ordinary state of every under-determined figure. The free directions
+  are *sampled*; a continuous family of configurations exists and one of them is on screen.
+- **a filter emptied the set** — `filterBranches` sets `emptiedBy` only when a non-empty set became
+  empty, never for an empty input. Genuinely no configuration.
+- **contradictory givens** — `t1.inconsistent`, which already carries `integralityFailed`
+  (`tier1.ts:165`). Genuinely no configuration.
+
+The name is what made the misuse look correct: a field documented as *"how many valid configurations
+the givens leave"* invites exactly this read, and the B-series predicted it — the issue was filed
+before any surface consumed the value, and a shipped surface then consumed it exactly as predicted.
+
+**Decision.**
+
+1. **`hasConfiguration` is the existence predicate**, computed beside the count it must not be confused
+   with: `enumeratedConfigCount > 0 || (!t1.inconsistent && emptiedBy === null)`. A kept branch is a
+   configuration; with none enumerated the figure still has them unless something *refuted* the givens.
+   The head-line asks this and nothing else.
+2. **`configCount` is renamed `enumeratedConfigCount`** everywhere (`Derived2`, `FigureClosure`,
+   `surfacedFormulas`), with both doc comments rewritten to say it is a size and that 0 is ordinary.
+   The rename is the prophylactic — a future reader cannot make this mistake against that name.
+3. **The count's own consumers are unchanged**, because they were already asking size questions:
+   `canCycle` (byte-identical, and locked as such — it read the right predicate since #689),
+   `surfacedFormulas`' `> 1` De Moivre/roots split, and `isKnowledge`/`whyNotKnowledge`'s
+   `multi-config`. The sweep found **no** reader of the count in the load-audit or export paths.
+
+**The true case is not silenced** — the fix's other half, and the reason [#655](https://github.com/dcodish/geo_builder/issues/655)
+must land *after* this one: a contradiction and a filter-emptied set both still say «אין תצורה תקפה».
+
+Locks: `issue-698.test.ts` (9) — the five rows above asserted on the STATUS LINE rather than the count,
+a drawn under-determined figure never reading «no valid configuration» (with `enumeratedConfigCount === 0`
+and `hasConfiguration === true` asserted together, since both are true at once), both refuted cases still
+reading it, and `canCycle` pinned to its pre-fix values.

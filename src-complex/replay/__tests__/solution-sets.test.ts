@@ -63,7 +63,7 @@ describe('#680 — an enumerating equation draws its whole solution set', () => 
 
   it('the set is ONE configuration — there is nothing to cycle (ADR-CX-020)', () => {
     const d = build('z^3 = 8');
-    expect(d.configCount).toBe(1);
+    expect(d.enumeratedConfigCount).toBe(1);
     expect(d.freeDof).toEqual([]);
     expect(d.canCycle).toBe(false);
   });
@@ -123,7 +123,7 @@ describe('#680 — solving is told from relating by what the earlier lines said'
     // enumeration; the several solutions are the exam's «כל האפשרויות» and stay configurations.
     const d = build('z1^3 = z3', '-2z1 = conj(z3)');
     expect(d.points.map((p) => p.name).sort()).toEqual(['z1', 'z3']);
-    expect(d.configCount).toBe(4);
+    expect(d.enumeratedConfigCount).toBe(4);
   });
 
   it('...but the SAME shape enumerates once its right-hand side is grounded', () => {
@@ -140,7 +140,7 @@ describe('#680 — solving is told from relating by what the earlier lines said'
     // equation about z1 constrains it rather than enumerating a fresh letter.
     const d = build('|z1| = 2', 'z1^3 = 8');
     expect(d.points.map((p) => p.name)).toEqual(['z1']);
-    expect(d.configCount).toBe(3); // one number, its three possible directions
+    expect(d.enumeratedConfigCount).toBe(3); // one number, its three possible directions
   });
 });
 
@@ -149,13 +149,13 @@ describe('#680 — the other two modes are untouched (#607 family keeps its bran
     const d = build('z', 'z^3 = 8');
     // one letter, one point; the three roots are the three configurations it may sit at
     expect(d.points.map((p) => p.name)).toEqual(['z']);
-    expect(d.configCount).toBe(3);
+    expect(d.enumeratedConfigCount).toBe(3);
     expect(d.canCycle).toBe(true);
   });
 
   it('an EXISTING determined letter is VERIFIED — the equation is a claim', () => {
     const d = build('z1 = 2i', 'z1^2 = -4');
     expect(d.points.map((p) => p.name)).toEqual(['z1']);
-    expect(d.configCount).toBe(1);
+    expect(d.enumeratedConfigCount).toBe(1);
   });
 });

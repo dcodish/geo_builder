@@ -5702,6 +5702,53 @@ Locks: `src3d/__tests__/issue-769.test.ts` — the operator's sequence (refusal 
 the CC' sibling at t = ½, the offer-lane agreement, and the class (midpoint, foot, plane∩edge, the
 free-rider exemption, a distinct nearby derived point still building).
 
+## ADR-3D-184 — THE PROSE PATH ISOLATES: VecMath's exemption held only where it emitted structure (#482 Am. 4)
+
+**Status:** Accepted (2026-08-30) · **Ladder:** stage 5d (display) · **Round:** #824 · **Operator ruling:** 2026-08-16, transcribed on #482
+
+The 2026-08-16 ruling asked that the student's own text be isolated **"on every surface that echoes user
+text: the fact rows, the query rows, the load audit, export."** The fact rows and the input preview
+shipped (ADR-3D-121, ADR-3D-123 + Am. 1–3, PR #495). This closes the ruling by measuring the other three
+— and only one of them was a gap.
+
+**The gap — the query lane.** ADR-3D-121 exempted `VecMath` rows from isolation on a *stated reason*:
+«VecMath emits one element per token, so bidi sees structure rather than one neutral run». That reason is
+true of the MathML path and **false of the prose path**: `VecMath.tsx:130` returns the raw string whenever
+the tokenizer finds nothing expression-like, and the row then sits as one neutral run under the caller's
+`dir="auto"`. The data panel's ask lane renders **every** row through `VecMath`, so the operator's own
+reported strings were still reordered there after the fact-row lane was fixed. Measured at `61aa3eb`,
+7 of 9 realistic query rows take the prose path and isolation changes the layout of every one:
+
+| row | path | isolation |
+| --- | --- | --- |
+| «הישר l - x=(1,2,3)+t(m-2,m,m+2)» | prose | would change ❌ |
+| «מישור π1: x+(m-2)y+(m-1)z-5=0» | prose | would change ❌ |
+| «מישור ABC», «שטח המשולש ABC», «נפח הפירמידה SABCD», «זווית בין ℓ למישור π» | prose | would change ❌ |
+| `\|AB\|`, `u·v` | MathML | no-op ✅ |
+
+**Decision — isolate at the RENDER EVENT, which is the #482 lesson itself.** `VecMath`'s prose branch
+returns `isolateLtrRuns3(text)`. Not at the call sites: putting it there is exactly the mistake #482
+diagnosed (the chokepoint bound to a seam an author must remember, rather than to the event it guards),
+and it would have to be repeated for the fact rows, the ask rows and the answers. The MathML branch is
+untouched, so ADR-3D-121's reasoning survives precisely where it was true. The function is total,
+idempotent and byte-recoverable, so a caller that already isolated loses nothing.
+
+**The other two surfaces needed nothing, and one would have been made WORSE.**
+
+- **The load audit** echoes no student text: the banner interpolates `x.step` — step *numbers* —
+  (`App3.tsx:368`), never the utterance `loadAudit3` carries.
+- **The export must NOT isolate**, and this supersedes the export leg of the ruling's wording. #464/#465
+  already decided it at `questionDoc.ts:157`: *"the browser's fix — U+2066/U+2069 isolates — is WRONG in
+  a .docx: Word has no glyph for them and prints visible ⟦LRI⟧ boxes. OOXML's own mechanism is per-RUN
+  direction"* — so the export passes `segments: bidiSegments3` and emits one `TextRun` per direction.
+  Same segmentation as the browser, different expression. Routing `isolateLtrRuns3` through it, which is
+  what the ruling's generic wording asks for, would print literal boxes in the student's Word document.
+
+Locks: `bidi3.test.ts` gains «#482 Am. 4» (5) — the operator's four reported rows asserted to take the
+prose path (so the exemption provably left them unprotected), the isolate covering the run and the string
+byte-recoverable, the MathML rows still taking the structural path, idempotence, and the mechanism
+asserted at the source (this tree has no DOM harness — the #559 precedent).
+
 ## ADR-3D-185 — ONE ARC OVER AN OPERAND PAIR: an angle whose sides are OBJECTS is drawn (#542)
 
 **Status:** Accepted (2026-08-30) · **Ladder:** stage 5d (display) · **Round:** #824 · **Operator request:** PR #540 play, 2026-08-11
