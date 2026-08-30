@@ -189,8 +189,23 @@ export interface Derived2 {
   readonly sequences: readonly DerivedSequence[];
   /** products between drawn numbers, read as rotation-and-scale */
   readonly rotations: readonly DerivedRotation[];
-  /** how many valid configurations the givens leave — what "show another" cycles */
-  readonly configCount: number;
+  /**
+   * How many branches the ENUMERATION kept — what "show another" cycles.
+   *
+   * This is a SIZE, never an existence claim: 0 means "no enumerated branch", which is the ordinary
+   * state of an under-determined figure (nothing to enumerate — the free directions are sampled) as
+   * much as it is the state of a refuted one. Ask {@link hasConfiguration} whether a figure exists;
+   * reading this count as that answer is what printed «אין תצורה תקפה» over a drawn point (#698).
+   */
+  readonly enumeratedConfigCount: number;
+  /**
+   * Does the figure HAVE a valid configuration? The existence half, split from the count.
+   *
+   * False only when something REFUTED the givens: contradictory moduli/arguments (`contradiction`),
+   * or a filter that emptied a non-empty enumerated set (`emptiedBy`). A figure with no enumeration
+   * at all still has configurations — a continuous family of them — and one of them is on screen.
+   */
+  readonly hasConfiguration: boolean;
   readonly configIndex: number;
   /** the still-open degrees of freedom, named the way the cue shows them */
   readonly freeDof: readonly string[];
@@ -341,8 +356,18 @@ export function foldConstraints(input: FoldInput): Derived2 {
   }
 
   const { kept, emptiedBy } = filterBranches(t1.branches, filterList, sample);
-  const configCount = kept.length;
-  const index = configCount ? ((configIndex % configCount) + configCount) % configCount : 0;
+  const enumeratedConfigCount = kept.length;
+  /**
+   * EXISTENCE, asked separately from the count (#698, ADR-CX-034).
+   *
+   * A kept branch is a configuration. With none enumerated the figure still has configurations —
+   * `tier1` returns `branches: []` when no argument is determined, i.e. "nothing to enumerate", not
+   * "nothing survived" — unless the givens were actually refuted: `t1.inconsistent` (which already
+   * carries `integralityFailed`), or a filter that emptied a set that HAD members (`filterBranches`
+   * sets `emptiedBy` only in that case, never for an empty input).
+   */
+  const hasConfiguration = enumeratedConfigCount > 0 || (!t1.inconsistent && emptiedBy === null);
+  const index = enumeratedConfigCount ? ((configIndex % enumeratedConfigCount) + enumeratedConfigCount) % enumeratedConfigCount : 0;
   const branch: Branch | undefined = kept[index];
 
   /**
@@ -767,7 +792,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
   const drivenCount = solved ? consumedDimensions(evaluateAt, solved.x) : 0;
   const closure = {
     remainingDof: Math.max(0, freeDofNames.length - drivenCount),
-    configCount,
+    enumeratedConfigCount,
   };
   /**
    * IS THE ONE REMAINING FREEDOM A PURE **GAUGE**? — «הביעו באמצעות r», answered.
@@ -977,7 +1002,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
     objects: t1.inconsistent ? [] : resolveObjects(objects, points, sample),
     sequences: t1.inconsistent ? [] : resolveSequences(sequences, points),
     rotations: t1.inconsistent ? [] : resolveRotations(constraints, points),
-    configCount,
+    enumeratedConfigCount,
+    hasConfiguration,
     configIndex: index,
     freeDof: freeDofNames,
     untranslated,
@@ -987,10 +1013,10 @@ export function foldConstraints(input: FoldInput): Derived2 {
     unsatisfied,
     undecided,
     knowledge: [...knowledge, ...ratioRows, ...exprRows],
-    canCycle: configCount > 1 || closure.remainingDof > 0,
+    canCycle: enumeratedConfigCount > 1 || closure.remainingDof > 0,
     emptiedBy,
     claims: verifyClaims(assertions, t1, branch),
-    formulas: t1.inconsistent ? [] : surfacedFormulas(constraints, configCount),
+    formulas: t1.inconsistent ? [] : surfacedFormulas(constraints, enumeratedConfigCount),
   };
 }
 

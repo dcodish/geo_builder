@@ -125,7 +125,7 @@ describe('F12 — the minimal n: the student answers, the tool checks', () => {
 describe('canCycle — is there another drawing to show?', () => {
   it('a fully determined figure has nothing to cycle', () => {
     const d = deriveLines(['z1 = 3+4i', 'z2 = 2cis150']);
-    expect(d.configCount).toBe(1);
+    expect(d.enumeratedConfigCount).toBe(1);
     expect(d.freeDof).toEqual([]);
     expect(d.canCycle).toBe(false);
   });
@@ -137,7 +137,7 @@ describe('canCycle — is there another drawing to show?', () => {
    */
   it('a constrained letter with several solutions can cycle', () => {
     const d = deriveLines(['z', 'z^3 = 8']);
-    expect(d.configCount).toBe(3);
+    expect(d.enumeratedConfigCount).toBe(3);
     expect(d.canCycle).toBe(true);
   });
 

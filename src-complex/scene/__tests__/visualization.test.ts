@@ -201,7 +201,7 @@ describe('the polar/cartesian toggle is display-only, over the whole catalog', (
       readings: d.points.map((p) => p.reading),
       objects: d.objects.map((o) => [o.kind, o.label]),
       sequences: d.sequences.map((s) => [s.kind, s.terms.map((t) => t.name)]),
-      configCount: d.configCount,
+      enumeratedConfigCount: d.enumeratedConfigCount,
       untranslated: d.untranslated.map((u) => u.src),
     });
   };
