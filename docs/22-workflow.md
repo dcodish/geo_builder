@@ -130,6 +130,10 @@ round before it starts — a P1 is never taken silently, and there is never a se
 `/status-update`'s "Waiting on you" section surfaces the whole loop: plans awaiting `auto-ok`, PRs
 awaiting play, rounds in flight, rounds awaiting validation.
 
+**Gating and landing (ADR-W-034, operator ruling 2026-08-30):** each item is gated on `tsc`, build, its
+product lane and its own locks; the FULL suite runs once per batch, on the merged staging tip, and the
+batch lands on `main` in ONE push. Round #822 measured the per-item alternative at ~5 hours for 8 items.
+
 **Phase 2 (not yet built, not yet decided):** scheduled unattended rounds and their landing policy
 (bugs direct-to-main vs one-PR-per-round) wait on Phase 1's measured escalation rate ([ADR-W-012](06w-decisions-workspace.md)).
 [ADR-W-028](06w-decisions-workspace.md) spent that data on the *cap* only — every round measured so far had

@@ -1516,3 +1516,37 @@ Locks: `server/__tests__/test-tiers.test.ts` asserts the RECORD — red → `gre
 failing file, green → `green:true`, dirty tree → `dirty:true`, crash → `green:false` with details
 `null`, mode stamped, and the JSON landing parseable on disk. Deliberately not the printed summary
 (always correct — which is what made the hole invisible) and not the exit code (which nobody kept).
+
+## ADR-W-034 — A fix round gates the BATCH, and lands it in ONE push (operator ruling 2026-08-30)
+
+**Context.** Round #822 (8 items, all landed, 0 escalations) took ~5 hours wall-clock. Measured: 11
+full-suite runs (8 items + 3 re-runs), each 17–25 min instead of the nominal ~6 because runs were
+overlapped and the slow-tier files crawled under load; and the landing was SERIAL — the per-item gate
+was "full suite on the rebased tip", so item N could not start its gate until N−1 had landed.
+
+**Ruling (operator, "yes to 1+3").**
+
+1. **One full suite per batch, not per item.** Per item, the gate is: `tsc -b`, the product build, the
+   product lane (`npm run test:run:3d` / `test:run:2d`) and the item's own locks — all green. The full
+   suite (`npm run test:full`) runs **once, on the merged batch tip, before the push** — and again only
+   when it comes back red (fix, re-run). The bar on what actually lands is unchanged: nothing reaches
+   `main` without a green full suite on exactly that state.
+2. **Land in one push at the end.** Item branches merge, in composition order, into a staging tip
+   (`round/<date>` on the shared tree or a worktree); conflicts are reconciled there; the batch's full
+   suite runs on that tip; then `main` fast-forwards to it and pushes once. The ledger still records
+   per-item commits (`Fixes #NN` + `round #RR`) and gate lines; the SHA column is filled at the push.
+3. **Never overlap suite runs** — a lane, a probe or a full suite runs alone. (Not a ruling; a rule the
+   round applies to itself, recorded here because it doubled every gate in #822.)
+
+**What stays.** Escalation, the 5–8 band and the two-escalation stop (ADR-W-028), fixtures-first,
+ADR + locks per item, the ledger-as-record, and the operator's play-and-close validation. A PR item
+(feature route) is unaffected — its gate is its own.
+
+**Why the bar is the same.** The full suite's job is to catch what the fast tier and the lane miss
+across products (ADR-394). Running it on the merged tip tests the exact bytes that land; running it
+per rebased item tested seven intermediate states that never shipped. What is lost is attribution —
+a batch-level red does not say which item caused it — and that is paid once, by bisecting inside
+the round, instead of eight times up front.
+
+Applies from the round after #822. `.claude/skills/fix-round/SKILL.md` Steps 2–3 carry the mechanics.
+

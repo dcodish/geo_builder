@@ -82,7 +82,10 @@ Sequential, one item at a time (parallel items in one tree overwrite each other)
 3. **Per-item gates, no exceptions:** ADR entry in the product's log; per-fix unit test; the
    regression lock per standing rule 4 (fixtures-first — a `.geo.json` fixture when the essence
    is "builds green and verifies", a scenario in the LAST corpus chunk when a bespoke assertion
-   is needed); `npm run test:full` green; `tsc -b` + build clean.
+   is needed); `tsc -b` + build clean; the PRODUCT LANE green (`npm run test:run:3d` /
+   `test:run:2d`) plus the item's own locks. The FULL suite is the BATCH gate (Step 3), not a
+   per-item one ([ADR-W-034](../../../docs/06w-decisions-workspace.md)). **Never overlap suite
+   runs** — a lane or a full suite runs alone; overlapping doubled every gate in round #822.
 4. **Commits reference the round:** every item commit carries `Fixes #NN` AND mentions the
    round issue (`round #RR`) — from any commit you can find the round, from the round every
    commit.
@@ -93,15 +96,20 @@ Sequential, one item at a time (parallel items in one tree overwrite each other)
   (the other PC pushed mid-round), STOP landing and reconcile — report, don't silently rebase
   over external movement. The round's own earlier landings are the only movement it absorbs
   unannounced.
-- **Bugs/debt:** merge the item branch into `main` (rebase on latest `main` first if earlier
-  items landed), commit message states the root cause and carries `Fixes #NN` + `round #RR`.
-  **Push immediately** (commit ⇒ push). Remove the worktree after merge.
+- **Bugs/debt — one push at the end** ([ADR-W-034](../../../docs/06w-decisions-workspace.md)):
+  item branches merge, in composition order, into a STAGING tip (`round/<date>`, its own worktree);
+  conflicts are reconciled there (ADR-log tails always collide — keep both, in order); the batch's
+  **`npm run test:full` runs once on that tip** (again only if red — fix on the staging tip, re-run);
+  then `main` fast-forwards to it and pushes ONCE. Item commit messages state the root cause and
+  carry `Fixes #NN` + `round #RR`; the ledger's SHA column is filled at the push. Remove the
+  worktrees after the push.
 - **Features** (including bugs reclassified as capability gaps): `gh pr create` with
   `Closes #NN`; the PR body carries what/why, the ADR link, test evidence, and the play
   instructions (Hebrew utterances). **The round never merges a PR** — play-and-approve is the
   operator's gate.
-- If a later item's full-suite run breaks an earlier item's scenario, stop landing and
-  reconcile before any push — never push a red combination.
+- If the batch's full-suite run is red, bisect INSIDE the round (drop items from the staging tip
+  until green, then re-add) — never push a red combination; an item that cannot be made green on
+  the tip is recorded as skipped, with the failing file named.
 - **Update the ledger as each item resolves** — landed (SHA), PR'd (PR#), escalated, or
   skipped, appended to the round issue body (`gh issue edit --body-file`) with the item's
   evidence lines (Step 5 format). The ledger never lies about progress: an item is recorded
