@@ -21,7 +21,7 @@
     "lexicon": {
       "question": "Does it name Hebrew/English vocabulary, or map a noun to a shape?",
       "sharing": "undecided",
-      "rationale": "The vocabulary is identical across products even though the lowering to constraints is not. No directory carries this layer yet; it is declared so the split is nameable when one does."
+      "rationale": "The vocabulary is identical across products even though the lowering to constraints is not. src3d/lexicon carries it (#753, ADR-3D-188): a leaf importing NOTHING, so parser/ and engine/ may both read the same Hebrew noun gates without either depending on the other — the drift that had already bitten three times. Whether the layer is shared ACROSS products stays undecided."
     },
     "shell": {
       "question": "Neither of the above.",
@@ -192,6 +192,7 @@
     "src3d/engine": "engine",
     "src3d/i18n": "shell",
     "src3d/parser": "engine",
+    "src3d/lexicon": "lexicon",
     "src3d/render": "engine",
     "src3d/store": "engine",
 

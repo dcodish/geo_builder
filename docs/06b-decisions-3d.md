@@ -5804,3 +5804,47 @@ Locks: `issue-542.test.ts` (14) — the world-space geometry (dihedral at the st
 point on the seam radius, the supplement when that is what was stated, the line↔plane arc centred at the
 crossing, operand order irrelevant, `shared` moving the focus onto the edge, `toward` choosing the visible
 side, and the three refusals) plus the operator's four rows end-to-end with the gate off and on.
+
+## ADR-3D-188 — ONE NOUN VOCABULARY: the lexicon layer gets its first directory, and the AREA head takes its subject noun (#753)
+
+**Status:** Accepted (2026-08-30) · **Ladder:** stage 0 (parse) · **Round:** #826 · **Operator ruling:** 2026-08-19 — *"for #753 - option 1 - the recommended approach"*
+
+«שטח ABC» answered; **«שטח המשולש ABC» did not.** The point, length and volume heads all took their
+subject noun in #642's sweep and this one could not — the polygon vocabulary («משולש / מרובע / ריבוע /
+מלבן / מקבילית / טרפז / דלתון / מחומש / מצולע», with the adjectival and plural forms a book sentence
+uses) lived only in `parser/parse3.ts`, and `engine/queries.ts` **may not import from `parser/`**.
+
+**Root cause — a copy, not a missing regex.** The two files maintained private copies of the same Hebrew
+gates and had already drifted **three times**: #640 (the line noun in `parse3.ts`), #642 (the subject
+noun in `queries.ts`), and the ASCII-only `\w*` suffix gate found while fixing that one, which could not
+match «קואורדינטות». Copying the polygon list in would have been the fourth. Round #752 stopped and
+filed this instead, as #642's own audit comment directed: *"If the local fix cannot be made without the
+hoist, escalate instead of copying the gate a third time."*
+
+**Decision — the layer `BOUNDARIES.json` had already named, and left empty.** The registry declares a
+`lexicon` layer (*"Does it name Hebrew/English vocabulary, or map a noun to a shape?"*) with the note
+*"No directory carries this layer yet; it is declared so the split is nameable when one does."*
+`src3d/lexicon/nouns3.ts` is the directory that does:
+
+- **It imports nothing.** That is the entire property — a leaf both `parser/` and `engine/` may depend
+  on without either depending on the other, so the copy cannot come back.
+- **It knows only how words are SPELLED.** What a triangle *means* stays in the layer that builds one;
+  nothing here lowers a noun to geometry.
+- `parse3.ts`'s `DECL_WORDS_HE` is now **composed** from the leaf's parts (solids, polygons, qualifiers,
+  parts) in the order it listed them — the list is unchanged, only its home.
+- The AREA head reads `SHAPE_SUBJ` from the same leaf. The noun is **optional**, so «שטח ABC» is
+  byte-identical.
+- `BOUNDARIES.json` classifies the new directory (the map is TOTAL — an unclassified directory fails the
+  isolation test, which is the copy tripwire made mechanical) and its `lexicon` rationale is updated to
+  say the layer is now carried. Whether it is shared ACROSS products stays undecided, as ADR-W-003 left it.
+
+**«מישור» is in the gate too**, from the operator's 2026-08-29 session: «שטח DBB'D'» answered 22.63 while
+«שטח מישור DBB'D'» did not — and a student who has just typed «מישור DBB'D'» into the fact list writes
+exactly that after «שטח». It compounds with #813, where the phrasing that *would* route them to the
+answerable area query was the one this gap rejected.
+
+Locks: `issue-753.test.ts` (14) — the six answering forms including both Hebrew nouns and the English
+mirrors, «שטח מישור DBB'D'» answering identically to the bare run, the noun staying optional, a non-shape
+noun still refused, and the SEAM itself: the leaf importing nothing, the parser holding no private copy,
+the query lane reading the same leaf, and the polygon words being present in the composed declaration
+vocabulary.

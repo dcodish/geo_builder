@@ -13,6 +13,7 @@
  */
 
 import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
+import { SHAPE_SUBJ } from '../lexicon/nouns3';
 import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, decompStr, formatBranches, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr } from './dataView';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
@@ -154,7 +155,17 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
   }
 
   // AREA: «area ABC» / «שטח ABC» / «S_{ABC}» / «SABC»
-  const areaM = s.match(/^(?:שטח|area|the\s+area\s+of)\s+([A-Z0-9'\s]+)$/i) ?? s.match(new RegExp(`^S_?\\{?\\s*((?:${PT}){3,})\\s*\\}?$`));
+  /**
+   * #753 (ADR-3D-188) — the AREA head takes its SUBJECT NOUN, like its three siblings.
+   *
+   * «שטח המשולש ABC», «שטח המרובע ABCD», «שטח מישור DBB'D'» were `notUnderstood` while «שטח ABC»
+   * answered. The point, length and volume heads all took their noun in #642's sweep; this one could
+   * not, because the polygon vocabulary lived only in `parse3.ts` and `engine/` may not import from
+   * `parser/`. It now reads the SAME words from the lexicon leaf, so the two lanes cannot drift a
+   * fourth time. «מישור» is in the gate because a student who has just typed «מישור DBB'D'» into the
+   * fact list writes exactly that after «שטח» (operator session, 2026-08-29).
+   */
+  const areaM = s.match(new RegExp(String.raw`^(?:שטח|area|the\s+area\s+of)\s+` + SHAPE_SUBJ + String.raw`([A-Z0-9'\s]+)$`, 'i')) ?? s.match(new RegExp(`^S_?\\{?\\s*((?:${PT}){3,})\\s*\\}?$`));
   if (areaM) {
     const ids = areaM[1].match(new RegExp(PT, 'g')) ?? [];
     if (ids.length >= 3) return { kind: 'area', ids };

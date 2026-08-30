@@ -21,6 +21,7 @@ import { readOperand, readRelationSides } from './operandToken';
 import { stripFormatControls } from '../../shell/bidi';
 import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
+import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX } from '../lexicon/nouns3';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 import { riderPairsT } from '../engine/onSegmentRatio';
 
@@ -306,25 +307,9 @@ export const CONSTRUCT_NOUNS =
  * the optional definite article and the prosthetic prefixes — because a spelling this list misses is
  * now an ESCALATION rather than a silent drop, which is the safe direction but still a lost parse.
  */
-const HE_PREFIX = String.raw`(?:[ובלכשמה]{1,3})?`;
-const DECL_WORDS_HE = [
-  // solids
-  'מנסרה', 'מנסרות', 'פירמיד[הות]+', 'תיב[הות]+', 'קוביי?[הות]+', 'מקבילונ?ים?', 'מקבילון',
-  // final-form trap (`src3d/CLAUDE.md`): «ארבעון» ends in FINAL nun, so a medial-נ stem can never
-  // match it — the first draft of this very list got it wrong and the tetra corpus caught it
-  'טטר[אה]?ה?דר(?:ו[ןנ]|ים)?', 'ארבעו[ןנ](?:ים)?',
-  // base / flat-shape nouns (the `statedQuadBase` + polygon vocabulary)
-  // the adjectival forms a book sentence uses for the same shape («תיבה מלבנית», «מנסרה משולשת») are
-  // part of the SAME vocabulary — a gate that knows the noun but not its adjective fails on real input
-  'משולש(?:ת|ים|ות)?', 'מרובע(?:ת|ים|ות)?', 'ריבוע(?:י[תםי]?|ים)?', 'מלבני(?:ת|ים|ות)?', 'מלבנים', 'מלבן',
-  'מעויי?נ(?:ת|ים|ות)?', 'מעויי?ן',
-  'מקבילי(?:ת|ות)', 'טרפז(?:ים|ות)?', 'דלתונ?ים?', 'דלתון', 'מחומש(?:ים)?', 'משושה?', 'מצולע(?:ים)?',
-  // qualifiers: rightness, the equal-sides family, the edge family
-  'ישר(?:ה|ים|ות)?', 'זו?וית', 'זו?ויות', 'שוו?ה', 'שוו[יו]ם', 'צלעות', 'שוקיים', 'מקצועות(?:יו|יה)?',
-  // the base clause and the solid's own parts
-  'שבסיס[הו]', 'בסיס(?:ה|ו|ים)?', 'קודקוד(?:ה|ו|ים)?', 'פאה', 'פאות',
-].join('|');
-const DECL_WORDS_EN = String.raw`prisms?|pyramids?|box(?:es)?|cuboids?|cubes?|parallelepipeds?|tetrahedr(?:on|a)|triangles?|triangular|quadrilaterals?|quads?|squares?|rectangles?|rhombus(?:es)?|parallelograms?|trapez\w*|kites?|pentagons?|hexagons?|polygons?|right|angled|isosceles|equilateral|regular|bases?|edges?|vert(?:ex|ices)|faces?`;
+// #753 (ADR-3D-188): the noun vocabulary moved to `src3d/lexicon/nouns3.ts` — a leaf that imports
+// nothing, so `engine/queries.ts` can read the SAME words without importing from `parser/`. The gates
+// had already drifted three times as private copies; the list itself is unchanged, only its home.
 const DECL_VOCAB = new RegExp(`(?:${HE_PREFIX}(?:${DECL_WORDS_HE}))|\\b(?:${DECL_WORDS_EN})\\b`, 'gi');
 
 /** Tokens a declaration sentence may legitimately wrap around its nouns without stating geometry —
