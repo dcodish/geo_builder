@@ -103,7 +103,7 @@ export type Claim3 =
   // #375: a POINT-RUN plane stated ⟂ a named LINE (see planeLinePerps)
   | { type: 'plane-line-perp'; ids: Id[]; line: string }
   // S2 (#378): ∥/⟂/angle where one side is a NAMED LINE — the claim twin of lineRels
-  | { type: 'line-rel'; rel: 'perp' | 'parallel' | 'angle'; deg?: number; label?: string; op: Operand3; line: string }
+  | { type: 'line-rel'; rel: 'perp' | 'parallel' | 'angle' | 'contained'; deg?: number; label?: string; op: Operand3; line: string }
   // S4 (#378): the MUTUAL POSITION of two located objects, over the general operand pair — the
   // claim twin of `mutualRels`. (`lines-rel` above is the frozen V7-T3 segment-pair spelling; both
   // verdicts come from the one `mutualPosition` classifier, so they cannot disagree.)
@@ -120,7 +120,7 @@ export type Claim3 =
   | { type: 'mag-val'; e: VecExpr; value: number };
 
 /** S3 (#378) — the relations a PLANE takes part in. `coincident` is the plane twin of S4's. */
-export type PlaneRel3 = 'perp' | 'parallel' | 'angle' | 'coincident';
+export type PlaneRel3 = 'perp' | 'parallel' | 'angle' | 'coincident' | 'contained';
 
 /**
  * S4 (#378) — the four mutually exclusive positions two located directions can occupy in R³.
@@ -779,7 +779,7 @@ export type Command3 =
   // residual that rotates the figure; an absolute op (line/plane-named) makes it a parameter
   // root-find when a symbolic direction is present, else a pure claim. `statedAsPlane` records the
   // ADR-3D-100 noun slip (the student called the line a plane) for the build-notice correction.
-  | { type: 'line-rel'; rel: 'perp' | 'parallel' | 'angle'; deg?: number; label?: string; op: Operand3; line: string; statedAsPlane?: true }
+  | { type: 'line-rel'; rel: 'perp' | 'parallel' | 'angle' | 'contained'; deg?: number; label?: string; op: Operand3; line: string; statedAsPlane?: true }
   // S4 (#378): the MUTUAL POSITION of two located objects — «AB ו-CD מצטלבים» (skew), «נחתכים»
   // (intersecting), «מקבילים» (parallel), «מתלכדים» (coincident) over the general operand pair.
   // Lowered to a recorded claim ALWAYS (the final arbiter) plus, per the frame classifier:
@@ -1078,7 +1078,7 @@ export interface Construction3 {
    *  by the frame classifier over `op` (`isAbsolute`, engine/operands.ts): gauge op → a pivot residual
    *  (the planeLinePerps stage); absolute op → a parameter root-find when a direction carries the
    *  figure parameter, else verify-only (the recorded claim is always the final arbiter). */
-  lineRels: { rel: 'perp' | 'parallel' | 'angle'; deg?: number; op: Operand3; line: string; statedAsPlane?: true }[];
+  lineRels: { rel: 'perp' | 'parallel' | 'angle' | 'contained'; deg?: number; op: Operand3; line: string; statedAsPlane?: true }[];
 }
 
 export const emptyConstruction3 = (): Construction3 => ({

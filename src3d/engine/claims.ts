@@ -8,7 +8,7 @@
  */
 
 import { lineAtParam, planeAtParam, resolve3, type Resolved3 } from './evaluate';
-import { lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
+import { containmentDeviation, lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { atomVec, evalExpr } from './vecExpr';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { cross3, dot3, runNormal, norm3, sub3, v3, type Vec3 } from './vec3';
@@ -120,7 +120,7 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       if (!ln) return false;
       const geom = resolveOperand(claim.op, c, { lines: resolved.lines, planes: resolved.planes })((id) => pos.get(id) ?? null);
       if (!geom) return false;
-      const dev = lineRelDeviation(claim.rel, claim.deg, geom, ln.dir);
+      const dev = lineRelDeviation(claim.rel, claim.deg, geom, ln, figureExtent(pos));
       return dev !== null && dev <= 1e-4;
     }
     case 'mutual-rel': {
@@ -141,7 +141,10 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       const dev =
         claim.rel === 'coincident'
           ? planeCoincidenceDeviation(ga, gb, figureExtent(pos))
-          : relDeviation(claim.rel, claim.deg, ga, gb);
+          : // #614: containment is direction AND position — one shared predicate with the panel
+            claim.rel === 'contained'
+            ? containmentDeviation(ga, gb, figureExtent(pos))
+            : relDeviation(claim.rel, claim.deg, ga, gb);
       return dev !== null && dev <= 1e-4;
     }
     case 'distance-rel': {

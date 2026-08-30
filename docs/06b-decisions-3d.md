@@ -5804,3 +5804,58 @@ Locks: `issue-542.test.ts` (14) — the world-space geometry (dihedral at the st
 point on the seam radius, the supplement when that is what was stated, the line↔plane arc centred at the
 crossing, operand order irrelevant, `shared` moving the focus onto the edge, `toward` choosing the visible
 side, and the three refusals) plus the operator's four rows end-to-end with the gate off and on.
+
+## ADR-3D-189 — CONTAINMENT HAS AN INPUT FORM: the tool can hear the phrase it prints (#614, #532 cap. 2)
+
+**Status:** Accepted (2026-08-30) · **Ladder:** stage 0 (parse) + stage 3 (verify) + stage 5 (drive) · **Round:** #826
+
+[ADR-3D-154](#adr-3d-154) added the panel's «מוכל במישור» row — the right call, because reporting a
+contained segment as merely *parallel* is a false statement. The consequence was an asymmetry the
+operator hit within minutes of the row existing: a student reads «CD מוכל במישור ABC» in ארגון נתונים,
+types that same sentence on another figure, and is refused. [ADR-3D-105](#adr-3d-105) had left `contains`
+planned and unbuilt, and the whole relation — both languages, both frames — was absent from the grammar.
+
+**Decision — `contained` is a first-class relation, sharing ONE definition with the panel.**
+
+1. **One predicate.** The panel's containment test was *inlined* at `dataView.ts` — parallel deviation
+   combined with a zero gap. It is now `containmentDeviation` in `operands.ts`, and the panel asks it.
+   That is the point of the issue rather than a tidy-up: the two lanes cannot drift about what «מוכל»
+   means (the `memberHolds3` / `angleBetweenOperands` precedent).
+2. **`PlaneRel3` and `lineRels` gain `contained`** — the named-line column belongs to S2 and
+   `planeRelGiven` defers it, so a member added to only one lane would silently drop half the forms.
+3. **The residual is one more `rel`, not a new mechanism.** The `plane-rel` drive builder already
+   emitted direction **and** offset for `coincident`; containment is that shape one operand-kind down:
+   a mixed line×plane pair reads its direction in one component plus one offset row (count 2). And a
+   PLANAR side contained in a plane **is** coincidence — same statement, so it reuses that residual
+   rather than growing a second spelling that could drift from it.
+4. **Both frames, both languages, together** (the `CROSS_HE_VERB`/`CROSS_HE_NOUN` precedent — reach for
+   one and the other silently drops): verb-headed «מוכל / נמצא ב / מונח על», `is contained in`,
+   `lies in/on`; and the container-headed «המישור P מכיל את ℓ», `plane P contains ℓ`, which is
+   *directed* and so cannot ride the symmetric splitter table. Both reach the identical command.
+5. **Operands:** a segment/pair, a named line, and a point-run — the last being **#532 capability 2**
+   («A'B'C'D' מונח על מישור π2»), the same relation rather than a rule of its own. A container that is
+   not planar states nothing and is refused instead of being given an invented meaning.
+
+**A pre-existing conflation this uncovered, and had to fix to work.** `solvePivot`'s `invariantOnly`
+branch returned `[]` when there were no dims to flex, on the stated intent that the condition would be
+*"refused downstream"*. It is not: `store3` reads `pivot.solutions === 0` as unsatisfiable and blames the
+newest pin. So a similarity-invariant relation **true by construction** on a shape with no free dims —
+«AB מוכל במישור ABCD» on a cube — came back `givens-contradict`. Two states shared one empty answer:
+**the #698 class, in the solver.** With nothing to flex the question is decidable immediately, so the
+residual is evaluated at the identity — if it already holds, the identity IS the solution; if not, the
+relation stays refused exactly as before.
+
+**Not fixed here:** «AB מקביל למישור A'B'C'D'» on the same figure still fails, through a *different* path
+(`no-solution` on a point, not this branch) — measured before and after, and untouched by this change.
+Filed separately rather than absorbed.
+
+**Deliberately out of scope:** the noun-prefixed operand «משולש ACS מונח על מישור π2» needs the shape-noun
+gate that [ADR-3D-188](#adr-3d-188) (#753) hoisted into `src3d/lexicon/` in this same round; the bare-run
+spelling that #532 measured works today, and the noun follows once both are on `main`.
+
+Locks: `issue-614.test.ts` (19) — seven spellings across both frames and languages all lowering to one
+command, the two frames producing identical commands, the named-line and polygon-run operands, a
+non-planar container refused, M1 both ways (a true containment accepted on a no-free-dims figure, a false
+one refused `claim-refuted`), **the round trip** (a figure whose panel prints «BE מוכל במישור ABCD»
+accepting that exact sentence), the shared predicate being order-independent and rejecting a parallel-but-
+offset line, planar containment equalling coincidence, and the ∥ sibling keeping its cell.

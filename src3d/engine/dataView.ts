@@ -18,7 +18,7 @@ import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
 import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { figureSymbolsOf } from './types';
-import { angleBetweenOperands, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
+import { angleBetweenOperands, containmentDeviation, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import type { Construction3, Id, MutualRel3, Operand3, Positions3 } from './types';
 
 /** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
@@ -820,9 +820,11 @@ export function dataView(c: Construction3, seed: number): DataPanel {
           // a line with |cos(dir, normal)| = 0 AND no offset LIES IN the plane — reporting that as
           // plain 'parallel' would be a false statement, so it gets its own row (which also delivers
           // the `contains` cell ADR-3D-105 left planned). Operator-decided at arming.
+          // #614: the SAME predicate the statement lane verifies and drives with, so the row the panel
+          // prints and the sentence the student may type can never mean different things.
           const contained = geoms.every(([a, b], k) => {
-            const gap = distanceBetween(a!, b!);
-            return gap !== null && Math.abs(gap) < TOL * Math.max(1, figureExtent(positions[k]));
+            const dev = containmentDeviation(a!, b!, figureExtent(positions[k]));
+            return dev !== null && dev < TOL;
           });
           mutual.push({ a: lin.label, b: pln.label, rel: contained ? 'contained' : 'parallel', mixed: true });
         } else if (devs.every((d) => d.perp! < TOL)) {
