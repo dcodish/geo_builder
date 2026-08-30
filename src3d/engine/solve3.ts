@@ -17,7 +17,7 @@
  */
 
 import { pinSymsOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin } from './types';
-import { distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
+import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, cross3, dist3, dot3, runNormal, norm3, scale3, sub3, v3, type Vec3 } from './vec3';
 
@@ -931,6 +931,28 @@ export function solvePivot(
   // exactly as a coordinate sign given does, so it must widen the pool the same way. Enforced in the
   // same filter; a statement collected in one place and honoured in another is honoured by luck.
   const collectAll = c.signGivens.length > 0 || c.componentSigns.length > 0 || nPinSym > 0;
+  // #818: the stated SIGNS, as conditions over a candidate — a coordinate sign given on a point and a
+  // sign on a named free component (#814) are one kind here, exactly as `applySolutions`' filter treats
+  // them. A `partial` point is absolute and sign-honoured at sample time (ADR-3D-094): not a condition.
+  const signConds: { positive: boolean; value: (at: (id: Id) => Vec3 | undefined) => number | undefined }[] = [
+    ...c.signGivens
+      .filter((g) => c.points.get(g.id)?.kind !== 'partial')
+      .map((g) => ({ positive: g.positive, value: (at: (id: Id) => Vec3 | undefined) => at(g.id)?.[g.axis] })),
+    ...c.componentSigns.map((g) => ({ positive: g.positive, value: (at: (id: Id) => Vec3 | undefined) => componentValue(c, g.target, g.axis, at) })),
+  ];
+  /** A candidate's FINAL positions (gauge applied to gauge points; absolute points verbatim). */
+  const atFor = (mirror: boolean, x: number[]): ((id: Id) => Vec3 | undefined) => {
+    const g = { ...unpack(x), mirror };
+    const override = coupled ? new Map(coupled.defs.map((d, i) => [d, x[7 + nDims + i]])) : undefined;
+    const pos = evalCanonical(x.slice(7, 7 + nDims), override);
+    return (id) => {
+      const p = pos.get(id);
+      if (!p) return undefined;
+      const def = c.points.get(id);
+      const absolute = def?.kind === 'coord' || (def?.kind === 'on-plane' && !c.pointPlanes.has(def.plane));
+      return absolute ? p : applyGauge(p, g);
+    };
+  };
   for (const mirror of [false, true]) {
     const fPrimary = residualsFor(mirror);
     if (scaleFree) {
@@ -1082,6 +1104,38 @@ export function solvePivot(
           // still collected by the probe's own release, so no root is lost to this exit.)
           if (explore(0.75)) continue;
           for (const d of [-3, -1.5, -0.75, 1.5, 3]) explore(d);
+        }
+      }
+    }
+    // #818 (ADR-3D-179): SIGN-AXIS CONTINUATION — the #797 walk, for a stated coordinate sign. The
+    // cold starts spread the GAUGE (eight rotations) and the symbol walk spreads the pin symbols; the
+    // shape DIMS start at the seed's one sample in every start, so a branch that differs only in a dim
+    // (D = (3, ±4, 0): the parallelogram's angle, acute or obtuse) is reached at some seeds and not at
+    // others — at seed 1017 all nine solutions carried D.y = +4 against «שיעור ה-y של D הוא שלילי»,
+    // and the sign filter fell through to a drawing that contradicted the given. Failure path only:
+    // when no solution of this mirror honours every stated sign, restart from each found one with the
+    // violated coordinate HARD-pinned at its negation while gauge and dims adapt, then release — the
+    // two-step walk above, along the axis the student named instead of a symbol's.
+    if (collectAll && signConds.length > 0) {
+      const holds = (x: number[]): boolean => {
+        const at = atFor(mirror, x);
+        return signConds.every((cd) => {
+          const v = cd.value(at);
+          return v === undefined ? true : cd.positive ? v > 1e-9 : v < -1e-9;
+        });
+      };
+      const mine = results.filter((r) => r.mirror === mirror);
+      if (mine.length > 0 && !mine.some((r) => holds(r.x))) {
+        for (const sol of mine.slice(0, 4)) {
+          const at = atFor(mirror, sol.x);
+          for (const cd of signConds) {
+            const v = cd.value(at);
+            if (v === undefined || (cd.positive ? v > 1e-9 : v < -1e-9)) continue; // this sign already holds
+            const target = -v;
+            const fPin = (y: number[]) => [...fPrimary(y), 1e3 * ((cd.value(atFor(mirror, y)) ?? 0) - target)];
+            const rp = leastSquares(fPin, [...sol.x], 40);
+            collect(leastSquares(fFor(symAnchorTargets), rp.x));
+          }
         }
       }
     }

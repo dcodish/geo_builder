@@ -15,7 +15,7 @@
  * solved with the gauge frozen is decided by `isAbsolute` over its operands, never by its pin kind.
  */
 
-import type { Construction3, Id, MutualRel3, Operand3 } from './types';
+import type { ComponentTarget, Construction3, Id, MutualRel3, Operand3 } from './types';
 import type { ResolvedLine, ResolvedPlane } from './evaluate';
 import { cross3, dot3, runNormal, norm3, sub3, v3, type Vec3 } from './vec3';
 
@@ -643,3 +643,32 @@ export function mutualDeviation(rel: ClosedMutualRel, s1: MutualSide, s2: Mutual
   if (rel === 'coincident') return Math.hypot(parts.sin, parts.anchorOff);
   return parts.coplanar; // intersecting: coplanarity is the equality; ¬parallel is the open gate
 }
+
+/**
+ * #814 (ADR-3D-175) — the value of ONE component of an injected object, for the three target kinds a
+ * letter can name. A named vector is a point pair (`c.vectors`), so the pair and vector cases are the
+ * same computation — written once here so the sign check below is not three enumerated cases (and so a
+ * fourth injection lane cannot answer it differently). `undefined` = not placeable yet.
+ */
+export function componentValue(
+  c: Construction3,
+  target: ComponentTarget,
+  axis: 'x' | 'y' | 'z',
+  at: (id: Id) => Vec3 | undefined,
+): number | undefined {
+  if (target.kind === 'point') return at(target.id)?.[axis];
+  const seg = target.kind === 'pair' ? { from: target.a, to: target.b } : c.vectors.get(target.name);
+  if (!seg) return undefined;
+  const from = at(seg.from);
+  const to = at(seg.to);
+  return from && to ? to[axis] - from[axis] : undefined;
+}
+
+/** #814 — do the stated component signs hold under a given placement? Shared by the pivot's solution
+ *  filter and the drive's rollback check, so one statement cannot be enforced in one and not the other. */
+export const componentSignsHold = (c: Construction3, at: (id: Id) => Vec3 | undefined): boolean =>
+  c.componentSigns.every((g) => {
+    const v = componentValue(c, g.target, g.axis, at);
+    return v === undefined ? false : g.positive ? v > 1e-9 : v < -1e-9;
+  });
+

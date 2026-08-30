@@ -64,14 +64,10 @@ describe('#814 — the operator sequence', () => {
   it('«p שלילי» selects the other root — the sign SELECTS, it never invents', () => {
     [...FIGURE, 'p שלילי'].forEach(submit);
     expectAllOk();
-    // Asserted on the DRAWN figure rather than on the panel string: the panel prints a value only when
-    // it is identical across its three samples, and the negative branch is not found at every seed
-    // (#818). That gap is not this fix's — the established coordinate sign given
-    // «שיעור ה-y של D הוא שלילי» is violated at exactly the same seed on this figure, so
-    // `componentSigns` is behaving as its sibling does. The panel showing «?» there is the honest
-    // response to that, not a second defect.
+    // #818 (ADR-3D-179) reached the negative branch at every seed, so this is asserted on the PANEL
+    // again — a value printed is a value identical across the panel's samples.
+    expect(panel()).toEqual(['A(0, 0, 0)', 'B(0, 5, 0)', 'C(3, 1, 0)', 'D(3, -4, 0)', 'S(0, 0, 6)', 'M(3/2, 1/2, 0)']);
     expect(derived().positions.get('D')!.y).toBeCloseTo(-4, 5);
-    expect(derived().positions.get('C')!.y).toBeCloseTo(1, 5);
   });
 
   it('the selection holds at EVERY seed — a branch chosen by seed luck is not knowledge', () => {

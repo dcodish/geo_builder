@@ -5386,3 +5386,65 @@ Locks: `src3d/__tests__/issue-815.test.ts` (the operator's order interactively a
 equation-alone step with k varying by seed and «k = ?», the apply gate + namespace, entry-order
 equivalence to 3 decimals, the plane cell, the rider boundary, the pinning-given boundary) and
 `fixtures3/prism-eq-first-815.geo3.json` (the equation-first sequence through the real load path).
+
+## ADR-3D-179 — A STATED SIGN IS REACHED, NOT HOPED FOR: sign-axis continuation in the pivot (#818; extends ADR-3D-168 Am. 1)
+
+**2026-08-30 · round #822.** The operator's pyramid (2026-08-29, playing #814): «פירמידה SABCD שבסיסה
+מקבילית», SA the height, `A(0,0,0)`, `B(0,5,0)`, `S(0,0,6)`, `D(3,p,0)`, `|u| = |v|`, then «שיעור ה-y של D
+הוא שלילי». `|AD| = |AB| = 5` forces `p = ±4` and the given selects −4. Measured D.y by seed: 4 → −4,
+**1017 → +4**, 2031 → −4. The panel fell back to «D(3, ?, 0)» (honest — the value was not identical
+across its samples), and a configuration cycle could land the student on a drawing that contradicts
+their own given.
+
+**Class.** *A discrete branch that differs from the found one only in a SHAPE DIM is reached at some
+seeds and not others, because the multi-start spreads everything except the dims.* The pivot's cold
+starts spread the gauge (eight seed-rotated rotations, ADR-3D-007) and, since #797, walk the pin-symbol
+axis (ADR-3D-168 Am. 1); every start takes the shape dims at the seed's ONE sample. The two D positions
+are the parallelogram's angle, acute or obtuse — a dim — so whether the pool carries the −4 branch
+depends on which basin the seed's sampled angle starts nearest. At seed 1017 the pool held nine
+solutions, every one D.y = +4. `satisfiesSigns` then found nothing admissible and **fell through to
+the unfiltered pool** (`pool = satisfying.length > 0 ? satisfying : solutions`), drawing the opposite
+sign. The figure was measured, not guessed: the pool was dumped per seed before any code was written.
+
+**What the honesty half actually looked like (the plan's half 2, measured).** The fallback was NOT
+silent at the store: `derive3` at seed 1017 reported **`sign-unsatisfiable: D`** — the verifier
+(`store3.ts`, the `sign-given` branch) already names the statement on final positions. What was wrong
+is that the refusal was FALSE — a satisfiable given refused because the solver did not look where the
+branch was — and that the store's seed never derived there, so the operator saw «?» and no message.
+The fallback drawing under a named refusal is the store's keep-visible convention and is kept; there
+was nothing silent to remove. Recorded as a deviation from the plan's wording, not from its intent.
+
+**Mechanism (the fix) — `solve3.ts`, the #797 walk along the axis the student named.** After the cold
+starts and the symbol continuation, per mirror: the stated signs are read as CONDITIONS over a candidate
+(`signConds` — a coordinate sign given on a point and a sign on a named free component (#814) are one
+kind here, exactly as `applySolutions`' filter treats them; a `partial` point is absolute and
+sign-honoured at sample time, ADR-3D-094, so it is not a condition). When **no** solution of that mirror
+honours every condition, the pivot restarts from each found solution (up to four distinct bases) with
+the violated coordinate HARD-pinned at its negation (`1e3 · (value(y) + v)`) while gauge and dims adapt
+— 40 iterations, the pinned stage only steers into the basin — then RELEASES anchored at the seed's
+targets and collects the result through the ordinary accept/dedup/park path. The value is read from the
+candidate's FINAL positions (`atFor`: gauge applied to gauge points, absolute points verbatim — the
+same rule `residualsFor` uses for pins). **Failure path only:** a pool that already carries the stated
+sign never enters, so every other figure is bit-identical. `componentValue` / `componentSignsHold`
+move from `evaluate.ts` to `operands.ts` (re-exported), since solve3 may never import evaluate.
+
+**New capability:** a stated coordinate sign selects its branch at EVERY seed — the #814 lock that had
+to be loosened to the drawn position («p שלילי») is tightened back to the panel string `D(3, -4, 0)`.
+«show another configuration» walks only sign-honouring drawings.
+
+**Sibling audit.** *3-D:* the pin-symbol sign (`paramSigns`) already has its own walk (ADR-3D-168
+Am. 1) and is untouched; the plane-side given (above/below) is a requirement, seed-searched, not a
+pivot branch — not this class. A genuinely unsatisfiable sign («D.z חיובי» on a base pinned to z = 0)
+still refuses `sign-unsatisfiable`, locked — the walk finds branches, it never invents them. *2-D
+(`src/`):* the sampler/solver has no sign-given lane on coordinates (`grep signGiven src/` → none);
+its discrete branches are the `branch index` cycled by ADR-052. Not present. *Complex:* branch
+selection is the enumerated solution set (#694). Not present.
+
+**Perf:** the walk fires only on the failure path; on the operator's figure at seed 1017 the pool grows
+from 9 to 5 admissible (the filter now has something to keep) and the derive stays ~1 s. `issue-814`'s
+19 tests: 29.8 s, unchanged in shape.
+
+Locks: `src3d/__tests__/issue-818.test.ts` (both sign forms at a ten-seed battery including the
+operator's 4 / 1017 / 2031, the panel string, the positive sign untouched, the unsatisfiable refusal,
+six resamples all honouring the sign), `issue-814.test.ts` tightened back to the panel, and
+`fixtures3/pyramid-sign-branch-818.geo3.json` saved AT seed 1017 through the real load path.
