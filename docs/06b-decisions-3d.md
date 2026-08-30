@@ -5804,3 +5804,52 @@ Locks: `issue-542.test.ts` (14) — the world-space geometry (dihedral at the st
 point on the seam radius, the supplement when that is what was stated, the line↔plane arc centred at the
 crossing, operand order irrelevant, `shared` moving the focus onto the edge, `toward` choosing the visible
 side, and the three refusals) plus the operator's four rows end-to-end with the gate off and on.
+
+## ADR-3D-186 — THE DIMS ARE SPREAD TOO, ON THE FAILURE PATH: satisfiability stops depending on entry order (#816)
+
+**Status:** Accepted (2026-08-30) · **Ladder:** stage 5 (pivot solve) · **Round:** #826
+
+The operator's exam pyramid refused a coordinate it could satisfy. With «|u| = |v|» typed **before** the
+injections, `S(0,0,6)` came back `injection-unsatisfiable`; with the same line typed **after**, the
+identical fact set built fully determined. Measured at `12673b7`, the relation-first order **succeeded at
+seeds 2, 4, 5, 7, 11, 17, 101, 1013, 2027 and failed at 0, 1, 3** — 9 of 12.
+
+**Root cause — search coverage, not the gate.** `store3.ts:359` reports `resolved.pivot.solutions === 0`
+honestly; the pivot genuinely finds nothing. A structural defect cannot succeed at three seeds in four.
+The gap is the one this file already names, in the comment shipped with #818: the cold starts spread the
+**gauge** (eight seed-rotated starts) and the #797 walk spreads the **pin symbols**, but *"the shape DIMS
+start at the seed's one sample in every start"*. When the solution needs a different dims basin, no start
+reaches it, and a SEARCH failure is presented to the student as an impossibility — with a message about
+coordinates that are, in fact, satisfiable.
+
+**Decision — apply the dims spread this file already has, where it was missing.** `dimStarts` in the
+`invariantOnly` branch (`solve3.ts:845`) has used the same three variants since it was written; it simply
+never reached the gauge-solving path. So the fix is not a new mechanism:
+
+- the same variants, as **EXTRA** starts crossed with the existing rotations;
+- **only when this mirror found nothing.** The success path is bit-identical and costs nothing — verified
+  by measuring the pristine build: a figure that already solves prints exactly what it printed before;
+- the existing eight starts are **never moved**. The #518 lesson is recorded twice in this file
+  (`:878`, `:901`) — shifting the start set costs hard figures real solution branches. Widening a path
+  that was about to refuse cannot take a branch away.
+
+**Measured alternative, rejected.** Widening the pool *unconditionally* in `collectAll` — the coherent-
+sounding "an incomplete pool understates the admissible set" argument (#797's) — was implemented and
+measured: it changed **none** of the panel's cells on this figure. It would have cost every pooled solve
+three extra start sweeps to buy nothing, which is the #518 trade in the wrong direction. Reverted.
+
+**What the fix achieves, stated as the invariant.** The two orders are now byte-identical in every panel
+cell, at every seed, bare and with either sign — which is docs/17 **M2 law (i)** itself, so the lock
+compares the ORDERS rather than pinning values (pinning numbers would pass while hiding a difference in
+the cells that read «?»).
+
+**What it deliberately does NOT fix.** Bare (no sign given), the panel prints `D(3, ?, 0)` at seeds 0/1/3
+and `D(3, 4, 0)` at seed 17 — **identically in both orders, and identically before this fix.** A
+two-branch quantity reading as knowledge at some seeds is the ADR-052 class and lives in `dataView`'s
+seed-invariance judgement, not in the pivot: filed as **#827** rather than absorbed here.
+
+Locks: `issue-816.test.ts` (26) — the three seeds that refused now build, the 12-seed sweep clean in both
+orders, the two orders printing the SAME panel at every seed bare and with either sign, «p חיובי»/«p שלילי»
+selecting ±4 at every seed in the relation-first order (proof the extra starts found real solutions rather
+than numerical debris), and a genuinely unsatisfiable injection (`S(0,3,6)`, contradicting `AS ⟂ AB`)
+still refused — widening only ever ADDS starts, so a system with no solution still finds none.
