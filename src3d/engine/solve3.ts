@@ -254,6 +254,14 @@ export function solvePivot(
    *  relates it to a figure-derived plane needs it verbatim; passing it in keeps solve3 free of any
    *  import from evaluate (which imports solve3). */
   lines?: Map<string, { anchor: Vec3; dir: Vec3 }>,
+  /**
+   * #803 (ADR-3D-180) — the TRANSLATION-SLIDE probe. Instead of solving, take an already-exact
+   * solution `x` (under THIS call's full residual set) and try to move its translation by a seeded
+   * step along a seeded direction while every residual stays exact — the #518 park / #797 walk
+   * pattern on the gauge's translation. Returns the slid solution when the placement had that
+   * freedom, `[]` when translation is pinned (the walk snaps back) or `x` is not exact.
+   */
+  probe?: { x: number[]; mirror: boolean; flip?: boolean },
 ): PivotResult[] {
   const pointPins = c.pins;
   const vecPins = c.vectorPins;
@@ -953,6 +961,42 @@ export function solvePivot(
       return absolute ? p : applyGauge(p, g);
     };
   };
+  if (probe) {
+    // #803 (ADR-3D-180): a driven placement's LEFTOVER translation freedom (the slide along a line a
+    // vertex was put on, the slide within a plane) is sampled by walking the exact solution — hard-pin
+    // the translation's PROJECTION on a seeded direction at a seeded step (40 iterations, the pinned
+    // stage only steers), release on the primary residuals, keep only if still exact AND actually
+    // moved. Pinned translation cannot satisfy the projection and snaps back on release (|proj| ≈ 0);
+    // free translation keeps the displacement. One projection residual, so a 1-D slide with any
+    // component along the direction is found (a direction orthogonal to it is measure-zero).
+    if (probe.x.length !== 7 + nDims + nSym + nPinSym) return [];
+    const fP = residualsFor(probe.mirror);
+    const pErr = (x: number[]): number => fP(x).reduce((a, v) => a + v * v, 0);
+    if (degenerate(probe.x) || pErr(probe.x) >= ACCEPT) return [];
+    const h = (k: number) => (Math.abs(Math.sin((seed + 1) * 12.9898 + k * 78.233)) * 43758.5453) % 1;
+    const raw = v3(h(1) - 0.5, h(2) - 0.5, h(3) - 0.5);
+    const dir = scale3(norm3(raw) < 1e-6 ? v3(1, 0, 0) : scale3(raw, 1 / norm3(raw)), probe.flip ? -1 : 1);
+    const step = Math.exp(probe.x[6]) * (0.4 + 0.8 * h(4)); // in figure units, so the move is visible at any scale
+    const t0 = v3(probe.x[0], probe.x[1], probe.x[2]);
+    // The slide is a PLACEMENT question: only translation + rotation move (the Stage-A shape); scale,
+    // dims and symbols stay frozen at the solution's values. Opening them invited the explode basin —
+    // extent-normalised residuals (a coordinate-plane «zero», a run membership) vanish "for free" as the
+    // figure grows, so the walk drove the scale to 1e6 while every primary residual stayed exact.
+    const rest = probe.x.slice(6);
+    const full = (y6: number[]): number[] => [...y6.slice(0, 6), ...rest];
+    const proj = (y6: number[]): number => dot3(sub3(v3(y6[0], y6[1], y6[2]), t0), dir);
+    const fP6 = (y6: number[]) => fP(full(y6));
+    const fPin = (y6: number[]) => [...fP6(y6), 1e3 * (proj(y6) - step)];
+    const rp = leastSquares(fPin, probe.x.slice(0, 6), 40);
+    const rr = leastSquares(fP6, rp.x);
+    const xr = full(rr.x);
+    if (degenerate(xr) || pErr(xr) >= ACCEPT || Math.abs(proj(rr.x)) < 1e-6 * Math.max(1, step)) return [];
+    const g = { ...unpack(xr), mirror: probe.mirror };
+    const dims = xr.slice(7, 7 + nDims);
+    const symbols = coupled ? xr.slice(7 + nDims, 7 + nDims + nSym) : undefined;
+    const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((sym, i) => [sym, xr[7 + nDims + nSym + i]])) : undefined;
+    return [{ transform: (q) => applyGauge(q, g), mirror: probe.mirror, dims, symbols, pinSymbols, err: pErr(xr), x: [...xr] }];
+  }
   for (const mirror of [false, true]) {
     const fPrimary = residualsFor(mirror);
     if (scaleFree) {

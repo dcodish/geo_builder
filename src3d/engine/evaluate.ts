@@ -781,6 +781,13 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     for (const p of [...c.pins, ...c.vectorPins, ...c.pairPins])
       pinCount += (p.x !== null ? 1 : 0) + (p.y !== null ? 1 : 0) + (p.z !== null ? 1 : 0);
     dims += pinSymsOf(c).length;
+    // #803 (ADR-3D-180): the absolute-membership drives consume placement DOF exactly like pins — a
+    // plane pin is one residual per member, a pin-symbol line membership two (a line is two planes),
+    // an equation-plane membership one. The count omitted all of them, so the exam's fully determined
+    // prism (eight plane pins) reported «דרגות חופש שטרם נקבעו: 2».
+    for (const pin of c.planePins) pinCount += pin.ids.length;
+    for (const d of symMemberDrives(c)) pinCount += d.line !== undefined ? 2 : 1;
+    for (const m of c.memberships) if (!m.side && m.plane !== 'any' && c.planes.has(m.plane) && !c.planes.get(m.plane)!.free) pinCount += 1;
     // #324: a coordinate-plane relation consumes DOF like pins (its residual count)
     for (const cp of c.coordPlanePins)
       pinCount += cp.mode === 'share' ? cp.ids.length - 1 : cp.mode === 'zero' ? cp.ids.length : cp.mode === 'perp' ? 1 : 2;
@@ -1113,7 +1120,30 @@ export function placementSampled3(c: Construction3): boolean {
 export function translationKnown3(c: Construction3): boolean {
   if (c.pins.length > 0 || absolutePointCount(c) > 0) return true;
   if (!hasAbsoluteFrameObject(c)) return false;
-  return placementSampled3(c) || gaugePlacedIds3(c).length === 0;
+  // #803 (ADR-3D-180): the third way a placement is not frozen at the canonical gauge — DRIVEN by
+  // absolute pins. Case 3 asked only {sampled, nothing to hide} and left pin-driven placement silent,
+  // so the exam's prism (two line equations lowered to eight plane pins, every vertex identical at every
+  // seed) refused «מישור A'B'C'» while holding it exactly. Sound because the leftover freedom of a
+  // driven placement is SAMPLED (`resolve3`'s translation-slide stage), so per-quantity seed-stability
+  // stays the arbiter: a cube with one vertex on a line still prints nothing.
+  return placementSampled3(c) || gaugePlacedIds3(c).length === 0 || translationDrivenAbsolute3(c);
+}
+
+/**
+ * #803 — is the figure's TRANSLATION driven by a stated relation to an ABSOLUTE object? These are the
+ * lists that close `translationGaugeFree3` for an absolute reason: equation/numeric-line plane pins, a
+ * membership on an equation plane, a pin-symbol membership (#801), a coordinate-plane relation that
+ * places coordinates. A membership on a POINT-RUN plane or a free plane pinned to figure content is
+ * figure-internal — it closes the funnel (placement frozen) but drives nothing absolute, and stays
+ * silent (the #611 rule). Read by the knowledge gate and by the slide stage, so the two cannot disagree.
+ */
+export function translationDrivenAbsolute3(c: Construction3): boolean {
+  return (
+    c.planePins.length > 0 ||
+    symMemberDrives(c).length > 0 ||
+    c.memberships.some((m) => !m.side && m.plane !== 'any' && c.planes.has(m.plane) && !c.planes.get(m.plane)!.free) ||
+    c.coordPlanePins.some((cp) => cp.mode === 'zero' || cp.mode === 'contains')
+  );
 }
 
 /** #517 — the frame gate for VECTOR coordinates (a difference — translation cancels), shared by the
@@ -1316,7 +1346,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
 
   // #801: the memberships a pin-symbol carrier owns — drivable only INSIDE the pivot (operands.ts)
   const symDrives = symMemberDrives(c);
-  const warm: { x?: number[] } = {}; // the applied solution's vector — the drive's warm start (ADR-3D-033)
+  const warm: { x?: number[]; mirror?: boolean } = {}; // the applied solution's vector — the drive's warm start (ADR-3D-033)
   if (
     (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0 ||
       c.planePins.length > 0 || c.coordPlanePins.length > 0 || figPlanePerps.length > 0 ||
@@ -1381,6 +1411,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
           }
         }
         warm.x = [...chosen.x];
+        warm.mirror = chosen.mirror;
         const finalCanonical = evalCanonical(chosen.dims, false, overrideOf(chosen));
         for (const [id, q] of finalCanonical) {
           const def = c.points.get(id);
@@ -1473,6 +1504,52 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       }
     }
 
+    /** The member pins the pivot drives (stage 4) and the slide stage probes (#803) — one builder. */
+    const buildMemberPins = (): MemberPin[] => {
+      const members: MemberPin[] = [];
+      // mirror applySolutions' lane rule: a gauge-frame member is evaluated inside
+      // the solve; an absolute-lane member (typed coords / coord-sym at the pinned
+      // parameter / an equation-plane rider) is FROZEN at its final position
+      const frozenOf = (id: Id): { ok: boolean; frozen?: Vec3 } => {
+        const def = c.points.get(id);
+        const gauge = def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
+        const fin = pos.get(id);
+        if (gauge) return { ok: true };
+        return fin && Number.isFinite(fin.x) && Number.isFinite(fin.y) && Number.isFinite(fin.z)
+          ? { ok: true, frozen: fin }
+          : { ok: false };
+      };
+      for (const m of drivableMemberships) {
+        const { ok, frozen } = frozenOf(m.id);
+        if (!ok) continue;
+        if (c.pointPlanes.has(m.plane)) {
+          members.push({ id: m.id, frozen, run: c.pointPlanes.get(m.plane)! });
+        } else {
+          const pd = c.planes.get(m.plane)!;
+          // a symbolic-parameter equation plane stays selection/verify-only (chooseParam)
+          if ([pd.cx, pd.cy, pd.cz, pd.d].every((e) => e.p === 0))
+            members.push({ id: m.id, frozen, plane: { n: v3(pd.cx.k, pd.cy.k, pd.cz.k), d: pd.d.k } });
+        }
+      }
+      for (const d of symDrives) {
+        const { ok, frozen } = frozenOf(d.id);
+        if (!ok) continue;
+        const ld = d.line !== undefined ? c.lines.get(d.line) : undefined;
+        const pd = d.plane !== undefined ? c.planes.get(d.plane) : undefined;
+        if (ld?.kind === 'parametric' && ld.sym !== undefined) {
+          members.push({ id: d.id, frozen, symLine: { anchor: ld.anchor, dir: ld.dir, sym: ld.sym } });
+        } else if (pd?.sym !== undefined && pd !== undefined) {
+          members.push({ id: d.id, frozen, symPlane: { cx: pd.cx, cy: pd.cy, cz: pd.cz, d: pd.d, sym: pd.sym } });
+        }
+      }
+      return members;
+    };
+    /** Do the stated signs hold on the CURRENT positions? Stage 4's rollback check and stage 5's (#803). */
+    const signsHold = (): boolean =>
+      c.signGivens.every((g) => {
+        const q = pos.get(g.id);
+        return !!q && (g.positive ? q[g.axis] > 1e-9 : q[g.axis] < -1e-9);
+      }) && componentSignsHold(c, (id) => pos.get(id)); // #814: named components ride the same check
     // 4) MEMBERSHIP drive (ADR-3D-033, M1 — the operator's "fit the diagram to match
     //    input"): a stated `X on plane Y` about an EXISTING point that the pinned
     //    figure leaves UNMET re-solves the free DOFs (gauge + dims) WITH a membership
@@ -1509,42 +1586,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
           return !pl || !memberHolds3(p, pl);
         });
       if (unmetMembership()) {
-        const members: MemberPin[] = [];
-        // mirror applySolutions' lane rule: a gauge-frame member is evaluated inside
-        // the solve; an absolute-lane member (typed coords / coord-sym at the pinned
-        // parameter / an equation-plane rider) is FROZEN at its final position
-        const frozenOf = (id: Id): { ok: boolean; frozen?: Vec3 } => {
-          const def = c.points.get(id);
-          const gauge = def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
-          const fin = pos.get(id);
-          if (gauge) return { ok: true };
-          return fin && Number.isFinite(fin.x) && Number.isFinite(fin.y) && Number.isFinite(fin.z)
-            ? { ok: true, frozen: fin }
-            : { ok: false };
-        };
-        for (const m of drivableMemberships) {
-          const { ok, frozen } = frozenOf(m.id);
-          if (!ok) continue;
-          if (c.pointPlanes.has(m.plane)) {
-            members.push({ id: m.id, frozen, run: c.pointPlanes.get(m.plane)! });
-          } else {
-            const pd = c.planes.get(m.plane)!;
-            // a symbolic-parameter equation plane stays selection/verify-only (chooseParam)
-            if ([pd.cx, pd.cy, pd.cz, pd.d].every((e) => e.p === 0))
-              members.push({ id: m.id, frozen, plane: { n: v3(pd.cx.k, pd.cy.k, pd.cz.k), d: pd.d.k } });
-          }
-        }
-        for (const d of symDrives) {
-          const { ok, frozen } = frozenOf(d.id);
-          if (!ok) continue;
-          const ld = d.line !== undefined ? c.lines.get(d.line) : undefined;
-          const pd = d.plane !== undefined ? c.planes.get(d.plane) : undefined;
-          if (ld?.kind === 'parametric' && ld.sym !== undefined) {
-            members.push({ id: d.id, frozen, symLine: { anchor: ld.anchor, dir: ld.dir, sym: ld.sym } });
-          } else if (pd?.sym !== undefined && pd !== undefined) {
-            members.push({ id: d.id, frozen, symPlane: { cx: pd.cx, cy: pd.cy, cz: pd.cz, d: pd.d, sym: pd.sym } });
-          }
-        }
+        const members = buildMemberPins();
         if (members.length > 0) {
           // transactional (M2): the drive is an EXPERIMENT — snapshot what it may
           // mutate, and roll back if it broke anything that held before (a discrete
@@ -1552,11 +1594,6 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
           const posBefore = new Map(pos);
           const paramBefore = paramOut;
           const pivotBefore = pivot;
-          const signsHold = (): boolean =>
-            c.signGivens.every((g) => {
-              const q = pos.get(g.id);
-              return !!q && (g.positive ? q[g.axis] > 1e-9 : q[g.axis] < -1e-9);
-            }) && componentSignsHold(c, (id) => pos.get(id)); // #814: named components ride the same check
           const signsBefore = signsHold();
           // warm-started from the pinned figure's own solution so the drive PERTURBS it
           // (branch choices preserved, minimal movement) instead of re-rolling the basins
@@ -1586,6 +1623,52 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
             resolveSymObjects(); // #801: the restored pivot's symbol values, not the rejected candidate's
           }
         }
+      }
+    }
+
+    // 5) #803 (ADR-3D-180): TRANSLATION SLIDE — a placement DRIVEN by absolute pins may still have
+    //    freedom left (a vertex put on a line slides along it; on a plane, within it), and the funnel's
+    //    documented conservatism froze that freedom at wherever the drive settled — the same position at
+    //    every seed. Frozen-but-unstated is ADR-052's cardinal sin the moment such a position is READ as
+    //    knowledge, and the knowledge gate now opens for driven placement. So the leftover is sampled:
+    //    probe the applied solution (or the canonical gauge when nothing had to move) along a seeded
+    //    direction; a fully pinned placement snaps back and stays put — the exam's prism is bit-identical.
+    //    Transactional like stage 4: a slid figure that breaks a sign given or the parameter is rolled back.
+    if (c.pins.length === 0 && translationDrivenAbsolute3(c) && !(pivot && pivot.solutions === 0)) {
+      const members = buildMemberPins();
+      const x0 = warm.x ?? [0, 0, 0, 0, 0, 0, 0, ...dims0];
+      const mirror = warm.mirror ?? false;
+      const posBefore = new Map(pos);
+      const paramBefore = paramOut;
+      const pivotBefore = pivot;
+      const restore = (): void => {
+        pos.clear();
+        for (const [id, q] of posBefore) pos.set(id, q);
+        paramOut = paramBefore;
+        pivot = pivotBefore;
+        resolveLatePlanes();
+        resolveSymObjects();
+      };
+      // a stated SIGN on the slide's own axis SELECTS the side the sample lands on (the #818 rule,
+      // one stage over): the seeded direction first, its opposite if that side breaks a sign — and if
+      // neither holds every sign and the parameter, the placement stays where the drive left it.
+      const attempt = (flip: boolean): boolean => {
+        const slid = solvePivot(c, EC, dims0, seed, undefined, members, undefined, lines, { x: x0, mirror, flip });
+        if (slid.length === 0) return false;
+        applySolutions(slid);
+        pinParam();
+        resolveLatePlanes();
+        const paramBroke =
+          paramBefore !== null && Number.isFinite(paramBefore.value) && !(paramOut !== null && Number.isFinite(paramOut.value));
+        return !paramBroke && signsHold();
+      };
+      if (!attempt(false)) {
+        restore();
+        if (!attempt(true)) restore();
+      }
+      if (pivot !== pivotBefore && pivotBefore) {
+        // the slide is a re-placement of the CHOSEN configuration, not a new pool
+        pivot = { ...pivot!, solutions: pivotBefore.solutions, chosen: pivotBefore.chosen };
       }
     }
   }

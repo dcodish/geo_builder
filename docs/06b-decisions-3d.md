@@ -5448,3 +5448,83 @@ Locks: `src3d/__tests__/issue-818.test.ts` (both sign forms at a ten-seed batter
 operator's 4 / 1017 / 2031, the panel string, the positive sign untouched, the unsatisfiable refusal,
 six resamples all honouring the sign), `issue-814.test.ts` tightened back to the panel, and
 `fixtures3/pyramid-sign-branch-818.geo3.json` saved AT seed 1017 through the real load path.
+## ADR-3D-180 — A DRIVEN PLACEMENT IS KNOWLEDGE, AND ITS LEFTOVER FREEDOM IS SAMPLED: the gate asks, the resolver slides (#803; extends ADR-3D-101 and the #639 gate)
+
+**2026-08-30 · round #822.** Operator, 2026-08-27, the #801 exercise continued with its workaround:
+«מנסרה ישרה משולשת ABCA'B'C'», the three vector injections (k = 2), then the exam's two line equations
+«משוואת הישר AC היא x=(8,-1,-1)+t(3,0,-1)», «משוואת הישר BC היא x=(4,0,2)+m(2,-2,-4)». Every vertex
+identical to three decimals at every seed — A = (2,−1,1), … C' = (6,−6,3) — and the query «מישור
+A'B'C'» (the exam's part ב) answered **«לא נקבע על ידי הנתונים»**. `A`, «מישור ABC», the ארגון נתונים
+coordinates block and the canvas labels were silent the same way; the DOF cue read «2».
+
+**Class — #639's, one member short again.** `translationKnown3` (#639) opened for {a stated absolute
+position, a SAMPLED placement, nothing gauge-placed}. This figure has no pin and no coordinate point;
+its placement is DRIVEN — the on-line lowering (ADR-3D-031 Am.) put eight plane pins on the pivot and
+the pivot solved the placement to the stated absolutes. `translationGaugeFree3` is false *because* of
+those pins, so `placementSampled3` is false, and the gate returned false: **the plane pins that pin the
+translation absolutely are exactly what closed the gate.** The #639 comment named the law and left this
+member out on purpose ("neither stated nor sampled — frozen — reads falsely stable"): true for a
+placement frozen at the canonical gauge, false for one the pivot drove.
+
+**Why the gate could not simply open (measured first).** With the gate widened alone, a cube with ONE
+vertex on an absolute line printed `A(0, 2, 3)`: the drive settles the slide along the line wherever LM
+stopped — the same place at every seed — so stability, the gate's arbiter, would have certified an
+unstated position (ADR-052's cardinal sin, #315's shape). The funnel's documented conservatism
+(ADR-3D-101: partial freedoms stay pinned) was harmless while the gate stayed shut; opening the gate
+makes it a lie. The two halves only work together.
+
+**Mechanism.**
+
+1. **The gate asks the funnel's question** (`evaluate.ts` — `translationDrivenAbsolute3`). A placement
+   is not frozen at the canonical gauge when it is sampled, when there is nothing to hide, or when it is
+   DRIVEN by a stated relation to an absolute object: equation/numeric-line plane pins, a membership on
+   an equation plane, a pin-symbol membership (#801), a coordinate-plane relation that places
+   coordinates. A membership on a POINT-RUN plane or a free plane pinned to figure content is
+   figure-internal — it closes the funnel but drives nothing absolute — and stays silent (the #611 rule,
+   locked). Read by the gate and by the slide stage, so the two cannot disagree.
+2. **The resolver SAMPLES a driven placement's leftover translation** — `resolve3` stage 5, after the
+   drives, when no absolute position is stated (`c.pins.length === 0`) and the placement is driven. It
+   PROBES the applied solution (or the canonical gauge, when every membership already held there — a
+   plane through the origin, the frozen case the drive never enters) through `solvePivot`'s new
+   `probe` mode: hard-pin the translation's projection on a seeded direction at a seeded step (40
+   iterations, the pinned stage only steers), release on the primary residuals, keep only if still
+   exact AND actually moved. A fully pinned translation cannot satisfy the projection and snaps back
+   on release (|proj| ≈ 0) — the exam's prism is bit-identical. A partially pinned one keeps the
+   displacement: the cube slides along its line (A.x varies, A.y = 2, A.z = 3 hold — and the panel
+   prints exactly that partial), or within its plane. The probe moves TRANSLATION and ROTATION only
+   (the Stage-A shape); scale, dims and symbols stay frozen at the solution's values — the first cut
+   opened them and the full suite caught the explode basin (a coordinate-plane «zero» residual is
+   extent-normalised, so the walk grew the box to 1e6 with every primary residual still exact). The #518 park / #797 walk pattern on the gauge's
+   translation; failure-path in cost (one pinned + one release solve, warm, only on driven figures).
+3. **Transactional, and a sign SELECTS the side.** Like stage 4, the slide is an experiment: the seeded
+   direction first, its opposite if that side breaks a stated sign (the #818 rule one stage over —
+   «שיעור ה-x של A הוא חיובי» on the sliding cube lands on the positive side at every seed), and if
+   neither holds every sign and the parameter, the placement stays where the drive left it. The pool
+   count and chosen index survive the re-placement (it is not a new pool).
+4. **The DOF cue counts the drives** (`freeDofCount3`): a plane pin is one residual per member, a
+   pin-symbol line membership two, an equation-plane membership one. The count omitted all of them —
+   the fully determined prism read «2»; it reads 0.
+
+**New capability:** a figure placed by line/plane equations alone (no coordinate typed) answers point
+coordinates, plane equations in both representations, and populates the coordinates block and the
+canvas labels — the exam's part ב answers `x − 5y + 3z − 45 = 0 | x = (3,−6,4) + t·(1,2,3) + s·(3,0,−1)`
+with no workaround. And an under-determined driven placement now VARIES on «הצג תצורה אחרת» instead
+of asserting the position the solver happened to stop at.
+
+**Sibling audit.** *3-D:* the rotation freedom of a driven placement was already seed-varied by the
+multi-start (measured: B, C' differ per seed on the cube+line figure); scale is never sampled
+(ADR-3D-054 owns it). `vectorFramePinned3` derives from `translationKnown3` and inherits the fix. The
+#367 canonical-placement sampling (frameless-but-absolute) is untouched: it runs when the funnel says
+FREE, the slide when it says DRIVEN, the frozen figure-internal case when it says neither. *2-D:* no
+absolute frame — `src/` figures are similarity classes; the analogue (a point on a given line with
+free position) is the ADR-052 `freeDofs` sampler, already in place. Not present. *Complex:* no gauge.
+
+**Perf:** `derive3` median of six seeds — prism 370 ms (main 361), cube+line 1 ms (0), the ADR-3D-031
+box+plane+line exam 20 ms (11). Within noise on the determined figure; +9 ms on the sliding one.
+
+Locks: `src3d/__tests__/issue-803.test.ts` (the prism seed-invariant with the gate open and DOF 0;
+«מישור A'B'C'» → the exam's plane in both forms, «מישור ABC» and «A» answering; panel + canvas label
+from the same entry; the sliding cube on a line — coordinates vary by seed, the partial `(?, 2, 3)`
+prints, the face plane refuses; the sliding cube on a plane — nothing prints; the figure-internal
+frozen case silent; the sign selecting the slide's side at six seeds) and
+`fixtures3/prism-pin-driven-803.geo3.json` (the operator's sequence through the real load path).
