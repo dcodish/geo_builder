@@ -17,6 +17,7 @@ import { inputPreview3, isolateLtrRuns3, RUN_CORE, RUN_DELIMS, textDir3 } from '
 import { SYMBOL_PALETTE_3 } from '../ui/symbols3';
 import { parse3 } from '../parser/parse3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
+import { tokenizeRow } from '../render/VecMath';
 import he from '../i18n/locales/he.json';
 import en from '../i18n/locales/en.json';
 // #559: the defect IS the markup (a list-wide `dir` and the per-row choices under it), and this tree
@@ -459,5 +460,60 @@ describe('#559 — the data panel follows the app direction, per-row', () => {
 
   it('no PHYSICAL margin survives in the panel — a left margin is wrong in an RTL list', () => {
     expect(panelBlock).not.toMatch(/className="[^"]*\bm[lr]-\d/);
+  });
+});
+
+/**
+ * #482 Am. 4 (ADR-3D-184) — THE QUERY LANE. The fact-row lane was isolated in ADR-3D-121/123, but the
+ * data panel's ask rows render through `VecMath`, which ADR-3D-121 exempted on the stated grounds that
+ * it «emits one element per token, so bidi sees structure rather than one neutral run». That holds only
+ * on the MathML path. When the tokenizer finds nothing expression-like the row passed through as RAW
+ * text — one neutral run under the caller's `dir="auto"` — so the operator's own reported strings were
+ * still reordered on the surface the chokepoint had not reached.
+ */
+describe('#482 Am. 4 — VecMath’s prose path isolates; its MathML path still does not need to', () => {
+  const VECS = new Set(['u', 'v', 'w']);
+  const structural = (s: string) => tokenizeRow(s, VECS).some((t) => t.k === 'pair' || t.k === 'vec' || t.k === 'frac');
+
+  // the operator's own rows (#482 report + the 2026-08-10 follow-up measurement), verbatim
+  const REPORTED = [
+    'ישר l - x=(1,2,3)+t(m-2,m, m+2)',
+    'מישור π1 - x+(m-2)y+(m-1)z-5',
+    'הישר l: x=(1,2,3)+t(m-2,m,m+2)',
+    'הנקודה B על המישור (π2)',
+  ];
+
+  it('every reported row takes the PROSE path — so exempting VecMath left them unprotected', () => {
+    for (const s of REPORTED) expect(structural(s), s).toBe(false);
+  });
+
+  it('the prose path isolates, and the isolate covers the technical run', () => {
+    for (const s of REPORTED) {
+      const out = isolateLtrRuns3(s);
+      expect(out, s).not.toBe(s); // it did something
+      expect(out.includes(LRI) && out.includes(PDI), s).toBe(true);
+      expect(strip(out), s).toBe(s); // and only that: byte-recoverable
+    }
+  });
+
+  it('a row the tokenizer DOES understand keeps the MathML path (the ADR-3D-121 reasoning, intact)', () => {
+    for (const s of ['|AB|', 'u·v', 'AB = u']) expect(structural(s), s).toBe(true);
+  });
+
+  it('isolation is idempotent, so a caller that already isolated loses nothing', () => {
+    for (const s of REPORTED) {
+      const once = isolateLtrRuns3(s);
+      expect(isolateLtrRuns3(once)).toBe(once);
+    }
+  });
+
+  /**
+   * The mechanism, asserted at the render event rather than at a caller: VecMath's prose branch must
+   * route through the isolator. Source-asserted for the same reason #559 is — this tree has no DOM
+   * harness, and the defect IS which branch calls what.
+   */
+  it('VecMath’s prose branch calls the isolator', () => {
+    const src = readFileSync(join(__dirname, '..', 'render', 'VecMath.tsx'), 'utf8');
+    expect(src).toMatch(/return React\.createElement\(React\.Fragment, null, isolateLtrRuns3\(text\)\)/);
   });
 });
