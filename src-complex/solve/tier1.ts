@@ -92,6 +92,12 @@ export interface Tier1Result {
   readonly deferred: readonly Constraint[];
   /** every complex name the constraints mention, in first-seen order — the set the figure must DRAW */
   readonly names: readonly string[];
+  /**
+   * #719 — magnitude givens that are IMPOSSIBLE on their own («|z1| = -5»), as the student's own
+   * statements. Not `inconsistent`: nothing here conflicts with anything else — the given is
+   * out of domain by itself, and saying "your two statements conflict" would name the wrong culprit.
+   */
+  readonly impossible: readonly string[];
 }
 
 const BRANCH_BUDGET = 2048;
@@ -112,6 +118,8 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
   const modRows: Row<ExpVec>[] = [];
   const argRows: Row<Angle>[] = [];
   const deferred: Constraint[] = [];
+  /** #719 — magnitude givens that no z can satisfy, as the student stated them */
+  const impossible: string[] = [];
   const names: string[] = [];
   const kNames: string[] = [];
 
@@ -135,7 +143,28 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
 
     const kind = c.kind ?? 'eq';
     if (kind === 'eq' || kind === 'mod') modRows.push(modulusRow(lf, rf));
-    if (kind === 'mod') continue; // a magnitude given says nothing about direction
+    if (kind === 'mod') {
+      /**
+       * #719 (ADR-CX-035) — A MAGNITUDE GIVEN WHOSE VALUE IS NOT A POSITIVE REAL IS IMPOSSIBLE.
+       *
+       * `linearize` faithfully encodes a negative literal as (modulus |v|, argument ½ turn), and the
+       * next line then drops the argument row — correctly, since a magnitude says nothing about
+       * direction. The sign was therefore not lost, it was CONSUMED: «|z1| = -5» became «|z1| = 5»
+       * and nothing failed, which is why the defect was silent. `modulus.ts` already states the rule
+       * («a modulus must be positive — the sign belongs to the argument»); it just never reached a
+       * refusal surface.
+       *
+       * The test is the mirror of the one that keeps a trivial argument row below: when the RHS's
+       * argument is a KNOWN constant (no unknowns) and it is not zero, the right-hand side is not a
+       * positive real, so no z can satisfy it. An RHS whose argument is still unknown («|z1| = |z2|»,
+       * «|z1| = 2·z2») says nothing and is left alone — and a literal ZERO never arrives here at all,
+       * because `linearize` returns null for it (ln 0), so «|z1| = 0» stays satisfiable via the
+       * numeric tier. That boundary is deliberate, not incidental.
+       */
+      const dir = argumentRow(lf, rf);
+      if (dir.coef.size === 0 && !ANG_OPS.isZero(dir.rhs)) impossible.push(c.src);
+      continue; // a magnitude given says nothing about direction
+    }
 
     const a = argumentRow(lf, rf);
     // `arg(lhs) − arg(rhs) = delta` shifts the constant; an `eq` is the delta-zero case
@@ -177,6 +206,7 @@ export function solveTier1(constraints: readonly Constraint[]): Tier1Result {
 
   return {
     inconsistent,
+    impossible,
     modulus,
     argument,
     branches,

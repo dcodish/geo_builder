@@ -2112,3 +2112,55 @@ Locks: `issue-698.test.ts` (9) — the five rows above asserted on the STATUS LI
 a drawn under-determined figure never reading «no valid configuration» (with `enumeratedConfigCount === 0`
 and `hasConfiguration === true` asserted together, since both are true at once), both refuted cases still
 reading it, and `canCycle` pinned to its pre-fix values.
+
+## ADR-CX-035 — AN OUT-OF-DOMAIN MAGNITUDE IS REFUSED, NEVER NORMALISED (#719)
+
+**Status:** Accepted (2026-08-30) · **Ladder:** stage 0 (parse) + stage 1 (tier 1) + stage 5b (acceptance) · **Round:** #826
+
+«|z1| = -5» was **accepted, drawn, and listed as an ordinary fact**, with the panel printing «|z1| = 5».
+Both submit paths agreed, so nothing looked wrong. That is the honesty invariant violated in its exact
+stated form: *no stated magnitude is ever silently dropped — a given parses to a constraint, escalates,
+or errors, but never vanishes.*
+
+**Root cause — the parser, not the solver.** The issue's own triage located the loss in `logpolar.ts`
+(a negative literal lowers to modulus |v| + argument ½ turn, and a modulus equation drops the argument
+row by construction). That mechanism is real, but it is not the path this statement takes. Measured at
+`12673b7`: `rules.ts` composes a magnitude equation as
+`rhs: rhs.t === 'abs' ? rhs : abs(rhs)` — and `abs(…)` around the student's `-5` rewrote the statement
+into «|z1| = |−5|» **before tier 1 ever saw a sign**. The wrap is right for a name or a positive number
+(a magnitude equation compares magnitudes); on a negative literal it is a silent normalisation of the
+student's own words.
+
+**Decision — two halves, each at the layer that owns the question.**
+
+1. **The parser stops normalising.** A right-hand side that is *not a positive real* passes through
+   **unwrapped**. The test is on the ARGUMENT, not on a sign: the literal reaches the rules as an exact
+   `val` whose argument is half a turn (it is linearised on the way in), never as a bare negative `num`.
+   An argument that is a known non-zero constant means the value points somewhere other than the
+   positive real axis; an argument carrying symbols is not decidable there and is left alone.
+2. **Tier 1 judges impossibility, once.** Composing a `mod` row, a right-hand side whose argument is a
+   known non-zero constant is a given no `z` can satisfy: it joins `Tier1Result.impossible` as the
+   student's own statement. This is deliberately **not** `inconsistent` — nothing here conflicts with
+   anything else, and saying "your two statements conflict" would name the wrong culprit.
+3. **One channel, not a second path.** `impossible` joins `unsatisfied` in `derive2` — and leads it,
+   because it is the most fundamental verdict available. That is the [ADR-CX-031](#adr-cx-031) (#788)
+   channel, so the refusal reaches the always-visible strip and the ADR-CX-023 acceptance gate together,
+   surfacing as the existing `impossible` error key naming the statement.
+
+**The zero boundary, stated rather than inherited.** «|z1| = 0» is **satisfiable** (z₁ at the origin) and
+stays accepted. It is not saved by the sign test but by `linearize`, which returns null for a literal
+zero (ln 0 is undefined) so the constraint routes to the numeric tier and never reaches this judgement
+at all. Deliberate, and recorded so a later tightening of the sign test does not sweep it in.
+
+**Class sweep (standing rule 1), measured rather than assumed.** The pattern is *a magnitude-valued
+left-hand side against a right-hand side that is not a positive real.* Every sibling was probed:
+`|z1-z2| = -2` already refuses (a non-monomial LHS routes to the numeric tier — that is *why* the sibling
+worked), and «אורך z1z2 = -5» / «שטח Oz1z2 = -5» already refuse through #788's measure lane. The `mod`
+constraint kind was the one unguarded cell, and tier 1 is where all four of its producers converge, so
+one check covers them and any future producer. A negative ARGUMENT stays legal throughout — this is a
+magnitude rule, not a sign rule.
+
+Locks: `issue-719.test.ts` (10) — the refusal cold and after a value that made it look like a true
+restatement, the statement named on the always-visible `unsatisfied` channel, «|z1| = 0» still accepted,
+«|z1| = 5» and «|z1| = |z2|» byte-identical, «arg z1 = -30» still legal, and the three sibling lanes
+keeping their existing refusals.
