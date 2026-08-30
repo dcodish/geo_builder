@@ -866,6 +866,8 @@ export default function App3() {
                             <span className="font-medium">
                               {' = '}
                               <VecMath text={r.answer} vecNames={new Set(derived.construction.vectors.keys())} />
+                              {/* #813: a note may ACCOMPANY an answer (a frameless plane reports its shape and says why no equation follows) */}
+                              {r.note && <span className="font-normal text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>}
                             </span>
                           ) : (
                             <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>

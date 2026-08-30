@@ -5528,3 +5528,57 @@ from the same entry; the sliding cube on a line — coordinates vary by seed, th
 prints, the face plane refuses; the sliding cube on a plane — nothing prints; the figure-internal
 frozen case silent; the sign selecting the slide's side at six seeds) and
 `fixtures3/prism-pin-driven-803.geo3.json` (the operator's sequence through the real load path).
+## ADR-3D-181 — NO FRAME IS NOT «לא נקבע»: a frameless plane query reports its shape and names what is missing (#813)
+
+**2026-08-30 · round #822.** Operator, 2026-08-29: «קובייה ABCDA'B'C'D'», «|AB| = 4», «DB», «AB = u»,
+«BC = v», «מישור DBB'D'», «AA' = w» — the query «מישור DBB'D'» answered **«לא נקבע על ידי הנתונים»**
+while the panel above it printed «w מקביל למישור DBB'D'», «|DB| = 4√2», «DB² = 32», and «שטח DBB'D'»
+answered 16√2. The refusal of the EQUATION is right — no coordinate and no absolute object, so the
+cube floats and the d-term is gauge (#315). What was wrong is what the student was told.
+
+**Class.** *One message covers two different states, and the lane answers only one of a plane's
+properties.* `note: 'undetermined'` was returned both when there is NO FRAME (nothing wrong with the
+givens; everything except placement may be known) and when a frame exists and the equation genuinely
+varies across samples. To a student the first reads "the tool knows nothing about this plane" — a
+false statement about the givens — and it is a dead end: nothing says that the area answers or that
+one stated coordinate would produce the equation. The ADR-3D-108 theme (the engine understands more
+than the UI communicates) in the query lane; the sibling of #803, where the same gate withheld an
+answer for a different reason.
+
+**Mechanism.**
+
+1. **The note is split** (`queries.ts`). `!translationKnown3(c)` returns `note: 'noFrame'` — worded as
+   what is missing and what to do: no coordinate system, so no equation; state one point's coordinates
+   or a plane/line equation. `'undetermined'` is now only the framed, genuinely-varying case.
+2. **The lane answers the properties that ARE knowledge** (`framelessPlane`). For a named point-run
+   plane or a bare run, the reply carries the seed-invariant shape facts — `S(DBB'D') = 16√2`, the ring's
+   side lengths, and the mutual relations the panel already derives (`w ∥ DBB'D'`) — obtained through the
+   SAME lanes the panel and the scalar query use: area and lengths via `answerQuery` itself, relations
+   via `dataView`'s mutual table. No second computation, so a panel row and its query answer cannot
+   diverge (the #297 discipline already stated in that file); an unpinned scale drops the lengths
+   through the scalar lane's own `scale` gate, an unstable relation never appears.
+3. **A note may accompany an answer** (`App3.tsx`): the frameless reply shows its facts AND why no
+   equation follows. Previously a note rendered only in place of a missing answer.
+4. **Scope guard.** The frameless case still refuses the equation and the coordinates — this widens
+   what is REPORTED, never what is ASSERTED. Locked: the answer carries no `x`/`y`/`z` frameless.
+
+**Measured while locking, and recorded rather than assumed:** the issue's plan expected one coordinate
+(«A(0,0,0)») to make the equation answer. It does not — a cube pinned at one vertex still rotates freely
+about it, so the equation is genuinely undetermined and now reads as the FRAMED note (the two states
+finally differ to the student). With `B(4,0,0)`, `D(0,4,0)` added it answers `x + y − 4 = 0`.
+
+**New capability:** «מישור XYZ…» on a frameless figure answers the cross-section's area, side lengths
+and relations — the classic bagrut ask for exactly this figure — and tells the student what a single
+coordinate would add.
+
+**Sibling audit.** *3-D:* the POINT query on a frameless figure already goes through
+`dataView.pointCoords` and returns nothing — its `undetermined` is the same double-meaning one message
+over; it now reads the no-frame note too? No — deliberately NOT changed here: a point has no frameless
+knowledge to report (its only property IS position), so the message would carry no answer; the note
+split for points is #370's cue-semantics discussion, not this fix. *2-D:* no equation lane. *Complex:*
+not present.
+
+Locks: `src3d/__tests__/issue-813.test.ts` — the operator's sequence (the note, the area and lengths
+equal to the scalar lane's own answers, the ∥ relation), the frameless-then-framed progression (one
+coordinate → framed «לא נקבע», three → the equation), a bare run, the no-scale case (note alone), and a
+genuinely under-determined framed plane still «לא נקבע».

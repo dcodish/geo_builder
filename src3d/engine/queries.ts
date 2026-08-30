@@ -409,6 +409,41 @@ function pinFreeMeasures(c: Construction3): { c: Construction3; params: string }
 }
 
 /** Answer one query against the figure — the whole honesty gate (stability + scale) lives here. */
+/**
+ * #813 (ADR-3D-181) — a PLANE query on a FRAMELESS figure. The equation is honestly refused (its d-term
+ * is translation-dependent, #315), but the plane's shape is often fully known — the classic bagrut
+ * cross-section. Reports the seed-invariant properties through the SAME lanes the panel and the scalar
+ * query use (area and side lengths via `answerQuery` itself; relations via `dataView`'s mutual table),
+ * so a row here and a row there can never disagree (the #297 discipline). Only what those lanes call
+ * knowledge is reported: an unpinned scale drops the lengths, an unstable relation never appears.
+ * The note is set in both outcomes — with an answer it explains why no equation follows, without one
+ * it is the whole reply.
+ */
+function framelessPlane(c: Construction3, text: string, q: Extract<Query, { kind: 'plane' }>, seed: number): QueryResult {
+  const ids = q.ids ?? (q.name ? c.pointPlanes.get(q.name) : undefined);
+  const label = q.name ?? (ids ? ids.join('') : '');
+  const parts: string[] = [];
+  if (ids && ids.length >= 3) {
+    const area = answerQuery(c, `שטח ${ids.join('')}`, seed);
+    if (area.answer !== null) parts.push(`S(${label}) = ${area.answer}`);
+    for (let i = 0; i < ids.length; i++) {
+      const a = ids[i];
+      const b = ids[(i + 1) % ids.length];
+      if (ids.length === 3 && i === 2 && ids.length < 3) break;
+      const len = answerQuery(c, `|${a}${b}|`, seed);
+      if (len.answer !== null) parts.push(`|${a}${b}| = ${len.answer}`);
+    }
+  }
+  const GLYPH: Record<string, string> = { parallel: '∥', perpendicular: '⟂', contained: '⊂', coincident: '=', intersecting: '∩', skew: '⋈' };
+  if (label) {
+    for (const row of dataView(c, seed).mutual) {
+      if (row.a !== label && row.b !== label) continue;
+      parts.push(`${row.a} ${GLYPH[row.rel] ?? row.rel} ${row.b}`);
+    }
+  }
+  return { text, answer: parts.length > 0 ? parts.join(' · ') : null, note: 'noFrame' };
+}
+
 export function answerQuery(c: Construction3, text: string, seed: number): QueryResult {
   const q = parseQuery(c, text);
   if (!q) return { text, answer: null, note: 'notUnderstood' };
@@ -462,7 +497,12 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
     // #315: the d-term is translation-dependent, so an equation is gauge until a real point injection
     // anchors the frame. The panel carries this same explicit gate — cross-sample agreement alone does
     // not catch it, because an unanchored figure can still be placed identically at every seed.
-    if (!translationKnown3(c)) return { text, answer: null, note: 'undetermined' };
+    // #813 (ADR-3D-181): NO FRAME is not "not determined by the givens" — nothing is wrong with the
+    // givens; the student has not placed the figure in a coordinate system, and everything EXCEPT
+    // placement may be known. One note for two states told the student the tool knew nothing about a
+    // plane whose area and relations it was printing inches above. The frameless case gets its own
+    // note and still reports what IS knowledge (the plane's seed-invariant properties).
+    if (!translationKnown3(c)) return framelessPlane(c, text, q, seed);
     const resolvedPer = seeds.map((sd) => resolve3(c, sd));
     const per = resolvedPer.map((r) => {
       if (q.name) return r.planes.get(q.name);

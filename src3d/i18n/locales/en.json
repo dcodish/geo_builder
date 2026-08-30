@@ -178,6 +178,7 @@
       "notUnderstood": "not recognised — try A, plane ABC, w·v, |AB|, ∠SAB, area ABC, volume SABCD",
       "unavailable": "those points aren't in the figure",
       "undetermined": "not determined by the givens",
+      "noFrame": "no coordinate system, so no equation — what IS known about the plane is shown. For an equation, state one point's coordinates (e.g. A(0,0,0)) or a plane/line equation",
       "scale": "depends on the figure's scale (pin a size)",
       "depends": "depends on {{param}}"
     }

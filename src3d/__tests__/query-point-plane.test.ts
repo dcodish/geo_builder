@@ -143,7 +143,9 @@ describe('#317 — a PLANE answers its canonical equation', () => {
 
   it('an UNANCHORED figure refuses — a plane equation is gauge until translation is pinned (#315)', () => {
     const r = ans(['קובייה'], "מישור ABB'");
-    expect(r.answer).toBeNull();
-    expect(r.note).toBe('undetermined');
+    expect(r.answer, 'no scale either, so nothing frameless is knowledge — the equation stays refused').toBeNull();
+    // #813 (ADR-3D-181): the frameless state has its own note — «no coordinate system» is not «not
+    // determined by the givens»; the framed, genuinely-varying case keeps 'undetermined'.
+    expect(r.note).toBe('noFrame');
   });
 });
