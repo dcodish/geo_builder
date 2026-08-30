@@ -86,9 +86,11 @@ describe('#494 — a DETACHED clitic re-binds to its operand', () => {
 
 describe('#380 — a point-run plane is THREE OR FOUR labels, in both relation frames', () => {
   it('∥ accepts the box FACE it used to reject outright', () => {
-    expect(cmds('AB מקביל למישור ABCD')).toMatchObject([{ type: 'seg-plane-rel', rel: 'parallel', plane: ['A', 'B', 'C', 'D'] }]);
-    expect(cmds("AB מקביל למישור DCC'D'")).toMatchObject([{ type: 'seg-plane-rel', plane: ['D', 'C', "C'", "D'"] }]);
-    expect(cmds("A'B' מקביל למישור ABCD")).toMatchObject([{ type: 'seg-plane-rel', a: "A'", b: "B'", plane: ['A', 'B', 'C', 'D'] }]);
+    // #821 (ADR-3D-177 Am. 1): ∥ now draws the ring too, so the relation is the LAST command (as for ⟂)
+    expect(cmds('AB מקביל למישור ABCD')?.at(-1)).toMatchObject({ type: 'seg-plane-rel', rel: 'parallel', plane: ['A', 'B', 'C', 'D'] });
+    expect(cmds("AB מקביל למישור DCC'D'")?.at(-1)).toMatchObject({ type: 'seg-plane-rel', plane: ['D', 'C', "C'", "D'"] });
+    expect(cmds("A'B' מקביל למישור ABCD")?.at(-1)).toMatchObject({ type: 'seg-plane-rel', a: "A'", b: "B'", plane: ['A', 'B', 'C', 'D'] });
+    expect(cmds('AB מקביל למישור ABCD')?.filter((c) => c.type === 'segment3')).toHaveLength(4);
   });
 
   it('⟂ CARRIES the fourth label instead of silently dropping it', () => {
@@ -99,13 +101,13 @@ describe('#380 — a point-run plane is THREE OR FOUR labels, in both relation f
   });
 
   it('the 3-label forms are unchanged (primes were never the problem)', () => {
-    expect(cmds("A'B' מקביל למישור ABC")).toMatchObject([{ type: 'seg-plane-rel', plane: ['A', 'B', 'C'] }]);
-    expect(cmds('AB מקביל למישור ABC')).toMatchObject([{ type: 'seg-plane-rel', plane: ['A', 'B', 'C'] }]);
+    expect(cmds("A'B' מקביל למישור ABC")?.at(-1)).toMatchObject({ type: 'seg-plane-rel', plane: ['A', 'B', 'C'] });
+    expect(cmds('AB מקביל למישור ABC')?.at(-1)).toMatchObject({ type: 'seg-plane-rel', plane: ['A', 'B', 'C'] });
   });
 
   it('English mirrors both arities', () => {
-    expect(cmds('AB is parallel to plane ABCD')).toMatchObject([{ type: 'seg-plane-rel', plane: ['A', 'B', 'C', 'D'] }]);
-    expect(cmds('AB is parallel to plane ABC')).toMatchObject([{ type: 'seg-plane-rel', plane: ['A', 'B', 'C'] }]);
+    expect(cmds('AB is parallel to plane ABCD')?.at(-1)).toMatchObject({ type: 'seg-plane-rel', plane: ['A', 'B', 'C', 'D'] });
+    expect(cmds('AB is parallel to plane ABC')?.at(-1)).toMatchObject({ type: 'seg-plane-rel', plane: ['A', 'B', 'C'] });
   });
 });
 

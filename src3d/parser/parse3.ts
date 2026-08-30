@@ -1282,12 +1282,12 @@ const segPlaneRel: Rule = (s0) => {
     // lowered as a RELATION: the engine decides — a symbol PIN when an endpoint is a symbolic
     // vec-defined point (V7), else the V1 claim (segments drawn by apply).
     //
-    // The ring's edges are DRAWN for ⟂ and not for ∥ — each relation keeps exactly the figure it drew
-    // before this rule unified their parsing. Unifying how a statement is READ must not silently change
-    // what it DRAWS; whether ∥ should also show the plane it names is a separate question about the
-    // figure (#821, awaiting an operator ruling), not something to smuggle in behind a parser fix.
-    const edges: Command3[] =
-      rel === 'perp' ? ring.map((q, i) => ({ type: 'segment3', a: q, b: ring[(i + 1) % ring.length] })) : [];
+    // #821 (ADR-3D-177 Am. 1, operator ruling 2026-08-30): a plane the student NAMES in a relation is
+    // DRAWN — its ring's edges — for ∥ exactly as for ⟂ («if we reference a plane … we should draw
+    // ACD; the user has the option of disabling it through the input panel»). The honesty invariant:
+    // everything the student stated is visible on the figure. Both arities, both operand orders, both
+    // notations, because the ring comes from the classified operand, not from a spelled rule.
+    const edges: Command3[] = ring.map((q, i) => ({ type: 'segment3', a: q, b: ring[(i + 1) % ring.length] }));
     return [...edges, { type: 'seg-plane-rel', rel, a: segSide.op.a, b: segSide.op.b, plane: ring }];
   }
   return null;
@@ -2420,7 +2420,8 @@ const linePerpPlane: Rule = (s) => {
 // «הפאה» takes). `מקביל(?:ים|ות|ה)?` below already carried its full set; ⟂ carried only the plural, so
 // the face/base vocabulary would have parsed its operands and then failed on the verb.
 const PERP_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מאונ[ךכ](?:ים|ות|ת)?|ניצב(?:ים|ות|ה)?|אנך|⊥|perpendicular)\s*(?:ל(?=\S)|to\s+)?-?\s*/;
-const PAR_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מקביל(?:ים|ות|ה)?|∥|parallel)\s*(?:ל(?=\S)|to\s+)?-?\s*/;
+// #821: `||` is how the operator TYPED ∥ («ACD||AB») — an Israeli keyboard has no ∥ glyph (the #493 argument).
+const PAR_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מקביל(?:ים|ות|ה)?|∥|\|\||parallel)\s*(?:ל(?=\S)|to\s+)?-?\s*/;
 
 const planeLinePerp: Rule = (s0) => {
   const s = stripStatementPrefix(s0).trim();

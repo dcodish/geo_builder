@@ -5582,3 +5582,22 @@ Locks: `src3d/__tests__/issue-813.test.ts` — the operator's sequence (the note
 equal to the scalar lane's own answers, the ∥ relation), the frameless-then-framed progression (one
 coordinate → framed «לא נקבע», three → the equation), a bare run, the no-scale case (note alone), and a
 genuinely under-determined framed plane still «לא נקבע».
+### ADR-3D-177 Am. 1 — ∥ DRAWS THE NAMED PLANE'S RING, exactly as ⟂ does (#821; operator ruling 2026-08-30)
+
+**The ruling.** ADR-3D-177 deliberately did not harmonise what the two relations DRAW and filed #821
+for a decision. The operator ruled (2026-08-30): *"if we reference a plane like we say plane ACD is
+parallel to AB or just ACD||AB, we should draw ACD. the user has the option of disabling it through
+the input panel so this is no problem even if he didnt want it highlighted."* The honesty invariant —
+everything the student stated is visible on the figure — applied to the ∥ side; the clutter concern is
+answered by the input panel's per-fact visibility toggle, which the student already has.
+
+**The change.** `segPlaneRel`'s `edges` binding emits the ring's edges for BOTH relations. Because the
+ring comes from the classified operand (`readRelationSides`), both arities (3- and 4-label faces),
+both operand orders, both notations and both locales follow with no further rule — the whole point of
+the seam. The «בסיס» sentinel has no run to draw and stays as it was for both. And `||` — the way the
+operator actually typed ∥, an Israeli keyboard having no ∥ glyph (the #493 argument) — joins the ∥
+splitter's spellings; `ACD||AB` was `not-handled` before.
+
+Locks: `src3d/__tests__/issue-821.test.ts` — the operator's three phrasings draw the triangle, the
+matrix (relation × arity × order × notation × locale) always draws the ring, the sentinel stays undrawn,
+and the pyramid end-to-end carries the ACD edges in the construction.
