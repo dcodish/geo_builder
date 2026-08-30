@@ -14,8 +14,8 @@
 import { openCrossings3 } from '../engine/crossings3';
 import { cleanMag } from '../engine/dataView';
 import { freeDofCount3, hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
-import { distanceWitness, resolveOperand } from '../engine/operands';
-import type { Construction3, Id, Positions3 } from '../engine/types';
+import { distanceWitness, resolveOperand, type OperandGeom } from '../engine/operands';
+import type { Construction3, Id, Operand3, Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
 import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
@@ -291,6 +291,83 @@ function labelDir(incident: { dx: number; dy: number }[]): { dx: number; dy: num
 const fmt = (x: number): string => cleanMag(Object.is(x, -0) ? 0 : x, 3);
 
 
+/**
+ * #542 (ADR-3D-185) — THE ONE ARC OVER AN OPERAND PAIR.
+ *
+ * The renderer knew exactly one kind of angle — the (vertex, p, q) triple of #94 — so every angle
+ * whose SIDES ARE OBJECTS drew nothing: the panel and the solve were right and the canvas was silent.
+ * The mistake to avoid is the enumeration one ([ADR-3D-140](../../docs/06b-decisions-3d.md)): three
+ * record kinds do NOT grow three arc builders. They normalize to an operand pair and arrive here,
+ * exactly as `angleBetweenOperands` (#523) became the one measurement.
+ *
+ * Two geometries, chosen by what the operands ARE (never by which record produced them):
+ *  - **plane × plane** — the dihedral. The arc lives in the plane ⟂ to the seam, centred ON the seam:
+ *    at the shared edge's midpoint when the two runs share one (a face↔base pair sharing BC draws
+ *    where a textbook draws it), else at the seam point nearest the figure's centre.
+ *  - **line-ish × plane** — the arc runs from the line to its PROJECTION onto the plane, centred at
+ *    their crossing. A segment contributes its carrier line, which is why no case is needed for it.
+ *
+ * `toward` orients each side into its own operand's material, so the arc marks the angle the student
+ * can see rather than its vertical opposite; a STATED value additionally flips the second side when
+ * the supplement is the one that was stated (the rule the equation-plane lane already used).
+ */
+export function objectAngleArc(
+  ga: OperandGeom,
+  gb: OperandGeom,
+  opts: { shared: Vec3[]; toward: { a: Vec3 | null; b: Vec3 | null }; center: Vec3; r: number; deg?: number },
+): { pts: Vec3[]; label: Vec3 } | null {
+  const { shared, toward, center, r, deg } = opts;
+  const orient = (u: Vec3, focus: Vec3, mat: Vec3 | null): Vec3 =>
+    mat && dot3(u, sub3(mat, focus)) < 0 ? scale3(u, -1) : u;
+
+  const arcAt = (focus: Vec3, a1: Vec3, a2: Vec3): { pts: Vec3[]; label: Vec3 } | null => {
+    let u2 = a2;
+    // the drawn angle must be the STATED one when there is one: pick between it and its supplement
+    if (deg !== undefined) {
+      const drawn = (Math.acos(Math.max(-1, Math.min(1, dot3(a1, u2)))) * 180) / Math.PI;
+      if (Math.abs(drawn - deg) > Math.abs(180 - drawn - deg)) u2 = scale3(u2, -1);
+    }
+    const pts: Vec3[] = [];
+    for (let s = 0; s <= 12; s++) {
+      const m = add3(scale3(a1, 1 - s / 12), scale3(u2, s / 12));
+      if (norm3(m) < 1e-9) continue;
+      pts.push(add3(focus, scale3(normalize3(m), r)));
+    }
+    if (pts.length < 2) return null;
+    const bis = add3(a1, u2);
+    return { pts, label: add3(focus, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : a1, r * 1.55)) };
+  };
+
+  // ---- plane × plane
+  if (ga.normal && gb.normal && ga.d !== undefined && gb.d !== undefined) {
+    const seam = intersectPlanes({ n: ga.normal, d: ga.d }, { n: gb.normal, d: gb.d });
+    if (!seam) return null; // parallel or coincident — there is no dihedral to draw
+    const focus = projectOntoLine(shared.length ? centroid3(shared) : center, seam);
+    const u1 = normalize3(cross3(normalize3(ga.normal), seam.dir));
+    const u2 = normalize3(cross3(normalize3(gb.normal), seam.dir));
+    if (norm3(u1) < 1e-9 || norm3(u2) < 1e-9) return null;
+    return arcAt(focus, orient(u1, focus, toward.a), orient(u2, focus, toward.b));
+  }
+
+  // ---- line-ish × plane (either way round)
+  const ln = ga.dir && ga.point ? ga : gb.dir && gb.point ? gb : null;
+  const pl = ga.normal && ga.d !== undefined ? ga : gb.normal && gb.d !== undefined ? gb : null;
+  if (!ln || !pl || ln === pl) return null;
+  const n = normalize3(pl.normal!);
+  const L = normalize3(ln.dir!);
+  const denom = dot3(n, L);
+  if (Math.abs(denom) < 1e-9) return null; // parallel to the plane: the angle is 0, nothing to arc
+  const proj = sub3(L, scale3(n, denom));
+  // ⟂ to the plane is a RIGHT angle, and #307 draws those as a knee, never an arc labelled 90°
+  if (norm3(proj) < 1e-9) return null;
+  const t = -(dot3(n, ln.point!) + pl.d! / norm3(pl.normal!)) / denom;
+  const focus = add3(ln.point!, scale3(L, t));
+  const u2 = normalize3(proj);
+  // the line's own side is the one pointing along its projection, so the arc closes on the plane
+  const u1 = dot3(L, u2) < 0 ? scale3(L, -1) : L;
+  return arcAt(focus, u1, u2);
+}
+
 export function buildScene3(
   c: Construction3,
   resolved: Resolved3,
@@ -302,6 +379,10 @@ export function buildScene3(
   planeDisplay: Record<string, 'face' | 'full' | 'hidden'> = {},
   /** #397 (ADR-3D-108): draw the closest-point WITNESS of every stated distance (dashed + value). */
   showWitnesses = true,
+  /** #542 (ADR-3D-185): draw the arcs of angles whose SIDES ARE OBJECTS. Operator's explicit request —
+   *  these appear only while «ארגון נתונים» is open, so the canvas stays clean by default. The VERTEX
+   *  arcs (#94 and the stated-vangle marks) are NOT gated and keep drawing unconditionally. */
+  showObjectAngles = false,
 ): Scene3 {
   const positions = resolved.positions;
   const frame = cameraFrame(cam);
@@ -553,6 +634,65 @@ export function buildScene3(
     const bis = add3(u1, u2);
     const label = add3(v, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : u1, r * 1.6));
     wAngles.push({ pts, label, text: mk.label ?? '' });
+  }
+
+  /**
+   * #542 (ADR-3D-185) — every angle whose SIDES ARE OBJECTS, through the ONE builder above.
+   *
+   * The three record kinds that carry such an angle are normalized to an operand PAIR here and then
+   * share a single geometry; none of them gets an arc builder of its own. Gated on the data panel at
+   * the operator's request — the vertex arcs above are not.
+   */
+  if (showObjectAngles) {
+    const atA = (id: Id) => positions.get(id) ?? null;
+    const absA = { lines: resolved.lines, planes: resolved.planes };
+    const degText = (deg: number | undefined, label: string | undefined): string =>
+      // a STATED value IS the given, so it may print; a NAMED angle draws its name and leaves the
+      // number to the panel — the #371 / ADR-3D-030 Am. 2 knowledge rule the vertex marks follow
+      deg !== undefined ? `${deg}°` : (label ?? '');
+    const pairs: { a: Operand3; b: Operand3; text: string; deg?: number }[] = [
+      ...c.claims.flatMap((cl) =>
+        cl.type === 'plane-rel' && cl.rel === 'angle'
+          ? [{ a: cl.a, b: cl.b, text: degText(cl.deg, cl.label), deg: cl.deg }]
+          : cl.type === 'line-rel' && cl.rel === 'angle'
+            ? [{ a: cl.op, b: { kind: 'line' as const, name: cl.line }, text: degText(cl.deg, cl.label), deg: cl.deg }]
+            : [],
+      ),
+      // #523 — a NAMED angle between any two operands; #319's (segment × point-run) lowering is frozen
+      // and reaches the same place through its own record rather than being re-spelled.
+      ...c.relMarks.map((mk) => ({ a: mk.a, b: mk.b, text: mk.label, deg: undefined })),
+      ...c.linePlaneMarks.map((mk) => ({
+        a: { kind: 'segment' as const, a: mk.a, b: mk.b },
+        b: { kind: 'plane-run' as const, ids: mk.plane },
+        text: mk.label,
+        deg: undefined,
+      })),
+    ];
+    /** the operand's own material, so the arc is drawn on the side the student can see */
+    const materialOf = (op: Operand3): Vec3 | null => {
+      const ids = op.kind === 'plane-run' ? op.ids : op.kind === 'segment' ? [op.a, op.b] : op.kind === 'point' ? [op.id] : [];
+      const pts = ids.map(atA).filter((x): x is Vec3 => !!x);
+      return pts.length ? centroid3(pts) : null;
+    };
+    const seenArc = new Set<string>();
+    for (const pr of pairs) {
+      const key = [JSON.stringify(pr.a), JSON.stringify(pr.b)].sort().join('~') + '~' + pr.text;
+      if (seenArc.has(key)) continue;
+      seenArc.add(key);
+      const ga = resolveOperand(pr.a, c, absA)(atA);
+      const gb = resolveOperand(pr.b, c, absA)(atA);
+      if (!ga || !gb) continue;
+      const sharedIds =
+        pr.a.kind === 'plane-run' && pr.b.kind === 'plane-run' ? pr.a.ids.filter((id) => (pr.b as { ids: Id[] }).ids.includes(id)) : [];
+      const arc = objectAngleArc(ga, gb, {
+        shared: sharedIds.map(atA).filter((x): x is Vec3 => !!x),
+        toward: { a: materialOf(pr.a), b: materialOf(pr.b) },
+        center,
+        r: h * 0.38,
+        deg: pr.deg,
+      });
+      if (arc) wAngles.push({ ...arc, text: pr.text });
+    }
   }
 
   // #371: a number on the canvas must be seed-invariant KNOWLEDGE ([ADR-3D-030](docs/06b-decisions-3d.md)

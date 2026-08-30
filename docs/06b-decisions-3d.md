@@ -5748,3 +5748,59 @@ Locks: `bidi3.test.ts` gains «#482 Am. 4» (5) — the operator's four reported
 prose path (so the exemption provably left them unprotected), the isolate covering the run and the string
 byte-recoverable, the MathML rows still taking the structural path, idempotence, and the mechanism
 asserted at the source (this tree has no DOM harness — the #559 precedent).
+
+## ADR-3D-185 — ONE ARC OVER AN OPERAND PAIR: an angle whose sides are OBJECTS is drawn (#542)
+
+**Status:** Accepted (2026-08-30) · **Ladder:** stage 5d (display) · **Round:** #824 · **Operator request:** PR #540 play, 2026-08-11
+
+The geometry was right and the panel was right; the **canvas was silent** for every angle whose sides are
+objects. Measured at `61aa3eb`, through the real `buildScene3`:
+
+| figure | the record it produced | arcs |
+| --- | --- | --- |
+| «הזווית בין הפאה SBC לבסיס ABCD היא 60» | `plane-rel` claim, `rel: 'angle'`, `deg: 60` | **0** |
+| «זווית בין ישר ℓ למישור π=45» | `line-rel` claim, `rel: 'angle'`, `deg: 45` | **0** |
+| «הזווית בין המישור ABB'A' למישור ABCD היא α» | `relMarks` (#523) | **0** |
+| «∠SAB = α» | `angleMarks` (#94) | 1 ← the baseline that worked |
+
+**Root cause:** `scene3` built arcs from `c.angleMarks` — the (vertex, p, q) triple — and from the
+numeric vertex givens, and from `c.planeAngles`, the V2 *equation-plane* lane gated on a drawn seam.
+Nothing else. The renderer knew ONE KIND of angle and everything else fell outside it — the same shape as
+the cluster that produced [ADR-3D-140](#adr-3d-140).
+
+**Decision — the three record kinds do NOT grow three arc builders.** They normalize to an operand PAIR
+and share one geometry, exactly as `angleBetweenOperands` (#523) became the one measurement. `objectAngleArc`
+takes two `OperandGeom`s and chooses by **what the operands are**, never by which record produced them:
+
+- **plane × plane** — the dihedral. The arc lives in the plane ⟂ to the seam (`intersectPlanes`), centred
+  ON the seam: at the shared edge's midpoint when the two runs share one — a face↔base pair sharing BC
+  draws where a textbook draws it — else at the seam point nearest the figure's centre.
+- **line-ish × plane** — from the line to its PROJECTION onto the plane, centred at their crossing. A
+  segment contributes its carrier line, so «segment × plane» needs no case of its own.
+- **Refusals are geometry, not special cases:** parallel planes have no dihedral; a line parallel to its
+  plane subtends nothing; and a line ⟂ its plane draws **no arc**, because #307 gives every right angle a
+  KNEE rather than an arc labelled 90°.
+
+`toward` orients each side into its own operand's material so the arc marks the angle the student can see
+rather than its vertical opposite; a stated value additionally selects between the angle and its
+supplement (the rule the equation-plane lane already used).
+
+**Honesty, unchanged (#371 / ADR-3D-030 Am. 2):** a stated `60` IS the given and may print; a named angle
+draws its NAME and leaves the number to the panel, exactly as the vertex marks do.
+
+**The gate (operator's explicit request).** These arcs appear only while «ארגון נתונים» is open —
+`buildScene3` takes `showObjectAngles`, fed from `App3`'s `showData` through `Figure3`. It defaults to
+**false**, so no existing caller or test changes behaviour. The vertex arcs are deliberately NOT gated.
+The issue left one question open — *whether the flag should gate the numeric text too, or only the arc* —
+and this reads it as **the whole mark**: the arc and its value are one object, and an orphaned number
+floating where an arc used to be is not a thing the canvas should draw. Flagged for the operator's play.
+
+**The frozen lanes are untouched:** `angleMarks` keeps its own vertex loop (its lowering is frozen) and
+`planeAngles` keeps the V2 equation-plane loop — measured empty on all four figures above, so the new
+builder cannot double-draw over it. `linePlaneMarks` (#319, also frozen) reaches the shared builder
+through its own record rather than being re-spelled.
+
+Locks: `issue-542.test.ts` (14) — the world-space geometry (dihedral at the stated angle with every arc
+point on the seam radius, the supplement when that is what was stated, the line↔plane arc centred at the
+crossing, operand order irrelevant, `shared` moving the focus onto the edge, `toward` choosing the visible
+side, and the three refusals) plus the operator's four rows end-to-end with the gate off and on.
