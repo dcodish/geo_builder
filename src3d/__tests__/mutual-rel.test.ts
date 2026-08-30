@@ -146,10 +146,13 @@ describe('surfacing — the DATA PANEL says it, the canvas stays clean (operator
     expect(panel.mutual.some((m) => m.rel === 'perpendicular' && m.a === 'AB' && m.b === "CC'")).toBe(true);
   });
 
-  it('a pair SHARING an endpoint is skipped — "they meet at B" is noise, not knowledge', () => {
+  it('a pair SHARING an endpoint gets no POSITION row — "they meet at B" is noise, not knowledge', () => {
     for (const u of ["תיבה ABCDA'B'C'D'", 'AB', 'BC']) submit(u);
     const panel = dataView(derive3(state().facts, state().seed).construction, state().seed);
-    expect(panel.mutual.some((m) => (m.a === 'AB' && m.b === 'BC') || (m.a === 'BC' && m.b === 'AB'))).toBe(false);
+    const rows = panel.mutual.filter((m) => (m.a === 'AB' && m.b === 'BC') || (m.a === 'BC' && m.b === 'AB'));
+    // #811 (ADR-3D-182): the skip is about POSITION only — the ⟂ row (a direction relation, and the
+    // exam's AB·BC = 0) is reported for adjacent edges; a position row never is.
+    expect(rows.map((m) => m.rel)).toEqual(['perpendicular']);
   });
 });
 

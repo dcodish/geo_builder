@@ -519,6 +519,29 @@ export function dataView(c: Construction3, seed: number): DataPanel {
 
   const lengths = statedLengths(c);
   const pairKey = (a: Id, b: Id) => [a, b].sort().join('|');
+  // #811 (ADR-3D-182): the universe the DERIVED relations (|a| = |b|, a·b = 0) scan. `addEntry` below
+  // presents a drawn SEGMENT as a vector — label, decomposition, coordinates, |BC|, BC² — while the
+  // relation blocks iterated `c.vectors` alone, so the same object was a vector for display and not
+  // for derivation (#558/#577's class: the object exists but is outside the universe the derivation
+  // scans; a third loop would recommit it). One list: declared vectors first, then the student's
+  // drawn segments and arrows, deduplicated by their point pair so «AB = u» + segment AB is one row
+  // under `u`. Solid EDGES stay out (a cube's 12 edges are 66 mostly-noise pairs — the ADR-3D-104
+  // flood-control ruling); a segment the student named is not flood.
+  const relUniverse: [string, { from: Id; to: Id }][] = [];
+  {
+    const seen = new Set<string>();
+    for (const [name, d] of vecNames) {
+      seen.add(pairKey(d.from, d.to));
+      relUniverse.push([name, d]);
+    }
+    for (const [a, b] of [...c.segments, ...c.arrows]) {
+      const key = pairKey(a, b);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      relUniverse.push([`${a}${b}`, { from: a, to: b }]);
+    }
+  }
+  const relLabel = (name: string) => (c.vectors.has(name) ? `|${name}|` : `|${name}|`);
   const entries: VecEntry[] = [];
   const seen = new Set<string>();
   const basisNames = basis.map(([n]) => n);
@@ -573,8 +596,9 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     }
   }
   {
-    const mags = vecNames.map(([name, d]) => ({
+    const mags = relUniverse.map(([name, d]) => ({
       name,
+      d,
       per: positions.map((pos) => {
         const p = pos.get(d.from);
         const q = pos.get(d.to);
@@ -594,14 +618,14 @@ export function dataView(c: Construction3, seed: number): DataPanel {
         }
       }
       if (cls.length > 1) {
-        const stated = cls.map((n) => lengths.get(pairKey(c.vectors.get(n)!.from, c.vectors.get(n)!.to))).find((v) => v !== undefined);
+        const stated = cls.map((n) => { const e = relUniverse.find(([nm]) => nm === n)![1]; return lengths.get(pairKey(e.from, e.to)); }).find((v) => v !== undefined);
         // no stated number? a frame can still DERIVE one — append it when the class
         // length is the same in every sampled configuration (scale is pinned)
         const per = mags[i].per as number[];
         const derived =
           stated === undefined && hasScale && per.every((m) => Math.abs(m - per[0]) < 1e-6 * Math.max(1, per[0])) ? per[0] : undefined;
         const val = stated ?? derived;
-        relations.push(cls.map((n) => `|${n}|`).join(' = ') + (val !== undefined ? ` = ${cleanMag(val)}` : ''));
+        relations.push(cls.map(relLabel).join(' = ') + (val !== undefined ? ` = ${cleanMag(val)}` : ''));
       }
     }
   }
@@ -611,9 +635,11 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // shape property — invariant across every sampled configuration; so a pair reads as
   // perpendicular iff the normalised dot (the cosine) is ~0 in EVERY seed (the same
   // multi-sample discipline the magnitude equalities use). ⊥ from construction (cube /
-  // pyramid-height edges) or from a stated ⟂ given both surface identically.
+  // pyramid-height edges) or from a stated ⟂ given both surface identically — for every object in
+  // `relUniverse` (#811: a drawn segment included; before, a segment was presented as a vector but
+  // never scanned here, and this comment claimed coverage that did not exist).
   {
-    const dirs = vecNames.map(([name, d]) => ({
+    const dirs = relUniverse.map(([name, d]) => ({
       name,
       per: positions.map((pos) => {
         const p = pos.get(d.from);
@@ -720,7 +746,12 @@ export function dataView(c: Construction3, seed: number): DataPanel {
           // The shared-endpoint skip is a LINEAR notion and stays scoped to this branch: two segments
           // from one vertex obviously meet there. Two PLANES sharing two points do not meet trivially
           // at all — hoisting this test out of here silently dropped «ABC ⟂ ABD».
-          if (A.ids.some((id) => B.ids.includes(id))) continue;
+          // #811 (ADR-3D-182): the shared-endpoint test is about POSITION — two segments from one vertex
+          // obviously meet there — so it suppresses the position row only. It used to `continue` out of
+          // the whole branch, taking the ⟂ row 13 lines below with it, although that row's own comment
+          // says ⟂ is position-independent. Adjacent edges of every box, cube and prism share a vertex,
+          // so the most common perpendicularity in the corpus (the exam's AB·BC = 0) was unreachable.
+          const adjacent = A.ids.some((id) => B.ids.includes(id));
           const sidesAt = resolved.map((res) =>
             mutualSides(A.op, B.op, c, { lines: res.lines, planes: res.planes }, (id) => res.positions.get(id) ?? null),
           );
@@ -730,7 +761,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
           // an EDGE pair reports only the informative relations: a 'skew'/'intersecting' row on every
           // undrawn edge of a solid is exactly the noise the scope rule exists to keep out
           const informative = !(A.edge || B.edge) || rel === 'parallel' || rel === 'coincident';
-          if (rel && informative) mutual.push({ a: A.label, b: B.label, rel });
+          if (rel && informative && !adjacent) mutual.push({ a: A.label, b: B.label, rel });
           // ⟂ is a DIRECTION relation, independent of position: two skew lines can be perpendicular,
           // so it is reported alongside rather than instead of the mutual position.
           const perp = sidesAt.every((s) => {

@@ -5601,3 +5601,53 @@ splitter's spellings; `ACD||AB` was `not-handled` before.
 Locks: `src3d/__tests__/issue-821.test.ts` — the operator's three phrasings draw the triangle, the
 matrix (relation × arity × order × notation × locale) always draws the ring, the sentinel stays undrawn,
 and the pyramid end-to-end carries the ACD edges in the construction.
+## ADR-3D-182 — A PERPENDICULARITY BETWEEN OBJECTS THAT SHARE A VERTEX IS REPORTED: one universe for the panel's derived relations (#811; the #558/#577 class, third member)
+
+**2026-08-30 · round #822.** Operator, 2026-08-29, playing #754: «קובייה ABCDA'B'C'D'», «|AB| = 4»,
+then «BC» — *"the data panel adds BC²=16 but doesnt say they are perpendicular and that AB·BC=0"*.
+Measured headlessly: `relations = []`, `mutual = []` for the adjacent pair, while the same figure with
+«CC'» (perpendicular, sharing nothing) reported `{AB, CC', skew}` + `{AB, CC', perpendicular}`. The ⟂
+machinery worked; sharing a vertex was what suppressed it.
+
+**Class.** *The object exists but is outside the universe the derivation scans* — #558 (a named line
+could not be compared against a solid edge) and #577 (declared vectors were in no universe at all) were
+the same defect, fixed one member at a time; this is the next member, in two lanes at once:
+
+1. **The mutual lane** — the linear×linear flood control `if (A.ids.some(id => B.ids.includes(id)))
+   continue;` is justified by POSITION ("two segments from one vertex obviously meet there" — true,
+   and a correct reason to suppress the position row) but the `continue` left the branch before the ⟂
+   computation, whose own comment states the opposite property (⟂ is a DIRECTION relation,
+   independent of position). Adjacent edges of every box, cube and prism share a vertex, so the most
+   common perpendicularity in the corpus — the exam's `AB·BC = 0` — was structurally unreachable.
+2. **The relations lane** — the derived `u·v = 0` and `|u| = |v|` blocks iterated `c.vectors` only,
+   while `addEntry` presents a drawn SEGMENT as a vector (label, decomposition, coordinates, |BC|, BC²)
+   in the same panel. Two presentations of one object, only one of which participated; and the perp
+   block's comment claimed coverage ("⊥ from construction … surface identically") that did not exist
+   for a segment.
+
+**Mechanism.**
+
+1. **The skip is split by what it is about.** `adjacent` now guards only the position row; the ⟂ row
+   is computed for every linear pair. Nothing else in the branch changes.
+2. **One universe** (`relUniverse`). The derived-relations blocks read declared vectors first, then the
+   student's drawn segments and arrows, deduplicated by point pair so «AB = u» + segment AB is one row
+   under `u` (locked: no «|u| = |AB|» tautology). Solid EDGES stay out — a cube's 12 edges are 66
+   mostly-noise pairs, the ADR-3D-104 flood-control ruling — and a segment the student NAMED is not
+   flood. The magnitude class's stated-length lookup reads the pair from the universe entry, so a
+   stated «|AB| = 4» still decorates the class. A third scan would have recommitted the class error
+   (#577's note); this removes the display-vs-derivation asymmetry instead.
+3. **The comment is corrected** at the perp block.
+
+**New capability:** the operator's sequence prints `AB ⊥ BC` (mutual), `AB·BC = 0` and
+`|AB| = |BC| = 4` (relations) — the vector-geometry chapter's core statement on the figure the exam is
+built on. Controls locked unchanged: «CC'» keeps skew + ⟂, «DC» keeps ∥ and no ⟂; a cube with no named
+segment produces no edge×edge flood; two adjacent NON-perpendicular segments (AB, the face diagonal AC)
+produce neither a ⟂ row nor a position row.
+
+**Sibling audit.** *3-D:* the linear×planar and plane×plane cells have no shared-endpoint skip (the
+#577 note explains why hoisting it dropped «ABC ⟂ ABD» once) — unaffected; the query lane shares the
+panel's derivations and inherits both fixes. *2-D:* the theorem-surfacing spine derives relations
+over a coordinate-free `MatchCtx` with no universe partition — not present. *Complex:* not present.
+
+Locks: `src3d/__tests__/issue-811.test.ts` — the operator's sequence (three rows, position row still
+suppressed), both controls, the no-flood cube, the adjacent non-⟂ pair, the vector/segment dedupe.
