@@ -17,6 +17,7 @@
  * needed for the target platforms (tablets/desktop — ADR-207).
  */
 import React from 'react';
+import { isolateLtrRuns3 } from '../i18n/bidi';
 
 type Tok =
   | { k: 'pair'; text: string }
@@ -127,7 +128,23 @@ function tokEl(t: Tok, i: number): React.ReactNode {
 /** A notation row as MathML. Prose-only rows (no pair/vec/frac token) render as plain text. */
 export function VecMath({ text, vecNames }: { text: string; vecNames: Set<string> }): React.ReactElement {
   const toks = tokenizeRow(text, vecNames);
-  if (!toks.some((t) => t.k === 'pair' || t.k === 'vec' || t.k === 'frac')) return React.createElement(React.Fragment, null, text);
+  /**
+   * #482 (ADR-3D-184) — THE PROSE PATH MUST ISOLATE, because the reason the MathML path need not is
+   * the structure it emits.
+   *
+   * ADR-3D-121 left VecMath rows un-isolated on a stated justification: «VecMath emits one element
+   * per token, so bidi sees structure rather than one neutral run». That is true of the MathML path
+   * below — and false here, where the tokenizer found nothing expression-like and the row passes
+   * through as ONE neutral run under the caller's `dir="auto"`. The query lane renders every row
+   * through this function, so the operator's own reported strings — «הישר l - x=(1,2,3)+t(m-2,m,m+2)»,
+   * «מישור π1: x+(m-2)y+(m-1)z-5=0» — were still reordered there after the fact-row lane was fixed:
+   * the same defect, on the surface the chokepoint had not reached.
+   *
+   * Isolating at the RENDER EVENT rather than at a caller is the #482 lesson itself. The function is
+   * total, idempotent and byte-recoverable, so a caller that already isolated loses nothing.
+   */
+  if (!toks.some((t) => t.k === 'pair' || t.k === 'vec' || t.k === 'frac'))
+    return React.createElement(React.Fragment, null, isolateLtrRuns3(text));
   // group by whitespace-separated visual runs so prose keeps natural spacing
   return m(
     'math',
