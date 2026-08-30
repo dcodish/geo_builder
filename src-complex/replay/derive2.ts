@@ -780,7 +780,14 @@ export function foldConstraints(input: FoldInput): Derived2 {
     .filter((m) => m.status === 'violated')
     .map((m) => m.relation.src);
 
-  const unsatisfied = [...unsatisfiedRelations, ...violatedMeasures, ...violatedFilters];
+  /**
+   * #719 (ADR-CX-035) — an IMPOSSIBLE magnitude given joins the same channel, first.
+   *
+   * It leads because it is the most fundamental verdict available: «|z1| = -5» is refused by itself,
+   * with no reference to any other statement, so naming it before the relational verdicts tells the
+   * student the true reason rather than pointing at a conflict that is not the problem.
+   */
+  const unsatisfied = [...t1.impossible, ...unsatisfiedRelations, ...violatedMeasures, ...violatedFilters];
 
   /**
    * STAGE 5d — the only place a number the engine computed reaches a string.
