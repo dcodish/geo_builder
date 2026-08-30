@@ -16,7 +16,7 @@
  * (`שיעור ה-z של C' חיובי`) select among the surviving solutions, else the seed.
  */
 
-import type { Construction3, Id, LinExpr, Positions3, ScalarPin } from './types';
+import { pinSymsOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin } from './types';
 import { distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, cross3, dist3, dot3, runNormal, norm3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -281,14 +281,11 @@ export function solvePivot(
 
   // #325 (ADR-3D-079): the pins' OPEN symbols (`B(2t,t,k)` → t, k) are pivot unknowns too,
   // appended AFTER the coupled symbols. Unknown layout: [gauge 7 | dims | coupled | pinSyms].
-  const pinSyms: string[] = [];
-  // #794 (ADR-3D-168): vector and pair pins carry the same component grammar as point pins,
-  // so their open symbols are pivot unknowns by the same collection — one derivation, three lists.
-  for (const pin of [...pointPins, ...vecPins, ...c.pairPins]) {
-    for (const comp of [pin.x, pin.y, pin.z]) {
-      if (comp !== null && typeof comp === 'object' && !pinSyms.includes(comp.sym)) pinSyms.push(comp.sym);
-    }
-  }
+  // #794 (ADR-3D-168): vector and pair pins carry the same component grammar as point pins, so their
+  // open symbols are pivot unknowns by the same collection. #815: and so is a letter carried only by an
+  // EQUATION under a stated membership — ONE derivation (`pinSymsOf`), so the unknown layout can never
+  // be one symbol short of the namespace the rest of the engine reasons about.
+  const pinSyms: string[] = pinSymsOf(c);
   const nPinSym = pinSyms.length;
   /** A pin component's target value at the trial unknowns (null = unconstrained). */
   const compTarget = (comp: number | null | import('./types').SymComp, x: number[]): number | null => {

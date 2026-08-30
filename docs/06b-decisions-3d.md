@@ -5091,6 +5091,7 @@ resolver. Not present.
   lane has no membership drive at all** — «A על הישר ℓ» against a `c.param`-carrying line can only be
   verified, never satisfied. That is the same class one lane over, and it is the algebraic lane's own
   gap (a letter the equations carry is not a pivot unknown), so it is FILED rather than half-built here.
+  → Closed by [ADR-3D-178](#adr-3d-178) (#815): the membership is a second DOOR into the same re-homing.
 - The remaining slide ALONG a driving line stays unsampled, the funnel's documented conservatism for
   partially-pinned placement (same as today's numeric plane-pin case).
 
@@ -5307,3 +5308,81 @@ Locks: `src3d/__tests__/issue-819.test.ts` — the exam sentence He + En buildin
 compound lowering to both commands, «דרך AC» ≡ «דרך A ו-C», and the MATRIX asserted on lowered commands
 (order × notation × noun × locale, the 4-label face, the «בסיס» sentinel, and the two neighbouring cells
 proven unclaimed) plus a same-verdict-either-order check on a true and a false statement.
+
+## ADR-3D-178 — THE LETTER REACHES THE MECHANISM THAT CAN DETERMINE IT: the membership door (#815; extends ADR-3D-174)
+
+**2026-08-30 · round #822.** Found while fixing #801: the operator's prism with the line equation typed
+FIRST — «מנסרה ישרה משולשת ABCA'B'C'», then «משוואת הישר AC היא x=(8,-1,-1)+t(k+1,0,k-3)» — was refused
+**`not-on-line: A`** at the equation's own step, though the identical fact set builds green in the other
+order (that is #801) and derives green as a loaded file (ADR-3D-174 §2's re-homing acts on the SET).
+The interactive step refused a satisfiable statement and blamed the point.
+
+**Class.** *A letter carried only by EQUATIONS is never an unknown any drive can solve for, even when
+a stated membership is exactly the given that determines it.* The algebraic lane's letter (`c.param`)
+is root-found post-pivot over angle / ⟂ / line-relation givens, or — with none of those — simply
+SAMPLED (ADR-052, correct for a letter nothing pins). A membership against such a carrier can select a
+root (`chooseParam`) but there are no roots here, and it cannot move the figure: the lane has no
+membership drive at all (recorded as ADR-3D-174's second known limit). ADR-3D-174 §4 built exactly that
+drive — inside the pivot, gauge + dims + symbol jointly — but only for a letter the pivot already owned
+through an injection. The mechanism existed one lane over; the letter had no door to reach it.
+
+**Mechanism (the fix).** One body, two doors.
+
+1. **The membership door** (`apply.ts` — `adoptParamForCarrier`). An EXISTING point stated onto an
+   algebraic-lane carrier (a parametric line or an equation plane whose `LinExpr`s carry `p ≠ 0` and no
+   `sym`) hands the letter to the pivot under the SAME conditions as the injection door: the lane holds
+   nothing to root-find over (no plane-angle / ⟂ / line-relation / param given) and no coord-sym point
+   defines the letter. The re-homing body `adoptParamAsPinSym` used is extracted as
+   `releaseParamToPivot` and shared verbatim — the equations are re-marked `sym`, `c.param` is released.
+   A NEW point stated onto the carrier is a rider seated by construction: no drive needed, no door.
+   A side given (above/below a plane) is an inequality — sampled and verified, never driven — no door.
+   When the lane DOES hold a pinning given the letter stays there and the membership remains a
+   verify/selection: moving a root-find given into the pivot is a real mechanism, not attempted here.
+2. **One namespace** (`types.ts` — `pinSymsOf`). The pivot's symbol namespace was derived from the
+   pins' components only; after either door the letter may live in NO pin — only in the equation object
+   whose numbers are in it — and it is a pivot unknown all the same. `pinSymsOf` now also reads the
+   `sym` of every parametric line and equation plane, so the unknown layout, `freeDofCount3`,
+   `figureSymbolsOf`, the one-owner guards (`paramLane`, the coord-sym `two-params` refusal, `param-sign`)
+   and the data panel's symbol surfaces all see one set. `solve3` builds its unknown layout by calling
+   `pinSymsOf(c)` instead of re-deriving from the pin lists — the layout can no longer be one symbol
+   short of the namespace the rest of the engine reasons about.
+3. **The pivot block's entry condition asked one list too few** (`evaluate.ts`). The block that runs
+   the pivot and its failure-path drives was entered on `{pins, vectorPins, pairPins, scalarPins,
+   planePins, coordPlanePins, figPlanePerps, gaugeLineRels, drivableMemberships}` — `symMemberDrives`
+   was missing, so a figure whose ONLY pin-symbol content is a membership never reached the ADR-3D-174
+   drive at all. #801 was carried in by its pair pins. Added — an enumeration standing in for the
+   question, the `src3d/CLAUDE.md` trap, one more member.
+
+Everything else is bit-identical: the drive is failure-path only (a figure whose memberships hold never
+enters); the residual is ADR-3D-174 §4's, unchanged; `resolveSymObjects` fills the line at the solved
+value as before.
+
+**What the letter is at the equation's own step.** With prism + equation + the two memberships (A, C
+on AC), the pivot solves gauge (7) + k against 2 × 3 residuals of rank 2 each: under-determined, as the
+figure genuinely is. k is an OPEN pin symbol — its seed anchor (ADR-3D-079 Am. 2) makes it VARY with
+the seed (locked: four seeds, k differs) and the panel prints «k = ?», never a value. The injections
+then determine k = 2 and the panel reads «k = 2», identical to the other order.
+
+**New capability:** a membership stated against an algebraic-lane equation object DRIVES the figure and
+determines (or partially pins) the equation's letter — in either entry order, interactively. Satisfiability
+no longer depends on whether the equation or the injections were typed first (docs/17 M2 law i).
+
+**Sibling audit.** *3-D:* the plane cell («מישור π: x+(k-1)y+z-4=0» then «A על המישור π», injections
+after) had the same hole and takes the same door — locked. The new-rider cell (no door) and the
+pinning-given cell (lane keeps the letter) are locked as the boundaries. The `on-line` numeric lowering
+(ADR-3D-031 Am.) is untouched: a numeric carrier has nothing to re-home. *2-D (`src/`):* one symbol
+mechanism (`radius-symbol`), no second lane to re-home to — not present (ADR-3D-174's audit stands).
+*Complex:* one algebra evaluator — not present.
+
+**Known limits, recorded not hidden:** the pinning-given cell (a plane angle already root-finding k,
+then a membership on that plane) keeps today's verify-only behaviour; moving a root-find given into the
+pivot as a residual is the LADDER stage ADR-3D-174 declined too. The slide ALONG a driving line stays
+the funnel's documented conservatism.
+
+**Perf:** `derive3` at seed 0 — equation-first full sequence 368 ms, prism + equation alone 346 ms,
+injections-first (#801) 310 ms; the drive adds no solve to a figure that already holds.
+
+Locks: `src3d/__tests__/issue-815.test.ts` (the operator's order interactively at three seeds, the
+equation-alone step with k varying by seed and «k = ?», the apply gate + namespace, entry-order
+equivalence to 3 decimals, the plane cell, the rider boundary, the pinning-given boundary) and
+`fixtures3/prism-eq-first-815.geo3.json` (the equation-first sequence through the real load path).

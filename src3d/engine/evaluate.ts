@@ -1343,7 +1343,8 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   if (
     (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0 ||
       c.planePins.length > 0 || c.coordPlanePins.length > 0 || figPlanePerps.length > 0 ||
-      gaugeLineRels.length > 0 || drivableMemberships.length > 0) &&
+      gaugeLineRels.length > 0 || drivableMemberships.length > 0 ||
+      symDrives.length > 0) && // #815: a pin-symbol membership with NO pin beside it enters the pivot too
     c.solids.length > 0
   ) {
     const dims0 = c.solids.flatMap((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed, solid.oblique));

@@ -420,6 +420,48 @@ const partialNameOf = (c: Construction3, sym: string): PartialName | undefined =
 function adoptParamAsPinSym(c: Construction3, exprs: (SymComp | null)[]): Construction3 | null {
   const sym = c.param;
   if (!sym || !exprs.some((e) => e !== null && e.sym === sym)) return c; // nothing to re-home
+  return releaseParamToPivot(c);
+}
+
+/**
+ * #815 — the SAME re-homing, arriving through the MEMBERSHIP door. A letter carried only by equations
+ * is not a pivot unknown: with no pinning given the algebraic lane merely SAMPLES it (ADR-052), so a
+ * stated «A על הישר AC» against «x=(8,-1,-1)+t(k+1,0,k-3)» could be verified but never satisfied —
+ * the lane has no membership drive, and the refusal blamed the point. Yet that membership is exactly
+ * the given that determines k (the pivot solves gauge + k jointly, ADR-3D-174 §4) — so when an EXISTING
+ * point is stated onto an algebraic-lane carrier, the letter re-homes to the mechanism that can drive
+ * it, under the same conditions as the injection door. The class: *a letter reaches the mechanism
+ * that can DETERMINE it, whichever statement makes that determinable* — one body, two doors.
+ *
+ * No refusal exists at this door: when the lane holds a pinning given it keeps the letter and the
+ * membership stays a verify/selection (`chooseParam`), exactly as before.
+ */
+function adoptParamForCarrier(c: Construction3, carrier: { kind: 'line' | 'plane'; name: string }): Construction3 {
+  if (!c.param) return c;
+  let exprs: LinExpr[] = [];
+  if (carrier.kind === 'line') {
+    const def = c.lines.get(carrier.name);
+    if (def?.kind === 'parametric' && def.sym === undefined) exprs = [...def.anchor, ...def.dir];
+  } else {
+    const def = c.planes.get(carrier.name);
+    if (def && !def.free && def.sym === undefined) exprs = [def.cx, def.cy, def.cz, def.d];
+  }
+  if (!exprs.some((e) => e.p !== 0)) return c; // a numeric carrier — nothing to re-home
+  return releaseParamToPivot(c) ?? c;
+}
+
+/**
+ * The re-homing body shared by both doors (#801 injection, #815 membership): the algebraic lane
+ * releases its letter to the pivot when it holds nothing capable of pinning it — no angle / ⟂ /
+ * line-relation given to root-find over, no param given, and no coord-sym point (there the letter
+ * DEFINES the point's coordinates and the lane cannot be left). Every equation written in the letter
+ * is re-marked pin-symbol-parametric and `c.param` is released.
+ *
+ * `null` = the lane has a real claim on the letter; each door decides what that means.
+ */
+function releaseParamToPivot(c: Construction3): Construction3 | null {
+  const sym = c.param;
+  if (!sym) return c;
   if (c.planeAngles.length > 0 || c.linePerps.length > 0 || c.lineRels.length > 0 || c.paramGivens.length > 0) return null;
   for (const def of c.points.values()) if (def.kind === 'coord-sym') return null;
   const next = clone(c);
@@ -1553,6 +1595,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         );
         return { ok: true, next };
       }
+      // #815: a stated membership against an algebraic-lane plane re-homes its letter to the pivot (a side
+      // given is an inequality — sampled + verified, never driven — so it opens no door)
+      if (!cmd.side && cmd.plane !== 'any') c = adoptParamForCarrier(c, { kind: 'plane', name: cmd.plane });
       const next = clone(c);
       if (autoCreate) next.planes.set(cmd.plane, freePlaneDef(cmd.plane));
       next.memberships.push(cmd);
@@ -1688,6 +1733,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         next.points.set(cmd.id, { kind: 'on-line', line: cmd.line });
         return { ok: true, next };
       }
+      c = adoptParamForCarrier(c, { kind: 'line', name: cmd.line }); // #815: the letter re-homes through the membership door
       const next = clone(c);
       // M1 (ADR-3D-031 Am., the ADR-3D-030 shape): an EXISTING point stated onto a NUMERIC
       // typed line on a SOLID-bearing figure is ALSO a GIVEN — a point on a line is a point

@@ -1172,6 +1172,13 @@ export function pinSymsOf(c: Construction3): string[] {
       if (comp !== null && typeof comp === 'object' && !out.includes(comp.sym)) out.push(comp.sym);
     }
   }
+  // #815: an EQUATION written in a pin symbol carries that symbol too. After the re-homing (#801's
+  // injection door, #815's membership door) the letter may live in no pin at all — only in the line or
+  // plane whose numbers are in it — and it is a pivot unknown all the same: the membership residual
+  // against that carrier is what determines it. Derived here so the pivot's unknown layout, the DOF
+  // count, the symbol surfaces and the one-owner guards all see one namespace.
+  for (const def of c.lines.values()) if (def.kind === 'parametric' && def.sym !== undefined && !out.includes(def.sym)) out.push(def.sym);
+  for (const def of c.planes.values()) if (def.sym !== undefined && !out.includes(def.sym)) out.push(def.sym);
   return out;
 }
 

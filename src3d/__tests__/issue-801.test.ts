@@ -82,10 +82,8 @@ describe('#801 — the equation and the injections share ONE letter', () => {
   it('M2 re-homing — the equation FIRST still reaches the same figure (the fact SET, e.g. a loaded file)', () => {
     // The equation is applied before anything owns k, so it opens the algebraic lane; the injections
     // that follow RE-HOME the letter to the pivot instead of refusing `two-params` (#794's answer),
-    // and the whole set resolves to the same figure. NOTE the honest boundary: typing this order
-    // INTERACTIVELY still stops at the equation itself — at that moment k is the algebraic lane's and
-    // that lane has no membership drive at all, so «A on ℓ» cannot yet be satisfied. That gap belongs
-    // to the algebraic lane (filed separately); what is asserted here is the re-homing.
+    // and the whole set resolves to the same figure. The interactive step in this order is #815's
+    // (ADR-3D-178, `issue-815.test.ts`); what is asserted here is the re-homing of the SET.
     const d = derive3(facts([PRISM[0], NAMED, ...PRISM.slice(1)]), 0);
     expect(Object.values(d.status).every((s) => s === 'ok'), JSON.stringify(d.status)).toBe(true);
     expect(d.construction.param).toBeUndefined();
