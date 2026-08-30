@@ -31,8 +31,9 @@ import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { scalePinned } from '../engine/solve3';
 import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
-import { dot3, norm3, sub3 } from '../engine/vec3';
-import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
+import { dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
+import { namedPointAt } from '../engine/crossings3';
+import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Id, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
 import { parse3 } from '../parser/parse3';
 
@@ -357,6 +358,37 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     status[blamedPinOwner] = coordPinOwnerIds.has(blamedPinOwner)
       ? { code: 'injection-unsatisfiable' }
       : { code: 'givens-contradict', stated: f.utterance, others: namedStatements(pinOwnerIds, blamedPinOwner) };
+  }
+
+  // #769 (ADR-3D-183) — A DERIVED POINT THAT LANDS ON AN EXISTING NAMED POINT IS NOT MINTED. The
+  // student made two claims — "there is a crossing of AC' with plane ADE" (true) and "call it G, a new
+  // point" (false: it is A, which defines the plane). The refusal affirms the geometry and refuses the
+  // name (operator ruling 2026-08-25). Stated over DERIVED points — every 0-DOF kind — not over the one
+  // command that surfaced it; provenance is derived from the fact list (the first fact naming the id
+  // minted it), never from a list of minting command types. The judgement is the click-offer's own
+  // (`namedPointAt`), so the OFFER lane and the TYPED lane answer one question the same way (#653).
+  {
+    const DERIVED = new Set([
+      'on-segment', 'centroid', 'in-span', 'right-apex', 'foot-plane', 'foot-line', 'line-plane', 'plane-cut',
+      'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'vec-defined', 'vec-pair',
+    ]);
+    const order = [...c.points.keys()];
+    const minter = new Map<Id, string>();
+    for (const f of facts) for (const cmd of f.cmds) if ('id' in cmd && typeof cmd.id === 'string' && !minter.has(cmd.id)) minter.set(cmd.id, f.id);
+    for (const [id, def] of c.points) {
+      if (!DERIVED.has(def.kind)) continue;
+      if (def.kind === 'on-segment' && def.t === undefined) continue; // a free rider, not a derived point
+      const fid = minter.get(id);
+      if (fid === undefined || status[fid] !== 'ok') continue;
+      const P = positions.get(id);
+      if (!P) continue;
+      const earlier = order.slice(0, order.indexOf(id)).flatMap((q): [Id, Vec3][] => {
+        const Q = positions.get(q);
+        return Q ? [[q, Q]] : [];
+      });
+      const with_ = namedPointAt(P, earlier);
+      if (with_ !== null) status[fid] = { code: 'point-coincides', id, with: with_ };
+    }
   }
 
   for (const f of facts) {

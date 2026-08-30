@@ -113,6 +113,8 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.wrongSideOfPlane', { id: err.id });
     case 'not-on-line':
       return t('err.notOnLine', { id: err.id });
+    case 'point-coincides':
+      return t('err.pointCoincides', { id: err.id, with: err.with });
     case 'line-misses-plane':
       return t('err.lineMissesPlane', { id: err.id });
     case 'crossing-off-segment':

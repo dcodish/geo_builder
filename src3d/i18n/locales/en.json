@@ -87,6 +87,7 @@
     "planeSideUndefined": "Plane {{id}} is vertical — it has no \"above\" or \"below\"",
     "wrongSideOfPlane": "«{{id}}» is not on the stated side of the plane — check the givens",
     "notOnLine": "«{{id}}» is not on the line — check the givens",
+    "pointCoincides": "the point you asked for is «{{with}}» — a point already in the figure. The geometry is right, but there is no new point here to call «{{id}}»; if you meant another point, check the segment or plane you named",
     "symbolicNewPoint": "A new point «{{id}}» needs numeric coordinates — letters are only allowed for a point already in the figure",
     "injectionUnsatisfiable": "No placement of the solid matches the given coordinates — check the givens",
     "givensContradict": "The givens contradict each other — no figure satisfies «{{stated}}» together with {{others}}",

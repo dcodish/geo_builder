@@ -5651,3 +5651,53 @@ over a coordinate-free `MatchCtx` with no universe partition — not present. *C
 
 Locks: `src3d/__tests__/issue-811.test.ts` — the operator's sequence (three rows, position row still
 suppressed), both controls, the no-flood cube, the adjacent non-⟂ pair, the vector/segment dedupe.
+## ADR-3D-183 — A DERIVED POINT THAT LANDS ON AN EXISTING NAMED POINT IS NOT MINTED: affirm the geometry, refuse the name (#769; operator ruling 2026-08-25)
+
+**2026-08-30 · round #822.** Surfaced while building #755/#756: «תיבה ABCDA'B'C'D'», «E אמצע BB'»,
+«מישור ADE», then the operator's own line «G נקודת חיתוך של AC' עם מישור ADE» — built green and placed
+G at (0,0,0), on top of A. A is one of the three points that DEFINE plane ADE, so the crossing of AC'
+with it is A itself; `line-plane-point` computed it, `apply` accepted it (free id, existing operands),
+and the figure ended up with two named points at one location. The click-offer already got this right
+by a different route (`openCrossings3` suppresses a dot within `NAMED_TOL` of a placed point) — the
+OFFER lane and the TYPED lane disagreed about one point (the #653 shape).
+
+**The ruling (2026-08-25).** The student made two claims and only one is false: "there is a crossing
+of AC' with plane ADE" — true, and the refusal must not deny it; "call it G, a new point" — false, it
+is the A already in the figure. So the message AFFIRMS the crossing and REFUSES the name, in the
+ADR-W-030 teaching form: the point you asked for is «A», already in the figure; the geometry is right,
+but there is no new point here to call «G». This also catches the likely real error — a student
+transcribing the problem who wrote AC' almost certainly meant CC', which crosses honestly at t = ½.
+
+**Class-first.** The defect is not in `line-plane-point`: *no* derived-point mint checked distinctness
+against existing named points — a crossing, a foot, a midpoint, a plane∩segment cut could all stack
+silently. Fixing the reported cell alone would have been the narrow patch the standing rule forbids
+(the second one-empty-square-in-a-matrix this month, cf. #755).
+
+**Mechanism.**
+
+1. **One judgement, exported** — `namedPointAt(point, placed)` in `crossings3.ts`: the click-offer's
+   own "this position IS an existing named point" test (`NAMED_TOL · max(1, |P|)`, the figure's
+   existing distinctness epsilon — no new tolerance, ruling requirement 1), used by the offer lane and
+   by the store's verify pass alike (requirement 2, ADR-W-006: derive, never copy).
+2. **The check at the mint chokepoint** — the store's verify pass, over every DERIVED (0-DOF) point
+   kind: midpoint/on-segment with a stated t, centroid, in-span, right-apex, the four feet, line∩plane,
+   plane∩segment, bisector-seg, right-pyramid-apex, vec-defined, vec-pair. Free riders (on-line,
+   on-plane, partial, free3) are never judged — two riders on one line are two riders. Provenance is
+   DERIVED from the fact list (the first fact naming the id minted it), never from a list of minting
+   command types; `c.points` is insertion-ordered (parents precede), so the EARLIER point is the one
+   named. The refusal lands on the minting fact as `point-coincides {id, with}`; keep-prior-on-error
+   means the point is not minted.
+
+**New capability:** the operator's line refuses naming A, «CC'» still builds at t = ½, «F אמצע AB» after
+«E אמצע AB» names E, a height-to-face whose foot is a vertex names the vertex, a plane∩edge crossing at
+an endpoint names the endpoint.
+
+**Sibling audit.** *3-D:* the offer lane reads the same helper (locked: no dot at A). *2-D (`src/`):*
+measured — «משולש ABC», «E אמצע AB», «F אמצע AB» builds green with E ≡ F and reports it through
+`Derived.coincidences = [[E, F]]` (the ADR-378 collector's notice): the 2-D product COMMUNICATES the
+coincidence rather than refusing it — a design already in place, not a silent stack; left as is, its
+ruling is that product's own. *Complex:* no derived points of this kind.
+
+Locks: `src3d/__tests__/issue-769.test.ts` — the operator's sequence (refusal names A, G not minted),
+the CC' sibling at t = ½, the offer-lane agreement, and the class (midpoint, foot, plane∩edge, the
+free-rider exemption, a distinct nearby derived point still building).

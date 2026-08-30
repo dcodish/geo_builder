@@ -15,7 +15,7 @@
  */
 
 import { paramIsKnowledge, type Resolved3 } from './evaluate';
-import type { Construction3 } from './types';
+import type { Construction3, Id } from './types';
 import { add3, dist3, dot3, norm3, scale3, sub3, type Vec3 } from './vec3';
 
 export interface Crossing3 {
@@ -50,6 +50,19 @@ interface Carrier3 {
 const NAMED_TOL = 1e-6;
 
 /**
+ * #769 (ADR-3D-183) — the ONE judgement of "this position IS an existing named point": the click-offer
+ * uses it to suppress a dot on top of a vertex, and the store's verify pass uses it to refuse minting a
+ * derived point there (the same question, one seam over — ADR-W-006, derive rather than copy). Returns
+ * the id of the first placed point within the figure's distinctness tolerance, else null. `placed` is
+ * iterated in insertion order, so the EARLIER point is the one named.
+ */
+export function namedPointAt(point: Vec3, placed: Iterable<[Id, Vec3]>): Id | null {
+  const scale = Math.max(1, norm3(point));
+  for (const [id, p] of placed) if (dist3(p, point) <= NAMED_TOL * scale) return id;
+  return null;
+}
+
+/**
  * Every line∩plane crossing the givens DETERMINE and no existing point already occupies.
  *
  * The honesty gate is one condition, and it is the whole reason this is not a pure geometry helper:
@@ -82,7 +95,6 @@ export function openCrossings3(c: Construction3, resolved: Resolved3): Crossing3
   // an unforced parameter makes every algebraic object a sample of itself — nothing here is knowledge
   if (c.param && !paramIsKnowledge(resolved.param)) return [];
 
-  const placed = [...resolved.positions.values()];
   const out: Crossing3[] = [];
 
   for (const carrier of crossingCarriers3(c, resolved)) {
@@ -103,7 +115,7 @@ export function openCrossings3(c: Construction3, resolved: Resolved3): Crossing3
       const point = add3(carrier.anchor, scale3(carrier.dir, t));
       if (!Number.isFinite(point.x) || !Number.isFinite(point.y) || !Number.isFinite(point.z)) continue;
       const scale = Math.max(1, norm3(point));
-      if (placed.some((p) => dist3(p, point) <= NAMED_TOL * scale)) continue; // already a named point
+      if (namedPointAt(point, resolved.positions) !== null) continue; // already a named point (#769: the shared judgement)
       if (out.some((k) => dist3(k.point, point) <= NAMED_TOL * scale)) continue; // one dot per location
       out.push({ line: carrier.name, plane, point });
     }

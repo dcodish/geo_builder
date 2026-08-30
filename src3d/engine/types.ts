@@ -1236,6 +1236,9 @@ export type EngineError3 =
   | { code: 'plane-side-undefined'; id: string } // above/below a (near-)vertical plane is meaningless
   | { code: 'wrong-side-of-plane'; id: Id } // a stated above/below does not hold for the point
   | { code: 'not-on-line'; id: Id } // a stated on-line membership does not hold
+  // #769 (ADR-3D-183): a DERIVED point (a crossing, a foot, a midpoint…) lands on a point the figure
+  // already names — the geometry the student asked for is right, the NAME is not: it is `with`.
+  | { code: 'point-coincides'; id: Id; with: Id }
   | { code: 'line-misses-plane'; id: Id } // ℓ ∥ π at the chosen parameter — no crossing point
   // #780: the plane crosses the LINE through the stated segment, but outside the drawn ink. The
   // student pointed at an edge, so a crossing beyond its endpoints is not on the figure — refuse
