@@ -714,6 +714,7 @@ export default function App3() {
               resolved={derived.resolved}
               planeDisplay={planeDisplay}
               showWitnesses={showWitness}
+              showObjectAngles={showData}
               coordLabels={showData && dataPanel ? dataPanel.pointCoords : undefined}
               width={canvasSize.w}
               height={canvasSize.h}
