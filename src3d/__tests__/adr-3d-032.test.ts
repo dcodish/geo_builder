@@ -85,7 +85,10 @@ describe('ADR-3D-032 — the data panel derives a forced plane equation (part ג
     expect(state().lastError).toBeNull();
     const panel = dataView(derived().construction, state().seed);
     expect(panel.planes).toContain("ABB'A': 20x - y + 2z - 5 = 0");
-    expect(panel.planes).toContain("ABB'A': x = (0, -3, 1) + t·(0, 10, 5) + s·(2, 8, -16)");
+    // #823: the parametric form is written against the plane's own symbol. This figure has TWO planes
+    // (A'B'C'D' is π1, and prints only its standard form), so ABB'A' is π2 — the number follows the
+    // figure's plane enumeration, not the order in which parametric rows happen to be printable.
+    expect(panel.planes).toContain("ABB'A': π2 = (0, -3, 1) + t·(0, 10, 5) + s·(2, 8, -16)");
   });
 
   it('an UNDER-determined plane prints nothing (the multi-sample knowledge gate)', () => {

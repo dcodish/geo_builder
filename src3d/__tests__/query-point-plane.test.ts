@@ -89,15 +89,18 @@ describe('#317 — a PLANE answers its canonical equation', () => {
     // operator, 2026-08-15: "whenever giving a plane, always give both representations if possible" —
     // a plane has two standard forms and the panel has always printed both.
     const r = ans(TRIANGLE, 'מישור ABC');
-    expect(r.answer).toContain('z = 0');
-    expect(r.answer).toContain('x = (0, 0, 0) + t·(4, 0, 0) + s·(0, 2, 0)');
+    // #823: one representation per ROW, and the parametric is written against the plane's own symbol
+    expect(r.rows).toEqual(['z = 0', 'π = (0, 0, 0) + t·(4, 0, 0) + s·(0, 2, 0)']);
+    expect(r.answer).toBe('z = 0'); // the first row is a complete answer on its own
   });
 
   it("the parametric half is the PANEL's own, not a second derivation", () => {
     const { c, seed } = build([...TRIANGLE, 'המישור ABC']);
-    const panelPar = dataView(c, seed).planes.find((p) => p.startsWith('ABC: x ='));
+    // #823: the parametric row is written against the plane's symbol, and the query lane's second ROW
+    // is the same string the panel prints — which is this test's point, now assertable directly.
+    const panelPar = dataView(c, seed).planes.find((p) => p.startsWith('ABC: π'));
     expect(panelPar).toBeDefined();
-    expect(answerQuery(c, 'מישור ABC', seed).answer).toContain(panelPar!.replace('ABC: ', ''));
+    expect(answerQuery(c, 'מישור ABC', seed).rows![1]).toBe(panelPar!.replace('ABC: ', ''));
   });
 
   it('"if possible" is honest — no run, or an unstable one, yields NO parametric form', () => {
@@ -109,7 +112,7 @@ describe('#317 — a PLANE answers its canonical equation', () => {
       new Map([['A', v(0, 0, 0)], ['B', v(1, 0, 0)], ['C', v(0, 1, 0)]]),
       new Map([['A', v(0, 0, 0)], ['B', v(1, 0, 0)], ['C', v(0, 1, 0)]]),
     ];
-    expect(parametricPlaneForm(['A', 'B', 'C'], stable)).toBe('x = (0, 0, 0) + t·(1, 0, 0) + s·(0, 1, 0)');
+    expect(parametricPlaneForm(['A', 'B', 'C'], stable)).toBe('π = (0, 0, 0) + t·(1, 0, 0) + s·(0, 1, 0)');
     expect(parametricPlaneForm(undefined, stable), 'no run (an equation-given plane)').toBeNull();
 
     const slidingAnchor = [stable[0], new Map([['A', v(9, 9, 9)], ['B', v(1, 0, 0)], ['C', v(0, 1, 0)]])];
@@ -136,7 +139,8 @@ describe('#317 — a PLANE answers its canonical equation', () => {
 
   it('a DECLARED plane answers exactly what the panel prints for it', () => {
     const { c, seed } = build([...TRIANGLE, 'המישור ABC']);
-    const row = dataView(c, seed).planes.find((p) => p.startsWith('ABC: ') && !p.includes('x ='));
+    // #823: exclude the PARAMETRIC row by what makes it parametric, not by the `x =` it no longer has
+    const row = dataView(c, seed).planes.find((p) => p.startsWith('ABC: ') && !p.includes(' + t·'));
     expect(row).toBeDefined();
     expect(answerQuery(c, 'מישור ABC', seed).answer).toContain(row!.replace('ABC: ', ''));
   });

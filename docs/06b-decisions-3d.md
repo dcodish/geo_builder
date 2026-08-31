@@ -5854,6 +5854,58 @@ selecting ±4 at every seed in the relation-first order (proof the extra starts 
 than numerical debris), and a genuinely unsatisfiable injection (`S(0,3,6)`, contradicting `AS ⟂ AB`)
 still refused — widening only ever ADDS starts, so a system with no solution still finds none.
 
+## ADR-3D-187 — A PLANE'S TWO REPRESENTATIONS GET A ROW EACH, AND THE PARAMETRIC ONE IS «π» (#823)
+
+**Status:** Accepted (2026-08-30) · **Ladder:** stage 5d (display) · **Round:** #826 · **Operator report:** playing round #822, 2026-08-30
+
+Giving both representations is the 2026-08-15 ruling («whenever giving a plane, always give both
+representations if possible») and is not in question. This is how they were PRESENTED:
+
+> `מישור ABC = x - 5y + 3z - 10 = 0  |  x = (2, -1, 1) + t·(1, 2, 3) + s·(3, 0, -1)`
+
+Two defects in one row. The query lane joined the forms with `  |  ` while the panel had always pushed
+them as two rows — so the same figure read two different ways on two surfaces. And the parametric form
+opened with a bare `x =`, which reads as *the coordinate x* and says nothing about which plane is being
+described.
+
+**Decision.**
+
+1. **One representation per row.** `QueryResult` gains `rows?: readonly string[]`, present only when an
+   answer has more than one row; `answer` stays the FIRST row, which is a complete answer on its own so
+   no non-UI consumer needs a special case. The App renders `rows ?? [answer]` — every single-value
+   query is bit-identical.
+2. **The parametric form is written against the plane's own symbol**, not `x`. `parametricPlaneForm`
+   takes the symbol; the panel and the query lane both pass it.
+3. **The symbol is composed ONCE** — `planeSymbols(c)` — and read by both surfaces, so they cannot
+   disagree about which plane is π1 (the #653 class: two surfaces answering one question from two
+   sources). «π» when the figure has one plane, «π1», «π2» … when it has several, enumerated in the
+   panel's own iteration order, which is the authority for *the figure's planes*.
+4. **A plane the student NAMED keeps its name** and is never renumbered — and its name is *reserved*,
+   so a generated symbol can never collide with a plane the student themselves called π2.
+
+**A query names its plane either way**, and both must reach the same registry entry: «מישור π1» carries
+the name, «מישור ABC» carries the RUN. Resolving only the name would have printed «π» in the query lane
+for a plane the panel was calling «π1» — the exact disagreement this issue exists to remove.
+
+**Unchanged:** when a plane has no stable parametric form (an equation-given plane has no run at all),
+the standard form stands alone rather than a sampled parametrisation being invented — the honesty half
+of the 2026-08-15 ruling, untouched here.
+
+**A judgement worth naming: the number follows the FIGURE'S planes, not the printable rows.** On the
+ADR-3D-032 figure that means «ABB'A': π2 = …» appears while no «π1» is visible, because π1 is
+A'B'C'D', whose run has no stable parametric form and which therefore prints only its standard row. The
+alternative — numbering only the planes that get a parametric row, so the first one is always π1 —
+reads better in that one screenshot and is *unstable*: whether a plane has a printable parametric form
+depends on run stability, so an unrelated plane gaining or losing its own row would RENUMBER this one.
+A label that moves under the student is worse than a label that starts at 2, so the enumeration is over
+the plane universe. Flagged for the operator's play; if they prefer the other reading it is a one-line
+change to the universe passed to `planeSymbols`.
+
+Locks: `issue-823.test.ts` (8) — the operator's own plane answering in two rows with their reported
+numbers, no answer string carrying «|», `answer` remaining the complete first row, a single-value query
+carrying no `rows` at all, «π =» rather than «x =», two planes numbered π1/π2 with distinct symbols, and
+the panel and the query lane agreeing on both the symbol and the parametric text.
+
 ## ADR-3D-188 — ONE NOUN VOCABULARY: the lexicon layer gets its first directory, and the AREA head takes its subject noun (#753)
 
 **Status:** Accepted (2026-08-30) · **Ladder:** stage 0 (parse) · **Round:** #826 · **Operator ruling:** 2026-08-19 — *"for #753 - option 1 - the recommended approach"*

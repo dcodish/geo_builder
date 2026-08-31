@@ -867,8 +867,16 @@ export default function App3() {
                           <VecMath text={r.text} vecNames={new Set(derived.construction.vectors.keys())} />
                           {r.answer !== null ? (
                             <span className="font-medium">
-                              {' = '}
-                              <VecMath text={r.answer} vecNames={new Set(derived.construction.vectors.keys())} />
+                              {/* #823: an answer may have several ROWS — a plane gives its standard and
+                                  its parametric form, one per line, never joined by a `|` (operator,
+                                  2026-08-30). A single-value answer is the one-row case and is
+                                  unchanged. */}
+                              {(r.rows ?? [r.answer]).map((row, k) => (
+                                <span key={k} className={k > 0 ? 'block' : undefined}>
+                                  {k === 0 ? ' = ' : null}
+                                  <VecMath text={row} vecNames={new Set(derived.construction.vectors.keys())} />
+                                </span>
+                              ))}
                               {/* #813: a note may ACCOMPANY an answer (a frameless plane reports its shape and says why no equation follows) */}
                               {r.note && <span className="font-normal text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>}
                             </span>
