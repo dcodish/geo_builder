@@ -6004,3 +6004,61 @@ non-planar container refused, M1 both ways (a true containment accepted on a no-
 one refused `claim-refuted`), **the round trip** (a figure whose panel prints «BE מוכל במישור ABCD»
 accepting that exact sentence), the shared predicate being order-independent and rejecting a parallel-but-
 offset line, planar containment equalling coincidence, and the ∥ sibling keeping its cell.
+
+## ADR-3D-191 — AN UNSTATED ENDPOINT IS FREE, AND CONTAINMENT TAKES A DEGREE OF FREEDOM (#840, #839)
+
+**Status:** Accepted (2026-08-31) · **Ladder:** stage 1 (apply) + stage 5 (placement) · **Operator report:** playing `prod/2026-08-31`
+
+> *"when i delete the E middle of it doesnt do anything (is yellow). In this case, I think that BE should
+> be drawn with a degree of freedom and having it part of ABCD should even limit the degree of freedom
+> even more. But it doesn't do any of that."*
+
+Both halves were true, and they are one chain: the segment could not exist, so the relation had nothing
+to constrain — which is why [ADR-3D-189](#adr-3d-189)'s containment shipped with a drive that was never
+reachable.
+
+**Half 1 — «קטע BE» with no `E` was refused `unknown-point`.** 3-D refused any utterance naming a point
+it did not know; it never created one. 2-D does the opposite («נקודה E» → a free point), so the products
+disagreed about what naming an unknown point means.
+
+[ADR-052](../06-decisions.md#adr-052) settles it: a student enters only what the question shows, and every
+unstated magnitude is a **free DOF**. `E` is unstated, so it is free. `segment3` now mints an unknown
+endpoint as `free3` — 3 sampled degrees of freedom that «הציגו תצורה אחרת» resamples.
+
+**Two guards, not one — the second was found by a failing lock.** The first version minted on every
+`segment3`, and `v7-t1` went red: many commands emit a `segment3` as a **carrier** («נסמן: AB = u, AC = v»
+draws the vector's segment before naming it), and minting there let a NAMING introduce its own subject,
+against that test's explicit *"naming needs existing points"*. So the mint is gated on `bare` — the
+drawing register, where the student's whole sentence IS the segment. Every other `segment3` in the parser
+is a carrier and creates nothing.
+
+**The typo guard is kept, and it is the reason the scope is narrow.** The polygon lane already mints
+free corners on exactly this argument (*"«משולש XYZ» already builds three free points"*) and does so only
+when the run has at least one KNOWN point. The same rule applies here: «קטע BE» extends from a `B` that
+exists, while «קטע QZ» — both ends unknown — is still refused and names the undeclared label. The wider
+reading (mint on every mention, as 2-D does) would silently invent both points; that trade was flagged to
+the operator on #840 and is **not** taken here.
+
+**Half 2 — containment could only verify, never constrain.** The `plane-rel` pin solves the GAUGE and the
+shape DIMS: it moves the whole figure. A free point's position is **sampled**, outside that unknown
+vector, so the pin could check «BE מוכל במישור ABCD» and could never bring a loose `E` into the plane —
+it came back `claim-refuted`.
+
+#614's analysis pointed at lowering to point memberships, and measurement said one step further: **a
+membership on an already-sampled point only verifies it.** What removes the freedom is re-homing the
+point — a `free3` endpoint becomes an `on-plane` **rider**, which `evaluate` already places
+(`placeOnPlaneRider`) and already counts as **2 degrees of freedom instead of 3** (`evaluate.ts:765`).
+
+**Only a FREE endpoint is re-homed.** A bound one — a solid vertex, a midpoint, a foot — already has an
+owner and keeps it; re-kinding it would unbind it from the construction that defines it, and its
+containment stays the claim's business. Measured: `B` remains `solid-vertex` throughout.
+
+**Measured result** (the operator's own figure): free `E` moves in three dimensions across seeds
+(z = 1.03, 1.11, 0.81); contained `E` sits at **z = 0 at every seed** while still sliding in x and y. The
+DOF count drops by exactly one. That is the operator's sentence made literal.
+
+Locks: `issue-840.test.ts` (16) — «קטע BE» building with `E` minted free and genuinely moving, the typo
+still caught, a bound endpoint keeping its owner, the containment ACCEPTED rather than refused, `E`
+re-homed `free3 → on-plane`, `E` in the plane at five seeds while still sliding inside it, the DOF count
+dropping by exactly one, and the two cases that must not change (the entailed midpoint case, and a false
+containment on bound points still refusing).
