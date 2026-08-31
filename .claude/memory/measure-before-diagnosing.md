@@ -1,0 +1,36 @@
+---
+name: measure-before-diagnosing
+description: "A root cause written from reading code is a hypothesis — run it and measure before it goes in the issue body, because a wrong diagnosis gets built on"
+metadata: 
+  node_type: memory
+  type: feedback
+  originSessionId: 5dd166f3-bdf1-4c93-b683-4b5af62f30de
+  modified: 2026-08-31T20:09:02.059Z
+---
+
+On 2026-08-31, in one round, **two of four issues were filed with a root cause I had reasoned to from
+reading the code, and both were wrong**:
+
+- **#848** — filed as *"the commas render on the wrong side"*. Dumping the actual rendered markup
+  showed the commas were fine (`u̲,` sat correctly inside its island); the **equations** were reversed
+  (`AB`, `=`, `u` were three separate islands, and islands in an RTL container lay right-to-left).
+  Corrected and retitled before any code was written — but only because the fix forced a measurement.
+- **#850** — the plan asserted *"a cube/prism knows its opposite faces."* It does not: `SolidObj`
+  stores face rings and no parallelism, and `prismBaseN()` covers six kinds that exclude `cube` and
+  `box` — the exact kinds in the report. Escalated instead of built.
+
+**Why:** both diagnoses were plausible readings of the code, and both were about what the code *would*
+do rather than what it *does*. A wrong root cause in an issue body is worse than none — it is the
+thing the next session (or the fix-round loop) builds against, and it survives review because it
+reads like analysis.
+
+**How to apply:** before writing a root cause into an issue, **run the case and print the actual
+state** — the rendered markup, the derived construction, the verdict. It is usually a five-line probe
+in a scratch test or the browser. Then write the diagnosis from what came back. The measurement also
+belongs in the issue, so the next reader can tell analysis from observation.
+
+Corollary, learned the same day: for anything visual, the measurement must be the **rendered** result.
+`textContent` was correct on every broken build of the bidi row, which is how that defect survived two
+fixes — see [[no-browser-self-test]].
+
+Related: [[gate-lines-are-read-not-matched]] (evidence produced is not evidence read).
