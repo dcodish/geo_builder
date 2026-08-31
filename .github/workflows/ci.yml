@@ -144,6 +144,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # #846: this is the ONLY job that runs check-sibling-safety, and that script needs the PR
+          # base commit. At the default depth 1 the base is not fetched, so its HEAD~1 fallback --
+          # which exists to make a fresh clone work -- is itself absent and the lane dies before any
+          # test runs. The sibling guarantee (ADR-W-017) is why this lane exists; it needs history.
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v5
