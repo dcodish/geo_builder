@@ -17,7 +17,7 @@
  * needed for the target platforms (tablets/desktop — ADR-207).
  */
 import React from 'react';
-import { isolateLtrRuns3 } from '../i18n/bidi';
+import { isolateLtrRuns3, textDir3 } from '../i18n/bidi';
 
 type Tok =
   | { k: 'pair'; text: string }
@@ -145,10 +145,29 @@ export function VecMath({ text, vecNames }: { text: string; vecNames: Set<string
    */
   if (!toks.some((t) => t.k === 'pair' || t.k === 'vec' || t.k === 'frac'))
     return React.createElement(React.Fragment, null, isolateLtrRuns3(text));
+  /**
+   * #838 (ADR-3D-190) — THE WRAPPER'S DIRECTION FOLLOWS THE ROW, NOT THE PRESENCE OF A MATH TOKEN.
+   *
+   * This element used to be hard-coded `dir="ltr"`, and it wraps the WHOLE row — the Hebrew prose
+   * tokens included. So «BE מוכל במישור ABCD» was laid out left-to-right and a Hebrew reader, scanning
+   * right-to-left, met «ABCD» first: the operator read their own statement as if ABCD were contained
+   * in BE, and reported it as a containment bug (2026-08-31).
+   *
+   * ADR-3D-184 left this branch alone on the argument that «VecMath emits one element per token, so
+   * bidi sees structure rather than one neutral run». That is true of a PURE EXPRESSION and false of a
+   * Hebrew sentence containing expression tokens — the structure is there, and the wrapper was
+   * overriding the direction it should have been ordered in. The tokens were checked; the wrapper
+   * around them was not.
+   *
+   * `textDir3` is the same question the input preview asks («what direction is this string?»), so the
+   * two seams cannot disagree. A pure expression row still reads `ltr` and is byte-identical; a Hebrew
+   * sentence orders its islands right-to-left while each island stays internally LTR, which is what the
+   * per-token elements already are.
+   */
   // group by whitespace-separated visual runs so prose keeps natural spacing
   return m(
     'math',
-    { dir: 'ltr', style: { fontSize: 'inherit' } },
+    { dir: textDir3(text), style: { fontSize: 'inherit' } },
     m('mrow', null, ...toks.map((t, i) => (t.k === 'op' && t.text === ' ' ? m('mspace', { key: i, width: '0.35em' }) : tokEl(t, i)))),
   );
 }
