@@ -6259,3 +6259,62 @@ no-`no-solution` cross-product property; and the stated segment still drawn (#82
 **Sibling check (ADR-W-004).** 2-D has no planes, so this lane has no 2-D twin. The general class —
 *a relation table advertising an action no code implements* — is worth a sweep in both products; not
 done here, and not claimed to be. Filed as #845 rather than absorbed silently.
+## ADR-3D-194 — A COORDINATE IS KNOWLEDGE ONLY IF THE ADMISSIBLE POOL AGREES, NOT MERELY THE SEEDS (#827)
+
+**Status:** accepted, 2026-08-31.
+
+**Measured — the operator's exam pyramid, no sign given.** `|AD| = 5` with `AD = (3, p, 0)` forces
+**p = ±4**, and both configurations are reachable («p חיובי» / «p שלילי» each select one, at every
+seed, in both entry orders):
+
+| seed | panel, before |
+| --- | --- |
+| 0, 1, 3, 42 | `D(3, ?, 0)` ✅ honest — the givens do not determine it |
+| **17, 99** | **`D(3, 4, 0)`** ❌ printed as knowledge, though −4 holds equally |
+
+[ADR-052](../06-decisions.md#adr-052)'s cardinal sin in its exact stated form — *a value the givens
+leave open, printed as a value* — reached through the panel's sampling rather than through DOF
+accounting. And the instability is its own defect: «הציגו תצורה אחרת» changes the seed, so the same
+figure printed `4` and then `?`.
+
+**Root cause.** The pivot enumerates an admissible pool of placements and picks
+`chosen = pool[seed % pool.length]`, so **the branch is a function of the seed**. `dataView` judged a
+coordinate by comparing three sampled configurations (`[seed, seed+1013, seed+2027]`). Those three
+samples vary the **gauge**; they do not vary the **branch**. When the deterministic pick lands in the
+same branch for all three — which it does at some seeds and not others — a branch choice reads as a
+fact.
+
+**This is [#797 (ADR-3D-168 Am. 1)](#adr-3d-168) one lane over.** That amendment established, for pin
+symbols, that *seed-stability alone is not determinedness*: a symbol restricted to discrete roots
+cannot be moved off a root by resampling, so a deterministic root pick reads seed-stable. It fixed
+that by exposing `symRoots` — the admissible pool's distinct values — and requiring a singleton.
+**Coordinates had no equivalent guard.** The finding was right and was applied to one lane only.
+
+**Decision — the same answer, for coordinates.** `resolve3` now also exposes
+`pivot.pointRoots`: the admissible pool's distinct positions per point, post sign-filtering and
+gauge-transformed exactly as the chosen solution is. `dataView` prints an axis as knowledge only when
+it agrees across the three seeds **and** across that pool at every seed.
+
+**Why not simply sample more seeds.** Because more seeds cannot help: they resample the gauge, and
+every sample can still land in the same branch. That is the whole shape of the defect, and it is why
+the fix is a different *question*, not a bigger *sample*.
+
+**Cost is confined.** `pointRoots` is computed only when the pool holds more than one solution — with
+a single solution there is no branch to miss — so the solver's hot path is untouched on ordinary
+figures, and on multi-branch ones it reuses work the sign filter already does.
+
+**The opposite failure is locked against.** A panel that prints `?` for everything is honest and
+useless. So the tests assert both directions: with no sign given `D` reads `(3, ?, 0)` at every seed;
+with «p חיובי» it reads `(3, 4, 0)` at every seed and with «p שלילי» `(3, -4, 0)` — a stated sign
+narrows the pool to one, which is exactly when a value becomes knowledge. The student's own injected
+coordinates (`A`, `B`, `S`) still print, and a single-solution figure is untouched.
+
+**Locks** (`src3d/__tests__/issue-827.test.ts`, 7 tests): the operator's exact nine-line sequence at
+seeds 0/1/3/17/42/99; the seed-invariance of the verdict (the property that actually failed); both
+sign selections; the value returning once a sign is stated; injected coordinates unaffected; a
+single-solution figure unaffected.
+
+**Sibling check (ADR-W-004).** 2-D's knowledge gates are #434's territory — *"gates trust
+`freeDofCount===0` without measurement"* — which is the same class (a determinedness verdict taken
+from one observation) on a different mechanism. That issue is open and armed; this ADR does not close
+it, and the connection is recorded there rather than assumed fixed here.

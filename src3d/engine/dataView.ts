@@ -983,7 +983,27 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     for (const id of positions[0].keys()) {
       const ps = positions.map((pos) => pos.get(id));
       if (ps.some((p) => !p)) continue;
-      const stableAx = axes.map((ax) => near(ps[0]![ax], ps[1]![ax]) && near(ps[0]![ax], ps[2]![ax]));
+      /**
+       * #827 (ADR-3D-194) — BRANCH COVERAGE, not just seed agreement.
+       *
+       * Agreeing across the three sampled configurations proves the coordinate does not move with
+       * the GAUGE. It does not prove the givens determine it: the pivot picks a branch with
+       * `pool[seed % pool.length]`, so a two-branch value can read stable at some seeds and open at
+       * others — the operator saw `D(3, 4, 0)` at seed 17 where `p = ±4` and −4 holds equally.
+       *
+       * So an axis is knowledge only when it ALSO agrees across the admissible pool at every
+       * sampled seed. This is #797 (ADR-3D-168 Am. 1) applied one lane over: that ADR established
+       * for pin symbols that seed-stability alone is not determinedness; coordinates had no
+       * equivalent guard. More seeds cannot substitute — they resample the gauge, and every sample
+       * can still land in the same branch.
+       */
+      const branchAgrees = (ax: 'x' | 'y' | 'z'): boolean =>
+        resolved.every((r) => {
+          const roots = r.pivot?.pointRoots?.[id];
+          if (!roots || roots.length <= 1) return true; // one solution ⇒ no branch to miss
+          return roots.every((q) => near(q[ax], roots[0][ax]));
+        });
+      const stableAx = axes.map((ax) => near(ps[0]![ax], ps[1]![ax]) && near(ps[0]![ax], ps[2]![ax]) && branchAgrees(ax));
       const nStable = stableAx.filter(Boolean).length;
       if (nStable === 3) {
         const cs = coordStr(ps[0]!);
