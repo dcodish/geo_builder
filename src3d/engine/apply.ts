@@ -529,6 +529,7 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
     case 'mag-val':
       return exprRefsError(c, claim.e);
     case 'perp-plane':
+    case 'par-plane': // #833: the ∥ twin validates identically — both are segment × 3-point plane
       return missingPoint(c, [...claim.seg, ...claim.plane]);
     case 'collinear3':
       return missingPoint(c, claim.ids);
@@ -1995,8 +1996,24 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // that engine limitation is precisely why the parser had been truncating «MO ⊥ ABCD» to ABC —
       // a silent drop covering for a refusal. The claim's geometry needs three points to fix the
       // plane; the remaining labels of a well-formed run lie on it by construction.
-      if (cmd.rel === 'perp' && plane.length >= 3) {
-        const asClaim = applyCommand3(c, { type: 'claim', claim: { type: 'perp-plane', seg: [cmd.a, cmd.b], plane: [plane[0], plane[1], plane[2]] } });
+      /**
+       * #833 (ADR-3D-193) — ⟂ AND ∥ BOTH LOWER TO A CLAIM ON A DETERMINED FIGURE.
+       *
+       * ⟂ got this in #380; ∥ never did, and the comment above used to say so out loud
+       * («∥-to-plane as a claim is not yet demanded»). The consequence was not a missing feature but
+       * a FALSE NEGATIVE: with no free dims to drive, «AB מקביל למישור A'B'C'D'» on a cube — true by
+       * construction, AB a bottom edge and A'B'C'D' the top face — fell off the end of this switch
+       * into `no-solution` naming a point that was never the problem (the operator's `{"code":
+       * "no-solution","id":"A"}`). `relationTable` had advertised `claim` for
+       * `parallel|segment|plane-run` the whole time; nothing implemented it.
+       *
+       * The class, and what the locks state: a relation ENTAILED by the construction is never
+       * refused — for ∥ and ⟂ alike, anchored and un-anchored. A search or lowering failure must
+       * never be presented to a student as an impossibility (#816's honesty rule).
+       */
+      if (plane.length >= 3) {
+        const claim = cmd.rel === 'perp' ? ('perp-plane' as const) : ('par-plane' as const);
+        const asClaim = applyCommand3(c, { type: 'claim', claim: { type: claim, seg: [cmd.a, cmd.b], plane: [plane[0], plane[1], plane[2]] } });
         if (!asClaim.ok || hasSegment(asClaim.next, cmd.a, cmd.b)) return asClaim;
         const withSeg = clone(asClaim.next);
         withSeg.segments.push([cmd.a, cmd.b]); // the stated segment is drawn (V1 convention preserved)

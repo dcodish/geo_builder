@@ -6195,3 +6195,67 @@ class, not the reported point); and seed-invariance at seeds 0/1/3/17/42 — the
 **Sibling check (ADR-W-004).** 2-D has no plane objects, so defect 3 has no 2-D twin. Defect 4's
 class — *a true statement that changed nothing is silently inert* — does exist there and is already
 answered by the `coincidences` notice (ADR-123) and #612's `redundantShapes`; no new 2-D gap found.
+## ADR-3D-193 — ∥-TO-PLANE LOWERS TO A CLAIM, EXACTLY AS ⟂ DOES (#833)
+
+**Status:** accepted, 2026-08-31.
+
+**The refusal.** On a cube, with `AB` a bottom edge and `A'B'C'D'` the top face:
+
+```
+קובייה ABCDA'B'C'D'
+AB מקביל למישור A'B'C'D'      → {"code":"no-solution","id":"A"}
+```
+
+True by construction, adds nothing, **refused** — and the refusal named point `A`, which was never
+the problem. Reproduced anchored (`A(0,0,0)`, `B(4,0,0)`, `D(0,4,0)`) and un-anchored, so it is not
+the gauge case.
+
+**Root cause — a lowering that was never written.** `seg-plane-rel` ends in three branches: a
+symbol-pin lane, a driving `scalarPin` when `freeDims(c) > 0`, and — since #380 — a `perp-plane`
+**claim** for ⟂. There was no fourth branch for ∥. The code said so out loud:
+
+> `// otherwise: ⟂ is the existing claim; ∥-to-plane as a claim is not yet demanded`
+
+So on a **determined** figure a ∥ statement fell past every branch to the function's final
+`return { ok: false, error: { code: 'no-solution', id: cmd.a } }`. Meanwhile `relationTable` had
+declared `parallel|segment|plane-run` as `{ status: 'supported', actions: ['drive-dims', 'claim'] }`
+the whole time: **the table advertised a claim action nothing implemented.**
+
+This is a different mechanism from [ADR-3D-189](#adr-3d-189), which fixed `solvePivot`'s
+`invariantOnly` branch returning `[]` for both "nothing to flex" and "no solution". That one made the
+containment twin work on this very figure; this one is the ∥ lane, and was deliberately not swept in.
+
+**Decision.** ∥ lowers to a new `par-plane` claim — the segment's direction orthogonal to the plane's
+normal — routed by the same branch that already routed ⟂, with the same degeneracy guard (a run
+whose two spanning directions are dependent is not a plane, so the claim is unanswerable rather than
+true). The two relations differ only in which claim they name:
+
+```ts
+const claim = cmd.rel === 'perp' ? 'perp-plane' : 'par-plane';
+```
+
+Keeping one branch for both is the point: a future relation added here inherits the lowering instead
+of quietly re-earning the `no-solution` fallthrough.
+
+**A contained segment satisfies it**, and that is the intended reading — ∥ is a statement about
+DIRECTION, and the containment reading has its own relation («מוכל», ADR-3D-191/192). Excluding it
+would reintroduce a false negative of exactly the kind this ADR removes.
+
+**Honesty, both directions.** The fix must not turn a wrong statement into an accepted one. A false ∥
+(«AA' מקביל למישור A'B'C'D'» — `AA'` is perpendicular to that face) is still refused, and now with
+`claim-refuted`: the claim was checked and did not hold, which the student can act on, rather than
+`no-solution` naming an innocent point. That change of verdict is itself part of the fix.
+
+**Class (docs/17).** *A search or lowering failure presented to a student as an impossibility* — the
+#816 family. The locked property is stronger than the report: over the cross product of four segments
+× three faces, **no verdict on this lane is ever `no-solution` again**; every answer is a build or a
+claim verdict.
+
+**Locks** (`src3d/__tests__/issue-833.test.ts`, 9 tests): the operator's exact two lines; the same
+anchored; a side face as well as the top/bottom pair; all four bottom edges at seeds 0/1/3/17; a
+false ∥ still refused as `claim-refuted`; ⟂ still lowering and still refuting when false; the
+no-`no-solution` cross-product property; and the stated segment still drawn (#821 / V1).
+
+**Sibling check (ADR-W-004).** 2-D has no planes, so this lane has no 2-D twin. The general class —
+*a relation table advertising an action no code implements* — is worth a sweep in both products; not
+done here, and not claimed to be. Filed as #845 rather than absorbed silently.
