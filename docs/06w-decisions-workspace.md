@@ -1550,3 +1550,63 @@ the round, instead of eight times up front.
 
 Applies from the round after #822. `.claude/skills/fix-round/SKILL.md` Steps 2–3 carry the mechanics.
 
+
+## ADR-W-035 — A UI-touching change SELF-SCREENSHOTS, and the session reads the images before the operator does (#704)
+
+**Status:** accepted, 2026-08-31. **Scope:** all products. **Stage:** the readiness gate (standing
+rule 5), not CI.
+
+**The problem, stated by the operator** (2026-08-17, playing #699): *"why can't you use playwright to
+see this for yourself? why do I need to manually test?"* — and then demonstrated twice on 2026-08-31,
+in one day: a bidi row-direction fix that **did not work**, and the #841 placeholder collision where
+minting a point broke every later definition of it. Both shipped. Both were caught by the operator's
+eyes, not by the session's gates. Both had the same shape: **the session verified the mechanism it
+changed and never looked at the surface a student sees.** Tests were green in both cases, honestly.
+
+The absence of this gate also has a measured downstream cost: on 2026-08-31 it led the operator to
+waive play-and-approve entirely («lets deploy all for now»), so two UI PRs shipped visually unseen by
+either party.
+
+**Decision.** For a change touching a UI surface, the readiness gate grows a self-screenshot step.
+`scripts/visual-smoke.mjs` drives the real app in a real browser (Playwright + Chromium, a
+devDependency), runs a scripted utterance sequence per product, captures the states the play sheet
+will ask the operator to check, and **reads the captures back**. The session then looks at the images
+itself and fixes or files what it sees, before reporting anything ready.
+
+**What it fails on** — the mechanical breakage, so the operator's play is spent on judgement:
+
+| lock | why it is a failure and not a warning |
+| --- | --- |
+| a **blank** capture (≥99.5% one quantized colour) or one under 3 KB | a screenshot of a page that did not paint is indistinguishable from a screenshot of a white app; without this the gate launders "I looked at it" |
+| a **refused** line (`role=alert` appearing during the sequence) | the #841 class exactly — mechanism green, student surface amber |
+| an **uncaught page error** | the captures are no longer trustworthy evidence, whatever they show |
+| a step that leaves the figure with **no geometry** | the DOM-level answer to "did anything draw?" |
+| the **input placeholder** not matching | the product's copy moved, or the app failed to render |
+
+**Sequences are the products' own example lines**, not invented input — 2-D runs CLAUDE.md's defining
+interaction (`ריבוע ABCD` → `נקודה G על AD` → `זווית GBA = 37`, a free shape, a 1-DOF point-on-object
+and a constraint that slides it); 3-D runs `he.json` `examples.ex1/ex3/ex5`; complex runs the #701
+enumerated-roots repro, the worst labelling load in any product. A sequence that stops building is
+therefore a real signal about shipped copy, never about this script drifting from the app.
+
+**Not CI** (ADR-W-005): a browser download is heavy and CI here is best-effort. This is a **local
+gate, like `check:siblings`** — seconds, runnable before every UI-touching report. Screenshots are
+per-machine artifacts and stay gitignored under the existing `reports/*` rule (ADR-W-008); the
+`manifest.json` is the part worth quoting in a PR body.
+
+**The judgement is a pure function** (`judgeCapture`), split from the browser that produces the
+measurements, and locked by `scripts/__tests__/visual-smoke.test.ts`. That split is the point: a gate
+that cannot fail is worse than no gate, so what it means to fail is unit-tested — including that an
+*unmeasurable* capture fails rather than silently passing on `undefined` comparisons.
+
+**What this does NOT change.** The operator's play remains the acceptance judgment — does the design
+feel right, is this the figure the exercise asks for. This gate only stops him being the first to
+discover clipping, collisions, a missing control, a blank canvas or broken RTL. Passing it proves the
+captures are real, **not** that they are right; the script says so on success, because a green gate
+that reads as "verified" would recreate the exact overconfidence it exists to fix.
+
+**Honesty rule this carries.** A session may claim it "tested in the app" only for what it actually
+drove and looked at. Everything else is headless verification and must be described as such — the
+distinction the play sheet now draws for the operator (`.claude/memory/no-browser-self-test.md`).
+
+Workflow text: docs/22 §4 steps 4–5. Command: `npm run smoke:visual [-- --app 2d|3d|complex] [-- --base URL]`.

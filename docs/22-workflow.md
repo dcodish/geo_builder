@@ -158,7 +158,19 @@ Applies to feature requests **and** bug reports reclassified as capability gaps.
 2. **Scope with the operator** before building anything non-trivial (the ADR-262 pattern — AskUserQuestion rounds; big things get a plan doc first, like docs/18/20).
 3. **Branch:** `feat/<issue#>-<slug>` (fixes that go the PR route: `fix/<issue#>-<slug>`). Prefer a **git worktree** for the branch when the shared Dropbox tree carries another session's work — created **outside Dropbox** under `"$TMPDIR"/claude/geo-wt/<branch>`, never as a sibling in `Dropbox/projects/` (§7).
 4. **Build** under the normal gates (ADR, tests, scenario/fixture, suite + `tsc` + build green).
+   **If the change touches a UI surface, the visual smoke is part of those gates**
+   ([ADR-W-035](06w-decisions-workspace.md#adr-w-035)): `npm run dev` then
+   `npm run smoke:visual -- --app <2d|3d|complex>` (add `--base http://localhost:PORT` for a PR on
+   its own port, #783). The script drives the real app, captures the states the play sheet will ask
+   the operator to check, and **fails on a blank capture, a refused line, or an uncaught page
+   error** — then the session **reads the screenshots itself** and fixes or files what it sees.
+   Passing the gate proves the captures are real, not that they are right; looking is still the job.
+   Not CI (ADR-W-005) — a local gate, like `check:siblings`.
 5. **Open the PR** with `gh pr create` — title `feat: <what> (ADR-NNN)`, body: what/why, the ADR link, `Closes #NN`, test evidence. CI must pass.
+   For a UI-touching PR the body also carries **"screenshots reviewed by the session"** next to the
+   test evidence, naming what was captured and what the session saw — the procedural line, like the
+   sibling-safety one. The operator's play stays the acceptance judgment (does the design feel
+   right); it stops being the first line of defence against mechanical breakage.
 6. **Operator gate:** the operator plays with it (dev server / screenshots) and approves; then merge to `main` (squash or merge-commit, either is fine; keep `Closes #NN`).
 7. Deploy from `main` when ready (§5).
 

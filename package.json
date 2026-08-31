@@ -21,7 +21,8 @@
     "test:full": "node scripts/test-tiers.mjs full",
     "test:fast": "node scripts/test-tiers.mjs fast",
     "test:tiers": "node scripts/test-tiers.mjs report",
-    "check:siblings": "node scripts/check-sibling-safety.mjs"
+    "check:siblings": "node scripts/check-sibling-safety.mjs",
+    "smoke:visual": "node scripts/visual-smoke.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
@@ -44,6 +45,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "esbuild": "^0.25.12",
     "jszip": "^3.10.1",
+    "playwright": "^1.62.1",
     "tailwindcss": "^4.0.0",
     "typescript": "~5.7.2",
     "vite": "^6.1.0",
