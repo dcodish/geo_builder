@@ -32,6 +32,23 @@ import {
   type ExprQuery,
 } from '../model/measure';
 import { rat } from '../value/rational';
+import { frac as ratFrac } from '../value/rational';
+import { normalize as angNormalize } from '../value/angle';
+
+/**
+ * #719 — is this right-hand side a value that is NOT a positive real?
+ *
+ * `-5` reaches the rules as an exact `val` whose argument is half a turn (the literal was linearised
+ * on the way in), never as a bare negative `num`, which is why the shape is tested on the ARGUMENT
+ * rather than on a sign. An argument that is a known non-zero constant means the value points
+ * somewhere other than the positive real axis — so no magnitude can equal it. A value whose argument
+ * carries symbols is not decidable here and is left alone.
+ */
+const isNotPositiveReal = (e: Expr): boolean => {
+  if (e.t !== 'val' || e.v.kind !== 'exact') return false;
+  const a = angNormalize(e.v.arg);
+  return a.atoms.size === 0 && ratFrac(a.turns).n !== 0n;
+};
 import { canonName, isComplexName, isPointLabel, parseExpr } from './exprParse';
 import {
   ACCUSATIVE_KW,
@@ -423,7 +440,23 @@ const equation: Rule = (s) => {
     declares: refNames(lhs).concat(refNames(rhs)),
     constraints: [
       modulusOnly
-        ? { kind: 'mod', lhs: lhs.t === 'abs' ? lhs : abs(lhs), rhs: rhs.t === 'abs' ? rhs : abs(rhs), src: s }
+        ? {
+            kind: 'mod',
+            lhs: lhs.t === 'abs' ? lhs : abs(lhs),
+            /**
+             * #719 (ADR-CX-035) — a NEGATIVE literal passes through UNWRAPPED, so the magnitude lane
+             * can refuse it.
+             *
+             * `abs(rhs)` is right for a name or a positive number — a magnitude equation compares
+             * magnitudes — but on «|z1| = -5» it silently rewrote the student's statement into
+             * «|z1| = |-5|», i.e. «|z1| = 5», and nothing downstream could ever know a sign had been
+             * stated. That is the honesty invariant exactly: a stated magnitude must parse to a
+             * constraint, escalate, or error, but never vanish. Left unwrapped, tier1 sees an RHS
+             * whose argument is a known ½ turn and refuses the given by itself.
+             */
+            rhs: rhs.t === 'abs' || isNotPositiveReal(rhs) ? rhs : abs(rhs),
+            src: s,
+          }
         : { lhs, rhs, src: s },
     ],
     claims: [claimAll(s)],

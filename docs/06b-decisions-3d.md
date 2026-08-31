@@ -5805,6 +5805,55 @@ point on the seam radius, the supplement when that is what was stated, the line�
 crossing, operand order irrelevant, `shared` moving the focus onto the edge, `toward` choosing the visible
 side, and the three refusals) plus the operator's four rows end-to-end with the gate off and on.
 
+## ADR-3D-186 — THE DIMS ARE SPREAD TOO, ON THE FAILURE PATH: satisfiability stops depending on entry order (#816)
+
+**Status:** Accepted (2026-08-30) · **Ladder:** stage 5 (pivot solve) · **Round:** #826
+
+The operator's exam pyramid refused a coordinate it could satisfy. With «|u| = |v|» typed **before** the
+injections, `S(0,0,6)` came back `injection-unsatisfiable`; with the same line typed **after**, the
+identical fact set built fully determined. Measured at `12673b7`, the relation-first order **succeeded at
+seeds 2, 4, 5, 7, 11, 17, 101, 1013, 2027 and failed at 0, 1, 3** — 9 of 12.
+
+**Root cause — search coverage, not the gate.** `store3.ts:359` reports `resolved.pivot.solutions === 0`
+honestly; the pivot genuinely finds nothing. A structural defect cannot succeed at three seeds in four.
+The gap is the one this file already names, in the comment shipped with #818: the cold starts spread the
+**gauge** (eight seed-rotated starts) and the #797 walk spreads the **pin symbols**, but *"the shape DIMS
+start at the seed's one sample in every start"*. When the solution needs a different dims basin, no start
+reaches it, and a SEARCH failure is presented to the student as an impossibility — with a message about
+coordinates that are, in fact, satisfiable.
+
+**Decision — apply the dims spread this file already has, where it was missing.** `dimStarts` in the
+`invariantOnly` branch (`solve3.ts:845`) has used the same three variants since it was written; it simply
+never reached the gauge-solving path. So the fix is not a new mechanism:
+
+- the same variants, as **EXTRA** starts crossed with the existing rotations;
+- **only when this mirror found nothing.** The success path is bit-identical and costs nothing — verified
+  by measuring the pristine build: a figure that already solves prints exactly what it printed before;
+- the existing eight starts are **never moved**. The #518 lesson is recorded twice in this file
+  (`:878`, `:901`) — shifting the start set costs hard figures real solution branches. Widening a path
+  that was about to refuse cannot take a branch away.
+
+**Measured alternative, rejected.** Widening the pool *unconditionally* in `collectAll` — the coherent-
+sounding "an incomplete pool understates the admissible set" argument (#797's) — was implemented and
+measured: it changed **none** of the panel's cells on this figure. It would have cost every pooled solve
+three extra start sweeps to buy nothing, which is the #518 trade in the wrong direction. Reverted.
+
+**What the fix achieves, stated as the invariant.** The two orders are now byte-identical in every panel
+cell, at every seed, bare and with either sign — which is docs/17 **M2 law (i)** itself, so the lock
+compares the ORDERS rather than pinning values (pinning numbers would pass while hiding a difference in
+the cells that read «?»).
+
+**What it deliberately does NOT fix.** Bare (no sign given), the panel prints `D(3, ?, 0)` at seeds 0/1/3
+and `D(3, 4, 0)` at seed 17 — **identically in both orders, and identically before this fix.** A
+two-branch quantity reading as knowledge at some seeds is the ADR-052 class and lives in `dataView`'s
+seed-invariance judgement, not in the pivot: filed as **#827** rather than absorbed here.
+
+Locks: `issue-816.test.ts` (26) — the three seeds that refused now build, the 12-seed sweep clean in both
+orders, the two orders printing the SAME panel at every seed bare and with either sign, «p חיובי»/«p שלילי»
+selecting ±4 at every seed in the relation-first order (proof the extra starts found real solutions rather
+than numerical debris), and a genuinely unsatisfiable injection (`S(0,3,6)`, contradicting `AS ⟂ AB`)
+still refused — widening only ever ADDS starts, so a system with no solution still finds none.
+
 ## ADR-3D-187 — A PLANE'S TWO REPRESENTATIONS GET A ROW EACH, AND THE PARAMETRIC ONE IS «π» (#823)
 
 **Status:** Accepted (2026-08-30) · **Ladder:** stage 5d (display) · **Round:** #826 · **Operator report:** playing round #822, 2026-08-30
@@ -5856,3 +5905,47 @@ Locks: `issue-823.test.ts` (8) — the operator's own plane answering in two row
 numbers, no answer string carrying «|», `answer` remaining the complete first row, a single-value query
 carrying no `rows` at all, «π =» rather than «x =», two planes numbered π1/π2 with distinct symbols, and
 the panel and the query lane agreeing on both the symbol and the parametric text.
+
+## ADR-3D-188 — ONE NOUN VOCABULARY: the lexicon layer gets its first directory, and the AREA head takes its subject noun (#753)
+
+**Status:** Accepted (2026-08-30) · **Ladder:** stage 0 (parse) · **Round:** #826 · **Operator ruling:** 2026-08-19 — *"for #753 - option 1 - the recommended approach"*
+
+«שטח ABC» answered; **«שטח המשולש ABC» did not.** The point, length and volume heads all took their
+subject noun in #642's sweep and this one could not — the polygon vocabulary («משולש / מרובע / ריבוע /
+מלבן / מקבילית / טרפז / דלתון / מחומש / מצולע», with the adjectival and plural forms a book sentence
+uses) lived only in `parser/parse3.ts`, and `engine/queries.ts` **may not import from `parser/`**.
+
+**Root cause — a copy, not a missing regex.** The two files maintained private copies of the same Hebrew
+gates and had already drifted **three times**: #640 (the line noun in `parse3.ts`), #642 (the subject
+noun in `queries.ts`), and the ASCII-only `\w*` suffix gate found while fixing that one, which could not
+match «קואורדינטות». Copying the polygon list in would have been the fourth. Round #752 stopped and
+filed this instead, as #642's own audit comment directed: *"If the local fix cannot be made without the
+hoist, escalate instead of copying the gate a third time."*
+
+**Decision — the layer `BOUNDARIES.json` had already named, and left empty.** The registry declares a
+`lexicon` layer (*"Does it name Hebrew/English vocabulary, or map a noun to a shape?"*) with the note
+*"No directory carries this layer yet; it is declared so the split is nameable when one does."*
+`src3d/lexicon/nouns3.ts` is the directory that does:
+
+- **It imports nothing.** That is the entire property — a leaf both `parser/` and `engine/` may depend
+  on without either depending on the other, so the copy cannot come back.
+- **It knows only how words are SPELLED.** What a triangle *means* stays in the layer that builds one;
+  nothing here lowers a noun to geometry.
+- `parse3.ts`'s `DECL_WORDS_HE` is now **composed** from the leaf's parts (solids, polygons, qualifiers,
+  parts) in the order it listed them — the list is unchanged, only its home.
+- The AREA head reads `SHAPE_SUBJ` from the same leaf. The noun is **optional**, so «שטח ABC» is
+  byte-identical.
+- `BOUNDARIES.json` classifies the new directory (the map is TOTAL — an unclassified directory fails the
+  isolation test, which is the copy tripwire made mechanical) and its `lexicon` rationale is updated to
+  say the layer is now carried. Whether it is shared ACROSS products stays undecided, as ADR-W-003 left it.
+
+**«מישור» is in the gate too**, from the operator's 2026-08-29 session: «שטח DBB'D'» answered 22.63 while
+«שטח מישור DBB'D'» did not — and a student who has just typed «מישור DBB'D'» into the fact list writes
+exactly that after «שטח». It compounds with #813, where the phrasing that *would* route them to the
+answerable area query was the one this gap rejected.
+
+Locks: `issue-753.test.ts` (14) — the six answering forms including both Hebrew nouns and the English
+mirrors, «שטח מישור DBB'D'» answering identically to the bare run, the noun staying optional, a non-shape
+noun still refused, and the SEAM itself: the leaf importing nothing, the parser holding no private copy,
+the query lane reading the same leaf, and the polygon words being present in the composed declaration
+vocabulary.
