@@ -49,6 +49,26 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       const ok2 = Math.abs(dot3(d, e2)) <= REL_TOL * Math.max(norm3(d) * norm3(e2), 1);
       return ok1 && ok2;
     }
+    /**
+     * #833 (ADR-3D-193) — AB ∥ plane A'B'C'D': the segment's direction is orthogonal to the plane's
+     * normal. Mirrors `perp-plane` above, including its degeneracy guard (a plane whose two spanning
+     * directions are dependent is not a plane, so the claim is unanswerable rather than true).
+     *
+     * A segment LYING IN the plane satisfies this too, and that is the intended reading: ∥ is a
+     * statement about DIRECTION, and the containment reading has its own relation («מוכל»). Refusing
+     * it here would put back a false negative of exactly the kind this issue is about.
+     */
+    case 'par-plane': {
+      const [s1, s2] = claim.seg.map((id) => pos.get(id)!);
+      const [p1, p2, p3] = claim.plane.map((id) => pos.get(id)!);
+      if (!s1 || !s2 || !p1 || !p2 || !p3) return false;
+      const d = sub3(s2, s1);
+      const e1 = sub3(p2, p1);
+      const e2 = sub3(p3, p1);
+      const n = cross3(e1, e2);
+      if (norm3(n) <= REL_TOL * Math.max(norm3(e1) * norm3(e2), 1e-12)) return false;
+      return Math.abs(dot3(d, n)) <= REL_TOL * Math.max(norm3(d) * norm3(n), 1);
+    }
     case 'collinear3': {
       const ps = claim.ids.map((id) => pos.get(id));
       if (ps.some((p) => !p)) return false;

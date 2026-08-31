@@ -73,6 +73,13 @@ export type Claim3 =
   | { type: 'volume-eq-poly'; ids1: Id[]; ids2: Id[] } // נפח SENB = נפח CENB (two tetra volumes equal)
   | { type: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // AM = ½u + ½v + 5/3·w
   | { type: 'perp-plane'; seg: [Id, Id]; plane: [Id, Id, Id] } // CA' ⊥ plane BC'D
+  /**
+   * #833 (ADR-3D-193): AB ∥ plane A'B'C'D'. The `perp` twin above has existed since #380; this one
+   * did not, so on a DETERMINED figure a TRUE ∥ statement fell off the end of `seg-plane-rel` into a
+   * bare `no-solution` — the relation table advertised `claim` for `parallel|segment|plane-run` and
+   * nothing implemented it.
+   */
+  | { type: 'par-plane'; seg: [Id, Id]; plane: [Id, Id, Id] }
   | { type: 'collinear3'; ids: Id[] } // E, C, A' on one line
   | { type: 'length-eq'; a: Id; b: Id; value: number } // AB = 3 (all points pinned ⇒ a CHECK)
   | { type: 'area-eq'; ids: [Id, Id, Id]; value: number } // שטח ABC = 4.5
