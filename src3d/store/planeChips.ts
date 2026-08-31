@@ -10,11 +10,18 @@
  *
  * The rule, and the whole of it:
  *
- *   1. If some fact DECLARES the plane («מישור ABCD», a free plane), the first such fact owns the
- *      chip. A relation stated about a plane the student already drew is not what put it on screen.
- *   2. Otherwise the first fact that names the plane at all owns it — a relation CAN be what
- *      materialised a plane (`materializePlaneRun`), and #383 requires a stated relation to leave a
- *      visible trace. Taking the chip away there would hide a plane the student can no longer reach.
+ *   Only a fact that DECLARES the plane («מישור ABCD», a free plane) owns the chip, and only while
+ *   that fact is `ok`.
+ *
+ * #847 (ADR-3D-197) deleted the second clause this file used to carry — *"otherwise the first fact
+ * that names the plane at all owns it"*. That clause was an inference, not the instruction, and the
+ * operator rejected it on sight: **a relation is a statement ABOUT a plane, never a declaration of
+ * one.** It also produced the inconsistency they hit — the same sentence gaining or losing a button
+ * depending on what else had been typed.
+ *
+ * The reachability it was protecting (#821: *"the user has the option of disabling it through the
+ * input panel"*) is answered instead by the data panel's PLANES section, which lists every plane the
+ * figure draws with its toggle, whatever created it. Operator ruling, 2026-08-31.
  *
  * Provenance is derived from the FACT LIST, never from a list of "minting command types" — the #769
  * (ADR-3D-183) pattern, for the same reason it was chosen there: a list of kinds silently goes stale
@@ -75,25 +82,32 @@ export function planesDeclaredBy(cmd: Command3): string[] {
  * Pure over the fact list, so it answers identically for a typed figure, a loaded one and an undone
  * one — the same property every notice in `engine/notices.ts` has, and for the same reason.
  */
-export function planeChipsByFact(facts: readonly FactLike[]): Map<string, string[]> {
+export function planeChipsByFact(
+  facts: readonly FactLike[],
+  /**
+   * #847 — is this fact currently satisfied? A row that FAILED cannot own a plane's affordance: it
+   * materialised nothing. The operator's screenshot was exactly this — «BE מוכל במישור ABCD» amber
+   * after «E אמצע AC» was deleted, still offering «הסתר מישור» for a plane it had not created.
+   *
+   * Optional so the pure derivation stays callable without a status map; absent means "assume ok",
+   * which is the pre-#847 behaviour.
+   */
+  isOk: (factId: string) => boolean = () => true,
+): Map<string, string[]> {
   const owner = new Map<string, string>();
+  const eligible = facts.filter((f) => isOk(f.id));
 
-  // Pass 1 — a declaring row always wins, wherever it sits in the list.
-  for (const f of facts) {
+  // ONLY a declaring row. There is no second pass: a plane nobody declared is reachable from the
+  // panel's planes section, not from a sentence that merely mentions it.
+  for (const f of eligible) {
     for (const cmd of f.cmds) {
       for (const name of planesDeclaredBy(cmd)) if (!owner.has(name)) owner.set(name, f.id);
-    }
-  }
-  // Pass 2 — a plane nobody declared belongs to the first row that named it.
-  for (const f of facts) {
-    for (const cmd of f.cmds) {
-      for (const name of planesNamedBy(cmd)) if (!owner.has(name)) owner.set(name, f.id);
     }
   }
 
   const out = new Map<string, string[]>();
   for (const f of facts) {
-    const mine = [...new Set(f.cmds.flatMap(planesNamedBy))].filter((name) => owner.get(name) === f.id);
+    const mine = [...new Set(f.cmds.flatMap(planesDeclaredBy))].filter((name) => owner.get(name) === f.id);
     out.set(f.id, mine);
   }
   return out;

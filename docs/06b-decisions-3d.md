@@ -6352,3 +6352,50 @@ about to play. That is the argument for the gate, made on its first real use.
 
 Locks grow to 12 tests, including the property rather than the instance: **`D` open ⟺ `v` open**, over
 the no-sign figure and both sign selections.
+
+## ADR-3D-197 — A RELATION NEVER OWNS A PLANE; EVERY DRAWN PLANE IS REACHABLE FROM THE PANEL (#847)
+
+**Status:** accepted, 2026-08-31. **Supersedes clause 2 of [ADR-3D-192](#adr-3d-192).**
+
+**Operator ruling**, playing the round #843 batch and shown a screenshot of their own figure:
+*"it doesn't own the plane."*
+
+**What ADR-3D-192 got wrong.** Its rule had two clauses: a DECLARING row owns the chip; *otherwise*
+the first row that names the plane owns it. The first clause was the instruction. **The second was my
+inference** — reasoned from #383 (a stated relation must leave a visible trace) and from the fear of
+stranding a plane. The operator rejected it immediately, and the principle is simpler than the one I
+reasoned to: **a relation is a statement ABOUT a plane, never a declaration of one.**
+
+It also produced the inconsistency they hit. «BE מוכל במישור ABCD» gained or lost a button depending
+on whether «מישור ABCD» had been typed earlier — the same sentence, two affordances.
+
+**And a second defect that needed no ruling:** a row that is **not `ok`** kept its chip. Deleting
+«E אמצע AC» left the containment amber — refused, materialising nothing — still offering to toggle a
+plane. Status is now part of the ownership question.
+
+**The coupling, and why it was escalated rather than guessed.** Removing the chip from relation rows
+could not ship alone: `App3.tsx` had the **only** control for `planeDisplay`, and `scene3.ts` draws
+any plane in `pointPlanes`, which nine relation sites populate. So the removal by itself would have
+left «AB מקביל למישור A'B'C'D'» drawing a patch the student cannot dismiss — contradicting #821
+(*"the user has the option of disabling it through the input panel"*), and worse for them than the
+bug reported. Four options were put to the operator with their costs.
+
+**Decision (operator, option c): a PLANES section in the data panel.** It lists what the **figure
+draws** — `resolved.planes`, the renderer's own list — each with the display toggle the chip used to
+carry. A plane is therefore reachable however it came to exist, and no fact row needs to pretend it
+owns an object it merely mentioned.
+
+Rejected, with reasons recorded: minting a plane fact row from a relation (one utterance would become
+two rows — new here, and it needs answers for undo, save/load and deletion semantics); click-to-toggle
+on the canvas (the better end state, but 3-D has no click-to-edit surface at all yet — worth revisiting
+when it does); and not drawing an undeclared plane at all (it reverses #821, the operator's own ruling).
+
+**Locks** (`issue-847.test.ts`, 7 tests; `issue-842.test.ts` updated): no relation row carries a chip
+in any family at any status; a DECLARED plane keeps its chip on its own row; a declaring row that is
+itself not `ok` owns nothing; every mentioned plane is still reachable — by a row or by the panel;
+and the #842 property that no plane is offered twice still holds. The two superseded assertions in
+`issue-842.test.ts` were **inverted rather than deleted**, so the rejected behaviour cannot creep back
+unnoticed.
+
+Verified in the browser: three clean fact rows, the plane drawn, and «מישורים → ABCD → פאה בלבד» in
+the panel; zero page errors.

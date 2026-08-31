@@ -50,11 +50,14 @@ describe('#842 step 3 — only the row that MATERIALISED the plane offers its to
     expect(chipRows()).toEqual([['מישור ABCD', 'ABCD']]);
   });
 
-  it('a relation that is the ONLY mention still gets the chip — #383: a stated relation leaves a trace', () => {
-    // No «מישור ABCD» row here: the containment is what materialised the plane, so hiding its chip
-    // would leave the student a plane on screen with no way to reach it.
+  it('SUPERSEDED by #847 — a relation that is the only mention gets NO chip either', () => {
+    // This file originally locked the opposite: the containment kept the chip because nothing else
+    // had declared the plane. That was clause 2 of ADR-3D-192 — an inference, not the operator's
+    // instruction — and they rejected it on sight (a relation is a statement ABOUT a plane, never a
+    // declaration of one). The reachability it protected now lives in the data panel's planes
+    // section (ADR-3D-197). Kept as a test, inverted, so the superseded behaviour cannot creep back.
     build(["קובייה ABCDA'B'C'D'", 'E אמצע AC', 'BE מוכל במישור ABCD']);
-    expect(chipRows()).toEqual([['BE מוכל במישור ABCD', 'ABCD']]);
+    expect(chipRows()).toEqual([]);
   });
 
   it('the DECLARING row wins even when a relation named the plane first', () => {
@@ -80,9 +83,10 @@ describe('#842 step 3 — only the row that MATERIALISED the plane offers its to
     ]);
   });
 
-  it('every plane a fact list mentions still reaches SOME row — no plane becomes unreachable', () => {
+  it('every plane a fact list mentions is still REACHABLE — via a row or the panel (#847)', () => {
     // The property that matters beyond any one sequence: narrowing ownership must never orphan a
-    // plane. Whatever is named anywhere is toggleable somewhere.
+    // plane. After #847 the answer is no longer "some row" — a plane nobody declared is reachable
+    // from the data panel's planes section, which lists what the FIGURE draws.
     for (const seq of [
       OPERATOR,
       ["קובייה ABCDA'B'C'D'", 'E אמצע AC', 'BE מוכל במישור ABCD'],
@@ -90,8 +94,11 @@ describe('#842 step 3 — only the row that MATERIALISED the plane offers its to
     ]) {
       build(seq);
       const mentioned = new Set(st().facts.flatMap((f) => f.cmds.flatMap(planesNamedBy)));
-      const offered = new Set(chipRows().map(([, name]) => name));
-      expect(offered, `sequence ${JSON.stringify(seq)}`).toEqual(mentioned);
+      const onRows = new Set(chipRows().map(([, name]) => name));
+      const inPanel = new Set(derive3(st().facts, st().seed).resolved.planes.keys());
+      for (const name of mentioned) {
+        expect(onRows.has(name) || inPanel.has(name), `${name} unreachable in ${JSON.stringify(seq)}`).toBe(true);
+      }
     }
   });
 
