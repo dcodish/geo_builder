@@ -429,7 +429,10 @@ describe('#559 — the data panel follows the app direction, per-row', () => {
     // forgets `dir: 'app'` re-creates the list-wide override this lock exists to prevent. (The
     // chrome side — an 'app' row rendering NO dir of its own — is locked in shell/__tests__.)
     const sections = panelMarkup.match(/key: '[a-z]+',/g) ?? [];
-    expect(sections.length, 'the five skeleton sections').toBe(5);
+    // #847 (ADR-3D-197) added `planes` — every drawn plane with its display toggle, after the chip
+    // was taken off relation rows. The count is deliberate: a new section must be a decision, not a
+    // drive-by, because each one is a place a `dir: 'app'` can be forgotten.
+    expect(sections.length, 'the six skeleton sections (planes, points, measures, relations, mutual, params)').toBe(6);
     expect(panelMarkup.match(/dir: 'app',/g) ?? []).toHaveLength(sections.length);
   });
 
