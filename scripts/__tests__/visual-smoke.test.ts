@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 // @ts-expect-error — a plain .mjs tool script; there are no types to import and none are wanted.
-import { judgeCapture, APPS, BYTE_FLOOR, UNIFORM_SHARE } from '../visual-smoke.mjs';
+import { judgeCapture, APPS, BYTE_FLOOR, UNIFORM_SHARE, COLOR_FLOOR } from '../visual-smoke.mjs';
 
 /**
  * #704 — the visual smoke harness.
@@ -28,6 +28,15 @@ describe('#704 visual smoke — the capture verdict', () => {
     // not an equality, precisely so a lone antialiased pixel cannot buy a pass.
     expect(judgeCapture('x.png', { ...good, dominantShare: UNIFORM_SHARE })).toContain('BLANK');
     expect(judgeCapture('x.png', { ...good, dominantShare: UNIFORM_SHARE - 0.01 })).toBeNull();
+  });
+
+  it('REJECTS a near-uniform capture on colour count, where the share alone would pass', () => {
+    // Calibration, not a guess: the sparsest legitimate capture (an empty-state screenshot) measures
+    // dominantShare 0.979 — only 1.6 points under the share threshold. distinctColors separates a
+    // real page (81+) from a blank one (1-3) by an order of magnitude, so both conditions must hold.
+    const nearlyBlank = { bytes: 60_000, dominantShare: 0.99, distinctColors: 2 };
+    expect(judgeCapture('x.png', nearlyBlank)).toContain('BLANK');
+    expect(judgeCapture('x.png', { ...nearlyBlank, distinctColors: COLOR_FLOOR })).toBeNull();
   });
 
   it('rejects a truncated file', () => {

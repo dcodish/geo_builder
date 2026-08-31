@@ -214,6 +214,17 @@ async function auditImages(browser, files) {
 
 export const BYTE_FLOOR = 3000;      // a real 1600×950 app screenshot is tens of KB
 export const UNIFORM_SHARE = 0.995;  // ≥99.5% one quantized colour = nothing rendered
+export const COLOR_FLOOR = 8;        // a blank page quantizes to 1–3 colours; a real one to 81+
+
+/*
+ * Calibrated against the 16 real captures, not guessed. Measured across all three products:
+ *   dominantShare  0.79 … 0.979   (the sparsest is a legitimate EMPTY-state screenshot)
+ *   distinctColors 81 … 202
+ *   bytes          52 KB … 101 KB
+ * So `dominantShare` alone leaves only ~1.6 points of margin — the empty state is genuinely mostly
+ * one background colour, which is exactly the capture a blank page most resembles. `distinctColors`
+ * separates them by an order of magnitude, so both must hold. Either one firing is a failure.
+ */
 
 /**
  * The verdict on ONE capture, as a pure function of its measurements — the gate's actual decision,
@@ -225,6 +236,7 @@ export const UNIFORM_SHARE = 0.995;  // ≥99.5% one quantized colour = nothing 
 export function judgeCapture(name, m) {
   if (!m || m.error) return `${name}: unreadable (${m?.error ?? 'no measurement'})`;
   if (!(m.bytes >= BYTE_FLOOR)) return `${name}: only ${m.bytes} bytes — the capture is not a real screenshot`;
+  if (!(m.distinctColors >= COLOR_FLOOR)) return `${name}: BLANK — only ${m.distinctColors} distinct colours`;
   if (m.dominantShare >= UNIFORM_SHARE) return `${name}: BLANK — ${(m.dominantShare * 100).toFixed(1)}% one colour`;
   return null;
 }
