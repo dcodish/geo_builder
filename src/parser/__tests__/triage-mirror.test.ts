@@ -63,11 +63,47 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
     for (const p of guards) {
       expect(triageSrc, `triage.mjs must mirror the submit pipeline's pre-parse ${p}() short-circuit (ADR-346)`).toContain(`${p}(`);
     }
-    // `wordRootMagnitude` guards the ESCALATION seam (after the parse), outside the extracted region,
-    // so it keeps an explicit assertion of its own.
-    for (const p of ['wordRootMagnitude']) {
-      expect(pipeSrc, `submitPipeline.ts no longer calls ${p} — update this guard + the harness`).toContain(`${p}(`);
-      expect(triageSrc, `triage.mjs must mirror the submit pipeline's ${p} short-circuit (ADR-346)`).toContain(`${p}(`);
+  });
+
+  it('#829 — the POST-PARSE escalation seams are DERIVED too, not enumerated', () => {
+    // The 5th #35-class drift, and the one the #501 fix left standing. That fix derived the
+    // PRE-parse guards and then covered the escalation-seam side with a hand-written list of ONE
+    // (`['wordRootMagnitude']`) — verbatim the trap its own comment says it removed: *a guard that
+    // lists what it knows cannot fail on what it does not*. Three seams landed there afterwards
+    // (`splitGuidance`, `independentConstructs` #763, `upperCasedLabelCandidate` #779), nothing
+    // forced the list to follow, and the harness reported all three as LIVE grammar gaps — shipping
+    // false `not-handled` verdicts to the prod dashboard's «פערים אמיתיים» card.
+    //
+    // So this side is derived from the same source, between the parse and the LLM escalation.
+    const start = pipeSrc.indexOf('parse(utterance,');
+    // Search for the escalation FROM `start`: the bare name also appears in the import block above.
+    const end = pipeSrc.indexOf('llmParse(utterance', start);
+    expect(start, 'the parse anchor moved — re-anchor this extraction').toBeGreaterThan(0);
+    expect(end, 'the llmParse anchor moved — re-anchor this extraction').toBeGreaterThan(start);
+    // Built with String.raw, like the set-literal reader above: a regex literal written through a
+    // generator is one silent escape away from matching nothing.
+    const CALL = new RegExp(String.raw`\b([a-z]\w*)\(utterance\)`, 'g');
+    const region = pipeSrc.slice(start, end);
+    // Not every `f(utterance)` after the parse is a SEAM — `statedLabelTokens` feeds the dropped-label
+    // accounting, which the harness mirrors through `droppedNewLabels` instead. The discriminator is
+    // the pipeline's OWN declaration: a guided short-circuit logs `source: 'scope'`, which is exactly
+    // the verdict the harness has to reproduce (`guided`, with that `scope:` detail). So a call counts
+    // as a seam when the FIRST thing the pipeline logs after consulting it is a scope answer.
+    // Deriving it from the log rather than from a character window keeps the rule free of a magic
+    // distance that would drift the first time a seam grows a line.
+    const seams = [...new Set([...region.matchAll(CALL)]
+      .filter((m) => {
+        const after = region.slice(m.index);
+        const at = after.indexOf('logDebug({');
+        if (at < 0) return false;
+        return /source: 'scope'/.test(after.slice(at, after.indexOf('});', at)));
+      })
+      .map((m) => m[1]))];
+    // The shrinking-expectation guard the pre-parse half already has: an anchor drift that yields an
+    // empty list would make this test pass forever while proving nothing. Four seams exist today.
+    expect(seams.length, `no post-parse seams extracted — the anchors are wrong (found ${JSON.stringify(seams)})`).toBeGreaterThanOrEqual(4);
+    for (const p of seams) {
+      expect(triageSrc, `triage.mjs must mirror the submit pipeline's post-parse ${p}() short-circuit (ADR-346, #829)`).toContain(`${p}(`);
     }
   });
 

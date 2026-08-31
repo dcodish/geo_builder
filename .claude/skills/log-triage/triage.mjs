@@ -71,9 +71,12 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, impliedPointBinding, buildParseCtx, classifyOutOfScope,
-  looksLikeLatex, wordRootMagnitude, statedNegation,
+  looksLikeLatex, wordRootMagnitude, statedNegation, splitGuidance, upperCasedLabelCandidate,
   droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs, droppedCompoundRelation,
 } from '../../../src/parser/index.ts';
+// #829: `independentConstructs` (#763) lives in the APP layer, not the parser — the seam is a submit-path
+// decision, so the mirror must reach across the same boundary the pipeline does.
+import { independentConstructs } from '../../../src/app/independence.ts';
 import { unaccountedSpans } from '../../../src/parser/spanAccounting.ts';
 import { replay, nameCentreFacts, renameFacts, autoNamedLabels } from '../../../src/store/geoStore.ts';
 import { parse3 } from '../../../src3d/parser/parse3.ts';
@@ -222,6 +225,40 @@ const headRev = (() => {
  *  a REGRESSION in already-working input is what the test suite is for, not what triage is for. */
 const OPEN = new Set(['not-handled', 'would-escalate', 'refused', 'error', 'unverified']);
 
+/**
+ * #829 — THE POST-PARSE ESCALATION SEAMS, mirrored at the App's own position and in the App's order.
+ *
+ * `submitPipeline.ts#runSubmit` runs FOUR guided short-circuits after `parse()` and before paying for
+ * an LLM call. The harness mirrored one (`wordRootMagnitude`) and missed three, so every utterance
+ * the tool answers ON PURPOSE — the #763 independent-constructs teaching, the #108 compound split,
+ * the #779 lowercase-label nudge — was reported as a LIVE grammar gap, and those false `not-handled`
+ * verdicts shipped to the prod dashboard's «פערים אמיתיים» card. In the 2026-08-30 window that was
+ * 100% of the 2-D worklist.
+ *
+ * Returns the `guided` verdict the App would produce, or null to let the caller fall through.
+ * `parsed` is the App's `!r.ok` gate: the lowercase-label nudge only applies to a FAILED parse.
+ */
+function guidedAtSeam(u, pctx, parsed) {
+  // 1 — #246: the «שורש N» format nudge.
+  if (wordRootMagnitude(u)) return { now: 'guided', detail: 'scope:word-root' };
+  // 2 — #108: a compound line is TAUGHT as numbered steps, never auto-parsed.
+  const split = splitGuidance(u);
+  if (split) return { now: 'guided', detail: `scope:${split.category}` };
+  // 3 — #763: the compounds `splitGuidance`'s hand-listed separators cannot see.
+  const independent = independentConstructs(u);
+  if (independent) return { now: 'guided', detail: `scope:${independent.category}:independent` };
+  // 4 — #779: PROOF-BASED, exactly as the App and the 3-D harness do it — the nudge fires only when
+  // the upper-cased candidate actually parses, so a genuine gap stays a genuine gap.
+  if (!parsed) {
+    const lifted = upperCasedLabelCandidate(u);
+    if (lifted) {
+      const lr = parse(lifted, pctx);
+      if (lr.ok && lr.commands.length > 0) return { now: 'guided', detail: 'scope:lowercase-labels' };
+    }
+  }
+  return null;
+}
+
 // ---- verify: replay each SESSION through the App's submit path ------------
 // The categories App.tsx#submit refuses with a GUIDED message BEFORE ever paying for an LLM call
 // (ADR-289 / #43). Not gaps — the tool answering on purpose. Keep in sync with App.tsx's PRE_LLM.
@@ -346,15 +383,18 @@ function session2d(evs) {
           const oos = classifyOutOfScope(u);
           res =
             oos && PRE_LLM.has(oos.category) ? { now: 'guided', detail: `scope:${oos.category}` }
-            : wordRootMagnitude(u) ? { now: 'guided', detail: 'scope:word-root' } // #246: escalation-seam √ guard, mirrors submitPipeline
-            : { now: 'not-handled', detail: oos ? `${r.reason} (scope:${oos.category})` : r.reason };
+            // #829: ALL FOUR post-parse seams, in the App's order — not just the √ one (#246)
+            : guidedAtSeam(u, pctx, false)
+            ?? { now: 'not-handled', detail: oos ? `${r.reason} (scope:${oos.category})` : r.reason };
         } else {
           const dropped = droppedBy(u, r.commands, pctx);
           if (dropped.length) {
-            // #246: a dropped שורש magnitude gets the √ nudge at the seam, not an LLM escalation (mirrors submitPipeline)
-            res = wordRootMagnitude(u)
-              ? { now: 'guided', detail: 'scope:word-root' }
-              : { now: 'would-escalate', detail: `dropped:${dropped.join(',').slice(0, 40)}` };
+            // The seam is reached by a WEAK parse too, not only a failed one — the App runs these
+            // guards after the dropped-span accounting and before the LLM, so a dropped given that
+            // one of them answers is `guided`, never `would-escalate`. `parsed: true` here, so the
+            // #779 lowercase nudge (a failed-parse guard) correctly does not apply (#246, #829).
+            res = guidedAtSeam(u, pctx, true)
+              ?? { now: 'would-escalate', detail: `dropped:${dropped.join(',').slice(0, 40)}` };
           } else {
             const next = [...facts, ...r.commands.map((cmd, k) => ({ id: `f${facts.length}-${k}`, group: `g${out.length}`, cmd, enabled: true }))];
             const d = replay(next, 0);

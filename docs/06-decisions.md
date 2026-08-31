@@ -8293,3 +8293,70 @@ miscounted as a label.
 separately; no equivalent single-vertex/symbol hole found there. The general class — *sibling rules
 that split one statement and drift apart in what each accepts* — is the one #772 also belongs to and
 is worth watching wherever a statement is split by value kind.
+## ADR-469 — the post-parse escalation seams are DERIVED, like the pre-parse guards (#829)
+
+**Status:** accepted, 2026-08-31. The **5th** instance of the #35 mirror-drift class, and the one the
+#501 fix left standing.
+
+**What broke.** In the 2026-08-30 log-triage window, **100% of the 2-D worklist was false signal**:
+
+| utterance (prod) | the App answers | the harness said |
+| --- | --- | --- |
+| `משולש ABC וריבוע WERT` | `scope:split-statements:independent` (#763) | ▶ LIVE grammar gap |
+| `משולש ABC שווה שוקיים AB=AC` | `scope:split-statements` (#108) | ▶ LIVE grammar gap |
+
+Both students then typed exactly what the guidance told them and all four follow-ups built — the
+teaching seam working as designed, reported as a defect. Worse than a wasted worklist: the distilled
+verdict map (`verdicts-2d.json`, #183) carries the same false `not-handled` verdicts to the prod
+dashboard, so the «פערים אמיתיים» card showed deliberately-answered input as real gaps.
+
+**Root cause.** `runSubmit` has **four** guided short-circuits after `parse()` and before the LLM.
+`triage.mjs` mirrored one. But the defect is not the three missing calls — it is why nothing caught
+them. `triage-mirror.test.ts` DERIVES the pre-parse guard list from the pipeline source (#501's fix)
+over the region ending **at** `parse(utterance,`; every post-parse seam lies outside it, and that
+side was covered by a hand-written list of one:
+
+```js
+for (const p of ['wordRootMagnitude']) { … }
+```
+
+That is verbatim the trap #501's own comment says it removed — *"a guard that lists what it knows
+cannot fail on what it does not"* — left standing on the other side of the parse. Three seams landed
+there afterwards (`splitGuidance`, `independentConstructs` #763, `upperCasedLabelCandidate` #779) and
+nothing forced the list to follow.
+
+**Decision — derive that side too**, between the `parse(utterance,` and `llmParse(utterance` anchors,
+with the same shrinking-expectation guard the pre-parse half has (`>= 4`, so an anchor drift that
+yields an empty list fails loudly instead of passing forever). The `['wordRootMagnitude']` literal is
+deleted; it is now simply a member of the derived set.
+
+**Not every `f(utterance)` after the parse is a seam** — `statedLabelTokens` feeds the dropped-label
+accounting, which the harness mirrors through `droppedNewLabels`. The discriminator is the pipeline's
+**own declaration**: a guided short-circuit logs `source: 'scope'`, which is precisely the verdict the
+harness must reproduce. So a call counts as a seam when *the first thing the pipeline logs after
+consulting it* is a scope answer. Deriving it from the log rather than from a character window
+deliberately avoids a magic distance that would drift the first time a seam grows a line.
+
+**The harness half.** `guidedAtSeam(u, pctx, parsed)` mirrors all four at the App's position and in
+the App's order, and is called from **both** places the App reaches the seam — the failed parse and
+the weak/dropped parse. `upperCasedLabelCandidate` stays **proof-based** (the nudge fires only when
+the lifted candidate actually parses, exactly as `session3d` already does for the 3-D variant), so a
+genuine gap stays a genuine gap.
+
+**The inverse failure is worse and is locked against.** A harness that calls every unparseable line
+"guided" reports zero gaps forever. `issue-829-seams.test.ts` therefore checks both directions: the
+two reported utterances are answered by a seam, AND genuine nonsense still returns null.
+
+**Behaviour is locked separately from text.** The mirror guard compares TEXT (the harness fetches logs
+and writes a report on import, so the suite must never import it — the standing ADR-346 constraint).
+The behavioural half lives on the seam predicates themselves, which is what the harness now calls.
+
+**Follow-up:** re-run `--reverify` for 2-D so the corrected verdicts replace the false ones already
+uploaded to the prod box. Not done in this round — it needs a live prod-log pull, which is the
+operator's call, not an autonomous one.
+
+**Sibling check (ADR-W-004).** The 3-D lane already mirrored its own `upperCasedLabelCandidate3` and
+`classifyGuidance3`; the derived guard now covers 2-D the same way. The class — *a mirror contract
+enforced by an enumerated list rather than a derived one* — has now produced five instances
+(ADR-169 `parallels`, the 2026-07-17 context-free verify, #243, #501, this). Every remaining
+enumerated mirror list is a candidate for the same treatment.
