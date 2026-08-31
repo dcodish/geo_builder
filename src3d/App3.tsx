@@ -618,7 +618,9 @@ export default function App3() {
                       ? t('notice.lineAutoNamed', { requested: n.requested, assigned: n.assigned })
                       : n.kind === 'containment-redundant'
                         ? t('notice.containmentRedundant', { seg: n.seg, plane: n.plane })
-                        : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
+                        : n.kind === 'relation-entailed'
+                          ? t(n.rel === 'perp' ? 'notice.entailedPerp' : 'notice.entailedParallel', { seg: n.seg, plane: n.plane })
+                          : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
             </div>
           ))}
           {lastNotice && !lastError && !busy && (

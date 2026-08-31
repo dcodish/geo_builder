@@ -6510,3 +6510,63 @@ unnoticed.
 
 Verified in the browser: three clean fact rows, the plane drawn, and «מישורים → ABCD → פאה בלבד» in
 the panel; zero page errors.
+
+## ADR-3D-198 — A ∥ / ⟂ THE FIGURE ALREADY IMPLIES SAYS SO (#850)
+
+**Status:** accepted, 2026-08-31. Completes the operator's own follow-up to #833.
+
+**The gap.** [#833](#adr-3d-193) fixed the honesty half: «AB מקביל למישור A'B'C'D'» on a cube was
+REFUSED though true by construction, and now builds. It built **silently** — a ✓ and a drawn segment,
+which reads as "something happened" when nothing did. Operator: *"this is maybe not build and say
+that its already known? what do you think?"*
+
+**How the verdict is reached — and the fork the operator settled.**
+
+Two routes were put to them, with costs:
+
+- **structural** — a per-solid-kind parallel-face rule. Cannot ever over-claim, because it never
+  consults a drawn position; narrower (silent on ⟂, whose rightness `parallelepiped` complicates).
+- **numeric, multi-sample** — check the relation holds across sampled configurations, reusing shipped
+  machinery. Broader; but it is a *sampled* verdict, and [#827](#adr-3d-194) — fixed the same day —
+  was exactly a sampled verdict being confidently wrong.
+
+**A correction on the record:** the escalation that framed this claimed the structural route was
+blocked because `prismBaseN()` omits `cube`/`box`. True but the wrong predicate — `faceIndices()`
+puts base at `faces[0]` and top at `faces[1]` for **every** prism kind, cube and box included via its
+final fallback. The structural route was far cheaper than stated. The operator was shown the
+correction and **chose the numeric route anyway**.
+
+**Decision — numeric, with the counterfactual made cheap and the #827 guard bolted on.**
+
+The honest question is *would this hold if the student had not said it?*, and the **lowering already
+answers it**: `seg-plane-rel` becomes a driving `scalarPin` while the figure has free dims, and a pure
+claim once it does not. **A claim with no matching pin constrained nothing** — the figure was
+determined by the other facts and this sentence only checked it. So the candidate set is exact and
+free; no counterfactual re-derivation is needed.
+
+The operator's numeric gate then confirms it, and `verifyClaim` already **is** that gate — it checks
+`claimSeeds`, four configurations. On top of it, `relationHoldsInEveryBranch` walks
+`pivot.pointRoots` (built for #827): seeds vary the GAUGE and never the BRANCH, so a two-branch
+figure must satisfy the relation in **every admissible branch** before anything is claimed. That is
+the concern raised against the numeric route, answered inside it.
+
+**The plane is named as the STUDENT wrote it.** A `perp-plane` / `par-plane` claim stores three
+points, because three fix a plane; reporting «A'B'C'» back would name internal state, which is the
+honesty invariant's own counter-example. `statedPlaneName` recovers the full run from the figure — a
+materialised point-run plane, else the solid FACE those three points open.
+
+**What is never reported:** a relation that DROVE the figure (it is information, not a consequence —
+the distinction the whole notice rests on), and a false relation, which still refuses with
+`claim-refuted` exactly as #833 left it.
+
+**Perf:** the branch walk is gated behind a candidate claim existing, and `derive3` passes the sample
+it had already computed — no extra solve on the hot path.
+
+**Locks** (`src3d/__tests__/issue-850.test.ts`, 9 tests): the operator's sentence builds AND reports;
+the plane's stated name; the ⟂ twin; anchored and un-anchored alike; seed-invariance at 0/1/3/17/42;
+a driving relation reports nothing; a false relation still refuses; a bare figure reports nothing.
+
+**Note on the family.** This is the fourth "true, and already known" channel (#612 `shape-redundant`,
+#396 `redundant-relation`, #842 `containment-redundant`, this). They should converge on one channel
+with a per-relation entailment test; filed as **#853** rather than done here, since converging them
+is a refactor with no user-visible change and belongs in its own pass.
