@@ -6004,3 +6004,45 @@ non-planar container refused, M1 both ways (a true containment accepted on a no-
 one refused `claim-refuted`), **the round trip** (a figure whose panel prints «BE מוכל במישור ABCD»
 accepting that exact sentence), the shared predicate being order-independent and rejecting a parallel-but-
 offset line, planar containment equalling coincidence, and the ∥ sibling keeping its cell.
+
+## ADR-3D-190 — A HEBREW ROW IS ORDERED AS HEBREW, even when it contains maths (#838)
+
+**Status:** Accepted (2026-08-31) · **Ladder:** stage 5d (display) · **Operator report:** playing `prod/2026-08-31`
+
+> *"also note that the inputs are not shown bidi"*
+
+The fact row for «BE מוכל במישור ABCD» displayed with its operands **swapped** — it read as if `ABCD`
+were contained in `BE`. The operator reported it as a containment bug, because that is what the app said.
+
+**Root cause.** `VecMath` wraps a row in `<math dir="ltr">` whenever the tokenizer finds a `pair`/`vec`/
+`frac` token, and that wrapper covers the **whole row, prose included**. A Hebrew sentence containing two
+point-pairs was therefore laid out left-to-right: `BE` leftmost, `ABCD` rightmost, and a reader scanning
+right-to-left meets `ABCD` first. Measured at `f78940c`: «BE מוכל במישור ABCD», «E אמצע AC» and «קטע BE»
+all take the MathML path and were all reversed; «מישור ABCD» and «קובייה ABCDA'B'C'D'» take the prose
+path and were correct.
+
+**This corrects [ADR-3D-190's own predecessor.](#adr-3d-184)** ADR-3D-184 (#482 Am. 4) fixed VecMath's
+prose path and deliberately left the MathML branch untouched, on this reasoning:
+
+> *"The MathML branch is untouched, so ADR-3D-121's reasoning survives precisely where it was true."*
+
+That reasoning — *"VecMath emits one element per token, so bidi sees structure rather than one neutral
+run"* — is true of a **pure expression** and **false of a Hebrew sentence containing expression tokens**.
+The structure was there; the wrapper was overriding the direction it should have been ordered in. The
+tokens were checked and the wrapper around them was not.
+
+**Decision — the wrapper's direction follows the ROW, not the presence of a math token.** `dir` comes
+from `textDir3(text)`, the same question the input preview already asks, so the two seams cannot
+disagree. A pure expression still reads `ltr` and is byte-identical; a Hebrew sentence orders its islands
+right-to-left while each island stays internally LTR — which is what the per-token elements already are.
+
+**Residual risk, stated rather than hidden:** this relies on MathML Core's `dir`, which the same file's
+ADR-207 note already depends on for MathML support generally. It could not be verified visually in this
+session — there is no browser here (#704). If a browser turns out to ignore `dir` on `<math>`, the next
+step is to stop putting prose inside the math element at all: render prose as isolated text and each
+expression as its own small `<math dir="ltr">`, which uses ordinary HTML bidi for the sentence.
+
+Locks: `issue-838.test.tsx` (9) — the operator's three rows ordered RTL and their operands in typed
+source order, pure expressions still LTR, the prose path never entering the math element, and the
+property over the whole command catalog: every advertised utterance renders in the direction its own text
+calls for.
