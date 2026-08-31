@@ -351,11 +351,19 @@ export interface NameVectorCommand {
   to: Id;
 }
 
-/** An auxiliary drawn segment between EXISTING points (idempotent; a solid edge is never duplicated). */
+/** An auxiliary drawn segment (idempotent; a solid edge is never duplicated). */
 export interface Segment3Command {
   type: 'segment3';
   a: Id;
   b: Id;
+  /**
+   * #840 — the DRAWING register: the student's whole sentence is this segment («קטע BE»), so an
+   * unstated endpoint is theirs to introduce and is minted free.
+   *
+   * A `segment3` emitted as another command's CARRIER never sets it — «נסמן: AB = u, AC = v» draws
+   * the vector's segment before naming it, and naming needs points that already exist (`v7-t1`).
+   */
+  bare?: true;
 }
 
 /** A named-angle MARKER (#94): `∠SDB` / `∠SDB = α` — a pedagogical highlight, NOT a driver. Draws the arc

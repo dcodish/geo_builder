@@ -1728,7 +1728,9 @@ const bareSegment: Rule = (s) => {
   if (!m) return null;
   const [, a, b] = m;
   if (a === b) return null;
-  return [{ type: 'segment3', a, b }];
+  // #840: this rule IS the drawing register — the student's whole sentence is this segment, so an
+  // unstated endpoint is theirs to introduce. Every other `segment3` in this file is a carrier.
+  return [{ type: 'segment3', a, b, bare: true }];
 };
 
 // ---------------------------------------------------------------------------

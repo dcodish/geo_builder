@@ -4,7 +4,7 @@
  */
 
 import { exprPointIds, exprVectorNames } from './vecExpr';
-import { isAbsolute, lineDirCarriesParam, planeNormalCarriesParam, sameOperand } from './operands';
+import { isAbsolute, isPlanar, lineDirCarriesParam, planeNormalCarriesParam, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
@@ -971,9 +971,41 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'segment3': {
+      if (cmd.a === cmd.b) return { ok: false, error: { code: 'unknown-point', id: cmd.b } };
+      /**
+       * #840 (ADR-3D-191) — AN UNSTATED ENDPOINT IS A FREE POINT, not a refusal.
+       *
+       * «קטע BE» on a figure with no `E` was refused `unknown-point`, so the segment never existed and
+       * nothing could be said about it — the operator deleted «E אמצע AC» and watched both that row and
+       * the containment statement go inert (2026-08-31).
+       *
+       * [ADR-052](../../docs/06-decisions.md#adr-052) is the rule: a student enters only what the
+       * question shows, and every unstated magnitude is a FREE DOF rather than a fixed value. `E` is
+       * unstated, so it is free — 3 sampled DOFs that «הציגו תצורה אחרת» resamples — and the segment
+       * draws and moves. That is also what makes a later «BE מוכל במישור ABCD» able to REMOVE a degree
+       * of freedom instead of being inert (#839).
+       *
+       * The mechanism is not new: the polygon lane above mints `free3` corners on exactly this argument
+       * («משולש XYZ already builds three free points»), and it does so only when the run has at least
+       * one KNOWN point. The same guard applies here and is what keeps a typo catchable: «קטע BE»
+       * extends from a `B` that exists, while «קטע QZ» — both ends unknown — is still refused, so a
+       * mistyped pair names the undeclared label rather than silently inventing two points.
+       *
+       * `bare` is the second half of that guard. Many commands emit a `segment3` as a CARRIER —
+       * «נסמן: AB = u, AC = v» draws the vector's segment before naming it — and minting there would
+       * let a NAMING introduce its own subject. `v7-t1` locks that refusal («naming needs existing
+       * points») and it caught this: the first version of this fix minted on every `segment3`. Only
+       * the drawing register may introduce a point.
+       */
+      const fresh = [cmd.a, cmd.b].filter((id) => !c.points.has(id));
+      if (cmd.bare && fresh.length > 0 && fresh.length < 2) {
+        const next = clone(c);
+        for (const id of fresh) next.points.set(id, { kind: 'free3' });
+        if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]);
+        return { ok: true, next };
+      }
       const missing = missingPoint(c, [cmd.a, cmd.b]);
       if (missing) return { ok: false, error: missing };
-      if (cmd.a === cmd.b) return { ok: false, error: { code: 'unknown-point', id: cmd.b } };
       if (c.segments.some((s) => samePair(s, cmd.a, cmd.b))) return { ok: true, next: c }; // idempotent — the 2-D convention
       // a pair that IS a solid edge is still RECORDED (ADR-3D-030 Am. 2): the student
       // naming `BB'` is a deliberate act — the data panel organizes that pair's
@@ -1429,6 +1461,37 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (!next.relMarks.some((mk) => mk.label === cmd.label && sameOperand(mk.a, cmd.a) && sameOperand(mk.b, cmd.b)))
           next.relMarks.push({ a: cmd.a, b: cmd.b, label: cmd.label });
         return { ok: true, next };
+      }
+      /**
+       * #839 (ADR-3D-191) — CONTAINMENT OF A SEGMENT DRIVES THROUGH ITS ENDPOINTS.
+       *
+       * The `plane-rel` pin below solves the GAUGE and the shape DIMS — it moves the whole figure. A
+       * free point's position is SAMPLED, not part of that unknown vector, so the pin can verify a
+       * containment and can never bring a loose endpoint into the plane: «BE מוכל במישור ABCD» with a
+       * free `E` came back `claim-refuted` instead of placing E (operator, 2026-08-31).
+       *
+       * #614's analysis pointed at memberships, and measurement said one step further: a membership on
+       * an ALREADY-SAMPLED point only verifies it. What actually removes the freedom is re-homing the
+       * point itself — a `free3` endpoint becomes an `on-plane` RIDER, which `evaluate` already places
+       * and already counts as **2 degrees of freedom instead of 3** (`evaluate.ts:765`). That is the
+       * operator's sentence made literal: *"having it part of ABCD should limit the degree of freedom
+       * even more."* The relation's own claim stays, so the panel and the verdict are unchanged.
+       */
+      if (cmd.rel === 'contained') {
+        const planeSide = isPlanar(cmd.a) ? cmd.a : cmd.b;
+        const linear = planeSide === cmd.a ? cmd.b : cmd.a;
+        const planeName =
+          planeSide.kind === 'plane-run' ? planeSide.ids.join('')
+          : planeSide.kind === 'plane-named' ? planeSide.name
+          : null;
+        if (planeName !== null && linear.kind === 'segment') {
+          for (const id of [linear.a, linear.b]) {
+            // ONLY a point the figure leaves free is re-homed. A bound endpoint (a solid vertex, a
+            // midpoint, a foot) already has an owner and keeps it — re-kinding one would unbind it
+            // from the construction that defines it, and its containment is the CLAIM's business.
+            if (next.points.get(id)?.kind === 'free3') next.points.set(id, { kind: 'on-plane', plane: planeName });
+          }
+        }
       }
       // the DRIVE — only when both operands ride the gauge (an absolute side would have to MOVE the
       // figure, which is the pivot's lane; those instances stay claim-verified, see #386's sibling)
