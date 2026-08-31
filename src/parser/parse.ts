@@ -2052,6 +2052,46 @@ const centralAngle: Rule = (s, ctx) => {
     : [...arms, { type: 'mark-angle', vertex: centre, ray1: a, ray2: b }];
 };
 
+/**
+ * #831 (ADR-468) — THE VERTEX AND ARMS OF AN ANGLE REFERENCE, READ ONCE FOR EVERY VALUE KIND.
+ *
+ * Two rules split the angle statement by the KIND of its value: `angle` takes a number
+ * («זווית A = 40») and `measureAngle` takes a symbol («זווית BAC = α»). Each used to resolve the
+ * angle's vertex for itself, and only `angle` ever grew the SINGLE-VERTEX lane — so
+ * «זווית A = α» fell between them and went `not-handled`, alone among its neighbours, while both
+ * «זווית A = 40» and «זווית BAC = α» built.
+ *
+ * That is #772's defect exactly (a value slot that is number-only where its sibling takes both), and
+ * it gets #772's answer: the shared thing is read in ONE place. A rule now decides only what its
+ * value means; WHICH angle is being named is this function's business, so a third value kind cannot
+ * reopen the hole by forgetting to copy the lane.
+ *
+ * `text` must arrive with the angle keyword AND the value expression already removed — the value is
+ * the one part that is genuinely the caller's, and leaving it in would let a symbol spelled with a
+ * Latin letter be counted as a second label.
+ */
+type AngleArms = { ray1: Id; vertex: Id; ray2: Id };
+function angleArms(text: string, ctx: ParseContext): AngleArms | Clarify | null {
+  const three = labelRun(text, 3);
+  if (three) return { ray1: three[0], vertex: three[1], ray2: three[2] };
+  // SINGLE-vertex form — «∠B = …». Well-defined only when the named vertex has EXACTLY two edges in
+  // the figure (one possible angle): resolve its arms from `ctx.neighbors`. With any other number
+  // (more = several angles to choose between; fewer = no arms) the intended angle is ambiguous, so
+  // ASK for all three letters rather than guessing or escalating to the LLM.
+  // Gated to a CLEAN single-label text so compounds fall through.
+  const one = labelRun(text, 1); // labelRun already uppercases a lone lowercase label (`d` -> `D`)
+  const upperCount = (text.match(/[A-Z]\d*/g) ?? []).length;
+  // A LOWERCASE vertex (#45 / ADR-299): «נתון זווית d=90». `labelRun` resolves it, but an
+  // uppercase-only count reads zero labels and bails. Count a LONE lowercase Latin letter too — but
+  // only when there is NO uppercase label, so a filler word's letters are never counted.
+  const lowerLoners = upperCount === 0 ? (text.match(/(?<![A-Za-z])[a-z](?![A-Za-z])/g) ?? []).length : 0;
+  if (!one || upperCount + lowerLoners !== 1) return null;
+  const v = one[0];
+  const nb = (ctx.neighbors ?? {})[v] ?? [];
+  if (nb.length === 2) return { ray1: nb[0], vertex: v, ray2: nb[1] };
+  return { clarify: 'ambiguous-angle', vertex: v };
+}
+
 const angle: Rule = (s, ctx) => {
   if (!/(?:angle|∠|זוו?ית)/i.test(s)) return null;
   // A COMPARISON is not a value (ADR-390, issue #277): "∠ABC > 40" states a REGION, and reading its
@@ -2078,40 +2118,16 @@ const angle: Rule = (s, ctx) => {
   const valM = stripped.match(new RegExp(String.raw`(?<![A-Za-z])` + num));
   if (!valM && !rightWord) return null; // no degree value AND not a right-angle word → not this rule
   const value = valM ? parseFloat(valM[1]) : 90;
-  const ids = labelRun(stripped, 3);
-  if (ids) {
-    const [r1, v, r2] = ids;
-    return [
-      { type: 'segment', a: v, b: r1 },
-      { type: 'segment', a: v, b: r2 },
-      { type: 'set-angle', vertex: v, ray1: r1, ray2: r2, value },
-    ];
-  }
-  // SINGLE-vertex form — "∠B = 90" / "זווית B = 90". Only well-defined when the named vertex has EXACTLY two
-  // edges in the figure (one possible angle): resolve its arms from `ctx.neighbors`. With a different number
-  // of edges (more = several angles to choose between; fewer = no arms to use) the intended angle is
-  // ambiguous, so ASK the student to name all three letters rather than guessing or escalating to the LLM.
-  // Gated to a CLEAN single-label utterance (exactly one label besides the value) so compounds fall through.
-  const one = labelRun(stripped, 1); // labelRun already uppercases a lone lowercase label (`d` → `D`)
-  const upperCount = (stripped.match(/[A-Z]\d*/g) ?? []).length;
-  // A LOWERCASE vertex (#45 / ADR-299): "נתון זווית d=90" — a student typed a lowercase point label.
-  // `labelRun` resolves it, but the compound-guard count was UPPERCASE-only and so read zero labels and
-  // bailed. Count a LONE lowercase Latin letter too — but only when there is NO uppercase label (so a
-  // lowercase FILLER word's letters, e.g. "is a", are never counted: those cases always have uppercase
-  // vertices and take the count-3 path). So a bare lowercase vertex reads as exactly one label.
-  const lowerLoners = upperCount === 0 ? (stripped.match(/(?<![A-Za-z])[a-z](?![A-Za-z])/g) ?? []).length : 0;
-  const labelCount = upperCount + lowerLoners;
-  if (!one || labelCount !== 1) return null;
-  const v = one[0];
-  const nb = (ctx.neighbors ?? {})[v] ?? [];
-  if (nb.length === 2) {
-    return [
-      { type: 'segment', a: v, b: nb[0] },
-      { type: 'segment', a: v, b: nb[1] },
-      { type: 'set-angle', vertex: v, ray1: nb[0], ray2: nb[1], value },
-    ];
-  }
-  return { clarify: 'ambiguous-angle', vertex: v };
+  // #831: the numeric text is removed before the vertex is read, so a value can never be counted as
+  // a label — the shared reader then answers the same question for both value kinds.
+  const arms = angleArms(valM ? stripped.replace(valM[0], ' ') : stripped, ctx);
+  if (!arms || 'clarify' in arms) return arms;
+  const { ray1: r1, vertex: v, ray2: r2 } = arms;
+  return [
+    { type: 'segment', a: v, b: r1 },
+    { type: 'segment', a: v, b: r2 },
+    { type: 'set-angle', vertex: v, ray1: r1, ray2: r2, value },
+  ];
 };
 
 /**
@@ -3358,14 +3374,17 @@ const measurePower: Rule = (s) => {
  * which would otherwise read the coefficient as the angle's degree value. A numeric
  * angle ("angle ABC = 37") has no variable here and falls through to `angle`.
  */
-const measureAngle: Rule = (s) => {
+const measureAngle: Rule = (s, ctx) => {
   if (!/angle|∠|זוו?ית/i.test(s)) return null;
   const stripped = s.replace(/angle|∠|זוו?ית/gi, ' ');
-  const ids = labelRun(stripped, 3);
-  if (!ids) return null;
   const m = stripped.match(new RegExp(String.raw`=\s*(${COEF})?\s*[*·]?\s*(${VAR})(?![a-zA-Z])`));
   if (!m) return null; // numeric or unreadable → let `angle` take the numeric case
-  return [{ type: 'measure-angle', vertex: ids[1], ray1: ids[0], ray2: ids[2], expr: { coef: m[1] ? parseFloat(m[1]) : 1, var: m[2] } }];
+  // #831: the SAME vertex reader the numeric lane uses — so «זווית A = α» resolves its arms from
+  // `ctx.neighbors` exactly as «זווית A = 40» does. The value expression is removed first, or a
+  // symbol spelled with a Latin letter would be counted as a second label.
+  const arms = angleArms(stripped.replace(m[0], ' '), ctx);
+  if (!arms || 'clarify' in arms) return arms;
+  return [{ type: 'measure-angle', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2, expr: { coef: m[1] ? parseFloat(m[1]) : 1, var: m[2] } }];
 };
 
 /**
