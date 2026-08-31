@@ -78,7 +78,9 @@ describe('#803 — the operator’s prism: a pin-driven placement answers', () =
     const top = answerQuery(c, "מישור A'B'C'", state().seed);
     expect(top.answer, JSON.stringify(top)).not.toBeNull();
     expect(top.answer!.replace(/\s/g, '')).toContain(EXAM_PLANE.replace(/\s/g, ''));
-    expect(top.answer, 'the parametric form rides along').toContain('|');
+    // #823: the two representations are ROWS now, never joined by `|` — the parametric still rides along
+    expect(top.rows, 'the parametric form rides along, as its own row').toHaveLength(2);
+    expect(top.rows![1]).toMatch(/^π\d* = /);
     expect(answerQuery(c, 'מישור ABC', state().seed).answer).not.toBeNull();
     const a = answerQuery(c, 'A', state().seed);
     expect(a.answer).toBe('A(2, -1, 1)');

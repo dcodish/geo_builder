@@ -227,7 +227,7 @@ export function canonicalPlaneEq(
  * An anchor that slides or an edge that changes with the seed is a drawing, not a consequence of the
  * givens, and prints nothing (the #371/#481 rule) — which is what "if possible" resolves to.
  */
-export function parametricPlaneForm(run: Id[] | undefined, positions: Positions3[]): string | null {
+export function parametricPlaneForm(run: Id[] | undefined, positions: Positions3[], symbol = 'π'): string | null {
   if (!run || run.length < 3 || positions.length < 2) return null;
   const anchors = positions.map((pos) => pos.get(run[0]));
   if (!anchors.every((p): p is Vec3 => !!p)) return null;
@@ -244,7 +244,44 @@ export function parametricPlaneForm(run: Id[] | undefined, positions: Positions3
   const e1 = stableEdge(run[0], run[1]);
   const e2 = stableEdge(run[0], run[run.length - 1]);
   if (!e1 || !e2) return null;
-  return `x = ${coordStr(anchors[0])} + t·${coordStr(e1)} + s·${coordStr(e2)}`;
+  return `${symbol} = ${coordStr(anchors[0])} + t·${coordStr(e1)} + s·${coordStr(e2)}`;
+}
+
+/**
+ * #823 (ADR-3D-187) — THE SYMBOL EACH PLANE'S PARAMETRIC FORM IS WRITTEN AGAINST.
+ *
+ * The parametric row used to open with a bare `x =`, which reads as the coordinate x and says nothing
+ * about WHICH plane is being described (operator, 2026-08-30). It is now the plane's own symbol: «π»
+ * when the figure has one plane, «π1», «π2» … when it has several.
+ *
+ * Composed ONCE, here, and read by both surfaces that print a plane — the panel's planes block and the
+ * query lane — so the two can never disagree about which plane is π1 (the #653 class: two surfaces
+ * answering one question from two sources). The enumeration follows the panel's own iteration order,
+ * which is the authority for "the figure's planes".
+ *
+ * A plane the student NAMED keeps its own name and is never renumbered, and its name is reserved so a
+ * generated symbol can never collide with it.
+ */
+export function planeSymbols(c: Construction3): Map<string, string> {
+  const named = new Set(c.planes.keys());
+  const universe = [...c.pointPlanes.keys(), ...c.relPlanes.keys(), ...named];
+  const out = new Map<string, string>();
+  const single = universe.length === 1;
+  let n = 0;
+  for (const name of universe) {
+    if (named.has(name)) {
+      out.set(name, name); // the student's own name outranks any symbol we would mint
+      continue;
+    }
+    if (single) {
+      out.set(name, 'π');
+      continue;
+    }
+    do n += 1;
+    while (named.has(`π${n}`)); // never collide with a plane the student called π2
+    out.set(name, `π${n}`);
+  }
+  return out;
 }
 
 /** Solve M·x = t for 3×3 M given by columns u,v,w; null when singular. */
@@ -979,6 +1016,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     // so the agreement check drops it (a sampled equation is not knowledge, the #371/#481 rule); once
     // pinned it is identical in every configuration and its forced equation surfaces, which is exactly
     // the exam's «מצאו את משוואת המישור» moment.
+    const symbols = planeSymbols(c); // #823 — one enumeration, shared with the query lane
     const freeNames = [...c.planes.keys()].filter((n) => c.planes.get(n)!.free);
     for (const name of [...c.pointPlanes.keys(), ...c.relPlanes.keys(), ...freeNames]) {
       const per = resolved.map((r) => r.planes.get(name));
@@ -988,7 +1026,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       planes.push(`${name}: ${planeEqStr(eq)}`);
       // the parametric form rides when the run's anchor point and spanning edges are stable. Shared
       // with the query lane (#317) so a plane's two representations are derived once, never twice.
-      const par = parametricPlaneForm(c.pointPlanes.get(name), positions);
+      const par = parametricPlaneForm(c.pointPlanes.get(name), positions, symbols.get(name) ?? 'π');
       if (par) planes.push(`${name}: ${par}`);
     }
   }

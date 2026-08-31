@@ -1227,6 +1227,61 @@ export function solvePivot(
         }
       }
     }
+    /**
+     * #816 (ADR-3D-186) — DIMS WIDENING, on the FAILURE PATH ONLY.
+     *
+     * The cold starts spread the GAUGE (eight seed-rotated starts) and the #797 walk spreads the pin
+     * symbols, but **the shape DIMS start at the seed's one sample in every start** — the gap this
+     * file already names at the #818 continuation below. When the solution needs a different dims
+     * basin, no start reaches it, the pivot returns nothing, and `store3` faithfully reports that as
+     * `injection-unsatisfiable`: a SEARCH failure presented to the student as an impossibility. The
+     * operator's exam pyramid did exactly that when «|u| = |v|» was typed before the coordinates —
+     * satisfiable at every seed, found at 9 of 12.
+     *
+     * The spread itself is not new: `dimStarts` in the `invariantOnly` branch above has used these
+     * same variants since it was written. It simply never reached the gauge-solving path. So this is
+     * that spread, applied here, and:
+     *
+     *  - **only when this mirror found nothing** — a figure that already has a solution is untouched,
+     *    so the success path is bit-identical and costs nothing;
+     *  - as **EXTRA** starts. The existing eight are never moved: the #518 lesson is recorded twice in
+     *    this file (`solve3.ts:878`, `:901`) — shifting the start set costs hard figures real solution
+     *    branches. Widening on a path that was about to refuse cannot take a branch away.
+     */
+    if (nDims > 0) {
+      /**
+       * Gated on failure in BOTH modes. Widening the pool unconditionally was measured on this
+       * figure and changed nothing — the panel's `?` comes from its own seed-invariance sampling,
+       * not from the pool's size — so it would have cost every pooled solve three extra start
+       * sweeps to buy nothing, which is the #518 trade in the wrong direction.
+       */
+      const foundNothing = collectAll
+        ? !results.some((r) => r.mirror === mirror)
+        : !(best && (anchored ? primaryErr(best.x) : best.err) < ACCEPT);
+      if (foundNothing) {
+        const variants: ((v: number, i: number) => number)[] = [
+          (v) => v * 0.75,
+          (v) => v * 1.3,
+          (v, i) => (i % 2 ? v * 0.6 : v * 1.2),
+        ];
+        for (const f of variants) {
+          const widened = dims0.map(f);
+          for (const x0 of starts) {
+            let r = leastSquares(fSeed, [...x0.slice(0, 7), ...widened, ...x0.slice(7 + nDims)]);
+            for (let polish = 0; polish < 3 && r.err > 1e-24 && r.err < 1e-4; polish++) {
+              const r2 = leastSquares(fSeed, r.x);
+              if (r2.err >= r.err * 0.99) break;
+              r = r2;
+            }
+            if (degenerate(r.x)) continue;
+            collect(r);
+            if (!best || r.err < best.err) best = r;
+          }
+          // one accepted solution is enough when we are not building the configuration pool
+          if (!collectAll && best && (anchored ? primaryErr(best.x) : best.err) < ACCEPT) break;
+        }
+      }
+    }
     // acceptance: per-residual ~1e-6 — far under the 2e-5 claim tolerance (the numeric-
     // Jacobian floor rises with mixed scalar residuals; 1e-16 was V4-era point-pins-only)
     const bestAccept = best ? (anchored ? primaryErr(best.x) : best.err) : Infinity;

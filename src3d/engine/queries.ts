@@ -13,7 +13,8 @@
  */
 
 import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
-import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, decompStr, formatBranches, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr } from './dataView';
+import { SHAPE_SUBJ } from '../lexicon/nouns3';
+import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, decompStr, formatBranches, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr, planeSymbols } from './dataView';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
@@ -49,8 +50,18 @@ type Query =
 export interface QueryResult {
   /** The student's query text, verbatim. */
   text: string;
-  /** The value (`0`, `6`, `90°`), or null when it can't be answered. */
+  /** The value (`0`, `6`, `90°`), or null when it can't be answered. For a multi-row answer this is
+   *  the FIRST row — a complete answer on its own, so a non-UI consumer needs no special case. */
   answer: string | null;
+  /**
+   * #823 — the answer as ROWS, when it has more than one.
+   *
+   * A plane has two standard representations and both are given (operator ruling, 2026-08-15). They
+   * used to be joined into one string with `  |  `; the operator asked for one representation per row,
+   * as the panel already does. Present only when there is more than one row, so every single-value
+   * query is untouched and the App renders `rows ?? [answer]`.
+   */
+  rows?: readonly string[];
   /** Why it can't be answered — shown in place of a value. */
   note?: string;
   /** For note `depends`: the free named parameter(s) the quantity is a function of («α»). */
@@ -154,7 +165,17 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
   }
 
   // AREA: «area ABC» / «שטח ABC» / «S_{ABC}» / «SABC»
-  const areaM = s.match(/^(?:שטח|area|the\s+area\s+of)\s+([A-Z0-9'\s]+)$/i) ?? s.match(new RegExp(`^S_?\\{?\\s*((?:${PT}){3,})\\s*\\}?$`));
+  /**
+   * #753 (ADR-3D-188) — the AREA head takes its SUBJECT NOUN, like its three siblings.
+   *
+   * «שטח המשולש ABC», «שטח המרובע ABCD», «שטח מישור DBB'D'» were `notUnderstood` while «שטח ABC»
+   * answered. The point, length and volume heads all took their noun in #642's sweep; this one could
+   * not, because the polygon vocabulary lived only in `parse3.ts` and `engine/` may not import from
+   * `parser/`. It now reads the SAME words from the lexicon leaf, so the two lanes cannot drift a
+   * fourth time. «מישור» is in the gate because a student who has just typed «מישור DBB'D'» into the
+   * fact list writes exactly that after «שטח» (operator session, 2026-08-29).
+   */
+  const areaM = s.match(new RegExp(String.raw`^(?:שטח|area|the\s+area\s+of)\s+` + SHAPE_SUBJ + String.raw`([A-Z0-9'\s]+)$`, 'i')) ?? s.match(new RegExp(`^S_?\\{?\\s*((?:${PT}){3,})\\s*\\}?$`));
   if (areaM) {
     const ids = areaM[1].match(new RegExp(PT, 'g')) ?? [];
     if (ids.length >= 3) return { kind: 'area', ids };
@@ -521,8 +542,25 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
     // edges, and an equation-given plane has no run at all — in those cases the standard form stands
     // alone rather than a sampled parametrisation being invented to fill the slot.
     const run = q.ids ?? c.pointPlanes.get(q.name!);
-    const par = parametricPlaneForm(run, resolvedPer.map((r) => r.positions));
-    return { text, answer: par ? `${planeEqStr(eq)}  |  ${par}` : planeEqStr(eq) };
+    /**
+     * #823 — the SAME symbol the panel prints, from the one enumeration, so the two surfaces cannot
+     * disagree about which plane is π1.
+     *
+     * A query names its plane either way: «מישור π1» carries the name, «מישור ABC» carries the RUN.
+     * Both must reach the same registry entry, or the query lane would print «π» for a plane the panel
+     * is calling «π1» — the disagreement this issue exists to remove.
+     */
+    const symbols = planeSymbols(c);
+    const byRun =
+      q.name ??
+      [...c.pointPlanes.entries()].find(
+        ([, ids]) => run !== undefined && ids.length === run.length && ids.every((id) => run.includes(id)),
+      )?.[0];
+    const symbol = (byRun !== undefined ? symbols.get(byRun) : undefined) ?? 'π';
+    const par = parametricPlaneForm(run, resolvedPer.map((r) => r.positions), symbol);
+    const standard = planeEqStr(eq);
+    // one representation per ROW — never joined by `|` (operator, 2026-08-30)
+    return par ? { text, answer: standard, rows: [standard, par] } : { text, answer: standard };
   }
 
   const vals = seeds.map((s) => {
