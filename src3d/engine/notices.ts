@@ -70,7 +70,63 @@ export type BuildNotice3 =
       kind: 'line-auto-named';
       requested: string;
       assigned: string;
+    }
+  | {
+      /** #842 (ADR-3D-192): a CONTAINMENT that was true and already entailed — «BE מוכל במישור ABCD»
+       *  where B defines the plane and E is the midpoint of AC. It changed no point's definition and
+       *  its claim already held, so it added nothing; the operator read the silence as *"this line
+       *  just drew the plane again"*. Distinct from `redundant-relation` (#396), which needs both
+       *  sides ABSOLUTE — a gauge-riding segment against a point-run plane is never that. */
+      kind: 'containment-redundant';
+      seg: string;
+      plane: string;
     };
+
+/**
+ * #842 — is this point, BY ITS DEFINITION, already confined to this plane?
+ *
+ * STRUCTURAL, never numeric, and deliberately conservative. The alternative — checking whether the
+ * containment's residual was already zero — would have to judge that at sampled positions, and a
+ * quantity that merely *looks* satisfied across the samples it happened to draw is exactly the #827
+ * defect (a two-branch value printing as knowledge). A structural entailment cannot be wrong about a
+ * branch it never looked at, so the notice can only ever under-claim: when this returns false the
+ * statement may still be redundant, and we say nothing rather than risk telling a student their real
+ * given added nothing.
+ *
+ * `visited` guards the recursion; a malformed cycle answers "not entailed", the safe direction.
+ */
+function pointEntailedInPlane(
+  c: Construction3,
+  id: Id,
+  planeName: string,
+  planeIds: readonly Id[],
+  visited = new Set<Id>(),
+): boolean {
+  if (planeIds.includes(id)) return true; // the point is one of the plane's own defining points
+  if (visited.has(id)) return false;
+  visited.add(id);
+  const def = c.points.get(id);
+  if (!def) return false;
+  const inPlane = (q: Id) => pointEntailedInPlane(c, q, planeName, planeIds, visited);
+  switch (def.kind) {
+    // A rider the STUDENT stated on this plane is entailed. One the containment itself implied
+    // (#841's placeholder) is not — that is the relation doing the work, which is the opposite of
+    // redundant, and counting it would make every re-homing containment report itself as pointless.
+    case 'on-plane':
+      return def.plane === planeName && !def.implied;
+    case 'on-segment':
+      return inPlane(def.a) && inPlane(def.b); // a point of a segment whose ends lie in the plane
+    case 'centroid':
+      return def.of.every(inPlane);
+    case 'plane-cut':
+      return def.plane === planeName || (inPlane(def.a) && inPlane(def.b));
+    case 'foot-plane':
+    case 'line-plane':
+      return def.plane === planeName;
+    default:
+      return false;
+  }
+}
 
 /**
  * Every notice the figure currently warrants. Recomputed on each derive — a notice is a property of
@@ -123,6 +179,25 @@ export function buildNotices3(c: Construction3): BuildNotice3[] {
       if (carriesParam(a) || carriesParam(b)) continue;
       out.push({ kind: 'redundant-relation', a: operandLabel(a), b: operandLabel(b) });
     }
+  }
+  // #842 (ADR-3D-192): a containment that changed no definition and was already entailed. The
+  // student's ✓ is honest — the statement IS true — but a ✓ alone reads as "something happened",
+  // and here nothing did. Point-run planes only: an absolute plane's redundancy is #396's lane.
+  for (const cl of c.claims) {
+    if (cl.type !== 'plane-rel' || cl.rel !== 'contained') continue;
+    const planeSide = cl.a.kind === 'plane-run' || cl.a.kind === 'plane-named' ? cl.a : cl.b;
+    const linear = planeSide === cl.a ? cl.b : cl.a;
+    if (linear.kind !== 'segment') continue;
+    const planeName =
+      planeSide.kind === 'plane-run' ? planeSide.ids.join('')
+      : planeSide.kind === 'plane-named' ? planeSide.name
+      : null;
+    if (planeName === null) continue;
+    const planeIds = c.pointPlanes.get(planeName);
+    if (!planeIds) continue; // an equation plane — not this lane
+    if (!pointEntailedInPlane(c, linear.a, planeName, planeIds)) continue;
+    if (!pointEntailedInPlane(c, linear.b, planeName, planeIds)) continue;
+    out.push({ kind: 'containment-redundant', seg: operandLabel(linear), plane: planeName });
   }
   return out;
 }
