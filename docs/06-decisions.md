@@ -8224,3 +8224,72 @@ Locks: `two-circle-family.test.ts` — the five spellings build with k = 1, the 
 inherits, the internal-tangency member refuses, «שני משולשים ששטחם שווה» stays out of the lane. The
 ADR-463 refusal locks flipped to builds; the family invariant held at every step of this history:
 carried or refused, never dropped — now carried.
+
+## ADR-468 — the angle's VERTEX is read once, for every value KIND (#831)
+
+**Status:** accepted, 2026-08-31.
+
+**The gap.** Prod session `mhcpvsvx` (2026-08-23). A student pushed on the same sentence four times
+in about a minute, then found the working form themselves:
+
+```
+סימון זווית A ע"י אלפא   → scope:ui-command   (guided — correct, this IS an imperative)
+סימון זווית A ע"י α      → scope:ui-command   (guided — correct)
+זווית A=α                → llm → not-understood        ← the gap
+זווית BAD=α              → ✓ measure-angle             ← their own recovery
+```
+
+Both halves shipped; only their **intersection** was missing:
+
+| utterance | before |
+| --- | --- |
+| `זווית A=40` | ✓ `segment, segment, set-angle` |
+| `זווית BAC=α` | ✓ `measure-angle` |
+| **`זווית A=α`** | ✗ **not-handled** → a paid LLM call → not-understood |
+
+**Root cause.** Two rules split the angle statement by the KIND of its value — `angle` takes a
+number, `measureAngle` takes a symbol — and **each resolved the vertex for itself**. `angle` grew a
+SINGLE-VERTEX lane (#45 / ADR-299: resolve the arms from `ctx.neighbors` when the vertex has exactly
+two edges, else ASK); `measureAngle` never did, and still demanded a three-label run. A symbolic
+single-vertex angle therefore fell between two rules that had each solved half the problem.
+
+**This is [#772](#adr-459)'s defect** — *a value slot that is number-only where its sibling slot takes
+number-or-symbol* — and it takes #772's fix rather than a new rule.
+
+**Decision.** The vertex/arms reader is extracted as `angleArms(text, ctx)` and used by **both**
+rules. A rule now decides only what its own value means; *which angle is being named* is one
+function's business. The asymmetry is removed structurally, so a third value kind cannot reopen the
+hole by forgetting to copy the lane — which is precisely how this one opened.
+
+`text` reaches the reader with the angle keyword **and the value expression** already removed. That
+is not cosmetic: leaving the value in would let a symbol spelled with a Latin letter («זווית A=x») be
+counted as a second label and silently bail to `not-handled`. Locked.
+
+**A consequence worth naming.** The symbolic lane inherits the numeric lane's *honesty*, not just its
+reach: on an ambiguous vertex («זווית A=α» after «ריבוע ABCD» + «אלכסון AC», where A has three edges)
+it now ASKS for all three letters instead of escalating to the LLM. Both value kinds return the
+identical verdict on the identical figure — locked as its own test, because "one reader" is the claim
+and two behaviours would falsify it.
+
+**A standing question this settles, at no cost.** The 2026-08-24 triage raised *"Greek letters as
+angle labels — worth a ruling on whether a Greek letter may name an angle measure"* as awaiting the
+operator. It needs no ruling: Greek letters **already** name angle measures («זווית BAC=α» has always
+lowered to `measure-angle`). What looked like a policy gap was this one missing slot. The bare-token
+`α`/`β` refusals (`scope:unrelated`) are a separate and deliberate matter, untouched here.
+
+**Observed, deliberately not changed.** «זווית a=40» is `not-handled` — on `main` as well as after
+this fix. `labelRun` strips FILLER before reading labels, and a lone `a` is the English article, so
+the lowercase form works for every letter except that one. Unrelated to this class, low value
+(the uppercase form works), and swept in silently it would have been a patch; recorded here instead.
+
+**Locks** (`src/__tests__/issue-831.test.ts`, 14 tests): the student's own session prefix and the
+context-free triangle; the resolved arms and the parsed coefficient; every neighbouring form
+unchanged (numeric single-vertex, three-letter numeric, three-letter symbolic, the right-angle word
+form, the lowercase vertex); the coefficient form `2α`; the English mirror; the ambiguous-vertex ask
+in the symbolic lane; both value kinds agreeing on that ask; and the Latin-letter symbol not being
+miscounted as a label.
+
+**Sibling check (ADR-W-004).** 3-D angles are reached through different rules and were measured
+separately; no equivalent single-vertex/symbol hole found there. The general class — *sibling rules
+that split one statement and drift apart in what each accepts* — is the one #772 also belongs to and
+is worth watching wherever a statement is split by value kind.
