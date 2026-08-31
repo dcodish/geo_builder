@@ -19,3 +19,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [gh --body @- eats issue bodies](gh-body-at-dash-eats-issues.md) — `--body @-` files the literal characters, not stdin; it has destroyed three issue bodies (#361, #765, #766) — always `--body-file`
 - [Stacked PR merge order](stacked-pr-merge-order.md) — never `--delete-branch` mid-stack: it auto-closes the next PR, and a closed PR can't be reopened while its base is gone (round #800, 2026-08-29)
 - [Tier JSON machine drift](tier-json-machine-drift.md) — `reports/test-tiers.json` stores raw ms, so it churns between the two PCs; timing-only drift gets discarded, not committed (2026-08-30)
+- [No browser self-test](no-browser-self-test.md) — this harness cannot drive a browser; UI ships logic-verified but visually unseen, and #704 (visual smoke harness) is the standing fix (2026-08-31)
