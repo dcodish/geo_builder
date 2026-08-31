@@ -6352,3 +6352,56 @@ about to play. That is the argument for the gate, made on its first real use.
 
 Locks grow to 12 tests, including the property rather than the instance: **`D` open ⟺ `v` open**, over
 the no-sign figure and both sign selections.
+
+## ADR-3D-196 — AN EQUATION INSIDE A HEBREW ROW IS ONE ISLAND, SO IT READS FORWARD (#848)
+
+**Status:** accepted, 2026-08-31. Amends [ADR-3D-190](#adr-3d-190) Am. 1 — the third report on the
+same row.
+
+**The symptom.** «נסמן: AB = u, AD = v, AA' = w» rendered with every clause backwards:
+
+```
+w̲ = AA'⃗   v̲, = AD⃗   u̲, = AB⃗ : נסמן        instead of        AB⃗ = u̲, AD⃗ = v̲, AA'⃗ = w̲  :נסמן
+```
+
+**Root cause.** ADR-3D-190 Am. 1 stopped wrapping the row in `dir="ltr"` and split it into islands
+ordered by an RTL container — correct in principle. But it classified **every space as prose**:
+
+```ts
+const prose = t.k === 'text' || (t.k === 'op' && t.text === ' ');
+```
+
+A space inside an expression is not prose. Treating it as a separator atomised «AB = u» into three
+islands — `AB`, `=`, `u` — and three islands in an RTL container are laid right-to-left. The clause
+came out reversed. The split went exactly one level too far.
+
+**Why it survived two fixes.** «BE מוכל במישור ABCD» — the row the previous two rounds were tested
+against — has *no expression*: one pair, then Hebrew prose. Atomising it changes nothing, so it read
+as fixed. **The defect needs an `=` to show.** And every verification was `textContent`-shaped: the
+logical text has been correct through all three reports, so a text assertion passed on every broken
+build. That is recorded here because it is the transferable part.
+
+**Decision.** A space is prose only when prose stands on one side of it; **between two math tokens it
+belongs to the expression.** The whole expression then becomes ONE `<math dir="ltr">` island —
+internally left-to-right as mathematics, ordered right-to-left against the Hebrew around it, which is
+what ADR-3D-190 set out to do.
+
+Two refinements the first attempt needed, both found by looking at the rendered row rather than the
+DOM:
+
+1. **Sentence punctuation stays with the sentence.** With the colon inside the island, «נסמן» sat at
+   one end of the row and its colon at the other. `:` `,` `.` `;` `?` `!` directly after a prose token
+   are prose. Any *other* operator stays math, so «נתון |AB| = 4» keeps its opening bar with the
+   magnitude — the edge the rule must not over-reach into.
+2. **A space inside an island is `mspace`, not `<mo>`.** As an operator it carries MathML's spacing on
+   both sides; measured, that widened the row past the truncating fact-row container and clipped
+   «נסמן» off its leading edge. `scrollWidth` 267 → 253 against a 253px slot.
+
+**Locks** (`src3d/render/__tests__/issue-848-row-order.test.tsx`, 8 tests): the operator's row yields
+exactly ONE island; that island carries the whole expression in source order; the Hebrew word comes
+first in DOM order (⇒ rightmost under `dir="rtl"`); the colon stays with «נסמן»; «BE מוכל במישור ABCD»
+keeps its ADR-3D-190 order; a pure-expression row is untouched; an opening delimiter stays with its
+expression; a fraction row stays one island.
+
+**On STRUCTURE AND ORDER, never `textContent`** — stated as a requirement rather than a preference,
+because a textContent lock would have passed on all three broken builds.

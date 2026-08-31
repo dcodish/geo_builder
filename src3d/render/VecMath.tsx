@@ -186,16 +186,68 @@ export function VecMath({ text, vecNames }: { text: string; vecNames: Set<string
       m('mrow', null, ...toks.map((t, i) => (t.k === 'op' && t.text === ' ' ? m('mspace', { key: i, width: '0.35em' }) : tokEl(t, i)))),
     );
 
+  /**
+   * #848 (ADR-3D-196) — A SPACE INSIDE AN EXPRESSION IS PART OF THE EXPRESSION.
+   *
+   * ADR-3D-190 Am. 1 split a Hebrew row into per-token islands and let the container order them as
+   * Hebrew. Correct in principle, one level too far in practice: it treated EVERY space as prose, so
+   * «AB = u» became three separate islands — `AB`, `=`, `u` — and three islands in an RTL container
+   * are laid right-to-left. The clause rendered **«u = AB»**: the equation backwards.
+   *
+   * «BE מוכל במישור ABCD» hid this, which is why #838 read as fixed. It has no expression — one pair
+   * then Hebrew prose — so atomising it changed nothing. The defect needs an `=` to show.
+   *
+   * So a space is prose only when prose stands on one side of it. Between two math tokens it belongs
+   * to the expression, and the whole expression becomes ONE `<math dir="ltr">` island: internally
+   * left-to-right as mathematics, ordered right-to-left against the Hebrew around it. That is what
+   * ADR-3D-190 set out to do.
+   */
+  // A type GUARD, not a plain predicate: the `prose` const below relies on TypeScript's aliased-
+  // condition narrowing to know `t.text` exists, which a bare boolean call would not provide.
+  // A type GUARD, not a plain predicate: the `prose` const below relies on TypeScript's aliased-
+  // condition narrowing to know `t.text` exists, which a bare boolean call would not provide.
+  const isSpace = (t: Tok): t is Extract<Tok, { k: 'op' }> => t.k === 'op' && t.text === ' ';
+  /** Punctuation that belongs to the SENTENCE, not to an expression, when prose precedes it. */
+  const SENTENCE_PUNCT = new Set([':', ',', '.', ';', '?', '!']);
+
+  /**
+   * Classify every token as prose or math in ONE pass, because the answer for a space depends on
+   * its neighbours' answers and the answer for punctuation depends on what precedes it.
+   *
+   *  - a `text` token is prose;
+   *  - sentence punctuation directly after prose is prose — «נסמן:» must read as one word plus its
+   *    colon, or the colon drifts to the far end of the row away from the word it belongs to;
+   *  - any other operator is math (so «נתון |AB| = 4» keeps its opening bar with the expression);
+   *  - a space is math only when math stands on BOTH sides — that is the fix itself.
+   */
+  const isProse: boolean[] = toks.map((t) => t.k === 'text');
+  toks.forEach((t, i) => {
+    if (t.k !== 'op' || !SENTENCE_PUNCT.has(t.text)) return; // a space is not sentence punctuation
+    let a = i - 1;
+    while (a >= 0 && isSpace(toks[a])) a--;
+    if (a >= 0 && isProse[a] && toks[a].k === 'text') isProse[i] = true;
+  });
+  toks.forEach((t, i) => {
+    if (!isSpace(t)) return;
+    let a = i - 1;
+    while (a >= 0 && isSpace(toks[a])) a--;
+    let b = i + 1;
+    while (b < toks.length && isSpace(toks[b])) b++;
+    const mathBefore = a >= 0 && !isProse[a];
+    const mathAfter = b < toks.length && !isProse[b];
+    isProse[i] = !(mathBefore && mathAfter);
+  });
+
   const groups: { math: Tok[] | null; text: string }[] = [];
-  for (const t of toks) {
-    const prose = t.k === 'text' || (t.k === 'op' && t.text === ' ');
+  toks.forEach((t, i) => {
+    const prose = t.k === 'text' || (t.k === 'op' && isProse[i]);
     const last = groups[groups.length - 1];
     if (prose) {
       if (last && last.math === null) last.text += t.text;
       else groups.push({ math: null, text: t.text });
     } else if (last && last.math !== null) last.math.push(t);
     else groups.push({ math: [t], text: '' });
-  }
+  });
   return m(
     'span',
     { dir: 'rtl', style: { unicodeBidi: 'isolate' } },
@@ -205,7 +257,11 @@ export function VecMath({ text, vecNames }: { text: string; vecNames: Set<string
         : m(
             'math',
             { key: gi, dir: 'ltr', style: { fontSize: 'inherit' } },
-            m('mrow', null, ...g.math.map((t, i) => tokEl(t, i))),
+            // #848: a space inside the island is `mspace`, exactly as the pure-expression branch
+            // above does it. Rendered as an `<mo>` it would carry MathML's operator spacing on both
+            // sides and widen the row — enough, measured, to overflow the truncating fact row and
+            // clip «נסמן» off its right-hand (leading) edge.
+            m('mrow', null, ...g.math.map((t, i) => (t.k === 'op' && t.text === ' ' ? m('mspace', { key: i, width: '0.35em' }) : tokEl(t, i)))),
           ),
     ),
   );
