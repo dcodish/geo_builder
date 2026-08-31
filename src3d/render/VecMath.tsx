@@ -107,13 +107,18 @@ function tokEl(t: Tok, i: number): React.ReactNode {
     case 'pair':
       return m('mover', { key: i, accent: 'true' }, m('mi', { mathvariant: 'normal' }, t.text), m('mo', { stretchy: 'true' }, '→'));
     case 'vec':
-      // a NAMED vector matches the canvas convention (ADR-3D-003): arrow above AND underline below
-      return m(
-        'mover',
-        { key: i, accent: 'true' },
-        m('munder', { accentunder: 'true' }, m('mi', null, t.text), m('mo', { stretchy: 'true' }, '_')),
-        m('mo', { stretchy: 'true' }, '→'),
-      );
+      /**
+       * #849 (ADR-3D-195) — a DECLARED name takes the UNDERLINE ONLY. The arrow belongs to a point
+       * PAIR, where it means "from A to B"; a name has no endpoints to point between.
+       *
+       * This restores the row rule the operator set on 2026-07-07 (*"point pairs get the combining
+       * arrow, declared vector names get the textbook underline"*) and re-stated on 2026-07-25.
+       * #313 added this renderer and gave named vectors arrow+underline citing ADR-3D-003 — which
+       * governs the CANVAS label, not the row — so the row rule was overridden by a comment
+       * referencing the wrong ADR, and `notation.ts`'s correct implementation became unreachable for
+       * vector facts. Both surfaces now agree (ADR-3D-195 supersedes ADR-3D-003's notation clause).
+       */
+      return m('munder', { key: i, accentunder: 'true' }, m('mi', null, t.text), m('mo', { stretchy: 'true' }, '_'));
     case 'frac':
       return m('mfrac', { key: i }, tokEl(t.num, 0), tokEl(t.den, 1));
     case 'num':

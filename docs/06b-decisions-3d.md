@@ -6352,3 +6352,63 @@ about to play. That is the argument for the gate, made on its first real use.
 
 Locks grow to 12 tests, including the property rather than the instance: **`D` open ⟺ `v` open**, over
 the no-sign figure and both sign selections.
+
+## ADR-3D-195 — ONE vector-notation convention: the name is UNDERLINED, the pair is ARROWED (#849)
+
+**Status:** accepted, 2026-08-31. **Supersedes** [ADR-3D-003](#adr-3d-003)'s notation clause (its
+auto-draw, coloured-shaft and arrowhead-at-head clauses stand).
+
+**The rule.** A **declared name** (`u`, `v`, `w`) takes the **underline** only. A **point pair**
+(`AB`, `AA'`) takes the **arrow** only. On both surfaces — the step row and the canvas label.
+
+**This is not a new rule; it is a restored one.** The operator set it for the step rows on
+2026-07-07 (ADR-3D-014 Am.): *"point pairs get the combining arrow (SE⃗ = 3/4 SD⃗), declared vector
+names get the textbook underline (u̲)"*, and re-stated it on 2026-07-25 when an underline went
+missing (ADR-3D-073). `src3d/render/notation.ts` has implemented it correctly the whole time and says
+so in its header.
+
+**What went wrong.** #313 added the MathML renderer `VecMath.tsx` and gave declared names
+**arrow + underline**, with this comment:
+
+```ts
+// a NAMED vector matches the canvas convention (ADR-3D-003): arrow above AND underline below
+```
+
+That comment is the defect. ADR-3D-003 governs the **canvas label**, not the row. `App3.tsx` routes a
+vector fact to `VecMath`, so the wrong convention won and `notation.ts`'s correct implementation
+became **unreachable for vector facts** — dead code that looked live. The row has been wrong since
+2026-07-25, and the operator reported it as a change of mind when it was a regression against their
+own instruction.
+
+**Why the arrow belongs to the pair and not the name.** The arrow *means* «from A to B». A pair has
+endpoints to point between; a declared name does not. Marking them differently also does real work
+for a student: the row shows at a glance which vectors they NAMED and which are concrete pairs, and
+«AB = u» displays both conventions side by side, which is the moment the distinction is worth seeing.
+
+**The canvas half was the only genuine decision**, since ADR-3D-003 explicitly specified
+arrow+underline there. Decided rather than returned to the operator (who asked what there was to
+decide — a fair question, since "row" and "canvas" name places in the code, not places a person
+looks): the instruction was about the NOTATION, not about one renderer, and two surfaces disagreeing
+about one object is worse than either convention alone. The supporting reason is stronger than
+consistency: ADR-3D-003's own amendment already draws a named vector as its **own coloured shaft with
+the arrowhead at the head point**, so direction is already carried by the drawing. An arrow over the
+letter was a third marking of the same fact.
+
+**What must NOT be "simplified" away later.** On the canvas the label sits *away* from the shaft, so
+it keeps the **underline**. A bare italic `w` beside a teal line reads as a point label. Underline
+only — never no mark. Locked as its own test.
+
+**Checked and ruled out:** legibility. Both marks were captured at 3× on the running app before and
+after; the underline is clean on the row and on the canvas. This was purely about which convention
+applies.
+
+**Locks** (`src3d/render/__tests__/issue-849-notation.test.ts`, 7 tests, plus the updated
+`vecmath.test.tsx` and `render3.test.tsx`): a name renders `munder` and **no** `mover`; a pair
+renders `mover` and **no** `munder`; both appear in one row with exactly one of each; the underline
+survives every coefficient syntax (the ADR-3D-073 boundary class); the canvas label has two lines and
+one path — and specifically still has its underline; and, the lock that matters most, **one test
+drives `notation.ts` and `VecMath` for the same fact**, so the two renderers can no longer drift
+apart in silence. That drift, not either convention, was the actual defect.
+
+**Noticed, not fixed here:** on `AA'` the stretchy arrow spans only `AA`, leaving the prime outside
+it, where ADR-3D-003 specifies the whole pair name. Filed as #852 rather than folded in.

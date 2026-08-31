@@ -29,7 +29,7 @@ describe('Figure3 (static, DOM-free)', () => {
     expect(html).toContain('data-testid="figure3"');
   });
 
-  it('a named vector renders in textbook notation: chevron + label with arrow above and underline (ADR-3D-003)', () => {
+  it('#849 — a named vector renders with the UNDERLINE only; direction is the shaft + its arrowhead (ADR-3D-195)', () => {
     let c = emptyConstruction3();
     const cmds: Command3[] = [
       { type: 'solid', kind: 'cube', ids: ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"] },
@@ -46,9 +46,15 @@ describe('Figure3 (static, DOM-free)', () => {
     expect(html).toContain('data-testid="vec-w"');
     const group = html.split('data-testid="vec-w"')[1].split('</g></g>')[0];
     expect(group).toContain('>w</text>'); // the italic name
-    expect((group.match(/<line /g) ?? []).length).toBe(3); // the coloured shaft + the notation's arrow shaft + underline
-    expect((group.match(/<path /g) ?? []).length).toBe(2); // the head arrowhead + the notation's arrowhead
-    expect((group.match(/#0d9488/g) ?? []).length).toBeGreaterThanOrEqual(5); // everything in the vector colour
+    // #849: was 3 (shaft + the label's own arrow shaft + underline). The label's arrow is gone —
+    // direction is already carried by the coloured shaft and its arrowhead at the head point, so an
+    // arrow over the letter was a third marking of the same fact. The UNDERLINE stays: the label
+    // sits away from the shaft and a bare italic letter would read as a point label.
+    expect((group.match(/<line /g) ?? []).length).toBe(2); // the coloured shaft + the notation's underline
+    expect((group.match(/<path /g) ?? []).length).toBe(1); // the head arrowhead ONLY (#849)
+    // #849: one colour still ties the whole vector together — shaft, arrowhead, name, underline.
+    // The floor drops from 5 to 4 because the label's own arrow (a line + a path) is gone.
+    expect((group.match(/#0d9488/g) ?? []).length).toBeGreaterThanOrEqual(4);
   });
 
   it('canvas MATH labels are bidi-ISOLATED so an RTL document cannot reorder them (ADR-3D-031 Am.)', () => {

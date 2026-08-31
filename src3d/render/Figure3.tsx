@@ -355,8 +355,13 @@ export default function Figure3({ construction, resolved, width = 640, height = 
               transform={`translate(${v.x2} ${v.y2}) rotate(${v.angleDeg})`}
               fill={VECTOR_COLOR}
             />
-            {/* the name in textbook vector notation: arrow above + underline (ADR-3D-003) —
-                an UNNAMED ink arrow (#72 `חץ A'C`) draws no label */}
+            {/* #849 (ADR-3D-195): the name in textbook vector notation — the UNDERLINE ONLY. Every
+                label here is a DECLARED name (`c.vectors`), never a point pair, and the arrow means
+                "from A to B", which a name has no endpoints for. The direction is already carried by
+                this vector's own coloured shaft and its arrowhead at the head point (ADR-3D-003 Am.),
+                so an arrow over the letter was a third marking of the same fact. The underline STAYS:
+                the label sits away from the shaft, and a bare italic letter beside a teal line would
+                read as a point label. An UNNAMED ink arrow (#72 `חץ A'C`) draws no label. */}
             {v.name && (
               <g transform={`translate(${v.labelX} ${v.labelY})`}>
                 <text
@@ -374,8 +379,6 @@ export default function Figure3({ construction, resolved, width = 640, height = 
                 >
                   {v.name}
                 </text>
-                <line x1={-6} y1={-11} x2={6.5} y2={-11} stroke={VECTOR_COLOR} strokeWidth={1.2} />
-                <path d="M 6.5 -11 l -3.5 -2.3 M 6.5 -11 l -3.5 2.3" stroke={VECTOR_COLOR} strokeWidth={1.2} fill="none" strokeLinecap="round" />
                 <line x1={-6} y1={9} x2={6} y2={9} stroke={VECTOR_COLOR} strokeWidth={1.2} />
               </g>
             )}

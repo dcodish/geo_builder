@@ -1,7 +1,8 @@
 /**
  * #313 — MathML vector notation (DOM-free render locks, the repo's react-dom/server pattern).
- * The arrow spans the WHOLE pair name via a stretchy <mover>; u/6 is a real <mfrac>; named vectors
- * get arrow + underline (the ADR-3D-003 canvas convention); prose-only rows stay plain text.
+ * The arrow spans the WHOLE pair name via a stretchy <mover>; u/6 is a real <mfrac>; a declared name
+ * gets the UNDERLINE ONLY (#849, ADR-3D-195 — the arrow means "from A to B" and belongs to a pair);
+ * prose-only rows stay plain text.
  */
 import { describe, expect, it } from 'vitest';
 import React from 'react';
@@ -22,12 +23,22 @@ describe('VecMath', () => {
   it('u/6 renders as a real fraction with the vector atom as numerator', () => {
     const out = html('FE = u/6 - v/6');
     expect(out).toContain('<mfrac>');
-    expect(out).toMatch(/<mfrac><mover[^>]*><munder[^>]*><mi>u<\/mi>/);
+    expect(out).toMatch(/<mfrac><munder[^>]*><mi>u<\/mi>/);
   });
 
-  it('a named vector carries arrow + underline (the canvas convention)', () => {
+  it('#849 — a DECLARED name carries the underline ONLY, never an arrow', () => {
     const out = html('SB = u');
-    expect(out).toMatch(/<mover accent="true"><munder accentunder="true"><mi>u<\/mi>/);
+    expect(out).toMatch(/<munder accentunder="true"><mi>u<\/mi>/);
+    // the real lock is the ABSENCE: this row rendered arrow+underline from #313 until #849, which
+    // contradicted the row rule the operator set on 2026-07-07 and re-stated on 2026-07-25.
+    expect(out).not.toMatch(/<mover[^>]*><munder/);
+  });
+
+  it('#849 — and the PAIR in the same row still carries the arrow, and no underline', () => {
+    // The distinction is the whole point: `SB` is a pair (arrow = from S to B), `u` is a name.
+    const out = html('SB = u');
+    expect(out).toContain('<mover accent="true"><mi mathvariant="normal">SB</mi>');
+    expect(out).not.toMatch(/<munder[^>]*><mi mathvariant="normal">SB<\/mi>/);
   });
 
   it('a numeric fraction is an mfrac; a decimal stays mn', () => {
@@ -51,8 +62,8 @@ describe('VecMath', () => {
     expect(fracs.length).toBe(2);
     expect(JSON.stringify(fracs)).toContain('"k":"vec"');
     const out = html('FE⃗ = u̲/6 - v̲/6'); // the EXACT factDisplay3 output shape the step rows pass in
-    expect(out).toMatch(/<mfrac><mover[^>]*><munder[^>]*><mi>u<\/mi>/);
-    expect(out).toMatch(/<mfrac><mover[^>]*><munder[^>]*><mi>v<\/mi>/);
+    expect(out).toMatch(/<mfrac><munder[^>]*><mi>u<\/mi>/);
+    expect(out).toMatch(/<mfrac><munder[^>]*><mi>v<\/mi>/);
   });
 });
 
