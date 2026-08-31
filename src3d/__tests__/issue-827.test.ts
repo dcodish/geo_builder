@@ -99,6 +99,57 @@ describe('#827 — a STATED sign is knowledge, and still prints', () => {
   });
 });
 
+describe('#827 — the VECTOR lane tells the same story as the point lane', () => {
+  beforeEach(reset);
+
+  // Found by driving the real app after the point-lane fix landed: D read (3, ?, 0) while two rows
+  // below v⃗ = AD printed (3, 4, 0) — same seeds, same branch, one surface over, and a panel
+  // contradicting itself on screen. A student reading «D(3, ?, 0)» and «v = (3, 4, 0)» together
+  // learns the value anyway, which is the defect the point-lane fix was supposed to remove.
+  const vecOf = (seed: number, label: string) => {
+    const d = derive3(st().facts, seed);
+    return dataView(d.construction, seed).vectors.find((e) => e.label === label);
+  };
+
+  it('v = AD prints NO coordinates at any seed — D is two-branch, so v is too', () => {
+    build(PYRAMID);
+    for (const seed of SEEDS) expect(vecOf(seed, 'v')?.coords, `seed ${seed}`).toBeNull();
+  });
+
+  it('but |v| = 5 STILL prints — the magnitude is forced by |u| = |v|, whichever branch holds', () => {
+    // The distinction that makes this a real fix rather than blanket suppression: the length is
+    // knowledge, the components are not.
+    build(PYRAMID);
+    for (const seed of SEEDS) expect(vecOf(seed, 'v')?.mag, `seed ${seed}`).toBe('|v| = 5');
+  });
+
+  it('u and w — both endpoints determined — still print their coordinates', () => {
+    build(PYRAMID);
+    for (const seed of SEEDS) {
+      expect(vecOf(seed, 'u')?.coords, `u at seed ${seed}`).toBe('(0, 5, 0)');
+      expect(vecOf(seed, 'w')?.coords, `w at seed ${seed}`).toBe('(0, 0, 6)');
+    }
+  });
+
+  it('once the sign is stated, v prints its coordinates too', () => {
+    build([...PYRAMID, 'p חיובי']);
+    for (const seed of SEEDS) expect(vecOf(seed, 'v')?.coords, `seed ${seed}`).toBe('(3, 4, 0)');
+  });
+
+  it('the panel never contradicts itself: D open ⟺ v open', () => {
+    // The property, not the instance. Whatever the figure, the point and the vector derived from it
+    // must agree about whether the givens determine that component.
+    for (const seq of [PYRAMID, [...PYRAMID, 'p חיובי'], [...PYRAMID, 'p שלילי']]) {
+      build(seq);
+      for (const seed of SEEDS) {
+        const dOpen = (coordsAt(seed, 'D') ?? '').includes('?');
+        const vOpen = vecOf(seed, 'v')?.coords === null;
+        expect(vOpen, `D open=${dOpen} but v open=${vOpen} at seed ${seed}`).toBe(dOpen);
+      }
+    }
+  });
+});
+
 describe('#827 — determined coordinates are untouched', () => {
   beforeEach(reset);
 
