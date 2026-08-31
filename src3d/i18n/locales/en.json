@@ -147,6 +147,8 @@
     "openParam": "free parameter — pinned once more data arrives",
     "secPoints": "Points",
     "secMeasures": "Measures",
+    "secPlanes": "Planes",
+    "planesHint": "Click to show the plane in full, as its face only, or to hide it",
     "secRelations": "Relations",
     "secParams": "Parameters",
     "secAsk": "Ask",

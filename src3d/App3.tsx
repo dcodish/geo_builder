@@ -248,7 +248,12 @@ export default function App3() {
   const notices = derived.notices; // #305 (ADR-3D-090): non-error "here is what changed" messages
   // #842 (ADR-3D-192): which row owns each plane's display chip — derived from the fact list, so a
   // relation row never offers to toggle a plane another row drew.
-  const planeChips = useMemo(() => planeChipsByFact(facts), [facts]);
+  // #847: a row that is not `ok` owns nothing — it materialised no plane. Status is part of the
+  // question, so it is part of the derivation's input.
+  const planeChips = useMemo(
+    () => planeChipsByFact(facts, (id) => derived.status[id] === 'ok'),
+    [facts, derived.status],
+  );
 
   // responsive canvas: track the HOST's box (V5; #718: height too)
   useEffect(() => {
@@ -774,6 +779,39 @@ export default function App3() {
                 hideLabel={t('dataPanel.hide')}
                 status={facts.length > 0 ? (dof === 0 ? t('cue.determined') : t('cue.free', { n: dof })) : undefined}
                 sections={[
+                  {
+                    /**
+                     * #847 (ADR-3D-197) — EVERY DRAWN PLANE, WITH ITS TOGGLE, IN ONE PLACE.
+                     *
+                     * The toggle used to ride whichever fact row happened to mention the plane. The
+                     * operator's ruling: a relation is a statement ABOUT a plane, never a declaration
+                     * of one, so it owns nothing. That left a plane a relation materialised with no
+                     * control at all — and #821 requires one («the user has the option of disabling
+                     * it through the input panel»). It lives here instead, listing what the FIGURE
+                     * draws (`resolved.planes`) rather than what any sentence said, so a plane is
+                     * reachable however it came to exist.
+                     */
+                    key: 'planes',
+                    title: t('dataPanel.secPlanes'),
+                    dir: 'app',
+                    rows: [...derived.resolved.planes.keys()].map((name) => (
+                      <span key={name} className="flex items-center gap-2">
+                        <MathRun>{name}</MathRun>
+                        <button
+                          type="button"
+                          title={t('dataPanel.planesHint')}
+                          onClick={() => togglePlaneDisplay(name)}
+                          className="shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] leading-4 text-slate-500 hover:border-blue-400 hover:text-blue-700"
+                        >
+                          {(planeDisplay[name] ?? 'full') === 'full'
+                            ? t('facts.planeFace')
+                            : planeDisplay[name] === 'face'
+                              ? t('facts.planeHide')
+                              : t('facts.planeFull')}
+                        </button>
+                      </span>
+                    )),
+                  },
                   {
                     key: 'points',
                     title: t('dataPanel.secPoints'),
