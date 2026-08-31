@@ -6036,11 +6036,22 @@ from `textDir3(text)`, the same question the input preview already asks, so the 
 disagree. A pure expression still reads `ltr` and is byte-identical; a Hebrew sentence orders its islands
 right-to-left while each island stays internally LTR — which is what the per-token elements already are.
 
-**Residual risk, stated rather than hidden:** this relies on MathML Core's `dir`, which the same file's
+**Amendment 1 (same day) — the residual risk landed, and the fallback is what shipped.** The paragraph
+below predicted that MathML Core's `dir` might not reorder, and the operator's next play confirmed it: the
+row was STILL reversed. So prose no longer lives inside the math element at all. A row with **no Hebrew**
+is untouched — one `<math dir="ltr">`, byte-identical — while a Hebrew row is split: each expression
+island is its own `<math dir="ltr">`, the prose between them goes through `isolateLtrRuns3` (which is what
+handles a Latin run the tokenizer left as prose — «ABCD» is four letters and tokenizes as TEXT, not a
+pair), and the container carries the row's direction. Ordering is then **HTML's** bidi on a `<span dir=…>`
+— the mechanism every other row in this app already uses — instead of MathML's.
+
+The lesson worth keeping: the first fix was verified on the markup and was wrong about the pixels. There
+is no browser in this harness (#704), so a display fix asserted on markup alone is a hypothesis until
+someone looks.
+
+**The original risk note, kept for the record:** this relies on MathML Core's `dir`, which the same file's
 ADR-207 note already depends on for MathML support generally. It could not be verified visually in this
-session — there is no browser here (#704). If a browser turns out to ignore `dir` on `<math>`, the next
-step is to stop putting prose inside the math element at all: render prose as isolated text and each
-expression as its own small `<math dir="ltr">`, which uses ordinary HTML bidi for the sentence.
+session — there is no browser here (#704).
 
 Locks: `issue-838.test.tsx` (9) — the operator's three rows ordered RTL and their operands in typed
 source order, pure expressions still LTR, the prose path never entering the math element, and the

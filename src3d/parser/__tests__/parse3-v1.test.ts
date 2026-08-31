@@ -103,8 +103,10 @@ describe('span-defined point (Greek scalars)', () => {
 
 describe('bare segment', () => {
   it('a lone pair (optionally with קטע/segment) draws an auxiliary segment', () => {
-    expect(cmds("CA'")).toEqual([{ type: 'segment3', a: 'C', b: "A'" }]);
-    expect(cmds('קטע AM')).toEqual([{ type: 'segment3', a: 'A', b: 'M' }]);
-    expect(cmds('segment BD')).toEqual([{ type: 'segment3', a: 'B', b: 'D' }]);
+    // #840: the DRAWING register carries `bare` — the student's whole sentence is this segment, so an
+    // unstated endpoint is theirs to introduce. A `segment3` emitted as another command's carrier does not.
+    expect(cmds("CA'")).toEqual([{ type: 'segment3', a: 'C', b: "A'", bare: true }]);
+    expect(cmds('קטע AM')).toEqual([{ type: 'segment3', a: 'A', b: 'M', bare: true }]);
+    expect(cmds('segment BD')).toEqual([{ type: 'segment3', a: 'B', b: 'D', bare: true }]);
   });
 });

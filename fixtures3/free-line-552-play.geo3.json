@@ -157,7 +157,8 @@
         {
           "type": "segment3",
           "a": "B'",
-          "b": "E"
+          "b": "E",
+          "bare": true
         }
       ]
     },
@@ -167,7 +168,8 @@
         {
           "type": "segment3",
           "a": "E",
-          "b": "C'"
+          "b": "C'",
+          "bare": true
         }
       ]
     },

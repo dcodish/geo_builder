@@ -55,7 +55,8 @@
         {
           "type": "segment3",
           "a": "A",
-          "b": "C'"
+          "b": "C'",
+          "bare": true
         }
       ]
     },

@@ -164,10 +164,49 @@ export function VecMath({ text, vecNames }: { text: string; vecNames: Set<string
    * sentence orders its islands right-to-left while each island stays internally LTR, which is what the
    * per-token elements already are.
    */
-  // group by whitespace-separated visual runs so prose keeps natural spacing
+  /**
+   * #838 Am. 1 — PROSE IS NOT MATHEMATICS, so it does not live inside the math element.
+   *
+   * ADR-3D-190 set `dir` on the `<math>` wrapper from the row's text. The operator reported the row
+   * STILL reversed, so MathML's own `dir` is not reordering here — the residual risk that ADR named,
+   * and the fallback it named is this one.
+   *
+   * A row with no Hebrew is untouched: one `<math dir="ltr">`, exactly as before, so every pure
+   * expression («|AB| = 4», «u·v») renders byte-identically. A HEBREW row is split instead — each
+   * expression island becomes its own `<math dir="ltr">`, the prose between them goes through
+   * `isolateLtrRuns3` (the #482 chokepoint, which is what handles a Latin run the tokenizer left as
+   * prose — «ABCD» is four letters and tokenizes as TEXT, not as a pair), and the container carries the
+   * row's direction. Ordering is then HTML's bidi on a `<span dir=…>` — the mechanism that already lays
+   * out every other row in this app correctly — instead of MathML's.
+   */
+  if (textDir3(text) === 'ltr')
+    return m(
+      'math',
+      { dir: 'ltr', style: { fontSize: 'inherit' } },
+      m('mrow', null, ...toks.map((t, i) => (t.k === 'op' && t.text === ' ' ? m('mspace', { key: i, width: '0.35em' }) : tokEl(t, i)))),
+    );
+
+  const groups: { math: Tok[] | null; text: string }[] = [];
+  for (const t of toks) {
+    const prose = t.k === 'text' || (t.k === 'op' && t.text === ' ');
+    const last = groups[groups.length - 1];
+    if (prose) {
+      if (last && last.math === null) last.text += t.text;
+      else groups.push({ math: null, text: t.text });
+    } else if (last && last.math !== null) last.math.push(t);
+    else groups.push({ math: [t], text: '' });
+  }
   return m(
-    'math',
-    { dir: textDir3(text), style: { fontSize: 'inherit' } },
-    m('mrow', null, ...toks.map((t, i) => (t.k === 'op' && t.text === ' ' ? m('mspace', { key: i, width: '0.35em' }) : tokEl(t, i)))),
+    'span',
+    { dir: 'rtl', style: { unicodeBidi: 'isolate' } },
+    ...groups.map((g, gi) =>
+      g.math === null
+        ? m('span', { key: gi }, isolateLtrRuns3(g.text))
+        : m(
+            'math',
+            { key: gi, dir: 'ltr', style: { fontSize: 'inherit' } },
+            m('mrow', null, ...g.math.map((t, i) => tokEl(t, i))),
+          ),
+    ),
   );
 }

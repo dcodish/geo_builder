@@ -689,6 +689,25 @@ function riderRatioRetarget(c: Construction3, cmd: Command3): Command3 | null {
 /** The public reducer (#322): run the case reducer, then idempotently dedup the ScalarPin list so a
  *  re-typed macro utterance is a true no-op (mirrors ADR-3D-047's solid re-declare). Claims are left
  *  untouched — derive3 attributes them by COUNT-DELTA, and a re-verify of the same claim is harmless. */
+/**
+ * #841 — is `cmd` aimed at a point that is only a PLACEHOLDER? Returns the construction without it, so
+ * the command can define it properly; null when there is nothing to yield.
+ *
+ * A placeholder is a point the student never positioned: one minted free by a bare segment (#840), or
+ * re-homed onto a plane by a relation (#839). A rider the student STATED is not one.
+ */
+function placeholderYields(c: Construction3, cmd: Command3): Construction3 | null {
+  const id = (cmd as { id?: unknown }).id;
+  if (typeof id !== 'string') return null;
+  const def = c.points.get(id);
+  if (!def) return null;
+  const placeholder = def.kind === 'free3' || (def.kind === 'on-plane' && def.implied === true);
+  if (!placeholder) return null;
+  const points = new Map(c.points);
+  points.delete(id);
+  return { ...c, points };
+}
+
 export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
   const r = applyCommand3Inner(c, cmd);
   if (r.ok) r.next.scalarPins = dedupDeep(r.next.scalarPins);
@@ -701,6 +720,30 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
   // precedent), so all three spellings share one path instead of three routing sites.
   const retarget = riderRatioRetarget(c, cmd);
   if (retarget) return applyCommand3(c, retarget);
+
+  /**
+   * #841 — A PLACEHOLDER YIELDS TO A REAL DEFINITION, at the one entry every command passes through
+   * (the `riderRatioRetarget` precedent directly above).
+   *
+   * #840 made an unstated endpoint a free point, and #839 re-homes it onto a plane. Both are
+   * PLACEHOLDERS: they say "this point has no position yet", not "this point is defined". But every
+   * later definition asks `c.points.has(id)` and then either refuses `already-defined` (13 sites) or
+   * degrades into a CLAIM about a position the point does not have — so «קטע BE» + «BE מוכל במישור
+   * ABCD» + «E אמצע BD» came back `claim-refuted`, while the same three lines in a different order
+   * built fine. That is docs/17 M2 law (i) — satisfiability must not depend on entry order — and it
+   * was introduced by #840/#839 rather than found by them.
+   *
+   * So a definition landing on a placeholder is tried against a construction WITHOUT it: the
+   * placeholder was never a definition, and the real one takes its place. The student's own givens are
+   * untouched — a rider THEY stated carries no `implied` mark and is never stripped — and the
+   * relation that implied the placeholder survives as its claim, which re-verifies against the new
+   * definition (so «E אמצע B'D'», which would leave the plane, still refuses).
+   */
+  const yielded = placeholderYields(c, cmd);
+  if (yielded) {
+    const r = applyCommand3(yielded, cmd);
+    if (r.ok) return r;
+  }
   switch (cmd.type) {
     case 'solid': {
       // #349 (ADR-3D-089): `parallelepiped` is the legacy spelling of `prism4` + `oblique` — normalize it
@@ -1489,7 +1532,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
             // ONLY a point the figure leaves free is re-homed. A bound endpoint (a solid vertex, a
             // midpoint, a foot) already has an owner and keeps it — re-kinding one would unbind it
             // from the construction that defines it, and its containment is the CLAIM's business.
-            if (next.points.get(id)?.kind === 'free3') next.points.set(id, { kind: 'on-plane', plane: planeName });
+            // `implied` (#841): the student did not state this rider, the relation did — so a later
+            // real definition of the point replaces it instead of colliding with it.
+            if (next.points.get(id)?.kind === 'free3') next.points.set(id, { kind: 'on-plane', plane: planeName, implied: true });
           }
         }
       }

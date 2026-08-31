@@ -917,7 +917,18 @@ export type PointDef =
   | { kind: 'partial'; x: number | null; y: number | null; z: number | null }
   // a free point riding a named plane (2 sampled DOF), or floating on a stated SIDE of
   // it (side ±1 = above/below the +z-oriented normal; 3 sampled DOF) — ADR-3D-015
-  | { kind: 'on-plane'; plane: string; side?: 1 | -1 }
+  | {
+      kind: 'on-plane';
+      plane: string;
+      side?: 1 | -1;
+      /**
+       * #841 — the rider was IMPLIED by a relation (#839's containment re-homing), not stated by the
+       * student. It is a placeholder: it records that the point has no position yet beyond its
+       * carrier, so a later real definition REPLACES it. A rider the student stated («B על מישור π2»)
+       * never sets this and is never replaced — discarding it would drop a given.
+       */
+      implied?: true;
+    }
   // a free point riding a named line (1 sampled DOF) — the on-plane rider, line edition
   // (ADR-3D-031: `משוואת הישר AB היא (0,7,6)+t(0,2,1)` creates A,B as riders on the line)
   | { kind: 'on-line'; line: string }

@@ -165,7 +165,7 @@ describe('#55 (ADR-3D-040): the coefficient form of the length/vector ambiguity'
 describe("#449 — «אלכסון תיבה AC'»: the diagonal noun carries its solid", () => {
   it('the reported phrasing builds the SAME segment as the bare one', () => {
     expect(cmd("אלכסון תיבה AC'")).toEqual(cmd("אלכסון AC'"));
-    expect(cmd("אלכסון תיבה AC'")).toEqual([{ type: 'segment3', a: 'A', b: "C'" }]);
+    expect(cmd("אלכסון תיבה AC'")).toEqual([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
   });
 
   it('every solid noun, with and without the definite article', () => {
@@ -177,12 +177,12 @@ describe("#449 — «אלכסון תיבה AC'»: the diagonal noun carries its 
       "אלכסון מנסרה AC'",
       "אלכסון פירמידה AC'",
     ])
-      expect(cmd(u), u).toEqual([{ type: 'segment3', a: 'A', b: "C'" }]);
+      expect(cmd(u), u).toEqual([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
   });
 
   it('the English forms', () => {
     for (const u of ["space diagonal AC'", "main diagonal AC'", "the space diagonal of the box AC'", "diagonal AC'"])
-      expect(cmd(u), u).toEqual([{ type: 'segment3', a: 'A', b: "C'" }]);
+      expect(cmd(u), u).toEqual([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
   });
 
   it('it builds end-to-end on a real box, drawn as ink', () => {
@@ -196,7 +196,7 @@ describe("#449 — «אלכסון תיבה AC'»: the diagonal noun carries its 
 
   it('no theft: the solid DECLARATION and a plain segment are untouched', () => {
     expect(cmd("תיבה ABCDA'B'C'D'")).toEqual([{ type: 'solid', kind: 'box', ids: ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"] }]);
-    expect(cmd('קטע AB')).toEqual([{ type: 'segment3', a: 'A', b: 'B' }]);
-    expect(cmd("AC'")).toEqual([{ type: 'segment3', a: 'A', b: "C'" }]);
+    expect(cmd('קטע AB')).toEqual([{ type: 'segment3', a: 'A', b: 'B', bare: true }]);
+    expect(cmd("AC'")).toEqual([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
   });
 });
