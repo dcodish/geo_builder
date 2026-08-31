@@ -221,13 +221,23 @@ export function symMemberDrives(c: Construction3): { id: Id; sym: string; line?:
  * angle is the formula sheet's sin β = |n·u|/(|n||u|) ⇒ ||cos(n,u)| − sin(deg)|.
  */
 export function lineRelDeviation(
-  rel: 'perp' | 'parallel' | 'angle',
+  rel: 'perp' | 'parallel' | 'angle' | 'contained',
   deg: number | undefined,
   geom: OperandGeom,
-  lineDir: Vec3,
+  /** the named line — its DIRECTION suffices for a direction relation, but containment needs its
+   *  anchor too, so the whole line may be passed (#614) */
+  line: Vec3 | { anchor: Vec3; dir: Vec3 },
+  extent = 1,
 ): number | null {
+  const dir = 'dir' in line ? line.dir : line;
+  if (rel === 'contained') {
+    // #614: containment is direction AND position, so a bare direction cannot answer it — the line's
+    // anchor is required. The operand is the plane side; `containmentDeviation` sorts them itself.
+    if (!('dir' in line)) return null;
+    return containmentDeviation({ point: line.anchor, dir }, geom, extent);
+  }
   // a named line IS a directional operand — so this is `relDeviation` with the line as side B
-  return relDeviation(rel, deg, geom, { dir: lineDir });
+  return relDeviation(rel, deg, geom, { dir });
 }
 
 /** A side's CHARACTERISTIC VECTOR: the direction it runs along, or the normal it is perpendicular to.
@@ -420,6 +430,35 @@ export function distanceWitness(a: OperandGeom, b: OperandGeom): [Vec3, Vec3] | 
 /** The figure's size — the yardstick an OFFSET must be measured against to stay scale-free (a gap of
  *  0.01 means something different on a unit cube than on a 100-unit one). Min 1 so an empty or
  *  degenerate figure can never divide by ~0. */
+/**
+ * #614 (ADR-3D-189) — IS THIS LINEAR OPERAND CONTAINED IN THIS PLANE?
+ *
+ * Containment is direction AND position: parallel to the plane *and* sitting at zero distance from it.
+ * `relDeviation` answers direction questions only, so this pairs it with `distanceBetween`, normalised
+ * by the figure's extent so the reading is scale-free.
+ *
+ * Extracted from the panel's own inline test (#577), which is the point of the issue rather than a
+ * tidy-up: the panel PRINTED «מוכל במישור» from a rule the statement lane could not read, so a student
+ * could see a phrase the tool refused to hear. One definition means the two lanes cannot drift about
+ * what «מוכל» means — the `memberHolds3` / `angleBetweenOperands` precedent.
+ *
+ * Returns a DEVIATION (0 = contained) so it composes like every other reading here, or null when the
+ * pair is not a linear × planar one at all.
+ */
+export function containmentDeviation(a: OperandGeom, b: OperandGeom, extent = 1): number | null {
+  // A PLANAR operand contained in a plane is the same statement as the two planes COINCIDING — «משולש
+  // ACS מונח על מישור π2» says the triangle's carrier plane IS π2 (#532 capability 2). Reusing the
+  // coincidence reading rather than writing a second one keeps that identity true by construction.
+  if (!a.dir && !b.dir) return planeCoincidenceDeviation(a, b, extent);
+  const lin = a.dir ? a : b.dir ? b : null;
+  const pln = a.normal !== undefined && a.d !== undefined ? a : b.normal !== undefined && b.d !== undefined ? b : null;
+  if (!lin || !pln || lin === pln) return null;
+  const par = relDeviation('parallel', undefined, lin, pln);
+  const gap = distanceBetween(lin, pln);
+  if (par === null || gap === null) return null;
+  return Math.max(par, Math.abs(gap) / Math.max(1, extent));
+}
+
 export function figureExtent(pos: ReadonlyMap<Id, Vec3>): number {
   const ps = [...pos.values()];
   if (ps.length === 0) return 1;

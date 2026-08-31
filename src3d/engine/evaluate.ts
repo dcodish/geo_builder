@@ -17,6 +17,7 @@ import { defaultViewFrame } from './defaultView';
 import {
   isAbsolute,
   lineDirCarriesParam,
+  figureExtent,
   lineRelDeviation,
   lineSym3,
   mutualHolds,
@@ -1494,7 +1495,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
           if (!ln) return false;
           const geom = resolveOperand(pin.op, c, { lines, planes })((id) => pos.get(id) ?? null);
           if (!geom) return true;
-          const dev = lineRelDeviation(pin.rel, pin.deg, geom, ln.dir);
+          const dev = lineRelDeviation(pin.rel, pin.deg, geom, ln, figureExtent(pos));
           return dev === null || dev > 1e-4;
         });
       if (!hasOtherPins || unmet) {

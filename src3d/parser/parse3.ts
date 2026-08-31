@@ -2408,6 +2408,22 @@ const PERP_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מאונ[ךכ](?:ים|ות|ת)?|ני
 // #821: `||` is how the operator TYPED ∥ («ACD||AB») — an Israeli keyboard has no ∥ glyph (the #493 argument).
 const PAR_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מקביל(?:ים|ות|ה)?|∥|\|\||parallel)\s*(?:ל(?=\S)|to\s+)?-?\s*/;
 
+/**
+ * #614 (ADR-3D-189) — CONTAINMENT, verb-headed: «ℓ מוכל במישור P», «נמצא ב…», «מונח על…»,
+ * `is contained in`, `lies in`, `lies on`.
+ *
+ * The tool PRINTED «מוכל במישור» in the data panel (ADR-3D-154) and could not hear the same sentence
+ * back — the asymmetry the operator hit within minutes of the row existing. Both frames are added
+ * together, per the CROSS_HE_VERB/CROSS_HE_NOUN precedent: reach for only one and the other silently
+ * drops.
+ */
+const CONTAINED_SPLIT =
+  /\s*(?:(?:is|are)\s+)?(?:מוכל(?:ים|ות|ת)?|נמצא(?:ים|ות|ת)?|מונח(?:ים|ות|ת)?|contained(?:\s+in)?|lies?\s+(?:in|on)|lying\s+(?:in|on))\s*(?:ב(?=\S)|על\s+|in\s+|on\s+)?-?\s*/;
+
+/** The CONTAINER-headed frame — «המישור P מכיל את ℓ», `plane P contains ℓ`. Directed: the sides arrive
+ *  reversed, so it cannot ride the symmetric splitter table and gets its own reader. */
+const CONTAINS_SPLIT = /\s*(?:(?:the\s+)?)?(?:מכיל(?:ה|ים|ות)?|contains?|containing)\s*(?:את\s+)?-?\s*/;
+
 const planeLinePerp: Rule = (s0) => {
   const s = stripStatementPrefix(s0).trim();
   const parts = s.split(PERP_SPLIT);
@@ -2575,10 +2591,19 @@ const onLineMembership: Rule = (s) => {
  */
 const lineRelGiven: Rule = (s0) => {
   const s = stripStatementPrefix(s0).trim();
-  for (const [rel, splitter] of [['perp', PERP_SPLIT], ['parallel', PAR_SPLIT]] as const) {
+  // #614: containment joins the named-line column too — «הישר ℓ מוכל במישור ABCD» and the
+  // container-headed «המישור ABCD מכיל את הישר ℓ». `reversed` marks the frame whose sides arrive the
+  // other way round; both reach the SAME `line-rel` command.
+  const FORMS: readonly (readonly ['perp' | 'parallel' | 'contained', RegExp, boolean?])[] = [
+    ['perp', PERP_SPLIT],
+    ['parallel', PAR_SPLIT],
+    ['contained', CONTAINED_SPLIT],
+    ['contained', CONTAINS_SPLIT, true],
+  ];
+  for (const [rel, splitter, reversed] of FORMS) {
     const parts = s.split(splitter);
     if (parts.length !== 2) continue;
-    const sides = readRelationSides(parts[0], parts[1]);
+    const sides = readRelationSides(reversed ? parts[1] : parts[0], reversed ? parts[0] : parts[1]);
     if (!sides) continue;
     const [a, b] = sides;
     const line = a.op.kind === 'line' ? a : b.op.kind === 'line' ? b : null;
@@ -2586,6 +2611,9 @@ const lineRelGiven: Rule = (s0) => {
     const other = line === a ? b : a;
     const op = other.op;
     if (op.kind === 'point') return null; // a point has no direction — nothing to relate
+    // #614: a line is contained in a PLANE — nothing else. Another line, a segment or a vector is not
+    // a container, so the statement is refused rather than given an invented meaning.
+    if (rel === 'contained' && !isPlanar(op)) return null;
     if (op.kind === 'line' && op.name === line.op.name) return null; // a line related to itself is vacuous
     if (rel === 'perp') {
       // line ⟂ named plane is the FROZEN line-perp-plane lowering (linePerpPlane owns the
@@ -3687,15 +3715,19 @@ const tetraAltitude: Rule = (s) => {
  */
 const planeRelGiven: Rule = (s0) => {
   const s = stripStatementPrefix(s0).trim();
-  const forms: [PlaneRel3, RegExp][] = [
+  // #614: `reversed` marks the CONTAINER-headed frame («המישור P מכיל את ℓ»), whose sides arrive the
+  // other way round. Both frames reach ONE command, so the panel row and the typed sentence agree.
+  const forms: [PlaneRel3, RegExp, boolean?][] = [
     ['perp', PERP_SPLIT],
     ['parallel', PAR_SPLIT],
     ['coincident', /\s*(?:מתלכד(?:ים|ות)?\s*(?:עם\s*)?|coincides?\s+with|are\s+coincident\s+with|is\s+coincident\s+with)\s*-?\s*/],
+    ['contained', CONTAINED_SPLIT],
+    ['contained', CONTAINS_SPLIT, true],
   ];
-  for (const [rel, splitter] of forms) {
+  for (const [rel, splitter, reversed] of forms) {
     const parts = s.split(splitter);
     if (parts.length !== 2) continue;
-    const sides = readRelationSides(parts[0], parts[1]);
+    const sides = readRelationSides(reversed ? parts[1] : parts[0], reversed ? parts[0] : parts[1]);
     if (!sides) continue;
     const [a, b] = sides;
     if (!isPlanar(a.op) && !isPlanar(b.op)) continue; // no plane: not this rule's business
@@ -3714,6 +3746,10 @@ const planeRelGiven: Rule = (s0) => {
       // the POINT-RUN cell already HAS a driving command — reuse it rather than record a second
       // spelling of the same relation (the issue's "one spelling authority"). Every other pairing
       // stays a claim, kept honest by the store's placement guard rather than by a parse-time refusal.
+      // #614: CONTAINMENT against the coordinate frame is `coordPlaneRel`'s cell — it has its own
+      // `contains` mode (#324). Falling into the line below would have mapped it to `share`, a
+      // DIFFERENT relation wearing the same utterance: the shadow-matrix gate caught exactly that.
+      if (rel === 'contained') return null;
       if (other.kind === 'plane-run' && rel !== 'coincident') {
         const axis = frame.axes === 'xy' ? 'z' : frame.axes === 'yz' ? 'x' : 'y';
         return [{ type: 'coord-plane-rel', ids: other.ids, axis, mode: rel === 'perp' ? 'perp' : 'share' }];
@@ -3723,9 +3759,16 @@ const planeRelGiven: Rule = (s0) => {
     if (a.op.kind === 'point' || b.op.kind === 'point') return null; // a point has no direction
     if (sameOperand(a.op, b.op)) return null;
     // the frozen segment × POINT-RUN owners keep their cells (they run earlier; defensive)
-    if (rel !== 'coincident' && (a.op.kind === 'segment' || b.op.kind === 'segment')) {
+    if (rel !== 'coincident' && rel !== 'contained' && (a.op.kind === 'segment' || b.op.kind === 'segment')) {
       const other = a.op.kind === 'segment' ? b.op : a.op;
       if (other.kind === 'plane-run') continue;
+    }
+    // #614: containment has no frozen owner and no direction-only reading — it needs a LINEAR side and
+    // a PLANAR one, in either order, and refuses anything else rather than inventing a meaning.
+    if (rel === 'contained') {
+      // the CONTAINER must be planar; the contained side may be linear (a segment) or planar (a
+      // polygon run — #532 capability 2, «משולש ACS מונח על מישור π2»). Two linear sides state nothing.
+      if (!isPlanar(b.op)) continue;
     }
     if (rel === 'coincident' && (!isPlanar(a.op) || !isPlanar(b.op))) continue; // only planes coincide here
     const canon = (op: Operand3): Operand3 => (op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) } : op);

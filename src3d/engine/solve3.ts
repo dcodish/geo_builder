@@ -667,23 +667,49 @@ export function solvePivot(
         const va = ga?.dir ?? ga?.normal;
         const vb = gb?.dir ?? gb?.normal;
         const mixed = !!ga && !!gb && !ga.dir !== !gb.dir; // exactly one side is planar
-        const wide = pin.rel === 'parallel' || pin.rel === 'coincident' ? !mixed : mixed; // 3 components vs 1
-        const count = pin.rel === 'coincident' ? 4 : pin.rel === 'angle' ? 1 : wide ? 3 : 1;
+        // #614: containment between two PLANAR sides is coincidence — same statement, so the same
+        // residual, rather than a second spelling that could drift from it.
+        const rel = pin.rel === 'contained' && !mixed ? 'coincident' : pin.rel;
+        const wide = rel === 'parallel' || rel === 'coincident' || rel === 'contained' ? !mixed : mixed; // 3 components vs 1
+        // #614: CONTAINED is direction AND position — the parallel component plus one offset row, the
+        // same shape `coincident` already uses one operand-kind up (two planes rather than a line and
+        // a plane). A mixed pair reads its direction in ONE component, so the count is 2.
+        const count = rel === 'coincident' ? 4 : rel === 'contained' ? 2 : rel === 'angle' ? 1 : wide ? 3 : 1;
         if (!va || !vb || norm3(va) < 1e-12 || norm3(vb) < 1e-12) {
           for (let i = 0; i < count; i++) out.push(10);
           continue;
         }
         const den = Math.max(norm3(va) * norm3(vb), 1e-12);
-        if (pin.rel === 'angle') {
+        if (rel === 'angle') {
           const t = ((pin.deg ?? 0) * Math.PI) / 180;
           out.push(Math.abs(dot3(va, vb)) / den - (mixed ? Math.sin(t) : Math.cos(t)));
-        } else if (wide || pin.rel === 'coincident') {
+        } else if (wide || rel === 'coincident') {
           const x = cross3(va, vb);
           out.push(x.x / den, x.y / den, x.z / den);
         } else {
           out.push(dot3(va, vb) / den);
         }
-        if (pin.rel === 'coincident') {
+        if (rel === 'contained') {
+          /**
+           * #614 — …and the linear operand must SIT ON the plane, not merely run parallel to it.
+           *
+           * One offset row: the signed distance from the linear side's own point to the plane,
+           * size-normalized exactly as `coincident`'s is, so the residual is scale-free and CROSSES
+           * zero through the solution (the ADR-3D-006 touch-zero lesson) rather than touching it.
+           */
+          const lin = ga!.dir ? ga! : gb!;
+          const pln = ga!.dir ? gb! : ga!;
+          if (pln.normal === undefined || pln.d === undefined || lin.point === undefined) out.push(10);
+          else {
+            let extent = 1;
+            for (const id of c.points.keys()) {
+              const q = at(id);
+              if (q) extent = Math.max(extent, norm3(q));
+            }
+            out.push((dot3(pln.normal, lin.point) + pln.d) / (Math.max(norm3(pln.normal), 1e-12) * extent));
+          }
+        }
+        if (rel === 'coincident') {
           // …and the planes must share an offset. Size-normalized so the residual is scale-free.
           const na = norm3(va);
           const nb = norm3(vb);
@@ -832,7 +858,25 @@ export function solvePivot(
   };
 
   if (invariantOnly) {
-    if (dims0.length === 0) return []; // nothing to flex — the condition either holds or is refused downstream
+    if (dims0.length === 0) {
+      /**
+       * #614 (ADR-3D-189) — "NOTHING TO FLEX" IS NOT THE SAME ANSWER AS "NO SOLUTION".
+       *
+       * This returned `[]` on the stated intent that the condition would be "refused downstream". It
+       * is not: `store3` reads `pivot.solutions === 0` as unsatisfiable and blames the newest pin, so
+       * a similarity-invariant relation that is TRUE BY CONSTRUCTION on a shape with no free dims —
+       * «AB מוכל במישור ABCD» on a cube, and «AB מקביל למישור A'B'C'D'» before it — came back as a
+       * contradiction. Two states shared one empty answer, the #698 class in the solver.
+       *
+       * With nothing to flex the question is decidable immediately: evaluate the residual at the
+       * identity. If it already holds, the identity IS the solution; if it does not, the relation is
+       * genuinely unsatisfiable and stays refused, exactly as before.
+       */
+      const primary = residualsFor(false)([0, 0, 0, 0, 0, 0, 0]).reduce((sum, v) => sum + v * v, 0);
+      return primary < 1e-10
+        ? [{ transform: (p) => p, mirror: false, dims: [], err: primary, x: [0, 0, 0, 0, 0, 0, 0] }]
+        : [];
+    }
     const f = residualsFor(false); // mirror is also invariant here
     const fd = (d: number[]) => f([0, 0, 0, 0, 0, 0, 0, ...d]);
     const warmDims = warmStart && warmStart.length >= 7 + nDims ? warmStart.slice(7, 7 + nDims) : null;
