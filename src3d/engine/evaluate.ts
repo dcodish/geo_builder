@@ -374,7 +374,12 @@ export interface Resolved3 {
    *  #325: `pinSymbols` carries the chosen solution's values for the pins' OPEN symbols (`B(2t,t,k)`).
    *  #797 (ADR-3D-168 Am. 1): `symRoots` carries the ADMISSIBLE pool's distinct values per pin symbol
    *  (post sign-filtering) — a symbol is determined only when its set is a singleton at every seed. */
-  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]> } | null;
+  /** #827: `pointRoots` is the SAME question for point COORDINATES — the admissible pool's distinct
+   *  positions per point (post sign-filtering, gauge-transformed exactly as the chosen solution is).
+   *  Present only when the pool holds more than one solution, because that is the only case where a
+   *  coordinate can be a branch choice. A coordinate is knowledge only when this set agrees on that
+   *  axis; without it, a deterministic branch pick reads seed-stable and prints as fact. */
+  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]> } | null;
   /** V6 — resolved solids of revolution (world centre/apex + numeric radius/height) for the renderer. */
   revolutions: { kind: 'cylinder' | 'cone' | 'sphere'; center: Vec3; apex?: Vec3; r: number; h: number }[];
   /** V8-i — resolved circles in R³ (world centre + unit normal + radius + in-plane basis) for the renderer + on-circle checks. */
@@ -1411,6 +1416,36 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
             if (!list.some((r) => Math.abs(r - v) <= 1e-3 * Math.max(1, Math.abs(r)))) list.push(v);
           }
         }
+        /**
+         * #827 (ADR-3D-194) — THE SAME ADMISSIBLE-POOL QUESTION, FOR POINT COORDINATES.
+         *
+         * `chosen = pool[seed % pool.length]` makes the branch a function of the seed, and the panel
+         * judged a coordinate by comparing three sampled configurations. When the deterministic pick
+         * lands in the same branch for all three — which it does at some seeds and not others — a
+         * two-branch value printed as knowledge: the operator's `D(3, 4, 0)` at seed 17, where the
+         * givens force p = ±4 and −4 holds equally.
+         *
+         * That is #797's finding one lane over: *seed-stability alone is not determinedness*. The
+         * answer is the same too — expose the admissible pool so the panel can require a singleton,
+         * rather than adding more seeds, which cannot help when every sample picks the same branch.
+         *
+         * Only computed when the pool holds more than one solution: with a single solution there is
+         * no branch to miss, and this is the solver's hot path.
+         */
+        const pointRoots: Record<string, Vec3[]> = {};
+        if (pool.length > 1) {
+          for (const sol of pool) {
+            for (const [id, q] of evalCanonical(sol.dims, false, overrideOf(sol))) {
+              const def = c.points.get(id);
+              // the same gauge rule the chosen solution below uses — an equation-plane point is
+              // Lane-A absolute and must NOT be transformed, or every branch would look distinct
+              const gauge = def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
+              const v = gauge ? sol.transform(q) : q;
+              const list = (pointRoots[id] ??= []);
+              if (!list.some((r) => (['x', 'y', 'z'] as const).every((ax) => Math.abs(r[ax] - v[ax]) <= 1e-4 * Math.max(1, Math.abs(r[ax]))))) list.push(v);
+            }
+          }
+        }
         warm.x = [...chosen.x];
         warm.mirror = chosen.mirror;
         const finalCanonical = evalCanonical(chosen.dims, false, overrideOf(chosen));
@@ -1425,6 +1460,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
         pivot = {
           solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err, pinSymbols: chosen.pinSymbols,
           ...(Object.keys(symRoots).length > 0 ? { symRoots } : {}),
+          ...(Object.keys(pointRoots).length > 0 ? { pointRoots } : {}),
         };
       } else {
         pivot = { solutions: 0, chosen: -1, err: Infinity };
