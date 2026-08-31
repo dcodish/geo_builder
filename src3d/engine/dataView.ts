@@ -499,6 +499,28 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   const seeds = [seed, seed + 1013, seed + 2027];
   const resolved = seeds.map((s) => resolve3(c, s));
   const positions = resolved.map((r) => r.positions);
+  /**
+   * #827 — the VECTOR lane needs the same branch guard the point lane got, for the same reason.
+   *
+   * Found by driving the real app after the point-lane fix landed: `D` correctly read `(3, ?, 0)`
+   * while two rows below `v⃗ = AD` printed `(3, 4, 0)` — the same seeds (17, 99), the same branch,
+   * one surface over, and a panel contradicting itself on screen. Agreeing across the three sampled
+   * configurations proves the delta does not move with the GAUGE; it does not prove the givens
+   * determine it.
+   *
+   * The pool positions are paired by index (`pointRoots` is stored per solution, in pool order, not
+   * deduplicated) precisely so this can subtract the SAME configuration's endpoints. Pairing across
+   * branches would invent a delta no configuration actually has.
+   */
+  const branchStablePair = (a: Id, b: Id): boolean =>
+    resolved.every((r) => {
+      const ra = r.pivot?.pointRoots?.[a];
+      const rb = r.pivot?.pointRoots?.[b];
+      if (!ra || !rb || ra.length !== rb.length || ra.length <= 1) return true; // one solution ⇒ no branch
+      const d0 = sub3(rb[0], ra[0]);
+      return ra.every((pa, i) => sameVec(sub3(rb[i], pa), d0));
+    });
+
   const stablePair = (a: Id, b: Id): Vec3 | null => {
     const ds = positions.map((pos) => {
       const p = pos.get(a);
@@ -506,6 +528,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       return p && q ? sub3(q, p) : null;
     });
     if (ds.some((d) => !d)) return null;
+    if (!branchStablePair(a, b)) return null;
     return sameVec(ds[0]!, ds[1]!) && sameVec(ds[0]!, ds[2]!) ? ds[0]! : null;
   };
 

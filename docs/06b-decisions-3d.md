@@ -6318,3 +6318,37 @@ single-solution figure unaffected.
 `freeDofCount===0` without measurement"* — which is the same class (a determinedness verdict taken
 from one observation) on a different mechanism. That issue is open and armed; this ADR does not close
 it, and the connection is recorded there rather than assumed fixed here.
+
+### ADR-3D-194 Am. 1 — the VECTOR lane, found by looking at the app
+
+**2026-08-31, same round.** The point-lane fix above landed, its 7 tests were green, and the 3-D lane
+and full suite were green. Then the figure was driven in a real browser under the new #704 harness and
+the panel showed this:
+
+```
+נקודות     D(3, ?, 0)          ← honest, the fix working
+מדידות     v⃗ = (3, 4, 0)       ← the same branch, printed as knowledge
+```
+
+`v = AD`, so `v` is exactly as two-branch as `D` is — and at exactly the same seeds (17, 99). The
+panel now **contradicted itself on screen**: a student reading both rows learns the value anyway,
+which is the whole thing the fix was supposed to prevent.
+
+`stablePair` had the same defect `stableAx` had: it compared the delta across the three sampled
+configurations, which proves the delta does not move with the GAUGE and proves nothing about
+branches. The fix is the same guard (`branchStablePair`), and it required one change to the data:
+`pointRoots` is now stored **one entry per pool solution, in pool order and not deduplicated**, so
+two points' entries can be subtracted pairwise. Deduplicating per point had lost the pairing, and
+subtracting across branches would invent a delta no configuration actually has.
+
+**`|v| = 5` still prints**, and must: the magnitude is forced by `|u| = |v|` whichever branch holds.
+The length is knowledge; the components are not. A fix that suppressed both would be honest and
+useless, so the distinction is locked.
+
+**Why this amendment exists at all.** The mechanism was verified and the surface was not — the exact
+pattern that shipped two defects on 2026-08-31 and prompted #704. The harness built earlier in this
+same round caught it within minutes of the first look, on the very acceptance case the operator was
+about to play. That is the argument for the gate, made on its first real use.
+
+Locks grow to 12 tests, including the property rather than the instance: **`D` open ⟺ `v` open**, over
+the no-sign figure and both sign selections.

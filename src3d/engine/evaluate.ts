@@ -374,11 +374,13 @@ export interface Resolved3 {
    *  #325: `pinSymbols` carries the chosen solution's values for the pins' OPEN symbols (`B(2t,t,k)`).
    *  #797 (ADR-3D-168 Am. 1): `symRoots` carries the ADMISSIBLE pool's distinct values per pin symbol
    *  (post sign-filtering) — a symbol is determined only when its set is a singleton at every seed. */
-  /** #827: `pointRoots` is the SAME question for point COORDINATES — the admissible pool's distinct
-   *  positions per point (post sign-filtering, gauge-transformed exactly as the chosen solution is).
-   *  Present only when the pool holds more than one solution, because that is the only case where a
-   *  coordinate can be a branch choice. A coordinate is knowledge only when this set agrees on that
-   *  axis; without it, a deterministic branch pick reads seed-stable and prints as fact. */
+  /** #827: `pointRoots` is the SAME question for point COORDINATES — the admissible pool's position
+   *  per point (post sign-filtering, gauge-transformed exactly as the chosen solution is). ONE ENTRY
+   *  PER POOL SOLUTION, IN POOL ORDER and deliberately not deduplicated, so entries for different
+   *  points pair into a vector; a consumer asking about a→b must not mix branches. Present only when
+   *  the pool holds more than one solution, since that is the only case where a coordinate can be a
+   *  branch choice. A coordinate is knowledge only when these agree; without it, a deterministic
+   *  branch pick reads seed-stable and prints as fact. */
   pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]> } | null;
   /** V6 — resolved solids of revolution (world centre/apex + numeric radius/height) for the renderer. */
   revolutions: { kind: 'cylinder' | 'cone' | 'sphere'; center: Vec3; apex?: Vec3; r: number; h: number }[];
@@ -1440,9 +1442,11 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
               // the same gauge rule the chosen solution below uses — an equation-plane point is
               // Lane-A absolute and must NOT be transformed, or every branch would look distinct
               const gauge = def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
-              const v = gauge ? sol.transform(q) : q;
-              const list = (pointRoots[id] ??= []);
-              if (!list.some((r) => (['x', 'y', 'z'] as const).every((ax) => Math.abs(r[ax] - v[ax]) <= 1e-4 * Math.max(1, Math.abs(r[ax]))))) list.push(v);
+              // Stored ONE ENTRY PER POOL SOLUTION, in pool order, deliberately NOT deduplicated:
+              // `pointRoots[a][i]` and `pointRoots[b][i]` must describe the same configuration, or a
+              // consumer asking about the VECTOR a→b would pair positions from different branches.
+              // The pool is small, so the redundancy costs nothing and the pairing is worth keeping.
+              (pointRoots[id] ??= []).push(gauge ? sol.transform(q) : q);
             }
           }
         }
