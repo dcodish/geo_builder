@@ -6115,3 +6115,83 @@ still caught, a bound endpoint keeping its owner, the containment ACCEPTED rathe
 re-homed `free3 → on-plane`, `E` in the plane at five seeds while still sliding inside it, the DOF count
 dropping by exactly one, and the two cases that must not change (the entailed midpoint case, and a false
 containment on bound points still refusing).
+
+## ADR-3D-192 — A PLANE'S TOGGLE BELONGS TO THE ROW THAT DREW IT, AND A REDUNDANT CONTAINMENT SAYS SO (#842)
+
+**Status:** accepted, 2026-08-31. Closes the half of #839 that [ADR-3D-191](#adr-3d-191) did not —
+steps 3 and 4 of that plan, filed as #842 rather than left closed inside a "fixed" issue.
+
+**What the operator actually saw first**, playing `prod/2026-08-31`:
+
+> *"I'm pretty sure that the last one BE מוכל במישור ABCD just drew the plane … by the הסתר מישור
+> that was added, make me think it just drew the plane again (which already existed)."*
+
+One reading, two independent defects.
+
+### 3 — the plane toggle asserted something false
+
+Every fact row that so much as **mentioned** a point-run plane grew a «הסתר מישור» chip
+(`App3.tsx`, inline in the row's JSX). With «מישור ABCD» already on screen, the containment row got a
+second chip for the same plane — and since "hide plane" was that row's *only* affordance, the
+statement read as *"this line drew the plane again"*. The chip is a claim about **who made the
+plane**; offering it from a row that did not make it is the UI stating something untrue.
+
+**Decision — ownership is derived from the fact list**, in `store/planeChips.ts`:
+
+1. If some fact **declares** the plane («מישור ABCD», a free plane), the first such fact owns the
+   chip, *wherever it sits in the list*. Order must not decide ownership.
+2. Otherwise the **first fact that names it** owns it — a relation genuinely can be what
+   materialised a plane (`materializePlaneRun`), and [#383](#adr-3d-107) requires a stated relation
+   to leave a visible trace. Taking the chip away there would strand a plane on screen with no way
+   to reach it.
+
+Provenance derived from the fact list, never from a list of "minting command types" — the **#769
+(ADR-3D-183) pattern**, chosen for the same reason: a list of kinds goes stale the moment a new
+command learns to name a plane, and nothing forces it to be updated.
+
+**Applied uniformly to ∥, ⟂, ⊂, distances, claims and angles** — the third lock in #842 asked which,
+and this is the answer. The defect is identical on every relation family; restricting the fix to
+containment would special-case the one input the operator happened to report, which standing rule 1
+forbids. The locked property is stronger than the report: **each plane is offered by exactly one
+row, and every plane mentioned anywhere is still offered somewhere** (narrowing ownership must never
+orphan a plane).
+
+### 4 — a statement that changed nothing looked like it changed something
+
+«BE מוכל במישור ABCD» where `B` defines the plane and `E` is the midpoint of `AC` is **true and adds
+nothing**. It committed `ok`, drew a ✓, and emitted no notice — and a ✓ alone reads as "something
+happened". The precedents are #612 `shape-redundant` and #396 `redundant-relation`; neither covered
+this, because #396 requires both sides **absolute** (`isSelfDetermined` ⊃ `isAbsolute`) and a
+gauge-riding segment against a point-run plane is never that.
+
+**Decision — a new `containment-redundant` notice, decided STRUCTURALLY.**
+
+The tempting test is numeric: was the containment's residual already zero? That has to be judged at
+sampled positions, and a quantity that merely *looks* satisfied across the samples it happened to
+draw is **exactly the #827 defect** this round is also fixing — a two-branch value printing as
+knowledge because every sample landed in one branch. So the verdict is a structural entailment
+instead (`pointEntailedInPlane`): a point is confined to the plane if it is one of the plane's own
+defining points, a student-stated rider on it, or recursively a midpoint/on-segment/centroid of
+points that are. A structural entailment cannot be wrong about a branch it never looked at.
+
+It is therefore deliberately **conservative and can only under-claim**: when the check returns false
+the statement may still be redundant and we say nothing. Under-claiming costs a missing notice;
+over-claiming would tell a student their real given added nothing, which is the honesty invariant
+itself.
+
+**The trap this had to avoid.** After ADR-3D-191 a containment **re-homes** a free endpoint into an
+`on-plane` rider — so on the very figures where the containment did the most work, both endpoints
+end up lying in the plane, and a naive "both ends are in the plane" test would report the useful
+containment as pointless. The `implied: true` flag (#841) is what separates them: a rider the
+*student* stated entails, a rider the *relation* implied does not. Locked as its own test.
+
+**Locks** (`src3d/__tests__/issue-842.test.ts`, 13 tests): the operator's exact four-line sequence;
+each plane offered by exactly one row; no plane orphaned; the declaring row wins regardless of order;
+a relation that is the only mention keeps its chip; ∥ obeys the same rule; the notice fires for the
+operator's figure and **not** for the ADR-3D-191 re-homing case; a midpoint chain still counts (the
+class, not the reported point); and seed-invariance at seeds 0/1/3/17/42 — the deliberate opposite of
+#827, since a structural verdict must never depend on where the figure was sampled.
+
+**Sibling check (ADR-W-004).** 2-D has no plane objects, so defect 3 has no 2-D twin. Defect 4's
+class — *a true statement that changed nothing is silently inert* — does exist there and is already
+answered by the `coincidences` notice (ADR-123) and #612's `redundantShapes`; no new 2-D gap found.

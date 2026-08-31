@@ -40,6 +40,7 @@ import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, seri
 import { auditLoad3 } from './store/loadAudit3';
 import { useStore } from 'zustand';
 import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
+import { planeChipsByFact } from './store/planeChips';
 import { factDisplay3, isVectorFact3 } from './render/notation';
 import { VecMath } from './render/VecMath';
 
@@ -245,6 +246,9 @@ export default function App3() {
   const derived = useMemo(() => derive3(facts, seed), [facts, seed]);
   const dof = useMemo(() => freeDofCount3(derived.construction, derived.resolved), [derived]);
   const notices = derived.notices; // #305 (ADR-3D-090): non-error "here is what changed" messages
+  // #842 (ADR-3D-192): which row owns each plane's display chip — derived from the fact list, so a
+  // relation row never offers to toggle a plane another row drew.
+  const planeChips = useMemo(() => planeChipsByFact(facts), [facts]);
 
   // responsive canvas: track the HOST's box (V5; #718: height too)
   useEffect(() => {
@@ -607,7 +611,9 @@ export default function App3() {
                     ? t('notice.redundantRelation', { a: n.a, b: n.b })
                     : n.kind === 'line-auto-named'
                       ? t('notice.lineAutoNamed', { requested: n.requested, assigned: n.assigned })
-                      : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
+                      : n.kind === 'containment-redundant'
+                        ? t('notice.containmentRedundant', { seg: n.seg, plane: n.plane })
+                        : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
             </div>
           ))}
           {lastNotice && !lastError && !busy && (
@@ -657,17 +663,11 @@ export default function App3() {
                       isolateLtrRuns3(f.utterance)
                     )}
                   </span>
-                  {[...new Set(f.cmds.flatMap((cm) =>
-                    cm.type === 'plane-through' ? [cm.name]
-                    : cm.type === 'free-plane' ? [cm.name] // #487: the declaring row cycles its patch like any other plane-materialising fact
-                    : cm.type === 'plane-rel' || cm.type === 'mutual-rel' || cm.type === 'distance-rel'
-                      ? [cm.a, cm.b].flatMap((op) => (op.kind === 'plane-run' ? [op.ids.join('')] : []))
-                      : cm.type === 'line-rel' && cm.op.kind === 'plane-run' ? [cm.op.ids.join('')]
-                      : cm.type === 'claim' && (cm.claim.type === 'plane-eq' || cm.claim.type === 'coord-plane-rel') ? [cm.claim.ids.join('')]
-                      : cm.type === 'coord-plane-rel' && cm.ids.length > 0 ? [cm.ids.join('')]
-                      : cm.type === 'line-plane-angle' ? [cm.plane.join('')]
-                      : [],
-                  ))].map((name) => (
+                  {/* #842 (ADR-3D-192): the chip goes on the row that MATERIALISED the plane, not on
+                      every row that mentions it. Provenance is derived from the fact list (the #769
+                      pattern), so a relation stated about a plane the student already drew no longer
+                      offers "hide plane" as its only affordance. */}
+                  {(planeChips.get(f.id) ?? []).map((name) => (
                     <button
                       key={name}
                       type="button"
