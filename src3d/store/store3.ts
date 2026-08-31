@@ -581,7 +581,10 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     }
   }
 
-  return { construction: c, resolved, positions, status, notices: buildNotices3(c) };
+  // #850: the notice lane's numeric gate needs sampled configurations. `resolved` is the one this
+  // derive already computed — no extra solve on the hot path; the branch guard inside reads the
+  // admissible pool this sample already carries (`pivot.pointRoots`, built for #827).
+  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved]) };
 }
 
 export interface Geo3State {

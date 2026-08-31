@@ -18,6 +18,8 @@
 import { CYCLIC_MEMBER, CYCLIC_MEMBER_NAME, QUAD_PYRAMIDS } from './baseShapes';
 import { isSelfDetermined, lineDirCarriesParam, operandLabel, planeNormalCarriesParam } from './operands';
 import type { QuadBase } from './baseShapes';
+import { cross3, dot3, norm3, sub3 } from './vec3';
+import type { Resolved3 } from './evaluate';
 import type { Construction3, Id, Operand3, SolidKind } from './types';
 
 /** A non-error message attached to a successfully built figure. */
@@ -80,7 +82,73 @@ export type BuildNotice3 =
       kind: 'containment-redundant';
       seg: string;
       plane: string;
+    }
+  | {
+      /** #850 (ADR-3D-198): a ∥ / ⟂ between a segment and a plane that is a CONSEQUENCE of the
+       *  figure, not a new given — «AB מקביל למישור A'B'C'D'» on a cube. #833 made it build instead
+       *  of being refused; this says it was already known, so a ✓ does not read as "something
+       *  happened". */
+      kind: 'relation-entailed';
+      seg: string;
+      plane: string;
+      rel: 'perp' | 'parallel';
     };
+
+/**
+ * #850 — does this seg-vs-plane relation hold in EVERY admissible branch at this sample?
+ *
+ * The operator chose the numeric route over the structural one. The risk they were shown, and the
+ * reason this function exists: a sampled verdict can be confidently wrong — #827, fixed the same
+ * day, was exactly that. Seeds vary the GAUGE; they never vary the BRANCH, so a figure with two
+ * admissible placements can agree across every seed and still be true in only one of them.
+ *
+ * `pointRoots` (built for #827) carries the pool's position per point, one entry per solution in
+ * pool order, so the branches can be walked directly. Absent ⇒ a single solution ⇒ nothing to miss.
+ * Anything unmeasurable answers TRUE-to-abstain here and is refused by the caller's own claim check,
+ * because this guard may only ever subtract confidence, never add it.
+ */
+function relationHoldsInEveryBranch(
+  r: Resolved3,
+  seg: readonly [Id, Id],
+  plane: readonly [Id, Id, Id],
+  rel: 'perp' | 'parallel',
+): boolean {
+  const roots = r.pivot?.pointRoots;
+  if (!roots) return true;
+  const lists = [...seg, ...plane].map((id) => roots[id]);
+  if (lists.some((l) => !l || l.length !== lists[0]!.length)) return true; // not all tracked — abstain
+  const n = lists[0]!.length;
+  if (n <= 1) return true;
+  for (let i = 0; i < n; i++) {
+    const [s1, s2, p1, p2, p3] = lists.map((l) => l![i]);
+    const d = sub3(s2!, s1!);
+    const nrm = cross3(sub3(p2!, p1!), sub3(p3!, p1!));
+    const den = norm3(d) * norm3(nrm);
+    if (den < 1e-12) return false;
+    // ∥ ⇒ the direction is orthogonal to the normal; ⟂ ⇒ it is parallel to it.
+    const ok = rel === 'parallel'
+      ? Math.abs(dot3(d, nrm)) <= 2e-5 * Math.max(den, 1)
+      : norm3(cross3(d, nrm)) <= 2e-5 * Math.max(den, 1);
+    if (!ok) return false;
+  }
+  return true;
+}
+
+/**
+ * #850 — the plane's name AS THE STUDENT WROTE IT.
+ *
+ * A `perp-plane` / `par-plane` claim stores three points, because three fix a plane. The student
+ * wrote «A'B'C'D'». Naming the truncation back at them would be the honesty invariant's own
+ * counter-example — a message must name the statement, never internal state — so the full run is
+ * recovered from the figure: a materialised point-run plane if one exists, otherwise the solid FACE
+ * the three points open. Falls back to the three only when nothing in the figure matches.
+ */
+function statedPlaneName(c: Construction3, ids3: readonly Id[]): string {
+  const opens = (ring: readonly Id[]) => ring.length >= ids3.length && ids3.every((id, i) => ring[i] === id);
+  for (const [name, run] of c.pointPlanes) if (opens(run)) return name;
+  for (const s of c.solids) for (const face of s.faces) if (opens(face)) return face.join('');
+  return ids3.join('');
+}
 
 /**
  * #842 — is this point, BY ITS DEFINITION, already confined to this plane?
@@ -132,7 +200,7 @@ function pointEntailedInPlane(
  * Every notice the figure currently warrants. Recomputed on each derive — a notice is a property of
  * the built figure, never a one-shot event, so undo/redo and load all show the right thing.
  */
-export function buildNotices3(c: Construction3): BuildNotice3[] {
+export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = []): BuildNotice3[] {
   const out: BuildNotice3[] = [];
   // #375: derived from the pin's own flag, so it survives save/load and undo exactly like every notice
   for (const pin of c.planeLinePerps) {
@@ -198,6 +266,37 @@ export function buildNotices3(c: Construction3): BuildNotice3[] {
     if (!pointEntailedInPlane(c, linear.a, planeName, planeIds)) continue;
     if (!pointEntailedInPlane(c, linear.b, planeName, planeIds)) continue;
     out.push({ kind: 'containment-redundant', seg: operandLabel(linear), plane: planeName });
+  }
+
+  /**
+   * #850 (ADR-3D-198) — a ∥ / ⟂ that the figure already implies says so.
+   *
+   * The counterfactual — *would this hold if the student had not said it?* — is already answered by
+   * the LOWERING. `seg-plane-rel` becomes a driving `scalarPin` when the figure still has free dims,
+   * and a pure claim otherwise. **A claim with no matching pin constrained nothing**: the figure was
+   * determined by the other facts and this sentence only checked it. So the candidate set is exact
+   * and costs nothing to compute.
+   *
+   * The operator's numeric gate then confirms it, and `verifyClaim` already IS that gate — it checks
+   * `claimSeeds`, four configurations, not one. On top of it the branch guard above, so a two-branch
+   * figure can never report entailment on the strength of the branch it happened to draw.
+   *
+   * Sampling is gated behind a candidate existing, so an ordinary figure pays nothing.
+   */
+  {
+    const pinned = new Set(
+      c.scalarPins.flatMap((p) =>
+        p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane' ? [`${p.a}${p.b}|${[...p.plane].join('')}`] : [],
+      ),
+    );
+    for (const cl of c.claims) {
+      if (cl.type !== 'perp-plane' && cl.type !== 'par-plane') continue;
+      const rel = cl.type === 'perp-plane' ? ('perp' as const) : ('parallel' as const);
+      // A relation that DROVE the figure is information, not a consequence — never reported.
+      if (pinned.has(`${cl.seg[0]}${cl.seg[1]}|${cl.plane.join('')}`)) continue;
+      if (samples.length > 0 && !samples.every((r) => relationHoldsInEveryBranch(r, cl.seg, cl.plane, rel))) continue;
+      out.push({ kind: 'relation-entailed', seg: cl.seg.join(''), plane: statedPlaneName(c, cl.plane), rel });
+    }
   }
   return out;
 }
