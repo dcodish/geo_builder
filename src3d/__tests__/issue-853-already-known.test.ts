@@ -83,7 +83,9 @@ describe('#853 — the four cases are ONE channel', () => {
     // cheap AND correct: add the entry without the strings and the suite fails here, instead of the
     // student meeting a raw i18n key on the canvas.
     for (const [lang, dict] of [['he', he], ['en', en]] as const) {
-      const notice = (dict as { notice: Record<string, Record<string, string>> & { alreadyKnown?: string } }).notice;
+      // The locale files are typed by their own literal shape; this test asks a STRUCTURAL question of
+      // them (does every rel carry both halves?), so it reads them through the shape it needs.
+      const notice = (dict as unknown as { notice: Record<string, Record<string, string>> & { alreadyKnown?: string } }).notice;
       expect(notice.alreadyKnown, `${lang}: the one template must exist`).toBeTruthy();
       expect(notice.alreadyKnown).toContain('{{statement}}');
       expect(notice.alreadyKnown).toContain('{{why}}');
@@ -96,7 +98,7 @@ describe('#853 — the four cases are ONE channel', () => {
 
   it('the retired keys are gone from both locales — no dead strings left behind', () => {
     for (const [lang, dict] of [['he', he], ['en', en]] as const) {
-      const notice = (dict as { notice: Record<string, unknown> }).notice;
+      const notice = (dict as unknown as { notice: Record<string, unknown> }).notice;
       for (const dead of ['shapeRedundant', 'redundantRelation', 'containmentRedundant', 'entailedPerp', 'entailedParallel']) {
         expect(notice[dead], `${lang}: ${dead} should have been retired with its notice kind`).toBeUndefined();
       }

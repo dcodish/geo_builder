@@ -113,7 +113,7 @@ describe('#520 — the tail burn is gone and the answers are not', () => {
     // singular at every rung ran the full iteration cap. It now bails at the same 1e12 λ the rejected-
     // step path uses. x cannot have moved on that path, so the RESULT is identical either way.
     let calls = 0;
-    const r = leastSquares((x) => { calls++; return [1, 2, 3]; }, [0.5, -1, 2]);
+    const r = leastSquares(() => { calls++; return [1, 2, 3]; }, [0.5, -1, 2]);
     expect(r.x).toEqual([0.5, -1, 2]);
     expect(r.err).toBe(14);
     expect(calls, 'and it costs one Jacobian, not one per rung').toBeLessThan(30);
