@@ -22,6 +22,16 @@ matcher defects, not missing vocabulary. I had read the newest comment; it argue
 decisive proof was `git log -- <the module>`, which I only ran because a follow-up question made me
 look again.
 
+**3 — a LABEL you apply from the body can re-ask a settled question.** On 2026-09-01, in a
+`/status-update` pass, I applied `needs-operator` to #551 with the note *"the label was lagging the
+body."* Backwards: the body lags. #551 had been ruled **parked** on 2026-08-26 (*"park it until
+demand shows up"*) with `needs-operator` deliberately cleared and three concrete revisit triggers
+recorded — none of which had fired. I read the body's `Design doc first -> operator sign-off` route,
+did not read the comment run, and re-opened a closed question by labelling it. The same pass then
+listed it as the top item under "Waiting on you". Caught in the following `/decisions` pass and
+reverted.
+
+
 **Why:** re-asking a settled question wastes the operator's turn, and a recommendation that
 contradicts an earlier ruling can talk them out of their own decision. Presenting shipped work as
 pending is worse — it makes the whole report untrustworthy, since the operator cannot tell which
@@ -34,3 +44,10 @@ mechanism. If it shipped, say so, close the issue, and note the discrepancy rath
 correcting the report. When a body and the code disagree, **the code wins** — then post a comment
 saying the body is stale, so the next reader is not caught by the same thing. Related:
 [[gate-lines-are-read-not-matched]] (the sibling rule: evidence produced is not evidence read).
+
+**The label is a claim too.** `gh issue edit --add-label needs-operator` asserts "this is waiting on
+the operator" as loudly as a sentence in a report does, and a status pass that reads bodies at scale is
+exactly where this misfires. Read the comment run BEFORE adding an attention label, not just before
+writing the row. If the body states a routing gate ("needs sign-off", "blocked on X", "build order"),
+treat that as a claim to verify, never as current state — gates in bodies are the single most
+frequently-stale thing in this queue.
