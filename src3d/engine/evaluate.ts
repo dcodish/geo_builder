@@ -13,6 +13,7 @@
  */
 
 import { sample } from './rng';
+import { riderSampleT } from './onSegmentRatio';
 import { defaultViewFrame } from './defaultView';
 import {
   isAbsolute,
@@ -381,7 +382,7 @@ export interface Resolved3 {
    *  the pool holds more than one solution, since that is the only case where a coordinate can be a
    *  branch choice. A coordinate is knowledge only when these agree; without it, a deterministic
    *  branch pick reads seed-stable and prints as fact. */
-  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]> } | null;
+  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number> } | null;
   /** V6 — resolved solids of revolution (world centre/apex + numeric radius/height) for the renderer. */
   revolutions: { kind: 'cylinder' | 'cone' | 'sphere'; center: Vec3; apex?: Vec3; r: number; h: number }[];
   /** V8-i — resolved circles in R³ (world centre + unit normal + radius + in-plane basis) for the renderer + on-circle checks. */
@@ -766,8 +767,12 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     if (rev.kind !== 'sphere' && rev.height === undefined) dims++;
   }
   let freeT = 0;
-  for (const def of c.points.values()) {
-    if (def.kind === 'on-segment' && def.t === undefined) freeT++;
+  for (const [id, def] of c.points) {
+    // #820 (ADR-3D-204): a rider the PIVOT drove is no longer free — the given that named it consumed
+    // the DOF, and `pivot.riderTs` is the resolution's own record of what it solved rather than a
+    // second opinion about it (the ADR-3D-124 rule that closed the ADR-052 conformance smell for
+    // free planes: the count and the sampling share one source).
+    if (def.kind === 'on-segment' && def.t === undefined && resolved.pivot?.riderTs?.[id] === undefined) freeT++;
     if (def.kind === 'free3') freeT += 3; // #774: a mixed-run minted point — three genuine free DOFs
     if (def.kind === 'on-plane') freeT += def.side ? 3 : 2; // a plane rider slides in-plane; a side point also floats
     if (def.kind === 'on-line') freeT += 1; // a line rider slides along its line (ADR-3D-031)
@@ -1363,12 +1368,17 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     c.solids.length > 0
   ) {
     const dims0 = c.solids.flatMap((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed, solid.oblique));
-    const evalCanonical = (dims: number[], cheap = true, override?: Map<number, number>): Positions3 => {
+    const evalCanonical = (
+      dims: number[],
+      cheap = true,
+      override?: Map<number, number>,
+      riderTs?: ReadonlyMap<Id, number>,
+    ): Positions3 => {
       const p2: Positions3 = new Map<Id, Vec3>();
       for (const [id, def] of c.points) {
         if (def.kind === 'coord') p2.set(id, v3(def.x, def.y, def.z));
       }
-      evaluateSolidsAndPoints(c, seed, p2, planes, lines, dims, cheap, override);
+      evaluateSolidsAndPoints(c, seed, p2, planes, lines, dims, cheap, override, undefined, undefined, riderTs);
       return p2;
     };
 
@@ -1377,11 +1387,17 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     const coupledDefs = [...new Set(coupledPins.map((p) => p.def))];
     const overrideOf = (sol: PivotResult): Map<number, number> | undefined =>
       sol.symbols ? new Map(coupledDefs.map((d, i) => [d, sol.symbols![i]])) : undefined;
-    const EC = (dims: number[], override?: Map<number, number>) => evalCanonical(dims, true, override);
+    /** #820: the rider twin of `overrideOf` — every re-evaluation of a solution must place a DRIVEN
+     *  rider where the pivot put it, or the positions written back would contradict the residuals
+     *  that accepted them. */
+    const ridersOf = (sol: PivotResult): ReadonlyMap<Id, number> | undefined =>
+      sol.riderTs ? new Map(Object.entries(sol.riderTs)) : undefined;
+    const EC = (dims: number[], override?: Map<number, number>, riderTs?: ReadonlyMap<Id, number>) =>
+      evalCanonical(dims, true, override, riderTs);
 
     const applySolutions = (solutions: PivotResult[]): void => {
       const satisfiesSigns = (sol: PivotResult): boolean => {
-        const p2 = evalCanonical(sol.dims, false, overrideOf(sol));
+        const p2 = evalCanonical(sol.dims, false, overrideOf(sol), ridersOf(sol));
         // #325: a sign given on a PIN symbol (`t פרמטר חיובי` after `B(2t,t,k)`) selects
         // among pivot solutions, exactly like a coordinate sign given
         const symsOk = c.paramSigns.every((s) => {
@@ -1437,7 +1453,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
         const pointRoots: Record<string, Vec3[]> = {};
         if (pool.length > 1) {
           for (const sol of pool) {
-            for (const [id, q] of evalCanonical(sol.dims, false, overrideOf(sol))) {
+            for (const [id, q] of evalCanonical(sol.dims, false, overrideOf(sol), ridersOf(sol))) {
               const def = c.points.get(id);
               // the same gauge rule the chosen solution below uses — an equation-plane point is
               // Lane-A absolute and must NOT be transformed, or every branch would look distinct
@@ -1452,7 +1468,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
         }
         warm.x = [...chosen.x];
         warm.mirror = chosen.mirror;
-        const finalCanonical = evalCanonical(chosen.dims, false, overrideOf(chosen));
+        const finalCanonical = evalCanonical(chosen.dims, false, overrideOf(chosen), ridersOf(chosen));
         for (const [id, q] of finalCanonical) {
           const def = c.points.get(id);
           // an on-plane point rides the gauge iff its plane is a POINT-run plane (the run's
@@ -1463,6 +1479,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
         }
         pivot = {
           solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err, pinSymbols: chosen.pinSymbols,
+          ...(chosen.riderTs ? { riderTs: chosen.riderTs } : {}),
           ...(Object.keys(symRoots).length > 0 ? { symRoots } : {}),
           ...(Object.keys(pointRoots).length > 0 ? { pointRoots } : {}),
         };
@@ -2149,6 +2166,9 @@ function evaluateSolidsAndPoints(
   symbolOverride?: Map<number, number>, // V8-c: def index → jointly-solved symbol value
   freePlaneDofs?: Map<string, number>, // #487: out-param — per-free-plane SAMPLED DOF count (the cue's number)
   freeLineDofs?: Map<string, number>, // #552: the free-line twin
+  /** #820 (ADR-3D-204): pivot-solved on-segment rider parameters — a free rider whose `t` a stated
+   *  given DRIVES is placed at the solved value, not at the seed's sample. */
+  riderTOverride?: ReadonlyMap<Id, number>,
 ): void {
   let dimCursor = 0;
   c.solids.forEach((solid, i) => {
@@ -2188,7 +2208,9 @@ function evaluateSolidsAndPoints(
       const a = pos.get(def.a);
       const b = pos.get(def.b);
       if (!a || !b) continue; // unreachable if apply enforced parents; stay total anyway
-      const t = def.t ?? sample(seed, `t-${id}-${def.a}-${def.b}`, 0.22, 0.78);
+      // #820: a DRIVEN rider's `t` comes from the pivot; a stated ratio still wins over both; and
+      // with neither, the seed's sample — via the one key `solve3` anchors to (`riderSampleT`).
+      const t = riderTOverride?.get(id) ?? def.t ?? riderSampleT(seed, id, def.a, def.b);
       pos.set(id, lerp3(a, b, t));
     } else if (def.kind === 'on-plane') {
       placeOnPlaneRider(id, def);

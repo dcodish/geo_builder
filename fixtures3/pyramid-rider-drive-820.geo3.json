@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "app": "3d-builder",
+  "savedAt": "2026-09-01T15:29:31.183Z",
+  "seed": 4,
+  "facts": [
+    {
+      "utterance": "פירמידה SABCD שבסיסה מקבילית",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramidPar",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "S"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "המקצוע SA הוא גובה בפירמידה",
+      "cmds": [
+        {
+          "type": "seg-plane-rel",
+          "rel": "perp",
+          "a": "S",
+          "b": "A",
+          "plane": []
+        }
+      ]
+    },
+    {
+      "utterance": "נסמן: AB = u, AD = v, AS = w",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "name-vector",
+          "name": "u",
+          "from": "A",
+          "to": "B"
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "D"
+        },
+        {
+          "type": "name-vector",
+          "name": "v",
+          "from": "A",
+          "to": "D"
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "S"
+        },
+        {
+          "type": "name-vector",
+          "name": "w",
+          "from": "A",
+          "to": "S"
+        }
+      ]
+    },
+    {
+      "utterance": "A(0,0,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "B(0,5,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "B",
+          "x": 0,
+          "y": 5,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "S(0,0,6)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "S",
+          "x": 0,
+          "y": 0,
+          "z": 6
+        }
+      ]
+    },
+    {
+      "utterance": "D(3,p,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "D",
+          "x": 3,
+          "y": null,
+          "z": 0,
+          "syms": [
+            null,
+            "p",
+            null
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "|u| = |v|",
+      "cmds": [
+        {
+          "type": "mag-rel",
+          "e1": [
+            {
+              "coeff": 1,
+              "atom": {
+                "kind": "named",
+                "name": "u"
+              }
+            }
+          ],
+          "e2": [
+            {
+              "coeff": 1,
+              "atom": {
+                "kind": "named",
+                "name": "v"
+              }
+            }
+          ],
+          "c": 1
+        }
+      ]
+    },
+    {
+      "utterance": "p חיובי",
+      "cmds": [
+        {
+          "type": "param-sign",
+          "sym": "p",
+          "positive": true
+        }
+      ]
+    },
+    {
+      "utterance": "K על SB",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "K",
+          "a": "S",
+          "b": "B"
+        }
+      ]
+    },
+    {
+      "utterance": "SD מקביל למישור ACK",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "C"
+        },
+        {
+          "type": "segment3",
+          "a": "C",
+          "b": "K"
+        },
+        {
+          "type": "segment3",
+          "a": "K",
+          "b": "A"
+        },
+        {
+          "type": "seg-plane-rel",
+          "rel": "parallel",
+          "a": "S",
+          "b": "D",
+          "plane": [
+            "A",
+            "C",
+            "K"
+          ]
+        }
+      ]
+    }
+  ]
+}

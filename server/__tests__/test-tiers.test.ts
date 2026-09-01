@@ -18,8 +18,7 @@
  */
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
-import { classifySlow } from '../../scripts/test-tiers.mjs';
-
+import { classifySlow, serializeTiers } from '../../scripts/test-tiers.mjs';
 type Timed = { file: string; ms: number };
 const names = (fs: Timed[]): string[] => (classifySlow(fs) as Timed[]).map((f) => f.file).sort();
 
@@ -177,5 +176,116 @@ describe('#750 — the suite verdict is the machine-readable answer', () => {
   it('writing is BEST-EFFORT — an unwritable destination must never fail the suite run itself', () => {
     const v = buildVerdict({ mode: 'full', status: 0, report: REPORT_GREEN, at, sha: 'cdd8150', dirty: false });
     expect(() => writeVerdict(v, join(tmpdir(), 'geo-verdict-nope', 'a', '\u0000bad'))).not.toThrow();
+  });
+});
+
+import { writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/** The repo root, from this file's own location — no cwd assumption (the lanes run from anywhere). */
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/**
+ * #812 (ADR-W-037) — THE TRACKED ARTIFACT CARRIES SHARED STATE AND NOTHING ELSE.
+ *
+ * #484 (above) made the RULE machine-independent; the FILE was not. It still recorded `slow[].ms` and
+ * `measuredCutoffMs` — the writing machine's wall clock — and no consumer read either back. So the one
+ * legitimate one-line change (a test joining the tier) arrived wrapped in a full column of numbers that
+ * differed on every machine, and every parallel PR in a fix round conflicted on exactly this file and
+ * nothing else. Round #800 stacked four PRs to route around it, and that stack's own failure mode cost a
+ * recovery session.
+ *
+ * These assert the SERIALIZED bytes — what is actually committed — because the shape one layer above
+ * them is not what git merges.
+ */
+describe('#812 — the tier artifact holds no per-machine state', () => {
+  const SAMPLE = [
+    { file: 'z/late.test.ts', ms: 900_000 },
+    { file: 'a/early.test.ts', ms: 100_000 },
+  ];
+
+  it('the serialized artifact carries no timing field', () => {
+    const text = serializeTiers(SAMPLE);
+    const parsed = JSON.parse(text) as { slow: unknown[]; measuredCutoffMs?: unknown };
+    expect(parsed.measuredCutoffMs, 'measuredCutoffMs was written and never read').toBeUndefined();
+    expect(parsed.slow, 'membership is file PATHS').toEqual(['a/early.test.ts', 'z/late.test.ts']);
+    // Belt and braces on the bytes: no number outside the rule block can be a timing.
+    expect(text.replace(/"(share|minMeanMult)": [\d.]+/g, ''), 'no stray ms').not.toMatch(/"ms"/);
+  });
+
+  it('entries are sorted by PATH, not by measured time', () => {
+    // The measurement order is a machine's speed ranking: keeping it would move a file that merely got
+    // faster, which is the same churn one field over.
+    const byTime = serializeTiers(SAMPLE);
+    const byName = serializeTiers([...SAMPLE].reverse());
+    expect(byTime).toBe(byName);
+  });
+
+  it('every entry is exactly ONE line — so a membership change is an insertion', () => {
+    const lines = serializeTiers(SAMPLE).split('\n').filter((l) => l.includes('.test.ts'));
+    expect(lines).toHaveLength(SAMPLE.length);
+  });
+
+  /**
+   * The merge-shaped regression the issue asked for, run through git's OWN 3-way merge rather than a
+   * proxy for it — this is the property the whole change exists to buy.
+   *
+   * Measured, and stated exactly: two branches that each add a slow file merge cleanly, INCLUDING when
+   * their own timings for the shared files differ wildly (the real cross-machine situation, and the case
+   * that conflicted on every parallel PR before). The one residue is two additions that BOTH sort to the
+   * very end of the list — JSON's trailing comma makes each of them rewrite the previous last line — and
+   * the issue's plan called that out in advance: the conflict then MEANS something (two real membership
+   * changes) and resolves by keeping both lines, instead of being a choice between two machines' clocks.
+   */
+  const mergeStatus = (base: string[], ours: string[], theirs: string[]) => {
+    const dir = mkdtempSync(join(tmpdir(), 'tiers-merge-'));
+    // Each side reports its OWN timings for every file — different machines, as in the real case.
+    const w = (name: string, files: string[], ms: number) => {
+      const p = join(dir, name);
+      writeFileSync(p, serializeTiers(files.map((file, i) => ({ file, ms: ms + i }))));
+      return p;
+    };
+    const r = spawnSync(
+      'git',
+      ['merge-file', '-p', w('ours.json', ours, 900_000), w('base.json', base, 100_000), w('theirs.json', theirs, 5_000)],
+      { encoding: 'utf8' },
+    );
+    rmSync(dir, { recursive: true, force: true });
+    return r;
+  };
+  const BASE = ['m/aa.test.ts', 'm/mm.test.ts', 'm/zz.test.ts'];
+
+  it.each([
+    ['both insertions in the middle', [...BASE, 'm/bb.test.ts'], [...BASE, 'm/nn.test.ts']],
+    ['one in the middle, one at the end', [...BASE, 'm/bb.test.ts'], [...BASE, 'm/zzz.test.ts']],
+  ])('two branches merge cleanly — %s', (_name, ours, theirs) => {
+    const r = mergeStatus(BASE, ours, theirs);
+    expect(r.status, `git merge-file conflicted:\n${r.stdout}`).toBe(0);
+    const merged = JSON.parse(r.stdout) as { slow: string[] };
+    expect(merged.slow).toEqual([...new Set([...ours, ...theirs])].sort());
+  });
+
+  it('the ONE residual conflict is about membership, never about a machine', () => {
+    // Two additions that both sort to the very end: JSON's trailing comma makes each rewrite the
+    // previous last line. Asserted rather than hidden — and asserted to be RESOLVABLE by keeping both
+    // lines, which is the whole difference from the timing churn this replaces.
+    const r = mergeStatus(BASE, [...BASE, 'm/zz1.test.ts'], [...BASE, 'm/zz2.test.ts']);
+    expect(r.status, 'the tail case is the known residue').not.toBe(0);
+    const conflicted = r.stdout.split('\n').filter((l) => /^[<=>]{7}/.test(l) || l.includes('.test.ts'));
+    expect(conflicted.join('\n'), 'no timing ever appears in a conflict').not.toMatch(/\d{4,}/);
+    expect(r.stdout).toContain('m/zz1.test.ts');
+    expect(r.stdout).toContain('m/zz2.test.ts');
+  });
+
+  it('the artifact ON DISK is in the new shape (it can never regress to timings)', () => {
+    const onDisk = JSON.parse(readFileSync(join(ROOT, 'reports', 'test-tiers.json'), 'utf8')) as {
+      slow: unknown[];
+      measuredCutoffMs?: unknown;
+    };
+    expect(onDisk.measuredCutoffMs).toBeUndefined();
+    expect(onDisk.slow.every((s) => typeof s === 'string'), 'every entry is a path').toBe(true);
+    expect([...(onDisk.slow as string[])].sort()).toEqual(onDisk.slow);
   });
 });

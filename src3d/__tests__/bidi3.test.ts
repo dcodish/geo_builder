@@ -520,3 +520,49 @@ describe('#482 Am. 4 — VecMath’s prose path isolates; its MathML path still 
     expect(src).toMatch(/return React\.createElement\(React\.Fragment, null, isolateLtrRuns3\(text\)\)/);
   });
 });
+
+/**
+ * #868 — THE INPUT BOX TAKES ITS BASE DIRECTION FROM THE CONTENT, LIKE 2-D.
+ *
+ * The operator, playing PR #867: *"the bidi text is biting again on the input"*. Measured in a real
+ * browser with «D על AC» in each product's main box: 2-D resolved `dir="rtl"`, 3-D resolved **ltr** —
+ * because 3-D never passed the shared `boxDir` prop and fell back to `dir="auto"`, which keys off the
+ * first strong character. Most 3-D sentences open with a point label, so most of them took an LTR base
+ * and laid out left-aligned — while the preview underneath laid out RTL. The box was contradicting the
+ * very thing the preview exists to compensate for.
+ *
+ * `shell/frame/InputArea.tsx`'s own doc predicted it: *"dir='auto' keys off the first strong character,
+ * and «AB שווה …» would take an LTR base."*
+ *
+ * Asserted on the SOURCE, per the #559 precedent above: the defect is the markup, and this tree has no
+ * DOM harness. The PROPERTY — box and preview resolve through the same function, so they can never
+ * disagree — is what is pinned, not the one string that exposed it.
+ */
+describe('#868 — the input box and its preview cannot disagree about direction', () => {
+  const app = readFileSync(join(__dirname, '..', 'App3.tsx'), 'utf8');
+  const inputArea = (() => {
+    const start = app.indexOf('<InputArea');
+    expect(start, 'the InputArea must be findable').toBeGreaterThan(0);
+    return app.slice(start, app.indexOf('/>', start));
+  })();
+
+  it('the box direction is passed at all (it used to fall back to dir="auto")', () => {
+    expect(inputArea).toMatch(/boxDir=/);
+  });
+
+  it('the box and the preview resolve through the SAME function', () => {
+    const boxFn = inputArea.match(/boxDir=\{\(s\) => (\w+)\(s\)\}/)?.[1];
+    const previewFn = inputArea.match(/previewDir=\{\(s\) => (\w+)\(s\)\}/)?.[1];
+    expect(boxFn, 'boxDir resolves through a named direction function').toBeTruthy();
+    expect(boxFn).toBe(previewFn);
+  });
+
+  it('and that function gives a Hebrew-bearing line an RTL base — the reported string included', () => {
+    // the operator's line: it opens with a strong LTR letter, which is exactly what dir="auto" trips on
+    expect(textDir3('D על AC')).toBe('rtl');
+    expect(textDir3('OD חוצה זווית AOC')).toBe('rtl');
+    expect(textDir3('המרחק בין A למישור π2 הוא 5')).toBe('rtl');
+    // a genuinely LTR line still lays out LTR
+    expect(textDir3('AB = (1,2,3)')).toBe('ltr');
+  });
+});

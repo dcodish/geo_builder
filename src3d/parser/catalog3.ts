@@ -260,6 +260,9 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // --- V8-f: vector-relation givens ---
   { category: 'vectors', he: 'קוסינוס הזווית בין הוקטורים u ו-w הוא √35/10', en: 'the cosine of the angle between u and w is √35/10' },
   { category: 'vectors', he: 'קוסינוס הזווית ACB = 3/4', en: 'cos∠ACB = 3/4' },
+  // #862 (ADR-3D-205): the MIXED arm — a segment against a declared vector. The table declared this
+  // cell supported long before any sentence reached it; the catalog is where a student finds out it can.
+  { category: 'vectors', he: 'הזווית בין AB לבין v היא 60', en: 'the angle between AB and v is 60' },
   { category: 'vectors', he: 'u·v = v·w = u·w', en: 'u·v = v·w = u·w' },
   { category: 'vectors', he: 'AE יוצר זוויות שוות עם AB ו-AD', en: 'AE makes equal angles with AB and AD' },
   { category: 'points', he: 'D על AC כך ש-OD חוצה-זווית AOC', en: 'D on AC such that OD bisects angle AOC' },

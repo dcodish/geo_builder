@@ -18,6 +18,6 @@ which loads every session and has operator authority. One fact, one home — do 
 - [PR items need their own server](pr-items-need-their-own-server.md) — an unmerged PR can't be played on the `main` dev server; give each PR item its own port (round #783, 2026-08-26)
 - [gh --body @- eats issue bodies](gh-body-at-dash-eats-issues.md) — `--body @-` files the literal characters, not stdin; it has destroyed three issue bodies (#361, #765, #766) — always `--body-file`
 - [Stacked PR merge order](stacked-pr-merge-order.md) — never `--delete-branch` mid-stack: it auto-closes the next PR, and a closed PR can't be reopened while its base is gone (round #800, 2026-08-29)
-- [Tier JSON machine drift](tier-json-machine-drift.md) — `reports/test-tiers.json` stores raw ms, so it churns between the two PCs; timing-only drift gets discarded, not committed (2026-08-30)
+- [Tier JSON machine drift](tier-json-machine-drift.md) — #812 dropped the timings, so a diff there is now a REAL membership change (commit it); it can still differ per machine (2026-09-01)
 - [Look at the UI before he does](no-browser-self-test.md) — the harness CAN drive a browser (Playwright, proven 2026-08-31); `npm run smoke:visual` is the gate, and reading the screenshots is the job
 - [Measure before diagnosing](measure-before-diagnosing.md) — a root cause read off the code is a hypothesis; run the case and print the real state before it goes in the issue body (2026-08-31: two of four wrong)

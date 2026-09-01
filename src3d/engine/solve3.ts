@@ -16,6 +16,7 @@
  * (`שיעור ה-z של C' חיובי`) select among the surviving solutions, else the seed.
  */
 
+import { riderSampleT } from './onSegmentRatio';
 import { pinSymsOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
@@ -176,6 +177,8 @@ export interface PivotResult {
   symbols?: number[];
   /** #325 (ADR-3D-079) — the solved values of the pins' OPEN symbols (`B(2t,t,k)` → t, k). */
   pinSymbols?: Record<string, number>;
+  /** #820 (ADR-3D-204) — the solved parameters of the free on-segment RIDERS a given drives. */
+  riderTs?: Record<Id, number>;
   err: number;
   /** The solved parameter vector [t, w, logScale, dims…] — the warm-start vehicle: a
    *  later DRIVE (ADR-3D-033) perturbs the pinned figure from here, so it lands in the
@@ -244,7 +247,7 @@ export function scalePinned(c: Construction3): boolean {
 
 export function solvePivot(
   c: Construction3,
-  evalCanonical: (dims: number[], symbolOverride?: Map<number, number>) => Positions3,
+  evalCanonical: (dims: number[], symbolOverride?: Map<number, number>, riderTs?: ReadonlyMap<Id, number>) => Positions3,
   dims0: number[],
   seed: number,
   coupled?: { defs: number[]; pins: Construction3['symbolPins'] },
@@ -295,6 +298,30 @@ export function solvePivot(
   // be one symbol short of the namespace the rest of the engine reasons about.
   const pinSyms: string[] = pinSymsOf(c);
   const nPinSym = pinSyms.length;
+  /**
+   * #820 (ADR-3D-204) — A FREE RIDER'S PARAMETER IS A PIVOT UNKNOWN, NOT A SAMPLE.
+   *
+   * «K על SB» gives K one free DOF. Every stated given that names K was VERIFIED against whatever `t`
+   * the sampler happened to pick, so «SD מקביל למישור ACK» — satisfiable at t = ½, and reachable by
+   * the plane-first spelling the engine already had — came back `givens-contradict`, accusing the
+   * student's own statements. The answer must not depend on WHICH side of a relation holds the free
+   * DOF (docs/17 M2: a given re-homes the obligations of the DOF it constrains); the free plane got
+   * this in #487 and the rider never did.
+   *
+   * So the lane: unknowns are `[gauge 7 | dims | coupled | pinSyms | riderTs]`. Membership is
+   * MEASURED, not enumerated — a rider joins only when moving it actually changes a residual (the
+   * probe below), so a figure whose riders no constraint mentions solves bit-identically to before.
+   * Each included rider keeps a soft anchor at its seed sample, so an UNDER-determined rider still
+   * varies with the seed instead of parking on a default (ADR-052), and a solution that slid the
+   * rider off its host segment is not a figure at all (`degenerate`).
+   */
+  const riderBase = 7 + nDims + nSym + nPinSym;
+  let riders: { id: Id; t0: number }[] = [];
+  for (const [id, def] of c.points)
+    if (def.kind === 'on-segment' && def.t === undefined) riders.push({ id, t0: riderSampleT(seed, id, def.a, def.b) });
+  /** The trial rider parameters at `x` — `undefined` when the lane is empty (every path stays bit-identical). */
+  const riderMap = (x: number[]): ReadonlyMap<Id, number> | undefined =>
+    riders.length === 0 ? undefined : new Map(riders.map((r, i) => [r.id, x[riderBase + i]]));
   /** A pin component's target value at the trial unknowns (null = unconstrained). */
   const compTarget = (comp: number | null | import('./types').SymComp, x: number[]): number | null => {
     if (comp === null) return null;
@@ -342,7 +369,7 @@ export function solvePivot(
     const g = { ...unpack(x), mirror };
     const dims = x.slice(7, 7 + nDims);
     const override = coupled ? new Map(coupled.defs.map((d, i) => [d, x[7 + nDims + i]])) : undefined;
-    const pos = evalCanonical(dims, override);
+    const pos = evalCanonical(dims, override, riderMap(x));
     const out: number[] = [];
     for (const pin of pointPins) {
       const p = pos.get(pin.id);
@@ -840,7 +867,7 @@ export function solvePivot(
     // legitimately close vertices is untouched.
     const dims = x.slice(7, 7 + nDims);
     const override = coupled ? new Map(coupled.defs.map((d, i) => [d, x[7 + nDims + i]])) : undefined;
-    const pos = evalCanonical(dims, override);
+    const pos = evalCanonical(dims, override, riderMap(x));
     for (const solid of c.solids) {
       const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
       let maxD = 0;
@@ -854,11 +881,37 @@ export function solvePivot(
       }
       if (pts.length >= 2 && minD <= 1e-4 * Math.max(maxD, 1e-12)) return true;
     }
-    return false;
+    // #820: a candidate that slid a rider OFF its host segment is not a figure either — «K על SB»
+    // is a given like any other, so a solution reaching the relation at t = 1.4 has not satisfied
+    // the student's statements. Checked here because every acceptance site already asks `degenerate`.
+    return riders.some((_, i) => !(x[riderBase + i] >= -1e-9 && x[riderBase + i] <= 1 + 1e-9));
   };
 
+  /**
+   * #820 — WHICH riders are unknowns: the ones a residual actually reads. Measured by moving each
+   * rider a long way along its host and asking whether any residual changed — a structural walk over
+   * the constraint families would be an enumeration to keep in sync (`src3d/CLAUDE.md`: "an
+   * enumeration is not a rule"), and this cannot drift from the residual set because it IS the
+   * residual set. A rider nothing reads leaves the lane, so its figure solves exactly as before.
+   */
+  if (riders.length > 0) {
+    const base = [0, 0, 0, 0, 0, 0, 0, ...dims0, ...Array(nSym).fill(0.2), ...Array(nPinSym).fill(0.3), ...riders.map((r) => r.t0)];
+    const at = residualsFor(false);
+    const r0 = at(base);
+    const reads = riders.map((r, i) => {
+      const probeX = [...base];
+      probeX[riderBase + i] = r.t0 > 0.5 ? r.t0 - 0.3 : r.t0 + 0.3;
+      const r1 = at(probeX);
+      return r1.some((v, k) => Math.abs(v - (r0[k] ?? 0)) > 1e-9) || r1.length !== r0.length;
+    });
+    riders = riders.filter((_, i) => reads[i]);
+  }
+  const nRider = riders.length;
+
   if (invariantOnly) {
-    if (dims0.length === 0) {
+    // #820: with a rider in the lane there IS something to flex, so the immediate answer below does
+    // not apply — the [dims | riderTs] solve underneath handles an empty dims vector unchanged.
+    if (dims0.length === 0 && nRider === 0) {
       /**
        * #614 (ADR-3D-189) — "NOTHING TO FLEX" IS NOT THE SAME ANSWER AS "NO SOLUTION".
        *
@@ -872,22 +925,34 @@ export function solvePivot(
        * identity. If it already holds, the identity IS the solution; if it does not, the relation is
        * genuinely unsatisfiable and stays refused, exactly as before.
        */
-      const primary = residualsFor(false)([0, 0, 0, 0, 0, 0, 0]).reduce((sum, v) => sum + v * v, 0);
+      const x0 = [0, 0, 0, 0, 0, 0, 0, ...riders.map((r) => r.t0)];
+      const primary = residualsFor(false)(x0).reduce((sum, v) => sum + v * v, 0);
       return primary < 1e-10
-        ? [{ transform: (p) => p, mirror: false, dims: [], err: primary, x: [0, 0, 0, 0, 0, 0, 0] }]
+        ? [{
+            transform: (p) => p, mirror: false, dims: [], err: primary,
+            ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, x0[7 + i]])) } : {}),
+            x: x0,
+          }]
         : [];
     }
     const f = residualsFor(false); // mirror is also invariant here
+    // #820: `invariantOnly` implies nSym = nPinSym = 0, so the unknown vector here is exactly
+    // [dims | riderTs] — the rider tail rides the same anchored dims-only solve.
     const fd = (d: number[]) => f([0, 0, 0, 0, 0, 0, 0, ...d]);
-    const warmDims = warmStart && warmStart.length >= 7 + nDims ? warmStart.slice(7, 7 + nDims) : null;
+    const warmDims = warmStart && warmStart.length >= 7 + nDims + nRider ? warmStart.slice(7, 7 + nDims + nRider) : null;
     // regularised-nearest: the invariant residuals are ANGLE-like (length-normalized),
     // so an unconstrained dim can drift to extremes that also shrink them (a ⟂ apex
     // ran its free height to ~55× the base — a needle). A tiny pull toward the seed's
     // sampled dims anchors the null-space; acceptance stays on the PRIMARY residuals.
     const REG = 1e-4;
-    const fr = (d: number[]) => [...fd(d), ...d.map((v, i) => REG * (v - dims0[i]))];
-    // dims-only multi-start: deterministic jitters around the seed's sample
-    const dimStarts = [dims0, dims0.map((v) => v * 0.75), dims0.map((v) => v * 1.3), dims0.map((v, i) => (i % 2 ? v * 0.6 : v * 1.2))];
+    const anchors = [...dims0, ...riders.map((r) => r.t0)];
+    const fr = (d: number[]) => [...fd(d), ...d.map((v, i) => REG * (v - anchors[i]))];
+    // dims-only multi-start: deterministic jitters around the seed's sample. #820: a rider start is
+    // SPREAD across its host rather than jittered off the sample — the roots of a relation in `t` sit
+    // anywhere in [0,1] and the near-sample basin is not privileged.
+    const riderStarts = [riders.map((r) => r.t0), riders.map(() => 0.3), riders.map(() => 0.7), riders.map(() => 0.5)];
+    const dimStarts = [dims0, dims0.map((v) => v * 0.75), dims0.map((v) => v * 1.3), dims0.map((v, i) => (i % 2 ? v * 0.6 : v * 1.2))]
+      .map((d, i) => [...d, ...riderStarts[i]]);
     if (warmDims) dimStarts.unshift(warmDims);
     let best: { x: number[]; err: number } | null = null;
     for (const d0 of dimStarts) {
@@ -911,7 +976,11 @@ export function solvePivot(
     // acceptance: the regulariser's pull stops LM at a primary floor of ~(REG·dims)² —
     // 1e-10 sits above that equilibrium and far under the 2e-5 claim tolerance
     if (primary >= 1e-10) return [];
-    return [{ transform: (p) => p, mirror: false, dims: best.x, err: primary, x: [0, 0, 0, 0, 0, 0, 0, ...best.x] }];
+    return [{
+      transform: (p) => p, mirror: false, dims: best.x.slice(0, nDims), err: primary,
+      ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, best!.x[nDims + i]])) } : {}),
+      x: [0, 0, 0, 0, 0, 0, 0, ...best.x],
+    }];
   }
 
   // #518 (ADR-3D-133): the gauge's SCALE gets a seed-dependent SOFT ANCHOR, like every other DOF the
@@ -937,7 +1006,10 @@ export function solvePivot(
     const symStart = Array.from({ length: nSym }, () => 0.2 + 0.2 * (k % 3)); // 0.2/0.4/0.6 spread
     // #325: pin symbols start on a ± spread so a sign given can find its branch
     const pinSymStart = Array.from({ length: nPinSym }, () => (k < 4 ? 1 : -1) * (0.3 + 0.3 * (k % 3)));
-    starts.push([0, 0, 0, axes[k].x * angles[k], axes[k].y * angles[k], axes[k].z * angles[k], 0, ...dims0, ...symStart, ...pinSymStart]);
+    // #820: rider starts SPREAD across the host (0.2/0.35/…/0.8), never all at the seed's sample —
+    // a relation's root in `t` sits anywhere in [0,1] and the sample's basin is not privileged.
+    const riderStart = riders.map((r) => (k === 0 ? r.t0 : 0.1 + 0.1 * ((k * 3) % 8)));
+    starts.push([0, 0, 0, axes[k].x * angles[k], axes[k].y * angles[k], axes[k].z * angles[k], 0, ...dims0, ...symStart, ...pinSymStart, ...riderStart]);
   }
   // #797 (ADR-3D-168 Am. 1): the ±0.3–0.9 pin-symbol spread explores only the near-origin
   // basins — a discrete root beyond it (Q2's k ∈ {1,2}) was structurally unreachable, so the
@@ -946,7 +1018,7 @@ export function solvePivot(
   // starts costs hard figures real solution branches). Only when pin symbols exist.
   // the warm start (a prior solve's exact solution) goes FIRST so a drive perturbs the
   // pinned figure's own basin before gambling on the rotation spread (ADR-3D-033)
-  if (warmStart && warmStart.length === 7 + nDims + nSym + nPinSym) starts.unshift([...warmStart]);
+  if (warmStart && warmStart.length === 7 + nDims + nSym + nPinSym + nRider) starts.unshift([...warmStart]);
 
   const results: PivotResult[] = [];
   // ADR-3D-030: plane-equation pins reach solvePivot ONLY on the drive path (the normal
@@ -965,7 +1037,7 @@ export function solvePivot(
     nSym === 0 && planeDrive && pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 &&
     c.scalarPins.every((p) => p.kind !== 'length' && p.kind !== 'dot');
   const REG_SF = 1e-4;
-  const ACCEPT = planeDrive || nPinSym > 0 ? 1e-10 : 1e-12; // reg equilibrium floors primary at ~(REG·pull)²
+  const ACCEPT = planeDrive || nPinSym > 0 || nRider > 0 ? 1e-10 : 1e-12; // reg equilibrium floors primary at ~(REG·pull)²
   /** A candidate whose solid carries two coincident vertices is DEGENERATE — never a figure. */
   // Sign givens select among DISCRETE placement branches — and those are not only the
   // two mirrors: within one mirror, different rotation BASINS are exact solutions too
@@ -982,7 +1054,10 @@ export function solvePivot(
   // #814 (ADR-3D-175): a sign on a NAMED free component («p חיובי» after «D(3,p,0)») selects a branch
   // exactly as a coordinate sign given does, so it must widen the pool the same way. Enforced in the
   // same filter; a statement collected in one place and honoured in another is honoured by luck.
-  const collectAll = c.signGivens.length > 0 || c.componentSigns.length > 0 || nPinSym > 0;
+  // #820: a rider lane keeps the full pool for the same reason an open pin symbol does (#797) — two
+  // admissible `t` are two configurations, and a pool that carries one of them hides the other from
+  // every honesty gate downstream.
+  const collectAll = c.signGivens.length > 0 || c.componentSigns.length > 0 || nPinSym > 0 || nRider > 0;
   // #818: the stated SIGNS, as conditions over a candidate — a coordinate sign given on a point and a
   // sign on a named free component (#814) are one kind here, exactly as `applySolutions`' filter treats
   // them. A `partial` point is absolute and sign-honoured at sample time (ADR-3D-094): not a condition.
@@ -996,7 +1071,7 @@ export function solvePivot(
   const atFor = (mirror: boolean, x: number[]): ((id: Id) => Vec3 | undefined) => {
     const g = { ...unpack(x), mirror };
     const override = coupled ? new Map(coupled.defs.map((d, i) => [d, x[7 + nDims + i]])) : undefined;
-    const pos = evalCanonical(x.slice(7, 7 + nDims), override);
+    const pos = evalCanonical(x.slice(7, 7 + nDims), override, riderMap(x));
     return (id) => {
       const p = pos.get(id);
       if (!p) return undefined;
@@ -1013,7 +1088,7 @@ export function solvePivot(
     // moved. Pinned translation cannot satisfy the projection and snaps back on release (|proj| ≈ 0);
     // free translation keeps the displacement. One projection residual, so a 1-D slide with any
     // component along the direction is found (a direction orthogonal to it is measure-zero).
-    if (probe.x.length !== 7 + nDims + nSym + nPinSym) return [];
+    if (probe.x.length !== 7 + nDims + nSym + nPinSym + nRider) return [];
     const fP = residualsFor(probe.mirror);
     const pErr = (x: number[]): number => fP(x).reduce((a, v) => a + v * v, 0);
     if (degenerate(probe.x) || pErr(probe.x) >= ACCEPT) return [];
@@ -1039,7 +1114,8 @@ export function solvePivot(
     const dims = xr.slice(7, 7 + nDims);
     const symbols = coupled ? xr.slice(7 + nDims, 7 + nDims + nSym) : undefined;
     const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((sym, i) => [sym, xr[7 + nDims + nSym + i]])) : undefined;
-    return [{ transform: (q) => applyGauge(q, g), mirror: probe.mirror, dims, symbols, pinSymbols, err: pErr(xr), x: [...xr] }];
+    const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, xr[riderBase + i]])) : undefined;
+    return [{ transform: (q) => applyGauge(q, g), mirror: probe.mirror, dims, symbols, pinSymbols, riderTs, err: pErr(xr), x: [...xr] }];
   }
   for (const mirror of [false, true]) {
     const fPrimary = residualsFor(mirror);
@@ -1050,7 +1126,15 @@ export function solvePivot(
       // at all. Only when placement alone cannot satisfy the pins (e.g. two plane
       // equations jointly pinning a dim) does the anchored full solve below open
       // scale + dims.
-      const fA = (y: number[]) => fPrimary([y[0], y[1], y[2], y[3], y[4], y[5], 0, ...dims0]);
+      // #820: placement-only, so the riders stay at their samples here (this stage moves nothing but
+      // the gauge); a rider that must MOVE is solved by the anchored full solve below. The
+      // coupled/pin-symbol window is padded with NaN rather than skipped, so the rider slots keep
+      // their true indices while those slots behave EXACTLY as they did when this vector simply ended
+      // early (an absent entry and a NaN entry are the same number downstream) — this stage never had
+      // symbol values to offer, and inventing zeros for them would turn a NaN-poisoned solve into a
+      // plausible-looking wrong one.
+      const symPad = Array<number>(nSym + nPinSym).fill(NaN);
+      const fA = (y: number[]) => fPrimary([y[0], y[1], y[2], y[3], y[4], y[5], 0, ...dims0, ...symPad, ...riders.map((r) => r.t0)]);
       let bestA: { x: number[]; err: number } | null = null;
       for (const x0 of starts) {
         let r = leastSquares(fA, x0.slice(0, 6));
@@ -1064,16 +1148,25 @@ export function solvePivot(
       }
       if (bestA && bestA.err < ACCEPT) {
         const g = { ...unpack([...bestA.x, 0]), mirror };
-        results.push({ transform: (p) => applyGauge(p, g), mirror, dims: dims0, err: bestA.err, x: [...bestA.x, 0, ...dims0] });
+        results.push({
+          transform: (p) => applyGauge(p, g), mirror, dims: dims0, err: bestA.err,
+          ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r) => [r.id, r.t0])) } : {}),
+          x: [...bestA.x, 0, ...dims0, ...symPad, ...riders.map((r) => r.t0)],
+        });
         continue; // this mirror solved by placement alone
       }
     }
     // #325: pin-symbol seed-anchors ride whether or not this is a plane drive — any solve
     // with open symbols is `anchored`, and its acceptance moves to the PRIMARY residuals
     // (the anchor equilibrium floors the full error above the raw thresholds).
-    const anchored = planeDrive || nPinSym > 0;
+    const anchored = planeDrive || nPinSym > 0 || nRider > 0;
     const symAnchorTerms = (x: number[], targets: number[]): number[] =>
       targets.map((tgt, i) => REG_SF * (x[7 + nDims + nSym + i] - tgt));
+    // #820: the rider twin — an UNDER-determined rider keeps varying with the seed (ADR-052) instead
+    // of parking wherever LM's null-space left it; a determining given overrides the 1e-4 pull exactly
+    // as it overrides `dims0` and the symbol anchors.
+    const riderAnchorTerms = (x: number[]): number[] =>
+      riders.map((r, i) => REG_SF * (x[riderBase + i] - r.t0));
     // #797 (ADR-3D-168 Am. 1): the residual function is parameterized by its symbol-anchor
     // targets — the cold starts use the Am. 2 seed targets, while the symbol-axis continuation
     // below anchors each warm restart at its own displaced value, so which discrete root it
@@ -1083,6 +1176,7 @@ export function solvePivot(
           ...fPrimary(x),
           ...(planeDrive ? [REG_SF * x[6], ...x.slice(7, 7 + nDims).map((v, i) => REG_SF * (v - dims0[i]))] : []),
           ...symAnchorTerms(x, targets),
+          ...riderAnchorTerms(x),
         ]
       : fPrimary;
     // best-selection stays on the FULL error (the anchor's pull punishes the collapse
@@ -1128,13 +1222,14 @@ export function solvePivot(
           .map((p) => applyGauge(p, g))
           .map((q) => `${q.x.toFixed(5)},${q.y.toFixed(5)},${q.z.toFixed(5)}`)
           .join('|') +
-        (nPinSym > 0 ? '#' + cx.slice(7 + nDims + nSym).map((v) => v.toFixed(4)).join(',') : '');
+        (nPinSym + nRider > 0 ? '#' + cx.slice(7 + nDims + nSym).map((v) => v.toFixed(4)).join(',') : '');
       if (seen.has(sig)) return;
       seen.add(sig);
       const dims = cx.slice(7, 7 + nDims);
       const symbols = coupled ? cx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
       const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((s, i) => [s, cx[7 + nDims + nSym + i]])) : undefined;
-      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, err: rAccept, x: [...cx] });
+      const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, cx[riderBase + i]])) : undefined;
+      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, err: rAccept, x: [...cx] });
     };
     const fSeed = fFor(symAnchorTargets);
     for (const x0 of starts) {
@@ -1182,7 +1277,7 @@ export function solvePivot(
             // the pinned stage only steers the gauge into the target's basin — 40 iterations
             // suffice (warm start, and the RELEASE solve carries the precision)
             const rp = leastSquares(fPin, x0, 40);
-            collect(leastSquares(fFor(rp.x.slice(7 + nDims + nSym)), rp.x));
+            collect(leastSquares(fFor(rp.x.slice(7 + nDims + nSym, 7 + nDims + nSym + nPinSym)), rp.x));
             return primaryErr(rp.x) < ACCEPT;
           };
           // Probe first: a symbol admissible OFF its converged value is CONTINUOUS — its
@@ -1292,7 +1387,8 @@ export function solvePivot(
       const dims = bx.slice(7, 7 + nDims);
       const symbols = coupled ? bx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
       const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((s, i) => [s, bx[7 + nDims + nSym + i]])) : undefined;
-      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, err: bestAccept, x: [...bx] });
+      const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, bx[riderBase + i]])) : undefined;
+      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, err: bestAccept, x: [...bx] });
     }
   }
   // #797 (ADR-3D-168 Am. 1): interleave the pool round-robin across DISTINCT symbol vectors —

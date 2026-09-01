@@ -59,20 +59,21 @@ const PENDING_PROBES: Record<string, string[]> = {
     'l1:x=(0,0,0)+t(1,2,3)',
     'הזווית בין הישר l1 לבין המישור ABC היא 60',
   ],
+  // #862 (ADR-3D-205) — the one cell this sweep found hollow, now REACHABLE and therefore promoted out
+  // of the ratchet below and into the probe table, where it is checked like every other supported cell.
+  'angle|segment|vector': ['פירמידה משולשת ABCD', 'נסמן: CD = v', 'קוסינוס הזווית בין הוקטורים AB ו-v הוא 1/2'],
 };
 
 /**
  * A RATCHET, and it may only shrink: cells the table calls `supported` that no utterance reaches.
  *
- * `angle|segment|vector` declares `['drive-dims', 'claim']` with the note *"cos-angle with value
- * (V8-f)"*. Five phrasings were tried — the two `קוסינוס … הוקטורים` orders, `קוסינוס … לבין`, and both
- * degree forms — and every one is `not-understood`. Its PERPENDICULAR twin over the identical operand
- * kinds (`perp|segment|vector`, exercised above) works, so this is the angle lane specifically, not the
- * mixed-operand seam.
+ * **It is now EMPTY**, and that is the sweep's whole point arriving. `angle|segment|vector` was its one
+ * entry — declared `['drive-dims', 'claim']` with the note *"cos-angle with value (V8-f)"* while five
+ * phrasings all came back `not-understood` — and #862 made it reachable, which failed the honesty test
+ * below exactly as designed and forced this deletion. Leave the structure standing: the next sweep that
+ * finds a hollow row records it here, and the same test will make it impossible to forget.
  */
-const KNOWN_UNREACHABLE: Record<string, string> = {
-  'angle|segment|vector': '#862 — declared supported, unreachable in 5 phrasings; the ⟂ twin works',
-};
+const KNOWN_UNREACHABLE: Record<string, { why: string; setup: string[]; forms: string[] }> = {};
 
 describe('#845 — every PENDING supported cell is reachable through the real submit path', () => {
   beforeEach(() => st().clear());
@@ -87,20 +88,17 @@ describe('#845 — every PENDING supported cell is reachable through the real su
   it('the KNOWN_UNREACHABLE ratchet is honest — each entry really is still unreachable', () => {
     // If one of these starts working, this test fails and the entry must be DELETED. That is what makes
     // the list a ratchet rather than a note: it cannot quietly outlive the defect it records.
-    const setup = ['פירמידה משולשת ABCD', 'נסמן: CD = v'];
-    const forms = [
-      'קוסינוס הזווית בין הוקטורים AB ו-v הוא 1/2',
-      'קוסינוס הזווית בין הוקטורים v ו-AB הוא 1/2',
-      'קוסינוס הזווית בין AB לבין v הוא 1/2',
-      'הזווית בין AB לבין v היא 60',
-      'הזווית בין הוקטורים AB ו-v היא 60',
-    ];
-    expect(KNOWN_UNREACHABLE['angle|segment|vector']).toBeTruthy();
-    for (const f of forms) {
-      st().clear();
-      for (const l of setup) st().submit(l);
-      st().submit(f);
-      expect(st().lastError, `«${f}» reaches the engine now — delete the ratchet entry`).not.toBeNull();
+    // #862 (ADR-3D-205): generic over the map rather than naming one cell, because naming it is what
+    // would have had to be edited anyway the moment the entry went — and the next hollow row deserves
+    // the same net without anyone remembering to rebuild it.
+    for (const [cell, entry] of Object.entries(KNOWN_UNREACHABLE)) {
+      expect(PENDING_PROBES[cell], `${cell}: a cell cannot be both probed and known-unreachable`).toBeUndefined();
+      for (const f of entry.forms) {
+        st().clear();
+        for (const l of entry.setup) st().submit(l);
+        st().submit(f);
+        expect(st().lastError, `«${f}» reaches the engine now — delete the ${cell} ratchet entry`).not.toBeNull();
+      }
     }
   });
 
