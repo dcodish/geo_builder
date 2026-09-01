@@ -3003,28 +3003,42 @@ const planeThroughBare: Rule = (s) => {
 // ---------------------------------------------------------------------------
 
 
-/** `הזווית בין A'C לבין BC' היא 90` / the exam's `גודל הזווית שבין הישר AB ובין הישר AM
- *  הוא 60` — the angle between two SEGMENT-lines (≤90°), a claim. */
+/**
+ * `הזווית בין A'C לבין BC' היא 90` / the exam's `גודל הזווית שבין הישר AB ובין הישר AM הוא 60` — a
+ * stated angle VALUE between two direction operands.
+ *
+ * #862 (ADR-3D-205): the sides are read through the shared operand seam instead of two hard-coded
+ * point-pair captures, so the MIXED arm — a segment against a declared vector, «הזווית בין AB לבין v
+ * היא 60» — reaches the cell `relationTable` has advertised as supported all along. Two lowerings,
+ * chosen by what the arms ARE and never by which sentence was typed:
+ *
+ *  - **pair × pair** keeps the frozen `angle-seg-eq` CLAIM — the ≤90° segment-line reading this rule
+ *    has always produced. Nothing about that cell changes.
+ *  - **any VECTOR arm** lowers to `cos-angle` at `cos(deg)` — the very command the cosine spelling of
+ *    the identical fact produces, so «…היא 60» and «קוסינוס… הוא 0.5» are one fact stated two ways.
+ *    That is the `angle|vector|vector` cell's own lowering, inherited rather than re-invented.
+ */
 const angleSegClaim: Rule = (s0) => {
   const s = stripStatementPrefix(s0);
   const m =
     s.match(
       new RegExp(
-        `^(?:גודל\\s+)?ה?זו?וית\\s+ש?בין\\s+(?:ה?ישר\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+(?:לבין|ובין|ל|ו)-?\\s*(?:ה?ישר\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+(?:היא|הוא)\\s+(${NUM})\\s*°?$`,
+        `^(?:גודל\\s+)?ה?זו?וית\\s+ש?בין\\s+(.+?)\\s+(?:לבין|ובין|ל|ו)-?\\s*(.+?)\\s+(?:היא|הוא)\\s+(${NUM})\\s*°?$`,
       ),
     ) ??
-    s.match(
-      new RegExp(
-        `^the\\s+angle\\s+between\\s+(?:line\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+and\\s+(?:line\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+is\\s+(${NUM})\\s*°?$`,
-      ),
-    );
+    s.match(new RegExp(`^the\\s+angle\\s+between\\s+(.+?)\\s+and\\s+(.+?)\\s+is\\s+(${NUM})\\s*°?$`, 'i'));
   if (!m) return null;
-  const [, a1, b1, a2, b2, deg] = m;
-  return [
-    { type: 'segment3', a: a1, b: b1 },
-    { type: 'segment3', a: a2, b: b2 },
-    { type: 'claim', claim: { type: 'angle-seg-eq', a1, b1, a2, b2, deg: +deg } },
-  ];
+  const sides = readRelationSides(m[1], m[2]);
+  if (!sides) return null;
+  const u = vecAtomOf(sides[0].op);
+  const v = vecAtomOf(sides[1].op);
+  if (!u || !v) return null; // a line / plane / point arm belongs to another cell — decline, never guess
+  const deg = +m[3];
+  const draw: Command3[] = [];
+  for (const at of [u, v]) if (at.kind === 'pair') draw.push({ type: 'segment3', a: at.from, b: at.to });
+  if (u.kind === 'pair' && v.kind === 'pair')
+    return [...draw, { type: 'claim', claim: { type: 'angle-seg-eq', a1: u.from, b1: u.to, a2: v.from, b2: v.to, deg } }];
+  return [...draw, { type: 'cos-angle', u, v, cos: Math.cos((deg * Math.PI) / 180) }];
 };
 
 /** `A'K : A'C = 2 : 3` — a length-RATIO claim (draws both segments). */
@@ -3217,7 +3231,6 @@ const angleBound3: Rule = (s0) => {
  * meant — and an operand may equally be a declared vector (`u`).
  */
 const PT3 = String.raw`[A-Z]\d*'?`;
-const VEC_NOUN3 = String.raw`(?:ה?(?:ו?וקטור|ישר|קטע)\s+|(?:the\s+)?(?:vector|line|segment)\s+)?`;
 
 interface AnglePhrase3 {
   a: VecAtom;
@@ -3228,13 +3241,30 @@ interface AnglePhrase3 {
   draw: Command3[];
 }
 
-/** One operand of a between-form angle: a point pair (`BE`) or a declared vector (`u`). */
+/**
+ * #862 (ADR-3D-205) — the ARM of an angle, as an operand kind rather than a spelling.
+ *
+ * An angle's arm is a direction, and exactly two operand kinds carry one here: a point PAIR («AB») and
+ * a declared VECTOR («v»). Everything else — a named line, a plane, a bare point — belongs to another
+ * angle cell and must fall through, so the rule declines exactly where a hand-written regex would have.
+ */
+const vecAtomOf = (op: Operand3): VecAtom | null =>
+  op.kind === 'segment' ? (op.a === op.b ? null : { kind: 'pair', from: op.a, to: op.b })
+  : op.kind === 'vector' ? { kind: 'named', name: op.name }
+  : null;
+
+/**
+ * One operand of a between-form angle, read through the SHARED operand seam (`readOperand`,
+ * ADR-3D-140) rather than a private regex.
+ *
+ * #862: the private version spelled its own noun list (a private singular-only noun list) and its own token
+ * shapes, so «הוקטורים AB ו-v» — the plural head noun #522 taught the seam to read — failed here while
+ * the singular twin parsed, and the angle family drifted from the ⟂/∥ family that had already been
+ * migrated. The kinds are still decided by what the token IS; `vecAtomOf` says which kinds are arms.
+ */
 function angleOperand3(t: string): VecAtom | null {
-  const body = t.trim().replace(new RegExp(`^${VEC_NOUN3}`), '').trim();
-  const pair = body.match(new RegExp(`^(${PT3})(${PT3})$`));
-  if (pair) return pair[1] === pair[2] ? null : { kind: 'pair', from: pair[1], to: pair[2] };
-  const named = body.match(/^([a-w])$/);
-  return named ? { kind: 'named', name: named[1] } : null;
+  const read = readOperand(t);
+  return read ? vecAtomOf(read.op) : null;
 }
 
 function parseAnglePhrase3(t: string): AnglePhrase3 | null {
@@ -3317,13 +3347,24 @@ const mkAtom = (named?: string, pa?: string, pb?: string): VecAtom | null =>
  */
 const cosAngleGiven: Rule = (s) => {
   if (!/cos|קוסינוס/i.test(s)) return null;
+  // #862 (ADR-3D-205): the two sides are OPERANDS, not two spellings of `[a-w]`. The regexes below
+  // capture the raw text and the shared seam classifies it, so «AB» and «v» are the same kind of thing
+  // to this rule and the mixed pair the capability table has always advertised finally has a sentence.
   let m =
-    s.match(/קוסינוס\s+(?:ה?זו?וית\s+)?בין\s+(?:ה?וקטורים\s+)?([a-w])\s+ו-?\s*([a-w])\s+(?:הוא|היא|שווה\s+ל-?|=)\s*(.+)$/) ??
-    s.match(/(?:the\s+)?cosine\s+of\s+the\s+angle\s+between\s+(?:the\s+vectors?\s+)?([a-w])\s+and\s+([a-w])\s+(?:is|equals?|=)\s*(.+)$/i) ??
-    s.match(/^cos\s*(?:∠|∡)?\s*\(\s*([a-w])\s*,\s*([a-w])\s*\)\s*=\s*(.+)$/i);
+    s.match(/קוסינוס\s+(?:ה?זו?וית\s+)?ש?בין\s+(.+?)\s+(?:לבין|ובין|ל|ו)-?\s*(.+?)\s+(?:הוא|היא|שווה\s+ל-?|=)\s*(.+)$/) ??
+    s.match(/(?:the\s+)?cosine\s+of\s+the\s+angle\s+between\s+(.+?)\s+and\s+(.+?)\s+(?:is|equals?|=)\s*(.+)$/i) ??
+    s.match(/^cos\s*(?:∠|∡)?\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)\s*=\s*(.+)$/i);
   if (m) {
+    const sides = readRelationSides(m[1], m[2]);
+    const u = sides && vecAtomOf(sides[0].op);
+    const v2 = sides && vecAtomOf(sides[1].op);
+    if (!u || !v2) return null;
     const v = evalRadical(m[3].trim());
-    return v === null ? null : [{ type: 'cos-angle', u: { kind: 'named', name: m[1] }, v: { kind: 'named', name: m[2] }, cos: v }];
+    if (v === null) return null;
+    // the V1 convention: an operand the student named as a point pair is DRAWN
+    const draw: Command3[] = [];
+    for (const at of [u, v2]) if (at.kind === 'pair') draw.push({ type: 'segment3', a: at.from, b: at.to });
+    return [...draw, { type: 'cos-angle', u, v: v2, cos: v }];
   }
   // vertex form: cos∠ACB / cos ACB / קוסינוס הזווית ACB = value — rays CA, CB from the middle vertex
   m = s.match(/(?:cos|קוסינוס(?:\s+ה?זו?וית)?)\s*(?:∠|∡)?\s*([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:הוא|היא|שווה\s+ל-?|is|=)\s*(.+)$/i);
