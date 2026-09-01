@@ -6571,6 +6571,73 @@ a driving relation reports nothing; a false relation still refuses; a bare figur
 with a per-relation entailment test; filed as **#853** rather than done here, since converging them
 is a refactor with no user-visible change and belongs in its own pass.
 
+## ADR-3D-200 — «אלכסון ראשי» NAMES NONE OF FOUR: THE ROLE PHRASE ASKS (#836)
+
+**Context.** Prod session `u1y60bg6` — the user's entire session was one line:
+
+```
+קובייה ABCD עם אלכסון ראשי   ✗ not-handled → escalated → the LLM built it
+```
+
+A cube or box has **four** space diagonals — AC', BD', CA', DB' — so «אלכסון ראשי» names none of them.
+The LLM answered by *picking one*. That is exactly the invented given [ADR-052](06-decisions.md#adr-052)
+forbids: the student never said which.
+
+**Operator ruling (2026-08-31).** *"there is more than one אלכסון ראשי so we should ask user to indicate
+the letters."*
+
+**Decision.**
+
+- **The role phrase used as a REFERENCE returns a clarify**, `ambiguous-main-diagonal` — a typed refusal,
+  never `not-handled`. This is the #516 lesson applied again: `not-handled` is the lane that escalates to
+  the LLM, *whose job is to guess*, so **a refusal implemented as a decline is not a refusal**. The rule
+  follows the existing `PARAM_CONFLATED` pattern — it records the ambiguity and declines, and `parse3`
+  turns the flag into the refusal after the loop, so a later rule may still legitimately own the line.
+- **The candidates are named, and DERIVED.** `spaceDiagonals(faces)` reads the solid's own rings: base
+  ring `faces[0]`, the opposite ring being the other face of the same size sharing no vertex, and the
+  diagonal joining `base[i]` to `top[(i + n/2) % n]`. So a box, a cube and a quad prism all answer from
+  one rule, and no cube-shaped list exists to fall out of date. A **pyramid** correctly yields none (its
+  apex is adjacent to every base vertex), and an **odd** prism yields none rather than rounding to a
+  near-miss and calling it "the main diagonal".
+  Naming them is the half that makes the refusal useful: a bare *"which diagonal?"* leaves a student who
+  does not know the prime convention no better off.
+- **Where the candidates are computed matters.** `parse3` is **context-free by design** — it takes a
+  string and nothing else — so it cannot know the figure. The store, which owns the construction, turns
+  the parser's typed refusal into the message's candidate list. The parser says *"this is ambiguous"*;
+  the layer that can see the figure says *"…and here are the four."*
+- **With letters it simply builds — through the EXISTING family rule.** «אלכסון ראשי AC'» is «אלכסון AC'»
+  plus a redundant word, so the ROLE qualifier joined `bareSegment`'s own alternation beside the SOLID
+  qualifier (#449: «אלכסון תיבה AC'», "space diagonal AC'"). One rule, one lowering — not a parallel path.
+
+  **A first attempt did more and was wrong.** It emitted a `spaceDiagonal` flag so apply could verify the
+  pair really is a space diagonal and refuse by name otherwise — the issue asks for that too. It broke
+  #449's lock, which pins the exact command for "main diagonal AC'", and the conflict exposed that the
+  issue asks for two incompatible things: *"must lower exactly as «אלכסון AC'» does"* and *"verify the
+  named pair really is a space diagonal"*. #449 is operator-approved and locked, so **"lowers exactly as"
+  wins**, and the validation is not smuggled in beside it. The gap is real and is filed separately: the
+  whole qualified family — «אלכסון תיבה AC'», "space diagonal AC'", now «אלכסון ראשי AC'» — accepts any
+  pair without checking the claim, so a face diagonal offered to any of them draws silently. Fixing that
+  is one decision about the family, not a side effect of this issue — filed as #859 (needs-operator).
+
+**Deliberately NOT touched — the declaration form.** «תיבה מלבנית עם אלכסון תיבה» (#438, two prod users)
+keeps building. There the student *declares a figure* and asks for **a** space diagonal indefinitely, and
+#438's lock is geometric on purpose — any of the four satisfies the box identity — because none is meant
+in particular. This ADR governs a **definite reference** to *the* main diagonal, which is the case that
+cannot be answered without asking. The two are different statements that happen to share a noun.
+
+**Out of scope.** The user's full line «קובייה ABCD **עם** אלכסון ראשי» additionally needs the
+shape-plus-construct family (#461) and resolves through both once that lands. This ADR covers the
+diagonal reference itself.
+
+**No catalog entry.** The clarify message is the teaching surface here, and it names the candidates from
+the *student's own figure* — strictly better than a static catalog line that must guess at the lettering.
+
+**Locks.** `src3d/__tests__/issue-836-main-diagonal.test.ts` (16 tests): all four role spellings (He + En)
+return `ambiguous-main-diagonal` and never `not-handled`; the derivation yields a box's four pairs, a
+pyramid's none and an odd prism's none, and is checked against a solid the parser actually built (none of
+its pairs lies on a face); «אלכסון ראשי AC'» lowers to byte-identical commands to «אלכסון AC'» and draws
+on a real cube; **the four #449 siblings are asserted byte-identical to before**, so the family rule is
+provably extended rather than rewritten; and the three #438 declaration forms are asserted unchanged.
 ## ADR-3D-202 — THE DECLARED-VS-LOWERED SWEEP: ONE HOLLOW ROW, AND A RATCHET THAT KEEPS IT HONEST (#845)
 
 **Context.** #833 was a ∥-to-plane statement, true by construction, refused `no-solution`. The part worth
