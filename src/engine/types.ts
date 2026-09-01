@@ -987,7 +987,11 @@ export type Command =
   // only a degenerate figure and another vertex admits a real one (1 → the first id, 2 → the second).
   // An explicit 90° statement pins the seat through the ADR-163 reseat, which always wins over `rot`.
   | { type: 'right-triangle'; ids: [Id, Id, Id]; rot?: 1 | 2 }
-  | { type: 'polygon'; ids: Id[] } // a generic n-gon (n ≥ 3): n boundary segments + the polygon object; its vertices are placed by prior commands (e.g. a regular polygon's on-circle vertices)
+  // a generic n-gon (n ≥ 3): n boundary segments + the polygon object. Its vertices are normally placed by
+  // prior commands (e.g. a regular polygon's on-circle vertices); `place` instead creates them as FREE
+  // vertices in general position — a BARE «מחומש» states a five-sided figure and nothing more (#835,
+  // ADR-052: equal sides/angles were never stated, so they must not be drawn in).
+  | { type: 'polygon'; ids: Id[]; place?: boolean }
   | { type: 'free-point'; id: Id; x: number; y: number; free?: boolean; ifAbsent?: boolean } // free: an AUTO-placed default (a construct's apex) — a free DOF, NOT pinned (ADR-052); a student-typed "A at (x,y)" omits it and pins. ifAbsent: a parser-injected ensure-exists (a NEW point named onto a line, ADR-236) — skipped entirely when the id already exists as ANYTHING (never moves, never conflicts)
   | { type: 'point-on-segment'; id: Id; a: Id; b: Id; t?: number; branch?: number; extension?: boolean } // branch: which root, once a constraint drives it (ADR-043); extension: an unstated t>1 default, recruitable not eager (ADR-073)
   | { type: 'point-by-distances'; id: Id; from1: Id; dist1: number; from2: Id; dist2: number; branch?: number }

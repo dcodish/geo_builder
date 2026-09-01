@@ -108,7 +108,8 @@
     "tangentsExhaustedTouchTaken": "The only internal tangent — the one at the touch point — is already drawn.",
     "tangentsExhaustedIntTangent": "The single common tangent is already drawn — internally tangent circles have exactly one, at the touch point.",
     "measureCaseNote": "The letter {{letter}} was read as a measure symbol (a radius) — lowercase letters are for measures; point labels are uppercase.",
-    "canonicalHint": "Got it. Next time you can write: {{canonical}} — that form always works."
+    "canonicalHint": "Got it. Next time you can write: {{canonical}} — that form always works.",
+    "polygonNotSupported": "The polygon \"{{noun}}\" is not supported. Supported: {{offer}} — add \"regular\" for a regular one (e.g. \"regular pentagon\")."
   },
   "explore": {
     "title": "Explore the figure"
