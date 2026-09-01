@@ -64,6 +64,22 @@ const SEEDED: Record<string, string[]> = {
   // #571 — the operator's diagonal plane, named by its two vertical edges. A plane named by points is
   // a SET: this stated order traces a bowtie and used to be refused `not-coplanar` on coplanar points.
   'plane-run-order-571.geo3.json': ["קובייה ABCDA'B'C'D'", "מישור BB'DD'", "מישור BB'D'D"],
+  // #820 (ADR-3D-204) — the operator's bagrut pyramid with the rider the relation DRIVES. «K על SB»
+  // leaves one free DOF and «SD מקביל למישור ACK» consumes it, landing K on SB's midpoint; before the
+  // fix this exact sequence refused `givens-contradict` and named the student's own givens.
+  'pyramid-rider-drive-820.geo3.json': [
+    'פירמידה SABCD שבסיסה מקבילית',
+    'המקצוע SA הוא גובה בפירמידה',
+    'נסמן: AB = u, AD = v, AS = w',
+    'A(0,0,0)',
+    'B(0,5,0)',
+    'S(0,0,6)',
+    'D(3,p,0)',
+    '|u| = |v|',
+    'p חיובי',
+    'K על SB',
+    'SD מקביל למישור ACK',
+  ],
   'free-line-552.geo3.json': [
     'פירמידה BCKS',
     'l⊥BCK',
