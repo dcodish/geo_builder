@@ -22,6 +22,16 @@ import { cross3, dot3, norm3, sub3 } from './vec3';
 import type { Resolved3 } from './evaluate';
 import type { Construction3, Id, Operand3, SolidKind } from './types';
 
+/**
+ * The relations that can be «true, and already known» (#853). The list is the SOURCE, not a copy:
+ * the notice type reads its `rel` from here, and the i18n ratchet
+ * (`src3d/__tests__/issue-853-already-known.test.ts`) requires every member to carry both halves of
+ * the message — the statement wording and the reason it follows — in Hebrew and English. A fifth case
+ * is therefore one entry plus two strings per language, and the suite says so if the strings are missing.
+ */
+export const ALREADY_KNOWN_RELS = ['shape', 'objects', 'contained', 'perp', 'parallel'] as const;
+export type AlreadyKnownRel = (typeof ALREADY_KNOWN_RELS)[number];
+
 /** A non-error message attached to a successfully built figure. */
 export type BuildNotice3 =
   | {
@@ -47,24 +57,6 @@ export type BuildNotice3 =
       line: string;
     }
   | {
-      /** #396 (ADR-3D-108): a stated relation between two ABSOLUTE objects (equation planes, typed
-       *  lines) verified true but could never have driven anything — the objects are fully determined
-       *  by their own defining equations, so the statement adds no information. The student sees the
-       *  ✓ AND learns the given was redundant. Deliberately NOT emitted for claims on figure points:
-       *  there a claim is the verify-your-answer register (the tool's charter), not redundancy. */
-      kind: 'redundant-relation';
-      a: string;
-      b: string;
-    }
-  | {
-      /** #612 (ADR-3D-158): a shape statement that was TRUE and already known — «ABCD ריבוע» on a base
-       *  the figure already holds as a square. It changed nothing, and the operator's ruling is that
-       *  the student must be told so rather than shown a ✓ that suggests something happened. */
-      kind: 'shape-redundant';
-      base: QuadBase;
-      ids: Id[];
-    }
-  | {
       /** #333 (ADR-3D-153): the student named an intersection line `ℓ` while `ℓ` was already another
        *  line, so it was auto-indexed. Operator ruling 2026-07-25: auto-index and SAY SO, rather than
        *  refuse with a bare `already-defined` the student cannot act on. Derived from the line's
@@ -74,24 +66,28 @@ export type BuildNotice3 =
       assigned: string;
     }
   | {
-      /** #842 (ADR-3D-192): a CONTAINMENT that was true and already entailed — «BE מוכל במישור ABCD»
-       *  where B defines the plane and E is the midpoint of AC. It changed no point's definition and
-       *  its claim already held, so it added nothing; the operator read the silence as *"this line
-       *  just drew the plane again"*. Distinct from `redundant-relation` (#396), which needs both
-       *  sides ABSOLUTE — a gauge-riding segment against a point-run plane is never that. */
-      kind: 'containment-redundant';
-      seg: string;
-      plane: string;
-    }
-  | {
-      /** #850 (ADR-3D-198): a ∥ / ⟂ between a segment and a plane that is a CONSEQUENCE of the
-       *  figure, not a new given — «AB מקביל למישור A'B'C'D'» on a cube. #833 made it build instead
-       *  of being refused; this says it was already known, so a ✓ does not read as "something
-       *  happened". */
-      kind: 'relation-entailed';
-      seg: string;
-      plane: string;
-      rel: 'perp' | 'parallel';
+      /** #853 (ADR-3D-209): the ONE channel for «true, and already known».
+       *
+       *  Four notices used to say this — `shape-redundant` (#612), `redundant-relation` (#396),
+       *  `containment-redundant` (#842) and `relation-entailed` (#850) — each with its own kind, its
+       *  own string and its own detection, added one per report. A student cannot tell them apart, and
+       *  the next case had four precedents pointing three ways. They are now four CASES of one
+       *  predicate ({@link alreadyKnown}) on one channel: `rel` says which relation the student stated,
+       *  `subject`/`object` carry it in their own wording, and the message is one template.
+       *
+       *  Each case KEEPS its own conservative entailment test — structural for the containment and the
+       *  self-determined pair, numeric-with-a-branch-guard for the ∥/⟂, an apply-time flag for the
+       *  shape — because those are the tests the operator ruled on. What converged is the channel and
+       *  the wording, never the confidence: when entailment cannot be shown, this says nothing. */
+      kind: 'already-known';
+      /** Which relation was stated — chooses the wording and names the entailment test that passed. */
+      rel: AlreadyKnownRel;
+      /** What the statement was about, in the student's own letters («ABCD», «BE», «π1»). */
+      subject: string;
+      /** The other side, where the relation has one («ABCD» the plane, «π2»). */
+      object?: string;
+      /** The shape name key, for `rel: 'shape'` only. */
+      shape?: QuadBase;
     };
 
 /**
@@ -197,40 +193,42 @@ function pointEntailedInPlane(
 }
 
 /**
- * Every notice the figure currently warrants. Recomputed on each derive — a notice is a property of
- * the built figure, never a one-shot event, so undo/redo and load all show the right thing.
+ * #853 (ADR-3D-209) — «true, and already known», in ONE predicate.
+ *
+ * Four reports produced four notices for one sentence to the student: a shape statement the figure
+ * already held (#612), a relation between two objects their own definitions already fixed (#396), a
+ * containment both endpoints already satisfied (#842), and a ∥/⟂ the built figure implies (#850).
+ * Each was added because the previous one did not cover the case at hand — the honest reason, and also
+ * the definition of an enumeration growing one member per report. They are cases, not kinds.
+ *
+ * **What converged: the channel and the wording.** Every case emits one `already-known` notice whose
+ * `rel` names the relation, so the fifth case has one place to go and one message template to fill.
+ *
+ * **What deliberately did NOT converge: the entailment tests.** Each case keeps the test the operator
+ * ruled on for it — structural for #396 and #842, numeric-with-a-branch-guard for #850, an apply-time
+ * flag for #612. Merging four special cases risks a predicate general enough to over-claim on a case
+ * none of them handled, and over-claiming here means telling a student their given was worthless when
+ * it was not. The conservative direction is kept in all four: when entailment cannot be SHOWN, say
+ * nothing.
  */
-export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = []): BuildNotice3[] {
+function alreadyKnown(c: Construction3, samples: readonly Resolved3[]): BuildNotice3[] {
   const out: BuildNotice3[] = [];
-  // #375: derived from the pin's own flag, so it survives save/load and undo exactly like every notice
-  for (const pin of c.planeLinePerps) {
-    if (pin.statedAsPlane) out.push({ kind: 'line-called-plane', ids: [...pin.ids], line: pin.line });
+
+  // ---- case 1 (#612, ADR-3D-158): a shape statement that was true of the figure already.
+  // Test: the apply-time flag — `applyShape` records the statement it found nothing to change.
+  for (const r of c.redundantShapes) {
+    out.push({ kind: 'already-known', rel: 'shape', subject: [...r.ids].join(''), shape: r.base });
   }
-  // S2 (#378): the same flag on the general line-relation family
-  for (const r of c.lineRels) {
-    if (r.statedAsPlane) out.push({ kind: 'line-rel-noun', line: r.line });
-  }
-  // #612 (ADR-3D-158): shape statements that added nothing
-  for (const r of c.redundantShapes) out.push({ kind: 'shape-redundant', base: r.base, ids: [...r.ids] });
-  // #333 (ADR-3D-153): an intersection line that did not get the name the student wrote
-  for (const [name, def] of c.lines) {
-    if (def.kind === 'plane-plane' && def.requested && def.requested !== name) {
-      out.push({ kind: 'line-auto-named', requested: def.requested, assigned: name });
-    }
-  }  for (const s of c.solids) {
-    const spec = (QUAD_PYRAMIDS as Partial<Record<SolidKind, { base: QuadBase; right: boolean }>>)[s.kind];
-    if (!spec?.right) continue;
-    const entry = CYCLIC_MEMBER[spec.base];
-    if (entry.fix.kind === 'none') continue; // square / rectangle are cyclic already — nothing changed
-    out.push({ kind: 'base-constrained', ids: [...s.ids], from: spec.base, to: CYCLIC_MEMBER_NAME[spec.base] });
-  }
-  // #396 (ADR-3D-108): a relation between two SELF-DETERMINED objects that could never drive is
-  // REDUNDANT — say so (it was verified at commit, or it would have refused claim-refuted).
-  // Excluded: any side whose direction/normal carries the figure parameter — there the
-  // statement PINNED the parameter (2024-Q2's «ℓ ⟂ π»), which is real information.
-  // #500: the predicate is `isSelfDetermined`, NOT `isAbsolute` — a FREE plane (#487) is absolute
-  // and carries no parameter, yet the stated relation is the very thing that orients it, so the
-  // notice would have been a false statement about the student's own given.
+
+  // ---- case 2 (#396, ADR-3D-108): a relation between two SELF-DETERMINED objects could never have
+  // driven anything — both are fixed by their own defining equations, so the statement adds nothing.
+  // (It was verified at commit, or it would have refused claim-refuted.) Test: structural.
+  // Excluded: a side whose direction/normal carries the figure parameter — there the statement PINNED
+  // the parameter (2024-Q2's «ℓ ⟂ π»), which is real information. #500: the predicate is
+  // `isSelfDetermined`, NOT `isAbsolute` — a FREE plane (#487) is absolute and carries no parameter,
+  // yet the stated relation is the very thing that orients it, so the notice would have been a false
+  // statement about the student's own given. Deliberately NOT emitted for claims on figure points:
+  // there a claim is the verify-your-answer register (the tool's charter), not redundancy.
   {
     const carriesParam = (op: Operand3): boolean =>
       op.kind === 'line' ? lineDirCarriesParam(c, op.name)
@@ -245,12 +243,15 @@ export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = 
       const [a, b] = pair;
       if (!isSelfDetermined(c, a) || !isSelfDetermined(c, b)) continue;
       if (carriesParam(a) || carriesParam(b)) continue;
-      out.push({ kind: 'redundant-relation', a: operandLabel(a), b: operandLabel(b) });
+      out.push({ kind: 'already-known', rel: 'objects', subject: operandLabel(a), object: operandLabel(b) });
     }
   }
-  // #842 (ADR-3D-192): a containment that changed no definition and was already entailed. The
-  // student's ✓ is honest — the statement IS true — but a ✓ alone reads as "something happened",
-  // and here nothing did. Point-run planes only: an absolute plane's redundancy is #396's lane.
+
+  // ---- case 3 (#842, ADR-3D-192): a containment whose endpoints already lie in the plane by earlier
+  // givens — «BE מוכל במישור ABCD» where B defines the plane and E is the midpoint of AC. It changed no
+  // point's definition and its claim already held. Test: structural (`pointEntailedInPlane`, per
+  // endpoint). Point-run planes only: an absolute plane's redundancy is case 2's lane, and a
+  // gauge-riding segment against a point-run plane is never two self-determined sides.
   for (const cl of c.claims) {
     if (cl.type !== 'plane-rel' || cl.rel !== 'contained') continue;
     const planeSide = cl.a.kind === 'plane-run' || cl.a.kind === 'plane-named' ? cl.a : cl.b;
@@ -265,24 +266,21 @@ export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = 
     if (!planeIds) continue; // an equation plane — not this lane
     if (!pointEntailedInPlane(c, linear.a, planeName, planeIds)) continue;
     if (!pointEntailedInPlane(c, linear.b, planeName, planeIds)) continue;
-    out.push({ kind: 'containment-redundant', seg: operandLabel(linear), plane: planeName });
+    out.push({ kind: 'already-known', rel: 'contained', subject: operandLabel(linear), object: planeName });
   }
 
-  /**
-   * #850 (ADR-3D-198) — a ∥ / ⟂ that the figure already implies says so.
-   *
-   * The counterfactual — *would this hold if the student had not said it?* — is already answered by
-   * the LOWERING. `seg-plane-rel` becomes a driving `scalarPin` when the figure still has free dims,
-   * and a pure claim otherwise. **A claim with no matching pin constrained nothing**: the figure was
-   * determined by the other facts and this sentence only checked it. So the candidate set is exact
-   * and costs nothing to compute.
-   *
-   * The operator's numeric gate then confirms it, and `verifyClaim` already IS that gate — it checks
-   * `claimSeeds`, four configurations, not one. On top of it the branch guard above, so a two-branch
-   * figure can never report entailment on the strength of the branch it happened to draw.
-   *
-   * Sampling is gated behind a candidate existing, so an ordinary figure pays nothing.
-   */
+  // ---- case 4 (#850, ADR-3D-198): a ∥ / ⟂ the figure already implies.
+  //
+  // The counterfactual — *would this hold if the student had not said it?* — is already answered by
+  // the LOWERING. `seg-plane-rel` becomes a driving `scalarPin` when the figure still has free dims,
+  // and a pure claim otherwise. **A claim with no matching pin constrained nothing**: the figure was
+  // determined by the other facts and this sentence only checked it. So the candidate set is exact
+  // and costs nothing to compute.
+  //
+  // Test: NUMERIC (the operator's ruling) — `verifyClaim` already checks `claimSeeds`, four
+  // configurations, not one; on top of it the branch guard, so a two-branch figure can never report
+  // entailment on the strength of the branch it happened to draw. Sampling is gated behind a candidate
+  // existing, so an ordinary figure pays nothing.
   {
     const pinned = new Set(
       c.scalarPins.flatMap((p) =>
@@ -295,8 +293,43 @@ export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = 
       // A relation that DROVE the figure is information, not a consequence — never reported.
       if (pinned.has(`${cl.seg[0]}${cl.seg[1]}|${cl.plane.join('')}`)) continue;
       if (samples.length > 0 && !samples.every((r) => relationHoldsInEveryBranch(r, cl.seg, cl.plane, rel))) continue;
-      out.push({ kind: 'relation-entailed', seg: cl.seg.join(''), plane: statedPlaneName(c, cl.plane), rel });
+      out.push({ kind: 'already-known', rel, subject: cl.seg.join(''), object: statedPlaneName(c, cl.plane) });
     }
   }
+
+  return out;
+}
+
+/**
+ * Every notice the figure currently warrants. Recomputed on each derive — a notice is a property of
+ * the built figure, never a one-shot event, so undo/redo and load all show the right thing.
+ */
+export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = []): BuildNotice3[] {
+  const out: BuildNotice3[] = [];
+  // #375: derived from the pin's own flag, so it survives save/load and undo exactly like every notice
+  for (const pin of c.planeLinePerps) {
+    if (pin.statedAsPlane) out.push({ kind: 'line-called-plane', ids: [...pin.ids], line: pin.line });
+  }
+  // S2 (#378): the same flag on the general line-relation family
+  for (const r of c.lineRels) {
+    if (r.statedAsPlane) out.push({ kind: 'line-rel-noun', line: r.line });
+  }
+  // #333 (ADR-3D-153): an intersection line that did not get the name the student wrote
+  for (const [name, def] of c.lines) {
+    if (def.kind === 'plane-plane' && def.requested && def.requested !== name) {
+      out.push({ kind: 'line-auto-named', requested: def.requested, assigned: name });
+    }
+  }  for (const s of c.solids) {
+    const spec = (QUAD_PYRAMIDS as Partial<Record<SolidKind, { base: QuadBase; right: boolean }>>)[s.kind];
+    if (!spec?.right) continue;
+    const entry = CYCLIC_MEMBER[spec.base];
+    if (entry.fix.kind === 'none') continue; // square / rectangle are cyclic already — nothing changed
+    out.push({ kind: 'base-constrained', ids: [...s.ids], from: spec.base, to: CYCLIC_MEMBER_NAME[spec.base] });
+  }
+  // #853 (ADR-3D-209): everything that says «true, and already known» — one predicate, one channel.
+  // The four cases that used to live here inline (a redundant shape, a relation between two
+  // self-determined objects, an entailed containment, an implied ∥/⟂) are cases of `alreadyKnown`.
+  out.push(...alreadyKnown(c, samples));
+
   return out;
 }
