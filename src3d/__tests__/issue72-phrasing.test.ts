@@ -163,11 +163,34 @@ describe('#55 (ADR-3D-040): the coefficient form of the length/vector ambiguity'
  * admitted, so the label group had to match «תיבה» and the utterance escalated to the LLM.
  */
 describe("#449 — «אלכסון תיבה AC'»: the diagonal noun carries its solid", () => {
-  it('the reported phrasing builds the SAME segment as the bare one', () => {
-    expect(cmd("אלכסון תיבה AC'")).toEqual(cmd("אלכסון AC'"));
-    expect(cmd("אלכסון תיבה AC'")).toEqual([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
+  it('the reported phrasing names the SAME segment as the bare one', () => {
+    /**
+     * This compared the two commands with `toEqual` until #859. What #449 established — and what is
+     * still asserted — is that the solid qualifier does not change WHICH segment is named. It no longer
+     * makes the two commands equal: under the operator's ruling the qualifier carries a strictly
+     * stronger CLAIM («אלכסון תיבה AC'» asserts a SPACE diagonal, the bare form only a diagonal), which
+     * is the whole point of that fix. So the segment is compared, and the claims are asserted to differ.
+     */
+    const qualified = cmd("אלכסון תיבה AC'");
+    const bare = cmd("אלכסון AC'");
+    const seg = ({ type, a, b }: { type: string; a: string; b: string }) => ({ type, a, b });
+    expect(qualified.map(seg as never)).toEqual(bare.map(seg as never));
+    expect(qualified).toMatchObject([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
+    expect((qualified[0] as { diagonal?: string }).diagonal, 'the solid qualifier claims SPACE').toBe('space');
+    expect((bare[0] as { diagonal?: string }).diagonal, 'the bare noun claims only a diagonal').toBe('any');
   });
 
+
+  /**
+   * #859 — these assertions were `toEqual` on the exact command. They are now `toMatchObject` on the
+   * SEGMENT, with the diagonal CLAIM asserted separately, because the operator ruled the word must be
+   * checked: *"the term אלכסון should be sure to be a diagonal."* So «אלכסון תיבה AC'» now carries
+   * `diagonal: 'space'` in addition to naming A–C'.
+   *
+   * What #449 locks is unchanged and still locked: the qualifier does not change WHICH segment is named.
+   * What is deliberately no longer locked is that the command has no other fields — that was never the
+   * property #449 was defending, and pinning it would forbid ever enriching the lowering.
+   */
   it('every solid noun, with and without the definite article', () => {
     for (const u of [
       "אלכסון התיבה AC'",
@@ -177,12 +200,23 @@ describe("#449 — «אלכסון תיבה AC'»: the diagonal noun carries its 
       "אלכסון מנסרה AC'",
       "אלכסון פירמידה AC'",
     ])
-      expect(cmd(u), u).toEqual([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
+      expect(cmd(u), u).toMatchObject([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
   });
 
   it('the English forms', () => {
     for (const u of ["space diagonal AC'", "main diagonal AC'", "the space diagonal of the box AC'", "diagonal AC'"])
-      expect(cmd(u), u).toEqual([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
+      expect(cmd(u), u).toMatchObject([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
+  });
+
+  it("#859 — the CLAIM each form makes: space for the qualified ones, `any` for a bare «אלכסון»", () => {
+    for (const u of ["אלכסון תיבה AC'", "אלכסון קובייה AC'", "space diagonal AC'", "main diagonal AC'"])
+      expect(cmd(u)[0], u).toMatchObject({ diagonal: 'space' });
+    // מנסרה/פירמידה stay at the weaker claim: a pyramid HAS no space diagonal, so demanding one would
+    // refuse the face diagonal the student legitimately drew.
+    for (const u of ["אלכסון מנסרה AC'", "אלכסון פירמידה AC'", "diagonal AC'", "אלכסון AC'"])
+      expect(cmd(u)[0], u).toMatchObject({ diagonal: 'any' });
+    // «קטע AB» claims nothing about the pair, so it carries no claim at all and is never checked
+    expect(cmd('קטע AB')[0]).not.toHaveProperty('diagonal');
   });
 
   it('it builds end-to-end on a real box, drawn as ink', () => {

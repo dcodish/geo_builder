@@ -6809,3 +6809,82 @@ already-working lane asserted unchanged, so the asymmetry cannot return; the sym
 both the injection (`symExprs` all in `k`) and the equation (two direction components parameter-bearing);
 `וקטור` and the subject-noun forms are asserted untouched; and the canonical forms are asserted to parse
 on the first pass, pinning the seam as inert for them.
+
+## ADR-3D-203 — «אלכסון» IS A CLAIM, AND THE CLAIM IS CHECKED (#859)
+
+**Context.** Found while implementing #836 and confirmed by the operator playing it: the diagonal noun
+was **decoration**. On a cube, «אלכסון AB» drew an EDGE and called it a diagonal; «אלכסון ראשי AC» drew
+a FACE diagonal and called it a main one. Both silent, both a green ✓.
+
+This is a *silent-wrong-ink* class: nothing refuses, nothing errs, and the logs record a success. It
+cannot surface through log triage — only reading the code or looking at the figure finds it. That is an
+argument for fixing it, not for deferring it.
+
+**Operator ruling (2026-09-01).**
+
+> *"the term אלכסון should be sure to be a diagonal and this is true for all tools. if the word is used."*
+
+They first proposed a mitigation — a message on **every** use of «אלכסון» asking for explicit nodes — and
+withdrew it when shown what it would cost:
+
+> *"correct - we should not do the אלכסון thing i proposed but we need to fix it correctly to support it"*
+
+**Why the message was the wrong shape.** It would have fired on input that is already correct and undone
+two features approved in the same round: «אלכסון AC» already names its nodes; «אלכסוני הבסיס» (#834) and
+«אלכסון תיבה» (#438) deliberately take no letters; and «אלכסון ראשי» with no letters **already** asks,
+naming all four candidates (#836, ADR-3D-200). The *asking* half was done. The missing half was the
+opposite: when the letters ARE given, the tool has everything it needs to be sure and never looked.
+
+**Decision — two claim levels, checked where the figure is known.**
+
+| form | claim | refused when |
+| --- | --- | --- |
+| `אלכסון AC` · `diagonal AC` | `any` — face **or** space | the pair is an EDGE |
+| `אלכסון ראשי/המרחב/תיבה/קובייה AC` · `space\|body\|main diagonal AC` | `space` — through the solid | the pair is a face diagonal **or** an edge |
+
+The parser attaches the claim (`Segment3Command.diagonal`); **apply** checks it, because `parse3` is
+context-free by design and cannot see the solid. `faceDiagonals()` joins `spaceDiagonals()` in
+`baseShapes.ts`, both derived from the same rings so the two answers cannot disagree about what a face is.
+
+`מנסרה` / `פירמידה` qualifiers deliberately yield `any`, not `space`: **a pyramid has no space diagonal**,
+so demanding one would refuse the face diagonal the student legitimately drew.
+
+**The guard is half the design.** The check fires only when there is a SINGLE solid and both letters
+belong to it. With no solid, several solids, or a pair reaching a derived point, there is nothing to check
+against — and *"I cannot tell"* must never become a refusal, or the figure loses ink it is entitled to.
+Locked in three tests.
+
+**Also fixed: the PAIR-FIRST order.** «AC אלכסון ראשי» — the spelling the operator actually typed — was
+`not-handled`, while every other construct noun in this grammar reads either order. Normalised to the
+noun-first form the family rule already owns, so there is one lowering for two word orders, and the claim
+travels with it («AB אלכסון ראשי» is still refused).
+
+**Supersedes half of [ADR-3D-200](#adr-3d-200).** That ADR concluded — correctly at the time — that in
+«אלכסון ראשי AC'» *"the role word is redundant, not an error"*, and #836's lock asserted the role form
+lowered **identically** to the bare one. Under this ruling the role word is **no longer redundant**: it
+carries a strictly stronger claim (`space` vs `any`), so «אלכסון ראשי AC» refuses where «אלכסון AC»
+builds. What survives from ADR-3D-200 is the part it was really defending — the role word does not change
+*which* segment is named — and the lock now asserts exactly that, with the two claims asserted to differ.
+
+Two other locks moved from `toEqual` to `toMatchObject` for the same reason (#449's sibling assertions).
+That is not a weakening: what #449 defends is that a qualifier does not change WHICH segment is named,
+and that is still pinned. What is deliberately no longer pinned is that the command has no other fields —
+never the property #449 was defending, and pinning it would forbid ever enriching the lowering. The two
+assertions on forms that make NO claim («קטע AB», a bare pair) stay exact `toEqual`, which is what proves
+the claim is attached only where the word appears.
+
+**Stated cost.** This changes the contract of `אלכסון <pair>` (#72 / #449), an operator-approved form that
+today draws whatever pair it is given. Under the ruling that is precisely the intent — but a figure where
+a student wrote «אלכסון AB» will now refuse where it used to draw. Recorded here rather than discovered
+later.
+
+**Sibling check (ADR-W-004).** The ruling says *"this is true for all tools"*. 2-D has no solids, so there
+is no face-vs-space distinction to enforce; the analogous 2-D claim is «אלכסון» on a polygon, where the
+same principle would mean refusing a pair that is a SIDE rather than a diagonal. Not examined here — it
+wants its own pass against 2-D's own diagonal forms rather than an assertion from this one.
+
+**Locks.** `src3d/__tests__/issue-859-diagonal-claim.test.ts` (22 tests): the derivations (a quad's two
+crossing pairs, a triangle's none, edge/face/space classification); both refusals by name in Hebrew and
+English with the right `kind`; five correct forms still building; «קטע AB» claiming nothing and so drawing
+an edge freely; the pyramid staying at the weaker claim; all three guard cases; and the pair-first order
+with its claim intact.

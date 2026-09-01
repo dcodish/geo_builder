@@ -476,3 +476,44 @@ export function spaceDiagonals(faces: string[][]): [string, string][] {
   if (!top) return [];
   return base.map((v, i) => [v, top[(i + n / 2) % n]] as [string, string]);
 }
+
+/**
+ * #859 — a solid's FACE diagonals: pairs lying on one face but NOT adjacent on it.
+ *
+ * The twin of {@link spaceDiagonals}, derived from the same rings so the two answers cannot disagree
+ * about what a face is. A ring's diagonals are the vertex pairs at distance ≥ 2 along it — on a quad
+ * that is the two crossing pairs; on a triangle there are none, which is correct rather than a gap.
+ */
+export function faceDiagonals(faces: string[][]): [string, string][] {
+  const out: [string, string][] = [];
+  const seen = new Set<string>();
+  for (const ring of faces) {
+    const n = ring.length;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 2; j < n; j++) {
+        if (i === 0 && j === n - 1) continue; // adjacent around the ring — an EDGE, not a diagonal
+        const key = [ring[i], ring[j]].sort().join('\u0000');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push([ring[i], ring[j]]);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * #859 — is `[a, b]` a diagonal of this solid at all (face OR space)?
+ *
+ * The operator's ruling: *"the term אלכסון should be sure to be a diagonal … if the word is used."* An
+ * EDGE is the case this excludes — «אלכסון AB» on a cube drew one and called it a diagonal.
+ */
+export function isAnyDiagonal(faces: string[][], a: string, b: string): boolean {
+  const hit = ([p, q]: [string, string]) => (p === a && q === b) || (p === b && q === a);
+  return faceDiagonals(faces).some(hit) || spaceDiagonals(faces).some(hit);
+}
+
+/** #859 — is `[a, b]` specifically a SPACE diagonal (what «אלכסון ראשי» / «אלכסון תיבה» claim)? */
+export function isSpaceDiagonal(faces: string[][], a: string, b: string): boolean {
+  return spaceDiagonals(faces).some(([p, q]) => (p === a && q === b) || (p === b && q === a));
+}

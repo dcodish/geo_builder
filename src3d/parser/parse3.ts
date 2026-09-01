@@ -1814,17 +1814,45 @@ const heightFromApex: Rule = (s) => {
 // segment «אלכסון AC'» names, so they belong to this family rather than to a parallel path. One rule, one
 // lowering: the role word is redundant, not an error.
 const SOLID_QUALIFIER = String.raw`(?:ה?(?:תיב[הת]|קוביי?[הת]|מנסר[הת]|פירמיד[הת]|ראשי|מרחב(?:י)?)\s+)`;
+/** #859 — the PAIR-FIRST order: «AC אלכסון ראשי», «AC אלכסון». Every other construct noun in this
+ *  grammar reads either order; the diagonal noun read only noun-first, so the operator's own spelling
+ *  was `not-handled`. Normalised to the noun-first form the family rule already owns, rather than
+ *  duplicating the rule — one lowering, two word orders. */
+const PAIR_FIRST_DIAGONAL = new RegExp(
+  String.raw`^((?:[A-Z]\d*'?){2})\s+(ה?אלכסו[ןם](?:\s+ה?(?:ראשי|מרחב(?:י)?|תיב[הת]|קוביי?[הת]))?)\s*$`,
+);
+
 const BARE_SEGMENT_RE = new RegExp(
   String.raw`^(?:קטע\s+|העבירו\s+(?:את\s+)?|נ?חבר\s+(?:את\s+)?|ה?אלכסו[ןם]\s+${SOLID_QUALIFIER}?|segment\s+|draw\s+|connect\s+|join\s+|(?:the\s+)?(?:space|body|main)?\s*diagonal\s+(?:of\s+the\s+(?:box|cube|prism|pyramid)\s+)?)?([A-Z]\d*'?)([A-Z]\d*'?)\s*$`,
 );
+/**
+ * #859 — WHICH claim the sentence made about the pair, so apply can check it.
+ *
+ * Operator ruling 2026-09-01: *"the term אלכסון should be sure to be a diagonal … if the word is used."*
+ * The word was decoration before: «אלכסון AB» drew an EDGE and called it a diagonal, «אלכסון ראשי AC»
+ * drew a FACE diagonal and called it a main one — both silent, both with a green ✓.
+ *
+ *  - `space`  — «ראשי» / «המרחב» / «תיבה» / «קובייה» / space|body|main: a diagonal THROUGH the solid.
+ *  - `any`    — a bare «אלכסון» / «diagonal»: face or space, but never an edge.
+ *  - absent   — «קטע AB» / «חבר AB» and friends assert nothing about the pair, so nothing is checked.
+ *
+ * `מנסרה` / `פירמידה` deliberately yield `any`, not `space`: a pyramid HAS no space diagonal, so
+ * demanding one would refuse the face diagonal the student legitimately drew.
+ */
+const SPACE_CLAIM = /ה?אלכסו[ןם]\s+ה?(?:ראשי|מרחב(?:י)?|תיב[הת]|קוביי?[הת])|(?:space|body|main)\s+diagonal|diagonal\s+of\s+the\s+(?:box|cube)/i;
+const ANY_CLAIM = /ה?אלכסו[ןם]|diagonal/i;
+
 const bareSegment: Rule = (s) => {
+  const pf = s.match(PAIR_FIRST_DIAGONAL);
+  if (pf) s = `${pf[2]} ${pf[1]}`; // «AC אלכסון ראשי» ⇒ «אלכסון ראשי AC»
   const m = s.match(BARE_SEGMENT_RE);
   if (!m) return null;
   const [, a, b] = m;
   if (a === b) return null;
+  const claim = SPACE_CLAIM.test(s) ? 'space' : ANY_CLAIM.test(s) ? 'any' : undefined;
   // #840: this rule IS the drawing register — the student's whole sentence is this segment, so an
   // unstated endpoint is theirs to introduce. Every other `segment3` in this file is a carrier.
-  return [{ type: 'segment3', a, b, bare: true }];
+  return [{ type: 'segment3', a, b, bare: true, ...(claim ? { diagonal: claim } : {}) }];
 };
 
 // ---------------------------------------------------------------------------

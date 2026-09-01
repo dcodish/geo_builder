@@ -117,7 +117,9 @@
     "planeNotDetermined": "Plane {{id}} has no stated equation or orientation yet — this statement needs a determined plane. Pin it with an equation, three points on it, or a ∥/⊥ relation",
     "lineNotDetermined": "Line {{id}} has no determined direction or position yet — this statement needs a determined line. Pin it with two points on it, a parametric form, or a ∥/⊥ relation",
     "ambiguousMainDiagonal": "The solid has several main diagonals: {{pairs}}. Name the letters of the one you mean (e.g. \"diagonal AC'\").",
-    "ambiguousMainDiagonalBare": "Name the letters of the main diagonal you mean (e.g. \"diagonal AC'\")."
+    "ambiguousMainDiagonalBare": "Name the letters of the main diagonal you mean (e.g. \"diagonal AC'\").",
+    "notADiagonal": "«{{pair}}» is not a diagonal of the solid — it is an edge. A diagonal joins non-adjacent vertices.",
+    "notASpaceDiagonal": "«{{pair}}» is not a MAIN diagonal — it is a face diagonal. A main diagonal passes through the solid, joining opposite vertices."
   },
   "examples": {
     "title": "Examples",

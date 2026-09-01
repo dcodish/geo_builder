@@ -371,6 +371,13 @@ export interface Segment3Command {
    * the vector's segment before naming it, and naming needs points that already exist (`v7-t1`).
    */
   bare?: true;
+  /**
+   * #859 — the DIAGONAL claim the sentence made about this pair, checked at apply where the figure is
+   * known. Operator ruling 2026-09-01: *"the term אלכסון should be sure to be a diagonal"*. `space` is
+   * «ראשי»/«המרחב»/«תיבה»/«קובייה» and the English space|body|main forms; `any` is a bare «אלכסון».
+   * Absent on «קטע AB» and friends, which claim nothing about the pair.
+   */
+  diagonal?: 'any' | 'space';
 }
 
 /** A named-angle MARKER (#94): `∠SDB` / `∠SDB = α` — a pedagogical highlight, NOT a driver. Draws the arc
@@ -1259,6 +1266,10 @@ export type EngineError3 =
   | { code: 'unknown-point'; id: Id }
   | { code: 'unknown-vector'; id: string }
   | { code: 'unknown-plane'; id: string }
+  // #859: the pair does not match the DIAGONAL the sentence claimed — an edge offered to «אלכסון», or a
+  // face diagonal offered to «אלכסון ראשי». Named rather than silently drawn: the refusal names the
+  // student's own statement, and `kind` says which claim was broken.
+  | { code: 'not-a-diagonal'; a: string; b: string; kind: 'any' | 'space' }
   | { code: 'unknown-line'; id: string }
   | { code: 'bad-solid'; kind: SolidKind }
   | { code: 'bad-name'; id: string }

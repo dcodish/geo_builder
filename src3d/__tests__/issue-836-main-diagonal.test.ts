@@ -92,14 +92,25 @@ describe('#836 — WITH letters it simply builds, through the EXISTING family ru
     const plain = parse3("אלכסון AC'");
     expect(role.ok && plain.ok).toBe(true);
     if (!role.ok || !plain.ok) return;
-    expect(role.commands).toEqual(plain.commands);
-    expect(role.commands).toEqual([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
+    /**
+     * #859 SUPERSEDES half of this. When #836 landed, the role word was redundant and the two lowered
+     * IDENTICALLY. The operator then ruled that «אלכסון» must be sure of itself, so the role word now
+     * carries a STRONGER claim: «אלכסון ראשי AC'» asserts a SPACE diagonal, «אלכסון AC'» only asserts
+     * a diagonal. They are no longer identical, and that is the ruling working as intended.
+     *
+     * What survives from #836, and is what this test exists for: the role word does not change WHICH
+     * segment is named. That is asserted; the claims are asserted to differ, deliberately.
+     */
+    expect(role.commands).toMatchObject([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
+    expect(plain.commands).toMatchObject([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
+    expect((role.commands[0] as { diagonal?: string }).diagonal, 'the role word claims a SPACE diagonal').toBe('space');
+    expect((plain.commands[0] as { diagonal?: string }).diagonal, 'the bare noun claims only a diagonal').toBe('any');
   });
 
   it("«אלכסון המרחב AC'» joins the same family", () => {
     const r = parse3("אלכסון המרחב AC'");
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.commands).toEqual([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
+    if (r.ok) expect(r.commands).toMatchObject([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
   });
 
   it('and it draws on a real cube', () => {
@@ -107,11 +118,21 @@ describe('#836 — WITH letters it simply builds, through the EXISTING family ru
     expect(c.segments).toEqual([['A', "C'"]]);
   });
 
-  it("the #449 siblings are byte-identical to before — the family rule was EXTENDED, not rewritten", () => {
+  it("the #449 siblings still name the SAME segment — the family rule was EXTENDED, not rewritten", () => {
+    /**
+     * This assertion was `toEqual` when #836 landed, and it was right then: #836 deliberately added no
+     * field, so the siblings really were byte-identical. **#859 changed that on purpose** — the operator
+     * ruled that «אלכסון» must be sure of itself, so every qualified form now carries a `diagonal`
+     * claim for apply to check.
+     *
+     * What #836 was defending is unchanged and still asserted: extending the family rule with the ROLE
+     * qualifier did not alter WHICH segment any sibling names. The claim field is #859's, and is
+     * asserted in its own file rather than smuggled in here.
+     */
     for (const u of ["space diagonal AC'", "main diagonal AC'", "the space diagonal of the box AC'", "diagonal AC'"]) {
       const r = parse3(u);
       expect(r.ok, u).toBe(true);
-      if (r.ok) expect(r.commands, u).toEqual([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
+      if (r.ok) expect(r.commands, u).toMatchObject([{ type: 'segment3', a: 'A', b: "C'", bare: true }]);
     }
   });
 });

@@ -62,6 +62,12 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
     // #836: name the candidates — a bare "which diagonal?" leaves a student who does not know the prime
     // convention no better off. `pairs` is empty only when the figure has no single solid with space
     // diagonals, and the message then asks for letters without inventing candidates.
+    // #859: name the pair AND which claim it broke — «אלכסון AB» is not a diagonal at all, while
+    // «אלכסון ראשי AC» is a diagonal but not a MAIN one. Two different corrections for the student.
+    case 'not-a-diagonal':
+      return err.kind === 'space'
+        ? t('err.notASpaceDiagonal', { pair: `${err.a}${err.b}` })
+        : t('err.notADiagonal', { pair: `${err.a}${err.b}` });
     case 'ambiguous-main-diagonal':
       return err.pairs
         ? t('err.ambiguousMainDiagonal', { pairs: err.pairs })

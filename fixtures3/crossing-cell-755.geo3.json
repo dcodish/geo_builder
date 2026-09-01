@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "app": "3d-builder",
-  "savedAt": "2026-08-25T20:05:46.494Z",
+  "savedAt": "2026-09-01T12:06:35.772Z",
   "seed": 0,
   "facts": [
     {
@@ -56,7 +56,8 @@
           "type": "segment3",
           "a": "A",
           "b": "C'",
-          "bare": true
+          "bare": true,
+          "diagonal": "any"
         }
       ]
     },

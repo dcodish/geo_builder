@@ -11,7 +11,7 @@ import { FREE_LINE_TOKEN } from './freeLine';
 import { riderPairsT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
+import { isAnyDiagonal, isSpaceDiagonal, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { pinSymsOf } from './types';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PartialName, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
 
@@ -1038,6 +1038,27 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
 
     case 'segment3': {
       if (cmd.a === cmd.b) return { ok: false, error: { code: 'unknown-point', id: cmd.b } };
+      /**
+       * #859 — CHECK the diagonal claim before drawing the ink.
+       *
+       * «אלכסון AB» drew an edge and called it a diagonal; «אלכסון ראשי AC» drew a face diagonal and
+       * called it a main one. Both silent, both a green ✓. The operator's ruling is that the word must
+       * be sure of itself.
+       *
+       * Guarded deliberately: only when there is a SINGLE solid and both letters belong to it. With no
+       * solid, several solids, or a pair reaching a free point, there is nothing to check against — and
+       * "I cannot tell" must not become a refusal (the figure would lose ink it is entitled to).
+       */
+      if (cmd.diagonal && c.solids.length === 1) {
+        const faces = c.solids[0].faces;
+        const ids = c.solids[0].ids;
+        if (ids.includes(cmd.a) && ids.includes(cmd.b)) {
+          const ok = cmd.diagonal === 'space'
+            ? isSpaceDiagonal(faces, cmd.a, cmd.b)
+            : isAnyDiagonal(faces, cmd.a, cmd.b);
+          if (!ok) return { ok: false, error: { code: 'not-a-diagonal', a: cmd.a, b: cmd.b, kind: cmd.diagonal } };
+        }
+      }
       /**
        * #840 (ADR-3D-191) — AN UNSTATED ENDPOINT IS A FREE POINT, not a refusal.
        *
