@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { COMMAND_CATALOG_3D } from '../catalog3';
+import { COMMAND_CATALOG_3D, type CatalogEntry3 } from '../catalog3';
 import { PROMPT_EXAMPLES_3D, buildSystemPrompt3, buildLlmRequest3 } from '../llmShared3';
 import { parse3, parseRename3 } from '../parse3';
 
@@ -14,18 +14,20 @@ import { parse3, parseRename3 } from '../parse3';
  * #578 (ADR-3D-211): the deterministic lane has TWO readers — `parse3`, which lowers a sentence to
  * commands, and `parseRename3`, which reads a rewrite of HISTORY (a rename adds no command, so it is
  * intercepted in `submit` before the grammar). The guard asks the honest question — "does the
- * deterministic lane understand this line?" — rather than carrying an exception list, so a catalog
- * entry can never be listed for a lane that would not in fact read it.
+ * deterministic lane understand this line?" Each entry DECLARES its reader and is checked against that
+ * one: an OR would let a construction entry pass because the rename reader happened to claim it, which
+ * is exactly the shadow class this suite exists to catch.
  */
-const understood = (u: string): boolean => parse3(u).ok || parseRename3(u) !== null;
+const understood = (u: string, lane: CatalogEntry3['lane']): boolean =>
+  lane === 'rewrite' ? parseRename3(u) !== null : parse3(u).ok;
 
 describe('catalog guard', () => {
   for (const entry of COMMAND_CATALOG_3D) {
     it(`He: ${entry.he}`, () => {
-      expect(understood(entry.he), entry.he).toBe(true);
+      expect(understood(entry.he, entry.lane), entry.he).toBe(true);
     });
     it(`En: ${entry.en}`, () => {
-      expect(understood(entry.en), entry.en).toBe(true);
+      expect(understood(entry.en, entry.lane), entry.en).toBe(true);
     });
   }
 });

@@ -32,7 +32,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { COMMAND_CATALOG_3D } from '../catalog3';
-import { RULES, markVectorContext, normalize3 } from '../parse3';
+import { RULES, markVectorContext, normalize3, parseRename3 } from '../parse3';
 import allowlist from './shadow-allowlist3.json';
 
 interface Analysis {
@@ -69,10 +69,17 @@ describe('3-D parser shadow-matrix — catalog corpus', () => {
   // Every catalog entry is, by definition, supported (the catalog3 guard re-parses them all), so the
   // whole catalog in BOTH locales is the corpus (symbol-form entries where he === en analyze twice —
   // harmless, and it keeps the corpus definition identical to the 2-D guard's).
-  const corpus = COMMAND_CATALOG_3D.flatMap((c) => [
-    { text: c.en, lang: 'en' as const },
-    { text: c.he, lang: 'he' as const },
+  const all = COMMAND_CATALOG_3D.flatMap((c) => [
+    { text: c.en, lang: 'en' as const, lane: c.lane },
+    { text: c.he, lang: 'he' as const, lane: c.lane },
   ]);
+  // #578 (ADR-3D-211): the deterministic lane has a SECOND reader. A rename rewrites HISTORY rather than
+  // lowering to commands, so it is read by `parseRename3` before the grammar and no RULE will ever claim
+  // it — it belongs in the catalog (the coverage map and the in-app panel) but not in a matrix about rule
+  // ordering. Split by the READER, not by an exclusion list, and the "nothing escalates" invariant below
+  // is asserted over BOTH halves, so a catalog entry can never fall between them.
+  const rewrites = all.filter((e) => e.lane === 'rewrite');
+  const corpus = all.filter((e) => e.lane !== 'rewrite');
 
   it('winner rule per catalog utterance is stable', () => {
     const winners = corpus.map(({ text, lang }) => ({ text, lang, winner: analyze(text).winner }));
@@ -113,6 +120,11 @@ describe('3-D parser shadow-matrix — catalog corpus', () => {
     // fails here with the utterance named.
     const escalating = corpus.filter(({ text }) => analyze(text).winner === '(none)').map((c) => c.text);
     expect(escalating).toEqual([]);
+    // …and the other half of the lane is covered too: every entry NOT in the rules corpus must be a
+    // history rewrite the second reader owns. Together the two assertions say what the invariant means —
+    // no catalog entry reaches the LLM — across both readers rather than only the one this matrix pins.
+    expect(rewrites.length + corpus.length).toBe(all.length);
+    for (const { text } of rewrites) expect(parseRename3(text), text).not.toBeNull();
   });
 });
 

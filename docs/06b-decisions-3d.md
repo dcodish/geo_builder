@@ -7210,12 +7210,21 @@ right, the session around it stale.
 **The seed is deliberately untouched.** A letter is a name, not a configuration: the drawing must not
 jump because a vertex was re-lettered. This is the stability rule, applied to naming.
 
-**Discoverability — the catalog carries it.** 2-D leaves rename out of its catalog, and that is how this
-issue came to be filed: the operator could not find a feature 2-D already had. The 3-D catalog is the
-coverage map AND the in-app commands panel, so the two rename forms are listed. The guard test now asks
-the honest question — *does the DETERMINISTIC LANE understand this line?* (`parse3` **or**
-`parseRename3`) — rather than carrying an exception list, so a catalog entry can never be listed for a
-lane that would not in fact read it.
+**Discoverability — the catalog carries it, and the catalog now says which LANE reads an entry.**
+2-D leaves rename out of its catalog, and that is how this issue came to be filed: the operator could not
+find a feature 2-D already had. The 3-D catalog is the coverage map AND the in-app commands panel, so the
+two rename forms are listed — but the catalog is also **the vocabulary the LLM is allowed to emit**, and
+teaching it a line `parse3` cannot re-parse would break the PAR-10 contract and spend a paid call on a
+step that can never commit.
+
+So an entry declares its reader once — `lane?: 'rewrite'`, absent meaning the construction lane — and
+every consumer reads that field instead of learning about rename separately: the LLM prompt emits only
+construction entries; the honesty-gate false-positive net measures only what the LLM can emit; the
+rule-ordering shadow matrix covers only what the RULES lane owns, and asserts the remainder is claimed by
+the rewrite reader so nothing can fall between the two; and the catalog guard checks each entry against
+**its own** reader rather than `parse3(u).ok || parseRename3(u)` — an OR would let a construction entry
+pass because the rename reader happened to claim it, which is precisely the shadow class that suite
+exists to catch. The first version of this change did use the OR, and the honesty net is what exposed it.
 
 **Locks.** `src3d/__tests__/issue-578-rename.test.ts` (20): the operator's figure end to end; the
 rewritten-history property against a natively-typed twin; primes in both directions; the plane-run name

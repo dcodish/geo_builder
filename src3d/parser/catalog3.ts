@@ -10,6 +10,20 @@ export interface CatalogEntry3 {
   category: string;
   he: string;
   en: string;
+  /**
+   * WHICH READER of the deterministic lane owns this entry (#578, ADR-3D-211).
+   *
+   * Absent = the construction lane: `parse3` lowers it to commands. That is what the LLM is allowed to
+   * emit, what the honesty gates are measured against, and what the rule-ordering shadow matrix covers.
+   *
+   * `'rewrite'` = a line that edits the SESSION rather than the figure — a rename, read by
+   * `parseRename3` before the grammar and never lowered to a command. It belongs in the catalog because
+   * the catalog is the coverage map AND the in-app commands panel (2-D omits rename, and the operator
+   * could not find it — that is how #578 came to be filed), but teaching it to the LLM would have the
+   * model emit a line the re-parse must refuse, burning a paid call on something that can never commit.
+   * Every consumer reads THIS field rather than learning about rename separately.
+   */
+  lane?: 'rewrite';
 }
 
 export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
@@ -327,6 +341,6 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // because the catalog is the coverage map AND the in-app commands panel: 2-D leaves rename out and
   // the operator could not find it, which is how this issue was filed. The guard test reads the whole
   // deterministic lane (`parse3` OR `parseRename3`), so this entry is checked like every other.
-  { category: 'editing', he: 'שנה שם E ל-O', en: 'rename E to O' },
-  { category: 'editing', he: "החלף A' ב-M", en: "relabel A' to M" },
+  { category: 'editing', lane: 'rewrite', he: 'שנה שם E ל-O', en: 'rename E to O' },
+  { category: 'editing', lane: 'rewrite', he: "החלף A' ב-M", en: "relabel A' to M" },
 ];

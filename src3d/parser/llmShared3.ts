@@ -64,7 +64,10 @@ export const PROMPT_EXAMPLES_3D: PromptExample3[] = [
 const renderExample = (e: PromptExample3): string => `"${e.freeform}" → ${JSON.stringify(e.steps)}`;
 
 export function buildSystemPrompt3(): string {
-  const vocab = COMMAND_CATALOG_3D.map((c) => `- ${c.en}   |   ${c.he}`).join('\n');
+  // #578: only the CONSTRUCTION lane is emittable. A 'rewrite' entry (a rename) is read before the
+  // grammar and never lowers to a command, so teaching it here would produce steps the deterministic
+  // re-parse must refuse — the PAR-10 contract, and a paid call spent on a line that cannot commit.
+  const vocab = COMMAND_CATALOG_3D.filter((e) => e.lane !== 'rewrite').map((c) => `- ${c.en}   |   ${c.he}`).join('\n');
   return [
     "You translate a high-school student's freeform 3-D geometry / vectors request (Hebrew or English) into",
     `an ordered list of canonical command lines, returned ONLY through the ${TOOL_NAME} tool.`,
