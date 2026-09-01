@@ -210,14 +210,14 @@ const GEO_SYMBOL = /[A-Z]\d*|\d|[∠°⊥⟂∥√△▲◯=<>]/;
  *  vav class): «זווי» alone missed the single-vav form, so «זוית abc» (lowercase labels, so no GEO_SYMBOL
  *  either) was mis-classified `unrelated` and got a "not geometry" brush-off (#244). */
 const GEO_KEYWORD =
-  /נקוד|זו?וי|ישר|קטע|מעגל|עיגול|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקביל|אנך|מאונך|חוצה|תיכון|גובה|קוטר|מיתר|רדיוס|משיק|חותך|דלתון|מחומש|משושה|צלע|point|line|segment|circle|triangle|square|rectangle|quad|angle|tangent|chord|radius|diameter|perpendicular|parallel|bisect|median|midpoint|pentagon|hexagon/i;
+  /נקוד|זו?וי|ישר|קטע|מעגל|עיגול|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקביל|אנך|מאונך|חוצה|תיכון|גובה|קוטר|מיתר|רדיוס|משיק|חותך|דלתון|מחומש|משושה|משובע|מתומן|משומן|מתושע|מעושר|מצולע|צלע|point|line|segment|circle|triangle|square|rectangle|quad|angle|tangent|chord|radius|diameter|perpendicular|parallel|bisect|median|midpoint|pentagon|hexagon|heptagon|octagon|nonagon|decagon|polygon/i;
 
 /** Statement separators for the compound-input heuristic — list/clause punctuation plus the common He/En
  *  conjunctions and sentence enders. Also the bare Hebrew ו glued to a following construct noun ("…ומעגל…"):
  *  safe to split liberally here because the keyword-bearing-piece guard below rejects false positives (a ו
  *  glued to a non-construct word yields a keyword-less piece that doesn't count). NOT a parser — a hint only. */
 const COMPOUND_SEP =
-  /\s*[,;.\n]\s*|\s+(?:וגם|ואז|\band\b|\bthen\b)\s+|\s+ו(?:-|\s+|(?=[A-Z]))\s*|\s+ו(?=מעגל|עיגול|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|נקוד|זווי|ישר|קטע|מחומש|משושה|דלתון)/gi;
+  /\s*[,;.\n]\s*|\s+(?:וגם|ואז|\band\b|\bthen\b)\s+|\s+ו(?:-|\s+|(?=[A-Z]))\s*|\s+ו(?=מעגל|עיגול|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|נקוד|זווי|ישר|קטע|מחומש|משושה|משובע|מתומן|משומן|מתושע|מעושר|מצולע|דלתון)/gi;
 
 /**
  * A FAILED utterance that packs several independent statements into one line — a shape AND a point-on-side
@@ -261,8 +261,8 @@ const RELATION_OP = /=|≠|⟂|⊥|∥|>|<|שווה\s+ל|שווים|מקביל|�
  *  parallelogram CONTAINS the Hebrew for parallel, and `parallel` is a prefix of `parallelogram` in
  *  English — the pair that shipped the bug), and a property whose nouns were hand-listed in the test
  *  could not fail on the noun nobody thought of. Derived, per ADR-W-006. */
-export const SHAPE_NOUNS_HE = ['משולש', 'מרובע', 'ריבוע', 'מלבן', 'מעוין', 'מעויין', 'טרפז', 'מקבילית', 'דלתון', 'מחומש', 'משושה'];
-export const SHAPE_NOUNS_EN = ['triangle', 'quadrilateral', 'square', 'rectangle', 'rhombus', 'trapezoid', 'parallelogram', 'kite', 'pentagon', 'hexagon'];
+export const SHAPE_NOUNS_HE = ['משולש', 'מרובע', 'ריבוע', 'מלבן', 'מעוין', 'מעויין', 'טרפז', 'מקבילית', 'דלתון', 'מחומש', 'משושה', 'משובע', 'מתומן', 'משומן', 'מתושע', 'מעושר', 'מצולע'];
+export const SHAPE_NOUNS_EN = ['triangle', 'quadrilateral', 'square', 'rectangle', 'rhombus', 'trapezoid', 'parallelogram', 'kite', 'pentagon', 'hexagon', 'heptagon', 'octagon', 'nonagon', 'decagon', 'polygon'];
 const SHAPE_NOUN = new RegExp(`(?:${SHAPE_NOUNS_HE.join('|')})|\\b(?:${SHAPE_NOUNS_EN.join('|')})\\b`, 'i');
 const tidy = (p: string) => p.replace(/\s+/g, ' ').trim().replace(/[.,;]+$/, '');
 
