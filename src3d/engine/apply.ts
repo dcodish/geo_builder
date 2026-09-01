@@ -259,6 +259,28 @@ function recordShape(c: Construction3, base: QuadBase, ids: [Id, Id, Id, Id]): C
 }
 
 /** First missing point among ids, as an error — or null when all exist. */
+/**
+ * THE "the base" sentinel, resolved (#834). `face: []` means *the base of the single solid* — faces[0],
+ * the base-first convention `faceIndices()` keeps for every solid kind (prismRing, the quad-pyramid
+ * family, the flat-polygon double-sided case; see the comment at the top of this file).
+ *
+ * Extracted so the two commands that speak about "the diagonals of the base" — the crossing form
+ * («אלכסוני הבסיס נפגשים בנקודה O») and the point-free draw form («אלכסוני הבסיס») — resolve it through
+ * ONE function. A second resolver is exactly how the two forms would drift apart, and a prism has two
+ * candidate rings, so the top one must never be picked by an independent guess.
+ *
+ * The multi-solid refusal is deliberate and stays: with two solids present, WHICH base is meant is the
+ * student's to say ([ADR-052](../../docs/06-decisions.md#adr-052)), never a silent pick.
+ */
+function resolveQuadRing(c: Construction3, face: Id[], errId: Id): { ok: true; face: Id[] } | { ok: false; error: EngineError3 } {
+  if (face.length === 0 && c.solids.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+  const ring = face.length === 0 ? c.solids[0].faces[0] : face;
+  if (ring.length !== 4) return { ok: false, error: { code: 'no-solution', id: errId } }; // no diagonals without a quad
+  const missing = missingPoint(c, ring);
+  if (missing) return { ok: false, error: missing };
+  return { ok: true, face: ring };
+}
+
 function missingPoint(c: Construction3, ids: Id[]): EngineError3 | null {
   for (const id of ids) if (!c.points.has(id)) return { code: 'unknown-point', id };
   return null;
@@ -1104,17 +1126,32 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
 
     case 'diag-intersection': {
       if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
-      // face: [] is the "the base" sentinel — resolve HERE (one chokepoint) to the
-      // single solid's base ring (faces[0], base-first convention across every kind)
-      if (cmd.face.length === 0 && c.solids.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
-      const face = cmd.face.length === 0 ? c.solids[0].faces[0] : cmd.face;
-      if (face.length !== 4) return { ok: false, error: { code: 'no-solution', id: cmd.id } }; // no diagonals without a quad
-      const missing = missingPoint(c, face);
-      if (missing) return { ok: false, error: missing };
+      // face: [] is the "the base" sentinel — resolved by the ONE helper both diagonal forms share
+      const ring = resolveQuadRing(c, cmd.face, cmd.id);
+      if (!ring.ok) return { ok: false, error: ring.error };
+      const face = ring.face;
       // a parallelogram's diagonals bisect ⇒ the crossing = midpoint of a diagonal
       // (1st & 3rd cyclic vertices); reuses the on-segment point kind (no eval change)
       const next = clone(c);
       next.points.set(cmd.id, { kind: 'on-segment', a: face[0], b: face[2], t: 0.5 });
+      return { ok: true, next };
+    }
+
+    case 'quad-diagonals': {
+      // #834 — «אלכסוני הבסיס»: DRAW the two diagonals, naming no crossing. Two prod users typed this
+      // (and «הוסף אלכסוני בסיס») on a square pyramid; only the crossing form existed, so both were
+      // not-handled and escalated to the paid LLM, which built something for one and failed the other.
+      //
+      // This is a missing ARM of an existing construct, not a new construct: the base carrier and the
+      // diagonal pair both already existed and were reachable only through the naming-the-crossing
+      // form. It shares `resolveQuadRing`, so «the base» keeps meaning exactly what it means there.
+      const ring = resolveQuadRing(c, cmd.face, 'diagonals');
+      if (!ring.ok) return { ok: false, error: ring.error };
+      const [a, b, d, e] = ring.face;
+      const next = clone(c);
+      for (const [p, q] of [[a, d], [b, e]] as const) {
+        if (!next.segments.some((seg) => samePair(seg, p, q))) next.segments.push([p, q]);
+      }
       return { ok: true, next };
     }
 

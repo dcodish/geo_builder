@@ -99,6 +99,7 @@ const COMMAND_SAVEABLE: Record<Command3['type'], boolean> = {
   circle3: true,
   'cos-angle': true,
   'diag-intersection': true,
+  'quad-diagonals': true, // #834: «אלכסוני הבסיס» draws real ink — a saved figure must reload with its diagonals
   'dot-eq-chain': true,
   'dot-given': true,
   'draw-arrow': true,
