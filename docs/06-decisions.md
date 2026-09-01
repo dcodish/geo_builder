@@ -8436,3 +8436,76 @@ with D strictly between A and C; the forcing geometry (A outside, C inside, tang
 is between A and C at **every** seed that builds (39/40, seed 17 being #855). Scenario
 `satisfiable-circle-crossing-is-not-refused-830` in `scenarios-corpus-4.ts` replays the student's own
 lines and additionally asserts the tangency and the isosceles given survive the crossing.
+
+## ADR-471 — a BARE polygon noun is a generic n-gon; the supported set is closed and says so (#835)
+
+**Context.** Prod session `khf8ht6c` (log-triage 2026-08-30): a student typed «מחומש תלת מימדי», «מחומש 0»,
+«מחומש» and left with no figure. That was the entire session.
+
+Two defects sat behind it.
+
+**(a) The bare noun was excluded on purpose.** `regularPolygon` opened with
+
+```ts
+if (!/\bregular\b|משוכלל/i.test(s) && !/\b\d+\s*-?\s*gon\b/i.test(s)) return null;
+```
+
+commented *"so a bare 'pentagon' (possibly irregular) is left to the LLM net"*. The escape was honest —
+the only thing we could otherwise offer was «מחומש משוכלל», which adds givens the question never gave —
+but it routed the commonest spelling of a common shape to a paid guess that returned `not-understood`.
+
+**(b) `מתומן` was in no list at all.** The noun table held `משומן` (a legitimate but uncommon variant that
+also reads as *greased*); `מתומן`, the standard modern-Hebrew octagon and the operator's own spelling, was
+missing from the table, `POLY_STRIP`, `SHAPE_NOUNS_HE`, the span accountant **and** the geometry-word gate
+at `scope.ts:213`. Missing from the last one is why it came back `scope:unrelated`: **the tool told a
+student that a real geometry word was not about geometry.** That is the honesty failure in this issue.
+
+**Operator rulings, 2026-09-01.**
+
+> *"we should support מחומש, משושה, מתומן. if משוכלל is not mentioned, so its just the shape and if its
+> משוכלל so draw it like that. for all other types of poligons, issue a note saying they are not
+> supported. if we ever see this as a gap in logs we can add them but for now i dont see a reason we
+> should."*
+
+> *"dont delete capability. if its there and works, leave it"*
+
+**Decision.**
+
+- **Bare `מחומש` (5) / `משושה` (6) / `מתומן` (8) build a GENERIC, possibly-irregular n-gon** — the n-sided
+  «מרובע ABCD». The `polygon` command gained `place`, which seats the vertices as free DOFs in general
+  position, deliberately UNEVEN (deterministic per-index jitter, so a re-issued command stays idempotent).
+  Drawing them regular would assert equal sides and equal angles the student never stated
+  ([ADR-052](#adr-052)) *and* would make «משוכלל» meaningless — the two halves of the same argument.
+- **«משוכלל» keeps meaning regular**, unchanged.
+- **`מתומן` becomes the primary octagon spelling**, `משומן` kept as an accepted variant, and both are added
+  to all four lists plus the scope gate.
+- **Every other polygon noun is refused BY NAME** — a new `polygon-not-supported` result carrying the
+  student's word and the three that work, so the message points somewhere useful instead of only saying
+  no. It never reaches the LLM, which could only invent a figure.
+- **«מצולע משוכלל בעל n צלעות» is WITHDRAWN.** The 2026-08-31 ruling had named it as the taught format for
+  the unsupported n-gons; the 2026-09-01 ruling replaced that with the plain notice. It neither builds nor
+  escalates — the refusal names the three nouns, so a student typing «בעל 5 צלעות» is told to type
+  «מחומש», which is the useful answer.
+
+**The no-regression constraint is the sharpest part of this change.** Ruling 2 means the new refusal lane
+must not swallow anything that already worked: `משובע משוכלל` (7), `משומן משוכלל`, `מתושע משוכלל` (9),
+`מעושר משוכלל` (10), `מצולע משוכלל ABCDE` and `regular 7-gon ABCDEFG` all still build. Locked explicitly.
+
+**One regression was caught by the suite and is worth recording**, because it shows where the boundary
+actually is: the first cut of the bare-noun lane matched `POLY_NAME_N` wholesale, which includes
+`triangle: 3` and `quadrilateral: 4` — so «triangle ABC» was refused as an unsupported polygon. Those two
+have their own dedicated lowerings and this rule only ever owned them through the REGULAR route (regular
+triangle ⇒ equilateral, regular quadrilateral ⇒ square). The bare lane now returns null below n = 5,
+handing the line back rather than answering for it.
+
+**Not fixed here.** «מחומש 0» still refuses rather than building a pentagon and dropping the stray `0` —
+silently discarding a token the student typed is the honesty invariant this codebase does not break. The
+session's decisive line, «מחומש», now builds.
+
+**Locks.** `src/parser/__tests__/issue-835-ngon.test.ts` (32 tests): the three nouns and their English
+mirrors build one generic `polygon` with `place`; a bare noun emits no circle and no pinned angles; both
+octagon spellings parse and `מתומן` is in scope; «משוכלל» still seats n vertices on a hidden circle;
+**no existing capability regressed**; every other noun returns `polygon-not-supported` with its offer
+list; the withdrawn format refuses; and no refusal is ever `not-handled` (the lane that reaches the LLM).
+Scenario `bare-ngon-nouns-build-generic-835` asserts the geometry — five vertices, no circle, sides not
+all equal.
