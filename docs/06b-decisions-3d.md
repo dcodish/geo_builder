@@ -6889,6 +6889,128 @@ English with the right `kind`; five correct forms still building; «קטע AB» 
 an edge freely; the pyramid staying at the weaker claim; all three guard cases; and the pair-first order
 with its claim intact.
 
+### ADR-3D-205 — an angle's ARM is an operand kind, not a spelling (#862)
+
+**The hollow row.** `relationTable` declared `angle|segment|vector` **supported**, with actions
+`['drive-dims', 'claim']` and the note *"cos-angle with value (V8-f)"*. **No utterance reached it.** Five
+phrasings — both `קוסינוס … הוקטורים` orders, `קוסינוס … לבין`, and both degree forms — all returned
+`not-understood`. It is the one hollow cell the [#845](https://github.com/dcodish/geo_builder/issues/845)
+sweep found (ADR-3D-202), and it was left filed rather than fixed because that round was scoped to the
+sweep.
+
+**Root cause — the same enumeration, in two rules.** Nothing was missing from the engine. `cos-angle`
+takes two `VecAtom`s and a `VecAtom` is `named | pair`, so the mixed relation was always representable;
+the ⟂ twin over the identical operand kinds («AB מאונך ל-v») builds, and both single-kind angle cells
+build. What was missing was a sentence, because each of the two VALUE-form angle rules spelled its own
+operand shapes:
+
+| rule | what it captured | what it therefore could not read |
+| --- | --- | --- |
+| `angleSegClaim` (degrees) | two hard-coded point-pair captures `([A-Z]…)([A-Z]…)` | any vector arm |
+| `cosAngleGiven` (cosine) | two `[a-w]` letters | any segment arm |
+
+So the mixed pair fell between them in **both** lanes. This is `src3d/CLAUDE.md`'s standing trap — *"an
+enumeration is not a rule"* — and it is why the answer is a seam, not a sixth regex.
+
+**Decision — every angle arm is read through the shared operand seam.**
+
+`readOperand` / `readRelationSides` (ADR-3D-140, widened by #522) already classify a side by what the
+token IS, strip an optional noun including the plural head form, and handle the conjoined frame. The
+angle family now uses it, and a two-line `vecAtomOf` says which of the seam's kinds are *arms*:
+
+- `segment` → `{ kind: 'pair' }`; `vector` → `{ kind: 'named' }`;
+- **everything else → `null`**, so a line / plane / point arm declines and the rules that own those
+  cells (`linePlaneAngle`, `angleBetweenPlanes`, `lineRelAngle`, `planeRelAngle`) keep them. The decline
+  is the load-bearing half: widening a rule's reach is only safe if it still refuses its neighbours' work.
+
+Three call sites converge on it — `angleSegClaim`, `cosAngleGiven`'s between-branch, and
+`angleOperand3` (the between-form atom shared by the angle-EQUALITY rule, #337/ADR-3D-088), which had
+its own singular-only noun list and so failed «הוקטורים AB ו-v» while the singular twin parsed.
+
+**Two lowerings, chosen by the arms and never by the sentence.** `pair × pair` keeps the frozen
+`angle-seg-eq` claim it has always produced — that cell does not move. Any **vector** arm lowers to
+`cos-angle` at `cos(deg)`, which is the `angle|vector|vector` cell's own lowering, inherited rather than
+re-invented; so «הזווית בין AB לבין v היא 60» and «קוסינוס הזווית בין AB לבין v הוא 1/2» produce the
+same command, as one fact stated two ways should.
+
+**Deviation from the issue's suggested seam, and why.** #862 proposed `readRelationSides` verbatim, the
+migration ADR-3D-177 performed for the ⟂/∥ segment×plane cell. That is what happens — with a converter,
+because `readRelationSides` yields `Operand3` while the angle commands carry `VecAtom`. Naming that
+conversion (`vecAtomOf`) rather than inlining it is what lets the *same* two lines state which kinds are
+arms for all three rules, instead of each one re-deciding.
+
+**The ratchet did its job, and is now empty.** #845's `KNOWN_UNREACHABLE` entry asserted this cell was
+*still* unreachable; making it work failed that test, exactly as designed, and forced the entry's
+deletion. The cell moved into `PENDING_PROBES`, where it is checked like every other supported cell, and
+the honesty test was rewritten to iterate the map rather than name one cell — so the next hollow row
+inherits the same net without anyone rebuilding it. A new guard asserts a cell can never be both probed
+and known-unreachable.
+
+**Not converged: `perpOperand`.** The ⟂ family has its own private arm reader, and it is the same
+private spelling one lane over. It is deliberately left alone: its cell **works** (that is #862's own
+evidence that the mixed-operand seam is fine), so converging it would be refactoring a correct reader
+inside a bug fix, and its callers pre-strip their nouns differently. Recorded here so the next pass at
+the operand seam knows it is the remaining one.
+
+**Catalog.** «הזווית בין AB לבין v היא 60» / «the angle between AB and v is 60» joins `catalog3.ts`
+— the coverage map is where a student finds out the cell exists, and a capability absent from it is
+advertised to no one.
+
+**Gates.** Shadow-matrix WINNERS snapshot regenerated: **additions only** (the two new catalog rows, both
+won by `angleSegClaim`), **no existing winner changed** — which is the property that snapshot defends.
+The HARD allowlist gate passed unchanged.
+
+**Locks.** `src3d/__tests__/issue-862-angle-mixed-arm.test.ts` (15 tests): all five reported frames plus
+the two English mirrors building end-to-end; both operand orders reaching the relation; the degree and
+cosine frames asserted to carry the SAME value; the exact command list for the mixed form (the pair arm
+drawn, the vector arm not re-declared); the two neighbouring cells asserted byte-for-byte unchanged,
+including the exam's noun-carrying wording; the line/plane arms still going to their owners; and the ⟂
+twin unchanged. Plus the #845 sweep, now with the cell in the probe table.
+
+### ADR-3D-208 — the input BOX takes its base direction from the content, like 2-D (#868)
+
+**Reported** by the operator while playing PR #867: *"the bidi text is biting again on the input"*.
+
+**Measured in a real browser**, the same string «D על AC» in each product's main input:
+
+| product | `dir` attribute | resolved |
+|---|---|---|
+| 2-D | `rtl` | **rtl** — correct |
+| 3-D | `auto` | **ltr** — left-aligned, wrong |
+
+And the consequence that makes it a defect rather than a preference: the live preview **underneath** the
+box laid the identical string out RTL. The box was contradicting the very thing the preview exists to
+compensate for.
+
+**Root cause.** `shell/frame/InputArea.tsx` exposes a `boxDir` prop whose own doc predicted this exactly:
+*"dir='auto' keys off the first strong character, and «AB שווה …» would take an LTR base."* **Only 2-D
+passed it.** 3-D passed `previewDir` and not `boxDir`, so its box fell back to `dir="auto"` — and «D על
+AC» opens with a strong LTR `D`. Most 3-D sentences open with a point label, so most of them took an LTR
+base.
+
+`src-complex` omits it too, and there it is **correct**: the prop's doc says *"absent = auto (the
+math-first products)"*, and a complex-numbers line genuinely is math-first. The gap was 3-D's alone — a
+sentence product, like 2-D.
+
+**This does not reopen a settled ruling.** [ADR-3D-184](#adr-3d-184) records the operator's 2026-08-10
+ruling that *"the input box itself cannot be fixed: isolate characters inside an editable value corrupt
+what the student typed and where their caret sits, and forcing `dir='ltr'` is what 2-D tried and REVERTED
+(#118)"*. That forbids two specific things — injecting isolates into the editable value, and **forcing**
+LTR. Setting the base direction **by content** is neither; it is the opposite of forcing LTR, and it is
+what 2-D settled on *after* #118. The typed value stays raw and the preview is untouched.
+
+**Decision.** 3-D passes `boxDir={(s) => textDir3(s)}` — the SAME function it already passes as
+`previewDir`, so the box and the preview cannot disagree by construction rather than by discipline.
+
+**Verified in the browser after the change:** «D על AC» → `rtl`, «OD חוצה זווית AOC» → `rtl`,
+«AB = (1,2,3)» → `ltr`, and the box now renders the identical layout as its own preview.
+
+**Locks.** `src3d/__tests__/bidi3.test.ts` (3 new): `boxDir` is passed at all; the box and the preview
+resolve through the **same named function** (the property, so a future edit cannot split them); and
+`textDir3` gives an RTL base to the reported string and its siblings while leaving a pure-math line LTR.
+Asserted on the SOURCE, per the #559 precedent in the same file — the defect is the markup and this tree
+has no DOM harness.
+
 ### ADR-3D-207 — the bisector stated on its own; the perpendicular bisector's honest end (#343, #342)
 
 Two halves of one question: what should an utterance this tool has already DECIDED about do?
@@ -7030,125 +7152,3 @@ midpoint (He + En); the plane-carrier spelling reaching the SAME K (the carrier 
 claim of the fix); entry-order permutation with the pins after the relation (M2 law (i)); the DOF cue's
 0 → 1 → 0; a relation no `t` satisfies still refusing («SB מקביל למישור ACK»); and an unmentioned rider
 still sampled and seed-varying.
-
-### ADR-3D-205 — an angle's ARM is an operand kind, not a spelling (#862)
-
-**The hollow row.** `relationTable` declared `angle|segment|vector` **supported**, with actions
-`['drive-dims', 'claim']` and the note *"cos-angle with value (V8-f)"*. **No utterance reached it.** Five
-phrasings — both `קוסינוס … הוקטורים` orders, `קוסינוס … לבין`, and both degree forms — all returned
-`not-understood`. It is the one hollow cell the [#845](https://github.com/dcodish/geo_builder/issues/845)
-sweep found (ADR-3D-202), and it was left filed rather than fixed because that round was scoped to the
-sweep.
-
-**Root cause — the same enumeration, in two rules.** Nothing was missing from the engine. `cos-angle`
-takes two `VecAtom`s and a `VecAtom` is `named | pair`, so the mixed relation was always representable;
-the ⟂ twin over the identical operand kinds («AB מאונך ל-v») builds, and both single-kind angle cells
-build. What was missing was a sentence, because each of the two VALUE-form angle rules spelled its own
-operand shapes:
-
-| rule | what it captured | what it therefore could not read |
-| --- | --- | --- |
-| `angleSegClaim` (degrees) | two hard-coded point-pair captures `([A-Z]…)([A-Z]…)` | any vector arm |
-| `cosAngleGiven` (cosine) | two `[a-w]` letters | any segment arm |
-
-So the mixed pair fell between them in **both** lanes. This is `src3d/CLAUDE.md`'s standing trap — *"an
-enumeration is not a rule"* — and it is why the answer is a seam, not a sixth regex.
-
-**Decision — every angle arm is read through the shared operand seam.**
-
-`readOperand` / `readRelationSides` (ADR-3D-140, widened by #522) already classify a side by what the
-token IS, strip an optional noun including the plural head form, and handle the conjoined frame. The
-angle family now uses it, and a two-line `vecAtomOf` says which of the seam's kinds are *arms*:
-
-- `segment` → `{ kind: 'pair' }`; `vector` → `{ kind: 'named' }`;
-- **everything else → `null`**, so a line / plane / point arm declines and the rules that own those
-  cells (`linePlaneAngle`, `angleBetweenPlanes`, `lineRelAngle`, `planeRelAngle`) keep them. The decline
-  is the load-bearing half: widening a rule's reach is only safe if it still refuses its neighbours' work.
-
-Three call sites converge on it — `angleSegClaim`, `cosAngleGiven`'s between-branch, and
-`angleOperand3` (the between-form atom shared by the angle-EQUALITY rule, #337/ADR-3D-088), which had
-its own singular-only noun list and so failed «הוקטורים AB ו-v» while the singular twin parsed.
-
-**Two lowerings, chosen by the arms and never by the sentence.** `pair × pair` keeps the frozen
-`angle-seg-eq` claim it has always produced — that cell does not move. Any **vector** arm lowers to
-`cos-angle` at `cos(deg)`, which is the `angle|vector|vector` cell's own lowering, inherited rather than
-re-invented; so «הזווית בין AB לבין v היא 60» and «קוסינוס הזווית בין AB לבין v הוא 1/2» produce the
-same command, as one fact stated two ways should.
-
-**Deviation from the issue's suggested seam, and why.** #862 proposed `readRelationSides` verbatim, the
-migration ADR-3D-177 performed for the ⟂/∥ segment×plane cell. That is what happens — with a converter,
-because `readRelationSides` yields `Operand3` while the angle commands carry `VecAtom`. Naming that
-conversion (`vecAtomOf`) rather than inlining it is what lets the *same* two lines state which kinds are
-arms for all three rules, instead of each one re-deciding.
-
-**The ratchet did its job, and is now empty.** #845's `KNOWN_UNREACHABLE` entry asserted this cell was
-*still* unreachable; making it work failed that test, exactly as designed, and forced the entry's
-deletion. The cell moved into `PENDING_PROBES`, where it is checked like every other supported cell, and
-the honesty test was rewritten to iterate the map rather than name one cell — so the next hollow row
-inherits the same net without anyone rebuilding it. A new guard asserts a cell can never be both probed
-and known-unreachable.
-
-**Not converged: `perpOperand`.** The ⟂ family has its own private arm reader, and it is the same
-private spelling one lane over. It is deliberately left alone: its cell **works** (that is #862's own
-evidence that the mixed-operand seam is fine), so converging it would be refactoring a correct reader
-inside a bug fix, and its callers pre-strip their nouns differently. Recorded here so the next pass at
-the operand seam knows it is the remaining one.
-
-**Catalog.** «הזווית בין AB לבין v היא 60» / «the angle between AB and v is 60» joins `catalog3.ts`
-— the coverage map is where a student finds out the cell exists, and a capability absent from it is
-advertised to no one.
-
-**Gates.** Shadow-matrix WINNERS snapshot regenerated: **additions only** (the two new catalog rows, both
-won by `angleSegClaim`), **no existing winner changed** — which is the property that snapshot defends.
-The HARD allowlist gate passed unchanged.
-
-**Locks.** `src3d/__tests__/issue-862-angle-mixed-arm.test.ts` (15 tests): all five reported frames plus
-the two English mirrors building end-to-end; both operand orders reaching the relation; the degree and
-cosine frames asserted to carry the SAME value; the exact command list for the mixed form (the pair arm
-drawn, the vector arm not re-declared); the two neighbouring cells asserted byte-for-byte unchanged,
-including the exam's noun-carrying wording; the line/plane arms still going to their owners; and the ⟂
-twin unchanged. Plus the #845 sweep, now with the cell in the probe table.
-
-### ADR-3D-208 — the input BOX takes its base direction from the content, like 2-D (#868)
-
-**Reported** by the operator while playing PR #867: *"the bidi text is biting again on the input"*.
-
-**Measured in a real browser**, the same string «D על AC» in each product's main input:
-
-| product | `dir` attribute | resolved |
-|---|---|---|
-| 2-D | `rtl` | **rtl** — correct |
-| 3-D | `auto` | **ltr** — left-aligned, wrong |
-
-And the consequence that makes it a defect rather than a preference: the live preview **underneath** the
-box laid the identical string out RTL. The box was contradicting the very thing the preview exists to
-compensate for.
-
-**Root cause.** `shell/frame/InputArea.tsx` exposes a `boxDir` prop whose own doc predicted this exactly:
-*"dir='auto' keys off the first strong character, and «AB שווה …» would take an LTR base."* **Only 2-D
-passed it.** 3-D passed `previewDir` and not `boxDir`, so its box fell back to `dir="auto"` — and «D על
-AC» opens with a strong LTR `D`. Most 3-D sentences open with a point label, so most of them took an LTR
-base.
-
-`src-complex` omits it too, and there it is **correct**: the prop's doc says *"absent = auto (the
-math-first products)"*, and a complex-numbers line genuinely is math-first. The gap was 3-D's alone — a
-sentence product, like 2-D.
-
-**This does not reopen a settled ruling.** [ADR-3D-184](#adr-3d-184) records the operator's 2026-08-10
-ruling that *"the input box itself cannot be fixed: isolate characters inside an editable value corrupt
-what the student typed and where their caret sits, and forcing `dir='ltr'` is what 2-D tried and REVERTED
-(#118)"*. That forbids two specific things — injecting isolates into the editable value, and **forcing**
-LTR. Setting the base direction **by content** is neither; it is the opposite of forcing LTR, and it is
-what 2-D settled on *after* #118. The typed value stays raw and the preview is untouched.
-
-**Decision.** 3-D passes `boxDir={(s) => textDir3(s)}` — the SAME function it already passes as
-`previewDir`, so the box and the preview cannot disagree by construction rather than by discipline.
-
-**Verified in the browser after the change:** «D על AC» → `rtl`, «OD חוצה זווית AOC» → `rtl`,
-«AB = (1,2,3)» → `ltr`, and the box now renders the identical layout as its own preview.
-
-**Locks.** `src3d/__tests__/bidi3.test.ts` (3 new): `boxDir` is passed at all; the box and the preview
-resolve through the **same named function** (the property, so a future edit cannot split them); and
-`textDir3` gives an RTL base to the reported string and its siblings while leaving a pure-math line LTR.
-Asserted on the SOURCE, per the #559 precedent in the same file — the defect is the markup and this tree
-has no DOM harness.
