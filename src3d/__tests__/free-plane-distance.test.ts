@@ -81,10 +81,23 @@ describe('#508 — the reported sequence builds, instead of being told it is wro
 
 describe('#508 — the class: a free plane never produces a FALSE ACCUSATION', () => {
   it('a claim about a still-sampled plane reads plane-not-determined, never claim-refuted', () => {
-    // the second distance is real information this resolver does not yet pin (it would constrain the
-    // NORMAL). It must not be reported as the student's error — it is the tool's gap.
-    build([...FIGURE, 'המרחק בין A למישור π2 הוא 5', 'המרחק בין B למישור π2 הוא 5']);
+    /**
+     * The INSTANCE moved with #528 (ADR-3D-206), the CLASS did not.
+     *
+     * This used to be the second DISTANCE, and the comment said out loud why: *"real information this
+     * resolver does not yet pin (it would constrain the NORMAL) — it is the tool's gap."* #528 closed
+     * that gap, so the same sequence now builds (asserted below). What the test defends is not the
+     * distance; it is that a constraint kind the resolver STILL does not pin costs an honest "pin this
+     * plane first" and never a false accusation. A stated plane↔plane ANGLE is such a kind today.
+     */
+    build([...FIGURE, 'הזווית בין המישור ABC למישור π2 היא 60']);
     expect(state().lastError).toEqual({ code: 'plane-not-determined', id: 'π2' });
+  });
+
+  it('#528: the second DISTANCE is no longer such a kind — it pins the normal and builds', () => {
+    build([...FIGURE, 'המרחק בין A למישור π2 הוא 5', 'המרחק בין B למישור π2 הוא 5']);
+    expect(state().lastError).toBeNull();
+    for (const id of ['A', 'B']) expect(Math.abs(signedDist(0, id)), id).toBeCloseTo(5, 6);
   });
 
   it('a DETERMINED plane keeps the ordinary verify register — the guard did not swallow real refutations', () => {
