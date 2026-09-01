@@ -7153,3 +7153,57 @@ resolve through the **same named function** (the property, so a future edit cann
 `textDir3` gives an RTL base to the reported string and its siblings while leaving a pure-math line LTR.
 Asserted on the SOURCE, per the #559 precedent in the same file — the defect is the markup and this tree
 has no DOM harness.
+
+### ADR-3D-209 — «true, and already known» is ONE channel, with the four entailment tests kept (#853)
+
+**Context.** Four notices had grown to say one sentence to the student — *"that is true, and you already
+knew it"*:
+
+| notice | added by | fires when | method |
+| --- | --- | --- | --- |
+| `shape-redundant` | #612 (ADR-3D-158) | a shape statement already true of the figure | a flag set at apply |
+| `redundant-relation` | #396 (ADR-3D-108) | a relation between two SELF-DETERMINED objects | structural |
+| `containment-redundant` | #842 (ADR-3D-192) | a containment whose endpoints already lie in the plane | structural |
+| `relation-entailed` | #850 (ADR-3D-198) | a ∥ / ⟂ the figure already implies | numeric (operator ruling) |
+
+Four kinds, four i18n strings, four detections, four render branches — answering one question. Each was
+added because the previous one did not cover the case at hand, which is the honest reason and also the
+definition of an enumeration growing by one member per report. Worse, they disagreed about METHOD without
+meaning to, so the next person deciding how to detect a fifth case had four precedents pointing three ways.
+
+**Decision — converge the CHANNEL and the WORDING; keep every entailment TEST.**
+
+- One notice kind, `already-known`, carrying `rel` (which relation was stated), `subject`/`object` (the
+  statement in the student's own letters) and `shape` (for the shape case). One render branch.
+- One message template, `notice.alreadyKnown`, filled from two per-relation halves —
+  `notice.stated.<rel>` (the statement in the student's wording) and `notice.follows.<rel>` (why it
+  follows). The four bespoke strings are retired from both locales.
+- One predicate, `alreadyKnown(c, samples)`, holding the four cases in one place, called once from
+  `buildNotices3`.
+
+**What deliberately did NOT converge: the four entailment tests.** Each case keeps the test the operator
+ruled on for it — the apply-time flag (#612), the `isSelfDetermined` structural test with its
+carries-parameter and #500 free-plane exclusions (#396), the per-endpoint `pointEntailedInPlane`
+recursion (#842), and the numeric `claimSeeds` check with #827's branch guard (#850). The risk the issue
+named for merging special cases is real and specific here: a predicate general enough to cover all four
+could over-claim on a case none of them handled, and over-claiming means telling a student their given
+was worthless when it was not. The conservative direction is kept in all four — when entailment cannot be
+SHOWN, this says nothing.
+
+**What the fifth case now costs.** One entry in `ALREADY_KNOWN_RELS`, its own test in `alreadyKnown`, and
+two strings per language. `ALREADY_KNOWN_RELS` is the SOURCE the notice type reads its `rel` from, and the
+ratchet in `issue-853-already-known.test.ts` fails when a member has no wording in Hebrew or English — so
+a fifth case cannot reach a student as a raw i18n key, and it cannot become a fifth kind by accident.
+
+**User-visible surface, honestly.** The intent was no behaviour change and the four per-case locks hold
+unchanged in substance (same figures, same verdicts, same silences). Two things do change: the message
+TEXT is now assembled from the shared template, saying the same thing in the same register; and the notice
+ORDER moves, because all four cases are emitted at one point in `buildNotices3` rather than at four —
+which groups the "already known" notices together in the banner.
+
+**Locks.** The four issue locks retargeted onto the channel (#612 → `rel: 'shape'`, #396 →
+`'objects'`, #842 → `'contained'`, #850 → `'perp' | 'parallel'`), all still asserting their own figures;
+plus `src3d/__tests__/issue-853-already-known.test.ts` (8 tests): one figure per case arriving on the one
+channel with the right `rel` and no legacy kind anywhere; subjects carry student letters and never a `~`
+or `@` machinery id; #500's driven relation still silent; the i18n ratchet; and the retired keys asserted
+gone from both locales.

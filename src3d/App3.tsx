@@ -630,19 +630,19 @@ export default function App3() {
             <div key={`notice-${i}`} role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {n.kind === 'base-constrained'
                 ? t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
-                : n.kind === 'shape-redundant'
-                  ? t('notice.shapeRedundant', { ids: n.ids.join(''), shape: t(`notice.shape.${n.base}`) })
                 : n.kind === 'line-rel-noun'
                   ? t('notice.lineRelNoun', { line: n.line })
-                  : n.kind === 'redundant-relation'
-                    ? t('notice.redundantRelation', { a: n.a, b: n.b })
-                    : n.kind === 'line-auto-named'
-                      ? t('notice.lineAutoNamed', { requested: n.requested, assigned: n.assigned })
-                      : n.kind === 'containment-redundant'
-                        ? t('notice.containmentRedundant', { seg: n.seg, plane: n.plane })
-                        : n.kind === 'relation-entailed'
-                          ? t(n.rel === 'perp' ? 'notice.entailedPerp' : 'notice.entailedParallel', { seg: n.seg, plane: n.plane })
-                          : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
+                  : n.kind === 'line-auto-named'
+                    ? t('notice.lineAutoNamed', { requested: n.requested, assigned: n.assigned })
+                    : n.kind === 'already-known'
+                      ? /* #853 (ADR-3D-209): ONE template for «true, and already known» — the
+                           statement in the student's own wording, then why it follows. The four
+                           former notices differ only in those two slots. */
+                        t('notice.alreadyKnown', {
+                          statement: t(`notice.stated.${n.rel}`, { a: n.subject, b: n.object ?? '', shape: n.shape ? t(`notice.shape.${n.shape}`) : '' }),
+                          why: t(`notice.follows.${n.rel}`),
+                        })
+                      : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
             </div>
           ))}
           {lastNotice && !lastError && !busy && (
