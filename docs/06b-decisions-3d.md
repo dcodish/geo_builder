@@ -6570,3 +6570,61 @@ a driving relation reports nothing; a false relation still refuses; a bare figur
 #396 `redundant-relation`, #842 `containment-redundant`, this). They should converge on one channel
 with a per-relation entailment test; filed as **#853** rather than done here, since converging them
 is a refactor with no user-visible change and belongs in its own pass.
+
+## ADR-3D-202 — THE DECLARED-VS-LOWERED SWEEP: ONE HOLLOW ROW, AND A RATCHET THAT KEEPS IT HONEST (#845)
+
+**Context.** #833 was a ∥-to-plane statement, true by construction, refused `no-solution`. The part worth
+generalising was **how it stayed invisible**: `relationTable` declared
+
+```ts
+'parallel|segment|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], … }
+```
+
+`claim` was listed; nothing implemented it. The table is the product's own statement of what it can do —
+it drives coverage reasoning and reads as authoritative — and nothing forced a declared action to
+correspond to code. That is the **mirror-drift** shape (#35 / #501 / #829): *a contract enforced by an
+enumerated list rather than a derived one*, and it had produced a student-visible false negative.
+
+**What the sweep actually found — and what the codebase already had.** `relation-battery.test.ts` is
+stronger than the issue assumed: it already carries an honesty ratchet, asserting every `supported` cell
+is either exercised end-to-end or parked in `BATTERY_PENDING` with a cited reason. So "supported" cannot
+mean "nobody ever ran it". **The gap is one level in:** a pending cell says *"covered by a suite over
+there"*, and nobody re-checks that claim.
+
+So the sweep drove all **13 pending cells** through the real `submit` path. **12 are reachable. One is
+not:**
+
+`angle|segment|vector` — declared `['drive-dims','claim']`, note *"cos-angle with value (V8-f)"* —
+is `not-understood` in five phrasings (both `קוסינוס … הוקטורים` operand orders, `קוסינוס … לבין`, and
+both degree forms). Two facts pin it as the #833 class rather than a parser wish: its **⟂ twin over the
+identical operand kinds** («AB מאונך ל-v») builds, so the mixed segment×vector seam is fine; and **both
+single-kind angle cells** build. The table advertises a capability that exists on either side of it and
+not in between. Filed as **#862**.
+
+**A finding about sweeps themselves, worth more than the hole.** The sweep's first pass reported *four*
+holes. All four were bad probe phrasing — `ל-` where the catalog writes `לבין`, degrees where the V8-f
+lane wants `קוסינוס`. A sweep that authors its own utterances measures the author's memory of the grammar
+as much as the grammar. Every probe in the locked sweep is therefore cross-checked against `catalog3.ts`
+or the suite the table's own note cites, and that discipline is recorded here because the next sweep will
+face it too: **an unreachable-looking cell is a bad probe until the canonical phrasing is confirmed.**
+
+**Decision — the sweep is locked, and its finding is a RATCHET.**
+`src3d/__tests__/issue-845-reltable-sweep.test.ts` exercises the 12 reachable pending cells, and keeps
+`angle|segment|vector` in a `KNOWN_UNREACHABLE` list whose own test asserts the cell is **still**
+unreachable in all five phrasings. If someone makes it work, that test fails and the entry must be
+deleted — the list cannot quietly outlive the defect it records. A separate test pins the diagnosis by
+asserting the ⟂ twin over the same operand kinds still builds.
+
+**Deliberately NOT done here — step 2.** The issue's second half ("make it structural — derive the
+supported set from the lowerings") is not attempted. The measured yield is **one** hollow row out of 70
+supported cells, so the case for a derivation mechanism rests on one member; and the round that ran this
+sweep was scoped to the sweep, with holes filed rather than fixed. The honest sizing the issue asked for
+is now available: step 2 buys one known defect plus insurance, and should be judged on that.
+
+**Sibling check (ADR-W-004).** 2-D has no `relationTable`; `src/parser/catalog.ts` is the analogous
+authoritative-by-reading surface, and it is already re-parsed by its own guard (every catalog entry must
+parse), which is the same property this sweep just established for the 3-D table's pending cells. The
+class is present in 2-D only if a catalog entry can parse while its ACTION is unimplemented — not
+examined here, and worth its own pass rather than an assertion.
+
+**Locks.** `src3d/__tests__/issue-845-reltable-sweep.test.ts` (14 tests).
