@@ -158,6 +158,15 @@ function runVitest(extraArgs) {
   return r.status ?? 1;
 }
 
+/**
+ * #812 (ADR-W-037) — the tracked membership, read as FILE PATHS.
+ *
+ * The artifact used to carry `{ file, ms }` objects and now carries plain paths. Both shapes are read
+ * here, so a working copy that predates the change still runs and every consumer asks ONE function what
+ * the slow set is instead of each remembering the entry's shape.
+ */
+const slowFiles = (tiers) => (tiers?.slow ?? []).map((s) => (typeof s === 'string' ? s : s.file));
+
 // ── fast ───────────────────────────────────────────────────────────────────
 function fast() {
   const tiers = readJson(TIERS, null);
@@ -170,7 +179,7 @@ function fast() {
     const { status } = runAndRecord('fast', []);
     process.exit(status);
   }
-  const excludes = tiers.slow.flatMap((s) => ['--exclude', `**/${base(s.file)}`]);
+  const excludes = slowFiles(tiers).flatMap((f) => ['--exclude', `**/${base(f)}`]);
   // #484: membership is a SHARE of suite time, not a wall-clock cutoff, so the message reports the rule.
   // `thresholdMs` is the pre-#484 field — still read so an older tier file prints something sensible.
   const how = tiers.rule?.kind === 'top-share'
@@ -254,7 +263,7 @@ function updateTiers(files) {
   const slow = classifySlow(files);
 
   const prev = readJson(TIERS, null);
-  const prevSet = new Set((prev?.slow ?? []).map((s) => s.file));
+  const prevSet = new Set(slowFiles(prev));
   const nextSet = new Set(slow.map((s) => s.file));
   const added = [...nextSet].filter((f) => !prevSet.has(f));
   const removed = [...prevSet].filter((f) => !nextSet.has(f));
@@ -266,29 +275,49 @@ function updateTiers(files) {
   if (!added.length && !removed.length && prev && sameRule) return;
 
   mkdirSync(dirname(TIERS), { recursive: true });
-  writeFileSync(
-    TIERS,
-    `${JSON.stringify(
-      {
-        _comment:
-          'MEASURED tier membership (ADR-394, rule relative since #484). Rewritten by `npm run test:full` ' +
-          'only when the SET of slow files changes — the per-file `ms` are the writing machine\'s timings ' +
-          'and are informational, so a faster or slower PC no longer produces a diff. `npm run test:fast` ' +
-          'derives its --exclude list from `slow`.',
-        rule: { kind: 'top-share', share: SLOW_SHARE, minMeanMult: MIN_MEAN_MULT },
-        // informational only — what the relative rule happened to correspond to on THIS machine
-        measuredCutoffMs: slow.length ? slow[slow.length - 1].ms : null,
-        updatedAt: new Date().toISOString().slice(0, 10),
-        slow,
-      },
-      null,
-      2,
-    )}\n`,
-  );
+  writeFileSync(TIERS, serializeTiers(slow));
   console.log(`\ntier membership updated (heaviest files holding ${Math.round(SLOW_SHARE * 100)}% of suite time):`);
   for (const f of added) console.log(`  + ${f}`);
   for (const f of removed) console.log(`  - ${f}`);
+  // #812: the cutoff this machine happened to measure is REPORTED, not recorded — it is the one number the
+  // old artifact carried that nothing ever read back, and writing it is what made a routine membership
+  // change collide with every other branch's routine membership change.
+  if (slow.length) console.log(`  (this machine's slowest included file measured ${Math.round(slow[slow.length - 1].ms / 1000)}s)`);
   console.log('  commit reports/test-tiers.json so the fast tier matches on every machine.');
+}
+
+/**
+ * #812 (ADR-W-037) — SERIALIZE the tier artifact: shared state only, one file per line, path-sorted.
+ *
+ * Three properties, each load-bearing for MERGING rather than for reading:
+ *  - **no timings.** `slow[].ms` and `measuredCutoffMs` were the writing machine's wall clock, and no
+ *    consumer ever read them back (`classifySlow` measures the CURRENT run). Two branches that each add
+ *    a test therefore wrote two different numbers on top of one real one-line change — a guaranteed
+ *    textual conflict, on every parallel PR, over values nothing consumes.
+ *  - **sorted by PATH, not by time.** The measurement order is a machine's speed ranking, so keeping it
+ *    would re-introduce exactly the same churn one field over: a file that merely got faster would move.
+ *  - **one line per entry**, so a membership change is an insertion git can merge with another
+ *    insertion instead of a rewritten block.
+ *
+ * Exported so the guard asserts the SERIALIZED bytes — the thing that actually gets committed — rather
+ * than a shape one layer above them.
+ */
+export function serializeTiers(slow) {
+  return `${JSON.stringify(
+    {
+      _comment:
+        'MEASURED tier membership (ADR-394, rule relative since #484; #812 dropped the timings). Rewritten ' +
+        'by `npm run test:full` only when the SET of slow files changes. It carries the SHARED state and ' +
+        'nothing else — no per-machine timings — so two machines that agree on membership produce ' +
+        'byte-identical files, and two branches that each add a test merge as two insertions. ' +
+        '`npm run test:fast` derives its --exclude list from `slow`.',
+      rule: { kind: 'top-share', share: SLOW_SHARE, minMeanMult: MIN_MEAN_MULT },
+      updatedAt: new Date().toISOString().slice(0, 10),
+      slow: [...new Set(slow.map((s) => (typeof s === 'string' ? s : s.file)))].sort(),
+    },
+    null,
+    2,
+  )}\n`;
 }
 
 /** Append a record when the full run failed and the fast tier would NOT have. */
@@ -297,7 +326,7 @@ function trackCatches(files) {
   if (!failing.length) return;
 
   const tiers = readJson(TIERS, null);
-  const slowSet = new Set((tiers?.slow ?? []).map((s) => s.file));
+  const slowSet = new Set(slowFiles(tiers));
   const inSlowOnly = failing.filter((f) => slowSet.has(f.file));
   const unique = inSlowOnly.length === failing.length; // nothing in the fast tier failed
 
@@ -368,7 +397,7 @@ function report() {
     for (const [f, n] of ranked) console.log(`  ${String(n).padStart(3)}×  ${f}`);
   }
   const tiers = readJson(TIERS, null);
-  const never = (tiers?.slow ?? []).map((s) => s.file).filter((f) => !byFile[f]);
+  const never = slowFiles(tiers).filter((f) => !byFile[f]);
   if (never.length) {
     console.log('\nSlow files with no unique catch on record (candidates to speed up or fold in):');
     for (const f of never) console.log(`       ${f}`);
