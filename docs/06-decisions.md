@@ -8509,3 +8509,60 @@ octagon spellings parse and `מתומן` is in scope; «משוכלל» still sea
 list; the withdrawn format refuses; and no refusal is ever `not-handled` (the lane that reaches the LLM).
 Scenario `bare-ngon-nouns-build-generic-835` asserts the geometry — five vertices, no circle, sides not
 all equal.
+
+## ADR-472 — the convexity default is read from what a fact DECLARES, not from its command type (#443)
+
+**Symptom.** A bare «דלתון ABCD» — no convexity stated — draws as a **dart**. Measured at `3516b70`: 4 of
+the first 200 seeds, and every one of them passed `meetsRequirements`, so the resampler was free to
+offer them.
+
+**Root cause.** `polygonsConvex` enforced the default by iterating facts whose `cmd.type` is in
+`POLYGON_SHAPES` (`square | rectangle | rhombus | parallelogram | trapezoid | quadrilateral`). A named
+shape declared through a MACRO — kite, isosceles, iso-trapezoid, midsegment ([ADR-138](#adr-138)), and
+every inscribed shape ([ADR-262](#adr-262)) — is a `shape-variant` / `inscribe` fact that becomes a
+polygon only at replay. **The guard never saw its ring.** So the guarantee its own doc comment states —
+*every declared polygon draws convex* — held for «מרובע ABCD» and silently not for «דלתון ABCD».
+
+Proved directly rather than inferred: `polygonsConvex` returned `true` for a hand-built dart over the
+kite's own ring, and `false` for the identical ring declared as a plain quadrilateral.
+
+**Decision — read the rings out of the macro's own EXPANSION.**
+
+A wider whitelist would drift again with the next macro, which is the mistake this codebase keeps paying
+for. Instead `declaredRings(cmd)` applies the SAME rule to the expanded commands: expand a
+`shape-variant` / `inscribe` through the engine's own `expandShapeVariant` / `expandInscribe` and take
+every polygon-creating command out of the result. A macro that lowers to a polygon inherits the guard by
+construction, with nothing to remember.
+
+Two details carry the design:
+
+- **A synthesised `polygon` counts only INSIDE an expansion.** A bare `polygon` command is the student
+  drawing an arbitrary ring («מצולע ABCDE»), which may legitimately be concave — a separate question,
+  deliberately not answered here. A macro's `polygon` is the boundary of a shape the student NAMED,
+  which is exactly what this default is about.
+- **The expansion is read with EMPTY explicit-equality / on-segment lists.** Those choose *which
+  variant* a macro emits; every variant of a macro declares the same ring, so reading it without them
+  cannot pick a different polygon.
+
+Memoized on the command object (immutable through the fold) because this runs per candidate
+configuration inside `meetsRequirements`, and `expandInscribe` enumerates placements.
+
+**#441's exemption survives, and now actually reaches these shapes.** A ring stated concave («דלתון קעור
+ABCD») is exempt from the default and checked only for simplicity — as before. That exemption was moot
+for a macro ring until now, because the guard did not see the ring at all.
+
+**Scope, stated honestly.** This widens `polygonsConvex`; it adds no call site. `firstSatisfyingSeed`
+keeps its narrower `ok` predicate (errors, extensions, crossings) — deliberately: display *quality* in
+the submit-path seed ladder is [#194](https://github.com/dcodish/geo_builder/issues/194)'s question, not
+this one's. So the effect is exactly where `polygonsConvex` was always consulted: `meetsRequirements`,
+the config search, and «הצג תצורה אחרת».
+
+**The corpus diff is the evidence.** Extending the default to macro rings changes which configuration is
+chosen for every figure containing a kite / isosceles / iso-trapezoid / midsegment / inscribed polygon,
+which is why #443 was split out of #441 rather than riding along. Any scenario whose chosen configuration
+moves was drawing concave-by-luck.
+
+**Locks.** `src/replay/__tests__/issue-443-macro-convexity.test.ts` (10 tests): the guard rejecting a
+dart over a kite ring and over an inscribed ring; the direct ring unchanged; the four MEASURED dart seeds
+asserted to draw concave and to fail `meetsRequirements`; a convex seed still passing; the stated-concave
+exemption; and a triangle-shaped macro untouched.
