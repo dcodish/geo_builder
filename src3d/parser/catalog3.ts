@@ -84,6 +84,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'points', he: "AE = 2EA'", en: "AE = 2EA'" },
   { category: 'points', he: "E מפגש התיכונים של משולש BC'D", en: "E is the centroid of triangle BC'D" },
   { category: 'points', he: 'O מפגש האלכסונים של הפאה ABCD', en: 'O is the intersection of the diagonals of face ABCD' },
+  // #834: the point-free arm — DRAW the base's diagonals without naming a crossing (2 prod users)
+  { category: 'points', he: 'אלכסוני הבסיס', en: 'diagonals of the base' },
   { category: 'points', he: 'A(2,-2,6)', en: 'A(2,-2,6)' },
   {
     // ADR-3D-032: one symbolic coordinate = the figure parameter (a later given pins it)

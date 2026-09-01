@@ -407,6 +407,17 @@ export interface DiagIntersectionCommand {
 }
 
 /**
+ * #834 — `אלכסוני הבסיס` / `אלכסוני ABCD` / `the diagonals of the base`: DRAW the quad's two diagonals,
+ * naming no crossing point. The point-free arm of {@link DiagIntersectionCommand}: same carrier, same
+ * `face` convention (`[]` = the "the base" sentinel, resolved by apply through the one shared helper),
+ * but it stops short of minting a point the student never named.
+ */
+export interface QuadDiagonalsCommand {
+  type: 'quad-diagonals';
+  face: Id[];
+}
+
+/**
  * 2020-Q2's `P על AM כך ש-KP = αu + βv`: P rides segment a–b, its t DRIVEN so the
  * vector vecFrom→P lies in span{span} of the declared basis — closed-form (the
  * complement coefficient is affine in t), the V1 embodiment of "1-DOF root-find only".
@@ -779,6 +790,7 @@ export type Command3 =
   | Segment3Command
   | Centroid3Command
   | DiagIntersectionCommand
+  | QuadDiagonalsCommand
   | PointInSpanCommand
   | ClaimCommand
   | Point3Command

@@ -87,6 +87,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # #846: this lane runs check-sibling-safety, which diffs against the PR base. At the
+          # default depth 1 that commit is not fetched and nothing can be classified.
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v5
@@ -109,6 +113,11 @@ jobs:
       - name: Test (2-D + shared server)
         run: npx vitest run src/ server/
 
+      # The sibling guarantee (ADR-W-017) applies to EVERY lane, not just complex (#846, operator
+      # ruling 2026-09-01). Before this, a 2-D-only PR got no sibling verification at all.
+      - name: Sibling safety (other products still build; no sibling file touched)
+        run: node scripts/check-sibling-safety.mjs --product 2d --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+
   test-3d:
     name: 3-D Space Builder (src3d/ + server/)
     needs: changes
@@ -116,6 +125,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # #846: this lane runs check-sibling-safety, which diffs against the PR base. At the
+          # default depth 1 that commit is not fetched and nothing can be classified.
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v5
@@ -136,6 +149,11 @@ jobs:
 
       - name: Test (3-D + shared server)
         run: npx vitest run src3d/ server/
+
+      # The sibling guarantee (ADR-W-017) applies to EVERY lane, not just complex (#846, operator
+      # ruling 2026-09-01). Before this, a 3-D-only PR got no sibling verification at all.
+      - name: Sibling safety (other products still build; no sibling file touched)
+        run: node scripts/check-sibling-safety.mjs --product 3d --base "${{ github.event.pull_request.base.sha || github.event.before }}"
 
   test-complex:
     name: Complex Builder (src-complex/ + shell/ + server/)
@@ -176,4 +194,4 @@ jobs:
       # The sibling guarantee (ADR-W-017) is the reason this lane exists at all: a change here
       # must not be able to regress a shipped product, and the check proves it in seconds.
       - name: Sibling safety (2-D and 3-D still build; no sibling file touched)
-        run: node scripts/check-sibling-safety.mjs --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+        run: node scripts/check-sibling-safety.mjs --product complex --base "${{ github.event.pull_request.base.sha || github.event.before }}"

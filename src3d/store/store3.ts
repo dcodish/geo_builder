@@ -27,6 +27,7 @@ import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { stripFormatControls } from '../../shell/bidi';
 import { applyCommand3, freeDims } from '../engine/apply';
+import { spaceDiagonals } from '../engine/baseShapes';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { scalePinned } from '../engine/solve3';
 import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
@@ -64,6 +65,11 @@ export type StoreError3 =
   /** #516: one letter as both the running parameter and a figure DOF — a recognized ambiguity
    *  surfaces a clarification and NEVER escalates to the LLM lane (which would guess). */
   | { code: 'param-roles-conflated'; letter: string }
+  // #836: «אלכסון ראשי» named none of the solid's four space diagonals. `pairs` is derived from the
+  // figure's own rings HERE, where the construction is known — `parse3` is context-free by design — so
+  // the message can name the candidates instead of asking a bare "which one?" that leaves a student who
+  // does not know the prime convention no better off.
+  | { code: 'ambiguous-main-diagonal'; pairs: string }
   /** The LLM decomposition lost part of the stated input (docs/24 S2.3 honesty gates) — `items` names
    *  the dropped labels/magnitudes; nothing was committed. */
   | { code: 'dropped-given'; items: string }
@@ -151,6 +157,20 @@ const refsCoordFrame = (claim: unknown): boolean => {
   walk(claim);
   return found;
 };
+
+/**
+ * #836 — the space diagonals of the figure's single solid, as a readable list («AC', BD', CA', DB'»).
+ *
+ * Derived from the solid's own rings ({@link spaceDiagonals}), never a hard-coded cube list, so a box or
+ * a quad prism answers correctly too. Empty when there is no single solid, or when the solid has none (a
+ * pyramid): the message then falls back to asking for letters without naming candidates, which is still
+ * honest — naming a candidate that does not exist would be worse than naming none.
+ */
+function mainDiagonalCandidates(st: { facts: Fact3[]; seed: number }): string {
+  const c = derive3(st.facts, st.seed).construction;
+  if (c.solids.length !== 1) return '';
+  return spaceDiagonals(c.solids[0].faces).map(([a, b]) => `${a}${b}`).join(', ');
+}
 
 export function derive3(facts: Fact3[], seed: number): Derived3 {
   let c: Construction3 = emptyConstruction3();
@@ -668,7 +688,9 @@ export const useGeo3 = create<Geo3State>()(
                 ? { code: 'ambiguous-vector-length' }
                 : parsed.reason === 'param-roles-conflated'
                   ? { code: 'param-roles-conflated', letter: parsed.letter }
-                  : { code: 'not-understood' },
+                  : parsed.reason === 'ambiguous-main-diagonal'
+                    ? { code: 'ambiguous-main-diagonal', pairs: mainDiagonalCandidates(get()) }
+                    : { code: 'not-understood' },
           });
           return;
         }
@@ -789,7 +811,9 @@ export const useGeo3 = create<Geo3State>()(
                 ? { code: 'ambiguous-vector-length' }
                 : parsed.reason === 'param-roles-conflated'
                   ? { code: 'param-roles-conflated', letter: parsed.letter }
-                  : { code: 'not-understood' },
+                  : parsed.reason === 'ambiguous-main-diagonal'
+                    ? { code: 'ambiguous-main-diagonal', pairs: mainDiagonalCandidates(get()) }
+                    : { code: 'not-understood' },
           });
           return false;
         }

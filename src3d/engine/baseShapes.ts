@@ -452,3 +452,27 @@ export function quadPyramidLayout(
   const [ax, ay, az] = top;
   return { ring, apex: { x: ax, y: ay, z: az } };
 }
+
+/**
+ * #836 — a solid's SPACE (main) diagonals, derived from its own rings.
+ *
+ * A space diagonal joins a base vertex to the vertex of the opposite ring that is diagonally across the
+ * solid — never an edge, never a face diagonal. Derived rather than hard-coded so a box, a cube and a
+ * quad prism all answer from the same rule, and so a solid kind added later needs no second list.
+ *
+ * `faces[0]` is the base ring by the base-first convention `faceIndices()` keeps for every kind; the
+ * opposite ring is the other face of the SAME size that shares no vertex with it. A pyramid has none
+ * (its apex is adjacent to every base vertex), so it correctly yields an empty list — "this solid has no
+ * main diagonal" is the honest answer there, not a guess.
+ *
+ * Only an EVEN base admits an exact opposite (i + n/2); an odd prism has no vertex directly across, so
+ * it yields nothing rather than rounding to a near-miss and calling it "the main diagonal".
+ */
+export function spaceDiagonals(faces: string[][]): [string, string][] {
+  const base = faces[0];
+  if (!base || base.length < 4 || base.length % 2 !== 0) return [];
+  const n = base.length;
+  const top = faces.slice(1).find((f) => f.length === n && f.every((v) => !base.includes(v)));
+  if (!top) return [];
+  return base.map((v, i) => [v, top[(i + n / 2) % n]] as [string, string]);
+}

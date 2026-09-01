@@ -59,6 +59,13 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.ambiguousVectorLength');
     case 'param-roles-conflated':
       return t('err.paramRolesConflated', { letter: err.letter });
+    // #836: name the candidates — a bare "which diagonal?" leaves a student who does not know the prime
+    // convention no better off. `pairs` is empty only when the figure has no single solid with space
+    // diagonals, and the message then asks for letters without inventing candidates.
+    case 'ambiguous-main-diagonal':
+      return err.pairs
+        ? t('err.ambiguousMainDiagonal', { pairs: err.pairs })
+        : t('err.ambiguousMainDiagonalBare');
     case 'dropped-given':
       return t('err.droppedGiven', { items: err.items });
     case 'not-understood':

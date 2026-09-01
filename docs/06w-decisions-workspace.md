@@ -1610,3 +1610,62 @@ drove and looked at. Everything else is headless verification and must be descri
 distinction the play sheet now draws for the operator (`.claude/memory/no-browser-self-test.md`).
 
 Workflow text: docs/22 §4 steps 4–5. Command: `npm run smoke:visual [-- --app 2d|3d|complex] [-- --base URL]`.
+
+## ADR-W-036 — The sibling guard's VIEWPOINT is a parameter, and an unreachable base stops the run (#846)
+
+**Context.** `scripts/check-sibling-safety.mjs` is the mechanical form of the operator's standing
+requirement (2026-08-16): *"as we continue evolving this complex tool we gain capability, but we never,
+never, never harm the other tools that are running."* Round #843 found it crashing before any test ran:
+
+```
+fatal: ambiguous argument 'HEAD~1...HEAD': unknown revision or path not in the working tree.
+```
+
+Two defects, and the second hid the first.
+
+**1 — The fallback answered a different question, then died.** `changedFiles()` verified the requested
+base and, failing that, silently retargeted to `HEAD~1`. On a depth-1 CI clone the PR base is not
+fetched *and neither is `HEAD~1`*, so the fallback that existed to make a fresh clone work was itself
+what killed the lane. The silent retarget was the worse half: a sibling check that compares the wrong
+range reports PASS over a diff nobody asked about.
+
+**2 — The guard had one hard-coded viewpoint, so only one lane could run it.** `SIBLING_PREFIXES`
+listed `src/` and `src3d/`; `COMPLEX_PREFIXES` listed `src-complex/`. That is the complex product's
+point of view baked into the file. Pointed at a 2-D branch the guard would have refused every
+legitimate `src/` edit as a sibling violation — so it ran only in `test-complex`, and a 2-D-only or
+3-D-only PR got **no sibling verification at all**. The guarantee (ADR-W-017) was enforced on one
+product out of three.
+
+**Decision.**
+
+- **A product REGISTRY** (`PRODUCTS`) holds each product's own prefixes and its build script; the
+  viewpoint is a `--product` argument (`2d` | `3d` | `complex`, default `complex`). `own` is the tree
+  the change may touch, `sibling` is any other product's tree, and the builds that run are the
+  siblings' — building the tree you just changed proves nothing about a sibling. Adding product N+1 is
+  one row (docs/22 §9), not a fourth hand-maintained list.
+- **Longest-prefix ownership** (`productOf`) replaces the ordered `if`s. The old code carried the
+  comment *"Order matters: `src-complex/` would otherwise match the `src/` sibling prefix"* — a
+  correctness property held by list order is exactly the mirror-drift shape this workspace keeps
+  retiring (ADR-W-004 family). Longest-match cannot be broken by reordering.
+- **An unreachable base stops the run.** Try the base, then try to fetch it (`git fetch --depth=1
+  origin <sha>` — GitHub serves an explicit sha), and otherwise **refuse**: a readable message naming
+  the likely cause (a shallow checkout) and the fix, plus exit 1. Never a silent retarget. The CLI
+  entry point catches it and prints the message rather than a stack trace — "loudly" means legible in
+  the last lines of a CI log, not a Node traceback.
+- **Every lane runs the guard** — `test-2d --product 2d`, `test-3d --product 3d`, `test-complex
+  --product complex`, each with `fetch-depth: 0`. This is the operator's ruling of 2026-09-01, asked as
+  step 3 of the issue: *"yes — test-2d and test-3d should run the sibling check too."*
+
+**Why not just `fetch-depth: 0` on the complex lane.** Round #843 already applied that one-line unblock
+so PR #844 could go green, and filed the rest. It stops the crash and leaves both real defects: a
+fallback that lies when it does not crash, and a guarantee enforced for one product in three.
+
+**Evidence.** The same 9-file diff, classified from two viewpoints: `--product complex` REFUSES it (4
+files under `src/` are a sibling tree) while `--product 2d` PASSES it (those 4 are `own`, 0 sibling) and
+builds 3-D and complex instead. An unreachable base exits 1 with the readable refusal and no stack.
+
+**Locks.** `server/__tests__/sibling-safety.test.ts` (14 tests, in `server/` so it runs in EVERY lane —
+the script belongs to no product): the same file is `own` to its product and `sibling` to the other two;
+a 2-D slice sees both others as siblings; every registered product is a usable viewpoint owning its
+whole tree; `productOf` resolves by longest prefix, not list order; an unknown viewpoint THROWS rather
+than silently classifying everything as sibling; and the partition is total under every viewpoint.

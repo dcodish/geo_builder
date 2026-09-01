@@ -221,6 +221,16 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     ui.setBusy(false);
     return;
   }
+  // #835 — a polygon noun outside the supported bare set. The operator's ruling is that the rest are
+  // NOT supported and say so BY NAME: escalating would hand the LLM a shape it can only invent, and the
+  // student would get a figure they never described. Naming what DOES build turns a refusal into a
+  // usable next step.
+  if (!r.ok && r.reason === 'polygon-not-supported') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `polygon-not-supported:${r.noun}` });
+    ui.setInputNote(t('input.polygonNotSupported', { noun: r.noun, offer: r.offer.join(', ') }));
+    ui.setBusy(false);
+    return;
+  }
   // A single-vertex angle ("∠B = 90") the parser flagged as ambiguous (the vertex has ≠2 edges, so WHICH
   // angle is meant is unclear) — ask the student to name all three letters instead of escalating to the LLM
   // (which would only guess). Keep the text so they can edit it into the three-letter form.
