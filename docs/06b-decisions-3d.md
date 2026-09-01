@@ -6570,3 +6570,55 @@ a driving relation reports nothing; a false relation still refuses; a bare figur
 #396 `redundant-relation`, #842 `containment-redundant`, this). They should converge on one channel
 with a per-relation entailment test; filed as **#853** rather than done here, since converging them
 is a refactor with no user-visible change and belongs in its own pass.
+
+## ADR-3D-199 — «אלכסוני הבסיס» DRAWS; the point-free arm of an existing construct (#834)
+
+**Context.** Two unrelated prod users, the same lesson, 2026-08-23, on a square pyramid:
+
+```
+פירמידה ישרה מרובעת            ✓ solid, concyclic
+אלכסוני הבסיס נפגשים בנקודה O  ✓ diag-intersection      ← the construct EXISTS
+אלכסוני הבסיס                  ✗ not-handled            ← just DRAW them
+הוסף אלכסוני בסיס              ✗ not-handled            ← both users typed this exact line
+```
+
+Both refusals escalated to the paid LLM, which built something for one user and failed the other.
+
+**Diagnosis (docs/17 class-first).** Not a missing construct — a **missing ARM of an existing one**. The
+base carrier and the diagonal pair both existed and were reachable *only* through the form that names the
+crossing: `diagIntersection` requires an intersection verb (`מפגש|נפגש|נחתכ|חיתוך|intersect|meet`), so a
+sentence that merely names the diagonals fell past it into `not-handled`.
+
+**Decision.** A `quad-diagonals` command — the point-free twin of `diag-intersection`, same `face`
+convention (`[]` = the "the base" sentinel) — lowered to the two diagonal segments and **no point**. Not
+minting a crossing is the whole difference: the student named none, and inventing one would put a label on
+the figure they never wrote (ADR-052).
+
+**The ruling routes through the existing chokepoint, it does not re-decide.** The operator's ruling —
+*"diagonals of base should relate to the bottom base of a shape"* — was **already implemented**: `face: []`
+resolves to `c.solids[0].faces[0]`, and `faceIndices()` keeps the base ring first for every solid kind. So
+the constraint on this change is that it must reach that same resolution rather than compute a base of its
+own. The sentinel logic is now a shared helper, `resolveQuadRing`, called by both commands — a second
+resolver is exactly how the two forms would drift apart, and a prism has two candidate rings, so the top
+one must never be picked by an independent guess.
+
+**Refusals that stay refusals.** Two solids present ⇒ `unknown-plane: base` — which base is meant is the
+student's to say (ADR-052), never a silent pick; naming the ring («אלכסוני EFGH») resolves it. A
+non-quad base ⇒ `no-solution` — a triangle has no diagonals, and that is said rather than silently skipped.
+
+**Ownership.** `diagIntersection` is registered first and keeps every sentence with an intersection verb;
+this rule additionally declines those explicitly, so ownership does not rest on registry order alone.
+
+**The imperative is tolerated, not ruled on.** «הוסף אלכסוני בסיס» builds, because the neighbouring height
+rule already tolerates a leading «שרטטו/ציירו/העבירו» via its `IMP` fragment and consistency beats a
+local exception. [ADR-W-030](06w-decisions-workspace.md) (#778) re-decides imperatives for every rule at
+once — *state the given, don't command the tool* — and when it lands this fragment goes with the rest.
+
+**Out of scope.** The users' fuller line «קובייה ABCD **עם** אלכסון ראשי» is the shape-plus-construct
+family (#461), and «אלכסון ראשי» itself is #836. Neither is touched here.
+
+**Locks.** `src3d/__tests__/issue-834-base-diagonals.test.ts` (15 tests): all four point-free spellings
+lower to `quad-diagonals` with the sentinel; «אלכסוני ABCD» names its ring; the crossing form still
+belongs to `diagIntersection` and the singular «אלכסון AC'» is still a segment; the diagonals are AC and
+BD of the BOTTOM ring on pyramid, prism and box (the prism's top ring being the trap); no point is minted;
+re-issuing is idempotent; and both refusals hold.

@@ -1227,6 +1227,46 @@ const diagIntersection: Rule = (s) => {
 };
 
 /**
+ * #834 — `אלכסוני הבסיס` / `אלכסוני ABCD` / `the diagonals of the base`: DRAW the quad's two diagonals,
+ * naming no crossing point.
+ *
+ * Two prod users (2026-08-23, same lesson) typed «אלכסוני הבסיס» and «הוסף אלכסוני בסיס» on a square
+ * pyramid. Both were not-handled and escalated to the paid LLM, which built something for one and failed
+ * the other — while «אלכסוני הבסיס נפגשים בנקודה O» built fine. This is a missing ARM of an existing
+ * construct, not a new construct: the base carrier and the diagonal pair both existed and were reachable
+ * ONLY through the form that names the crossing.
+ *
+ * Ownership: `diagIntersection` runs FIRST and owns any sentence with an intersection verb, so the
+ * naming form is untouched; this rule declines those explicitly rather than relying on order alone.
+ *
+ * The leading imperative («הוסף…») is tolerated exactly as the height rule's `IMP` fragment tolerates
+ * «שרטטו/ציירו/העבירו» — consistency with the neighbouring rules, not a ruling. [ADR-W-030](
+ * ../../docs/06w-decisions-workspace.md) (#778) re-decides imperatives for every rule at once; when it
+ * lands, this fragment goes with the rest.
+ */
+const quadDiagonals: Rule = (s) => {
+  if (!/אלכסונ|diagonal/i.test(s)) return null;
+  // the crossing form owns any sentence that names a meeting point (belt and braces over rule order)
+  if (/מפגש|נפגש|נחתכ|חיתוך|intersect|meet/i.test(s)) return null;
+  const IMP = String.raw`(?:(?:שרטטו?|ציירו?|העבירו?|נעביר|הוסיפו?|הוסף)\s+(?:את\s+)?)?`;
+  // PLURAL only: «אלכסון AC'» is a single named segment and belongs to the diagonal-noun rule.
+  const HE_DIAGS = String.raw`ה?אלכסונ(?:ים|י)\s*(?:של\s+)?`;
+  const EN_DIAGS = String.raw`(?:the\s+)?diagonals\s+(?:of\s+)?`;
+  const BASE = String.raw`(?:ה?בסיס(?:\s+(?:של\s+)?ה?\S+)?|(?:the\s+)?base(?:\s+of\s+the\s+\S+)?)`;
+  // (a) THE BASE — the sentinel; apply resolves it to the single solid's base ring.
+  if (new RegExp(`^${IMP}(?:${HE_DIAGS}|${EN_DIAGS})${BASE}\s*$`, 'i').test(s.trim())) {
+    return [{ type: 'quad-diagonals', face: [] }];
+  }
+  // (b) A NAMED QUAD — «אלכסוני ABCD» — the same lowering with the ring spelled out.
+  const named = new RegExp(`^${IMP}(?:${HE_DIAGS}|${EN_DIAGS})((?:${LBL})+)\s*$`, 'i').exec(s.trim());
+  if (named) {
+    const ids = named[1].match(TOKEN) ?? [];
+    if (ids.length === 4 && new Set(ids).size === 4) return [{ type: 'quad-diagonals', face: ids }];
+  }
+  return null;
+};
+
+/**
  * #819 (ADR-3D-177) — the SEGMENT × PLANE-RUN cell of ⟂/∥: either relation, either ORDER, either
  * NOTATION, read through the shared operand seam (ADR-3D-140's `readRelationSides`).
  *
@@ -3918,6 +3958,7 @@ export const RULES: Rule[] = [
   nameVectors,
   centroidRule,
   diagIntersection, // `מפגש האלכסונים` — before onSegment/midpoint grab the tokens
+  quadDiagonals, // #834 `אלכסוני הבסיס` — AFTER diagIntersection, which owns the naming form
   bisectorPoint, // V8-f (G11): `D על AC כך ש-OD חוצה זווית AOC` — before onSegment grabs `D על AC`
   segPlaneRel, // #819: segment × plane-run, ⟂ and ∥, either order, either notation
   perpSegGiven, // issue #14: `SM ⊥ DB` / `u ⊥ v` — after segPlaneRel (3–4-point targets are planes)
