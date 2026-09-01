@@ -6967,3 +6967,81 @@ midpoint (He + En); the plane-carrier spelling reaching the SAME K (the carrier 
 claim of the fix); entry-order permutation with the pins after the relation (M2 law (i)); the DOF cue's
 0 → 1 → 0; a relation no `t` satisfies still refusing («SB מקביל למישור ACK»); and an unmentioned rider
 still sampled and seed-varying.
+
+### ADR-3D-205 — an angle's ARM is an operand kind, not a spelling (#862)
+
+**The hollow row.** `relationTable` declared `angle|segment|vector` **supported**, with actions
+`['drive-dims', 'claim']` and the note *"cos-angle with value (V8-f)"*. **No utterance reached it.** Five
+phrasings — both `קוסינוס … הוקטורים` orders, `קוסינוס … לבין`, and both degree forms — all returned
+`not-understood`. It is the one hollow cell the [#845](https://github.com/dcodish/geo_builder/issues/845)
+sweep found (ADR-3D-202), and it was left filed rather than fixed because that round was scoped to the
+sweep.
+
+**Root cause — the same enumeration, in two rules.** Nothing was missing from the engine. `cos-angle`
+takes two `VecAtom`s and a `VecAtom` is `named | pair`, so the mixed relation was always representable;
+the ⟂ twin over the identical operand kinds («AB מאונך ל-v») builds, and both single-kind angle cells
+build. What was missing was a sentence, because each of the two VALUE-form angle rules spelled its own
+operand shapes:
+
+| rule | what it captured | what it therefore could not read |
+| --- | --- | --- |
+| `angleSegClaim` (degrees) | two hard-coded point-pair captures `([A-Z]…)([A-Z]…)` | any vector arm |
+| `cosAngleGiven` (cosine) | two `[a-w]` letters | any segment arm |
+
+So the mixed pair fell between them in **both** lanes. This is `src3d/CLAUDE.md`'s standing trap — *"an
+enumeration is not a rule"* — and it is why the answer is a seam, not a sixth regex.
+
+**Decision — every angle arm is read through the shared operand seam.**
+
+`readOperand` / `readRelationSides` (ADR-3D-140, widened by #522) already classify a side by what the
+token IS, strip an optional noun including the plural head form, and handle the conjoined frame. The
+angle family now uses it, and a two-line `vecAtomOf` says which of the seam's kinds are *arms*:
+
+- `segment` → `{ kind: 'pair' }`; `vector` → `{ kind: 'named' }`;
+- **everything else → `null`**, so a line / plane / point arm declines and the rules that own those
+  cells (`linePlaneAngle`, `angleBetweenPlanes`, `lineRelAngle`, `planeRelAngle`) keep them. The decline
+  is the load-bearing half: widening a rule's reach is only safe if it still refuses its neighbours' work.
+
+Three call sites converge on it — `angleSegClaim`, `cosAngleGiven`'s between-branch, and
+`angleOperand3` (the between-form atom shared by the angle-EQUALITY rule, #337/ADR-3D-088), which had
+its own singular-only noun list and so failed «הוקטורים AB ו-v» while the singular twin parsed.
+
+**Two lowerings, chosen by the arms and never by the sentence.** `pair × pair` keeps the frozen
+`angle-seg-eq` claim it has always produced — that cell does not move. Any **vector** arm lowers to
+`cos-angle` at `cos(deg)`, which is the `angle|vector|vector` cell's own lowering, inherited rather than
+re-invented; so «הזווית בין AB לבין v היא 60» and «קוסינוס הזווית בין AB לבין v הוא 1/2» produce the
+same command, as one fact stated two ways should.
+
+**Deviation from the issue's suggested seam, and why.** #862 proposed `readRelationSides` verbatim, the
+migration ADR-3D-177 performed for the ⟂/∥ segment×plane cell. That is what happens — with a converter,
+because `readRelationSides` yields `Operand3` while the angle commands carry `VecAtom`. Naming that
+conversion (`vecAtomOf`) rather than inlining it is what lets the *same* two lines state which kinds are
+arms for all three rules, instead of each one re-deciding.
+
+**The ratchet did its job, and is now empty.** #845's `KNOWN_UNREACHABLE` entry asserted this cell was
+*still* unreachable; making it work failed that test, exactly as designed, and forced the entry's
+deletion. The cell moved into `PENDING_PROBES`, where it is checked like every other supported cell, and
+the honesty test was rewritten to iterate the map rather than name one cell — so the next hollow row
+inherits the same net without anyone rebuilding it. A new guard asserts a cell can never be both probed
+and known-unreachable.
+
+**Not converged: `perpOperand`.** The ⟂ family has its own private arm reader, and it is the same
+private spelling one lane over. It is deliberately left alone: its cell **works** (that is #862's own
+evidence that the mixed-operand seam is fine), so converging it would be refactoring a correct reader
+inside a bug fix, and its callers pre-strip their nouns differently. Recorded here so the next pass at
+the operand seam knows it is the remaining one.
+
+**Catalog.** «הזווית בין AB לבין v היא 60» / «the angle between AB and v is 60» joins `catalog3.ts`
+— the coverage map is where a student finds out the cell exists, and a capability absent from it is
+advertised to no one.
+
+**Gates.** Shadow-matrix WINNERS snapshot regenerated: **additions only** (the two new catalog rows, both
+won by `angleSegClaim`), **no existing winner changed** — which is the property that snapshot defends.
+The HARD allowlist gate passed unchanged.
+
+**Locks.** `src3d/__tests__/issue-862-angle-mixed-arm.test.ts` (15 tests): all five reported frames plus
+the two English mirrors building end-to-end; both operand orders reaching the relation; the degree and
+cosine frames asserted to carry the SAME value; the exact command list for the mixed form (the pair arm
+drawn, the vector arm not re-declared); the two neighbouring cells asserted byte-for-byte unchanged,
+including the exam's noun-carrying wording; the line/plane arms still going to their owners; and the ⟂
+twin unchanged. Plus the #845 sweep, now with the cell in the probe table.
