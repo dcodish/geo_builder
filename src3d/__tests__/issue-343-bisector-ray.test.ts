@@ -134,3 +134,58 @@ describe('#342 — the perpendicular bisector is a decided NON-feature, not a ga
     run('פירמידה משולשת ABCD', 'M אמצע AB');
   });
 });
+
+/**
+ * #343 PLAY-FINDING (operator, 2026-09-01) — the two-statement route must reach the same figure.
+ *
+ * Playing the new construct, the operator typed «OD חוצה זווית AOC» and then «D על AC», and the second
+ * line was refused *"הטענה לא מתקיימת בציור"* — the tool telling them their statement was false about a
+ * figure it had drawn from an arbitrary choice of its own. It is not false: the bisector of ∠AOC meets
+ * AC at exactly one point, and the tool's OWN one-sentence form «D על AC כך ש-OD חוצה זווית AOC» finds
+ * it.
+ *
+ * This is the #820 class returning with a new rider kind — the answer depending on which sentence
+ * carried the free DOF — so the lock is written as the two routes AGREEING, not as one of them working.
+ */
+describe('#343 play — a membership DETERMINES the bisector rider, it does not judge it', () => {
+  beforeEach(() => st().clear());
+
+  it('«OD חוצה זווית AOC» then «D על AC» builds — it used to be refused claim-refuted', () => {
+    run('פירמידה משולשת AOCB', 'OD חוצה זווית AOC', 'D על AC');
+  });
+
+  it('the two-statement route and the one-sentence carrier form reach the SAME point', () => {
+    run('פירמידה משולשת AOCB', 'OD חוצה זווית AOC', 'D על AC');
+    const two = derive3(st().facts, 0).construction.points.get('D');
+    st().clear();
+    run('פירמידה משולשת AOCB', 'D על AC כך ש-OD חוצה זווית AOC');
+    const one = derive3(st().facts, 0).construction.points.get('D');
+    expect(two).toEqual(one);
+    expect(two).toEqual({ kind: 'bisector-seg', a: 'A', b: 'C', apex: 'O' });
+  });
+
+  it('…and D really lands on AC, with the angle still bisected', () => {
+    run('פירמידה משולשת AOCB', 'OD חוצה זווית AOC', 'D על AC');
+    const d = derive3(st().facts, 0);
+    const [A, C, O, D] = ['A', 'C', 'O', 'D'].map((id) => d.positions.get(id)!);
+    // on segment AC: the cross product of A→D and A→C vanishes, and D is between them
+    const AD = { x: D.x - A.x, y: D.y - A.y, z: D.z - A.z };
+    const AC = { x: C.x - A.x, y: C.y - A.y, z: C.z - A.z };
+    const cross = Math.hypot(AD.y * AC.z - AD.z * AC.y, AD.z * AC.x - AD.x * AC.z, AD.x * AC.y - AD.y * AC.x);
+    expect(cross / Math.hypot(AC.x, AC.y, AC.z) ** 2, 'D is on line AC').toBeLessThan(1e-6);
+    const t = (AD.x * AC.x + AD.y * AC.y + AD.z * AC.z) / (AC.x ** 2 + AC.y ** 2 + AC.z ** 2);
+    expect(t, 'strictly between A and C').toBeGreaterThan(0);
+    expect(t, 'strictly between A and C').toBeLessThan(1);
+    expect(dot(unit(O, D), unit(O, A))).toBeCloseTo(dot(unit(O, D), unit(O, C)), 8);
+  });
+
+  it('a membership on some OTHER segment is a different construction — still the claim lane', () => {
+    // the bisector of ∠AOC meeting BC is not what `bisector-seg` root-finds, so it must not be
+    // silently re-homed; it stays a claim, exactly as before.
+    st().clear();
+    run('פירמידה משולשת AOCB', 'OD חוצה זווית AOC');
+    st().submit('D על BC');
+    const def = derive3(st().facts, 0).construction.points.get('D');
+    expect(def).toMatchObject({ kind: 'bisector-ray' });
+  });
+});

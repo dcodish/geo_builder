@@ -1669,3 +1669,59 @@ the script belongs to no product): the same file is `own` to its product and `si
 a 2-D slice sees both others as siblings; every registered product is a usable viewpoint owning its
 whole tree; `productOf` resolves by longest prefix, not list order; an unknown viewpoint THROWS rather
 than silently classifying everything as sibling; and the partition is total under every viewpoint.
+
+### ADR-W-037 — the tier artifact carries shared state and nothing else (#812)
+
+**What happened.** Every parallel PR in a fix round conflicted against `main` on exactly one file —
+`reports/test-tiers.json` — and on nothing else. Round #800 predicted it, pre-emptively STACKED four PRs
+to route around it, and that stack's own failure mode (a `--delete-branch` on the stack base auto-closing
+the next PR) cost a recovery session.
+
+**Root cause.** [ADR-W-035](#adr-w-035) made the tier RULE machine-independent — membership is the
+heaviest files holding a share of suite time, a ratio, invariant under a uniform speed difference. The
+**artifact** was not. It still recorded two kinds of content with different lifetimes:
+
+| field | what it is | who reads it |
+| --- | --- | --- |
+| `slow[].file` | tier MEMBERSHIP — shared state, identical on every machine | `test:fast` builds its `--exclude` list from it |
+| `slow[].ms`, `measuredCutoffMs` | the writing machine's wall clock | **nobody** — `classifySlow` measures the CURRENT run |
+
+The write guard was already correct (*"rewrite only when the SET of slow files actually changed"*), and
+the file's own `_comment` claimed the timings were informational *"so a faster or slower PC no longer
+produces a diff"*. **That promise was not kept**: when membership legitimately changed — which any round
+adding a slow test does — the rewrite carried the machine's numbers along. Two branches each adding a
+test wrote two different `measuredCutoffMs` and two different `ms` columns on top of one real one-line
+change.
+
+**Decision — serialize the shared state, report the rest.** One exported `serializeTiers`, with three
+properties, each load-bearing for MERGING rather than for reading:
+
+1. **No timings.** `slow` is a list of paths; `measuredCutoffMs` is gone. The cutoff this machine
+   measured is now *printed* by the run that measured it, which is where a diagnostic belongs.
+2. **Sorted by PATH, not by measured time.** Not in the issue's plan, and necessary: the old order was
+   the machine's speed ranking, so keeping it would have re-introduced the identical churn one field over
+   — a file that merely got faster would move up the list.
+3. **One line per entry**, so a membership change is an insertion git can merge with another insertion.
+
+One tolerant reader (`slowFiles`) serves all four consumers and accepts the old object shape, so a
+working copy that predates the change still runs.
+
+**Measured, and stated exactly.** Through `git merge-file`, two branches that each add a slow file — each
+reporting wildly different timings for the shared files, the real cross-machine case — merge **cleanly**
+when the insertions land in the middle, and cleanly when one lands at the end. The **one** residue is two
+additions that BOTH sort to the very end: JSON's trailing comma makes each rewrite the previous last
+line. The issue's plan called that out in advance, and the difference is the point — that conflict is two
+real membership changes, it resolves by keeping both lines, and no number is ever inside it. All three
+cases are asserted, including the residual one, so the limit is recorded rather than discovered again.
+
+**`updatedAt` stays.** It is printed by `test:fast`, and the write guard means it changes only when
+membership does — so it is part of the membership record, not per-run noise.
+
+**Scope note.** This is not a gitignore proposal: the artifact stays committed and the write guard stays,
+both correct and load-bearing ([docs/08](08-testing-strategy.md), [ADR-394](06-decisions.md#adr-394)).
+
+**Locks.** `server/__tests__/test-tiers.test.ts` (7 new): no timing field in the serialized bytes;
+path-sorted (asserted by serializing the same set in two orders and demanding byte equality); one line
+per entry; the three measured merge outcomes; and the artifact **on disk** asserted to be in the new
+shape, so it can never quietly regress to timings. They live beside #484's, in `server/`, because the
+shared-server tests run in every per-product lane and this script belongs to no product.

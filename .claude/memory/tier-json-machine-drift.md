@@ -1,21 +1,26 @@
 ---
 name: tier-json-machine-drift
-description: reports/test-tiers.json drifts wholesale between the two PCs because it stores raw ms — don't commit the churn
-metadata:
+description: "reports/test-tiers.json no longer stores timings (#812) — a diff in it is now a real membership change, but membership can still differ per machine"
+metadata: 
+  node_type: memory
   type: project
+  originSessionId: f2fd245a-2843-40f3-a231-fcfa4334f955
+  modified: 2026-09-01T16:36:57.228Z
 ---
 
-`npm run test:full` rewrites `reports/test-tiers.json` with **absolute milliseconds**, so the same
-green suite produces a different file on each of David's two PCs — the home PC ran ~30% faster than
-the office PC on 2026-08-30, which moved `measuredCutoffMs` (64346 → 35379) and reshuffled slow-tier
-membership even though nothing about the code changed.
+**Superseded in part by #812 / ADR-W-037 (2026-09-01, round #864).** The artifact no longer carries
+`slow[].ms` or `measuredCutoffMs` — it holds the tier MEMBERSHIP as file paths, sorted by path, one per
+line. So the old failure mode is gone: a green suite on either PC no longer rewrites the file just
+because the clock differed, and two branches that each add a slow test now merge as two insertions
+instead of conflicting on a column of numbers.
 
-**Why:** the file is a measurement, not a decision. Committing it from whichever machine happened to
-run last makes it ping-pong across every cross-machine round ([[work-pc-cross-machine]]), and the diff
-looks like a real change to the next session.
+**What is left.** A diff in this file is now a REAL membership change — but membership can still differ
+between the two PCs, because the relative rule (the heaviest files holding 75% of suite time) is
+invariant under a *uniform* speed difference and the machines are not uniformly different (core counts
+change per-file wall time unevenly). So it can still ping-pong across a cross-machine round
+([[work-pc-cross-machine]]), just without the noise on top.
 
-**How to apply:** after a full run whose only dirt is `reports/test-tiers.json`, check whether membership
-moved for a *reason* (a genuinely new slow file) or just from timing. Timing-only → `git checkout --` it
-and deploy/commit the clean tree; the tooling's "commit test-tiers.json" hint is not a per-run obligation.
-The conservative membership is the one measured on the SLOWER machine, so keeping the office-measured
-file costs nothing at home.
+**How to apply:** after a full run, read the diff. Paths only, and it names which files joined and left →
+that is the measurement talking, commit it (the script prints the same list). If you ever see an `ms` or
+`measuredCutoffMs` line reappear, something regressed #812 and `server/__tests__/test-tiers.test.ts` should
+have caught it. The conservative membership is still the one measured on the SLOWER machine.

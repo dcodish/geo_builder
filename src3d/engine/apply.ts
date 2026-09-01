@@ -981,6 +981,32 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
             return { ok: true, next };
           }
         }
+        /**
+         * #343 play-finding — THE SAME RULE, ONE RIDER KIND OVER.
+         *
+         * A `bisector-ray` point's distance along the ray is undetermined (the sentence that made it
+         * said the direction and nothing else), so a stated MEMBERSHIP is the given that DETERMINES
+         * it — the point where the bisector meets the segment — not a claim to check against a
+         * position nothing had chosen. Exactly the reasoning of the `on-segment` branch above.
+         *
+         * Without this, «OD חוצה זווית AOC» + «D על AC» refused `claim-refuted` — *"the claim does not
+         * hold in the drawing"* — while the ONE-sentence carrier form «D על AC כך ש-OD חוצה זווית AOC»
+         * builds the identical figure. Two spellings of one construction disagreeing is the #820 class
+         * this round already fixed for the on-segment rider, and it must not come back with a new kind.
+         *
+         * The segment must SPAN the angle's own rays, which is the classic case (a triangle's bisector
+         * meeting the opposite side) and what `bisector-seg` root-finds. A membership on some other
+         * segment is a different construction and still falls through to the claim lane.
+         */
+        if (rider?.kind === 'bisector-ray' && cmd.t === undefined) {
+          const spans =
+            (rider.a === cmd.a && rider.b === cmd.b) || (rider.a === cmd.b && rider.b === cmd.a);
+          if (spans) {
+            const next = clone(c);
+            next.points.set(cmd.id, { kind: 'bisector-seg', a: cmd.a, b: cmd.b, apex: rider.apex });
+            return { ok: true, next };
+          }
+        }
         if (cmd.t !== undefined) {
           return applyCommand3(c, {
             type: 'vec-rel',

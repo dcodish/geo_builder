@@ -1845,6 +1845,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "the angle between AB and v is 60",
+    "winner": "angleSegClaim",
+  },
+  {
+    "lang": "he",
+    "text": "הזווית בין AB לבין v היא 60",
+    "winner": "angleSegClaim",
+  },
+  {
+    "lang": "en",
     "text": "u·v = v·w = u·w",
     "winner": "dotEqGiven",
   },

@@ -28,6 +28,7 @@
  * chain-form vector statement and its length reading agree — and why the NON-chain vector spelling
  * `AE = 2·A'E` (vectors ⇒ t = 2, off the segment; lengths ⇒ t = ⅔) is deliberately not guessed at.
  */
+import { sample } from './rng';
 import type { Id } from './types';
 
 /** A determined parameter, or `'invalid'` when the letters do not describe this rider's two halves. */
@@ -57,4 +58,21 @@ export function riderPairsT(id: Id, a: Id, b: Id, p1: Id, x: Id, y: Id, q1: Id, 
   const outer2 = y === id ? q1 : y;
   if (outer1 === id || outer2 === id) return 'invalid'; // a degenerate pair (|AE| = k·|EA|)
   return halvesT(a, b, outer1, outer2, k);
+}
+
+/**
+ * #820 — THE RIDER'S SAMPLED PARAMETER, IN ONE PLACE.
+ *
+ * A free rider (`K על SB`, no ratio stated) has no determined `t`, so one is SAMPLED per seed. That
+ * value is read in two layers now: the evaluator places the point at it, and the pivot uses it as the
+ * START and the soft ANCHOR of the rider's solved unknown (ADR-3D-204). Two spellings of the same key
+ * would put the solver's anchor on a different configuration than the one the evaluator draws — a
+ * silent disagreement no test would name — so the key lives here, with the rest of the rider's
+ * arithmetic, and both layers call it.
+ *
+ * `solve3` must not import `evaluate` (evaluate imports solve3), which is why this is not a private
+ * helper in the evaluator.
+ */
+export function riderSampleT(seed: number, id: Id, a: Id, b: Id): number {
+  return sample(seed, `t-${id}-${a}-${b}`, 0.22, 0.78);
 }

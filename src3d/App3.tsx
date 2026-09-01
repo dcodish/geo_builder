@@ -592,6 +592,14 @@ export default function App3() {
           {/* THE SHARED INPUT AREA (B4, the shared-components rule): box, palette, preview seam
               and quick strip exist ONCE in shell/. The #482 preview discipline is preserved by
               the props: inputPreview3 gates it, textDir3 sets its base direction (#118). */}
+          {/* #868: the BOX takes its base direction by CONTENT, exactly as 2-D does. `dir="auto"` keys
+              off the first strong character, so «D על AC» — a Hebrew sentence that happens to open with
+              a point label, i.e. most of them — took an LTR base and laid out left-aligned while the
+              preview beneath it laid out RTL: the box contradicting the very thing the preview exists
+              to compensate for. This is NOT the `dir="ltr"` that #118 reverted, nor the isolate
+              injection ADR-3D-184's ruling forbids — the typed value stays raw and only the BASE
+              follows the content, through the same `textDir3` the preview already uses, so the two
+              cannot disagree. */}
           <InputArea
             value={text}
             onChange={setText}
@@ -603,6 +611,7 @@ export default function App3() {
             symbols={SYMBOL_SPECS_3}
             preview={(s) => inputPreview3(s)}
             previewDir={(s) => textDir3(s)}
+            boxDir={(s) => textDir3(s)}
           />
           {/* No example strip above the box (operator ruling 2026-08-18): the examples are the
               CLEAN-CANVAS QuickChips (below) and, with B7, the manual screen. */}

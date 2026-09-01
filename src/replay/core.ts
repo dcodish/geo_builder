@@ -2192,6 +2192,48 @@ export function commandObjectIds(cmd: AnyCommand): Id[] {
 const POLYGON_SHAPES = new Set(['square', 'rectangle', 'rhombus', 'parallelogram', 'trapezoid', 'quadrilateral']);
 
 /**
+ * #443 (ADR-479) — EVERY polygon ring a fact DECLARES, macros included.
+ *
+ * `polygonsConvex` used to read `cmd.ids` off facts whose `cmd.type` is in `POLYGON_SHAPES`. A named
+ * shape declared through a MACRO — kite, isosceles, iso-trapezoid, midsegment ([ADR-138](docs/06-decisions.md#adr-138)),
+ * and every inscribed shape ([ADR-262](docs/06-decisions.md#adr-262)) — is a `shape-variant` /
+ * `inscribe` fact that only becomes a polygon at replay, so the guard never saw its ring. The
+ * consequence was that the guarantee the guard's own doc states — *every declared polygon draws convex*
+ * — silently held for «מרובע ABCD» and not for «דלתון ABCD», which could therefore draw as a DART
+ * (measured: 4 of the first 200 seeds).
+ *
+ * The fix is not a wider whitelist, which would drift again with the next macro: the rings are read out
+ * of the macro's OWN EXPANSION, by the same rule applied to the expanded commands. A macro that lowers
+ * to a polygon inherits the guard by construction.
+ *
+ * A synthesised `polygon` counts only INSIDE an expansion. A bare `polygon` command is the student
+ * drawing an arbitrary ring («מצולע ABCDE»), which may legitimately be concave and is a separate
+ * question; a macro's `polygon` is the boundary of a shape the student NAMED, which is exactly what this
+ * default is about.
+ *
+ * Memoized on the command object (immutable through the fold), because this runs per candidate
+ * configuration inside `meetsRequirements` and `expandInscribe` enumerates placements.
+ */
+const declaredRingsMemo = new WeakMap<object, Id[][]>();
+function declaredRings(cmd: AnyCommand): Id[][] {
+  const cached = declaredRingsMemo.get(cmd as object);
+  if (cached) return cached;
+  const out: Id[][] = [];
+  const take = (c: AnyCommand, inExpansion: boolean) => {
+    if (!POLYGON_SHAPES.has(c.type) && !(inExpansion && c.type === 'polygon')) return;
+    const ids = (c as { ids?: Id[] }).ids;
+    if (ids && ids.length >= 4) out.push(ids);
+  };
+  take(cmd, false);
+  // The explicit-equality / on-segment lists only choose WHICH variant is emitted; every variant of a
+  // macro declares the same ring, so reading it with empty lists cannot pick a different polygon.
+  if (cmd.type === 'shape-variant') for (const e of expandShapeVariant(cmd, [], [])) take(e, true);
+  else if (cmd.type === 'inscribe') for (const e of expandInscribe(cmd, [])) take(e, true);
+  declaredRingsMemo.set(cmd as object, out);
+  return out;
+}
+
+/**
  * Every declared polygon (a shape's `ids` cycle) is a valid CONVEX drawing — every turn around the
  * cycle has the same orientation. This rejects both a self-crossing ("tangled" ABCD) **and** a concave
  * ("dart") quad: both are valid point sets but neither is what a student means by the shape, so "show
@@ -2220,9 +2262,9 @@ export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean 
     if (!c.convex) statedConcave.add(ringKey(c.ids));
   }
   for (const f of facts) {
-    if (!f.enabled || !POLYGON_SHAPES.has(f.cmd.type)) continue;
-    const ids = (f.cmd as { ids?: Id[] }).ids;
-    if (!ids || ids.length < 4) continue;
+    if (!f.enabled) continue;
+    // #443: the rings the fact DECLARES — directly, or through the macro it expands into.
+    for (const ids of declaredRings(f.cmd)) {
     if (statedConcave.has(ringKey(ids))) {
       const pts0 = ids.map((id) => positions.get(id));
       if (pts0.some((p) => !p)) continue;
@@ -2239,6 +2281,7 @@ export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean 
       if (turn === 0) return false; // a collinear (degenerate) corner
       if (sign === 0) sign = turn;
       else if (turn !== sign) return false; // a reflex turn → concave (or crossed)
+    }
     }
   }
   return true;

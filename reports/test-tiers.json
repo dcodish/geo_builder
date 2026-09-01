@@ -1,120 +1,34 @@
 {
-  "_comment": "MEASURED tier membership (ADR-394, rule relative since #484). Rewritten by `npm run test:full` only when the SET of slow files changes — the per-file `ms` are the writing machine's timings and are informational, so a faster or slower PC no longer produces a diff. `npm run test:fast` derives its --exclude list from `slow`.",
+  "_comment": "MEASURED tier membership (ADR-394, rule relative since #484; #812 dropped the timings). Rewritten by `npm run test:full` only when the SET of slow files changes. It carries the SHARED state and nothing else — no per-machine timings — so two machines that agree on membership produce byte-identical files, and two branches that each add a test merge as two insertions. `npm run test:fast` derives its --exclude list from `slow`.",
   "rule": {
     "kind": "top-share",
     "share": 0.75,
     "minMeanMult": 3
   },
-  "measuredCutoffMs": 64346,
-  "updatedAt": "2026-08-30",
+  "updatedAt": "2026-09-01",
   "slow": [
-    {
-      "file": "src3d/__tests__/right-apex.test.ts",
-      "ms": 806415
-    },
-    {
-      "file": "src3d/__tests__/book-coordinate-givens.test.ts",
-      "ms": 426813
-    },
-    {
-      "file": "src3d/__tests__/adr-3d-032.test.ts",
-      "ms": 349746
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-6.test.ts",
-      "ms": 233420
-    },
-    {
-      "file": "src/theorems/__tests__/b-corpus.test.ts",
-      "ms": 179956
-    },
-    {
-      "file": "src/engine/__tests__/membership-conversion.test.ts",
-      "ms": 162809
-    },
-    {
-      "file": "src3d/__tests__/named-parametric-line.test.ts",
-      "ms": 157794
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-1.test.ts",
-      "ms": 152242
-    },
-    {
-      "file": "src3d/__tests__/member-drive.test.ts",
-      "ms": 138686
-    },
-    {
-      "file": "src/__tests__/scenarios-props-budget.test.ts",
-      "ms": 127357
-    },
-    {
-      "file": "src/__tests__/scenarios-props-submit-gate.test.ts",
-      "ms": 117149
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-5.test.ts",
-      "ms": 114447
-    },
-    {
-      "file": "src3d/__tests__/exam-2026-2.test.ts",
-      "ms": 113111
-    },
-    {
-      "file": "src/__tests__/issue-566.test.ts",
-      "ms": 113094
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-4.test.ts",
-      "ms": 102511
-    },
-    {
-      "file": "src3d/__tests__/plane-eq-drive.test.ts",
-      "ms": 95976
-    },
-    {
-      "file": "src3d/__tests__/issue-815.test.ts",
-      "ms": 95704
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-8.test.ts",
-      "ms": 92709
-    },
-    {
-      "file": "src3d/__tests__/scenarios3.test.ts",
-      "ms": 90041
-    },
-    {
-      "file": "src/replay/__tests__/basin-ownership.test.ts",
-      "ms": 89683
-    },
-    {
-      "file": "src/engine/__tests__/obligation-preservation.test.ts",
-      "ms": 88316
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-7.test.ts",
-      "ms": 83228
-    },
-    {
-      "file": "src/__tests__/scenarios-props-resample.test.ts",
-      "ms": 82070
-    },
-    {
-      "file": "src3d/__tests__/issue-814.test.ts",
-      "ms": 81703
-    },
-    {
-      "file": "src/engine/__tests__/inscribe-joint-solve.test.ts",
-      "ms": 77938
-    },
-    {
-      "file": "src/engine/__tests__/issue-541.test.ts",
-      "ms": 73731
-    },
-    {
-      "file": "src/app/__tests__/resolve-view.test.ts",
-      "ms": 64346
-    }
+    "src/__tests__/issue-566.test.ts",
+    "src/__tests__/scenarios-e2e-1.test.ts",
+    "src/__tests__/scenarios-e2e-4.test.ts",
+    "src/__tests__/scenarios-e2e-5.test.ts",
+    "src/__tests__/scenarios-e2e-6.test.ts",
+    "src/__tests__/scenarios-e2e-7.test.ts",
+    "src/__tests__/scenarios-e2e-8.test.ts",
+    "src/__tests__/scenarios-props-budget.test.ts",
+    "src/__tests__/scenarios-props-submit-gate.test.ts",
+    "src/engine/__tests__/membership-conversion.test.ts",
+    "src/engine/__tests__/obligation-preservation.test.ts",
+    "src/replay/__tests__/basin-ownership.test.ts",
+    "src/theorems/__tests__/b-corpus.test.ts",
+    "src3d/__tests__/adr-3d-032.test.ts",
+    "src3d/__tests__/book-coordinate-givens.test.ts",
+    "src3d/__tests__/exam-2026-2.test.ts",
+    "src3d/__tests__/issue-815.test.ts",
+    "src3d/__tests__/issue-816.test.ts",
+    "src3d/__tests__/issue-827.test.ts",
+    "src3d/__tests__/member-drive.test.ts",
+    "src3d/__tests__/named-parametric-line.test.ts",
+    "src3d/__tests__/plane-eq-drive.test.ts",
+    "src3d/__tests__/right-apex.test.ts"
   ]
 }
