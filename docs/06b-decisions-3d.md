@@ -7207,3 +7207,52 @@ plus `src3d/__tests__/issue-853-already-known.test.ts` (8 tests): one figure per
 channel with the right `rel` and no legacy kind anywhere; subjects carry student letters and never a `~`
 or `@` machinery id; #500's driven relation still silent; the i18n ratchet; and the retired keys asserted
 gone from both locales.
+### ADR-3D-210 — the Jacobian belongs to x, not to the iteration (#520)
+
+**Context.** `leastSquares` exits early only on `err < 1e-24`. Any solve whose error FLOORS above that —
+every anchored lane (plane drives, pin symbols), and since [ADR-3D-133](#adr-3d-133) every solve carrying
+the universal scale anchor with a determined scale — ends by walking λ from ~1e-12 up to the 1e12 bail,
+ten per rejected step, roughly 25 rungs. The loop recomputed the **full central-difference Jacobian on
+every rung**: 2n residual evaluations to reproduce numbers it had already computed, because a rejected
+step leaves `x` exactly where it was.
+
+**Decision — cache the Jacobian and the λ-free halves of the normal equations, keyed on `x` moving.**
+`J`, `JᵀJ` and `−Jᵀr` are functions of `x` alone; λ enters only through the damping added to the diagonal.
+They are computed when the cache is empty and invalidated at the ONE place `x` changes — the accepted
+step. Nothing else about the loop moves.
+
+**This is the option that keeps LM's semantics.** The issue offered two shapes: a stagnation exit (break
+after K consecutive failures) or removing the recomputation. A stagnation exit changes the trajectory of
+every solve — λ escalation exists precisely because a shorter, more gradient-like step often *is* accepted
+after a few failures — and would need its own honesty argument about the answers it changes. Caching
+changes no answer at all, which is provable rather than arguable, so it is what shipped.
+
+**Measured, before → after** (`ea49e00` vs this commit, residual evaluations per solve — exact integers,
+not timings):
+
+| problem | before | after |
+| --- | ---: | ---: |
+| floors above 1e-24, n = 2 | 116 | **48** |
+| seven unknowns, floored (the anchored shape) | 316 | **92** |
+| damping exhaustion with no descent direction | 113 | **23** |
+| over-determined, inconsistent | 106 | **42** |
+| Rosenbrock (accepted steps dominate) | 146 | **118** |
+| reaches zero (early exit, no failed steps) | 21 | 21 |
+
+Every returned `err` and `x` in that battery agreed **to the last of 18 printed digits** before and after.
+Figure-level wall clock on three anchored figures moved 1.5 → 1.2, 1.8 → 1.5 and 2.2 → 1.5 ms median over
+8 seeds — reported as indicative only: the #518 calibration on this very issue showed that ambient load
+dominates differences of this size, and the residual counts above are the honest measurement.
+
+**One semantic change, stated.** The `!delta` path (the damped system came back singular) used to grow λ
+with no ceiling and run out the iteration budget. It now bails at the same `λ > 1e12` the rejected-step
+path uses. `x` cannot have moved on that path, so the returned value is identical; what changes is that a
+hopeless solve stops instead of spinning — the docs/17 §7 rule that the failure path must not be more
+expensive than the success path. (With the absolute damping floor the diagonal is ≥ λ, so a system
+singular at *every* rung is not reachable in practice; the ceiling bounds it anyway.)
+
+**Locks.** `src3d/__tests__/issue-520-lm-tail-burn.test.ts` (14): the six-problem battery asserted against
+the pre-fix values at 1e-13 relative (tight enough that a changed trajectory cannot hide, loose enough
+that a last-ulp platform difference cannot flake) AND against the exact call counts, since the count is
+the mechanism; plus the damping ladder terminating on a hopeless solve, and Rosenbrock still converging
+through many accepted steps so the cache cannot be cutting a descent short.
