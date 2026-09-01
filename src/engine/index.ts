@@ -28,6 +28,7 @@ export { checkGivens } from './verify';
 export { solveBudget, budgetExceeded, withSolveBudget } from './solveBudget';
 export type { GivenViolation } from './verify';
 export { detectRelations, detectRelationsAcross, figureEdges, convergedSamples, requirementSamples, distinctSamples, isScaffoldId } from './relations';
+export { wellSpread, tightestWedge, SPREAD_MIN_DEG } from './spread';
 export type { RelationsResult, SegmentRef, AngleRef, DefiniteAngle, DefiniteLength, DetectOptions } from './relations';
 export { findInkCrossings, crossingCommands, crossingCounts, drawnCircles, drawnPointIds, resolveDrawnLines } from './inkCrossings';
 // #429 (ADR-423): which part of a circle carries ink — the arc twin of `resolveDrawnLines`.

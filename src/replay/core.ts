@@ -18,7 +18,7 @@ import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -1433,6 +1433,34 @@ export const WORKER_SEARCH_BUDGET_MS = 12_000;
  * of wall-clock (E2): past the deadline it returns the best seed seen so far (the relaxed fallback if one
  * was recorded, else `from` — keep the current view, amber if short).
  */
+/**
+ * #194 (ADR-474) — the DISPLAY-QUALITY preference, as a predicate over an already-computed figure.
+ *
+ * A drawing that meets every stated requirement can still be unreadable: on the Q9 two-circle figure
+ * about half the seeds place A within ~2° of the secant, so ∠ACE draws at 0.8°. This asks whether the
+ * figure in hand is legible, and it is consulted only as a PREFERRED tier — never as a gate. A figure
+ * whose givens force a small wedge fails it at every seed, and every caller falls through to today's
+ * behaviour, because a valid configuration must stay drawable (ADR-052).
+ */
+const spreadOk = (fig: Derived): boolean => fig.lastError === null && wellSpread(fig.construction, fig.positions);
+
+/**
+ * #194 (ADR-474) — how legible this drawing is, as a number: the tightest wedge anywhere in it.
+ *
+ * MEASURED on the Q9 figure the issue was filed on (ADR-474): seeds 0–15 range from 0.16° to 5.80° and
+ * NONE clears the 7° bar, so a pass/fail preference alone would have found nothing to prefer in that
+ * band and returned the 1.29° drawing; the sweep does reach a legible seed at 24 (10.26°). Ranking is
+ * what makes the tier honest in between — and it is the whole answer for a figure that has no legible
+ * configuration at all, where "best available" is the only improvement available.
+ * So the tier is: take the first candidate that clears the bar; failing that, take the BEST one seen.
+ */
+const spreadScore = (fig: Derived): number => (fig.lastError === null ? tightestWedge(fig.construction, fig.positions) : -1);
+
+/** How many extra candidates a sweep may examine purely to improve spread, once it already holds an
+ *  acceptable answer. Bounds the cost the preference can add to a figure that has no legible
+ *  configuration — it never searches longer than this beyond the seed it would have returned. */
+const SPREAD_EXTRA_TRIES = 24;
+
 export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budgetMs = SEARCH_BUDGET_MS): number {
   const deadline = Date.now() + budgetMs;
   const hasExt = extensionTriples(facts).length > 0;
@@ -1442,11 +1470,17 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   // The point-free crossing statement (`segments-cross`, issue #241 / ADR-383) is the same discrete
   // requirement as a named `onSeg` meet — it joins every bar and the reflection search below.
   const hasCross = facts.some((f) => f.enabled && f.cmd.type === 'segments-cross');
+  // #194 (ADR-474): NO new search is opened here. With no discrete requirement this function does one
+  // replay and returns, exactly as before — the spread preference rides only the sweeps that already
+  // exist (below, and in `findValidConfig`/`searchResample`), so a figure that draws fine never pays
+  // for the preference and a figure that does not is re-seeded by the auto-resolver that already runs.
   if (!hasExt && !hasOnSeg && !hasCross) return from; // nothing to satisfy → keep the seed
   const ok = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig) && intersectionsWithinSegments(fig) && segmentsCrossWithin(facts, fig.positions);
   // The ADR-142 acceptance bar: a SHARED-ENDPOINT extension counts on EITHER side (see extensionsClear).
   const okRelaxed = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig, true) && intersectionsWithinSegments(fig) && segmentsCrossWithin(facts, fig.positions);
-  if (ok(base0)) return from; // the current view already satisfies every requirement
+  // #194 (ADR-474): the current view is kept only when it is BOTH satisfying and legible — otherwise it
+  // is remembered as the strict fallback and the sweep looks for one that is also well spread.
+  if (ok(base0) && spreadOk(base0)) return from;
   // Candidate seeds in priority order. When a segment-meet is off its segment the cause is almost always an
   // apex pointing the wrong way, which plain re-seeding rarely fixes — so try the REFLECTION seeds first
   // (targeted mask = mirror exactly the failing apexes, then the other non-empty subsets), each over a small
@@ -1467,17 +1501,35 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   // full strict pass, THEN a full relaxed pass — burned the entire wall budget on a provably futile strict
   // sweep for the ADR-142 class, so the live app (2500ms) never reached the fallback its tests (∞) always did.
   let fallback = okRelaxed(base0) ? from : -1;
+  // #194 (ADR-474): the STRICT-but-squashed fallback — the seed today would have returned. Recorded
+  // while sweeping (ADR-267: one interleaved pass, never a second) so the preference costs no extra
+  // replay: tier 1 is strict AND well spread, tier 2 is strict (today), tier 3 the relaxed fallback.
+  let strictOnly = ok(base0) ? from : -1;
+  let strictOnlyScore = strictOnly >= 0 ? spreadScore(base0) : -1;
+  let sinceStrict = 0; // candidates examined since the first acceptable answer (SPREAD_EXTRA_TRIES)
   // The same deadline is ARMED inside the solve ladder (engine/solveBudget.ts): the between-replay check
   // below caps the sweep, and the in-ladder consult caps a single pathological candidate (issue #59 —
   // one replay used to blow through 32 budgets before this line ever ran again).
   return withSolveBudget(deadline, () => {
     for (const s of seeds) {
       if (Date.now() > deadline) break; // out of budget — settle for the best seen so far
+      if (strictOnly >= 0 && ++sinceStrict > SPREAD_EXTRA_TRIES) break; // bounded improvement, then settle
       const fig = replay(facts, s);
-      if (ok(fig)) return s;
+      if (ok(fig)) {
+        if (spreadOk(fig)) return s; // tier 1 — satisfying AND legible: nothing can beat it, stop here
+        // tier 2 — satisfying but tight. Keep the LEAST tight one seen (see spreadScore): on a figure
+        // with no legible configuration this is the difference between a 5.8° drawing and a 0.16° one.
+        const sc = spreadScore(fig);
+        if (strictOnly < 0 || sc > strictOnlyScore) {
+          strictOnly = s;
+          strictOnlyScore = sc;
+        }
+      }
       if (fallback < 0 && okRelaxed(fig)) fallback = s;
     }
-    return fallback >= 0 ? fallback : from;
+    // Past the sweep or the deadline: settle for the best tier seen, exactly as before the preference
+    // existed. A figure with no well-spread configuration lands on the same seed it used to.
+    return strictOnly >= 0 ? strictOnly : fallback >= 0 ? fallback : from;
   });
 }
 
@@ -1538,9 +1590,20 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
   // REFLECTION DOF (high seed bits) that the plain seed sweep below can't reach, so a segment-meet whose
   // apex points the wrong way is brought onto the segments in a handful of tries instead of by luck.
   const s0 = firstSatisfyingSeed(facts, fromSeed, 120, timeLeft());
+  // #194 (ADR-474): a requirement-meeting config that draws a squashed wedge is REMEMBERED rather than
+  // returned — the sweep below gets a chance to find one that is also legible, and this seed is what it
+  // settles for when none exists. Behaviour is therefore identical on every figure that has no
+  // better-spread configuration, which is the ADR-052 guarantee: valid stays drawable.
+  let meetingOnly: number | null = null;
+  let meetingScore = -1;
   if (meetsRequirements(facts, s0)) {
-    lastConfigTier = 'current';
-    return { facts, seed: s0 };
+    const fig0 = replay(facts, s0);
+    if (spreadOk(fig0)) {
+      lastConfigTier = 'current';
+      return { facts, seed: s0 };
+    }
+    meetingOnly = s0;
+    meetingScore = spreadScore(fig0);
   }
   // ADR-142 acceptance (issue #19 / ADR-267): `firstSatisfyingSeed` may have returned its shared-endpoint
   // FALLBACK — every seed it examined failed the strict extension direction, so the RELAXED bar is the right
@@ -1558,11 +1621,33 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
   // ladder — the between-replay checks alone couldn't stop a single 30 s candidate.
   return withSolveBudget(deadline, () => {
     for (let s = fromSeed; s < fromSeed + 40; s++) {
-      if (Date.now() > deadline) return null; // out of budget — caller keeps the current figure, amber
-      if (meetsRequirements(facts, s)) {
-        lastConfigTier = 'sweep';
-        return { facts, seed: s };
+      if (Date.now() > deadline) {
+        // #194: out of budget — a remembered meeting-but-squashed config still beats amber.
+        if (meetingOnly !== null) {
+          lastConfigTier = 'current';
+          return { facts, seed: meetingOnly };
+        }
+        return null; // caller keeps the current figure, amber
       }
+      if (meetsRequirements(facts, s)) {
+        const fig = replay(facts, s);
+        if (spreadOk(fig)) {
+          lastConfigTier = 'sweep';
+          return { facts, seed: s };
+        }
+        // #194: no legible configuration yet — hold the LEAST tight one seen, which is today's answer
+        // when the sweep never improves on it.
+        const sc = spreadScore(fig);
+        if (meetingOnly === null || sc > meetingScore) {
+          meetingOnly = s;
+          meetingScore = sc;
+        }
+      }
+    }
+    // #194: the sweep found nothing better-spread — return what today would have returned.
+    if (meetingOnly !== null) {
+      lastConfigTier = meetingOnly === s0 ? 'current' : 'sweep';
+      return { facts, seed: meetingOnly };
     }
     // #566 (ADR-445, ordering per Am. 1): the RIGHT-ANGLE-SEAT dimension. «משולש ישר זווית ABC»
     // leaves WHICH vertex is right unstated — the lowering defaults to the last id, and ADR-163
@@ -1671,6 +1756,8 @@ export function searchResample(facts: Fact[], seed: number, onProgress?: (k: num
   const deadline = Date.now() + budgetMs;
   const curStrict = meetsRequirements(facts, seed);
   let fallback = -1;
+  /** #194: the first requirement-meeting but squashed candidate — the answer when nothing better shows. */
+  let squashed = -1;
   for (let k = 0; k < 24 && Date.now() <= deadline; k++) {
     onProgress?.(k + 1, 24);
     s += 1;
@@ -1678,10 +1765,17 @@ export function searchResample(facts: Fact[], seed: number, onProgress?: (k: num
     // Accept only a view that MEETS EVERY REQUIREMENT — the SAME bar the initial display uses — AND is a
     // genuinely DIFFERENT drawing (see the class notes above; the Q8 two-right-triangles lock).
     if (!shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions))) continue;
-    if (meetsRequirements(facts, s)) return s;
+    if (meetsRequirements(facts, s)) {
+      // #194 (ADR-474): «הצג תצורה אחרת» prefers a legible alternative, per press. A squashed-but-valid
+      // candidate is remembered, not discarded — when the valid family is ONLY squashed the student must
+      // still be able to reach it (ADR-052), so it is what this press returns.
+      if (spreadOk(r)) return s;
+      if (squashed < 0) squashed = s;
+      continue;
+    }
     if (!curStrict && fallback < 0 && meetsRequirements(facts, s, true)) fallback = s;
   }
-  return fallback >= 0 ? fallback : null;
+  return squashed >= 0 ? squashed : fallback >= 0 ? fallback : null;
 }
 
 /** The command types whose `branch` a student can cycle — shared by `cycleAlt` and the composite
