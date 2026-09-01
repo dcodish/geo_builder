@@ -36,7 +36,15 @@ export type ParseResult3 =
   // because `not-handled` escalates to the LLM lane, whose job is to guess — and it resolved exactly
   // the ambiguity this guard refused to resolve (built the `t` reading, silently rewriting the
   // student's letter). A refusal implemented as a decline is not a refusal.
-  | { ok: false; reason: 'param-roles-conflated'; letter: string };
+  | { ok: false; reason: 'param-roles-conflated'; letter: string }
+  // #836: «אלכסון ראשי» / «האלכסון הראשי» used as a REFERENCE — a cube or box has FOUR space diagonals,
+  // so the role phrase names none of them. Operator ruling 2026-08-31: *"there is more than one אלכסון
+  // ראשי so we should ask user to indicate the letters."* A typed refusal, never `not-handled`: the LLM
+  // answered this line by PICKING one, which is exactly the invented given (ADR-052) the clarify exists
+  // to prevent. The candidate PAIRS are not listed here — `parse3` is context-free by design — they are
+  // derived from the figure's own rings where the construction is known (the store), so the message can
+  // name them.
+  | { ok: false; reason: 'ambiguous-main-diagonal' };
 
 const NOT_HANDLED: ParseResult3 = { ok: false, reason: 'not-handled' };
 
@@ -378,6 +386,47 @@ const gated = (rule: Rule, consumed?: RegExp): Rule => {
   // exactly this kind of change.
   Object.defineProperty(wrapped, 'name', { value: rule.name });
   return wrapped;
+};
+
+/**
+ * #836 — «אלכסון ראשי» as a REFERENCE asks WHICH one.
+ *
+ * Prod session `u1y60bg6`, the user's entire session: «קובייה ABCD עם אלכסון ראשי» → not-handled →
+ * escalated → the LLM built it, silently choosing one of four space diagonals. Operator ruling
+ * (2026-08-31): *"there is more than one אלכסון ראשי so we should ask user to indicate the letters."*
+ *
+ * A cube or box has FOUR space diagonals (AC', BD', CA', DB'), so the role phrase names none of them.
+ * Per [ADR-052](../../docs/06-decisions.md#adr-052) — never a silent pick, never a paid LLM guess — this
+ * returns a CLARIFY, which short-circuits before escalation like the rest of the `ambiguous-*` family.
+ *
+ * WITH letters it simply builds: «אלכסון ראשי AC'» is «אלכסון AC'» with a redundant role word, so the
+ * role word is dropped and the ordinary diagonal rule owns the line (a pair that is NOT a space diagonal
+ * is then refused by name downstream, rather than silently drawing a face diagonal).
+ *
+ * NOT in scope, deliberately: the DECLARATION form «תיבה מלבנית עם אלכסון תיבה» (#438, two prod users)
+ * keeps building. There the student declares a figure and asks for *a* space diagonal indefinitely —
+ * its lock is geometric (any of the four satisfies the box identity) precisely because none is meant in
+ * particular. This rule is about a DEFINITE reference to "the main diagonal", which is the one that
+ * cannot be answered without asking. The user's full line «קובייה ABCD עם אלכסון ראשי» additionally
+ * needs the shape-plus-construct family (#461) and resolves through both once that lands.
+ */
+const MAIN_DIAGONAL_ROLE = /(?:ה)?אלכסו[ןנ]\s+(?:ה)?(?:ראשי|מרחב(?:י)?)|\bmain\s+diagonal\b/i;
+
+const mainDiagonalRef: Rule = (s) => {
+  if (!MAIN_DIAGONAL_ROLE.test(s)) return null;
+  // WITH letters the role word is REDUNDANT, not an error — and the line is then owned by `bareSegment`,
+  // the ONE rule of the qualified-diagonal family (#449: «אלכסון תיבה AC'», "space diagonal AC'"). The
+  // role qualifier was added to that rule's own alternation rather than answered here, so «אלכסון ראשי
+  // AC'» lowers to EXACTLY what «אלכסון AC'» lowers to, which is what #836 asks for. Declining here is
+  // what lets the family rule win.
+  if (labelTokens(s).length > 0) return null;
+  // A solid DECLARATION in the same utterance is #438's / #461's business, not a bare reference.
+  if (/קוביי?ה|תיבה|מנסרה|פירמידה|\bcube\b|\bbox\b|\bcuboid\b|\bprism\b|\bpyramid\b/i.test(s)) return null;
+  // The #516 pattern: a rule that RECOGNISES an ambiguity records it and declines, and `parse3` turns
+  // the flag into a typed refusal after the loop — so a later rule may still legitimately own the line,
+  // but nothing falls through to `not-handled` (which escalates to the LLM, whose job is to guess).
+  MAIN_DIAGONAL_AMBIGUOUS = true;
+  return null;
 };
 
 /** cube / box: 8 vertices as given, or 4 base vertices auto-primed to the top face.
@@ -1462,6 +1511,8 @@ let VEC_MARKED = false; // set per-parse; see parse3()
  *  ambiguity to the LLM lane to guess). Set by the rule, read only after NO rule matched — so it
  *  can never steal an utterance some other rule legitimately owns. Reset per-parse. */
 let PARAM_CONFLATED: string | null = null;
+/** #836: a rule saw «אלכסון ראשי» used as a definite REFERENCE — four candidates, so it must ask. */
+let MAIN_DIAGONAL_AMBIGUOUS = false;
 
 /** The VALUE of a {@link RADICAND} capture — `48`, `(48)`, `(12/4)`. Null on a zero denominator, so a
  *  malformed radicand refuses rather than reaching a figure as NaN or Infinity. */
@@ -1759,7 +1810,10 @@ const heightFromApex: Rule = (s) => {
  *  shared fragment rather than a private spelling, and the English «(space|body|main) diagonal of the
  *  box» forms join here. No ordering risk: this rule runs last, and `cubeOrBox` returns null on a
  *  two-token utterance, so a solid DECLARATION can never be read as a diagonal. */
-const SOLID_QUALIFIER = String.raw`(?:ה?(?:תיב[הת]|קוביי?[הת]|מנסר[הת]|פירמיד[הת])\s+)`;
+// #836: the ROLE qualifier joins the SOLID one — «אלכסון ראשי AC'» / «אלכסון המרחב AC'» name exactly the
+// segment «אלכסון AC'» names, so they belong to this family rather than to a parallel path. One rule, one
+// lowering: the role word is redundant, not an error.
+const SOLID_QUALIFIER = String.raw`(?:ה?(?:תיב[הת]|קוביי?[הת]|מנסר[הת]|פירמיד[הת]|ראשי|מרחב(?:י)?)\s+)`;
 const BARE_SEGMENT_RE = new RegExp(
   String.raw`^(?:קטע\s+|העבירו\s+(?:את\s+)?|נ?חבר\s+(?:את\s+)?|ה?אלכסו[ןם]\s+${SOLID_QUALIFIER}?|segment\s+|draw\s+|connect\s+|join\s+|(?:the\s+)?(?:space|body|main)?\s*diagonal\s+(?:of\s+the\s+(?:box|cube|prism|pyramid)\s+)?)?([A-Z]\d*'?)([A-Z]\d*'?)\s*$`,
 );
@@ -3479,7 +3533,7 @@ const relPlaneRule: Rule = (s) => {
   // refuses the rule outright rather than committing the plane and dropping the point the student named
   // (docs/17 §2.4 / the honesty invariant: a stated given never vanishes).
   // Composed from the SHARED crossing atoms, never re-spelled (the #333/#755 discipline), and with no
-  // `` after a Hebrew word: Hebrew letters are not `\w`, so a word boundary there never matches and
+  // `` after a Hebrew word: Hebrew letters are not `\w`, so a word boundary there never matches and
   // the tail would be silently dropped — the same trap `src3d/CLAUDE.md` records for `ℓ`.
   const tailM = s.match(new RegExp(String.raw`[\s,]+ו?(?:${CROSS_HE_VERB})(.*)$|[\s,]+and\s+(?:it\s+)?(?:${CROSS_EN_VERB})(.*)$`));
   let cut: Command3 | null = null;
@@ -3888,6 +3942,10 @@ const distanceGiven: Rule = (s) => {
 
 
 export const RULES: Rule[] = [
+  // #836: FIRST, and it never claims a line — it only RECORDS that «אלכסון ראשי» was used as a definite
+  // reference, so parse3 can refuse with a clarify instead of letting the line reach the LLM. Declining
+  // always means a later rule may still own the utterance legitimately.
+  mainDiagonalRef,
   // #324: FIRST — gated by the lowercase-coordinate object so it can never steal, while the
   // polygon rules WOULD steal its polygon-noun subjects (building the shape, dropping the clause)
   coordPlaneRel,
@@ -4000,6 +4058,7 @@ export function markVectorContext(utterance: string): void {
 export function parse3(utterance: string): ParseResult3 {
   markVectorContext(utterance);
   PARAM_CONFLATED = null;
+  MAIN_DIAGONAL_AMBIGUOUS = false;
   const s = normalize3(utterance);
   if (!s) return NOT_HANDLED;
   if (!VEC_MARKED && /^([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*$/.test(s))
@@ -4011,5 +4070,7 @@ export function parse3(utterance: string): ParseResult3 {
   // #516: no rule matched, but a rule RECOGNIZED an ambiguity — that is a refusal with a
   // clarification, never `not-handled` (which escalates to the LLM lane, whose job is to guess).
   if (PARAM_CONFLATED) return { ok: false, reason: 'param-roles-conflated', letter: PARAM_CONFLATED };
+  // #836: «אלכסון ראשי» names none of a solid's four space diagonals — ask which, never pick one.
+  if (MAIN_DIAGONAL_AMBIGUOUS) return { ok: false, reason: 'ambiguous-main-diagonal' };
   return NOT_HANDLED;
 }

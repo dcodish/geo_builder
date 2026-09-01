@@ -61,7 +61,12 @@ export type ParseResult =
   | { ok: false; reason: 'reserved-symbol'; symbol: string }
   /** #775: a side named by its ROLE («ליתר», «לבסיס») with no unique referent in the figure —
    *  clarify rather than guess a side or burn an escalation on a form the LLM must not invent for. */
-  | { ok: false; reason: 'role-side-unresolved'; role: string };
+  | { ok: false; reason: 'role-side-unresolved'; role: string }
+  /** #835: a polygon noun outside the supported bare set (מחומש/משושה/מתומן) — the operator's ruling is
+   *  that the rest are NOT supported and say so by name, rather than escalating to an LLM that would
+   *  invent a figure. `noun` is the student's word; `offer` names what does build, so the message can
+   *  point somewhere useful instead of only refusing. */
+  | { ok: false; reason: 'polygon-not-supported'; noun: string; offer: string[] };
 
 /**
  * Figure context the parser may consult to resolve implicit references — chiefly
@@ -228,7 +233,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string };
+type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -4661,12 +4666,34 @@ const POLY_NAME_N: Record<string, number> = {
   triangle: 3, quadrilateral: 4,
   pentagon: 5, hexagon: 6, heptagon: 7, octagon: 8, nonagon: 9, decagon: 10, hendecagon: 11, dodecagon: 12,
 };
-/** Hebrew polygon names (n ≥ 5). מחומש=5 משושה=6 משובע=7 משומן=8 מתושע=9 מעושר=10. */
+/**
+ * Hebrew polygon names (n ≥ 5). מחומש=5 משושה=6 משובע=7 מתומן/משומן=8 מתושע=9 מעושר=10.
+ *
+ * #835: `מתומן` is the standard modern-Hebrew octagon and was absent from EVERY list — this table, the
+ * strip regex, `SHAPE_NOUNS_HE`, the span accountant and the geometry-word gate — so a real geometry word
+ * was refused as `scope:unrelated` ("not about geometry"). The entry that was here, `משומן`, is a
+ * legitimate but uncommon variant that also reads as "greased". Both parse; `מתומן` is the primary.
+ */
 const HE_POLY_NAME_N: Record<string, number> = {
-  מחומש: 5, משושה: 6, משובע: 7, משומן: 8, מתושע: 9, מעושר: 10,
+  מחומש: 5, משושה: 6, משובע: 7, מתומן: 8, משומן: 8, מתושע: 9, מעושר: 10,
 };
+
+/**
+ * #835 — the operator's ruling of 2026-09-01: *"we should support מחומש, משושה, מתומן. if משוכלל is not
+ * mentioned, so its just the shape and if its משוכלל so draw it like that. for all other types of
+ * poligons, issue a note saying they are not supported."*
+ *
+ * So a BARE noun builds only for these three, as a generic (possibly irregular) n-gon. Every other bare
+ * polygon noun gets a NAMED refusal — never a silent LLM escalation that invents a figure, and never
+ * `scope:unrelated`. The set is closed deliberately: it is what the corpus actually uses, and it reopens
+ * when the logs show demand, not before.
+ */
+const BARE_POLY_SUPPORTED = new Set([5, 6, 8]);
+
+/** The nouns a refusal can OFFER, so the message names what does work rather than only what does not. */
+export const BARE_POLY_OFFER = ['מחומש', 'משושה', 'מתומן'];
 const POLY_STRIP =
-  /regular|polygon|מצולע|משוכלל|equilateral|triangle|משולש|quadrilateral|מרובע|square|ריבוע|pentagon|hexagon|heptagon|octagon|nonagon|decagon|hendecagon|dodecagon|מחומש|משושה|משובע|משומן|מתושע|מעושר|\d+\s*-?\s*gon|\bgon\b/gi;
+  /regular|polygon|מצולע|משוכלל|equilateral|triangle|משולש|quadrilateral|מרובע|square|ריבוע|pentagon|hexagon|heptagon|octagon|nonagon|decagon|hendecagon|dodecagon|מחומש|משושה|משובע|מתומן|משומן|מתושע|מעושר|\d+\s*-?\s*gon|\bgon\b/gi;
 
 /**
  * "regular pentagon ABCDE" / "מחומש משוכלל ABCDE" / "regular polygon ABCDE" / "regular 7-gon ABCDEFG"
@@ -4677,11 +4704,37 @@ const POLY_STRIP =
  * n=3 → equilateral, n=4 → square (the canonical shapes); n ≥ 5 → the generic `polygon` command.
  */
 const regularPolygon: Rule = (s, ctx) => {
-  if (!/\bregular\b|משוכלל/i.test(s) && !/\b\d+\s*-?\s*gon\b/i.test(s)) return null;
+  // #835 — the «בעל N צלעות» / «with N sides» FORMAT is withdrawn. The 2026-08-31 ruling had named it as
+  // the taught spelling for the unsupported n-gons; the 2026-09-01 ruling replaced that with a plain
+  // not-supported notice, so the format must not build and must not reach the LLM either. Refusing it
+  // here (before any other reading) means the message names the three nouns that DO work — the student
+  // typing «בעל 5 צלעות» is told to type «מחומש», which is the useful answer.
+  if (/בעל\s*\d+\s*צלעות|\bwith\s+\d+\s+sides\b/i.test(s)) {
+    return { clarify: 'polygon-not-supported', noun: (s.match(/בעל\s*(\d+)\s*צלעות|\bwith\s+(\d+)\s+sides\b/i) ?? [])[0] ?? s.trim() };
+  }
+  const isRegular = /\bregular\b|משוכלל/i.test(s) || /\b\d+\s*-?\s*gon\b/i.test(s);
   let n: number | null = null;
   for (const [name, k] of Object.entries(POLY_NAME_N)) if (new RegExp(String.raw`\b${name}\b`, 'i').test(s)) { n = k; break; }
   if (n === null) for (const [name, k] of Object.entries(HE_POLY_NAME_N)) if (s.includes(name)) { n = k; break; }
   if (n === null) { const g = s.match(/\b(\d+)\s*-?\s*gon\b/i); if (g) n = parseInt(g[1], 10); }
+  // #835 — the BARE-noun lane. A polygon noun with no regularity marker states an n-sided figure and
+  // nothing else. For the three supported nouns that builds a GENERIC n-gon below (free vertices, no
+  // equal sides/angles); for any other it is refused BY NAME here, rather than escalating to the LLM,
+  // which can only invent a figure the student did not describe. `n === null` (no noun at all) is not
+  // ours — fall through to null so other rules still see the line.
+  if (!isRegular) {
+    // n < 5 is NOT this rule's business when bare: «משולש ABC» and «מרובע ABCD» have their own dedicated
+    // lowerings (triangle / quadrilateral), and this rule only ever owned them via the REGULAR route
+    // (regular triangle ⇒ equilateral, regular quadrilateral ⇒ square). Returning null hands the line
+    // back; returning a refusal here would have refused the plainest shape in the corpus.
+    if (n === null || n < 5) return null;
+    if (!BARE_POLY_SUPPORTED.has(n)) {
+      const noun = s.match(new RegExp(Object.keys(HE_POLY_NAME_N).join('|')))?.[0]
+        ?? s.match(new RegExp(String.raw`\b(?:${Object.keys(POLY_NAME_N).join('|')})\b`, 'i'))?.[0]
+        ?? String(n);
+      return { clarify: 'polygon-not-supported', noun };
+    }
+  }
   const r = parseRadius(s);
   const named = circleCenter(s);
   let rest = dropCircleRef(s).replace(POLY_STRIP, ' ');
@@ -4700,6 +4753,11 @@ const regularPolygon: Rule = (s, ctx) => {
       : null);
   if (!ids) return null;
   if (shapeLeftover(removeClaimed(rest, ids))) return 'stop';
+  // #835 — the BARE noun builds a GENERIC n-gon: n free vertices and the ring, nothing else. This is the
+  // n-sided «מרובע ABCD», and it is the whole point of the ruling — «מחומש» must not silently acquire the
+  // equal sides and equal angles of «מחומש משוכלל» (ADR-052), which would also make the qualifier
+  // meaningless. n is 5, 6 or 8 here; every other bare noun was refused by name above.
+  if (!isRegular) return [{ type: 'polygon', ids, place: true }];
   // Routing: a regular triangle is equilateral; a regular quadrilateral is a square.
   if (n === 3) return [
     { type: 'triangle', ids: [ids[0], ids[1], ids[2]] },
@@ -10026,6 +10084,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
     }
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).
     if (res.clarify === 'shape-not-found') return { ok: false, reason: 'shape-not-found', noun: res.noun };
+    if (res.clarify === 'polygon-not-supported') return { ok: false, reason: 'polygon-not-supported', noun: res.noun, offer: BARE_POLY_OFFER };
     if (res.clarify === 'ambiguous-angle') return { ok: false, reason: 'ambiguous-angle', vertex: res.vertex };
     if (res.clarify === 'ambiguous-circle-ref') return { ok: false, reason: 'ambiguous-circle-ref', centers: res.centers };
     if (res.clarify === 'ambiguous-container') return { ok: false, reason: 'ambiguous-container', centers: res.centers };

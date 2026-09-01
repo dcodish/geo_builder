@@ -2316,4 +2316,25 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(A, B) / dist(A, C), '|AB| = |AC|').toBeCloseTo(1, 2);
     },
   },
+  {
+    id: 'bare-ngon-nouns-build-generic-835',
+    title: '#835: «מחומש» / «מתומן» build a GENERIC n-gon; «משוכלל» makes it regular',
+    guards:
+      "prod session khf8ht6c (log-triage 2026-08-30): a student typed «מחומש תלת מימדי», «מחומש 0», «מחומש» and left with NO figure — that was their whole session. Two defects: the bare noun was deliberately excluded (`regularPolygon` returned null without «משוכלל»/regular/an n-gon form, \"so a bare pentagon is left to the LLM net\"), and «מתומן» — the standard modern-Hebrew octagon — was absent from every list including the geometry-word gate, so the tool answered `scope:unrelated`: a real geometry word declared not to be about geometry. Operator rulings 2026-09-01: support מחומש/משושה/מתומן, bare ⇒ generic possibly-irregular, «משוכלל» ⇒ regular, every other polygon ⇒ a named not-supported notice (never the LLM); «מצולע משוכלל בעל n צלעות» WITHDRAWN; and \"dont delete capability — if its there and works, leave it\", so the 7/9/10 «משוכלל» builds must not regress. ADR-471. The scenario asserts the GEOMETRY: a bare noun's sides must not come out equal, which is the ADR-052 half — drawing it regular would assert givens the student never stated and make «משוכלל» meaningless.",
+    steps: ['מחומש'],
+    check(fig) {
+      allStepsOk(fig);
+      const poly = fig.construction.objects.find((o) => o.kind === 'polygon') as { vertices: string[] } | undefined;
+      expect(poly, 'a polygon ring was built').toBeDefined();
+      expect(poly!.vertices, 'five vertices').toHaveLength(5);
+      // no hidden circle: the regular route seats vertices on one, the generic route must not
+      expect(fig.construction.objects.some((o) => o.kind === 'circle'), 'no circle — regularity was never stated').toBe(false);
+      const L = poly!.vertices.map((id, i) => {
+        const a = at(fig, id), b = at(fig, poly!.vertices[(i + 1) % poly!.vertices.length]);
+        return dist(a, b);
+      });
+      // ADR-052: a bare noun must NOT draw equal sides. A regular pentagon has spread exactly 1.
+      expect(Math.max(...L) / Math.min(...L), 'the sides are NOT all equal').toBeGreaterThan(1.02);
+    },
+  },
 ];

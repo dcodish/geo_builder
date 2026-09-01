@@ -1045,12 +1045,33 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
     }
 
-    case 'polygon':
-      // A generic n-gon. Unlike square/triangle, it does NOT own its vertices' placement — they are created
-      // by prior commands (e.g. a regular polygon's on-circle vertices). This case only wires the n boundary
+    case 'polygon': {
+      // A generic n-gon. Normally it does NOT own its vertices' placement — they are created by prior
+      // commands (e.g. a regular polygon's on-circle vertices) and this case only wires the n boundary
       // segments + the polygon object.
+      //
+      // #835: a BARE noun («מחומש», «משושה», «מתומן») is a generic, POSSIBLY-IRREGULAR n-gon, the n-sided
+      // twin of «מרובע ABCD». `place` seats the vertices as FREE DOFs — deliberately UNEVEN, so the default
+      // does not read as regular. Drawing it regular would assert equal sides and equal angles the student
+      // never stated ([ADR-052](../../docs/06-decisions.md#adr-052)) and would make «משוכלל» meaningless.
+      if (cmd.place) {
+        const n = cmd.ids.length;
+        const R = 5;
+        placeBase(
+          objects,
+          cmd.ids.map((id, i) => {
+            // deterministic per-index jitter (no RNG — a re-issued command is idempotent): ±0.05 rad and
+            // ±10% radius keeps the ring CONVEX and in vertex order while breaking equal sides/angles.
+            const th = Math.PI / 2 + (2 * Math.PI * i) / n + (((i * 37) % 11) - 5) / 100;
+            const rr = R * (1 + (((i * 53) % 7) - 3) / 30);
+            return { id, x: rr * Math.cos(th), y: rr * Math.sin(th) };
+          }),
+          pos,
+        );
+      }
       polyEdges(objects, cmd.ids);
       break;
+    }
 
     case 'right-triangle': {
       // Right angle ALWAYS at c (the last id). Legs c→a and c→b; a and b are interchangeable
