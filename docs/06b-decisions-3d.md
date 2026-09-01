@@ -7045,3 +7045,47 @@ cosine frames asserted to carry the SAME value; the exact command list for the m
 drawn, the vector arm not re-declared); the two neighbouring cells asserted byte-for-byte unchanged,
 including the exam's noun-carrying wording; the line/plane arms still going to their owners; and the ⟂
 twin unchanged. Plus the #845 sweep, now with the cell in the probe table.
+
+### ADR-3D-208 — the input BOX takes its base direction from the content, like 2-D (#868)
+
+**Reported** by the operator while playing PR #867: *"the bidi text is biting again on the input"*.
+
+**Measured in a real browser**, the same string «D על AC» in each product's main input:
+
+| product | `dir` attribute | resolved |
+|---|---|---|
+| 2-D | `rtl` | **rtl** — correct |
+| 3-D | `auto` | **ltr** — left-aligned, wrong |
+
+And the consequence that makes it a defect rather than a preference: the live preview **underneath** the
+box laid the identical string out RTL. The box was contradicting the very thing the preview exists to
+compensate for.
+
+**Root cause.** `shell/frame/InputArea.tsx` exposes a `boxDir` prop whose own doc predicted this exactly:
+*"dir='auto' keys off the first strong character, and «AB שווה …» would take an LTR base."* **Only 2-D
+passed it.** 3-D passed `previewDir` and not `boxDir`, so its box fell back to `dir="auto"` — and «D על
+AC» opens with a strong LTR `D`. Most 3-D sentences open with a point label, so most of them took an LTR
+base.
+
+`src-complex` omits it too, and there it is **correct**: the prop's doc says *"absent = auto (the
+math-first products)"*, and a complex-numbers line genuinely is math-first. The gap was 3-D's alone — a
+sentence product, like 2-D.
+
+**This does not reopen a settled ruling.** [ADR-3D-184](#adr-3d-184) records the operator's 2026-08-10
+ruling that *"the input box itself cannot be fixed: isolate characters inside an editable value corrupt
+what the student typed and where their caret sits, and forcing `dir='ltr'` is what 2-D tried and REVERTED
+(#118)"*. That forbids two specific things — injecting isolates into the editable value, and **forcing**
+LTR. Setting the base direction **by content** is neither; it is the opposite of forcing LTR, and it is
+what 2-D settled on *after* #118. The typed value stays raw and the preview is untouched.
+
+**Decision.** 3-D passes `boxDir={(s) => textDir3(s)}` — the SAME function it already passes as
+`previewDir`, so the box and the preview cannot disagree by construction rather than by discipline.
+
+**Verified in the browser after the change:** «D על AC» → `rtl`, «OD חוצה זווית AOC» → `rtl`,
+«AB = (1,2,3)» → `ltr`, and the box now renders the identical layout as its own preview.
+
+**Locks.** `src3d/__tests__/bidi3.test.ts` (3 new): `boxDir` is passed at all; the box and the preview
+resolve through the **same named function** (the property, so a future edit cannot split them); and
+`textDir3` gives an RTL base to the reported string and its siblings while leaving a pure-math line LTR.
+Asserted on the SOURCE, per the #559 precedent in the same file — the defect is the markup and this tree
+has no DOM harness.
