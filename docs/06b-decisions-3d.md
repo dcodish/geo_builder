@@ -7046,6 +7046,70 @@ drawn, the vector arm not re-declared); the two neighbouring cells asserted byte
 including the exam's noun-carrying wording; the line/plane arms still going to their owners; and the ⟂
 twin unchanged. Plus the #845 sweep, now with the cell in the probe table.
 
+### ADR-3D-206 — a free plane's pin list becomes a FIT over the stated distances (#528)
+
+**The gap, left open deliberately by #508.** A stated distance from a known point pins a free plane's
+OFFSET exactly (`d = −n·p ± value`, the sign a sampled branch). The NORMAL kept its two free DOFs, and a
+SECOND distance therefore landed as a claim against a still-sampled normal — which #508's own class guard
+turns into `plane-not-determined`:
+
+```
+פירמידה משולשת ABCD
+מישור π2
+המרחק בין A למישור π2 הוא 5    ✅ builds — pins the offset
+המרחק בין B למישור π2 הוא 5    ❌ plane-not-determined
+```
+
+Refused honestly, never silently wrong — but the second given is **real information**: two equal
+distances say the plane is parallel to AB or separates A and B symmetrically.
+
+**The observation that makes it small.** With a unit normal, `n·pᵢ + d = σᵢ·vᵢ`. Subtracting the first
+from the rest ELIMINATES `d` and leaves one **affine constraint on the normal** per extra point:
+
+> `n̂·(pᵢ − p₀)/|pᵢ − p₀| = (σᵢvᵢ − σ₀v₀)/|pᵢ − p₀|`
+
+— the same shape as every other orientation fact this resolver already honours. A ⟂ relation and a
+member chord are this with the right-hand side **0**; #534's stated line-plane angle is this with
+`cos(90° − β)`. So the pin LIST becomes a FIT, and `unitNormalsFor` solves all of them together:
+
+| independent constraints | answer | sampled |
+| --- | --- | --- |
+| 2 or more | a line intersected with the unit sphere: 0, 1 or 2 discrete normals | 0 |
+| exactly 1 | a CONE about the axis at that cosine — the spin is a genuine free DOF | 1 |
+| none | nothing to say here; the caller keeps its own fully-sampled path | 2 |
+
+**The side pattern is a discrete branch set**, exactly like #508's single sign: the 2^k patterns are
+enumerated, the infeasible ones dropped (a demanded cosine outside [−1, 1] is a plane that does not
+exist), and the seed picks among the survivors — ADR-052, so a branch the student did not state is
+reachable by «show another configuration» and never silently chosen. The chosen pattern fixes the
+OFFSET too, so the normal and the offset come out of one branch and cannot disagree about the side.
+
+**Measured:** the reported sequence builds with both distances holding to 1e-6; the free-plane DOF reads
+**3 → 2 → 1 → 0** across «מישור π2» / first distance / second / third, and a determined figure honours
+all three exactly. The count is the resolution's own, so the cue and the sampler still cannot drift
+(the ADR-3D-124 rule).
+
+**Deliberate boundaries, so the blast radius is nil.** The fit engages only when two or more distances
+name the plane, no member already pins the offset (a member's offset would come from a different branch
+than the normal), and no parallel relation has pinned the normal outright. Every pre-existing figure
+therefore takes the untouched path — which is what makes this a widening rather than a rewrite of a
+delicate resolver. The pattern count is capped at 2^6.
+
+**A stated limitation.** An unsatisfiable pair (A and B one apart, at distances 1 and 9) is refused
+`plane-not-determined` — literally true, since no pattern pinned anything, and it is #508's honest guard
+rather than an accusation. A message that named the CONTRADICTION would be better, and needs a new code
+plus i18n; recorded here rather than smuggled in.
+
+**Not taken.** #528 suggests doing this "together with the rest of the recorded-constraint sweep #508
+called for (an angle to a plane, a membership of a LINE in a plane)". Those are separate widenings of the
+same resolver and are left to their own slice; what they will find is that `unitNormalsFor` is already
+the seam they need.
+
+**Locks.** `src3d/__tests__/issue-528-plane-distance-fit.test.ts` (7 tests): the reported sequence in He
+and En with both distances exact; the 3 → 2 → 1 → 0 DOF ladder; three distances all honoured; the
+leftover spin varying across seeds while both givens hold at every one; #508's single-distance case
+unchanged; and an unsatisfiable pair refusing rather than drawing a plane that misses a given.
+
 ### ADR-3D-208 — the input BOX takes its base direction from the content, like 2-D (#868)
 
 **Reported** by the operator while playing PR #867: *"the bidi text is biting again on the input"*.
