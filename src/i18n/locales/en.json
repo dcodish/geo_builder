@@ -159,6 +159,7 @@
     "noValidConfig": "No configuration satisfies all the requirements together — the shown drawing may be degenerate (e.g. coinciding points). Check the last given you entered.",
     "pending": "This relation is recorded but not determined yet — add the remaining givens (lengths/angles) to pin the figure, and it will resolve on its own.",
     "converge": "{{a}} and {{b}} have landed at the same point.",
+    "offArcNotice": "{{point}} necessarily lies on the part of circle {{circle}} that is not drawn — the construction forces it there.",
     "v": {
       "onCircle": "{{point}} should lie on circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
       "tangent": "tangency point {{point}} should lie on circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",

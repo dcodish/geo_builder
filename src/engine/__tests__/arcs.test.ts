@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import {
   angleIntoSpans, angleOffSpans, angleOnSpans, drawnArcSpans, drawnSign, norm2pi, orientArc, type ArcSpan,
 } from '../arcs';
+import { checkGivens, forcedOffArcs } from '../verify';
 import { buildScene } from '@/render/scene';
 import { factsOf } from '@/__tests__/scenarios-harness';
 import { replay } from '@/store/geoStore';
@@ -182,5 +183,55 @@ describe('#429 — the class members, end to end', () => {
     // vertices spread around the WHOLE circle — at least one outside the 0..180 half
     expect(ds.some((d) => d > 180), `angles ${ds.map((d) => d.toFixed(0)).join()}`).toBe(true);
     expect(before.violations).toEqual([]);
+  });
+});
+
+describe('#433 (ADR-423 tier 3) — a STRUCTURALLY forced departure is allowed, and said out loud', () => {
+  /** «חצי מעגל» + a point on it + the diameter from that point: D is the antipode, always on the other half. */
+  const facts = () => factsOf(['חצי מעגל', 'C על המעגל', 'קוטר מנקודה C']);
+
+  it('the semicircle diameter builds green — the exclusion holds (it must never be a violation)', () => {
+    const fig = replay(facts(), 0);
+    expect(fig.lastError).toBeNull();
+    // unsatisfiable if flagged: no seed can put an antipode of an on-ink point back on the same half
+    expect(fig.violations, 'a forced departure is NOT amber').toEqual([]);
+  });
+
+  it('…and it is no longer SILENT — the notice names the point and its circle', () => {
+    const fig = replay(facts(), 0);
+    expect(fig.forcedOffArc.map((f) => f.point)).toEqual(['D']);
+    expect(fig.forcedOffArc[0].circle).toBe('circle-O');
+    expect(Number(fig.forcedOffArc[0].off), 'it really is off the drawn half').toBeGreaterThan(0);
+  });
+
+  it('the notice survives every seed — it is structural, not a sampling accident', () => {
+    for (let seed = 0; seed < 8; seed++) {
+      const fig = replay(facts(), seed);
+      expect(fig.violations, `seed ${seed}`).toEqual([]);
+      expect(fig.forcedOffArc.map((f) => f.point), `seed ${seed}`).toEqual(['D']);
+    }
+  });
+
+  it('the tier boundary holds: the SAME coordinates read amber when the point is merely DRIVEN there', () => {
+    // #429's honesty hole stays shut — only a construction that DEFINES the point opposite the ink is
+    // tier 3. Re-label the antipode as a driven on-circle point and the very same position must flip
+    // channels: a violation, and no notice.
+    const fig = replay(facts(), 0);
+    const anti = fig.construction.objects.find((o) => o.kind === 'antipode')!;
+    const driven = {
+      ...fig.construction,
+      objects: fig.construction.objects.map((o) =>
+        o.id === anti.id ? { kind: 'on-circle' as const, id: o.id, circle: (o as { circle: string }).circle, theta: 0, free: false } : o,
+      ),
+    };
+    expect(forcedOffArcs(driven, fig.positions, fig.circles), 'no notice for a merely-driven point').toEqual([]);
+    const v = checkGivens([], fig.positions, fig.circles, driven);
+    expect(v.map((x) => x.relation), 'it reads amber instead').toEqual(['point-off-arc']);
+  });
+
+  it('a FULL circle forces nothing off — no notice where all the ink is drawn', () => {
+    const fig = replay(factsOf(['מעגל O', 'C על המעגל', 'קוטר מנקודה C']), 0);
+    expect(fig.violations).toEqual([]);
+    expect(fig.forcedOffArc, 'nothing is off the ink when the whole circle is drawn').toEqual([]);
   });
 });
