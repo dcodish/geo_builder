@@ -6888,3 +6888,66 @@ crossing pairs, a triangle's none, edge/face/space classification); both refusal
 English with the right `kind`; five correct forms still building; «קטע AB» claiming nothing and so drawing
 an edge freely; the pyramid staying at the weaker claim; all three guard cases; and the pair-first order
 with its claim intact.
+
+### ADR-3D-207 — the bisector stated on its own; the perpendicular bisector's honest end (#343, #342)
+
+Two halves of one question: what should an utterance this tool has already DECIDED about do?
+
+#### The bisector RAY — a capability, so it gets a construct (#343)
+
+`bisectorPoint` (V8-f/G11) reads the CARRIER form, «D על AC כך ש-OD חוצה זווית AOC», where a stated
+segment determines D. A textbook states the bisector by itself far more often, and every such spelling
+escaped to the paid LLM lane. Nothing was missing from the geometry; the sentence had no rule.
+
+What the sentence states is the **direction**. How far along the bisector D sits was never said, so it is
+a free sampled DOF (ADR-052) — which is exactly why this is a distinct construct (`bisector-ray`) rather
+than a widened regex over `bisector-point`: the two forms differ in what they DETERMINE.
+
+- **The apex is derived, not positional**: it is the letter the segment and the angle share, and it must
+  be the angle's middle letter. So «OD חוצה זווית AOC» and «AD חוצה זווית BAC» are one rule, and a pair
+  that does not touch the vertex declines.
+- **M1 duality, decided at apply** (parse3 is context-free by design): on an EXISTING point the same
+  sentence is a GIVEN about it, not a re-creation. «AD חוצה זווית BAC» on the pyramid ABCD lowers to the
+  equal-angle pair ∠(AD, AB) = ∠(AD, AC), which the engine already drives and verifies — instead of the
+  `already-defined` refusal its carrier twin still gives. A new construct must not repeat a known
+  anti-pattern just because its neighbour does.
+- The rider is placed off the figure's own spread (the `seatOnLineRider` convention), so it lands in
+  general position on a big figure and a small one alike, and «show another configuration» slides it.
+- The bisector direction is the normalised sum of the two unit ray directions; when the rays are exactly
+  opposite there is no internal bisector and the point is left unplaced rather than invented.
+
+**Not built, and recorded rather than forgotten:** «AD חוצה את זווית A» names the angle by its vertex
+alone. In 2-D (ADR-164/261) the figure resolves it, because a vertex there usually has two incident
+edges; in 3-D a pyramid vertex has three or more, so WHICH two rays the letter names is a genuine
+ambiguity and an operator's call. It stays an honest escalation rather than a guess.
+
+**Superseded, not skipped: the altitude half of #343.** The issue also asks for «גובה מ A» /
+«גובה מהקודקוד S» to build with an auto-named foot. Measured at `3516b70`, both already reach the
+GUIDANCE register as `ambiguous-height` — put there by **operator ruling #467** (2026-08-09: *"should
+give a message saying there are several options for this and user should give better input"*), which
+post-dates #343's plan and decides the question the other way. Building it would reverse an operator
+ruling, so it is left alone and the divergence is recorded on the issue.
+
+#### The perpendicular bisector — a decided NON-feature, so it gets guidance (#342)
+
+#330 already drew the line in the tokenizer: `אמצע` is the midpoint and `אמצעי`/`אמצעית`/`אמצעים` is
+this adjective, deliberately not matched, so the construct *"escalates honestly"*. It escalated to the
+**paid LLM lane**, which is the part that was never right: the construct is not missing by oversight, it
+is a decision, and a decision belongs in the guidance register (ADR-3D-040). Every such utterance was
+buying a Haiku call to arrive at a refusal the tool already knew it would give.
+
+The message teaches the two things that ARE expressible and cover the exam's uses — «M אמצע AB» for the
+midpoint and «CM מאונך ל-AB» for the perpendicularity. The #73 no-theft invariant holds (every supported
+catalog example still classifies null), and the midpoint is explicitly locked against theft, since
+distinguishing it from this adjective is the whole of #330's tokenizer rule.
+
+**Catalog.** «OD חוצה זווית AOC» / «OD bisects angle AOC» joins `catalog3.ts`. Shadow-matrix WINNERS
+snapshot regenerated: additions only, no existing winner changed.
+
+**Locks.** `src3d/__tests__/issue-343-bisector-ray.test.ts` (19 tests): the four fully-named frames
+building (He + En); the vertex-named frame; the arm cosines asserted EQUAL, which is what "bisects"
+means; the distance along the ray varying with the seed and adding exactly one to the DOF cue; the apex
+derived from the shared letter, with two declining cases; the carrier form asserted byte-identical; the
+M1 given on an existing point; the single-vertex frame deliberately still refused; the three
+perp-bisector spellings reaching guidance with the right category; and the midpoint not stolen, in three
+spellings, plus still building.

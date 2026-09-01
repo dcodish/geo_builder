@@ -2490,6 +2490,38 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    /**
+     * #343 (ADR-3D-207) — «OD חוצה זווית AOC»: the bisector RAY, with D a free rider on it.
+     *
+     * The carrier-less twin of `bisector-point`. There the student named a segment for D to sit on,
+     * which determines it; here nothing says HOW FAR along the bisector D lies, so that distance is an
+     * unstated magnitude and stays a sampled free DOF (ADR-052) rather than being defaulted. The
+     * DIRECTION is fully stated, which is the whole content of the sentence.
+     */
+    case 'bisector-ray': {
+      /**
+       * M1 duality, decided HERE because `parse3` is context-free by design: on an EXISTING point the
+       * sentence is a GIVEN about it, not a re-creation. «AD חוצה זווית BAC» where D is already a
+       * vertex says ∠(AD, AB) = ∠(AD, AC) — an equal-angle pair the engine already drives and verifies
+       * — so it lowers to that rather than refusing `already-defined`, which is what the carrier twin
+       * still does and what this construct must not repeat.
+       */
+      if (c.points.has(cmd.id)) {
+        const arm = (to: Id) => ({ kind: 'pair' as const, from: cmd.apex, to });
+        return applyCommand3(c, { type: 'angle-pair-eq', a: arm(cmd.id), b: arm(cmd.a), c: arm(cmd.id), d: arm(cmd.b) });
+      }
+      const missing = missingPoint(c, [cmd.a, cmd.b, cmd.apex]);
+      if (missing) return { ok: false, error: missing };
+      // an angle needs three distinct points; the parser gates this too, and a guard bound to the
+      // CONCEPT rather than to one code path is the `src3d/CLAUDE.md` rule
+      if (cmd.a === cmd.apex || cmd.b === cmd.apex || cmd.a === cmd.b)
+        return { ok: false, error: { code: 'no-solution', id: cmd.apex } };
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'bisector-ray', a: cmd.a, b: cmd.b, apex: cmd.apex });
+      if (!hasSegment(next, cmd.apex, cmd.id)) next.segments.push([cmd.apex, cmd.id]); // draw the bisector
+      return { ok: true, next };
+    }
+
     // triage 3-D: altitude from a vertex to the opposite face of THE tetrahedron. The face
     // is resolved here (the ADR-3D-011 sentinel pattern) = the tetra's other 3 vertices → foot-face.
     case 'tetra-altitude': {

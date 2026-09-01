@@ -3397,6 +3397,43 @@ const bisectorPoint: Rule = (s) => {
 };
 
 /**
+ * #343 (ADR-3D-207) — «OD חוצה זווית AOC»: the bisector RAY, stated on its own.
+ *
+ * `bisectorPoint` above handles the CARRIER form — «D על AC כך ש-OD חוצה זווית AOC» — where a stated
+ * segment determines D. A textbook states the bisector by itself far more often, and every such
+ * spelling escaped to the paid LLM lane: the bare form, the `את` form, and the English «bisects» /
+ * «is the bisector of». Nothing was missing from the geometry; the sentence had no rule.
+ *
+ * What the sentence states is the DIRECTION. How far along the bisector `D` sits was never said, so it
+ * is a free sampled DOF (ADR-052) — which is exactly the difference from the carrier form, and why this
+ * is a distinct construct rather than a widened regex.
+ *
+ * The apex is DERIVED, not positional: it is the letter the segment and the angle share, and it must be
+ * the angle's middle letter. So «OD חוצה זווית AOC» and «AD חוצה זווית BAC» are one rule, and a pair
+ * that does not touch the angle's vertex correctly declines.
+ */
+const bisectorRay: Rule = (s0) => {
+  const s = stripStatementPrefix(s0).trim();
+  if (!/חוצ|bisect/i.test(s)) return null;
+  const L = String.raw`([A-Z]\d*'?)`;
+  const m =
+    s.match(new RegExp(`^${L}${L}\\s+חוצ[הת]?\\s*-?\\s*(?:את\\s+)?(?:ה?זו?וית\\s+)?${L}${L}${L}\\s*$`)) ??
+    s.match(
+      new RegExp(
+        `^${L}${L}\\s+(?:is\\s+the\\s+bisector\\s+of|bisects)\\s+(?:the\\s+)?(?:angle\\s+|∠)?${L}${L}${L}\\s*$`,
+        'i',
+      ),
+    );
+  if (!m) return null;
+  const [, p1, p2, r1, apex, r2] = m;
+  // the apex is the letter the PAIR and the ANGLE share; the pair's other letter is the rider
+  const id = p1 === apex ? p2 : p2 === apex ? p1 : null;
+  if (!id) return null; // the segment does not start at the angle's vertex — not this sentence
+  if (r1 === apex || r2 === apex || r1 === r2 || id === r1 || id === r2) return null; // an angle needs three distinct points
+  return [{ type: 'bisector-ray', id, a: r1, b: r2, apex }];
+};
+
+/**
  * MUTUAL POSITION — «NK ו-PL מצטלבים» / «NK and PL are skew» / «AB מקביל ל-CD» / «AB חותך את CD»,
  * over the general operand pair (S4, #378, ADR-3D-104).
  *
@@ -4046,6 +4083,7 @@ export const RULES: Rule[] = [
   diagIntersection, // `מפגש האלכסונים` — before onSegment/midpoint grab the tokens
   quadDiagonals, // #834 `אלכסוני הבסיס` — AFTER diagIntersection, which owns the naming form
   bisectorPoint, // V8-f (G11): `D על AC כך ש-OD חוצה זווית AOC` — before onSegment grabs `D על AC`
+  bisectorRay, // #343: the carrier-LESS twin `OD חוצה זווית AOC` — after it, so the longer form wins
   segPlaneRel, // #819: segment × plane-run, ⟂ and ∥, either order, either notation
   perpSegGiven, // issue #14: `SM ⊥ DB` / `u ⊥ v` — after segPlaneRel (3–4-point targets are planes)
   collinearClaim,

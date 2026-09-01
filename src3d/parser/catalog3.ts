@@ -263,6 +263,9 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'vectors', he: 'u·v = v·w = u·w', en: 'u·v = v·w = u·w' },
   { category: 'vectors', he: 'AE יוצר זוויות שוות עם AB ו-AD', en: 'AE makes equal angles with AB and AD' },
   { category: 'points', he: 'D על AC כך ש-OD חוצה-זווית AOC', en: 'D on AC such that OD bisects angle AOC' },
+  // #343 (ADR-3D-207): the carrier-LESS bisector — the way a textbook usually states it. How far
+  // along the ray D sits was never said, so it stays a free sampled DOF.
+  { category: 'points', he: 'OD חוצה זווית AOC', en: 'OD bisects angle AOC' },
   // --- V8-g: the 2-D vector lane (flat polygons in the plane) ---
   { category: 'solids', he: 'משולש ABC', en: 'triangle ABC' },
   { category: 'solids', he: 'משולש ABC ישר זווית', en: 'right triangle ABC' },

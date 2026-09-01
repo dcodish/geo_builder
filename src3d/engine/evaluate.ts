@@ -771,6 +771,7 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     if (def.kind === 'free3') freeT += 3; // #774: a mixed-run minted point — three genuine free DOFs
     if (def.kind === 'on-plane') freeT += def.side ? 3 : 2; // a plane rider slides in-plane; a side point also floats
     if (def.kind === 'on-line') freeT += 1; // a line rider slides along its line (ADR-3D-031)
+    if (def.kind === 'bisector-ray') freeT += 1; // #343: how far along the bisector was never stated
     if (def.kind === 'partial') freeT += [def.x, def.y, def.z].filter((v) => v === null).length; // each unstated component is a free DOF (ADR-3D-094)
   }
   const param = c.param && pinningGivens(c) === 0 && c.paramGivens.length === 0 ? 1 : 0;
@@ -1007,7 +1008,7 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 }
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'right-apex', 'free3']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'bisector-ray', 'foot-seg', 'right-pyramid-apex', 'right-apex', 'free3']);
 
 /**
  * #367: is anything in the figure stated in ABSOLUTE coordinates — a typed parametric line, a plane
@@ -2340,6 +2341,28 @@ function evaluateSolidsAndPoints(
       const from = pos.get(def.from);
       const line = lines.get(def.line);
       if (from && line) pos.set(id, footOnLine(from, line));
+    } else if (def.kind === 'bisector-ray') {
+      /**
+       * #343 (ADR-3D-207) — a FREE rider on the bisector ray of ∠a·apex·b.
+       *
+       * The direction is knowledge (the normalised sum of the two unit ray directions IS the internal
+       * bisector); the DISTANCE along it is not, so it is sampled off the figure's own spread — the
+       * `seatOnLineRider` convention, so a bisector rider lands in general position on a big figure and
+       * on a small one alike, and «show another configuration» slides it.
+       */
+      const A = pos.get(def.a);
+      const B = pos.get(def.b);
+      const O = pos.get(def.apex);
+      if (!A || !B || !O) continue;
+      const d1 = normalize3(sub3(A, O));
+      const d2 = normalize3(sub3(B, O));
+      const bis = add3(d1, d2);
+      if (norm3(bis) < 1e-9) continue; // the rays are opposite — no internal bisector direction
+      const u = normalize3(bis);
+      const placed = [...pos.values()];
+      let spread = 1.2;
+      for (const q of placed) spread = Math.max(spread, dist3(q, O));
+      pos.set(id, add3(O, scale3(u, sample(seed, `bisray-t-${id}`, 0.25, 0.8) * spread)));
     } else if (def.kind === 'bisector-seg') {
       // V8-f (G11): D on segment a–b, its t root-found so ray apex→D bisects ∠(a)(apex)(b).
       // f(t) = cos(apex→P(t), apex→a) − cos(apex→P(t), apex→b) is monotone on [0,1]
