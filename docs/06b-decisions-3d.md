@@ -6570,3 +6570,66 @@ a driving relation reports nothing; a false relation still refuses; a bare figur
 #396 `redundant-relation`, #842 `containment-redundant`, this). They should converge on one channel
 with a per-relation entailment test; filed as **#853** rather than done here, since converging them
 is a refactor with no user-visible change and belongs in its own pass.
+
+## ADR-3D-201 — A DECLARATIVE NOUN PREFIX IS NORMALISED ONCE, AT THE SEAM (#837)
+
+**Context.** Prod sessions `fwynr5ws` + `8p8o74z2` (log-triage 2026-08-30, one user, six refusals across
+two sessions on the same prism exercise):
+
+```
+AA'=(k-1, k-7, k+1)                            ✓ inject-pair
+ישר AA'=(k-1,k-7, k+1)                         ✗ not-handled
+משוואת הישר AC היא x=(8,-1,-1)+t(k+1,0,k-3)    ✓ line3, on-line, on-line
+AC על הישר x=(8,-1,-1)+t(k+1,0,k-3)            ✗ not-handled
+ישר AC x=(8,-1,-1)+t(k+1,0,k-3)                ✓ line3, on-line, on-line   (#815)
+```
+
+**The cost, from the session itself:** five consecutive refusals, then the student **solved for `k` by
+hand** and typed `t(3,0,-1)` to get past the tool. They finished with a figure that no longer carries the
+symbolic parameter the exercise is about. So the acceptance here is not "the line parses" — it is *the
+symbol survives*.
+
+**Diagnosis.** A declarative noun prefix on a statement the grammar already handles. «ישר AA'=…» and
+«AC על הישר …» are ordinary textbook noun phrases naming exactly the statement the bare form makes; the
+prefix carries no extra given, and the rules match on the statement's shape, so the prefix pushes the
+input off every one of them.
+
+The signature is the **asymmetry**: `ישר AC x=…` parses while `ישר AA'=…` does not. #815 added that
+tolerance *at a rule*, so it covers whichever lane happened to be fixed. A sixth rule would repeat the
+mistake in a new place.
+
+**Decision — a rewrite table at the SEAM, applied only after every rule has declined.**
+
+`NOUN_PREFIX_REWRITES` maps a non-canonical spelling onto the canonical statement and `parse3` re-reads
+the line **once** (guarded against recursion):
+
+- `ה?(ישר|קטע) <pair> = …` → `<pair> = …` — the object noun agrees with what the pair already is.
+- `<pair> על ה?ישר <equation>` → `משוואת הישר <pair> היא <equation>` — a membership phrasing of the fact
+  that lowering already produces, routed to it rather than duplicated.
+
+**Why after the rule loop, and not in `normalize3`.** Reaching that point means nothing parsed, so a
+rewrite can only turn a refusal into a parse — it can never alter a form that works today. Normalising
+earlier would have put every existing spelling at risk to fix two that do not, and #815's rule-level
+tolerance means some rules *expect* the prefix. The lock asserts the canonical forms still parse on the
+first pass, so the seam is provably inert for them.
+
+**The seam is deliberately narrow.** `וקטור` is **not** in the strip list: «וקטור AB = …» is a different
+statement from «|AB| = …», and the `ambiguous-vector-length` guard exists to keep them apart. Stripping it
+as decoration would erase a distinction the tool refuses to guess at. Likewise «ישר ℓ1» and «קטע AB»,
+where the noun is the *subject* rather than a prefix, are untouched.
+
+**Explicitly NOT #778.** [ADR-W-030](06w-decisions-workspace.md) governs IMPERATIVE wrappers — «הוסף»,
+«שרטט», «סמן» — and its ruling is *state the given, don't command the tool*, i.e. teach them away. There
+is no verb here and nothing is commanded; «ישר AA' = (k-1, k-7, k+1)» is how the statement appears in a
+textbook, arguably more canonical than the bare form. The right answer is to **parse** it.
+
+**Sibling check (ADR-W-004) — measured, and the class is NOT present in 2-D.** «הישר AB», «ישר AB»,
+«הקטע AB», «קטע AB» and «הישר AB מקביל ל-CD» all already lower identically to their bare forms. The 2-D
+grammar tolerates the determiner-style prefix wherever it was tried, so there is nothing to port.
+
+**Locks.** `src3d/parser/__tests__/issue-837-noun-prefix.test.ts` (13 tests): six prefixed spellings are
+asserted **byte-identical** to their canonical twins; both lanes are covered explicitly, with #815's
+already-working lane asserted unchanged, so the asymmetry cannot return; the symbolic `k` survives in
+both the injection (`symExprs` all in `k`) and the equation (two direction components parameter-bearing);
+`וקטור` and the subject-noun forms are asserted untouched; and the canonical forms are asserted to parse
+on the first pass, pinning the seam as inert for them.

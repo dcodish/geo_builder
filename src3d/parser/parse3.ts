@@ -3956,6 +3956,60 @@ export function markVectorContext(utterance: string): void {
   VEC_MARKED = /[→⃗⟶]/.test(utterance) || /(?:^|[\s:,])(?:ה?ו?וקטור|vectors?)\s/i.test(utterance);
 }
 
+
+/**
+ * #837 — DECLARATIVE NOUN PREFIXES, normalised ONCE at the seam.
+ *
+ * Prod sessions `fwynr5ws` + `8p8o74z2` (log-triage 2026-08-30, 1 user, 6 refusals across two sessions):
+ *
+ * ```
+ * AA'=(k-1, k-7, k+1)                            ✓ inject-pair
+ * ישר AA'=(k-1,k-7, k+1)                         ✗ not-handled
+ * משוואת הישר AC היא x=(8,-1,-1)+t(k+1,0,k-3)    ✓ line3, on-line, on-line
+ * AC על הישר x=(8,-1,-1)+t(k+1,0,k-3)            ✗ not-handled
+ * ישר AC x=(8,-1,-1)+t(k+1,0,k-3)                ✓ line3, on-line, on-line   (#815)
+ * ```
+ *
+ * Session `8p8o74z2` shows the cost: five consecutive refusals, then the student **solved for `k` by
+ * hand** and typed `t(3,0,-1)` to get past the tool — ending with a figure that no longer carries the
+ * symbolic parameter their exercise is about.
+ *
+ * These are ordinary textbook noun phrases naming exactly the statement the bare form makes; the prefix
+ * carries no extra given. Note `ישר AC x=…` DOES parse while `ישר AA'=…` does not — the tolerance was
+ * added at a RULE (#815), so it covers whichever lane happened to be fixed. That asymmetry is the
+ * defect's signature, and it is why this is a seam and not a sixth rule: a rewrite table applied to the
+ * whole utterance cannot cover one lane and miss another.
+ *
+ * Applied ONLY after every rule has declined, so no currently-working form can change: a rewrite that
+ * fires on a sentence nothing parsed is either an improvement or still `not-handled`.
+ *
+ * Explicitly NOT #778 (ADR-W-030). That governs IMPERATIVE wrappers — «הוסף», «שרטט», «סמן» — whose
+ * ruling is *state the given, don't command the tool*, i.e. teach them away. There is no verb here and
+ * nothing is being commanded; «ישר AA' = (k-1, k-7, k+1)» is how the statement appears in a textbook,
+ * arguably more canonical than the bare form. So the right answer is to PARSE it, not to teach it away.
+ *
+ * `וקטור` is deliberately absent from the strip list: it is not decoration. «וקטור AB = …» is a
+ * different statement from «|AB| = …», and the ambiguous-vector-length guard exists to keep them apart.
+ */
+const PAIR_TOK = String.raw`[A-Z]\d*'?`;
+const NOUN_PREFIX_REWRITES: { when: RegExp; to: (m: RegExpMatchArray) => string }[] = [
+  // «ישר AA'=(…)» / «הקטע AB = (…)» — the object noun agrees with what the pair already is, so it can be
+  // normalised away. Covers the injection lane that #815's rule-level tolerance never reached.
+  {
+    when: new RegExp(String.raw`^ה?(?:ישר|קטע)\s+((?:${PAIR_TOK}){2}\s*=.*)$`),
+    to: (m) => m[1],
+  },
+  // «AC על הישר x=…» — a MEMBERSHIP phrasing of the fact «משוואת הישר AC היא x=…» already lowers
+  // (line3 + on-line + on-line). Routed to that lowering rather than duplicated.
+  {
+    when: new RegExp(String.raw`^((?:${PAIR_TOK}){2})\s+על\s+ה?ישר\s+(.+)$`),
+    to: (m) => `משוואת הישר ${m[1]} היא ${m[2]}`,
+  },
+];
+
+/** Guards the single re-parse below against any possibility of recursion. */
+let REWRITING = false;
+
 export function parse3(utterance: string): ParseResult3 {
   markVectorContext(utterance);
   PARAM_CONFLATED = null;
@@ -3970,5 +4024,22 @@ export function parse3(utterance: string): ParseResult3 {
   // #516: no rule matched, but a rule RECOGNIZED an ambiguity — that is a refusal with a
   // clarification, never `not-handled` (which escalates to the LLM lane, whose job is to guess).
   if (PARAM_CONFLATED) return { ok: false, reason: 'param-roles-conflated', letter: PARAM_CONFLATED };
+  // #837: LAST — a declarative noun prefix is normalised away and the line is re-read ONCE. Reaching
+  // here means every rule declined, so this can only turn a refusal into a parse, never alter one.
+  if (!REWRITING) {
+    for (const { when, to } of NOUN_PREFIX_REWRITES) {
+      const m = s.match(when);
+      if (!m) continue;
+      const rewritten = to(m);
+      if (rewritten === s) continue;
+      REWRITING = true;
+      try {
+        const r = parse3(rewritten);
+        if (r.ok) return r;
+      } finally {
+        REWRITING = false;
+      }
+    }
+  }
   return NOT_HANDLED;
 }
