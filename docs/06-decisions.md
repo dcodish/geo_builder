@@ -8360,3 +8360,79 @@ operator's call, not an autonomous one.
 enforced by an enumerated list rather than a derived one* — has now produced five instances
 (ADR-169 `parallels`, the 2026-07-17 context-free verify, #243, #501, this). Every remaining
 enumerated mirror list is a candidate for the same treatment.
+
+## ADR-470 — a stated ORDER selects the crossing; `avoid` is meaningful only when it IS one (#830)
+
+**Context.** A prod student (session `j7r7np51`, 2026-08-30) built an isosceles triangle with a circle
+tangent to AB at B, then typed «AC חותכת את המעגל בנקודה D» and was refused twice, with two different
+and both-false messages — first *«cannot construct D: line chord-AC does not meet circle circle-O»*,
+then *«over-constrained: A–D–C in order on a line cannot hold»*. They gave up and drew a different
+figure with «המשך AC», whose R lies beyond C and is not the D their problem asked for.
+
+The order is not merely satisfiable, it is **forced**: A outside the circle and C inside ⇒ segment AC
+meets the circle exactly once, strictly between them. The refusal asserted something false.
+
+**Root cause — selection, not recruitment.** The issue's filed hypothesis (the #3 class: *"a free DOF
+the apply-time satisfiability check does not recruit"*) is measurably not what happens. From `D`,
+`freeDrivableAncestors` returns `["circle-O", "@ctr-O", "A"]` — the circle's free radius and centre were
+reachable all along. The defect is one layer earlier, in how the crossing is **chosen**:
+
+The parser emits `{type:'line-circle-intersection', id:'D', avoid:'A', order:['A','D','C']}`. `tryEval`'s
+`line-circle` case checks `onSegment` (unset), then takes the `avoid` branch into `otherCrossing`, whose
+rule is *"keep the fresh root FARTHEST from `avoid`"*. That rule reads as *"keep the OTHER crossing"*
+only under the precondition its own contract states — **that `avoid` is one of the crossings**. It never
+checked it. Here A is outside the circle (|OA| = 8.773 vs r = 5), so it is not a crossing at all, and
+"farthest from A" degenerated into an arbitrary geometric preference that picked the root at t = 1.905
+along A→C — **beyond C**, violating the order the same command asserts.
+
+The `collinear-order` constraint then had to argue with a selection actively placing D on the wrong
+root. The joint solve traded away the tangency chasing it (the raw trial evaluates *«over-constrained:
+@ctr-OB ⟂ AB cannot hold»*), the recruiter's experiments failed, and the ladder finally reported the
+order as impossible — on a figure where flipping the root satisfies everything with no solving at all.
+0 of 40 seeds built the sequence, so this was systematic, never a basin lottery.
+
+**Decision — two halves, both reusing what exists.**
+
+1. **`otherCrossing` enforces its stated precondition.** The farthest-from-`avoid` rule applies only when
+   `avoid` is within `LEN_EPS` of one of `sols`. Otherwise the hint is meaningless and the call falls
+   through to the ordinary branch pick, exactly as an absent `avoid` already does. The parser sets
+   `avoid` from a line ENDPOINT without knowing whether that endpoint lies on the circle; the guard
+   belongs where the positions are known.
+
+2. **A stated order drives the SELECTION.** `order: [X, id, Y]` says, in as many words, *the new point
+   lies between X and Y* — which is exactly what the existing `onSegment` selection expresses, and
+   `tryEval` already checks `onSegment` before `avoid`/`branch`. The `line-circle-intersection` lowering
+   now derives `onSegment: [X, Y]` from that unambiguous order shape. Only `[X, id, Y]` is derivable; a
+   longer stated sequence keeps the constraint alone, and an explicit parser `onSegment` always wins.
+
+This is the principle already documented for driven carriers at `evaluate.ts:209` — *"prefer the root
+that satisfies the order over the near one"* — finally applied to the derived-crossing lane, which never
+got it. **No new machinery, no new constraint type, no solver change.**
+
+**LADDER stage.** None inserted. Both halves act strictly at the constructive-sweep SELECTION stage,
+before any solve — which is the point: the previous behaviour pushed a selection error into the solver
+and let it surface as a false over-constraint three stages later.
+
+**Why not the filed plan.** Recruiting more DOFs would not have helped: the DOFs were already reachable,
+and the configuration needing no solve at all was rejected before the solver ran. Fixing this in the
+recruiter would have been a patch on a symptom, and would have left every other `avoid`-without-a-crossing
+pick silently wrong.
+
+**Sibling check (ADR-W-004).** The 3-D twin **#820 is NOT fixed** — it was closed on 2026-08-29 by a
+GitHub keyword accident (commit `f5e1d11` wrote *"Deliberately **NOT** fixed: #820"*, and GitHub matched
+`fixed: #820`). It is reopened. Its mechanism is genuinely different — an on-segment rider's `t` is
+absent from `solvePivot`'s unknown layout — so this fix neither ports to it nor closes it. Swept every
+commit message in the repo for a negated closing keyword: that was the only occurrence. **Convention:
+never write a closing keyword next to an issue number you are not closing** — phrase it as *"#NNN is
+out of scope here"*.
+
+**Also found, filed not folded.** #855 — the same prefix resolves to an empty figure with no error at
+seed 17 of 40, a pre-existing defect unrelated to the crossing (the #830 regression test skips that seed
+and says why).
+
+**Locks.** `src/engine/__tests__/issue-830.test.ts` — `otherCrossing` keeps the other root when `avoid`
+IS a crossing, ignores it when it is not, and is unchanged when absent; the bisected minimal repro builds
+with D strictly between A and C; the forcing geometry (A outside, C inside, tangency exact) holds; and D
+is between A and C at **every** seed that builds (39/40, seed 17 being #855). Scenario
+`satisfiable-circle-crossing-is-not-refused-830` in `scenarios-corpus-4.ts` replays the student's own
+lines and additionally asserts the tangency and the isosceles given survive the crossing.

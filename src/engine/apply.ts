@@ -1660,8 +1660,21 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       addObj(objects, { kind: 'arc-midpoint', id: cmd.id, circle: cmd.circle, from: cmd.from, to: cmd.to, branch: cmd.branch ?? 0 });
       break;
 
-    case 'line-circle-intersection':
-      addObj(objects, { kind: 'line-circle', id: cmd.id, line: cmd.line, circle: cmd.circle, branch: cmd.branch ?? 0, ...(cmd.avoid ? { avoid: cmd.avoid } : {}), ...(cmd.onSegment ? { onSegment: cmd.onSegment } : {}) });
+    case 'line-circle-intersection': {
+      // A stated ORDER selects the ROOT, it does not merely argue with it afterwards (#830). «AC חותכת
+      // את המעגל בנקודה D» asserts `order [A, D, C]` — which says, in as many words, *D lies between A
+      // and C*: exactly what the `onSegment` SELECTION already expresses (and tryEval checks before
+      // `avoid`/`branch`). Deriving it here means the crossing is PICKED on the stated side, instead of
+      // being picked blind and then fought by the order's soft residual through the joint solve — the
+      // failure the operator hit, where a satisfiable A–D–C was reported impossible because selection
+      // had put D beyond C. Only the unambiguous shape [X, id, Y] is derivable; a longer stated
+      // sequence keeps the constraint alone, and an explicit `onSegment` from the parser always wins.
+      const orderSpan =
+        !cmd.onSegment && cmd.order && cmd.order.length === 3 && cmd.order[1] === cmd.id
+          ? ([cmd.order[0], cmd.order[2]] as [Id, Id])
+          : undefined;
+      const onSeg = cmd.onSegment ?? orderSpan;
+      addObj(objects, { kind: 'line-circle', id: cmd.id, line: cmd.line, circle: cmd.circle, branch: cmd.branch ?? 0, ...(cmd.avoid ? { avoid: cmd.avoid } : {}), ...(onSeg ? { onSegment: onSeg } : {}) });
       // Keep the crossing ON the segment (the circle "cuts CE at D" ⇒ D between C and E). D is already
       // collinear (it's a point on the line), so we add ONLY the side/order constraint — NOT `addCollinear`
       // (which would mis-drive a free on-circle endpoint, ADR-127). The order's residual is folded into the
@@ -1669,6 +1682,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // it across configurations, not just the default seed.
       if (cmd.order && cmd.order.length >= 3) constraints.push({ type: 'collinear-order', points: [...cmd.order] });
       break;
+    }
 
     // "המשך AC חותך מעגל P בנקודה D" (ADR-054): the new point D is on circle P, collinear with A,C, and
     // BEYOND the 2nd named point (order A→C→D). Two structurally different cases:

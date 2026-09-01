@@ -2285,4 +2285,35 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(A, D) / r, '|AD| = 18R/7').toBeCloseTo(18 / 7, 2);
     },
   },
+  {
+    id: 'satisfiable-circle-crossing-is-not-refused-830',
+    title: '#830: «AC חותכת את המעגל בנקודה D» builds with D between A and C — the crossing is SELECTED on the stated side',
+    guards:
+      "prod session j7r7np51 (2026-08-30): a student building an isosceles triangle with a tangent circle was refused the crossing TWICE, with two different and both-false messages («cannot construct D: line chord-AC does not meet circle», then «over-constrained: A–D–C in order on a line cannot hold»), and gave up — finishing on a DIFFERENT figure via «המשך AC», whose R lies beyond C and is not the D their problem asked for. The order is not merely satisfiable but FORCED: A outside the circle and C inside ⇒ segment AC crosses exactly once, strictly between them. Root cause was SELECTION, not the recruiter (the circle's free radius and centre were reachable from D all along): the parser sets `avoid: A` from the line's named endpoint and `otherCrossing` applied its farthest-from-avoid rule without checking that `avoid` is one of the crossings — with A outside it is not, so D was placed at t=1.905, beyond C, violating the order the same command asserts. The order then fought the selection through the joint solve and traded away the tangency. ADR-470: `otherCrossing` enforces its stated precondition, and a stated order [X, id, Y] drives the selection through the existing `onSegment` mechanism. These are the student's own lines.",
+    steps: [
+      'משולש ABC שווה שוקיים',
+      'AB=AC',
+      'מעגל',
+      'AB משיקה למעגל בנקודה B',
+      'AC חותכת את המעגל בנקודה D', // refused twice in prod — the whole point of the scenario
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      const O = at(fig, '@ctr-O');
+      const r = fig.circles.get('circle-O')!.r;
+      // D is a real crossing: on the circle AND on segment AC, strictly between A and C
+      expect(dist(O, D) / r, 'D is on the circle').toBeCloseTo(1, 3);
+      const dx = C.x - A.x, dy = C.y - A.y;
+      const t = ((D.x - A.x) * dx + (D.y - A.y) * dy) / (dx * dx + dy * dy);
+      expect(t, 'A–D–C: D is past A').toBeGreaterThan(0);
+      expect(t, 'A–D–C: D is before C (the root beyond C was the defect)').toBeLessThan(1);
+      // the tangency the crossing used to trade away still holds: |OB| = r and OB ⟂ AB
+      expect(dist(O, B) / r, 'B is still the tangency point').toBeCloseTo(1, 3);
+      const dot = (A.x - B.x) * (O.x - B.x) + (A.y - B.y) * (O.y - B.y);
+      expect(Math.abs(dot) / (dist(A, B) * r), 'OB ⟂ AB — the tangency survived the crossing').toBeLessThan(1e-2);
+      // and the isosceles given the student stated is intact
+      expect(dist(A, B) / dist(A, C), '|AB| = |AC|').toBeCloseTo(1, 2);
+    },
+  },
 ];

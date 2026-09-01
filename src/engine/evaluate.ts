@@ -1290,7 +1290,16 @@ export function bySide(sols: Vec[], anchor: Vec, dir: Vec): Vec[] {
 export function otherCrossing(sols: Vec[], placed: Vec[], avoid: Vec | undefined, branch: number): Vec | null {
   const fresh = sols.filter((s) => !placed.some((q) => dist(s, q) < LEN_EPS));
   if (!fresh.length) return null;
-  if (!avoid) return fresh[branch % fresh.length];
+  // ENFORCE the precondition this function's contract states — "when a known reference point is one of
+  // them" (#830). `avoid` is meaningful only when it IS one of the crossings: the rule "keep the root
+  // farthest from `avoid`" reads as "keep the OTHER one" precisely because `avoid` occupies one root.
+  // The caller sets `avoid` from a line ENDPOINT without knowing whether that endpoint lies on the
+  // circle, and when it does not the farthest-from rule degenerates into "the root farthest from an
+  // arbitrary point" — geometrically meaningless, and wrong exactly when a stated order wants the NEAR
+  // root (the operator's «AC חותכת את המעגל בנקודה D» with A outside: D was placed beyond C at t=1.9,
+  // violating the A–D–C the same command asserts, and the order was then reported impossible).
+  // Unmeaningful ⇒ fall through to the ordinary branch pick, exactly as an absent `avoid` does.
+  if (!avoid || !sols.some((s) => dist(s, avoid) < LEN_EPS)) return fresh[branch % fresh.length];
   return fresh.reduce((far, s) => (dist(s, avoid) > dist(far, avoid) ? s : far), fresh[0]);
 }
 
