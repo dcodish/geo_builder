@@ -20,7 +20,13 @@ invariant under a *uniform* speed difference and the machines are not uniformly 
 change per-file wall time unevenly). So it can still ping-pong across a cross-machine round
 ([[work-pc-cross-machine]]), just without the noise on top.
 
-**How to apply:** after a full run, read the diff. Paths only, and it names which files joined and left →
-that is the measurement talking, commit it (the script prints the same list). If you ever see an `ms` or
+**And it is noisy run-to-run on ONE machine.** Measured 2026-09-01: two full runs 40 minutes apart on the
+same PC moved three files in and out of the tier. The rule is a share of total suite time, so ordinary
+load variation reshuffles the tail. So a membership diff is NOT automatically worth committing.
+
+**How to apply:** after a full run, read the diff. Paths only, and it names which files joined and left.
+Commit it when the membership change has a REASON (a genuinely new slow test, a file that got much
+faster); discard it when it is the same handful of borderline files trading places — and always discard
+it before tagging a deploy, so the tag sits on the tested commit. If you ever see an `ms` or
 `measuredCutoffMs` line reappear, something regressed #812 and `server/__tests__/test-tiers.test.ts` should
 have caught it. The conservative membership is still the one measured on the SLOWER machine.
