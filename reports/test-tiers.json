@@ -15,11 +15,7 @@
     "src/__tests__/scenarios-e2e-7.test.ts",
     "src/__tests__/scenarios-e2e-8.test.ts",
     "src/__tests__/scenarios-props-budget.test.ts",
-    "src/__tests__/scenarios-props-resample.test.ts",
     "src/__tests__/scenarios-props-submit-gate.test.ts",
-    "src/app/__tests__/resolve-view.test.ts",
-    "src/engine/__tests__/inscribe-joint-solve.test.ts",
-    "src/engine/__tests__/issue-541.test.ts",
     "src/engine/__tests__/membership-conversion.test.ts",
     "src/engine/__tests__/obligation-preservation.test.ts",
     "src/replay/__tests__/basin-ownership.test.ts",
@@ -27,12 +23,12 @@
     "src3d/__tests__/adr-3d-032.test.ts",
     "src3d/__tests__/book-coordinate-givens.test.ts",
     "src3d/__tests__/exam-2026-2.test.ts",
-    "src3d/__tests__/issue-814.test.ts",
     "src3d/__tests__/issue-815.test.ts",
+    "src3d/__tests__/issue-816.test.ts",
+    "src3d/__tests__/issue-827.test.ts",
     "src3d/__tests__/member-drive.test.ts",
     "src3d/__tests__/named-parametric-line.test.ts",
     "src3d/__tests__/plane-eq-drive.test.ts",
-    "src3d/__tests__/right-apex.test.ts",
-    "src3d/__tests__/scenarios3.test.ts"
+    "src3d/__tests__/right-apex.test.ts"
   ]
 }
