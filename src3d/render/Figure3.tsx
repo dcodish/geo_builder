@@ -37,6 +37,14 @@ export interface Figure3Props {
   /** #483: a determined-but-unnamed ℓ∩π crossing was clicked — the App names it through the normal
    *  submit path. Absent = the offer is not drawn at all, which keeps this component a pure view. */
   onNameCrossing?: (c: SceneCrossing3) => void;
+  /** #578 (ADR-3D-211): re-letter a point by clicking it — 2-D's FR-RN-10 interaction, ported at the
+   *  operator's ruling ("the same interface as the 2d tool has"). Returns the refusal so the popover can
+   *  say WHY nothing happened. Absent = points are not clickable and no menu exists, so this component
+   *  stays a pure view for every caller that does not wire it (the #483 contract). */
+  onRenamePoint?: (from: string, to: string) => { ok: boolean; reason?: string };
+  /** Localised strings for that popover (i18n-injected, like `resetLabel` — this file carries no
+   *  translation layer of its own). */
+  renameText?: { title: string; placeholder: string; apply: string; taken: string; bad: string };
   /** Tooltip on a crossing dot (i18n-injected, like `resetLabel` — this component stays translation-free). */
   crossingLabel?: string;
   /** #714 — labels for the named view presets (i18n-injected). Absent = the presets are not offered,
@@ -87,7 +95,7 @@ const ltr = (s: string) => `⁦${s}⁩`;
  */
 const CANVAS_DIR = { direction: 'ltr' } as const;
 
-export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay, showWitnesses = true, showObjectAngles = false, onNameCrossing, crossingLabel, presetLabels }: Figure3Props) {
+export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay, showWitnesses = true, showObjectAngles = false, onNameCrossing, onRenamePoint, renameText, crossingLabel, presetLabels }: Figure3Props) {
   /**
    * #5 — the HOME camera for THIS figure. A purely planar figure is read face-on (`planarNormal` /
    * `faceOnView`, engine/defaultView); everything else keeps the ¾ textbook view. Derived from the
@@ -114,6 +122,11 @@ export default function Figure3({ construction, resolved, width = 640, height = 
   // coordinate `buildScene3` emits is unchanged, and the #483 crossing hit targets translate with
   // their marks for free.
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  /** #578: the on-canvas rename popover — which point, where (canvas px, pan included), and the note a
+   *  refusal leaves. View state, like orbit/zoom/pan: outside the store and outside undo. */
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [renameVal, setRenameVal] = useState('');
+  const [menuNote, setMenuNote] = useState('');
   const drag = useRef<{ x: number; y: number } | null>(null);
   /** #533: which gesture the current drag is — orbit (the primary, unmoved) or pan. */
   const dragMode = useRef<'orbit' | 'pan'>('orbit');
@@ -182,6 +195,17 @@ export default function Figure3({ construction, resolved, width = 640, height = 
     const rect = e.currentTarget.getBoundingClientRect();
     zoomAbout({ x: e.clientX - rect.left, y: e.clientY - rect.top }, e.deltaY < 0 ? 1.12 : 1 / 1.12);
   };
+
+  /** #578: hand the typed letter to the host and keep the popover OPEN on a refusal, with the reason —
+   *  a menu that closed on failure would read as "it worked". */
+  function applyRename() {
+    if (!menu || !onRenamePoint || !renameText) return;
+    const to = renameVal.trim().toUpperCase();
+    if (!to) return;
+    const res = onRenamePoint(menu.id, to);
+    if (res.ok) setMenu(null);
+    else setMenuNote(res.reason === 'target-taken' ? renameText.taken : renameText.bad);
+  }
 
   return (
     <div className="relative" data-testid="figure3">
@@ -406,7 +430,24 @@ export default function Figure3({ construction, resolved, width = 640, height = 
             </g>
           ))}
         {scene.points.map((p) => (
-          <g key={p.id}>
+          <g
+            key={p.id}
+            className={onRenamePoint ? 'cursor-pointer' : undefined}
+            // #578: the generous transparent hit ring is the #483 pattern — clickable on a tablet
+            // without enlarging the dot — and `stopPropagation` keeps the click off the orbit drag.
+            onPointerDown={onRenamePoint ? (e) => e.stopPropagation() : undefined}
+            onClick={
+              onRenamePoint
+                ? (e) => {
+                    e.stopPropagation();
+                    setMenu({ id: p.id, x: p.x + pan.x, y: p.y + pan.y });
+                    setRenameVal('');
+                    setMenuNote('');
+                  }
+                : undefined
+            }
+          >
+            {onRenamePoint && <circle cx={p.x} cy={p.y} r={11} fill="transparent" />}
             <circle cx={p.x} cy={p.y} r={3} fill="#0f172a" />
             <text
               x={p.x + p.labelDx}
@@ -442,6 +483,61 @@ export default function Figure3({ construction, resolved, width = 640, height = 
         ))}
         </g>
       </svg>
+      {/* #578 (ADR-3D-211) — the on-canvas rename popover, 2-D's FR-RN-10 ported. PHYSICAL `left`, not
+          `insetInlineStart`: the coordinate is a left-based canvas pixel, and under the Hebrew-default
+          RTL a logical inset resolves to `right`, opening the menu mirrored — the exact bug 2-D records
+          at its own menu (F1/REN-1). The backdrop closes it, so it can never be stranded open. */}
+      {menu && onRenamePoint && renameText && (
+        <>
+          <div style={{ position: 'absolute', inset: 0 }} onClick={() => setMenu(null)} />
+          <div
+            dir="ltr"
+            data-testid="rename-menu"
+            style={{
+              position: 'absolute',
+              left: Math.min(Math.max(menu.x + 8, 0), Math.max(0, width - 168)),
+              top: Math.min(Math.max(menu.y + 8, 0), Math.max(0, height - 92)),
+              background: '#fff',
+              border: '1px solid #cbd5e1',
+              borderRadius: 8,
+              boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+              padding: 8,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              zIndex: 10,
+              minWidth: 150,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
+              {renameText.title} {menu.id}
+            </div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <input
+                autoFocus
+                data-testid="rename-input"
+                value={renameVal}
+                maxLength={4}
+                placeholder={renameText.placeholder}
+                onChange={(e) => {
+                  setRenameVal(e.target.value);
+                  if (menuNote) setMenuNote('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') applyRename();
+                  if (e.key === 'Escape') setMenu(null);
+                }}
+                style={{ width: 64, fontSize: 13, padding: '2px 6px', border: '1px solid #cbd5e1', borderRadius: 6 }}
+              />
+              <button type="button" onClick={applyRename} style={{ fontSize: 12, padding: '2px 8px', border: '1px solid #cbd5e1', borderRadius: 6, background: '#f8fafc' }}>
+                {renameText.apply}
+              </button>
+            </div>
+            {menuNote && <div style={{ fontSize: 11, color: '#b45309' }}>{menuNote}</div>}
+          </div>
+        </>
+      )}
       {/* #742 / ADR-W-024: the canvas corner cluster — ↺ − +, the SAME cluster every builder's
           canvas carries (shared style + step from shell/frame/canvasControls). The zoom buttons
           reuse the wheel's about-a-point math, aimed at the canvas centre; the clamp stays this

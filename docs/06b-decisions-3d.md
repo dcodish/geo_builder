@@ -7153,3 +7153,72 @@ resolve through the **same named function** (the property, so a future edit cann
 `textDir3` gives an RTL base to the reported string and its siblings while leaving a pure-math line LTR.
 Asserted on the SOURCE, per the #559 precedent in the same file — the defect is the markup and this tree
 has no DOM harness.
+
+### ADR-3D-211 — a rename is a rewrite of HISTORY, reached from two entry points and one core (#578)
+
+**Context.** 3-D had no rename of any kind. Operator, prod 2026-08-14: a pyramid-height foot came out `E`
+when they wanted `O`, and unlike 2-D there was no way to change it — the whole figure had to be retyped.
+2-D has had the mechanism since #539; this ports it. Operator ruling, 2026-08-14: *"if we get to click on
+image and change letter in the same interface as the 2d tool has, that is fine. of course the command is
+ok too"* — **both** entry points, sharing one core.
+
+**Decision — the same shape 2-D chose, with this product's label grammar.**
+
+A rename is **not a fact and not a command**. It rewrites the ordered fact list in place, so the figure
+afterwards is byte-for-byte the figure the student would have had if they had typed the new letter from
+the start. That is asserted directly in the lock (same coordinates, point for point), and it is what
+keeps the fact list the single source of truth: a rename that appended a "now call E O" fact would make
+every later replay depend on a naming event, and undo would have to unwind a name instead of a statement.
+
+**Both halves of every fact are rewritten.** The utterance alone will not do: an LLM-committed `Fact3`
+holds `cmds` its utterance never produced (the #305 lane), so re-parsing rewritten text would silently
+build something else. The commands alone will not do either: the step row shows the utterance, and a row
+still reading «SE גובה» after E became O is a lie about what the figure holds.
+
+**`renameInCommand3` is a recursive STRUCTURAL walk, not a field list.** `Command3` operands nest —
+`{kind:'segment',a,b}`, `{kind:'plane-run',ids:[…]}`, claim structures — and a command kind added later
+must not quietly escape the rewrite: an enumeration is not a rule (`src3d/CLAUDE.md`). The LABEL GRAMMAR
+decides what is an id, so lowercase `type`/`kind`/`rel` values and `π1`/`ℓ` names are untouched for free,
+while a point-run plane's name (`"ABCD"`) is rewritten letter by letter — which is what keeps
+`pointPlanes` addressable after the rename. `src`/`requested` are carved out as RAW SOURCE (2-D's `expr`
+carve-out, same reason): an equation is echoed to the student verbatim and may legitimately hold a
+capital that is not a point (#339).
+
+**The PRIME is this product's own boundary problem.** 2-D's guard is `(?!\d)`, enough where a label is
+`[A-Z]\d*`. Here `A` and `A'` are two different vertices of the same cube, so the token rule is: match a
+whole label, refusing a following (or preceding) lowercase letter, digit or prime, while ALLOWING an
+adjacent uppercase — because that is exactly what a run like `ABCD` is. Locked in both directions.
+
+**Two entry points, one action.** The text command («שנה שם E ל-O» / "rename E to O", both verbs, both
+languages, primes) is intercepted in the store's `submit` **before** `parse3` — that is where the fact
+list lives, and putting it there means the scenario harness and any future caller get it too. The canvas
+popover is 2-D's FR-RN-10 ported onto the #483 hit-target pattern (transparent ring, `stopPropagation`
+so the click never reaches the orbit drag), and it calls the SAME `rename` action, so the two cannot
+drift into two behaviours. The lock asserts they produce identical fact lists.
+
+**A refusal is TYPED, never `not-understood`.** `rename-refused` carries its reason and both letters.
+This matters beyond politeness: App3 escalates `not-understood` to the paid LLM lane, so a rename we
+understood and declined would buy a guess at a question already answered. `target-taken` is a refusal
+rather than a merge — fusing two of the student's vertices is a different operation (2-D's ADR-122
+territory) and nobody asked for it.
+
+**The session state around the figure follows the facts.** `queries` («|AB|») and `planeDisplay` (keyed
+by the point RUN, «ABCD») are rewritten in the same action. Skipping them would leave a display toggle
+addressing a plane that no longer exists and a data-panel row asking about a vanished point — the figure
+right, the session around it stale.
+
+**The seed is deliberately untouched.** A letter is a name, not a configuration: the drawing must not
+jump because a vertex was re-lettered. This is the stability rule, applied to naming.
+
+**Discoverability — the catalog carries it.** 2-D leaves rename out of its catalog, and that is how this
+issue came to be filed: the operator could not find a feature 2-D already had. The 3-D catalog is the
+coverage map AND the in-app commands panel, so the two rename forms are listed. The guard test now asks
+the honest question — *does the DETERMINISTIC LANE understand this line?* (`parse3` **or**
+`parseRename3`) — rather than carrying an exception list, so a catalog entry can never be listed for a
+lane that would not in fact read it.
+
+**Locks.** `src3d/__tests__/issue-578-rename.test.ts` (20): the operator's figure end to end; the
+rewritten-history property against a natively-typed twin; primes in both directions; the plane-run name
+and the nested claim operand following; English and both Hebrew verbs; typed refusals committing nothing;
+no fact appended; the seed unmoved; one-step undo; queries + planeDisplay following; the canvas action
+and the text command producing identical facts; the token boundary; and the grammar's declines.
