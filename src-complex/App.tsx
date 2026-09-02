@@ -30,6 +30,7 @@ import { PolarPlane } from './render/PolarPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
 import { SYMBOLS } from './ui/symbols';
 import { AskText } from './ui/askText';
+import { RadicalText } from './render/radicalText';
 import { complexBidi } from './i18n';
 import registry from '../products.json';
 
@@ -590,7 +591,8 @@ export function App() {
               hideLabel={t('panelHide')}
               status={v2Freedom(derived2, t)}
               sections={[
-                { key: 'points', title: t('secPoints'), rows: v2Labels(derived2, view) },
+                // #727: the radical index rendered large enough to read (the same treatment the canvas gets)
+                { key: 'points', title: t('secPoints'), rows: v2Labels(derived2, view).map((r, i) => <RadicalText key={i} text={r} />) },
                 // verdict rows word their WHY in prose, in the UI's language (#716: the engine
                 // publishes codes; whyText words them) — they follow the app's direction
                 { key: 'measures', title: t('secMeasures'), rows: v2Measures(derived2, t), dir: 'app' },

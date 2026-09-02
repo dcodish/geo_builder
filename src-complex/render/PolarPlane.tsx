@@ -12,6 +12,7 @@
  */
 
 import type { Scene } from '../scene/scene';
+import { RadicalTspans } from './radicalText';
 
 const W = 680;
 const H = 620;
@@ -420,7 +421,9 @@ export function PolarPlane({
                   undetermined point's reading IS the bare name — nothing sampled is ever printed.
                   (#653/#675: one source, two surfaces — both print stage 5d's composition.)
                   #703: the reading FOLLOWS THE VIEW — a+bi in the cartesian lens. */}
-              {cart ? p.readingCart : p.reading}
+              {/* #727: the radical INDEX is drawn as a real digit, raised — the Unicode superscript
+                  was hairline at this size and read as the retired ~ mark. */}
+              <RadicalTspans text={cart ? p.readingCart : p.reading} />
             </text>
           </g>
           );
