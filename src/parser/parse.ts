@@ -10980,8 +10980,8 @@ export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { 
     if (from === X) return null;
     // The assert carries POST-RENAME ids: `nameCentre` renames the picked circle `circle-<from>` →
     // `circle-<to>`, so a lock built on the pre-rename id would reference a GHOST — it applied vacuously
-    // green, `orderedBelow` was stamped on neither circle, and the radius sliders ignored the just-stated
-    // big/small order (issue #179, the operator's follow-up play-test).
+    // green and `orderedBelow` was stamped on neither circle, so the just-stated big/small order was
+    // silently lost (issue #179, the operator's follow-up play-test).
     const mapId = (id: Id): Id => (id === `circle-${from}` ? `circle-${X}` : id);
     return { from, to: X, ...(rec ? {} : { assert: { outer: mapId(outerId), inner: mapId(innerId) } }) };
   }

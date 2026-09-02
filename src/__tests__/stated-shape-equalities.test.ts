@@ -89,7 +89,7 @@ describe('#444 — the channel never overlaps the FORCED one', () => {
 describe('#444 — the marks are visually distinct', () => {
   it('declared ticks carry the `stated` flag; forced ticks do not', () => {
     const { st, stated } = build(['דלתון ABCD']);
-    const d = replay(st.facts, st.seed, st.radiusOverrides);
+    const d = replay(st.facts, st.seed);
     const empty = { equalSegments: [], equalAngles: [], definiteAngles: [], definiteLengths: [], samplesUsed: 0 };
     const marks = relationMarks(empty, d.positions, stated.flatMap((s) => s.classes));
     expect(marks.ticks.length).toBe(4); // two classes × two segments
@@ -97,7 +97,7 @@ describe('#444 — the marks are visually distinct', () => {
 
     // a genuinely forced class stays unflagged, so the renderer can never draw one as the other
     const sq = build(['ריבוע ABCD']);
-    const dsq = replay(sq.st.facts, sq.st.seed, sq.st.radiusOverrides);
+    const dsq = replay(sq.st.facts, sq.st.seed);
     const forced = relationMarks(sq.relations, dsq.positions);
     expect(forced.ticks.length).toBeGreaterThan(0);
     expect(forced.ticks.some((t) => t.stated)).toBe(false);

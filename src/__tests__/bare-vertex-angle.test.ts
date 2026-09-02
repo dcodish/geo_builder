@@ -30,7 +30,7 @@ function figure(utterances: string[]) {
 }
 function ctxOf() {
   const st = useGeoStore.getState();
-  const d = replay(st.facts, st.seed, st.radiusOverrides);
+  const d = replay(st.facts, st.seed);
   return buildParseCtx(d.construction, d.positions);
 }
 
@@ -57,7 +57,7 @@ describe('#447 — the bare vertex angle is claimed by the GRAMMAR', () => {
     if (!r.ok) throw new Error('parse');
     for (const c of r.commands) useGeoStore.getState().execute(c, 'A=40');
     const st = useGeoStore.getState();
-    const d = replay(st.facts, st.seed, st.radiusOverrides);
+    const d = replay(st.facts, st.seed);
     expect(d.violations).toEqual([]);
     expect(st.facts.every((f) => !f.enabled || d.status[f.id] === 'ok')).toBe(true);
   });

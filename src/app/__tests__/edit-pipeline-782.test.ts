@@ -32,7 +32,7 @@ function makeDeps() {
 /** Type an utterance the way submit does, and hand back the group key of the step it created. */
 function submitStep(utterance: string): string {
   const st = useGeoStore.getState();
-  const view = replay(st.facts, st.seed, st.radiusOverrides);
+  const view = replay(st.facts, st.seed);
   const r = parse(utterance, buildParseCtx(view.construction, view.positions));
   expect(r.ok, `precondition: «${utterance}» must parse`).toBe(true);
   if (!r.ok) throw new Error('unreachable');

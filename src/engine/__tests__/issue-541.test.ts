@@ -75,7 +75,7 @@ describe('#541 — a constraint on a Thales-aux touch point reaches the apex DOF
     const r = parse(last, pctx);
     expect(r.ok, last).toBe(true);
     if (!r.ok) return;
-    const outcome = dryRunOutcome(facts, r.commands, 0, {});
+    const outcome = dryRunOutcome(facts, r.commands, 0);
     expect(outcome.produced, `${last} → ${outcome.produced ? '' : `${outcome.reason}: ${outcome.detail ?? ''}`}`).toBe(true);
     const after = replay(trialFacts(facts, r.commands), 0);
     for (const [id, st] of Object.entries(after.status)) expect(st, `status of ${id}`).toBe('ok');
@@ -94,7 +94,7 @@ describe('#541 — a constraint on a Thales-aux touch point reaches the apex DOF
     const r = parse('ישר A O1 O2 C', pctx);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(dryRunOutcome(facts, r.commands, 0, {}).produced).toBe(true);
+    expect(dryRunOutcome(facts, r.commands, 0).produced).toBe(true);
   });
 });
 

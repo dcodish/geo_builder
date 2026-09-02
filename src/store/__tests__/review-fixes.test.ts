@@ -2,8 +2,8 @@
  * Regression locks for the 2026-07-03 Fable review — store findings S1/S2/S3 (see ADR-203):
  *  S1 — `relabelId` must rewrite a label at ANY position inside a concatenated structured id
  *       (`bis-ABC`'s middle letter), not only after a non-letter (the old lookbehind).
- *  S2 — rename/swap/merge must remap `radiusOverrides` (keyed `circle-X`) with the centre letter,
- *       like the sibling display maps — else a dialed radius silently snaps back to the seed.
+ *  S2 — RETIRED with the radius sliders (#875 / ADR-475): it locked that rename/swap remapped
+ *       `radiusOverrides`, a mechanism that no longer exists.
  *  S3 — atomic-group poisoning runs to a FIXPOINT: blocking group A can make a LATER group newly
  *       mixed; its scaffolding must not survive half-drawn.
  */
@@ -43,33 +43,6 @@ describe('S1 — rename rewrites a label ANYWHERE inside a structured id', () =>
     expect(s().rename('C', 'D')).toEqual({ ok: true });
     const ids = s().facts.map((f) => (f.cmd as { id?: string }).id);
     expect(ids).toEqual(['D', 'C1']); // C1 is its own token — never eaten by the C rename
-  });
-});
-
-describe('S2 — a dialed radius follows rename/swap (radiusOverrides remap)', () => {
-  const FREE_CIRCLE: AnyCommand[] = [
-    { type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true },
-  ];
-
-  it('rename O → P keeps the dialed radius', () => {
-    FREE_CIRCLE.forEach((c) => s().execute(c, 'circle O'));
-    s().setRadius('circle-O', 7);
-    expect(s().radiusOverrides['circle-O']).toBe(7);
-    expect(s().rename('O', 'P')).toEqual({ ok: true });
-    expect(s().radiusOverrides['circle-P'], 'override tracked the renamed centre').toBe(7);
-    expect(s().radiusOverrides['circle-O']).toBeUndefined();
-    // and the drawn radius honours it
-    const d = replay(s().facts, s().seed, s().radiusOverrides);
-    expect(d.circles.get('circle-P')?.r).toBeCloseTo(7, 6);
-  });
-
-  it('swap O ↔ Q exchanges the two dialed radii', () => {
-    s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true }, 'circle O');
-    s().execute({ type: 'free-point', id: 'Q', x: 20, y: 0, free: true }, 'point Q');
-    s().setRadius('circle-O', 8);
-    expect(s().swap('O', 'Q')).toEqual({ ok: true });
-    expect(s().radiusOverrides['circle-Q'], 'the dial followed the swapped centre').toBe(8);
-    expect(s().radiusOverrides['circle-O']).toBeUndefined();
   });
 });
 

@@ -601,8 +601,7 @@ function setCarrierVals(c: Construction, vals: Map<Id, number[]>): Construction 
  * converges. The copied values are STARTS for the re-solve, never results — `evaluate` re-solves
  * the directives, and the sampled NON-driven DOFs keep their sampled values, so genuine sampling
  * variety is untouched (a determined figure just lands back on its one shape). Only objects that
- * still carry a `solve` in `to` are warmed (a dialed radius, whose solve the override cleared,
- * keeps the student's value). Returns null when there is nothing to warm, so the retry costs
+ * still carry a `solve` in `to` are warmed. Returns null when there is nothing to warm, so the retry costs
  * nothing on carrier-less figures. Kind-switch kept exhaustive alongside {@link carrierSpec} /
  * {@link setCarrierVals} — a new carrier kind must be added to all three.
  */

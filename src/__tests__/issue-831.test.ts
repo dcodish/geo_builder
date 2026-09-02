@@ -24,7 +24,7 @@ import { useGeoStore, replay } from '@/store/geoStore';
 
 function ctxOf() {
   const st = useGeoStore.getState();
-  const d = replay(st.facts, st.seed, st.radiusOverrides);
+  const d = replay(st.facts, st.seed);
   return buildParseCtx(d.construction, d.positions);
 }
 function figure(utterances: string[]) {

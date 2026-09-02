@@ -3,7 +3,7 @@
  * file and restore it by replay.
  *
  * The store's ordered fact list is the single source of truth and the figure is DERIVED by
- * `replay(facts, seed, radiusOverrides)` — so the file is exactly those replay inputs plus a
+ * `replay(facts, seed)` — so the file is exactly those replay inputs plus a
  * small header, and **no positions**: loading feeds the facts back through the normal replay
  * path, so a loaded figure is indistinguishable from a built one (editable, undoable,
  * cycleable), and the file stays compact, human-diffable, and robust to engine layout changes.
@@ -11,7 +11,7 @@
  * Each saved fact carries both the `utterance` (human-readable; the fixtures harness re-parses
  * it as a parser-drift differential) and the lowered `cmd` (what load actually replays — an
  * LLM-escalated step never re-escalates on load, and `cmd.branch` keeps the chosen alternative).
- * The `seed` + dialed radii ride in the header so the loaded figure shows the SAME configuration
+ * The `seed` rides in the header so the loaded figure shows the SAME configuration
  * that was saved, not the canonical seed-0 view. Display preferences (hidden labels, dashed
  * segments, hidden circles) are included so an author's styled figure survives the round trip.
  *
@@ -53,7 +53,6 @@ export interface FigureFile {
    *  (operator ruling), so this field is never read back into the session. */
   name?: string;
   seed: number;
-  radiusOverrides: Record<Id, number>;
   facts: Fact[];
   display?: FigureFileDisplay;
   /** #477: the student's value QUERIES, verbatim. Questions, not facts — they are stored so a saved
@@ -67,7 +66,7 @@ export type FigureLoadResult = { ok: true; file: FigureFile } | { ok: false; rea
 
 /** Serialize the session to pretty-printed JSON (human-diffable — the point of a text format). */
 export function serializeFigure(
-  state: { facts: Fact[]; seed: number; radiusOverrides: Record<Id, number>; display?: FigureFileDisplay; queries?: string[] },
+  state: { facts: Fact[]; seed: number; display?: FigureFileDisplay; queries?: string[] },
   meta: { locale?: string; savedAt?: string; name?: string } = {},
 ): string {
   const file: FigureFile = {
@@ -77,7 +76,6 @@ export function serializeFigure(
     ...(meta.savedAt ? { savedAt: meta.savedAt } : {}),
     ...(meta.name ? { name: meta.name } : {}),
     seed: state.seed,
-    radiusOverrides: state.radiusOverrides,
     facts: state.facts.map(sanitizeFactOut),
     ...(state.display ? { display: state.display } : {}),
     ...(state.queries?.length ? { queries: state.queries } : {}),
@@ -142,9 +140,10 @@ export function deserializeFigure(text: string): FigureLoadResult {
   }
   if (facts.length === 0) return { ok: false, reason: 'no-facts' };
 
-  const radiusOverrides: Record<Id, number> = {};
-  if (isRecord(raw.radiusOverrides))
-    for (const [k, v] of Object.entries(raw.radiusOverrides)) if (typeof v === 'number' && isFinite(v)) radiusOverrides[k] = v;
+  // A pre-ADR-475 file carries `radiusOverrides` (the removed radius sliders, #875). It is READ and
+  // DISCARDED rather than rejected, so an old saved figure still loads: a dialed radius was always a
+  // viewing aid and never a given (ADR-048), so dropping it loses nothing the student stated. Parsed
+  // deliberately — the load audit must not report it as an unknown/lossy field.
 
   const d = isRecord(raw.display) ? raw.display : {};
   const display: FigureFileDisplay = {
@@ -173,7 +172,6 @@ export function deserializeFigure(text: string): FigureLoadResult {
       ...(typeof raw.savedAt === 'string' ? { savedAt: raw.savedAt } : {}),
       ...(typeof raw.name === 'string' ? { name: raw.name } : {}),
       seed: typeof raw.seed === 'number' && Number.isFinite(raw.seed) ? raw.seed : 0,
-      radiusOverrides,
       facts,
       display,
     },

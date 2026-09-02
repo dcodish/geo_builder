@@ -52,7 +52,7 @@ describe('issue #42 — the store name: outside undo, reset by clear', () => {
 describe('issue #42 — the saved file embeds the name (provenance only)', () => {
   it('serialize embeds; deserialize passes it through', () => {
     const json = serializeFigure(
-      { facts: [{ id: 'g0.0', utterance: 'משולש ABC', group: 'g0', cmd: { type: 'triangle', ids: ['A', 'B', 'C'] }, enabled: true }], seed: 0, radiusOverrides: {} },
+      { facts: [{ id: 'g0.0', utterance: 'משולש ABC', group: 'g0', cmd: { type: 'triangle', ids: ['A', 'B', 'C'] }, enabled: true }], seed: 0 },
       { name: 'bagrut Q4' },
     );
     expect(JSON.parse(json).name).toBe('bagrut Q4');
@@ -62,7 +62,7 @@ describe('issue #42 — the saved file embeds the name (provenance only)', () =>
 
   it('a name-less file stays name-less (older files load unchanged)', () => {
     const json = serializeFigure(
-      { facts: [{ id: 'g0.0', cmd: { type: 'triangle', ids: ['A', 'B', 'C'] }, enabled: true }], seed: 0, radiusOverrides: {} },
+      { facts: [{ id: 'g0.0', cmd: { type: 'triangle', ids: ['A', 'B', 'C'] }, enabled: true }], seed: 0 },
     );
     expect('name' in JSON.parse(json)).toBe(false);
     const r = deserializeFigure(json);

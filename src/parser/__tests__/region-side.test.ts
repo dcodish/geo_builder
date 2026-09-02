@@ -148,12 +148,12 @@ describe('issue #99 — point-polygon-side (region requirement)', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     // exact duplicate of an enabled fact → 'empty' (noop-exists is honest)
-    expect(dryRunOutcome(facts, r.commands, 0, {}).produced).toBe(false);
+    expect(dryRunOutcome(facts, r.commands, 0).produced).toBe(false);
     // but a DIFFERENT region statement about the same existing point commits (zero coordinate delta)
     const facts3 = runLines(['משולש ABC', 'משולש ABD'.replace('ABD', 'ABD'), 'נקודה E בתוך משולש ABC']);
     const r3 = parse('נקודה E בתוך משולש ABD', ctxOf(facts3));
     expect(r3.ok).toBe(true);
-    if (r3.ok) expect(dryRunOutcome(facts3, r3.commands, 0, {}).produced).toBe(true);
+    if (r3.ok) expect(dryRunOutcome(facts3, r3.commands, 0).produced).toBe(true);
   });
 
   it('no-theft: inscription phrasings are untouched', () => {

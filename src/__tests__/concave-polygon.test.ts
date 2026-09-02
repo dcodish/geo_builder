@@ -35,7 +35,7 @@ function build(utterance: string) {
 
 function ringAt(utteranceState: ReturnType<typeof build>, seed: number, ids: string[]) {
   const st = utteranceState.state();
-  const d = replay(st.facts, seed, st.radiusOverrides);
+  const d = replay(st.facts, seed);
   const pts = ids.map((i) => d.positions.get(i)) as P[];
   return { pts, violations: d.violations };
 }
