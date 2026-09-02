@@ -7468,3 +7468,31 @@ rather than deleted (the vertex-named frame is asserted to PARSE, not to build g
 asserts `bisector-dir` and explicitly `not.toContain('cos-eq')`, and checks the tip direction really is
 the bisector direction), plus the reported case: the pyramid refuses by name AND its volume is unchanged
 to 8 places, so a future regression that flattens the solid instead of refusing cannot pass.
+
+**Amendment 1 (operator ruling, 2026-09-02) — three existing locks encoded degenerate figures, and
+they were re-based, not relaxed.** The flat-collapse arm turned the full suite RED in exactly three
+places. Each was measured on `main` before deciding, and all three build **flat in prod today**:
+
+| lock | figure | flatness on `main` |
+| --- | --- | --- |
+| `issue-821` | `פירמידה SABCD` + «SB מקביל למישור ACD» | 8.8e-9 |
+| `relation-battery` | `פירמידה משולשת ABCD` + «AB=u» + «CD מקביל ל-u» | 1.0e-8 / 8.4e-9 |
+| `issue-817` | its 7-line sequence, six named seeds | 3.8e-14 … 8.4e-17 |
+
+Two are **forced by the givens, not solver accidents**: plane ACD *is* the base plane and B lies in
+it, so «SB ∥ ACD» drags S into it; and two parallel lines are coplanar, so a tetrahedron with AB ∥ CD
+has no volume. Both statements genuinely contradict the declared solid, and refusing them is the
+[ADR-276](06-decisions.md#adr-276) answer.
+
+The operator chose to keep the gate and re-base the tests (Option B, 2026-09-02). `issue-821` moves
+to the #820 family, where K rides SB and «SD מקביל למישור ACK» is satisfiable, and **keeps the old
+figure as a refusal lock** so the witness is not lost. The battery cell keeps its subject and moves to
+a declared «מרובע», coplanar by definition and excluded from the gate by construction. `issue-817`'s
+control is **inverted rather than deleted** — it asserted a collapse still happens, and now asserts
+`collapsed === []`, the stronger property; its renderer-totality test is kept as defence in depth.
+
+The one genuine collision is with #817's own design position — that a collapsed configuration is
+TOLERATED and the renderer made total over it. "Never produced" and "rendered safely if produced" do
+not conflict in behaviour, but the RECORD is now stale, and `solidFaceCollapsed` may still have a job
+this gate does not cover (a collapsed FACE on a solid that keeps its volume). Both are **#873**,
+filed rather than decided here.

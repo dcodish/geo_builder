@@ -346,16 +346,23 @@ describe('the battery — supported cells exercised end-to-end', () => {
   });
 
   it('parallel|segment|vector + parallel|vector|vector — a free vector is a direction, so ∥ applies', () => {
-    for (const u of ['פירמידה משולשת ABCD', 'AB=u', 'CD מקביל ל-u']) submit(u);
+    // #872 (ADR-3D-212): the CELL is unchanged; the FIGURE moved. This ran on
+    // «פירמידה משולשת ABCD», where AB ∥ CD is impossible for a real tetrahedron — two parallel
+    // lines are coplanar, so A, B, C, D are, and the solid has no volume. It passed because the
+    // solver flattened it (measured 1.0e-8 of span on `main`, green, no notice); `degenerate()` now
+    // refuses that, and the refusal is locked in `issue-343-bisector-ray.test.ts`'s sibling family.
+    // A declared מרובע is coplanar BY DEFINITION, so the same relation is satisfiable there and the
+    // cell tests what it means to test: a free vector is a direction, so ∥ applies to it.
+    for (const u of ['מרובע ABCD', 'AB=u', 'DC מקביל ל-u']) submit(u);
     expect(state().lastError).toBeNull();
     for (const seed of [0, 1]) {
       const p = derive3(state().facts, seed).resolved.positions;
-      const d1 = vsub(p.get('D')!, p.get('C')!);
+      const d1 = vsub(p.get('C')!, p.get('D')!);
       const d2 = vsub(p.get('B')!, p.get('A')!);
       expect(vnorm(vcross(d1, d2)) / Math.max(vnorm(d1) * vnorm(d2), 1e-12), `∥ at seed ${seed}`).toBeLessThan(1e-4);
     }
     state().clear();
-    for (const u of ['פירמידה משולשת ABCD', 'AB=u', 'CD=v', 'u מקביל ל-v']) submit(u);
+    for (const u of ['מרובע ABCD', 'AB=u', 'DC=v', 'u מקביל ל-v']) submit(u);
     expect(state().lastError).toBeNull();
   });
 
