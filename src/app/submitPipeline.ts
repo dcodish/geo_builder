@@ -284,6 +284,15 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     ui.setBusy(false);
     return;
   }
+  // #519 (ADR-477): a SHAPE-consuming construct on a figure with 2+ candidate shapes — WHICH shape is
+  // the student's to say (ADR-052). The owning rules already declined; before this the decline went to
+  // the LLM lane, whose guess parses and commits. Ask, naming the candidates.
+  if (!r.ok && r.reason === 'ambiguous-shape') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `ambiguous-shape:${r.noun}:${r.shapes.join(',')}` });
+    ui.setInputNote(t('input.ambiguousShape', { shapes: r.shapes.join(', '), first: r.shapes[0] ?? 'ABCD' }));
+    ui.setBusy(false);
+    return;
+  }
   // #354: a containment whose CONTAINER was not named, on a figure with 2+ circles — which one contains it
   // is the student's to say (ADR-052), so ask instead of escalating to an LLM that could only guess.
   if (!r.ok && r.reason === 'ambiguous-container') {
