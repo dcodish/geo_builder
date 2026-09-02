@@ -103,6 +103,9 @@ export type Claim3 =
   | { type: 'concyclic'; ids: Id[] }
   | { type: 'dot-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // u·v = v·w (a chained-equality link)
   | { type: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // ∠(a,b) = ∠(c,d) — AE makes equal angles with AB, AD
+  // #872: apex→tip is the INTERNAL BISECTOR RAY of ∠(a·apex·b). Strictly stronger than the `cos-eq`
+  // pair it replaced: equal arm angles alone is a whole plane of directions in R³.
+  | { type: 'bisector-dir'; apex: Id; a: Id; b: Id; tip: Id }
   // triage 3-D: the angle between a LINE (a–b) and a PLANE (point-run) — `sin β = |n·u|/(|n||u|)`
   | { type: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number }
   // #324 (ADR-3D-079): the ring's relation to a coordinate plane/axis (see coordPlanePins)
@@ -150,6 +153,7 @@ export type ScalarPin =
   | { kind: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number } // cos∠ACB = 3/4 · cos(w,u) = √35/10 (G6)
   | { kind: 'dot-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // u·v = v·w (G9 chain link)
   | { kind: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // ∠(a,b) = ∠(c,d) — equal angles (G10)
+  | { kind: 'bisector-dir'; apex: Id; a: Id; b: Id; tip: Id } // #872: apex→tip IS the internal bisector of ∠(a·apex·b)
   // triage 3-D: the angle between line a–b and plane (point-run) is `deg` — similarity-invariant
   | { kind: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number }
   // #305 (ADR-3D-090): the base of a RIGHT pyramid over a general quad must be CYCLIC.
@@ -899,6 +903,10 @@ export type Command3 =
   | { type: 'angle-bound3'; vertex?: Id; p?: Id; q?: Id; label?: string; min?: number; max?: number }
   // V8-f (G11): `D על AC כך ש-OD חוצה-זווית AOC` — D on segment a–b, ray apex→D bisects ∠(a)(apex)(b).
   | { type: 'bisector-point'; id: Id; a: Id; b: Id; apex: Id }
+  /** #343 (ADR-3D-207): «OD חוצה זווית AOC» — the bisector RAY of ∠a·apex·b, with `id` a FREE rider
+   *  on it. The carrier-less twin of `bisector-point`: with no segment stated for `id` to sit on,
+   *  its distance from the apex is an unstated magnitude, so it is a sampled DOF (ADR-052). */
+  | { type: 'bisector-ray'; id: Id; a: Id; b: Id; apex: Id }
   // triage 3-D: `הזווית בין הישר AC' לבין המישור ABCD היא 30` — the angle between a line and a plane
   | { type: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg?: number; label?: string } // #319: a Greek value NAMES the measure (never a driver); the panel derives its degrees
   // V8-j (G12): `T על SC כך ש-TABCD פירמידה ישרה` — T on segment a–b so pyramid(base, apex=T) is right.
@@ -972,6 +980,8 @@ export type PointDef =
   | { kind: 'foot-face'; from: Id; face: Id[] } // V8-e (G5): foot of ⟂ from a vertex onto a face's plane
   // V8-f (G11): D on segment a–b, its t root-found so ray apex→D bisects ∠(a)(apex)(b)
   | { kind: 'bisector-seg'; a: Id; b: Id; apex: Id }
+  /** #343: a FREE rider on the bisector ray of ∠a·apex·b — one sampled DOF (how far along the ray). */
+  | { kind: 'bisector-ray'; a: Id; b: Id; apex: Id }
   // V8-g: the foot of the ⟂ from `from` onto the line through a,b (a triangle altitude's foot)
   | { kind: 'foot-seg'; from: Id; a: Id; b: Id }
   // V8-j (G12): the apex on segment a–b positioned so pyramid (base, apex) is RIGHT — i.e. the

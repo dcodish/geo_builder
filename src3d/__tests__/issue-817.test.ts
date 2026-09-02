@@ -89,22 +89,37 @@ describe('#817 — the renderer is TOTAL over engine output', () => {
   beforeEach(reset);
 
   // Seeds 0/1/3/6/11/13 are the ones that produced a collapsed base and threw
-  // `normalize3: zero vector` from `auxSegmentHidden`. The seed preference now steers away from them,
-  // but the renderer must survive them regardless — a bad drawing is fixed upstream, never by crashing.
-  it('a seed whose base IS collapsed still renders rather than throwing', () => {
+  // `normalize3: zero vector` from `auxSegmentHidden`. The renderer must survive them regardless —
+  // a bad drawing is fixed upstream, never by crashing — so this stays as defence in depth even now
+  // that the solver no longer emits a collapsed configuration at all (see below).
+  it('the historically-crashing seeds still render rather than throwing', () => {
     SEQ.forEach(submit);
     for (const seed of [0, 1, 3, 6, 11, 13]) {
       expect(() => render(seed), `seed ${seed}`).not.toThrow();
     }
   });
 
-  it('at least one of those seeds really is collapsed — otherwise this test proves nothing', () => {
+  /**
+   * #872 (ADR-3D-212) STRENGTHENED THIS, and the reversal is deliberate.
+   *
+   * This used to assert the OPPOSITE — *"at least one of those seeds really is collapsed — otherwise
+   * this test proves nothing"* — because #817 decided a collapsed configuration is TOLERATED and the
+   * renderer is made total over it. Measured on `main`, all six of these seeds are flat to 1e-14–1e-16
+   * of span: real, shipped, silent degeneracies.
+   *
+   * The flat-collapse arm of `degenerate()` now rejects such a configuration at solve time, so the
+   * solver cannot produce one — which is strictly stronger than rendering it safely, and makes the
+   * old control unsatisfiable by construction. Asserting the stronger property here keeps a live
+   * check rather than deleting the control. The reconciliation of #817's own ADR is tracked
+   * separately; this test states today's truth.
+   */
+  it('#872: none of those seeds is collapsed ANY MORE — the solver cannot emit one', () => {
     SEQ.forEach(submit);
     const collapsed = [0, 1, 3, 6, 11, 13].filter((seed) => {
       const d = derive3(state().facts, seed);
       return solidFaceCollapsed(d.construction, d.positions);
     });
-    expect(collapsed.length).toBeGreaterThan(0);
+    expect(collapsed, 'a collapsed configuration is no longer reachable').toEqual([]);
   });
 });
 

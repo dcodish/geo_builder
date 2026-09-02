@@ -1885,6 +1885,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "OD bisects angle AOC",
+    "winner": "bisectorRay",
+  },
+  {
+    "lang": "he",
+    "text": "OD חוצה זווית AOC",
+    "winner": "bisectorRay",
+  },
+  {
+    "lang": "en",
     "text": "triangle ABC",
     "winner": "planarPolygon",
   },

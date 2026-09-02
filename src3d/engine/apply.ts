@@ -579,6 +579,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
     case 'dot-eq':
     case 'cos-eq':
       return firstAtomError(c, [claim.a, claim.b, claim.c, claim.d]);
+    case 'bisector-dir':
+      return missingPoint(c, [claim.apex, claim.a, claim.b, claim.tip]); // #872
     case 'line-plane-angle':
       return missingPoint(c, [claim.a, claim.b, ...claim.plane]);
     case 'lines-rel':
@@ -978,6 +980,32 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           if ((rider.a === cmd.a && rider.b === cmd.b) || flipped) {
             const next = clone(c);
             next.points.set(cmd.id, { kind: 'on-segment', a: rider.a, b: rider.b, t: flipped ? 1 - cmd.t : cmd.t });
+            return { ok: true, next };
+          }
+        }
+        /**
+         * #343 play-finding — THE SAME RULE, ONE RIDER KIND OVER.
+         *
+         * A `bisector-ray` point's distance along the ray is undetermined (the sentence that made it
+         * said the direction and nothing else), so a stated MEMBERSHIP is the given that DETERMINES
+         * it — the point where the bisector meets the segment — not a claim to check against a
+         * position nothing had chosen. Exactly the reasoning of the `on-segment` branch above.
+         *
+         * Without this, «OD חוצה זווית AOC» + «D על AC» refused `claim-refuted` — *"the claim does not
+         * hold in the drawing"* — while the ONE-sentence carrier form «D על AC כך ש-OD חוצה זווית AOC»
+         * builds the identical figure. Two spellings of one construction disagreeing is the #820 class
+         * this round already fixed for the on-segment rider, and it must not come back with a new kind.
+         *
+         * The segment must SPAN the angle's own rays, which is the classic case (a triangle's bisector
+         * meeting the opposite side) and what `bisector-seg` root-finds. A membership on some other
+         * segment is a different construction and still falls through to the claim lane.
+         */
+        if (rider?.kind === 'bisector-ray' && cmd.t === undefined) {
+          const spans =
+            (rider.a === cmd.a && rider.b === cmd.b) || (rider.a === cmd.b && rider.b === cmd.a);
+          if (spans) {
+            const next = clone(c);
+            next.points.set(cmd.id, { kind: 'bisector-seg', a: cmd.a, b: cmd.b, apex: rider.apex });
             return { ok: true, next };
           }
         }
@@ -2487,6 +2515,53 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const next = clone(c);
       next.points.set(cmd.id, { kind: 'bisector-seg', a: cmd.a, b: cmd.b, apex: cmd.apex });
       if (!hasSegment(next, cmd.apex, cmd.id)) next.segments.push([cmd.apex, cmd.id]); // draw OD
+      return { ok: true, next };
+    }
+
+    /**
+     * #343 (ADR-3D-207) — «OD חוצה זווית AOC»: the bisector RAY, with D a free rider on it.
+     *
+     * The carrier-less twin of `bisector-point`. There the student named a segment for D to sit on,
+     * which determines it; here nothing says HOW FAR along the bisector D lies, so that distance is an
+     * unstated magnitude and stays a sampled free DOF (ADR-052) rather than being defaulted. The
+     * DIRECTION is fully stated, which is the whole content of the sentence.
+     */
+    case 'bisector-ray': {
+      /**
+       * M1 duality, decided HERE because `parse3` is context-free by design: on an EXISTING point the
+       * sentence is a GIVEN about it, not a re-creation. «AD חוצה זווית BAC» where D is already a
+       * vertex is a statement about D, so it lowers to a constraint rather than refusing
+       * `already-defined` (which is what the carrier twin still does).
+       *
+       * #872 (ADR-3D-212) — WHICH constraint is the whole defect. This lowered to ∠(AD,AB) = ∠(AD,AC),
+       * an equal-angle pair; in R³ that is NOT the bisector. The directions making equal angles with
+       * the two arms form a whole PLANE through the apex, of which the bisector ray is one member, so
+       * the solver satisfied the given out of the angle's plane and the figure never bisected anything
+       * (measured: the arm angle settled at ~2.3× the half-angle with D up to 96% of span off plane
+       * ABC, at every seed). The lowering must be the construct's OWN defining incidence — D lies on
+       * the ray `bisectorDir3(apex, a, b)` — which is exactly what the constructive lane places.
+       */
+      if (c.points.has(cmd.id)) {
+        const missingTip = missingPoint(c, [cmd.a, cmd.b, cmd.apex]);
+        if (missingTip) return { ok: false, error: missingTip };
+        if (cmd.a === cmd.apex || cmd.b === cmd.apex || cmd.a === cmd.b || cmd.id === cmd.apex)
+          return { ok: false, error: { code: 'no-solution', id: cmd.apex } };
+        const next = clone(c);
+        const pin = { apex: cmd.apex, a: cmd.a, b: cmd.b, tip: cmd.id } as const;
+        if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'bisector-dir', ...pin });
+        else next.claims.push({ type: 'bisector-dir', ...pin });
+        if (!hasSegment(next, cmd.apex, cmd.id)) next.segments.push([cmd.apex, cmd.id]); // the stated ray is drawn
+        return { ok: true, next };
+      }
+      const missing = missingPoint(c, [cmd.a, cmd.b, cmd.apex]);
+      if (missing) return { ok: false, error: missing };
+      // an angle needs three distinct points; the parser gates this too, and a guard bound to the
+      // CONCEPT rather than to one code path is the `src3d/CLAUDE.md` rule
+      if (cmd.a === cmd.apex || cmd.b === cmd.apex || cmd.a === cmd.b)
+        return { ok: false, error: { code: 'no-solution', id: cmd.apex } };
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'bisector-ray', a: cmd.a, b: cmd.b, apex: cmd.apex });
+      if (!hasSegment(next, cmd.apex, cmd.id)) next.segments.push([cmd.apex, cmd.id]); // draw the bisector
       return { ok: true, next };
     }
 

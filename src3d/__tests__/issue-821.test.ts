@@ -56,13 +56,33 @@ describe('#821 — ∥ draws the named plane’s ring, as ⟂ does', () => {
     expect(ringEdges('AS ניצב לבסיס')).toEqual([]);
   });
 
-  it('end to end: the pyramid with «SB מקביל למישור ACD» shows the ACD triangle on the figure', () => {
+  /**
+   * #872 (ADR-3D-212) RE-BASED THE FIGURE, not the subject. This read
+   * «פירמידה SABCD» + «SB מקביל למישור ACD», which is UNSATISFIABLE for a real pyramid:
+   * base ABCD is planar and B lies in it, so plane ACD IS the base plane, and a segment from B
+   * parallel to that plane forces S into it too. It passed because the solver flattened the solid —
+   * measured at 8.8e-9 of span on `main`, drawn green, no notice. The degeneracy arm of `degenerate()`
+   * now refuses it (locked below), so this test moves to a figure where the statement is genuinely
+   * satisfiable — the #820 family, where K rides SB — and keeps asserting what #821 is ABOUT: a ∥
+   * statement DRAWS the named plane's ring.
+   */
+  it('end to end: «SD מקביל למישור ACK» shows the ACK triangle on the figure', () => {
     reset();
-    ['פירמידה SABCD', 'SB מקביל למישור ACD'].forEach(submit);
+    ['פירמידה SABCD', 'K על SB', 'SD מקביל למישור ACK'].forEach(submit);
     expect(state().lastError).toBeNull();
     const c = derive3(state().facts, state().seed).construction;
     const has = (a: string, b: string) => c.segments.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
-    expect(has('A', 'C') && has('C', 'D') && has('D', 'A'), 'the named plane is visible').toBe(true);
+    expect(has('A', 'C') && has('C', 'K') && has('K', 'A'), 'the named plane is visible').toBe(true);
+  });
+
+  /**
+   * #872 — and the figure this test used to assert is kept, as the refusal it should always have
+   * been. Losing the witness would lose the finding.
+   */
+  it('«SB מקביל למישור ACD» on a pyramid REFUSES — it can only hold by flattening the solid', () => {
+    reset();
+    ['פירמידה SABCD', 'SB מקביל למישור ACD'].forEach(submit);
+    expect(state().lastError?.code).toBe('givens-contradict');
   });
 
   beforeEach(reset);

@@ -7110,6 +7110,69 @@ and En with both distances exact; the 3 → 2 → 1 → 0 DOF ladder; three dist
 leftover spin varying across seeds while both givens hold at every one; #508's single-distance case
 unchanged; and an unsatisfiable pair refusing rather than drawing a plane that misses a given.
 
+### ADR-3D-207 — the bisector stated on its own; the perpendicular bisector's honest end (#343, #342)
+
+Two halves of one question: what should an utterance this tool has already DECIDED about do?
+
+#### The bisector RAY — a capability, so it gets a construct (#343)
+
+`bisectorPoint` (V8-f/G11) reads the CARRIER form, «D על AC כך ש-OD חוצה זווית AOC», where a stated
+segment determines D. A textbook states the bisector by itself far more often, and every such spelling
+escaped to the paid LLM lane. Nothing was missing from the geometry; the sentence had no rule.
+
+What the sentence states is the **direction**. How far along the bisector D sits was never said, so it is
+a free sampled DOF (ADR-052) — which is exactly why this is a distinct construct (`bisector-ray`) rather
+than a widened regex over `bisector-point`: the two forms differ in what they DETERMINE.
+
+- **The apex is derived, not positional**: it is the letter the segment and the angle share, and it must
+  be the angle's middle letter. So «OD חוצה זווית AOC» and «AD חוצה זווית BAC» are one rule, and a pair
+  that does not touch the vertex declines.
+- **M1 duality, decided at apply** (parse3 is context-free by design): on an EXISTING point the same
+  sentence is a GIVEN about it, not a re-creation. «AD חוצה זווית BAC» on the pyramid ABCD lowers to the
+  equal-angle pair ∠(AD, AB) = ∠(AD, AC), which the engine already drives and verifies — instead of the
+  `already-defined` refusal its carrier twin still gives. A new construct must not repeat a known
+  anti-pattern just because its neighbour does.
+- The rider is placed off the figure's own spread (the `seatOnLineRider` convention), so it lands in
+  general position on a big figure and a small one alike, and «show another configuration» slides it.
+- The bisector direction is the normalised sum of the two unit ray directions; when the rays are exactly
+  opposite there is no internal bisector and the point is left unplaced rather than invented.
+
+**Not built, and recorded rather than forgotten:** «AD חוצה את זווית A» names the angle by its vertex
+alone. In 2-D (ADR-164/261) the figure resolves it, because a vertex there usually has two incident
+edges; in 3-D a pyramid vertex has three or more, so WHICH two rays the letter names is a genuine
+ambiguity and an operator's call. It stays an honest escalation rather than a guess.
+
+**Superseded, not skipped: the altitude half of #343.** The issue also asks for «גובה מ A» /
+«גובה מהקודקוד S» to build with an auto-named foot. Measured at `3516b70`, both already reach the
+GUIDANCE register as `ambiguous-height` — put there by **operator ruling #467** (2026-08-09: *"should
+give a message saying there are several options for this and user should give better input"*), which
+post-dates #343's plan and decides the question the other way. Building it would reverse an operator
+ruling, so it is left alone and the divergence is recorded on the issue.
+
+#### The perpendicular bisector — a decided NON-feature, so it gets guidance (#342)
+
+#330 already drew the line in the tokenizer: `אמצע` is the midpoint and `אמצעי`/`אמצעית`/`אמצעים` is
+this adjective, deliberately not matched, so the construct *"escalates honestly"*. It escalated to the
+**paid LLM lane**, which is the part that was never right: the construct is not missing by oversight, it
+is a decision, and a decision belongs in the guidance register (ADR-3D-040). Every such utterance was
+buying a Haiku call to arrive at a refusal the tool already knew it would give.
+
+The message teaches the two things that ARE expressible and cover the exam's uses — «M אמצע AB» for the
+midpoint and «CM מאונך ל-AB» for the perpendicularity. The #73 no-theft invariant holds (every supported
+catalog example still classifies null), and the midpoint is explicitly locked against theft, since
+distinguishing it from this adjective is the whole of #330's tokenizer rule.
+
+**Catalog.** «OD חוצה זווית AOC» / «OD bisects angle AOC» joins `catalog3.ts`. Shadow-matrix WINNERS
+snapshot regenerated: additions only, no existing winner changed.
+
+**Locks.** `src3d/__tests__/issue-343-bisector-ray.test.ts` (19 tests): the four fully-named frames
+building (He + En); the vertex-named frame; the arm cosines asserted EQUAL, which is what "bisects"
+means; the distance along the ray varying with the seed and adding exactly one to the DOF cue; the apex
+derived from the shared letter, with two declining cases; the carrier form asserted byte-identical; the
+M1 given on an existing point; the single-vertex frame deliberately still refused; the three
+perp-bisector spellings reaching guidance with the right category; and the midpoint not stolen, in three
+spellings, plus still building.
+
 ### ADR-3D-208 — the input BOX takes its base direction from the content, like 2-D (#868)
 
 **Reported** by the operator while playing PR #867: *"the bidi text is biting again on the input"*.
@@ -7334,3 +7397,102 @@ rewritten-history property against a natively-typed twin; primes in both directi
 and the nested claim operand following; English and both Hebrew verbs; typed refusals committing nothing;
 no fact appended; the seed unmoved; one-step undo; queries + planeDisplay following; the canvas action
 and the text command producing identical facts; the token boundary; and the grammar's declines.
+
+### ADR-3D-212 — «bisects» is a DIRECTION, and a solid that loses its volume is not a solution (#872)
+
+**Context.** Operator play-finding on PR #867, 2026-09-02: «AD חוצה זווית BAC» on `פירמידה משולשת ABCD`
+was accepted, drawn green, and AD did not bisect ∠BAC. Measured through the real `parse3 → derive3`, at
+every configuration the student can cycle: the arm angle settled at **~2.3× the half-angle** (60.9° vs
+22.9°, 76.6° vs 31.0°) with D **76–96% of the figure's span off plane ABC**, and `lastError` null
+throughout.
+
+**Root cause — one sentence, two lanes, deriving their meaning independently.** [ADR-3D-207](#adr-3d-207)
+gave `bisector-ray` a constructive lane that places the tip along `û(AB) + û(AC)` (coplanar by
+construction, and measured correct: arm == half, 0.00% off plane, in both the point-free and carrier
+forms). Its **M1 existing-id lowering** then re-derived the meaning on its own and picked
+`angle-pair-eq` → a `cos-eq` pin: *the two arm angles are equal*. In R³ that is **not** the bisector. The
+directions making equal angles with two arms form a whole **plane** through the apex (normal
+`û(AB) − û(AC)`); the bisector is the single ray in it that also lies in `span(AB, AC)`. The lowering
+dropped the coplanarity, so the solver satisfied the given out of the angle's plane — where the tip
+already was. The class is **a construct whose constructive and given lanes each define what the sentence
+means**; M1's own rule says the lowering is "derived from the command's own defining incidences", and
+this one was not.
+
+**Decision 1 — one definition, three consumers.** `bisectorDir3(apex, a, b)` (`engine/vec3.ts`) is the
+only place that says what the internal bisector direction is. The constructive placement in `evaluate`,
+the new driving residual in `solve3`, and the verification in `claims` all read it. The two lanes can no
+longer come to disagree, which is the actual defect — not the wrong constant.
+
+The pin/claim is `bisector-dir { apex, a, b, tip }`, routed by the same M1 duality as its neighbours
+(free dims + a solid ⇒ drive; else verify). Its residual is the **signed components** of
+`û(tip − apex) − û(bis)` — the [ADR-3D-006](#adr-3d-006) touch-zero lesson, since a magnitude touches zero
+instead of crossing it and the descent stalls short; three residuals for a two-parameter condition is the
+same deliberate redundancy the `mutual` cross-product residual carries, and both sides being unit vectors
+makes it scale-free (`PIN_FIXES_SCALE: false`). Driving the direction rather than an angle equality also
+fixes the **sign** for free: equal angles admits the EXTERNAL bisector, a direction difference does not.
+
+**Decision 2 — a solid driven flat is not a solution.** Correcting the residual alone produced a second
+wrong figure, and it had to be measured to be seen: the pyramid **built**, with the given satisfied, by
+flattening ABCD to **zero volume** (0.128 → 1e-9 normalised) — silently, `lastError` and `lastNotice`
+both null. `degenerate()` in `solve3` is already the total gate every acceptance site asks, and its own
+comment already says *"a collapsed solid is not a figure whatever given caused the collapse"* — but it
+measured collapse by **pairwise vertex distance**, which cannot see a flat one: the vertices stay well
+separated while the solid loses its volume. It now also rejects a solid whose vertices go **coplanar**
+(`offPlaneSpread ≤ 1e-4 · span`, the flat `polygon3/4/5` kinds excluded — they are the V8-g 2-D vector
+lane and are coplanar on purpose).
+
+**Sibling audit (docs/17 §6).** The 2-D engine has had exactly this gate since
+[ADR-413](06-decisions.md#adr-413) — `collapsedPolygon`, a declared polygon driven to zero AREA, same
+1e-4-of-span threshold, same rejection-routes-into-the-failure-ladder shape. 3-D had the coincident-vertex
+and rider-off-segment arms and not the flat one. This ADR is its R³ twin, and the cross-product audit is
+what found it: the class was **already decided**, in the sibling product, and 3-D was the member missing
+it. Within 3-D, the M1-lowering class was grepped: `bisector-ray` was the only construct whose given lane
+re-derived a *direction* as a *scalar*; the neighbours (`angle-pair-eq`, `cos-angle`, `line-plane-angle`)
+are genuinely scalar statements and are unaffected.
+
+**Consequence, and it is the honest one.** On `פירמידה משולשת ABCD` the sentence is **unsatisfiable** —
+the bisector of ∠BAC lies in plane ABC, and a pyramid whose apex sits in its own base plane is not a
+pyramid — so it now refuses with `givens-contradict` naming the student's own statement
+([ADR-276](06-decisions.md#adr-276)), and the standing figure is left untouched rather than flattened.
+Where the given IS satisfiable — a tip that can reach the angle's plane, e.g. «E על BC» then
+«AE חוצה זווית BAC» — it drives E onto the true bisector (arm == half, 0.00% off plane). PR #867's own
+play sheet asked for the opposite on the pyramid and was wrong to.
+
+**The DOF cue is unchanged and still counts this pin as 1**, though a direction pin removes 2 — the
+existing convention for every `scalarPin` (`freeDofCount3` subtracts `scalarPins.length`). Deliberately
+not changed here: per-kind DOF weights are #370's open cue-semantics question and inventing them inside a
+bug fix would decide it silently.
+
+**Locks.** `src3d/__tests__/issue-343-bisector-ray.test.ts` — the file's two wrong assertions corrected
+rather than deleted (the vertex-named frame is asserted to PARSE, not to build green; the M1 test now
+asserts `bisector-dir` and explicitly `not.toContain('cos-eq')`, and checks the tip direction really is
+the bisector direction), plus the reported case: the pyramid refuses by name AND its volume is unchanged
+to 8 places, so a future regression that flattens the solid instead of refusing cannot pass.
+
+**Amendment 1 (operator ruling, 2026-09-02) — three existing locks encoded degenerate figures, and
+they were re-based, not relaxed.** The flat-collapse arm turned the full suite RED in exactly three
+places. Each was measured on `main` before deciding, and all three build **flat in prod today**:
+
+| lock | figure | flatness on `main` |
+| --- | --- | --- |
+| `issue-821` | `פירמידה SABCD` + «SB מקביל למישור ACD» | 8.8e-9 |
+| `relation-battery` | `פירמידה משולשת ABCD` + «AB=u» + «CD מקביל ל-u» | 1.0e-8 / 8.4e-9 |
+| `issue-817` | its 7-line sequence, six named seeds | 3.8e-14 … 8.4e-17 |
+
+Two are **forced by the givens, not solver accidents**: plane ACD *is* the base plane and B lies in
+it, so «SB ∥ ACD» drags S into it; and two parallel lines are coplanar, so a tetrahedron with AB ∥ CD
+has no volume. Both statements genuinely contradict the declared solid, and refusing them is the
+[ADR-276](06-decisions.md#adr-276) answer.
+
+The operator chose to keep the gate and re-base the tests (Option B, 2026-09-02). `issue-821` moves
+to the #820 family, where K rides SB and «SD מקביל למישור ACK» is satisfiable, and **keeps the old
+figure as a refusal lock** so the witness is not lost. The battery cell keeps its subject and moves to
+a declared «מרובע», coplanar by definition and excluded from the gate by construction. `issue-817`'s
+control is **inverted rather than deleted** — it asserted a collapse still happens, and now asserts
+`collapsed === []`, the stronger property; its renderer-totality test is kept as defence in depth.
+
+The one genuine collision is with #817's own design position — that a collapsed configuration is
+TOLERATED and the renderer made total over it. "Never produced" and "rendered safely if produced" do
+not conflict in behaviour, but the RECORD is now stale, and `solidFaceCollapsed` may still have a job
+this gate does not cover (a collapsed FACE on a solid that keeps its volume). Both are **#873**,
+filed rather than decided here.

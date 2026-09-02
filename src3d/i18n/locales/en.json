@@ -187,7 +187,8 @@
     "oblique-prism": "A prism not stated \"right\" builds oblique — the tilt is a degree of freedom, and \"the prism is right\" straightens it. For a pentagon or hexagon base state \"right\" (e.g. \"right prism with a pentagon base\"), since a regular base is not a stated given. If you meant an oblique prism, name its base: e.g. \"prism with a triangle base\".",
     "lowercase-labels": "Vertex labels are written in UPPERCASE — AS, not as. Lowercase letters are reserved for vectors (u, v, w), parameters (t, k, m) and coordinates (x, y, z), and angles are named with Greek letters (α, β, γ, θ). Try: {{corrected}}",
     "ambiguous-height": "A height from a single point does not say which plane to drop it onto — there are several options. Name the base or the segment: \"height from D to base ABC\", \"height of the pyramid from D\", or \"CD is the altitude in triangle ABC\".",
-    "latin-angle-label": "A lowercase latin letter is reserved here for vectors and parameters (u, v, w, t, k, m), so it cannot name an angle. Name the angle by its vertices — “∠ABC”, and “60 < ∠ABC < 90” works too — or use a Greek label from the palette: “60 < α < 90”."
+    "latin-angle-label": "A lowercase latin letter is reserved here for vectors and parameters (u, v, w, t, k, m), so it cannot name an angle. Name the angle by its vertices — “∠ABC”, and “60 < ∠ABC < 90” works too — or use a Greek label from the palette: “60 < α < 90”.",
+    "perp-bisector": "The perpendicular bisector is not supported here. What it gives can be stated directly: «M is the midpoint of AB» for the midpoint, and «CM is perpendicular to AB» for the right angle — two givens the tool builds and verifies."
   },
   "query": {
     "placeholder": "ask… e.g. AE (vector), |AE|, w·v, ∠SAB, area ABC",

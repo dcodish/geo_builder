@@ -96,6 +96,7 @@ const COMMAND_SAVEABLE: Record<Command3['type'], boolean> = {
   'angle-mark': true,
   'angle-pair-eq': true,
   'bisector-point': true,
+  'bisector-ray': true, // #343: «OD חוצה זווית AOC» — a stated construction, same round-trip argument
   circle3: true,
   'cos-angle': true,
   'diag-intersection': true,

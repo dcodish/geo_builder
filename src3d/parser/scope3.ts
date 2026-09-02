@@ -31,6 +31,8 @@ export type ScopeCategory3 =
   | 'lowercase-labels'
   | 'ambiguous-height'
   | 'latin-angle-label'
+  // #342: the perpendicular bisector — a decided NON-feature, so its end state is guidance
+  | 'perp-bisector'
   // S2 (#378, DoD 12) added two forward-pointing categories; S4 and S3 have since retired both by
   // SUPPORTING their forms. Guidance for something the parser handles is a lie — the #73 no-theft
   // sweep enforces that, and it is what caught the stale entry.
@@ -150,6 +152,32 @@ const RULES3: ScopeRule3[] = [
       /^(?!.*ישרה)(?=.*מנסרה\s+נטויה)(?!.*(?:שבסיס[הו]|משולשת|מרובעת|מקבילון))/,
       /^(?!.*\bright\b)(?=.*\bprism\b)[\s\S]*(?:\b(?:pentagonal|hexagonal)\s+prism\b|\b(?:pentagon|hexagon)\s+base\b|\bbase\s+is\s+(?:a\s+)?(?:pentagon|hexagon)\b)/i,
       /^(?!.*\bright\b)(?=.*\boblique\b)(?=.*\bprism\b)(?!.*\bbase\b)/i,
+    ],
+  },
+  {
+    /**
+     * #342 (ADR-3D-207) — the PERPENDICULAR BISECTOR («אנך אמצעי»), a decided NON-feature.
+     *
+     * #330 already draws the line in the tokenizer: `אמצע` is the midpoint and `אמצעי`/`אמצעית`/
+     * `אמצעים` is this adjective, deliberately NOT matched, so the perp-bisector "escalates honestly".
+     * It escalates to the PAID LLM lane, which is the part that was never right: the construct is not
+     * missing by oversight, it is a decision, and a decision belongs in this register. Every such
+     * utterance was buying a Haiku call to arrive at a refusal the tool already knew it would give.
+     *
+     * The message teaches the two things that ARE expressible and cover the exam's uses: the MIDPOINT
+     * of the segment, and a perpendicularity stated as a given.
+     *
+     * The lookaheads keep it honest, the same way `ambiguous-height`'s do: «אמצע AB» (the supported
+     * midpoint) must never reach here, and neither may a sentence that merely CONTAINS the adjective
+     * while stating something the parser handles — the register only runs on a failed parse, but a
+     * pattern whose own semantics are wrong is a trap for whoever widens it next.
+     */
+    category: 'perp-bisector',
+    patterns: [
+      /ה?אנך\s+ה?אמצעי/,
+      /ה?אמצעי\s+ה?אנך/,
+      /\bperpendicular\s+bisector\b/i,
+      /\bperp\.?\s*bisector\b/i,
     ],
   },
   // S4 (#378, ADR-3D-104): the `seg-parallel-given` guidance is RETIRED — «AB מקביל ל-CD» is now
