@@ -33,4 +33,18 @@ Corollary, learned the same day: for anything visual, the measurement must be th
 `textContent` was correct on every broken build of the bidi row, which is how that defect survived two
 fixes — see [[no-browser-self-test]].
 
+**Corollary 2 (2026-09-02, #874): measuring the wrong LAYER is the same failure wearing a lab coat.**
+I filed a P2 claiming a radius slider "EMPTIES the figure and blames the student's «AB = 10»" — with a
+measurement table, which is exactly what makes it convincing. But I had called `replay(facts, seed,
+override)` directly. The app dials through the store's `setRadius`, which carries a guard
+(`if (fig.lastError === null && !radiusViolated)`) that **rejects** every such value: the real
+behaviour was a frozen slider and an intact figure. Caught it only because a later question sent me
+back to the store. Retracted, retitled, downgraded to P3.
+
+**How to apply:** before measuring, ask *which entry point does the student actually go through?* —
+the store action, not the pure function it wraps; the submit pipeline, not `parse`. A pure-core probe
+answers "can the engine do this", never "what does the user see". When the claim is about UI
+behaviour, the probe must start where the click starts, and the issue should say which path was
+measured.
+
 Related: [[gate-lines-are-read-not-matched]] (evidence produced is not evidence read).
