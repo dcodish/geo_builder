@@ -189,7 +189,7 @@ describe('#814 — the parser carries the NAME, never the solver register', () =
     expect(cmds('v = (k-1, k, 3)')).toEqual([
       {
         type: 'inject-vector', name: 'v', x: null, y: null, z: 3,
-        symExprs: [{ sym: 'k', k: 1, c: -1 }, { sym: 'k', k: 1, c: 0 }, null],
+        symExprs: [{ terms: [{ sym: 'k', k: 1 }], c: -1 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }, null],
         syms: ['k', 'k', null],
       },
     ]);

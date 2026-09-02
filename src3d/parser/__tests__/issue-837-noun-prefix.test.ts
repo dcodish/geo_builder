@@ -24,6 +24,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { parse3 } from '../parse3';
+import { symsOfAffine, type SymAffine } from '../../engine/types';
 
 const cmds = (u: string) => {
   const r = parse3(u);
@@ -65,10 +66,12 @@ describe("#837 — the prefixed form is IDENTICAL to the canonical one", () => {
 
 describe('#837 — the SYMBOLIC parameter survives (what the student lost)', () => {
   it("«ישר AA'=(k-1,k-7,k+1)» keeps k — it does not need solving by hand first", () => {
-    const [c] = cmds("ישר AA'=(k-1,k-7, k+1)") as [{ type: string; symExprs?: { sym: string }[] }];
+    // #509: a component is an affine form over N symbols now, so "is it symbolic in k" is asked of the
+    // component's SYMBOLS rather than of a single `.sym` field. Same assertion, one carrier later.
+    const [c] = cmds("ישר AA'=(k-1,k-7, k+1)") as [{ type: string; symExprs?: SymAffine[] }];
     expect(c.type).toBe('inject-pair');
     expect(c.symExprs, 'the components are symbolic in k').toBeDefined();
-    expect(c.symExprs!.every((e) => e.sym === 'k')).toBe(true);
+    expect(c.symExprs!.every((e) => symsOfAffine(e).join() === 'k')).toBe(true);
   });
 
   it('«AC על הישר x=…+t(k+1,0,k-3)» keeps k in the direction vector', () => {

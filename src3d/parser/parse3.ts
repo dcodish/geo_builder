@@ -21,6 +21,7 @@ import { readOperand, readRelationSides } from './operandToken';
 import { stripFormatControls } from '../../shell/bidi';
 import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
+import { soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX } from '../lexicon/nouns3';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 import { riderPairsT } from '../engine/onSegmentRatio';
@@ -2057,9 +2058,22 @@ const VAL = String.raw`-?(?:\d+\s*\/\s*\d+|\d*\.\d+|(?:${UNUM})?\s*√\s*${RADIC
  *  Composed from the shared atoms (the S2.1 lexical-ratchet discipline). The SYMBOLIC branch keeps
  *  `NUM` for its coefficient and offset: widening those runs into the affine model itself, which is
  *  #509's territory and needs a design ruling, not a lexical change. */
-const COMP = String.raw`(?:${NUM}\s*[·*]?\s*[a-w](?:\s*[+-]\s*${NUM})?|-?[a-w](?:\s*[+-]\s*${NUM})?|${VAL})`;
+/** ONE affine term: an optional signed coefficient on a symbol — `t`, `2t`, `-t`, `2·t`, `+3q`. */
+const COMP_TERM = String.raw`[+-]?\s*(?:${UNUM}\s*[·*]?\s*)?[a-w]`;
+/** #509 ([ADR-3D-213](../../docs/06b-decisions-3d.md)): a component is a SEQUENCE of affine terms
+ *  with an optional numeric offset — `p+q`, `2p+3q`, `2t-3`, and every one-term form unchanged.
+ *  DEGREE STAYS 1: a term is a coefficient times a symbol, so `p^2`, `p*q` (two symbols multiplied)
+ *  and `p/2` match nothing here and are refused by this same reader — the ADR-3D-079 / docs/20 D3
+ *  no-CAS boundary, now enforced by the grammar rather than assumed. */
+const COMP = String.raw`(?:${COMP_TERM}(?:\s*${COMP_TERM})*(?:\s*[+-]\s*${UNUM})?|${VAL})`;
 const COMP_NUM_RE = new RegExp(String.raw`^${VAL}$`);
-const COMP_TERM_RE = new RegExp(String.raw`^(-|${NUM})?[·*]?([a-w])(?:([+-])(${NUM}))?$`);
+/** Scans a symbolic component: the first term, the remaining terms, and the numeric offset.
+ *  Anchored, so anything that is not a clean sum of coefficient·symbol terms simply does not match. */
+const COMP_COMP_TERMS_RE = new RegExp(String.raw`^(${COMP_TERM})((?:\s*${COMP_TERM})*)(?:\s*([+-])\s*(${UNUM}))?$`);
+/** One term of that sequence, split into sign, coefficient and symbol. */
+const ONE_COMP_TERM_RE = new RegExp(String.raw`^([+-]?)\s*(${UNUM})?\s*[·*]?\s*([a-w])$`);
+/** The terms after the first, scanned out of the run `COMP_COMP_TERMS_RE` captured. */
+const COMP_TERM_SCAN_RE = new RegExp(COMP_TERM, 'g');
 /** #325: attach symExprs only when they carry STRUCTURE beyond bare distinct letters — a
  *  coefficient/offset (`2t`, `t+1`) or a symbol SHARED across components (`B(t,t,3)`). Bare
  *  distinct letters keep the V4 register byte-identical: placeholders, not open symbols. */
@@ -2067,7 +2081,12 @@ function symStructure(
   comps: { num: number | null; expr: SymComp | null }[],
 ): [SymComp | null, SymComp | null, SymComp | null] | undefined {
   const named = comps.flatMap((t) => (t.expr !== null ? [t.expr] : []));
-  const structured = named.some((e) => e.k !== 1 || e.c !== 0) || new Set(named.map((e) => e.sym)).size < named.length;
+  // #509: a component naming SEVERAL symbols carries structure by itself — «C(p+q,1,0)» can never
+  // be a bare placeholder letter, so it must reach the solver as open unknowns.
+  const allSyms = named.flatMap(symsOfAffine);
+  const structured =
+    named.some((e) => e.terms.length > 1 || e.terms[0].k !== 1 || e.c !== 0) ||
+    new Set(allSyms).size < allSyms.length;
   return structured ? (comps.map((t) => t.expr) as [SymComp | null, SymComp | null, SymComp | null]) : undefined;
 }
 
@@ -2079,7 +2098,7 @@ const symNames = (
   comps: { num: number | null; expr: SymComp | null }[],
 ): [string | null, string | null, string | null] | undefined =>
   comps.some((t) => t.expr !== null)
-    ? (comps.map((t) => t.expr?.sym ?? null) as [string | null, string | null, string | null])
+    ? (comps.map((t) => (t.expr ? soleSymOf(t.expr) : null)) as [string | null, string | null, string | null])
     : undefined;
 
 /** Parse one component: a plain number, or {sym, k, c} for k·sym + c. */
@@ -2089,11 +2108,18 @@ function parseComp(t: string): { num: number | null; expr: SymComp | null } {
   // used by the vec-rel coefficient lane. A second evaluator here would be a second set of rounding and
   // malformed-input rules to keep in step (docs/17: reuse the chokepoint).
   if (COMP_NUM_RE.test(s)) return { num: literalValue(s), expr: null };
-  const m = s.match(COMP_TERM_RE);
+  const m = s.match(COMP_COMP_TERMS_RE);
   if (!m) return { num: null, expr: null };
-  const k = m[1] === undefined ? 1 : m[1] === '-' ? -1 : +m[1];
+  // #509: read every term of the sequence, then the optional numeric offset. A repeated symbol is
+  // kept as written and summed by the consumers — `k+k` is 2k, not two unknowns.
+  const terms: { sym: string; k: number }[] = [];
+  for (const raw of [m[1], ...(m[2].match(COMP_TERM_SCAN_RE) ?? [])]) {
+    const t = raw.replace(/\s+/g, '').match(ONE_COMP_TERM_RE);
+    if (!t) return { num: null, expr: null };
+    terms.push({ sym: t[3], k: (t[1] === '-' ? -1 : 1) * (t[2] === undefined ? 1 : +t[2]) });
+  }
   const c = m[3] ? (m[3] === '-' ? -1 : 1) * +m[4] : 0;
-  return { num: null, expr: { sym: m[2], k, c } };
+  return { num: null, expr: { terms, c } };
 }
 
 /** #510 — a component that matched LEXICALLY but could not be evaluated (`1/0`): neither a number nor a
@@ -2113,7 +2139,7 @@ const coordPoint: Rule = (s) => {
   const [, id, x, y, z, restRaw] = m;
   const comps = [x, y, z].map(parseComp);
   if (comps.some(unreadableComp)) return null; // #510: a malformed literal is never an unknown coordinate
-  const syms = comps.map((t) => t.expr?.sym ?? null) as [string | null, string | null, string | null];
+  const syms = comps.map((t) => (t.expr ? soleSymOf(t.expr) : null)) as [string | null, string | null, string | null];
   const symExprs = symStructure(comps);
   const cmds: Command3[] = [
     comps.some((t) => t.expr !== null)
@@ -2460,7 +2486,7 @@ const parametricLine: Rule = (s) => {
   // shape again: a fixed token standing in for something the student states.
   //
   // Position decides the roles unambiguously (a constant scale on a direction vector is meaningless), so
-  // no new engine concept is needed. `[a-w]` mirrors `PARAM_TERM`'s symbol charset, which keeps x/y/z out
+  // no new engine concept is needed. `[a-w]` mirrors `PARAM_COMP_TERM`'s symbol charset, which keeps x/y/z out
   // — «x = x(1,0,0)» can never be read as a line.
   const m = body.match(/^(?:x\s*=\s*)?(?:\(([^()]*)\)\s*\+\s*)?([a-w])\s*[·×*]?\s*\(([^()]*)\)$/);
   if (!m) return null;
@@ -2853,7 +2879,7 @@ const injectionList: Rule = (s) => {
       // #325: symbolic affine components ride the list too (`נתונות הנקודות: B(2t, t, k)`)
       cmds.push({
         type: 'point3', id: gr.pt!, x, y, z,
-        syms: comps.map((t) => t.expr?.sym ?? null) as [string | null, string | null, string | null],
+        syms: comps.map((t) => (t.expr ? soleSymOf(t.expr) : null)) as [string | null, string | null, string | null],
         ...(symExprs ? { symExprs } : {}),
       });
     } else {

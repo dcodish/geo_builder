@@ -15,7 +15,10 @@ import { stripFormatControls } from '../../shell/bidi';
 import type { Command3 } from '../engine/types';
 import type { Fact3 } from './store3';
 
-export const SCHEMA_VERSION_3D = 1;
+/** Bumped to 2 by #509: `symExprs` changed shape (one symbol → an affine term list). A v1 file is
+ *  MIGRATED on load ({@link deserializeFigure3}); the bump is so an OLDER build refuses a v2 file
+ *  cleanly («newer-schema») instead of misreading its components. */
+export const SCHEMA_VERSION_3D = 2;
 
 export interface FigureFile3 {
   schemaVersion: number;
@@ -151,6 +154,30 @@ export type LoadResult3 =
   | { ok: true; facts: Fact3[]; seed: number; queries: string[]; planeDisplay: PlaneDisplayMode3Map }
   | { ok: false; reason: 'bad-file' | 'newer-schema' };
 
+/**
+ * #509 ([ADR-3D-213](../../docs/06b-decisions-3d.md)) — a saved figure written before the affine
+ * widening stores each symbolic component as `{sym, k, c}` (one symbol by construction). The carrier is
+ * now `{terms: [{sym, k}], c}`, and `symExprs` is PERSISTED — it rides the stored commands — so every
+ * figure a student has already saved would otherwise stop replaying.
+ *
+ * Migrated on load rather than by a schema bump alone, because a bump only tells the old file it is not
+ * welcome; this keeps it working. Idempotent: a component already in the new shape is returned as-is,
+ * so a re-save and re-load costs nothing.
+ */
+function migrateSymExprs(cmd: Command3): Command3 {
+  const withExprs = cmd as { symExprs?: unknown };
+  if (!Array.isArray(withExprs.symExprs)) return cmd;
+  let changed = false;
+  const migrated = withExprs.symExprs.map((e) => {
+    if (!e || typeof e !== 'object' || 'terms' in e) return e;
+    const legacy = e as { sym?: unknown; k?: unknown; c?: unknown };
+    if (typeof legacy.sym !== 'string' || typeof legacy.k !== 'number' || typeof legacy.c !== 'number') return e;
+    changed = true;
+    return { terms: [{ sym: legacy.sym, k: legacy.k }], c: legacy.c };
+  });
+  return changed ? ({ ...cmd, symExprs: migrated } as Command3) : cmd;
+}
+
 export function deserializeFigure3(text: string): LoadResult3 {
   let raw: unknown;
   try {
@@ -177,7 +204,8 @@ export function deserializeFigure3(text: string): LoadResult3 {
     // ids are session-local — always minted fresh on load
     // #751 (ADR-W-029): clean on LOAD too — a file saved before the invariant carries the
     // app's display isolates, and those saves are already in the wild.
-    facts.push({ id: nanoid(8), utterance: stripFormatControls(f.utterance), cmds: f.cmds, enabled: f.enabled !== false });
+    // #509: and so are files carrying the pre-affine symbolic components — migrate them.
+    facts.push({ id: nanoid(8), utterance: stripFormatControls(f.utterance), cmds: f.cmds.map(migrateSymExprs), enabled: f.enabled !== false });
   }
   const queries = Array.isArray(file.queries) ? file.queries.filter((q): q is string => typeof q === 'string') : [];
   // #318: lenient like `queries` — keep only well-formed entries; anything else falls back to 'full'

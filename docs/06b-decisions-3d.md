@@ -7496,3 +7496,71 @@ TOLERATED and the renderer made total over it. "Never produced" and "rendered sa
 not conflict in behaviour, but the RECORD is now stale, and `solidFaceCollapsed` may still have a job
 this gate does not cover (a collapsed FACE on a solid that keeps its volume). Both are **#873**,
 filed rather than decided here.
+
+### ADR-3D-213 — a coordinate component is an AFFINE FORM over N symbols; the arity lived in the readers, not the model (#509)
+
+**Status:** accepted, 2026-09-03 · **Widens:** [ADR-3D-079](#adr-3d-079) (#325) · **LADDER stage:** 0 (parse) + the pivot's component targets · **Round:** #878
+
+**Context.** The operator, building a real bagrut figure, typed `C(p^2,p^2+4,0)` and it refused. That
+report made it look like a DEGREE problem, and #509 was first scoped as one. Measured, it is an ARITY
+problem — and not in the data model, which is where both this issue and #301 said it was:
+
+| utterance | before |
+| --- | --- |
+| `C(2t,t,k)` — two distinct symbols, one per component | ✅ builds, `pinSyms ["t","k"]` |
+| `C(p+q,1,0)` · `C(2p+3q,1,0)` — two symbols in ONE component | ❌ `not-handled` |
+
+The **solver has been n-symbol since #794**: `pinSymsOf` collects N symbols across every pin family, and
+a figure carrying two of them in separate givens resolves green. What is single-symbol is three
+independent READERS, each enforcing arity 1 its own way — `COMP_TERM_RE` (this carrier), `bindSymbol`
+inside `parseSymExpr` (#301) and `parseLinearEq`'s guard (#339).
+
+**Decision — the shared form is the deliverable, and this reader is its FIRST adoption.**
+
+```ts
+interface SymAffine { terms: { sym: string; k: number }[]; c: number; }   // Σ kᵢ·symᵢ + c
+```
+
+`SymComp` is now an alias of it, so the ~27 consuming sites keep their name while the compiler
+enumerated every one that had to change. Three helpers keep the reading in one place: `symsOfAffine`,
+`evalAffine` (the pivot's component target) and `soleSymOf` (the "which single letter names this
+component" question, which only has an answer when there is one). **#301 and #339 are the remaining two
+adoptions** — widening only the regex here and leaving a bespoke shape behind is the patch they would
+have copied, which is why the form, not the row, is the deliverable.
+
+**Degree stays 1, by construction and now by assertion.** A term is a coefficient times a symbol, so
+`p^2`, `p/2` and `2(p+1)` match nothing in the grammar and are refused by the same reader that enforces
+the arity — the ADR-3D-079 / docs/20 D3 no-CAS boundary, unchanged.
+
+**One row of the issue's approved list is NOT delivered, and it needs a ruling: `C(p*q,1,0)`.**
+The 2026-09-01 ruling lists it beside `C(p+q,…)` and `C(2p+3q,…)` as "the two-symbol rows", and in the
+same breath says *"Option A is not re-opened. This ruling is about the ARITY of the component reader,
+not its degree."* But `p·q` is a PRODUCT of two symbols — degree 2 — so an affine form cannot carry it,
+and the plan's own mechanism (*"widen `COMP_TERM_RE` from a single term to a term SEQUENCE"*) is a sum.
+The row appears to have been grouped by "two letters appear" rather than by degree. It is therefore
+refused here **alongside** `p^2` and `p/2`, and asserted as refused, so the boundary is explicit rather
+than accidental. Carrying it needs the degree ruling this one declined to re-open.
+
+**The migration this forced, and it is the part that would have hurt.** `symExprs` is PERSISTED — it
+rides the stored commands in every saved `.geo3.json` — so changing the carrier's shape would have
+stopped every already-saved figure from replaying. The fixture net caught it immediately (four files,
+both the green-replay and the parser-drift halves). A legacy `{sym,k,c}` component is now **migrated on
+load** to its one-term image, idempotently, and `SCHEMA_VERSION_3D` goes to 2 so an older build refuses
+a new file cleanly instead of misreading its components.
+
+**Scope check:** the whole 3-D lane (206 files, 3993 tests) passes. Eighteen tests moved, all of them
+assertions on the component LITERAL rather than on behaviour: `{sym:'k',k:1,c:-1}` became
+`{terms:[{sym:'k',k:1}],c:-1}`, the exact one-term image of the same component.
+
+**Locked** in `multi-symbol-affine-509.test.ts` (23): the form's three helpers; the newly-supported rows
+building with both symbols in `pinSyms`; the component reading back as the affine form written; a
+multi-symbol component naming no single letter; the degree boundary refused across six spellings
+including `p*q`; the baseline rows and ADR-3D-032's exact single-symbol lowering unchanged; and the
+figure RESOLVING rather than merely applying. Plus the fixture
+`fixtures3/prism-two-symbol-component-509.geo3.json` per standing rule 4.
+
+A correction on the record: #509's ruling comment gives the already-green two-symbol figure as
+«תיבה» + `AA'=(k-1,k-7,k+1)` + `BB'=(m,m+2,m-1)`. That sequence does not resolve, on this branch or on
+`main` — in a box `AA'` and `BB'` are the same vector, so stating both differently is a real
+contradiction and the engine correctly says `givens-contradict`. The property is real; the edge pair
+named was not independent. The lock uses `AB` and `AA'`.
