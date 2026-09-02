@@ -8567,6 +8567,53 @@ dart over a kite ring and over an inscribed ring; the direct ring unchanged; the
 asserted to draw concave and to fail `meetsRequirements`; a convex seed still passing; the stated-concave
 exemption; and a triangle-shaped macro untouched.
 
+## ADR-473 — the three drawn-arc tiers are decided in ONE audit, and the forced tier speaks (#433)
+
+**Context.** [ADR-423](#adr-423) (#429) gave the drawn-arc requirement three tiers: a FREE on-circle
+point is confined to the ink by `evaluate`; a point DRIVEN off it reads amber (`figure.v.pointOffArc`);
+and a departure the construction STRUCTURALLY forces — the far end of a diameter drawn from a point on a
+semicircle is always on the other half — is *allowed with a notice*, per the operator's ruling of
+2026-07-30 and the [ADR-123](#adr-123) allow-with-a-notice precedent.
+
+Two of the three shipped. The third was **allowed but silent**: `verify.ts` collected the `antipode` ids
+into a local `forcedOff` set purely to *skip* them, and nothing downstream ever learned they existed.
+Measured on `main` at `9d635a4` — «חצי מעגל» → «C על המעגל» → «קוטר מנקודה C» builds with
+`lastError: null`, `violations: []`, and D sitting at θ = 189.5° on a circle whose drawn span is 0°–180°.
+Ink appeared where the student drew none, and the tool said nothing. Per docs/17 §6 (*everything the
+student stated is visible on the figure*) an allowed-but-unusual outcome must say so.
+
+**Decision.** The tier a point falls into is now decided in **one place**, `auditDrawnArcs`, which walks
+the construction once and returns both channels:
+
+| the point's position is… | outcome |
+| --- | --- |
+| a FREE (unstated) choice | silence — `evaluate` already confined it to the ink |
+| a CONSEQUENCE of a constraint | a `point-off-arc` VIOLATION (amber) |
+| STRUCTURALLY forced off the ink | a `ForcedOffArc` NOTICE — allowed, and said out loud |
+
+`checkGivens` consumes `.violations`; the new `forcedOffArcs` export consumes `.forced`. One audit means
+the exclusion and the notice can never disagree about which tier a point is in — the previous shape had
+the skip in one expression and the notice nowhere, so nothing enforced that they described the same set.
+
+The notice is threaded like a forced coincidence: `forcedOffArc: ForcedOffArc[]` on `Derived` beside
+`coincidences` (`replay/core.ts`), rendered in `App.tsx` in the same `infoBanner`, with the new
+`figure.offArcNotice` key in `he.json` + `en.json`. The Hebrew states the fact *and* that it is forced
+(«…נמצאת בהכרח על החלק שאינו מצויר… כך מחייב המבנה»), so it does not read as an error.
+
+**The tier boundary does not move.** The structural class is exactly the constructions whose DEFINITION
+places them diametrically opposite their reference (`antipode` today). A point that merely *happens* to
+be driven off the ink stays in tier 2 and stays amber — turning that into a notice would re-open the
+honesty hole #429 closed. The lock asserts this with the same coordinates in both tiers.
+
+**Why the forced tier must never be a violation.** It is unsatisfiable: no seed can put the antipode of
+an on-ink point back on the same half, so `meetsRequirements` could never clear one and `findValidConfig`
+would burn its entire budget proving it. That is why tier 3 is a notice by construction, not by taste.
+
+**Locks.** `src/engine/__tests__/arcs.test.ts` (+5): the semicircle diameter builds green with no
+violation; the notice names D and `circle-O` with a positive offset; it holds across 8 seeds (structural,
+not a sampling accident); the same coordinates re-labelled as a merely-driven point flip to amber with no
+notice; and a FULL circle produces neither.
+
 ## ADR-474 — a drawing that meets every requirement can still be unreadable: the SPREAD preference (#194)
 
 **Context.** Operator, 2026-07-17 (the Q9 session, right after #193): *"we need to add some preference —

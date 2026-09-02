@@ -71,14 +71,14 @@ describe('#396 — a relation between two ABSOLUTE objects gets the redundancy n
     submit('המישור π2: x = 0');
     submit('π1 ניצב ל-π2');
     expect(state().lastError).toBeNull();
-    expect(derived().notices).toContainEqual({ kind: 'redundant-relation', a: 'π1', b: 'π2' });
+    expect(derived().notices).toContainEqual({ kind: 'already-known', rel: 'objects', subject: 'π1', object: 'π2' });
   });
 
   it('a relation over FIGURE objects (the verify register) never notices', () => {
     submit("תיבה ABCDA'B'C'D'");
     submit("המישור ABC מקביל למישור A'B'C'");
     expect(state().lastError).toBeNull();
-    expect(derived().notices.filter((n) => n.kind === 'redundant-relation')).toEqual([]);
+    expect(derived().notices.filter((n) => n.kind === 'already-known' && n.rel === 'objects')).toEqual([]);
   });
 
   it('a ⟂ that PINS the figure parameter (the 2024-Q2 shape) never notices — it was information', () => {
@@ -86,7 +86,7 @@ describe('#396 — a relation between two ABSOLUTE objects gets the redundancy n
     submit('המישור π1: x + y - z = 0');
     submit('הישר ℓ ניצב למישור π1');
     expect(state().lastError).toBeNull();
-    expect(derived().notices.filter((n) => n.kind === 'redundant-relation')).toEqual([]);
+    expect(derived().notices.filter((n) => n.kind === 'already-known' && n.rel === 'objects')).toEqual([]);
   });
 
   // #500 — the operator's exact prod sequence (2026-08-10). A FREE plane (#487) is absolute but NOT
@@ -97,7 +97,7 @@ describe('#396 — a relation between two ABSOLUTE objects gets the redundancy n
     submit('π2');
     submit('π1 ניצב ל-π2');
     expect(state().lastError).toBeNull();
-    expect(derived().notices.filter((n) => n.kind === 'redundant-relation')).toEqual([]);
+    expect(derived().notices.filter((n) => n.kind === 'already-known' && n.rel === 'objects')).toEqual([]);
   });
 
   it('a free plane ∥ an EQUATION plane — the free side is still driven, so no notice', () => {
@@ -105,7 +105,7 @@ describe('#396 — a relation between two ABSOLUTE objects gets the redundancy n
     submit('מישור π2');
     submit('π2 מקביל ל-π1');
     expect(state().lastError).toBeNull();
-    expect(derived().notices.filter((n) => n.kind === 'redundant-relation')).toEqual([]);
+    expect(derived().notices.filter((n) => n.kind === 'already-known' && n.rel === 'objects')).toEqual([]);
   });
 
   it('a typed LINE ⟂ a free plane (the line-rel lane) — same pin, same silence', () => {
@@ -113,7 +113,7 @@ describe('#396 — a relation between two ABSOLUTE objects gets the redundancy n
     submit('מישור π2');
     submit('הישר ℓ מאונך למישור π2');
     expect(state().lastError).toBeNull();
-    expect(derived().notices.filter((n) => n.kind === 'redundant-relation')).toEqual([]);
+    expect(derived().notices.filter((n) => n.kind === 'already-known' && n.rel === 'objects')).toEqual([]);
   });
 
   it('a free plane REPLACED by its equation makes a later relation genuinely redundant — notice returns', () => {
@@ -122,7 +122,7 @@ describe('#396 — a relation between two ABSOLUTE objects gets the redundancy n
     submit('המישור π2: x = 0');
     submit('π1 ניצב ל-π2');
     expect(state().lastError).toBeNull();
-    expect(derived().notices).toContainEqual({ kind: 'redundant-relation', a: 'π1', b: 'π2' });
+    expect(derived().notices).toContainEqual({ kind: 'already-known', rel: 'objects', subject: 'π1', object: 'π2' });
   });
 });
 

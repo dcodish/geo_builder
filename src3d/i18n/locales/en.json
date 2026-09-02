@@ -193,7 +193,6 @@
   "load.unbuildable": "The file opened, but no step could be rebuilt in this version ({{count}} steps) — it may have been saved by a newer build. The steps are kept exactly as saved.",
   "load.partial": "The file opened, but {{count}} step(s) could not be rebuilt (step {{steps}}) — they are flagged in the list. The steps are kept exactly as saved.",
   "notice": {
-    "shapeRedundant": "{{ids}} is already a {{shape}} from an earlier given — the statement is true and adds no new information.",
     "baseConstrained": "For the pyramid to be right, the base ({{ids}}) was constrained from a {{from}} to a {{to}}.",
     "shape": {
       "square": "square",
@@ -209,11 +208,22 @@
     },
     "lineCalledPlane": "Note: {{line}} is a line, not a plane. Read as \"plane {{ids}} is perpendicular to line {{line}}\".",
     "lineRelNoun": "Note: {{line}} is a line, not a plane — the relation was built against line {{line}}.",
-    "redundantRelation": "The relation between {{a}} and {{b}} was verified ✓ — but it already follows from their definitions, so this given adds no new information.",
-    "containmentRedundant": "«{{seg}}» lies in plane «{{plane}}» — true and verified ✓, but both endpoints already lie in that plane by earlier givens, so this adds no new information and changes nothing in the figure.",
-    "entailedParallel": "«{{seg}}» is parallel to plane «{{plane}}» — true and verified ✓, but it already follows from the solid you defined, so this adds no new information.",
-    "entailedPerp": "«{{seg}}» is perpendicular to plane «{{plane}}» — true and verified ✓, but it already follows from the solid you defined, so this adds no new information.",
     "lineAutoNamed": "The name {{requested}} is already taken, so the intersection line was named {{assigned}}.",
+    "alreadyKnown": "{{statement}} — true and verified ✓, but {{why}}, so this given adds no new information.",
+    "stated": {
+      "shape": "{{a}} is a {{shape}}",
+      "objects": "the relation between {{a}} and {{b}}",
+      "contained": "«{{a}}» lies in plane «{{b}}»",
+      "perp": "«{{a}}» is perpendicular to plane «{{b}}»",
+      "parallel": "«{{a}}» is parallel to plane «{{b}}»"
+    },
+    "follows": {
+      "shape": "the shape is already known from an earlier given",
+      "objects": "it already follows from the objects own definitions",
+      "contained": "both endpoints already lie in that plane by earlier givens",
+      "perp": "it already follows from the solid you defined",
+      "parallel": "it already follows from the solid you defined"
+    },
     "alreadyStated": "That is already stated («{{utterance}}») — the figure is unchanged and no row was added"
   },
   "display": {

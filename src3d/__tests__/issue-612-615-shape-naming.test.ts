@@ -40,7 +40,7 @@ describe("#612 — the operator's exact sequence", () => {
     submit('ריבוע ABCD');
     expect(state().lastError, 'true and already known — not an error').toBeNull();
     const d = derived();
-    expect(d.notices.some((n) => n.kind === 'shape-redundant'), 'the student must be told it added nothing').toBe(true);
+    expect(d.notices.some((n) => n.kind === 'already-known' && n.rel === 'shape'), 'the student must be told it added nothing').toBe(true);
     // and it really did nothing: no pins accumulated, no point moved
     expect(d.construction.scalarPins.length).toBe(before.construction.scalarPins.length);
     for (const id of ['A', 'B', 'C', 'D', 'S']) expect(dist3(P(d, id), P(before, id))).toBeLessThan(1e-9);

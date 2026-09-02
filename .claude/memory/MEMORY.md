@@ -21,3 +21,5 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Tier JSON machine drift](tier-json-machine-drift.md) — #812 dropped the timings, so a diff there is now a REAL membership change (commit it); it can still differ per machine (2026-09-01)
 - [Look at the UI before he does](no-browser-self-test.md) — the harness CAN drive a browser (Playwright, proven 2026-08-31); `npm run smoke:visual` is the gate, and reading the screenshots is the job
 - [Measure before diagnosing](measure-before-diagnosing.md) — a root cause read off the code is a hypothesis; run the case and print the real state before it goes in the issue body (2026-08-31: two of four wrong)
+- [Heredocs eat backslashes](heredoc-eats-backslashes.md) — bash heredocs silently halve backslashes and run backticks; write files with the Write tool and do string surgery from a .cjs script, then read the lines back (round #869)
+- [Gate after the LAST file](gate-after-the-last-file.md) — run `tsc -b` after the test file exists, not before it; two test-only type errors reached the batch gate in round #869

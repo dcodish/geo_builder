@@ -13,12 +13,12 @@
  * The store re-exports this module's surface, so existing consumers are untouched.
  */
 
-import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
+import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Construction, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
 import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -115,6 +115,10 @@ export interface Derived {
   /** Pairs of distinct points the geometry drove to the same location — allowed, shown as a notice so the
    *  student knows two labels converged (e.g. a derived point landing on a circle's centre). [ADR-123] */
   coincidences: [Id, Id][];
+  /** References the CONSTRUCTION forces off the drawn ink — ADR-423 tier 3: allowed (the departure is
+   *  unavoidable and the figure is right), surfaced as a notice so ink appearing where the student drew
+   *  none is never silent. Distinct from the amber `point-off-arc` violation, which is tier 2. [#433] */
+  forcedOffArc: ForcedOffArc[];
 }
 
 /** A free circle radius the student can drag: `base` is the stable seed radius (for the slider range),
@@ -1144,7 +1148,11 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
   // Distinct points the geometry drove onto the same spot — allowed (not an error), surfaced as a notice
   // so the student knows two labels converged ([ADR-123](docs/06-decisions.md#adr-124)).
   const coincidences: [Id, Id][] = e.ok ? e.coincidences ?? [] : [];
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, radiusDofs, coincidences };
+  // ADR-423 tier 3 (#433): a reference the construction FORCES off the drawn ink — a diameter's far end
+  // on a semicircle is always on the other half. Allowed, never a violation (flagging it would be
+  // unsatisfiable), but said out loud, the way a forced coincidence is.
+  const forcedOffArc: ForcedOffArc[] = e.ok ? forcedOffArcs(figure, e.positions, e.circles) : [];
+  return { construction: figure, positions: e.ok ? e.positions : new Map(), circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, radiusDofs, coincidences, forcedOffArc };
 }
 
 /** The (a, b, id, circle) triples every enabled `extend-onto-circle` step asserts ("המשך a·b onto `circle` at id"). */

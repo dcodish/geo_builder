@@ -601,7 +601,7 @@ export default function App() {
   const display = searchHold || viewStale ? lastGoodViewRef.current! : derivedRaw;
   // GEOMETRY from the displayable state; STATUS/ERROR from the real current state (the step list and the
   // error banner must tell the truth about what just happened).
-  const { construction, positions, circles, labels, angleMarks, violations, radiusDofs, coincidences } = display;
+  const { construction, positions, circles, labels, angleMarks, violations, radiusDofs, coincidences, forcedOffArc } = display;
   const { status, lastError, pending } = derivedRaw;
   // #574 (ADR-447): the one seam turning an anonymous id into words the student can act on.
   const describePoint = (id: string): string => {
@@ -1195,6 +1195,15 @@ export default function App() {
                   remains is student-named, so `describePoint` is a no-op here today; it stays as the
                   ADR-447 seam should a described anonymous pair ever be ruled back in. */}
               ⓘ {visibleCoincidences(coincidences).map(([a, b]) => t('figure.converge', { a: describePoint(a), b: describePoint(b) })).join(' ')}
+            </div>
+          )}
+
+          {forcedOffArc.length > 0 && (
+            <div style={infoBanner}>
+              {/* ADR-423 tier 3 (#433): the departure is FORCED by the construction, so this states a
+                  fact rather than reporting an error — the amber `figure.v.pointOffArc` violation stays
+                  the channel for a point that merely happens to be driven off the ink. */}
+              ⓘ {forcedOffArc.map((f) => t('figure.offArcNotice', { point: f.point, circle: f.circle.replace(/^circle-/, '') })).join(' ')}
             </div>
           )}
 
