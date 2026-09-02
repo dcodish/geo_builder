@@ -11,7 +11,7 @@ import { lineAtParam, planeAtParam, resolve3, type Resolved3 } from './evaluate'
 import { containmentDeviation, lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { atomVec, evalExpr } from './vecExpr';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
-import { cross3, dot3, runNormal, norm3, sub3, v3, type Vec3 } from './vec3';
+import { bisectorDir3, cross3, dist3, dot3, runNormal, norm3, normalize3, sub3, v3, type Vec3 } from './vec3';
 import type { Claim3, Construction3 } from './types';
 
 /** Claim tolerance. Closed-form figures verify to ~1e-15; a figure placed by the V4
@@ -308,6 +308,22 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       const den2 = norm3(cc) * norm3(d);
       if (den1 < 1e-12 || den2 < 1e-12) return false;
       return Math.abs(dot3(a, b) / den1 - dot3(cc, d) / den2) <= REL_TOL;
+    }
+    case 'bisector-dir': {
+      /**
+       * #872 — the verification twin of the `bisector-dir` pin, reading the SAME definition. On a
+       * determined figure the tool checks the statement it was actually given: that apex→tip is the
+       * internal bisector RAY, not merely that the two arm angles are equal.
+       */
+      const O = pos.get(claim.apex);
+      const A = pos.get(claim.a);
+      const B = pos.get(claim.b);
+      const T = pos.get(claim.tip);
+      if (!O || !A || !B || !T) return false;
+      const u = bisectorDir3(O, A, B);
+      const ray = sub3(T, O);
+      if (!u || norm3(ray) < 1e-12) return false;
+      return dist3(normalize3(ray), u) <= REL_TOL;
     }
     case 'line-plane-angle': {
       // triage 3-D: sin β = |n·u| / (|n||u|) (formula sheet). n from two plane edges at pt[0].

@@ -579,6 +579,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
     case 'dot-eq':
     case 'cos-eq':
       return firstAtomError(c, [claim.a, claim.b, claim.c, claim.d]);
+    case 'bisector-dir':
+      return missingPoint(c, [claim.apex, claim.a, claim.b, claim.tip]); // #872
     case 'line-plane-angle':
       return missingPoint(c, [claim.a, claim.b, ...claim.plane]);
     case 'lines-rel':
@@ -2528,13 +2530,28 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       /**
        * M1 duality, decided HERE because `parse3` is context-free by design: on an EXISTING point the
        * sentence is a GIVEN about it, not a re-creation. «AD חוצה זווית BAC» where D is already a
-       * vertex says ∠(AD, AB) = ∠(AD, AC) — an equal-angle pair the engine already drives and verifies
-       * — so it lowers to that rather than refusing `already-defined`, which is what the carrier twin
-       * still does and what this construct must not repeat.
+       * vertex is a statement about D, so it lowers to a constraint rather than refusing
+       * `already-defined` (which is what the carrier twin still does).
+       *
+       * #872 (ADR-3D-212) — WHICH constraint is the whole defect. This lowered to ∠(AD,AB) = ∠(AD,AC),
+       * an equal-angle pair; in R³ that is NOT the bisector. The directions making equal angles with
+       * the two arms form a whole PLANE through the apex, of which the bisector ray is one member, so
+       * the solver satisfied the given out of the angle's plane and the figure never bisected anything
+       * (measured: the arm angle settled at ~2.3× the half-angle with D up to 96% of span off plane
+       * ABC, at every seed). The lowering must be the construct's OWN defining incidence — D lies on
+       * the ray `bisectorDir3(apex, a, b)` — which is exactly what the constructive lane places.
        */
       if (c.points.has(cmd.id)) {
-        const arm = (to: Id) => ({ kind: 'pair' as const, from: cmd.apex, to });
-        return applyCommand3(c, { type: 'angle-pair-eq', a: arm(cmd.id), b: arm(cmd.a), c: arm(cmd.id), d: arm(cmd.b) });
+        const missingTip = missingPoint(c, [cmd.a, cmd.b, cmd.apex]);
+        if (missingTip) return { ok: false, error: missingTip };
+        if (cmd.a === cmd.apex || cmd.b === cmd.apex || cmd.a === cmd.b || cmd.id === cmd.apex)
+          return { ok: false, error: { code: 'no-solution', id: cmd.apex } };
+        const next = clone(c);
+        const pin = { apex: cmd.apex, a: cmd.a, b: cmd.b, tip: cmd.id } as const;
+        if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'bisector-dir', ...pin });
+        else next.claims.push({ type: 'bisector-dir', ...pin });
+        if (!hasSegment(next, cmd.apex, cmd.id)) next.segments.push([cmd.apex, cmd.id]); // the stated ray is drawn
+        return { ok: true, next };
       }
       const missing = missingPoint(c, [cmd.a, cmd.b, cmd.apex]);
       if (missing) return { ok: false, error: missing };

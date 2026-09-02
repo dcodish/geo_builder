@@ -16,6 +16,7 @@ import { derive3, useGeo3 } from '../store/store3';
 import { classifyGuidance3 } from '../parser/scope3';
 import { freeDofCount3 } from '../engine/evaluate';
 import { parse3 } from '../parser/parse3';
+import { bisectorDir3, dist3, dot3, normalize3, sub3 } from '../engine/vec3';
 
 const st = () => useGeo3.getState();
 const run = (...lines: string[]) => {
@@ -42,7 +43,14 @@ describe('#343 — the bisector RAY, with a free rider on it', () => {
     'OD bisects angle AOC',
   ])('builds: %s', (line) => run('פירמידה משולשת AOCB', line));
 
-  it('the VERTEX-named frame «AD חוצה זווית BAC» builds too', () => run('פירמידה משולשת ABCD', 'AD חוצה זווית BAC'));
+  /**
+   * #872: this frame PARSES by the same rule (asserted below); whether it BUILDS depends on the
+   * figure, and on a pyramid it must not — see the M1 test. The old assertion here was
+   * `run(…)`, i.e. "it builds green", which is exactly the defect #872 reported.
+   */
+  it('the VERTEX-named frame «AD חוצה זווית BAC» is the same RULE', () => {
+    expect(parse3('AD חוצה זווית BAC').ok).toBe(true);
+  });
 
   it('the ray really BISECTS — the two arm cosines are equal', () => {
     run('פירמידה משולשת AOCB', 'OD חוצה זווית AOC');
@@ -86,15 +94,53 @@ describe('#343 — the bisector RAY, with a free rider on it', () => {
 
   /**
    * M1 duality (decided at apply, because `parse3` is context-free): on an EXISTING point the same
-   * sentence is a GIVEN about it, never a re-creation. «AD חוצה זווית BAC» on the pyramid ABCD — where
-   * D is already a vertex — says the two arm angles are equal, and that is what it lowers to.
+   * sentence is a GIVEN about it, never a re-creation — so it must not refuse `already-defined`.
+   *
+   * #872 (ADR-3D-212) CORRECTED WHICH given. This asserted `cos-eq` — an equality of the two arm
+   * ANGLES — and that is not what "bisects" means in R³: the directions making equal angles with the
+   * two arms are a whole PLANE through the apex, so the solver satisfied it out of the angle's plane
+   * and the drawing never bisected anything. The given is the construct's own defining incidence:
+   * the tip lies on the bisector RAY.
    */
-  it('on an EXISTING point the sentence is a GIVEN, not «already defined»', () => {
-    run('פירמידה משולשת ABCD', 'AD חוצה זווית BAC');
+  it('on an EXISTING point the sentence is a GIVEN — the bisector RAY, not equal arm angles', () => {
+    st().clear();
+    st().submit('פירמידה משולשת ABCD');
+    st().submit('E על BC'); // a tip that CAN reach the bisector: BC lies in the angle's own plane
+    st().submit('AE חוצה זווית BAC');
+    expect(st().lastError, 'a satisfiable bisector given builds').toBeNull();
     const d = derive3(st().facts, st().seed);
     const tag = (x: { kind?: string; type?: string }) => x.kind ?? x.type;
-    const stated = [...d.construction.claims, ...d.construction.scalarPins].some((x) => tag(x) === 'cos-eq');
-    expect(stated, 'it becomes an equal-angle given').toBe(true);
+    const kinds = [...d.construction.claims, ...d.construction.scalarPins].map(tag);
+    expect(kinds, 'the given is the bisector direction').toContain('bisector-dir');
+    expect(kinds, 'never the weaker equal-angle pair').not.toContain('cos-eq');
+    // and it really bisects: the tip direction IS the internal bisector direction
+    const [A, B, C, E] = ['A', 'B', 'C', 'E'].map((id) => d.positions.get(id)!);
+    const u = bisectorDir3(A, B, C)!;
+    expect(dist3(normalize3(sub3(E, A)), u)).toBeLessThan(1e-4);
+  });
+
+  /**
+   * #872 — the reported case. On a PYRAMID the same sentence is unsatisfiable: the bisector of ∠BAC
+   * lies in plane ABC, and a פירמידה whose apex sits in its own base plane is not a pyramid. The
+   * honest answer is a refusal that names the student's statement (ADR-276) — never a green figure
+   * (the defect), and never a silently flattened solid (what the corrected residual alone produced,
+   * until `degenerate` learned to see a FLAT collapse).
+   */
+  it('«AD חוצה זווית BAC» on a PYRAMID refuses, naming the statement', () => {
+    st().clear();
+    st().submit('פירמידה משולשת ABCD');
+    const before = derive3(st().facts, st().seed);
+    const vol = (pos: typeof before.positions) => {
+      const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => pos.get(id)!);
+      const ab = sub3(B, A), ac = sub3(C, A), ad = sub3(D, A);
+      return Math.abs(dot3(ad, { x: ab.y * ac.z - ab.z * ac.y, y: ab.z * ac.x - ab.x * ac.z, z: ab.x * ac.y - ab.y * ac.x })) / 6;
+    };
+    const v0 = vol(before.positions);
+    st().submit('AD חוצה זווית BAC');
+    expect(st().lastError?.code, 'it refuses').toBe('givens-contradict');
+    expect((st().lastError as { stated?: string }).stated, 'it names the statement the student typed').toContain('חוצה');
+    // the standing figure is untouched — the pyramid was NOT flattened to buy the given
+    expect(vol(derive3(st().facts, st().seed).positions)).toBeCloseTo(v0, 8);
   });
 
   it('the CARRIER form is untouched — the longer sentence still wins', () => {

@@ -37,7 +37,8 @@ import { resolveFreePlane } from './freePlane';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
-  triangleIncircle3} from './vec3';
+  triangleIncircle3,
+  bisectorDir3} from './vec3';
 import { quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
@@ -2376,11 +2377,8 @@ function evaluateSolidsAndPoints(
       const B = pos.get(def.b);
       const O = pos.get(def.apex);
       if (!A || !B || !O) continue;
-      const d1 = normalize3(sub3(A, O));
-      const d2 = normalize3(sub3(B, O));
-      const bis = add3(d1, d2);
-      if (norm3(bis) < 1e-9) continue; // the rays are opposite — no internal bisector direction
-      const u = normalize3(bis);
+      const u = bisectorDir3(O, A, B); // #872: the ONE definition, shared with the driving residual
+      if (!u) continue; // a zero-length arm, or opposite rays — no internal bisector direction
       const placed = [...pos.values()];
       let spread = 1.2;
       for (const q of placed) spread = Math.max(spread, dist3(q, O));

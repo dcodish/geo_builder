@@ -17,10 +17,10 @@
  */
 
 import { riderSampleT } from './onSegmentRatio';
-import { pinSymsOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin } from './types';
+import { pinSymsOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
-import { add3, cross3, dist3, dot3, runNormal, norm3, scale3, sub3, v3, type Vec3 } from './vec3';
+import { add3, bisectorDir3, cross3, dist3, dot3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 export interface GaugeParams {
   /** [tx, ty, tz, rx, ry, rz (axis-angle), logScale, ...dims] */
@@ -231,6 +231,7 @@ const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
   'cos-angle': false, // V8-f: cosines and equal dot products are similarity-invariant
   'dot-eq': false,
   'cos-eq': false,
+  'bisector-dir': false, // #872: a pure DIRECTION — similarity-invariant, pins no size
   concyclic: false, // #305
   'line-plane-angle': false, // sin β is length-normalized
   mutual: false, // S4 (#378): every residual is normalized by the operand magnitudes
@@ -243,6 +244,46 @@ const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
 export function scalePinned(c: Construction3): boolean {
   if (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0) return true;
   return c.scalarPins.some((p) => PIN_FIXES_SCALE[p.kind]);
+}
+
+/**
+ * #872 — the FLAT kinds: coplanar by definition, so the volume gate must never judge them.
+ * `polygon3/4/5` are V8-g's 2-D vector lane, modelled as "solids" to reuse the dims sampler.
+ */
+const FLAT_SOLID_KINDS: ReadonlySet<SolidKind> = new Set<SolidKind>(['polygon3', 'polygon4', 'polygon5']);
+
+/**
+ * #872 — how far the vertices stray from ONE plane, in absolute units.
+ *
+ * The plane is built from the widest vertex pair and the vertex furthest off that line — the most
+ * numerically stable triple the point set offers. Returns 0 when no such triple exists (all points
+ * collinear), which the caller reads as flat; the coincident-vertex arm above has already claimed
+ * the all-points-equal case.
+ */
+function offPlaneSpread(pts: Vec3[]): number {
+  let ai = 0, bi = 1, span = -1;
+  for (let i = 0; i < pts.length; i++)
+    for (let j = i + 1; j < pts.length; j++) {
+      const d = norm3(sub3(pts[j], pts[i]));
+      if (d > span) { span = d; ai = i; bi = j; }
+    }
+  if (span <= 1e-12) return 0;
+  const A = pts[ai];
+  const u = scale3(sub3(pts[bi], A), 1 / span);
+  // the vertex furthest from line A+u completes the plane
+  let ci = -1, far = -1;
+  for (let k = 0; k < pts.length; k++) {
+    const w = sub3(pts[k], A);
+    const off = norm3(sub3(w, scale3(u, dot3(w, u))));
+    if (off > far) { far = off; ci = k; }
+  }
+  if (ci < 0 || far <= 1e-12) return 0; // collinear — no plane, and flatter than flat
+  const n = cross3(u, sub3(pts[ci], A));
+  const nn = norm3(n);
+  if (nn <= 1e-12) return 0;
+  let worst = 0;
+  for (const p of pts) worst = Math.max(worst, Math.abs(dot3(sub3(p, A), n)) / nn);
+  return worst;
 }
 
 export function solvePivot(
@@ -664,6 +705,30 @@ export function solvePivot(
         const cc = dirOf(pin.c);
         const d = dirOf(pin.d);
         out.push(a && b && cc && d ? cosOf(a, b) - cosOf(cc, d) : 10); // G10: ∠(a,b) = ∠(c,d)
+      } else if (pin.kind === 'bisector-dir') {
+        /**
+         * #872 — apex→tip IS the internal bisector ray of ∠(a·apex·b).
+         *
+         * SIGNED COMPONENTS of the unit-direction difference (the ADR-3D-006 touch-zero lesson): a
+         * magnitude like |u−v| touches zero instead of crossing it and the descent stalls short of the
+         * solution. Three residuals for a two-parameter condition is the same deliberate redundancy the
+         * `mutual` cross-product residual carries, and it is scale-free — both sides are unit vectors.
+         *
+         * This single expression also fixes the SIGN for free: an equal-angle residual is satisfied by
+         * the EXTERNAL bisector too, a direction difference is not.
+         */
+        const O = at(pin.apex);
+        const A = at(pin.a);
+        const B = at(pin.b);
+        const T = at(pin.tip);
+        const u = O && A && B ? bisectorDir3(O, A, B) : null;
+        const ray = O && T ? sub3(T, O) : null;
+        if (!u || !ray || norm3(ray) < 1e-12) {
+          out.push(10, 10, 10);
+        } else {
+          const w = normalize3(ray);
+          out.push(w.x - u.x, w.y - u.y, w.z - u.z);
+        }
       } else if (pin.kind === 'line-plane-angle') {
         const a = at(pin.a);
         const b = at(pin.b);
@@ -880,6 +945,15 @@ export function solvePivot(
         }
       }
       if (pts.length >= 2 && minD <= 1e-4 * Math.max(maxD, 1e-12)) return true;
+      // #872 (ADR-3D-212): the FLAT collapse the pairwise test cannot see. Vertices stay well
+      // separated while the solid loses its VOLUME — a פירמידה whose apex is driven into its own
+      // base plane is not a pyramid, and the sentence that flattened it has not been satisfied, it
+      // has been evaded. The 2-D engine has had exactly this gate since ADR-413 (`collapsedPolygon`,
+      // a declared polygon driven to zero AREA); this is its R³ twin, same 1e-4-of-span threshold,
+      // and the sibling-product audit docs/17 §6 asks for is what found it.
+      // FLAT kinds are excluded by construction — `polygon3/4/5` are the 2-D vector lane and are
+      // coplanar on purpose.
+      if (!FLAT_SOLID_KINDS.has(solid.kind) && pts.length >= 4 && maxD > 1e-12 && offPlaneSpread(pts) <= 1e-4 * maxD) return true;
     }
     // #820: a candidate that slid a rider OFF its host segment is not a figure either — «K על SB»
     // is a given like any other, so a solution reaching the relation at t = 1.4 has not satisfied

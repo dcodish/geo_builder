@@ -31,6 +31,27 @@ export function normalize3(a: Vec3): Vec3 {
   return scale3(a, 1 / n);
 }
 
+/**
+ * The INTERNAL bisector direction of ∠(a·apex·b), as a unit vector — the normalised sum of the two
+ * unit arm directions. `null` when it does not exist: an arm of zero length, or two opposite rays
+ * (a straight angle has no internal bisector direction, only a bisector plane).
+ *
+ * #872 (ADR-3D-212): the ONE definition of what "bisects" means in R³. Every consumer — the
+ * constructive placement in `evaluate`, the driving residual in `solve3`, the verification in
+ * `claims` — reads it from here. The defect this replaces was two lanes deriving the meaning
+ * independently: the constructive lane used this direction, the given lane lowered the same sentence
+ * to an equality of the two arm ANGLES, which in R³ is a whole plane of directions through the apex
+ * and admits every out-of-plane one.
+ */
+export function bisectorDir3(apex: Vec3, a: Vec3, b: Vec3): Vec3 | null {
+  const ra = sub3(a, apex);
+  const rb = sub3(b, apex);
+  if (norm3(ra) < 1e-12 || norm3(rb) < 1e-12) return null;
+  const bis = add3(normalize3(ra), normalize3(rb));
+  if (norm3(bis) < 1e-9) return null; // opposite rays: no internal bisector direction
+  return normalize3(bis);
+}
+
 /** Linear interpolation a + t·(b−a) — the on-segment point. */
 export const lerp3 = (a: Vec3, b: Vec3, t: number): Vec3 => add3(a, scale3(sub3(b, a), t));
 

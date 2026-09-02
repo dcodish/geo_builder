@@ -103,6 +103,9 @@ export type Claim3 =
   | { type: 'concyclic'; ids: Id[] }
   | { type: 'dot-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // u·v = v·w (a chained-equality link)
   | { type: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // ∠(a,b) = ∠(c,d) — AE makes equal angles with AB, AD
+  // #872: apex→tip is the INTERNAL BISECTOR RAY of ∠(a·apex·b). Strictly stronger than the `cos-eq`
+  // pair it replaced: equal arm angles alone is a whole plane of directions in R³.
+  | { type: 'bisector-dir'; apex: Id; a: Id; b: Id; tip: Id }
   // triage 3-D: the angle between a LINE (a–b) and a PLANE (point-run) — `sin β = |n·u|/(|n||u|)`
   | { type: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number }
   // #324 (ADR-3D-079): the ring's relation to a coordinate plane/axis (see coordPlanePins)
@@ -150,6 +153,7 @@ export type ScalarPin =
   | { kind: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number } // cos∠ACB = 3/4 · cos(w,u) = √35/10 (G6)
   | { kind: 'dot-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // u·v = v·w (G9 chain link)
   | { kind: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // ∠(a,b) = ∠(c,d) — equal angles (G10)
+  | { kind: 'bisector-dir'; apex: Id; a: Id; b: Id; tip: Id } // #872: apex→tip IS the internal bisector of ∠(a·apex·b)
   // triage 3-D: the angle between line a–b and plane (point-run) is `deg` — similarity-invariant
   | { kind: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number }
   // #305 (ADR-3D-090): the base of a RIGHT pyramid over a general quad must be CYCLIC.

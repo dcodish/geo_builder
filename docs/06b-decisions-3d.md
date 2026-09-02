@@ -7152,3 +7152,74 @@ resolve through the **same named function** (the property, so a future edit cann
 `textDir3` gives an RTL base to the reported string and its siblings while leaving a pure-math line LTR.
 Asserted on the SOURCE, per the #559 precedent in the same file — the defect is the markup and this tree
 has no DOM harness.
+
+### ADR-3D-212 — «bisects» is a DIRECTION, and a solid that loses its volume is not a solution (#872)
+
+**Context.** Operator play-finding on PR #867, 2026-09-02: «AD חוצה זווית BAC» on `פירמידה משולשת ABCD`
+was accepted, drawn green, and AD did not bisect ∠BAC. Measured through the real `parse3 → derive3`, at
+every configuration the student can cycle: the arm angle settled at **~2.3× the half-angle** (60.9° vs
+22.9°, 76.6° vs 31.0°) with D **76–96% of the figure's span off plane ABC**, and `lastError` null
+throughout.
+
+**Root cause — one sentence, two lanes, deriving their meaning independently.** [ADR-3D-207](#adr-3d-207)
+gave `bisector-ray` a constructive lane that places the tip along `û(AB) + û(AC)` (coplanar by
+construction, and measured correct: arm == half, 0.00% off plane, in both the point-free and carrier
+forms). Its **M1 existing-id lowering** then re-derived the meaning on its own and picked
+`angle-pair-eq` → a `cos-eq` pin: *the two arm angles are equal*. In R³ that is **not** the bisector. The
+directions making equal angles with two arms form a whole **plane** through the apex (normal
+`û(AB) − û(AC)`); the bisector is the single ray in it that also lies in `span(AB, AC)`. The lowering
+dropped the coplanarity, so the solver satisfied the given out of the angle's plane — where the tip
+already was. The class is **a construct whose constructive and given lanes each define what the sentence
+means**; M1's own rule says the lowering is "derived from the command's own defining incidences", and
+this one was not.
+
+**Decision 1 — one definition, three consumers.** `bisectorDir3(apex, a, b)` (`engine/vec3.ts`) is the
+only place that says what the internal bisector direction is. The constructive placement in `evaluate`,
+the new driving residual in `solve3`, and the verification in `claims` all read it. The two lanes can no
+longer come to disagree, which is the actual defect — not the wrong constant.
+
+The pin/claim is `bisector-dir { apex, a, b, tip }`, routed by the same M1 duality as its neighbours
+(free dims + a solid ⇒ drive; else verify). Its residual is the **signed components** of
+`û(tip − apex) − û(bis)` — the [ADR-3D-006](#adr-3d-006) touch-zero lesson, since a magnitude touches zero
+instead of crossing it and the descent stalls short; three residuals for a two-parameter condition is the
+same deliberate redundancy the `mutual` cross-product residual carries, and both sides being unit vectors
+makes it scale-free (`PIN_FIXES_SCALE: false`). Driving the direction rather than an angle equality also
+fixes the **sign** for free: equal angles admits the EXTERNAL bisector, a direction difference does not.
+
+**Decision 2 — a solid driven flat is not a solution.** Correcting the residual alone produced a second
+wrong figure, and it had to be measured to be seen: the pyramid **built**, with the given satisfied, by
+flattening ABCD to **zero volume** (0.128 → 1e-9 normalised) — silently, `lastError` and `lastNotice`
+both null. `degenerate()` in `solve3` is already the total gate every acceptance site asks, and its own
+comment already says *"a collapsed solid is not a figure whatever given caused the collapse"* — but it
+measured collapse by **pairwise vertex distance**, which cannot see a flat one: the vertices stay well
+separated while the solid loses its volume. It now also rejects a solid whose vertices go **coplanar**
+(`offPlaneSpread ≤ 1e-4 · span`, the flat `polygon3/4/5` kinds excluded — they are the V8-g 2-D vector
+lane and are coplanar on purpose).
+
+**Sibling audit (docs/17 §6).** The 2-D engine has had exactly this gate since
+[ADR-413](06-decisions.md#adr-413) — `collapsedPolygon`, a declared polygon driven to zero AREA, same
+1e-4-of-span threshold, same rejection-routes-into-the-failure-ladder shape. 3-D had the coincident-vertex
+and rider-off-segment arms and not the flat one. This ADR is its R³ twin, and the cross-product audit is
+what found it: the class was **already decided**, in the sibling product, and 3-D was the member missing
+it. Within 3-D, the M1-lowering class was grepped: `bisector-ray` was the only construct whose given lane
+re-derived a *direction* as a *scalar*; the neighbours (`angle-pair-eq`, `cos-angle`, `line-plane-angle`)
+are genuinely scalar statements and are unaffected.
+
+**Consequence, and it is the honest one.** On `פירמידה משולשת ABCD` the sentence is **unsatisfiable** —
+the bisector of ∠BAC lies in plane ABC, and a pyramid whose apex sits in its own base plane is not a
+pyramid — so it now refuses with `givens-contradict` naming the student's own statement
+([ADR-276](06-decisions.md#adr-276)), and the standing figure is left untouched rather than flattened.
+Where the given IS satisfiable — a tip that can reach the angle's plane, e.g. «E על BC» then
+«AE חוצה זווית BAC» — it drives E onto the true bisector (arm == half, 0.00% off plane). PR #867's own
+play sheet asked for the opposite on the pyramid and was wrong to.
+
+**The DOF cue is unchanged and still counts this pin as 1**, though a direction pin removes 2 — the
+existing convention for every `scalarPin` (`freeDofCount3` subtracts `scalarPins.length`). Deliberately
+not changed here: per-kind DOF weights are #370's open cue-semantics question and inventing them inside a
+bug fix would decide it silently.
+
+**Locks.** `src3d/__tests__/issue-343-bisector-ray.test.ts` — the file's two wrong assertions corrected
+rather than deleted (the vertex-named frame is asserted to PARSE, not to build green; the M1 test now
+asserts `bisector-dir` and explicitly `not.toContain('cos-eq')`, and checks the tip direction really is
+the bisector direction), plus the reported case: the pyramid refuses by name AND its volume is unchanged
+to 8 places, so a future regression that flattens the solid instead of refusing cannot pass.
