@@ -1725,3 +1725,60 @@ path-sorted (asserted by serializing the same set in two orders and demanding by
 per entry; the three measured merge outcomes; and the artifact **on disk** asserted to be in the new
 shape, so it can never quietly regress to timings. They live beside #484's, in `server/`, because the
 shared-server tests run in every per-product lane and this script belongs to no product.
+
+## ADR-W-038 — one ASK LANE across the builders; the answers stay product-shaped (#741)
+
+**Status:** accepted, 2026-09-02 · **Operator report** (2026-08-18) · **Extends:** [ADR-W-016](#adr-w-016) (the shell is parameterized by its caller), [ADR-W-023](#adr-w-023) (the panel's row contract)
+
+**Context.** The operator, moving between the three tools:
+
+> *"the data panel is not the same in all tools. in geo, i need to press חשב ערכים to see it and then i
+> can enter a value for calculation. in 3d its there from the start. in complex, it looks different and
+> i dont have an option to enter a value for calculation. we need a unified approach here."*
+
+The B6/D8 skeleton (#671) had unified the panel's SECTIONS and left the ASK lane alone, so each product
+kept its own history. Measured at `0e8062a`, and the 2-D half is worse than the report says:
+
+| | where the box lives | when it exists |
+| --- | --- | --- |
+| **2-D** | inside the `valuesLayer &&` card | **only after «חשב ערכים» runs** — and `valuesLayer` is invalidated on identity (`valuesState.facts === facts`), so **every new fact hid it again** |
+| **3-D** | a direct `DataPanel` child | always |
+| **complex** | a direct `DataPanel` child (rebuilt at #789) | always |
+
+So 2-D's lane was not merely behind a button; it was behind a button that had to be pressed **again
+after every line the student typed**. That is the operator's *"i need to press חשב ערכים to see it"*,
+and it is why the box felt absent rather than merely hidden.
+
+**Decision — the LANE is shared, the ANSWERS are not.**
+
+`shell/frame/AskLane.tsx` owns everything that must look and behave the same in every builder: the box,
+the submit, the collapsed symbol palette, and the rule that **the lane is always present** — never
+behind a button, never gated on a computation having run. All three Apps render it; none keeps a
+private ask form.
+
+The **answer rows stay per-product**, passed in as children. An answer is the one genuinely
+product-shaped part — a length with a unit, a vector equation, a complex modulus — and keeping it out of
+the shell is what stops this component from acquiring the `if (product === …)` that ADR-W-016 forbids.
+
+**#217's pull-only economics survive the move, one step later.** 2-D's values compute is expensive
+(sampling), which is why it was gated at all. It is now pulled when a question is **submitted** rather
+than when the panel opens: nothing is computed because the lane is merely visible, so the bargain is
+unchanged — and «חשב ערכים» remains as the separate trigger that volunteers the automatic rows. A
+question asked before any compute has run shows as itself, marked waiting, and never disappears.
+
+**Consequences.**
+
+- 3-D's ask button loses its bespoke blue Tailwind styling and 2-D's its bespoke small-grey styling;
+  both now render the shared control. That the three looked different was the defect, not a feature.
+- The complex third of #741 needed nothing — #789 (PR #790, ADR-CX-032) had already rebuilt it on the
+  3-D shape; this ADR only moves it onto the shared component.
+- The stale comment at `src/App.tsx` claiming the panel-open pulls the compute is reconciled: opening
+  the panel does pull, but the pull is invalidated by the next fact, which is the mechanism above.
+
+**Deliberately not done.** The panel's *sections* are already shared (#671) and the answer renderers
+stay separate by design; no further consolidation of the three data panels is attempted here.
+
+**Locked** in `shell/__tests__/ask-lane-parity.test.ts` (the `row-parity` source-scan pattern): every
+App imports and renders the shared lane, none keeps a private ask input, 2-D's lane is **not** inside
+the values-gated block, asking is what pulls the compute, and «חשב ערכים» still exists as its own
+trigger. Verified visually in all three products (`npm run smoke:visual`).
