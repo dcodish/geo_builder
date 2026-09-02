@@ -19,6 +19,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
+import type { BuildNotice3 } from '../engine/notices';
 
 function reset() {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
@@ -29,8 +30,12 @@ const build = (us: string[]) => {
   reset();
   for (const u of us) st().submit(u);
 };
+/** The #850 CASES of the converged `already-known` channel (#853) — the ∥/⟂ ones. */
 const entailed = (seed = 0) =>
-  derive3(st().facts, seed).notices.filter((n) => n.kind === 'relation-entailed');
+  derive3(st().facts, seed).notices.filter(
+    (n): n is Extract<BuildNotice3, { kind: 'already-known' }> =>
+      n.kind === 'already-known' && (n.rel === 'perp' || n.rel === 'parallel'),
+  );
 
 const CUBE = "קובייה ABCDA'B'C'D'";
 const ANCHOR = ['A(0,0,0)', 'B(4,0,0)', 'D(0,4,0)'];
@@ -42,7 +47,7 @@ describe('#850 — an entailed relation says so', () => {
     build([CUBE, "AB מקביל למישור A'B'C'D'"]);
     expect(st().lastError, 'still builds — #833 must not regress').toBeNull();
     expect(entailed()).toEqual([
-      { kind: 'relation-entailed', seg: 'AB', plane: "A'B'C'D'", rel: 'parallel' },
+      { kind: 'already-known', rel: 'parallel', subject: 'AB', object: "A'B'C'D'" },
     ]);
   });
 
@@ -50,13 +55,13 @@ describe('#850 — an entailed relation says so', () => {
     // The claim keeps three points, because three fix a plane. Reporting «A'B'C'» back would name
     // internal state — the thing the honesty invariant exists to forbid.
     build([CUBE, "AB מקביל למישור A'B'C'D'"]);
-    expect(entailed()[0]).toMatchObject({ plane: "A'B'C'D'" });
+    expect(entailed()[0]).toMatchObject({ object: "A'B'C'D'" });
   });
 
   it('the ⟂ twin too — «AA\' מאונך למישור ABCD»', () => {
     build([CUBE, ...ANCHOR, "AA' מאונך למישור ABCD"]);
     expect(entailed()).toEqual([
-      { kind: 'relation-entailed', seg: "AA'", plane: 'ABCD', rel: 'perp' },
+      { kind: 'already-known', rel: 'perp', subject: "AA'", object: 'ABCD' },
     ]);
   });
 
@@ -103,7 +108,7 @@ describe('#850 — what must NOT be reported', () => {
     ]) {
       build(seq);
       expect(st().lastError, `${JSON.stringify(seq)} should build`).toBeNull();
-      for (const n of entailed()) expect(n.seg.length).toBeGreaterThan(0);
+      for (const n of entailed()) expect(n.subject.length).toBeGreaterThan(0);
     }
   });
 });

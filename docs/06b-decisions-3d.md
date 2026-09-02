@@ -7154,6 +7154,109 @@ resolve through the **same named function** (the property, so a future edit cann
 Asserted on the SOURCE, per the #559 precedent in the same file — the defect is the markup and this tree
 has no DOM harness.
 
+### ADR-3D-209 — «true, and already known» is ONE channel, with the four entailment tests kept (#853)
+
+**Context.** Four notices had grown to say one sentence to the student — *"that is true, and you already
+knew it"*:
+
+| notice | added by | fires when | method |
+| --- | --- | --- | --- |
+| `shape-redundant` | #612 (ADR-3D-158) | a shape statement already true of the figure | a flag set at apply |
+| `redundant-relation` | #396 (ADR-3D-108) | a relation between two SELF-DETERMINED objects | structural |
+| `containment-redundant` | #842 (ADR-3D-192) | a containment whose endpoints already lie in the plane | structural |
+| `relation-entailed` | #850 (ADR-3D-198) | a ∥ / ⟂ the figure already implies | numeric (operator ruling) |
+
+Four kinds, four i18n strings, four detections, four render branches — answering one question. Each was
+added because the previous one did not cover the case at hand, which is the honest reason and also the
+definition of an enumeration growing by one member per report. Worse, they disagreed about METHOD without
+meaning to, so the next person deciding how to detect a fifth case had four precedents pointing three ways.
+
+**Decision — converge the CHANNEL and the WORDING; keep every entailment TEST.**
+
+- One notice kind, `already-known`, carrying `rel` (which relation was stated), `subject`/`object` (the
+  statement in the student's own letters) and `shape` (for the shape case). One render branch.
+- One message template, `notice.alreadyKnown`, filled from two per-relation halves —
+  `notice.stated.<rel>` (the statement in the student's wording) and `notice.follows.<rel>` (why it
+  follows). The four bespoke strings are retired from both locales.
+- One predicate, `alreadyKnown(c, samples)`, holding the four cases in one place, called once from
+  `buildNotices3`.
+
+**What deliberately did NOT converge: the four entailment tests.** Each case keeps the test the operator
+ruled on for it — the apply-time flag (#612), the `isSelfDetermined` structural test with its
+carries-parameter and #500 free-plane exclusions (#396), the per-endpoint `pointEntailedInPlane`
+recursion (#842), and the numeric `claimSeeds` check with #827's branch guard (#850). The risk the issue
+named for merging special cases is real and specific here: a predicate general enough to cover all four
+could over-claim on a case none of them handled, and over-claiming means telling a student their given
+was worthless when it was not. The conservative direction is kept in all four — when entailment cannot be
+SHOWN, this says nothing.
+
+**What the fifth case now costs.** One entry in `ALREADY_KNOWN_RELS`, its own test in `alreadyKnown`, and
+two strings per language. `ALREADY_KNOWN_RELS` is the SOURCE the notice type reads its `rel` from, and the
+ratchet in `issue-853-already-known.test.ts` fails when a member has no wording in Hebrew or English — so
+a fifth case cannot reach a student as a raw i18n key, and it cannot become a fifth kind by accident.
+
+**User-visible surface, honestly.** The intent was no behaviour change and the four per-case locks hold
+unchanged in substance (same figures, same verdicts, same silences). Two things do change: the message
+TEXT is now assembled from the shared template, saying the same thing in the same register; and the notice
+ORDER moves, because all four cases are emitted at one point in `buildNotices3` rather than at four —
+which groups the "already known" notices together in the banner.
+
+**Locks.** The four issue locks retargeted onto the channel (#612 → `rel: 'shape'`, #396 →
+`'objects'`, #842 → `'contained'`, #850 → `'perp' | 'parallel'`), all still asserting their own figures;
+plus `src3d/__tests__/issue-853-already-known.test.ts` (8 tests): one figure per case arriving on the one
+channel with the right `rel` and no legacy kind anywhere; subjects carry student letters and never a `~`
+or `@` machinery id; #500's driven relation still silent; the i18n ratchet; and the retired keys asserted
+gone from both locales.
+### ADR-3D-210 — the Jacobian belongs to x, not to the iteration (#520)
+
+**Context.** `leastSquares` exits early only on `err < 1e-24`. Any solve whose error FLOORS above that —
+every anchored lane (plane drives, pin symbols), and since [ADR-3D-133](#adr-3d-133) every solve carrying
+the universal scale anchor with a determined scale — ends by walking λ from ~1e-12 up to the 1e12 bail,
+ten per rejected step, roughly 25 rungs. The loop recomputed the **full central-difference Jacobian on
+every rung**: 2n residual evaluations to reproduce numbers it had already computed, because a rejected
+step leaves `x` exactly where it was.
+
+**Decision — cache the Jacobian and the λ-free halves of the normal equations, keyed on `x` moving.**
+`J`, `JᵀJ` and `−Jᵀr` are functions of `x` alone; λ enters only through the damping added to the diagonal.
+They are computed when the cache is empty and invalidated at the ONE place `x` changes — the accepted
+step. Nothing else about the loop moves.
+
+**This is the option that keeps LM's semantics.** The issue offered two shapes: a stagnation exit (break
+after K consecutive failures) or removing the recomputation. A stagnation exit changes the trajectory of
+every solve — λ escalation exists precisely because a shorter, more gradient-like step often *is* accepted
+after a few failures — and would need its own honesty argument about the answers it changes. Caching
+changes no answer at all, which is provable rather than arguable, so it is what shipped.
+
+**Measured, before → after** (`ea49e00` vs this commit, residual evaluations per solve — exact integers,
+not timings):
+
+| problem | before | after |
+| --- | ---: | ---: |
+| floors above 1e-24, n = 2 | 116 | **48** |
+| seven unknowns, floored (the anchored shape) | 316 | **92** |
+| damping exhaustion with no descent direction | 113 | **23** |
+| over-determined, inconsistent | 106 | **42** |
+| Rosenbrock (accepted steps dominate) | 146 | **118** |
+| reaches zero (early exit, no failed steps) | 21 | 21 |
+
+Every returned `err` and `x` in that battery agreed **to the last of 18 printed digits** before and after.
+Figure-level wall clock on three anchored figures moved 1.5 → 1.2, 1.8 → 1.5 and 2.2 → 1.5 ms median over
+8 seeds — reported as indicative only: the #518 calibration on this very issue showed that ambient load
+dominates differences of this size, and the residual counts above are the honest measurement.
+
+**One semantic change, stated.** The `!delta` path (the damped system came back singular) used to grow λ
+with no ceiling and run out the iteration budget. It now bails at the same `λ > 1e12` the rejected-step
+path uses. `x` cannot have moved on that path, so the returned value is identical; what changes is that a
+hopeless solve stops instead of spinning — the docs/17 §7 rule that the failure path must not be more
+expensive than the success path. (With the absolute damping floor the diagonal is ≥ λ, so a system
+singular at *every* rung is not reachable in practice; the ceiling bounds it anyway.)
+
+**Locks.** `src3d/__tests__/issue-520-lm-tail-burn.test.ts` (14): the six-problem battery asserted against
+the pre-fix values at 1e-13 relative (tight enough that a changed trajectory cannot hide, loose enough
+that a last-ulp platform difference cannot flake) AND against the exact call counts, since the count is
+the mechanism; plus the damping ladder terminating on a hopeless solve, and Rosenbrock still converging
+through many accepted steps so the cache cannot be cutting a descent short.
+
 ### ADR-3D-211 — a rename is a rewrite of HISTORY, reached from two entry points and one core (#578)
 
 **Context.** 3-D had no rename of any kind. Operator, prod 2026-08-14: a pyramid-height foot came out `E`

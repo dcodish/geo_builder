@@ -58,45 +58,57 @@ export function leastSquares(residuals: (x: number[]) => number[], x0: number[],
   let err = r.reduce((s, v) => s + v * v, 0);
   let lambda = 1e-3;
   const n = x.length;
+  // #520 (ADR-3D-210): the Jacobian and the normal equations are a function of x ALONE — λ enters only
+  // through the damping added to the diagonal below. A REJECTED step leaves x untouched, so recomputing
+  // them costs 2n residual evaluations to reproduce the same numbers. Any solve whose error floors above
+  // the 1e-24 early exit — every anchored lane — ends by walking λ from ~1e-12 to the 1e12 bail, ten per
+  // failure, and paid a full central-difference Jacobian for each rung. Cached here and invalidated only
+  // where x actually moves, so the trajectory is identical and the tail costs one residual call a rung.
+  let jac: { J: number[][]; JtJ: number[][]; Jtr: number[] } | null = null;
 
   for (let iter = 0; iter < iterations; iter++) {
-    // numeric Jacobian (central differences)
-    const m = r.length;
-    const J: number[][] = [];
-    for (let j = 0; j < n; j++) {
-      const h = 1e-6 * Math.max(1, Math.abs(x[j]));
-      const xp = [...x];
-      const xm = [...x];
-      xp[j] += h;
-      xm[j] -= h;
-      const rp = residuals(xp);
-      const rm = residuals(xm);
-      J.push(rp.map((v, i) => (v - rm[i]) / (2 * h)));
-    }
-    // normal equations (JᵀJ + λ·diag) δ = −Jᵀr
-    const A: number[][] = [];
-    const b: number[] = [];
-    for (let i = 0; i < n; i++) {
-      A.push([]);
-      let bi = 0;
+    if (!jac) {
+      // numeric Jacobian (central differences)
+      const m = r.length;
+      const J: number[][] = [];
       for (let j = 0; j < n; j++) {
-        let s = 0;
-        for (let k = 0; k < m; k++) s += J[i][k] * J[j][k];
-        A[i].push(s);
+        const h = 1e-6 * Math.max(1, Math.abs(x[j]));
+        const xp = [...x];
+        const xm = [...x];
+        xp[j] += h;
+        xm[j] -= h;
+        const rp = residuals(xp);
+        const rm = residuals(xm);
+        J.push(rp.map((v, i) => (v - rm[i]) / (2 * h)));
       }
-      for (let k = 0; k < m; k++) bi -= J[i][k] * r[k];
-      b.push(bi);
+      // normal equations (JᵀJ + λ·diag) δ = −Jᵀr — the λ-free halves
+      const JtJ: number[][] = [];
+      const Jtr: number[] = [];
+      for (let i = 0; i < n; i++) {
+        JtJ.push([]);
+        let bi = 0;
+        for (let j = 0; j < n; j++) {
+          let s = 0;
+          for (let k = 0; k < m; k++) s += J[i][k] * J[j][k];
+          JtJ[i].push(s);
+        }
+        for (let k = 0; k < m; k++) bi -= J[i][k] * r[k];
+        Jtr.push(bi);
+      }
+      jac = { J, JtJ, Jtr };
     }
-    // damping floor is ABSOLUTE: a noise-tiny diagonal (an invariant direction's
+    // damping floor is ABSOLUTE: a noise-tiny diagonal (an invariant direction’s
     // cancellation residue, ~1e-20) must not be its own damping scale — λ·1e-20
     // admits ~1e10 steps along pure noise, blowing coordinates into catastrophic-
     // cancellation territory (the "numeric-Jacobian floor" class). Unknowns here
     // are O(1) (world units, radians, logScale), so a unit floor is sound.
+    const A = jac.JtJ.map((row) => [...row]);
     for (let i = 0; i < n; i++) A[i][i] += lambda * Math.max(A[i][i], 1);
-    const delta = solveLinear(A, b);
+    const delta = solveLinear(A, [...jac.Jtr]);
     if (!delta) {
       lambda *= 10;
-      continue;
+      if (lambda > 1e12) break; // singular at every damping — the same exhaustion, without the burn
+      continue; // x is unchanged, so the cached Jacobian is still the Jacobian AT x
     }
     const xNew = x.map((v, i) => v + delta[i]);
     const rNew = residuals(xNew);
@@ -105,6 +117,7 @@ export function leastSquares(residuals: (x: number[]) => number[], x0: number[],
       x = xNew;
       r = rNew;
       err = errNew;
+      jac = null; // x moved — the Jacobian must be recomputed there
       lambda = Math.max(lambda / 3, 1e-12);
       if (err < 1e-24) break;
     } else {
