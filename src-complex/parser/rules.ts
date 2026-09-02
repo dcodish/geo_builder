@@ -23,6 +23,7 @@ import {
 } from '../model/sequence';
 import { type FigureObject, isOrigin, objectDeclares } from '../model/figure';
 import { type RootsEquation, asRootsEquation } from '../model/solutionSet';
+import type { Selection } from '../model/constraint';
 import {
   MEASURE_ARITY,
   type MeasureKind,
@@ -90,7 +91,7 @@ import {
   OF_A,
   ORDINAL_ANY,
   ORDINALS,
-  QUADRANT_KW,
+  QUADRANT_KW, SOLUTION_KW,
   REAL_KW,
   SEQUENCE_KW,
   TERM_KW,
@@ -137,6 +138,12 @@ export interface ParsedLine {
    * the enumeration went missing on this path in the first place.
    */
   readonly roots: RootsEquation[];
+  /**
+   * #694 — «z₀ הוא הפתרון ברביע הרביעי»: bind a NEW name to the member of an enumerated solution
+   * set that satisfies a filter. Reported as a shape; the fold resolves it, because WHICH member
+   * satisfies the filter is only knowable once the directions are solved.
+   */
+  readonly selections: Selection[];
   /** names the line brings into existence, whether or not a constraint mentions them */
   readonly declares: string[];
   readonly claims: Claim[];
@@ -167,6 +174,7 @@ const empty = (): ParsedLine => ({
   exprQueries: [],
   sequences: [],
   roots: [],
+  selections: [],
   declares: [],
   claims: [],
   atoms: new Map(),
@@ -197,6 +205,39 @@ const declaration: Rule = (s) => {
   const names = (spelled[1].match(rx(NAME, 'giu')) ?? []).map((n) => canonName(n));
   if (!names.length) return null;
   return { ...empty(), declares: names, claims: [claimAll(s)] };
+};
+
+/**
+ * F5b (#694) — «z₀ הוא הפתרון ברביע הרביעי» / «z0 is the solution in the fourth quadrant».
+ *
+ * The exam's own sentence, and the one with no grammar at all before this: it measured as
+ * `line-unaccounted: «הפתרון»`. It is a SELECTION, not a filter on the named number — see
+ * {@link Selection}. Distinguished from F5 by the solution NOUN, which is what makes «z₀ הוא
+ * הפתרון ברביע הרביעי» mean "of those solutions, the one in that quadrant" rather than "z₀ happens
+ * to lie there".
+ *
+ * The filter is built by the SAME ordinal vocabulary F5 uses, so the two can never disagree about
+ * what «הרביעי» means; the shared part is deliberately the predicate, not the sentence.
+ */
+const solutionSelection: Rule = (s) => {
+  // The solution noun, definite: «הפתרון» / «the solution». Indefinite «פתרון» is not this
+  // sentence — it does not point at a set that already exists.
+  if (!rx(SOLUTION_KW).test(s)) return null;
+  const nameFirst = s.match(rx(`^(${NAME})\\s+(.*)$`));
+  const nameLast = s.match(rx(`^(.*?)\\s+(${NAME})$`));
+  const placement = nameFirst ? { raw: nameFirst[1], rest: nameFirst[2] } : nameLast ? { raw: nameLast[2], rest: nameLast[1] } : null;
+  if (!placement) return null;
+  const { rest } = placement;
+  if (!rx(QUADRANT_KW).test(rest)) return null;
+  const found = ORDINALS.find(([re]) => re.test(rest));
+  if (!found) return null;
+  const name = canonName(placement.raw);
+  return {
+    ...empty(),
+    declares: [name],
+    selections: [{ name, filter: { kind: 'quadrant', name, q: found[1], src: s }, src: s }],
+    claims: [claimAll(s)],
+  };
 };
 
 /** F5 — «z1 ברביע הראשון» / «z1 in the first quadrant». A filter, never a driver. */
@@ -985,6 +1026,9 @@ const bareExpression: Rule = (s) => {
 /** First match wins. Order is specific-to-general: a relation sentence before the bare equation. */
 export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = [
   { name: 'declaration', rule: declaration },
+  // #694: BEFORE `quadrant` — «z0 הוא הפתרון ברביע הרביעי» also matches that rule's NAME+quadrant
+  // shape, and would lower to a filter ON z0 instead of a selection FROM the set.
+  { name: 'solution-selection', rule: solutionSelection },
   { name: 'quadrant', rule: quadrantGiven },
   // an INEQUALITY before the equation rule: «arg z2 < 45» has no '=' but the chained form does not
   // either, and a comparator is a filter, never a relation to solve

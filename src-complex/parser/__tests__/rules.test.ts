@@ -192,6 +192,9 @@ describe('span accounting is ENFORCING, not advisory', () => {
   it('the rule list is ordered and named, so precedence is reviewable', () => {
     expect(RULES.map((r) => r.name)).toEqual([
       'declaration',
+      // #694: BEFORE `quadrant` — «z0 הוא הפתרון ברביע הרביעי» also matches that rule's NAME + quadrant
+      // shape, and taken by it would lower to a filter ON z0 instead of a selection FROM the set.
+      'solution-selection',
       'quadrant',
       'argument-inequality',
       'generic-polar',

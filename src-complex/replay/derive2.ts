@@ -59,7 +59,7 @@ import { verifyClaims } from '../solve/claims';
 import { claimDriveRows } from '../solve/claimDrive';
 import { filterBranches } from '../solve/filter';
 import { type AffineArg, projectWindow, statedWindow, violatesDeg } from '../solve/window';
-import type { BranchFilter, Constraint } from '../model/constraint';
+import type { BranchFilter, Constraint, Selection as SolutionSelection } from '../model/constraint';
 import type { Why } from '../model/why';
 
 /** A statement the fold could not use, with the reason — surfaced, never swallowed. */
@@ -298,6 +298,19 @@ export interface FoldInput {
    * the number's display name becomes «A (z₁)» at the stage-5d chokepoint.
    */
   readonly aliases?: ReadonlyMap<string, string>;
+  /** #694 — «z0 is the solution in the fourth quadrant»: bind a new name to a member of the set. */
+  readonly selections?: readonly ResolvedSelection[];
+}
+
+/**
+ * A {@link Selection} with the SET it picks from, supplied by the lowering (the parser is stateless
+ * per line and cannot know what earlier lines enumerated).
+ *
+ * `candidates` empty means there was no enumeration in scope — the sentence points at nothing, and
+ * that refuses like any other unsatisfiable given rather than inventing a set to satisfy it.
+ */
+export interface ResolvedSelection extends SolutionSelection {
+  readonly candidates: readonly string[];
 }
 
 /**
@@ -324,6 +337,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     exprQueries = [],
     sequences = [],
     aliases = new Map<string, string>(),
+    selections = [],
   } = input;
   /**
    * #688 — DRIVE OR CHECK. Tier 1 is solved once to learn what the OTHER lines determined; a claim whose
@@ -646,11 +660,43 @@ export function foldConstraints(input: FoldInput): Derived2 {
   // the solved parameter values must reach everything downstream, objects included
   for (const [k, v] of state.par) sample.set(k, v);
 
+  /**
+   * #694 ([ADR-CX-037](../../docs/06d-decisions-complex.md#adr-cx-037)) — RESOLVE the selections.
+   *
+   * «z0 הוא הפתרון ברביע הרביעי» binds a NEW name to the member of an enumerated set that satisfies a
+   * filter. It is resolved HERE, beside the filter re-verification, because that is the first point at
+   * which each candidate has a DRAWN direction — the question "which of these is in that quadrant?"
+   * has no answer before the solve.
+   *
+   * The three outcomes, and two of them are refusals the operator named at the ask:
+   *  - exactly ONE member satisfies → bind, as an alias (the #791 display tie: the row reads «z₀ (z₆)»);
+   *  - NONE → refuse, NAMING the student’s statement. Never bind nothing, and never bind the nearest;
+   *  - TWO OR MORE → refuse, naming it. Never pick one — picking would assert a given the student did
+   *    not state (ADR-052). In the exams a ≥2 result is usually the question telling the student to
+   *    answer «שתי האפשרויות», so this reads as information rather than as a malfunction.
+   *
+   * A selection whose set is EMPTY (no enumeration in scope) refuses through the same door: the
+   * sentence points at nothing, and inventing a set to satisfy it is the silent-invention class.
+   */
+  const selectionAliases = new Map<string, string>();
+  const unresolvedSelections: string[] = [];
+  for (const sel of selections) {
+    const matched = sel.candidates.filter((c) => {
+      const a = argumentOf(c, state);
+      if (!Number.isFinite(a.deg)) return false;
+      return !violatesDeg(sel.filter, ((a.deg % 360) + 360) % 360);
+    });
+    if (matched.length === 1) selectionAliases.set(matched[0], sel.name);
+    else unresolvedSelections.push(sel.src);
+  }
+
   const points: DerivedPoint[] = [];
   if (!t1.inconsistent) {
     // the union: names the constraints mention PLUS bare declarations, so a number the student merely
     // named is still on the canvas (always-visualise) rather than waiting for a constraint to earn it
-    const boundLabels = new Set(aliases.values());
+    // #694: a resolved selection is an alias like any other — «z₀ (z₆)» through the #791 display tie.
+    const allAliases = new Map<string, string>([...aliases, ...selectionAliases]);
+    const boundLabels = new Set(allAliases.values());
     for (const name of drawnNames) {
       // #791: a bound label is the SAME point as its number — one dot, one dual-named reading
       if (boundLabels.has(name)) continue;
@@ -663,7 +709,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
       // a DIRECTION, folded into one turn — see the note on `argumentDeg` below
       const argumentDeg = ((a.deg % 360) + 360) % 360;
       const exactLabel = m.exact && a.exact ? exactLabelOf(m.exact, a.exact) : null;
-      const alias = aliases.get(name);
+      const alias = allAliases.get(name);
       const display = alias ? `${alias} (${prettyName(name)})` : prettyName(name);
       points.push({
         name,
@@ -787,7 +833,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * with no reference to any other statement, so naming it before the relational verdicts tells the
    * student the true reason rather than pointing at a conflict that is not the problem.
    */
-  const unsatisfied = [...t1.impossible, ...unsatisfiedRelations, ...violatedMeasures, ...violatedFilters];
+  const unsatisfied = [...t1.impossible, ...unsatisfiedRelations, ...violatedMeasures, ...violatedFilters, ...unresolvedSelections];
 
   /**
    * STAGE 5d — the only place a number the engine computed reaches a string.

@@ -59,3 +59,31 @@ export type BranchFilter =
   | { readonly kind: 'range'; readonly name: string; readonly minDeg?: Rat; readonly maxDeg?: Rat; readonly src: string }
   /** the direction is exactly this many degrees */
   | { readonly kind: 'exact'; readonly name: string; readonly deg: Rat; readonly src: string };
+
+/**
+ * A SELECTION — «z₀ הוא הפתרון ברביע הרביעי» (#694,
+ * [ADR-CX-037](../../docs/06d-decisions-complex.md#adr-cx-037)).
+ *
+ * Four of the eight sampled exams enumerate roots and then pick one by a condition (docs/27 §2,
+ * archetype 2), and this is the sentence they write. It is neither a branch prune nor a constraint on a
+ * member: an enumeration is ONE configuration containing n points ([ADR-CX-021](../../docs/06d-decisions-complex.md#adr-cx-021)),
+ * so there are no n branches left for a filter to thin, and «z₁ ברביע הראשון» constrains the *wrong*
+ * thing — z₁ is a determined point and the exam is not claiming anything about it.
+ *
+ * What the exam does is **bind a NEW name to the member of the set that satisfies the condition**. The
+ * bare letter stays reserved for the set (ADR-CX-024, untouched by the operator's 2026-08-26 ruling:
+ * the exams always introduce a new name, so the named form covers the corpus and the bare form buys a
+ * sentence nobody writes).
+ *
+ * `filter` is scoped over a FILTER PREDICATE rather than over the quadrant noun — the same sentence
+ * will want «הפתרון הממשי» and «הפתרון שבו …», and enumerating filter nouns is the habit this tree
+ * keeps paying for (`src-complex/CLAUDE.md`).
+ */
+export interface Selection {
+  /** the new name the student is binding */
+  readonly name: string;
+  /** which member of the set: any filter, judged against each candidate's own direction */
+  readonly filter: BranchFilter;
+  /** the student's sentence, quoted verbatim by every refusal */
+  readonly src: string;
+}
