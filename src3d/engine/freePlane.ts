@@ -71,6 +71,50 @@ const orient = (n: Vec3): Vec3 => {
 };
 
 /**
+ * #528 (ADR-3D-206) — the unit normals satisfying a set of AFFINE constraints `n̂·û = cos`.
+ *
+ * Every orientation fact this resolver honours has that one shape: a ⟂ relation and a member chord are
+ * it with `cos = 0`, #534's stated line↔plane angle is it with `cos = cos(90° − β)`, and #528's second
+ * distance is it with `cos = (σᵢvᵢ − σ₀v₀)/|pᵢ − p₀|`. Solving them together is what turns the pin LIST
+ * into a fit, and the answer carries its own DOF count so the cue can never disagree with the sampler
+ * (the ADR-3D-124 rule).
+ *
+ *  - **two or more independent constraints** → the intersection of a line with the unit sphere: 0, 1 or
+ *    2 discrete normals. `sampled = 0` — the orientation is determined, up to a branch.
+ *  - **exactly one** → a CONE about `û` at that cosine; its SPIN is a genuine free DOF, sampled.
+ *  - **none** → no answer here; the caller keeps its own fully-sampled path.
+ */
+function unitNormalsFor(cons: { u: Vec3; cos: number }[], seed: number, key: string): { ns: Vec3[]; sampled: number } {
+  const indep: { u: Vec3; cos: number }[] = [];
+  for (const cn of cons) {
+    if (indep.every((w) => norm3(cross3(w.u, cn.u)) > 1e-6)) indep.push(cn);
+    if (indep.length === 2) break;
+  }
+  if (indep.length === 0) return { ns: [], sampled: 2 };
+  if (indep.length === 1) {
+    const [e1, e2] = orthoBasis(indep[0].u);
+    const th = sample(seed, `freeplane-spin-${key}`, 0, Math.PI * 2);
+    const s = Math.sqrt(Math.max(0, 1 - indep[0].cos * indep[0].cos));
+    const n = add3(scale3(indep[0].u, indep[0].cos), scale3(add3(scale3(e1, Math.cos(th)), scale3(e2, Math.sin(th))), s));
+    return { ns: [n], sampled: 1 };
+  }
+  // n = a·u₁ + b·u₂ + t·(u₁×u₂), with (a, b) from the 2×2 Gram system and t from |n| = 1.
+  const [c1, c2] = indep;
+  const g11 = dot3(c1.u, c1.u), g12 = dot3(c1.u, c2.u), g22 = dot3(c2.u, c2.u);
+  const det = g11 * g22 - g12 * g12;
+  if (Math.abs(det) < 1e-12) return { ns: [], sampled: 2 };
+  const a = (c1.cos * g22 - c2.cos * g12) / det;
+  const b = (c2.cos * g11 - c1.cos * g12) / det;
+  const p = add3(scale3(c1.u, a), scale3(c2.u, b)); // the point of the line closest to the origin
+  const w = cross3(c1.u, c2.u);
+  const wl = norm3(w);
+  const rem = 1 - dot3(p, p);
+  if (wl < 1e-12 || rem < -1e-9) return { ns: [], sampled: 0 }; // the line misses the unit sphere
+  const t = Math.sqrt(Math.max(0, rem)) / wl;
+  return { ns: t < 1e-9 ? [p] : [add3(p, scale3(w, t)), add3(p, scale3(w, -t))], sampled: 0 };
+}
+
+/**
  * Resolve one free plane for this seed. `resolvedNormals` carries the normals of planes already
  * resolved this pass (equation planes and EARLIER free planes, insertion order), so a relation between
  * two free planes reads the earlier one rather than a placeholder.
@@ -163,7 +207,25 @@ export function resolveFreePlane(
   // when #487 landed (docs/17: an enumeration is not a rule). The remaining members of the class are
   // handled by the store's honesty guard rather than silently: a claim about a plane whose relevant DOF
   // is still SAMPLED can never be refuted, because there is nothing yet to refute it against.
-  let offsetPin: { p: Vec3; value: number } | null = null;
+  /**
+   * #528 (ADR-3D-206) — EVERY stated distance, not just the first.
+   *
+   * #508 took the first distance and left the rest to be "verified downstream", which for a plane whose
+   * normal is still SAMPLED means refused `plane-not-determined`: «המרחק בין A למישור π2 הוא 5» builds
+   * and the very next «המרחק בין B למישור π2 הוא 5» is turned away, though it is real information —
+   * two equal distances say the plane is parallel to AB or separates A and B symmetrically.
+   *
+   * With a unit normal, `n·pᵢ + d = σᵢ·vᵢ` for a side branch σᵢ ∈ {−1, +1}. Subtracting the first from
+   * the rest ELIMINATES d and leaves one affine constraint on the normal per extra point:
+   *
+   *     n̂·(pᵢ − p₀)/|pᵢ − p₀| = (σᵢvᵢ − σ₀v₀)/|pᵢ − p₀|
+   *
+   * — the same shape as every other normal constraint this resolver already honours (a ⟂ relation and a
+   * member chord are this with the right-hand side 0; #534's stated line↔plane angle is this with the
+   * right-hand side cos(90° − β)). So the pin LIST becomes a FIT, and the offset then follows from the
+   * first distance exactly as before.
+   */
+  const offsetPins: { p: Vec3; value: number }[] = [];
   for (const cl of c.claims) {
     if (cl.type !== 'distance-rel') continue;
     const other =
@@ -172,9 +234,52 @@ export function resolveFreePlane(
     const p = pos.get(other.id);
     // a RIDER of this plane is at distance 0 by construction — it defines nothing about the offset
     if (!p || c.points.get(other.id)?.kind === 'on-plane') continue;
-    offsetPin = { p, value: cl.value };
-    break; // the first pins it; a second distance is verified downstream, exactly like an extra member
+    offsetPins.push({ p, value: cl.value });
   }
+
+  /**
+   * #528 (ADR-3D-206) — the NORMAL as a small fit, once two or more distances are stated.
+   *
+   * The side pattern σ is a discrete branch set, exactly like #508's single ±: the 2^k patterns are
+   * enumerated, the infeasible ones dropped (a demanded cosine outside [−1, 1] is a plane that does not
+   * exist), and the seed picks among what survives — ADR-052, a branch the student did not state is
+   * sampled and reachable by «show another configuration», never silently chosen. The pattern also
+   * fixes the OFFSET, so `n` and `d` come out of the SAME branch and cannot contradict each other.
+   *
+   * `null` when fewer than two distances name the plane, or when a MEMBER already pins the offset (a
+   * member's chords constrain the normal through the existing path, and its `d` would otherwise be read
+   * from a different branch than the normal). Every pre-existing figure therefore takes the untouched
+   * path below — which is what keeps this widening free of blast radius.
+   */
+  const fit = ((): { n: Vec3; d: number; sampled: number } | null => {
+    if (offsetPins.length < 2 || offsetPins.length > 6 || members.length > 0 || parallelTo) return null;
+    const base: { u: Vec3; cos: number }[] = dirConstraints.map((u) => ({ u, cos: 0 }));
+    if (coneAxis) base.push({ u: coneAxis, cos: Math.cos(coneHalfAngle) });
+    const k = offsetPins.length;
+    const out: { n: Vec3; d: number; sampled: number }[] = [];
+    for (let mask = 0; mask < 1 << k; mask++) {
+      const sgn = (i: number) => ((mask >> i) & 1 ? -1 : 1);
+      const cons = [...base];
+      let feasible = true;
+      for (let i = 1; i < k && feasible; i++) {
+        const raw = sub3(offsetPins[i].p, offsetPins[0].p);
+        const len = norm3(raw);
+        if (len < 1e-9) {
+          // two distances to the SAME point: consistent only when they agree, and no orientation news
+          feasible = Math.abs(sgn(i) * offsetPins[i].value - sgn(0) * offsetPins[0].value) < 1e-9;
+          continue;
+        }
+        const cos = (sgn(i) * offsetPins[i].value - sgn(0) * offsetPins[0].value) / len;
+        if (Math.abs(cos) > 1 + 1e-9) feasible = false; // no unit normal makes this angle
+        else cons.push({ u: scale3(raw, 1 / len), cos: Math.max(-1, Math.min(1, cos)) });
+      }
+      if (!feasible) continue;
+      const { ns, sampled } = unitNormalsFor(cons, seed, `${name}-${mask}`);
+      for (const n0 of ns) out.push({ n: n0, d: -dot3(n0, offsetPins[0].p) + sgn(0) * offsetPins[0].value, sampled });
+    }
+    if (out.length === 0) return null; // nothing satisfies the set — leave it to the claim lane to refuse
+    return out[Math.min(out.length - 1, Math.floor(sample(seed, `freeplane-fit-${name}`, 0, out.length)))];
+  })();
 
   // ---- the normal -----------------------------------------------------------------------
   let n: Vec3;
@@ -182,6 +287,10 @@ export function resolveFreePlane(
   if (parallelTo) {
     n = parallelTo;
     nSampled = 0;
+  } else if (fit) {
+    // #528: the orientation the stated distances (with everything else the figure says) determine.
+    n = fit.n;
+    nSampled = fit.sampled;
   } else if (coneAxis) {
     // #534: the normal rides a cone about the line — the half-angle is knowledge, the SPIN is not, so
     // the spin is sampled and "show another configuration" walks the whole family of planes that
@@ -225,11 +334,14 @@ export function resolveFreePlane(
   if (members.length > 0) {
     d = -dot3(n, members[0]);
     dSampled = 0;
-  } else if (offsetPin) {
+  } else if (fit) {
+    d = fit.d; // the SAME branch that chose the normal — n and d can never disagree about the side
+    dSampled = 0;
+  } else if (offsetPins.length > 0) {
     // WHICH SIDE of the point the plane sits on is a genuine free choice the student did not state, so
     // it is a sampled BRANCH (ADR-052) — "show another configuration" flips it — not a silent default.
     const side = sample(seed, `freeplane-side-${name}`, -1, 1) < 0 ? -1 : 1;
-    d = -dot3(n, offsetPin.p) + side * offsetPin.value;
+    d = -dot3(n, offsetPins[0].p) + side * offsetPins[0].value;
     dSampled = 0;
   } else {
     // seat the sampled plane near the figure: through a point offset from the centroid, scaled to

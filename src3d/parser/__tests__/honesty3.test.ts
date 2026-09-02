@@ -194,7 +194,9 @@ describe('the gates hold at the LLM commit seam (store3.submitSteps) — wiring 
 describe('false-positive net — no catalog utterance trips either gate (both locales)', () => {
   // The LLM emits catalog-shaped canonical lines, so the catalog IS the surface the gates must never
   // block. Existing points/vectors are empty here (everything is new) — the strictest setting.
-  for (const entry of COMMAND_CATALOG_3D) {
+  // #578: the gates guard what the LLM can EMIT, which is the construction lane — a 'rewrite' entry
+  // never reaches them (it is read before the grammar and lowers to no command at all).
+  for (const entry of COMMAND_CATALOG_3D.filter((e) => e.lane !== 'rewrite')) {
     for (const [lang, text] of [
       ['he', entry.he],
       ['en', entry.en],

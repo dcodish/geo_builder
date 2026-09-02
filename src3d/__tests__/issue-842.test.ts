@@ -115,9 +115,10 @@ describe('#842 step 4 — a redundant containment says so', () => {
   it("the operator's figure: «BE מוכל במישור ABCD» is true, changes nothing, and is reported redundant", () => {
     const d = build(OPERATOR);
     expect(buildNotices3(d.construction)).toContainEqual({
-      kind: 'containment-redundant',
-      seg: 'BE',
-      plane: 'ABCD',
+      kind: 'already-known',
+      rel: 'contained',
+      subject: 'BE',
+      object: 'ABCD',
     });
   });
 
@@ -127,7 +128,7 @@ describe('#842 step 4 — a redundant containment says so', () => {
     // pointless. The `implied` flag is what separates them.
     const d = build(["קובייה ABCDA'B'C'D'", 'מישור ABCD', 'קטע BE', 'BE מוכל במישור ABCD']);
     expect(d.construction.points.get('E')).toMatchObject({ kind: 'on-plane', plane: 'ABCD', implied: true });
-    expect(buildNotices3(d.construction).some((n) => n.kind === 'containment-redundant')).toBe(false);
+    expect(buildNotices3(d.construction).some((n) => n.kind === 'already-known' && n.rel === 'contained')).toBe(false);
   });
 
   it('the notice survives reload and undo — it is derived, never a one-shot event', () => {
@@ -136,7 +137,7 @@ describe('#842 step 4 — a redundant containment says so', () => {
     const first = buildNotices3(derive3(st().facts, st().seed).construction);
     const again = buildNotices3(derive3([...st().facts], st().seed).construction);
     expect(again).toEqual(first);
-    expect(first.some((n) => n.kind === 'containment-redundant')).toBe(true);
+    expect(first.some((n) => n.kind === 'already-known' && n.rel === 'contained')).toBe(true);
   });
 
   it('is seed-invariant — a structural entailment cannot depend on where the figure was sampled', () => {
@@ -146,7 +147,7 @@ describe('#842 step 4 — a redundant containment says so', () => {
       reset();
       OPERATOR.forEach(submit);
       const d = derive3(st().facts, seed);
-      expect(buildNotices3(d.construction).some((n) => n.kind === 'containment-redundant'), `seed ${seed}`).toBe(true);
+      expect(buildNotices3(d.construction).some((n) => n.kind === 'already-known' && n.rel === 'contained'), `seed ${seed}`).toBe(true);
     }
   });
 
@@ -154,9 +155,10 @@ describe('#842 step 4 — a redundant containment says so', () => {
     // E is the midpoint of AC, F the midpoint of AE: both are entailed in ABCD by recursion.
     const d = build(["קובייה ABCDA'B'C'D'", 'מישור ABCD', 'E אמצע AC', 'F אמצע AE', 'BF מוכל במישור ABCD']);
     expect(buildNotices3(d.construction)).toContainEqual({
-      kind: 'containment-redundant',
-      seg: 'BF',
-      plane: 'ABCD',
+      kind: 'already-known',
+      rel: 'contained',
+      subject: 'BF',
+      object: 'ABCD',
     });
   });
 

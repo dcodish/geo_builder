@@ -4253,3 +4253,27 @@ export function parse3(utterance: string): ParseResult3 {
   }
   return NOT_HANDLED;
 }
+
+/**
+ * «שנה שם E ל-O» / "rename E to O" — a RENAME request (#578, ADR-3D-211).
+ *
+ * Not a construction command: it rewrites the fact list's history rather than adding to it, so it
+ * returns its own shape and never reaches `parse3`'s command lane. The grammar mirrors 2-D's
+ * `parseRename` verbatim (the two products should answer to the same sentence) with this product's
+ * label token — the PRIME — added: on a cube «שנה שם A' ל-M» must name the top vertex, not the base one.
+ *
+ * Normalised through {@link normalize3} first, exactly like every parse path: this runs BEFORE `parse3`
+ * on the raw text, so a pasted maqaf («שנה שם E ל־O») or an invisible bidi control would otherwise break
+ * the connector group — the #531 lesson, which cost two prod refusals the day it was found.
+ */
+export function parseRename3(raw: string): { from: string; to: string } | null {
+  const s = normalize3(raw);
+  const L = String.raw`([A-Za-z]\d*'?)`;
+  const m =
+    s.match(new RegExp(String.raw`(?:rename|relabel|replace)\s+${L}(?:\s+(?:to|as|into|with|by|->|→|=))?\s+${L}(?![A-Za-z0-9'])`, 'i')) ??
+    s.match(new RegExp(String.raw`(?:שנה|החלף)\s*(?:שם\s*)?(?:את\s*)?${L}\s*(?:ל-?|ב-?|עם|→|=)?\s*${L}(?![A-Za-z0-9'])`, 'i'));
+  if (!m) return null;
+  const from = m[1].toUpperCase();
+  const to = m[2].toUpperCase();
+  return from === to ? null : { from, to };
+}

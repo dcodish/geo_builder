@@ -80,6 +80,11 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.badFile');
     case 'newer-schema':
       return t('err.newerSchema');
+    // #578 (ADR-3D-211): a rename we UNDERSTOOD and declined. Each reason names the letters the
+    // student typed, never internal state — a 'target-taken' is the honest answer that renaming onto a
+    // live letter would merge two of their vertices, which is a different operation nobody asked for.
+    case 'rename-refused':
+      return t(`err.rename.${err.reason}`, { from: err.from, to: err.to });
     case 'already-defined':
       return t('err.alreadyDefined', { id: err.id });
     // #612 (ADR-3D-158): name BOTH shapes — the honesty invariant is that a refusal names the
@@ -228,6 +233,7 @@ export default function App3() {
   const toggle = useGeo3((s) => s.toggle);
   const remove = useGeo3((s) => s.remove);
   const replaceFact = useGeo3((s) => s.replaceFact);
+  const rename = useGeo3((s) => s.rename);
   const clear = useGeo3((s) => s.clear);
   const resample = useGeo3((s) => s.resample);
   const loadFigure = useGeo3((s) => s.loadFigure);
@@ -449,6 +455,15 @@ export default function App3() {
    * student can read, undo, re-order and save, and replaying the file re-derives the same point. That
    * is why #485's noun frame had to land first — this utterance has to parse in both languages.
    */
+  /** #578: the canvas half of the rename. One store action for both entry points — the text command is
+   *  intercepted in `submit`, this is the click — so a refusal reads the same either way. */
+  const onRenamePoint = (from: string, to: string) => {
+    if (busy) return { ok: false, reason: 'busy' };
+    const res = rename(from, to);
+    logDebug3({ kind: 'action', action: 'rename', detail: `${from}->${to}:${res.ok ? 'ok' : res.reason}` });
+    return res.ok ? { ok: true } : { ok: false, reason: res.reason };
+  };
+
   const onNameCrossing = (k: { line: string; plane: string }) => {
     if (busy) return;
     const id = nextFreeLabel3(derived.construction);
@@ -630,19 +645,19 @@ export default function App3() {
             <div key={`notice-${i}`} role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {n.kind === 'base-constrained'
                 ? t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
-                : n.kind === 'shape-redundant'
-                  ? t('notice.shapeRedundant', { ids: n.ids.join(''), shape: t(`notice.shape.${n.base}`) })
                 : n.kind === 'line-rel-noun'
                   ? t('notice.lineRelNoun', { line: n.line })
-                  : n.kind === 'redundant-relation'
-                    ? t('notice.redundantRelation', { a: n.a, b: n.b })
-                    : n.kind === 'line-auto-named'
-                      ? t('notice.lineAutoNamed', { requested: n.requested, assigned: n.assigned })
-                      : n.kind === 'containment-redundant'
-                        ? t('notice.containmentRedundant', { seg: n.seg, plane: n.plane })
-                        : n.kind === 'relation-entailed'
-                          ? t(n.rel === 'perp' ? 'notice.entailedPerp' : 'notice.entailedParallel', { seg: n.seg, plane: n.plane })
-                          : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
+                  : n.kind === 'line-auto-named'
+                    ? t('notice.lineAutoNamed', { requested: n.requested, assigned: n.assigned })
+                    : n.kind === 'already-known'
+                      ? /* #853 (ADR-3D-209): ONE template for «true, and already known» — the
+                           statement in the student's own wording, then why it follows. The four
+                           former notices differ only in those two slots. */
+                        t('notice.alreadyKnown', {
+                          statement: t(`notice.stated.${n.rel}`, { a: n.subject, b: n.object ?? '', shape: n.shape ? t(`notice.shape.${n.shape}`) : '' }),
+                          why: t(`notice.follows.${n.rel}`),
+                        })
+                      : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
             </div>
           ))}
           {lastNotice && !lastError && !busy && (
@@ -756,6 +771,17 @@ export default function App3() {
               }}
               crossingLabel={t('actions.nameCrossing')}
               onNameCrossing={onNameCrossing}
+              // #578 (ADR-3D-211): click a point to re-letter it — the same interaction 2-D has
+              // (FR-RN-10), routed through the SAME store action the text command uses, so the two
+              // entry points cannot drift into two behaviours.
+              onRenamePoint={onRenamePoint}
+              renameText={{
+                title: t('rename.title'),
+                placeholder: t('rename.placeholder'),
+                apply: t('rename.apply'),
+                taken: t('rename.taken'),
+                bad: t('rename.bad'),
+              }}
             />
           </div>
           {/* B6 (#671): the DOF cue moved to the data panel's head-line — its generic home across

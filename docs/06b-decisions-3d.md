@@ -7046,6 +7046,70 @@ drawn, the vector arm not re-declared); the two neighbouring cells asserted byte
 including the exam's noun-carrying wording; the line/plane arms still going to their owners; and the ⟂
 twin unchanged. Plus the #845 sweep, now with the cell in the probe table.
 
+### ADR-3D-206 — a free plane's pin list becomes a FIT over the stated distances (#528)
+
+**The gap, left open deliberately by #508.** A stated distance from a known point pins a free plane's
+OFFSET exactly (`d = −n·p ± value`, the sign a sampled branch). The NORMAL kept its two free DOFs, and a
+SECOND distance therefore landed as a claim against a still-sampled normal — which #508's own class guard
+turns into `plane-not-determined`:
+
+```
+פירמידה משולשת ABCD
+מישור π2
+המרחק בין A למישור π2 הוא 5    ✅ builds — pins the offset
+המרחק בין B למישור π2 הוא 5    ❌ plane-not-determined
+```
+
+Refused honestly, never silently wrong — but the second given is **real information**: two equal
+distances say the plane is parallel to AB or separates A and B symmetrically.
+
+**The observation that makes it small.** With a unit normal, `n·pᵢ + d = σᵢ·vᵢ`. Subtracting the first
+from the rest ELIMINATES `d` and leaves one **affine constraint on the normal** per extra point:
+
+> `n̂·(pᵢ − p₀)/|pᵢ − p₀| = (σᵢvᵢ − σ₀v₀)/|pᵢ − p₀|`
+
+— the same shape as every other orientation fact this resolver already honours. A ⟂ relation and a
+member chord are this with the right-hand side **0**; #534's stated line-plane angle is this with
+`cos(90° − β)`. So the pin LIST becomes a FIT, and `unitNormalsFor` solves all of them together:
+
+| independent constraints | answer | sampled |
+| --- | --- | --- |
+| 2 or more | a line intersected with the unit sphere: 0, 1 or 2 discrete normals | 0 |
+| exactly 1 | a CONE about the axis at that cosine — the spin is a genuine free DOF | 1 |
+| none | nothing to say here; the caller keeps its own fully-sampled path | 2 |
+
+**The side pattern is a discrete branch set**, exactly like #508's single sign: the 2^k patterns are
+enumerated, the infeasible ones dropped (a demanded cosine outside [−1, 1] is a plane that does not
+exist), and the seed picks among the survivors — ADR-052, so a branch the student did not state is
+reachable by «show another configuration» and never silently chosen. The chosen pattern fixes the
+OFFSET too, so the normal and the offset come out of one branch and cannot disagree about the side.
+
+**Measured:** the reported sequence builds with both distances holding to 1e-6; the free-plane DOF reads
+**3 → 2 → 1 → 0** across «מישור π2» / first distance / second / third, and a determined figure honours
+all three exactly. The count is the resolution's own, so the cue and the sampler still cannot drift
+(the ADR-3D-124 rule).
+
+**Deliberate boundaries, so the blast radius is nil.** The fit engages only when two or more distances
+name the plane, no member already pins the offset (a member's offset would come from a different branch
+than the normal), and no parallel relation has pinned the normal outright. Every pre-existing figure
+therefore takes the untouched path — which is what makes this a widening rather than a rewrite of a
+delicate resolver. The pattern count is capped at 2^6.
+
+**A stated limitation.** An unsatisfiable pair (A and B one apart, at distances 1 and 9) is refused
+`plane-not-determined` — literally true, since no pattern pinned anything, and it is #508's honest guard
+rather than an accusation. A message that named the CONTRADICTION would be better, and needs a new code
+plus i18n; recorded here rather than smuggled in.
+
+**Not taken.** #528 suggests doing this "together with the rest of the recorded-constraint sweep #508
+called for (an angle to a plane, a membership of a LINE in a plane)". Those are separate widenings of the
+same resolver and are left to their own slice; what they will find is that `unitNormalsFor` is already
+the seam they need.
+
+**Locks.** `src3d/__tests__/issue-528-plane-distance-fit.test.ts` (7 tests): the reported sequence in He
+and En with both distances exact; the 3 → 2 → 1 → 0 DOF ladder; three distances all honoured; the
+leftover spin varying across seeds while both givens hold at every one; #508's single-distance case
+unchanged; and an unsatisfiable pair refusing rather than drawing a plane that misses a given.
+
 ### ADR-3D-207 — the bisector stated on its own; the perpendicular bisector's honest end (#343, #342)
 
 Two halves of one question: what should an utterance this tool has already DECIDED about do?
@@ -7152,6 +7216,187 @@ resolve through the **same named function** (the property, so a future edit cann
 `textDir3` gives an RTL base to the reported string and its siblings while leaving a pure-math line LTR.
 Asserted on the SOURCE, per the #559 precedent in the same file — the defect is the markup and this tree
 has no DOM harness.
+
+### ADR-3D-209 — «true, and already known» is ONE channel, with the four entailment tests kept (#853)
+
+**Context.** Four notices had grown to say one sentence to the student — *"that is true, and you already
+knew it"*:
+
+| notice | added by | fires when | method |
+| --- | --- | --- | --- |
+| `shape-redundant` | #612 (ADR-3D-158) | a shape statement already true of the figure | a flag set at apply |
+| `redundant-relation` | #396 (ADR-3D-108) | a relation between two SELF-DETERMINED objects | structural |
+| `containment-redundant` | #842 (ADR-3D-192) | a containment whose endpoints already lie in the plane | structural |
+| `relation-entailed` | #850 (ADR-3D-198) | a ∥ / ⟂ the figure already implies | numeric (operator ruling) |
+
+Four kinds, four i18n strings, four detections, four render branches — answering one question. Each was
+added because the previous one did not cover the case at hand, which is the honest reason and also the
+definition of an enumeration growing by one member per report. Worse, they disagreed about METHOD without
+meaning to, so the next person deciding how to detect a fifth case had four precedents pointing three ways.
+
+**Decision — converge the CHANNEL and the WORDING; keep every entailment TEST.**
+
+- One notice kind, `already-known`, carrying `rel` (which relation was stated), `subject`/`object` (the
+  statement in the student's own letters) and `shape` (for the shape case). One render branch.
+- One message template, `notice.alreadyKnown`, filled from two per-relation halves —
+  `notice.stated.<rel>` (the statement in the student's wording) and `notice.follows.<rel>` (why it
+  follows). The four bespoke strings are retired from both locales.
+- One predicate, `alreadyKnown(c, samples)`, holding the four cases in one place, called once from
+  `buildNotices3`.
+
+**What deliberately did NOT converge: the four entailment tests.** Each case keeps the test the operator
+ruled on for it — the apply-time flag (#612), the `isSelfDetermined` structural test with its
+carries-parameter and #500 free-plane exclusions (#396), the per-endpoint `pointEntailedInPlane`
+recursion (#842), and the numeric `claimSeeds` check with #827's branch guard (#850). The risk the issue
+named for merging special cases is real and specific here: a predicate general enough to cover all four
+could over-claim on a case none of them handled, and over-claiming means telling a student their given
+was worthless when it was not. The conservative direction is kept in all four — when entailment cannot be
+SHOWN, this says nothing.
+
+**What the fifth case now costs.** One entry in `ALREADY_KNOWN_RELS`, its own test in `alreadyKnown`, and
+two strings per language. `ALREADY_KNOWN_RELS` is the SOURCE the notice type reads its `rel` from, and the
+ratchet in `issue-853-already-known.test.ts` fails when a member has no wording in Hebrew or English — so
+a fifth case cannot reach a student as a raw i18n key, and it cannot become a fifth kind by accident.
+
+**User-visible surface, honestly.** The intent was no behaviour change and the four per-case locks hold
+unchanged in substance (same figures, same verdicts, same silences). Two things do change: the message
+TEXT is now assembled from the shared template, saying the same thing in the same register; and the notice
+ORDER moves, because all four cases are emitted at one point in `buildNotices3` rather than at four —
+which groups the "already known" notices together in the banner.
+
+**Locks.** The four issue locks retargeted onto the channel (#612 → `rel: 'shape'`, #396 →
+`'objects'`, #842 → `'contained'`, #850 → `'perp' | 'parallel'`), all still asserting their own figures;
+plus `src3d/__tests__/issue-853-already-known.test.ts` (8 tests): one figure per case arriving on the one
+channel with the right `rel` and no legacy kind anywhere; subjects carry student letters and never a `~`
+or `@` machinery id; #500's driven relation still silent; the i18n ratchet; and the retired keys asserted
+gone from both locales.
+### ADR-3D-210 — the Jacobian belongs to x, not to the iteration (#520)
+
+**Context.** `leastSquares` exits early only on `err < 1e-24`. Any solve whose error FLOORS above that —
+every anchored lane (plane drives, pin symbols), and since [ADR-3D-133](#adr-3d-133) every solve carrying
+the universal scale anchor with a determined scale — ends by walking λ from ~1e-12 up to the 1e12 bail,
+ten per rejected step, roughly 25 rungs. The loop recomputed the **full central-difference Jacobian on
+every rung**: 2n residual evaluations to reproduce numbers it had already computed, because a rejected
+step leaves `x` exactly where it was.
+
+**Decision — cache the Jacobian and the λ-free halves of the normal equations, keyed on `x` moving.**
+`J`, `JᵀJ` and `−Jᵀr` are functions of `x` alone; λ enters only through the damping added to the diagonal.
+They are computed when the cache is empty and invalidated at the ONE place `x` changes — the accepted
+step. Nothing else about the loop moves.
+
+**This is the option that keeps LM's semantics.** The issue offered two shapes: a stagnation exit (break
+after K consecutive failures) or removing the recomputation. A stagnation exit changes the trajectory of
+every solve — λ escalation exists precisely because a shorter, more gradient-like step often *is* accepted
+after a few failures — and would need its own honesty argument about the answers it changes. Caching
+changes no answer at all, which is provable rather than arguable, so it is what shipped.
+
+**Measured, before → after** (`ea49e00` vs this commit, residual evaluations per solve — exact integers,
+not timings):
+
+| problem | before | after |
+| --- | ---: | ---: |
+| floors above 1e-24, n = 2 | 116 | **48** |
+| seven unknowns, floored (the anchored shape) | 316 | **92** |
+| damping exhaustion with no descent direction | 113 | **23** |
+| over-determined, inconsistent | 106 | **42** |
+| Rosenbrock (accepted steps dominate) | 146 | **118** |
+| reaches zero (early exit, no failed steps) | 21 | 21 |
+
+Every returned `err` and `x` in that battery agreed **to the last of 18 printed digits** before and after.
+Figure-level wall clock on three anchored figures moved 1.5 → 1.2, 1.8 → 1.5 and 2.2 → 1.5 ms median over
+8 seeds — reported as indicative only: the #518 calibration on this very issue showed that ambient load
+dominates differences of this size, and the residual counts above are the honest measurement.
+
+**One semantic change, stated.** The `!delta` path (the damped system came back singular) used to grow λ
+with no ceiling and run out the iteration budget. It now bails at the same `λ > 1e12` the rejected-step
+path uses. `x` cannot have moved on that path, so the returned value is identical; what changes is that a
+hopeless solve stops instead of spinning — the docs/17 §7 rule that the failure path must not be more
+expensive than the success path. (With the absolute damping floor the diagonal is ≥ λ, so a system
+singular at *every* rung is not reachable in practice; the ceiling bounds it anyway.)
+
+**Locks.** `src3d/__tests__/issue-520-lm-tail-burn.test.ts` (14): the six-problem battery asserted against
+the pre-fix values at 1e-13 relative (tight enough that a changed trajectory cannot hide, loose enough
+that a last-ulp platform difference cannot flake) AND against the exact call counts, since the count is
+the mechanism; plus the damping ladder terminating on a hopeless solve, and Rosenbrock still converging
+through many accepted steps so the cache cannot be cutting a descent short.
+
+### ADR-3D-211 — a rename is a rewrite of HISTORY, reached from two entry points and one core (#578)
+
+**Context.** 3-D had no rename of any kind. Operator, prod 2026-08-14: a pyramid-height foot came out `E`
+when they wanted `O`, and unlike 2-D there was no way to change it — the whole figure had to be retyped.
+2-D has had the mechanism since #539; this ports it. Operator ruling, 2026-08-14: *"if we get to click on
+image and change letter in the same interface as the 2d tool has, that is fine. of course the command is
+ok too"* — **both** entry points, sharing one core.
+
+**Decision — the same shape 2-D chose, with this product's label grammar.**
+
+A rename is **not a fact and not a command**. It rewrites the ordered fact list in place, so the figure
+afterwards is byte-for-byte the figure the student would have had if they had typed the new letter from
+the start. That is asserted directly in the lock (same coordinates, point for point), and it is what
+keeps the fact list the single source of truth: a rename that appended a "now call E O" fact would make
+every later replay depend on a naming event, and undo would have to unwind a name instead of a statement.
+
+**Both halves of every fact are rewritten.** The utterance alone will not do: an LLM-committed `Fact3`
+holds `cmds` its utterance never produced (the #305 lane), so re-parsing rewritten text would silently
+build something else. The commands alone will not do either: the step row shows the utterance, and a row
+still reading «SE גובה» after E became O is a lie about what the figure holds.
+
+**`renameInCommand3` is a recursive STRUCTURAL walk, not a field list.** `Command3` operands nest —
+`{kind:'segment',a,b}`, `{kind:'plane-run',ids:[…]}`, claim structures — and a command kind added later
+must not quietly escape the rewrite: an enumeration is not a rule (`src3d/CLAUDE.md`). The LABEL GRAMMAR
+decides what is an id, so lowercase `type`/`kind`/`rel` values and `π1`/`ℓ` names are untouched for free,
+while a point-run plane's name (`"ABCD"`) is rewritten letter by letter — which is what keeps
+`pointPlanes` addressable after the rename. `src`/`requested` are carved out as RAW SOURCE (2-D's `expr`
+carve-out, same reason): an equation is echoed to the student verbatim and may legitimately hold a
+capital that is not a point (#339).
+
+**The PRIME is this product's own boundary problem.** 2-D's guard is `(?!\d)`, enough where a label is
+`[A-Z]\d*`. Here `A` and `A'` are two different vertices of the same cube, so the token rule is: match a
+whole label, refusing a following (or preceding) lowercase letter, digit or prime, while ALLOWING an
+adjacent uppercase — because that is exactly what a run like `ABCD` is. Locked in both directions.
+
+**Two entry points, one action.** The text command («שנה שם E ל-O» / "rename E to O", both verbs, both
+languages, primes) is intercepted in the store's `submit` **before** `parse3` — that is where the fact
+list lives, and putting it there means the scenario harness and any future caller get it too. The canvas
+popover is 2-D's FR-RN-10 ported onto the #483 hit-target pattern (transparent ring, `stopPropagation`
+so the click never reaches the orbit drag), and it calls the SAME `rename` action, so the two cannot
+drift into two behaviours. The lock asserts they produce identical fact lists.
+
+**A refusal is TYPED, never `not-understood`.** `rename-refused` carries its reason and both letters.
+This matters beyond politeness: App3 escalates `not-understood` to the paid LLM lane, so a rename we
+understood and declined would buy a guess at a question already answered. `target-taken` is a refusal
+rather than a merge — fusing two of the student's vertices is a different operation (2-D's ADR-122
+territory) and nobody asked for it.
+
+**The session state around the figure follows the facts.** `queries` («|AB|») and `planeDisplay` (keyed
+by the point RUN, «ABCD») are rewritten in the same action. Skipping them would leave a display toggle
+addressing a plane that no longer exists and a data-panel row asking about a vanished point — the figure
+right, the session around it stale.
+
+**The seed is deliberately untouched.** A letter is a name, not a configuration: the drawing must not
+jump because a vertex was re-lettered. This is the stability rule, applied to naming.
+
+**Discoverability — the catalog carries it, and the catalog now says which LANE reads an entry.**
+2-D leaves rename out of its catalog, and that is how this issue came to be filed: the operator could not
+find a feature 2-D already had. The 3-D catalog is the coverage map AND the in-app commands panel, so the
+two rename forms are listed — but the catalog is also **the vocabulary the LLM is allowed to emit**, and
+teaching it a line `parse3` cannot re-parse would break the PAR-10 contract and spend a paid call on a
+step that can never commit.
+
+So an entry declares its reader once — `lane?: 'rewrite'`, absent meaning the construction lane — and
+every consumer reads that field instead of learning about rename separately: the LLM prompt emits only
+construction entries; the honesty-gate false-positive net measures only what the LLM can emit; the
+rule-ordering shadow matrix covers only what the RULES lane owns, and asserts the remainder is claimed by
+the rewrite reader so nothing can fall between the two; and the catalog guard checks each entry against
+**its own** reader rather than `parse3(u).ok || parseRename3(u)` — an OR would let a construction entry
+pass because the rename reader happened to claim it, which is precisely the shadow class that suite
+exists to catch. The first version of this change did use the OR, and the honesty net is what exposed it.
+
+**Locks.** `src3d/__tests__/issue-578-rename.test.ts` (20): the operator's figure end to end; the
+rewritten-history property against a natively-typed twin; primes in both directions; the plane-run name
+and the nested claim operand following; English and both Hebrew verbs; typed refusals committing nothing;
+no fact appended; the seed unmoved; one-step undo; queries + planeDisplay following; the canvas action
+and the text command producing identical facts; the token boundary; and the grammar's declines.
 
 ### ADR-3D-212 — «bisects» is a DIRECTION, and a solid that loses its volume is not a solution (#872)
 

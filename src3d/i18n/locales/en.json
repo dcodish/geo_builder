@@ -66,10 +66,22 @@
   "status": {
     "inactive": "Inactive — a given it depends on is off"
   },
+  "rename": {
+    "title": "Rename:",
+    "placeholder": "letter",
+    "apply": "rename",
+    "taken": "that letter is taken — pick a free one",
+    "bad": "not a legal letter, or no such point"
+  },
   "err": {
     "notUnderstood": "I couldn't understand that given (this version: solids, points on segments, vector naming, and claims to verify)",
     "shapeLessSpecific": "The figure is already known to be a {{actual}}, so it is not called a {{stated}}. Remove the earlier given if you meant {{stated}}.",
     "alreadyDefined": "«{{id}}» is already defined in the figure",
+    "rename": {
+      "same": "«{{from}}» and «{{to}}» are the same name — nothing to change",
+      "no-source": "There is no point «{{from}}» in the figure",
+      "target-taken": "The name «{{to}}» is already taken — pick a free letter (renaming onto a live label would merge two points)"
+    },
     "unknownPoint": "Point «{{id}}» is not defined yet",
     "unknownVector": "Vector «{{id}}» is not declared — name it first (denote AB = u)",
     "badSolid": "The number of vertices doesn't fit the requested solid",
@@ -194,7 +206,6 @@
   "load.unbuildable": "The file opened, but no step could be rebuilt in this version ({{count}} steps) — it may have been saved by a newer build. The steps are kept exactly as saved.",
   "load.partial": "The file opened, but {{count}} step(s) could not be rebuilt (step {{steps}}) — they are flagged in the list. The steps are kept exactly as saved.",
   "notice": {
-    "shapeRedundant": "{{ids}} is already a {{shape}} from an earlier given — the statement is true and adds no new information.",
     "baseConstrained": "For the pyramid to be right, the base ({{ids}}) was constrained from a {{from}} to a {{to}}.",
     "shape": {
       "square": "square",
@@ -210,11 +221,22 @@
     },
     "lineCalledPlane": "Note: {{line}} is a line, not a plane. Read as \"plane {{ids}} is perpendicular to line {{line}}\".",
     "lineRelNoun": "Note: {{line}} is a line, not a plane — the relation was built against line {{line}}.",
-    "redundantRelation": "The relation between {{a}} and {{b}} was verified ✓ — but it already follows from their definitions, so this given adds no new information.",
-    "containmentRedundant": "«{{seg}}» lies in plane «{{plane}}» — true and verified ✓, but both endpoints already lie in that plane by earlier givens, so this adds no new information and changes nothing in the figure.",
-    "entailedParallel": "«{{seg}}» is parallel to plane «{{plane}}» — true and verified ✓, but it already follows from the solid you defined, so this adds no new information.",
-    "entailedPerp": "«{{seg}}» is perpendicular to plane «{{plane}}» — true and verified ✓, but it already follows from the solid you defined, so this adds no new information.",
     "lineAutoNamed": "The name {{requested}} is already taken, so the intersection line was named {{assigned}}.",
+    "alreadyKnown": "{{statement}} — true and verified ✓, but {{why}}, so this given adds no new information.",
+    "stated": {
+      "shape": "{{a}} is a {{shape}}",
+      "objects": "the relation between {{a}} and {{b}}",
+      "contained": "«{{a}}» lies in plane «{{b}}»",
+      "perp": "«{{a}}» is perpendicular to plane «{{b}}»",
+      "parallel": "«{{a}}» is parallel to plane «{{b}}»"
+    },
+    "follows": {
+      "shape": "the shape is already known from an earlier given",
+      "objects": "it already follows from the objects own definitions",
+      "contained": "both endpoints already lie in that plane by earlier givens",
+      "perp": "it already follows from the solid you defined",
+      "parallel": "it already follows from the solid you defined"
+    },
     "alreadyStated": "That is already stated («{{utterance}}») — the figure is unchanged and no row was added"
   },
   "display": {

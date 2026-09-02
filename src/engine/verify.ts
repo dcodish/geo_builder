@@ -235,57 +235,9 @@ export function checkGivens(
     }
   }
 
-  // #429 (ADR-423): a point asserted ON a circle must land on the part of it that is DRAWN. A FREE
-  // on-circle point is already confined by `evaluate` (its position was an unstated choice, so it is made
-  // on the ink), which leaves the cases where the position is a CONSEQUENCE — a driven carrier, a pinned
-  // θ, a derived crossing. There a departure is real information, so it surfaces amber rather than being
-  // silently overridden, and because `meetsRequirements` gates on a clean verifier the sampler and "show
-  // another configuration" keep every free vertex on the ink.
-  //
-  // Structurally-forced departures are EXCLUDED and reported as a notice instead (the operator's ruling,
-  // and the ADR-123 allow-with-a-notice precedent): an `antipode` of a point on a semicircle is ALWAYS on
-  // the other half, so flagging it would be both dishonest and unsatisfiable — no seed could clear it, and
-  // the config search would burn its whole budget proving that.
-  if (construction) {
-    const arcs = construction.objects.filter((o) => o.kind === 'arc');
-    if (arcs.length > 0) {
-      const cache = new Map<Id, ArcSpan[] | null>();
-      const spansFor = (circleId: Id): ArcSpan[] | null => {
-        if (!cache.has(circleId)) {
-          const co = construction.objects.find((o) => o.kind === 'circle' && o.id === circleId) as { center: Id } | undefined;
-          const rc = circles.get(circleId);
-          cache.set(circleId, co && rc ? drawnArcSpans(arcs, positions, co.center, rc.r) : null);
-        }
-        return cache.get(circleId) ?? null;
-      };
-      // ids whose position is STRUCTURALLY opposite the ink — see the note above
-      const forcedOff = new Set<Id>(
-        construction.objects.filter((o) => o.kind === 'antipode').map((o) => o.id),
-      );
-      for (const o of construction.objects) {
-        if (o.kind !== 'on-circle') continue;
-        if (o.free && o.solve === undefined) continue; // confined by `evaluate` — cannot violate
-        if (forcedOff.has(o.id)) continue;
-        const rc = circles.get(o.circle);
-        const p = positions.get(o.id);
-        if (!rc || !p || rc.r <= 1e-9) continue;
-        const spans = spansFor(o.circle);
-        if (!spans || spans.length === 0) continue; // the whole circle is drawn
-        const ang = Math.atan2(p.y - rc.center.y, p.x - rc.center.x);
-        // angular slack matching the on-circle position tolerance, so a point AT an endpoint passes
-        const tol = Math.max(1e-6, onCircleTol(rc.r) / rc.r);
-        if (angleOnSpans(ang, spans, tol)) continue;
-        const off = ((angleOffSpans(ang, spans) * 180) / Math.PI).toFixed(1);
-        violations.push({
-          relation: 'point-off-arc',
-          ids: [o.id, o.circle],
-          message: `${o.id} should lie on the drawn part of ${circleLabel(o.circle)}, but sits ${off}° beyond it`,
-          messageKey: 'figure.v.pointOffArc',
-          params: { point: o.id, circle: circleName(o.circle), off },
-        });
-      }
-    }
-  }
+  // #429 (ADR-423): a point asserted ON a circle must land on the part of it that is DRAWN. The three
+  // tiers and their split between a violation, a notice and silence live in `auditDrawnArcs` below.
+  if (construction) violations.push(...auditDrawnArcs(construction, positions, circles).violations);
 
   // A stated bare CROSSING with no point named («CD חותך את AB», issue #241 / ADR-383): the two
   // segments must cross WITHIN both spans — the ADR-166 meaning, point-free. The endpoints are free
@@ -712,3 +664,105 @@ export function checkGivens(
 
   return violations;
 }
+/**
+ * A reference the CONSTRUCTION forces off the drawn ink — ADR-423's third tier. Allowed (the figure is
+ * geometrically right and the departure is unavoidable), but not silent: the student is told, because
+ * ink appeared where they did not draw any.
+ */
+export interface ForcedOffArc {
+  /** The point that sits off the drawn part. */
+  point: Id;
+  /** The circle whose drawn part it left. */
+  circle: Id;
+  /** How far beyond the ink it sits, in degrees, for the message. */
+  off: string;
+}
+
+/**
+ * The drawn-arc audit — ONE pass over the construction answering ADR-423's three tiers, so the tier a
+ * point falls into is decided in a single place:
+ *
+ * | the point's position is… | outcome |
+ * | --- | --- |
+ * | a FREE (unstated) choice | silence — `evaluate` already confined it to the ink, so it cannot violate |
+ * | a CONSEQUENCE of a constraint | a `point-off-arc` VIOLATION (amber): a departure is real information |
+ * | STRUCTURALLY forced off the ink | a {@link ForcedOffArc} NOTICE — allowed, and said out loud (#433) |
+ *
+ * The third tier is the operator's ruling of 2026-07-30 and follows the ADR-123 allow-with-a-notice
+ * precedent. It must never be a violation: an `antipode` of a point on a semicircle is ALWAYS on the
+ * other half, so flagging it would be unsatisfiable — no seed could clear it and `findValidConfig`
+ * would burn its whole budget proving that. The structural class is exactly the constructions whose
+ * DEFINITION places them diametrically opposite their reference (`antipode` today); a point that
+ * merely HAPPENS to be driven off the ink stays in tier 2, which is what keeps #429's honesty hole shut.
+ */
+function auditDrawnArcs(
+  construction: Construction,
+  positions: Map<Id, Vec>,
+  circles: Map<Id, ResolvedCircle>,
+): { violations: GivenViolation[]; forced: ForcedOffArc[] } {
+  const violations: GivenViolation[] = [];
+  const forced: ForcedOffArc[] = [];
+  const arcs = construction.objects.filter((o) => o.kind === 'arc');
+  if (arcs.length === 0) return { violations, forced }; // the whole circle is drawn everywhere
+
+  const cache = new Map<Id, ArcSpan[] | null>();
+  const spansFor = (circleId: Id): ArcSpan[] | null => {
+    if (!cache.has(circleId)) {
+      const co = construction.objects.find((o) => o.kind === 'circle' && o.id === circleId) as { center: Id } | undefined;
+      const rc = circles.get(circleId);
+      cache.set(circleId, co && rc ? drawnArcSpans(arcs, positions, co.center, rc.r) : null);
+    }
+    return cache.get(circleId) ?? null;
+  };
+  /** How far past the ink the object sits, or null when it is ON the ink / unmeasurable. */
+  const offBy = (id: Id, circleId: Id): string | null => {
+    const rc = circles.get(circleId);
+    const p = positions.get(id);
+    if (!rc || !p || rc.r <= 1e-9) return null;
+    const spans = spansFor(circleId);
+    if (!spans || spans.length === 0) return null; // the whole circle is drawn
+    const ang = Math.atan2(p.y - rc.center.y, p.x - rc.center.x);
+    // angular slack matching the on-circle position tolerance, so a point AT an endpoint passes
+    const tol = Math.max(1e-6, onCircleTol(rc.r) / rc.r);
+    if (angleOnSpans(ang, spans, tol)) return null;
+    return ((angleOffSpans(ang, spans) * 180) / Math.PI).toFixed(1);
+  };
+
+  // ids whose position is STRUCTURALLY opposite the ink — tier 3
+  const structural = new Map<Id, Id>(
+    construction.objects.flatMap((o) => (o.kind === 'antipode' ? [[o.id, o.circle] as [Id, Id]] : [])),
+  );
+  for (const [point, circle] of structural) {
+    const off = offBy(point, circle);
+    if (off !== null) forced.push({ point, circle, off });
+  }
+
+  for (const o of construction.objects) {
+    if (o.kind !== 'on-circle') continue;
+    if (o.free && o.solve === undefined) continue; // tier 1 — confined by `evaluate`, cannot violate
+    if (structural.has(o.id)) continue; // tier 3 — reported as a notice above, never as a violation
+    const off = offBy(o.id, o.circle);
+    if (off === null) continue;
+    violations.push({
+      relation: 'point-off-arc',
+      ids: [o.id, o.circle],
+      message: `${o.id} should lie on the drawn part of ${circleLabel(o.circle)}, but sits ${off}° beyond it`,
+      messageKey: 'figure.v.pointOffArc',
+      params: { point: o.id, circle: circleName(o.circle), off },
+    });
+  }
+  return { violations, forced };
+}
+
+/**
+ * The references ADR-423's third tier allows off the drawn ink (#433). Same audit as the verifier's, so
+ * the notice and the exclusion can never disagree about which tier a point is in.
+ */
+export function forcedOffArcs(
+  construction: Construction,
+  positions: Map<Id, Vec>,
+  circles: Map<Id, ResolvedCircle>,
+): ForcedOffArc[] {
+  return auditDrawnArcs(construction, positions, circles).forced;
+}
+

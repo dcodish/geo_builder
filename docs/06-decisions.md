@@ -8566,3 +8566,117 @@ moves was drawing concave-by-luck.
 dart over a kite ring and over an inscribed ring; the direct ring unchanged; the four MEASURED dart seeds
 asserted to draw concave and to fail `meetsRequirements`; a convex seed still passing; the stated-concave
 exemption; and a triangle-shaped macro untouched.
+
+## ADR-473 — the three drawn-arc tiers are decided in ONE audit, and the forced tier speaks (#433)
+
+**Context.** [ADR-423](#adr-423) (#429) gave the drawn-arc requirement three tiers: a FREE on-circle
+point is confined to the ink by `evaluate`; a point DRIVEN off it reads amber (`figure.v.pointOffArc`);
+and a departure the construction STRUCTURALLY forces — the far end of a diameter drawn from a point on a
+semicircle is always on the other half — is *allowed with a notice*, per the operator's ruling of
+2026-07-30 and the [ADR-123](#adr-123) allow-with-a-notice precedent.
+
+Two of the three shipped. The third was **allowed but silent**: `verify.ts` collected the `antipode` ids
+into a local `forcedOff` set purely to *skip* them, and nothing downstream ever learned they existed.
+Measured on `main` at `9d635a4` — «חצי מעגל» → «C על המעגל» → «קוטר מנקודה C» builds with
+`lastError: null`, `violations: []`, and D sitting at θ = 189.5° on a circle whose drawn span is 0°–180°.
+Ink appeared where the student drew none, and the tool said nothing. Per docs/17 §6 (*everything the
+student stated is visible on the figure*) an allowed-but-unusual outcome must say so.
+
+**Decision.** The tier a point falls into is now decided in **one place**, `auditDrawnArcs`, which walks
+the construction once and returns both channels:
+
+| the point's position is… | outcome |
+| --- | --- |
+| a FREE (unstated) choice | silence — `evaluate` already confined it to the ink |
+| a CONSEQUENCE of a constraint | a `point-off-arc` VIOLATION (amber) |
+| STRUCTURALLY forced off the ink | a `ForcedOffArc` NOTICE — allowed, and said out loud |
+
+`checkGivens` consumes `.violations`; the new `forcedOffArcs` export consumes `.forced`. One audit means
+the exclusion and the notice can never disagree about which tier a point is in — the previous shape had
+the skip in one expression and the notice nowhere, so nothing enforced that they described the same set.
+
+The notice is threaded like a forced coincidence: `forcedOffArc: ForcedOffArc[]` on `Derived` beside
+`coincidences` (`replay/core.ts`), rendered in `App.tsx` in the same `infoBanner`, with the new
+`figure.offArcNotice` key in `he.json` + `en.json`. The Hebrew states the fact *and* that it is forced
+(«…נמצאת בהכרח על החלק שאינו מצויר… כך מחייב המבנה»), so it does not read as an error.
+
+**The tier boundary does not move.** The structural class is exactly the constructions whose DEFINITION
+places them diametrically opposite their reference (`antipode` today). A point that merely *happens* to
+be driven off the ink stays in tier 2 and stays amber — turning that into a notice would re-open the
+honesty hole #429 closed. The lock asserts this with the same coordinates in both tiers.
+
+**Why the forced tier must never be a violation.** It is unsatisfiable: no seed can put the antipode of
+an on-ink point back on the same half, so `meetsRequirements` could never clear one and `findValidConfig`
+would burn its entire budget proving it. That is why tier 3 is a notice by construction, not by taste.
+
+**Locks.** `src/engine/__tests__/arcs.test.ts` (+5): the semicircle diameter builds green with no
+violation; the notice names D and `circle-O` with a positive offset; it holds across 8 seeds (structural,
+not a sampling accident); the same coordinates re-labelled as a merely-driven point flip to amber with no
+notice; and a FULL circle produces neither.
+
+## ADR-474 — a drawing that meets every requirement can still be unreadable: the SPREAD preference (#194)
+
+**Context.** Operator, 2026-07-17 (the Q9 session, right after #193): *"we need to add some preference —
+if the diagram draws angles that are small (i.e. fits the constraints but the segments are very close),
+we should look for a seed that allows a better spread."* On the Q9 two-circle figure every stated
+requirement is met and ∠ACE draws at **1.3°**. Nothing is wrong with the figure; it is simply the wrong
+one of the valid drawings to show. "Show another configuration" met the same squashed configurations.
+
+**Decision — a PREFERRED tier on the existing seed ladder, never a gate.**
+
+`wellSpread(construction, positions, minDeg = 7)` (`src/engine/spread.ts`) is a pure single-sample
+predicate: the tightest wedge anywhere in the drawing, over the DRAWN edge set the detection layer
+already uses (`figureEdges` + collinear splits — one source of truth for "what the student sees",
+FR-RV-6). At each vertex incident neighbours merge into distinct ray directions at **0.05°**.
+
+**That merge epsilon is the whole discrimination, and it costs nothing.** A STRUCTURALLY collinear
+neighbour — a `set-line` rider, an on-segment point — is on its carrier to solver precision (~1e-6 rad ≈
+6e-5°), so it merges and contributes no wedge: there is no angle there to read. An ACCIDENTALLY
+near-collinear point — Q9's A at 0.8° off the secant — is four orders of magnitude away from that, does
+not merge, and its tiny wedge is exactly what we penalise. The structural-vs-squashed distinction falls
+out of the gap between 0.05° and 7° for free: no statedness analysis, no second sample.
+
+**Wired into the sweeps that already exist — no new search is opened.** `firstSatisfyingSeed` keeps its
+one-replay fast path when there is no discrete requirement to satisfy; the preference rides the sweeps
+that were already running there, in `findValidConfig`, and in `searchResample`, so a figure that draws
+fine never pays for it (one cheap predicate over positions already computed).
+
+**The tier RANKS, it does not merely filter — and that is a deliberate deviation from the fix plan.**
+The plan specified a boolean tier: *first seed strict-ok AND wellSpread → first strict-ok → relaxed*.
+Measured on the issue's own figure, seeds 0–15 range from **0.16° to 5.80°** and none clears the 7° bar,
+so within that band a pass/fail preference would have found nothing to prefer and returned the 1.29°
+drawing. So the tier is: **take the first candidate that clears the bar; failing that, take the best one
+seen** (`spreadScore` = the tightest wedge, maximised). On a figure with no legible configuration at all
+— the one case the plan's boolean can say nothing about — "best available" is the only improvement there
+is, and it is the difference between a 5.8° drawing and a 0.16° one.
+
+The extra exploration is bounded: `SPREAD_EXTRA_TRIES = 24` candidates beyond the seed the sweep would
+already have returned, and the existing deadline still caps everything. A figure with no legible
+configuration therefore searches a bounded amount longer and then settles, exactly where it settles today.
+
+**Measured, before → after** (the Q9 sequence, `findValidConfig` from seed 0):
+
+| | seed | tightest wedge | ∠ACE | ∠AFD |
+| --- | ---: | ---: | ---: | ---: |
+| before | 0 | 1.29° | 1.34° | 1.29° |
+| after | 24 | **10.26°** | **31.24°** | **31.47°** |
+
+**It is a preference, and the difference matters.** A figure whose givens FORCE a small wedge — a stated
+`∠ABC = 5°`, genuinely tight geometry — fails the bar at every seed, falls through the ladder, and behaves
+exactly as today: no refusal, no endless search. Putting spread into `meetsRequirements` would have turned
+a drawing preference into a refusal of real geometry, which is the opposite of honest
+([ADR-052](#adr-052): a valid configuration must stay reachable and drawable). «הצג תצורה אחרת» keeps the
+boolean form rather than the ranking, deliberately: a maximin resample would return the same "best" seed
+on every press and stop cycling.
+
+**The detection sample pool is explicitly NOT filtered by spread** (#193's boundary). Ground truth is what
+holds in every VALID configuration ([ADR-256](#adr-256)/295), so a spread-filtered pool would over-claim —
+reporting relations that break only in squashed-valid configs. The two fixes compose: #193 makes detection
+robust to squashed samples in the pool, this keeps them off the canvas.
+
+**Locks.** `src/replay/__tests__/issue-194-spread.test.ts` (7): the predicate on ordinary figures; the
+structural rider contributing no wedge (the merge-epsilon discrimination, from both sides); a wedge-free
+figure; the Q9 figure opening ∠ACE/∠AFD past the bar with the whole drawing legible and at least 5× its
+former tightest wedge; the stated-5° figure building, drawing and keeping its 5°; the everyday figures
+still landing on seed 0; and the #193 boundary asserted from the pool's side — a squashed configuration
+is still valid and still a legitimate sample.
