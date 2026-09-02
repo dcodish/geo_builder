@@ -80,6 +80,11 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.badFile');
     case 'newer-schema':
       return t('err.newerSchema');
+    // #578 (ADR-3D-211): a rename we UNDERSTOOD and declined. Each reason names the letters the
+    // student typed, never internal state — a 'target-taken' is the honest answer that renaming onto a
+    // live letter would merge two of their vertices, which is a different operation nobody asked for.
+    case 'rename-refused':
+      return t(`err.rename.${err.reason}`, { from: err.from, to: err.to });
     case 'already-defined':
       return t('err.alreadyDefined', { id: err.id });
     // #612 (ADR-3D-158): name BOTH shapes — the honesty invariant is that a refusal names the
@@ -228,6 +233,7 @@ export default function App3() {
   const toggle = useGeo3((s) => s.toggle);
   const remove = useGeo3((s) => s.remove);
   const replaceFact = useGeo3((s) => s.replaceFact);
+  const rename = useGeo3((s) => s.rename);
   const clear = useGeo3((s) => s.clear);
   const resample = useGeo3((s) => s.resample);
   const loadFigure = useGeo3((s) => s.loadFigure);
@@ -449,6 +455,15 @@ export default function App3() {
    * student can read, undo, re-order and save, and replaying the file re-derives the same point. That
    * is why #485's noun frame had to land first — this utterance has to parse in both languages.
    */
+  /** #578: the canvas half of the rename. One store action for both entry points — the text command is
+   *  intercepted in `submit`, this is the click — so a refusal reads the same either way. */
+  const onRenamePoint = (from: string, to: string) => {
+    if (busy) return { ok: false, reason: 'busy' };
+    const res = rename(from, to);
+    logDebug3({ kind: 'action', action: 'rename', detail: `${from}->${to}:${res.ok ? 'ok' : res.reason}` });
+    return res.ok ? { ok: true } : { ok: false, reason: res.reason };
+  };
+
   const onNameCrossing = (k: { line: string; plane: string }) => {
     if (busy) return;
     const id = nextFreeLabel3(derived.construction);
@@ -756,6 +771,17 @@ export default function App3() {
               }}
               crossingLabel={t('actions.nameCrossing')}
               onNameCrossing={onNameCrossing}
+              // #578 (ADR-3D-211): click a point to re-letter it — the same interaction 2-D has
+              // (FR-RN-10), routed through the SAME store action the text command uses, so the two
+              // entry points cannot drift into two behaviours.
+              onRenamePoint={onRenamePoint}
+              renameText={{
+                title: t('rename.title'),
+                placeholder: t('rename.placeholder'),
+                apply: t('rename.apply'),
+                taken: t('rename.taken'),
+                bad: t('rename.bad'),
+              }}
             />
           </div>
           {/* B6 (#671): the DOF cue moved to the data panel's head-line — its generic home across

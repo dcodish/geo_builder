@@ -23,6 +23,7 @@
 import { create } from 'zustand';
 import type { PlaneDisplayMode3Map } from './figureFile3';
 import { buildNotices3, type BuildNotice3 } from '../engine/notices';
+import { normalizeLabel3, renameFacts3, renamePlaneDisplay3, renameQueries3, type RenameResult3 } from './rename3';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { stripFormatControls } from '../../shell/bidi';
@@ -36,7 +37,7 @@ import { dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Id, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
-import { parse3 } from '../parser/parse3';
+import { parse3, parseRename3 } from '../parser/parse3';
 
 export interface Fact3 {
   id: string;
@@ -73,6 +74,10 @@ export type StoreError3 =
   /** The LLM decomposition lost part of the stated input (docs/24 S2.3 honesty gates) — `items` names
    *  the dropped labels/magnitudes; nothing was committed. */
   | { code: 'dropped-given'; items: string }
+  /** #578 (ADR-3D-211): a RENAME that could not be done. Typed, NOT `not-understood`: the sentence
+   *  was understood perfectly, so escalating it to the LLM would pay for a guess at a question already
+   *  answered. `from`/`to` are echoed so the message can name the letters the student typed. */
+  | { code: 'rename-refused'; reason: 'same' | 'no-source' | 'target-taken'; from: string; to: string }
   | { code: 'bad-file' }
   | { code: 'newer-schema' }
   | null;
@@ -631,6 +636,10 @@ export interface Geo3State {
    *  An edit that orphans a DEPENDENT commits and the dependent flags on its own row — the same
    *  reversible auto-drop contract as `toggle`, this product's honesty surface. */
   replaceFact: (factId: string, utterance: string) => boolean;
+  /** #578 (ADR-3D-211): re-letter a point across the whole fact list — history is rewritten, so the
+   *  figure is exactly what it would have been had the student typed the new letter from the start.
+   *  One undoable step. Also reached from the text command, intercepted in `submit`. */
+  rename: (from: string, to: string) => RenameResult3;
   clear: () => void;
   /** Data-panel QUERIES (ADR-3D-057, #274): quantities the student asked to see («w·v», «|AB|»…).
    *  NOT facts — never replayed, never on the figure; saved with the file, undoable. */
@@ -678,6 +687,16 @@ export const useGeo3 = create<Geo3State>()(
 
       submit: (utterance) => {
         utterance = stripFormatControls(utterance); // #751 (ADR-W-029) — the store-side ingest invariant
+        // #578 (ADR-3D-211): «שנה שם E ל-O» is a rewrite of HISTORY, not a statement about the figure,
+        // so it is read BEFORE the grammar and never becomes a fact. Intercepted here rather than in
+        // App3 because this is where the fact list lives — and because a refusal must carry its own
+        // code: a rename we understood and declined must not reach the LLM lane, which escalates on
+        // `not-understood` and would pay for a guess at a question already answered.
+        const rn = parseRename3(utterance);
+        if (rn) {
+          get().rename(rn.from, rn.to);
+          return;
+        }
         const parsed = parse3(utterance);
         if (!parsed.ok) {
           // #516: every TYPED refusal keeps its identity — only a genuine `not-handled` may read as
@@ -851,6 +870,30 @@ export const useGeo3 = create<Geo3State>()(
         return true;
       },
 
+      rename: (from, to) => {
+        const F = normalizeLabel3(from);
+        const T = normalizeLabel3(to);
+        if (!F || !T) {
+          set({ lastError: { code: 'rename-refused', reason: 'no-source', from, to }, lastNotice: null });
+          return { ok: false, reason: 'no-source' };
+        }
+        const { facts, queries, planeDisplay } = get();
+        const r = renameFacts3(facts, F, T);
+        if (!r.ok) {
+          set({ lastError: { code: 'rename-refused', reason: r.reason, from: F, to: T }, lastNotice: null });
+          return r;
+        }
+        // The SEED is deliberately untouched: a letter is a name, not a configuration, so the drawing
+        // the student is looking at must not jump when they re-letter a vertex (the stability rule).
+        set({
+          facts: r.facts,
+          queries: renameQueries3(queries, F, T),
+          planeDisplay: renamePlaneDisplay3(planeDisplay, F, T),
+          lastError: null,
+          lastNotice: null,
+        });
+        return { ok: true };
+      },
       clear: () => set({ facts: [], queries: [], planeDisplay: {}, figureName: '', lastError: null, lastNotice: null }),
 
       // A query is a QUESTION about the figure, never a fact (ADR-3D-057): it never enters replay.
