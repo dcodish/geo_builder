@@ -202,6 +202,8 @@
       "perimeterOf": "perimeter("
     },
     "overConstrained": "Can't do that: {{what}} contradicts an earlier given — they can't both hold.",
+    "notDeterminedHere": "Your givens are fine. {{who}} are not determined yet, and in the placement the tool picked for them {{what}} can't hold \u2014 press \u00abshow another configuration\u00bb.",
+    "notDeterminedHereBare": "Your givens are fine. In the placement the tool picked, {{what}} can't hold \u2014 press \u00abshow another configuration\u00bb.",
     "unknownPoint": "{{what}} refers to a point that hasn't been defined yet. Create it first.",
     "unresolvedDeps": "This step relies on {{ids}}, which aren't defined yet (or an earlier step it depends on failed). Define them first.",
     "unknownCircle": "Circle {{center}} is not defined — there is no circle by that name in the figure. You can name an existing circle, e.g.: the centre of the circle is {{center}}.",

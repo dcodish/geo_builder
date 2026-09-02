@@ -8746,3 +8746,88 @@ one shape type.
 **Lock.** A structural test asserts no `type="range"` in the 2-D tree binds to a magnitude, so the
 affordance cannot return by accident; plus the stated-radius given still builds, and a pre-change save
 file still loads.
+
+## ADR-476 — a refusal whose counterpart is a SAMPLED value never accuses the student; and the sampler stays inside the feasible set (#855)
+
+**Status:** accepted, 2026-09-02 · **Ports:** [ADR-3D-138](06b-decisions-3d.md#adr-3d-138) (#508/#512) to 2-D · **LADDER stage:** 5, the per-seed tail (`runTail`) · **Operator ruling**
+
+**Context.** The prefix «משולש ABC» / «מעגל» / «AB משיקה למעגל בנקודה B» built at 39 of 40 seeds and, at
+seed 17 alone, drew nothing while the step row read «over-constrained: @ctr-OB ⟂ AB cannot hold». The
+issue was filed as a silent empty figure; round #864 measured it and found a different, worse defect —
+the error is not missing, it is an **accusation**, and the tangency it blames is satisfiable. Measured
+at seed 17:
+
+| | A | centre O | r | \|OA\| |
+| --- | --- | --- | --- | --- |
+| fold (seed 0) | (2.00, 3.60) | (10.00, 0.00) | 5.000 | 8.773 — outside ✓ |
+| seed 16 | (3.56, 6.10) | (10.55, −3.80) | 3.148 | 12.120 — outside ✓ |
+| **seed 17** | (4.92, 0.21) | (1.20, −2.77) | **7.915** | **4.762 — INSIDE ✗** |
+
+A tangent from A touches only when A is outside the circle (the touch point sees `OT ⟂ AT`, so
+`|OA|² = r² + |AT|² ≥ r²`). «מעגל» states no size, so the radius is a free DOF ([ADR-052](#adr-052))
+and the sampler jitters it 0.45×–1.6× while the free points move independently — nothing tells it that
+the student's tangency **couples** those DOFs. At seed 17 it drew a sample from outside the feasible
+set, and the figure then blamed the student for it.
+
+**The class.** *The seed sampler varies each free DOF independently of whether the DRIVEN system is
+still feasible at that sample; the per-seed tail then gets ONE evaluate, and a sample that makes the
+driven system infeasible is reported as an impossibility of the givens — refuted by the 39 seeds that
+build.* It is the honesty rule pointed the wrong way (docs/17 §7): a refusal levelled at the student
+on the strength of a placement the **tool** invented.
+
+**Decision — two halves, in the order the operator ruled them (2026-09-02, *"we need to ensure this
+works like the 3d does"*).**
+
+**(c) Sample inside the feasible set** (`engine/sample.ts`, `clampToPlacementPreconditions`). A
+construct's *placement precondition* bounds the DOFs the sampler is free to invent. A tangency caps the
+free radius at `|PO|`; the clamp is derived from the constraint's own geometry — any perpendicular whose
+shared endpoint is an on-circle point, whose one arm is that circle's radius and whose other arm runs to
+a second point — so every phrasing that lowers to a tangency is covered, rather than the utterance that
+was reported. It is a **no-op on every feasible sample**, so seeds that already built are unchanged.
+
+Only a **free** radius is clamped. A stated radius is a given: bending it to make a seed work would
+drop a stated magnitude, which the honesty invariant forbids outright. That sibling figure
+(«מעגל שרדיוסו 5» + the same tangency) therefore still has an unusable seat — and it is exactly the case
+half (b) exists for.
+
+**(b) The class guard** (`replay/core.ts`, `sampledConfigError`). *A per-seed evaluate failure can never
+be a contradiction of the givens.* The proof is structural, not statistical: this seam only ever
+overrides rows the FOLD marked `ok`, so a configuration in which every stated given holds demonstrably
+exists. The accusing shape therefore degrades to an honest **"not determined"**, naming the sampled
+objects the conflict is really with:
+
+```
+over-constrained: @ctr-OB ⟂ AB cannot hold                        ← was: your given contradicts an earlier one
+not determined: @ctr-O, A are still free, so @ctr-OB ⟂ AB
+                cannot be judged in this configuration            ← now: your givens are fine
+```
+
+Which objects those are is read by a **structural walk** — `constraintRefs` over the violated
+constraint, intersected with `freeDofs` — never by a switch over constraint kinds. ADR-3D-138 makes
+that point explicitly, and for the same reason: an enumeration of the kinds that exist today is
+precisely what a kind added later would quietly escape. Only the `over-constrained` shape is
+substituted (the `blameNewStatement` discipline); a dependency or unknown-point error is not an
+accusation and stays verbatim.
+
+**Deliberately NOT in scope.** Re-running the recruit ladder at the per-seed tail — option (a) of the
+#864 escalation, the underlying mechanism fix. The tail is the hot path (every seed of every sweep) and
+stages 2e–3 are fold-only by design; the perf question is real and is a separate measured item, not
+something to smuggle in behind a message fix. The operator ruled it out of scope explicitly.
+
+**Consequences.**
+
+- The reported prefix and the operator's full five-line sequence resolve at **every** seed 0..40;
+  «הצג תצורה אחרת» can no longer land on the vanishing seat.
+- The tangency still HOLDS at every seed (B on the circle, `OB ⟂ AB`, A outside) — the clamp fixes the
+  seat, it does not weaken the given.
+- #830's regression test carried a `continue` that skipped seed 17 with the comment *"a separate,
+  pre-existing defect"*. That fence is **retired**: the loop now asserts all 40 seeds build.
+- A second placement precondition joins by adding a clause to the same helper. The docs/17 note stands:
+  it must stay a derivation from a constraint's own geometry, never a list of the utterances we met.
+
+**Locked** in `engine/__tests__/issue-855.test.ts` (all 41 seeds green for both sequences; the tangency
+holding per seed; seed 17's sampled construction evaluating; a feasible sample unclamped; and, for the
+stated-radius sibling, no `over-constrained` at any seed, the structural-walk message naming `@ctr-O`
+and `A`, and the stated radius never bent), plus the fixture
+`src/__tests__/fixtures/issue-855-tangency-sampled-seat.geo.json` — the operator's exact sequence saved
+**at seed 17**, so the fixture net replays the very configuration the bug was filed on.
