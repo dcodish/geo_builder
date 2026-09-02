@@ -23,3 +23,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Measure before diagnosing](measure-before-diagnosing.md) — a root cause read off the code is a hypothesis; run the case and print the real state before it goes in the issue body (2026-08-31: two of four wrong)
 - [Heredocs eat backslashes](heredoc-eats-backslashes.md) — bash heredocs silently halve backslashes and run backticks; write files with the Write tool and do string surgery from a .cjs script, then read the lines back (round #869)
 - [Gate after the LAST file](gate-after-the-last-file.md) — run `tsc -b` after the test file exists, not before it; two test-only type errors reached the batch gate in round #869
+- [A red suite may be the gate working](red-suite-may-be-the-gate-working.md) — measure each failing scenario on the PRE-change baseline before relaxing a new invariant; in #872 all three red locks were asserting figures that already shipped flat
