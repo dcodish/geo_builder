@@ -86,9 +86,31 @@ describe('#546 — the ambiguous-circle-ref ASK (never not-handled, never a gues
     expect(r.ok, JSON.stringify(r)).toBe(true);
   });
 
-  it('a bare circle MENTION (area/radius talk) keeps its fallback path — the ask is construct-gated', () => {
+  /**
+   * REVERSED by #519 ([ADR-477](../../../docs/06-decisions.md#adr-477)), deliberately and with the
+   * measurement on record.
+   *
+   * This fence asserted the ask's construct GATING: a bare «מעגל» mention (area/radius talk) kept its
+   * LLM path. #519's audit is precisely the audit of that gating — it was an allowlist of five
+   * construct nouns, and beside two unnamed circles every circle-consuming form outside the five
+   * («רדיוס המעגל הוא 5», «נקודה P בתוך המעגל», «AB חותך את המעגל בנקודה D») escaped to the LLM lane,
+   * whose job is to guess. The oracle check (standing rule 2) confirmed the guess parses and COMMITS.
+   *
+   * The bar for asking rather than escalating is that the question be ANSWERABLE, and that was measured
+   * before the gate moved: «שטח המעגל O שווה 25», «היקף המעגל O שווה 20» and «רדיוס המעגל O הוא 5» all
+   * parse. So the student can act on the question, which an escalation never let them do.
+   *
+   * What this fence protected that still holds is asserted below it: the qualifier channel, the named
+   * centre, the tie-break, and the single-circle ADR-029 principle are all untouched.
+   */
+  it('a bare circle MENTION beside TWO circles now ASKS — the allowlist gating is retired (#519)', () => {
     const r = parse('שטח המעגל שווה 25', twoCircles());
-    if (!r.ok) expect(r.reason).not.toBe('ambiguous-circle-ref');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('ambiguous-circle-ref');
+  });
+
+  it('…and the question is answerable: naming the circle builds it (#519)', () => {
+    expect(parse('שטח המעגל O שווה 25', twoCircles()).ok).toBe(true);
   });
 
   it('a QUALIFIER (size/side/circum/contained) keeps its own resolver channel — no ask over it', () => {
