@@ -59,10 +59,10 @@ describe('figure-file fixtures net', () => {
         expect(r.ok, !r.ok ? `refused: ${(r as { reason: string }).reason}` : undefined).toBe(true);
       });
       if (!r.ok) return;
-      const { facts, seed, radiusOverrides } = r.file;
+      const { facts, seed } = r.file;
 
       it('replays green: builds, verified, nothing pending', () => {
-        const fig = replay(facts, seed, radiusOverrides);
+        const fig = replay(facts, seed);
         expect(fig.lastError).toBeNull();
         expect(fig.pending).toBe(false);
         expect(fig.violations).toEqual([]);

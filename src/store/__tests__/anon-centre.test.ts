@@ -128,11 +128,6 @@ describe('anonymous auto-centres (ADR-342 / #177)', () => {
     expect(after.positions.has('O1'), 'O1 is the real centre of the small circle').toBe(true);
     const inner = after.construction.objects.find((o) => o.id === 'circle-O1')! as { orderedBelow?: string };
     expect(inner.orderedBelow, 'the order lock LANDED (orderedBelow stamped)').toBe('circle-O');
-    // …and the ADR-309 slider machinery keys off it: the small circle can never be dragged past the big.
-    st.setRadius('circle-O1', 20);
-    expect(useGeoStore.getState().radiusOverrides['circle-O1'], 'an order-violating dial is rejected').toBeUndefined();
-    st.setRadius('circle-O1', 2);
-    expect(useGeoStore.getState().radiusOverrides['circle-O1'], 'a legal dial is accepted').toBe(2);
     // the En mirror + the big qualifier, on a fresh figure
     st.clear();
     st.executeMany(r0.commands, 'שני מעגלים נחתכים');

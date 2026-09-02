@@ -1,7 +1,7 @@
 /**
  * Figure file save/load (FR-HS-10) — the `.geo.json` serializer + the store's `loadFigure`.
  *
- * The file is the store's replay inputs (facts + seed + dialed radii + display prefs), never
+ * The file is the store's replay inputs (facts + seed + display prefs), never
  * positions: a load replays through the normal path, so a loaded figure must be geometrically
  * identical to the session it was saved from, and loading must be a single undoable step that
  * never destroys the session that was open.
@@ -12,7 +12,7 @@ import { deserializeFigure, figureFileName, serializeFigure, FIGURE_FILE_VERSION
 import { parse, buildParseCtx } from '@/parser';
 
 const s = () => useGeoStore.getState();
-const fig = () => replay(s().facts, s().seed, s().radiusOverrides);
+const fig = () => replay(s().facts, s().seed);
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
 /** Type an utterance exactly as the app does (parse with the live figure context → executeMany). */
@@ -29,7 +29,6 @@ const saveCurrent = (): string =>
     {
       facts: s().facts,
       seed: s().seed,
-      radiusOverrides: s().radiusOverrides,
       display: {
         hidden: s().hidden,
         segStyle: s().segStyle,
@@ -62,7 +61,7 @@ describe('figure file — serialize/deserialize round trip', () => {
     expect(r.file.facts.map((f) => f.cmd)).toEqual(s().facts.map((f) => f.cmd));
     expect(r.file.seed).toBe(s().seed);
 
-    const after = replay(r.file.facts, r.file.seed, r.file.radiusOverrides);
+    const after = replay(r.file.facts, r.file.seed);
     expect(after.lastError).toBeNull();
     for (const [id, p] of before.positions) {
       expect(after.positions.get(id), `position of ${id}`).toBeDefined();
@@ -84,20 +83,16 @@ describe('figure file — serialize/deserialize round trip', () => {
     if (!r.ok) throw new Error(r.reason);
     const loadedCmd = r.file.facts.find((f) => f.id === branched!.id)!.cmd;
     expect(loadedCmd).toEqual(cycledCmd); // the alternative rides IN the command
-    const after = replay(r.file.facts, r.file.seed, r.file.radiusOverrides);
+    const after = replay(r.file.facts, r.file.seed);
     expect(dist(after.positions.get('G')!, gBefore)).toBeLessThan(1e-9);
   });
 
-  it('the seed and dialed radii ride in the header so the saved CONFIGURATION reloads', () => {
+  it('the seed rides in the header so the saved CONFIGURATION reloads', () => {
     submit('מעגל O');
     submit('משולש ABC חסום במעגל');
-    // Dial the free radius + move off the canonical seed, as a student exploring would.
-    const dof = fig().radiusDofs[0];
-    if (dof) s().setRadius(dof.circle, dof.base * 1.5);
     const r = deserializeFigure(saveCurrent());
     if (!r.ok) throw new Error(r.reason);
     expect(r.file.seed).toBe(s().seed);
-    expect(r.file.radiusOverrides).toEqual(s().radiusOverrides);
   });
 });
 

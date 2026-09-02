@@ -130,7 +130,7 @@ describe('E4 — one user action = one undo entry', () => {
   });
 });
 
-describe('E5 — undo restores the seed and clears the dialed radii', () => {
+describe('E5 — undo restores the seed', () => {
   it('undo rolls the seed back with the facts (the view the student saw)', () => {
     s().executeMany([{ type: 'square', ids: ['A', 'B', 'C', 'D'] } as AnyCommand], 'square');
     s().executeMany([{ type: 'free-point', id: 'G', x: 9, y: 9, free: true } as AnyCommand], 'G');
@@ -142,14 +142,6 @@ describe('E5 — undo restores the seed and clears the dialed radii', () => {
     expect(s().facts).toHaveLength(2); // facts untouched by that entry
   });
 
-  it('undo clears the dialed-radius scratchpad', () => {
-    s().executeMany([{ type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true } as AnyCommand], 'circle');
-    s().setRadius('circle-O', 8);
-    expect(s().radiusOverrides['circle-O']).toBe(8);
-    s().executeMany([{ type: 'point-on-circle', id: 'A', circle: 'circle-O' } as AnyCommand], 'A on O');
-    s().undo();
-    expect(s().radiusOverrides).toEqual({}); // the scratchpad never outlives the state it annotated
-  });
 });
 
 describe('E6 — subscripted points in rename/swap and seg-style keys', () => {

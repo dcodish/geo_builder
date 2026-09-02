@@ -37,7 +37,7 @@ function makeDeps() {
     },
     view: () => {
       const st = useGeoStore.getState();
-      const d = replay(st.facts, st.seed, st.radiusOverrides);
+      const d = replay(st.facts, st.seed);
       return { construction: d.construction, positions: d.positions };
     },
     isBusy: () => false,

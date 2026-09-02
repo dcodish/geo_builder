@@ -24,7 +24,7 @@ describe('reported scenario — carrier segments drawn + a typo never silently d
       const r = parse(utterance, ctx);
       let commands: AnyCommand[] | null = null;
       if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0 && droppedGivenNumbers(utterance, r.commands).length === 0) {
-        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
+        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed);
         if (outcome.produced || (outcome.reason === 'error' && hasDeferrableConstraint(r.commands))) commands = r.commands;
       }
       if (!commands) commands = llm ?? null;

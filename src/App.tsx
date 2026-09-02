@@ -95,10 +95,8 @@ export default function App() {
   const setGroupEnabled = useGeoStore((s) => s.setGroupEnabled);
   const removeGroup = useGeoStore((s) => s.removeGroup);
   const select = useGeoStore((s) => s.select);
-  const radiusOverrides = useGeoStore((s) => s.radiusOverrides);
   const figureName = useGeoStore((s) => s.figureName);
   const setFigureName = useGeoStore((s) => s.setFigureName);
-  const setRadius = useGeoStore((s) => s.setRadius);
   const seed = useGeoStore((s) => s.seed);
   const showMeasures = useGeoStore((s) => s.showMeasures);
   const setShowMeasures = useGeoStore((s) => s.setShowMeasures);
@@ -312,7 +310,7 @@ export default function App() {
   // (the submit pipeline builds its own parse context from the injected display view — S0.4)
 
   // ── save / load a figure file (FR-HS-10) ─────────────────────────────────
-  // The file is the store's replay inputs (facts + seed + dialed radii) plus display preferences —
+  // The file is the store's replay inputs (facts + seed) plus display preferences —
   // no positions (the figure is re-derived on load). See src/store/figureFile.ts.
   const saveFigure = () => {
     const st = useGeoStore.getState();
@@ -337,7 +335,6 @@ export default function App() {
       {
         facts: st.facts,
         seed: st.seed,
-        radiusOverrides: st.radiusOverrides,
         display: {
           hidden: st.hidden,
           segStyle: st.segStyle,
@@ -482,7 +479,7 @@ export default function App() {
     // Smoke-replay before committing: a file that makes the derivation THROW (not merely flag a fact)
     // must never become the session — refuse it instead of a white screen on the next render.
     try {
-      replay(r.file.facts, r.file.seed, r.file.radiusOverrides);
+      replay(r.file.facts, r.file.seed);
     } catch {
       setBusy(false);
       noteFileProblem('file.badFile');
@@ -580,7 +577,7 @@ export default function App() {
   }
 
   // Figure + per-fact status are derived from the fact list.
-  const derivedRaw = useMemo(() => replay(facts, seed, radiusOverrides), [facts, seed, radiusOverrides]);
+  const derivedRaw = useMemo(() => replay(facts, seed), [facts, seed]);
   // #85 ([ADR-293](docs/06-decisions.md#adr-293)) — view-level keep-prior, the NEVER-BLANK principle: when
   // the current (facts, seed, overrides) state evaluates to NOTHING (positions empty) or to non-finite
   // coordinates (a NaN viewBox renders an empty canvas with every status green), the canvas keeps drawing
@@ -601,7 +598,7 @@ export default function App() {
   const display = searchHold || viewStale ? lastGoodViewRef.current! : derivedRaw;
   // GEOMETRY from the displayable state; STATUS/ERROR from the real current state (the step list and the
   // error banner must tell the truth about what just happened).
-  const { construction, positions, circles, labels, angleMarks, violations, radiusDofs, coincidences, forcedOffArc } = display;
+  const { construction, positions, circles, labels, angleMarks, violations, coincidences, forcedOffArc } = display;
   const { status, lastError, pending } = derivedRaw;
   // #574 (ADR-447): the one seam turning an anonymous id into words the student can act on.
   const describePoint = (id: string): string => {
@@ -1677,59 +1674,6 @@ export default function App() {
           )}
           </div>
 
-          {/* Playable degrees of freedom (first slice): a slider per free-circle radius. Dialing a value
-              is a viewing scratchpad — "show another configuration" resets it. */}
-          {radiusDofs.length > 0 && (
-            <div>
-              <div style={sectionLabel}>{t('dof.title')}</div>
-              {radiusDofs.map((d) => {
-                const value = radiusOverrides[d.circle] ?? d.current;
-                // A concentric pair (ADR-244) shares a centre letter — label its sliders outer/inner.
-                const paired = radiusDofs.some((o) => o.circle !== d.circle && o.center === d.center);
-                const isInner = construction.objects.some((o) => o.kind === 'circle' && o.id === d.circle && o.innerOf);
-                // A bound radius SYMBOL (issue #54 — "מעגל שרדיוסו R") names the slider, so the student
-                // sees the letter they typed pointing at the DOF it denotes (§6 visibility).
-                const circObj = construction.objects.find((o) => o.kind === 'circle' && o.id === d.circle);
-                const sym = circObj && circObj.kind === 'circle' ? circObj.radiusSymbol : undefined;
-                // An anonymous centre ('@ctr-O', ADR-342) is displayed by its reference token — the letter
-                // the student uses for the circle («מעגל O»), never the internal id.
-                const ctrTok = d.center.startsWith('@ctr-') ? d.center.slice(5) : d.center;
-                const base = paired ? t(isInner ? 'dof.radiusInner' : 'dof.radiusOuter', { center: ctrTok }) : t('dof.radius', { center: ctrTok });
-                const label = sym ? `${base} (${sym})` : base;
-                // Two circles under a stated RADIUS ORDER (R>r, ADR-305/244) share ONE common slider scale,
-                // so the order is VISIBLE — R's thumb always sits to the right of r's on the same axis
-                // (issue #113 follow-up: with per-slider ranges the small circle's thumb could sit further
-                // right than the big one's, so the order was enforced but not shown). The order itself is
-                // still guaranteed by `setRadius` (rejects a value that violates radius-order/ratio); the
-                // shared scale makes it legible. A circle not in an order keeps its own range.
-                const orderPartner =
-                  circObj && circObj.kind === 'circle' && circObj.orderedBelow
-                    ? circObj.orderedBelow // d is inner → its outer
-                    : construction.objects.find((o) => o.kind === 'circle' && o.orderedBelow === d.circle)?.id; // d is outer → its inner
-                const partnerDof = orderPartner ? radiusDofs.find((x) => x.circle === orderPartner) : undefined;
-                const bases = partnerDof ? [d.base, partnerDof.base] : [d.base];
-                const min = Math.max(0.2, Math.min(...bases) * 0.3);
-                const max = Math.max(...bases) * 2.2;
-                return (
-                  <div key={d.circle} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, minWidth: 96 }} dir={textDir(label)}>{label}</span>
-                    <input
-                      type="range"
-                      min={min}
-                      max={max}
-                      step={d.base * 0.02}
-                      value={Math.min(max, Math.max(min, value))}
-                      onChange={(e) => setRadius(d.circle, Number(e.target.value))}
-                      // #84: log the FINAL dialed value on release (not every drag tick) so a session replays.
-                      onPointerUp={(e) => logDebug({ kind: 'action', action: 'slider', detail: `${d.circle}=${Number((e.target as HTMLInputElement).value).toFixed(2)}` })}
-                      style={{ flex: 1 }}
-                    />
-                    <span style={{ fontSize: 12, minWidth: 34, textAlign: 'end', color: '#64748b' }}>{value.toFixed(1)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
 
           {/* The LIVE theorem feed (Phase 6a) — the bagrut theorems the STATED givens announce, updated
               every step (help, don't reveal: only what the givens *announce*, never the derived "aha").

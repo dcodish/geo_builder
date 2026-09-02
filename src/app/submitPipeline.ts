@@ -208,7 +208,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
       logDebug({ kind: 'input', utterance, locale, source: 'rename', rename: pbind, result: 'auto-bind-point', intermediate: true });
     }
     const st = store();
-    const d = replay(st.facts, st.seed, st.radiusOverrides);
+    const d = replay(st.facts, st.seed);
     pctx = buildParseCtx(d.construction, d.positions);
     r = parse(utterance, pctx);
   }
@@ -367,7 +367,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
       // A deterministic parse can "succeed" yet build NOTHING — apply with an error (kept-prior) or
       // change nothing at all. Dry-run before committing so a silent fail isn't shown as success
       // (operator request); a step that builds something commits immediately.
-      const outcome = dryRunOutcome(st.facts, r.commands, st.seed, st.radiusOverrides);
+      const outcome = dryRunOutcome(st.facts, r.commands, st.seed);
       if (outcome.produced) {
         // One utterance → one BATCH commit (one group id, one set, ONE undo entry — E4/STO-4).
         store().executeMany(r.commands, utterance);
@@ -562,7 +562,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     }
   }
   const llmBuilds =
-    out !== null && out.built.length > 0 && dryRunOutcome(cur.facts, llmCmds, cur.seed, cur.radiusOverrides).produced;
+    out !== null && out.built.length > 0 && dryRunOutcome(cur.facts, llmCmds, cur.seed).produced;
   if (!llmBuilds) {
     // Both the grammar AND the LLM failed to BUILD anything. Distinguish a deliberately OUT-OF-SCOPE
     // concept — a named angle/theorem relationship, a proof or compute request, or pure free text —

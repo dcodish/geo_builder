@@ -4,7 +4,7 @@
  * deferral + HOIST + the config sweeps — the most intricate control flow in the product — living in
  * the 2,717-line Zustand store beside selection highlighting and undo).
  *
- * Everything here is PURE over (facts, seed, radiusOverrides): the replay/fold memo (ADR-280), the
+ * Everything here is PURE over (facts, seed): the replay/fold memo (ADR-280), the
  * ADR-104 deferral fixpoint, the atomic-group poisoning, the M2 HOIST rescue (ADR-231), the seed &
  * config searches (firstSatisfyingSeed / meetsRequirements / findValidConfig / searchResample /
  * searchAnotherView, ADR-267), the shared detection sample core (M3), and the validity predicates.
@@ -111,7 +111,6 @@ export interface Derived {
    *  no error: a fact can apply cleanly yet leave its relation unsatisfied (the verifier net). */
   violations: GivenViolation[];
   /** Free-radius circles the student can dial directly (a slider per circle) — the first playable DOF. */
-  radiusDofs: RadiusDof[];
   /** Pairs of distinct points the geometry drove to the same location — allowed, shown as a notice so the
    *  student knows two labels converged (e.g. a derived point landing on a circle's centre). [ADR-123] */
   coincidences: [Id, Id][];
@@ -123,12 +122,6 @@ export interface Derived {
 
 /** A free circle radius the student can drag: `base` is the stable seed radius (for the slider range),
  *  `current` is the radius being drawn right now (seed-varied or dialed). */
-export interface RadiusDof {
-  circle: Id;
-  center: Id;
-  base: number;
-  current: number;
-}
 
 /** Reflect point `p` across the line through `a0`,`a1` (the mirror image). Degenerate axis ⇒ `p` unchanged. */
 function reflectAcross(p: Vec, a0: Vec, a1: Vec): Vec {
@@ -180,7 +173,7 @@ function applyReflections(c: Construction, mask: number): Construction {
 }
 
 /**
- * Replay memoization (E1 / STO-1). `replay` is pure in `(facts, seed, radiusOverrides)` but was
+ * Replay memoization (E1 / STO-1). `replay` is pure in `(facts, seed)` but was
  * treated as free and called from four layers per user action (dry-run, the commit guard, the debug
  * snapshot, render) — and the config search (`firstSatisfyingSeed`/`findValidConfig`/`meetsRequirements`)
  * re-replays the SAME (facts, seed) pairs across its passes. A tiny cache keyed on the facts array's
@@ -193,8 +186,8 @@ const replayCache = new WeakMap<Fact[], { snapshot: readonly Fact[]; bySeed: Map
 const REPLAY_CACHE_MAX = 512; // per facts-array — above this the sweep is exploring, not re-checking
 export const replayStats = { computes: 0 };
 
-export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}): Derived {
-  const key = `${seed}|${JSON.stringify(radiusOverrides)}`;
+export function replay(facts: Fact[], seed = 0): Derived {
+  const key = `${seed}`;
   let entry = replayCache.get(facts);
   // The store never mutates a facts array (every action builds a new one), but TESTS and harnesses
   // legitimately `push` into one between replays — so a ref-keyed hit is only valid while the array
@@ -205,7 +198,7 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   if (entry && !fresh) entry = undefined;
   const hit = fresh ? entry!.bySeed.get(key) : undefined;
   if (hit) return hit;
-  const out = computeReplay(facts, seed, radiusOverrides);
+  const out = computeReplay(facts, seed);
   replayStats.computes++;
   if (!entry) {
     entry = { snapshot: facts.slice(), bySeed: new Map() };
@@ -229,7 +222,7 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
  * The seed-INDEPENDENT half of a replay ([ADR-280](docs/06-decisions.md#adr-280), issue #59): everything
  * derived from the fact list alone — the symbol table, the default-yield pre-scans, the apply fold
  * (`runBuild`, including the failure-path recruiter), the ADR-104 deferral retries, the atomic-group
- * poisoning, and the ADR-231 HOIST rescue. The seed and radius overrides enter only in {@link runTail},
+ * poisoning, and the ADR-231 HOIST rescue. The seed enters only in {@link runTail},
  * which perturbs the finished construction and evaluates once. Statuses and the rtReorder map are stored
  * BY FACT INDEX (not id) so a dry-run trial array and the committed array — same content, different fact
  * ids — share one fold. A HOIST rescue is kept as a `rescue` candidate (build-clean and not pending);
@@ -339,7 +332,7 @@ export function trialFacts(facts: Fact[], commands: AnyCommand[]): Fact[] {
   return [...facts, ...eff.map((c, i) => ({ id: `~try.${i}`, group: '~try', enabled: true, cmd: c }))];
 }
 
-function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}): Derived {
+function computeReplay(facts: Fact[], seed = 0): Derived {
   const key = foldKey(facts);
   let fold = foldCache.get(key);
   if (!fold) {
@@ -353,18 +346,18 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
       foldCache.set(key, fold);
     }
   }
-  return tailChoice(fold, facts, seed, radiusOverrides);
+  return tailChoice(fold, facts, seed);
 }
 
 /** Per-seed candidate choice: try the HOIST rescue chain first; a rescue whose tail evaluates clean at
  *  THIS seed wins (exactly the old recursive acceptance `rescued.lastError === null && !rescued.pending`),
  *  else fall back to the fold that failed — its honest error stands. */
-function tailChoice(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: Record<Id, number>): Derived {
+function tailChoice(fold: FoldNode, facts: Fact[], seed: number): Derived {
   if (fold.rescue) {
-    const r = tailChoice(fold.rescue, facts, seed, radiusOverrides);
+    const r = tailChoice(fold.rescue, facts, seed);
     if (r.lastError === null && !r.pending) return r;
   }
-  return runTail(fold, facts, seed, radiusOverrides);
+  return runTail(fold, facts, seed);
 }
 
 /** #566 (ADR-445): the vertices an enabled EXPLICIT 90° statement names — the right-triangle seat's
@@ -963,12 +956,12 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
 }
 
 /**
- * The seed-DEPENDENT tail of a replay (ADR-280): reflections + the ADR-018 sample + radius overrides on
+ * The seed-DEPENDENT tail of a replay (ADR-280): reflections + the ADR-018 sample on
  * the fold's finished construction, ONE evaluate, then the per-seed presentation (labels, asserted angle
- * marks, the givens verifier, radius sliders, coincidences). This is all a new seed — a sweep candidate,
+ * marks, the givens verifier, coincidences). This is all a new seed — a sweep candidate,
  * a "show another configuration" probe, a detection sample — ever pays.
  */
-function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: Record<Id, number>): Derived {
+function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   const { cur, applied, pending } = fold;
   const status: Record<string, FactStatus> = {};
   facts.forEach((f, i) => { status[f.id] = fold.statusByIndex[i]; });
@@ -993,21 +986,7 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
   let preMask = 0, postMask = 0;
   refl.forEach((id, i) => { if (fullMask & (1 << i)) (helpers.has(id) ? (postMask |= 1 << i) : (preMask |= 1 << i)); });
   const sampled = applyReflections(applySeed(applyReflections(cur, preMask), baseSeedOf(seed)), postMask);
-  // A dialed radius (the DOF slider) overrides the sampled value for that free circle — a viewing
-  // scratchpad (ADR-048): it's cleared by "show another configuration", never a fixed given (ADR-052).
-  let figure =
-    Object.keys(radiusOverrides).length === 0
-      ? sampled
-      : {
-          ...sampled,
-          objects: sampled.objects.map((o) =>
-            o.kind === 'circle' && o.radius.via === 'free' && radiusOverrides[o.id] !== undefined
-              ? // FIX the dialed radius (clear any `solve`): the student is choosing it, so the OTHER free
-                // DOFs re-solve AROUND it (e.g. a tangent apex moves to keep ∠CAB=90), not the radius.
-                { ...o, radius: { via: 'free' as const, value: radiusOverrides[o.id] }, solve: undefined }
-              : o,
-          ),
-        };
+  let figure = sampled;
   let e = evaluate(figure);
   // #359 ([ADR-400](docs/06-decisions.md#adr-400)): per-seed BASIN RETRY. The fold's ladder (recruit /
   // settle / scale, docs/LADDER.md stages 2e–3) runs only at fold time; the tail is one evaluate, so a
@@ -1028,9 +1007,9 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
       }
     }
   }
-  // A dialed radius override (or a seed) can break a figure that BUILT fine — surface that failure so the
-  // error reflects what's actually drawn (and so `setRadius` can reject an impossible dial). `lastError`
-  // was build-only, so an override that made `evaluate` fail left it null with the figure silently gone.
+  // A seed can break a figure that BUILT fine — surface that failure so the error reflects what is
+  // actually drawn. `lastError` was build-only, so a sample that made `evaluate` fail left it null with
+  // the figure silently gone.
   if (!e.ok && !lastError) lastError = e.error;
   // #360 ([ADR-398](docs/06-decisions.md#adr-398)): attribute a PER-SEED evaluate failure to the fact
   // rows that own the violated constraint / stuck object. `status` came from the seed-independent fold
@@ -1137,14 +1116,6 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
   const violations = e.ok ? checkGivens(applied, e.positions, e.circles, figure) : [];
   // Free-radius circles the student can dial (base = stable seed radius for the slider range; current =
   // what's drawn). Read from the pre-seed construction so the range doesn't shift as the value changes.
-  // Show a slider only for a FREE, not-currently-driven radius — a radius the solver drives is pinned by
-  // a constraint (e.g. |OC|=9), so dialing it would just fight that constraint. (The override above still
-  // clears `solve` so a momentarily-recruited radius can be dialed with the rest re-solving around it.)
-  const radiusDofs: RadiusDof[] = cur.objects.flatMap((o) =>
-    o.kind === 'circle' && o.radius.via === 'free' && o.solve === undefined
-      ? [{ circle: o.id, center: o.center, base: o.radius.value, current: e.ok ? e.circles.get(o.id)?.r ?? o.radius.value : o.radius.value }]
-      : [],
-  );
   // Distinct points the geometry drove onto the same spot — allowed (not an error), surfaced as a notice
   // so the student knows two labels converged ([ADR-123](docs/06-decisions.md#adr-124)).
   const coincidences: [Id, Id][] = e.ok ? e.coincidences ?? [] : [];
@@ -1152,7 +1123,7 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
   // on a semicircle is always on the other half. Allowed, never a violation (flagging it would be
   // unsatisfiable), but said out loud, the way a forced coincidence is.
   const forcedOffArc: ForcedOffArc[] = e.ok ? forcedOffArcs(figure, e.positions, e.circles) : [];
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, radiusDofs, coincidences, forcedOffArc };
+  return { construction: figure, positions: e.ok ? e.positions : new Map(), circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, coincidences, forcedOffArc };
 }
 
 /** The (a, b, id, circle) triples every enabled `extend-onto-circle` step asserts ("המשך a·b onto `circle` at id"). */
@@ -1883,15 +1854,15 @@ export type StepOutcome = { produced: true } | { produced: false; reason: 'error
  * step that produces nothing must never be a silent no-op). A *givens violation* is deliberately NOT
  * "produced nothing" — the amber "may not match" cue already flags that, and the figure is still shown.
  */
-export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, overrides: Record<Id, number> = {}): StepOutcome {
+export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): StepOutcome {
   // ALL THREE label kinds (#162): the gate predates ADR-118's `areas`, so a lone symbolic area label
   // («שטח משולש AFO הוא 9b» — correctly no constraint, ADR-031/118) counted as nothing and the
   // student's statement was swallowed as "already drawn". A diff, so an exact re-statement still nets 0.
   const labelCount = (l: MeasureLabels) => l.lengths.length + l.angles.length + l.areas.length;
-  const before = replay(facts, seed, overrides);
+  const before = replay(facts, seed);
   const all = trialFacts(facts, commands);
   const trial = all.slice(facts.length);
-  const after = replay(all, seed, overrides);
+  const after = replay(all, seed);
   const errored = trial.find((f) => after.status[f.id] !== 'ok');
   if (errored) return { produced: false, reason: 'error', detail: after.status[errored.id] };
   // "Built something" = added a shape/constraint/label, OR RESHAPED the figure — a step like "diameter AB"

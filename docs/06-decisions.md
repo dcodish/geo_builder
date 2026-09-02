@@ -8680,3 +8680,69 @@ figure; the Q9 figure opening ∠ACE/∠AFD past the bar with the whole drawing 
 former tightest wedge; the stated-5° figure building, drawing and keeping its 5°; the everyday figures
 still landing on seed 0; and the #193 boundary asserted from the pool's side — a squashed configuration
 is still valid and still a legitimate sample.
+
+## ADR-475 — magnitude dialing is a decided NON-feature: the radius sliders are removed (#875)
+
+**Status:** accepted, 2026-09-02 · **Supersedes:** [ADR-048](#adr-048) · **Operator ruling**
+
+**Context.** The circle-radius slider shipped early as the UI for "this size was never stated — you
+choose it", framed by ADR-048 as *"a viewing aid, not a fixed given"*. Two bugs filed against it in
+one week ([#810](https://github.com/dcodish/geo_builder/issues/810) — a coupled circle group offers
+no slider though a real free DOF exists; [#874](https://github.com/dcodish/geo_builder/issues/874) —
+a slider is offered on a radius a given already pins) sent the session to measure what the control
+actually does. All three of its observable behaviours are wrong:
+
+| figure | slider | dragging it |
+| --- | --- | --- |
+| «מעגל» alone | offered | value changes (r → 2.5 / 10) but the drawing is **identical** — 360.0px at every setting, because the canvas is a pure auto-fit and a lone circle's size has nothing to be measured against |
+| «מעגל O» + «AB קוטר במעגל O» + «AB = 10» | offered | **frozen** — `setRadius`'s guard rejects every value, so `radiusOverrides` stays `{}` |
+| the pair + other sized geometry | **none** | a genuinely visible freedom with no control at all |
+
+The operator's reading, on being shown this (2026-09-02): *"in general, i'm thinking that the sliders
+are wrong. we dont have a slider for segment legth either."* — and the ruling: *"lets remove the radius
+sliders all together and document as a feature we decided to not implement with the reasoning."*
+
+**Decision — remove the radius sliders; magnitude dialing is not a feature this tool has.**
+
+The reasoning, recorded so it is not re-proposed as a gap:
+
+1. **It was a one-off.** The circle radius was the ONLY magnitude slider in the app; the other
+   `type="range"` in the tree is the view-rotation control. Segment length, angle and on-carrier
+   position are equally free and equally unstated, and never had one. There was no rule to learn.
+2. **The tool already has the honest mechanism for an unstated magnitude** — «הצג תצורה אחרת». It
+   covers every free DOF and every branch uniformly, and it says the true thing (*another valid
+   drawing*) rather than *the size you chose*.
+3. **And for a stated one — type it.** «רדיוס המעגל 4» becomes a FACT: it enters the ordered list,
+   drives the solve, survives undo, saves with the figure. That is the architecture of docs/11.
+4. **The slider was a second state channel beside the fact list**, and needed bespoke defence for it:
+   `setRadius` carries its own impossibility guard because a dialed value can contradict the givens in
+   ways a fact cannot, and `radiusOverrides` had to be cleared on undo, on resample, and on a seed
+   advance — three places a fact would simply have been replayed.
+5. **It could assert an unstated given through the UI.** A student who dials a radius until it "looks
+   right" holds a figure carrying a magnitude they never gave — precisely what [ADR-052](#adr-052)
+   forbids, arriving through an affordance instead of through a default.
+
+**Consequences.** #810 and #874 close as moot — no group offers a slider and no circle does. The
+zoom/auto-fit decoupling ruled as Option C on #810 is retired with them: it existed only to make a
+scale-only slider meaningful. `replay`'s third parameter, `RadiusDof`, `radiusDofs`, the `setRadius`
+store action and the `radiusOverrides` state all go, so no dead machinery is left behind (docs/17 —
+a removal that leaves the mechanism is not a removal). The `set-radius` PARSER rule is untouched: the
+stated given «רדיוס המעגל 5» is unrelated despite the similar name.
+
+**Backward compatibility.** A `.geo.json` written before this change carries `radiusOverrides`. The
+loader ignores the field instead of erroring and the figure draws at its replayed radii — correct by
+ADR-048's own definition of a dialed value as a viewing aid, and the load audit does not report it as
+a lossy field. Old saved figures keep loading.
+
+**What this deliberately gives up, and where it went.** Dragging showed a *trend* — as this grows,
+that shrinks — which the discrete «הצג תצורה אחרת» cannot. That is real teaching value and it is the
+only argument the slider ever had. It is recorded as
+[#876](https://github.com/dcodish/geo_builder/issues/876), filed and NOT scheduled: if it is ever
+built it must be one uniform "explore a free magnitude" mode over every free DOF, explicitly a viewing
+mode that never enters the fact list, gated on the induced-subfigure *"is this free relative to the
+rest of the drawing"* question (`scalePinned`) that `radiusDofs` was never asking — never a control on
+one shape type.
+
+**Lock.** A structural test asserts no `type="range"` in the 2-D tree binds to a magnitude, so the
+affordance cannot return by accident; plus the stated-radius given still builds, and a pre-change save
+file still loads.

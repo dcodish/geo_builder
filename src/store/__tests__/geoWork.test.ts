@@ -58,14 +58,13 @@ describe('searchAnotherView (the pure extraction — ADR-340 composite)', () => 
     expect(ticks[0]).toBe(1);
   });
   it('the store action applies exactly the searched composite', () => {
-    useGeoStore.setState({ facts: factsOf('מעגל שמרכזו O', 'A על המעגל', 'B על המעגל'), seed: 0, radiusOverrides: { 'circle-O': 3 } });
+    useGeoStore.setState({ facts: factsOf('מעגל שמרכזו O', 'A על המעגל', 'B על המעגל'), seed: 0 });
     const expected = searchAnotherView(useGeoStore.getState().facts, 0);
     const changed = useGeoStore.getState().resample();
     expect(changed).toBe(expected !== null);
     if (expected !== null) {
       expect(useGeoStore.getState().seed).toBe(expected.seed);
-      expect(useGeoStore.getState().radiusOverrides).toEqual({}); // a fresh view clears dialed radii
-    }
+      }
   });
 });
 
@@ -103,7 +102,7 @@ describe('trialFacts — the prefold warms exactly the dry-run content', () => {
 
 describe('geoWork — the no-Worker fallback (vitest env)', () => {
   beforeEach(() => {
-    useGeoStore.setState({ facts: [], seed: 0, radiusOverrides: {} });
+    useGeoStore.setState({ facts: [], seed: 0 });
   });
   it('resample resolves the same COMPOSITE the sync search finds (ADR-340: validated facts + seed, never a bare seed)', async () => {
     const facts = factsOf('מעגל שמרכזו O', 'A על המעגל', 'B על המעגל');

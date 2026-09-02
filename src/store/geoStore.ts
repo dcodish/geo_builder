@@ -259,9 +259,6 @@ export interface GeoState {
   /** Reveal every circle's centre + label (ADR-059); UI-only, not undoable. Default false.
    *  A display preference grouped with `showMeasures` in the sidebar (was a ⊙ button on the canvas). */
   showCenters: boolean;
-  /** Dialed free-circle radii (the DOF sliders): circle id → radius. A viewing scratchpad — UI-only,
-   *  not undoable, cleared by "show another configuration". */
-  radiusOverrides: Record<Id, number>;
   /** Point ids whose label + vertex dot are hidden on the figure — a DISPLAY preference (the point still
    *  participates in the construction; segments through it still draw). UI-only, not undoable: the student
    *  un-hides by clicking the ghost again. Rewritten by `rename`/`merge` so it tracks the renamed letter. */
@@ -305,8 +302,7 @@ export interface GeoState {
    *  step whose row still showed ✓). Applies the same idempotency/move-in-place policy per command. */
   executeMany: (cmds: AnyCommand[], utterance?: string) => void;
   /** Undo/redo wrappers (E5/STO-5): zundo restores `facts` + `seed` (the figure the student SAW — the
-   *  seed is in the temporal state, so an auto-advanced/resampled view rolls back with its facts), and
-   *  any dialed radii are cleared (a viewing scratchpad can't outlive the state it annotated). */
+   *  seed is in the temporal state, so an auto-advanced/resampled view rolls back with its facts). */
   undo: () => void;
   redo: () => void;
   /** Replace a fact's command *in place* (same list position) — an edit (ADR-015). */
@@ -362,11 +358,8 @@ export interface GeoState {
    *  Returns `true` if the figure now meets every requirement, `false` if none was found (kept as-is). */
   autoResolve: () => boolean;
   /** #41 (ADR-290): apply a view decided OFF-thread (a worker resample / auto-resolve outcome) as ONE
-   *  undo-tracked transition — the async twin of `resample`/`autoResolve`'s own `set` (clears dialed radii
-   *  like every fresh view). */
+   *  undo-tracked transition — the async twin of `resample`/`autoResolve`'s own `set`. */
   applyView: (patch: { facts?: Fact[]; seed: number }) => void;
-  /** Dial a free circle's radius directly (a DOF slider). Cleared on resample. */
-  setRadius: (circle: Id, value: number) => void;
   /** Show/hide measure labels on the figure (ADR-031). */
   setShowMeasures: (show: boolean) => void;
   /** Show/hide every circle's centre + label (ADR-059). */
@@ -485,7 +478,6 @@ function commitCommands(
       const s = firstSatisfyingSeed(next, seed);
       if (s !== seed) {
         patch.seed = s;
-        patch.radiusOverrides = {};
       }
     }
   }
@@ -501,7 +493,6 @@ export const useGeoStore = create<GeoState>()(
       seed: 0,
       showMeasures: true,
       showCenters: false,
-      radiusOverrides: {},
       hidden: [],
       segStyle: {},
       hiddenCircles: [],
@@ -522,13 +513,10 @@ export const useGeoStore = create<GeoState>()(
 
       undo: () => {
         useGeoStore.temporal.getState().undo();
-        // A dialed radius is a viewing scratchpad on the state it annotated — never carry it across (E5).
-        if (Object.keys(get().radiusOverrides).length) set({ radiusOverrides: {} });
       },
 
       redo: () => {
         useGeoStore.temporal.getState().redo();
-        if (Object.keys(get().radiusOverrides).length) set({ radiusOverrides: {} });
       },
 
       update: (id, cmd, utterance) => {
@@ -600,7 +588,6 @@ export const useGeoStore = create<GeoState>()(
           const s = firstSatisfyingSeed(next, seed);
           if (s !== seed) {
             patch.seed = s;
-            patch.radiusOverrides = {};
           }
         }
         set(patch);
@@ -743,12 +730,12 @@ export const useGeoStore = create<GeoState>()(
         // post-hoc mutation — the applied view is always validated as a whole.
         const found = searchAnotherView(get().facts, get().seed);
         if (found === null) return false; // determined (or nothing valid/shape-different in budget)
-        set({ ...(found.facts !== get().facts ? { facts: found.facts } : {}), seed: found.seed, radiusOverrides: {} });
+        set({ ...(found.facts !== get().facts ? { facts: found.facts } : {}), seed: found.seed });
         return true;
       },
 
       applyView: (patch) => {
-        set({ ...(patch.facts ? { facts: patch.facts } : {}), seed: patch.seed, radiusOverrides: {} });
+        set({ ...(patch.facts ? { facts: patch.facts } : {}), seed: patch.seed });
       },
 
       autoResolve: () => {
@@ -756,27 +743,10 @@ export const useGeoStore = create<GeoState>()(
         if (meetsRequirements(facts, seed)) return true; // already meets every requirement — nothing to search
         const found = findValidConfig(facts, 0);
         if (found) {
-          set({ facts: found.facts, seed: found.seed, radiusOverrides: {} });
+          set({ facts: found.facts, seed: found.seed });
           return true;
         }
         return false; // no fully-valid configuration found in budget — keep the current figure (shown amber)
-      },
-
-      setRadius: (circle, value) => {
-        const { facts, seed, radiusOverrides } = get();
-        const candidate = { ...radiusOverrides, [circle]: value };
-        // A playable DOF must not be draggable into an IMPOSSIBLE figure (operator requirement): accept a
-        // value only if the figure still BUILDS (no error) AND still honours its stated RADIUS RELATIONS —
-        // a `set-radius-order` (R>r) / `set-radius-ratio` given is a REQUIREMENT the verifier flags but that
-        // leaves `lastError` null, so an order-only check let the slider drag the small circle past the big
-        // one (operator report 2026-07-13). Reject a candidate that introduces a radius-order/ratio
-        // violation, so the slider STOPS at the R>r boundary. Other (pre-existing) violations don't freeze
-        // the slider — only radius-relation ones, which dialing this radius directly controls.
-        const fig = replay(facts, seed, candidate);
-        const radiusViolated = fig.violations.some(
-          (v) => v.relation === 'radius-order' || v.relation === 'radius-ratio' || v.relation === 'circles-disjoint' || v.relation === 'circle-contained',
-        );
-        if (fig.lastError === null && !radiusViolated) set({ radiusOverrides: candidate });
       },
 
       setShowMeasures: (show) => set({ showMeasures: show }),
@@ -806,9 +776,6 @@ export const useGeoStore = create<GeoState>()(
           hidden: get().hidden.map((h) => (h === F ? T : h)), // a hidden point keeps its hidden state under the new letter
           segStyle: renameSegStyle(get().segStyle, F, T), // a styled segment keeps its style under the renamed endpoint
           hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)), // a hidden circle tracks its renamed centre
-          // a dialed radius (keyed `circle-X`) tracks its renamed centre too — else the override orphans
-          // and the circle silently snaps back to its seed radius (review 2026-07-03, S2)
-          radiusOverrides: Object.fromEntries(Object.entries(get().radiusOverrides).map(([k, v]) => [relabelId(k, F, T), v])),
           selectedId: null,
         });
         return { ok: true };
@@ -824,20 +791,13 @@ export const useGeoStore = create<GeoState>()(
       nameCentre: (from, to) => {
         const r = nameCentreFacts(get().facts, from, to);
         if (!r.ok) return { ok: false, reason: r.reason };
-        const { source, letter, anon } = r;
+        const { source, letter } = r;
         const T = to.toUpperCase();
         set({
           facts: r.facts,
           hidden: get().hidden.map((h) => (h === source ? T : h)),
           segStyle: renameSegStyle(get().segStyle, source, T),
           hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${letter}` ? `circle-${T}` : c)),
-          radiusOverrides: Object.fromEntries(
-            Object.entries(get().radiusOverrides).map(([k, v]) => [
-              // whole-id (or concentric `-`-suffix) mapping — never substring (the ADR-122 class, see nameCentreFacts)
-              anon ? (k === `circle-${letter}` ? `circle-${T}` : k.startsWith(`circle-${letter}-`) ? `circle-${T}` + k.slice(`circle-${letter}`.length) : k) : relabelId(k, source, T),
-              v,
-            ]),
-          ),
           selectedId: null,
         });
         return { ok: true };
@@ -889,14 +849,11 @@ export const useGeoStore = create<GeoState>()(
         const TMP = '\u0000'; // a sentinel that can never be a real label or appear in an utterance
         const swapCmd = (cmd: AnyCommand) => renameInCommand(renameInCommand(renameInCommand(cmd, A, TMP), B, A), TMP, B);
         const swapUtt = (u: string | undefined) => relabelUtterance(relabelUtterance(relabelUtterance(u, A, TMP), B, A), TMP, B);
-        const swapKey = (k: string) => relabelId(relabelId(relabelId(k, A, TMP), B, A), TMP, B);
         set({
           facts: facts.map((f) => ({ ...f, cmd: swapCmd(f.cmd), utterance: swapUtt(f.utterance) })),
           hidden: get().hidden.map((h) => (h === A ? B : h === B ? A : h)),
           segStyle: renameSegStyle(renameSegStyle(renameSegStyle(get().segStyle, A, TMP), B, A), TMP, B),
           hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${A}` ? `circle-${B}` : c === `circle-${B}` ? `circle-${A}` : c)),
-          // dialed radii (keyed `circle-X`) swap with their centres (review 2026-07-03, S2)
-          radiusOverrides: Object.fromEntries(Object.entries(get().radiusOverrides).map(([k, v]) => [swapKey(k), v])),
           selectedId: null,
         });
         return { ok: true };
@@ -930,26 +887,22 @@ export const useGeoStore = create<GeoState>()(
           hidden: [...new Set(get().hidden.map((h) => (h === F ? T : h)))],
           segStyle: renameSegStyle(get().segStyle, F, T),
           hiddenCircles: [...new Set(get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)))],
-          // a dialed radius follows the fold (review 2026-07-03, S2)
-          radiusOverrides: Object.fromEntries(Object.entries(get().radiusOverrides).map(([k, v]) => [relabelId(k, F, T), v])),
           selectedId: null,
         });
         return { ok: true };
       },
 
       clear: () => {
-        set({ facts: [], selectedId: null, figureName: '', seed: 0, radiusOverrides: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, values: null, shapes: null, queries: [] });
+        set({ facts: [], selectedId: null, figureName: '', seed: 0, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, values: null, shapes: null, queries: [] });
         useGeoStore.temporal.getState().clear();
       },
 
       loadFigure: (file) => {
         // ONE `set` — zundo records a single entry (facts + seed are the tracked slice), so undo
-        // brings back whatever session was open before the load. The dialed radii are applied but
-        // stay a scratchpad (cleared by undo/"show another", exactly as if the student dialed them).
+        // brings back whatever session was open before the load.
         set({
           facts: file.facts,
           seed: file.seed,
-          radiusOverrides: file.radiusOverrides,
           queries: file.queries ?? [],
           selectedId: null,
           relations: null,

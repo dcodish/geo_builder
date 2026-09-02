@@ -24,7 +24,7 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
       const r = parse(utterance, ctx);
       let commands: AnyCommand[] | null = null;
       if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0 && droppedGivenNumbers(utterance, r.commands).length === 0) {
-        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
+        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed);
         if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands))) commands = r.commands;
       }
       if (!commands) commands = llm ?? null; // LLM second attempt (mocked: pass the canonical commands)
@@ -63,7 +63,7 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
       const ctx = ctxOf(facts);
       const r = parse(utterance, ctx);
       if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0 && droppedGivenNumbers(utterance, r.commands).length === 0) {
-        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
+        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed);
         if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands))) return { kind: 'commit', commands: r.commands };
         if (outcome.reason === 'empty') {
           const existing = new Set((ctx.points ?? []).map((p) => p.toUpperCase()));
@@ -103,7 +103,7 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
       const r = parse(target, ctxOf(facts));
       expect(r.ok, `${target} parses`).toBe(true);
       if (r.ok) {
-        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
+        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed);
         // refused as a contradiction — NOT produced (no silent morph), and a deferrable constraint must not sneak it in
         expect(outcome.produced, `${target} must NOT reshape the trapezoid`).toBe(false);
         if (!outcome.produced) expect(outcome.reason === 'error' && !deferralWorthwhile(facts, r.commands), `${target} is a hard conflict`).toBe(true);
@@ -122,7 +122,7 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
       const ctx = ctxOf(facts);
       const r = parse(utterance, ctx);
       if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0 && droppedGivenNumbers(utterance, r.commands).length === 0) {
-        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
+        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed);
         if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands))) return { kind: 'commit' };
         if (outcome.reason === 'error') return { kind: 'conflict', detail: outcome.detail };
         if (outcome.reason === 'empty') return { kind: 'noop' };
@@ -194,7 +194,7 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
       const ctx = ctxOf(facts);
       const r = parse(utterance, ctx);
       if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0 && droppedGivenNumbers(utterance, r.commands).length === 0) {
-        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
+        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed);
         if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands))) return { kind: 'commit', commands: r.commands };
         if (outcome.reason === 'empty') {
           const existing = new Set((ctx.points ?? []).map((p) => p.toUpperCase()));
@@ -252,7 +252,7 @@ describe('reported scenarios — the 2025-bagrut figure passes the FULL submit g
       expect(droppedGivenNumbers(utterance, r.commands), `numbers gate: ${utterance}`).toEqual([]);
       expect(droppedGivenRelations(utterance, r.commands), `relations gate: ${utterance}`).toEqual([]);
       expect(droppedGivenVerbs(utterance, r.commands), `verbs gate: ${utterance}`).toEqual([]);
-      const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
+      const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed);
       const commits = outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands));
       expect(commits, `dry-run commits: ${utterance} (${!outcome.produced ? outcome.reason : ''})`).toBe(true);
       r.commands.forEach((c) => useGeoStore.getState().execute(c, utterance, 'g-' + utterance));
@@ -297,7 +297,7 @@ describe('reported scenarios — the 2025-bagrut figure passes the FULL submit g
       expect(droppedGivenNumbers(utterance, r.commands), `numbers gate: ${utterance}`).toEqual([]);
       expect(droppedGivenRelations(utterance, r.commands), `relations gate: ${utterance}`).toEqual([]);
       expect(droppedGivenVerbs(utterance, r.commands), `verbs gate: ${utterance}`).toEqual([]);
-      return { commands: r.commands, outcome: dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {}) };
+      return { commands: r.commands, outcome: dryRunOutcome(facts, r.commands, useGeoStore.getState().seed) };
     };
     const submit = (utterance: string) => {
       const res = gateAndClassify(utterance)!;

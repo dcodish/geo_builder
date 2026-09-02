@@ -220,12 +220,6 @@
     "degenerateCollinear": "Collinear points must be distinct — \"{{id}}\" appears twice.",
     "retryHint": "You can try a different order (enter the givens first), reword it, or build it in a few smaller steps."
   },
-  "dof": {
-    "title": "Adjust the figure",
-    "radius": "radius of circle {{center}}",
-    "radiusOuter": "outer circle radius ({{center}})",
-    "radiusInner": "inner circle radius ({{center}})"
-  },
   "display": {
     "title": "Display"
   },
