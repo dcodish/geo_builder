@@ -48,6 +48,12 @@ export type ParseResult =
   // circles the container IS determined (introduced / the single circle, ADR-376) and it builds; only the
   // genuinely ambiguous case asks. `centers` are the candidates, so the message can name them.
   | { ok: false; reason: 'ambiguous-container'; centers: string[] }
+  // #519 ([ADR-477](../../docs/06-decisions.md#adr-477)): a SHAPE-consuming construct («האלכסונים
+  // נחתכים», «קטע אמצעים») on a figure holding two or more candidate shapes, with nothing in the
+  // utterance saying which. The rules that own those constructs correctly decline (ADR-052 — the pick
+  // is the student's), but declining sent the utterance to the LLM lane, which can only guess and
+  // whose guess builds. Ask instead, naming the candidates. `noun` is the construct the student used.
+  | { ok: false; reason: 'ambiguous-shape'; noun: string; shapes: string[] }
   // Every common tangent of the requested kind is already drawn (two of a kind / four in all) — a
   // further one does not exist; refuse deterministically, never a solver grind (#197 Am. 3).
   | { ok: false; reason: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' }
@@ -233,7 +239,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string };
+type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -8492,15 +8498,83 @@ const unnamedSecant: Rule = (s, ctx) => {
  *     those have their own rules, clarifies and fallbacks);
  *   - OFF when a centre IS named (that rule failed for its own reason, not this ambiguity);
  *   - OFF when the tie-break binds (then the construct rule itself was the gap — escalate as before). */
+/**
+ * Construct nouns that name a circle WITHOUT saying «מעגל» — an arc, a tangent, a chord, a diameter.
+ * Kept alongside the circle-noun test in {@link ambiguousCircleAsk} because neither covers the other:
+ * «קשת AK» has no circle noun, and «רדיוס המעגל הוא 5» is not on this list.
+ */
+const CIRCLE_CONSTRUCT_NOUN = /משיק|tangent|מיתר|chord|קוטר|diameter|קשת|\barc\b|על\s+ה?מעגל|on\s+the\s+circle/i;
 const ambiguousCircleAsk: Rule = (s, ctx) => {
   const circles = (ctx.circles ?? []).filter((c) => !c.startsWith('~'));
   if (circles.length < 2) return null;
-  if (!/משיק|tangent|מיתר|chord|קוטר|diameter|קשת|\barc\b|על\s+ה?מעגל|on\s+the\s+circle/i.test(s)) return null;
+  // #519 — this gate used to be an ALLOWLIST of five construct keywords
+  // (`משיק|tangent|מיתר|chord|קוטר|diameter|קשת|arc|על המעגל|on the circle`), and the audit measured
+  // exactly what docs/17 predicts of an enumeration: every circle-consuming construct outside the five
+  // escaped it. Beside two unnamed circles, «רדיוס המעגל הוא 5», «AB חותך את המעגל בנקודה D»,
+  // «נקודה P בתוך המעגל» and «נקודה P מחוץ למעגל» all reached the LLM lane — whose job is to guess —
+  // and the oracle check confirmed a guessed reading PARSES AND COMMITS («רדיוס המעגל O הוא 5» builds).
+  // That is the #516 class: an ambiguity the parser recognised, handed to the layer that cannot refuse.
+  //
+  // The gate is now the UNION: the circle NOUN said anonymously, **or** one of the construct nouns
+  // that names a circle without saying «מעגל» at all. Swapping the list for the noun alone was tried
+  // first and the suite caught it immediately — «קשת AK» (arc AK) is a circle construct with no circle
+  // noun in it, and it stopped asking. So the noun test is what closes the leaks and the construct
+  // list is what keeps the noun-less constructs; neither is a superset of the other.
+  //
+  // The question this asks is a TRUE one, which is the bar for asking rather than escalating: naming
+  // the circle makes every leaked form parse — «רדיוס המעגל O הוא 5», «שטח המעגל O שווה 25»,
+  // «היקף המעגל O שווה 20» all build. An ask the student cannot answer would be worse than an
+  // escalation, so that was measured before the gate was widened.
+  if (!mentionsCircle(s) && !CIRCLE_CONSTRUCT_NOUN.test(s)) return null;
   if (/גדול|קטן|ימני|שמאלי|חיצוני|פנימי|חוסם|חסום|מוכל|outer|inner|\bright\b|\bleft\b|larger|smaller|circumscrib|inscrib|contained/i.test(s)) return null;
   if (circleCenter(s)) return null;
   if (anonymousCircleTieBreak(s, ctx, circles)) return null;
   return { clarify: 'ambiguous-circle-ref', centers: circles.map((c) => (c.startsWith('@ctr-') ? c.slice(5) : c)) };
 };
+
+/**
+ * #519 ([ADR-477](../../docs/06-decisions.md#adr-477)) — the SHAPE twin of {@link ambiguousCircleAsk}.
+ *
+ * The audit that opened this issue measured four recognised-ambiguity declines. Two are the circle
+ * family above; the other two are shape-consuming constructs that correctly refuse to pick and then
+ * hand the utterance to the layer that cannot refuse:
+ *
+ *   «האלכסונים נחתכים בנקודה M»  after two declared trapezoids  → not-handled → LLM
+ *   «קטע אמצעים»                 on a parallelogram (two base pairs) → not-handled → LLM
+ *
+ * The declines are RIGHT — which shape is meant is the student's to say (ADR-052), and the rules say
+ * so in their own comments. What was wrong is where the utterance went next. Acting as the oracle
+ * (standing rule 2, no live call), the reading an LLM would plausibly emit —
+ * «אלכסוני ABCD נחתכים בנקודה M» — parses AND COMMITS, so the guess reaches the figure as fact.
+ *
+ * Runs LAST, so it steals nothing: only an utterance no rule could read reaches it.
+ */
+const ambiguousShapeAsk: Rule = (s, ctx) => {
+  // A construct that consumes a whole shape, named WITHOUT one. Each noun is a construct, not a
+  // phrasing — the rules that own them are the ones whose declines this covers.
+  const noun =
+    /אלכסונ|\bdiagonals?\b/i.test(s) ? 'diagonals'
+    : /קטע\s+אמצעים|\bmidsegment\b|\bmedian\s+of\s+the\s+trapezoid\b/i.test(s) ? 'midsegment'
+    : null;
+  if (!noun) return null;
+  // The student naming any label run is them saying which — nothing to ask about.
+  if (/[A-Za-z]d*s+[A-Za-z]d*s+[A-Za-z]d*/.test(s)) return null;
+  const cands = (ctx.declaredPolygons ?? []).filter((p) => p.vertices.length === 4);
+  if (cands.length >= 2) return { clarify: 'ambiguous-shape', noun, shapes: cands.map((c) => c.vertices.map(up).join('')) };
+  // The other half of the SAME question, and the one `trapezoidMidsegment`'s own comment names: with
+  // ONE shape carrying TWO parallel pairs (a parallelogram and its specialisations) the ambiguity is
+  // not which SHAPE but which BASE PAIR — «a parallelogram has two ⇒ which base? ambiguous ⇒ defer,
+  // ADR-052». Same answer: name the two candidates and let the student pick, rather than escalate to
+  // a lane that would choose one for them.
+  if (noun === 'midsegment' && cands.length === 1 && TWO_BASE_PAIRS.test(cands[0].kind ?? '')) {
+    const [a, b, c, d] = cands[0].vertices.map(up);
+    return { clarify: 'ambiguous-shape', noun, shapes: [`${a}${b}∥${d}${c}`, `${b}${c}∥${a}${d}`] };
+  }
+  return null; // 0 shapes, or one with a single base pair → the owning rules resolve or say shape-not-found
+};
+
+/** Quad kinds with TWO vertex-disjoint parallel edge-pairs, so "the base" names neither of them. */
+const TWO_BASE_PAIRS = /parallelogram|rhombus|rectangle|square|מקבילית|מעוין|מלבן|ריבוע/i;
 
 /** «[להוסיף את] מרכז המעגל» / "the centre of the circle" — REVEAL the single circle's hidden centre. */
 const showCenter: Rule = (s, ctx) => {
@@ -8523,6 +8597,13 @@ const showCenter: Rule = (s, ctx) => {
 // A1 / PAR-11): the test runs EVERY rule against a corpus (not stopping at the first match) to detect a
 // later, more-specific rule whose output diverges from the earlier winner's — the first-match-wins
 // shadowing class behind ADR-119/077/166. Not part of the runtime API; `parse()` is the only entry point.
+/**
+ * The LAST-RESORT ASKS — rules that turn a recognised ambiguity into a typed question instead of an
+ * escalation. Listed separately (#519) because the parse loop consults them on the `stop` path too, where
+ * the ordinary sweep never reaches them; they also sit at the end of {@link RULES} for the normal path.
+ */
+const LAST_RESORT_ASKS: Rule[] = [ambiguousCircleAsk, ambiguousShapeAsk];
+
 export const RULES: Rule[] = [
   compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
   compoundAtDistance, // #760: "<point> on <carrier> at distance N from X" — membership + set-distance, composed
@@ -8678,6 +8759,7 @@ export const RULES: Rule[] = [
   bareLabelRunShape, // #505: a bare 3–4 letter run of NEW labels declares the shape («Abcd» → quadrilateral); 2 letters stay bareSegment's
   bareSegment, // LAST catch-all: a bare "AB" / "line AB" → draw the segment (after every keyword/structured rule)
   ambiguousCircleAsk, // #546 VERY LAST: an unbindable anonymous circle reference beside ≥2 circles ASKS instead of escalating — after every rule, so it steals nothing
+  ambiguousShapeAsk, // #519 VERY LAST: its shape twin — a shape-consuming construct beside ≥2 candidate shapes ASKS instead of escalating
 ];
 
 /**
@@ -10073,7 +10155,23 @@ function withStatedConvexity(commands: AnyCommand[], s: string): AnyCommand[] {
 function runRules(s: string, ctx: ParseContext): ParseResult {
   for (const rule of RULES) {
     const res = rule(s, ctx);
-    if (res === 'stop') break; // recognised but unreadable — escalate, don't half-parse
+    if (res === 'stop') {
+      // #519 ([ADR-477](../../docs/06-decisions.md#adr-477)) — a `stop` means "recognised but
+      // unreadable, escalate rather than half-parse", and escalating hands the utterance to the LLM
+      // lane, whose job is to GUESS. When a LAST-RESORT ASK can name the ambiguity instead, that is
+      // strictly better and it was simply unreachable: the asks sit at the end of RULES, and the
+      // `break` retired the loop before they ran. Measured on «AB חותך את המעגל בנקודה D» beside two
+      // unnamed circles — `lineLineIntersection` stops on «חותך», and `ambiguousCircleAsk`, four
+      // hundred rules later, had the right answer the whole time.
+      //
+      // Consulted only HERE and at their normal position, so a rule that reads the utterance cleanly
+      // still wins; this only ever replaces an escalation with a question.
+      for (const ask of LAST_RESORT_ASKS) {
+        const a = ask(s, ctx);
+        if (a && a !== 'stop' && !Array.isArray(a)) return refusalOf(a);
+      }
+      break;
+    }
     if (!res) continue;
     if (Array.isArray(res)) {
       // Concentric resolution runs LAST (ADR-244): the other post-passes mint the pair's OUTER id
@@ -10083,17 +10181,29 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
       return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
     }
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).
-    if (res.clarify === 'shape-not-found') return { ok: false, reason: 'shape-not-found', noun: res.noun };
-    if (res.clarify === 'polygon-not-supported') return { ok: false, reason: 'polygon-not-supported', noun: res.noun, offer: BARE_POLY_OFFER };
-    if (res.clarify === 'ambiguous-angle') return { ok: false, reason: 'ambiguous-angle', vertex: res.vertex };
-    if (res.clarify === 'ambiguous-circle-ref') return { ok: false, reason: 'ambiguous-circle-ref', centers: res.centers };
-    if (res.clarify === 'ambiguous-container') return { ok: false, reason: 'ambiguous-container', centers: res.centers };
-    if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };
-    if (res.clarify === 'alias-taken') return { ok: false, reason: 'alias-taken', name: res.name };
-    if (res.clarify === 'role-side-unresolved') return { ok: false, reason: 'role-side-unresolved', role: res.role };
-    return { ok: false, reason: 'ambiguous-circle', center: res.center };
+    return refusalOf(res);
   }
   return { ok: false, reason: 'not-handled' };
+}
+
+/**
+ * A rule's CLARIFY result, as the parse refusal it becomes.
+ *
+ * Extracted (#519) so the `stop` path above and the normal path can answer identically — the mapping
+ * used to live inline, which is why the `stop` escalation had no way to return a clarification even
+ * when a last-resort ask had produced one.
+ */
+function refusalOf(res: Clarify): ParseResult {
+  if (res.clarify === 'shape-not-found') return { ok: false, reason: 'shape-not-found', noun: res.noun };
+  if (res.clarify === 'polygon-not-supported') return { ok: false, reason: 'polygon-not-supported', noun: res.noun, offer: BARE_POLY_OFFER };
+  if (res.clarify === 'ambiguous-angle') return { ok: false, reason: 'ambiguous-angle', vertex: res.vertex };
+  if (res.clarify === 'ambiguous-circle-ref') return { ok: false, reason: 'ambiguous-circle-ref', centers: res.centers };
+  if (res.clarify === 'ambiguous-container') return { ok: false, reason: 'ambiguous-container', centers: res.centers };
+  if (res.clarify === 'ambiguous-shape') return { ok: false, reason: 'ambiguous-shape', noun: res.noun, shapes: res.shapes };
+  if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };
+  if (res.clarify === 'alias-taken') return { ok: false, reason: 'alias-taken', name: res.name };
+  if (res.clarify === 'role-side-unresolved') return { ok: false, reason: 'role-side-unresolved', role: res.role };
+  return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 
 /**

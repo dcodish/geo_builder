@@ -99,6 +99,10 @@ When we add a surfacing rule, a hint, or any teaching affordance, it should resp
 5. **Honour under-determination.** When the figure isn't fixed, say so (definite vs possible), and let alternatives be explored rather than implying the displayed case is the only one.
 6. **Forward (P) and recognition (C) are both first-class.** Don't surface only "use this" theorems; the converses that let a student *name and justify* a configuration are half the skill.
 7. **Hebrew-first, no jargon tax.** Statements appear in the student's language; the geometry is the only hard part on screen.
+8. **A refusal must teach the REASON, never just the verdict** (operator ruling, 2026-09-03). *"tell user why it is refused and not some generic message."* A generic «לא ניתן / זה לא יכול להתקיים» tells the student only that they lost; it is the one moment they are most ready to learn and we spend it on a shrug. Every refusal answers **which** of their statements, **what** about the figure conflicts with it, and — where there is one — **what to do next**.
+   - *Not* «המשפט לא נוסף — הוא לא יכול להתקיים: "z0 הוא הפתרון ברביע הראשון"», *but* «שני פתרונות נמצאים ברביע הראשון (z₂, z₃) — ציינו באיזה מהם מדובר, או שהתשובה היא "שתי האפשרויות"».
+   - The distinction the message must carry: **zero** matches, **many** matches, and **not supported yet** are three different things and read as three different sentences. A "many" result is usually the exam asking for «שתי האפשרויות» — information, not a malfunction — and "not supported yet" is ours to own, never dressed up as *«לא הצלחתי להבין»*, which blames the student's phrasing for our gap.
+   - This is the pedagogical face of the honesty invariants (CLAUDE.md): *error messages name the conflicting statement, never internal state.* Naming the statement is the floor; explaining the conflict is the bar.
 
 ---
 

@@ -99,14 +99,18 @@ describe("#830 — the operator's figure builds, with D strictly between A and C
       const A = positions.get('A');
       const C = positions.get('C');
       const D = positions.get('D');
-      if (!A || !C || !D) continue; // seed 17 fails on the PREFIX alone — a separate, pre-existing defect
+      // #855 retired the fence that used to stand here: seed 17 failed on the PREFIX alone (a sampled
+      // A inside the circle), so this loop skipped it with a `continue`. Every seed builds now, and
+      // ASSERTING that is the point — a silent skip would hide the day it comes back.
+      expect(A && C && D, `seed ${seed} builds`).toBeTruthy();
+      if (!A || !C || !D) continue;
       built++;
       const dx = C.x - A.x;
       const dy = C.y - A.y;
       const t = ((D.x - A.x) * dx + (D.y - A.y) * dy) / (dx * dx + dy * dy);
       if (t > 0 && t < 1) ordered++;
     }
-    expect(built, 'the figure builds at essentially every seed').toBeGreaterThanOrEqual(39);
+    expect(built, 'the figure builds at EVERY seed (#855 retired the seed-17 exception)').toBe(40);
     expect(ordered, 'and D is between A and C at EVERY seed that builds').toBe(built);
   });
 });

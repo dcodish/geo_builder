@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 // The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
 import { AppFrame } from '../shell/frame/AppFrame';
+import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
 import { ManualScreen } from '../shell/frame/ManualScreen';
@@ -29,7 +30,6 @@ import { bidiSegments3, inputPreview3, isolateLtrRuns3, textDir3 } from './i18n/
 import { questionLines3 } from './export/questionLines3';
 import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { SYMBOL_SPECS_3 } from './ui/symbols3';
-import { SymbolRow } from '../shell/frame/SymbolRow';
 import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
 import { restoreStatedSequences3 } from './parser/honesty3';
@@ -991,35 +991,21 @@ export default function App3() {
                     {t('display.witnesses')}
                   </label>
                 )}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    addQuery(queryText);
-                    setQueryText('');
-                  }}
-                  className="flex gap-1"
-                >
-                  <input
-                    ref={queryRef}
-                    dir="ltr"
-                    value={queryText}
-                    onChange={(e) => setQueryText(e.target.value)}
-                    placeholder={t('query.placeholder')}
-                    className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1 text-sm"
-                  />
-                  <button type="submit" className="rounded-lg bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700">
-                    {t('query.add')}
-                  </button>
-                </form>
-                {/* #525: the palette reaches the query box — collapsed, the product's own vocabulary */}
-                <SymbolRow
-                  symbols={SYMBOL_SPECS_3}
+                {/* #741 ([ADR-W-038](../docs/06w-decisions-workspace.md)) — the SHARED ask lane. 3-D's
+                    shape (always present, never behind a button) is the one the operator asked the
+                    other two to match, so this is the same markup they now render; only the answer
+                    rows above stay product-shaped. */}
+                <AskLane
                   value={queryText}
                   onChange={setQueryText}
                   inputRef={queryRef}
-                  startCollapsed
-                  compact
-                  toggleTitle={t('palette.show')}
+                  dir="ltr"
+                  placeholder={t('query.placeholder')}
+                  addLabel={t('query.add')}
+                  onSubmit={(text) => {
+                    addQuery(text);
+                  }}
+                  palette={{ symbols: SYMBOL_SPECS_3, startCollapsed: true, compact: true, toggleTitle: t('palette.show') }}
                 />
               </DataPanel>
             </div>

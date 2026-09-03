@@ -8746,3 +8746,154 @@ one shape type.
 **Lock.** A structural test asserts no `type="range"` in the 2-D tree binds to a magnitude, so the
 affordance cannot return by accident; plus the stated-radius given still builds, and a pre-change save
 file still loads.
+
+## ADR-476 — a refusal whose counterpart is a SAMPLED value never accuses the student; and the sampler stays inside the feasible set (#855)
+
+**Status:** accepted, 2026-09-02 · **Ports:** [ADR-3D-138](06b-decisions-3d.md#adr-3d-138) (#508/#512) to 2-D · **LADDER stage:** 5, the per-seed tail (`runTail`) · **Operator ruling**
+
+**Context.** The prefix «משולש ABC» / «מעגל» / «AB משיקה למעגל בנקודה B» built at 39 of 40 seeds and, at
+seed 17 alone, drew nothing while the step row read «over-constrained: @ctr-OB ⟂ AB cannot hold». The
+issue was filed as a silent empty figure; round #864 measured it and found a different, worse defect —
+the error is not missing, it is an **accusation**, and the tangency it blames is satisfiable. Measured
+at seed 17:
+
+| | A | centre O | r | \|OA\| |
+| --- | --- | --- | --- | --- |
+| fold (seed 0) | (2.00, 3.60) | (10.00, 0.00) | 5.000 | 8.773 — outside ✓ |
+| seed 16 | (3.56, 6.10) | (10.55, −3.80) | 3.148 | 12.120 — outside ✓ |
+| **seed 17** | (4.92, 0.21) | (1.20, −2.77) | **7.915** | **4.762 — INSIDE ✗** |
+
+A tangent from A touches only when A is outside the circle (the touch point sees `OT ⟂ AT`, so
+`|OA|² = r² + |AT|² ≥ r²`). «מעגל» states no size, so the radius is a free DOF ([ADR-052](#adr-052))
+and the sampler jitters it 0.45×–1.6× while the free points move independently — nothing tells it that
+the student's tangency **couples** those DOFs. At seed 17 it drew a sample from outside the feasible
+set, and the figure then blamed the student for it.
+
+**The class.** *The seed sampler varies each free DOF independently of whether the DRIVEN system is
+still feasible at that sample; the per-seed tail then gets ONE evaluate, and a sample that makes the
+driven system infeasible is reported as an impossibility of the givens — refuted by the 39 seeds that
+build.* It is the honesty rule pointed the wrong way (docs/17 §7): a refusal levelled at the student
+on the strength of a placement the **tool** invented.
+
+**Decision — two halves, in the order the operator ruled them (2026-09-02, *"we need to ensure this
+works like the 3d does"*).**
+
+**(c) Sample inside the feasible set** (`engine/sample.ts`, `clampToPlacementPreconditions`). A
+construct's *placement precondition* bounds the DOFs the sampler is free to invent. A tangency caps the
+free radius at `|PO|`; the clamp is derived from the constraint's own geometry — any perpendicular whose
+shared endpoint is an on-circle point, whose one arm is that circle's radius and whose other arm runs to
+a second point — so every phrasing that lowers to a tangency is covered, rather than the utterance that
+was reported. It is a **no-op on every feasible sample**, so seeds that already built are unchanged.
+
+Only a **free** radius is clamped. A stated radius is a given: bending it to make a seed work would
+drop a stated magnitude, which the honesty invariant forbids outright. That sibling figure
+(«מעגל שרדיוסו 5» + the same tangency) therefore still has an unusable seat — and it is exactly the case
+half (b) exists for.
+
+**(b) The class guard** (`replay/core.ts`, `sampledConfigError`). *A per-seed evaluate failure can never
+be a contradiction of the givens.* The proof is structural, not statistical: this seam only ever
+overrides rows the FOLD marked `ok`, so a configuration in which every stated given holds demonstrably
+exists. The accusing shape therefore degrades to an honest **"not determined"**, naming the sampled
+objects the conflict is really with:
+
+```
+over-constrained: @ctr-OB ⟂ AB cannot hold                        ← was: your given contradicts an earlier one
+not determined: @ctr-O, A are still free, so @ctr-OB ⟂ AB
+                cannot be judged in this configuration            ← now: your givens are fine
+```
+
+Which objects those are is read by a **structural walk** — `constraintRefs` over the violated
+constraint, intersected with `freeDofs` — never by a switch over constraint kinds. ADR-3D-138 makes
+that point explicitly, and for the same reason: an enumeration of the kinds that exist today is
+precisely what a kind added later would quietly escape. Only the `over-constrained` shape is
+substituted (the `blameNewStatement` discipline); a dependency or unknown-point error is not an
+accusation and stays verbatim.
+
+**Deliberately NOT in scope.** Re-running the recruit ladder at the per-seed tail — option (a) of the
+#864 escalation, the underlying mechanism fix. The tail is the hot path (every seed of every sweep) and
+stages 2e–3 are fold-only by design; the perf question is real and is a separate measured item, not
+something to smuggle in behind a message fix. The operator ruled it out of scope explicitly.
+
+**Consequences.**
+
+- The reported prefix and the operator's full five-line sequence resolve at **every** seed 0..40;
+  «הצג תצורה אחרת» can no longer land on the vanishing seat.
+- The tangency still HOLDS at every seed (B on the circle, `OB ⟂ AB`, A outside) — the clamp fixes the
+  seat, it does not weaken the given.
+- #830's regression test carried a `continue` that skipped seed 17 with the comment *"a separate,
+  pre-existing defect"*. That fence is **retired**: the loop now asserts all 40 seeds build.
+- A second placement precondition joins by adding a clause to the same helper. The docs/17 note stands:
+  it must stay a derivation from a constraint's own geometry, never a list of the utterances we met.
+
+**Locked** in `engine/__tests__/issue-855.test.ts` (all 41 seeds green for both sequences; the tangency
+holding per seed; seed 17's sampled construction evaluating; a feasible sample unclamped; and, for the
+stated-radius sibling, no `over-constrained` at any seed, the structural-walk message naming `@ctr-O`
+and `A`, and the stated radius never bent), plus the fixture
+`src/__tests__/fixtures/issue-855-tangency-sampled-seat.geo.json` — the operator's exact sequence saved
+**at seed 17**, so the fixture net replays the very configuration the bug was filed on.
+## ADR-477 — a recognized ambiguity ASKS; and a rule's `stop` may not outrank a typed question (#519)
+
+**Status:** accepted, 2026-09-02 · **Ports:** [ADR-3D-131](06b-decisions-3d.md#adr-3d-131) (#516) to 2-D · **Round:** #878
+
+**Context.** The 3-D #516 fix established the rule: *a statement the parser recognizes as ambiguous must
+surface a typed refusal — a decline to `not-handled` hands the ambiguity to the LLM lane, whose job is
+to guess.* #519 filed the 2-D audit of the four deferral sites that looked like that class. This ADR
+records the audit's verdicts and the two mechanisms it turned up.
+
+**The four sites all DECLINE CORRECTLY.** Which circle, which shape, which base pair — the pick is the
+student's (ADR-052), and each rule says so in its own comment. The defect was never the decline; it was
+where the utterance went next. Acting as the oracle (standing rule 2, no live call), the reading an LLM
+would plausibly return **parses and commits**: «רדיוס המעגל O הוא 5», «אלכסוני ABCD נחתכים בנקודה M» and
+«E אמצע AB» all build. So the tool's guess reached the figure as a stated fact.
+
+**Verdicts, measured at `0e8062a` beside two unnamed circles / two declared quads:**
+
+| site | before | verdict |
+| --- | --- | --- |
+| `circleForRef` + `existingCircleRef` (the two circle sites) | «על המעגל», «משיק», «מיתר», «קוטר», «קשת» asked; **«רדיוס המעגל הוא 5», «נקודה P בתוך המעגל», «נקודה P מחוץ למעגל», «AB חותך את המעגל» escaped to the LLM** | **routed** — the ask existed, its GATE was an allowlist |
+| `trapezoidMidsegment` (a parallelogram has two base pairs) | → LLM | **routed** — asks which base pair |
+| the diagonals rule (2+ candidate quads) | → LLM | **routed** — asks which shape |
+
+**Decision 1 — the ask's gate is a rule plus the noun-less constructs, not an allowlist.**
+`ambiguousCircleAsk` gated on five construct nouns. Anything else consuming a circle escaped it —
+exactly what docs/17 predicts of an enumeration. The gate is now *the circle noun said anonymously* **or**
+one of the construct nouns that names a circle without saying «מעגל».
+
+Swapping the list *for* the noun test was tried first and the suite caught it in one run: **«קשת AK» is
+a circle construct with no circle noun in it**, and it stopped asking. Neither test is a superset of the
+other, so the gate is the union. That regression is the reason this ADR does not claim the enumeration
+was eliminated — it was reduced to the forms that genuinely cannot be derived from the noun.
+
+**Decision 2 — a `stop` consults the last-resort asks before escalating.**
+The structural finding, and the one that made a leak *unreachable* rather than merely unlisted: the
+parse loop's `if (res === 'stop') break` retired the sweep before the last-resort asks, which sit at the
+end of `RULES`, could run. «AB חותך את המעגל בנקודה D» stops in `lineLineIntersection` on «חותך», and
+`ambiguousCircleAsk` had the right answer the whole time and was never asked for it. A guess was
+preferred to a question purely because of rule ORDER. The asks are now consulted on the `stop` path too
+(`LAST_RESORT_ASKS`), and the clarify→refusal mapping was extracted (`refusalOf`) so both paths answer
+identically. A `stop` with no ask to offer still escalates, unchanged.
+
+**Decision 3 — the new `ambiguous-shape` refusal**, the shape twin of `ambiguous-circle-ref`: it names
+the candidates, so the question can be answered. It covers both halves of the same question — *which
+shape* (two declared quads) and *which base pair* (one parallelogram, whose two parallel pairs are what
+`trapezoidMidsegment`'s own comment defers on).
+
+**The bar for asking rather than escalating: the question must be ANSWERABLE.** Measured before the gate
+moved — «רדיוס המעגל O הוא 5», «שטח המעגל O שווה 25», «היקף המעגל O שווה 20» and «נקודה K על המעגל O» all
+parse, so naming the circle acts on the answer. An ask the student cannot satisfy would be worse than an
+escalation.
+
+**One fence deliberately reversed.** `circle-ref-tiebreak.test.ts` asserted *"a bare circle MENTION
+(area/radius talk) keeps its fallback path — the ask is construct-gated"*. That fence asserts the
+gating this issue exists to audit, and the measurement above says the ask is answerable, so it is
+updated rather than worked around — with the reasoning recorded at the test.
+
+**Not in scope, filed instead** (found by the audit, outside its four sites): «מרכז המעגל הוא O» beside
+two circles *silently picks* a circle rather than deferring at all, and «קטע אמצעים בטרפז» with no
+trapezoid escalates where `shape-not-found` is the honest answer.
+
+**Locked** in `src/parser/__tests__/ambiguity-audit-519.test.ts` (26): the ten circle-consuming forms
+all ask and name their candidates; the ask stays OFF with one circle, no circle, a named circle and a
+qualifier; both shape halves ask and name their candidates; an absent shape stays `shape-not-found`; a
+single quad still builds; the `stop` path returns the ask, and a `stop` with nothing to ask still
+escalates; and the three oracle readings are shown to build, which is why the guess had to be prevented.

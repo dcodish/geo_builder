@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { Banner } from '../shell/frame/Banner';
+import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
 import { ManualScreen } from '../shell/frame/ManualScreen';
@@ -16,7 +17,6 @@ import { ToolButton } from '../shell/frame/ToolButton';
 // #745: and the shared RASTERISER — one svg→png in the workspace, not one per product.
 import { svgToPng } from '../shell/export/svgToPng';
 import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../shell/frame/canvasControls';
-import { SymbolRow } from '../shell/frame/SymbolRow';
 // #743: the under-canvas row's ONE look — the shell contract, replacing this tree's bare buttons.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
@@ -30,6 +30,7 @@ import { PolarPlane } from './render/PolarPlane';
 import { useComplexStore, type InputError } from './store/useComplexStore';
 import { SYMBOLS } from './ui/symbols';
 import { AskText } from './ui/askText';
+import { RadicalText } from './render/radicalText';
 import { complexBidi } from './i18n';
 import registry from '../products.json';
 
@@ -590,7 +591,8 @@ export function App() {
               hideLabel={t('panelHide')}
               status={v2Freedom(derived2, t)}
               sections={[
-                { key: 'points', title: t('secPoints'), rows: v2Labels(derived2, view) },
+                // #727: the radical index rendered large enough to read (the same treatment the canvas gets)
+                { key: 'points', title: t('secPoints'), rows: v2Labels(derived2, view).map((r, i) => <RadicalText key={i} text={r} />) },
                 // verdict rows word their WHY in prose, in the UI's language (#716: the engine
                 // publishes codes; whyText words them) — they follow the app's direction
                 { key: 'measures', title: t('secMeasures'), rows: v2Measures(derived2, t), dir: 'app' },
@@ -628,38 +630,27 @@ export function App() {
             >
               {/* #789 — the ask box: questions enter HERE, in the panel that answers them (the
                   operator's placement ruling, 2026-08-26) — never as facts */}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (submitQuery(askText)) setAskText('');
-                }}
-                style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}
-              >
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input
-                    ref={askRef}
-                    value={askText}
-                    onChange={(e) => setAskText(e.target.value)}
-                    placeholder={t('askPlaceholder')}
-                    dir="auto"
-                    style={{ minWidth: 0, flex: 1, border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', font: 'inherit' }}
-                  />
-                  <button type="submit" style={{ flexShrink: 0 }}>
-                    {t('askAdd')}
-                  </button>
-                </div>
-                {/* #525: the palette reaches every text surface — collapsed here (a cramped box) */}
-                <SymbolRow
-                  symbols={SYMBOLS}
-                  symbolTitle={(sy) => (sy.titleKey ? t(sy.titleKey) : sy.label)}
+              {/* #741 ([ADR-W-038](../docs/06w-decisions-workspace.md)) — the SHARED ask lane, the same
+                  component 2-D and 3-D render. `submitQuery` returns false when the line is not a
+                  question, and the box then KEEPS the text so the student can fix it. */}
+              <div style={{ marginTop: 10 }}>
+                <AskLane
                   value={askText}
                   onChange={setAskText}
                   inputRef={askRef}
-                  startCollapsed
-                  compact
-                  toggleTitle={t('paletteShow')}
+                  dir="auto"
+                  placeholder={t('askPlaceholder')}
+                  addLabel={t('askAdd')}
+                  onSubmit={(text) => submitQuery(text)}
+                  palette={{
+                    symbols: SYMBOLS,
+                    symbolTitle: (sy) => (sy.titleKey ? t(sy.titleKey) : sy.label),
+                    startCollapsed: true,
+                    compact: true,
+                    toggleTitle: t('paletteShow'),
+                  }}
                 />
-              </form>
+              </div>
               {/* the formula sheet, surfaced from what the figure DOES — each row names its premises */}
               {v2Formulas(derived2, i18n.language === 'he' ? 'he' : 'en').map((f) => (
                 <div key={f} className="v2-formula" dir="ltr">

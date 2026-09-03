@@ -156,13 +156,18 @@ Final body, in order:
 - **Escalated** — issue → why, one line each (the template lives on the issue itself).
 - **Skipped** — anything eligible the round did not resolve (labeling errors, mid-round
   drops), with the reason. Chat-only skips under-report the round.
-- **The play sheet, split by route** ([ADR-W-028](../../../docs/06w-decisions-workspace.md)) — two
-  sections, because they are two different sittings: **batch (landed on `main`)**, played in one
-  pass on the dev server, and **individual (PRs)**, each played under its own play-and-approve gate
-  (docs/22 §4) whether it shipped in this round or not. Per item in both: the exact utterances to
-  type **in Hebrew**, one per line in a code block, what to look for, and the before/after note
-  (prod runs the previous deploy — a free "before"). Omit a section that is empty rather than
-  printing an empty heading.
+- **The `## Heads-up` block, then the NUMBERED TEST-CASE LIST — exactly as standing rule 5
+  specifies it** (CLAUDE.md, which has operator authority and loads every session). That rule
+  carries the list itself: the heads-up contents, `T1…Tn` numbered continuously, and the five
+  things every case carries — title, **Server** URL with its path, the Hebrew lines, **Look
+  for**, **Before**. Do not re-derive it here and do not summarise it; read it and follow it.
+
+  A round adds only this: the cases are **grouped by route** — **batch (landed on `main`)**,
+  played in one sitting, then **one section per PR**, each under its own play-and-approve gate
+  (docs/22 §4) whether it shipped in this round or not — because they are different sittings on
+  different ports. The numbering still runs **continuously across every section**, and an empty
+  section is omitted rather than printed as an empty heading.
+  ([ADR-W-028](../../../docs/06w-decisions-workspace.md))
 - **The stats line**, exactly this machine-greppable form, always last:
   `stats: picked=N landed=N prs=N escalated=N skipped=N`
   — the Phase-2 landing-policy decision (#543) aggregates these by listing round issues,
@@ -175,9 +180,16 @@ executing now or crashed mid-flight.
 
 ## Step 6 — readiness gate (standing rule 5)
 
-The final message: dev server already running, the URL (`http://localhost:5173/` — root, not
-`/geo-builder/`), the play sheet inline (the round issue is the durable copy), the escalation
-list, and honest gate results. Tests green is our gate, not the operator's.
+Standing rule 5 (CLAUDE.md) governs — it is the same gate every "ready" report passes, and a round
+is not exempt. Start every server it names, `curl` each one, and quote the ports: the batch on
+`http://localhost:5173/` (root, not `/geo-builder/`) plus **one port per PR** from its own worktree,
+since an unmerged PR cannot be played on the `main` server.
+
+The final message carries, in this order: the **`## Heads-up`** items, the **numbered test-case
+list**, the escalation list, and honest gate results.
+
+**The chat copy is the SAME list as the round issue's, not a summary of it** — the operator plays
+from whichever is in front of them, and two versions that differ is how a case gets skipped.
 
 It ends with a **"waiting on you" digest** (ADR-W-014 — the operator must never have to ask
 what's blocked on them): open `needs-operator` decisions (one line each, the question itself),
@@ -190,4 +202,6 @@ Pick anything without `auto-ok` · write a fix plan for an unplanned issue · me
 · deploy · take a P1 silently · run over a dirty/behind tree · keep a symptom patch to avoid
 an escalation · exceed the announced composition mid-round (found new work → file an issue) ·
 land over unreconciled external `origin/main` movement · leave outcomes, deviations, or skips
-out of the ledger (chat is not a record) · finish with the `in-round` label still on.
+out of the ledger (chat is not a record) · finish with the `in-round` label still on · report a
+play sheet whose servers are not running, whose cases are not numbered, or whose heads-up items
+send the operator to an ADR to find out what changed.

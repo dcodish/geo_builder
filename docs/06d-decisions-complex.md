@@ -2165,6 +2165,52 @@ restatement, the statement named on the always-visible `unsatisfied` channel, «
 «|z1| = 5» and «|z1| = |z2|» byte-identical, «arg z1 = -30» still legal, and the three sibling lanes
 keeping their existing refusals.
 
+## ADR-CX-036 — THE RADICAL INDEX IS A DISPLAY CONCERN, AND IT IS RENDERED LARGE ENOUGH TO READ (#727)
+
+**Status:** Accepted (2026-09-02) · **Layer:** `value/radical` (where the index is) + `render/radicalText` (how it is drawn) · **Round:** #878
+
+The exam typography landed by #702 spells an n-th root the way the sheet does — `⁵√5`, `⁴√7`, `¹⁰√11` —
+using Unicode superscript digits. The operator read «⁵√5·cis10.63°» as the **retired `~` mark**
+(2026-08-18). The value was correct; the glyph was not readable. Those code points are drawn around
+0.58 em and hairline thin, and the canvas draws readings at 13 px. *If the operator misreads it,
+students will.*
+
+**Decision — treat it at the render layer, and leave the spelling alone.**
+
+`value/modulus.format` is the ONE spelling of a number: the canvas, the data panel and any export call
+it, so they cannot disagree about how a number is written (the ADR-3D-156 lesson its own doc states).
+Changing the string to make one surface legible would put that guarantee at risk for a font problem.
+So the string is untouched and each reading surface draws the index as a **real digit at 0.72 em,
+raised** — about 25 % larger than the Unicode glyph and at normal stroke weight.
+
+**Split across two layers, deliberately.** *Where* the index is (`value/radical.splitRadical`) is the
+part both surfaces must agree on, so it sits at the bottom with no imports. *How* it is drawn
+(`render/radicalText`) is two thin renderers, because the surfaces are SVG (`PolarPlane`) and HTML
+(the data panel) and neither can use the other's markup.
+
+The first attempt put both in `ui/`, and `import-direction.test.ts` refused it: *"render/ may import
+only from [render, value, scene] — move the shared piece down a layer instead."* The guard was right
+and its advice was the design.
+
+**What is deliberately NOT treated: an exponent.** A superscript is lifted only when it is immediately
+followed by `√`. `z²` keeps its glyph — an exponent sits at the top of the line with clear space
+around it, where it was always legible. Only the index is cramped against the radical sign.
+
+**The decimal fallback the issue also floated was not needed.** The treatment scales to any index —
+`¹⁰√11` renders as readably as `⁵√5` — so there is no legibility threshold to fall back at, and an
+exact value never has to degrade to a decimal.
+
+**A bug worth recording, because the tests caught it and a human review would not have.** The presence
+check and the splitter first shared one `/g/` regex. `RegExp.test` on a global regex advances
+`lastIndex`, and `String.matchAll` resumes from it — so the split skipped the very match the check had
+just found, and the FIRST radical on a label went untreated while the second was fixed. Two regexes
+now, no shared state, and a lock asserts repeated calls are stable.
+
+**Locked** in `src-complex/__tests__/radical-index-727.test.tsx` (12): the formatter's spelling is
+unchanged (the input, not the fix); a single- and a multi-digit index both lift as real digits; `√`
+and `∛` and a bare exponent are left alone; the operator's exact reading «⁵√5·cis10.63°» keeps its
+tail; two radicals in one label both lift with every raise matched by its restoring `dy`; a reading
+with no radical renders unwrapped; and the regex-state trap above. Verified visually on both surfaces.
 ## ADR-CX-037 — SELECTING a member of a solution set is a NEW NAME, not a filter and not a prune (#694)
 
 **Status:** Accepted (2026-09-03) · **Stage:** LADDER-CX 1b (lowering) + 3e (resolution) · **Operator ruling** (2026-08-26) · **Round:** #878
