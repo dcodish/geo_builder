@@ -77,6 +77,11 @@ decision-complete plan of record. `src-analytic/` moves from `plannedTrees` to `
 
 ## ADR-AG-002 — The ROUTE lane: the pedagogical core, on the existing ask channel (2026-09-03)
 
+**Status:** Accepted (2026-09-03) · **D3 and D4 amended the same day by
+[ADR-AG-003](#adr-ag-003) — the data panel follows the 3-D contract (what is fixed by the data is
+shown), and the route table's first delivery is a derivation trace, not an options menu. D5 and the
+authorship model stand unchanged.**
+
 **Context.** Operator, same session: *"One of the things that makes this tool stand out is that the
 input users can give is usually very limited… he wants to know what is the equation of a specific
 line… we can possibly also try to give tips or ideas about how to get to this equation. Now this
@@ -146,3 +151,69 @@ doubles as the coverage map of the technique inventory, the way `catalog.ts` doe
 phases R1 (routes) and R2 (notices) as a **second axis** alongside V0–V4 — the route lane needs the
 V0 substrate but not the loci, so it does not renumber the capability slices. Still open, unchanged:
 whether an answer is ever revealed after a wrong claim.
+
+---
+
+## ADR-AG-003 — Multipart is a WORKSPACE model, and the data panel follows the 3-D contract (2026-09-03)
+
+**Context.** Reviewing [ADR-AG-002](#adr-ag-002), the operator rejected the framing that
+multi-section questions are an analytic problem: *"This issue of multipart is not specific for this
+type of question. It's always been the case in all of the questions we do. So when the user enters
+data for section one… he will then input any new information that was given to him in section two.
+Section two builds on section one, so the engine should not be surprised… the data panel accumulates
+all of the referred or inferred data from the question."*
+
+**1. The multipart model — already the architecture, now named.** A bagrut question arrives in
+sections (א ב ג ד ה) and the student enters each section's givens as they come. There is no
+per-section state: the **ordered fact list accumulates across the whole question**, the figure is
+re-derived, and the data panel is that ledger made visible. What makes a later section land without
+surprise is **M1 — existing-id lowering** ([docs/17 §M1](17-design-rules.md)): "a command that would
+create an object whose id already exists is not a conflict and not a re-creation: it lowers to
+constraints on the existing object … the lowering lives in ONE place at the apply boundary."
+
+This is mature in every tree — `reinterpretAsConstraint` and the #613 restate-dedupe in 2-D, "M1
+duality intact (new id → free rider; existing id → verified/driven given)" in 3-D — and it has been
+exercised on real multipart exams twice: [ADR-308](06-decisions.md#adr-308) is a 2025-bagrut
+**part-ב** that could not be drawn until M1's over-constraint reporting was fixed, and
+[ADR-3D-031](06b-decisions-3d.md#adr-3d-031) is a 2024-Q2 **part-ב** chain landing on the book's
+answer.
+
+**Obligation on the new product:** `src-analytic/` inherits M1 at the apply boundary **from day one**,
+not as a later refinement. Without it, every second section of every question is a false conflict.
+This is the [ADR-W-004](06w-decisions-workspace.md#adr-w-004) discipline applied forward rather than
+after a bug: the products copy patterns by design, so a *load-bearing* pattern must be copied
+deliberately.
+
+**2. D3 amended — the data panel shows what is fixed by the data.** Operator, verbatim: *"this
+should be just like the 3d. we show the values and equations once they are defined by the input …
+for starters we should stick with the other tool behavior which is what's fixed by data — we show in
+data panel."*
+
+So [ADR-AG-002](#adr-ag-002) D3's currency split is **withdrawn**. The contract is the 3-D one
+([src3d/engine/dataView.ts](../src3d/engine/dataView.ts)): derived results — including equations and
+coordinates — are shown when they are **knowledge** (invariant across every valid configuration,
+never one sample's value, [ADR-052](06-decisions.md#adr-052)), behind the same explicit student
+checkbox that gates the 3-D panel. The honesty gate that matters is unchanged and is the one the
+`DataPanel` skeleton already binds: *"a value row may print a VALUE only when it is knowledge."*
+
+**3. D4 amended — the route table's first delivery is a TRACE, not an options menu.** Operator:
+*"what I want to maybe add is an option of showing how we reached this result — what equations and
+inputs did we use. however, we can scope this as a later version."*
+
+With values shown, "here are the routes you could take" loses its occasion; the useful question
+becomes **"how was this one reached?"** — which givens and which formula produced the row. The
+authored technique table from [ADR-AG-002](#adr-ag-002) survives intact and serves the trace: it is
+the vocabulary of the explanation. Two consequences:
+
+- **R1 is re-scoped** from an ask-triggered options menu to a **derivation trace on a shown row**,
+  and **deferred to a later version** on the operator's instruction. V1 ships the 3-D panel
+  behaviour and nothing more.
+- **D4's "never chains" concern is moot in its original form.** It guarded against the tool
+  assembling a solution plan while values stayed hidden. A trace explains a result the student can
+  already see; it is provenance, not a hint. The anti-solver boundary is now carried entirely by the
+  knowledge gate (§2) rather than by withholding.
+- The **options menu** survives only as the degenerate case — a row that is **not** determined, where
+  the honest answer is what is still missing. Whether that is worth building is deferred with R1.
+
+**Unchanged:** D5 (the notices lane stays deferred) · the authorship model (the technique table is
+the operator's voice, bound to a readable catalog by an integrity test) · every ADR-AG-001 decision.
