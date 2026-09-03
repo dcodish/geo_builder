@@ -9,10 +9,16 @@
  * fail loudly; a prefix table that mis-sorts one path fails OPEN — it would wave through exactly the
  * edit it exists to catch. So the near-misses are asserted, not the happy path.
  */
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const { classifyChange, productOf, PRODUCTS } = (await import('../../scripts/check-sibling-safety.mjs')) as any;
+const { classifyChange, productOf, PRODUCTS, firstReason, SIBLING_TRAILER } = (await import(
+  '../../scripts/check-sibling-safety.mjs'
+)) as any;
 
 type Buckets = { own: string[]; sibling: string[]; shared: string[]; inert: string[] };
 /** Default viewpoint stays `complex` — the one the guard shipped with (#846 made it a parameter). */
@@ -130,6 +136,95 @@ describe('#846 — the viewpoint is a PARAMETER, so every lane can run the guard
       const all = [...c.own, ...c.sibling, ...c.shared, ...c.inert];
       expect(all, id).toHaveLength(files.length);
       expect(new Set(all).size, id).toBe(files.length);
+    }
+  });
+});
+
+/**
+ * #895 — the cross-product reason has to travel WITH the change.
+ *
+ * It used to live in `ALLOW_SIBLING_EDIT`, an environment variable, so it existed only in the shell
+ * of whoever typed it: a legitimately cross-product change (product N+1's switcher label, which by
+ * construction lands in every sibling's resources) went green locally and could NEVER go green in
+ * CI. The reason now rides an `Allow-sibling-edit:` commit trailer, which review, CI and the other
+ * PC can all read.
+ *
+ * Like the classifier above, this half fails OPEN when it is wrong — a too-permissive reader waves
+ * through the exact edit the guard exists to catch — so the near-misses are what is asserted.
+ */
+describe('#895 — the cross-product reason rides a commit trailer', () => {
+  it('takes the reason git returned', () => {
+    expect(firstReason('the switcher label belongs in every sibling\n')).toBe(
+      'the switcher label belongs in every sibling',
+    );
+  });
+
+  it('FAILS CLOSED on a bare trailer — an empty reason is not a reason', () => {
+    // git emits a blank line for `Allow-sibling-edit:` written with no value. Accepting that would
+    // turn the hatch into a `--force` with extra typing, which is what it exists NOT to be.
+    for (const empty of ['', '\n\n', '   \n \t \n', undefined]) {
+      expect(firstReason(empty)).toBeUndefined();
+    }
+  });
+
+  it('skips the blank lines of commits that carry no trailer to find the one that does', () => {
+    expect(firstReason('\n\nthe real reason\n')).toBe('the real reason');
+  });
+
+  it('GIT parses the trailer, so prose DESCRIBING the hatch cannot arm it', () => {
+    // The near-miss that a hand-rolled /^Allow-sibling-edit:/ would fail open on: this mechanism
+    // gets explained in commit messages and ADR text, and the key at line start in a body
+    // paragraph must not count. Git honours the real definition — last paragraph only.
+    const dir = mkdtempSync(join(tmpdir(), 'sibling-trailer-'));
+    try {
+      const g = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' }).trim();
+      const trailerIn = (range: string) =>
+        firstReason(g('log', `--format=%(trailers:key=${SIBLING_TRAILER},valueonly,unfold=true)`, range));
+      const commit = (name: string, message: string) => {
+        writeFileSync(join(dir, name), name);
+        g('add', '-A');
+        g('commit', '-q', '-m', message);
+      };
+
+      g('init', '-q');
+      g('config', 'user.email', 'test@example.com');
+      g('config', 'user.name', 'test');
+      commit('base.txt', 'base');
+
+      commit(
+        'prose.txt',
+        [
+          'feat: a change that merely TALKS about the hatch',
+          '',
+          'Allow-sibling-edit: is what the refusal message tells you to write; this',
+          'paragraph is prose about the mechanism, not a trailer on the change.',
+          '',
+          'Closes #1',
+        ].join('\n'),
+      );
+      expect(trailerIn('HEAD~1..HEAD')).toBeUndefined();
+
+      commit(
+        'real.txt',
+        [
+          'feat: a change that actually claims the hatch',
+          '',
+          "Allow-sibling-edit: a fourth product's switcher label must exist in",
+          "  every sibling's resources, or each one renders a raw i18n key",
+          'Co-Authored-By: someone <s@example.com>',
+        ].join('\n'),
+      );
+      // Folded onto a second line, and followed by an unrelated trailer — both must survive.
+      expect(trailerIn('HEAD~1..HEAD')).toBe(
+        "a fourth product's switcher label must exist in every sibling's resources, or each one renders a raw i18n key",
+      );
+
+      // And the reason is found anywhere in the RANGE, not only on its tip commit.
+      expect(trailerIn('HEAD~2..HEAD')).toBe(
+        "a fourth product's switcher label must exist in every sibling's resources, or each one renders a raw i18n key",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

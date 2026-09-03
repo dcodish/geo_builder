@@ -1782,3 +1782,62 @@ stay separate by design; no further consolidation of the three data panels is at
 App imports and renders the shared lane, none keeps a private ask input, 2-D's lane is **not** inside
 the values-gated block, asking is what pulls the compute, and «חשב ערכים» still exists as its own
 trigger. Verified visually in all three products (`npm run smoke:visual`).
+
+---
+
+## ADR-W-039 — The sibling guard's escape hatch rides the COMMIT, because an env var cannot reach CI (#895)
+
+**Context.** [ADR-W-036](#adr-w-036) made the sibling guard runnable from every lane, and its escape
+hatch was deliberately *a reason, not a flag* — the script's own header argues that "a bare `--force`
+would be typed reflexively; a sentence gets read back in review." The sentence was carried in the
+environment variable `ALLOW_SIBLING_EDIT`.
+
+PR #894 (the Analytic Builder tree, [ADR-AG-006](06c-decisions-analytic.md#adr-ag-006)) is the first
+change that had to use it, and **all four CI lanes failed**. The refused edits were one line per
+sibling — `switcherAnalytic` in `src/i18n/locales/*.json`, `src3d/i18n/locales/*.json` and
+`src-complex/i18n/index.ts` — which are not optional: every builder renders `products.json` as data,
+so without the label each *shipped* builder shows a raw i18n key in its own product switcher.
+
+**The root cause is WHERE the sentence lived, not whether one was written.** An environment variable
+exists only in the shell of whoever typed it. It reaches neither review nor CI, and it evaporates
+when the shell closes. So the hatch had a shape nobody could satisfy: a legitimately cross-product
+change went green locally and could **never** go green in CI. Worse, it made a local pass look like
+a gate — ADR-AG-006 recorded `check-sibling-safety --product analytic` PASS, and that PASS had been
+produced by exporting the var, so the gate the ADR cited had never actually been met on the PR.
+
+This was never analytic-specific. It hits every future product N+1 by construction, and every
+shared-shell or workspace-wide rename — precisely the legitimate cases the header names.
+
+**Decision** (operator ruling, 2026-09-03: the justification must travel *with* the change).
+
+- The reason rides an **`Allow-sibling-edit:` commit trailer**, read from the commits in the same
+  `base..HEAD` range the guard already diffs. It is therefore read from exactly the work under
+  judgement, never from history that merely precedes it.
+- The trailer puts the sentence in the permanent git record, which is strictly better than the var
+  on every axis the original design cared about: `git log` keeps it forever, review reads it, the
+  other PC sees it, and CI can act on it — with **no new configuration surface** and no workflow-level
+  value that would disable the guard globally.
+- `ALLOW_SIBLING_EDIT` **stays** for the local pre-commit loop, when the reason is not yet written
+  into a commit. It is no longer the only channel, and it is documented as the local-only half.
+- The refusal message teaches the **trailer first**, because that is the form that survives to CI.
+
+**GIT parses the trailer, not a regex of ours** — a correctness decision, not a convenience one. A
+hand-rolled `^Allow-sibling-edit:` match fails **OPEN on prose**: this mechanism gets described in
+commit messages and ADR text, and a body paragraph explaining how the hatch works would arm it. Git
+honours the real definition — last paragraph only — so the sentence documenting the trailer cannot
+be mistaken for the trailer. It also unfolds continuations and matches the key case-insensitively,
+both of which a hand-rolled matcher gets wrong quietly. Verified against git 2.53 before adopting it.
+
+**A bare `Allow-sibling-edit:` fails CLOSED.** Git emits a blank value for a trailer written with no
+reason; the guard selects the first *non-empty* line, so an empty sentence does not open the hatch.
+An empty reason would be exactly the reflexive `--force` the design refuses.
+
+**Locked** in `server/__tests__/sibling-safety.test.ts` (#895 block, 4 tests): the reason is taken
+from git's output; a bare trailer and whitespace-only output yield nothing; blank lines from commits
+that carry no trailer are skipped to find the one that does; and — in a real temporary git repo — the
+key at line start **in a body paragraph is not a trailer**, while a real one is found folded, past an
+unrelated `Co-Authored-By:`, and anywhere in the range rather than only on its tip commit.
+
+**Consequences.** PR #894 goes green by stating its reason in its own commit, which is where a reader
+looking at that commit in two years will want to find it. The guard keeps its teeth in every lane:
+nothing global was relaxed, and the only way through is still a sentence somebody had to write.

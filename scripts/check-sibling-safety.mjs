@@ -22,6 +22,10 @@
  *   node scripts/check-sibling-safety.mjs --base HEAD~1
  *   ALLOW_SIBLING_EDIT="why this legitimately edits a sibling" node scripts/check-sibling-safety.mjs
  *
+ * ...or, the form that survives to CI — a trailer on any commit in the range being checked:
+ *
+ *   Allow-sibling-edit: a fourth product's switcher label must exist in every sibling's resources
+ *
  * `--product` (2d | 3d | complex, default complex) is the VIEWPOINT: which tree this change is allowed
  * to touch. Everything belonging to another product is a sibling, and the siblings' builds are the ones
  * that run. Before #846 the viewpoint was hard-coded, so only the complex lane could run this at all.
@@ -31,6 +35,14 @@
  * The escape hatch is deliberately a REASON, not a flag: a cross-product change is legitimate (the
  * shared shell, a workspace-wide rename), and the thing worth forcing is that somebody said out loud
  * why. A bare `--force` would be typed reflexively; a sentence gets read back in review.
+ *
+ * WHERE the sentence lives decides whether the hatch works at all (#895). An environment variable
+ * exists only in the shell of whoever typed it: it reaches neither review nor CI, and it evaporates
+ * when the shell closes — so a legitimately cross-product change could go green locally and could
+ * NEVER go green in CI, which is a gate nobody can satisfy rather than a gate that holds. The
+ * `Allow-sibling-edit:` TRAILER fixes that by putting the sentence in the change itself, where
+ * `git log` keeps it forever, review reads it, the other PC sees it, and CI can act on it. The env
+ * var stays for the local pre-commit loop, when the reason is not yet written into a commit.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -170,6 +182,57 @@ function changedFiles(base) {
   return [...new Set([...committed, ...working])].filter(Boolean);
 }
 
+/**
+ * The trailer key that carries a cross-product justification IN the change (#895).
+ *
+ * Matched case-insensitively, because a trailer typed by hand is typed however it is remembered,
+ * and refusing `allow-sibling-edit:` on capitalisation alone would send the author back to the
+ * env var — the exact channel this exists to replace.
+ */
+export const SIBLING_TRAILER = 'Allow-sibling-edit';
+
+/**
+ * Pick the reason out of what git's trailer parser returned.
+ *
+ * Git emits one line per matching trailer across the range, blank when a trailer was written with
+ * no value. Selecting the first NON-EMPTY line is what makes a bare `Allow-sibling-edit:` fail
+ * CLOSED: an empty reason is not a reason, and this guard's whole worth is that somebody said out
+ * loud why — a hatch that opens on an empty sentence is a `--force` with extra typing.
+ */
+export function firstReason(trailerOutput) {
+  return (
+    String(trailerOutput ?? '')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .find(Boolean) || undefined
+  );
+}
+
+/**
+ * Read the reason out of the commits being checked.
+ *
+ * The range is `base..HEAD` — the same commits `changedFiles` diffs, so the trailer is read from
+ * exactly the work under judgement and never from history that merely precedes it.
+ *
+ * GIT parses the trailer, not a regex of ours, and that is a correctness decision rather than a
+ * convenience one. A hand-rolled `^Allow-sibling-edit:` match fails OPEN on prose: this very
+ * mechanism gets DESCRIBED in commit messages and ADR text, and a body explaining how the hatch
+ * works would arm it. Git honours the real definition — last paragraph only — so the sentence that
+ * documents the trailer cannot be mistaken for the trailer. It also unfolds continuations and
+ * matches the key case-insensitively, both of which a hand-rolled matcher gets wrong quietly.
+ */
+function trailerReasonInRange(base) {
+  try {
+    return firstReason(
+      git('log', `--format=%(trailers:key=${SIBLING_TRAILER},valueonly,unfold=true)`, `${base}..HEAD`),
+    );
+  } catch {
+    // A missing/unreachable base is reported by changedFiles with a far better message than
+    // anything we could raise here; never let trailer lookup be the thing that fails first.
+    return undefined;
+  }
+}
+
 function run(label, cmd, args) {
   process.stdout.write(`  ${label} … `);
   try {
@@ -190,7 +253,13 @@ function main() {
   const base = baseIdx >= 0 ? argv[baseIdx + 1] : 'origin/main';
   const prodIdx = argv.indexOf('--product');
   const product = prodIdx >= 0 ? argv[prodIdx + 1] : 'complex';
-  const reason = process.env.ALLOW_SIBLING_EDIT?.trim();
+  // Two channels, one meaning. The trailer is the one that travels — to review, to CI, to the
+  // other PC — so it is what the refusal teaches; the env var serves the local loop, before the
+  // reason has been written into a commit (#895).
+  const envReason = process.env.ALLOW_SIBLING_EDIT?.trim();
+  const commitReason = trailerReasonInRange(base);
+  const reason = envReason || commitReason;
+  const reasonSource = envReason ? 'ALLOW_SIBLING_EDIT (local shell)' : `${SIBLING_TRAILER}: trailer`;
 
   if (!PRODUCTS[product]) {
     console.error(`unknown --product "${product}" — expected one of: ${Object.keys(PRODUCTS).join(', ')}`);
@@ -207,7 +276,7 @@ function main() {
 
   if (sibling.length > 0) {
     if (reason) {
-      console.log(`\n  ALLOW_SIBLING_EDIT set — permitted, and recorded:\n    "${reason}"`);
+      console.log(`\n  cross-product edit PERMITTED by ${reasonSource}, and recorded:\n    "${reason}"`);
       for (const f of sibling) console.log(`      ${f}`);
     } else {
       ok = false;
@@ -217,7 +286,10 @@ function main() {
       for (const f of sibling) console.error(`      ${f}`);
       console.error(
         `\n  A slice scoped to ${product} must not edit another product's tree. If this change really\n` +
-          `  is cross-product, say why and re-run:\n` +
+          `  is cross-product, say why IN THE COMMIT — a trailer on any commit in ${base}..HEAD:\n` +
+          `      ${SIBLING_TRAILER}: why this legitimately edits a sibling\n` +
+          `\n  That is the form CI can read; an env var lives only in your shell (#895). While you are\n` +
+          `  still writing the change and the reason is not yet committed, the local loop also takes:\n` +
           `      ALLOW_SIBLING_EDIT="the reason" node scripts/check-sibling-safety.mjs --product ${product}\n`,
       );
     }
