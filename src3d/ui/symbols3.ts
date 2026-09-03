@@ -27,6 +27,18 @@ export const SYMBOL_PALETTE_3: readonly Symbol3[] = [
   ['⃗', '⃗', 0],
   ['|·|', '||', 1],
   ['√', '√', 0],
+  // #511: the POWER, the second half of the operator's #509 report («I also dont have the power option
+  // in the symbols»). Placed beside √ because a power and a root are the same student's reach. The
+  // parser takes BOTH spellings — «C(p^2,1,0)» and «C(p²,1,0)» build identically — so the palette
+  // offers the SUPERSCRIPT, which is the one an Israeli keyboard cannot produce.
+  //
+  // SCOPE, so the button is honest: a power is meaningful in a COORDINATE COMPONENT only. «|AB|² = 25»,
+  // «p² = 4» and «x²+y²+z² = 9» are still not-handled — unchanged by this button, which offers the
+  // character in the position that works rather than withholding it everywhere (ADR-3D-214).
+  //
+  // ² is ALREADY in bidi CORE, so the bidi3.test.ts drift lock passes untouched — which is that
+  // lock working as designed, not a coincidence.
+  ['²', '²', 0],
   ['½', '½', 0],
   ['¾', '¾', 0],
   ['·', '·', 0],
