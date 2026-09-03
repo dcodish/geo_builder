@@ -39,7 +39,7 @@ The layering `engine ← replay ← store` is mechanically enforced by
 | `src/ui/`, `src/i18n/`, `src/export/` | Chrome: theme + modal, i18n bootstrap and locales, image/`.docx` export | engine |
 | `src3d/` | The 3-D Space Builder — a second product. See [`src3d/CLAUDE.md`](src3d/CLAUDE.md) | **`src/` (anything)** |
 | `src-complex/` | The complex-numbers Builder — a third product. See [`src-complex/CLAUDE.md`](src-complex/CLAUDE.md) | **`src/`, `src3d/`** |
-| `shell/` | The shared chrome tree ([ADR-W-016](docs/06w-decisions-workspace.md#adr-w-016), [ADR-W-019](docs/06w-decisions-workspace.md#adr-w-019)): design tokens, bidi core, i18n bootstrap, save envelope + naming + load audit, symbol-palette core, app frame (header, `⋯` menu, About/privacy modal, banners, product switcher). Parameterized by the caller — no strings, no product knowledge, no `if (product === …)`. Consumed by `src-complex/` today; 2-D/3-D adopt in Track B (docs/28 §5a) | **product trees, `server/`** |
+| `shell/` | The shared chrome tree ([ADR-W-016](docs/06w-decisions-workspace.md#adr-w-016), [ADR-W-019](docs/06w-decisions-workspace.md#adr-w-019)): design tokens, bidi core, i18n bootstrap, save envelope + naming + load audit, symbol-palette core, app frame (header, `⋯` menu, About/privacy modal, banners, product switcher). Parameterized by the caller — no strings, no product knowledge, no `if (product === …)`. Consumed by all three products (docs/28 §5a) | **product trees, `server/`** |
 | `server/` | The shared LLM proxy + admin dashboard, parameterized by `tool:` — never forked per product | product trees |
 | `archive/` | The old template-based implementation. Not compiled, not bundled, excluded from tests. Reference only | — |
 

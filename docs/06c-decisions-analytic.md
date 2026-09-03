@@ -217,3 +217,74 @@ the vocabulary of the explanation. Two consequences:
 
 **Unchanged:** D5 (the notices lane stays deferred) · the authorship model (the technique table is
 the operator's voice, bound to a readable catalog by an integrity test) · every ADR-AG-001 decision.
+
+---
+
+## ADR-AG-004 — Suite conformance is a V0 ACCEPTANCE GATE, not a polish pass (2026-09-03)
+
+**Context.** Operator, same session: *"when we start building this tool, it needs to fit into the
+overall tool. So it needs to have its specific chips that lead to the page, and the look and feel of
+the input and data and grid and so on is exactly like the other tools we have."*
+
+This is already the plan of record — [docs/28 §5](28-product-unification.md) Phase 4 is *"analytic
+geometry starts on the shared floor… the first product that never has to re-derive the doctrine or
+re-implement the chrome, which is the whole return on this work."* And the floor is **built**: all
+three shipped products now import `shell/` (`BOUNDARIES.json` carries `src → shell`, `src3d → shell`
+and `src-complex → shell` as asserted-real edges), the canvas cluster is one contract
+([ADR-W-024](06w-decisions-workspace.md#adr-w-024)), the quick chips are one component
+([ADR-W-029](06w-decisions-workspace.md#adr-w-029)), and `products.json`
+([ADR-W-021](06w-decisions-workspace.md#adr-w-021)) is the roster every builder's switcher renders as
+data.
+
+**What was missing is not a decision — it is a gate.** Nothing in [docs/19](19-analytic-geometry-tool.md)
+said conformance is part of *shipping V0*, and "make it match the others" is exactly the item that
+slips to a follow-up when a new product is being built fast. This ADR fixes that: **V0 does not pass
+its gate until the checklist below is green.** The corpus gate (קיץ א' 2022) and this one are one
+gate, not two.
+
+**The conformance checklist.**
+
+1. **Roster entry in `products.json`** — `id: "analytic"`, `labelKey`, `icon`, `url`, `devUrl`,
+   `tree: "src-analytic"`, `buildTarget`, `enabled`. This is what puts the tool's **chip in every
+   other builder's switcher**; `server/__tests__/isolation.test.ts` fails on a product tree with no
+   entry, and `registry-consistency.test.ts` holds `ci.yml` and the [docs/22 §9](22-workflow.md)
+   table in step with it.
+2. **A `switcherAnalytic` locale key in EVERY product's resources** — He *and* En, in `src/i18n`,
+   `src3d/i18n`, `src-complex/i18n` and its own. `labelKey` is resolved by *each consuming product's*
+   i18n (the `products.json` contract), so a missing key is a blank chip in a sibling tool, not in
+   this one. **The single easiest item to miss**, because it is the only one whose failure shows up
+   somewhere other than the product being built.
+3. **Mount the shared frame, do not re-implement it** — `AppFrame`, `Switcher`, `Workbench`,
+   `InputArea`, `FactList`, `DataPanel`, `AskLane`, `QuickChips`, `SymbolRow`, `ToolButton`,
+   `FigureName`, `Banner`, `Modal`, `ManualScreen`, plus `theme`, `bidi`, `format`, `i18n`, `save`,
+   `symbols`, `export/`. The [docs/28 §4a](28-product-unification.md) rulings D1–D10 apply as
+   written — three columns with the data panel opt-in on its own side (D1), the shared palette (D3),
+   the header with its overflow menu (D4), one input preview (D5), fact-list disable/edit/delete
+   (D6), every figure action under the canvas (D7), the one data-panel skeleton and gate (D8), a
+   manual screen plus in-app quick commands (D9/D9b), the tablet overlay (D10).
+4. **Canvas controls from `shell/frame/canvasControls.ts`** ([ADR-W-024](06w-decisions-workspace.md#adr-w-024))
+   — same ↺ / − / + cluster, same glyphs, same zoom arithmetic. Rendered by the product (view state
+   never enters the store or undo), styled from the shared module. "Grid and so on" is this item plus
+   D7's under-canvas row.
+5. **Quick chips supplied as `commands` + `display`, never one string**
+   ([ADR-W-029](06w-decisions-workspace.md#adr-w-029)) — raw command is what `onPick` receives and
+   what reaches the fact list, the saved file and the `.docx`; the display form is presentation only.
+6. **`BOUNDARIES.json`** — move `src-analytic` from `plannedTrees` to `trees`, classify **every**
+   directory (classification is total; an unclassified directory fails the suite), add the allowed
+   edge `src-analytic → shell`, and the forbidden edges to `src`, `src3d`, `src-complex` and
+   `server`.
+7. **The parity locks gain the new tree** — `shell/__tests__/row-parity.test.ts`,
+   `ask-lane-parity.test.ts`, `switcher-config.test.ts`, `switcher-slices.test.ts`,
+   `quick-chips.test.tsx`, `data-panel.test.tsx`. These are source-scan locks over the builders, so a
+   fourth builder that is not enumerated is simply unchecked — the conformance is only as real as its
+   membership in these tests.
+8. **The rest of the [docs/22 §9](22-workflow.md) N+1 recipe** — `analytic.html`,
+   `vite.config.analytic.ts` (own `base`, own `dist-analytic/`, **no `@` alias**), `build:analytic`
+   and `test:analytic` scripts, the `test-analytic` CI lane and its `changes` classifier paths, the
+   `analytic` GitHub label (created 2026-09-03), and the server's `tool: 'analytic'` value, log sink
+   and `DashboardProfile`.
+
+**What conformance does NOT mean.** [docs/28 §2](28-product-unification.md) stands: engine, model,
+solver, replay, scene, parser rules and catalogs are **copied, never shared**; locale files, the ADR
+log, fixtures, the deploy target, the CI lane and the save-file suffix stay per-product. Uniformity
+is the chrome and the doctrine, never the geometry.

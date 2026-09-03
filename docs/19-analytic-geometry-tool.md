@@ -254,7 +254,7 @@ fact).
 
 | Layer | Status |
 |---|---|
-| `shell/` — frame, header, `⋯` menu, About/privacy, product switcher, save envelope, symbol palette | **free** — mount it, as `src-complex` does |
+| `shell/` — `AppFrame`, `Switcher`, `Workbench`, `InputArea`, `FactList`, `DataPanel`, `AskLane`, `QuickChips`, `SymbolRow`, `ManualScreen`, `canvasControls`, theme/bidi/format/i18n/save/symbols/export | **mandatory, not merely free** — mount it; re-implementing any of it fails V0's conformance gate ([ADR-AG-004](06c-decisions-analytic.md#adr-ag-004)). All three shipped products already consume it |
 | SVG renderer + `transform.ts` (world→screen, isotropic fit, Y-flip) | **copied**, + axes/grid and curve plotting |
 | Parser front-end, rule pipeline, `catalog` as coverage map, LLM fallback via the `tool:`-parameterised proxy | **copied**, new grammar |
 | Store: Zustand + zundo, ordered fact list as source of truth, derive-on-demand, save/load, image export | **copied** |
@@ -266,8 +266,15 @@ fact).
 - **V0 — substrate + tangency** (D2). Axes and the pinned gauge · the four curve types **by
   equation** · point-on, curve∩curve intersections, point–line distance · all five tangency kinds ·
   the one-parameter pin with roots as branches. Covers outright the ~7 of 20 exams with no locus
-  ask. **Gate: קיץ א' 2022** — two internally tangent circles, both possibilities for M, all common
-  tangents drawn in one coordinate system.
+  ask. **Gate — BOTH halves, one gate:** (a) **קיץ א' 2022** reproduced — two internally tangent
+  circles, both possibilities for M, all common tangents drawn in one coordinate system; and
+  (b) **the suite-conformance checklist green** ([ADR-AG-004](06c-decisions-analytic.md#adr-ag-004)) —
+  the tool's chip in every other builder's switcher, its `switcherAnalytic` key in *every* product's
+  He and En resources, the shared frame mounted rather than re-implemented, the
+  [ADR-W-024](06w-decisions-workspace.md#adr-w-024) canvas cluster, `BOUNDARIES.json` moved out of
+  `plannedTrees` with a total classification, and the `shell/__tests__` parity locks enumerating the
+  fourth tree. [docs/28 §5](28-product-unification.md) Phase 4 is the whole return on the
+  unification work: this is the first product that never re-derives the chrome.
 - **V1 — the locus lane.** Moving point, swept trace, claimed-equation verification, `שרטטו את שתי
   האפשרויות`. **Gate: חורף 2024** (locus parabola with a parameter, both branches drawn) **and
   קיץ א' 2024** (locus line from `MA=MB` between two circles).
