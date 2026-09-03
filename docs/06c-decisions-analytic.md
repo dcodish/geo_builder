@@ -72,3 +72,77 @@ reveals an answer after a wrong attempt — all deferred to the first build sess
 **Consequences.** [docs/19](19-analytic-geometry-tool.md) is rewritten from `PROPOSED` to the
 decision-complete plan of record. `src-analytic/` moves from `plannedTrees` to `trees` in
 `BOUNDARIES.json` when the first file lands, not before.
+
+---
+
+## ADR-AG-002 — The ROUTE lane: the pedagogical core, on the existing ask channel (2026-09-03)
+
+**Context.** Operator, same session: *"One of the things that makes this tool stand out is that the
+input users can give is usually very limited… he wants to know what is the equation of a specific
+line… we can possibly also try to give tips or ideas about how to get to this equation. Now this
+isn't a solver… it's just, what options do you have based on the question. Somewhat similar (but
+much simpler) to the theorem detection concept in the 2-D tool."*
+
+The observation behind it is the product's real shape. In the sibling tools the student types many
+facts and the tool draws them; a 572 Q1 gives **four lines of givens and then asks a question**. The
+hard part for a student is not the algebra — it is knowing which formula to reach for. A teacher's
+entire value in that moment is *"you have a point and you have a perpendicular, so use the
+perpendicular-slope rule."* That is a **menu of routes**, and it is to this product what theorem
+surfacing is to the 2-D one ([docs/10 §3](10-pedagogy.md)).
+
+**The mechanism already exists — twice.** `shell/frame/DataPanel.tsx` ships the fixed section
+skeleton *points · measures · relations · parameters · **ask***, with its `children` slot documented
+as taking an ask form; behind it `src3d/engine/queries.ts` ([ADR-3D-057](06b-decisions-3d.md#adr-3d-057),
+#274) is the channel itself: *"a SEPARATE input where the student asks for a specific quantity and
+sees its value WITHOUT adding anything to the figure. A query is a question, never a fact: it never
+enters `replay`, never moves a point, never appears in the step list."* The third utterance class —
+givens · claims · **asks** — is settled architecture and the surface is already in shared chrome.
+This ADR does not add a lane. It gives that lane **a different answer** when what is asked for is
+the exam's own currency.
+
+**Why it is genuinely simpler than the 2-D spine** (and why none of docs/18's wounds reproduce):
+
+1. **No discovery.** The 2-D feed must find which of 109 theorems could apply. Here the student
+   *names the target*, so the table is indexed by target kind — line equation · circle equation ·
+   conic equation · point coordinates · locus equation · parameter value · length/angle/area. About
+   8 kinds × 3–5 routes ≈ 30 authored entries.
+2. **No relevance problem.** [docs/18 R3](18-theorem-relevance-plan.md) — "'prioritized' was never
+   designed or tested" — cannot occur: a menu scoped to one named target is four items long.
+3. **Availability is decidable, not evidential.** The engine already knows whether `B` and `D` are
+   determined, so ✓/✗ per route is a fact. No L1/L2/L3 evidence machinery is needed, and the lane
+   cannot hallucinate an available route.
+
+**Decisions (operator, 2026-09-03):**
+
+3. **D3 — split by currency.** An ask for an **equation or a point's coordinates** returns the
+   **route menu and never the value** — that is what the exam asks for. An ask for a **supporting
+   scalar** (length, distance, angle, area) is *answered* when it is knowledge, exactly as the 3-D
+   lane does today, preserving the approved "organize your data" pedagogy
+   ([src3d/engine/dataView.ts](../src3d/engine/dataView.ts)) without handing over the answer.
+4. **D4 — the tool never chains.** A blocked route names the missing **quantity**, never its value
+   (`חסר: השיפוע של BD`, never `−5/3`), and stops. If the student wants that quantity's own routes
+   they **ask again** — the same single mechanism, no new UI, and the student does the chaining,
+   which is the part worth them doing. "Not even step-by-step" stays literally true.
+5. **D5 — notices deferred.** Lane B (the tool volunteering `הישר משיק למעגל בכל תצורה` unasked —
+   the direct analogue of the 2-D L3-observed hint, and the home of the corpus's most common
+   `הוכיחו` item) is **out of the first build**. Routes ship and are validated first; the notices
+   lane needs the forced-across-samples discipline and an anti-flood cap of its own.
+
+**Two structural rules that keep this from becoming a solver** (design consequences, not separate
+decisions):
+
+- **Route order is authored and constant** — the textbook order, never re-sorted by which route the
+  engine would actually take. A ranked menu leaks the intended solution path; a fixed one cannot.
+- **No route card ever prints a value.** The tool holds the number; it does not say it. This is the
+  2-D no-reveal boundary ([docs/18 §2](18-theorem-relevance-plan.md), the conclusion-side rules)
+  transplanted, and it is why D3's split is drawn at *currency* rather than at *difficulty*.
+
+**Authorship.** The route table is **teacher knowledge, not engine knowledge** — the
+`PRINCIPLE_TABLE` model ([docs/18 §6](18-theorem-relevance-plan.md)): a readable catalog in the
+operator's voice, bound to the code table by an integrity test, growing by operator direction. It
+doubles as the coverage map of the technique inventory, the way `catalog.ts` does for input.
+
+**Consequences.** [docs/19 §4b](19-analytic-geometry-tool.md) records the lane; §7 adds the pedagogy
+phases R1 (routes) and R2 (notices) as a **second axis** alongside V0–V4 — the route lane needs the
+V0 substrate but not the loci, so it does not renumber the capability slices. Still open, unchanged:
+whether an answer is ever revealed after a wrong claim.

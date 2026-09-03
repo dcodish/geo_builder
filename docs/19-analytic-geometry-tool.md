@@ -128,15 +128,74 @@ Charter unchanged from the three shipped siblings: **reproduce and verify, never
 | `האם קיימת נקודה שבעבורה…?` | A refusal is a first-class answer. `no-roots` is an honest contradiction, never a fabricated point. |
 | `סרטטו את שני המעגלים וכל המשיקים המשותפים` | This *is* the tool. No verification needed — the drawing is the deliverable. |
 
+## 4b. The ROUTE lane — this product's teaching feature ([ADR-AG-002](06c-decisions-analytic.md#adr-ag-002))
+
+Theorem surfacing is what the 2-D tool teaches with ([docs/10 §3](10-pedagogy.md)). **This is the
+analytic tool's equivalent, and it exists because of §2's shape:** a Q1 gives four lines of givens
+and then asks a question. The student's difficulty is not the algebra — it is knowing which formula
+to reach for. A teacher's whole value in that moment is *"you have a point and you have a
+perpendicular, so use the perpendicular-slope rule."* That is a **menu of routes**.
+
+**It rides a channel that already exists.** `shell/frame/DataPanel.tsx` ships the fixed section
+skeleton *points · measures · relations · parameters · **ask***; `src3d/engine/queries.ts`
+([ADR-3D-057](06b-decisions-3d.md#adr-3d-057)) is the ask channel — "a question, never a fact: it
+never enters `replay`, never moves a point, never appears in the step list". The third utterance
+class (**givens · claims · asks**) is settled architecture. What is new is the *answer* the lane
+gives when the target is the exam's own currency.
+
+**The shape**, on the operator's own example — given `AB: y=−2x+8`, `AC: x=4`, `B(3,2)`, `D(0,7)`,
+asked `משוואת BD`:
+
+| Route | | Status |
+|---|---|---|
+| דרך שתי נקודות | **✓** | B ו-D — שתיהן ידועות |
+| נקודה + שיפוע | **✓** | יש D; **חסר: השיפוע של BD** |
+| נקודה + מקבילות/ניצבות לישר ידוע | ✗ | שום נתון לא קושר את BD לישר אחר |
+| נקודת חיתוך של שני ישרים | ✗ | BD לא ניתן כחיתוך |
+
+**Why it is much simpler than the 2-D spine.** (1) **No discovery** — the student names the target,
+so the table is indexed by target kind (~8 kinds × 3–5 routes ≈ 30 entries, against 109 theorems).
+(2) **No relevance problem** — [docs/18 R3](18-theorem-relevance-plan.md), the 2-D feed's worst
+wound, cannot occur when the menu is scoped to one target and is four items long. (3) **Availability
+is decidable, not evidential** — the engine already knows whether `B` and `D` are determined, so ✓/✗
+is a fact and the lane cannot hallucinate an available route. None of the L1/L2/L3 evidence
+machinery is needed.
+
+**The rules that keep it from being a solver** — structural, not restraint:
+
+- **Split by currency (D3).** An **equation or a point's coordinates** returns routes and never the
+  value. A **supporting scalar** (length, distance, angle, area) is answered when it is knowledge,
+  as the 3-D lane already does.
+- **The tool never chains (D4).** A blocked route names the missing *quantity*, never its value, and
+  stops. The student chains by **asking again** — same mechanism, no new UI.
+- **Route order is authored and constant** — the textbook order, never re-sorted by which route the
+  engine would take. A ranked menu leaks the intended solution path; a fixed one cannot.
+- **No route card ever prints a value.** The tool holds the number; it does not say it.
+
+**Lane B — notices** ("the figure forces this in every configuration — you may be meant to prove
+it") is the direct analogue of the 2-D L3-observed hint and the home of the corpus's most common
+`הוכיחו` item (`הראו כי הישר משיק למעגל`). **Deferred (D5)** — routes ship and are validated first.
+
+**Authorship.** The route table is teacher knowledge, not engine knowledge: a readable catalog in the
+operator's voice bound to the code table by an integrity test (the `PRINCIPLE_TABLE` model,
+[docs/18 §6](18-theorem-relevance-plan.md)). It doubles as the coverage map of the technique
+inventory, the way `catalog.ts` does for input.
+
 ## 5. Decisions
 
-**Resolved** ([ADR-AG-001](06c-decisions-analytic.md#adr-ag-001), operator 2026-09-03):
+**Resolved** ([ADR-AG-001](06c-decisions-analytic.md#adr-ag-001) and
+[ADR-AG-002](06c-decisions-analytic.md#adr-ag-002), operator 2026-09-03):
 
 - **D1 — draw-and-verify, NO CAS.** The §6 deadlock of the July draft. It dissolved once the corpus
   showed that even `הביעו באמצעות k` asks verify by sampling the parameter. The `src3d` NO-CAS
   boundary ([src3d/CLAUDE.md](../src3d/CLAUDE.md) rule 3) is adopted verbatim, escalation route
   included.
 - **D2 — V0 is the equation + tangency substrate, not the locus.** See §7.
+- **D3 — the route lane splits by currency.** Equations and coordinates → routes, never the value.
+  Supporting scalars → answered when they are knowledge. See §4b.
+- **D4 — the tool never chains.** A blocked route names the missing quantity and stops; the student
+  chains by asking again.
+- **D5 — the notices lane (Lane B) is deferred.** Routes ship and are validated first.
 
 **Deliberately still open:** the URL and deploy path · the 471 ↔ 572 profile split (the registry's
 "ONE engine with curriculum-level profiles" — [docs/22 §9](22-workflow.md)); V0/V1 target 572 only ·
@@ -200,6 +259,15 @@ fact).
   `בר-חסימה`. Corpus: `אוסף שאלות בגרויות 2020 עד 2024 חורף לפי נושא.pdf` pp. 36–46 (14 questions,
   ללא מעגל) and 47–57 (13, עם מעגל). Same engine, a curriculum profile.
 
+**The pedagogy lane is a SECOND axis**, not a slice in the V-sequence — it needs the V0 substrate but
+none of the loci, so it does not renumber anything:
+
+- **R1 — the route lane** (§4b, D3/D4). Lands any time after V0. Gate: on the V0 figure, asking
+  `משוואת BD` produces the four-route menu with correct ✓/✗ and the missing quantity named, and
+  asking `|AB|` is *answered* — the currency split visible in one session.
+- **R2 — the notices lane** (Lane B, deferred by D5). Needs the forced-across-samples discipline and
+  an anti-flood cap of its own before it ships.
+
 ## 8. Testing & validation corpus
 
 Per [docs/08](08-testing-strategy.md) and standing rule 4: reported inputs become permanent coverage,
@@ -220,11 +288,21 @@ also computes.
 - **The gauge inversion is the subtle hazard.** Every honesty habit in the 2-D tree assumes drawn
   coordinates are meaningless. Here they are the answer. A pattern copied across without re-reading
   that assumption is the predictable first bug class ([ADR-W-004](06w-decisions-workspace.md#adr-w-004)).
+- **The route lane leaks a plan if it is ever ranked.** Ordering routes by which one the engine would
+  take hands over the intended solution path without printing a single number — the one way §4b
+  becomes a solver while every value stays hidden. Order is authored and constant; a sort key on that
+  table is a design regression, not a feature.
+- **The route lane must not grow a planner.** No search, no chaining, no "and then you would get" —
+  authored entries, one step, the student asks again (D4). A depth parameter appearing anywhere in
+  that code is the tripwire.
 
 ---
 
-**Summary.** A fourth sibling at its own URL. Its distinguishing value is that **the exam prints no
-figure**, so the tool is not reproducing a drawing but supplying one. The new core is a coordinate
-substrate plus a closed four-curve family with a fixed tangency table; the parameter pin, the branch
-index, the claim verifier and the free-DOF sweep that generates every locus are all transplanted
-from shipped code. **Next step: file the tracking issue, then V0 against the קיץ א' 2022 gate.**
+**Summary.** A fourth sibling at its own URL. Two things distinguish it. **The exam prints no
+figure**, so the tool is not reproducing a drawing but supplying one. And the input is *sparse* —
+four lines of givens and then a question — so the teaching happens on the **ask** lane: §4b's route
+menu is to this product what theorem surfacing is to the 2-D one, and it is much simpler because the
+student names the target. The new core is a coordinate substrate plus a closed four-curve family
+with a fixed tangency table; the parameter pin, the branch index, the claim verifier, the ask
+channel and the free-DOF sweep that generates every locus are all transplanted from shipped code.
+**Next step: V0 against the קיץ א' 2022 gate, then R1.**
