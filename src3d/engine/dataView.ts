@@ -484,6 +484,34 @@ export function parametricDecomp(c: Construction3, from: Id, to: Id, seeds: numb
 }
 
 const near = (a: number, b: number) => Math.abs(a - b) < EPS;
+/**
+ * #884 — do two ADMISSIBLE ROOTS agree on a coordinate? A different question from {@link near}, and it
+ * needs a different tolerance.
+ *
+ * `near`/`EPS` compares values the SAME solve produced, which agree to machine precision. Roots in the
+ * pivot's pool are INDEPENDENT numeric solves, and they scatter: measured on «תיבה» + «C(p+q,1,0)», the
+ * pool holds 26–44 roots and the y/z spread is 2e-6 … 8e-6 — just above `EPS`. So a component pinned to
+ * exactly 1 by the student's own given read as "branch-dependent", `nStable` fell to 0, and the panel
+ * withheld «C(?, 1, 0)» entirely (operator, playing round #878 T10). The single-symbol form has a pool
+ * of 2 and scatters at 1e-13, which is why only the wider figure showed it.
+ *
+ * Relative, not a bigger constant: agreement to 1e-4 of the coordinate's own size — the
+ * `residualTolerance` discipline from 2-D, one product over. That is orders of magnitude above solver
+ * scatter and orders of magnitude below any genuine branch split (#827's case was `p = ±4`), so the
+ * guard keeps doing its job. `EPS` itself is untouched: it is the shared knowledge-gate epsilon and
+ * loosening it would weaken every other gate that reads it.
+ */
+const ROOT_AGREE_REL = 1e-4;
+/**
+ * The tolerance is relative to the POINT's size, not to the coordinate's own value: a coordinate that
+ * IS zero — `z = 0` in «C(p+q,1,0)», pinned exactly by the student — would otherwise collapse the
+ * relative term to nothing and fall back to `EPS`, which is the bug all over again on the one axis most
+ * likely to be pinned to 0.
+ */
+const rootScale = (q: Vec3): number => Math.max(Math.abs(q.x), Math.abs(q.y), Math.abs(q.z), 1);
+const rootsAgree = (a: number, b: number, scale: number): boolean =>
+  Math.abs(a - b) <= Math.max(EPS, ROOT_AGREE_REL * scale);
+
 const sameVec = (a: Vec3, b: Vec3) => near(a.x, b.x) && near(a.y, b.y) && near(a.z, b.z);
 
 /** Stated magnitudes: |pair| = value, from driving pins and recorded claims. */
@@ -1024,7 +1052,8 @@ export function dataView(c: Construction3, seed: number): DataPanel {
         resolved.every((r) => {
           const roots = r.pivot?.pointRoots?.[id];
           if (!roots || roots.length <= 1) return true; // one solution ⇒ no branch to miss
-          return roots.every((q) => near(q[ax], roots[0][ax]));
+          const scale = Math.max(...roots.map(rootScale));
+          return roots.every((q) => rootsAgree(q[ax], roots[0][ax], scale));
         });
       const stableAx = axes.map((ax) => near(ps[0]![ax], ps[1]![ax]) && near(ps[0]![ax], ps[2]![ax]) && branchAgrees(ax));
       const nStable = stableAx.filter(Boolean).length;

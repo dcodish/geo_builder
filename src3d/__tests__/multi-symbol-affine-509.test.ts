@@ -24,6 +24,7 @@ import { applyCommand3 } from '../engine/apply';
 import { emptyConstruction3, pinSymsOf, symsOfAffine, evalAffine, soleSymOf, type SymAffine } from '../engine/types';
 import { derive3, useGeo3 } from '../store/store3';
 import { deserializeFigure3 } from '../store/figureFile3';
+import { dataView } from '../engine/dataView';
 
 const BOX = "תיבה ABCDA'B'C'D'";
 
@@ -229,5 +230,65 @@ describe('#509 — a saved figure written before the widening still loads', () =
     const r = deserializeFigure3(V1.replace('"schemaVersion":1', '"schemaVersion":99'));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toBe('newer-schema');
+  });
+});
+
+/**
+ * #884 — a MULTI-SYMBOL point keeps its coordinate readout.
+ *
+ * Operator, playing PR #880 (T10): *"in other cases i saw that the image would show C(?, 1, 0). this is
+ * not shown on screen or in data panel"*. Correct — «C(p+q,1,0)» built, the panel listed p and q as free,
+ * and the point's own row vanished, so the student was never told that its y is 1 and its z is 0.
+ *
+ * Not the pin and not the figure: C sits at (x, 1.0000, 0.0000) at every sampled seed either way. The
+ * defect is in #827's branch-coverage guard. It asks whether the admissible roots agree, comparing them
+ * at `EPS` — a tolerance for values ONE solve produced. The pivot's roots are INDEPENDENT solves, and a
+ * two-symbol figure has 26–44 of them instead of 2, scattering at 2e-6 … 8e-6. So a coordinate pinned
+ * exactly by the student read as branch-dependent and was withheld.
+ *
+ * The guard itself is right and must keep working — that is what the last test here is for.
+ */
+describe('#884 — the coordinate readout survives a wide root pool', () => {
+  beforeEach(() => {
+    useGeo3.setState({ facts: [], seed: 0, lastError: null });
+    useGeo3.temporal.getState().clear();
+  });
+
+  const coordsOf = (line: string) => {
+    for (const u of [BOX, line]) useGeo3.getState().submit(u);
+    const d = derive3(useGeo3.getState().facts, 0);
+    return dataView(d.construction, 0).pointCoords as Record<string, { text: string; kind: string }>;
+  };
+
+  it.each(['C(p+q,1,0)', 'C(2p+3q,1,0)'])('«%s» prints C(?, 1, 0) — the pinned components are knowledge', (line) => {
+    const c = coordsOf(line);
+    expect(c.C, 'the row must exist at all — it did not').toBeDefined();
+    expect(c.C.text).toBe('(?, 1, 0)');
+    expect(c.C.kind).toBe('partial');
+  });
+
+  it('the single-symbol form is unchanged', () => {
+    expect(coordsOf('C(p,1,0)').C.text).toBe('(?, 1, 0)');
+  });
+
+  it('the pin HOLDS at every sampled seed — this was always display-only', () => {
+    for (const u of [BOX, 'C(p+q,1,0)']) useGeo3.getState().submit(u);
+    for (const seed of [0, 1013, 2027]) {
+      const C = derive3(useGeo3.getState().facts, seed).positions.get('C')!;
+      expect(C.y, `seed ${seed}`).toBeCloseTo(1, 6);
+      expect(C.z, `seed ${seed}`).toBeCloseTo(0, 6);
+    }
+  });
+
+  it('#827 STILL HOLDS: a genuinely two-branch coordinate is still withheld', () => {
+    // the loosened tolerance is relative (1e-4 of the point's size) — orders of magnitude below any
+    // real branch split, so «open until a sign narrows it» must survive untouched
+    for (const u of [BOX, 'C(p,1,0)', '|AC| = 5']) useGeo3.getState().submit(u);
+    const c = dataView(derive3(useGeo3.getState().facts, 0).construction, 0).pointCoords as Record<
+      string,
+      { text: string }
+    >;
+    // whatever it reports, it must not claim a definite x when ±roots exist
+    if (c.C) expect(c.C.text).toContain('?');
   });
 });
