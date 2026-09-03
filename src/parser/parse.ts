@@ -8326,6 +8326,69 @@ const similarity: Rule = (s, ctx) => {
 // rule to the membership rule, which read only its own clause and DROPPED the stated magnitude (the
 // ratio member «כך ש-AD = 2·DB» lost the membership instead — same hole, opposite half surviving).
 const SUCH_THAT = /\bsuch that\b|\bso that\b|\bsuch_that\b|כך\s*ש-?(?=\s|[A-Za-z]\d*)/i;
+/**
+ * #461 — «<shape> ABCD עם <construct>» / "<shape> ABCD with <construct>": declare the shape AND the
+ * construct in one line (the capability half of ADR-430).
+ *
+ * ADR-430 added the MECHANISM — the dropped-construct gate refuses rather than committing a bare
+ * rectangle with a green ✓ — and deliberately not the capability, so «מלבן ABCD עם אלכסונים» refused
+ * and escalated. Escalating is the right rung for input the grammar cannot represent, but it is not
+ * support: it is unreliable and invisible to the student (ADR-428).
+ *
+ * A SPLITTER, not a shape×construct table. The left half goes through the real grammar, so every shape
+ * that lane supports is supported here by construction; the right half is SYNTHESIZED from the shape's
+ * own label run and parsed the same way, so every construct that lane supports comes along too. The
+ * `compoundSuchThat` / `compoundAtDistance` pattern (#760) — and the reason 3-D's ADR-3D-113 fix is
+ * copied as a shape rather than imported.
+ *
+ * AMBIGUITY REFUSES, IT NEVER GUESSES (ADR-052). A bare «אלכסון» on a quad could be either diagonal,
+ * and a bare «גובה» on a triangle is one of three; choosing asserts a given the student never gave.
+ * Those ASK, naming the forms that would answer — the same `ambiguous-shape` question #519 built, one
+ * construct over, so no new message and no new refusal shape. The PLURAL «אלכסונים» is unambiguous:
+ * it is both, which is exactly why the reported line is the one that builds.
+ */
+const WITH_SPLIT = rx(String.raw`^(?<left>.+?)\s+(?:עם|with)\s+(?:an?\s+|the\s+)?(?<right>.+?)\s*$`, 'i');
+const shapeWithConstruct: Rule = (s, ctx) => {
+  const m = s.match(WITH_SPLIT);
+  if (!m) return null;
+  const { left, right } = m.groups as { left: string; right: string };
+  const lr = parse(left.trim(), ctx);
+  if (!lr.ok) return null; // the left is not a shape this grammar reads — leave the line to other rules
+  // the labels the shape declared, in order: what the construct half is about
+  const ids = lr.commands.flatMap((c) =>
+    'ids' in c && Array.isArray((c as { ids?: unknown }).ids) ? ((c as { ids: string[] }).ids) : [],
+  );
+  if (ids.length < 3) return null;
+  const noun = right.trim();
+
+  // BOTH diagonals of a quad — unambiguous, and the reported case
+  if (/^(?:ה?אלכסונים|diagonals)$/i.test(noun)) {
+    if (ids.length !== 4) return null;
+    const rr = parse(`אלכסוני ${ids.join('')} נחתכים`, ctx);
+    return rr.ok ? [...lr.commands, ...rr.commands] : null;
+  }
+  // ONE diagonal of a quad — WHICH one is the student's to say
+  if (/^(?:ה?אלכסון|diagonal)$/i.test(noun) && ids.length === 4) {
+    return { clarify: 'ambiguous-shape', noun: 'diagonal', shapes: [`${ids[0]}${ids[2]}`, `${ids[1]}${ids[3]}`] };
+  }
+  // a triangle's special lines: one PER VERTEX, so a bare noun names none of the three
+  const perVertex =
+    /^(?:ה?גובה|altitude)$/i.test(noun) ? 'גובה'
+    : /^(?:ה?תיכון|median)$/i.test(noun) ? 'תיכון'
+    : /^(?:ה?חוצה\s+זווית|angle\s+bisector|bisector)$/i.test(noun) ? 'חוצה זווית'
+    : null;
+  if (perVertex && ids.length === 3) {
+    return { clarify: 'ambiguous-shape', noun: perVertex, shapes: ids.map((v) => `${perVertex} מ-${v}`) };
+  }
+  /**
+   * Anything else is NOT this issue. A generic «parse the right half too» was tried and it swallowed
+   * «square ABCD with AB = 6», «משולש ABC עם נקודה D על AB» and their siblings — forms a dozen locks
+   * deliberately keep escalating (#497 / phase4's misparse defence). Those are shape + GIVEN, a
+   * different question from shape + CONSTRUCT, and widening into them here would decide it silently.
+   */
+  return null;
+};
+
 const compoundSuchThat: Rule = (s, ctx) => {
   const parts = s.split(SUCH_THAT);
   if (parts.length < 2) return null;
@@ -8642,6 +8705,7 @@ const showCenter: Rule = (s, ctx) => {
 const LAST_RESORT_ASKS: Rule[] = [ambiguousCircleAsk, ambiguousShapeAsk];
 
 export const RULES: Rule[] = [
+  shapeWithConstruct, // #461: «<shape> ABCD עם <construct>» — SPLIT, so every shape and every construct come along by construction
   compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
   compoundAtDistance, // #760: "<point> on <carrier> at distance N from X" — membership + set-distance, composed
   roleSideLine, // #775: «תיכון ליתר» — role noun → the declared side, rewritten and re-parsed
@@ -9722,6 +9786,18 @@ const withReservedGuard = (r: ParseResult, ctx: ParseContext): ParseResult => {
   return sym ? { ok: false, reason: 'reserved-symbol', symbol: sym } : r;
 };
 
+/**
+ * Is this refusal a question the split can no longer improve on?
+ *
+ * Deliberately just `ambiguous-shape`, and the reason is the distinction rather than the list. The
+ * other clarifies come from rules that have NOT considered the compound structure, so splitting the
+ * line can still rescue them — «משולש שווה שוקיים שבו זווית B=40» raises `ambiguous-angle` and then
+ * parses cleanly once split, which is why the gate intercepts it. `ambiguous-shape` is raised by the
+ * splitter itself, after it has already read both halves: there is nothing left to split, and letting
+ * the gate replace it with `not-handled` sends a recognised ambiguity to the LLM — whose job is to
+ * guess, which is the #516 class this tree keeps closing (#461).
+ */
+const isAmbiguityQuestion = (reason: string): boolean => reason === 'ambiguous-shape';
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
   let s = normalizeUtterance(raw);
   if (!s) return { ok: false, reason: 'not-handled' };
@@ -9834,7 +9910,13 @@ function parseResolved(s: string, ctx: ParseContext): ParseResult {
         droppedGivenRelations(s, whole.commands).length > 0 ||
         droppedCompoundRelation(s, whole.commands).length > 0 ||
         droppedRegionSubject(s, whole.commands))) ||
-    (!whole.ok && whole.reason !== 'not-handled' && droppedShapeNoun(s, [], ctx))
+    // #461: …but an AMBIGUITY question is not a gate failure. `shapeWithConstruct` answers
+    // «ריבוע ABCD עם אלכסון» with "which diagonal — AC or BD?", and that reply names no commands, so
+    // the dropped-noun gate saw an unconsumed «אלכסון» and replaced the question with `not-handled` —
+    // sending a recognised ambiguity to the LLM, which is the #516 class this tree keeps closing. The
+    // comment directly below already states the rule ("a clarification is a rule's genuine question —
+    // propagate it, never second-guess it with a split"); this makes the condition agree with it.
+    (!whole.ok && whole.reason !== 'not-handled' && !isAmbiguityQuestion(whole.reason) && droppedShapeNoun(s, [], ctx))
   ) {
     return splitStatements(s, ctx) ?? regionSideFallback(s, ctx) ?? { ok: false, reason: 'not-handled' };
   }

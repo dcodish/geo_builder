@@ -36,12 +36,25 @@ function gate(utterances: string[]): { ok: boolean; dropped: string[] } {
 }
 
 describe('#456 — a stated construct that no command produced is refused, not committed', () => {
-  it('the audit case: «מלבן ABCD עם אלכסונים» now escalates at the PARSE (#497) — never a bare rectangle', () => {
-    // The rectangle rule's denylist spelled «אלכסון» with a FINAL nun, so it could never see the
-    // plural «אלכסונים» (the lexicon's ADR-3D-035 trap) — which is exactly why this utterance used to
-    // half-parse and #456 needed the noun gate. The #497 fail-closed gate flags the plural as an
-    // unknown word and the whole line escalates; the noun gate stays the LLM-commit path's net.
-    expect(gate(['מלבן ABCD עם אלכסונים']).ok).toBe(false);
+  /**
+   * The audit case now BUILDS (#461, the capability half this ADR deliberately did not add).
+   *
+   * ADR-430's own text said so: it added the MECHANISM and left the capability open, and #461's gate
+   * note requires this lock to move from "refuses" to "builds" in the same commit as the capability —
+   * *"keep the gate's own refusal case alive on a phrasing that stays unsupported, or the mechanism
+   * loses its regression net."* Both halves are below.
+   */
+  it('the audit case: «מלבן ABCD עם אלכסונים» BUILDS the rectangle AND its diagonals (#461)', () => {
+    const g = gate(['מלבן ABCD עם אלכסונים']);
+    expect(g.ok).toBe(true);
+    // and the gate is SATISFIED — the stated noun materialised, which is the whole point of #456
+    expect(g.dropped).toEqual([]);
+  });
+
+  it('…and the gate still refuses a construct noun that no command produced', () => {
+    // the phrasing that stays unsupported: a shape plus a GIVEN is not #461's family, so «אלכסון»
+    // here is still a noun nothing materialised — the mechanism keeps its regression net
+    expect(gate(['מלבן ABCD', 'האלכסון שווה 5']).ok === false || gate(['מלבן ABCD', 'האלכסון שווה 5']).dropped.length > 0).toBe(true);
   });
 
   it('names the student\'s WHOLE word, never the regex stem (the honesty invariant)', () => {

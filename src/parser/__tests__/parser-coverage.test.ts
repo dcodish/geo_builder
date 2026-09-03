@@ -237,7 +237,9 @@ const ESCALATES: string[] = [
   'ריבוע ABCD וקטע AC',
   'square ABCD with point E on AB',
   'משולש ABC עם נקודה D על AB',
-  'rectangle ABCD with diagonals',
+  // 'rectangle ABCD with diagonals' — RETIRED by #461: the shape-plus-CONSTRUCT family now builds
+  //  deterministically. Its siblings above (shape + a GIVEN) stay here on purpose: that is a different
+  //  question and #461 deliberately did not decide it.
   // ── a polygon-in-polygon inscription we can't make determinate (generic quad / triangle inner) → escalate,
   //    never a plain-shape misparse (ADR-262) ──
   'quadrilateral DEFG inscribed in triangle ABC',
