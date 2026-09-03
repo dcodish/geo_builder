@@ -151,3 +151,56 @@ describe('#817 — the class: EVERY solid declares its base by noun, not by a st
     });
   }
 });
+
+/**
+ * #873 — the RECONCILIATION measurement (round #897).
+ *
+ * #817 (this file) decided a collapsed configuration is TOLERATED: steer away from it, and render it
+ * safely if it happens. #872 (ADR-3D-212) took the opposite position one layer earlier — the solver
+ * REJECTS a collapsed solid, so it cannot be emitted at all. The two do not contradict in behaviour
+ * ("never produced" plus "rendered safely if produced" is belt and braces); what went stale was the
+ * RECORD, which still described tolerance as the design position.
+ *
+ * These two tests are the measurement that settles it, so the claim in ADR-3D-176 Am. 1 is evidence
+ * rather than assertion. They are also the reason  is KEPT rather than removed:
+ * it answers a different question from  (a collapsed FACE CORNER, versus coincident
+ * vertices or a solid that lost its volume), and no reachable case was found in either direction.
+ */
+describe('#873 — collapse is unreachable from BOTH directions, so tolerance is the second line', () => {
+  beforeEach(reset);
+
+  it('the #817 figure no longer reaches a collapsed seed — the steering has nothing to steer', () => {
+    for (const u of [
+      'פירמידה SABCD שבסיסה מקבילית',
+      'המקצוע SA הוא גובה בפירמידה',
+      'M אמצע אלכסון BD',
+      'נסמן: AB = u, AD = v, AS = w',
+      'A(0,0,0)',
+      'B(0,5,0)',
+      'S(0,0,6)',
+    ]) {
+      submit(u);
+      expect(state().lastError, u).toBeNull();
+    }
+    // The six seeds #817 named as collapsed, plus neighbours. Before #872 these were flat to ~1e-16.
+    for (const seed of [0, 1, 2, 3, 4, 5, 6, 7, 11, 13]) {
+      const d = derive3(state().facts, seed);
+      expect(solidFaceCollapsed(d.construction, d.positions), `seed ${seed}`).toBe(false);
+    }
+  });
+
+  it('a collapsed base cannot be STATED either — the injection is refused, never drawn', () => {
+    // The other direction: if the solver cannot produce one, can the student inject one? A, B, C
+    // collinear on the y-axis would give the base a zero-area corner while the apex keeps the solid
+    // its volume — the one shape  (coincident vertices / lost volume) cannot see.
+    submit('פירמידה SABCD');
+    submit('A(0,0,0)');
+    submit('B(0,5,0)');
+    expect(state().lastError, 'the honest prefix must land').toBeNull();
+    submit('C(0,9,0)'); // collinear with A and B
+    expect(state().lastError, 'a stated collapse must be REFUSED, not drawn').not.toBeNull();
+    // and the figure that survives is not collapsed
+    const d = derived();
+    expect(solidFaceCollapsed(d.construction, d.positions)).toBe(false);
+  });
+});
