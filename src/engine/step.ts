@@ -631,7 +631,22 @@ function ensureOwnership(
     }
     if (o.kind === 'on-segment-solved') ownedKeys.add(constraintKey(o.constraint));
   }
-  const unowned = newCons.filter((k) => !isOrderConstraint(k) && !ownedKeys.has(constraintKey(k)));
+  /**
+   * #281 ([ADR-478](../../docs/06-decisions.md#adr-478)) — an ORDER constraint is no longer excluded.
+   *
+   * It was, and the exclusion was half-right: an order removes 0 DOF (ADR-039), so owning a carrier the
+   * way an equality does would FREEZE it, which is option B and #416's complaint. But owning nothing
+   * meant it was enforced only when it happened to be violated at the accepted draw — «זווית ABC גדולה
+   * מ-40» on a triangle drawn at 42° recruited nobody, and 18 of 40 configurations then refused a given
+   * that holds, while the STRONGER «> 45» refused none because it did recruit.
+   *
+   * The operator ruled option A: own the RANGE. The region half was already built — `isOrderOnlySolve`
+   * (sample.ts) keeps a carrier whose solve directive is ONLY an order fully samplable, and `evaluate`
+   * re-enforces the order from each perturbed start. So ownership plus that existing rule IS
+   * range-ownership: measured, «> 40» now refuses 0 of 40 and still takes 40 distinct angles across
+   * 41°–71°. Owned, and still moving.
+   */
+  const unowned = newCons.filter((k) => !ownedKeys.has(constraintKey(k)));
   if (!unowned.length) return null;
   if (freeDofs(next).length === 0) return null; // rigid figure → a genuine verify; nothing samples
   const unownedKeys = new Set(unowned.map(constraintKey));

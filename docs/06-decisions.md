@@ -8897,3 +8897,67 @@ all ask and name their candidates; the ask stays OFF with one circle, no circle,
 qualifier; both shape halves ask and name their candidates; an absent shape stays `shape-not-found`; a
 single quad still builds; the `stop` path returns the ask, and a `stop` with nothing to ask still
 escalates; and the three oracle readings are shown to build, which is why the guess had to be prevented.
+
+## ADR-478 — a satisfied ORDER given owns the RANGE: option A, and the region half already existed (#281)
+
+**Status:** accepted, 2026-09-03 · **Extends:** [ADR-399](#adr-399) (ownership at accept) · **Constrained by:** [ADR-039](#adr-039), [ADR-276](#adr-276), [ADR-052](#adr-052) · **Operator ruling**
+
+**Context.** «משולש ABC» + «זווית ABC גדולה מ-40» refused **18 of 40** configurations on a given that
+holds. The *stronger* «גדולה מ-45» refused **none**. A weaker requirement failing more often is the tell.
+
+The default triangle draws ∠ABC ≈ 42°:
+
+| given | at the accepted draw | carrier | configurations refused |
+| --- | --- | --- | --- |
+| «> 45» | violated → the ladder runs | **C recruited** | 0 / 40 |
+| «> 40» | already true → nothing runs | **none** | **18 / 40** |
+
+So an order was enforced only when it happened to be broken at the moment it was typed. Every later
+configuration reshuffles the free triangle, the angle drifts under the bar, and the given breaks with
+nothing able to drive it.
+
+`ensureOwnership` (ADR-399) exists for precisely this class — *"a constraint whose residual happens to
+be 0 at the accepted draw committed as an UNOWNED CHECK… nothing re-solved per seed, and every sampled
+configuration violated it"* — and excluded order constraints in one line.
+
+**The exclusion was half-right, which is why this needed a ruling.** An order removes 0 DOF (ADR-039):
+it pins a carrier into a REGION, not to a point. Owning one the way an equality does would freeze the
+carrier, the figure would stop visibly varying (ADR-052), and that is exactly what
+[#416](https://github.com/dcodish/geo_builder/issues/416) complains about from the other side. So the
+two issues are one question — *what does a satisfied order own?* — and the operator ruled
+**option A: own the RANGE**, over option B (own it like any other given) and option C (record the limit
+and stop).
+
+**Decision — lift the exclusion. The region half is already built.**
+
+`isOrderOnlySolve` (`engine/sample.ts`) already states and enforces the other half: *a carrier whose
+solve directive is ONLY an order/region constraint is NOT consumed — it keeps its full DOF and must stay
+samplable, because the order is re-enforced by `evaluate` from the perturbed start.* So ownership plus
+that existing rule **is** range-ownership; no third ownership mode had to be invented. The fix is one
+line, and the ADR is longer than the diff because the reasoning is the part worth keeping.
+
+Measured after: «> 40» refuses **0 / 40** and still takes **40 distinct angles across 41.0°–71.3°**.
+Owned, and still moving — which is the difference between A and B, asserted rather than asserted-about.
+
+**Consequences.**
+
+- The whole 2-D lane passes unchanged (339 files, 5791 tests) — no test moved. That matters, because
+  #416 warned that touching this seam blind "changes carrier assignment across many figures" and wanted
+  a full-suite comparison rather than a speculative refactor.
+- A later HARD given can still have the carrier: «> 40» followed by «AB=AC» / «זווית BAC = 50» / «AB=6»
+  each build. Ownership here is for enforcement, not exclusion.
+- ADR-276 is untouched: a satisfied order still contributes 0 to the joint cost, so it remains a
+  preference and never drags the minimum.
+- The freedom cue is unchanged by adding the given, as ADR-039 requires.
+
+**What #416 still owns, and why it is NOT bundled here despite the one-slice ruling.** Its two halves —
+(a) `addCollinearOrder` claiming pre-existing riders it merely sequences, and (b) the `soft-order`
+ancestor mode wired at a single call site — have **no known failing input**, and its own text says the
+risk of changing stage (B) blind is real and wants "a measured reason and a full-suite comparison".
+After this change there is still no failing input for either: the suite is green without them. Acting on
+them now would be the speculative refactor that issue exists to warn against, so they stay recorded, and
+the shared question they were bundled for is the one answered above.
+
+**Locked** in `engine/__tests__/issue-281.test.ts` (9): «> 40» refuses none and every configuration
+satisfies it; «> 45» unchanged; the angle still takes >20 distinct values across a >10° spread (option
+A, not B); the freedom cue is unchanged (ADR-039); and three later hard givens still build on top.
