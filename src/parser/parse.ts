@@ -1336,21 +1336,13 @@ const specialPointMeet: Rule = (s, ctx) => {
   // statement) — never a plausible fallback, never an LLM guess. The generic nouns («המרובע» /
   // "quadrilateral") keep the unique-ring behaviour, as does a figure context without kind info.
   if (!poly && fam.key === 'diag') {
-    const QUAD_NOUNS: [RegExp, string][] = [
-      [/(?<![א-ת])ה?ריבוע(?![א-ת])|\bsquare\b/i, 'square'],
-      [/(?<![א-ת])ה?מלבן(?![א-ת])|\brectangle\b/i, 'rectangle'],
-      [/(?<![א-ת])ה?מעוין(?![א-ת])|\brhombus\b/i, 'rhombus'],
-      [/(?<![א-ת])ה?טרפז(?![א-ת])|\btrapezoid\b/i, 'trapezoid'],
-      [/(?<![א-ת])ה?מקבילית(?![א-ת])|\bparallelogram\b/i, 'parallelogram'],
-      [/(?<![א-ת])ה?דלתון(?![א-ת])|\bkite\b/i, 'kite'],
-    ];
-    const named = QUAD_NOUNS.map(([re, kind]) => ({ m: s.match(re), kind })).find((x) => x.m);
+    const named = QUAD_KIND_NOUNS.map(([re, kind]) => ({ m: s.match(re), kind })).find((x) => x.m);
     if (named) {
       const declared = ctx.declaredPolygons;
       if (declared) {
         const cands = declared.filter((p) => p.vertices.length === 4 && p.kind === named.kind);
         if (cands.length === 1) poly = cands[0].vertices.map(up);
-        else if (cands.length === 0) return { clarify: 'shape-not-found', noun: named.m![0].replace(/^ה/, '') };
+        else if (cands.length === 0) return { clarify: 'shape-not-found', noun: named.m![0].replace(/^[בלמשכו]?ה?/, '') };
         else return null; // two declared rings of the SAME named kind — genuinely ambiguous, defer (ADR-052)
       }
     }
@@ -3936,6 +3928,27 @@ const nameCenter: Rule = (s, ctx) => {
   if (leftover) return null;
   const circles = (ctx.circles ?? []).map(up);
   if (circles.includes(X)) return [{ type: 'name-center', center: X }]; // reveal the existing circle's centre
+  /**
+   * #879 — the student NAMES an unnamed circle's centre with a fresh letter.
+   *
+   * This used to return null, and the generic `circle` rule then CREATED one: «מרכז המעגל הוא M»
+   * beside two circles drew a THIRD, and beside one drew a SECOND. The student wrote a definite
+   * reference — *the* circle — and got a new object; the silent-invention class, arriving through the
+   * naming door.
+   *
+   * The contract was already written (`ctx.autoCenters`, parse.ts): *"«מרכז המעגל הוא P» renames one
+   * of these to P and reveals it, instead of creating a second circle (issue #112)"*. So is the
+   * mechanism — `impliedCircleBinding` (#186/#538) turns an `implied` circle command into a RENAME of
+   * an auto-centre, and asks `unknown-circle` when it cannot tell which. `nameCenter` simply never
+   * reached it, because the circle it fell through to was not marked implied.
+   *
+   * Emitting it here routes the phrasing into that chokepoint rather than adding a second naming rule:
+   * one circle renames, an interchangeable pair binds (the #538 carve-out), anything else asks.
+   */
+  const autos = (ctx.autoCenters ?? []).map(up);
+  if (autos.length > 0 && !autos.includes(X) && !(ctx.points ?? []).map(up).includes(X)) {
+    return [{ type: 'circle', id: circleId(X), center: X, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, implied: true }];
+  }
   return null; // no circle yet → `circle` creates circle-X; a different existing centre → rename, defer
 };
 
@@ -8549,6 +8562,17 @@ const ambiguousCircleAsk: Rule = (s, ctx) => {
  *
  * Runs LAST, so it steals nothing: only an utterance no rule could read reaches it.
  */
+/** The quad kind NOUNS, module-scope so the diagonals rule and {@link ambiguousShapeAsk} read one list
+ *  rather than two that can drift (#879). */
+const QUAD_KIND_NOUNS: [RegExp, string][] = [
+  [/(?<![א-ת])[בלמשכו]?ה?ריבוע(?![א-ת])|\bsquare\b/i, 'square'],
+  [/(?<![א-ת])[בלמשכו]?ה?מלבן(?![א-ת])|\brectangle\b/i, 'rectangle'],
+  [/(?<![א-ת])[בלמשכו]?ה?מעוין(?![א-ת])|\brhombus\b/i, 'rhombus'],
+  [/(?<![א-ת])[בלמשכו]?ה?טרפז(?![א-ת])|\btrapezoid\b/i, 'trapezoid'],
+  [/(?<![א-ת])[בלמשכו]?ה?מקבילית(?![א-ת])|\bparallelogram\b/i, 'parallelogram'],
+  [/(?<![א-ת])[בלמשכו]?ה?דלתון(?![א-ת])|\bkite\b/i, 'kite'],
+];
+
 const ambiguousShapeAsk: Rule = (s, ctx) => {
   // A construct that consumes a whole shape, named WITHOUT one. Each noun is a construct, not a
   // phrasing — the rules that own them are the ones whose declines this covers.
@@ -8558,8 +8582,21 @@ const ambiguousShapeAsk: Rule = (s, ctx) => {
     : null;
   if (!noun) return null;
   // The student naming any label run is them saying which — nothing to ask about.
-  if (/[A-Za-z]d*s+[A-Za-z]d*s+[A-Za-z]d*/.test(s)) return null;
+  if (rx(`${LABEL}\\s+${LABEL}\\s+${LABEL}`).test(s)) return null;
   const cands = (ctx.declaredPolygons ?? []).filter((p) => p.vertices.length === 4);
+  /**
+   * #879 — the student NAMED a shape kind that the figure does not have: «קטע אמצעים בטרפז» with no
+   * trapezoid drawn. That is a MISSING REFERENT, not an ambiguity, so it is not this rule’s ask —
+   * but it must not escalate either. The LLM would invent a trapezoid or fall back to the triangle
+   * midsegment, and both assert a shape the student never drew.
+   *
+   * `shape-not-found` is the answer the codebase already gives for this, on the sibling phrasing
+   * «אלכסוני הטרפז נחתכים בנקודה M» on the same figure — so this is a routing gap, not a new message.
+   */
+  const namedKind = QUAD_KIND_NOUNS.map(([re, kind]) => ({ m: s.match(re), kind })).find((x) => x.m);
+  if (namedKind && !(ctx.declaredPolygons ?? []).some((pg) => pg.kind === namedKind.kind)) {
+    return { clarify: 'shape-not-found', noun: namedKind.m![0].replace(/^[בלמשכו]?ה?/, '') };
+  }
   if (cands.length >= 2) return { clarify: 'ambiguous-shape', noun, shapes: cands.map((c) => c.vertices.map(up).join('')) };
   // The other half of the SAME question, and the one `trapezoidMidsegment`'s own comment names: with
   // ONE shape carrying TWO parallel pairs (a parallelogram and its specialisations) the ambiguity is
