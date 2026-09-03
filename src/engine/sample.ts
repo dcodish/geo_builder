@@ -16,7 +16,7 @@
  * default (returns the construction unchanged).
  */
 
-import type { Constraint, Construction, FreePoint, Id, OnCirclePoint, OnLinePoint, SolveDirective } from './types';
+import type { Constraint, Construction, FreePoint, GeoObject, Id, OnCirclePoint, OnLinePoint, SolveDirective } from './types';
 import { isGeoPoint, isOrderConstraint } from './types';
 import { carrierOf, isShapeCarrier } from './carriers';
 import { constraintRefs } from './solve';
@@ -116,6 +116,79 @@ function hashId(s: string): number {
  * seed 0 returns the input unchanged (the canonical figure). The perturbation
  * keeps every shape valid (only free *parents* move; derived points follow).
  */
+/**
+ * PLACEMENT PRECONDITIONS — sample INSIDE the feasible set (#855, [ADR-476](../../docs/06-decisions.md#adr-476)).
+ *
+ * The sampler varies every free DOF independently, with no knowledge of which of them a DRIVEN construct
+ * couples. A tangent drawn from a point P to circle O can only touch when P is outside it (|PO| >= r —
+ * the touch point sees OT ⟂ PT, so |PO|² = r² + |PT|²), yet «מעגל» leaves the radius free (ADR-052) and
+ * the jitter above ranges it 0.45×–1.6× while the free points move independently. A sample that puts P
+ * INSIDE makes the student's tangency unsatisfiable at that seed alone — and the figure then vanished
+ * with «over-constrained: @ctr-OB ⟂ AB cannot hold», an accusation aimed at a given the fold had already
+ * proved satisfiable.
+ *
+ * The right place to fix that is HERE, not at the refusal: a value the tool invents must be drawn from
+ * the set where the student's givens can hold. Only a FREE radius is clamped — a stated radius is a
+ * given, and a given that genuinely conflicts must refuse honestly, never be quietly bent (the honesty
+ * invariant). The clamp is a no-op on every feasible sample, so seeds that already build are
+ * bit-identical.
+ *
+ * Stated as a RULE over the constraint set rather than as a fix for the reported figure: any tangency —
+ * however it was phrased — lowers to this radius ⟂ chord-through-P shape, so all of them are covered.
+ * A second precondition kind joins by adding a clause here; the docs/17 note is that this must stay a
+ * derivation from the constraint's own geometry, never a list of the utterances we happened to meet.
+ */
+function clampToPlacementPreconditions(c: Construction, objects: GeoObject[]): GeoObject[] {
+  const byId = new Map(objects.map((o) => [o.id, o]));
+  /** A point's coordinates, when they are carried DIRECTLY (a free point). A derived point's position is
+   *  only known after `evaluate`, so a precondition resting on one is left to the honest refusal. */
+  const coordOf = (id: Id): { x: number; y: number } | undefined => {
+    const o = byId.get(id);
+    return o && o.kind === 'free-point' ? { x: o.x, y: o.y } : undefined;
+  };
+  /** The circle T lies on, when T is an on-circle point whose circle is centred at `centre`. */
+  const circleThrough = (t: Id, centre: Id) => {
+    const to = byId.get(t);
+    if (!to || to.kind !== 'on-circle') return undefined;
+    const circ = byId.get((to as OnCirclePoint).circle);
+    return circ && circ.kind === 'circle' && circ.center === centre ? circ : undefined;
+  };
+
+  /** The smallest upper bound every tangency imposes on each free radius. */
+  const cap = new Map<Id, number>();
+  for (const con of c.constraints) {
+    if (con.type !== 'perpendicular') continue;
+    const arms: [Id, Id][][] = [
+      [[con.a, con.b], [con.c, con.d]],
+      [[con.c, con.d], [con.a, con.b]],
+    ];
+    for (const [radial, chord] of arms) {
+      // The shared endpoint is the touch point; the other ends are the centre and the external point.
+      const t = radial.find((id) => chord.includes(id));
+      if (!t) continue;
+      const centre = radial.find((id) => id !== t);
+      const outer = chord.find((id) => id !== t);
+      if (!centre || !outer) continue;
+      const circ = circleThrough(t, centre);
+      if (!circ || circ.radius.via !== 'free' || !notConsumed(circ as { solve?: unknown })) continue;
+      const o = coordOf(centre);
+      const p = coordOf(outer);
+      if (!o || !p) continue;
+      // Strictly inside, so the touch point stays a genuine touch rather than a degenerate P-on-circle.
+      const bound = Math.hypot(p.x - o.x, p.y - o.y) * 0.95;
+      cap.set(circ.id, Math.min(cap.get(circ.id) ?? Infinity, bound));
+    }
+  }
+  if (!cap.size) return objects;
+  return objects.map((o) => {
+    if (o.kind !== 'circle') return o;
+    const lim = cap.get(o.id);
+    return lim !== undefined && o.radius.via === 'free' && o.radius.value > lim
+      ? { ...o, radius: { via: 'free' as const, value: lim } }
+      : o;
+  });
+}
+
 export function applySeed(c: Construction, seed: number): Construction {
   if (!seed) return c;
   // A non-pinned free point is perturbed even when a constraint drives it: one scalar constraint
@@ -299,7 +372,7 @@ export function applySeed(c: Construction, seed: number): Construction {
     }
     return o;
   });
-  return { ...c, objects };
+  return { ...c, objects: clampToPlacementPreconditions(c, objects) };
 }
 
 /**

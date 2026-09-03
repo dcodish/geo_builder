@@ -15,6 +15,7 @@ import { useStore } from 'zustand';
 // The shared frame (B3-2d #668): the deliberate src -> shell adoption — the LAST product joins the
 // suite chrome (ADR-W-019; BOUNDARIES.json src -> shell edge flipped with this import).
 import { AppFrame } from '../shell/frame/AppFrame';
+import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
 import { ManualScreen } from '../shell/frame/ManualScreen';
@@ -39,7 +40,6 @@ import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { SYMBOL_SPECS } from '@/ui/symbols';
-import { SymbolRow } from '../shell/frame/SymbolRow';
 import { btn, card as themeCard, color as pal, fs, sectionTitle } from '@/ui/theme';
 // #743: the under-canvas row's ONE look — the style contract lives in shell (seeded from this
 // tree's own btn.accent/btn.subtle, which the operator praised); every builder's row consumes it.
@@ -116,6 +116,7 @@ export default function App() {
   const viewValues = useGeoStore((s) => s.viewValues);
   // clearValues retired from the UI (B6-2d): the panel head hides the column; a fact change
   // stales the layer store-side, and the in-panel button re-pulls.
+  const queries = useGeoStore((s) => s.queries); // #741: the asked questions themselves — the lane shows them before any compute has run
   const addQuery = useGeoStore((s) => s.addQuery);
   const removeQuery = useGeoStore((s) => s.removeQuery);
   const viewRelations = useGeoStore((s) => s.viewRelations);
@@ -176,7 +177,12 @@ export default function App() {
   // examplesOpen retired (operator 2026-08-18): no example strip above the input — the examples
   // live on the clean canvas (QuickChips) and in עזרה.
   // B6-2d: the נתונים panel — permanent column on wide screens (content collapsible), the same
-  // default as the complex/3-D panels. Opening it PULLS the values compute (#217's pull-only rule).
+  // default as the complex/3-D panels.
+  // #741 — this comment used to claim «opening it PULLS the values compute», which the operator's
+  // report contradicted. Both were right about half of it: opening DOES pull (below), but the pulled
+  // layer is invalidated by identity on the next fact, so from the student's side the values — and,
+  // before #741, the ask box inside them — were gone again after every line. The lane no longer
+  // depends on that pull at all; asking is its own pull (ADR-W-038).
   const [showData, setShowData] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1200px)').matches,
   );
@@ -1479,66 +1485,9 @@ export default function App() {
                   </div>
                 );
               })}
-              {/* #477 — the QUERY lane. The auto rows above are what the figure volunteers; this is where
-                  the student ASKS. Deliberately inside the values panel (operator ruling), because the
-                  answer belongs beside the list it extends and is computed from the very same sample
-                  pool — a separate widget would invite a separate computation, and two lists that can
-                  disagree are worse than one short list. */}
-              <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>{t('values.queryTitle')}</div>
-                {valuesLayer.queryRows.map((qr) => (
-                  <div key={qr.text} style={{ display: 'flex', gap: 6, alignItems: 'baseline', padding: '1px 2px' }}>
-                    <button
-                      type="button"
-                      title={t('values.queryRemove')}
-                      onClick={() => removeQuery(qr.text)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', font: 'inherit', padding: 0 }}
-                    >
-                      ×
-                    </button>
-                    <bdi style={{ direction: 'ltr', color: '#334155' }}>{qr.label ?? qr.text}</bdi>
-                    {qr.value !== null ? (
-                      <>
-                        <span style={{ color: '#334155' }}>=</span>
-                        <MathValue value={qr.value} exact={qr.exact} degrees={qr.kind === 'angle'} unit={qr.unit} />
-                      </>
-                    ) : (
-                      <span style={{ fontSize: 11, color: '#94a3b8' }}>{t(`values.q.${qr.note ?? 'undetermined'}`)}</span>
-                    )}
-                  </div>
-                ))}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    addQuery(queryText);
-                    setQueryText('');
-                  }}
-                  style={{ display: 'flex', gap: 4, marginTop: 3 }}
-                >
-                  <input
-                    ref={queryRef}
-                    value={queryText}
-                    onChange={(e) => setQueryText(e.target.value)}
-                    placeholder={t('values.queryPlaceholder')}
-                    title={t('values.queryHint')}
-                    dir={textDir(queryText)}
-                    style={{ flex: 1, minWidth: 0, fontSize: 12, padding: '2px 6px', border: '1px solid #cbd5e1', borderRadius: 4 }}
-                  />
-                  <button type="submit" disabled={!queryText.trim()} style={{ fontSize: 12, padding: '2px 8px', borderRadius: 4, border: '1px solid #cbd5e1', background: '#f8fafc', cursor: queryText.trim() ? 'pointer' : 'default' }}>
-                    {t('values.queryAdd')}
-                  </button>
-                </form>
-                {/* #525: the palette reaches the query box — collapsed, the product's own vocabulary */}
-                <SymbolRow
-                  symbols={SYMBOL_SPECS}
-                  value={queryText}
-                  onChange={setQueryText}
-                  inputRef={queryRef}
-                  startCollapsed
-                  compact
-                  toggleTitle={t('values.paletteShow')}
-                />
-              </div>
+              {/* #741: the ask lane used to live HERE, inside the values card, so it existed only after
+                  «חשב ערכים» ran — and the values layer is invalidated by every new fact, so it
+                  vanished again on the student's next line. It is now a direct panel child (below). */}
               {valuesLayer.areaClasses.length > 0 && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>{t('values.areaRatios')}</div>
@@ -1572,6 +1521,63 @@ export default function App() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+          {/* #741 ([ADR-W-038](docs/06w-decisions-workspace.md)) — THE ASK LANE, unconditional.
+              It used to render inside the values card above, so it appeared only once «חשב ערכים» had
+              run; and since `valuesLayer` is invalidated by every new fact, it disappeared again on the
+              student's very next line. The operator's report was that the panel is a different thing in
+              each tool — 2-D behind a button, 3-D always there. It is now the 3-D shape everywhere, on
+              the shared `AskLane`.
+              #217's pull-only economics are UNCHANGED by the move: nothing is computed because the lane
+              is visible — `addQuery` runs the values compute when a question is SUBMITTED, which is the
+              same "only on demand" bargain one step later, and «חשב ערכים» stays as the separate trigger
+              that volunteers the automatic rows. */}
+          {facts.length > 0 && (
+            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>{t('values.queryTitle')}</div>
+              <AskLane
+                value={queryText}
+                onChange={setQueryText}
+                inputRef={queryRef}
+                placeholder={t('values.queryPlaceholder')}
+                addLabel={t('values.queryAdd')}
+                hint={t('values.queryHint')}
+                dir={textDir(queryText)}
+                onSubmit={(text) => {
+                  addQuery(text);
+                  // The question IS the pull (#217): compute now if this figure's values are stale.
+                  if (!valuesLayer && !computingValues) {
+                    setComputingValues(true);
+                    void viewValues().finally(() => setComputingValues(false));
+                  }
+                }}
+                palette={{ symbols: SYMBOL_SPECS, startCollapsed: true, compact: true, toggleTitle: t('values.paletteShow') }}
+              >
+                {/* An answered row when the values layer is current; the question alone, marked as
+                    waiting, while it is not — never a silently dropped question. */}
+                {(valuesLayer?.queryRows ?? queries.map((text) => ({ text, label: undefined, value: null, exact: undefined, kind: undefined, unit: undefined, note: 'pending' as const }))).map((qr) => (
+                  <div key={qr.text} style={{ display: 'flex', gap: 6, alignItems: 'baseline', padding: '1px 2px' }}>
+                    <button
+                      type="button"
+                      title={t('values.queryRemove')}
+                      onClick={() => removeQuery(qr.text)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', font: 'inherit', padding: 0 }}
+                    >
+                      ×
+                    </button>
+                    <bdi style={{ direction: 'ltr', color: '#334155' }}>{qr.label ?? qr.text}</bdi>
+                    {qr.value !== null && qr.value !== undefined ? (
+                      <>
+                        <span style={{ color: '#334155' }}>=</span>
+                        <MathValue value={qr.value} exact={qr.exact} degrees={qr.kind === 'angle'} unit={qr.unit} />
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 11, color: '#94a3b8' }}>{t(`values.q.${qr.note ?? 'undetermined'}`)}</span>
+                    )}
+                  </div>
+                ))}
+              </AskLane>
             </div>
           )}
 

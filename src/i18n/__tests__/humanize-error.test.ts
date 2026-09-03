@@ -23,6 +23,13 @@ const CASES: { raw: string; contains: string[] }[] = [
   { raw: '|AB| = |AD| references an unknown point', contains: ['|AB| = |AD|'] },
   { raw: 'over-constrained: |AC| = 9 cannot hold', contains: ['|AC| = 9'] },
   { raw: 'over-constrained: ∠DOE = 2·∠COE cannot hold', contains: ['∠DOE = 2·∠COE'] },
+  // replay/core.ts (#855, ADR-476) — the SAMPLED-VALUE degradation of the two rows above: the ids it
+  // names are the still-free objects, so they must survive `sanitizeIds` as the student's letters.
+  {
+    raw: 'not determined: @ctr-O, A are still free, so @ctr-OB ⟂ AB cannot be judged in this configuration',
+    contains: ['O, A', 'OB ⟂ AB'],
+  },
+  { raw: 'not determined: |AC| = 9 cannot be judged in this configuration', contains: ['|AC| = 9'] },
   { raw: 'cannot place F on segment AB so that |AC| = 9', contains: ['F', 'AB', '|AC| = 9'] },
   {
     raw: 'cannot place E: line line-CA is tangent to circle circle-O at A — it has no second crossing to extend onto',

@@ -80,6 +80,7 @@
     "ambiguousCircle": "There are two circles around {{center}}, so I can't tell which one you mean. Say \"the outer circle\" or \"the inner circle\".",
     "ambiguousContainer": "The figure has several circles ({{circles}}), so which one contains it cannot be told. Name it — e.g. \"a circle contained in circle O\".",
     "ambiguousCircleRef": "The figure has several circles ({{circles}}), so I can't tell which one you mean. Name the circle — e.g. \"circle {{first}}\".",
+    "ambiguousShape": "The figure has several shapes ({{shapes}}), so I can't tell which one you mean. Name the shape — e.g. \"the diagonals of {{first}}\".",
     "unknownCircle": "There is no circle named {{center}}. More than one unnamed circle is drawn — name one first, e.g.: the centre of the right circle is {{center}}.",
     "partial": "Couldn't draw this part",
     "labelsDropped": "I only partly understood — I couldn't place {{labels}}. Rephrase the step (e.g. split it in two).",
@@ -202,6 +203,8 @@
       "perimeterOf": "perimeter("
     },
     "overConstrained": "Can't do that: {{what}} contradicts an earlier given — they can't both hold.",
+    "notDeterminedHere": "Your givens are fine. {{who}} are not determined yet, and in the placement the tool picked for them {{what}} can't hold \u2014 press \u00abshow another configuration\u00bb.",
+    "notDeterminedHereBare": "Your givens are fine. In the placement the tool picked, {{what}} can't hold \u2014 press \u00abshow another configuration\u00bb.",
     "unknownPoint": "{{what}} refers to a point that hasn't been defined yet. Create it first.",
     "unresolvedDeps": "This step relies on {{ids}}, which aren't defined yet (or an earlier step it depends on failed). Define them first.",
     "unknownCircle": "Circle {{center}} is not defined — there is no circle by that name in the figure. You can name an existing circle, e.g.: the centre of the circle is {{center}}.",

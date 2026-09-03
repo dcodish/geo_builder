@@ -13,7 +13,7 @@
  * The store re-exports this module's surface, so existing consumers are untouched.
  */
 
-import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Construction, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
+import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
 import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
@@ -1010,7 +1010,10 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   // A seed can break a figure that BUILT fine — surface that failure so the error reflects what is
   // actually drawn. `lastError` was build-only, so a sample that made `evaluate` fail left it null with
   // the figure silently gone.
-  if (!e.ok && !lastError) lastError = e.error;
+  // #855: the accusation is degraded ONCE, here, so `lastError` (the banner) and the per-row status
+  // below can never disagree about whose fault the failed sample was.
+  const seedErr = e.ok ? '' : sampledConfigError(e.error, e.violated, figure);
+  if (!e.ok && !lastError) lastError = seedErr;
   // #360 ([ADR-398](docs/06-decisions.md#adr-398)): attribute a PER-SEED evaluate failure to the fact
   // rows that own the violated constraint / stuck object. `status` came from the seed-independent fold
   // (which is what keeps the ADR-280 memo sound), so a seed where a stated given cannot hold used to show
@@ -1033,7 +1036,7 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
     }
     for (const fi of owners) {
       const f = facts[fi];
-      if (f && f.enabled && status[f.id] === 'ok') status[f.id] = e.error;
+      if (f && f.enabled && status[f.id] === 'ok') status[f.id] = seedErr;
     }
   }
   // #474: a stated magnitude labels from the FACT, not only from a SURVIVING constraint.
@@ -1515,6 +1518,38 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
 /** Branchable derived-point command types — the discrete "alternatives" a figure can have (which of two
  *  intersections, which arc side, which extension root). */
 const BRANCHABLE = new Set<AnyCommand['type']>(['point-by-distances', 'arc-midpoint', 'line-circle-intersection', 'circle-circle-intersection', 'point-on-segment']);
+
+/**
+ * THE SAMPLED-VALUE GUARD (#855, [ADR-476](docs/06-decisions.md#adr-476)) — the 2-D port of the 3-D
+ * `plane-not-determined` class ([ADR-3D-138](docs/06b-decisions-3d.md), #508/#512).
+ *
+ * A per-seed evaluate failure can NEVER be a contradiction of the student's givens, and the proof is
+ * structural rather than statistical: this seam only ever overrides rows the FOLD marked `ok`, so a
+ * configuration in which every one of them holds demonstrably exists. What failed is the tool's own
+ * sample of the DOFs nothing drives — «over-constrained: @ctr-OB ⟂ AB cannot hold» is therefore an
+ * accusation aimed at a given that is perfectly satisfiable, on the strength of a placement the tool
+ * invented (the honesty rule pointed the wrong way, docs/17 §7).
+ *
+ * So the accusing shape degrades to an honest "not determined yet", NAMING the sampled objects the
+ * conflict is really with. Which objects those are is read by a STRUCTURAL walk — `constraintRefs`
+ * over the violated constraint, intersected with {@link freeDofs} — and never by a switch over
+ * constraint kinds: an enumeration of the kinds that existed today is exactly what ADR-3D-138 warns a
+ * later kind would quietly escape.
+ *
+ * Only the `over-constrained` shape is substituted (the same discipline as `blameNewStatement`): a
+ * dependency or unknown-point error is not an accusation and stays verbatim.
+ */
+function sampledConfigError(error: string, violated: Constraint[] | undefined, figure: Construction): string {
+  const m = /^over-constrained: (.+) cannot hold$/.exec(error);
+  if (!m) return error;
+  const sampled = new Set(freeDofs(figure));
+  const names: string[] = [];
+  for (const con of violated ?? [])
+    for (const id of constraintRefs(con)) if (sampled.has(id) && !names.includes(id)) names.push(id);
+  return names.length
+    ? `not determined: ${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} still free, so ${m[1]} cannot be judged in this configuration`
+    : `not determined: ${m[1]} cannot be judged in this configuration`;
+}
 
 /**
  * Does the figure at this (facts, seed) meet EVERY requirement — it BUILDS, the givens verifier is clean,

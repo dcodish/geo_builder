@@ -142,6 +142,16 @@ const PATTERNS: Pattern[] = [
   // evaluate.ts:891 — `over-constrained: |AC| = 9 cannot hold`
   { re: /^over-constrained: (.+) cannot hold$/, key: 'errors.overConstrained', params: (m) => ({ what: m[1] }) },
 
+  // replay/core.ts (#855, ADR-476) — the SAMPLED-VALUE degradation of the row above. The conflict is with
+  // a placement the tool invented, so the message must not read as «your given contradicts an earlier
+  // one»; it says which objects are still free and points at "show another configuration".
+  {
+    re: /^not determined: (.+) (?:is|are) still free, so (.+) cannot be judged in this configuration$/,
+    key: 'errors.notDeterminedHere',
+    params: (m) => ({ who: m[1], what: m[2] }),
+  },
+  { re: /^not determined: (.+) cannot be judged in this configuration$/, key: 'errors.notDeterminedHereBare', params: (m) => ({ what: m[1] }) },
+
   // evaluate.ts:1183 — `cannot place E: line line-CA is tangent to circle circle-O at A — it has no second crossing to extend onto`
   {
     re: new RegExp(`^cannot place (\\S+): line .+ is tangent to circle .+ at .+ ${EMDASH} it has no second crossing to extend onto$`),
