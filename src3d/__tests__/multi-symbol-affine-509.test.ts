@@ -21,7 +21,9 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { parse3 } from '../parser/parse3';
 import { applyCommand3 } from '../engine/apply';
-import { emptyConstruction3, pinSymsOf, symsOfAffine, evalAffine, soleSymOf, type SymAffine } from '../engine/types';
+import { MAX_SYM_DEGREE, degreeOf, emptyConstruction3, evalAffine, isNonLinear, pinSymsOf, soleSymOf, symsOfAffine, type SymAffine } from '../engine/types';
+import { classifyGuidance3 } from '../parser/scope3';
+import i18n3 from '../i18n';
 import { derive3, useGeo3 } from '../store/store3';
 import { deserializeFigure3 } from '../store/figureFile3';
 import { dataView } from '../engine/dataView';
@@ -96,14 +98,15 @@ describe('#509 — the shared multi-symbol affine form', () => {
       },
     );
 
-    /** Current state, pinned so the arity work cannot regress it — NOT an endorsement. Option A
-     *  (degree ≤ 2–3) is ruled and owed, so these flip to `true` when #509 is finished. */
-    it.each(['C(p^2,p^2+4,0)', 'C(p²,1,0)', 'C(3p^2,1,0)', 'C(p*q,1,0)'])(
-      '«%s» is refused TODAY — ruled IN under Option A and still owed (#509)',
-      (line) => {
-        expect(parse3(line).ok).toBe(false);
-      },
-    );
+    /**
+     * `p*q` — a PRODUCT of two symbols — stays refused, and now it is the only row of the original
+     * table that does. Option A is a polynomial in each symbol (Σ aᵢ·symⁱ), so a term multiplying two
+     * DIFFERENT unknowns is not in it; the operator listed the row under "two-symbol" in the
+     * 2026-09-01 comment, which the 2026-08-26 ruling supersedes. Asserted so the boundary is explicit.
+     */
+    it('«C(p*q,1,0)» is refused — a product of two symbols is not a polynomial in one', () => {
+      expect(parse3('C(p*q,1,0)').ok).toBe(false);
+    });
   });
 
   describe('the baseline is unchanged', () => {
@@ -290,5 +293,85 @@ describe('#884 — the coordinate readout survives a wide root pool', () => {
     >;
     // whatever it reports, it must not claim a definite x when ±roots exist
     if (c.C) expect(c.C.text).toContain('?');
+  });
+});
+
+/**
+ * #509 Option A — the BOUNDED POLYNOMIAL, and the boundary that owns its own refusal.
+ *
+ * The operator ruled Option A on 2026-08-16 and confirmed it on 2026-08-26 as a deliberate reversal of
+ * Option B. It covers the DEGREE rows and excludes arithmetic inside a component. The arity widening
+ * that landed first (ADR-3D-213) was a step alongside this, not its completion — the operator caught
+ * that on the first play: *"i ruled in the past that we need to support this format."*
+ *
+ * Degree ≤ 3, not ≤ 2, because the ruling said to pick the smaller bound that covers the corpus and say
+ * why: the class table lists `C(p³, …)` explicitly, so two would leave an approved row failing.
+ *
+ * The no-CAS line (docs/20 D3) is what the bound buys: a polynomial is EVALUATED at a sampled
+ * assignment and never rearranged, so the solver stays a numeric root-find.
+ */
+describe('#509 Option A — powers build, arithmetic does not', () => {
+  it.each(['C(p^2,p^2+4,0)', 'C(p²,1,0)', 'C(p³,1,0)', 'C(3p^2,1,0)', 'C(2p²-3,1,0)'])(
+    '«%s» parses — the approved degree rows',
+    (line) => {
+      expect(parse3(line).ok, line).toBe(true);
+    },
+  );
+
+  it('the reported figure builds and resolves', () => {
+    const r = build([BOX, 'C(p^2,p^2+4,0)']);
+    expect(r.ok, r.ok ? '' : (r as { why: string }).why).toBe(true);
+    if (r.ok) expect(pinSymsOf(r.c)).toEqual(['p']);
+  });
+
+  it('the component reads back as the polynomial the student wrote', () => {
+    const p = parse3('C(2p²-3,1,0)');
+    expect(p.ok).toBe(true);
+    if (p.ok) {
+      const cmd = p.commands[0] as { symExprs?: (SymAffine | null)[] };
+      expect(cmd.symExprs?.[0]).toEqual({ terms: [{ sym: 'p', k: 2, e: 2 }], c: -3 });
+    }
+  });
+
+  it('a degree-1 component still carries NO exponent field — old carriers are untouched', () => {
+    const p = parse3('C(2p,1,0)');
+    expect(p.ok).toBe(true);
+    if (p.ok) {
+      const cmd = p.commands[0] as { symExprs?: (SymAffine | null)[] };
+      expect(cmd.symExprs?.[0]).toEqual({ terms: [{ sym: 'p', k: 2 }], c: 0 });
+    }
+  });
+
+  it('evaluates as Σ aᵢ·symⁱ + c', () => {
+    expect(evalAffine({ terms: [{ sym: 'p', k: 2, e: 2 }], c: -3 }, () => 4)).toBe(2 * 16 - 3);
+    expect(degreeOf({ terms: [{ sym: 'p', k: 1, e: 3 }], c: 0 })).toBe(3);
+    expect(isNonLinear({ terms: [{ sym: 'p', k: 1 }], c: 0 })).toBe(false);
+  });
+
+  it('degree is BOUNDED — p^4 is refused, not silently truncated', () => {
+    expect(parse3('C(p^4,1,0)').ok).toBe(false);
+    expect(MAX_SYM_DEGREE).toBe(3);
+  });
+
+  describe('the sanctioned boundary OWNS its refusal (the 2026-08-26 second lock)', () => {
+    // "those two must refuse in a way that NAMES what is unsupported, in the guidance register. They
+    // must not fall through to not-handled and escalate to the paid LLM."
+    it.each(['C(p/2,1,0)', 'C(2(p+1),1,0)'])('«%s» refuses AND reaches the guidance register', (line) => {
+      expect(parse3(line).ok).toBe(false);
+      expect(classifyGuidance3(line)?.category).toBe('component-arithmetic');
+    });
+
+    it('the guidance names what IS supported, so the student can act on it', () => {
+      const t = i18n3.getFixedT('he');
+      const msg = t('scope.component-arithmetic') as string;
+      expect(msg).not.toBe('scope.component-arithmetic');
+      expect(msg, 'it must show the power form that works').toContain('p^2');
+    });
+
+    it('a SUPPORTED component never reaches the register', () => {
+      for (const line of ['C(p^2,p^2+4,0)', 'C(p+q,1,0)', 'A(1,2,3)', BOX]) {
+        expect(classifyGuidance3(line), line).toBeNull();
+      }
+    });
   });
 });

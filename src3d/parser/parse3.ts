@@ -21,7 +21,7 @@ import { readOperand, readRelationSides } from './operandToken';
 import { stripFormatControls } from '../../shell/bidi';
 import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
-import { soleSymOf, symsOfAffine } from '../engine/types';
+import { MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX } from '../lexicon/nouns3';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 import { riderPairsT } from '../engine/onSegmentRatio';
@@ -2058,20 +2058,33 @@ const VAL = String.raw`-?(?:\d+\s*\/\s*\d+|\d*\.\d+|(?:${UNUM})?\s*√\s*${RADIC
  *  Composed from the shared atoms (the S2.1 lexical-ratchet discipline). The SYMBOLIC branch keeps
  *  `NUM` for its coefficient and offset: widening those runs into the affine model itself, which is
  *  #509's territory and needs a design ruling, not a lexical change. */
-/** ONE affine term: an optional signed coefficient on a symbol — `t`, `2t`, `-t`, `2·t`, `+3q`. */
-const COMP_TERM = String.raw`[+-]?\s*(?:${UNUM}\s*[·*]?\s*)?[a-w]`;
-/** #509 ([ADR-3D-213](../../docs/06b-decisions-3d.md)): a component is a SEQUENCE of affine terms
- *  with an optional numeric offset — `p+q`, `2p+3q`, `2t-3`, and every one-term form unchanged.
- *  DEGREE STAYS 1: a term is a coefficient times a symbol, so `p^2`, `p*q` (two symbols multiplied)
- *  and `p/2` match nothing here and are refused by this same reader — the ADR-3D-079 / docs/20 D3
- *  no-CAS boundary, now enforced by the grammar rather than assumed. */
+/** A superscript power, the way the exam writes it: `p²`, `p³`. */
+const SUP_POW = String.raw`[²³]`;
+/**
+ * ONE term: an optional signed coefficient on a symbol, now with an optional POWER (#509, Option A) —
+ * `2p^2`, `p³`, `-3p²`, and every degree-1 form unchanged.
+ *
+ * The grammar admits any integer power; {@link parseComp} enforces `MAX_SYM_DEGREE`. That split is
+ * deliberate: an over-degree component then refuses with a REASON rather than silently failing to
+ * match, which is the 2026-08-26 ruling's second lock — *"a recognised-but-unsupported shape is a
+ * refusal we own, not a question we outsource"*.
+ */
+const COMP_TERM = String.raw`[+-]?\s*(?:${UNUM}\s*[·*]?\s*)?[a-w](?:\s*(?:\^\s*\d+|${SUP_POW}))?`;
+/**
+ * #509 ([ADR-3D-213](../../docs/06b-decisions-3d.md), widened by ADR-3D-214): a component is a
+ * SEQUENCE of terms with an optional numeric offset — `p+q`, `2p+3q`, `2t-3`, `p^2`, `2p²-3`, `p³`.
+ *
+ * Bounded polynomial, Option A. What stays out is arithmetic INSIDE a component — `p/2`, `2(p+1)` —
+ * the operator's sanctioned permanent boundary, and the line that keeps the solver a numeric
+ * root-find (docs/20 D3): a polynomial is EVALUATED at a sampled assignment, never rearranged.
+ */
 const COMP = String.raw`(?:${COMP_TERM}(?:\s*${COMP_TERM})*(?:\s*[+-]\s*${UNUM})?|${VAL})`;
 const COMP_NUM_RE = new RegExp(String.raw`^${VAL}$`);
 /** Scans a symbolic component: the first term, the remaining terms, and the numeric offset.
- *  Anchored, so anything that is not a clean sum of coefficient·symbol terms simply does not match. */
+ *  Anchored, so anything that is not a clean sum of coefficient·symbol[^n] terms does not match. */
 const COMP_COMP_TERMS_RE = new RegExp(String.raw`^(${COMP_TERM})((?:\s*${COMP_TERM})*)(?:\s*([+-])\s*(${UNUM}))?$`);
-/** One term of that sequence, split into sign, coefficient and symbol. */
-const ONE_COMP_TERM_RE = new RegExp(String.raw`^([+-]?)\s*(${UNUM})?\s*[·*]?\s*([a-w])$`);
+/** One term of that sequence: sign, coefficient, symbol, and the power in either notation. */
+const ONE_COMP_TERM_RE = new RegExp(String.raw`^([+-]?)\s*(${UNUM})?\s*[·*]?\s*([a-w])(?:\s*(?:\^\s*(\d+)|(${SUP_POW})))?$`);
 /** The terms after the first, scanned out of the run `COMP_COMP_TERMS_RE` captured. */
 const COMP_TERM_SCAN_RE = new RegExp(COMP_TERM, 'g');
 /** #325: attach symExprs only when they carry STRUCTURE beyond bare distinct letters — a
@@ -2085,7 +2098,7 @@ function symStructure(
   // be a bare placeholder letter, so it must reach the solver as open unknowns.
   const allSyms = named.flatMap(symsOfAffine);
   const structured =
-    named.some((e) => e.terms.length > 1 || e.terms[0].k !== 1 || e.c !== 0) ||
+    named.some((e) => e.terms.length > 1 || e.terms[0].k !== 1 || (e.terms[0].e ?? 1) !== 1 || e.c !== 0) ||
     new Set(allSyms).size < allSyms.length;
   return structured ? (comps.map((t) => t.expr) as [SymComp | null, SymComp | null, SymComp | null]) : undefined;
 }
@@ -2116,7 +2129,11 @@ function parseComp(t: string): { num: number | null; expr: SymComp | null } {
   for (const raw of [m[1], ...(m[2].match(COMP_TERM_SCAN_RE) ?? [])]) {
     const t = raw.replace(/\s+/g, '').match(ONE_COMP_TERM_RE);
     if (!t) return { num: null, expr: null };
-    terms.push({ sym: t[3], k: (t[1] === '-' ? -1 : 1) * (t[2] === undefined ? 1 : +t[2]) });
+    // #509: the power, in either notation. Degree is BOUNDED here rather than in the grammar, so an
+    // over-degree component is a refusal we own instead of a silent non-match (the 2026-08-26 lock).
+    const e = t[4] !== undefined ? +t[4] : t[5] !== undefined ? (t[5] === '²' ? 2 : 3) : 1;
+    if (e < 1 || e > MAX_SYM_DEGREE) return { num: null, expr: null };
+    terms.push({ sym: t[3], k: (t[1] === '-' ? -1 : 1) * (t[2] === undefined ? 1 : +t[2]), ...(e === 1 ? {} : { e }) });
   }
   const c = m[3] ? (m[3] === '-' ? -1 : 1) * +m[4] : 0;
   return { num: null, expr: { terms, c } };

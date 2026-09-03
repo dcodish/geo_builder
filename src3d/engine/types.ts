@@ -474,11 +474,31 @@ export interface ClaimCommand {
  * ADR-3D-079 / docs/20 D3 "no CAS" boundary, unchanged and now asserted rather than assumed.
  */
 export interface SymAffine {
-  /** At least one term, in the order the student wrote them. */
-  terms: { sym: string; k: number }[];
+  /**
+   * At least one term, in the order the student wrote them.
+   *
+   * `e` is the EXPONENT (#509, Option A): 1 unless the student wrote a power, and at most
+   * {@link MAX_SYM_DEGREE}. It is optional so every existing one-degree carrier — and every saved file
+   * written before this — reads as degree 1 without a migration.
+   */
+  terms: { sym: string; k: number; e?: number }[];
   /** The constant offset. */
   c: number;
 }
+
+/**
+ * The bounded degree, ruled by the operator (2026-08-16, confirmed 2026-08-26 as a deliberate reversal
+ * of Option B): a component is `Σ aᵢ·symⁱ` over the declared symbols.
+ *
+ * Three, not two, because the ruling said "pick the smaller that covers the corpus and say why": the
+ * class table on #509 lists `C(p³, …)` explicitly, so two would leave a row of the approved set failing.
+ *
+ * What the bound BUYS is the no-CAS line (docs/20 D3). A polynomial is EVALUATED at a sampled
+ * assignment and never rearranged, so the solver stays a numeric root-find; `p/2` and `2(p+1)` are
+ * arithmetic INSIDE a component, which is a different reader and the operator's sanctioned permanent
+ * boundary.
+ */
+export const MAX_SYM_DEGREE = 3;
 
 /** The name every existing consumer knows this carrier by. */
 export type SymComp = SymAffine;
@@ -492,7 +512,13 @@ export const symsOfAffine = (e: SymAffine): string[] => {
 
 /** The component's value once every symbol has one — the ONE evaluation of this form. */
 export const evalAffine = (e: SymAffine, valueOf: (sym: string) => number): number =>
-  e.terms.reduce((acc, t) => acc + t.k * valueOf(t.sym), e.c);
+  e.terms.reduce((acc, t) => acc + t.k * Math.pow(valueOf(t.sym), t.e ?? 1), e.c);
+
+/** The highest power any term carries — 1 for the affine forms that predate #509. */
+export const degreeOf = (e: SymAffine): number => Math.max(...e.terms.map((t) => t.e ?? 1));
+
+/** Does this component carry a power at all? The pivot reads it to decide the ± branches. */
+export const isNonLinear = (e: SymAffine): boolean => degreeOf(e) > 1;
 
 /** A one-term component's symbol, or null when it names several — the "which letter is this" question,
  *  which only has an answer for a single-symbol component. */

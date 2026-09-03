@@ -7580,3 +7580,76 @@ A correction on the record: #509's ruling comment gives the already-green two-sy
 `main` — in a box `AA'` and `BB'` are the same vector, so stating both differently is a real
 contradiction and the engine correctly says `givens-contradict`. The property is real; the edge pair
 named was not independent. The lock uses `AB` and `AA'`.
+
+### ADR-3D-214 — Option A: a coordinate component is a BOUNDED POLYNOMIAL, and the boundary owns its refusal (#509)
+
+**Status:** accepted, 2026-09-03 · **Completes:** [ADR-3D-213](#adr-3d-213) (the arity half) · **Bounds:** [ADR-3D-079](#adr-3d-079) · **Operator ruling** (2026-08-16, confirmed 2026-08-26)
+
+**Context.** The operator typed `C(p^2, p^2+4, 0)` building a real bagrut figure and it refused. They
+ruled **Option A — the bounded polynomial `Σ aᵢ·symⁱ`** — on 2026-08-16, and confirmed it on 2026-08-26
+after the B-vs-A contradiction was put to them with both prior comments quoted; that comment records it
+as *"a deliberate reversal of B, not a restatement of it"*.
+
+A later comment (2026-09-01) re-scoped the issue as being *"about the ARITY of the component reader, not
+its degree"*, and ADR-3D-213 was built to that. **It was backwards on both halves** — it added the rows
+Option A excludes (`p+q`, `2p+3q`) and dropped the row Option A includes and the issue is titled after.
+The operator caught it on the first play: *"i ruled in the past that we need to support this format."*
+The arity work is real and stays; this is the half that was owed.
+
+**Decision — a term carries an EXPONENT, degree ≤ 3.**
+
+```ts
+terms: { sym: string; k: number; e?: number }[]   // e defaults to 1
+export const MAX_SYM_DEGREE = 3;
+```
+
+`e` is optional, so every degree-1 carrier — and every saved `.geo3.json` written before this — reads as
+degree 1 with no second migration on top of ADR-3D-213's.
+
+**Three, not two.** The ruling said to *"pick the smaller that covers the corpus and say why"*: the class
+table on #509 lists `C(p³, …)` explicitly, so a bound of two would leave an approved row failing.
+
+**The bound is what buys the no-CAS line** (docs/20 D3): a polynomial is EVALUATED at a sampled
+assignment and never rearranged, so the solver stays the numeric root-find it already was. Degree is
+enforced in the READER, not the grammar — the grammar admits any integer power so an over-degree
+component refuses with a reason rather than silently failing to match.
+
+| | rows |
+| --- | --- |
+| **builds** | `C(p^2,p^2+4,0)` · `C(p²,1,0)` · `C(p³,1,0)` · `C(3p^2,1,0)` · `C(2p²-3,1,0)` — plus everything ADR-3D-213 added |
+| **sanctioned permanent boundary** | `C(p/2,…)` · `C(2(p+1),…)` — arithmetic INSIDE a component |
+| **outside Option A** | `C(p*q,…)` — a product of two symbols is not a polynomial in one |
+
+**Decision 2 — the boundary OWNS its refusal.** The same 2026-08-26 ruling attached a second lock, and it
+was still unmet after ADR-3D-213: *"those two must refuse in a way that NAMES what is unsupported, in the
+guidance register. They must not fall through to `not-handled` and escalate to the paid LLM, which would
+guess at a component the student wrote precisely. A recognised-but-unsupported shape is a refusal we own,
+not a question we outsource."*
+
+So `component-arithmetic` joins the 3-D guidance register (ADR-3D-040), with a message that names what
+IS supported — the power form, and the rewrite for each boundary row (`C(p/2,…)` → `C(0.5p,…)`,
+`C(2(p+1),…)` → `C(2p+2,…)`). It is the END STATE, not a placeholder.
+
+The first draft of those patterns matched any parenthesised division and **stole a supported catalog
+example** — «DF = (k/2)DB + kDC'», where `(k/2)` is a vector coefficient read by an entirely different
+lane. The #73 no-theft sweep caught it, which is what that sweep is for; both patterns now require a
+point label immediately before the tuple.
+
+**Two locks moved, both deliberately and both stale by their own words.**
+`multi-symbol-affine-509.test.ts` pinned the degree rows as *"refused TODAY — ruled IN under Option A and
+still owed"*, and `value-literals.test.ts` asserted `C(p^2,…)` refused under the title *"that boundary is
+#509's, and needs a ruling"*. Both said in their text that they would flip when the ruling was answered.
+
+**Scope check:** the whole 3-D lane passes (206 files, 4019 tests).
+
+**Locked** in `multi-symbol-affine-509.test.ts`: the five approved degree rows parse; the reported figure
+builds and resolves with `pinSyms ["p"]`; a component reads back as the polynomial written
+(`2p²-3` → `{terms:[{sym:'p',k:2,e:2}],c:-3}`); a degree-1 component carries NO exponent field; the form
+evaluates as `Σ aᵢ·symⁱ + c`; `p^4` is refused rather than truncated; both boundary rows refuse AND reach
+the guidance register; the message names the power form; and a supported component never reaches the
+register.
+
+**Still open, deliberately.** The branch semantics the operator settled on 2026-08-13 — a pinned `p²`
+admits `p = ±√·`, so the roots are genuine configurations that cycle through the existing `paramSigns`
+machinery — are not exercised by a figure in this slice's corpus, so nothing here asserts them. Worth a
+measured follow-up rather than a claim.

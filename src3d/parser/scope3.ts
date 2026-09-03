@@ -31,6 +31,19 @@ export type ScopeCategory3 =
   | 'lowercase-labels'
   | 'ambiguous-height'
   | 'latin-angle-label'
+  /**
+   * #509 — ARITHMETIC inside a coordinate component: «C(p/2, 1, 0)», «C(2(p+1), 1, 0)».
+   *
+   * The operator's sanctioned permanent boundary (2026-08-26), and its own lock in the same ruling:
+   * *"those two must refuse in a way that NAMES what is unsupported, in the guidance register. They
+   * must not fall through to `not-handled` and escalate to the paid LLM, which would guess at a
+   * component the student wrote precisely. A recognised-but-unsupported shape is a refusal we own,
+   * not a question we outsource."*
+   *
+   * Option A (degree ≤ 3) covers the POWERS; division and parenthesised sub-expressions are the
+   * different reader that stays out, so this guidance is the END STATE, not a placeholder.
+   */
+  | 'component-arithmetic'
   // #342: the perpendicular bisector — a decided NON-feature, so its end state is guidance
   | 'perp-bisector'
   // S2 (#378, DoD 12) added two forward-pointing categories; S4 and S3 have since retired both by
@@ -50,6 +63,22 @@ interface ScopeRule3 {
 }
 
 const RULES3: ScopeRule3[] = [
+  {
+    /**
+     * #509 — a coordinate tuple whose component divides a symbol or wraps one in parentheses. Placed
+     * FIRST so it is reached before any looser rule: the student wrote a precise component and the
+     * honest answer names the one thing about it we do not read.
+     */
+    category: 'component-arithmetic',
+    patterns: [
+      // A LABELLED tuple — «C(…, …, …)» — one of whose components divides by or of a symbol.
+      // The label prefix is what keeps this off «DF = (k/2)DB», where (k/2) is a vector coefficient
+      // and fully supported; the lookahead requires the two commas that make it a 3-tuple.
+      /[A-Z]\d*'?\s*\((?=[^()]*,[^()]*,)[^()]*(?:[a-w]\s*\/|\/\s*[a-w])/,
+      // …or one whose component wraps a symbol in parentheses: «C(2(p+1), 1, 0)»
+      /[A-Z]\d*'?\s*\([^()]*\d\s*\([^()]*[a-w]/,
+    ],
+  },
   {
     /**
      * #467 — a height stated from a POINT ALONE. Operator ruling, 2026-08-09: *"גובה מנקודה D in 3d

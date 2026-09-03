@@ -52,10 +52,15 @@ describe('#510 — what must not change', () => {
     ["A'B' = (1,2,3)", { type: 'inject-pair', a: "A'", b: "B'" }],
   ])('«%s» is byte-identical', (u, shape) => expect(first(u)).toMatchObject(shape));
 
-  it('the SYMBOLIC branch is untouched — that boundary is #509\'s, and needs a ruling', () => {
+  it('the SYMBOLIC branch is untouched by THIS issue — the literal lane and the symbol lane are separate', () => {
     expect(first('C(2t,t,k)')).toMatchObject({ type: 'point3', syms: ['t', 't', 'k'] });
     expect(first('C(p,p+4,0)')).toMatchObject({ type: 'point3', z: 0 });
-    expect(parse3('C(p^2,p^2+4,0)').ok).toBe(false); // still refused, deliberately
+    // «C(p^2,…)» was asserted refused here while #509's ruling was still outstanding — this test's own
+    // title said so. It has since been answered: Option A, the bounded polynomial (ADR-3D-214), so the
+    // row BUILDS. What stays out of the symbol lane is arithmetic INSIDE a component, and it owns its
+    // refusal in the guidance register rather than escaping to the LLM.
+    expect(parse3('C(p^2,p^2+4,0)').ok).toBe(true);
+    expect(parse3('C(p/2,1,0)').ok).toBe(false);
   });
 
   it('a MALFORMED literal declines — it is never an "unknown" coordinate', () => {
