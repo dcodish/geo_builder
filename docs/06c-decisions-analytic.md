@@ -456,3 +456,70 @@ name no roster can ever claim** (`'no-such-product'`, `'statistics'`), never one
 claimed yet — otherwise shipping product N+1 turns three passing guards red for reasons that have
 nothing to do with the change. Two were fixed by renaming the example; the third was fixed at the
 root, by making the guard read the registry instead of a literal.
+
+---
+
+## ADR-AG-008 — The canonicity refusal is WIRED, not just computed (#896)
+
+**Context.** [ADR-AG-006](#adr-ag-006) claimed the canonicity gate "puts the refusal in one place: a
+rotated conic, a translated conic and a hyperbola are each refused *by name* rather than mis-drawn",
+and [`src-analytic/CLAUDE.md`](../src-analytic/CLAUDE.md) states it as a hard boundary. Measured
+through the real `parse → fold → evaluate` path while writing PR #894's play sheet, it was not true:
+
+| input | parse | fault | drawn |
+| --- | --- | --- | --- |
+| `(y-2)^2=8(x-1)` translated | **ok** | **none** | none |
+| `x^2+xy+y^2=1` rotated | **ok** | **none** | none |
+| `x^2/9-y^2/16=1` hyperbola | fails `not-handled` | reported | none |
+| `y^2=54x` canonical | ok | none | drawn |
+
+Only the hyperbola was refused, and only because it never parses. The other two parsed, committed to
+the line list, drew nothing and **said nothing**. A stated given vanished — the one thing the root
+CLAUDE.md says this product may never do.
+
+**Root cause — the reason was computed and thrown away one line later.** `classify` returned
+`'translated-conic'` and `'rotated'` correctly; the type even documents the distinction it draws
+(`'vacant'` — *"Not an error"* — versus the scope reasons — *"the student is told which"*). Then:
+
+```ts
+export function resolveCurve(c: Curve, env: Env): NumCurve | null {
+  const res = curveFromEquation(c.eq, env, c.kind);
+  return res.ok ? res.curve : null;          // ← the reason dies here
+}
+```
+
+Downstream every layer was therefore blind by construction: `evaluate` could only record an id
+(`vacant.push(d.id)`), `derive` produced no fault because nothing told it there was one, and `App`
+— which surfaces only `faults` — committed the line as if it had landed. `figure.vacant` was read
+by **no UI code at all**. Every piece existed and none was connected: even `errOutOfScope`
+(«המשפט מובן, אך אינו נתמך בכלי הזה») was already written in both locales and already wired into
+App's error map.
+
+**Decision.** Carry the reason the whole way, and keep the two failure kinds distinct at every step.
+
+- `resolveCurve` returns the classifier's `ClassifyResult` **reason intact**, instead of collapsing
+  it to `NumCurve | null`.
+- `Figure.vacant` becomes `Vacancy[]` — `{ id, reason }` rather than a bare id. Carrying only the id
+  is what made the refusal unreportable.
+- `derive` turns a **scope** reason into a `LineFault` with code `out-of-scope`, blamed on the line
+  that introduced the object (first writer wins, the rule `owner` already encodes for apply errors),
+  so App refuses the line instead of committing it.
+- A `'vacant'` reason is deliberately **not** a fault. An empty circle at this parameter value is
+  the documented "not at this value" that the domain filter needs to observe; reporting it as a
+  refusal would be the opposite defect, and it has its own test.
+
+**Why a THIRD failure stage is the right shape.** A line could already fail at parse (`not-handled`,
+`bad-equation`) or at apply (`conflicting-restatement`, `conic-slot-taken`). Canonicity cannot be
+decided at either: the equation is only classifiable once parameters have values, which is
+evaluation. So the fix is not "check earlier" — it is to let the stage that *can* decide report what
+it decided.
+
+**Locked** in `src-analytic/__tests__/engine.test.ts` (#896 block, 6 tests): one per row of the
+table, the canonical control that must keep drawing with no fault, a refusal blamed on the line that
+wrote it while its honest siblings still land, and the genuinely-vacant circle that must NOT raise.
+
+**A note on the record.** ADR-AG-006's gate list said this behaviour worked. It was written from the
+classifier's code rather than from a run — the same class as its sibling defect that session, where
+a recorded `check-sibling-safety` PASS ([ADR-W-039](06w-decisions-workspace.md#adr-w-039)) had been
+produced by an env var CI could never set. Both were found by running the thing instead of reading
+it; the tests above are what make the claim self-checking from here.

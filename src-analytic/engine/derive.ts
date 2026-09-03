@@ -51,6 +51,30 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   });
 
   const figure = evaluate(construction, seed);
+
+  /**
+   * The third place a line can fail (#896): it parsed, it applied, and only at EVALUATION did the
+   * conic classifier find it outside the product's scope — a rotated conic, a translated one, a
+   * hyperbola. `src-analytic/CLAUDE.md` states the contract ("refuses each by name"), and until
+   * this ran the refusal was computed and discarded: the line committed, drew nothing and said
+   * nothing, which is a stated given vanishing.
+   *
+   * A `vacant` reason is deliberately NOT a fault. An empty circle at this parameter value is the
+   * documented "not at this value", and reporting it as a refusal would be the opposite defect.
+   */
+  // First writer wins: if two lines name the same object, the one that introduced it owns the
+  // refusal — the same rule `owner` already encodes for apply errors. A `param` fact has no id.
+  const lineOf = new Map<string, number>();
+  facts.forEach((f, i) => {
+    if (f.t !== 'param' && !lineOf.has(f.id)) lineOf.set(f.id, owner[i]);
+  });
+  for (const v of figure.vacant) {
+    if (v.reason === 'vacant') continue;
+    const index = lineOf.get(v.id);
+    if (index === undefined) continue; // no line owns it — nothing honest to say about it
+    faults.push({ index, code: 'out-of-scope', detail: lines[index] });
+  }
+
   return { construction, figure, box: viewBox(figure), faults };
 }
 

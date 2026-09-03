@@ -10,6 +10,7 @@ import { isOn, polylines, residual, resolveCurve, ellipseFoci, parabolaFocus } f
 import { evaluate, isKnowledge, sampleParam, viewBox } from '../engine/evaluate';
 import { constValue, evalExpr, parseExpr, symbolsOf } from '../engine/expr';
 import { applyFact, fold } from '../engine/apply';
+import { derive } from '../engine/derive';
 import { inDomain, type Construction, type Fact } from '../engine/types';
 import { equationExpr, parseLine } from '../parser/parseAnalytic';
 
@@ -99,10 +100,13 @@ describe('conic — the exact fit and the canonicity gate', () => {
   it('carries a parameter through the fit', () => {
     const c = { kind: 'circle' as const, eq: eq('(x-a)^2+y^2=r^2') };
     const r = resolveCurve(c, { a: 5, r: 2 });
-    expect(r?.kind).toBe('circle');
-    if (r?.kind === 'circle') {
-      expect(r.cx).toBeCloseTo(5, 9);
-      expect(r.r).toBeCloseTo(2, 9);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.curve.kind).toBe('circle');
+      if (r.curve.kind === 'circle') {
+        expect(r.curve.cx).toBeCloseTo(5, 9);
+        expect(r.curve.r).toBeCloseTo(2, 9);
+      }
     }
   });
 });
@@ -241,6 +245,77 @@ describe('view — the window the figure is drawn in', () => {
     const b = viewBox(evaluate(c, 0));
     expect(b.minX).toBeLessThanOrEqual(0);
     expect(b.minY).toBeLessThanOrEqual(0);
+  });
+});
+
+/**
+ * #896 — a non-canonical conic is REFUSED BY NAME, never silently dropped.
+ *
+ * `src-analytic/CLAUDE.md` states the contract: "No hyperbola, no rotated conic, no translated
+ * conic … `engine/conic.ts` refuses each **by name**." The classifier always did. What was missing
+ * was the WIRE: `resolveCurve` collapsed `ClassifyResult` to `NumCurve | null`, so the reason died
+ * one line after it was computed, `evaluate` could only record an id, and `derive` had nothing to
+ * report. The line committed, drew nothing and said nothing — a stated given vanishing, which the
+ * root CLAUDE.md names as the thing this product may never do.
+ *
+ * The rows below are the measured table from the issue. The control matters as much as the
+ * refusals: over-reporting would be the opposite defect.
+ */
+describe('#896 — a non-canonical conic is refused by name, not dropped', () => {
+  const only = (src: string) => {
+    const d = derive([src]);
+    return { faults: d.faults, drawn: d.figure.curves.length, vacant: d.figure.vacant };
+  };
+
+  it('a TRANSLATED parabola is refused on its own line', () => {
+    const r = only('נתונה פרבולה שמשוואתה (y-2)^2=8(x-1)');
+    expect(r.drawn).toBe(0);
+    expect(r.vacant.map((v) => v.reason)).toEqual(['translated-conic']);
+    expect(r.faults).toEqual([
+      { index: 0, code: 'out-of-scope', detail: 'נתונה פרבולה שמשוואתה (y-2)^2=8(x-1)' },
+    ]);
+  });
+
+  it('a ROTATED conic is refused', () => {
+    const r = only('נתונה אליפסה שמשוואתה x^2+xy+y^2=1');
+    expect(r.drawn).toBe(0);
+    expect(r.vacant.map((v) => v.reason)).toEqual(['rotated']);
+    expect(r.faults.map((f) => f.code)).toEqual(['out-of-scope']);
+  });
+
+  it('a TRANSLATED ellipse is refused', () => {
+    const r = only('נתונה אליפסה שמשוואתה (x-1)^2/9+y^2/16=1');
+    expect(r.drawn).toBe(0);
+    expect(r.faults.map((f) => f.code)).toEqual(['out-of-scope']);
+  });
+
+  it('THE CONTROL: a canonical conic still draws, with no fault', () => {
+    const r = only('נתונה פרבולה קנונית שמשוואתה y^2=54x');
+    expect(r.drawn).toBe(1);
+    expect(r.faults).toEqual([]);
+    expect(r.vacant).toEqual([]);
+  });
+
+  it('the refusal is blamed on the LINE THAT WROTE IT, not the last line typed', () => {
+    const d = derive([
+      'נתונה הנקודה A(2,6)',
+      'נתונה אליפסה שמשוואתה x^2+xy+y^2=1',
+      'נתון הישר l1: y=x',
+    ]);
+    expect(d.faults.map((f) => f.index)).toEqual([1]);
+    // the honest lines still land — one refusal does not poison the figure
+    expect(d.figure.points).toHaveLength(1);
+    expect(d.figure.curves).toHaveLength(1);
+  });
+
+  it('a genuinely VACANT curve is NOT a fault — an empty circle at this parameter value', () => {
+    // r² = −1 has no circle at this sample. The type calls that "not an error", the domain filter
+    // needs to observe it, and reporting it as a refusal would be the opposite defect.
+    const c = fold(lines(['משוואת המעגל x^2+y^2+1=0'])).construction;
+    const f = evaluate(c, 0);
+    expect(f.curves).toHaveLength(0);
+    expect(f.vacant.map((v) => v.reason)).toEqual(['vacant']);
+    expect(derive(['משוואת המעגל x^2+y^2+1=0']).faults).toEqual([]);
   });
 });
 

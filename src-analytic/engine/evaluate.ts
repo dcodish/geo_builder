@@ -11,6 +11,7 @@
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
 import { resolveCurve, curveExtent, type Box } from './curves';
+import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
 import { inDomain, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
 
@@ -26,12 +27,25 @@ export interface FigureCurve {
   curve: NumCurve;
 }
 
+/**
+ * An object that produced no drawable geometry, WITH the reason (#896).
+ *
+ * The reason is the whole point. `vacant` is not an error — an empty circle at this parameter
+ * value is a legitimate state the domain filter needs to observe. The scope reasons are refusals,
+ * and `derive` turns exactly those into a fault the student sees. Carrying only the id, as this
+ * did, made the two indistinguishable and so made the refusal unreportable.
+ */
+export interface Vacancy {
+  id: Id;
+  reason: Extract<ClassifyResult, { ok: false }>['reason'];
+}
+
 export interface Figure {
   env: Env;
   points: FigurePoint[];
   curves: FigureCurve[];
   /** Objects that do not exist at this parameter value — named, never silently dropped. */
-  vacant: Id[];
+  vacant: Vacancy[];
 }
 
 // ---------------------------------------------------------------------------
@@ -82,18 +96,20 @@ export function evaluate(c: Construction, seed = 0): Figure {
   const env = sampleEnv(c, seed);
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];
-  const vacant: Id[] = [];
+  const vacant: Vacancy[] = [];
 
   for (const p of c.points) {
     const x = evalExpr(p.x, env);
     const y = evalExpr(p.y, env);
     if (Number.isFinite(x) && Number.isFinite(y)) points.push({ id: p.id, x, y });
-    else vacant.push(p.id);
+    // A point whose coordinates do not evaluate is absent at this parameter value, never a scope
+    // refusal — there is no such thing as an out-of-scope point.
+    else vacant.push({ id: p.id, reason: 'vacant' });
   }
   for (const d of c.curves) {
-    const nc = resolveCurve(d.curve, env);
-    if (nc) curves.push({ id: d.id, label: d.label, curve: nc });
-    else vacant.push(d.id);
+    const res = resolveCurve(d.curve, env);
+    if (res.ok) curves.push({ id: d.id, label: d.label, curve: res.curve });
+    else vacant.push({ id: d.id, reason: res.reason });
   }
   return { env, points, curves, vacant };
 }

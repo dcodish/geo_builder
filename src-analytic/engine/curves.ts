@@ -8,7 +8,7 @@
  * the synthetic tool: the exam supplies real magnitudes (`AC = 10`, `MN = 9`, radii of 1 and 2),
  * so a raw algebraic residual would silently change meaning between questions.
  */
-import { curveFromEquation } from './conic';
+import { curveFromEquation, type ClassifyResult } from './conic';
 import type { Env } from './expr';
 import type { Curve, NumCurve } from './types';
 
@@ -20,14 +20,20 @@ export const TOL = 1e-7;
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve a curve's equation against a parameter assignment. Returns null when there is no such
- * curve at this parameter value — an empty circle, a degenerate line. That null is an honest "not
- * at this value", which is exactly what the domain filter and the branch selector need to see; it
- * must never be softened into a drawn approximation.
+ * Resolve a curve's equation against a parameter assignment.
+ *
+ * Returns the classifier's own result, REASON INTACT (#896). Two failures live in that type and
+ * they are not the same event: `vacant` is an honest "no such curve at this parameter value" — an
+ * empty circle, a degenerate line — which the domain filter and the branch selector need to see and
+ * which must never be softened into a drawn approximation; the scope reasons (`rotated`,
+ * `translated-conic`, `hyperbola`, `not-a-curve`) are a REFUSAL the student is owed by name.
+ *
+ * This used to collapse both into `NumCurve | null`. The reason was computed by `classify` and
+ * destroyed one line later, so a translated parabola parsed, committed, drew nothing and said
+ * nothing — a stated given vanishing, which is the one thing this product may never do.
  */
-export function resolveCurve(c: Curve, env: Env): NumCurve | null {
-  const res = curveFromEquation(c.eq, env, c.kind);
-  return res.ok ? res.curve : null;
+export function resolveCurve(c: Curve, env: Env): ClassifyResult {
+  return curveFromEquation(c.eq, env, c.kind);
 }
 
 // ---------------------------------------------------------------------------
