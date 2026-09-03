@@ -7,6 +7,7 @@
   "switcher2d": "Plane Geometry",
   "switcher3d": "Space Geometry",
   "switcherComplex": "Complex Numbers",
+  "switcherAnalytic": "Analytic Geometry",
   "aboutLabel": "About",
   "aboutTitle": "About this tool",
   "aboutLead": "A tool for building the figure of a space-geometry question: enter the givens line by line — solids, points, vectors — and the figure builds and orbits in front of you. It draws and verifies the givens; it never solves the question.",

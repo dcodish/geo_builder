@@ -33,7 +33,7 @@ describe('validateToolConfig — choose among what exists', () => {
 
   it('refuses an id the registry does not declare, naming field and entry', () => {
     for (const cfg of [
-      { switcher: { order: ['analytic'] } },
+      { switcher: { order: ['statistics'] } }, // #888: 'analytic' was the example here until it shipped
       { switcher: { hidden: ['builder5'] } },
       { switcher: { labels: { nope: 'x' } } },
     ] as ToolConfig[]) {
@@ -115,6 +115,7 @@ describe('configFromForm — the form is curation, nothing more', () => {
         // show_2d absent → hidden
         ['show_3d', 'on'],
         ['show_complex', 'on'],
+        ['show_analytic', 'on'],
         ['order_complex', '1'],
         ['order_3d', '2'],
         ['label_3d', 'מרחב'],
@@ -139,6 +140,7 @@ describe('configFromForm — the form is curation, nothing more', () => {
         ['show_2d', 'on'],
         ['show_3d', 'on'],
         ['show_complex', 'on'],
+        ['show_analytic', 'on'],
         ['quick', ''],
       ]),
     );

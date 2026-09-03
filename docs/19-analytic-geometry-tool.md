@@ -9,8 +9,9 @@ decision-complete — D1/D2 by [ADR-AG-001](06c-decisions-analytic.md#adr-ag-001
 [ADR-AG-003](06c-decisions-analytic.md#adr-ag-003) (the data panel follows the 3-D contract;
 multipart is a workspace model), conformance as a V0 gate by
 [ADR-AG-004](06c-decisions-analytic.md#adr-ag-004), and the **input language** (§10) by
-[ADR-AG-005](06c-decisions-analytic.md#adr-ag-005). No code yet; `src-analytic/` is still in
-`plannedTrees`.**_
+[ADR-AG-005](06c-decisions-analytic.md#adr-ag-005). **V0 slice A BUILT**
+([ADR-AG-006](06c-decisions-analytic.md#adr-ag-006)) — the tree is registered and the tool draws;
+it is deliberately **not deployed** ([ADR-AG-007](06c-decisions-analytic.md#adr-ag-007)).**_
 
 The 2-D Geo Builder is **synthetic** plane geometry: relations → a figure, coordinates deliberately
 derived and non-unique. The 3-D Space Builder is **space** — vectors on solids, planes by equation
@@ -275,6 +276,12 @@ fact).
 | Engine geometry, constraint solve | **new** (product trees never share; [BOUNDARIES.json](../BOUNDARIES.json)) |
 
 ## 7. Phased build plan (gates in the doc-20 style; each gate = tests green + `tsc`/build clean + the operator can PLAY it)
+
+> **NOT DEPLOYED until the tool has decent capability** (operator, 2026-09-03 —
+> [ADR-AG-007](06c-decisions-analytic.md#adr-ag-007)). The registry entry carries `enabled: false`,
+> so no deployed builder can render a chip pointing at a path that would 404; `devOnly: true` keeps
+> the tool in its own switcher locally. Undeploying is one registry line plus a RUNBOOK row.
+
 
 - **V0 — substrate + tangency** (D2). Axes and the pinned gauge · the four curve types **by
   equation** · point-on, curve∩curve intersections, point–line distance · all five tangency kinds ·

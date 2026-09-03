@@ -126,7 +126,10 @@ describe('#846 — the viewpoint is a PARAMETER, so every lane can run the guard
   });
 
   it('an unknown viewpoint THROWS rather than silently classifying everything as sibling', () => {
-    expect(() => classify(['src/a.ts'], 'analytic')).toThrow(/unknown --product/);
+    // #888: the example here was 'analytic' — a PLANNED product — until it shipped and turned a
+    // negative example into a positive one. A negative example must be a name no roster can ever
+    // claim, not merely one it has not claimed yet.
+    expect(() => classify(['src/a.ts'], 'no-such-product')).toThrow(/unknown --product/);
   });
 
   it('partitions totally under EVERY viewpoint', () => {

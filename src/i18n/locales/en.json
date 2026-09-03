@@ -16,6 +16,7 @@
   "switcher2d": "Plane Geometry",
   "switcher3d": "Space Geometry",
   "switcherComplex": "Complex Numbers",
+  "switcherAnalytic": "Analytic Geometry",
   "switcherAria": "Switch between builders",
   "footer": {
     "by": "Developed by",
