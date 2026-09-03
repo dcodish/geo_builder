@@ -7,7 +7,10 @@ resolved the §6 decision that had blocked this plan for two months. Status: **A
 decision-complete — D1/D2 by [ADR-AG-001](06c-decisions-analytic.md#adr-ag-001), the pedagogy lane by
 [ADR-AG-002](06c-decisions-analytic.md#adr-ag-002) as amended by
 [ADR-AG-003](06c-decisions-analytic.md#adr-ag-003) (the data panel follows the 3-D contract;
-multipart is a workspace model). No code yet; `src-analytic/` is still in `plannedTrees`.**_
+multipart is a workspace model), conformance as a V0 gate by
+[ADR-AG-004](06c-decisions-analytic.md#adr-ag-004), and the **input language** (§10) by
+[ADR-AG-005](06c-decisions-analytic.md#adr-ag-005). No code yet; `src-analytic/` is still in
+`plannedTrees`.**_
 
 The 2-D Geo Builder is **synthetic** plane geometry: relations → a figure, coordinates deliberately
 derived and non-unique. The 3-D Space Builder is **space** — vectors on solids, planes by equation
@@ -218,10 +221,20 @@ corpus's most common `הוכיחו` item) stays deferred separately (D5, R2).
 - **D5 — the notices lane (Lane B) is deferred** (R2, §7).
 - **Multipart is the workspace model, and M1 is not optional here** — the analytic engine inherits
   existing-id lowering at the apply boundary from day one. See §4b.
+- **D6 — naming conventions taken from the corpus**: circles named, conics anonymous (one each,
+  max), lines `ℓ1`/`ℓ2` typed `l1`/`l2` with the 3-D `\w` trap inherited. See §10a.
+- **D7 — an inequality is one of THREE things** — parameter domain (declaration, filters roots) ·
+  branch selector (post-solve, picks among branches) · sweep range (sampling, bounds a free DOF).
+  Not interchangeable; V0's gate exam needs the first two at once. See
+  [ADR-AG-005](06c-decisions-analytic.md#adr-ag-005).
+- **D8 — the catalog carries the `catalog3.ts` contract** — reference + coverage map + the LLM's only
+  allowed vocabulary, over corpus phrasings rather than an invented command language. See §10.
+- **Settled by convention:** URL `/analytic-builder/`, devUrl `/analytic.html`, `build:analytic` →
+  `dist-analytic/`, matching the three siblings.
 
-**Deliberately still open:** the URL and deploy path · the 471 ↔ 572 profile split (the registry's
-"ONE engine with curriculum-level profiles" — [docs/22 §9](22-workflow.md)); V0/V1 target 572 only ·
-whether an answer is ever revealed after a wrong attempt.
+**Deliberately still open:** the 471 ↔ 572 profile split (the registry's "ONE engine with
+curriculum-level profiles" — [docs/22 §9](22-workflow.md)); V0/V1 target 572 only · whether an
+answer is ever revealed after a wrong claim (largely moot under D3′).
 
 ## 6. Architecture — what is new, what is transplanted
 
@@ -330,6 +343,80 @@ also computes.
 - **M1 skipped early is the predictable first bug class** — see §4b. Every multipart question breaks
   at its second section without it, and it is much cheaper at the apply boundary on day one than
   retrofitted per parser rule ([docs/17 §M1](17-design-rules.md)).
+
+## 10. The input language — sentence families ([ADR-AG-005](06c-decisions-analytic.md#adr-ag-005))
+
+Extracted from the same twenty exams as §2. This is the [docs/27 §10](27-complex-numbers-tool.md)
+layer for this product, and it seeds `src-analytic/parser/catalogAnalytic.ts` — which, on the
+`catalog3.ts` contract, is three things at once: the **user-facing reference**, the **coverage map**
+(a guard test re-parses every entry in He *and* En), and **the only vocabulary the LLM fallback is
+allowed to emit**.
+
+**The governing principle: the student types the exam's own sentence.** Every canonical form below is
+a phrasing that actually occurs in the corpus, not an invented command language. Where the exam says
+`נתון מעגל I שמשוואתו (x−3)²+(y−4)²=9, ומרכזו בנקודה K`, that is the input.
+
+### 10a. Naming conventions (what the corpus actually does)
+
+| Object | Convention | Notes |
+|---|---|---|
+| Point | Capital letter, optional digit subscript — `A`, `M`, `F₁`, `D₂` | The [ADR-228](06-decisions.md#adr-228) subscript convention; typed `F1`, `D2` |
+| Line | `ℓ`, `ℓ₁`, `ℓ₂` — typed `l`, `l1`, `l2`; or by two points (`AB`); or by role (`המשיק`) | **Inherits the 3-D trap: `ℓ` is not a `\w` character** — never `\b` after a line name, use an explicit lookahead ([src3d/CLAUDE.md](../src3d/CLAUDE.md)) |
+| Circle | **Named** — `מעגל I` / `מעגל II` (Roman numerals, the corpus's own device), or `המעגל שמרכזו M`, or bare `המעגל` when unique | Circles are the one family that regularly comes in twos, so naming is not optional |
+| Parabola, ellipse | **Anonymous** — `הפרבולה`, `האליפסה` | No exam in twenty carries two parabolas or two ellipses; at most one of each per figure |
+| Axes, origin | `ציר ה-x`, `ציר ה-y`, `ראשית הצירים` (`O`) | The frame always exists; it is never declared |
+
+### 10b. The fifteen families
+
+Each family lists the phrasing the corpus actually uses; the En column is the catalog's parallel
+entry.
+
+| # | Family | Hebrew (canonical) | English |
+|---|---|---|---|
+| **F1** | Point by coordinates | `נתונה הנקודה A(2,6)` · `A(−9a,0)` | `point A(2,6)` |
+| **F2** | Incidence | `הנקודה A נמצאת על האליפסה` · `B נמצאת על החלק החיובי של ציר ה-x` · `M נמצאת ברביע הראשון` · `E היא נקודה כלשהי על מעגל II` | `A is on the ellipse` · `B is on the positive x-axis` · `E is any point on circle II` |
+| **F3** | Line by equation | `נתון הישר ℓ1: 4y−3x−20=0` · `משוואת הישר AC היא y=−2x+8` · `הישר x=−4` | `line l1: 4y−3x−20=0` |
+| **F4** | Line by construction | `D היא נקודת החיתוך של הישר AC עם ציר ה-y` · `דרך A העבירו ישר המקביל לציר ה-x` · `מ-M מורידים אנך לציר ה-x החותך אותו בנקודה K` · `הישר העובר דרך ראשית הצירים ודרך A` | `D is the intersection of AC with the y-axis` · `through A draw a line parallel to the x-axis` |
+| **F5** | Circle | `נתון מעגל I שמשוואתו (x−3)²+(y−4)²=9, ומרכזו בנקודה K` · `משוואת המעגל x²+y²−2ax−2x=0` · `מעגל שמרכזו M(6,10)` · `מעגל שמרכזו F העובר דרך B` · `המשולש ABC חסום במעגל שמרכזו M` · `מעגל חסום במעוין` | `circle I: (x−3)²+(y−4)²=9, centre K` · `circle centred M through B` · `circle inscribed in the rhombus` |
+| **F6** | Conic | `נתונה פרבולה קנונית שמשוואתה y²=54x` · `נתונה אליפסה שמשוואתה x²/9+y²/b²=1` · `אורך הציר הראשי של האליפסה הוא 4t` | `canonical parabola y²=54x` · `the major axis of the ellipse is 4t` |
+| **F7** | Role | `F1 הוא המוקד הימני של האליפסה` · `מוקדי האליפסה נמצאים על ציר ה-x` · `הנקודה (t,0) היא מוקד של פרבולה קנונית` · `הישר ℓ2 הוא מדריך של פרבולה קנונית` · `AC הוא קוטר במעגל` · `הקטע AB הוא מיתר במעגל` | `F1 is the right focus of the ellipse` · `l2 is the directrix of a canonical parabola` · `AC is a diameter of the circle` |
+| **F8** | Tangency | `הישר y=x משיק למעגל` · `המשיק למעגל בנקודה A` · `דרך D העבירו משיק למעגל` · `הישר mx−y+n=0 הוא משיק משותף לשני המעגלים` · `מעגל שמרכזו M משיק לישרים ℓ1 ו-ℓ2` · `שני מעגלים המשיקים זה לזה מבחוץ` / `מבפנים` · `הישר ℓ משיק לפרבולה בנקודה A` | `y=x is tangent to the circle` · `the tangent to the circle at A` · `a common tangent to the two circles` · `two circles tangent externally` |
+| **F9** | Mutual position | `הישר BM מאונך לציר ה-x` · `AC מקביל ל-MB` · `הישר הנתון ניצב לישר שמצאתם בסעיף א` | `BM is perpendicular to the x-axis` |
+| **F10** | Metric given | `AB = 4√5` · `אורך הקטע המחבר את מרכזי המעגלים הוא 9` · `רדיוס המעגל שווה ל-5` · `היחס בין אורכי הרדיוסים הוא 1:2` · `∡APB = 90°` · `שטח המשולש KLM הוא 9` · `השטח הגדול ביותר של המשולש APB הוא 156.25` · `המרחק בין הישרים EF1 ו-GF2 הוא 24` · `AC²+BC²=1250` | `AB = 4√5` · `the ratio of the radii is 1:2` · `the largest possible area of APB is 156.25` |
+| **F11** | Parameter declaration | `a הוא פרמטר חיובי` · `a הוא פרמטר שונה מאפס` · `t הוא פרמטר קטן מ-9` · `0<k<6` | `a is a positive parameter` · `t is a parameter less than 9` |
+| **F12** | Curve edit (affine) | `מזיזים את המעגל ב-9 יחידות ימינה ו-12 יחידות למטה` · `מכפילים את שיעור ה-y של כל נקודה על המעגל ב-2/3` | `translate the circle 9 right and 12 down` · `multiply the y-coordinate of every point on the circle by 2/3` |
+| **F13** | Locus *(V1)* | `המקום הגיאומטרי של כל הנקודות שהמרחק שלהן מ-A שווה למרחק שלהן מהישר ℓ1` · `המקום הגיאומטרי של כל הנקודות M המקיימות MA=MB` · `המקום הגיאומטרי של מרכזי המעגלים שהקטע AB הוא מיתר שלהם` | `the locus of all points equidistant from A and l1` · `the locus of the centres of the circles having AB as a chord` |
+| **F14** | Branch selector / sweep range | `שיעור ה-y של B קטן מ-6` · `שיעור ה-x של M קטן משיעור ה-x של A` · `A היא נקודה כלשהי על מעגל II כך ש-−1.5 ≤ שיעור ה-y של A ≤ 1.5` | `the y-coordinate of B is less than 6` |
+| **F15** | Ask / claim *(the ask lane)* | `משוואת BD` · `|AB|` · `שטח ABC` · `הזווית BAC` · claim: `משוואת המעגל היא (x−5)²+y²=9` | `equation of BD` · `area ABC` |
+
+### 10c. Input normalization — what the parser accepts as the same thing
+
+A student types on a keyboard; the exam is typeset. Both must reach one internal form, at the single
+normalization chokepoint the 2-D parser already has (never per rule):
+
+`^2` ≡ `²` · `-` ≡ `−` (hyphen-minus ≡ minus sign) · `sqrt(5)` ≡ `√5` · `<=` `>=` ≡ `≤` `≥` ·
+`l1` ≡ `ℓ1` · `F1` ≡ `F₁` · `<A` ≡ `∡A` (the [#237](https://github.com/dcodish/geo_builder/issues/237)
+keyboard form) · `*` ≡ `·` · `pi` ≡ `π`.
+
+The symbol palette (`shell/symbols.ts`, per-product data on a shared core) offers `²  √  ≤  ≥  ℓ  ∡  π
+−` with wrap-selection, so the typed forms above are a fallback, never the only route. **Every symbol
+the palette offers must parse** — the shared test contract.
+
+### 10d. Coverage and the V0 cut
+
+| Family | V0 | V1 | Later |
+|---|---|---|---|
+| F1 F2 F3 F4 F5 F7 F8 F9 F10 F11 F14 | ✓ | | |
+| F6 (conics) | ✓ equation forms · focus/directrix forms | | |
+| F13 (locus) | | ✓ | |
+| F12 (curve edits) | | ✓ (it feeds the `#כיווץ מעגל` loci) | |
+| F15 (ask lane) | ✓ scalars + claims | | trace (R1) |
+
+**Deliberately out of the language, V0–V1:** ratio-division of a segment as a *given* (`BF:FD=1:2` —
+it appears in the corpus only as an ask) · any non-canonical conic · any second parabola or second
+ellipse in one figure · `הראו כי`-style proof requests (they are asks about the figure, served by the
+claim lane, not new given forms).
+
 
 ---
 

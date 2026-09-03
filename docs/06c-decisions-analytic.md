@@ -288,3 +288,71 @@ gate, not two.
 solver, replay, scene, parser rules and catalogs are **copied, never shared**; locale files, the ADR
 log, fixtures, the deploy target, the CI lane and the save-file suffix stay per-product. Uniformity
 is the chrome and the doctrine, never the geometry.
+
+---
+
+## ADR-AG-005 — The input language, the naming conventions, and the THREE kinds of inequality (2026-09-03)
+
+**Context.** Asked whether the plan was buildable, the honest answer was "enough to start, not enough
+to finish V0": [docs/19](19-analytic-geometry-tool.md) §2c/§2d carried a *construct set* and a
+*vocabulary list*, which is not a grammar. Every sibling has the layer above that — `catalog.ts`,
+`catalog3.ts`, [docs/27 §10](27-complex-numbers-tool.md)'s "generic sentence families" — and it is
+what a build session hits in hour one. A second gap sat underneath it: the corpus does not only *pin*
+parameters, it **bounds** them, in 14 of the 20 exams, and `src3d`'s transplanted model covers only
+the pinning.
+
+This ADR closes both. The language itself is [docs/19 §10](19-analytic-geometry-tool.md), extracted
+from the same twenty exams; the decisions are here.
+
+**D6 — naming, taken from what the corpus already does.**
+
+- **Circles are named**: `מעגל I` / `מעגל II` (the corpus's own Roman-numeral device), or
+  `המעגל שמרכזו M`, or bare `המעגל` when unique. Circles are the one family that regularly arrives in
+  twos, so naming is not optional for them.
+- **Parabolas and ellipses are anonymous** — `הפרבולה`, `האליפסה`. No exam in twenty carries two
+  parabolas or two ellipses, so at most one of each may exist per figure. A second one is a refusal,
+  not a silently-shadowed object.
+- **Lines** are `ℓ`, `ℓ1`, `ℓ2` (typed `l`, `l1`, `l2`), or named by two points, or by role
+  (`המשיק`). This **inherits the 3-D trap verbatim**: `ℓ` is not a `\w` character, so a `\b` after a
+  line name silently fails — use an explicit lookahead ([src3d/CLAUDE.md](../src3d/CLAUDE.md)). The
+  cost of rediscovering that was a session in the 3-D tree; [ADR-W-004](06w-decisions-workspace.md#adr-w-004)
+  says to carry it across rather than pay it twice.
+- **Points** are a capital letter with an optional digit subscript (`F1`, `D2`), the
+  [ADR-228](06-decisions.md#adr-228) convention already in the 2-D parser.
+
+**D7 — an inequality is one of THREE things, and they are not interchangeable.** This is the decision
+the plan was missing. The corpus's inequalities do three different jobs, act at three different
+points in the pipeline, and fail in three different ways:
+
+| Kind | Corpus form | Where it acts | Failure mode |
+|---|---|---|---|
+| **1. Parameter domain** | `a הוא פרמטר חיובי` · `t פרמטר קטן מ-9` · `0<k<6` · `a≠0` | **Declaration.** A precondition on the symbol, not a given to be satisfied. It **filters the roots** of every later pin — roots outside the domain were never candidates and are dropped silently | An empty admissible set is an honest contradiction *of the pin*, reported against the pinning statement |
+| **2. Branch selector** | `שיעור ה-y של B קטן מ-6` · `שיעור ה-x של M קטן משיעור ה-x של A` · `r<R` · `a<13` | **After solving.** An ordinary given that picks among branches already computed — the 3-D sign-given mechanism ([docs/20 §2](20-space-vectors-tool.md), «שיעור ה-z חיובי») | Selecting no branch is a contradiction named against the selector, never an empty figure |
+| **3. Sweep range** | `A היא נקודה כלשהי על מעגל II כך ש-−1.5 ≤ שיעור ה-y של A ≤ 1.5` | **Sampling.** Bounds a *free* DOF's interval. Never affects determinacy | None — it narrows a sweep; its consumer is the locus lane, which paints and verifies the trace only over the range |
+
+**Why the distinction is load-bearing, not pedantry.** Conflating them produces exactly the bugs this
+product would otherwise ship: treat a **domain** as a **selector** and `a>0` reports "no valid
+configuration" instead of simply never proposing a negative `a`; treat a **sweep range** as a
+**constraint** and a deliberately free point becomes determined, which is an
+[ADR-052](06-decisions.md#adr-052) violation (a default masquerading as a given). V0's own gate exam
+(קיץ א' 2022) needs kinds 1 and 2 simultaneously — `r<R` and `a<13` are what make its *two*
+possibilities two rather than four.
+
+Each kind names where it inserts, per the [LADDER](LADDER.md) convention; the product's own ladder
+document (`LADDER-AG.md`, the [LADDER-CX](LADDER-CX.md) pattern) is written when the engine exists.
+
+**D8 — the catalog carries the `catalog3.ts` contract.** `src-analytic/parser/catalogAnalytic.ts` is
+simultaneously the user-facing reference, the coverage map (a guard test re-parses **every** entry in
+He *and* En), and **the only vocabulary the LLM fallback may emit**. Its governing principle is that
+**the student types the exam's own sentence** — every canonical entry is a phrasing that occurs in the
+corpus, never an invented command language. Input normalization (`^2`≡`²`, `-`≡`−`, `sqrt`≡`√`,
+`l1`≡`ℓ1`, `<A`≡`∡A`, …) lives at the **single** normalization chokepoint, never per rule, and every
+symbol the palette offers must parse — the shared `shell/symbols.ts` test contract.
+
+**Also settled by convention, not worth an option list:** the URL is `/analytic-builder/`, devUrl
+`/analytic.html`, `build:analytic` → `dist-analytic/`, matching the three siblings exactly. The
+operator may override before the first build; nothing else depends on it.
+
+**Still open after this ADR:** the 471 ↔ 572 profile split (V4) · whether an answer is ever revealed
+after a wrong claim (largely moot under [ADR-AG-003](#adr-ag-003) D3′, since values already show
+behind the student's checkbox).
