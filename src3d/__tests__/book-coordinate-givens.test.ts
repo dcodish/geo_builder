@@ -112,20 +112,20 @@ describe('#325 — parse: affine symbolic components', () => {
       commands: [{
         type: 'point3', id: 'B', x: null, y: null, z: null,
         syms: ['t', 't', 'k'],
-        symExprs: [{ sym: 't', k: 2, c: 0 }, { sym: 't', k: 1, c: 0 }, { sym: 'k', k: 1, c: 0 }],
+        symExprs: [{ terms: [{ sym: 't', k: 2 }], c: 0 }, { terms: [{ sym: 't', k: 1 }], c: 0 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }],
       }],
     });
   });
   it('a single-symbol coefficient now parses too: M(2k, 1, 3)', () => {
     expect(parse3('M(2k, 1, 3)')).toMatchObject({
       ok: true,
-      commands: [{ type: 'point3', id: 'M', symExprs: [{ sym: 'k', k: 2, c: 0 }, null, null] }],
+      commands: [{ type: 'point3', id: 'M', symExprs: [{ terms: [{ sym: 'k', k: 2 }], c: 0 }, null, null] }],
     });
   });
   it('an affine offset: N(t+1, 2t-3, 0)', () => {
     expect(parse3('N(t+1, 2t-3, 0)')).toMatchObject({
       ok: true,
-      commands: [{ symExprs: [{ sym: 't', k: 1, c: 1 }, { sym: 't', k: 2, c: -3 }, null] }],
+      commands: [{ symExprs: [{ terms: [{ sym: 't', k: 1 }], c: 1 }, { terms: [{ sym: 't', k: 2 }], c: -3 }, null] }],
     });
   });
 });
