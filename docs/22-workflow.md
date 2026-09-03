@@ -241,7 +241,11 @@ product behind reality, which is the drift the machine registry exists to kill).
 deliberately **last** (D5 ruling, [ADR-CX-001](06d-decisions-complex.md#adr-cx-001)): **analytic
 geometry** — the 471 (4-pt) + 572 (5-pt) analytic-geometry questions as ONE engine with
 curriculum-level profiles (`src-analytic/`, ADR log `06c-decisions-analytic.md`, ids `ADR-AG-NNN`,
-label `analytic`); its doc-19 §6 decision stays parked.
+label `analytic`). **Planning complete 2026-09-03**
+([ADR-AG-001](06c-decisions-analytic.md#adr-ag-001)): the parked doc-19 §6 decision is resolved
+(draw-and-verify, **no CAS**) and [docs/19](19-analytic-geometry-tool.md) is now the
+decision-complete plan of record. No code yet — `src-analytic/` stays in `plannedTrees` until the
+first file lands.
 
 **Cross-product decisions** — ones belonging to no single product (this registry, the isolation rule, deploy topology, documentation structure) — go in [06w-decisions-workspace.md](06w-decisions-workspace.md) as `ADR-W-nnn`, under the issue label `workspace` ([ADR-W-001](06w-decisions-workspace.md#adr-w-001)). Pre-existing workspace decisions keep their original homes and ids: [ADR-266](06-decisions.md#adr-266) stays in the 2-D log, deliberately — over 200 ADR ids are referenced from docs and code comments, and stable anchors beat tidy filing.
 
