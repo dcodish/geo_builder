@@ -366,3 +366,12 @@ export const ATOM_SOURCES: Readonly<Record<string, string>> = {
   AREA_KW,
   EQUATES_KW,
 };
+
+/**
+ * The DEFINITE solution noun — «הפתרון» / «the solution» (#694).
+ *
+ * Definite on purpose: it points at a set that already exists (the enumeration on an earlier line), and
+ * that is exactly what makes «z₀ הוא הפתרון ברביע הרביעי» a SELECTION rather than a claim about z₀.
+ * The indefinite «פתרון» is not this sentence.
+ */
+export const SOLUTION_KW = String.raw`(?:ה(?:פתרון|פיתרון)|the\s+solution)`;

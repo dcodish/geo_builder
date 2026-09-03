@@ -2211,3 +2211,77 @@ unchanged (the input, not the fix); a single- and a multi-digit index both lift 
 and `∛` and a bare exponent are left alone; the operator's exact reading «⁵√5·cis10.63°» keeps its
 tail; two radicals in one label both lift with every raise matched by its restoring `dy`; a reading
 with no radical renders unwrapped; and the regex-state trap above. Verified visually on both surfaces.
+## ADR-CX-037 — SELECTING a member of a solution set is a NEW NAME, not a filter and not a prune (#694)
+
+**Status:** Accepted (2026-09-03) · **Stage:** LADDER-CX 1b (lowering) + 3e (resolution) · **Operator ruling** (2026-08-26) · **Round:** #878
+
+**Context.** Four of the eight sampled exams enumerate roots and then pick one by a condition
+(docs/27 §2, archetype 2): *«z₀ הוא הפתרון של המשוואה הנמצא ברביע הרביעי»*, and every later part is
+about that one root. The sentence had no grammar at all — it measured as
+`line-unaccounted: «הפתרון»`.
+
+Neither existing route reaches it:
+
+```
+z^6 = 1
+z ברביע הרביעי       → refused: z marks the equation's solutions   (reserved-letter)
+z1 ברביע הראשון      → accepted, then unsatisfied — CORRECT: z₁ is at 0°, in no quadrant
+```
+
+The second refusal is right, and it is also not the sentence the exam writes. The exam does not
+constrain a *named* solution; it **picks the member of the set** satisfying a condition and then talks
+about it. `filterBranches` cannot serve: an enumeration is ONE configuration containing n points
+([ADR-CX-021](#adr-cx-021)), so there are no n branches left for a filter to thin.
+
+**Decision — a selection binds a NEW NAME to the member that satisfies a filter.**
+
+The operator's ruling of 2026-08-26, put as a choice between this and also permitting the bare letter to
+narrow itself: **new-name only.** The deciding argument is worth keeping — *the exams always introduce a
+new name*, so the named form covers the corpus and the bare form buys a sentence the corpus does not
+write, at the cost of the reserved-letter rule's clarity (the "is `z` the set or one member?" ambiguity
+it exists to kill). **[ADR-CX-024](#adr-cx-024) stands untouched**, and a lock asserts it so a later
+widening cannot quietly reverse the ruling.
+
+**Where each part lives, and why.** The parser reports the sentence as a *shape* — it is stateless per
+line and cannot know what earlier lines enumerated. The lowering supplies the SET, read from the same
+`reserved` map the bare-letter rule uses, so a selection can only ever point at a set the student
+actually enumerated. The fold RESOLVES it, beside the stage-3e filter re-verification, because that is
+the first point at which each candidate has a drawn direction: *"which of these is in that quadrant?"*
+has no answer before the solve. A resolved selection is then an ordinary alias — the row reads
+«z₀ (z₆)» through the #791 display tie — so nothing downstream learns a new concept.
+
+The filter is scoped over a **filter predicate**, not over the quadrant noun: the same sentence will
+want «הפתרון הממשי» and «הפתרון שבו …», and enumerating filter nouns is the habit this tree keeps paying
+for (`src-complex/CLAUDE.md`). The quadrant family ships first because that is what the corpus writes,
+and it is built from the SAME ordinal vocabulary F5 uses, so the two rules can never disagree about what
+«הרביעי» means.
+
+**Zero and many are REFUSALS, not choices** — both named at the ask, neither a judgement call:
+
+- **No member satisfies** → refuse, **naming the student's statement**. Never bind nothing, never bind
+  the nearest.
+- **Two or more satisfy** → refuse, naming it. **Never pick one** — picking asserts a given the student
+  never stated ([ADR-052](06-decisions.md#adr-052)). In the exams a ≥2 result is usually the question
+  telling the student to answer «שתי האפשרויות», so it reads as information, not as a malfunction.
+- **No enumeration in scope** → the same door: the sentence points at nothing, and inventing a set to
+  satisfy it is the silent-invention class #680 was filed about.
+
+All three report through `unsatisfied`, which quotes the student's line verbatim — the same channel a
+violated filter or measure uses, because it is the same sentence: *you stated this and the drawing does
+not do it*.
+
+**Rule precedence, and it matters.** `solution-selection` runs BEFORE `quadrant`: the selection also
+matches that rule's NAME + quadrant shape, and taken by it would lower to a filter *on* `z0` instead of a
+selection *from* the set. The ordering is asserted in the rule-registry lock.
+
+**Not delivered, and named honestly.** The ruling asks for *a fixture per newly-transcribable exam
+(four of the eight sampled)*. One ships here — the archetype-2 opening this sentence unblocks. The other
+three need the full exam transcriptions, which is corpus work rather than part of this capability; they
+are the natural first use of it.
+
+**Locked** in `src-complex/__tests__/solution-selection-694.test.ts` (11): the exam's sentence binding
+z₀ to the fourth-quadrant root with the other five keeping their own names; the English mirror; the
+filter being read rather than hard-coded to the fourth; «z ברביע הרביעי» still `reserved-letter` with
+nothing bound; zero-match, multi-match and no-enumeration all refusing and quoting the statement; and
+the neighbouring F5 sentences reading exactly as before. Plus the fixture
+`exam-2023a-quadrant-selection.complex.json`.

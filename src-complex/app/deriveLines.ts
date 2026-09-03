@@ -17,10 +17,10 @@ import type { Claim as Assertion } from '../model/claim';
 import type { FigureObject } from '../model/figure';
 import type { ExprQuery, MeasureQuery, MeasureRelation, RatioQuery } from '../model/measure';
 import type { SequenceStatement } from '../model/sequence';
-import { rootsMode } from '../model/naming';
+import { type RootsMode, rootsMode } from '../model/naming';
 import { refsOf } from '../model/expr';
-import { solutionSetConstraints, solutionSetNames } from '../model/solutionSet';
-import { type Derived2, type FoldInput, type Untranslated, foldConstraints } from '../replay/derive2';
+import { type RootsEquation, solutionSetConstraints, solutionSetNames } from '../model/solutionSet';
+import { type Derived2, type FoldInput, type ResolvedSelection, type Untranslated, foldConstraints } from '../replay/derive2';
 
 /**
  * Fold the student's LINES through the v2 parser and the exact solver.
@@ -143,6 +143,8 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
   const sequences: SequenceStatement[] = [];
   const atoms = new Map<string, number>();
   const untranslated: Untranslated[] = [];
+  /** #694 — the selections this figure states, each with the set it picks from. */
+  const selections: ResolvedSelection[] = [];
   /** #791 — «z1 = A» / «A = z1» bindings, read off the equation shape: number name → label */
   const aliases = new Map<string, string>();
 
@@ -167,6 +169,11 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
    * the letter named, which is what the prototype did.
    */
   const reserved = new Map<string, string>();
+  /**
+   * #694 — every enumeration by its letter, so a later SELECTION can name the set's members with the
+   * SAME function that named them in the first place, never a second naming convention.
+   */
+  const rootsByLetter = new Map<string, { eq: RootsEquation; mode: RootsMode }>();
 
   lines.forEach((raw, idx) => {
     const r = parseLineV2(raw);
@@ -204,6 +211,21 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
       // …but only an ENUMERATION makes the letter mean the set rather than a number. In `constrain`
       // mode `z` IS the number the equation is about, and a later line may say more about it.
       if (mode !== 'constrain') reserved.set(eq.varName, eq.src);
+      rootsByLetter.set(eq.varName, { eq, mode });
+    }
+    /**
+     * #694 — a SELECTION names its candidate set from the enumeration in scope.
+     *
+     * The parser is stateless per line, so it reports the sentence and this layer supplies the members.
+     * Exactly ONE reserved letter is the unambiguous case; with none there is nothing to select from,
+     * and the selection carries no candidates — which the fold refuses against the student's own line
+     * rather than inventing a set to satisfy it.
+     */
+    for (const sel of r.line.selections) {
+      const enums = [...reserved.keys()];
+      const only = enums.length === 1 ? rootsByLetter.get(enums[0]) : undefined;
+      selections.push({ ...sel, candidates: only ? solutionSetNames(only.eq, only.mode) : [] });
+      mentioned.add(sel.name);
     }
     for (const n of [...r.line.declares, ...r.line.roots.flatMap((e) => refsOf(e.rhs))]) {
       mentioned.add(n);
@@ -249,5 +271,6 @@ export function lowerLines(lines: readonly string[]): Omit<FoldInput, 'configInd
     ratios,
     exprQueries,
     sequences,
+    selections,
   };
 }
