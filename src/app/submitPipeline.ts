@@ -293,6 +293,16 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     ui.setBusy(false);
     return;
   }
+  // #889: the SIBLING ask, and a different question — «מרובע ABCD עם אלכסון» names its shape and
+  // leaves the CONSTRUCT open. The candidates are constructs that do not exist yet, so the answer is
+  // one of them typed back verbatim; `ambiguousShape`'s wording («צורות», «בשרטוט», a hardcoded
+  // «אלכסוני») is false for every one of those and produced «אלכסוני גובה מ-A». Its own message.
+  if (!r.ok && r.reason === 'ambiguous-construct') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `ambiguous-construct:${r.noun}:${r.options.join(',')}` });
+    ui.setInputNote(t('input.ambiguousConstruct', { noun: r.noun, options: r.options.join(', '), first: r.options[0] ?? '' }));
+    ui.setBusy(false);
+    return;
+  }
   // #354: a containment whose CONTAINER was not named, on a figure with 2+ circles — which one contains it
   // is the student's to say (ADR-052), so ask instead of escalating to an LLM that could only guess.
   if (!r.ok && r.reason === 'ambiguous-container') {

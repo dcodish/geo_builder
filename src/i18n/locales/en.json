@@ -81,6 +81,7 @@
     "ambiguousContainer": "The figure has several circles ({{circles}}), so which one contains it cannot be told. Name it — e.g. \"a circle contained in circle O\".",
     "ambiguousCircleRef": "The figure has several circles ({{circles}}), so I can't tell which one you mean. Name the circle — e.g. \"circle {{first}}\".",
     "ambiguousShape": "The figure has several shapes ({{shapes}}), so I can't tell which one you mean. Name the shape — e.g. \"the diagonals of {{first}}\".",
+    "ambiguousConstruct": "There is more than one \"{{noun}}\" here ({{options}}), and the givens do not choose between them — you do. Say which, e.g. \"{{first}}\".",
     "unknownCircle": "There is no circle named {{center}}. More than one unnamed circle is drawn — name one first, e.g.: the centre of the right circle is {{center}}.",
     "partial": "Couldn't draw this part",
     "labelsDropped": "I only partly understood — I couldn't place {{labels}}. Rephrase the step (e.g. split it in two).",

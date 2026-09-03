@@ -8961,3 +8961,117 @@ the shared question they were bundled for is the one answered above.
 **Locked** in `engine/__tests__/issue-281.test.ts` (9): «> 40» refuses none and every configuration
 satisfies it; «> 45» unchanged; the angle still takes >20 distinct values across a >10° spread (option
 A, not B); the freedom cue is unchanged (ADR-039); and three later hard givens still build on top.
+
+---
+
+## ADR-479 — two different questions are two different sentences: the construct ambiguity gets its own refusal (#889)
+
+**Context.** #461 ([ADR-478's round](#adr-478)) added the shape-plus-construct family and, for the
+ambiguous members, an ASK — «מרובע ABCD עם אלכסון» is one of two diagonals, «משולש ABC עם גובה» one
+of three altitudes. It raised #519's `ambiguous-shape`, and its own comment named the reuse as a
+virtue: *"the same `ambiguous-shape` question #519 built, one construct over, so no new message and
+no new refusal shape."*
+
+Played in the browser on `main`, that is what it produces:
+
+```
+משולש ABC עם גובה
+→ יש כמה צורות בשרטוט (גובה מ-A, גובה מ-B, גובה מ-C), ולא ברור לאיזו מהן הכוונה.
+  ציינו את הצורה בשמה — למשל "אלכסוני גובה מ-A".
+```
+
+«אלכסוני גובה מ-⁧A⁩» is not a sentence. And the first clause is false twice: `גובה מ-A` is not a
+**צורה**, and none of the candidates is **בשרטוט** — none of them exists.
+
+**Decision.** A new refusal, `ambiguous-construct`, with its own message. The two asks are
+structurally different questions and [docs/10 §5 guideline 8](10-pedagogy.md) — a refusal teaches the
+REASON — applies one level up: two different reasons must read as two different sentences.
+
+| | #519 `ambiguousShapeAsk` | #461 `shapeWithConstruct` |
+| --- | --- | --- |
+| asks | which of these EXISTING SHAPES? | which VARIANT of this construct? |
+| candidates | polygons already on the figure | constructs that do not exist yet |
+| the answer | the construct re-aimed: «אלכסוני ABCD» | the candidate itself: «אלכסון AC» |
+
+`input.ambiguousShape` hardcodes the left column's vocabulary — «צורות», «בשרטוט», and the literal
+word «אלכסוני» before the example. All three are wrong for the right column. The new message
+hardcodes no construct word at all; the candidates are composed from **the student's own noun**, so
+«triangle ABC with altitude» is answered «altitude from A», not «גובה מ-A».
+
+**The ask and its answer are one question, so the rule owns both halves.** «מרובע ABCD עם אלכסון AC»
+— the candidate typed back into the sentence it was asked about — now BUILDS. It did not before: the
+named form fell through to the same `return null` as shape+GIVEN, so the ask's own example failed,
+while the sibling «משולש ABC עם גובה מ-A» happened to work through another rule. An ask whose
+example does not parse is a dead end, and sending a student mid-sentence away to start over on two
+lines is worse than the ambiguity was. ADJACENT vertices still refuse — «עם אלכסון AB» is a side,
+and drawing it would answer the question with something the student did not ask for (ADR-052 through
+the answer lane instead of the ask lane).
+
+`isAmbiguityQuestion` takes the new reason beside `ambiguous-shape`, for the reason already recorded
+there: both are raised by the splitter itself, after it has read both halves, so there is nothing
+left for a split to rescue and letting the gate replace one with `not-handled` sends a recognised
+ambiguity to the LLM.
+
+**Locked** in `parser/__tests__/issue-889-890.test.ts` and the updated `issue-461.test.ts`: the two
+reasons stay two; the construct message contains no construct word and carries the three placeholders
+the pipeline supplies; **every option the ask quotes, put back into the sentence, builds**; the named
+diagonal draws; a side refuses; #519's own ask is unchanged.
+
+---
+
+## ADR-480 — a STATED shape materialises: the crossing rule declares the ring its sentence names (#890)
+
+**Context.** Found play-verifying #461, and older than it — `compoundSuchThat` is byte-identical to
+`prod/2026-09-02-2`, and the #461 splitter requires «עם», which this sentence does not contain:
+
+```js
+parse('טרפז ABCD שהאלכסונים שלו נחתכים בנקודה M', empty)
+// { ok: true, commands: [ { type:'line-line-intersection', id:'M', a:'A', b:'C', c:'B', d:'D' } ] }
+```
+
+One command. The student stated a **טרפז** and it vanished — the honesty invariant *no stated object
+is ever silently dropped*, broken outright — and the error then read «הצעד הזה מסתמך על M שעדיין לא
+הוגדרו», blaming the student for `M`, the one thing they had got right.
+
+**Root cause.** `specialPointMeet` resolves its ring three ways, and the FIRST — a kind noun plus a
+label run of the right size, «טרפז ABCD» — reads the ring **out of the sentence itself**. The other
+two read it off the figure. Only the first can name a ring that does not exist yet, and it emitted
+the crossing over it without ever building it. Not the reported line only: the catalog's own example
+
+```
+G is the intersection of the diagonals of quadrilateral ABCD
+```
+
+has shipped exactly this way for as long as the coverage tests have carried it — because those tests
+assert `.ok` and never that the line **draws**. It did not: zero points, «unresolved dependencies
+for: G». Measured on `prod/2026-09-02-2`, so were «מפגש התיכונים במשולש ABC», «מפגש הגבהים במשולש
+ABC» and every sibling with no prior figure.
+
+**Decision.** When that branch names a ring the figure has not got, the rule **declares it**,
+synthesized through the real grammar from the sentence's own noun (`parse('quadrilateral ABCD')`) so
+every shape the noun lane reads comes along — the #461 splitter's shape, one rule over. The declared
+commands lead every emission, so evaluation is topological and the crossing resolves.
+
+Six phrasings that produced a headless figure now draw: the three reported «ש…» forms, both catalog
+examples, and the triangle families. The refusal that #890 first proposed — tightening the ADR-430
+gate so it stops certifying a shape from the crossing's own operands — was **measured and dropped**:
+it made the gate fire on relation givens («שטח המשולש ABF גדול פי 2 משטח המשולש BFE», «המעגל החוסם
+את משולש ABC…»), where the shape noun is a REFERENCE and not a declaration, and no mechanical test
+separates the two. Refusing was also the worse answer: building is what the student asked for.
+
+**What materialising deliberately does NOT reach.** Exactly ONE shape noun in the sentence, or this
+rule does not decide. «טרפז ABCD, אלכסוני הריבוע נפגשים בנקודה M» names two kinds with one declared;
+materialising there would bind the trapezoid's crossing under the square's name — the #770 P1 honesty
+class, which the existing routes already refuse BY NAME. A ring already on the figure is not
+re-declared, and the run-only form («אלכסוני ABCD»), which states no shape, declares nothing.
+
+**#891** is filed for the phrasings this does not reach: the glued «ש»+noun clause where no kind noun
+carries a label run. `SUCH_THAT` matches the separated markers («שבו», «כך ש») and not the prefixed
+form, and widening it blind turns readable lines into two unreadable halves — its own scoping pass.
+
+**Locked** in `parser/__tests__/issue-889-890.test.ts` (29 with ADR-479): the five phrasings build
+the shape FIRST and then the crossing; five of them **draw**, every status ok; the catalog example is
+asserted to draw and not merely to parse; the #770 two-noun line still refuses; a ring already on the
+figure is not re-declared; the run-only form declares nothing. The PAR-10 pinned
+`{example → command types}` map is updated deliberately, and the two rows that moved are the two
+catalog examples that now declare their stated shape.

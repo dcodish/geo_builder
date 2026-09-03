@@ -54,6 +54,12 @@ export type ParseResult =
   // is the student's), but declining sent the utterance to the LLM lane, which can only guess and
   // whose guess builds. Ask instead, naming the candidates. `noun` is the construct the student used.
   | { ok: false; reason: 'ambiguous-shape'; noun: string; shapes: string[] }
+  // #889: the OTHER ambiguity, and a different question. #461's shape-plus-construct rule knows
+  // exactly which shape it is about — «מרובע ABCD עם אלכסון» — and cannot know WHICH VARIANT of the
+  // construct: either diagonal, one of three altitudes. The candidates are constructs that do not
+  // exist yet, so the answer is a candidate typed back verbatim, not a shape name. Sharing the
+  // message above emitted «אלכסוני גובה מ-A» (docs/10 §5 guideline 8).
+  | { ok: false; reason: 'ambiguous-construct'; noun: string; options: string[] }
   // Every common tangent of the requested kind is already drawn (two of a kind / four in all) — a
   // further one does not exist; refuse deterministically, never a solver grind (#197 Am. 3).
   | { ok: false; reason: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' }
@@ -239,7 +245,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string };
+type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -1314,10 +1320,33 @@ const specialPointMeet: Rule = (s, ctx) => {
   const shapeM = s.match(
     /(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite)\s+((?:[A-Z]\d*\s*){3,4})(?![A-Za-z])/,
   );
+  /**
+   * #890 — a STATED shape materialises. «G is the intersection of the diagonals of quadrilateral
+   * ABCD» names the ring; with no such ring on the figure the crossing alone is a headless figure
+   * whose every vertex is unresolvable, and the student is told their own result point is
+   * undefined. That shipped green for as long as the catalog has carried the example, because the
+   * coverage tests assert `.ok` and never that it DRAWS. Synthesized through the real grammar from
+   * the sentence's own noun, so every shape that lane reads comes along (the #461 splitter shape).
+   */
+  const declared: AnyCommand[] = [];
   let poly: Id[] | null = null;
   if (shapeM) {
     const ids = (shapeM[1].match(/[A-Za-z]\d*/g) ?? []).map(up);
-    if (ids.length === fam.n) poly = ids;
+    if (ids.length === fam.n) {
+      poly = ids;
+      const have = (ctx.points ?? []).map(up);
+      // ONE shape noun in the sentence, or this rule is not the one to decide. «טרפז ABCD, אלכסוני
+      // הריבוע נפגשים בנקודה M» names two kinds and only one of them was declared; materialising
+      // here would bind the trapezoid's crossing under the square's name — the #770 P1 class,
+      // which the existing routes already refuse BY NAME. Declaring is for the unambiguous line.
+      const oneNoun = (s.match(POLY_NOUN) ?? []).length === 1;
+      if (oneNoun && !ids.every((v) => have.includes(v))) {
+        const sr = parse(shapeM[0].trim(), ctx);
+        // the noun is not a shape this grammar builds — defer, never a headless crossing
+        if (!sr.ok) return null;
+        declared.push(...sr.commands);
+      }
+    }
   }
   // #770: a LETTERS run right after the construct noun («אלכסוני ABCD») names the ring directly —
   // it used to fall through to the unique-quad fallback, so two quads deferred a fully-determined
@@ -1379,11 +1408,11 @@ const specialPointMeet: Rule = (s, ctx) => {
   // only when `visible`, and `line-line-intersection` computes its crossing without drawing the operand lines.
   if (fam.key === 'diag') {
     // quad ABCD: the crossing of the two diagonals (the diagonals themselves are not drawn).
-    return [{ type: 'line-line-intersection', id: X, a: A, b: C, c: B, d: D }];
+    return [...declared, { type: 'line-line-intersection', id: X, a: A, b: C, c: B, d: D }];
   }
   if (fam.key === 'median') {
     const ma = `~med-${B}${C}`, mb = `~med-${A}${C}`; // hidden side-midpoints (median 1: A→mid BC, median 2: B→mid AC)
-    return [
+    return [...declared,
       { type: 'midpoint', id: ma, a: B, b: C },
       { type: 'midpoint', id: mb, a: A, b: C },
       { type: 'line-line-intersection', id: X, a: A, b: ma, c: B, d: mb }, // the centroid
@@ -1391,7 +1420,7 @@ const specialPointMeet: Rule = (s, ctx) => {
   }
   if (fam.key === 'altitude') {
     const fa = `~alt-${A}`, fb = `~alt-${B}`; // hidden altitude feet (from A onto BC, from B onto AC)
-    return [
+    return [...declared,
       { type: 'foot', id: fa, from: A, a: B, b: C },
       { type: 'foot', id: fb, from: B, a: A, b: C },
       { type: 'line-line-intersection', id: X, a: A, b: fa, c: B, d: fb }, // the orthocentre
@@ -1399,7 +1428,7 @@ const specialPointMeet: Rule = (s, ctx) => {
   }
   if (fam.key === 'bisector') {
     const b1 = `bis-${A}${B}${C}`, b2 = `bis-${B}${A}${C}`; // bisector Lines (scaffolding — not visible)
-    return [
+    return [...declared,
       { type: 'bisector', id: b1, vertex: A, p: B, q: C },
       { type: 'bisector', id: b2, vertex: B, p: A, q: C },
       { type: 'line-intersection', id: X, line1: b1, line2: b2 }, // the incentre
@@ -1409,7 +1438,7 @@ const specialPointMeet: Rule = (s, ctx) => {
   // side-midpoints are scaffolding (invisible line + `~`-hidden midpoints); only the circumcentre is drawn.
   const mab = `~pb-${A}${B}`, mbc = `~pb-${B}${C}`;
   const l1 = `perp-${mab}-${A}${B}`, l2 = `perp-${mbc}-${B}${C}`;
-  return [
+  return [...declared,
     { type: 'midpoint', id: mab, a: A, b: B },
     { type: 'perpendicular-line', id: l1, through: mab, a: A, b: B, visible: false },
     { type: 'midpoint', id: mbc, a: B, b: C },
@@ -8361,24 +8390,54 @@ const shapeWithConstruct: Rule = (s, ctx) => {
   if (ids.length < 3) return null;
   const noun = right.trim();
 
+  /**
+   * WHICH variant the student means is theirs to say — but the ASK and the ANSWER are one question,
+   * so this rule owns both halves (#889). A bare «אלכסון» on a quad is one of two and a bare «גובה»
+   * on a triangle one of three: those ASK, quoting candidates the student can type back INTO THE
+   * SENTENCE THEY ARE ALREADY WRITING. A qualified «אלכסון AC» is that answer, so it must build
+   * here — an ask whose own example does not parse is a dead end, and sending a student mid-sentence
+   * away to rebuild on two lines is worse than the ambiguity was.
+   *
+   * The candidates are composed from the student's OWN noun, so an English utterance is answered in
+   * English rather than handed «גובה מ-A».
+   *
+   * `ambiguous-construct`, NOT #519's `ambiguous-shape`. That one asks *which of these existing
+   * shapes*, and its fix-up line re-aims the construct at one of them; this one asks *which variant
+   * of this construct*, over candidates that do not exist yet. Forcing both through one message
+   * produced «אלכסוני גובה מ-⁧A⁩», which is not a sentence — docs/10 §5 guideline 8: a refusal
+   * teaches the reason, and two different reasons read as two different sentences.
+   */
+  const DIAG_BARE = rx(String.raw`^(?:ה?אלכסון|diagonal)$`);
+  const DIAG_NAMED = rx(String.raw`^(?:ה?אלכסון|diagonal)\s+(${LABEL})\s*(${LABEL})$`);
+
   // BOTH diagonals of a quad — unambiguous, and the reported case
   if (/^(?:ה?אלכסונים|diagonals)$/i.test(noun)) {
     if (ids.length !== 4) return null;
     const rr = parse(`אלכסוני ${ids.join('')} נחתכים`, ctx);
     return rr.ok ? [...lr.commands, ...rr.commands] : null;
   }
-  // ONE diagonal of a quad — WHICH one is the student's to say
-  if (/^(?:ה?אלכסון|diagonal)$/i.test(noun) && ids.length === 4) {
-    return { clarify: 'ambiguous-shape', noun: 'diagonal', shapes: [`${ids[0]}${ids[2]}`, `${ids[1]}${ids[3]}`] };
+  // ONE diagonal, NAMED — the answer to the question below, in the sentence it was asked about
+  const named = noun.match(DIAG_NAMED);
+  if (named && ids.length === 4) {
+    const i = ids.indexOf(up(named[1])), j = ids.indexOf(up(named[2]));
+    // adjacent vertices are a SIDE. Drawing one would answer the question with something the student
+    // did not ask for and call it a diagonal — refuse, and let the ask below never have been dodged.
+    if (i < 0 || j < 0 || Math.abs(i - j) !== 2) return null;
+    const rr = parse(noun, ctx);
+    return rr.ok ? [...lr.commands, ...rr.commands] : null;
+  }
+  // ONE diagonal, unnamed — either of two
+  if (DIAG_BARE.test(noun) && ids.length === 4) {
+    return { clarify: 'ambiguous-construct', noun, options: [`${noun} ${ids[0]}${ids[2]}`, `${noun} ${ids[1]}${ids[3]}`] };
   }
   // a triangle's special lines: one PER VERTEX, so a bare noun names none of the three
   const perVertex =
-    /^(?:ה?גובה|altitude)$/i.test(noun) ? 'גובה'
-    : /^(?:ה?תיכון|median)$/i.test(noun) ? 'תיכון'
-    : /^(?:ה?חוצה\s+זווית|angle\s+bisector|bisector)$/i.test(noun) ? 'חוצה זווית'
-    : null;
+    /^(?:ה?גובה|altitude|height)$/i.test(noun) ||
+    /^(?:ה?תיכון|median)$/i.test(noun) ||
+    /^(?:ה?חוצה\s+זווית|angle\s+bisector|bisector)$/i.test(noun);
   if (perVertex && ids.length === 3) {
-    return { clarify: 'ambiguous-shape', noun: perVertex, shapes: ids.map((v) => `${perVertex} מ-${v}`) };
+    const he = /[א-ת]/.test(noun);
+    return { clarify: 'ambiguous-construct', noun, options: ids.map((v) => (he ? `${noun} מ-${v}` : `${noun} from ${v}`)) };
   }
   /**
    * Anything else is NOT this issue. A generic «parse the right half too» was tried and it swallowed
@@ -9789,15 +9848,17 @@ const withReservedGuard = (r: ParseResult, ctx: ParseContext): ParseResult => {
 /**
  * Is this refusal a question the split can no longer improve on?
  *
- * Deliberately just `ambiguous-shape`, and the reason is the distinction rather than the list. The
- * other clarifies come from rules that have NOT considered the compound structure, so splitting the
- * line can still rescue them — «משולש שווה שוקיים שבו זווית B=40» raises `ambiguous-angle` and then
- * parses cleanly once split, which is why the gate intercepts it. `ambiguous-shape` is raised by the
- * splitter itself, after it has already read both halves: there is nothing left to split, and letting
- * the gate replace it with `not-handled` sends a recognised ambiguity to the LLM — whose job is to
- * guess, which is the #516 class this tree keeps closing (#461).
+ * Deliberately just the two SPLITTER-raised clarifies, and the reason is the distinction rather than
+ * the list. The other clarifies come from rules that have NOT considered the compound structure, so
+ * splitting the line can still rescue them — «משולש שווה שוקיים שבו זווית B=40» raises
+ * `ambiguous-angle` and then parses cleanly once split, which is why the gate intercepts it.
+ * `ambiguous-shape` and `ambiguous-construct` are raised by the splitter itself, after it has already
+ * read both halves: there is nothing left to split, and letting the gate replace one with
+ * `not-handled` sends a recognised ambiguity to the LLM — whose job is to guess, which is the #516
+ * class this tree keeps closing (#461, #889).
  */
-const isAmbiguityQuestion = (reason: string): boolean => reason === 'ambiguous-shape';
+const isAmbiguityQuestion = (reason: string): boolean =>
+  reason === 'ambiguous-shape' || reason === 'ambiguous-construct';
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
   let s = normalizeUtterance(raw);
   if (!s) return { ok: false, reason: 'not-handled' };
@@ -10319,6 +10380,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'ambiguous-circle-ref') return { ok: false, reason: 'ambiguous-circle-ref', centers: res.centers };
   if (res.clarify === 'ambiguous-container') return { ok: false, reason: 'ambiguous-container', centers: res.centers };
   if (res.clarify === 'ambiguous-shape') return { ok: false, reason: 'ambiguous-shape', noun: res.noun, shapes: res.shapes };
+  if (res.clarify === 'ambiguous-construct') return { ok: false, reason: 'ambiguous-construct', noun: res.noun, options: res.options };
   if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };
   if (res.clarify === 'alias-taken') return { ok: false, reason: 'alias-taken', name: res.name };
   if (res.clarify === 'role-side-unresolved') return { ok: false, reason: 'role-side-unresolved', role: res.role };

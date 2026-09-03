@@ -53,10 +53,10 @@ describe('#461 — the shape and its construct in one line', () => {
     it('a SINGLE diagonal on a quad — which one?', () => {
       const r = p('ריבוע ABCD עם אלכסון');
       expect(r.ok).toBe(false);
-      if (!r.ok && r.reason === 'ambiguous-shape') {
-        expect(r.shapes).toEqual(['AC', 'BD']);
+      if (!r.ok && r.reason === 'ambiguous-construct') {
+        expect(r.options).toEqual(['אלכסון AC', 'אלכסון BD']);
       } else {
-        expect.fail(`expected ambiguous-shape, got ${!r.ok ? r.reason : 'ok'}`);
+        expect.fail(`expected ambiguous-construct, got ${!r.ok ? r.reason : 'ok'}`);
       }
     });
 
@@ -64,14 +64,23 @@ describe('#461 — the shape and its construct in one line', () => {
       ['משולש ABC עם גובה', 'גובה'],
       ['משולש ABC עם תיכון', 'תיכון'],
       ['משולש ABC עם חוצה זווית', 'חוצה זווית'],
-      ['triangle ABC with an altitude', 'גובה'],
     ])('«%s» — one per vertex, so it names the three', (line, noun) => {
       const r = p(line);
       expect(r.ok).toBe(false);
-      if (!r.ok && r.reason === 'ambiguous-shape') {
-        expect(r.shapes).toEqual([`${noun} מ-A`, `${noun} מ-B`, `${noun} מ-C`]);
+      if (!r.ok && r.reason === 'ambiguous-construct') {
+        expect(r.options).toEqual([`${noun} מ-A`, `${noun} מ-B`, `${noun} מ-C`]);
       } else {
-        expect.fail(`expected ambiguous-shape, got ${!r.ok ? r.reason : 'ok'}`);
+        expect.fail(`expected ambiguous-construct, got ${!r.ok ? r.reason : 'ok'}`);
+      }
+    });
+
+    it('an ENGLISH line is answered in English (#889) — it used to be handed «גובה מ-A»', () => {
+      const r = p('triangle ABC with an altitude');
+      expect(r.ok).toBe(false);
+      if (!r.ok && r.reason === 'ambiguous-construct') {
+        expect(r.options).toEqual(['altitude from A', 'altitude from B', 'altitude from C']);
+      } else {
+        expect.fail(`expected ambiguous-construct, got ${!r.ok ? r.reason : 'ok'}`);
       }
     });
 

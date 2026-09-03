@@ -440,19 +440,23 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "G is the intersection of the diagonals of quadrilateral ABCD": {
     "en": [
+      "quadrilateral",
       "line-line-intersection",
     ],
     "he": [
+      "quadrilateral",
       "line-line-intersection",
     ],
   },
   "H is the intersection of the altitudes of triangle ABC": {
     "en": [
+      "triangle",
       "foot",
       "foot",
       "line-line-intersection",
     ],
     "he": [
+      "triangle",
       "foot",
       "foot",
       "line-line-intersection",
@@ -482,11 +486,13 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "M is the intersection of the medians of triangle ABC": {
     "en": [
+      "triangle",
       "midpoint",
       "midpoint",
       "line-line-intersection",
     ],
     "he": [
+      "triangle",
       "midpoint",
       "midpoint",
       "line-line-intersection",
@@ -522,11 +528,13 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "O is the intersection of the angle bisectors of triangle ABC": {
     "en": [
+      "triangle",
       "bisector",
       "bisector",
       "line-intersection",
     ],
     "he": [
+      "triangle",
       "bisector",
       "bisector",
       "line-intersection",
@@ -534,6 +542,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "P is the intersection of the perpendicular bisectors of triangle ABC": {
     "en": [
+      "triangle",
       "midpoint",
       "perpendicular-line",
       "midpoint",
@@ -541,6 +550,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "line-intersection",
     ],
     "he": [
+      "triangle",
       "midpoint",
       "perpendicular-line",
       "midpoint",
