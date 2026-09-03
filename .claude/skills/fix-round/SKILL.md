@@ -156,13 +156,48 @@ Final body, in order:
 - **Escalated** — issue → why, one line each (the template lives on the issue itself).
 - **Skipped** — anything eligible the round did not resolve (labeling errors, mid-round
   drops), with the reason. Chat-only skips under-report the round.
-- **The play sheet, split by route** ([ADR-W-028](../../../docs/06w-decisions-workspace.md)) — two
-  sections, because they are two different sittings: **batch (landed on `main`)**, played in one
-  pass on the dev server, and **individual (PRs)**, each played under its own play-and-approve gate
-  (docs/22 §4) whether it shipped in this round or not. Per item in both: the exact utterances to
-  type **in Hebrew**, one per line in a code block, what to look for, and the before/after note
-  (prod runs the previous deploy — a free "before"). Omit a section that is empty rather than
-  printing an empty heading.
+- **HEADS-UP — what the operator must know before playing.** FIRST in the play sheet, because
+  it is the part that changes what they do. Plain language, **self-contained**: an item that
+  cannot be understood without opening an ADR, an issue or a doc is not written yet. No ADR ids
+  as the only pointer, no mechanism names, no jargon — say what changed for a *student*, in a
+  sentence or two. Include a line for each of:
+  - **a deliberate behaviour change** — something that used to work one way and now works
+    another, especially anything WITHDRAWN. The operator must never discover one of these by
+    tripping over it mid-play;
+  - **anything approved but NOT delivered**, and what it would take;
+  - **anything needing their ruling**, phrased as the question itself;
+  - **the widest-blast-radius area** — the one thing most worth a minute of their attention
+    (a save-file format, a shared surface, a message every figure can hit);
+  - **nothing else.** If there is genuinely nothing, write "nothing surprising in this batch"
+    rather than padding it.
+
+- **The play sheet — ONE NUMBERED TEST-CASE LIST, split by route**
+  ([ADR-W-028](../../../docs/06w-decisions-workspace.md)). Two sections, because they are two
+  different sittings: **batch (landed on `main`)**, played in one pass, and **individual (PRs)**,
+  each under its own play-and-approve gate (docs/22 §4) whether it shipped in this round or not.
+
+  Cases are numbered **T1, T2, T3 …** continuously across BOTH sections, so the operator can
+  report "T4 is wrong" and nobody has to work out which item that was. One test case is one
+  thing to check — an item that needs three separate checks gets three numbers, not one case
+  with three paragraphs.
+
+  **Every case carries its own server line.** Not once per section, not "the server above" —
+  on the case, every time, because the batch and each PR are different ports and the operator
+  is scrolling on a phone as often as not.
+
+  Per case, in this order:
+  1. `### T<n> · <one-line title in plain language>` — what a student can now do, not the
+     mechanism that lets them;
+  2. **Server:** the exact URL to open, including the path (`/3d.html`, `/complex.html`);
+  3. the exact utterances to type **in Hebrew**, one per line in a code block, plus any
+     button to press, in order;
+  4. **Look for:** what a pass looks like, concretely enough to be checked at a glance;
+  5. **Before:** what prod does today (prod runs the previous deploy — a free "before"), or
+     "unchanged" when the case is a regression guard rather than a new capability.
+
+  A case whose expected result is a REFUSAL is a real test case and gets its own number — the
+  refusals are where this tool's honesty lives, and they are the easiest thing to leave
+  untested. Omit a section that is empty rather than printing an empty heading.
 - **The stats line**, exactly this machine-greppable form, always last:
   `stats: picked=N landed=N prs=N escalated=N skipped=N`
   — the Phase-2 landing-policy decision (#543) aggregates these by listing round issues,
@@ -175,9 +210,17 @@ executing now or crashed mid-flight.
 
 ## Step 6 — readiness gate (standing rule 5)
 
-The final message: dev server already running, the URL (`http://localhost:5173/` — root, not
-`/geo-builder/`), the play sheet inline (the round issue is the durable copy), the escalation
-list, and honest gate results. Tests green is our gate, not the operator's.
+**Every server the play sheet names must ALREADY BE RUNNING when the round reports.** The batch
+on `http://localhost:5173/` (root, not `/geo-builder/`), and **one port per PR** from its own
+worktree — an unmerged PR cannot be played on the `main` server. Start them, curl each one, and
+quote the ports; a play sheet pointing at a dead port is not a finished round.
+
+The final message carries, in this order: the **heads-up** items (same words as the ledger's —
+the operator reads whichever they reach first), the **numbered test-case list** with its server
+lines, the escalation list, and honest gate results. Tests green is our gate, not the operator's.
+
+The chat copy is the same list as the round issue's, not a summary of it: the operator plays from
+whichever is in front of them, and two versions that differ is how a case gets skipped.
 
 It ends with a **"waiting on you" digest** (ADR-W-014 — the operator must never have to ask
 what's blocked on them): open `needs-operator` decisions (one line each, the question itself),
@@ -190,4 +233,6 @@ Pick anything without `auto-ok` · write a fix plan for an unplanned issue · me
 · deploy · take a P1 silently · run over a dirty/behind tree · keep a symptom patch to avoid
 an escalation · exceed the announced composition mid-round (found new work → file an issue) ·
 land over unreconciled external `origin/main` movement · leave outcomes, deviations, or skips
-out of the ledger (chat is not a record) · finish with the `in-round` label still on.
+out of the ledger (chat is not a record) · finish with the `in-round` label still on · report a
+play sheet whose servers are not running, whose cases are not numbered, or whose heads-up items
+send the operator to an ADR to find out what changed.
