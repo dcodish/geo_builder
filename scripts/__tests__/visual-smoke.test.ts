@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 // @ts-expect-error — a plain .mjs tool script; there are no types to import and none are wanted.
 import { judgeCapture, APPS, BYTE_FLOOR, UNIFORM_SHARE, COLOR_FLOOR } from '../visual-smoke.mjs';
@@ -57,8 +59,30 @@ describe('#704 visual smoke — the capture verdict', () => {
 });
 
 describe('#704 visual smoke — the product sequences', () => {
-  it('covers all three shipped products', () => {
-    expect(Object.keys(APPS).sort()).toEqual(['2d', '3d', 'complex']);
+  /**
+   * #888: this asserted the literal `['2d','3d','complex']`, so builder #4 turned a covered product
+   * into a RED suite — the list said "three" while `products.json` said four. A hard-coded roster in
+   * a guard is the drift `registry-consistency.test.ts` exists to kill, so the guard now READS the
+   * one authority: every enabled product must have a smoke sequence, at the URL the registry serves
+   * it from. Builder N+1 needs no edit here beyond its own APPS entry.
+   */
+  it('covers every ENABLED product in products.json, at the dev URL the registry declares', () => {
+    const registry = JSON.parse(
+      readFileSync(join(__dirname, '..', '..', 'products.json'), 'utf8'),
+    ) as { products: { id: string; devUrl: string; enabled: boolean }[] };
+    const known = new Set(registry.products.map((p) => p.id));
+    // Every SHIPPED product must be covered...
+    for (const p of registry.products.filter((x) => x.enabled)) {
+      expect(Object.keys(APPS), `${p.id} is shipped but has no smoke sequence`).toContain(p.id);
+    }
+    // ...and every covered app must be a product the registry declares. The two halves are separate
+    // because a NOT-YET-DEPLOYED tool (enabled: false) is exactly the one that most wants smoking:
+    // it is the only evidence anyone has that it renders at all.
+    for (const id of Object.keys(APPS)) {
+      expect(known, `${id} has a smoke sequence but no registry entry`).toContain(id);
+      const p = registry.products.find((x) => x.id === id)!;
+      expect(APPS[id].urlPath, `${id}: smoke URL must be the dev URL the registry declares`).toBe(p.devUrl);
+    }
   });
 
   it('drives every product with a real, non-empty Hebrew sequence', () => {

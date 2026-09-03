@@ -88,6 +88,7 @@ const he = {
   switcher2d: 'הנדסת המישור',
   switcher3d: 'הנדסת המרחב',
   switcherComplex: 'מספרים מרוכבים',
+  switcherAnalytic: 'גאומטריה אנליטית',
   switcherAria: 'מעבר בין הבונים',
   // B2 (#667): the opt-in data column (D1) — values/knowledge only; refusals stay on the canvas strip.
   dataShow: 'נתונים',
@@ -260,6 +261,7 @@ const en = {
   switcher2d: 'Plane Geometry',
   switcher3d: 'Space Geometry',
   switcherComplex: 'Complex Numbers',
+  switcherAnalytic: 'Analytic Geometry',
   switcherAria: 'Switch between builders',
   // B2 (#667): the opt-in data column (D1) — values/knowledge only; refusals stay on the canvas strip.
   dataShow: 'Data',

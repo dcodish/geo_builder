@@ -26,7 +26,7 @@
  *
  *   Allow-sibling-edit: a fourth product's switcher label must exist in every sibling's resources
  *
- * `--product` (2d | 3d | complex, default complex) is the VIEWPOINT: which tree this change is allowed
+ * `--product` (2d | 3d | complex | analytic, default complex) is the VIEWPOINT: which tree this change is allowed
  * to touch. Everything belonging to another product is a sibling, and the siblings' builds are the ones
  * that run. Before #846 the viewpoint was hard-coded, so only the complex lane could run this at all.
  *
@@ -64,6 +64,10 @@ export const PRODUCTS = {
   complex: {
     prefixes: ['src-complex/', 'complex.html', 'vite.config.complex.ts', 'dist-complex/'],
     build: 'build:complex',
+  },
+  analytic: {
+    prefixes: ['src-analytic/', 'analytic.html', 'vite.config.analytic.ts', 'dist-analytic/'],
+    build: 'build:analytic',
   },
 };
 

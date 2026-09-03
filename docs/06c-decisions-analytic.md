@@ -356,3 +356,103 @@ operator may override before the first build; nothing else depends on it.
 **Still open after this ADR:** the 471 ↔ 572 profile split (V4) · whether an answer is ever revealed
 after a wrong claim (largely moot under [ADR-AG-003](#adr-ag-003) D3′, since values already show
 behind the student's checkbox).
+
+---
+
+## ADR-AG-006 — V0 slice A BUILT: the substrate, the four-curve family, and suite conformance (2026-09-03)
+
+**What landed** (`feat/888-analytic-v0`). The product exists and draws. Typing the exam's own
+sentences — `נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9`, `נתון הישר l1: y=x`, `נתונה הנקודה A(2,6)` —
+puts them on axes, in Hebrew or English, with the data panel carrying what is fixed by the data.
+Families F1 (points, parameters allowed in coordinates), F3 (lines by equation), F5 (circles by
+equation), F6 (canonical conics) and F11 (parameter declaration) of [docs/19 §10](19-analytic-geometry-tool.md).
+
+**Three engineering decisions worth recording, because they shaped everything above them:**
+
+1. **A curve is ONE thing** — an implicit `f(x, y; params) = 0` — and its kind comes from an **exact
+   conic fit**: seven lattice probes read `A…F` off the residual, with no least squares and no
+   symbolic algebra. This is why `(x−3)²+(y−4)²=9`, `x²+y²−6x−8y+16=0` and `x²−6x+y²−8y+16=0` are
+   read as one circle without a pattern per spelling, and it puts the **canonicity gate in one
+   place**: a rotated conic, a translated conic and a hyperbola are each refused *by name* rather
+   than mis-drawn. Pattern-matching per spelling was the obvious alternative and would have grown a
+   rule per exam.
+2. **The expression layer is hand-written**, because the exam multiplies by JUXTAPOSITION (`2a`,
+   `4√5`, `25k²`, `2ax`). It parses and evaluates only — the NO-CAS boundary
+   ([ADR-AG-001](#adr-ag-001) D1) is structural, since there is nothing in the module that could
+   simplify or solve.
+3. **`isKnowledge` is the honesty boundary, and it is exercised on every panel row.** With values
+   shown ([ADR-AG-003](#adr-ag-003) §2) nothing is protected by withholding, so a coordinate prints
+   only when it is the same at every seed: `A(−9a, 0)` prints `—`, `B(3,4)` prints its value.
+
+**Three predicted traps, all of which bit, all now locked:**
+
+- **Hebrew morphology.** «נתון» ends in FINAL nun (ן) and «נתונה/נתונים/נתונות» in medial nun (נ), so
+  `נתונ(ה|ים|ות)?` silently dropped the commonest form — eleven tests failed at once. The
+  `מאונ[ךכ]` class from the 3-D tree ([ADR-W-004](06w-decisions-workspace.md#adr-w-004): carry the
+  class across rather than pay it twice) on a different letter. Predicted in
+  [docs/19 §10a](19-analytic-geometry-tool.md); still shipped, because knowing about a class is not
+  the same as writing the alternation out.
+- **A case-insensitive Roman-numeral class ate real input.** `[IVX]{1,3}` with the `i` flag read the
+  `x` of «the circle x²+y²−2ax−2x=0» as a numeral and swallowed the equation. Numerals are matched
+  case-sensitively with a following-separator lookahead.
+- **Bidi reversed the axis labels.** The RTL page set each SVG label's base direction, so `-6`
+  rendered as `6-` — the axis lying about its own coordinates, the worst class of bug this product
+  can have. **Found by reading the screenshot, not by a test**, which is the whole argument for the
+  visual smoke gate; `direction: ltr` on the surface is the fix.
+
+**Gates.** `npm run test:analytic` 350/350 · `tsc -b` clean · `npm run build:analytic` clean ·
+`check-sibling-safety --product analytic` PASS (with the documented cross-product reason: the
+`switcherAnalytic` key belongs in every sibling's resources) · `visual-smoke --app analytic` 6 shots,
+read back by the session.
+
+**Cross-product effects, as [ADR-AG-004](#adr-ag-004) warned.** `products.json` feeds the admin form
+and the docs/22 §9 table, so a fourth entry moved fixtures in
+`server/__tests__/admin-config.test.ts` (an id used there as an example of an UNREGISTERED tool was
+`'analytic'`) and required the §9 column, the CI lane and classifier, `scripts/visual-smoke.mjs` and
+`scripts/check-sibling-safety.mjs`.
+
+**Not claimed.** V0's corpus gate (קיץ א' 2022 — two internally tangent circles with all common
+tangents) needs tangency, intersections and the one-parameter **pin**, which are the next slices;
+D7 kinds 2 and 3 land with the pin.
+
+---
+
+## ADR-AG-007 — The analytic tool is NOT DEPLOYED, and that is structural (2026-09-03)
+
+**Context.** Operator, on seeing V0 slice A run: *"we now set a rule that analytical tool doesnt get
+deployed. so the deployed version doesnt have this capability and only local testing would show it.
+This is until the tool has decent capability."*
+
+**Why this needed more than "don't run the scp".** Not deploying `dist-analytic/` is easy — nothing
+in [RUNBOOK](RUNBOOK.md) ever mentioned it. The real exposure is the **switcher**: every builder
+renders `products.json` as data, so with the analytic entry `enabled: true` the three *deployed*
+tools would each show a «גאומטריה אנליטית» chip pointing at `/analytic-builder/`, and every student
+who clicked it would get a 404. The ruling therefore has to live in the registry, not in a habit.
+
+**Decision.**
+
+- The analytic entry carries **`enabled: false`**. Every shipped builder's roster is
+  `filter(p => p.enabled)`, so **no deployed page can link to this tool** — and no sibling needed a
+  single line changed to make that true.
+- It also carries **`devOnly: true`**, and the analytic app — *and only the analytic app* — widens
+  its own filter to `enabled || (import.meta.env.DEV && devOnly)`. The suite bar stays whole while
+  developing: locally the analytic app shows all four builders, the 2-D app shows three. Verified by
+  screenshot in both directions rather than asserted.
+- **The visual smoke still covers it.** The `products.json`-derived lock was split into two halves —
+  every *shipped* product must have a smoke sequence, and every smoked app must be a registry entry
+  — precisely because a not-yet-deployed tool is the one that most needs smoking: it is the only
+  evidence anyone has that it renders at all.
+
+**Undeploying is one line.** Flip `enabled` to `true`, drop `devOnly`, and add the
+`dist-analytic/` → `/analytic-builder/` row to the RUNBOOK. Nothing else knows about the
+distinction.
+
+**A class worth naming, because it bit three times in one session.** `'analytic'` was being used
+across the suite as an example of a name that is *not* a product: an unregistered switcher id in
+`server/__tests__/admin-config.test.ts`, an unknown `--product` viewpoint in
+`server/__tests__/sibling-safety.test.ts`, and an absent app in the hard-coded
+`['2d','3d','complex']` of `scripts/__tests__/visual-smoke.test.ts`. **A negative example must be a
+name no roster can ever claim** (`'no-such-product'`, `'statistics'`), never one it merely has not
+claimed yet — otherwise shipping product N+1 turns three passing guards red for reasons that have
+nothing to do with the change. Two were fixed by renaming the example; the third was fixed at the
+root, by making the guard read the registry instead of a literal.

@@ -35,12 +35,12 @@
     "src": { "product": "2d", "label": "2d", "adrLog": "docs/06-decisions.md" },
     "src3d": { "product": "3d", "label": "3d", "adrLog": "docs/06b-decisions-3d.md" },
     "src-complex": { "product": "complex", "label": "complex", "adrLog": "docs/06d-decisions-complex.md" },
+    "src-analytic": { "product": "analytic", "label": "analytic", "adrLog": "docs/06c-decisions-analytic.md" },
     "server": { "product": "server", "label": "server", "adrLog": "docs/06-decisions.md" }
   },
 
   "plannedTrees": {
-    "$comment": "Registered in docs/22 §9, not yet on disk. Moving one into 'trees' + classifying its directories is all that is needed to guard it on arrival.",
-    "src-analytic": { "product": "analytic", "label": "analytic", "adrLog": "docs/06c-decisions-analytic.md" }
+    "$comment": "Registered in docs/22 §9, not yet on disk. Moving one into 'trees' + classifying its directories is all that is needed to guard it on arrival. Empty today: src-analytic graduated when its first files landed (#888)."
   },
 
   "aliases": {
@@ -74,6 +74,11 @@
         "from": "src3d",
         "to": "shell",
         "why": "Flipped from forbidden by B3 (#668) — the deliberate Track B adoption ADR-W-019 reserved: the 3-D app mounts the shared frame (suite bar, builder strip, tool row, About/privacy). Asserted real by the isolation test, so the manifest can never advertise an adoption the code lost."
+      },
+      {
+        "from": "src-analytic",
+        "to": "shell",
+        "why": "Builder #4 is the FIRST born after the shared chassis existed (docs/28 §5 Phase 4, ADR-AG-004): it mounts shell/ rather than re-deriving the chrome, and suite conformance is half its V0 acceptance gate. Asserted real so the manifest can never advertise an adoption the code lost."
       },
       {
         "from": "src",
@@ -151,6 +156,46 @@
         "from": "server",
         "to": "shell",
         "why": "The proxy has no UI; nothing in browser chrome belongs in it. Listed so the boundary around the new tree is total rather than assumed."
+      },
+      {
+        "from": "src-analytic",
+        "to": "src",
+        "why": "Product trees never import each other (ADR-266). Stated for builder #4 on arrival rather than after a bug — the third tree shipped with a VACUOUS guard because it was registered with no edges."
+      },
+      {
+        "from": "src-analytic",
+        "to": "src3d",
+        "why": "Same rule, the second sibling."
+      },
+      {
+        "from": "src-analytic",
+        "to": "src-complex",
+        "why": "Same rule, the third sibling."
+      },
+      {
+        "from": "src",
+        "to": "src-analytic",
+        "why": "Same rule stated in both directions, so a 2-D session cannot reach into the analytic tree either."
+      },
+      {
+        "from": "src3d",
+        "to": "src-analytic",
+        "why": "Same rule, the other direction."
+      },
+      {
+        "from": "src-complex",
+        "to": "src-analytic",
+        "why": "Same rule, the other direction."
+      },
+      {
+        "from": "src-analytic",
+        "to": "server",
+        "why": "Like every sibling: the app posts to the proxy over HTTP (tool:'analytic'), never by import, so the key-handling path cannot reach a browser bundle."
+      },
+      {
+        "from": "shell",
+        "to": "src-analytic",
+        "why": "shell/ is parameterized by the caller and may never import a product tree (ADR-W-016 rule 2) — the frame must serve builder N+1 without knowing any builder."
       }
     ]
   },
@@ -211,7 +256,14 @@
     "src-complex/scene": "engine",
     "src-complex/formulas": "lexicon",
     "src-complex/i18n": "shell",
-    "src-complex/ui": "shell"
+    "src-complex/ui": "shell",
+
+    "src-analytic": "shell",
+    "src-analytic/engine": "engine",
+    "src-analytic/parser": "engine",
+    "src-analytic/render": "engine",
+    "src-analytic/store": "engine",
+    "src-analytic/i18n": "shell"
   },
 
   "classificationNotes": {

@@ -37,6 +37,7 @@ jobs:
       run2d: ${{ steps.classify.outputs.run2d }}
       run3d: ${{ steps.classify.outputs.run3d }}
       runcomplex: ${{ steps.classify.outputs.runcomplex }}
+      runanalytic: ${{ steps.classify.outputs.runanalytic }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -58,27 +59,31 @@ jobs:
             echo "run2d=true" >> "$GITHUB_OUTPUT"
             echo "run3d=true" >> "$GITHUB_OUTPUT"
             echo "runcomplex=true" >> "$GITHUB_OUTPUT"
+            echo "runanalytic=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          app2d=false; app3d=false; appcomplex=false; shared=false
+          app2d=false; app3d=false; appcomplex=false; appanalytic=false; shared=false
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             case "$f" in
               docs/*|reports/*|deploy/*|.claude/*|*.md) ;;                # docs-only: no lane
               src3d/*|3d.html|fixtures3/*|vite.config.3d.ts) app3d=true ;;
               src-complex/*|complex.html|fixtures-complex/*|vite.config.complex.ts) appcomplex=true ;;
+              src-analytic/*|analytic.html|fixtures-analytic/*|vite.config.analytic.ts) appanalytic=true ;;
               src/*|index.html) app2d=true ;;
               *) shared=true ;;   # server/, package*.json, tsconfig*, vite.config.ts, .github/, anything new
             esac
           done < <(git diff --name-only "$BASE" "$GITHUB_SHA")
-          run2d=false; run3d=false; runcomplex=false
+          run2d=false; run3d=false; runcomplex=false; runanalytic=false
           { [ "$shared" = true ] || [ "$app2d" = true ]; } && run2d=true
           { [ "$shared" = true ] || [ "$app3d" = true ]; } && run3d=true
           { [ "$shared" = true ] || [ "$appcomplex" = true ]; } && runcomplex=true
-          echo "classified: app2d=$app2d app3d=$app3d appcomplex=$appcomplex shared=$shared -> run2d=$run2d run3d=$run3d runcomplex=$runcomplex"
+          { [ "$shared" = true ] || [ "$appanalytic" = true ]; } && runanalytic=true
+          echo "classified: app2d=$app2d app3d=$app3d appcomplex=$appcomplex appanalytic=$appanalytic shared=$shared -> run2d=$run2d run3d=$run3d runcomplex=$runcomplex runanalytic=$runanalytic"
           echo "run2d=$run2d" >> "$GITHUB_OUTPUT"
           echo "run3d=$run3d" >> "$GITHUB_OUTPUT"
           echo "runcomplex=$runcomplex" >> "$GITHUB_OUTPUT"
+          echo "runanalytic=$runanalytic" >> "$GITHUB_OUTPUT"
 
   test-2d:
     name: 2-D Geo Builder (src/ + server/)
@@ -195,3 +200,39 @@ jobs:
       # must not be able to regress a shipped product, and the check proves it in seconds.
       - name: Sibling safety (2-D and 3-D still build; no sibling file touched)
         run: node scripts/check-sibling-safety.mjs --product complex --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+
+  test-analytic:
+    name: Analytic Builder (src-analytic/ + shell/ + server/)
+    needs: changes
+    if: needs.changes.outputs.runanalytic == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Same reason as the complex lane (#846): check-sibling-safety needs the PR base commit,
+          # which a depth-1 clone does not fetch.
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (tsc + vite, analytic bundle)
+        run: npm run build:analytic
+
+      - name: Build proxy (shared server bundle)
+        run: npm run build:proxy
+
+      - name: Test (analytic + shell + shared server)
+        run: npx vitest run src-analytic/ shell/ server/
+
+      # The sibling guarantee (ADR-W-017): a change in the newest tree must not be able to regress
+      # a shipped product, and the check proves it in seconds.
+      - name: Sibling safety (the three shipped builders still build; no sibling file touched)
+        run: node scripts/check-sibling-safety.mjs --product analytic --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+

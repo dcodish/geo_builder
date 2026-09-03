@@ -65,6 +65,18 @@ export const APPS = {
     // one ring plus a point far enough out to clip. If label placement breaks, it breaks here first.
     sequence: ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2', 'z^5 = w^2'],
   },
+  analytic: {
+    urlPath: '/analytic.html',
+    inputHint: '(x-3)^2',
+    // Two circles, a line and a point on one pair of axes — the product's whole claim is that it
+    // draws what the exam refuses to draw, so the smoke sequence is exactly that.
+    sequence: [
+      'נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9',
+      'נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1',
+      'נתון הישר l1: y=x',
+      'נתונה הנקודה A(2,6)',
+    ],
+  },
 };
 
 /** Buttons that dismiss a first-load modal. Matched by substring, both locales. */

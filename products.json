@@ -40,6 +40,25 @@
       "tree": "src-complex",
       "buildTarget": "build:complex",
       "enabled": true
+    },
+    {
+      "$comment": [
+        "NOT DEPLOYED (operator ruling, 2026-09-03): the analytic tool stays a LOCAL tool until it",
+        "has decent capability. `enabled: false` is what makes that structural rather than a thing",
+        "to remember -- every shipped builder's roster is `filter(p => p.enabled)`, so no deployed",
+        "page can render a chip pointing at /analytic-builder/ and 404. `devOnly` is the readmission",
+        "ticket: the analytic app itself widens its filter to `enabled || (DEV && devOnly)`, so the",
+        "suite bar is whole while developing. Flip enabled to true and drop devOnly on the deploy."
+      ],
+      "id": "analytic",
+      "labelKey": "switcherAnalytic",
+      "icon": "📈",
+      "url": "/analytic-builder/",
+      "devUrl": "/analytic.html",
+      "tree": "src-analytic",
+      "buildTarget": "build:analytic",
+      "enabled": false,
+      "devOnly": true
     }
   ]
 }

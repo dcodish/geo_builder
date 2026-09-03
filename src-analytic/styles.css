@@ -1,0 +1,14 @@
+/* The analytic builder's base sheet. Layout is the shared `Workbench`'s (docs/28 §4a D1) — this
+   file carries only what a stylesheet must own per app: the reset, the one font stack, and the
+   page ground on the shared slate tokens (shell/theme.ts). */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, 'Segoe UI', sans-serif;
+  background: #f8fafc;
+  color: #0f172a;
+}
+/* #744 — form controls don't inherit the body font by default, and the shell convention is that
+   the CONSUMING APP's stylesheet owns the one font stack. Without this rule the shared
+   FigureName and every unstyled control render in the browser's default input font. */
+input, button, textarea, select { font-family: inherit; }

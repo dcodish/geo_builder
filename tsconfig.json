@@ -22,5 +22,5 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["shell", "src", "src3d", "src-complex"]
+  "include": ["shell", "src", "src3d", "src-complex", "src-analytic"]
 }
