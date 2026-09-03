@@ -5236,6 +5236,44 @@ both non-degeneracy and no throw, a real-parallelogram assertion, the solid fami
 render guard exercised against seeds that ARE collapsed (with a companion test asserting at least one of
 them really is, so the guard test cannot quietly stop proving anything).
 
+**Amendment 1 (2026-09-04, #873, round #897) — tolerance is now the SECOND line of defence, and the
+control this ADR shipped has been inverted.**
+
+This ADR's design position was that a collapsed configuration is *tolerated*: steered away from by the
+preference tier, and rendered safely when it happens. [ADR-3D-212](#adr-3d-212) (#872) took the
+opposite position one layer earlier — the flat-collapse arm of `degenerate()` REJECTS a coplanar solid
+at solve time, so the solver cannot emit one at all.
+
+The two do not contradict in behaviour: *"never produced"* plus *"rendered safely if produced"* is belt
+and braces. What went stale was this record, which still described tolerance as the design position, and
+this ADR's own control test — which asserted that at least one seed really was collapsed, *"otherwise
+this test proves nothing"*. That control was **inverted rather than deleted** by #872: it now asserts
+`collapsed` is `[]`, the stronger property.
+
+**Measured (round #897), both directions:**
+
+| question | result |
+| --- | --- |
+| does the solver still reach a collapsed seed on this ADR's own figure? | **no** — 0 of 10 seeds (0,1,2,3,4,5,6,7,11,13), where #817 recorded six flat to ~1e-16 |
+| can a collapsed base be STATED instead? | **no** — «פירמידה SABCD» + `A(0,0,0)` + `B(0,5,0)` + `C(0,9,0)` (A, B, C collinear) is refused `injection-unsatisfiable` |
+
+**`solidFaceCollapsed` KEEPS its job — it is not dead code, and it is not removed.** It answers a
+different question from `degenerate()`: a collapsed *face corner* (per-corner `|sin|` over every face of
+every solid), where `degenerate()` tests coincident vertices and lost solid volume. A base whose three
+vertices go collinear while the apex holds the solid's volume is visible to the first and invisible to
+both arms of the second. **No reachable instance of that shape was found** in either direction above —
+which is why it stays as defence in depth and why the accept-gate extension #873 item 2 contemplated is
+**not built here**. If a reachable case is ever found, it is a FEATURE and gets its own issue, per this
+issue's own scope note.
+
+**The seed-preference steering is likewise kept.** It no longer fires on this ADR's figure, but "it does
+not fire here" is not "it fires nowhere", and #873's plan said to measure before removing. The
+measurement covers one figure; removal would need the negative across the family.
+
+Locks for this amendment: `src3d/__tests__/issue-817.test.ts` — the #873 block asserts both rows of the
+table above, so the reconciliation is evidence rather than assertion.
+
+
 ## ADR-3D-177 — THE RELATION READS EVERY FRAME: segment × plane-run ⟂/∥, classified not spelled (#819)
 
 **The class.** *A relation whose operands the engine resolves symmetrically is readable in only ONE
