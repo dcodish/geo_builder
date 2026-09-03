@@ -18,7 +18,7 @@ import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -1939,7 +1939,28 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
   // already folds solve-directive DOF removals, so the before/after delta is the exact general
   // signal; a truly-vacuous re-statement removes no DOF (delta 0) and stays a friendly no-op.
   const dofReduced = freeDofCount(after.construction) < freeDofCount(before.construction);
-  if (grew || dofReduced || dataOnly || reveals) return { produced: true };
+  /**
+   * #883 — a statement that fixes the figure's SCALE produced something, even with zero delta.
+   *
+   * The sibling of `dofReduced`, and the case it cannot see. `freeDofCount` counts freedom UP TO
+   * SIMILARITY — correctly: two circles read 2 (centre distance and radius ratio), and a lone circle
+   * reads 0 because its radius IS the gauge. So the FIRST absolute magnitude removes no similarity DOF
+   * and the count is unmoved, though the figure has just gone from "determined up to scale" to
+   * "determined".
+   *
+   * Normally the geometry moves and `grew` catches it. It does not when the stated value happens to
+   * equal the sampled default — and the first unnamed circle's default radius is exactly 5, so
+   * «רדיוס המעגל O הוא 5» moved nothing, registered as empty, and was reported «זה כבר קיים באיור»
+   * with the given DROPPED (operator, playing round #878 T8). A stated magnitude vanished, and the
+   * radius stayed free, so «הציגו תצורה אחרת» could then resize the circle the student had just fixed.
+   *
+   * `scalePinned` is the existing question (ADR-237: "a figure with no absolute given yet is determined
+   * only up to SIMILARITY, so its FIRST size given is a statement about SCALE"), so this is a reuse
+   * rather than a new rule — and it covers every first magnitude (a radius, a length, an area), not the
+   * one value that happened to be reported.
+   */
+  const scaleFixed = !scalePinned(before.construction) && scalePinned(after.construction);
+  if (grew || dofReduced || scaleFixed || dataOnly || reveals) return { produced: true };
   // No geometric change — but a `set-equal` NAMING an enabled shape-variant's (kite/isosceles) equal-pair
   // that no explicit equality already asserts is the student CHOOSING which sides are equal: it PINS a
   // previously-SOFT default (ADR-138 / design-rules M4), flipping the relation from "not forced" to
