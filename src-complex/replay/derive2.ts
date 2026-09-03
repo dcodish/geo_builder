@@ -224,6 +224,8 @@ export interface Derived2 {
   readonly drivenDof: number;
   /** a relation the numeric tier could not satisfy — reported, never rounded away (stage 3e) */
   readonly unsatisfied: readonly string[];
+  /** #887 — why each refusal happened, keyed by the line. Absent entry = the generic tail. */
+  readonly refusalReasons: ReadonlyMap<string, RefusalReason>;
   /**
    * A stated relation the engine could not EVALUATE — undecided, which is not the same as violated.
    *
@@ -309,6 +311,17 @@ export interface FoldInput {
  * `candidates` empty means there was no enumeration in scope — the sentence points at nothing, and
  * that refuses like any other unsatisfiable given rather than inventing a set to satisfy it.
  */
+/**
+ * #887 — the REASON behind a refusal, so the strip can say why rather than only that.
+ *
+ * `reason` is an i18n key suffix, never prose: the engine decides WHICH sentence, the UI owns the words
+ * (the one place a computed value reaches a string is stage 5d, and this keeps that true).
+ */
+export interface RefusalReason {
+  readonly reason: string;
+  readonly params?: Record<string, string>;
+}
+
 export interface ResolvedSelection extends SolutionSelection {
   readonly candidates: readonly string[];
 }
@@ -679,6 +692,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * sentence points at nothing, and inventing a set to satisfy it is the silent-invention class.
    */
   const selectionAliases = new Map<string, string>();
+  /** #887 — why a refusal happened, keyed by the student's line. The UI renders the specific message
+   *  when there is one and the generic tail when there is not. */
+  const refusalReasons = new Map<string, RefusalReason>();
   const unresolvedSelections: string[] = [];
   for (const sel of selections) {
     const matched = sel.candidates.filter((c) => {
@@ -686,8 +702,23 @@ export function foldConstraints(input: FoldInput): Derived2 {
       if (!Number.isFinite(a.deg)) return false;
       return !violatesDeg(sel.filter, ((a.deg % 360) + 360) % 360);
     });
-    if (matched.length === 1) selectionAliases.set(matched[0], sel.name);
-    else unresolvedSelections.push(sel.src);
+    if (matched.length === 1) {
+      selectionAliases.set(matched[0], sel.name);
+      continue;
+    }
+    // #887 (docs/10 guideline 8) — the refusal still goes through `unsatisfied`, because that is what
+    // the acceptance gate reads and the line must not commit. What is added is the REASON: zero, many
+    // and no-set-in-scope are three different things and the student is owed the one that applies.
+    unresolvedSelections.push(sel.src);
+    const q = sel.filter.kind === 'quadrant' ? String(sel.filter.q) : '';
+    refusalReasons.set(
+      sel.src,
+      sel.candidates.length === 0
+        ? { reason: 'selectionNoSet' }
+        : matched.length === 0
+          ? { reason: 'selectionNone', params: { quadrant: q } }
+          : { reason: 'selectionMany', params: { quadrant: q, names: matched.map(prettyName).join(', ') } },
+    );
   }
 
   const points: DerivedPoint[] = [];
@@ -1064,6 +1095,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     measures: checkedMeasures,
     drivenDof: drivenCount,
     unsatisfied,
+    refusalReasons,
     undecided,
     knowledge: [...knowledge, ...ratioRows, ...exprRows],
     canCycle: enumeratedConfigCount > 1 || closure.remainingDof > 0,

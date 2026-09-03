@@ -172,6 +172,12 @@ const he = {
   freedomCount: 'דרגות חופש: {{n}}',
   freedomPinned: 'הצורה נקבעה במלואה',
   stripUnsatisfied: 'לא מתקיים בתצורה הזו',
+  // #887 (docs/10 guideline 8) — zero, many and no-set are three different things and read as three
+  // different sentences. A "many" result is usually the exam asking for «שתי האפשרויות»: information,
+  // not a malfunction.
+  selectionMany: 'יש יותר מפתרון אחד ברביע ה{{quadrant}} ({{names}}) — ציינו באיזה מהם מדובר, או שהתשובה היא «שתי האפשרויות»',
+  selectionNone: 'אף אחד מהפתרונות אינו נמצא ברביע ה{{quadrant}}',
+  selectionNoSet: 'אין קבוצת פתרונות בשרטוט — «הפתרון» מפנה למשוואה שטרם נכתבה',
   stripUndecided: 'לא ניתן להכריע מהנתונים שניתנו',
   paletteShow: 'סמלים',
   // #789 — the data-panel ask lane (the ADR-3D-057 shape): a question is never a fact
@@ -336,6 +342,9 @@ const en = {
   freedomCount: 'degrees of freedom: {{n}}',
   freedomPinned: 'the figure is fully determined',
   stripUnsatisfied: 'does not hold in this configuration',
+  selectionMany: 'more than one solution lies in quadrant {{quadrant}} ({{names}}) — say which one, or the answer is «both possibilities»',
+  selectionNone: 'none of the solutions lies in quadrant {{quadrant}}',
+  selectionNoSet: 'there is no solution set in the figure — «the solution» refers to an equation that has not been written yet',
   stripUndecided: 'cannot be decided from the givens',
   paletteShow: 'Symbols',
   // #789 — the data-panel ask lane (the ADR-3D-057 shape): a question is never a fact

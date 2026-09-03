@@ -18,13 +18,16 @@
 import { describe, expect, it } from 'vitest';
 import { deriveLines } from '../app/deriveLines';
 import { v2Labels } from '../replay/scene2';
+import { complexI18n } from '../i18n';
+import { stripFormatControls } from '../../shell/bidi';
 
 const fold = (lines: string[]) => deriveLines(lines, 0, 0);
 /** The `why` codes of anything the grammar could not read. */
 const untranslated = (lines: string[]) => fold(lines).untranslated.map((u) => u.why.code);
 
+const SIX = 'z^6 = 1'; // roots at 0°, 60°, 120°, 180°, 240°, 300°
+
 describe('#694 — the exam’s selection sentence', () => {
-  const SIX = 'z^6 = 1'; // roots at 0°, 60°, 120°, 180°, 240°, 300°
 
   it('binds the new name to the fourth-quadrant root; the other five stay drawn and unnamed', () => {
     const labels = v2Labels(fold([SIX, 'z0 הוא הפתרון ברביע הרביעי']));
@@ -95,5 +98,64 @@ describe('#694 — the exam’s selection sentence', () => {
     it('a plain quadrant given on a FREE number is unaffected', () => {
       expect(untranslated(['z1 ברביע הראשון'])).toEqual([]);
     });
+  });
+});
+
+/**
+ * #887 — the three refusals say WHY, and say three different things.
+ *
+ * Operator, playing T15: *"error message now is המשפט לא נוסף — הוא לא יכול להתקיים … and should be
+ * more specific. tell user why it is refused and not some generic message."* — and the rule went into
+ * [docs/10-pedagogy.md §5 guideline 8](../../docs/10-pedagogy.md): a refusal teaches the REASON, never
+ * just the verdict, and zero / many / not-supported are three different sentences.
+ *
+ * ADR-CX-037 already said a ≥2 result should read "as information, not as a malfunction". It did not:
+ * all three cases were pushed onto the shared `unsatisfied` channel and rendered with one generic tail.
+ * They still go through `unsatisfied` — that is what the acceptance gate reads, and the line must not
+ * commit — but each now carries its own reason.
+ */
+describe('#887 — each refusal says why', () => {
+  const reasonFor = (lines: string[], src: string) => fold(lines).refusalReasons.get(src);
+
+  it('MANY: names the quadrant AND the candidates, so the student can pick or answer «both»', () => {
+    const src = 'z0 הוא הפתרון ברביע הראשון';
+    const why = reasonFor(['z^12 = 1', src], src);
+    expect(why?.reason).toBe('selectionMany');
+    expect(why?.params?.quadrant).toBe('1');
+    // 30° and 60° are the two first-quadrant roots of z^12 = 1
+    expect(why?.params?.names).toContain('z');
+    expect(why!.params!.names!.split(',').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('NONE: names the quadrant that is empty', () => {
+    const src = 'z0 הוא הפתרון ברביע השני';
+    const why = reasonFor(['z^2 = 1', src], src);
+    expect(why?.reason).toBe('selectionNone');
+    expect(why?.params?.quadrant).toBe('2');
+  });
+
+  it('NO SET: says the equation is missing, not that the statement is false', () => {
+    const src = 'z0 הוא הפתרון ברביע הרביעי';
+    expect(reasonFor(['z1 = 3+4i', src], src)?.reason).toBe('selectionNoSet');
+  });
+
+  it('the three are DIFFERENT sentences — a shared string is exactly the defect', () => {
+    const many = reasonFor(['z^12 = 1', 'z0 הוא הפתרון ברביע הראשון'], 'z0 הוא הפתרון ברביע הראשון')!;
+    const none = reasonFor(['z^2 = 1', 'z0 הוא הפתרון ברביע השני'], 'z0 הוא הפתרון ברביע השני')!;
+    const noSet = reasonFor(['z1 = 3+4i', 'z0 הוא הפתרון ברביע הרביעי'], 'z0 הוא הפתרון ברביע הרביעי')!;
+    expect(new Set([many.reason, none.reason, noSet.reason]).size).toBe(3);
+  });
+
+  it('every reason key resolves to real Hebrew — never the key echoed back', () => {
+    const tHe = complexI18n.getFixedT('he');
+    for (const key of ['selectionMany', 'selectionNone', 'selectionNoSet']) {
+      const out = stripFormatControls(tHe(key, { quadrant: '1', names: 'z₂, z₃' }) as string);
+      expect(out, key).not.toBe(key);
+      expect(out, key).toMatch(/[֐-׿]/);
+    }
+  });
+
+  it('a SUCCESSFUL selection records no refusal reason', () => {
+    expect(fold([SIX, 'z0 הוא הפתרון ברביע הרביעי']).refusalReasons.size).toBe(0);
   });
 });

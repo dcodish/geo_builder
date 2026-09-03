@@ -446,11 +446,16 @@ export function App() {
                 {v2Contradiction(derived2, t)}
                 {/* a relation the numeric tier could not satisfy has no row of its own — tier 1 pushed
                     it down — so without this it would simply be absent from a figure that ignores it */}
-                {derived2.unsatisfied.map((u) => (
-                  <div key={u} className="v2-skip">
-                    ✗ «{u}» — {t('stripUnsatisfied')}
-                  </div>
-                ))}
+                {/* #887 (docs/10 guideline 8): a refusal says WHY when the engine knows why. The generic
+                    tail stays for the refusals that have no more specific reason to give. */}
+                {derived2.unsatisfied.map((u) => {
+                  const why = derived2.refusalReasons.get(u);
+                  return (
+                    <div key={u} className="v2-skip">
+                      ✗ «{u}» — {why ? t(why.reason, why.params) : t('stripUnsatisfied')}
+                    </div>
+                  );
+                })}
                 {/* a relation the engine could not EVALUATE — undecided, and said so rather than dropped */}
                 {derived2.undecided.map((u) => (
                   <div key={`und-${u}`} className="v2-skip">
