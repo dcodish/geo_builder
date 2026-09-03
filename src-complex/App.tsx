@@ -215,7 +215,7 @@ export function App() {
   const [manualOpen, setManualOpen] = useState(false); // the D9 manual SCREEN (A6) — catalog-backed
   // #722 — the enrichment layers, OFF by default (the de-clutter ruling): each S5 visualization
   // is a student's choice, made per layer with the chips under the canvas.
-  const [layers, setLayers] = useState({ rings: false, angles: false, rotations: false, cycles: false, series: false });
+  const [layers, setLayers] = useState({ radii: false, rings: false, angles: false, rotations: false, cycles: false, series: false });
   const [showData, setShowData] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1000px)').matches,
   );
@@ -551,6 +551,7 @@ export function App() {
                   the default canvas is points + stated elements; each S5 layer is a choice).
                   A chip renders only when the figure HAS that layer to show. */}
               {([
+                ['radii', 'layerRadii', (polarScene?.radii.length ?? 0) > 0],
                 ['rings', 'layerRings', (polarScene?.rings.length ?? 0) > 0],
                 ['angles', 'layerAngles', (polarScene?.arcs.length ?? 0) > 0],
                 ['rotations', 'layerRotations', (polarScene?.rotations.length ?? 0) > 0],

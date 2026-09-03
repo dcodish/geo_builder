@@ -131,6 +131,7 @@ const he = {
   showCycle: 'מחזור חזקות',
   showRegion: 'פנים/חוץ',
   // #722 — the enrichment-layer chips (opt-in, under the canvas)
+  layerRadii: 'קטעי |z|',
   layerRings: 'טבעות |z|',
   layerAngles: 'קשתות זווית',
   layerRotations: 'סיבוב וכפל',
@@ -302,6 +303,7 @@ const en = {
   showCycle: 'power cycle',
   showRegion: 'inside/outside',
   // #722 — the enrichment-layer chips (opt-in, under the canvas)
+  layerRadii: '|z| segments',
   layerRings: '|z| rings',
   layerAngles: 'angle arcs',
   layerRotations: 'rotation & product',

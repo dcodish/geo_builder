@@ -54,6 +54,10 @@ const polar = (r: number, deg: number): [number, number] => {
  *  their radius arrows, stated regions and the grid; each S5 visualization layer renders only
  *  when its toggle is on. */
 export interface CanvasLayers {
+  /** #886 — the origin-to-point radius arrows. Opt-in since 2026-09-03: they were the last enrichment
+   *  left in the default canvas, and the operator withdrew them ("it should only draw the points").
+   *  A student who wants ONE of them writes «Oz2», which draws that segment and always did. */
+  radii?: boolean;
   rings?: boolean; // «where else this magnitude could sit» circles
   angles?: boolean; // the stated/derived angle arcs near the origin
   rotations?: boolean; // multiplication-as-rotation sweeps
@@ -249,8 +253,10 @@ export function PolarPlane({
         );
       })}
 
-      {/* radius vectors: the magnitude, drawn as a length */}
-      {scene.radii.map((r) => (
+      {/* radius vectors: the magnitude, drawn as a length. #886 — OPT-IN: withdrawn from the default
+          canvas, because the per-point form «Oz2» was always available and is the one a student
+          reasons with. The scene still BUILDS them (like every other layer); only the ink is gated. */}
+      {layers.radii && scene.radii.map((r) => (
         <line
           key={`rad${r.name}`}
           x1={X(0)}

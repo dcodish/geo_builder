@@ -163,6 +163,10 @@ export interface SceneDisplay {
 /** One definition of how a name is written, shared with every other surface (`model/naming`). */
 export { prettyName };
 
+/** #885 — the view for a figure with nothing in it: no points, no objects. Arbitrary by definition,
+ *  so it is named rather than left as a magic 3 inside the extent expression. */
+const EMPTY_FIGURE_EXTENT = 3;
+
 const niceStep = (raw: number): number => {
   const mag = 10 ** Math.floor(Math.log10(raw));
   const n = raw / mag;
@@ -199,7 +203,27 @@ export function buildScene(figure: SceneInput, display: SceneDisplay = {}): Scen
       ? [Math.hypot(o.center.re, o.center.im) + o.radius]
       : o.vertices.map((v) => Math.hypot(v.re, v.im)),
   );
-  const extent = Math.max(3, ...magnitudes, ...reach) * 1.25;
+  /**
+   * #885 — FIT TO THE CONTENT, and fall back to a default only when there is no content.
+   *
+   * This was `Math.max(3, …)`, a hard floor. It fires even when nothing is missing, and then it is pure
+   * dead space: «z^6 = 1» — the tool's most canonical figure, and the one every roots question opens
+   * with — has every root at modulus 1, so a view spanning 7.5 was drawn for content spanning 2 and the
+   * figure filled about a QUARTER of the canvas (operator, 2026-09-03: "the zoom is wrong too. it can be
+   * bigger on screen").
+   *
+   * The floor was guarding against UNDER-reaching — content that is not a plotted point, like
+   * «המעגל שמרכזו O ורדיוסו 8». But `reach` above already brings that in (a circle contributes
+   * centre + radius, every other object its vertices), so the floor was covering a hole that is closed.
+   * What remains is the genuinely EMPTY figure, where there is nothing to fit to and any frame is
+   * arbitrary — that, and only that, keeps a default.
+   *
+   * Deliberately not fed by `arcs`, `rings` or `spirals`: those are sized FROM `extent`
+   * (`radius: (extent / 4) * …`), so letting them contribute would be a feedback loop that grows the
+   * view every render.
+   */
+  const content = [...magnitudes, ...reach].filter((r) => Number.isFinite(r) && r > 1e-9);
+  const extent = (content.length ? Math.max(...content) : EMPTY_FIGURE_EXTENT) * 1.25;
 
   const step = niceStep(extent / 4);
   const rings: number[] = [];
