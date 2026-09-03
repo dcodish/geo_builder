@@ -156,48 +156,18 @@ Final body, in order:
 - **Escalated** — issue → why, one line each (the template lives on the issue itself).
 - **Skipped** — anything eligible the round did not resolve (labeling errors, mid-round
   drops), with the reason. Chat-only skips under-report the round.
-- **HEADS-UP — what the operator must know before playing.** FIRST in the play sheet, because
-  it is the part that changes what they do. Plain language, **self-contained**: an item that
-  cannot be understood without opening an ADR, an issue or a doc is not written yet. No ADR ids
-  as the only pointer, no mechanism names, no jargon — say what changed for a *student*, in a
-  sentence or two. Include a line for each of:
-  - **a deliberate behaviour change** — something that used to work one way and now works
-    another, especially anything WITHDRAWN. The operator must never discover one of these by
-    tripping over it mid-play;
-  - **anything approved but NOT delivered**, and what it would take;
-  - **anything needing their ruling**, phrased as the question itself;
-  - **the widest-blast-radius area** — the one thing most worth a minute of their attention
-    (a save-file format, a shared surface, a message every figure can hit);
-  - **nothing else.** If there is genuinely nothing, write "nothing surprising in this batch"
-    rather than padding it.
+- **The `## Heads-up` block, then the NUMBERED TEST-CASE LIST — exactly as standing rule 5
+  specifies it** (CLAUDE.md, which has operator authority and loads every session). That rule
+  carries the list itself: the heads-up contents, `T1…Tn` numbered continuously, and the five
+  things every case carries — title, **Server** URL with its path, the Hebrew lines, **Look
+  for**, **Before**. Do not re-derive it here and do not summarise it; read it and follow it.
 
-- **The play sheet — ONE NUMBERED TEST-CASE LIST, split by route**
-  ([ADR-W-028](../../../docs/06w-decisions-workspace.md)). Two sections, because they are two
-  different sittings: **batch (landed on `main`)**, played in one pass, and **individual (PRs)**,
-  each under its own play-and-approve gate (docs/22 §4) whether it shipped in this round or not.
-
-  Cases are numbered **T1, T2, T3 …** continuously across BOTH sections, so the operator can
-  report "T4 is wrong" and nobody has to work out which item that was. One test case is one
-  thing to check — an item that needs three separate checks gets three numbers, not one case
-  with three paragraphs.
-
-  **Every case carries its own server line.** Not once per section, not "the server above" —
-  on the case, every time, because the batch and each PR are different ports and the operator
-  is scrolling on a phone as often as not.
-
-  Per case, in this order:
-  1. `### T<n> · <one-line title in plain language>` — what a student can now do, not the
-     mechanism that lets them;
-  2. **Server:** the exact URL to open, including the path (`/3d.html`, `/complex.html`);
-  3. the exact utterances to type **in Hebrew**, one per line in a code block, plus any
-     button to press, in order;
-  4. **Look for:** what a pass looks like, concretely enough to be checked at a glance;
-  5. **Before:** what prod does today (prod runs the previous deploy — a free "before"), or
-     "unchanged" when the case is a regression guard rather than a new capability.
-
-  A case whose expected result is a REFUSAL is a real test case and gets its own number — the
-  refusals are where this tool's honesty lives, and they are the easiest thing to leave
-  untested. Omit a section that is empty rather than printing an empty heading.
+  A round adds only this: the cases are **grouped by route** — **batch (landed on `main`)**,
+  played in one sitting, then **one section per PR**, each under its own play-and-approve gate
+  (docs/22 §4) whether it shipped in this round or not — because they are different sittings on
+  different ports. The numbering still runs **continuously across every section**, and an empty
+  section is omitted rather than printed as an empty heading.
+  ([ADR-W-028](../../../docs/06w-decisions-workspace.md))
 - **The stats line**, exactly this machine-greppable form, always last:
   `stats: picked=N landed=N prs=N escalated=N skipped=N`
   — the Phase-2 landing-policy decision (#543) aggregates these by listing round issues,
@@ -210,17 +180,16 @@ executing now or crashed mid-flight.
 
 ## Step 6 — readiness gate (standing rule 5)
 
-**Every server the play sheet names must ALREADY BE RUNNING when the round reports.** The batch
-on `http://localhost:5173/` (root, not `/geo-builder/`), and **one port per PR** from its own
-worktree — an unmerged PR cannot be played on the `main` server. Start them, curl each one, and
-quote the ports; a play sheet pointing at a dead port is not a finished round.
+Standing rule 5 (CLAUDE.md) governs — it is the same gate every "ready" report passes, and a round
+is not exempt. Start every server it names, `curl` each one, and quote the ports: the batch on
+`http://localhost:5173/` (root, not `/geo-builder/`) plus **one port per PR** from its own worktree,
+since an unmerged PR cannot be played on the `main` server.
 
-The final message carries, in this order: the **heads-up** items (same words as the ledger's —
-the operator reads whichever they reach first), the **numbered test-case list** with its server
-lines, the escalation list, and honest gate results. Tests green is our gate, not the operator's.
+The final message carries, in this order: the **`## Heads-up`** items, the **numbered test-case
+list**, the escalation list, and honest gate results.
 
-The chat copy is the same list as the round issue's, not a summary of it: the operator plays from
-whichever is in front of them, and two versions that differ is how a case gets skipped.
+**The chat copy is the SAME list as the round issue's, not a summary of it** — the operator plays
+from whichever is in front of them, and two versions that differ is how a case gets skipped.
 
 It ends with a **"waiting on you" digest** (ADR-W-014 — the operator must never have to ask
 what's blocked on them): open `needs-operator` decisions (one line each, the question itself),

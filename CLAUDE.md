@@ -94,12 +94,27 @@ addition to, never a replacement for, the per-fix unit test.
 
 **5 — Readiness gate: a fix is not done until the operator can PLAY it.** Do not report anything "ready" until
 its acceptance gate passes — tests green, `tsc`/build clean, results reported honestly (no skipped or `.only`
-specs hiding gaps). Whenever you report a fix complete, **a dev server must already be running** and the message
-must carry **the URL** (`npm run dev` → `http://localhost:5173/` — dev serves at the ROOT, not `/geo-builder/`)
-**plus the concrete test cases**: the exact utterances to type — **in Hebrew**, one per line in a code block
-for copy-paste (the operator tests in Hebrew; the suite covers the English mirrors) — what to look for, and any
-worthwhile before/after (prod runs the previous deploy, so it is a free "before"). Tests green is *our* gate,
-not theirs.
+specs hiding gaps). Tests green is *our* gate, not theirs.
+
+**Every "ready" report carries a NUMBERED TEST-CASE LIST — this list, followed literally.** Not a
+summary, not prose. The operator works down it without opening any other document.
+
+1. **`## Heads-up` first** — plain language, self-contained (no ADR/issue id as the only pointer; say
+   what changed for a **student**). One line each, nothing else: a **behaviour change**, above all
+   anything WITHDRAWN · **approved but not delivered**, and what it needs · anything **needing a
+   ruling**, as the question · the **riskiest area** + the test number covering it. Nothing to say?
+   "Nothing surprising here" — never pad.
+2. **Cases `T1…Tn`, numbered continuously** across every product, route and PR, so "T7 is wrong"
+   identifies itself. **One case = one check** — three checks are three numbers.
+3. **Every case, in this order:** `### T<n> · <plain title>` (what a *student* can do, not the
+   mechanism) · **Server:** the URL **with its path** (`/` — the ROOT, not `/geo-builder/`;
+   `/3d.html`; `/complex.html`) on *every* case, never "the server above" · the utterances **in
+   Hebrew**, one per line in a code block · **Look for:** a pass, checkable at a glance · **Before:**
+   what prod does today (a free "before"), or "unchanged" for a regression guard.
+4. **A REFUSAL case gets its own number** — the easiest thing to leave untested.
+5. **Every server named is RUNNING and `curl`-checked**; one port per unmerged PR, from its own
+   worktree. A list pointing at a dead port is not a finished report.
+
 Enforced by the `Stop` hook [`scripts/ensure-test-server.mjs`](scripts/ensure-test-server.mjs), which fails
 OPEN — a broken hook must never wedge a session.
 
@@ -164,10 +179,10 @@ by `tool:`, never forked). Boundaries are declared in `BOUNDARIES.json` and enfo
 
 ## Cross-machine setup
 
-David works from two PCs. **This project is NOT in Dropbox** (moved 2026-07-23 — Dropbox kept corrupting
-`node_modules`, `.git`, and source files): it lives at `C:\projects\geo_builder` and **everything syncs through
-git.** New machine: `gh repo clone dcodish/geo_builder C:\projects\geo_builder`, `npm install`, copy `.env.local`.
-Claude's auto-memory (`.claude/memory/`) is git-**tracked** so it travels too — the deliberate exception to the
+David works from two PCs. **This project is NOT in Dropbox** (it corrupted `node_modules`, `.git` and
+source): it lives at `C:\projects\geo_builder` and **everything syncs through git.** New machine:
+`gh repo clone dcodish/geo_builder C:\projects\geo_builder`, `npm install`, copy `.env.local`. Claude's
+auto-memory (`.claude/memory/`) is git-**tracked** so it travels too — the deliberate exception to the
 workspace "keep projects in Dropbox for memory" convention.
 
 The switch is mechanical (`scripts/session-sync.mjs` + hooks): a `SessionStart` hook pulls `--ff-only` and
