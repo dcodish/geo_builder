@@ -105,15 +105,35 @@ export type ValueQuery =
   | { kind: 'perimeter'; ids: Id[] };
 
 /** Why a query could not be answered. Never a sampled number dressed as a fact (ADR-052). */
-export type QueryNote =
+/**
+ * Every reason a query row can carry INSTEAD of a value.
+ *
+ * A runtime list, with the type derived from it, because each member needs a locale entry in BOTH
+ * `he.json` and `en.json` and nothing else can check that: TypeScript erases a bare union, so
+ * `values-panel-notes.test.ts` has to be able to iterate the members. #882 is what this shape prevents —
+ * #741 introduced a fifth note (`pending`) as an inline literal, the compiler had no union to reject it
+ * against, and the student saw the raw key `values.q.pending` on the panel.
+ */
+export const QUERY_NOTES = [
   /** the text isn't a quantity this lane understands */
-  | 'not-understood'
+  'not-understood',
   /** it parses, but those points aren't in the figure */
-  | 'unavailable'
+  'unavailable',
   /** the givens don't pin it — it differs across sampled configurations */
-  | 'undetermined'
+  'undetermined',
   /** it carries units and the figure's scale is free, with no declared unit to express it in */
-  | 'scale';
+  'scale',
+  /**
+   * #882 — the question is SAVED but its answer is stale: the values layer is invalidated by every new
+   * fact (ADR-W-038), and nothing recomputes until the student asks again or presses «חשב ערכים».
+   *
+   * Deliberately not worded as "computing…", which would be a lie — no work is in flight. The row says
+   * what is true (the answer is waiting) and what to do about it, which is guideline 8 in docs/10.
+   */
+  'pending',
+] as const;
+
+export type QueryNote = (typeof QUERY_NOTES)[number];
 
 /** One answered (or honestly refused) query. */
 export interface QueryRow {

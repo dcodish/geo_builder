@@ -15,6 +15,7 @@ import { useStore } from 'zustand';
 // The shared frame (B3-2d #668): the deliberate src -> shell adoption — the LAST product joins the
 // suite chrome (ADR-W-019; BOUNDARIES.json src -> shell edge flipped with this import).
 import { AppFrame } from '../shell/frame/AppFrame';
+import type { QueryNote } from '@/engine/valuesPanel';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
@@ -1556,7 +1557,9 @@ export default function App() {
               >
                 {/* An answered row when the values layer is current; the question alone, marked as
                     waiting, while it is not — never a silently dropped question. */}
-                {(valuesLayer?.queryRows ?? queries.map((text) => ({ text, label: undefined, value: null, exact: undefined, kind: undefined, unit: undefined, note: 'pending' as const }))).map((qr) => (
+                {/* #882: the fallback row's note is a real `QueryNote`, so a value with no message
+                    cannot ship again — `values-panel-notes.test.ts` walks that union against both locales. */}
+                {(valuesLayer?.queryRows ?? queries.map((text) => ({ text, label: undefined, value: null, exact: undefined, kind: undefined, unit: undefined, note: 'pending' satisfies QueryNote }))).map((qr) => (
                   <div key={qr.text} style={{ display: 'flex', gap: 6, alignItems: 'baseline', padding: '1px 2px' }}>
                     <button
                       type="button"
