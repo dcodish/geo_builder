@@ -12,7 +12,7 @@ import { riderPairsT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
 import { isAnyDiagonal, isSpaceDiagonal, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
-import { pinSymsOf } from './types';
+import { pinSymsOf, symsOfAffine } from './types';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PartialName, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
@@ -441,7 +441,8 @@ const partialNameOf = (c: Construction3, sym: string): PartialName | undefined =
  */
 function adoptParamAsPinSym(c: Construction3, exprs: (SymComp | null)[]): Construction3 | null {
   const sym = c.param;
-  if (!sym || !exprs.some((e) => e !== null && e.sym === sym)) return c; // nothing to re-home
+  // #509: a component names N symbols now — the letter re-homes if it appears in ANY of the terms.
+  if (!sym || !exprs.some((e) => e !== null && symsOfAffine(e).includes(sym))) return c; // nothing to re-home
   return releaseParamToPivot(c);
 }
 
@@ -1442,10 +1443,18 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           // supply) it cannot be routed — a letter the pivot already owns is refused rather than reborn
           // in a second mechanism. The mirror of #794's injection guard.
           if (pinSymsOf(c).includes(sym)) return { ok: false, error: { code: 'two-params' } };
-          // #325: a coefficient/const on the symbol (`M(2k,1,3)`) flows into the LinExpr
+          // #325: a coefficient/const on the symbol (`M(2k,1,3)`) flows into the LinExpr.
+          // #509: the component is now an affine form over N symbols, but this branch is guarded on
+          // `letters.length === 1`, so every term here names the SAME letter and `LinExpr {k, p}`
+          // carries it exactly — the coefficients simply add («M(k+k,1,3)» is 2k). A component naming
+          // two letters never reaches this branch; it falls through to `symbolic-new-point` below,
+          // because the algebraic lane is single-parameter by construction and routing it is #301's.
           const exprs = cmd.symExprs ?? [null, null, null];
           const comp = (v: number | null, s: string | null, e: SymComp | null): { k: number; p: number } =>
-            v !== null ? { k: v, p: 0 } : e ? { k: e.c, p: e.k } : s ? { k: 0, p: 1 } : { k: 0, p: 0 };
+            v !== null ? { k: v, p: 0 }
+            : e ? { k: e.c, p: e.terms.reduce((acc, t) => acc + t.k, 0) }
+            : s ? { k: 0, p: 1 }
+            : { k: 0, p: 0 };
           const next = clone(c);
           next.points.set(cmd.id, {
             kind: 'coord-sym',

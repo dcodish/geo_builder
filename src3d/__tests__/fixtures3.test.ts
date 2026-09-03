@@ -154,6 +154,12 @@ const SEEDED: Record<string, string[]> = {
     '|u| = |v|',
     'p חיובי',
   ],
+  // #509 (ADR-3D-213): a component naming TWO symbols — the arity the reader could not read. The
+  // whole point is that it resolves, so the net (green replay + no parser drift) is the right lock.
+  'prism-two-symbol-component-509.geo3.json': [
+    'תיבה ABCDA\u0027B\u0027C\u0027D\u0027',
+    'C(p+q,1,0)',
+  ],
   'planes-2022-q2.geo3.json': [
     'המישור π1: z - 3 = 0',
     'המישור π2: ay + z - 8 = 0',

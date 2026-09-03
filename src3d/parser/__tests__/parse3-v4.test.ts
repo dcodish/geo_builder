@@ -39,7 +39,7 @@ describe('the נתון injection list', () => {
     expect(cmds('נתון: v = (k-1, k, 3)')).toEqual([
       {
         type: 'inject-vector', name: 'v', x: null, y: null, z: 3,
-        symExprs: [{ sym: 'k', k: 1, c: -1 }, { sym: 'k', k: 1, c: 0 }, null],
+        symExprs: [{ terms: [{ sym: 'k', k: 1 }], c: -1 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }, null],
         syms: ['k', 'k', null], // #814: the name rides alongside the solver register
       },
     ]);
@@ -53,7 +53,7 @@ describe('the נתון injection list', () => {
     const expected = [
       {
         type: 'inject-pair', a: 'A', b: "A'", x: null, y: null, z: null,
-        symExprs: [{ sym: 'k', k: 1, c: -1 }, { sym: 'k', k: 1, c: -7 }, { sym: 'k', k: 1, c: 1 }],
+        symExprs: [{ terms: [{ sym: 'k', k: 1 }], c: -1 }, { terms: [{ sym: 'k', k: 1 }], c: -7 }, { terms: [{ sym: 'k', k: 1 }], c: 1 }],
         syms: ['k', 'k', 'k'],
       },
     ];
@@ -67,12 +67,12 @@ describe('the נתון injection list', () => {
     expect(cmds('נתון: AB = (k-1, k, 3), AC = (k+1, 0, k-3)')).toEqual([
       {
         type: 'inject-pair', a: 'A', b: 'B', x: null, y: null, z: 3,
-        symExprs: [{ sym: 'k', k: 1, c: -1 }, { sym: 'k', k: 1, c: 0 }, null],
+        symExprs: [{ terms: [{ sym: 'k', k: 1 }], c: -1 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }, null],
         syms: ['k', 'k', null],
       },
       {
         type: 'inject-pair', a: 'A', b: 'C', x: null, y: 0, z: null,
-        symExprs: [{ sym: 'k', k: 1, c: 1 }, null, { sym: 'k', k: 1, c: -3 }],
+        symExprs: [{ terms: [{ sym: 'k', k: 1 }], c: 1 }, null, { terms: [{ sym: 'k', k: 1 }], c: -3 }],
         syms: ['k', null, 'k'],
       },
     ]);

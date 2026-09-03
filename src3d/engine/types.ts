@@ -456,13 +456,47 @@ export interface ClaimCommand {
  * principle: a statement about an existing point is a constraint). A component may
  * be null (`A(3,n,p)` — a symbolic letter): only the numeric components constrain.
  */
-/** #325 (ADR-3D-079): an AFFINE symbolic component of a typed coordinate — `2t` / `t` / `k` /
- *  `2t-3` is k·sym + c. The symbol is an OPEN unknown until data determines it. */
-export interface SymComp {
-  sym: string;
-  k: number;
+/**
+ * #325 (ADR-3D-079), widened by #509 ([ADR-3D-213](../../docs/06b-decisions-3d.md)): an AFFINE
+ * symbolic component of a typed coordinate — **Σ kᵢ·symᵢ + c**, degree 1 over any number of symbols.
+ *
+ * `2t`, `t`, `k`, `2t-3` are the one-term case; `p+q` and `2p+3q` are the reason this is a list. The
+ * symbols are OPEN unknowns until data determines them.
+ *
+ * **This is the shared form**, and that is the point of it. Three readers each hard-coded arity 1 in
+ * their own way — `COMP_TERM_RE` (this carrier), `bindSymbol` inside `parseSymExpr` (#301's vector
+ * expressions) and `parseLinearEq`'s guard (#339's plane equations). Widening one of them and leaving
+ * a bespoke shape behind is the patch the other two would then copy, so the form is the deliverable
+ * and the coordinate reader is its FIRST adoption; #301 and #339 are the remaining two.
+ *
+ * **Degree stays 1, by construction.** A term is a coefficient times a symbol, so `p²`, `p·q` and
+ * `p/2` have nowhere to live here and are refused by the same reader that enforces the arity — the
+ * ADR-3D-079 / docs/20 D3 "no CAS" boundary, unchanged and now asserted rather than assumed.
+ */
+export interface SymAffine {
+  /** At least one term, in the order the student wrote them. */
+  terms: { sym: string; k: number }[];
+  /** The constant offset. */
   c: number;
 }
+
+/** The name every existing consumer knows this carrier by. */
+export type SymComp = SymAffine;
+
+/** The distinct symbols an affine component names, in first-written order. */
+export const symsOfAffine = (e: SymAffine): string[] => {
+  const out: string[] = [];
+  for (const t of e.terms) if (!out.includes(t.sym)) out.push(t.sym);
+  return out;
+};
+
+/** The component's value once every symbol has one — the ONE evaluation of this form. */
+export const evalAffine = (e: SymAffine, valueOf: (sym: string) => number): number =>
+  e.terms.reduce((acc, t) => acc + t.k * valueOf(t.sym), e.c);
+
+/** A one-term component's symbol, or null when it names several — the "which letter is this" question,
+ *  which only has an answer for a single-symbol component. */
+export const soleSymOf = (e: SymAffine): string | null => (symsOfAffine(e).length === 1 ? e.terms[0].sym : null);
 
 export interface Point3Command {
   type: 'point3';
@@ -1224,7 +1258,8 @@ export function pinSymsOf(c: Construction3): string[] {
   ];
   for (const pin of lists) {
     for (const comp of [pin.x, pin.y, pin.z]) {
-      if (comp !== null && typeof comp === 'object' && !out.includes(comp.sym)) out.push(comp.sym);
+      // #509: a component names N symbols now, not one — «C(p+q,1,0)» contributes both.
+      if (comp !== null && typeof comp === 'object') for (const sym of symsOfAffine(comp)) if (!out.includes(sym)) out.push(sym);
     }
   }
   // #815: an EQUATION written in a pin symbol carries that symbol too. After the re-homing (#801's

@@ -17,7 +17,7 @@
  */
 
 import { riderSampleT } from './onSegmentRatio';
-import { pinSymsOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind } from './types';
+import { evalAffine, pinSymsOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, bisectorDir3, cross3, dist3, dot3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -380,7 +380,9 @@ export function solvePivot(
   const compTarget = (comp: number | null | import('./types').SymComp, x: number[]): number | null => {
     if (comp === null) return null;
     if (typeof comp === 'number') return comp;
-    return comp.c + comp.k * x[7 + nDims + nSym + pinSyms.indexOf(comp.sym)];
+    // #509: Σ kᵢ·symᵢ + c — the affine form's ONE evaluation, so a component naming several symbols
+    // («C(p+q,1,0)») targets the same residual a single-symbol one does.
+    return evalAffine(comp, (sym) => x[7 + nDims + nSym + pinSyms.indexOf(sym)]);
   };
   // #325 (ADR-3D-079 Am. 2): an UNDETERMINED pin symbol must VARY with the seed (ADR-052 —
   // a value the sampler never explores is a default masquerading as determined; the params
