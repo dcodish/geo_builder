@@ -11,13 +11,12 @@
  * adoption. Widening only the regex and leaving a bespoke shape behind is the patch the other two
  * issues would then copy.
  *
- * **The boundary is asserted, not assumed.** Degree stays 1 by construction: a term is a coefficient
- * times a symbol, so `p^2`, `p/2` and `2(p+1)` have nowhere to live and are refused by the same reader
- * that enforces the arity — the ADR-3D-079 / docs/20 D3 no-CAS line, unchanged.
- *
- * `p*q` is refused WITH them, and that is a deliberate divergence from the issue's row list: it is a
- * PRODUCT of two symbols, i.e. degree 2, which an affine form cannot carry — and the same ruling says
- * Option A (degree) is not re-opened. See the ADR; it needs its own ruling.
+ * **What is refused here is CURRENT STATE, not all boundary.** Degree stays 1 in this slice, so `p^2`,
+ * `p/2`, `2(p+1)` and `p*q` all match nothing. Only `p/2` and `2(p+1)` are a *sanctioned* boundary
+ * (ruled 2026-08-26). **`p^2` / `p³` / `3p^2` / `2p²−3` are RULED IN and still owed** — the operator
+ * ruled Option A (bounded polynomial, degree ≤ 2–3) on 2026-08-16 and confirmed it 2026-08-26. The
+ * assertions below therefore lock *today's* refusal so the arity work cannot silently regress it; they
+ * are NOT a statement that the degree rows should stay refused. #509 remains open for Option A.
  */
 import { describe, expect, it, beforeEach } from 'vitest';
 import { parse3 } from '../parser/parse3';
@@ -89,8 +88,17 @@ describe('#509 — the shared multi-symbol affine form', () => {
   });
 
   describe('the DEGREE boundary — asserted, not assumed', () => {
-    it.each(['C(p^2,p^2+4,0)', 'C(p²,1,0)', 'C(3p^2,1,0)', 'C(p/2,1,0)', 'C(2(p+1),1,0)', 'C(p*q,1,0)'])(
-      '«%s» is still refused — an affine form is degree 1 over a SUM of terms',
+    it.each(['C(p/2,1,0)', 'C(2(p+1),1,0)'])(
+      '«%s» is refused — the SANCTIONED boundary (ruled 2026-08-26), arithmetic inside one component',
+      (line) => {
+        expect(parse3(line).ok).toBe(false);
+      },
+    );
+
+    /** Current state, pinned so the arity work cannot regress it — NOT an endorsement. Option A
+     *  (degree ≤ 2–3) is ruled and owed, so these flip to `true` when #509 is finished. */
+    it.each(['C(p^2,p^2+4,0)', 'C(p²,1,0)', 'C(3p^2,1,0)', 'C(p*q,1,0)'])(
+      '«%s» is refused TODAY — ruled IN under Option A and still owed (#509)',
       (line) => {
         expect(parse3(line).ok).toBe(false);
       },

@@ -7528,18 +7528,34 @@ component" question, which only has an answer when there is one). **#301 and #33
 adoptions** — widening only the regex here and leaving a bespoke shape behind is the patch they would
 have copied, which is why the form, not the row, is the deliverable.
 
-**Degree stays 1, by construction and now by assertion.** A term is a coefficient times a symbol, so
-`p^2`, `p/2` and `2(p+1)` match nothing in the grammar and are refused by the same reader that enforces
-the arity — the ADR-3D-079 / docs/20 D3 no-CAS boundary, unchanged.
+**Degree stays 1 IN THIS SLICE — and that is a gap, not a boundary.** A term is a coefficient times a
+symbol, so `p^2`, `p/2` and `2(p+1)` match nothing in this grammar. Only `p/2` and `2(p+1)` are a
+*sanctioned* boundary. **`p^2`, `p³`, `3p^2` and `2p²−3` are RULED IN and still owed**: the operator
+ruled Option A — the bounded polynomial `Σ aᵢ·symⁱ`, degree ≤ 2–3 — on 2026-08-16 and confirmed it on
+2026-08-26 as a deliberate reversal of Option B. This slice does not deliver it, and #509 stays open
+until it does.
 
-**One row of the issue's approved list is NOT delivered, and it needs a ruling: `C(p*q,1,0)`.**
-The 2026-09-01 ruling lists it beside `C(p+q,…)` and `C(2p+3q,…)` as "the two-symbol rows", and in the
-same breath says *"Option A is not re-opened. This ruling is about the ARITY of the component reader,
-not its degree."* But `p·q` is a PRODUCT of two symbols — degree 2 — so an affine form cannot carry it,
-and the plan's own mechanism (*"widen `COMP_TERM_RE` from a single term to a term SEQUENCE"*) is a sum.
-The row appears to have been grouped by "two letters appear" rather than by degree. It is therefore
-refused here **alongside** `p^2` and `p/2`, and asserted as refused, so the boundary is explicit rather
-than accidental. Carrying it needs the degree ruling this one declined to re-open.
+**What this slice does NOT deliver, and why that matters.**
+
+The 2026-09-01 comment that scoped this work re-cast #509 as an ARITY issue and wrote that *"Option A is
+not re-opened"*. **That inverted the standing ruling**, and the operator caught it on first play
+(2026-09-03: *"i ruled in the past that we need to support this format"*). Option A, confirmed
+2026-08-26, covers exactly the DEGREE rows this slice refuses — and excludes exactly the arity rows this
+slice adds. So the two-symbol widening built here is real and useful, but it is **not** what #509 asked
+for:
+
+| row | Option A (the standing ruling) | this slice |
+| --- | --- | --- |
+| `C(p^2,…)`, `C(p³,…)`, `C(3p^2,…)`, `C(2p²−3,…)` | **covered — owed** | ✗ still refused |
+| `C(p/2,…)`, `C(2(p+1),…)` | sanctioned permanent boundary | ✗ refused (correct) |
+| `C(p+q,…)`, `C(2p+3q,…)` | not covered by A | ✓ added here |
+| `C(p*q,…)` | not covered by A (it is degree 2) | ✗ refused |
+
+So this ADR records an **arity** widening that is a step alongside #509, not its completion. #509 stays
+open for Option A. Its second, equally binding lock is also still unmet: the 2026-08-26 ruling requires
+the unsupported shapes to **refuse in the guidance register, naming what is unsupported** — *"a
+recognised-but-unsupported shape is a refusal we own, not a question we outsource"* — and today they
+fall through to `not-handled` and reach the paid LLM.
 
 **The migration this forced, and it is the part that would have hurt.** `symExprs` is PERSISTED — it
 rides the stored commands in every saved `.geo3.json` — so changing the carrier's shape would have
