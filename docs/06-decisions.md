@@ -9075,3 +9075,73 @@ asserted to draw and not merely to parse; the #770 two-noun line still refuses; 
 figure is not re-declared; the run-only form declares nothing. The PAR-10 pinned
 `{example → command types}` map is updated deliberately, and the two rows that moved are the two
 catalog examples that now declare their stated shape.
+
+---
+
+## ADR-481 — An unstated SEAT is a cyclable configuration; the accept-gate half is REFUSED by measurement (#569)
+
+**Status:** accepted, 2026-09-04 · **Partially completes:** [ADR-445](#adr-445) (#566) · fix-round #897
+
+**Context.** ADR-445 left two remainders tracked on #569: an accept-gate hardening, and the resample's
+inability to reach the right-angle seat. Both premises were measured before building. **Only one held.**
+
+### What landed — the SEAT is cyclable (half 2)
+
+«הציגו תצורה אחרת» cycles two discrete dimensions, `branch` and `variant`. The right-angle seat was not
+among them, so `searchAnotherView` could never move it. `findValidConfig` **could** — but that is a
+post-commit repair the student never asked for, and [ADR-052](#adr-052)'s cyclable-choice doctrine is
+that an unstated choice must be reachable **on purpose**, not only rescued behind their back.
+
+The seat joins as a third discrete dimension beside branch and variant, sharing the search tier's own
+pin set (`explicitRightAngleVerts`), so a seat the student stated with an explicit 90° is never cycled
+out from under them. It is walked **last** of the three: it reshapes the figure most drastically, so
+the cycles a student is likelier to mean are offered first.
+
+**Measured on «משולש ישר זווית ABC» + «משולש ABC חסום במעגל»:**
+
+| press | before | after |
+| --- | --- | --- |
+| 0 | `rot=0`, right angle at C | `rot=1`, right angle at **A** |
+| 1 | `rot=0`, at C | `rot=2`, at **B** |
+| 2 | `rot=0`, at C | `rot=0`, at C |
+| 3 | `rot=0`, at C | `rot=1`, at **A** |
+
+Before, the angle sat at C at every press and no number of presses could move it.
+
+### What did NOT land — the accept-gate hardening (half 1), and why
+
+#569 asked for a coincident-vertex check in the step-accept gate at ~1e-3·span, because
+`collapsedPolygon` (ADR-413) tests only COLLINEARITY and the #566 basin degenerates by driving C onto
+A — and three points, two of them coincident, are not collinear by any off-line measure. The reasoning
+is sound and the basin was real. **Two measurements refused it anyway.**
+
+1. **The symptom no longer reproduces.** #569 says a PINNED impossible seat "still draws the
+   near-collapse and relies on the `figure.noValidConfig` note". At HEAD it does not:
+   «משולש ישר זווית ABC» + «זווית ACB = 90» + «משולש ABC חסום במעגל» + «קשת AB = קשת BC» already
+   exhausts the search and returns null — the honest refusal. Something between the filing and now
+   closed that route.
+2. **Built anyway as defence in depth, it FALSELY over-constrains legitimate figures.** The 2-D lane
+   went red in four places, all kite-and-circle figures, one of them named for this exact hazard:
+
+   | failing lock | what it asserts |
+   | --- | --- |
+   | `scenarios-e2e-6` `[kite-tangents-redundant-equality-not-over-constrained]` | «דלתון ABCD» + B,C,D on circle O + AB,AD tangent **no longer FALSELY over-constrains** (ADR-139/140) |
+   | `driven-point-on-circle` (ADR-140) | a driven vertex declared on-circle converts and stays; `lastError` must be null — got `over-constrained` |
+   | `scenarios-e2e-7` `[anonymous-circle-binds-by-membership…]` | #546 circumcircle/incircle binding |
+   | `fixtures.test.ts` `issue-572-load-collapse` | the saved figure replays green |
+
+   Isolated by reverting `step.ts` alone and re-running: with half 1 off and half 2 on, all pass. The
+   attribution is measured, not inferred.
+
+**The tolerance was NOT tuned until the suite went green.** Picking a threshold that dodges four
+named locks is precisely the patch the standing rules forbid, and three of those four are locks
+written to catch *false* over-constraint — the failure mode this gate would introduce. A guard whose
+stated symptom is already closed and whose cost is four false refusals has not earned its place, and
+whether the class deserves a gate at all is now an operator question, recorded on #569.
+
+**Consequence:** #569 stays OPEN, relabelled `needs-operator` for half 1. This ADR closes only half 2.
+
+**Locked** in `src/__tests__/issue-566.test.ts`: a resample cycle reaches a seat other than the
+default (before, the set was `{C}` however many times it was pressed), a seat pinned by an explicit
+90° holds across presses, and the pinned-impossible-seat mirror is tightened from "either outcome is
+acceptable" — which proved nothing — to the exhausted-search refusal outright.

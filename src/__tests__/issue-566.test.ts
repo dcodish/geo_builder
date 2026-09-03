@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { factsOf } from './scenarios-harness';
-import { findValidConfig, meetsRequirements, replay } from '@/replay/core';
+import { findValidConfig, meetsRequirements, replay, searchAnotherView } from '@/replay/core';
 
 const STEPS = ['משולש ישר זווית ABC', 'משולש ABC חסום במעגל', 'קשת AB = קשת BC'];
 
@@ -52,16 +52,12 @@ describe('#566 — the unstated right-angle seat yields to a later constraint (A
     // satisfiable only degenerately, and the search must NOT undo the student's own statement.
     const facts = factsOf(['משולש ישר זווית ABC', 'זווית ACB = 90', 'משולש ABC חסום במעגל', 'קשת AB = קשת BC']);
     const found = findValidConfig(facts, 0);
-    if (found) {
-      // if anything was found it must NOT be a seat flip — C keeps the right angle
-      const fig = replay(found.facts, found.seed);
-      const [A, B, C] = ['A', 'B', 'C'].map((id) => at(fig, id));
-      const dot = (C.x - A.x) * (C.x - B.x) + (C.y - A.y) * (C.y - B.y);
-      expect(Math.abs(dot) / (d(A, C) * d(B, C)), 'the pinned right angle stays at C').toBeLessThan(1e-3);
-    } else {
-      // exhausted — the App surfaces figure.noValidConfig (the #566 silent-green fix's second half)
-      expect(found).toBeNull();
-    }
+    // #569 (ADR-481): TIGHTENED from "either outcome is acceptable" to the refusal path outright.
+    // This accepted both a found-but-unflipped config and an exhausted search, so a green here proved
+    // nothing about which one actually happened — and #569's whole question was which one does.
+    // Measured at HEAD before the change and again after: null both times. The honest outcome is the
+    // exhausted search, and the App surfaces `figure.noValidConfig` for it (#566's second half).
+    expect(found, 'a pinned impossible seat must EXHAUST, never draw a near-collapse').toBeNull();
   });
 
   it('no behaviour change when the default seat is fine: the figure without the arc given', () => {
@@ -89,5 +85,51 @@ describe('#566 — the unstated right-angle seat yields to a later constraint (A
     expect(Math.abs(dot) / (d(A, B) * d(B, C)), 'right angle at B').toBeLessThan(1e-4);
     expect(Math.abs(d(A, B) - d(B, C)) / span, 'equal arcs ⇒ |AB| = |BC|').toBeLessThan(1e-4);
     expect(meetsRequirements(found!.facts, found!.seed)).toBe(true);
+  });
+});
+
+/**
+ * #569 half 2 (ADR-481) — the SEAT is a cyclable configuration.
+ *
+ * «הציגו תצורה אחרת» cycled branch and variant; the right-angle seat was not among its dimensions, so
+ * no number of presses could move the angle off the default vertex. findValidConfig COULD move it, but
+ * that is a post-commit repair the student never asked for — ADR-052 says an unstated choice must be
+ * reachable ON PURPOSE. Measured before the change: rot stayed 0 and the angle stayed at C at every
+ * press.
+ */
+describe('#569 — «הציגו תצורה אחרת» reaches the right-angle seat (ADR-481)', () => {
+  const seatOf = (facts: Parameters<typeof replay>[0], seed: number): string => {
+    const fig = replay(facts, seed);
+    const [A, B, C] = ['A', 'B', 'C'].map((id) => at(fig, id));
+    const cos = (P: typeof A, Q: typeof A, R: typeof A) =>
+      Math.abs(((Q.x - P.x) * (R.x - P.x) + (Q.y - P.y) * (R.y - P.y)) / (d(P, Q) * d(P, R)));
+    const at3: [string, number][] = [['A', cos(A, B, C)], ['B', cos(B, A, C)], ['C', cos(C, A, B)]];
+    return at3.reduce((m, x) => (x[1] < m[1] ? x : m))[0];
+  };
+
+  it('a resample cycle reaches a seat OTHER than the default', () => {
+    const facts = factsOf(['משולש ישר זווית ABC', 'משולש ABC חסום במעגל']);
+    expect(seatOf(facts, 0), 'the default seat is the last id').toBe('C');
+    const seen = new Set<string>([seatOf(facts, 0)]);
+    let cur: { facts: typeof facts; seed: number } = { facts, seed: 0 };
+    for (let i = 0; i < 4; i++) {
+      const next = searchAnotherView(cur.facts, cur.seed);
+      if (!next) break;
+      seen.add(seatOf(next.facts, next.seed));
+      cur = next;
+    }
+    // Before ADR-481 this set was {C} however many times it was pressed.
+    expect([...seen].sort().join(''), 'the student can reach another seat deliberately').not.toBe('C');
+  });
+
+  it('a seat the student PINNED is never cycled out from under them', () => {
+    const facts = factsOf(['משולש ישר זווית ABC', 'זווית ACB = 90', 'משולש ABC חסום במעגל']);
+    let cur: { facts: typeof facts; seed: number } = { facts, seed: 0 };
+    for (let i = 0; i < 4; i++) {
+      const next = searchAnotherView(cur.facts, cur.seed);
+      if (!next) break;
+      expect(seatOf(next.facts, next.seed), `press ${i}: the pinned seat holds`).toBe('C');
+      cur = next;
+    }
   });
 });

@@ -1830,29 +1830,47 @@ export function searchAnotherView(
   const nVariant = variantFact ? variantCountOf(variantFact.cmd) : 1;
   const hasDofs = freeDofs(cur.construction).length > 0;
   const curStrict = meetsRequirements(facts, seed);
+  // #569 (ADR-445 remainder): the RIGHT-ANGLE SEAT is a discrete configuration dimension too, and
+  // «הציגו תצורה אחרת» could not reach it. `findValidConfig`'s seat tier rescues a figure whose
+  // DEFAULT seat is unsatisfiable, but that is a post-commit repair the student never asked for; the
+  // seat is an unstated choice, and ADR-052's cyclable-choice doctrine says an unstated choice must be
+  // reachable ON PURPOSE. Same pin set as the search tier (`explicitRightAngleVerts`), so a seat the
+  // student stated with an explicit 90° is never cycled out from under them.
+  const seatFact = facts.find(
+    (f) => f.enabled && f.cmd.type === 'right-triangle' && !f.cmd.ids.some((id) => explicitRightAngleVerts(facts).has(id)),
+  );
+  const nSeat = seatFact ? 3 : 1; // rot ∈ {0,1,2} — which of the three vertices carries the angle
 
   // A candidate's fact rewrite — the SAME steps `cycleAlt`/`cycleVariant` would apply.
-  const stepped = (b: number, v: number): Fact[] =>
+  const stepped = (b: number, v: number, r = 0): Fact[] =>
     facts.map((f) => {
       let cmd = f.cmd;
       if (b && f.enabled && branchId && BRANCH_CYCLE_KINDS.has(cmd.type) && 'id' in cmd && (cmd as { id?: Id }).id === branchId)
         cmd = { ...cmd, branch: ((((cmd as { branch?: number }).branch ?? 0) + b) % nBranch) } as AnyCommand;
       if (v && variantFact && f === variantFact) cmd = withVariant(cmd, ((((cmd as { variant: number }).variant ?? 0) + v) % nVariant));
+      if (r && seatFact && f === seatFact) {
+        const { rot: prev, ...rest } = cmd as Extract<AnyCommand, { type: 'right-triangle' }>;
+        const next = (((prev ?? 0) + r) % nSeat) as 0 | 1 | 2;
+        cmd = (next === 0 ? rest : { ...rest, rot: next }) as AnyCommand;
+      }
       return cmd === f.cmd ? f : { ...f, cmd };
     });
 
   // Discrete combos: everything-advances first (the legacy intent), then each family walked fully.
-  const combos: [number, number][] = [];
-  if (nBranch > 1 && nVariant > 1) combos.push([1, 1]);
-  for (let b = 1; b < nBranch; b++) combos.push([b, 0]);
-  for (let v = 1; v < nVariant; v++) combos.push([0, v]);
+  // The seat is walked LAST of the three: it reshapes the figure most drastically, so branch and
+  // variant — the cycles a student is likelier to mean — are offered before it.
+  const combos: [number, number, number][] = [];
+  if (nBranch > 1 && nVariant > 1) combos.push([1, 1, 0]);
+  for (let b = 1; b < nBranch; b++) combos.push([b, 0, 0]);
+  for (let v = 1; v < nVariant; v++) combos.push([0, v, 0]);
+  for (let r = 1; r < nSeat; r++) combos.push([0, 0, r]);
 
   let fallback: { facts: Fact[]; seed: number } | null = null;
   let k = 0;
   const total = combos.length * (hasDofs ? 4 : 1) + (hasDofs ? 24 : 0);
-  for (const [b, v] of combos) {
+  for (const [b, v, r] of combos) {
     if (Date.now() > deadline) break;
-    const fc = stepped(b, v);
+    const fc = stepped(b, v, r);
     // Fresh seeds first (the legacy press resampled AND flipped), the current seed as the in-combo fallback.
     const seeds = hasDofs ? [seed + 1, seed + 2, seed + 3, seed] : [seed];
     for (const s of seeds) {
