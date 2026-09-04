@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 5dd166f3-bdf1-4c93-b683-4b5af62f30de
-  modified: 2026-08-31T20:09:02.059Z
+  modified: 2026-09-04T00:00:00.000Z
 ---
 
 On 2026-08-31, in one round, **two of four issues were filed with a root cause I had reasoned to from
@@ -48,3 +48,16 @@ behaviour, the probe must start where the click starts, and the issue should say
 measured.
 
 Related: [[gate-lines-are-read-not-matched]] (evidence produced is not evidence read).
+
+**Corollary 3 (2026-09-04, #511/#899): a hand-counted number in a PLAY SHEET is the same hypothesis,
+and it costs the operator a play.** T7 told the operator *"there are 19 symbols now; there were 18."*
+The real counts are 20 and 19 — I counted the array by eye instead of rendering it. The operator opened
+the palette on **:5173** (`main`) rather than the PR's **:5175**, counted the 19 buttons actually there,
+matched the number I had given for "now", and correctly reported the button as missing. The PR was
+fine. Two browser calls settled it afterwards; the same two calls beforehand would have prevented it.
+
+**How to apply:** every checkable NUMBER or visual claim in a report to the operator — button counts,
+"there are N symbols", "the list shows X" — gets rendered and read back before it ships, exactly like a
+root cause. And when a play sheet's "Before" is a count, prefer a claim the wrong server cannot
+accidentally satisfy: say WHERE the new thing sits ("`²` starts the second row"), not just how many
+things there are. See [[pr-items-need-their-own-server]] and [[no-browser-self-test]].
