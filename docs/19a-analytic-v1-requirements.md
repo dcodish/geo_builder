@@ -121,6 +121,36 @@ understand to the paid LLM so it can guess at an empty clause is the failure
 **R11 — Notation.** Primes (`A'`, `F₁'`) and subscripts (`F₁`, `l1`). Primes already exist in the 3-D
 tree; subscripts are new to this input language.
 
+**R31 — A point's COMPONENTS are addressable and comparable: `Ax > Bx`.** *(Operator ruling,
+2026-09-04.)* The typed form of «שיעור ה-x של קדקוד A גדול משיעור ה-x של קדקוד B» (5d). Comparison
+operators `<` `≤` `≥` `≠` are already on the palette.
+
+**R31a — SEMANTICS first, because it decides correctness.** A *strict* comparison is a **selector**, not
+an equation: `Ax > Bx` pins nothing and instead chooses among configurations that already satisfy the
+givens — R14's discrete labelling DOF being consumed. An *equality* genuinely constrains: `Ax = Bx`
+forces AB vertical. Same syntax, two different members of
+[ADR-AG-005](06c-decisions-analytic.md#adr-ag-005) D7's three kinds. **Treating a strict comparison as
+an equation would report "no solution" on a perfectly good figure.**
+
+**R31b — NOTATION HAZARD, to be measured against the corpus before it ships.** `Ax` already has a
+meaning here. The expression layer multiplies by juxtaposition (ADR-AG-006 D2 — the reason `2a`,
+`4√5`, `2ax` work), and the standard line form `Ax + By + C = 0` uses uppercase coefficient names, which
+is ordinary notation and exactly what #339 covers in the 3-D tree.
+
+```
+Ax > Bx            → A's x-component vs B's x-component
+Ax + By + C = 0    → A·x + B·y + C = 0, a line with symbolic coefficients
+```
+
+A disambiguation exists and rests on a convention the tool already follows — **point labels uppercase,
+parameters lowercase** — so `ax` is unambiguously a product. It does **not** settle the
+`Ax + By + C = 0` case, where the uppercase letters are coefficients; that needs the surrounding form
+(a comparison of two bare tokens versus an equation summing terms in `x` and `y`).
+
+This is the exact class that silently ate real input in the sibling: a case-insensitive `[IVX]`
+Roman-numeral class swallowed the `x` of `x²+y²−2ax−2x=0` (ADR-AG-006). **Measure it against the
+corpus; do not reason it away.** *(Hazard, mine.)*
+
 ---
 
 ## 4 — Parameters, families and choice
