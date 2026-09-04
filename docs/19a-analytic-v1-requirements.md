@@ -207,6 +207,34 @@ shows as open. It becomes printable exactly when the student's givens have pinne
 moment the equation appears is the moment the student learns their givens were sufficient.*
 *(Consequence, mine.)*
 
+**R23 — TWO SURFACES, ONE GRAMMAR: the main input CONSTRUCTS, the data panel ASKS.** *(Operator
+ruling, 2026-09-04.)* «מעגל חוסם את ABC» typed into the main input **adds the circle to the figure and
+draws it**; the same sentence typed into the data panel **is calculated and not drawn**. The surface,
+not the wording, decides. One catalog therefore serves both lanes — a real economy, and it means every
+construct the tool can build is automatically a construct it can be asked about.
+
+**R24 — An ask is a DRY-RUN construction: built internally, evaluated, discarded.** It must never
+mutate the figure. The 2-D tool's `dryRunOutcome` already has this shape (apply on top of the current
+facts without committing), so it is copied rather than invented. It rides the ask channel
+[ADR-AG-002](06c-decisions-analytic.md#adr-ag-002) reserved, which #741 unified across the builders.
+
+**R25 — An ask obeys `isKnowledge` exactly as the canvas does.** Ask for the circumcircle of a triangle
+that is not yet determined and the answer is *open*, never a seed-dependent equation printed as fact.
+No second honesty mechanism — and the ask lane inherits R22's teaching: the answer arrives precisely
+when the givens suffice.
+
+**R26 — A queried object that cannot exist refuses honestly, and is never a silent blank.** The
+circumcircle of a collapsed triangle; a tangent from a point inside a circle.
+
+**R27 — Queries persist with the figure.** The 3-D store already saves them beside the facts
+(`loadFigure(facts, seed, queries, …)`), so a saved analytic figure carries both what the student built
+and what they asked.
+
+**Design risk to play for:** the two surfaces must be visually unmistakable, or a student types a
+construction into the ask box and wonders why nothing was drawn. The 2-D layout — an «שאלו על ערך» box
+with its own «חשב» button — is probably enough, but this is the kind of thing that only shows up on
+play. *(Note, mine.)*
+
 Patterns to copy from the 3-D tree (copied, never imported): the per-object display cycle already used
 for planes (full / face / hidden), and knowledge-gated panel rows.
 
