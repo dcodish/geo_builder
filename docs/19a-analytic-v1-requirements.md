@@ -226,6 +226,48 @@ Proposed V1 boundary: **א and ב in scope, ג deferred.** **OPEN.**
 
 ---
 
+### 5c — Triangle by SIDE EQUATIONS + parabola with a pinned parameter
+
+«במשולש ABC משוואת הצלע AB היא y = x−1» · «ומשוואת הצלע AC היא y = −x+3» · «הנקודה D(6;3) נמצאת על
+הצלע BC» · «BD/DC = 1/3» · «הנקודה D(6;3) נמצאת על הפרבולה y² = 2px» · «ישר המשיק לפרבולה בנקודה D
+נפגש בנקודה F עם ישר העובר דרך C כך ש-FD = FC»
+
+| need | today |
+| --- | --- |
+| a polygon's SIDE stated as a line equation | ✗ |
+| a vertex derived as the intersection of two side lines (A) | ✗ |
+| a vertex free ALONG a stated line (B on AB, C on AC — 1 DOF each) | ✗ |
+| a coordinate-stated point constrained to a segment, driving its still-free endpoints | ✗ |
+| segment ratio `BD/DC = 1/3` | ✗ — `length-ratio` exists in the 3-D tree to copy |
+| circumscribed circle as a derived object | ✗ |
+| a conic parameter PINNED by a membership statement (`D` on `y²=2px` ⇒ `p = 3/4`) | ✗ — the "one-parameter pin" ADR-AG-006 lists as not claimed |
+| tangent to a conic AT a named point on it | ✗ |
+| a line through a named point, otherwise free (1 DOF of direction) | ✗ |
+| line ∩ line as a named point (F) | ✗ |
+| distance equality `FD = FC`, consuming that direction DOF | ✗ |
+
+**What it proves — a polygon arrives THREE ways, and only an object-first model holds all of them:**
+
+| question | how the polygon is stated | vertices |
+| --- | --- | --- |
+| 5a parallelogram | shape noun + 2 vertex coordinates + area | partly stated, partly solved |
+| 5b ellipse | — | all derived (axis intersections, foci) |
+| 5c triangle | **side equations** | all derived from lines + a ratio |
+
+**The pin arrives through GEOMETRY, not syntax.** «הנקודה D נמצאת על הפרבולה y²=2px» determines `p`
+because D is on the curve. The student states geometry; the pin is a *consequence*. No pin keyword is
+needed, and none should be invented.
+
+**It exercises the multipart model properly** ([ADR-AG-003](06c-decisions-analytic.md#adr-ag-003)):
+part ב does not start a new figure, it grows part א's — triangle → circumcircle → parabola → tangent → F.
+
+**More pressure on the conic slot:** a circle and a parabola coexist here, so the slot rule's fate
+depends on whether a circle occupies one. 5b already broke it outright.
+
+**`D(6;3)` — the semicolon again, three questions running.** Relevant to R8.
+
+---
+
 ## 6 — Open rulings
 
 1. **R8** — semicolon coordinates: parsed-but-untaught, or refused?
