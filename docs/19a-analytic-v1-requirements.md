@@ -151,6 +151,48 @@ This is the exact class that silently ate real input in the sibling: a case-inse
 Roman-numeral class swallowed the `x` of `x²+y²−2ax−2x=0` (ADR-AG-006). **Measure it against the
 corpus; do not reason it away.** *(Hazard, mine.)*
 
+**R31c — The chosen notation is `x_A`, with the Hebrew phrase as the PRIMARY input.** The exam writes
+it in words — «שיעור ה-x של קדקוד A» — and never symbolically, so under the type-the-exam's-sentence
+principle the words are the primary form and `x_A` is the shorthand for people who would rather type
+less. Both parse; the catalog teaches the words, because those are what is on the page.
+
+Rejected, on collisions rather than taste:
+
+| form | why not |
+| --- | --- |
+| `A(x)` | collides with the point DECLARATION `A(2,6)` — ambiguous with the tool's commonest input |
+| `Ax` | collides twice: juxtaposition multiplication, and `Ax + By + C = 0` |
+| `xA` | only a CASE away from `xa`, a legitimate product — the `[IVX]` shape exactly |
+| `x_A` | **chosen.** No collision; the underscore is unused elsewhere in the grammar; standard maths; reads in the exam's own order; and the 2-D palette already carries an `S_{}` subscript button, so it is existing machinery |
+
+*Worth checking before closing this off: whether `Ax + By + C = 0` with uppercase symbolic coefficients
+actually occurs in the 572 corpus. If it never does, `Ax` could later be accepted as an additional
+spelling under the #511 accept-both-teach-one pattern. `x_A` is correct either way.*
+
+**R32 — NEAR-MISS INPUT is understood from context where the figure makes it unambiguous, and TAUGHT.
+Never silently accepted, never guessed, never outsourced.** *(Operator ruling, 2026-09-04, stated for
+`x_A` but general.)*
+
+This is [ADR-W-030](06w-decisions-workspace.md) / #778 — *"non-canonical input is TAUGHT, never
+silently accepted"* — applied here, and its pre-fill mechanism is exactly the operator's "better yet":
+the tool understands `xA`, builds it, **and shows `x_A`**. Accepted *and* taught, which is neither a
+refusal nor a silent fix. (#778's implementation is pending and its input list has gone stale; the
+ruling stands.)
+
+**"Suspects" must be a MEASURED near-miss, not a guess** — otherwise the parser invents intent, which
+is ADR-052's sin moved into the input layer. Context means *what is declared in the figure*:
+
+| situation | verdict |
+| --- | --- |
+| `A` is a declared point and no parameter `a` is in scope | unambiguous → understand it, show `x_A` |
+| `a` is a declared parameter and no point `A` exists | unambiguous → it is the product `x·a` |
+| **both** a point `A` and a parameter `a` exist | **ambiguous → refuse and NAME the format; do not pick** |
+
+Two prohibitions, both already ruled in the family: never accept silently without teaching
+(ADR-W-030), and never escalate to the paid LLM, because this is input we recognise —
+[ADR-3D-214](06b-decisions-3d.md#adr-3d-214) D2's *"a refusal we own, not a question we outsource"*
+applies even more plainly to recognised-but-misspelled than to recognised-but-unsupported.
+
 ---
 
 ## 4 — Parameters, families and choice
