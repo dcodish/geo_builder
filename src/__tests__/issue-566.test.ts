@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { factsOf } from './scenarios-harness';
-import { findValidConfig, meetsRequirements, replay, searchAnotherView } from '@/replay/core';
+import { cyclableSeat, findValidConfig, meetsRequirements, replay, searchAnotherView } from '@/replay/core';
 
 const STEPS = ['משולש ישר זווית ABC', 'משולש ABC חסום במעגל', 'קשת AB = קשת BC'];
 
@@ -120,6 +120,18 @@ describe('#569 — «הציגו תצורה אחרת» reaches the right-angle se
     }
     // Before ADR-481 this set was {C} however many times it was pressed.
     expect([...seen].sort().join(''), 'the student can reach another seat deliberately').not.toBe('C');
+  });
+
+  it('the BUTTON can reach it: `cyclableSeat` is the predicate App and the search share', () => {
+    // The half-2 bug found by driving the real UI: the search learned the seat while the App's
+    // `canCycle` still asked only about branch/variant/free-DOFs, so on a DETERMINED right-triangle
+    // figure — exactly where the seat is the only choice left — «הציגו תצורה אחרת» stayed DISABLED and
+    // the new dimension was unreachable. One exported predicate, both callers, so it cannot drift.
+    const open = factsOf(['משולש ישר זווית ABC', 'משולש ABC חסום במעגל']);
+    expect(cyclableSeat(open), 'an unstated seat is cyclable — the button must enable').toBeDefined();
+
+    const pinned = factsOf(['משולש ישר זווית ABC', 'זווית ACB = 90', 'משולש ABC חסום במעגל']);
+    expect(cyclableSeat(pinned), 'a seat the student stated is NOT a free choice').toBeUndefined();
   });
 
   it('a seat the student PINNED is never cycled out from under them', () => {

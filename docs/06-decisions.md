@@ -9145,3 +9145,21 @@ whether the class deserves a gate at all is now an operator question, recorded o
 default (before, the set was `{C}` however many times it was pressed), a seat pinned by an explicit
 90° holds across presses, and the pinned-impossible-seat mirror is tightened from "either outcome is
 acceptable" — which proved nothing — to the exhausted-search refusal outright.
+
+**Amendment 1 (2026-09-04, same round) — the BUTTON had to learn the seat too.**
+
+Half 2 shipped the dimension into `searchAnotherView` and was verified there. Driving the real UI
+immediately afterwards showed «הציגו תצורה אחרת» **disabled** on the very figure the fix was for:
+`canCycle` in `App.tsx` asked only about branch, variant and free DOFs, so on a DETERMINED
+right-triangle figure — exactly where the seat is the only remaining choice — the student could not
+press the button at all. The engine could cycle; the UI would not let anyone ask.
+
+The seat predicate is therefore **exported as `cyclableSeat` and imported by both**, rather than
+restated in the App: one source of truth, so the enablement and the search cannot disagree again.
+Verified in the browser after the fix — press 0 seats the right angle at C, press 1 at A.
+
+Locked in `src/__tests__/issue-566.test.ts`: `cyclableSeat` is defined for an unstated seat and
+undefined for one the student pinned with an explicit 90°.
+
+**The lesson is the one ADR-W-035 exists for.** Half 2's engine-level evidence was real and complete,
+and the feature was still unreachable by a student. A green search is not a usable button.

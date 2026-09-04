@@ -45,7 +45,7 @@ import { btn, card as themeCard, color as pal, fs, sectionTitle } from '@/ui/the
 // #743: the under-canvas row's ONE look — the style contract lives in shell (seeded from this
 // tree's own btn.accent/btn.subtle, which the operator praised); every builder's row consumes it.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
-import { groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
+import { cyclableSeat, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
@@ -1094,7 +1094,12 @@ export default function App() {
         {(
           <div style={figureActions}>
             {(() => {
-              const canCycle = facts.length > 0 && (branchId || hasVariant || freeDofs(construction).length > 0);
+              // #569 (ADR-481): the SEAT counts. Without it the button stayed disabled on a
+              // DETERMINED right-triangle figure — exactly where the seat is the only choice left —
+              // so the dimension `searchAnotherView` had just learned was unreachable by the student.
+              // `cyclableSeat` is the search's OWN predicate, imported rather than restated.
+              const canCycle =
+                facts.length > 0 && (branchId || hasVariant || freeDofs(construction).length > 0 || !!cyclableSeat(facts));
               return (
                 <button
                   type="button"

@@ -1816,6 +1816,25 @@ export const BRANCH_CYCLE_KINDS = new Set(['point-by-distances', 'arc-midpoint',
  * CURRENT view itself is not strict-valid. Returns null when nothing in budget qualifies — the caller
  * keeps the current view ("only configuration"), never applies an unvalidated one.
  */
+/**
+ * #569 (ADR-445 remainder, ADR-481): the RIGHT-ANGLE SEAT is a discrete configuration dimension, and
+ * «הציגו תצורה אחרת» could not reach it. `findValidConfig`'s seat tier rescues a figure whose DEFAULT
+ * seat is unsatisfiable, but that is a post-commit repair the student never asked for; the seat is an
+ * unstated choice, and ADR-052's cyclable-choice doctrine says an unstated choice must be reachable
+ * ON PURPOSE. Same pin set as the search tier (`explicitRightAngleVerts`), so a seat the student
+ * stated with an explicit 90° is never cycled out from under them.
+ *
+ * EXPORTED because the App's button-enablement predicate and this search must agree about whether a
+ * figure has anything left to cycle. They did not, at first: the search learned the seat while
+ * `canCycle` still asked only about branch/variant/free-DOFs, so on a DETERMINED figure — exactly
+ * where the seat is the only remaining choice — the button stayed disabled and the new dimension was
+ * unreachable. One predicate, both callers; the drift that bug was made of cannot recur.
+ */
+export function cyclableSeat(facts: Fact[]): Fact | undefined {
+  const pinned = explicitRightAngleVerts(facts);
+  return facts.find((f) => f.enabled && f.cmd.type === 'right-triangle' && !f.cmd.ids.some((id) => pinned.has(id)));
+}
+
 export function searchAnotherView(
   facts: Fact[],
   seed: number,
@@ -1830,15 +1849,7 @@ export function searchAnotherView(
   const nVariant = variantFact ? variantCountOf(variantFact.cmd) : 1;
   const hasDofs = freeDofs(cur.construction).length > 0;
   const curStrict = meetsRequirements(facts, seed);
-  // #569 (ADR-445 remainder): the RIGHT-ANGLE SEAT is a discrete configuration dimension too, and
-  // «הציגו תצורה אחרת» could not reach it. `findValidConfig`'s seat tier rescues a figure whose
-  // DEFAULT seat is unsatisfiable, but that is a post-commit repair the student never asked for; the
-  // seat is an unstated choice, and ADR-052's cyclable-choice doctrine says an unstated choice must be
-  // reachable ON PURPOSE. Same pin set as the search tier (`explicitRightAngleVerts`), so a seat the
-  // student stated with an explicit 90° is never cycled out from under them.
-  const seatFact = facts.find(
-    (f) => f.enabled && f.cmd.type === 'right-triangle' && !f.cmd.ids.some((id) => explicitRightAngleVerts(facts).has(id)),
-  );
+  const seatFact = cyclableSeat(facts);
   const nSeat = seatFact ? 3 : 1; // rot ∈ {0,1,2} — which of the three vertices carries the angle
 
   // A candidate's fact rewrite — the SAME steps `cycleAlt`/`cycleVariant` would apply.
