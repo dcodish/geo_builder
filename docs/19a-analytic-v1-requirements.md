@@ -169,6 +169,38 @@ only, or may the tool *prompt* ("still 2 free — did the question state more?")
 
 ---
 
+## 4a — Data entry and what the canvas shows
+
+**R19 — A shape noun stands alone, and constraints arrive afterwards.** *(Operator, 2026-09-04.)*
+«משולש ABC» is a complete statement: a triangle with a free gauge and free shape, drawn generically
+(R2). «משוואת הצלע AB היא y = x−1» then constrains it. Both orders must work — Q3's text gives the
+equations first, the operator's example gives the noun first — which is the entry-order independence
+the 2-D tool locks as M2.
+
+**R20 — Objects can display their equations on the canvas, behind a toggle, with STATED and DERIVED
+visually distinguished.** *(Operator: "so user can see what he entered and what was derived from it —
+same logic as in the 3-D tool.")* The distinction is the point; the toggle is the mechanism. It is the
+panel's «k = -3» versus «t = ?» split, moved onto the canvas.
+
+**R21 — A derived equation is often the exam's ANSWER, so it follows the existing rule: on request,
+and only when it is knowledge.** Q3 part א asks «מצא את משוואת המעגל החוסם» — a canvas that labels the
+circumcircle unasked has solved the question, and this product's boundary is that it reproduces figures
+and never solves them. The student's own input echoes back freely; derived equations stay behind the
+toggle.
+
+**R22 — The equation display doubles as a DETERMINACY signal, and that is the pedagogy.** The
+circumcircle of a not-yet-determined triangle has a seed-dependent equation — not knowledge, so it
+shows as open. It becomes printable exactly when the student's givens have pinned the figure. *The
+moment the equation appears is the moment the student learns their givens were sufficient.*
+*(Consequence, mine.)*
+
+Patterns to copy from the 3-D tree (copied, never imported): the per-object display cycle already used
+for planes (full / face / hidden), and knowledge-gated panel rows.
+
+**OPEN:** is the toggle global («הצג משוואות»), per-object, or both?
+
+---
+
 ## 5 — Capability inventory, from the corpus
 
 Two questions, read for what the FIGURE needs. Parts marked «מצא»/«הבע» are ask-lane, not
@@ -274,5 +306,6 @@ depends on whether a circle occupies one. 5b already broke it outright.
 2. **R13** — a parametric equation whose *kind* changes with the parameter: what does the tool do?
 3. **R17** — may a stated shape noun narrow a parameter's domain?
 4. **R18** — DOF reporting: passive only, or may it prompt?
-5. **R5 / 5b** — where V1 stops: tier 2 vs tier 3, and part ג in or out.
-6. The conic-slot removal needs its own ADR superseding the slot decision.
+5. **R20** — equation toggle: global, per-object, or both?
+6. **R5 / 5b** — where V1 stops: tier 2 vs tier 3, and part ג in or out.
+7. The conic-slot removal needs its own ADR superseding the slot decision.
