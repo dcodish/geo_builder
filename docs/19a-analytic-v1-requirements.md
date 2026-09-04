@@ -235,6 +235,35 @@ construction into the ask box and wonders why nothing was drawn. The 2-D layout 
 with its own «חשב» button — is probably enough, but this is the kind of thing that only shows up on
 play. *(Note, mine.)*
 
+**R28 — The data panel is an INVENTORY of everything the figure determines — distances and equations —
+exactly as in 2-D, 3-D and complex.** *(Operator ruling, 2026-09-04.)* Not only a place to ask. The
+shared panel sections in `shell/` (unified by #671) are reused rather than re-derived.
+
+**R29 — The analytic-specific row types are EQUATIONS and COORDINATES.** The siblings list lengths and
+angles; this product adds the equation of every line and curve, and every point's coordinates, as
+first-class rows.
+
+**R30 — Three panel behaviours carry over unchanged from the siblings, and need no new design:**
+
+- **per-row knowledge gating** — a distance that varies with a free DOF shows as open, never as a
+  number. It is what makes the panel trustworthy enough to check homework against (R21);
+- **on request, not on every keystroke** — each value costs a solve *per seed*, since `isKnowledge`
+  decides invariance by re-evaluating; n values is n×k solves, so «חשב ערכים» is the trigger;
+- **invalidation on the next fact** — the 3-D rule: opening the panel pulls, and the next given
+  invalidates it.
+
+**OPEN — what bounds "all"?** Distances are pairwise, so six named points is fifteen rows and a real
+bagrut figure reaches that easily. Three candidates:
+
+| option | cost |
+| --- | --- |
+| everything pairwise | complete; a wall of numbers on any real figure |
+| only what the figure NAMES — declared segments, polygon sides, radii — plus whatever was asked | legible; needs a rule for "names" |
+| everything, grouped and collapsible | complete and legible; the most UI |
+
+*My instinct is the second for V1, since R23 makes asking for the rest cheap — but "all computable" is
+what was said, so this is left open rather than narrowed unilaterally.*
+
 Patterns to copy from the 3-D tree (copied, never imported): the per-object display cycle already used
 for planes (full / face / hidden), and knowledge-gated panel rows.
 
@@ -349,4 +378,5 @@ depends on whether a circle occupies one. 5b already broke it outright.
 4. **R18** — DOF reporting: passive only, or may it prompt?
 5. **R20** — equation toggle: a single global «הצג משוואות» is likely enough now that R21 makes it a legibility control rather than a gate. Per-object display only if a case demands it.
 6. **R5 / 5b** — where V1 stops: tier 2 vs tier 3, and part ג in or out.
-7. The conic-slot removal needs its own ADR superseding the slot decision.
+7. **R28** — what bounds "all computable" in the data panel: pairwise, named-only, or grouped?
+8. The conic-slot removal needs its own ADR superseding the slot decision.
