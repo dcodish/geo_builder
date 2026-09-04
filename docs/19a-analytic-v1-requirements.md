@@ -368,6 +368,36 @@ depends on whether a circle occupies one. 5b already broke it outright.
 
 **`D(6;3)` — the semicolon again, three questions running.** Relevant to R8.
 
+### 5d — Right triangle from a vertex, a hypotenuse equation, and an ORDER given (no figure)
+
+«במשולש ישר-זווית ABC נתון: ∡ACB = 90°, C(4;−2)» · «משוואת היתר AB היא 2x+y−3=0» · «שיעור ה-x של קדקוד
+A גדול משיעור ה-x של קדקוד B» · א «שעבורם ניצבי המשולש ABC מקבילים לצירים» · ב «ניצבי המשולש ABC אינם
+מקבילים לצירים, אך אורך היתר שלו זהה לאורך היתר במשולש שבסעיף א'»
+
+| need | today |
+| --- | --- |
+| right triangle with the seat EXPLICITLY pinned («∡ACB = 90°») | ✗ here — the ADR-163 channel exists in 2-D |
+| a side named by its ROLE — «היתר», «ניצבי המשולש» — resolved from where the right angle sits | ✗ |
+| a side stated by equation (as 5c) | ✗ |
+| **coordinate-component comparison** — `x_A > x_B` | ✗ — a coordinate is stated today, never addressed or compared |
+| ∥ between a triangle's legs and the axes | ✗ |
+| **EXCLUSION** — «אינם מקבילים לצירים» | ✗ — specced for the sibling as #507 («זווית A לא תהיה ישרה» builds a ≠ requirement instead of refusing); copy it |
+| **cross-part value reference** — «אורך היתר … זהה … במשולש שבסעיף א'» | ✗ — the hardest new demand |
+
+**This question is the positive proof of P2.** It carries **no figure at all**, and precisely because
+there is no picture to point at, the exam is forced to state everything — including the labelling:
+«שיעור ה-x של קדקוד A גדול משיעור ה-x של קדקוד B». A well-authored question needs no drawing. The older
+ones that lean on theirs are the defective ones, which is exactly the operator's ruling, evidenced from
+the other direction.
+
+**And it is a textbook R14 case.** Part א's condition yields the pair {(4,−5), (2.5,−2)}; *which of
+them is called A* is a discrete choice, and the exam consumes that DOF with the x-comparison instead of
+a drawing. Precisely the shape the requirement wants.
+
+**The genuinely new architectural demand is the cross-part reference.**
+[ADR-AG-003](06c-decisions-analytic.md#adr-ag-003) made multipart a workspace model; this needs more —
+a **named result that crosses parts**, where a quantity *derived* in part א becomes a *given* in part ב.
+
 ---
 
 ## 6 — Open rulings
