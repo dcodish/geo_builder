@@ -182,11 +182,24 @@ visually distinguished.** *(Operator: "so user can see what he entered and what 
 same logic as in the 3-D tool.")* The distinction is the point; the toggle is the mechanism. It is the
 panel's «k = -3» versus «t = ?» split, moved onto the canvas.
 
-**R21 — A derived equation is often the exam's ANSWER, so it follows the existing rule: on request,
-and only when it is knowledge.** Q3 part א asks «מצא את משוואת המעגל החוסם» — a canvas that labels the
-circumcircle unasked has solved the question, and this product's boundary is that it reproduces figures
-and never solves them. The student's own input echoes back freely; derived equations stay behind the
-toggle.
+**R21 — A derived equation IS often the exam's answer, and showing it is correct.** *(Operator ruling,
+2026-09-04, overruling an earlier draft of this requirement that would have gated it.)*
+
+The concern was that Q3 part א asks «מצא את משוואת המעגל החוסם», so a canvas labelling the circumcircle
+has answered the question. The ruling: **this is the same case as the 3-D tool, and for a student the
+answer is meaningless without the way.** The bagrut awards marks for the derivation, not the number — a
+student who reads the equation off the canvas cannot write the working that earns the marks, so nothing
+transferable has been given away. Precedent in the product already:
+[ADR-3D-032](06b-decisions-3d.md#adr-3d-032) prints a derived plane equation on a determined figure.
+
+**The positive framing, which is the feature's real value: the derived equation is a CHECK.** The
+student works part א by hand, and the canvas agrees or it does not. Agreement confirms; disagreement
+says look again *without saying where* — which is the right amount of help, and the strongest thing
+this tool does for a student working alone. *(Framing, mine; the ruling is the operator's.)*
+
+**Consequence: the toggle's job is legibility, not protection.** It exists so the canvas is not
+cluttered with an equation on every object. That collapses most of open ruling 5 — a single global
+«הצג משוואות» is likely enough, and per-object display can wait for a case that demands it.
 
 **R22 — The equation display doubles as a DETERMINACY signal, and that is the pedagogy.** The
 circumcircle of a not-yet-determined triangle has a seed-dependent equation — not knowledge, so it
@@ -306,6 +319,6 @@ depends on whether a circle occupies one. 5b already broke it outright.
 2. **R13** — a parametric equation whose *kind* changes with the parameter: what does the tool do?
 3. **R17** — may a stated shape noun narrow a parameter's domain?
 4. **R18** — DOF reporting: passive only, or may it prompt?
-5. **R20** — equation toggle: global, per-object, or both?
+5. **R20** — equation toggle: a single global «הצג משוואות» is likely enough now that R21 makes it a legibility control rather than a gate. Per-object display only if a case demands it.
 6. **R5 / 5b** — where V1 stops: tier 2 vs tier 3, and part ג in or out.
 7. The conic-slot removal needs its own ADR superseding the slot decision.
