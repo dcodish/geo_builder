@@ -1841,3 +1841,42 @@ unrelated `Co-Authored-By:`, and anywhere in the range rather than only on its t
 **Consequences.** PR #894 goes green by stating its reason in its own commit, which is where a reader
 looking at that commit in two years will want to find it. The guard keeps its teeth in every lane:
 nothing global was relaxed, and the only way through is still a sentence somebody had to write.
+
+---
+
+## ADR-W-040 — The math-text core moves to `shell/`, and the "≥2 implementations" seeding rule is met by CONSUMERS (#900)
+
+**Context.** #900 needed the 3-D Builder to render `p^2` as p². 2-D has done exactly that since
+ADR-298 in `src/render/mathText.tsx` — a pure `string → MathML-string` module that names no product and
+branches on nothing. `src3d/` may not import `src/` ([BOUNDARIES.json](../BOUNDARIES.json)), so the
+options were to move it to `shell/` or to write a second copy.
+
+**The seeding rule reads the other way at first glance.** [ADR-W-016](#adr-w-016)'s `shell` layer is
+*"seeded only by surfaces already implemented ≥ 2 times and settled"*, and this surface is implemented
+once. Taken literally that would require writing the 3-D copy first and extracting later.
+
+**Decision: move it, and read the rule by its rationale.** The clause exists to stop an abstraction being
+invented from a single example, where the second use then bends the shape. Neither hazard is present:
+
+- **The shape is settled, not speculative** — shipped since ADR-298, locked by `mathText.test.ts`, and
+  unchanged by this move. The file is transplanted, not redesigned; the only edit is its docblock.
+- **It has two consumers on landing**, not one plus a hope: 2-D's step list and 3-D's non-vector rows.
+- **It carries no product knowledge** — the exact failure mode ADR-W-018 names ("branching on product
+  identity inside a shared module is a fork wearing a shared file's name"). There is nothing here to
+  parameterize; it takes a string and returns markup.
+- **Math rendering is in fact already implemented twice.** `src3d/render/VecMath.tsx` emits MathML too.
+  The two are not interchangeable — `VecMath` DECORATES (arrows, vector pairs) and `shell/math` does
+  not — but the claim that this is a one-off surface is false on the code.
+
+Writing the second copy instead would have created precisely the drift `symbols3.ts`'s docblock records
+from #482, where a palette and its bidi class disagreed because the vocabulary lived in two places.
+
+**What moved.** `src/render/mathText.tsx` → `shell/math.tsx`, `git mv` so history follows, with three
+import sites re-pointed (`src/App.tsx`, `src/render/mathSvg.tsx`, and its test). 2-D behaviour is
+byte-identical — same module, new path — and its own locks are the evidence.
+
+**The rule is not amended.** "≥ 2 times and settled" stays as written; this records that CONSUMERS, not
+copies, are what the clause is counting, and that a settled single implementation acquiring a second
+consumer satisfies it. A surface that is still being designed does not, however many callers want it.
+
+Consumed by #900's 3-D routing — see [ADR-3D-216](06b-decisions-3d.md#adr-3d-216).

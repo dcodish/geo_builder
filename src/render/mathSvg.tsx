@@ -15,7 +15,7 @@
  * `12√2` → `2√12`), and carries the same white halo (`paint-order: stroke`) as the plain labels.
  */
 import type { JSX } from 'react';
-import { hasMath } from './mathText';
+import { hasMath } from '../../shell/math';
 
 const NUM = String.raw`\d+(?:\.\d+)?`;
 const RADICAND = String.raw`\(\s*${NUM}(?:\s*\/\s*${NUM})?\s*\)|${NUM}`;

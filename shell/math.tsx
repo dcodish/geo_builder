@@ -1,4 +1,11 @@
 /**
+ * THE SHARED MATH-TEXT CORE (#900, ADR-W-040). It lived at `src/render/mathText.tsx` and served the 2-D
+ * step list alone; the 3-D Builder echoed `C(p^2,1,0)` with a literal caret because it had no equivalent.
+ * Moved here rather than copied: the module is pure `string -> structure`, names no product, and branches
+ * on nothing — the shell test the seeding rule actually protects. Its consumers are 2-D's step list and
+ * 3-D's non-vector rows; 3-D's VECTOR rows keep `VecMath`, which decorates (arrows, vector pairs) and must
+ * stay fact-kind-gated per #313.
+ *
  * Render math-flavoured notation as formatted math (MathML) inline within a line of otherwise plain text
  * ([ADR-298](docs/06-decisions.md#adr-298) Am. / issues #77 + #40). A student types `BC = 35/√32`; this
  * shows `35` over `√32` as a real fraction-with-radical, so the interpretation is visible — the disambiguating

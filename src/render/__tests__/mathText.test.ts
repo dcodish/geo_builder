@@ -3,7 +3,7 @@
  * (incl. the √() grouping), subscripts and superscripts become MathML; everything else stays verbatim.
  */
 import { describe, it, expect } from 'vitest';
-import { mathHtml, hasMath } from '../mathText';
+import { mathHtml, hasMath } from '../../../shell/math';
 
 describe('hasMath', () => {
   it('detects radicals / fractions / subscripts / powers', () => {

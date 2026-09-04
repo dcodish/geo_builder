@@ -47,7 +47,10 @@ describe('VecMath', () => {
   });
 
   it('the wiring contract: VecMath applies only to VECTOR rows (isVectorFact3 routes) — a prose row with a segment name must never gain an arrow', () => {
-    // classification lives in notation.ts; App3 renders non-vector facts as plain utterance text.
+    // classification lives in notation.ts. What the ROW does with it is FactRow3's, and is locked in
+    // issue-900-power-rendering.test.tsx: this gate decides the vector DECORATION only — since #900 a
+    // non-vector row still gets math STRUCTURE when its text carries any, which is what this file
+    // asserting only the gate's return value could never have caught.
     expect(isVectorFact3({ cmds: [{ type: 'midpoint3' }] })).toBe(false);
     expect(isVectorFact3({ cmds: [{ type: 'vec-rel' }] })).toBe(true);
     expect(isVectorFact3({ cmds: [{ type: 'claim', claim: { type: 'vec-eq' } }] })).toBe(true);
