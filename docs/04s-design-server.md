@@ -113,14 +113,16 @@ Declared in [`BOUNDARIES.json`](../BOUNDARIES.json) and enforced by `server/__te
 The shared `server/` tests run in **every** product CI lane, which is why the cross-product guards live
 here: a violation introduced by any product fails that product's own lane.
 
-## Known gap — this tree has no static type gate
+## The type gate — closed 2026-09-05
 
-**`server/` is not in [`tsconfig.json`](../tsconfig.json)'s `include`**, and `build.mjs` uses esbuild,
-which strips types without checking them. So the one tree that runs as a long-lived service in
-production is the only one `tsc -b` never sees. Measured 2026-09-05: **one real error**
-(`parseHandler.ts` — a `readonly` tuple against the SDK's mutable `string[]`), plus two in its tests.
-Low severity today; nothing prevents the next one.
+For most of this tree's life it was **not typechecked**: absent from [`tsconfig.json`](../tsconfig.json)'s
+`include`, and `build.mjs` uses esbuild, which strips types without checking them — so the one tree
+running as a long-lived production service was the only one `tsc -b` never saw.
 
-Scheduled as Phase 4 of [#904](https://github.com/dcodish/geo_builder/issues/904). Recorded here rather
-than only in an issue because a design doc that omits its own weakest property is not describing the
-system.
+Closed in #904 Phase 4: `server` is in `include`, and the three errors that had accumulated are fixed at
+their seams. The interesting one is [`parseHandler.ts`](../server/parseHandler.ts): the prompt builders
+own the request as plain data and deliberately import no SDK types (they ship in browser bundles), so
+their `as const` makes every array readonly where the SDK wants mutable `string[]`. That mismatch is a
+**boundary** concern, so the widening lives at the seam that knows this data is an SDK request — typed as
+`MessageCreateParamsNonStreaming`, which both widens and pins the non-streaming overload, rather than
+pulling SDK types into a product tree.
