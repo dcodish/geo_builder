@@ -1880,3 +1880,132 @@ copies, are what the clause is counting, and that a settled single implementatio
 consumer satisfies it. A surface that is still being designed does not, however many callers want it.
 
 Consumed by #900's 3-D routing — see [ADR-3D-216](06b-decisions-3d.md#adr-3d-216).
+
+## ADR-W-041 — Requirements and design are DELIVERABLES of a change, and the ADR is where that is enforced (#904)
+
+**Context.** A full audit (2026-09-05) measured the contract layer against the build. Since
+`docs/02-requirements.md` was last touched (2026-07-19) the repo took **887 commits, 216 of them
+`feat`. One touched the requirements doc.** The ADR logs took 332 commits over the same window. The
+code and test layers audited clean — 1 `TODO` in 86,423 non-test source lines, zero `@ts-ignore`, zero
+`.only`, zero dead modules, 10,646 tests green — so this is not general neglect. It is one specific
+artifact rotting while every mandatory gate stayed green.
+
+**Why no existing gate could catch it.** The workflow has an enforced home *and* a gate for decisions
+(the ADR logs, mandatory per CLAUDE.md), for work (the issue queue, `gh issue create` on every operator
+report) and for behaviour (the suite, `test:full` before any commit). The contract — what the product
+promises, and how it is built — has **neither**. It is the only artifact in the repo that no route step
+requires and no test reads. Nothing was skipped; there was nothing to skip.
+
+The sharpest evidence is `FR-RV-1…7`. The reveal layer shipped **2026-06-27** in `a390fcc`
+(`src/engine/relations.ts`, 591 lines; `viewRelations` / `hideRelations` live in both locales). Ten
+weeks later `docs/02-requirements.md` still heads that section *"(deferred, own phase)"* with every item
+tagged *"(Later)"* — and the doc was edited on 2026-07-19, three weeks after the feature shipped,
+without anyone looking at it. A session planning from that doc would conclude the feature does not exist.
+
+This is [ADR-W-018](#adr-w-018)'s rule ("branching on product identity inside a shared module is a fork
+wearing a shared file's name") and [docs/28](28-product-unification.md) §1c's finding ("the doctrine is
+duplicated in PROSE — which is the real defect") one layer up: a rule with no mechanical home is a rule
+held by memory, and memory lost.
+
+### Decision 1 — the contract
+
+A change that alters **what the product promises** updates its requirements doc. A change that alters
+**how it is built** updates its design doc. Both in the **same commit as the code**, exactly like the
+ADR and the regression scenario — not in a follow-up, not "when the dust settles". A promise the code
+makes and the doc denies is the same class of defect as a figure that violates its givens: the tool
+says one thing and does another.
+
+### Decision 2 — the hook is the ADR, not a new checklist item
+
+Every ADR gains two mandatory lines:
+
+```
+**Requirements:** FR-RN-9 (new), FR-RV-1…7 (status → Realised)   |   none (internal)
+**Design:**       04b §6 (the landing funnel gains a stage)      |   none (internal)
+```
+
+Three reasons this is the right seam rather than a new step in `docs/22`:
+
+- **An ADR is already mandatory** for any significant decision. Putting the question inside a step
+  nobody skips is the only placement that does not rely on remembering.
+- **It is auditable.** A test can assert the lines exist and that every id cited resolves. A prose rule
+  in a workflow doc cannot be tested, which is exactly how the current gap was created.
+- **It asks the question at the moment the answer is known** — while the author is arguing the decision,
+  not weeks later when a doc audit tries to reconstruct it.
+
+**`none (internal)` is a first-class answer and most ADRs will use it.** A refactor, a perf fix, a
+solver change behind an unchanged promise genuinely alters no contract. This is load-bearing: if an FR
+id were the only acceptable answer, sessions would invent FRs to satisfy the gate, and an inflated
+requirements doc is worse than a stale one — it lies with more words.
+
+### Decision 3 — the document scheme mirrors the ADR logs
+
+| | 2-D | 3-D | Analytic | Complex | Workspace |
+| --- | --- | --- | --- | --- | --- |
+| Decisions | `06` | `06b` | `06c` | `06d` | `06w` |
+| **Requirements** | `02` | **`02b`** | **`02c`** | **`02d`** | **`02w`** |
+| **Design** | `04` | **`04b`** | **`04c`** | **`04d`** | **`04w`** |
+
+The suffixes are already navigated daily, so the scheme costs nothing to learn, and it makes the
+coverage guard a one-line derivation from `products.json` rather than a hand-kept list.
+
+`02w` / `04w` exist to give the **shared** surfaces one home: the `shell/` chrome, the admin dashboard,
+the ask lane and data panel, save/load, the switcher, i18n. Today those are documented as D1–D10 inside
+`docs/28`, a *plan* document — and a plan is finished, while a contract is standing. Without `02w` each
+of those promises would be restated in four product docs, which is the prose duplication this ADR is
+reacting to.
+
+**Requirements docs are CONTRACT, not catalogue.** `src/parser/catalog.ts` and `src3d/parser/catalog3.ts`
+are already the machine-readable, test-guarded construct inventories, and they cannot drift because
+guard tests parse every entry. A requirements doc that re-listed constructs would be a second copy that
+*can* drift. It owns the layer above: the honesty invariants, the DOF promises, the claims contract, the
+gauge-vs-knowledge rule, the pedagogy boundary, the refusal semantics. This is what makes retrofitting
+3-D and complex a bounded job rather than a hopeless one.
+
+### Decision 4 — the gate is proportional, and the proportion is measured
+
+`test:full` is ~10 minutes. That cost should be paid whenever it can tell us something and not
+otherwise. Measured on the tree at `26c7cad`: **exactly two product tests read a doc file at runtime** —
+`src/__tests__/scenarios.test.ts` (`docs/test-scenarios.md`) and
+`src/theorems/__tests__/t5-principles.test.ts` (`docs/10-pedagogy.md`). Everything else guarding the doc
+surface is a registry/hygiene test. So the doc gate is that set plus the four guards:
+
+```
+npx vitest run server/__tests__/docs-hygiene.test.ts \
+  server/__tests__/registry-consistency.test.ts \
+  server/__tests__/isolation.test.ts \
+  server/__tests__/sibling-safety.test.ts \
+  src/__tests__/scenarios.test.ts \
+  src/theorems/__tests__/t5-principles.test.ts
+```
+
+**84 tests, 2.0 s**, against ~10 min. A change touching **any** `.ts` / `.tsx` pays the full suite,
+claimed by reading `reports/suite-verdict.json` per [ADR-W-033](#adr-w-033) — never an exit code.
+
+The list is **derived, not remembered**: the conformance guard recomputes the set of test files that
+read from `docs/` and fails if the registry disagrees. A new doc-reading test joins the gate by itself,
+which is the same discipline [ADR-394](06-decisions.md#adr-394) applied to the slow tier — a hand-kept
+exclusion list is how the fast tier silently stopped meaning anything.
+
+### Decision 5 — three long-open tooling questions, closed
+
+- **No linter, and this is the record of why.** Measured: 1 `TODO`, 16 `any` and zero `@ts-ignore`
+  across 86,423 non-test source lines, under `strict` + `noUnusedLocals` + `noUnusedParameters` +
+  `noFallthroughCasesInSwitch`. The defects this repo actually ships are semantic (a Hebrew morphology
+  gate admitting one spelling, an enumeration one member short) and no linter detects those — the
+  narrow guard tests do. Adopting one now means a mechanical diff across 239 modules for no measured
+  defect class, against a standing rule that nothing working may break. Revisit if a second contributor
+  joins, where a formatter's value is coordination rather than defect-finding.
+- **Coverage: measure once, do not gate.** Install `@vitest/coverage-v8`, run it as a diagnostic, record
+  the numbers in `docs/08`. This closes a question `docs/08` has carried under *Open decisions* since
+  2026-06-10. It is explicitly **not** a gate: this repo's correctness evidence is four independent nets
+  (invariants campaign, the coordinate oracle at 5.6e-15 worst residual, the givens verifier, 339
+  scenarios + 29 fixtures), and a line-coverage target would be a weaker claim dressed as a stronger one.
+- **Visual smoke in CI: deferred to its own issue.** `npm run smoke:visual` needs a preview server in
+  the lane; it is real value and a separate build, not part of a documentation-contract program.
+
+### What this does not decide
+
+The `parse.ts` decomposition (11,336 lines, untracked); whether `docs/19a` is renamed to `02c` now or
+when analytic V1 ratifies (it is live work, so the rename waits on the operator); and Phase 4 of #904,
+which is discussed when reached.
