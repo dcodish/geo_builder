@@ -16,9 +16,9 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const { classifyChange, productOf, PRODUCTS, firstReason, SIBLING_TRAILER } = (await import(
-  '../../scripts/check-sibling-safety.mjs'
-)) as any;
+// @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
+const tooling = (await import('../../scripts/check-sibling-safety.mjs')) as any;
+const { classifyChange, productOf, PRODUCTS, firstReason, SIBLING_TRAILER } = tooling;
 
 type Buckets = { own: string[]; sibling: string[]; shared: string[]; inert: string[] };
 /** Default viewpoint stays `complex` — the one the guard shipped with (#846 made it a parameter). */

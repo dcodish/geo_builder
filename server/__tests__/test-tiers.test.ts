@@ -224,7 +224,7 @@ describe('#812 — the tier artifact holds no per-machine state', () => {
   });
 
   it('every entry is exactly ONE line — so a membership change is an insertion', () => {
-    const lines = serializeTiers(SAMPLE).split('\n').filter((l) => l.includes('.test.ts'));
+    const lines = serializeTiers(SAMPLE).split('\n').filter((l: string) => l.includes('.test.ts'));
     expect(lines).toHaveLength(SAMPLE.length);
   });
 

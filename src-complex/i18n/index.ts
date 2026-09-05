@@ -190,7 +190,10 @@ const he = {
   askIsStatement: 'זהו נתון, לא שאלה — הקלידו אותו בתיבת הנתונים',
 };
 
-const en = {
+// #904 Phase 4: typed against `he`, so a missing or misspelled key is a COMPILE error rather than a
+// raw key printed to a student. The analytic tree already did this; this one did not, and its 147 keys
+// happened to agree. src3d/ gets the same guarantee via a parity TEST, its locales being JSON.
+const en: typeof he = {
   title: 'Complex Numbers',
   subtitle: 'The Gauss plane: enter givens line by line and watch the points',
   inputPlaceholder: 'e.g. z1 = 3+4i or w = z1*z2 or z^3 = 8',

@@ -17,6 +17,8 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
+// Type-only: erased at build, so the dynamic import('@anthropic-ai/sdk') below still governs runtime.
+import type { MessageCreateParamsNonStreaming } from '@anthropic-ai/sdk/resources';
 import { buildLlmRequest, extractSteps } from '../src/parser/llmShared';
 // The 3-D sibling app shares this proxy: a `tool: '3d'` field in the body selects its
 // prompt (docs/20 §6.6 — one process, one endpoint, no new infrastructure). The server
@@ -113,7 +115,13 @@ export async function handleParse(
     // hold sockets and multiply spend on a slow/hung upstream. One attempt, ~15 s ceiling.
     const client = new Anthropic({ apiKey, timeout: 15_000, maxRetries: 0 });
     const request = tool === '3d' ? buildLlmRequest3(utterance, context) : buildLlmRequest(utterance, context);
-    const msg = await client.messages.create(request);
+    // The prompt builders own the request as PLAIN DATA and deliberately import no SDK types — they ship in
+    // browser bundles, and `llmShared.ts` says so explicitly. Their `as const` therefore makes every array
+    // readonly, which the SDK's mutable `string[]` fields reject. Widening is a boundary concern, so it
+    // happens HERE, at the one seam that knows this data is an SDK request — not by pulling SDK types into
+    // a product tree. Derived from the SDK's own signature rather than `any`, so a real shape change still
+    // fails to compile.
+    const msg = await client.messages.create(request as unknown as MessageCreateParamsNonStreaming);
     const steps = extractSteps(msg.content as { type: string; name?: string; input?: unknown }[]) ?? [];
     return send(200, { steps });
   } catch (e) {
