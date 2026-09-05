@@ -1,0 +1,168 @@
+{
+  "$comment": [
+    "AUTHORITATIVE documentation registry (ADR-W-041, docs/06w-decisions-workspace.md; issue #904).",
+    "server/__tests__/docs-hygiene.test.ts READS this file. Do not restate these enumerations in prose",
+    "or hardcode them in a test — an enumeration living in a test is how docs/06c and src-analytic/",
+    "CLAUDE.md became invisible to the ADR-resolution guard while it reported green.",
+    "Adding a doc, a product, an ADR log or an orientation file means editing THIS file.",
+    "",
+    "The two grandfather lists (index.grandfathered, frIds.grandfathered) are asserted EXACT, not",
+    "'at most': a new omission fails the suite rather than joining a growing list of exceptions.",
+    "They shrink to empty as #904 Phases 2-3 land, and each names the issue that will empty it."
+  ],
+  "version": 1,
+
+  "orientationFiles": {
+    "$comment": [
+      "Files that load into EVERY session and must stay orientation, not chronology (ADR-W-002, #452).",
+      "Ceilings sit ABOVE current size on purpose: a guard that fires on a legitimate addition gets",
+      "relaxed, and then there is no guard. src-analytic/CLAUDE.md was missing here until #904 -- the",
+      "fourth product's orientation file was unguarded from the day the tree was created."
+    ],
+    "CLAUDE.md": { "ceiling": 20000 },
+    "src3d/CLAUDE.md": { "ceiling": 10000 },
+    "src-complex/CLAUDE.md": { "ceiling": 10000 },
+    "src-analytic/CLAUDE.md": { "ceiling": 10000 }
+  },
+
+  "adrLogs": {
+    "$comment": [
+      "path -> { idPrefix, contractFrom }. idPrefix builds the id-matching regex, so a log listed here",
+      "is automatically VISIBLE to the resolution guard -- docs/06c-decisions-analytic.md was absent",
+      "from the old hardcoded list, making every ADR-AG-* id unresolvable-by-omission rather than",
+      "checked. Headings are matched as '^#+' because the logs mix '## ADR-N' and '### ADR-N' (390 vs",
+      "120 in 06-decisions.md alone); a '^## ' matcher silently skips a quarter of them.",
+      "",
+      "contractFrom = the first id required to carry the ADR-W-041 **Requirements:** / **Design:**",
+      "lines. Each is set to (current max + 1) so all 815 existing ADRs are grandfathered by id and no",
+      "allowlist is needed -- EXCEPT 06w, deliberately set to 41 rather than 42 so ADR-W-041, the ADR",
+      "that mandates the lines, is the first one bound by its own rule."
+    ],
+    "docs/06-decisions.md": { "idPrefix": "", "contractFrom": 482 },
+    "docs/06b-decisions-3d.md": { "idPrefix": "3D-", "contractFrom": 217 },
+    "docs/06c-decisions-analytic.md": { "idPrefix": "AG-", "contractFrom": 9 },
+    "docs/06d-decisions-complex.md": { "idPrefix": "CX-", "contractFrom": 38 },
+    "docs/06w-decisions-workspace.md": { "idPrefix": "W-", "contractFrom": 41 }
+  },
+
+  "products": {
+    "$comment": [
+      "Keyed by products.json id, plus 'workspace' and 'server' which ship no builder but do own",
+      "contracts (the shell/ chrome, the admin dashboard, the proxy). The guard cross-checks that every",
+      "products.json id appears here, so builder N+1 cannot arrive without its docs being accounted for.",
+      "A null path is a DECLARED gap and must carry 'pending' with the issue that closes it -- that is",
+      "the difference between a known debt and an oversight."
+    ],
+    "2d": {
+      "requirements": "docs/02-requirements.md",
+      "design": "docs/04-design.md"
+    },
+    "3d": {
+      "requirements": null,
+      "design": null,
+      "pending": 904,
+      "note": "52,301 lines and 219 ADRs in production. docs/20 is the build plan, not a contract."
+    },
+    "complex": {
+      "requirements": null,
+      "design": null,
+      "pending": 904,
+      "note": "16,511 lines, 37 ADRs, shipped prod/2026-08-17-4. docs/27 is the plan."
+    },
+    "analytic": {
+      "requirements": "docs/02c-requirements-analytic.md",
+      "design": null,
+      "pending": 904,
+      "note": "Requirements promoted from 19a by ADR-W-041; design doc still to write."
+    },
+    "workspace": {
+      "requirements": null,
+      "design": null,
+      "pending": 904,
+      "note": "Owns the shared surfaces: shell/ chrome, ask lane + data panel, save/load, switcher. Today they live as D1-D10 in docs/28, a PLAN."
+    },
+    "server": {
+      "requirements": null,
+      "design": null,
+      "pending": 904,
+      "note": "server/admin.ts is 1,248 lines with no requirement anywhere; deploy/README.md is ops, not design."
+    }
+  },
+
+  "index": {
+    "$comment": [
+      "docs/README.md must reference every docs/*.md. The grandfathered list is the exact set of",
+      "omissions on 2026-09-05 and is emptied by #904 Phase 2 (Step 4)."
+    ],
+    "file": "docs/README.md",
+    "issue": 904,
+    "grandfathered": [
+      "02c-requirements-analytic.md",
+      "06c-decisions-analytic.md",
+      "06d-decisions-complex.md",
+      "09b-status-log.md",
+      "21-572-coverage-audit.md",
+      "23-architecture-review-2026-07.md",
+      "24-foundation-hardening-plan.md",
+      "25-joint-solve-design.md",
+      "26-3d-relations-plan.md",
+      "29-complex-formula-reference.md",
+      "LADDER-CX.md",
+      "LADDER.md",
+      "PLAY-QUEUE.md",
+      "manual-verification-2026-06-15.md",
+      "test-scenarios.md"
+    ]
+  },
+
+  "frIds": {
+    "$comment": [
+      "Every FR-* cited anywhere in docs/ must be DEFINED in a registered requirements doc. A definition",
+      "is the bold declaration form '**FR-XX-N (Tier)**'; everything else is a citation. The matcher",
+      "excludes a preceding letter so 'NFR-SE-1' is not read as a definition of 'FR-SE-1' -- that false",
+      "positive appeared twice during the audit that produced #904.",
+      "",
+      "FR-RV-7 is a REAL dangling reference found by this guard on the day it was written: cited by",
+      "FR-RV-4 and FR-RV-6, defined nowhere. Grandfathered rather than fixed in-flight, per #904's",
+      "'gaps are filed, not fixed' rule; resolved by Phase 2 (Step 5, the 02 truth pass)."
+    ],
+    "issue": 904,
+    "grandfathered": ["FR-RV-7"]
+  },
+
+  "docGate": {
+    "$comment": [
+      "The proportional gate of ADR-W-041: a doc-only change runs these instead of the ~10-minute full",
+      "suite. Measured 2026-09-05: 9 files, 655 tests, 2.1s.",
+      "",
+      "This gate is the ONLY protection a doc change gets. ci.yml carries 'paths-ignore: docs/**', so a",
+      "docs-only push runs no CI lane at all -- a doc edit that breaks a test surfaces on someone's next",
+      "CODE push, attributed to the wrong commit. That is why the list is derived rather than recalled.",
+      "",
+      "'derived' is CHECKED, not trusted: the guard rescans every test file for a quoted docs/*.md path",
+      "and fails if any match sits outside this gate, so a new doc-reading test joins by itself. This is",
+      "the ADR-394 discipline (a hand-kept exclusion list is how the fast tier stopped meaning anything)",
+      "applied to the doc gate. The scan is what caught the three readers a hand-written grep missed --",
+      "including two BYTE-MATCH gates, src/theorems (docs/07) and src-complex/formulas (docs/29), where",
+      "editing the doc alone turns the suite red.",
+      "",
+      "'registryGuards' read the JSON registries (BOUNDARIES/products/DOCS) rather than docs/*.md, so no",
+      "scan derives them; sibling-safety also matches the scan because it uses docs/ paths as classifier",
+      "FIXTURES. The asserted invariant is therefore 'every scan match is somewhere in the gate', not a",
+      "clean partition between the two lists."
+    ],
+    "derived": [
+      "server/__tests__/docs-hygiene.test.ts",
+      "server/__tests__/registry-consistency.test.ts",
+      "src/__tests__/scenarios.test.ts",
+      "src/theorems/__tests__/t5-principles.test.ts",
+      "src/theorems/__tests__/integrity.test.ts",
+      "src/theorems/__tests__/fill-order.test.ts",
+      "src-complex/formulas/__tests__/integrity.test.ts"
+    ],
+    "registryGuards": [
+      "server/__tests__/isolation.test.ts",
+      "server/__tests__/sibling-safety.test.ts"
+    ]
+  }
+}

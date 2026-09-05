@@ -1883,6 +1883,13 @@ Consumed by #900's 3-D routing — see [ADR-3D-216](06b-decisions-3d.md#adr-3d-2
 
 ## ADR-W-041 — Requirements and design are DELIVERABLES of a change, and the ADR is where that is enforced (#904)
 
+**Requirements:** none (internal) — no promise to a student changes. This ADR creates the requirements
+*structure* (`02b`/`02c`/`02d`/`02w`); the documents it mandates are written in #904 Phase 3.
+**Design:** none (internal) — no product architecture changes.
+
+*(These two lines are the form this ADR mandates. It is the first ADR bound by its own rule — the
+`06w` cutoff in `DOCS.json` is set at 41, not 42, deliberately.)*
+
 **Context.** A full audit (2026-09-05) measured the contract layer against the build. Since
 `docs/02-requirements.md` was last touched (2026-07-19) the repo took **887 commits, 216 of them
 `feat`. One touched the requirements doc.** The ADR logs took 332 commits over the same window. The
@@ -2009,3 +2016,28 @@ exclusion list is how the fast tier silently stopped meaning anything.
 The `parse.ts` decomposition (11,336 lines, untracked); whether `docs/19a` is renamed to `02c` now or
 when analytic V1 ratifies (it is live work, so the rename waits on the operator); and Phase 4 of #904,
 which is discussed when reached.
+
+**Amendment 2 (2026-09-05, Phase 1 — the gate above was measured wrong and is corrected here).**
+Decision 4 claimed *"exactly two product tests read a doc file at runtime"*, from a hand-written grep.
+Building the derived check in `DOCS.json` found **five**, not two: the grep missed
+`src/theorems/__tests__/integrity.test.ts` (byte-matches `THEOREM_TABLE` against `docs/07`),
+`src-complex/formulas/__tests__/integrity.test.ts` (byte-matches the formula table against `docs/29`)
+and `src/theorems/__tests__/fill-order.test.ts` (`docs/sample questions/theorem-ground-truth.md`). Two
+of those are byte-match gates, so editing the prose **alone** turns the suite red.
+
+The corrected gate is **9 files, 655 tests, 2.1 s** — the same wall-clock, 571 more tests. The
+under-count mattered more than it looks: `ci.yml` carries `paths-ignore: docs/**`, so a docs-only push
+runs **no CI lane at all**, and a doc-reading test outside the gate would first go red on someone
+else's later code push, attributed to the wrong commit.
+
+This is why Decision 4 says the list is *derived, not remembered* — the derivation caught its own
+author's list on the day it was written. The scan is now an assertion in `docs-hygiene.test.ts`: any
+test referencing a `docs/*.md` path that is not in the gate fails the suite.
+
+**Amendment 1 (2026-09-05, operator: "we should make changes now during cleanup").** `docs/19a` is
+renamed to `docs/02c-requirements-analytic.md` immediately, in Phase 1, rather than waiting on
+ratification. Its declared lifecycle changes with it: the file no longer *"folds into 19 and is
+deleted"*. Under this ADR a requirements doc is a **standing contract** and `docs/19` is a **finishing
+plan**, so the fold runs the other way — `docs/19`'s analytic requirements fold into `02c`, and
+ratification changes `02c`'s status line rather than ending its life. Recorded in that file's header,
+because a lifecycle reversal is exactly the kind of implication this ADR exists to stop losing.

@@ -1,9 +1,17 @@
-# Analytic Builder — V1 pedagogy and requirements
+# 02c — Requirements: the analytic-geometry tool (`src-analytic/`)
 
-**Status: IN PROGRESS.** Captured live from an operator session (2026-09-04) while the thoughts were
-still being given. It is the working record, not yet the plan of record: [docs/19](19-analytic-geometry-tool.md)
-stays authoritative until the decisions here are ratified as `ADR-AG-NNN` in
-[06c](06c-decisions-analytic.md), at which point this file folds into 19 and is deleted.
+**Status: IN PROGRESS — and this is the product's standing requirements doc.** Captured live from an
+operator session (2026-09-04) while the thoughts were still being given, and promoted from `19a` into
+the `02c` slot by [ADR-W-041](06w-decisions-workspace.md#adr-w-041) (2026-09-05, operator ruling).
+
+**That promotion changed this file's lifecycle, so the change is recorded rather than made silently.**
+The original header said this file *"folds into 19 and is deleted"* once its decisions ratified as
+`ADR-AG-NNN` in [06c](06c-decisions-analytic.md). It no longer does. Under ADR-W-041 a product's
+requirements are a **standing contract** and [docs/19](19-analytic-geometry-tool.md) is its build
+**plan** — a plan finishes and becomes history, a contract does not. Ratification therefore changes
+this file's *status line*, not its existence; the analytic sections of `docs/19` fold into **here**,
+not the reverse. Until a section is ratified, [docs/19](19-analytic-geometry-tool.md) stays
+authoritative where the two disagree.
 
 Read it as *the operator's intent plus its consequences*, with the open questions marked. Where a
 consequence is mine rather than theirs, it says so.

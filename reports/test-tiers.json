@@ -25,6 +25,7 @@
     "src3d/__tests__/adr-3d-032.test.ts",
     "src3d/__tests__/book-coordinate-givens.test.ts",
     "src3d/__tests__/exam-2026-2.test.ts",
+    "src3d/__tests__/issue-814.test.ts",
     "src3d/__tests__/issue-815.test.ts",
     "src3d/__tests__/issue-816.test.ts",
     "src3d/__tests__/issue-827.test.ts",
