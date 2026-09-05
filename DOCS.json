@@ -121,10 +121,10 @@
       "note": "Requirements promoted from 19a by ADR-W-041; design doc still to write."
     },
     "workspace": {
-      "requirements": null,
+      "requirements": "docs/02w-requirements-workspace.md",
       "design": null,
       "pending": 904,
-      "note": "Owns the shared surfaces: shell/ chrome, ask lane + data panel, save/load, switcher. Today they live as D1-D10 in docs/28, a PLAN."
+      "note": "Requirements written (#904 Step 7). Design doc 04w still to write: the shell/ seeding rule and boundary edges live in ADR-W-016 + BOUNDARIES.json meanwhile."
     },
     "server": {
       "requirements": null,

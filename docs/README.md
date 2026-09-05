@@ -32,7 +32,7 @@ tracked by [#904](https://github.com/dcodish/geo_builder/issues/904), not oversi
 | 02b | *(to write)* | Requirements — 3-D Space Builder |
 | 02c | [Requirements — Analytic](02c-requirements-analytic.md) | **In progress; the product's standing requirements doc.** V1 pedagogy + requirements, captured live 2026-09-04, promoted from `19a` by ADR-W-041 |
 | 02d | *(to write)* | Requirements — complex-numbers Builder |
-| 02w | *(to write)* | Requirements — shared surfaces (`shell/` chrome, ask lane + data panel, admin dashboard) |
+| 02w | [Requirements — shared surfaces](02w-requirements-workspace.md) | The contract every builder shares: suite chrome, the ask lane + data panel, save/load envelope, export, the admin surface, bidi and number display |
 | 03 | [Non-Functional Requirements](03-nonfunctional-requirements.md) | Quality attributes (`NFR-*`): usability, stability, cost, security, privacy |
 | 04 | [Design — 2-D](04-design.md) | Architecture, data model, engine, input layer, rendering. **2-D only** |
 | 04b–04w | *(to write)* | Design — 3-D, analytic, complex, and the shared `shell/` + `server/` |
