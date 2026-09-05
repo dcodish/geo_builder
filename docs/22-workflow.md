@@ -30,7 +30,7 @@ A heredoc into `--body "$(cat <<'EOF' … EOF)"` also works. The verify step is 
 
 **Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3`; one *app* — `2d` | `3d` | `server`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the operator has approved the issue's fix plan for autonomous execution (§2d — operator-applied ONLY), `in-round` on a fix-round's round issue while the round executes (an open `in-round` issue with no session running it = a round died mid-flight — [ADR-W-013](06w-decisions-workspace.md)), and `awaiting-play` on the same issue from round-finish until the operator validates the batch (§2d).
 
-**"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. (The historical backlog in [14-backlog.md](14-backlog.md) and ADR prose was partially migrated at adoption; sweep opportunistically.)
+**"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. ([14-backlog.md](14-backlog.md) is fully migrated as of 2026-09-05, #907 — it is now a historical record. ADR prose is still swept opportunistically.)
 
 **Prod-log triage findings follow the same taxonomy:** the log-triage agent/skill classifies each cluster `bug` vs `feature` with a proposed priority, **files the `bug` clusters as issues immediately** (deduped against open issues), and holds `feature` clusters as recommendations — those are filed as issues only once the operator approves them for building (then built via the feature route, §4).
 
@@ -183,7 +183,7 @@ Applies to feature requests **and** bug reports reclassified as capability gaps.
 
 1. **File the issue** labeled `feature` + priority.
 2. **Scope with the operator** before building anything non-trivial (the ADR-262 pattern — AskUserQuestion rounds; big things get a plan doc first, like docs/18/20).
-3. **Branch:** `feat/<issue#>-<slug>` (fixes that go the PR route: `fix/<issue#>-<slug>`). Prefer a **git worktree** for the branch when the shared Dropbox tree carries another session's work — created **outside Dropbox** under `"$TMPDIR"/claude/geo-wt/<branch>`, never as a sibling in `Dropbox/projects/` (§7).
+3. **Branch:** `feat/<issue#>-<slug>` (fixes that go the PR route: `fix/<issue#>-<slug>`). Prefer a **git worktree** when the shared tree carries another session's work — created **outside the repo tree** under `"$TMPDIR"/claude/geo-wt/<branch>` (§7).
 4. **Build** under the normal gates (ADR, tests, scenario/fixture, suite + `tsc` + build green).
    **If the change touches a UI surface, the visual smoke is part of those gates**
    ([ADR-W-035](06w-decisions-workspace.md#adr-w-035)): `npm run dev` then
@@ -215,16 +215,45 @@ Applies to feature requests **and** bug reports reclassified as capability gaps.
 
 Labels: `P1` (red) `P2` (orange) `P3` (yellow) · `bug` `feature` `debt` · `2d` `3d` `server` · `needs-operator`. The app-label set **grows with the workspace** — each new product (§9) gets its own label at creation (planned: `analytic`, `complex`); `server` doubles as the label for shared-infra / CI / workspace items. CI runs per-product lanes on every push and PR (`.github/workflows/ci.yml`, ADR-266). Branch protection on `main` is optional (solo repo; CI is the real gate) — revisit if collaborators join.
 
-## 7. Concurrency rules (the Dropbox reality)
+## 7. Concurrency rules (one shared tree, two machines)
 
-The repo's `.git` syncs between two PCs via Dropbox, and parallel Claude sessions share one working tree. Rules that keep the new flow safe:
+**The repo is NOT in Dropbox.** It lives at `C:\projects\geo_builder` and **git is the only channel
+between the two PCs** — the move happened 2026-07-23, after Dropbox corrupted `node_modules`, `.git`
+and source. The switch is mechanical: a `SessionStart` hook pulls `--ff-only` and reports anything
+needing a decision, the `/handoff` skill commits and pushes, and a `SessionEnd` hook pushes committed
+work as a net. **Nothing auto-commits.**
 
-- **Commit before switching contexts** — an uncommitted tree is invisible to the other PC's git and rides along into anyone's commit.
-- **Never `git checkout` a different branch in the shared tree while it carries another session's uncommitted work** — use a **worktree** (`git worktree add`) for topic branches instead; the shared tree stays on `main`.
-- **Worktrees and ALL scratch/temp working dirs live OUTSIDE Dropbox** — under the machine's OS temp, project-scoped: `"$TMPDIR"/claude/geo-wt/<branch>` for worktrees (derive the path from `$TMPDIR`/`%TEMP%`; never hardcode a `C:\Users\<name>\…` path), and the session scratchpad for loose scratch files. **Never create a worktree or temp dir as a sibling of the repo inside `Dropbox/projects/`, and never inside the repo tree.** Dropbox syncs everything to all three machines and leaves orphaned worktree shells (empty `node_modules`, stale `src/` copies, dangling symlinks) behind on `git worktree remove`/`prune` — that residue is dead weight on every machine and reads like garbage in the projects folder. Clean up with `git worktree remove` (or `git worktree prune` for stale registrations) when a branch is merged; if a temp dir ever *does* end up in Dropbox, delete the folder outright. `git worktree list` shows the live ones.
-- **Never link or copy `node_modules` into a worktree.** `git worktree remove` follows the junction and destroys the **shared tree's** copy — a working tree that then fails to build for every other session. (Moved here from CLAUDE.md, which is at its size ceiling; this is the hazard's one home.)
-- **One session = one concern** — a session's commits should map to one issue/PR so `Fixes #NN` stays honest.
-- Push after every commit (GitHub is the real backup; Dropbox corrupts `.git` — see PROJECT-MEMORY operational notes).
+What remains true, and is what these rules are actually about: **parallel Claude sessions share one
+working tree**, and an uncommitted change in it belongs to whoever commits next.
+
+- **Commit before switching contexts** — an uncommitted tree rides along into anyone else's commit, and
+  is invisible to the other PC until it is pushed.
+- **Push after every commit.** GitHub is the real backup *and the only channel to the other machine* —
+  since the Dropbox move that is a stronger reason than before, not a weaker one. An unpushed commit
+  does not exist as far as the other PC is concerned.
+- **Never `git checkout` a different branch in the shared tree while it carries another session's
+  uncommitted work** — use a **worktree** (`git worktree add`); the shared tree stays on `main`. Verify
+  the branch in the *same compound command* as any write, because a parallel session can switch it
+  mid-flight.
+- **Worktrees and ALL scratch/temp dirs live OUTSIDE the repo tree** — under the machine's OS temp,
+  project-scoped: `"$TMPDIR"/claude/geo-wt/<branch>` for worktrees (derive the path from
+  `$TMPDIR`/`%TEMP%`; never hardcode `C:\Users\<name>\…`), and the session scratchpad for loose files.
+  **Never inside the repo tree**, where they are picked up by `git add -A`, crawled by vitest, and left
+  behind as orphaned shells (empty `node_modules`, stale `src/` copies, dangling links) when
+  `git worktree remove`/`prune` runs. Clean up when a branch is merged; `git worktree list` shows the
+  live ones.
+- **Never link or copy `node_modules` into a worktree.** `git worktree remove` follows the junction and
+  destroys the **shared tree's** copy — a working tree that then fails to build for every other session.
+  (This hazard's one home; CLAUDE.md points here.)
+- **One session = one concern** — a session's commits should map to one issue/PR so `Fixes #NN` stays
+  honest.
+
+> **Why this section was rewritten (2026-09-05, [#906](https://github.com/dcodish/geo_builder/issues/906)).**
+> It was titled *"the Dropbox reality"* and opened by asserting that `.git` syncs via Dropbox — false
+> since 2026-07-23, in the section that governs how parallel sessions avoid destroying each other's
+> work. Every **rule** survived the rewrite; only their stated **reasons** changed, and the reasons are
+> what a session generalises from. It also pointed at a `Dropbox/projects/` directory that no longer
+> exists, which invites a reader to conclude the rules are obsolete. They are not.
 
 ## 8. Where each artifact lives (quick map)
 

@@ -3,12 +3,33 @@
 > **HISTORICAL (2026-09-05, [#904](https://github.com/dcodish/geo_builder/issues/904)).** This was a
 > point-in-time triage; the queryable queue is now `gh issue list` ([ADR-265](06-decisions.md#adr-265)),
 > and the "what next" answer is the open-issues report ([docs/22 §2c](22-workflow.md)). Read this for the
-> grounded verdicts it records, never as the live backlog. [#907](https://github.com/dcodish/geo_builder/issues/907)
-> sweeps its still-live items into the queue; until that closes, treat the list below as unmigrated.
-> The doc is kept rather than deleted because
-> [docs/18](18-theorem-relevance-plan.md) links to an item here, and a stable anchor beats tidy filing.
+> grounded verdicts it records, never as the live backlog. **Its items are FULLY MIGRATED** — see the
+> disposition table below ([#907](https://github.com/dcodish/geo_builder/issues/907)). The doc is kept
+> rather than deleted because [docs/18](18-theorem-relevance-plan.md) links to an item here, and a
+> stable anchor beats tidy filing.
 
 _Created 2026-07-01. A living, findable list of what's open and what's worth picking up next, so it doesn't get buried in the [PROJECT-MEMORY](PROJECT-MEMORY.md) session log._
+
+---
+
+## Migration complete (2026-09-05, [#907](https://github.com/dcodish/geo_builder/issues/907))
+
+**Every item below has been dispositioned.** The text that follows is preserved as the historical
+record of the triage and its grounded verdicts; the live queue is `gh issue list`.
+
+| Item | Disposition (verified against the code, 2026-09-05) |
+| --- | --- |
+| ★ N6 — dev-only step-through panel | **Filed → [#910](https://github.com/dcodish/geo_builder/issues/910).** Still unbuilt: no `.tsx` in `src/` references `replaySession`, so the backend exists and the UI does not |
+| N1 — "error but the image looks OK" | **Filed → [#911](https://github.com/dcodish/geo_builder/issues/911)** as an escalation-calibration question, measure-first |
+| ADR-052 DOF-honesty audit | **Filed → [#912](https://github.com/dcodish/geo_builder/issues/912)** |
+| LLM proxy prompt caching | **Filed → [#913](https://github.com/dcodish/geo_builder/issues/913)** |
+| Web-Worker split | **DONE.** `src/store/geoWorker.ts` + `geoWork.ts` exist and `geoWorker-*.js` ships as a deployed bundle. The remaining main-thread sweep is tracked separately as [#364](https://github.com/dcodish/geo_builder/issues/364) |
+| ADR-167 hover-to-focus | **DONE.** The interaction is live in `src/render/Figure.tsx` (`hoverRel` — pointing at a side or angle reveals only its equality class). The doc's remaining ask was *tuning*, which is not an issue without a reported problem |
+| Production proxy + admin dashboard deploy | **DONE.** Live since `prod/2026-08-18` — "both admin routes answer through Apache". Its per-tool config on prod is [#903](https://github.com/dcodish/geo_builder/issues/903) |
+
+The three ⛔ "not actually quick" entries (N3 synonyms, R7, ADR-073/ADR-049) were verdicts about
+*sequencing*, not work items, and remain valid reading. N4 and N5 were already struck as implemented
+when this doc was written.
 
 This is a **triage of the two open-work buckets** — the plan's *parked engineering threads* ([09-implementation-plan.md](09-implementation-plan.md) status line) and the operator-raised *UX/quality items N1–N6* (recorded in [PROJECT-MEMORY.md](PROJECT-MEMORY.md), 2026-06-21). It was produced by reading the actual code, so the "already done / not quick / quick win" verdicts are grounded, not guesses. **The canonical, full descriptions still live in those two files; this doc is the prioritized index.**
 
