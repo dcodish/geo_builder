@@ -19,20 +19,14 @@
       "relaxed, and then there is no guard. src-analytic/CLAUDE.md was missing here until #904 -- the",
       "fourth product's orientation file was unguarded from the day the tree was created.",
       "",
-      "A ceiling VALUE is arbitrary; its ROLE is not. The chronology ban (the '**Then (' form) is what",
-      "prevents the 188 KB failure -- 95 locally reasonable acts, each defensible alone. The ceiling",
-      "guards the slower thing: accretion that is legitimate one commit at a time. Its value is the",
-      "FORCING FUNCTION, not the number -- hitting it in #904 removed four passages duplicating a",
-      "fuller home, which nobody would have pruned voluntarily. So set a ceiling that produces a",
-      "periodic prune, never one so tight that recording a real rule becomes a negotiation: a session",
-      "that cannot afford a line will put it somewhere less discoverable, which is the opposite of",
-      "what these files are for. Context cost is NOT the constraint (CLAUDE.md is ~4,900 tokens,",
-      "prompt-cached); do not argue a ceiling from token budget.",
+      "WHY these numbers are what they are, which failure each guard catches, and why token budget is",
+      "the wrong axis to argue them on: ADR-W-042 in docs/06w-decisions-workspace.md. Read it before",
+      "changing a ceiling -- the doctrine is deliberately NOT restated here, because a JSON comment is",
+      "not a discoverable or linkable home for reasoning.",
       "",
-      "$raiseLog exists because the operator asked where 20000 came from and the answer was not written",
-      "down anywhere. Every raise appends an entry, so the growth curve stays visible and the next",
-      "raise is argued from data rather than from memory. Appending a row is also just conspicuous",
-      "enough to discourage a lazy one."
+      "$raiseLog is the data series that ADR keeps referring to: every raise appends date, file, new",
+      "value, size at the time and why, so the growth curve stays visible and the next raise is argued",
+      "from data rather than memory."
     ],
     "$raiseLog": [
       {

@@ -2041,3 +2041,63 @@ deleted"*. Under this ADR a requirements doc is a **standing contract** and `doc
 plan**, so the fold runs the other way — `docs/19`'s analytic requirements fold into `02c`, and
 ratification changes `02c`'s status line rather than ending its life. Recorded in that file's header,
 because a lifecycle reversal is exactly the kind of implication this ADR exists to stop losing.
+
+## ADR-W-042 — An orientation-file ceiling is a FORCING FUNCTION, not a budget; raises are logged (#904)
+
+**Requirements:** none (internal) — no promise to a student changes.
+**Design:** none (internal) — a parameter under [ADR-W-002](#adr-w-002); the mechanism is unchanged.
+
+**Context.** The operator asked what raising `CLAUDE.md`'s 20 KB ceiling would imply, and observed that
+the number looked arbitrary. It was: set on 2026-08-08 by [ADR-W-002](#adr-w-002) at the post-cleanup
+size (17,349 B) plus roughly 15%, a round number. **The reasoning was recorded nowhere**, so the first
+question ever asked about it had no answer in the repo — the same defect [ADR-W-041](#adr-w-041) exists
+to close, in miniature.
+
+**What the measurement showed.** In the 28 days after the ceiling landed, `CLAUDE.md` grew 2,607 B
+(~93 B/day) across 9 commits, and **every one was structural**: products 3 and 4, the `shell/` tree,
+standing rule 5, the fix-round and batch-approval machinery. Zero chronology. The ceiling was firing on
+the case it was *not* built for, and had 44 B left.
+
+**Two guards, two different failures.** They are routinely confused, so this records the split:
+
+- **The chronology ban** (the `**Then (` form) prevents the 188 KB failure — 95 locally reasonable acts
+  producing 172 KB of duplicated ADR narrative. That is the catastrophic mode, and it is caught by
+  FORM, independent of any size limit.
+- **The ceiling** guards the slower mode: accretion that is legitimate one commit at a time and only
+  visible in aggregate. Nothing else measures that.
+
+**Decision 1 — the ceiling's value is arbitrary; its ROLE is a forcing function.** Its worth is not
+that it bounds a budget but that hitting it forces a prune nobody performs voluntarily. The evidence is
+immediate: the squeeze in #904 Step 3 removed four passages that duplicated a fuller home (the tier
+doctrine and fold-memo corollary → `docs/08`; the `@/` alias hazard → `BOUNDARIES.json`; the worktree
+bullet → `docs/22 §7`), each verified at its origin before deletion. None would have been found by
+looking for duplication on purpose.
+
+**So set a ceiling that produces a periodic prune — never one so tight that recording a real rule
+becomes a negotiation.** 44 B is a wall, not a cadence, and a wall inverts the incentive: a session that
+cannot afford a line puts it somewhere less discoverable, which is precisely what these files exist to
+prevent. **Raised to 24,000** (operator ruling, 2026-09-05) — about six weeks between prunes at the
+observed rate, and the drivers of that rate, adding two products, are largely spent.
+
+**Decision 2 — context cost is the wrong axis, and this says so on purpose.** `CLAUDE.md` is ~4,900
+tokens and prompt-cached; against the session window that is noise. A future argument to tighten or
+loosen the ceiling on token-budget grounds is reasoning about the wrong quantity, and without this
+paragraph it is the most natural argument to reach for.
+
+**Decision 3 — every raise is logged.** `DOCS.json` `orientationFiles.$raiseLog` records date, file, new
+value, **size at the time**, and why, for each raise including the 2026-08-08 one reconstructed from
+git. The growth curve is then visible, the next raise is argued from data rather than memory, and
+appending a row is conspicuous enough to discourage a lazy one. The `$` prefix is this file's existing
+convention for "not an entry in this map", so the reader needed no change.
+
+**Why this is an ADR and not just the log entry.** The first attempt recorded only the `$raiseLog` row,
+on the reasoning that an ADR would duplicate a fact with a better home. That was wrong in one respect:
+the *parameter* belongs next to the number, but the *doctrine* above — which failure each guard catches,
+why the number is arbitrary, why token budget is the wrong axis — was sitting in a JSON `$comment`,
+where doctrine is not discoverable and not linkable. The log keeps the data series; this keeps the
+reasoning; the `$comment` now points here instead of restating it.
+
+**What this does not decide.** Whether the sibling trees' 10 KB ceilings should move (none is near one),
+and whether the ceiling should ever measure something smarter than total bytes — excluding the module
+table that legitimately grows with each product was considered and rejected as more mechanism than the
+problem deserves.
