@@ -12,7 +12,7 @@ import { riderPairsT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
 import { isAnyDiagonal, isSpaceDiagonal, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
-import { pinSymsOf, symsOfAffine } from './types';
+import { isNonLinear, pinSymsOf, symsOfAffine } from './types';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PartialName, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
@@ -1470,6 +1470,15 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           // two letters never reaches this branch; it falls through to `symbolic-new-point` below,
           // because the algebraic lane is single-parameter by construction and routing it is #301's.
           const exprs = cmd.symExprs ?? [null, null, null];
+          // #898 (ADR-3D-218): a POWER in a component needs a figure the solver can pin it in. This
+          // lane stores each component as a degree-1 `LinExpr {k, p}` BY CONSTRUCTION, with nowhere to
+          // put an exponent — so `comp` below would sum the terms' coefficients and lower `p²` to `p`,
+          // drawing «C(p²,p,0)» as «C(p,p,0)». That is a stated given silently dropped, the honesty
+          // invariant's headline case. Refuse by name instead, and keep the SOLID lane (where the pivot
+          // does carry the exponent, ADR-3D-214) untouched. The guard asks `isNonLinear` over ANY of the
+          // three components — never a test for `²` and never for the reported input: `p³`, `2p²-3`, and
+          // a power in y or z are the same statement and refuse identically.
+          if (exprs.some((e) => e && isNonLinear(e))) return { ok: false, error: { code: 'power-needs-solid', id: cmd.id } };
           const comp = (v: number | null, s: string | null, e: SymComp | null): { k: number; p: number } =>
             v !== null ? { k: v, p: 0 }
             : e ? { k: e.c, p: e.terms.reduce((acc, t) => acc + t.k, 0) }

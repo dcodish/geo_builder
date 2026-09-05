@@ -102,6 +102,7 @@
     "notOnLine": "«{{id}}» is not on the line — check the givens",
     "pointCoincides": "the point you asked for is «{{with}}» — a point already in the figure. The geometry is right, but there is no new point here to call «{{id}}»; if you meant another point, check the segment or plane you named",
     "symbolicNewPoint": "A new point «{{id}}» needs numeric coordinates — letters are only allowed for a point already in the figure",
+    "powerNeedsSolid": "A power in a coordinate of «{{id}}» needs a solid in the figure for the solver to pin it in — without one the tool cannot hold it, and it will not drop it silently. Add a solid first (say «box ABCDA'B'C'D'») and «C(p²,p,0)» will build.",
     "injectionUnsatisfiable": "No placement of the solid matches the given coordinates — check the givens",
     "givensContradict": "The givens contradict each other — no figure satisfies «{{stated}}» together with {{others}}",
     "givensContradictAlone": "The givens contradict each other — no figure satisfies «{{stated}}» together with the rest of the givens",
@@ -189,7 +190,7 @@
     "lowercase-labels": "Vertex labels are written in UPPERCASE — AS, not as. Lowercase letters are reserved for vectors (u, v, w), parameters (t, k, m) and coordinates (x, y, z), and angles are named with Greek letters (α, β, γ, θ). Try: {{corrected}}",
     "ambiguous-height": "A height from a single point does not say which plane to drop it onto — there are several options. Name the base or the segment: \"height from D to base ABC\", \"height of the pyramid from D\", or \"CD is the altitude in triangle ABC\".",
     "latin-angle-label": "A lowercase latin letter is reserved here for vectors and parameters (u, v, w, t, k, m), so it cannot name an angle. Name the angle by its vertices — “∠ABC”, and “60 < ∠ABC < 90” works too — or use a Greek label from the palette: “60 < α < 90”.",
-    "component-arithmetic": "Arithmetic inside a coordinate component (division or parentheses) is not supported. Powers are: «C(p^2, p^2+4, 0)», «C(2p²-3, 1, 0)», «C(p³, 1, 0)». Write «C(p/2, 1, 0)» as «C(0.5p, 1, 0)», and «C(2(p+1), 1, 0)» as «C(2p+2, 1, 0)».",
+    "component-arithmetic": "Arithmetic inside a coordinate component (division or parentheses) is not supported. Powers are — in a figure that has a solid: «C(p^2, p^2+4, 0)», «C(2p²-3, 1, 0)», «C(p³, 1, 0)». Write «C(p/2, 1, 0)» as «C(0.5p, 1, 0)», and «C(2(p+1), 1, 0)» as «C(2p+2, 1, 0)».",
     "perp-bisector": "The perpendicular bisector is not supported here. What it gives can be stated directly: «M is the midpoint of AB» for the midpoint, and «CM is perpendicular to AB» for the right angle — two givens the tool builds and verifies."
   },
   "query": {

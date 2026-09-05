@@ -1372,6 +1372,9 @@ export type EngineError3 =
   // honestly rather than silently extending their segment into a line (which is what used to happen).
   | { code: 'crossing-off-segment'; id: Id }
   | { code: 'symbolic-new-point'; id: Id } // a NEW point with symbolic components is under-determined
+  // #898: a coordinate POWER on a figure with no solid — nothing for the solver to pin the exponent
+  // in, and this lane's degree-1 storage would silently drop it. Refused by name, never dropped.
+  | { code: 'power-needs-solid'; id: Id }
   | { code: 'injection-unsatisfiable' } // no placement of the figure matches the injected COORDINATES
   // #425: the same "no placement" finding on a figure whose pins are not coordinates (angles, equal
   // sides, plane equations) — the givens contradict each other, and the message names which.

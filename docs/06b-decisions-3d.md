@@ -7687,10 +7687,34 @@ evaluates as `Σ aᵢ·symⁱ + c`; `p^4` is refused rather than truncated; both
 the guidance register; the message names the power form; and a supported component never reaches the
 register.
 
-**Still open, deliberately.** The branch semantics the operator settled on 2026-08-13 — a pinned `p²`
-admits `p = ±√·`, so the roots are genuine configurations that cycle through the existing `paramSigns`
-machinery — are not exercised by a figure in this slice's corpus, so nothing here asserts them. Worth a
-measured follow-up rather than a claim.
+**Answered by MEASUREMENT (#892, 2026-09-05) — there is no branch set to cycle.** The paragraph that
+stood here said a pinned `p²` admits `p = ±√·`, that the roots are genuine configurations cycling
+through `paramSigns`, and that no corpus figure exercised them. Run through the real
+`parse3 → store → derive3`, the premise does not hold:
+
+- **The letter appears ONLY squared.** «תיבה ABCDA'B'C'D' · A(0,0,0) · B(4,0,0) · D(0,1,0) · C(p²,1,0)»
+  builds clean and places C at (4.000, 1.000, 0.000) at seeds 0, 1, 2, 3, 7 and 1013 — identical. The box
+  forces `p² = 4`, so `p = ±2`, and both roots draw the SAME point, because the figure only ever reads
+  `p²`. There is nothing for «הציגו תצורה אחרת» to show.
+- **The letter ALSO appears at degree 1.** `D(0,−2,0) · C(p²,p,0)` resolves `p = −2`, and `D(0,2,0)`
+  resolves `p = +2` — the negative root is reached correctly. The data determines the sign, so there is
+  one solution, not two.
+- **The issue's own figure pins nothing.** `C(p²,1,0)` + `|AC| = 5` lets the box's free dimensions absorb
+  the length and `p` varies continuously with the seed — under-determination, not a root set, which is
+  why the original probe found nothing to cycle.
+
+A squared parameter's `±` is therefore either **unobservable** (both roots draw the identical figure) or
+**determined by the data** (one root satisfies the givens). There is no case where two genuinely
+different drawings exist and the tool silently shows one, so this question needed no operator ruling —
+it was answerable from the code and a probe, and should have been measured before it was filed as a
+decision. **Locked** in `coord-power-roots-892.test.ts`; the negative-root case is the valuable one, all
+that stands between `p = −2` and a silent regression.
+
+**Amendment (#898, 2026-09-05) — the "builds" row means IN THE SOLID LANE.** The table above reads as
+unconditional and it is not. A power needs a figure the solver can pin the exponent in. On a solid-free
+figure the coord-sym lane stores each component as a degree-1 `{k, p}` and dropped the exponent
+silently, drawing «C(p²,p,0)» as «C(p,p,0)» — that half now refuses by name, see
+[ADR-3D-218](#adr-3d-218).
 
 ---
 
@@ -7878,3 +7902,63 @@ through the real load path, verifier and parser-drift net included.
 **Not in scope.** The three-valued claim verdict (`undetermined`), which #909 was originally filed for
 and which the operator's 2026-09-05 ruling deferred; the branch `feat/909-claim-undetermined` still
 holds that groundwork and is not merged by this.
+
+### ADR-3D-218 — A coordinate power needs a solid to be pinned in; the solid-free lane refuses it by name (#898)
+
+**Status:** accepted, 2026-09-05 · **Amends:** [ADR-3D-214](#adr-3d-214) (#509) · fix-round #915 ·
+**Requirements:** [02b](02b-requirements-3d.md) (the symbolic-coordinate promise gains its precondition) ·
+**Design:** [04b](04b-design-3d.md), the solver section
+
+**Context.** Measured at HEAD, on a figure with no solid:
+
+```
+A(0,0,0) + C(p²,p,0)  → builds clean, C = (1.4715, 1.4715, 0.0000)
+                        the point record is {x:{k:0,p:1}, y:{k:0,p:1}, z:{k:0,p:0}}
+```
+
+`x = y`, not `x = y²`. The square is gone, and nothing said so — the honesty invariant's headline case:
+*no stated magnitude is ever silently dropped*. It is live in prod (`prod/2026-09-03`).
+
+**Root cause — one lossy narrowing, and it is the whole class.** `apply.ts`'s coord-sym branch reduces
+each component with a local helper:
+
+```ts
+: e ? { k: e.c, p: e.terms.reduce((acc, t) => acc + t.k, 0) }
+```
+
+The parsed `SymAffine` carries each term's exponent in `t.e` (`p²` → `e:2`). This reducer **sums the
+coefficients `t.k` and never reads `t.e`**, into a `{k, p}` shape that is degree-1 by construction and
+has nowhere to put an exponent. So `p²` and `p` lower to the identical object. The same narrowing ate
+`p³`, `2p²-3` (measured: stored as `{k:-3,p:2}`, i.e. `2p−3`), and a power in the y or z position.
+
+**The two lanes are different objects, not one object evaluated two ways** — which is why #898's
+original plan ("if the component reads `SymAffine`, use `evalAffine`") could not be built as written:
+
+```
+A(0,0,0) + C(p²,p,0)   → c.param = "p"   c.pins = []
+תיבה …  + C(p²,p,0)    → c.param = null  c.pins = [{id:'C', x:{terms:[{sym:'p',k:1,e:2}],c:0}, …}]
+```
+
+**Decision (operator ruling, 2026-09-05).** **Refuse, and say why.** A non-linear component on a
+solid-free figure gets a named refusal in the guidance register — `power-needs-solid`, a message in both
+locales naming the working form. Honouring powers in the free-point lane is **not scheduled**; it can be
+re-opened when a corpus figure needs it. The solid lane, where the pivot genuinely carries the exponent,
+is untouched.
+
+**The guard asks `isNonLinear`, never `²`.** The predicate already exists (`types.ts`, over `degreeOf`)
+and is called rather than re-derived, over **all three components**. Keying on the reported character
+would have left `p³`, `2p²-3` and the y/z positions dropping silently — the same defect wearing a
+different glyph, which is what standing rule 1's class test asks about.
+
+**The advertisement was fixed with the code.** `scope.component-arithmetic` told every student
+«חזקות כן: «C(p^2, p^2+4, 0)»…» unconditionally. Under this ruling that sentence is true only in the
+solid lane, so it now says so in both locales. **A guidance message that promises a capability the next
+line refuses is the same honesty defect in a different register** — the refusal and the advertisement
+are one deliverable, not two.
+
+**Locked** in `power-needs-solid-898.test.ts`: the operator's case refuses `power-needs-solid` and mints
+no C; the class refuses in all five spellings (`p³`, `2p²-3`, y, z, and the `p^2` caret form); a LINEAR
+symbolic component still builds in the solid-free lane; the SOLID lane still satisfies `x = y²` at three
+seeds; and both locales carry the message with the scope hint qualified.
+
+**Not in scope.** Honouring the power where it is refused — that is a capability, deliberately unbuilt.

@@ -140,6 +140,8 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.crossingOffSegment', { id: err.id });
     case 'symbolic-new-point':
       return t('err.symbolicNewPoint', { id: err.id });
+    case 'power-needs-solid':
+      return t('err.powerNeedsSolid', { id: err.id });
     case 'injection-unsatisfiable':
       return t('err.injectionUnsatisfiable');
     case 'sign-unsatisfiable':
