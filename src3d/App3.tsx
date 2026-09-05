@@ -165,6 +165,10 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.notOnSegment', { id: err.id });
     case 'claim-refuted':
       return t('err.claimRefuted');
+    // #909 — NOT a refusal. The claim may well be right; what is missing is a given that decides it,
+    // so the message asks for one instead of telling the student their answer is wrong.
+    case 'claim-undetermined':
+      return t('err.claimUndetermined');
     case 'placement-not-fixed':
       return t('err.placementNotFixed');
     case 'vacuous-relation':

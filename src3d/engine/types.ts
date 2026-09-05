@@ -1386,6 +1386,11 @@ export type EngineError3 =
   | { code: 'plane-not-determined'; id: string } // #487: this construct needs a plane with a stated equation — π is still free
   | { code: 'line-not-determined'; id: string } // #552: a claim judged against a free line whose relevant DOF is still sampled — pin it first, never accuse
   | { code: 'claim-refuted' } // the stated answer does not hold in the figure
+  // #909: the claim holds in SOME sampled configurations and not others, so what has been stated does
+  // not decide it. NOT a refusal: the student's answer may well be right, and saying "wrong" because
+  // they have not finished entering the question is the false accusation #508/#552/#512 each fixed for
+  // one carrier. This is that rule generalised.
+  | { code: 'claim-undetermined' }
   // #512: a relation to the COORDINATE FRAME judged against a placement the funnel sampled — the
   // statement may well be satisfiable; what is missing is a given that fixes where the figure sits.
   | { code: 'placement-not-fixed' }

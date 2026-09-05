@@ -116,6 +116,7 @@
     "boundUnsatisfiable": "No configuration of the figure puts the angle at {{id}} inside the stated bound",
     "incircleNeedsTriangle": "An inscribed circle can only be drawn in a triangle — a general quadrilateral has none.",
     "claimRefuted": "The claim doesn't hold in the figure — check the computation",
+    "claimUndetermined": "This claim cannot be decided yet — what you have entered still allows more than one figure, and it holds in some of them. That is not an error: add a given that pins what the claim depends on",
     "placementNotFixed": "The figure’s position relative to the coordinate system is not fixed yet, so a statement about the axes cannot be checked — state a placing given first (a point’s coordinates, or a base lying on a coordinate plane)",
     "vacuousRelation": "The relation names one object twice — it needs two different objects",
     "badFile": "This is not a valid Space Builder figure file",

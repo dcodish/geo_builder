@@ -362,3 +362,37 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
 export function verifyClaim(claim: Claim3, c: Construction3, seed: number): boolean {
   return claimSeeds(seed).every((s) => holdsAt(claim, c, resolve3(c, s)));
 }
+
+/**
+ * The THREE-valued verdict (#909).
+ *
+ * `verifyClaim` answers a yes/no question, and a yes/no answer cannot tell "the givens FORBID this"
+ * apart from "the givens leave this FREE". Collapsing them means a student who states a correct claim
+ * before pinning the figure is told they are wrong — for entering a problem line by line, which is the
+ * defining interaction of every builder in this suite.
+ *
+ * The distinction needs no DOF plumbing, because the sampler already exposes it: a fully-determined
+ * figure resolves IDENTICALLY at every seed, so a claim can only hold at some seeds and not others when
+ * residual freedom is what decides it. Mixed IS free.
+ *
+ *   every seed holds  -> 'verified'
+ *   no seed holds     -> 'refuted'      the givens forbid it
+ *   some seeds hold   -> 'undetermined' not yet decidable from what has been stated
+ *
+ * This GENERALISES three fixes the store already carried — #508 (a free plane), #552 (a free line),
+ * #512 (a sampled placement) — each of which special-cased one carrier of exactly this class. Those
+ * stay: they run first and name the object responsible, which is a better message. This is the rule
+ * beneath them, so a carrier nobody has special-cased yet degrades honestly instead of accusing.
+ *
+ * The complex builder reached the same three-valued shape independently (`model/claim.ts`), for the
+ * same stated reason.
+ */
+export type ClaimVerdict3 = 'verified' | 'refuted' | 'undetermined';
+
+export function claimVerdict(claim: Claim3, c: Construction3, seed: number): ClaimVerdict3 {
+  let held = 0;
+  const seeds = claimSeeds(seed);
+  for (const s of seeds) if (holdsAt(claim, c, resolve3(c, s))) held++;
+  if (held === seeds.length) return 'verified';
+  return held === 0 ? 'refuted' : 'undetermined';
+}

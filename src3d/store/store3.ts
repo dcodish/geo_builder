@@ -32,7 +32,7 @@ import { spaceDiagonals } from '../engine/baseShapes';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { scalePinned } from '../engine/solve3';
 import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
-import { verifyClaim } from '../engine/claims';
+import { claimVerdict } from '../engine/claims';
 import { dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Id, type Positions3 } from '../engine/types';
@@ -333,7 +333,8 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
             break;
           }
         }
-        if (!verifyClaim(claim, c, seed)) {
+        const verdict = claimVerdict(claim, c, seed);
+        if (verdict !== 'verified') {
           // #508 — a claim about a FREE plane whose relevant DOF is still SAMPLED cannot be refuted:
           // the configuration it "fails" in is one the tool invented, not one the student stated.
           // Reporting `claim-refuted` there is a false accusation — «your distance is wrong» about a
@@ -353,6 +354,9 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
             undetermined ? { code: 'plane-not-determined', id: undetermined }
             : undeterminedLine ? { code: 'line-not-determined', id: undeterminedLine }
             : resolved.placementSampled && refsCoordFrame(claim) ? { code: 'placement-not-fixed' }
+            // #909 — the general rule beneath the three guards above. They name the object responsible
+            // when they can; this catches every other carrier of the same class rather than accusing.
+            : verdict === 'undetermined' ? { code: 'claim-undetermined' }
             : { code: 'claim-refuted' };
           break;
         }
