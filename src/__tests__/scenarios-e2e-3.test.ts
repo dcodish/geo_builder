@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SCENARIOS, factsOf, replayFacts, sweepSeeds, roundTripProps, newRoundTripCounters, gateProps } from './scenarios-corpus';
+import { SCENARIOS, factsOf, replayFacts, sweepSeeds, roundTripProps, newRoundTripCounters, gateProps, dofHonesty } from './scenarios-corpus';
 
 // Slice 3/8 of the end-to-end scenario corpus (issue #60): membership is index % 8 === 2.
 // Same tests, same assertions as the old single-file loop — sharded so vitest's per-FILE parallelism
@@ -13,6 +13,7 @@ import { SCENARIOS, factsOf, replayFacts, sweepSeeds, roundTripProps, newRoundTr
 describe('reported scenarios — end-to-end replay of real bug reports (slice 3/8)', () => {
   const rt = newRoundTripCounters();
   const gc = { gateChecked: 0 };
+  const dc = { dofChecked: 0 };
 
   for (const [i, sc] of SCENARIOS.entries()) {
     if (i % 8 !== 2) continue;
@@ -25,6 +26,8 @@ describe('reported scenarios — end-to-end replay of real bug reports (slice 3/
       if (!sc.expectViolations) {
         expect(fig.violations, `givens not satisfied: ${JSON.stringify(fig.violations.map((v) => v.message))}`).toEqual([]);
       }
+      // ADR-052 DOF honesty (#912): freedom the cue CLAIMS must be freedom the sampler HAS.
+      dofHonesty(sc, fig, dc);
       // The cross-seed oracle (TST-1): every config the app would DISPLAY must honour this same check,
       // not only the default seed — the dominant historical escape class (ADR-085/098/127/166).
       sweepSeeds(sc, facts);
@@ -44,5 +47,6 @@ describe('reported scenarios — end-to-end replay of real bug reports (slice 3/
     expect(rt.renamed, 'rename round-trip exercised').toBeGreaterThan(0);
     expect(rt.toggled, 'disable/re-enable exercised').toBeGreaterThan(0);
     expect(gc.gateChecked, 'construct-noun gate net exercised').toBeGreaterThan(0);
+    expect(dc.dofChecked, 'ADR-052 DOF-honesty oracle exercised (#912)').toBeGreaterThan(0);
   });
 });

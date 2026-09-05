@@ -9163,3 +9163,82 @@ undefined for one the student pinned with an explicit 90°.
 
 **The lesson is the one ADR-W-035 exists for.** Half 2's engine-level evidence was real and complete,
 and the feature was still unreachable by a student. A green search is not a usable button.
+
+## ADR-482 — The ADR-052 DOF-honesty audit: the samplable set is COMPLETE, and the audit is now an oracle (#912)
+
+**Status:** accepted, 2026-09-06 · fix-round #915 · **Requirements:** none (internal — nothing the
+product promises changes; this checks a promise already made) · **Design:** none (internal)
+
+**Context.** [ADR-052](#adr-052)'s invariant is that *every unstated magnitude is a free degree of
+freedom, never a fixed value.* CLAUDE.md names the conformance smell precisely: **a value counted by
+`rawMovableDof` but absent from the samplable `freeDofs` is a default masquerading as fixed** — it
+inflates the DOF cue, it is never sampled, and "show another configuration" silently cannot move it. The
+backlog carried the question as an audit, flagging one candidate to check first: a circle's free CENTRE
+is *drivable* since [ADR-103](#adr-103) — is it *samplable*?
+
+**The measurement.** The whole scenario corpus was swept — 318 scenarios, each replayed through the real
+`parse → fact → replay` path — asking of every figure whether the DOF cue claims freedom the sampler
+cannot deliver:
+
+```
+scenarios replayed:                318 / 318
+figures with cue > 0 and NOTHING samplable:   0
+
+object kinds counted by rawMovableDof AND sampled:
+  free-point 736 · on-circle 196 · circle 137 · on-segment 63 · on-line 13 · perp-offset 10 · scaled-offset 6 · rotated 1
+```
+
+**The set is complete.** And the flagged case is clean — «מעגל שמרכזו O» samples both the centre and the
+free radius:
+
+```
+O:free-point/raw=2/SAMPLED   circle-O:circle/raw=1/SAMPLED
+```
+
+A confirmation is a real result: it turns an assumption into a checked fact, and the assumption here sat
+under every knowledge gate in the tree.
+
+**Objects counted and NOT sampled do occur, and are not the smell.** Measured over the same corpus:
+on-circle 113, circle 22, on-segment 22, perp-offset 19, scaled-offset 5, on-line 2, rotated 1. In every
+case a constraint has CONSUMED that carrier, and `freeDofCount` subtracts exactly those through
+`dofRemoved`. The raw count and the samplable set are not meant to be equal — the accounting between
+them is. Reading the smell as "raw ⊆ freeDofs, object by object" would have produced 184 false alarms
+and, worse, an "exception list" that grows until it means nothing.
+
+**Decision — the audit does not stay a finding in a doc; it becomes an oracle.** `dofHonesty` joins the
+scenario harness beside the seed sweep, the round-trip properties and the honesty-gate net, and every
+`scenarios-e2e-*` slice calls it. It asserts the figure-level invariant:
+
+> a figure whose cue reports remaining freedom has something the sampler can actually MOVE.
+
+It is **co-located** ([ADR-394](#adr-394)): it reuses the fact list and the derived figure the scenario's
+own check already built, so it costs no replay — the measured marginal cost is the constraint walk
+inside `freeDofCount`, which the cue already pays in the app. Every scenario, present and future, is an
+examined cell.
+
+**Why that framing and not a one-time confirmation.** A read of the code answers the question for the
+code as it is today; the next carrier kind added to `carrierOf` re-opens it, and nothing would say so.
+The corpus grows by standing rule 4 — every reported bug becomes a scenario — so binding the invariant
+to the corpus means the audit's coverage grows with the product rather than decaying from the day it was
+written. This is [#664](https://github.com/dcodish/geo_builder/issues/664)'s "an unexamined cell fails
+the suite" applied to one specific cell.
+
+**Stated at the FIGURE level, deliberately.** The per-object form would require attributing each
+constraint to the carrier it consumes, which the model does not do and should not have to. The converse
+is also deliberately not asserted: a samplable DOF on a cue-0 figure is the similarity gauge
+(place/rotate/scale), which is sampled on purpose and counted as knowledge on purpose — that is
+[ADR-101](#adr-101), not a violation.
+
+**And the oracle cannot pass vacuously.** It increments an exercised-counter that every slice
+asserts moved — the same discipline the round-trip and gate properties already use. Without it, a change
+that made figures stop CLAIMING freedom would skip the assertion on every scenario and the oracle would
+report green while checking nothing. That failure mode is not hypothetical: #174's `MARGINAL` set has been
+passing that way, and this round escalated it for exactly this reason.
+
+**Locked** in `src/engine/__tests__/dof-honesty-912.test.ts` (the circle's free centre is sampled; a
+STATED radius removes the radius from the samplable set and only the radius; a point on the circle joins
+it; and the invariant across seven figures spanning every carrier family) and, corpus-wide, by
+`dofHonesty` in `scenarios-harness.ts`.
+
+**Also folds in** the deferred DOF-cue inflation note under [ADR-065](#adr-065): the inflation it worried
+about would show as exactly this smell, and it does not occur in the corpus.
