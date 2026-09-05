@@ -17,9 +17,40 @@
       "Files that load into EVERY session and must stay orientation, not chronology (ADR-W-002, #452).",
       "Ceilings sit ABOVE current size on purpose: a guard that fires on a legitimate addition gets",
       "relaxed, and then there is no guard. src-analytic/CLAUDE.md was missing here until #904 -- the",
-      "fourth product's orientation file was unguarded from the day the tree was created."
+      "fourth product's orientation file was unguarded from the day the tree was created.",
+      "",
+      "A ceiling VALUE is arbitrary; its ROLE is not. The chronology ban (the '**Then (' form) is what",
+      "prevents the 188 KB failure -- 95 locally reasonable acts, each defensible alone. The ceiling",
+      "guards the slower thing: accretion that is legitimate one commit at a time. Its value is the",
+      "FORCING FUNCTION, not the number -- hitting it in #904 removed four passages duplicating a",
+      "fuller home, which nobody would have pruned voluntarily. So set a ceiling that produces a",
+      "periodic prune, never one so tight that recording a real rule becomes a negotiation: a session",
+      "that cannot afford a line will put it somewhere less discoverable, which is the opposite of",
+      "what these files are for. Context cost is NOT the constraint (CLAUDE.md is ~4,900 tokens,",
+      "prompt-cached); do not argue a ceiling from token budget.",
+      "",
+      "$raiseLog exists because the operator asked where 20000 came from and the answer was not written",
+      "down anywhere. Every raise appends an entry, so the growth curve stays visible and the next",
+      "raise is argued from data rather than from memory. Appending a row is also just conspicuous",
+      "enough to discourage a lazy one."
     ],
-    "CLAUDE.md": { "ceiling": 20000 },
+    "$raiseLog": [
+      {
+        "date": "2026-08-08",
+        "file": "CLAUDE.md",
+        "to": 20000,
+        "sizeAtChange": 17349,
+        "why": "ADR-W-002 / #452. Set at the post-cleanup size + ~15%, after the file was cut from 188 KB (90% duplicated ADR chronology). A round number, not a derived one."
+      },
+      {
+        "date": "2026-09-05",
+        "file": "CLAUDE.md",
+        "to": 24000,
+        "sizeAtChange": 19956,
+        "why": "#904 Step 3. Measured: +2,607 B over 28 days (~93 B/day), and ALL of it structural -- products 3 and 4, the shell/ tree, standing rule 5, the fix-round machinery. Zero chronology. The 44 B left was a wall, not a cadence. 24000 restores roughly six weeks between forced prunes; the growth drivers (adding two products) are largely spent, so the real rate should fall. Operator ruling."
+      }
+    ],
+    "CLAUDE.md": { "ceiling": 24000 },
     "src3d/CLAUDE.md": { "ceiling": 10000 },
     "src-complex/CLAUDE.md": { "ceiling": 10000 },
     "src-analytic/CLAUDE.md": { "ceiling": 10000 }
