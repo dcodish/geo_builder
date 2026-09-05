@@ -61,3 +61,22 @@ fine. Two browser calls settled it afterwards; the same two calls beforehand wou
 root cause. And when a play sheet's "Before" is a count, prefer a claim the wrong server cannot
 accidentally satisfy: say WHERE the new thing sits ("`²` starts the second row"), not just how many
 things there are. See [[pr-items-need-their-own-server]] and [[no-browser-self-test]].
+
+**Corollary 4 (2026-09-05, #909): a correct diagnosis does not make the FIX correct — measure the
+remedy too.** The diagnosis was right (3-D collapses "the givens forbid it" into "the givens leave it
+free"), the plan was right-shaped, and the implementation typechecked, carried both locale messages and
+passed its tests. It was also **inert**. The rule I built on — *"mixed across `claimSeeds` implies
+residual freedom"* — almost never fires, because an exact equality on a **continuously** sampled
+quantity holds at *no* seed: measured 350 values across the whole sampled range, `{verified: 0,
+refuted: 350, undetermined: 0}`. A student would have seen identical behaviour before and after. Green
+tests proved the new code did what I told it, never that it changed what the student meets.
+
+**How to apply:** before reporting a fix as a fix, **run the ORIGINAL failing case and show the
+before/after** — not just the new unit tests, which only assert the mechanism you just wrote. If you
+cannot produce a case whose output changes, you have not fixed it. Merging that would have closed the
+issue while the harm stood, which is worse than leaving it open, because a closed issue stops anyone
+looking. Escalate instead — CLAUDE.md standing rule 1 says so explicitly, and this is what it looks
+like in practice.
+
+Related: [[red-suite-may-be-the-gate-working]] (measure the pre-change baseline before relaxing an
+invariant) — same discipline, other end of the change.
