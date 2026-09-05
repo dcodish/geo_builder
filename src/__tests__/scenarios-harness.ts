@@ -37,7 +37,7 @@ import { expect } from 'vitest';
 import { CONTEXT_FREE_GATES } from '@/app/honestyGates';
 import { replay, meetsRequirements, useGeoStore } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
-import { freeDofs } from '@/engine';
+import { freeDofs, freeDofCount } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 import { factsOf, replayFacts } from './scenario-pipeline';
 import type { Step } from './scenario-pipeline';
@@ -120,6 +120,43 @@ export const SEED_SWEEP_HEAVY = new Set<string>([
   'collinear-flexes-redundant-carrier-kite-tangents', 'diameter-from-point-cuts-side-onto-segment',
   'alpha-less-than-beta-reshapes', 'kite-tangents-redundant-equality-not-over-constrained',
 ]);
+
+/**
+ * ADR-052 DOF HONESTY (#912) — **a figure whose cue reports remaining freedom must have something the
+ * sampler can actually MOVE.**
+ *
+ * CLAUDE.md names the smell precisely: *"a value counted by `rawMovableDof` but absent from
+ * `freeDofs` (so never sampled) is a default masquerading as fixed."* The harm is exact — the cue tells
+ * the student the figure is still free, «show another configuration» then moves nothing, and the
+ * unstated magnitude the tool picked reads as a given the question never gave.
+ *
+ * Co-located with the other oracles (ADR-394): it reuses the fact list and the derived figure the
+ * scenario's own check already built, so it costs no replay. Every scenario, present and future, is an
+ * examined cell — which is the durable form of the #912 audit, as opposed to a one-time reading of the
+ * code that goes stale the next time a carrier kind is added.
+ *
+ * **Why the assertion is at the FIGURE level and not per object.** Swept over the whole corpus (318
+ * scenarios), objects legitimately counted by `rawMovableDof` and absent from `freeDofs` are common —
+ * on-circle 113, circle 22, on-segment 22, perp-offset 19 — because a constraint CONSUMED that carrier,
+ * and `freeDofCount` subtracts exactly those through `dofRemoved`. Asserting per object would demand
+ * attributing each constraint to the carrier it consumes, which the model deliberately does not do. The
+ * figure-level invariant is the one that is both true and meaningful: freedom the cue CLAIMS must be
+ * freedom the sampler HAS.
+ */
+export function dofHonesty(sc: Scenario, fig: Derived, counter?: { dofChecked: number }): void {
+  const c = fig.construction;
+  if (!c) return;
+  const cue = freeDofCount(c);
+  if (cue <= 0) return; // determined up to similarity — nothing is claimed, nothing is owed
+  // NO SILENT VACUUM: a figure that stops claiming freedom would skip the assertion above and this
+  // oracle would pass by checking nothing. The slices assert this counter moved, exactly as they do
+  // for the round-trip and gate properties.
+  if (counter) counter.dofChecked++;
+  expect(
+    freeDofs(c).length,
+    `[${sc.id}] the DOF cue reports ${cue} free DOF but NOTHING is samplable — «show another configuration» would move nothing, so an unstated magnitude is being asserted as a given (ADR-052)`,
+  ).toBeGreaterThan(0);
+}
 
 /**
  * Run the seed sweep for ONE scenario over the fact list its e2e check already built. Throws (failing that
