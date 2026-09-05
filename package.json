@@ -25,7 +25,8 @@
     "test:fast": "node scripts/test-tiers.mjs fast",
     "test:tiers": "node scripts/test-tiers.mjs report",
     "check:siblings": "node scripts/check-sibling-safety.mjs",
-    "smoke:visual": "node scripts/visual-smoke.mjs"
+    "smoke:visual": "node scripts/visual-smoke.mjs",
+    "test:docs": "node scripts/doc-gate.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",

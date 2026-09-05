@@ -1,0 +1,61 @@
+name: Docs gate
+
+# The companion to ci.yml, and deliberately a SEPARATE workflow (#905, ADR-W-041).
+#
+# ci.yml carries `paths-ignore` for docs/**, **/*.md, reports/** and .claude/**. `paths-ignore` is
+# WORKFLOW-level, so a change confined to those paths triggers no lane at all — adding a job to ci.yml
+# could not fix this, because the workflow itself never starts. Making it work there would mean
+# removing `paths-ignore` and filtering per job, which risks silently changing when the four product
+# lanes run: a safety property traded for a convenience. So this workflow triggers ON the paths ci.yml
+# ignores, and ci.yml is not touched at all.
+#
+# Four of those ignored paths have tests that READ them, two of which byte-match a document against a
+# code table (src/theorems vs docs/07, src-complex/formulas vs docs/29) — editing the prose alone turns
+# the suite red. Before this lane existed the break surfaced on someone's next unrelated CODE push and
+# was attributed to that commit.
+#
+# The file list is NOT restated here. `scripts/doc-gate.mjs` reads it from DOCS.json, which is what
+# server/__tests__/registry-consistency.test.ts asserts — a hardcoded copy in YAML is the drift the
+# registry exists to abolish.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '**/*.md'
+      - 'reports/**'
+      - '.claude/**'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '**/*.md'
+      - 'reports/**'
+      - '.claude/**'
+
+# A newer push to the same branch/PR cancels the older run. Distinct from ci.yml's group so the two
+# workflows never cancel each other.
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  doc-gate:
+    name: Doc gate (file list from DOCS.json)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ~2s of tests; the lane is dominated by npm ci. Running the FULL suite here would cost ~10 min
+      # for a typo fix, which is the economy ci.yml's paths-ignore was right to protect.
+      - name: Doc gate
+        run: node scripts/doc-gate.mjs

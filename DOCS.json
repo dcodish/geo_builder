@@ -164,5 +164,24 @@
       "server/__tests__/isolation.test.ts",
       "server/__tests__/sibling-safety.test.ts"
     ]
+  },
+
+  "ciPathCoverage": {
+    "$comment": [
+      "#905. ci.yml's `paths-ignore` is WORKFLOW-level: a change confined to those paths triggers no",
+      "lane at all. That was safe while the paths held inert prose, and is not: four of them are read",
+      "by tests, two of which byte-match a document against a code table. .github/workflows/docs.yml",
+      "triggers ON those paths and runs scripts/doc-gate.mjs.",
+      "",
+      "registry-consistency.test.ts asserts that EVERY ci.yml paths-ignore glob is either covered by",
+      "docs.yml's trigger paths or listed in 'uncovered' below -- and, for each 'uncovered' glob, that",
+      "no test file actually reads that path. So the justification cannot silently go stale: the day a",
+      "test starts reading deploy/, the guard fails and the glob must move into docs.yml."
+    ],
+    "workflow": ".github/workflows/docs.yml",
+    "runner": "scripts/doc-gate.mjs",
+    "uncovered": {
+      "deploy/**": "Apache confs, the systemd unit and the deploy README. No test reads them; RUNBOOK.md covers the procedure. Move into docs.yml the moment one does."
+    }
   }
 }
