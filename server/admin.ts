@@ -1092,6 +1092,11 @@ function configPage(
       </tr>`,
     )
     .join('\n');
+  // #903 (ADR-W-043): the reachability probe's targets. Only ENABLED products — an undeployed
+  // builder has no public prefix to reach, and reporting it unreachable would be noise.
+  const probeTargets = JSON.stringify(
+    productRegistry.products.filter((p) => p.enabled !== false).map((p) => ({ id: p.id, url: p.url })),
+  );
   const refusalBlock = refusals.length
     ? `<div class="refusals"><strong>לא נשמר — יש לתקן:</strong><ul>${refusals
         .map((r) => `<li><code>${esc(r.field)}</code> · <code dir="ltr">${esc(r.entry)}</code> — ${esc(r.why)}</li>`)
@@ -1137,6 +1142,39 @@ ${rows}
 <textarea name="quick" placeholder="z1 = 3+4i">${esc((cfg.quickCommands ?? []).join('\n'))}</textarea>
 <div><button type="submit">שמירה</button> <a href="${base}" style="margin-inline-start:12px">חזרה לדוח</a></div>
 </form>
+<h2>הגעה: האם הקונפיגורציה מגיעה לבונים?</h2>
+<p class="note">#903 — הקונפיגורציה נקראת דרך ה-reverse proxy בנתיב הציבורי של כל בונה. אם הנתיב אינו
+מנותב, מה שנשמר כאן <strong>לא יגיע לתלמיד</strong>, והבונה ימשיך לעבוד עם הרוסטר המובנה בלי שדבר
+יתריע. השרת אינו יכול לבדוק את זה בעצמו — לכן הבדיקה רצה מהדפדפן שלך, על אותם נתיבים בדיוק.</p>
+<div id="reach" class="note">בודק…</div>
+<script>
+(function () {
+  var targets = ${probeTargets};
+  var out = document.getElementById('reach');
+  if (!out || !window.fetch) return;
+  Promise.all(
+    targets.map(function (t) {
+      return fetch(t.url + 'api/config?tool=' + encodeURIComponent(t.id), { cache: 'no-store' })
+        .then(function (r) { return { id: t.id, url: t.url, ok: r.status === 200 || r.status === 204, code: r.status }; })
+        .catch(function () { return { id: t.id, url: t.url, ok: false, code: 0 }; });
+    }),
+  ).then(function (rows) {
+    var bad = rows.filter(function (r) { return !r.ok; });
+    if (bad.length === 0) {
+      out.innerHTML = '<span style="color:#15803d">\u2713 כל הבונים הרשומים מקבלים את הקונפיגורציה.</span>';
+      return;
+    }
+    out.innerHTML =
+      '<div class="refusals"><strong>לא מנותב — מה שנשמר כאן לא ישפיע על הבונים האלה:</strong><ul>' +
+      bad
+        .map(function (r) {
+          return '<li><code dir="ltr">' + r.url + 'api/config</code> — ' + (r.code ? 'HTTP ' + r.code : 'אין תשובה') + '</li>';
+        })
+        .join('') +
+      '</ul>חסר כלל reverse-proxy. ראו <code dir="ltr">deploy/apache-*.conf</code> ואת שלב ה-proxy ב-<code dir="ltr">docs/RUNBOOK.md</code>.</div>';
+  });
+})();
+</script>
 </body></html>`;
 }
 

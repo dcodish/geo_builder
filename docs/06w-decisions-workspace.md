@@ -2101,3 +2101,81 @@ reasoning; the `$comment` now points here instead of restating it.
 and whether the ceiling should ever measure something smarter than total bytes — excluding the module
 table that legitimately grows with each product was considered and rejected as more mechanism than the
 problem deserves.
+
+## ADR-W-043 — A product's reverse-proxy rule is a DEPLOY STEP, and "unreachable" is not "unset" (#903)
+
+**Status:** accepted, 2026-09-05 · fix-round #915 · **Requirements:** none student-facing (nothing a
+student can do changes) · **Design:** [RUNBOOK](RUNBOOK.md) gains the per-product proxy step;
+`shell/switcherConfig.ts` gains the three-state read
+
+**Context.** Measured live on 2026-09-05:
+
+```
+https://themathbible.com/geo-builder/api/parse            → 405   routed (method refused)
+https://themathbible.com/geo-builder/api/config?tool=geo  → 404   NOT routed
+https://themathbible.com/3d-builder/api/log               → 405   routed
+https://themathbible.com/complex-builder/api/parse        → 404   nothing under this prefix exists
+```
+
+Two findings, one root cause. The **complex builder was added to the deploy table with no conf at
+all** — `deploy/` held `apache-geo-builder.conf` and `apache-3d-builder.conf` and nothing else — so
+its whole prefix 404'd from its first deploy (`prod/2026-08-15-2`). And **`/api/config` had never
+been proxied for ANY product**: the route is implemented server-side for every tool
+(`server/standalone.ts`) and carried by no conf. A shipped admin feature (#662's per-tool curation)
+was silently inert everywhere, visible only where something consumed it — which today is only
+`src-complex/App.tsx`.
+
+**Why it took a month to find.** The consumer's degraded path is correct and deliberate: *"a dead or
+configless server answers non-200 and the switcher renders the built-in registry roster; nothing here
+can error at the student."* It worked perfectly. It also **collapsed two different worlds into one
+`null`** — "there is no curation" and "your curation cannot be delivered" — so the failure had no
+observer. A graceful fallback that cannot distinguish absence from unreachability is an
+**error-swallowing** fallback wearing better clothes.
+
+**Decision (operator ruling, 2026-09-05): both halves.**
+
+**1 — The routing, as a recipe step rather than three files.** `deploy/apache-complex-builder.conf`
+is written, and `api/config` is added to the 2-D and 3-D confs too. Fixing only the complex prefix
+would have left the route unproxied for the two products that will need it the moment they grow a
+consumer, and for `src-analytic/`, already planned. The RUNBOOK now carries the per-product proxy
+step and the `curl` verification, because **the root cause is a missing recipe step, not a
+mis-executed one** — the recipe that produced this hole would produce it again for builder N+1.
+
+**Deliberately NO `/admin` line for complex.** Apache strips the product prefix and the Node server
+matches on the path TAIL, so `/complex-builder/admin` would reach the bare `/admin` and serve the
+**2-D dashboard** under the complex prefix — worse than the 404 it replaces. 2-D owns `/admin`, 3-D
+has the distinct `/admin3`, and complex has no dashboard mount because it does not log. It is
+curated from the existing config page (`/geo-builder/admin/config?tool=complex`). This departs from
+the fix plan's "proxy `api/parse`, `api/log`, `api/config`, `admin`" — measured, that fourth line
+would have shipped a misleading surface, so it is left out and locked out.
+
+**2 — The three-state read, in `shell/` rather than in the product.** `ConfigRead` is
+`configured` · `unset` · `unreachable`, and `readToolConfig` is total: it never throws and never
+rejects, so a caller cannot reintroduce the collapse by forgetting a `catch`. It lives in the shared
+chrome tree because **any product that adds a config consumer must inherit the distinction** — put it
+in `src-complex/App.tsx` and the next silently-inert surface repeats this exactly. `configOf` maps
+both non-configured outcomes to `null`, so the **student's** experience is byte-identical: the
+degraded path is preserved, not weakened.
+
+**Where the third state surfaces.** The operator's config page runs the probe **from the browser**,
+against each enabled product's own public prefix, and names any builder the config cannot reach. It
+has to be the browser: the dashboard is served by the very process that serves `/api/config`, so the
+server can always reach itself and **cannot observe its own proxy hole**. The complex app also warns
+on the console with the URL and what is inert. Neither is student-facing, per the ruling.
+
+**Locked** in `shell/__tests__/config-read-903.test.ts` (404/500/dead-network/non-JSON are all
+`unreachable` and never `unset`; 204 is `unset`; every non-configured outcome still yields `null` for
+the roster merge; the request goes through the app's own public prefix) and
+`server/__tests__/deploy-proxy-confs.test.ts` (every `enabled` product in `products.json` has a conf;
+every conf proxies `api/config` with its `ProxyPassReverse` twin; every `ProxyPass` is paired; and the
+complex conf does **not** proxy a bare `/admin`). Adding builder N+1 without its conf now fails the
+suite instead of failing quietly in production.
+
+**What this does NOT do — the last mile is the operator's.** Apache directives live in Plesk's GUI
+field (direct `vhost_ssl.conf` edits do not survive regeneration), so the confs in `deploy/` are
+sources, not deployment. **The routing stays broken in production until the new/updated directives are
+pasted there and Apache reloaded.** That is a deploy act, and a fix round never deploys.
+
+**Out of scope, deliberately.** The second comment on #903 proposes replacing the RUNBOOK's
+`server/`-only rebuild rule with a bundle diff — a real defect in the same document, and not in the
+approved scope of this ruling.
