@@ -61,6 +61,12 @@ const VERDICT = join(ROOT, 'reports', 'suite-verdict.json');
  */
 const SLOW_SHARE = Number(process.env.SLOW_TEST_SHARE) || 0.75;
 const MIN_MEAN_MULT = Number(process.env.SLOW_TEST_MEAN_MULT) || 3;
+/**
+ * #908 — the DEAD BAND that stops a borderline file flipping every run. A file already in the slow set
+ * is HELD there until it falls clearly below the entry bar (this fraction under it), so membership
+ * changes on a real change rather than on which unrelated files happened to be warm.
+ */
+const HYSTERESIS_BAND = Number(process.env.SLOW_TEST_HYSTERESIS) || 0.25;
 
 const rel = (p) => p.replace(/\\/g, '/').replace(`${ROOT.replace(/\\/g, '/')}/`, '');
 const base = (p) => rel(p).split('/').pop();
@@ -258,12 +264,52 @@ export function classifySlow(files) {
   return slow;
 }
 
+/**
+ * HYSTERESIS (#908) — hold a file that is already slow until it is CLEARLY not slow any more.
+ *
+ * Both of `classifySlow`'s conditions are ratios over the whole distribution, so a file sitting near
+ * either boundary flips whenever UNRELATED files speed up or slow down — machine load, cache warmth, a
+ * test added elsewhere. Measured 2026-09-05: three green runs of the same tree produced three different
+ * memberships. That destroys the signal the artifact exists to carry, because a session cannot tell a
+ * real membership change from noise and the honest response is to discard it — which trains the guard
+ * out of usefulness. It also falsifies docs/08's stated invariant that a routine green run leaves the
+ * tree clean.
+ *
+ * Entry is UNCHANGED — a newly-slow file still joins by itself, which is ADR-394's whole point. Only
+ * EXIT is damped: a file already in the set stays until it drops below `(1 - band) * MIN_MEAN_MULT`
+ * times the mean. So the set is easy to join and slightly sticky to leave, and a file that genuinely
+ * got fast still leaves on the next run.
+ *
+ * Pure, and separate from `classifySlow` on purpose: that function's contract is "a pure function of
+ * the timings and nothing else" and its tests assert exactly that. This one needs the PREVIOUS set, so
+ * it is composed rather than folded in.
+ */
+export function applyHysteresis(raw, prevFiles, files, band = HYSTERESIS_BAND) {
+  const prevSet = new Set(prevFiles ?? []);
+  if (!prevSet.size) return raw; // first run — nothing to hold
+  const rawSet = new Set(raw.map((s) => (typeof s === 'string' ? s : s.file)));
+  const total = files.reduce((sum, f) => sum + f.ms, 0);
+  if (!total || !files.length) return raw;
+  const bar = MIN_MEAN_MULT * (total / files.length) * (1 - band);
+  const ms = new Map(files.map((f) => [f.file, f.ms]));
+
+  const held = [];
+  for (const f of prevSet) {
+    if (rawSet.has(f)) continue;            // still slow by the raw rule
+    const t = ms.get(f);
+    if (t === undefined) continue;          // the file is gone — drop it, never resurrect a path
+    if (t >= bar) held.push({ file: f, ms: Math.round(t) });
+  }
+  return [...raw, ...held];
+}
+
 /** Rewrite reports/test-tiers.json only when the SET of slow files actually changed. */
 function updateTiers(files) {
-  const slow = classifySlow(files);
-
   const prev = readJson(TIERS, null);
   const prevSet = new Set(slowFiles(prev));
+  // #908: raw classification, then hold the borderline members that are still clearly slow.
+  const slow = applyHysteresis(classifySlow(files), prevSet, files);
+
   const nextSet = new Set(slow.map((s) => s.file));
   const added = [...nextSet].filter((f) => !prevSet.has(f));
   const removed = [...prevSet].filter((f) => !nextSet.has(f));
@@ -271,7 +317,11 @@ function updateTiers(files) {
   // Membership unchanged AND the rule that produced it unchanged → leave the file alone (a routine green
   // run must not dirty the tree). The rule check matters on the run that CHANGES the rule: the membership
   // it yields may coincide with the old list, and the file would then still describe the old rule.
-  const sameRule = prev?.rule?.kind === 'top-share' && prev.rule.share === SLOW_SHARE && prev.rule.minMeanMult === MIN_MEAN_MULT;
+  const sameRule =
+    prev?.rule?.kind === 'top-share' &&
+    prev.rule.share === SLOW_SHARE &&
+    prev.rule.minMeanMult === MIN_MEAN_MULT &&
+    prev.rule.hysteresis === HYSTERESIS_BAND;
   if (!added.length && !removed.length && prev && sameRule) return;
 
   mkdirSync(dirname(TIERS), { recursive: true });
@@ -311,7 +361,7 @@ export function serializeTiers(slow) {
         'nothing else — no per-machine timings — so two machines that agree on membership produce ' +
         'byte-identical files, and two branches that each add a test merge as two insertions. ' +
         '`npm run test:fast` derives its --exclude list from `slow`.',
-      rule: { kind: 'top-share', share: SLOW_SHARE, minMeanMult: MIN_MEAN_MULT },
+      rule: { kind: 'top-share', share: SLOW_SHARE, minMeanMult: MIN_MEAN_MULT, hysteresis: HYSTERESIS_BAND },
       updatedAt: new Date().toISOString().slice(0, 10),
       slow: [...new Set(slow.map((s) => (typeof s === 'string' ? s : s.file)))].sort(),
     },
