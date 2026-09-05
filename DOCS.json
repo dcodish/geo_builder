@@ -127,10 +127,9 @@
       "note": "Requirements written (#904 Step 7). Design doc 04w still to write: the shell/ seeding rule and boundary edges live in ADR-W-016 + BOUNDARIES.json meanwhile."
     },
     "server": {
-      "requirements": null,
-      "design": null,
-      "pending": 904,
-      "note": "server/admin.ts is 1,248 lines with no requirement anywhere; deploy/README.md is ops, not design."
+      "requirements": "docs/02w-requirements-workspace.md",
+      "design": "docs/04s-design-server.md",
+      "note": "Design: 04s. Requirements DELEGATED to 02w by design — FR-AD-1..4 own the admin surface and operator config, NFR-SE-1..3 the key/cost/privacy posture. A separate server requirements doc would be a third copy of promises that already have a home."
     }
   },
   "index": {

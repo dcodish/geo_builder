@@ -35,7 +35,8 @@ tracked by [#904](https://github.com/dcodish/geo_builder/issues/904), not oversi
 | 02w | [Requirements — shared surfaces](02w-requirements-workspace.md) | The contract every builder shares: suite chrome, the ask lane + data panel, save/load envelope, export, the admin surface, bidi and number display |
 | 03 | [Non-Functional Requirements](03-nonfunctional-requirements.md) | Quality attributes (`NFR-*`): usability, stability, cost, security, privacy |
 | 04 | [Design — 2-D](04-design.md) | Architecture, data model, engine, input layer, rendering. **2-D only** |
-| 04b–04w | *(to write)* | Design — 3-D, analytic, complex, and the shared `shell/` + `server/` |
+| 04b–04d, 04w | *(to write)* | Design — 3-D, analytic, complex, and the shared `shell/` chrome |
+| 04s | [Design — the shared server](04s-design-server.md) | The one Node service: single-file bundle, the key boundary, one proxy parameterized by `tool:`, cost controls, the event sink and dashboard — and the tree's missing type gate |
 | 05 | [Glossary](05-glossary.md) | Shared vocabulary for the domain and the system |
 
 ## Decision logs — the records that are kept current
