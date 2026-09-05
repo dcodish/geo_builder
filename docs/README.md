@@ -35,7 +35,10 @@ tracked by [#904](https://github.com/dcodish/geo_builder/issues/904), not oversi
 | 02w | [Requirements — shared surfaces](02w-requirements-workspace.md) | The contract every builder shares: suite chrome, the ask lane + data panel, save/load envelope, export, the admin surface, bidi and number display |
 | 03 | [Non-Functional Requirements](03-nonfunctional-requirements.md) | Quality attributes (`NFR-*`): usability, stability, cost, security, privacy |
 | 04 | [Design — 2-D](04-design.md) | Architecture, data model, engine, input layer, rendering. **2-D only** |
-| 04b–04d, 04w | *(to write)* | Design — 3-D, analytic, complex, and the shared `shell/` chrome |
+| 04b | [Design — 3-D](04b-design-3d.md) | The context-free parser and why that is the better architecture, the coordinate-injection pivot, the landing funnel, relations as a disposition map |
+| 04c | [Design — Analytic](04c-design-analytic.md) | The smallest tree: the parameter-carrying expression layer, the conic fit and canonicity gate, and the first builder born after the chassis |
+| 04d | [Design — Complex](04d-design-complex.md) | Log-polar makes the corpus LINEAR — exact ℚ elimination, branches as integer unknowns, DOF as nullspace dimension, and the three-valued claim verdict |
+| 04w | [Design — the shared chrome](04w-design-shell.md) | How `shell/` is built: slots not flags, the evidence-seeded entry rule, the two layers, the staggered adoption, and the rule that is enforced at import level only |
 | 04s | [Design — the shared server](04s-design-server.md) | The one Node service: single-file bundle, the key boundary, one proxy parameterized by `tool:`, cost controls, the event sink and dashboard — and the tree's missing type gate |
 | 05 | [Glossary](05-glossary.md) | Shared vocabulary for the domain and the system |
 

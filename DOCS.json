@@ -104,27 +104,23 @@
     },
     "3d": {
       "requirements": "docs/02b-requirements-3d.md",
-      "design": null,
-      "pending": 904,
-      "note": "Requirements written (#904 Step 8), scoped as CONTRACT — catalog3.ts (230 entries, guard-tested in He+En) stays the construct inventory. Design doc 04b still to write."
+      "design": "docs/04b-design-3d.md",
+      "note": "Requirements 02b, design 04b. catalog3.ts (230 entries, guard-tested He+En) is the construct inventory; docs/20 is the build plan."
     },
     "complex": {
       "requirements": "docs/02d-requirements-complex.md",
-      "design": null,
-      "pending": 904,
-      "note": "Requirements written (#904 Step 9), scoped as CONTRACT — docs/27 §10 remains the authoritative grammar contract and docs/29 the byte-matched formula sheet. Design doc 04d still to write."
+      "design": "docs/04d-design-complex.md",
+      "note": "Requirements 02d, design 04d. docs/27 §10 is the authoritative grammar contract; docs/29 is byte-matched by a test."
     },
     "analytic": {
       "requirements": "docs/02c-requirements-analytic.md",
-      "design": null,
-      "pending": 904,
-      "note": "Requirements promoted from 19a by ADR-W-041; design doc still to write."
+      "design": "docs/04c-design-analytic.md",
+      "note": "Requirements 02c (IN PROGRESS, promoted from 19a), design 04c. V0 in build and deliberately not deployed (ADR-AG-007)."
     },
     "workspace": {
       "requirements": "docs/02w-requirements-workspace.md",
-      "design": null,
-      "pending": 904,
-      "note": "Requirements written (#904 Step 7). Design doc 04w still to write: the shell/ seeding rule and boundary edges live in ADR-W-016 + BOUNDARIES.json meanwhile."
+      "design": "docs/04w-design-shell.md",
+      "note": "Requirements 02w, design 04w. The shell/ seeding rule is ADR-W-016 as amended by ADR-W-040; boundary edges are BOUNDARIES.json."
     },
     "server": {
       "requirements": "docs/02w-requirements-workspace.md",
