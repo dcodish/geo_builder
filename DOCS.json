@@ -149,14 +149,13 @@
       "excludes a preceding letter so 'NFR-SE-1' is not read as a definition of 'FR-SE-1' -- that false",
       "positive appeared twice during the audit that produced #904.",
       "",
-      "FR-RV-7 is a REAL dangling reference found by this guard on the day it was written: cited by",
-      "FR-RV-4 and FR-RV-6, defined nowhere. Grandfathered rather than fixed in-flight, per #904's",
-      "'gaps are filed, not fixed' rule; resolved by Phase 2 (Step 5, the 02 truth pass)."
+      "EMPTY as of #904 Step 5 (2026-09-05) and asserted exact. The one entry it ever held, FR-RV-7, was a",
+      "real dangling reference this guard found on the day it was written: cited by FR-RV-4, defined",
+      "nowhere. It was never a missing requirement -- FR-RV-6 IS the bounded-object-universe rule it meant",
+      "to cite -- so the fix was to repoint the citation, not to invent an FR to satisfy the guard."
     ],
     "issue": 904,
-    "grandfathered": [
-      "FR-RV-7"
-    ]
+    "grandfathered": []
   },
   "docGate": {
     "$comment": [
