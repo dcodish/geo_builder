@@ -1,5 +1,13 @@
 # 14 — Backlog & Quick-Win Triage
 
+> **HISTORICAL (2026-09-05, [#904](https://github.com/dcodish/geo_builder/issues/904)).** This was a
+> point-in-time triage; the queryable queue is now `gh issue list` ([ADR-265](06-decisions.md#adr-265)),
+> and the "what next" answer is the open-issues report ([docs/22 §2c](22-workflow.md)). Read this for the
+> grounded verdicts it records, never as the live backlog. [#907](https://github.com/dcodish/geo_builder/issues/907)
+> sweeps its still-live items into the queue; until that closes, treat the list below as unmigrated.
+> The doc is kept rather than deleted because
+> [docs/18](18-theorem-relevance-plan.md) links to an item here, and a stable anchor beats tidy filing.
+
 _Created 2026-07-01. A living, findable list of what's open and what's worth picking up next, so it doesn't get buried in the [PROJECT-MEMORY](PROJECT-MEMORY.md) session log._
 
 This is a **triage of the two open-work buckets** — the plan's *parked engineering threads* ([09-implementation-plan.md](09-implementation-plan.md) status line) and the operator-raised *UX/quality items N1–N6* (recorded in [PROJECT-MEMORY.md](PROJECT-MEMORY.md), 2026-06-21). It was produced by reading the actual code, so the "already done / not quick / quick win" verdicts are grounded, not guesses. **The canonical, full descriptions still live in those two files; this doc is the prioritized index.**

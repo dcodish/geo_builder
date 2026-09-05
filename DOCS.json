@@ -11,7 +11,6 @@
     "They shrink to empty as #904 Phases 2-3 land, and each names the issue that will empty it."
   ],
   "version": 1,
-
   "orientationFiles": {
     "$comment": [
       "Files that load into EVERY session and must stay orientation, not chronology (ADR-W-002, #452).",
@@ -44,12 +43,19 @@
         "why": "#904 Step 3. Measured: +2,607 B over 28 days (~93 B/day), and ALL of it structural -- products 3 and 4, the shell/ tree, standing rule 5, the fix-round machinery. Zero chronology. The 44 B left was a wall, not a cadence. 24000 restores roughly six weeks between forced prunes; the growth drivers (adding two products) are largely spent, so the real rate should fall. Operator ruling."
       }
     ],
-    "CLAUDE.md": { "ceiling": 24000 },
-    "src3d/CLAUDE.md": { "ceiling": 10000 },
-    "src-complex/CLAUDE.md": { "ceiling": 10000 },
-    "src-analytic/CLAUDE.md": { "ceiling": 10000 }
+    "CLAUDE.md": {
+      "ceiling": 24000
+    },
+    "src3d/CLAUDE.md": {
+      "ceiling": 10000
+    },
+    "src-complex/CLAUDE.md": {
+      "ceiling": 10000
+    },
+    "src-analytic/CLAUDE.md": {
+      "ceiling": 10000
+    }
   },
-
   "adrLogs": {
     "$comment": [
       "path -> { idPrefix, contractFrom }. idPrefix builds the id-matching regex, so a log listed here",
@@ -63,13 +69,27 @@
       "allowlist is needed -- EXCEPT 06w, deliberately set to 41 rather than 42 so ADR-W-041, the ADR",
       "that mandates the lines, is the first one bound by its own rule."
     ],
-    "docs/06-decisions.md": { "idPrefix": "", "contractFrom": 482 },
-    "docs/06b-decisions-3d.md": { "idPrefix": "3D-", "contractFrom": 217 },
-    "docs/06c-decisions-analytic.md": { "idPrefix": "AG-", "contractFrom": 9 },
-    "docs/06d-decisions-complex.md": { "idPrefix": "CX-", "contractFrom": 38 },
-    "docs/06w-decisions-workspace.md": { "idPrefix": "W-", "contractFrom": 41 }
+    "docs/06-decisions.md": {
+      "idPrefix": "",
+      "contractFrom": 482
+    },
+    "docs/06b-decisions-3d.md": {
+      "idPrefix": "3D-",
+      "contractFrom": 217
+    },
+    "docs/06c-decisions-analytic.md": {
+      "idPrefix": "AG-",
+      "contractFrom": 9
+    },
+    "docs/06d-decisions-complex.md": {
+      "idPrefix": "CX-",
+      "contractFrom": 38
+    },
+    "docs/06w-decisions-workspace.md": {
+      "idPrefix": "W-",
+      "contractFrom": 41
+    }
   },
-
   "products": {
     "$comment": [
       "Keyed by products.json id, plus 'workspace' and 'server' which ship no builder but do own",
@@ -113,33 +133,15 @@
       "note": "server/admin.ts is 1,248 lines with no requirement anywhere; deploy/README.md is ops, not design."
     }
   },
-
   "index": {
     "$comment": [
-      "docs/README.md must reference every docs/*.md. The grandfathered list is the exact set of",
-      "omissions on 2026-09-05 and is emptied by #904 Phase 2 (Step 4)."
+      "docs/README.md must reference every docs/*.md. The grandfathered list is EMPTY as of #904 Step 4",
+      "(2026-09-05) and must stay that way: a new doc is indexed in the same commit that adds it."
     ],
     "file": "docs/README.md",
     "issue": 904,
-    "grandfathered": [
-      "02c-requirements-analytic.md",
-      "06c-decisions-analytic.md",
-      "06d-decisions-complex.md",
-      "09b-status-log.md",
-      "21-572-coverage-audit.md",
-      "23-architecture-review-2026-07.md",
-      "24-foundation-hardening-plan.md",
-      "25-joint-solve-design.md",
-      "26-3d-relations-plan.md",
-      "29-complex-formula-reference.md",
-      "LADDER-CX.md",
-      "LADDER.md",
-      "PLAY-QUEUE.md",
-      "manual-verification-2026-06-15.md",
-      "test-scenarios.md"
-    ]
+    "grandfathered": []
   },
-
   "frIds": {
     "$comment": [
       "Every FR-* cited anywhere in docs/ must be DEFINED in a registered requirements doc. A definition",
@@ -152,9 +154,10 @@
       "'gaps are filed, not fixed' rule; resolved by Phase 2 (Step 5, the 02 truth pass)."
     ],
     "issue": 904,
-    "grandfathered": ["FR-RV-7"]
+    "grandfathered": [
+      "FR-RV-7"
+    ]
   },
-
   "docGate": {
     "$comment": [
       "The proportional gate of ADR-W-041: a doc-only change runs these instead of the ~10-minute full",
@@ -190,7 +193,6 @@
       "server/__tests__/sibling-safety.test.ts"
     ]
   },
-
   "ciPathCoverage": {
     "$comment": [
       "#905. ci.yml's `paths-ignore` is WORKFLOW-level: a change confined to those paths triggers no",

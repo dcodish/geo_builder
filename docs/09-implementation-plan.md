@@ -2,17 +2,14 @@
 
 _Last updated: 2026-07-17._
 
-> **Status (2026-07-18, deployed `prod/2026-07-18-3`).** The TWO-CIRCLE bundle is LIVE (PR #211 — ADR-358..362 + Am. 2-8: mutual positions, the word-relation gate, the full common-tangent family with position-accurate capacity/refusals and the tangents'-meet naming, the secant one-liner, ordinal references; issues #196/#210/#197/#191/#192 closed). Previous status follows.
+> **HISTORICAL — this is the original phased build plan, not current status.** It carried a stack of
+> dated `**Status:**` blockquotes here until 2026-09-05; that stack has been removed. Status in a plan
+> document is the exact drift [ADR-W-002](06w-decisions-workspace.md#adr-w-002) moved out of `CLAUDE.md`,
+> and it had been stale since 2026-07-18 while the ADR logs moved on by several hundred entries.
 >
-> **Status (2026-07-18, deployed `prod/2026-07-18-2`).** The quarter-circle bundle (ADR-354/355/356 — #202/#205/#170, the P1 closed) AND the sector «גזרה» (ADR-357 + Am., #171 via PR #209 — free/pinned/reflex central angle, the value-form family, middle-centre naming with the O-family override) are on main and LIVE. Previous status follows.
->
-> **Status (2026-07-17).** The full v1 pipeline is shipped and live in prod (engine, renderer, store, parser, LLM fallback, save/load, PNG + `.docx` exports; latest deploy tag `prod/2026-07-17` — #177/ADR-342 + both amendments are LIVE). Work is now **issue-queue-driven** ([ADR-265](06-decisions.md#adr-265); workflow: [22-workflow.md](22-workflow.md)) — day-to-day priorities are the open GitHub issues on `dcodish/geo_builder`, not this plan. Authoritative *current-state* sources: the **ADR log** ([06-decisions.md](06-decisions.md)), **[DEPLOY-LOG.md](DEPLOY-LOG.md)** (what is live), and **[PROJECT-MEMORY.md](PROJECT-MEMORY.md)** (session log).
->
-> **Resume pointer.** The P1 queue is EMPTY (all 2026-07-16 P1s fixed AND deployed). **2026-07-17 fix session (operator "go ahead"): the parser-distribution P2 package is FIXED on main** — #163 ([ADR-343](06-decisions.md#adr-343), a chained value distributes to EVERY member per the operator ruling «AB=BC=8 means AB=8 and BC=8»), #151 ([ADR-344](06-decisions.md#adr-344), plural chord/diameter declarations distribute over the conjunction), #160 ([ADR-345](06-decisions.md#adr-345), a count digit is a quantifier — the honesty gate no longer rejects a correct parse on spelling); awaiting deploy. Next: the remaining P2 queue (#150/#152/#156/#157/#158-needs-operator/#159/#162/#164/#168/#170/#171) + the standing operator gates (theorem-ranking play-and-judge, ≥3 principles, the 6c ship pass).
->
-> **Active milestone:** Phase 6 theorems — 6a is live; 6b (relevance) T1–T5 are built per [18-theorem-relevance-plan.md](18-theorem-relevance-plan.md); remaining operator gates = play-and-judge the ranking, author ≥3 principles, the 6c ship pass. **Parked threads:** the area constraint, the production proxy deploy, the coordinate-validation campaign.
->
-> **Full historical status narrative → [09b-status-log.md](09b-status-log.md)** (archived 2026-07-16 — the 81 KB single-line blockquote that used to live here).
+> **Current state lives in:** the tail of [06-decisions.md](06-decisions.md) (and the sibling logs),
+> `gh issue list`, and [DEPLOY-LOG.md](DEPLOY-LOG.md). The removed snapshots are preserved verbatim in
+> [09b-status-log.md](09b-status-log.md), which exists for exactly this reason.
 
 ## Purpose
 

@@ -1,45 +1,117 @@
 # Geo Builder — Documentation
 
-Living project documentation. Both apps are **built and in production** (themathbible.com/geo-builder/ + /3d-builder/).
+Living project documentation for a **four-product workspace**: the 2-D Geo Builder
+(`themathbible.com/geo-builder/`), the 3-D Space Builder (`/3d-builder/`), the complex-numbers Builder
+(`/complex-builder/`), and the analytic Builder (`src-analytic/` — **built locally, deliberately not
+deployed**, [ADR-AG-007](06c-decisions-analytic.md)). The machine-readable roster is
+[`products.json`](../products.json); the documentation registry is [`DOCS.json`](../DOCS.json).
 
-**For current state, read the tail of [06-decisions.md](06-decisions.md) / [06b-decisions-3d.md](06b-decisions-3d.md), `gh issue list`, and [DEPLOY-LOG.md](DEPLOY-LOG.md)** — those are the records actually kept current ([ADR-W-002](06w-decisions-workspace.md#adr-w-002)). The repo-root [`CLAUDE.md`](../CLAUDE.md) is an **orientation** file (what exists, where it lives, what must never be done) and deliberately carries no status; [09-implementation-plan.md](09-implementation-plan.md) and [PROJECT-MEMORY.md](PROJECT-MEMORY.md) are background that lags. Day-to-day process lives in [22-workflow.md](22-workflow.md) (issues → PRs → main → deploy) and [RUNBOOK.md](RUNBOOK.md).
+**For current state, read the tail of the relevant decision log, `gh issue list`, and
+[DEPLOY-LOG.md](DEPLOY-LOG.md)** — those are the records actually kept current
+([ADR-W-002](06w-decisions-workspace.md#adr-w-002)). The repo-root [`CLAUDE.md`](../CLAUDE.md) is an
+**orientation** file and deliberately carries no status. Day-to-day process lives in
+[22-workflow.md](22-workflow.md) and [RUNBOOK.md](RUNBOOK.md).
 
-## Contents
+> **How statuses in this index work.** A status below is **what the document says about itself**. Where a
+> document states none, this table describes its content and makes no status claim. **Do not write a
+> status here that the document does not carry** — the previous version of this index asserted statuses
+> for docs 19, 20, 27 and 28 that all four contradicted, and omitted 15 documents entirely. Totality is
+> now enforced: `docs-hygiene.test.ts` fails if any `docs/*.md` is missing from this file.
+
+## The contract — what the products promise, and how they are built
+
+Per-product docs follow the decision-log suffixes (`02b`/`02c`/`02d` requirements, `04b`/`04c`/`04d`
+design, `02w`/`04w` for shared surfaces), registered in [`DOCS.json`](../DOCS.json)
+([ADR-W-041](06w-decisions-workspace.md#adr-w-041)). Entries marked *(to write)* are declared gaps
+tracked by [#904](https://github.com/dcodish/geo_builder/issues/904), not oversights.
 
 | # | Document | What it covers |
-|---|----------|----------------|
+|---|---|---|
 | 01 | [Vision](01-vision.md) | Purpose, audience, the core interaction, goals & non-goals |
-| 02 | [Functional Requirements](02-requirements.md) | What the system must do (`FR-*`), actors, user stories |
-| 03 | [Non-Functional Requirements](03-nonfunctional-requirements.md) | Quality attributes (`NFR-*`): usability, stability, cost, security, … |
-| 04 | [Design](04-design.md) | Architecture, data model, engine, input layer, rendering, build order |
+| 02 | [Functional Requirements — 2-D](02-requirements.md) | What the 2-D builder must do (`FR-*`), actors, user stories |
+| 02b | *(to write)* | Requirements — 3-D Space Builder |
+| 02c | [Requirements — Analytic](02c-requirements-analytic.md) | **In progress; the product's standing requirements doc.** V1 pedagogy + requirements, captured live 2026-09-04, promoted from `19a` by ADR-W-041 |
+| 02d | *(to write)* | Requirements — complex-numbers Builder |
+| 02w | *(to write)* | Requirements — shared surfaces (`shell/` chrome, ask lane + data panel, admin dashboard) |
+| 03 | [Non-Functional Requirements](03-nonfunctional-requirements.md) | Quality attributes (`NFR-*`): usability, stability, cost, security, privacy |
+| 04 | [Design — 2-D](04-design.md) | Architecture, data model, engine, input layer, rendering. **2-D only** |
+| 04b–04w | *(to write)* | Design — 3-D, analytic, complex, and the shared `shell/` + `server/` |
 | 05 | [Glossary](05-glossary.md) | Shared vocabulary for the domain and the system |
-| 06 | [Decisions (ADR log)](06-decisions.md) | Key decisions and the reasoning behind each |
-| 06b | [Decisions — 3-D tool](06b-decisions-3d.md) | The 3-D track's own ADR log (`ADR-3D-NNN`) — separate by design so parallel sessions never race on one numbering (docs/20 §12) |
-| 06w | [Decisions — workspace](06w-decisions-workspace.md) | Cross-product decisions (`ADR-W-nnn`): ones belonging to no single product — the registry, boundaries, documentation structure. `06c`/`06d` are reserved for the planned analytic and complex products |
-| 07 | [Theorem Reference](07-theorem-reference.md) | The official bagrut theorem list (109 + appendices), bilingual, IDs + role tags — canonical source for the theorem feature |
-| 08 | [Testing Strategy](08-testing-strategy.md) | Test levels, per-layer coverage, golden fixtures, requirement→test traceability, and the "definition of ready" gate |
-| 09 | [Implementation Plan](09-implementation-plan.md) | Phased build plan: scope, dependencies, requirement coverage, per-phase gates, and milestones |
-| 10 | [Pedagogy](10-pedagogy.md) | The teaching charter: what students should learn, how each mechanic teaches, and the construction→theorem trigger map (Phase 6 payload) |
-| 11 | [Architecture as a Compiler](11-architecture-as-compiler.md) | A lens: the NL→commands→evaluation→render pipeline as a compiler front-end + constraint interpreter + retargetable back-end — and where new work slots in |
-| 12 | [Letter Placement](12-letter-placement.md) | The vertex/point label-placement guide |
-| 13 | [Design Audit (2026-06-17)](13-design-audit-2026-06-17.md) | Full design+development audit: the case-by-case-patching root cause, prioritized re-work/generalizations (R1–R9), and the test-strategy shift — directions captured as Proposed ADR-043…047 |
-| 14 | [Backlog & Quick-Win Triage](14-backlog.md) | The prioritized index of open work — parked engineering threads + operator-raised N1–N6, with grounded "already done / not quick / quick win" verdicts and what to pick up next |
-| 15 | [Hardening Plan (2026-07-02)](15-hardening-plan.md) | The sequenced A–F hardening program from the multi-area Fable review — all phases complete (ADR-170…207) |
-| 16 | [Phase 6 Theorems Plan](16-theorems-plan.md) | The pedagogy-first pre-dev plan for theorem surfacing: stated-vs-derived principle, no-reveal ladder, relevancy model, matcher set, gates, slices |
-| 17 | [Design Rules](17-design-rules.md) | **Read before fixing any bug.** The operator-commissioned doctrine: class-first diagnosis, patch tripwires, the chokepoint registry, designed mechanisms M1–M4, perf rules, escalation template |
-| 18 | [Theorem Discovery v2 — Relevance Replan](18-theorem-relevance-plan.md) | **ACCEPTED, decision-complete (2026-07-06); T1 next.** The 6b+ replan after the operator's dissatisfaction review: coverage disposition map (66/109 ids absent today), evidence-predicate library, explainable rank bands + subsumption, the observed (L2/L3) lane, the principles lane (teacher tips + intent hints); all §8 decisions resolved |
-| 19 | [Analytic-geometry tool (sibling app)](19-analytic-geometry-tool.md) | **PROPOSED — one decision open (2026-07-06).** A second tool at its own URL for bagrut analytic geometry: corpus reading (Q1 is a *locus* problem), the shared-chassis / new-core split, the locus↔free-DOF bridge, and vectors/3-D parked as a third track |
-| 20 | [Space/vectors tool (3-D)](20-space-vectors-tool.md) | **ACCEPTED, decision-complete (2026-07-06); V0 next.** The detailed plan for the third tool at **`/3d-builder/`** (bagrut Q2, vectors geometric + algebraic): corpus reading of four 572 exams, the two lanes + the coordinate-injection pivot, three new cores (bounded symbolic vector layer — **NO CAS**, linear equation layer, SVG projection renderer with textbook hidden-line style), phased V0–V6 build gated on the corpus |
-| 22 | [Project Workflow](22-workflow.md) | **The standard operating route (ADR-265):** GitHub issues for every report, priority rubric P1–P3, bug vs feature routes, PRs to `main`, deploy tagging |
-| 27 | [Complex-numbers tool (sibling app)](27-complex-numbers-tool.md) | **ACCEPTED, decision-complete (2026-08-14, ADR-CX-001); C0 next.** The fourth sibling (`src-complex/`, label `complex`): corpus reading of eight 572 exams (Q3 lives on an unprinted Gauss plane), the three exact chassis matches (branch index ↔ root multiplicity, free DOF ↔ unstated parameter, dependency graph ↔ derived numbers), the bounded exact-polar core (**no CAS**), always-visualize + polar↔cartesian toggle, series in scope, and the C0–C5 corpus-gated build plan — **complex builds before analytic** |
-| 28 | [Product unification](28-product-unification.md) | **WORKING DRAFT (2026-08-16) — not accepted, nothing scheduled.** Making three tools feel and behave like one: the measured split between chrome (diverges, already decided in ADR-W-016, unbuilt), engine (does NOT duplicate — copying stays correct) and **doctrine** (duplicated in prose only — 51 2-D ADRs cited from the 3-D log, honesty gates 18/8/0 across the trees); the one-app-vs-many fork RULED (separate builders, shared toolbar switcher, 2026-08-16); the two-family conformance-matrix design |
-| — | [RUNBOOK](RUNBOOK.md) | Ops: deploy procedures for both apps + the proxy, verification, troubleshooting index, rollback, logs |
-| — | [DEPLOY-LOG](DEPLOY-LOG.md) | Append-only record of what is live in production (paired with `prod/*` git tags) |
-| — | [Project Memory](PROJECT-MEMORY.md) | Operational notes and a dated session log. **Background, not status** — it lags the ADR logs (ADR-W-002) |
-| — | [Paper & Theory](paper/README.md) | Academic writing + the theory/algorithmic lineage behind the implementation (method↔citation mapping, paper outline, dated discussion logs) |
+
+## Decision logs — the records that are kept current
+
+| # | Document | Scope |
+|---|---|---|
+| 06 | [Decisions — 2-D](06-decisions.md) | `ADR-NNN`; also repo-wide/infra decisions |
+| 06b | [Decisions — 3-D](06b-decisions-3d.md) | `ADR-3D-NNN` |
+| 06c | [Decisions — Analytic](06c-decisions-analytic.md) | `ADR-AG-NNN` |
+| 06d | [Decisions — Complex](06d-decisions-complex.md) | `ADR-CX-NNN` |
+| 06w | [Decisions — Workspace](06w-decisions-workspace.md) | `ADR-W-nnn` — decisions belonging to no single product |
+
+## Process & operations
+
+| # | Document | What it covers |
+|---|---|---|
+| 08 | [Testing Strategy](08-testing-strategy.md) | Test levels, per-layer coverage, the two tiers, golden fixtures, the definition-of-ready gate |
+| 17 | [Design Rules](17-design-rules.md) | **Read before fixing any bug.** Class-first diagnosis, patch tripwires, the chokepoint registry, mechanisms M1–M4, the escalation template |
+| 22 | [Project Workflow](22-workflow.md) | **Adopted ([ADR-265](06-decisions.md#adr-265)).** Issues → PRs → `main` → deploy; the priority rubric; §3b the requirements/design contract step; §9 the product registry |
+| — | [LADDER](LADDER.md) | The cross-layer solve-ladder contract (2-D) — every mechanism ADR names the stage it inserts at |
+| — | [LADDER-CX](LADDER-CX.md) | The same contract for the complex-numbers engine |
+| — | [test-scenarios](test-scenarios.md) | Index of every reported-bug regression scenario; parity with the corpus is test-enforced |
+| — | [RUNBOOK](RUNBOOK.md) | Ops: deploy procedures for each app + the proxy, verification, troubleshooting, rollback |
+| — | [DEPLOY-LOG](DEPLOY-LOG.md) | Append-only record of what is live, paired with `prod/*` git tags |
+
+## Domain & reference
+
+| # | Document | What it covers |
+|---|---|---|
+| 07 | [Theorem Reference](07-theorem-reference.md) | The official bagrut theorem list (109 + appendices), bilingual, IDs + role tags. **Byte-matched against `THEOREM_TABLE` by a test** |
+| 10 | [Pedagogy](10-pedagogy.md) | The teaching charter, and the operator-editable principles catalog (byte-guarded) |
+| 11 | [Architecture as a Compiler](11-architecture-as-compiler.md) | The pipeline lens, revised 2026-07-24 after the docs/23 review corrected three stale premises |
+| 12 | [Letter Placement](12-letter-placement.md) | The two levers that decide a figure's lettering: naming order and orientation |
+| 29 | [Complex formula sheet](29-complex-formula-reference.md) | The official formula sheet, transcribed. **Byte-matched against the formula table by a test** |
+
+## Product plans
+
+Each is the build plan for one product; the *contract* lives in that product's requirements/design docs
+above, and the *current state* in its decision log.
+
+| # | Document | Status (as the document states it) |
+|---|---|---|
+| 19 | [Analytic-geometry tool](19-analytic-geometry-tool.md) | **Accepted**, rewritten 2026-09-03 against twenty consecutive 572 Q1s; V0 in build (#888). Not deployed |
+| 20 | [Space/vectors tool (3-D)](20-space-vectors-tool.md) | **Accepted, built and in production.** V8 complete — every 2009–2024 exam's space/vectors input is expressible |
+| 27 | [Complex-numbers tool](27-complex-numbers-tool.md) | **Accepted; shipped** `prod/2026-08-17-4` |
+| 28 | [Product unification](28-product-unification.md) | **Plan of record** ([ADR-W-018](06w-decisions-workspace.md#adr-w-018)); executing since 2026-08-17 |
+| 24 | [Foundation hardening plan](24-foundation-hardening-plan.md) | **Executed 2026-07-24/25**, but the umbrella issue [#310](https://github.com/dcodish/geo_builder/issues/310) is still open — treat as in progress |
+
+## Historical — completed or superseded
+
+**These describe finished or replaced work.** They carry useful background; none is current status. Read
+them for *why* something is the way it is, never for *what is true now*.
+
+| # | Document | Why it is here |
+|---|---|---|
+| 09 | [Implementation Plan](09-implementation-plan.md) | The original phased build plan. Background; lags the ADR logs ([ADR-W-002](06w-decisions-workspace.md#adr-w-002)) |
+| 09b | [Status Log](09b-status-log.md) | Explicitly archived 2026-07-16 — the status blockquote stack that had grown to ~81 KB on one line |
+| 13 | [Design Audit (2026-06-17)](13-design-audit-2026-06-17.md) | The case-by-case-patching audit; its directions became ADR-043…047 |
+| 14 | [Backlog & Quick-Win Triage](14-backlog.md) | Superseded by the issue queue ([ADR-265](06-decisions.md#adr-265)). Surviving items are being swept into issues |
+| 15 | [Hardening Plan (2026-07-02)](15-hardening-plan.md) | The sequenced A–F program from the multi-area review; its tracking table is ticked through ADR-170…207 |
+| 16 | [Phase 6 Theorems Plan](16-theorems-plan.md) | **Superseded for 6b+ by [18](18-theorem-relevance-plan.md)**, per its own header |
+| 18 | [Theorem Discovery v2 — relevance replan](18-theorem-relevance-plan.md) | *"The replan is fully built (T1–T5)"*; operator play-and-judge gates remain |
+| 21 | [572 coverage audit](21-572-coverage-audit.md) | A point-in-time sweep of ~42 exams (2026-07-08) that scoped the 3-D V8 work |
+| 23 | [Architecture review (2026-07)](23-architecture-review-2026-07.md) | Commissioned review; findings adopted, execution became [24](24-foundation-hardening-plan.md) |
+| 25 | [Joint-solve design](25-joint-solve-design.md) | S3.2 design; approved and built 2026-07-25 with one measured amendment |
+| 26 | [3-D relations plan](26-3d-relations-plan.md) | **Complete (2026-07-28)** — all six slices landed |
+| — | [Manual verification (2026-06-15)](manual-verification-2026-06-15.md) | A dated verification record for the deferred-backlog batch |
+| — | [Project Memory](PROJECT-MEMORY.md) | Operational notes + a dated session log. Background, not status; lags the ADR logs |
+| — | [Paper & Theory](paper/README.md) | Academic writing and the theory/algorithmic lineage behind the implementation |
 
 ## How to use these
 
-- **Read in order** for a full picture; 01 → 02/03 establish *what* and *why*, 04 establishes *how*.
-- These are **living documents** — update them as the design evolves, and add an ADR whenever a significant decision is made or changed: `06` for the 2-D app, `06b` for 3-D, `06w` for anything cross-product.
-- The repo-root `CLAUDE.md` (and `src3d/CLAUDE.md`) is the quick orientation for Claude Code sessions and points here for depth. It holds no history or status by design — a dated progress entry belongs in its ADR.
+- **Read in order** for a full picture: 01 → 02/03 establish *what* and *why*, 04 establishes *how*.
+- These are **living documents**. Add an ADR whenever a significant decision is made or changed, and
+  update the requirements/design docs in the **same commit as the code** — that is standing rule 6 in
+  `CLAUDE.md`, the [§3b](22-workflow.md) contract step, and it is test-enforced.
+- **A doc-only change is gated by `npm run test:docs`** (~2 s), not the full suite; `.github/workflows/docs.yml`
+  runs the same gate in CI on the paths `ci.yml` ignores.
+- Adding a document means adding it to this index — the totality guard will tell you if you forget.
