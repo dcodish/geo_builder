@@ -118,6 +118,11 @@ summary, not prose. The operator works down it without opening any other documen
 Enforced by the `Stop` hook [`scripts/ensure-test-server.mjs`](scripts/ensure-test-server.mjs), which fails
 OPEN — a broken hook must never wedge a session.
 
+**6 — Requirements and design are DELIVERABLES.** A change to what the product PROMISES updates its
+requirements doc; a change to HOW it is built updates its design doc — in the **same commit as the code**, like the ADR and the scenario. Every ADR carries `**Requirements:**` and `**Design:**` lines; `none
+(internal)` is a first-class answer. Registry [`DOCS.json`](DOCS.json), enforced by
+`docs-hygiene.test.ts` ([ADR-W-041](docs/06w-decisions-workspace.md#adr-w-041)).
+
 Strategy and per-step gates: [`docs/08-testing-strategy.md`](docs/08-testing-strategy.md). The engine is pure
 and deterministic and is tested hardest; the LLM fallback is always mocked. The **stability** regression —
 existing points must not jump when a fact is added — is a first-class test.
@@ -142,10 +147,8 @@ never silently built under a bug's banner.
   "commit and deploy now" waives only the play-and-approve gate, **never the PR** — the PR is the permanent
   tracking record.
 - **Check which branch the shared tree is on before editing** — a previous session may have left it on a
-  feature branch. **Branch in a worktree** when the tree has uncommitted work — never `git checkout` over it.
-  Worktrees and all temp/scratch dirs live under `"$TMPDIR"/claude/geo-wt/<branch>`, **never** inside the repo
-  tree. `git worktree remove`/`prune` when merged. Never link `node_modules` into a worktree: `git worktree
-  remove` follows the junction and destroys the shared tree's copy.
+  feature branch — and **branch in a worktree** when the tree has uncommitted work, never `git checkout`
+  over it. Worktree paths, cleanup, and the `node_modules` junction hazard: [docs/22 §7](docs/22-workflow.md).
 - **`main` is the trunk** — always green, always deployable. **Deploys use only committed `main` state**, per
   [docs/RUNBOOK.md](docs/RUNBOOK.md), each with a `prod/YYYY-MM-DD[-n]` tag and a DEPLOY-LOG entry.
 - **Commit ⇒ push.** GitHub is the real backup and the only channel to the other machine.
@@ -168,14 +171,15 @@ by `tool:`, never forked). Boundaries are declared in `BOUNDARIES.json` and enfo
 
 ## Commands
 
-- `npm run dev` — Vite dev server (2-D at `/`, 3-D at `/3d.html`)
-- `npm run build` — `tsc -b` typecheck then `vite build`; `npm run build:3d` for the 3-D app
+- `npm run dev` — Vite dev server: 2-D at `/`, 3-D at `/3d.html`, complex at `/complex.html`, analytic at `/analytic.html`
+- `npm run build` — `tsc -b` then `vite build`; `build:3d` / `build:complex` / `build:analytic` for the siblings
 - `npm test` — Vitest (watch). Single file: `npx vitest run <path>`. By name: `npx vitest run -t "<name>"`
-- **`npm run test:full`** — the FULL suite (~6 min) — **the bar before any commit and any deploy**. Also refreshes the measured tier membership and records any failure the fast tier would have missed ([ADR-394](docs/06-decisions.md#adr-394)).
-- **`npm run test:fast`** — every file measured under 60 s (~40 s) — the development loop, **never a gate**. Its exclusion list is derived from `reports/test-tiers.json`, not hand-maintained, so a newly-slow test joins the slow tier automatically.
-- `npm run test:tiers` — which slow files have actually caught a regression the fast tier missed. **A corpus-wide property goes in `scenarios-harness.ts`, called from the shard's per-scenario test** — a new FILE re-pays every cold solve (vitest isolates files, so the fold memo cannot cross them).
-- `npm run test:2d` / `npm run test:3d` — per-product slice (product tree + shared `server/` tests); one-shot `test:run:2d` / `test:run:3d`. CI mirrors the split: a diff touching one product runs only that lane; shared surface runs all lanes.
-- Path alias `@/` → `src/` (keep `tsconfig.json` and `vite.config.ts` in sync). **The alias belongs to the 2-D app only** — `vite.config.3d.ts` deliberately has none, and a stray `@/` inside `src3d/` would typecheck while silently coupling the products, which is why the isolation test rejects it.
+- **`npm run test:full`** — the FULL suite (~10 min) — **the bar before any commit and any deploy**. Claim green by READING `reports/suite-verdict.json`, never an exit code ([ADR-W-033](docs/06w-decisions-workspace.md#adr-w-033)).
+- **`npm run test:fast`** — every file measured under 60 s (~60 s) — the development loop, **never a gate**.
+- **`npm run test:docs`** — the doc gate (~2 s) — the correct bar for a **doc-only** change; anything touching `.ts`/`.tsx` pays `test:full` ([ADR-W-041](docs/06w-decisions-workspace.md#adr-w-041)).
+- `npm run test:tiers` — which slow files have actually caught a regression the fast tier missed.
+- `npm run test:2d` / `test:3d` / `test:complex` / `test:analytic` — per-product slice (tree + shared `server/`); CI mirrors the split.
+- Tier mechanics and the fold-memo rule: [docs/08](docs/08-testing-strategy.md). The `@/` alias is 2-D-only; that hazard and every import edge: [`BOUNDARIES.json`](BOUNDARIES.json).
 
 ## Cross-machine setup
 

@@ -147,8 +147,35 @@ Steps 1–3 run in the reporting session; steps 4–6 run **only in a dedicated 
 2. **Diagnose per [docs/17](17-design-rules.md)** — reproduce from `logs/debug-log.jsonl` / prod events through the real `parse → replay` path; identify the *class*, not the instance.
 3. **Reclassify honestly:** if diagnosis shows a *missing capability* rather than a defect, relabel `bug` → `feature` and switch to the feature route (§4) — do not silently build new capability under a bug's banner.
 4. **Fix at the root** — ADR entry; unit test + the exact-utterance scenario in `scenarios.test.ts` + index in [test-scenarios.md](test-scenarios.md); full suite + `tsc -b` + build green.
-5. **Land it:** small/contained fixes commit **directly to `main`** with `Fixes #NN` in the message (auto-closes the issue). Large, risky, or multi-session fixes go through a PR (§4 steps 4–6).
-6. Status/docs updates as today (CLAUDE.md current-state, PROJECT-MEMORY session log).
+5. **Update the contract** ([ADR-W-041](06w-decisions-workspace.md#adr-w-041), §3b) — a fix that changes what the product PROMISES updates its requirements doc, one that changes HOW it is built updates its design doc, **in the same commit**. Most bug fixes restore a promise rather than change one, so most answer `none (internal)` — but the ADR must say so explicitly.
+6. **Land it:** small/contained fixes commit **directly to `main`** with `Fixes #NN` in the message (auto-closes the issue). Large, risky, or multi-session fixes go through a PR (§4 steps 4–6).
+
+*(A step here used to read "status/docs updates as today (CLAUDE.md current-state, PROJECT-MEMORY session log)". It is gone: [ADR-W-002](06w-decisions-workspace.md#adr-w-002) moved status OUT of CLAUDE.md — a guard test now rejects it — and PROJECT-MEMORY lags the ADR logs. The current-state homes are the ADR log tail, the issue queue and DEPLOY-LOG.)*
+
+## 3b. The contract step: requirements and design ([ADR-W-041](06w-decisions-workspace.md#adr-w-041))
+
+Both routes carry it, because the contract was the one artifact with **no home and no gate** — and it rotted while every other gate stayed green (887 commits, 216 of them `feat`, between two touches of `docs/02-requirements.md`). The hook is the ADR, not a checklist item, because an ADR is already mandatory and a test can read it.
+
+**Every ADR carries two lines**, directly under its title:
+
+```markdown
+## ADR-NNN — <title> (#issue)
+
+**Requirements:** FR-<area>-<n> (new) · FR-RV-1…7 (status → Realised)  |  none (internal)
+**Design:** 04b §6 — the landing funnel gains a stage                  |  none (internal)
+```
+
+> Use the placeholder form `FR-<area>-<n>` (the convention [docs/02](02-requirements.md) itself uses), never a real-looking `FR-RN-NN`. The FR-resolution guard cannot tell an example from a claim, so a plausible-but-undefined id fails the suite — correctly, since a promise with no contract behind it is exactly what it catches. It fired on this template twice while it was being written: once on the example id, once on the sentence warning about the example id.
+
+- **Requirements** changes when what the product **promises a student** changes: a new construct, a changed refusal, a new honesty guarantee, or an existing FR whose *status* is now wrong (a `(Later)` that shipped).
+- **Design** changes when **how it is built** changes: a new module or layer, a new stage in the solve ladder, a moved boundary, a new shared surface.
+- **`none (internal)` is a first-class answer and most ADRs use it.** A refactor, a perf fix, or a solver change behind an unchanged promise genuinely alters no contract. This matters: if an FR id were the only acceptable answer, sessions would invent FRs to pass the gate, and an inflated requirements doc lies with more words than a stale one.
+
+**Which document** — [`DOCS.json`](../DOCS.json) is the registry (per product: requirements doc, design doc, or a `null` with the issue that will write it). The scheme mirrors the ADR logs: `02`/`02b`/`02c`/`02d` requirements and `04`/`04b`/`04c`/`04d` design, with **`02w`/`04w`** owning the shared surfaces (the `shell/` chrome, the admin dashboard, the ask lane) so they are written once rather than restated in four product docs.
+
+**Enforcement.** `server/__tests__/docs-hygiene.test.ts` fails when an ADR at or above its log's cutoff is missing either line, when a cited `FR-*` resolves nowhere, when a product in `products.json` has no `DOCS.json` entry, or when `docs/README.md` omits a document. Cutoffs are set at each log's *current max + 1*, so no ADR ever has to be backfilled.
+
+**The gate for a doc-only change is `npm run test:docs`** (~2 s), not the ~10-minute suite; anything touching `.ts`/`.tsx` pays `test:full`. `.github/workflows/docs.yml` runs the same gate in CI on the paths `ci.yml` ignores (#905).
 
 ## 4. The feature route (new capability — always a PR)
 
@@ -166,6 +193,7 @@ Applies to feature requests **and** bug reports reclassified as capability gaps.
    error** — then the session **reads the screenshots itself** and fixes or files what it sees.
    Passing the gate proves the captures are real, not that they are right; looking is still the job.
    Not CI (ADR-W-005) — a local gate, like `check:siblings`.
+4b. **Update the contract** ([ADR-W-041](06w-decisions-workspace.md#adr-w-041), §3b) — a new capability almost always changes what the product PROMISES, so a feature that answers `none (internal)` on **both** lines should be re-read: either it is genuinely internal, or a promise is being made that nothing has written down. New FR ids go in the product's requirements doc; a new mechanism or layer goes in its design doc. Same commit as the code, same branch as the PR.
 5. **Open the PR** with `gh pr create` — title `feat: <what> (ADR-NNN)`, body: what/why, the ADR link, `Closes #NN`, test evidence. CI must pass.
    For a UI-touching PR the body also carries **"screenshots reviewed by the session"** next to the
    test evidence, naming what was captured and what the session saw — the procedural line, like the
@@ -194,6 +222,7 @@ The repo's `.git` syncs between two PCs via Dropbox, and parallel Claude session
 - **Commit before switching contexts** — an uncommitted tree is invisible to the other PC's git and rides along into anyone's commit.
 - **Never `git checkout` a different branch in the shared tree while it carries another session's uncommitted work** — use a **worktree** (`git worktree add`) for topic branches instead; the shared tree stays on `main`.
 - **Worktrees and ALL scratch/temp working dirs live OUTSIDE Dropbox** — under the machine's OS temp, project-scoped: `"$TMPDIR"/claude/geo-wt/<branch>` for worktrees (derive the path from `$TMPDIR`/`%TEMP%`; never hardcode a `C:\Users\<name>\…` path), and the session scratchpad for loose scratch files. **Never create a worktree or temp dir as a sibling of the repo inside `Dropbox/projects/`, and never inside the repo tree.** Dropbox syncs everything to all three machines and leaves orphaned worktree shells (empty `node_modules`, stale `src/` copies, dangling symlinks) behind on `git worktree remove`/`prune` — that residue is dead weight on every machine and reads like garbage in the projects folder. Clean up with `git worktree remove` (or `git worktree prune` for stale registrations) when a branch is merged; if a temp dir ever *does* end up in Dropbox, delete the folder outright. `git worktree list` shows the live ones.
+- **Never link or copy `node_modules` into a worktree.** `git worktree remove` follows the junction and destroys the **shared tree's** copy — a working tree that then fails to build for every other session. (Moved here from CLAUDE.md, which is at its size ceiling; this is the hazard's one home.)
 - **One session = one concern** — a session's commits should map to one issue/PR so `Fixes #NN` stays honest.
 - Push after every commit (GitHub is the real backup; Dropbox corrupts `.git` — see PROJECT-MEMORY operational notes).
 
