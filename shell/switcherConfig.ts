@@ -60,3 +60,57 @@ export function applySwitcherConfig<E extends SwitcherRosterEntry>(
     return ra - rb;
   });
 }
+
+/**
+ * #903 (ADR-W-043) — THE THREE OUTCOMES OF A CONFIG READ.
+ *
+ * The degraded path above is right and stays: a student must never see proxy plumbing. But callers
+ * used to collapse a failed fetch and an empty config into the same `null`, so **"nothing is
+ * configured" and "the config could not be reached" were indistinguishable** — which is why the
+ * complex builder's curation sat inert for a month with nothing to notice it. The route answered 404
+ * because it had never been added to any reverse-proxy conf, and the app's own graceful fallback
+ * hid it perfectly.
+ *
+ * `unreachable` is deliberately NOT `unset`. Both leave the roster untouched for the student; only
+ * one of them means an operator's setting is being thrown away.
+ */
+export type ConfigRead =
+  | { status: 'configured'; config: ToolConfig }
+  /** The server answered and there is no curation for this tool (204). Nothing is wrong. */
+  | { status: 'unset' }
+  /** No usable answer: not routed (404), a server error, malformed JSON, or no response at all. */
+  | { status: 'unreachable'; why: string };
+
+/**
+ * Read one tool's operator config, distinguishing the three outcomes.
+ *
+ * Total by construction — it never throws and never rejects, so a caller can consume it without a
+ * `catch` and cannot accidentally reintroduce the collapse this exists to prevent. `fetchImpl` is
+ * injected for tests; `base` is the app's `BASE_URL` (the deployed prefix), so the request goes
+ * through the SAME public path a student's browser uses — which is what makes a missing proxy rule
+ * observable at all.
+ */
+export async function readToolConfig(
+  tool: string,
+  base = '/',
+  fetchImpl: typeof fetch = fetch,
+): Promise<ConfigRead> {
+  const url = `${base}api/config?tool=${encodeURIComponent(tool)}`;
+  let res: Response;
+  try {
+    res = await fetchImpl(url);
+  } catch (e) {
+    return { status: 'unreachable', why: `${url} — no response (${e instanceof Error ? e.message : String(e)})` };
+  }
+  if (res.status === 204) return { status: 'unset' };
+  if (res.status !== 200) return { status: 'unreachable', why: `${url} — HTTP ${res.status}` };
+  try {
+    return { status: 'configured', config: (await res.json()) as ToolConfig };
+  } catch {
+    return { status: 'unreachable', why: `${url} — 200 with a body that is not JSON` };
+  }
+}
+
+/** The config to apply, or null — the shape `applySwitcherConfig` already takes. Both non-configured
+ *  outcomes yield null, because the STUDENT'S experience is identical; only the operator is told apart. */
+export const configOf = (r: ConfigRead): ToolConfig | null => (r.status === 'configured' ? r.config : null);

@@ -20,7 +20,7 @@ import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from
 // #743: the under-canvas row's ONE look — the shell contract, replacing this tree's bare buttons.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
-import { applySwitcherConfig, type ToolConfig } from '../shell/switcherConfig';
+import { applySwitcherConfig, configOf, readToolConfig, type ToolConfig } from '../shell/switcherConfig';
 import { deriveLines } from './app/deriveLines';
 import { askRowsOf } from './app/askLane';
 import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, submitQuery, toggleLine } from './app/submit';
@@ -169,10 +169,18 @@ export function App() {
    */
   const [toolConfig, setToolConfig] = useState<ToolConfig | null>(null);
   useEffect(() => {
-    void fetch(`${import.meta.env.BASE_URL}api/config?tool=complex`)
-      .then((r) => (r.status === 200 ? (r.json() as Promise<ToolConfig>) : null))
-      .then((cfg) => setToolConfig(cfg))
-      .catch(() => setToolConfig(null));
+    // #903 (ADR-W-043): the read is the SHARED three-state one. The student's experience is
+    // unchanged — both non-configured outcomes leave the built-in roster alone — but «could not
+    // reach the config» no longer looks identical to «nothing is configured». That collapse is
+    // exactly why this builder's curation sat inert for a month: /complex-builder/api/config had
+    // never been added to a reverse-proxy conf, and this effect's own graceful fallback hid it.
+    void readToolConfig('complex', import.meta.env.BASE_URL).then((r) => {
+      setToolConfig(configOf(r));
+      if (r.status === 'unreachable')
+        console.warn(
+          `[complex] operator config UNREACHABLE — ${r.why}. Per-tool admin configuration is INERT for this builder until the reverse proxy routes api/config (deploy/apache-complex-builder.conf).`,
+        );
+    });
   }, []);
 
   /**

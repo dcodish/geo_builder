@@ -16,7 +16,35 @@ The single ops entry point. Deep 2-D proxy detail (one-time setup, env file, sec
 - **Server:** `ssh root@themathbible.com` (74.208.61.39). Plesk on Ubuntu 22.04. **Apache serves everything; nginx is OFF** — never touch `vhost_nginx.conf`.
 - **One proxy serves both apps** (`server/parseHandler.ts` binds them): LLM fallback (`/api/parse`, body `tool:'3d'` selects the 3-D prompt), usage-event sinks (`events.jsonl` + `events-3d.jsonl` via `EVENTS_3D_LOG_PATH`), and the two admin dashboards.
 - **Admin dashboards:** `https://themathbible.com/geo-builder/admin` and `…/3d-builder/admin` (→ proxy path `/admin3`, `ADMIN_3D_BASE`). Same credentials (in the env file).
-- **Apache directives** (reverse-proxy lines): sources in [deploy/apache-geo-builder.conf](../deploy/apache-geo-builder.conf) + [deploy/apache-3d-builder.conf](../deploy/apache-3d-builder.conf). **Store them in Plesk's GUI field** (*Domains → themathbible.com → Apache & nginx Settings → Additional directives for HTTPS*) so a Plesk regeneration doesn't drop them; direct edits to `vhost_ssl.conf` do NOT survive regeneration.
+- **Apache directives** (reverse-proxy lines): sources in [deploy/apache-geo-builder.conf](../deploy/apache-geo-builder.conf) + [deploy/apache-3d-builder.conf](../deploy/apache-3d-builder.conf) + [deploy/apache-complex-builder.conf](../deploy/apache-complex-builder.conf). **Store them in Plesk's GUI field** (*Domains → themathbible.com → Apache & nginx Settings → Additional directives for HTTPS*) so a Plesk regeneration doesn't drop them; direct edits to `vhost_ssl.conf` do NOT survive regeneration.
+
+### Adding a builder: its proxy rule is a DEPLOY STEP, not an afterthought (#903, [ADR-W-043](06w-decisions-workspace.md#adr-w-043))
+
+The complex builder was added to the table above with **no conf of its own**, so `/complex-builder/api/*`
+answered 404 from its first deploy — and because every consumer has a deliberate degraded path, nothing
+said so for a month. `/api/config` was worse: it had never been proxied for **any** product.
+
+**Every product in [`products.json`](../products.json) with `enabled: true` needs a `deploy/apache-<prefix>.conf`
+carrying, at minimum, the tails its app fetches**, and the static app alone is not a complete deploy:
+
+| tail | who needs it |
+| --- | --- |
+| `api/config` | **every** builder — the operator's per-tool curation. Silent when missing |
+| `api/parse` | any builder with an LLM fallback |
+| `api/log` | any builder that logs usage events |
+| `admin` | only a builder with its own dashboard mount **and a distinct path tail** (2-D `/admin`, 3-D `/admin3`). Without one, the prefix is stripped and the request lands on the 2-D dashboard — worse than a 404, so leave the line out |
+
+**Verify after pasting** — `405`/`200` mean routed, `404` means not:
+
+```sh
+for p in geo-builder 3d-builder complex-builder; do
+  printf '%s api/config -> ' "$p"
+  curl -s -o /dev/null -w '%{http_code}\n' "https://themathbible.com/$p/api/config?tool=x"
+done
+```
+
+The dashboard's config page (`/geo-builder/admin/config`) runs the same probe from the browser and
+names any builder the config cannot reach.
 
 ## Standard deploy
 
