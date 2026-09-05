@@ -5,11 +5,10 @@
     "share": 0.75,
     "minMeanMult": 3
   },
-  "updatedAt": "2026-09-04",
+  "updatedAt": "2026-09-05",
   "slow": [
     "src/__tests__/issue-566.test.ts",
     "src/__tests__/scenarios-e2e-1.test.ts",
-    "src/__tests__/scenarios-e2e-2.test.ts",
     "src/__tests__/scenarios-e2e-4.test.ts",
     "src/__tests__/scenarios-e2e-5.test.ts",
     "src/__tests__/scenarios-e2e-6.test.ts",
