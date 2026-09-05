@@ -7789,3 +7789,92 @@ and a row with no math is byte-identical to the plain isolated text.
 **Scope.** Powers are what was reported, but the gate is general — a 3-D row carrying a radical, a
 fraction or a subscript now renders it too, because the shared core already did. No new notation was
 invented for this.
+
+### ADR-3D-217 — A stated angle between two SEGMENTS is a given; `vangle`'s shape was standing in for a semantic rule (#909)
+
+**Status:** accepted, 2026-09-05 · fix-round #915 · **Requirements:** [02b](02b-requirements-3d.md) (the
+angle-given promise loses its shared-vertex precondition) · **Design:** the scalar-pin/solve section below
+
+**Context.** `relationTable.ts`'s `'angle|segment|segment'` row has declared `['drive-dims', 'claim']`
+since S3. The code delivered `drive-dims` for **one spelling** of that relation. Measured at HEAD:
+
+```
+תיבה ABCDA'B'C'D'  +  הזווית בין AC לבין AB היא 40    → builds, angle = 40.0000°   (a1 === a2)
+תיבה ABCDA'B'C'D'  +  הזווית בין A'C לבין BC' היא 70  → {"code":"claim-refuted"}
+תיבה ABCDA'B'C'D'  +  הזווית בין AC לבין BA היא 40    → {"code":"claim-refuted"}   ← the SAME angle at A
+```
+
+The third line is the tell. `AC`/`BA` names the same vertex angle at `A` as `AC`/`AB`; only the writing
+order differs, and one is honoured while the other is refuted. So this was never about whether the
+segments meet — it was `apply.ts`'s guard `cmd.claim.a1 === cmd.claim.a2`, which is not a semantic
+condition at all. It is the **shape of the only pin kind available**: `vangle` is *vertex + two rays*
+(`types.ts`), and a statement that does not fit that shape fell out of the drive lane into the claim
+lane, where it was verified against whichever figure the seed happened to produce and refuted.
+
+This is the [ADR-052](06-decisions.md#adr-052) cardinal sin in the angle lane: refuting a given because
+of proportions **the tool sampled** and the student never stated. A declared contract, half-kept.
+
+**Decision.** A new `ScalarPin`, `seg-angle`, carrying two independent segments, plus one routing rule:
+a **shared endpoint in any of its four spellings** normalizes to `vangle`; everything else takes
+`seg-angle`. The guard is deleted, not widened.
+
+**The residual is |cos|, and this is the load-bearing detail.** `cos-angle` already carries two
+`VecAtom`s and looks reusable — it is not. Its residual is the **signed** `cosOf(u,v)`, while
+`angle-seg-eq` is the undirected LINE angle: the verifier (`claims.ts`) and the param lane
+(`evaluate.ts`) both measure `|cos|`, ≤90°. Two independent segments have no canonical direction —
+which endpoint each was written from is arbitrary — so a signed target would make «BC'» and «C'B»
+state different things, and the drive would produce a figure its own verifier then refutes. **A drive
+must target exactly the quantity its verifier checks.** `seg-angle` exists because reusing `cos-angle`
+would have meant changing what `cos-angle` means. The kink of `|cos|` at zero is harmless: LM
+minimises the square of the residual, and a 90° given sits at that square's smooth floor.
+
+`PIN_FIXES_SCALE['seg-angle'] = false` — an angle is similarity-invariant. Answered deliberately, not
+by the type checker's demand; the `Record` over the union is what forced the question to be asked
+(#288's lesson, still working).
+
+**The shared-endpoint normalization is not tidiness.** The three alternate spellings could have taken
+`seg-angle` and measured correctly — that was the first cut, and it passed. But `scene3.ts` draws the
+arc-and-value mark from `vangle` pins and `rightAngles.ts` draws the knee from them, so those
+spellings would have built a right figure carrying **no visible angle**, while `AC`/`AB` carried one.
+One relation, one semantics, includes what the student SEES.
+
+**The claim is deliberately NOT also recorded, which departs from the fix plan in #909.** The plan
+said to keep it, per the M1 duality. Measured, that would be worse: when a value is unreachable the
+pivot returns `solutions === 0` and the store blames the newest pin with **`givens-contradict`, naming
+the conflicting statements** — the honesty invariant's own register. A recorded claim would preempt
+that with the earlier `claim-refuted` («your answer is wrong»), for what is a conflict *between
+givens*. `vangle` has never recorded one either, so this keeps the two branches identical. Refusal is
+not weakened — it is measured in three registers:
+
+| situation | verdict |
+| --- | --- |
+| a cube (determined) + 70° | `claim-refuted` — the verify-your-answer register, byte-preserved |
+| two contradictory angles | `givens-contradict`, naming both statements |
+| a value outside (0°, 90°] | `givens-contradict` |
+
+**The issue's proposed lock was wrong, and the test now records why.** #909 asked that 20° still refuse,
+on a measured "achievable range" of 47.76°–89.95°. That was the range of **sampled** boxes, not
+achievable ones: with `cos = |b²−c²| / (√(a²+b²+c²)·√(b²+c²))`, small `a` and small `c` against `b`
+drive it toward 1. The drive honours 20° and produces edges `1.0000 × 2.7545 × 0.0340` whose three
+edge angles are exactly 90° and whose closed form agrees to 20.0001°. Refusing it would have been the
+same cardinal sin one level down — a lock enforcing the tool's own sampling as a given. The test
+asserts the box is a **legal box** against the closed form instead.
+
+**The sibling rows were measured, not assumed.** `'angle|segment|vector'` and `'angle|vector|vector'`
+(also declared `drive-dims`) are not a separate lowering: «הזווית בין הוקטור A'C לבין הוקטור BC' היא 70»
+produces the identical `angle-seg-eq` claim — the noun prefix is a synonym ([ADR-3D-201](#adr-3d-201)) —
+so all three rows are fixed by this one change. The `cos-angle` pin serves the `cos∠(u,v) = value`
+phrasing, a different statement, and it already drove disjoint operands. That a student could state
+the relation as a **cosine** and be honoured while stating it in **degrees** was refused is the
+sharpest form of the defect.
+
+**Locked** in `src3d/__tests__/seg-angle-drive-909.test.ts` (15 cases): the operator's exact sequence at
+four seeds; the class (two space diagonals, an edge against a non-incident diagonal, a pyramid carrier,
+two angle givens at once, an angle composed with a stated size); all four shared-endpoint spellings
+normalizing to one `vangle`; the three refusal registers; the legal-box assertion above; and the knee
+still drawn for a crossing pair. Plus `fixtures3/box-seg-angle-909.geo3.json` — the operator's sequence
+through the real load path, verifier and parser-drift net included.
+
+**Not in scope.** The three-valued claim verdict (`undetermined`), which #909 was originally filed for
+and which the operator's 2026-09-05 ruling deferred; the branch `feat/909-claim-undetermined` still
+holds that groundwork and is not merged by this.

@@ -54,6 +54,12 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
 - **FR-SP-5 (Must)** — **A statement about an EXISTING object is a given, not a re-creation.** The same
   utterance drives a free figure or verifies a determined one, decided when it is applied. *(The "M1
   duality", the most productive pattern in this tree — reach for it before adding a construct.)*
+  **Which side of the duality a statement falls on is decided by the FIGURE's freedom — never by the
+  statement's spelling.** Two utterances that name the same relation must reach the same lane: an angle
+  between two segments is a given whether or not the segments meet, and whichever endpoint each was
+  written from. A drive available for one phrasing and not its synonym refutes the student on the
+  strength of how they wrote it. *(Realised for the angle family — [ADR-3D-217](06b-decisions-3d.md#adr-3d-217),
+  #909; `seg-angle-drive-909.test.ts`.)*
 - **FR-SP-6 (Must)** — **A stated new label must land on the figure.** A decomposition that loses a point
   the student named is **refused, naming the label** — never committed with the point missing. A label
   that already exists is context, not a drop. *(Realised — `droppedNewLabels3`, `honesty3.test.ts`.)*

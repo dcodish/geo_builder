@@ -144,6 +144,13 @@ export type ScalarPin =
   | { kind: 'length-rel'; a1: Id; b1: Id; a2: Id; b2: Id; c: number } // |a1b1| = c·|a2b2| (similarity-INVARIANT)
   | { kind: 'length'; a: Id; b: Id; value: number } // |DC| = 4
   | { kind: 'vangle'; vertex: Id; p: Id; q: Id; deg: number } // ∠ADC = 120
+  // #909 — the angle between two SEGMENTS that need not meet («הזווית בין A'C לבין BC' היא 70»).
+  // `vangle` is shaped as vertex+two rays and cannot express it, which is why the drive used to be
+  // guarded on `a1 === a2`. The residual is the UNDIRECTED line angle |cos| — deliberately NOT
+  // `cos-angle`'s signed `cosOf`: the verifier (claims.ts `angle-seg-eq`) and the param lane
+  // (evaluate.ts) both measure |cos|, and a drive must target exactly the quantity its verifier
+  // checks, or the figure it produces gets refuted by its own recorded claim.
+  | { kind: 'seg-angle'; a1: Id; b1: Id; a2: Id; b2: Id; deg: number } // ∠(a1b1, a2b2) = 70 (≤90°)
   | { kind: 'dot'; v1: string; v2: string; value: number } // u·v = 24
   | { kind: 'seg-perp-plane'; a: Id; b: Id; plane: Id[] } // DC ניצב למישור ABC (a driving given)
   | { kind: 'seg-par-plane'; a: Id; b: Id; plane: Id[] }

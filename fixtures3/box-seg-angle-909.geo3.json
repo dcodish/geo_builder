@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-09-05T20:25:03.773Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "תיבה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "box",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "הזווית בין A'C לבין BC' היא 70",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A'",
+          "b": "C"
+        },
+        {
+          "type": "segment3",
+          "a": "B",
+          "b": "C'"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "angle-seg-eq",
+            "a1": "A'",
+            "b1": "C",
+            "a2": "B",
+            "b2": "C'",
+            "deg": 70
+          }
+        }
+      ]
+    }
+  ]
+}

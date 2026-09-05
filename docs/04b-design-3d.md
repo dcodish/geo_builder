@@ -65,6 +65,16 @@ list rather than against intuition.
 `operands.ts` resolves operand *thunks*, so a rule names what it wants without knowing how that operand
 will be produced.
 
+**A declared action must hold for every spelling of its row, and the SHAPE of a pin kind is not a
+semantic rule.** `'angle|segment|segment'` declared `drive-dims` while `apply.ts` delivered it only when
+`claim.a1 === claim.a2` — not a geometric condition, but the shape of the one pin kind that existed
+(`vangle` = vertex + two rays). Everything else fell through to the claim lane and was refuted against a
+sampled figure. The lesson generalises past this row: when a statement fails to fit an existing pin, the
+question is whether the relation needs **its own pin kind**, never whether the statement can be turned
+away. Reuse is checked on the residual's MEANING, not its field list — `cos-angle` carries the right two
+operands and the wrong (signed) quantity, and a drive that targets something other than what its verifier
+measures produces figures its own claim then refutes. See [ADR-3D-217](06b-decisions-3d.md#adr-3d-217).
+
 ## Claims
 
 Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape by

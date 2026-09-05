@@ -239,6 +239,7 @@ const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
   dot: true, // u·v = 24 scales as s², so it fixes s
   'length-rel': false, // a RATIO of lengths
   vangle: false,
+  'seg-angle': false, // #909: an angle is similarity-INVARIANT — it must not fix the scale
   'seg-perp-plane': false,
   'seg-par-plane': false,
   'cos-angle': false, // V8-f: cosines and equal dot products are similarity-invariant
@@ -624,6 +625,24 @@ export function solvePivot(
         const d2 = sub3(q, vtx);
         const den = Math.max(norm3(d1) * norm3(d2), 1e-12);
         out.push(dot3(d1, d2) / den - Math.cos((pin.deg * Math.PI) / 180));
+      } else if (pin.kind === 'seg-angle') {
+        // #909 — the two-segment angle. |cos| (not the signed cos `vangle` uses above): the two
+        // segments are independent, so which endpoint each was written from is arbitrary, and a
+        // signed target would make «BC'» and «C'B» state different things. |cos| is exactly what
+        // `verifyClaim`/`angle-seg-eq` measures. The kink at |cos| = 0 is harmless: LM minimises the
+        // SQUARE of this residual, and cos(deg) = 0 (a 90° given) sits at that square's smooth floor.
+        const a1 = at(pin.a1);
+        const b1 = at(pin.b1);
+        const a2 = at(pin.a2);
+        const b2 = at(pin.b2);
+        if (!a1 || !b1 || !a2 || !b2) {
+          out.push(10);
+          continue;
+        }
+        const u = sub3(b1, a1);
+        const w = sub3(b2, a2);
+        const den = Math.max(norm3(u) * norm3(w), 1e-12);
+        out.push(Math.abs(dot3(u, w)) / den - Math.cos((pin.deg * Math.PI) / 180));
       } else if (pin.kind === 'dot') {
         const d1v = c.vectors.get(pin.v1);
         const d2v = c.vectors.get(pin.v2);

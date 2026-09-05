@@ -171,6 +171,10 @@ const SEEDED: Record<string, string[]> = {
     'מ-B מעבירים אנך לישר ℓ החותך אותו בנקודה C',
     'שטח המשולש ABC = 4.5',
   ],
+  // #909 (ADR-3D-215) — the operator's exact sequence. A stated angle between two segments that do
+  // not meet used to fall out of the drive lane and be refuted `claim-refuted`; it is a GIVEN, and
+  // the figure reshapes to honour it. Green replay + no parser drift is exactly the right lock.
+  'box-seg-angle-909.geo3.json': ["תיבה ABCDA'B'C'D'", "הזווית בין A'C לבין BC' היא 70"],
 };
 
 if (process.env.GEN_FIXTURES3) {

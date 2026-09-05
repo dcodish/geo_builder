@@ -1375,8 +1375,28 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           next.scalarPins.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
           return { ok: true, next };
         }
-        if (cmd.claim.type === 'angle-seg-eq' && cmd.claim.a1 === cmd.claim.a2) {
-          next.scalarPins.push({ kind: 'vangle', vertex: cmd.claim.a1, p: cmd.claim.b1, q: cmd.claim.b2, deg: cmd.claim.deg });
+        // #909 — a stated angle between two SEGMENTS is a GIVEN, whatever the two segments' spelling.
+        // The `a1 === a2` guard that used to sit here was not a semantic condition: it was the shape of
+        // the only pin kind available (`vangle` = vertex + two rays). Every other spelling of the same
+        // relation — «AC»/«BA» (a shared vertex written second), and every genuinely disjoint pair
+        // («A'C»/«BC'», two face diagonals, two space diagonals) — fell out of the drive lane into the
+        // claim lane and was refuted against whichever figure the seed happened to produce, which
+        // `relationTable`'s `'angle|segment|segment'` row already declared it must not be (`drive-dims`).
+        // The shared-vertex case keeps routing to `vangle`: same quantity, better-conditioned residual.
+        if (cmd.claim.type === 'angle-seg-eq') {
+          const { a1, b1, a2, b2, deg } = cmd.claim;
+          // A SHARED endpoint — in any of its four spellings — is a vertex angle, so it takes the
+          // `vangle` form: the better-conditioned residual, and the one the renderer marks with an arc
+          // (scene3) or a knee (rightAngles). `a1 === a2` was the only spelling that used to reach it;
+          // «AC»/«BA» states the same angle at A and was refuted. One relation, one semantics.
+          const shared =
+            a1 === a2 ? { vertex: a1, p: b1, q: b2 }
+            : a1 === b2 ? { vertex: a1, p: b1, q: a2 }
+            : b1 === a2 ? { vertex: b1, p: a1, q: b2 }
+            : b1 === b2 ? { vertex: b1, p: a1, q: a2 }
+            : null;
+          if (shared) next.scalarPins.push({ kind: 'vangle', ...shared, deg });
+          else next.scalarPins.push({ kind: 'seg-angle', a1, b1, a2, b2, deg });
           return { ok: true, next };
         }
       }

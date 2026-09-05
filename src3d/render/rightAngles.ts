@@ -178,6 +178,10 @@ export function rightAngles3(c: Construction3, resolved: Resolved3, scale: numbe
   for (const sp of c.scalarPins) {
     if (sp.kind === 'cos-angle' && isPerpCos(sp.cos)) addAtoms(sp.u, sp.v);
     else if (sp.kind === 'vangle' && isRight(sp.deg)) segPairs.push({ a: sp.vertex, b: sp.p, c: sp.vertex, d: sp.q });
+    // #909 — the two-segment angle DRIVES now instead of being recorded as a claim, so the knee has to
+    // be read off the pin as well. Without this arm «הזווית בין A'C לבין BC' היא 90» would build the
+    // right angle and stop DRAWING it — the claim arm below no longer sees it.
+    else if (sp.kind === 'seg-angle' && isRight(sp.deg)) segPairs.push({ a: sp.a1, b: sp.b1, c: sp.a2, d: sp.b2 });
     else if (sp.kind === 'seg-perp-plane') addPlaneRun(sp.a, sp.b, sp.plane);
   }
   for (const cl of [...c.claims, ...c.paramGivens]) {
