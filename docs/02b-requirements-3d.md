@@ -64,6 +64,13 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   multiples, and the identities a bagrut question asks a student to verify.
 - **FR-VC-2 (Must)** — Support **at most one symbolic parameter** in a vector expression, pinned by a
   given through root-finding. *(Two unknowns in one expression is a known boundary — issue #301.)*
+- **FR-VC-2a (Must)** — **A POWER in a coordinate component is supported where the solver can pin it,
+  and refused BY NAME where it cannot.** On a figure carrying a solid, `C(p², p, 0)` builds and the
+  relation `x = y²` holds. On a figure with no solid there is nothing to pin the exponent in, and the
+  statement is **refused with a message naming what is missing** — never accepted with the power
+  quietly discarded, which would state a given the student did not give. *(Realised —
+  [ADR-3D-218](06b-decisions-3d.md#adr-3d-218), #898; `power-needs-solid-898.test.ts`. The guidance
+  register carries the same precondition, so the hint cannot promise what the next line refuses.)*
 - **FR-VC-3 (Must)** — **NO CAS.** Every "symbolic" feature is a numeric root-find, a closed form, or a
   linear solve. Anything needing symbolic solving beyond that is **refused and escalated to the operator**,
   not approximated. This bound is what keeps the engine's answers trustworthy. *(Operator authority,

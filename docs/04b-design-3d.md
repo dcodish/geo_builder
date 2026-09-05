@@ -46,6 +46,16 @@ feature here is a numeric root-find, a closed form, or a linear solve; anything 
 the operator rather than being approximated. The bound is what makes the answers trustworthy — an
 approximate symbolic result would be indistinguishable, to a student, from a correct one.
 
+**A symbolic coordinate lives in one of two structurally different lanes, and the lane decides what can
+be expressed.** With a solid present the component becomes a pivot **pin** carrying the full affine form,
+exponents included; with no solid it becomes a `coord-sym` point whose components are stored as a
+degree-1 `{k, p}`. They are different objects, not one object evaluated two ways — so a capability
+present in one is not automatically present in the other, and the narrower lane must **refuse what it
+cannot hold rather than narrow it silently**. A lossy lowering is the worst outcome available: it looks
+like success and states a given the student never gave. See [ADR-3D-218](06b-decisions-3d.md#adr-3d-218)
+(#898), where a component reducer summing coefficients and never reading exponents drew «C(p²,p,0)» as
+«C(p,p,0)».
+
 ## Gauge, and why the landing funnel exists
 
 A figure's placement, rotation and scale are a **gauge** — free unless something absolute pins them. The
