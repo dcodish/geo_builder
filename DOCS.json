@@ -109,10 +109,10 @@
       "note": "Requirements written (#904 Step 8), scoped as CONTRACT — catalog3.ts (230 entries, guard-tested in He+En) stays the construct inventory. Design doc 04b still to write."
     },
     "complex": {
-      "requirements": null,
+      "requirements": "docs/02d-requirements-complex.md",
       "design": null,
       "pending": 904,
-      "note": "16,511 lines, 37 ADRs, shipped prod/2026-08-17-4. docs/27 is the plan."
+      "note": "Requirements written (#904 Step 9), scoped as CONTRACT — docs/27 §10 remains the authoritative grammar contract and docs/29 the byte-matched formula sheet. Design doc 04d still to write."
     },
     "analytic": {
       "requirements": "docs/02c-requirements-analytic.md",
