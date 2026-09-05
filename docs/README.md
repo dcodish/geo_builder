@@ -29,7 +29,7 @@ tracked by [#904](https://github.com/dcodish/geo_builder/issues/904), not oversi
 |---|---|---|
 | 01 | [Vision](01-vision.md) | Purpose, audience, the core interaction, goals & non-goals |
 | 02 | [Functional Requirements — 2-D](02-requirements.md) | What the 2-D builder must do (`FR-*`), actors, user stories |
-| 02b | *(to write)* | Requirements — 3-D Space Builder |
+| 02b | [Requirements — 3-D](02b-requirements-3d.md) | The 3-D contract: the two lanes, gauge-vs-knowledge, claims are verified never obeyed, the NO-CAS bound. `catalog3.ts` remains the construct inventory |
 | 02c | [Requirements — Analytic](02c-requirements-analytic.md) | **In progress; the product's standing requirements doc.** V1 pedagogy + requirements, captured live 2026-09-04, promoted from `19a` by ADR-W-041 |
 | 02d | *(to write)* | Requirements — complex-numbers Builder |
 | 02w | [Requirements — shared surfaces](02w-requirements-workspace.md) | The contract every builder shares: suite chrome, the ask lane + data panel, save/load envelope, export, the admin surface, bidi and number display |

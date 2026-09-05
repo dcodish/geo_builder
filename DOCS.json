@@ -103,10 +103,10 @@
       "design": "docs/04-design.md"
     },
     "3d": {
-      "requirements": null,
+      "requirements": "docs/02b-requirements-3d.md",
       "design": null,
       "pending": 904,
-      "note": "52,301 lines and 219 ADRs in production. docs/20 is the build plan, not a contract."
+      "note": "Requirements written (#904 Step 8), scoped as CONTRACT — catalog3.ts (230 entries, guard-tested in He+En) stays the construct inventory. Design doc 04b still to write."
     },
     "complex": {
       "requirements": null,
