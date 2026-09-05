@@ -41,7 +41,7 @@ import { auditLoad3 } from './store/loadAudit3';
 import { useStore } from 'zustand';
 import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
 import { planeChipsByFact } from './store/planeChips';
-import { factDisplay3, isVectorFact3 } from './render/notation';
+import { FactRowText3 } from './render/FactRow3';
 import { VecMath } from './render/VecMath';
 
 /** #492/#425: the student's own statements, quoted and comma-joined, for a refusal that names the
@@ -249,7 +249,6 @@ export default function App3() {
   const [text, setText] = useState('');
   // steps display: vector notation moved to src3d/render/notation.ts (#312 — the boundary-class
   // fix lives there, unit-tested; the stored utterance stays untouched).
-  const factDisplay = factDisplay3;
   // the palette's insert lives in shell/InputArea now (wrap-selection, applySymbol — B4)
   const [busy, setBusy] = useState(false);
   // #73 (ADR-3D-040): the guidance register's what-to-do-instead note (shown in place of an error)
@@ -682,9 +681,9 @@ export default function App3() {
 
           {/* B5 (#670, D6): the SHARED fact-list chrome — row cards, mute checkbox, ✎ edit-in-place,
               ✕ delete, one look across the builders. The row CONTENT stays this product's:
-              claim-✓/status dot, the bidi-isolated utterance (#482 ADR-3D-121: display-only,
-              idempotent; a VECTOR fact renders through VecMath, whose tokenizer must not see
-              injected isolates), and the per-plane display-cycle chips (#318/#395 ADR-3D-108 —
+              claim-✓/status dot, the row text (routed by `FactRow3` — #482 ADR-3D-121 isolation is
+              display-only and idempotent; a VECTOR fact renders through VecMath, whose tokenizer must
+              not see injected isolates), and the per-plane display-cycle chips (#318/#395 ADR-3D-108 —
               relation-operand and claim-carrier planes cycle exactly like a stated «מישור ABC»). */}
           <FactList
             testId="fact-list"
@@ -701,11 +700,9 @@ export default function App3() {
                     statusDot(derived.status[f.id])
                   )}
                   <span dir="auto" className="min-w-0 flex-1 truncate text-sm">
-                    {isVectorFact3(f) ? (
-                      <VecMath text={factDisplay(f, new Set(derived.construction.vectors.keys()))} vecNames={new Set(derived.construction.vectors.keys())} />
-                    ) : (
-                      isolateLtrRuns3(f.utterance)
-                    )}
+                    {/* #900 (ADR-3D-216): the routing lives in FactRow3, not in this callback — a decision
+                        inside a `rows={facts.map(...)}` ternary is one no test can reach. */}
+                    <FactRowText3 f={f} vecNames={new Set(derived.construction.vectors.keys())} />
                   </span>
                   {/* #842 (ADR-3D-192): the chip goes on the row that MATERIALISED the plane, not on
                       every row that mentions it. Provenance is derived from the fact list (the #769

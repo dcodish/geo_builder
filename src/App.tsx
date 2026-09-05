@@ -31,7 +31,7 @@ import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, stepLabel } from '@/p
 import { Figure } from '@/render';
 import { crossingCommands } from '@/engine';
 import type { Crossing } from '@/engine';
-import { MathText, hasMath } from '@/render/mathText';
+import { MathText, hasMath } from '../shell/math';
 import { MathValue } from '@/render/MathValue';
 import { formatMeasure } from '@/format';
 import { readoutForGroup } from '@/render/computedValue';

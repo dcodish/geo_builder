@@ -7691,3 +7691,59 @@ register.
 admits `p = ±√·`, so the roots are genuine configurations that cycle through the existing `paramSigns`
 machinery — are not exercised by a figure in this slice's corpus, so nothing here asserts them. Worth a
 measured follow-up rather than a claim.
+
+---
+
+### ADR-3D-216 — The row asks TWO questions: decoration is fact-kind-gated, structure is content-gated (#900)
+
+**Context.** The operator, playing #511 on 2026-09-04, typed «C(p^2,1,0)» and got the caret back
+verbatim in the step list: *"the display when i write ^ is not mathml."* Measured in a real browser,
+neither spelling rendered — `C(p^2,1,0)` and `C(p²,1,0)` both emitted a plain text node, with zero
+`<msup>`/`<math>` elements on the page. The superscript spelling only LOOKED right, because `²` is a
+literal character passing through a raw echo.
+
+**The defect is a gate answering a question it was never asked.** `App3.tsx` routed a row with
+`isVectorFact3(f)`: a vector fact went to `VecMath`, everything else to `isolateLtrRuns3(f.utterance)`.
+That single boolean was doing two unrelated jobs.
+
+- **Decoration** — the arrows and vector pairs `VecMath` adds. #313's note on the gate is
+  correct and stands: *"an arrow on a segment name in a prose row would assert vector-ness the statement
+  never had."* This job genuinely needs the fact's KIND.
+- **Structure** — rendering `p^2` as p². This asserts nothing the student did not write, so binding it
+  to fact-kind was the error. 2-D has rendered the identical notation since ADR-298 via
+  `hasMath(text)`, a CONTENT test.
+
+After #511 put `²` on the palette, the consequence became an honesty problem rather than a cosmetic one:
+the tool accepts two spellings it calls byte-identical (ADR-3D-215) and displayed them differently, so
+the student who types what an Israeli keyboard can produce got the worse-looking line.
+
+**Decision.** Split the question. `isVectorFact3` keeps the decoration; structure asks `hasMath`. A
+non-vector row whose text carries math renders through the shared core; everything else is unchanged.
+
+**`VecMath` is deliberately NOT the renderer for those rows.** Its tokenizer reads any `[A-Z][A-Z]` run
+as a vector `pair` (`VecMath.tsx:30`), so routing prose through it would manufacture exactly the arrows
+#313 forbids. The shared `shell/math` core is decoration-free — it converts fractions, radicals,
+subscripts and powers and leaves everything else verbatim — which is why it, and not the 3-D renderer,
+is the one that can be pointed at an arbitrary row. See [ADR-W-040](06w-decisions-workspace.md#adr-w-040)
+for the move to `shell/`.
+
+**Isolate FIRST, then render.** `isolateLtrRuns3` inserts LRI/PDI at RUN boundaries and a math token is
+LTR throughout, so no isolate lands inside one and #482's ordering survives the math path. This is the
+opposite of the VECTOR branch's rule — `VecMath`'s tokenizer must not see injected isolates — and the
+two now sit next to each other in `FactRow3.tsx` where the difference is legible.
+
+**The routing moved out of the JSX, which is the durable half.** It lived in a ternary inside
+`rows={facts.map(...)}`, invisible to every test: `vecmath.test.tsx` asserted what `isVectorFact3`
+RETURNS and could not assert what the row DID with it, so this defect was reachable with the whole suite
+green. `FactRow3.tsx` makes the routing a component, the `symbols3.ts` lesson applied to a render.
+
+**Locked** in `issue-900-power-rendering.test.tsx`, on rendered output rather than on a gate's return
+value: the operator's own line renders `<msup><mi>p</mi><mn>2</mn></msup>` and the caret does not
+survive; the two spellings produce **identical markup**; the `²` spelling now emits real `<math>`
+(the lock is the structure, not the glyph); a non-vector math row gains structure and **no** `<mover>`;
+a vector fact still routes to `VecMath` with its arrow; a Hebrew row with an LTR math run keeps its LRI;
+and a row with no math is byte-identical to the plain isolated text.
+
+**Scope.** Powers are what was reported, but the gate is general — a 3-D row carrying a radical, a
+fraction or a subscript now renders it too, because the shared core already did. No new notation was
+invented for this.
