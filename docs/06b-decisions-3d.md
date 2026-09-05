@@ -7694,6 +7694,48 @@ measured follow-up rather than a claim.
 
 ---
 
+### ADR-3D-215 — The palette offers the POWER, and the button waited for the parser rather than the reverse (#511)
+
+**Status:** accepted, 2026-09-04 · **Unblocked by:** [ADR-3D-214](#adr-3d-214) (#509) · fix-round #897
+
+**Context.** The operator's #509 report had two halves. The first — `C(p^2, p^2+4, 0)` refusing — was
+answered by ADR-3D-214. The second was *"I also dont have the power option in the symbols."* The
+palette offered 19 characters and none of them was a power, and on an Israeli keyboard a superscript
+is untypeable — the same argument [#272](#adr-3d-039) made for the Greek letters and #493 for `∥`.
+
+**Why it was deliberately NOT shipped in 2026-07.** #511's own body blocked it: *"Adding the button
+now would offer the student a character the tool refuses in every position — strictly worse than its
+absence."* That was correct then. `²` parsed nowhere.
+
+**Decision.** With ADR-3D-214 shipped, the blocker is gone and the button lands: one entry,
+`['²', '²', 0]`, placed beside `√` because a power and a root are the same student's reach.
+
+**The palette offers the SUPERSCRIPT, and that is the whole point.** The parser takes both spellings —
+`C(p^2,1,0)` and `C(p²,1,0)` produce byte-identical commands, asserted rather than assumed — so the
+palette's job is to supply the one a keyboard cannot. Offering `^` instead would be offering the
+character the student can already type.
+
+**The scope line is what makes the button honest.** A power is meaningful in a **coordinate component
+only**. `|AB|² = 25`, `p² = 4` and `x²+y²+z² = 9` remain `not-handled`, and this button does not change
+that. Offering the character in the position where it works, rather than withholding it everywhere
+because it does not work in three others, is the same judgement #493 made for `∥`.
+
+**The drift lock passed untouched, which is the lock working rather than a coincidence.** `bidi3.test.ts`
+requires every palette character to be `CORE` or a run delimiter, so adding a button without teaching
+bidi about it fails the suite. `²` and `³` were already in `CORE` — added for "the superscripts that end
+a measure (`x²`)" — so nothing in `i18n/bidi.ts` needed touching. Had they not been, the suite would
+have said so.
+
+**Locked** in `src3d/__tests__/bidi3.test.ts` (#511): the palette offers `²`; both spellings parse to a
+`point3`; and the two are the same command, so the offered character is never the weaker one.
+
+**One consequence worth recording.** This puts `²` one click away, which raises the exposure of
+[#898](https://github.com/dcodish/geo_builder/issues/898) — a power is silently dropped when the figure
+has no solid, so `C(p²,p,0)` draws `x = y`. That defect predates this button and is filed separately;
+it is noted here because the palette makes it easier to reach, not because it was caused by it.
+
+---
+
 ### ADR-3D-216 — The row asks TWO questions: decoration is fact-kind-gated, structure is content-gated (#900)
 
 **Context.** The operator, playing #511 on 2026-09-04, typed «C(p^2,1,0)» and got the caret back

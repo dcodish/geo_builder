@@ -228,6 +228,23 @@ describe('#482 — the bidi alphabet cannot drift from the palette the tool offe
     // ASCII `||` is the MAGNITUDE insert and must never double as "parallel" — `|AB|` would go ambiguous.
     expect(inserts.filter((i) => i === '||'), 'exactly one owner of ASCII ||').toHaveLength(1);
   });
+
+  it('#511 — the palette offers the POWER, and the character it inserts BUILDS', () => {
+    const inserts = SYMBOL_PALETTE_3.map(([, insert]) => insert);
+    expect(inserts, 'the second half of the #509 report: a power was untypeable').toContain('²');
+
+    // The button is only honest if the character it inserts is one the parser takes. Both spellings
+    // must build, and to the SAME command — the palette offers the superscript precisely because it
+    // is the one a student cannot type, so it must not be the weaker of the two.
+    for (const line of ['C(p²,1,0)', 'C(p^2,1,0)']) {
+      const r = parse3(line);
+      expect(r.ok, line).toBe(true);
+      if (r.ok) expect(r.commands[0].type, line).toBe('point3');
+    }
+    expect(JSON.stringify(parse3('C(p²,1,0)')), 'the two spellings are one command').toBe(
+      JSON.stringify(parse3('C(p^2,1,0)')),
+    );
+  });
 });
 
 /**
