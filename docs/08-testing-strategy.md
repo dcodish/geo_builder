@@ -1,6 +1,6 @@
 # 08 — Testing Strategy
 
-_Last updated: 2026-06-10._
+_Scope: the whole workspace — the 2-D, 3-D, complex and analytic builders and the shared `server/`. The last-changed date is git's to state; the hand-kept line here read 2026-06-10 while the file had been edited through August._
 
 ## Purpose
 
@@ -21,18 +21,19 @@ Define how Geo Builder is tested and — critically — **what must pass before 
 | Level | Tool | Scope |
 |---|---|---|
 | Unit | Vitest | Pure functions: engine, parser, transforms, command mapping, theorem predicates |
-| Property-based | Vitest + fast-check _(proposed)_ | Invariants over generated inputs: stability, geometric correctness, branch validity |
+| Property-based | Vitest, hand-rolled seeded generators | Invariants over generated inputs: stability, geometric correctness, branch validity. **`fast-check` was proposed and never adopted** — the campaigns below are seeded generators written directly, which give the same invariant coverage with no dependency |
 | Integration | Vitest | Store orchestration (apply→validate→solve→recompute, undo/redo), input-boundary dispatch |
 | Component | Vitest + React Testing Library + jsdom | SVG renderer output from a given figure |
-| E2E | Playwright _(proposed, headline flows)_ | Build → render → cycle alternative → export, in a real browser |
+| E2E / visual | **Playwright — installed and in use** | `npm run smoke:visual` drives the real app, captures the states a play sheet will ask about, and fails on a blank capture, a refused line or an uncaught page error ([ADR-W-035](06w-decisions-workspace.md#adr-w-035)). A LOCAL gate, not CI. `scripts/visual-parity.mjs` compares captures across builders |
 
 ## Two tiers ([ADR-394](06-decisions.md#adr-394), issue #344)
 
 | Command | Scope | Cost | Role |
 |---|---|---|---|
-| `npm run test:full` | everything | ~6 min | **The gate.** Run before every commit and every deploy. |
-| `npm run test:fast` | every file measured under 60 s | **~40 s**, ~5060 tests | The development loop. **Never a gate.** |
+| `npm run test:full` | everything | **~10 min** | **The gate.** Run before every commit and every deploy. |
+| `npm run test:fast` | every file measured under 60 s | **~60 s**, ~10,160 tests | The development loop. **Never a gate.** |
 | `npm run test:tiers` | — | instant | Which slow files have actually caught something |
+| **`npm run test:docs`** | the `DOCS.json` doc-gate set | **~2 s**, 674 tests | **The gate for a DOC-ONLY change** ([ADR-W-041](06w-decisions-workspace.md#adr-w-041)). Anything touching `.ts`/`.tsx` pays `test:full`. Five product tests read a document at runtime — two BYTE-MATCH one against a code table — and `ci.yml` ignores `docs/`, so `.github/workflows/docs.yml` runs this set on the paths CI declines (#905) |
 
 **The split is measured, never hand-written.** `test:full` records the files exceeding 60 s into `reports/test-tiers.json`; `test:fast` derives its `--exclude` list from it. A newly-slow test joins the slow tier by itself — the drift that quietly undid [ADR-280](06-decisions.md#adr-280)'s 3-min suite over two weeks. The file is rewritten only when *membership* changes, so a routine green run leaves the tree clean. Commit it: the fast tier must mean the same thing on every machine.
 
@@ -43,6 +44,29 @@ Define how Geo Builder is tested and — critically — **what must pass before 
 **Unique catches are tracked.** When a full run fails and every failure is in a slow-only file, the fast tier would have been green — that is appended to `reports/tier-catches.jsonl`. `npm run test:tiers` ranks the slow files by how often they were the only thing that caught a regression, and lists those that never have (candidates to speed up or fold into a shard). The tier split is a coverage/speed trade, so it should be re-argued from evidence rather than assumed.
 
 **Corollary for new tests — put a scenario's oracles in ONE test.** vitest isolates each *file* in its own worker, so the [ADR-280](06-decisions.md#adr-280) fold memo cannot cross files: a second oracle in a second file re-pays the entire cold solve (measured: repeat replay of the same content **0 ms** in-process, a different seed **4.9%**, a cold one **100%**). Adding a new corpus-wide property as its own file is how the suite got to 13 minutes. Add it to `scenarios-harness.ts` and call it from the shard's per-scenario test instead.
+
+## Per-product lanes — the workspace has four builders, not one
+
+This document was written for a single product and describes the 2-D engine throughout. The nets below
+are 2-D unless stated; the **structure** around them is workspace-wide:
+
+| | 2-D | 3-D | Complex | Analytic |
+| --- | --- | --- | --- | --- |
+| Local slice | `npm run test:2d` | `test:3d` | `test:complex` | `test:analytic` |
+| CI lane | `test-2d` | `test-3d` | `test-complex` | `test-analytic` |
+| Fixture net | `src/__tests__/fixtures/` | `fixtures3/` | `src-complex/__tests__/fixtures/` | `src-analytic/__tests__/fixtures/` |
+| Solve-ladder contract | [LADDER](LADDER.md) | — | [LADDER-CX](LADDER-CX.md) | — |
+
+- **The shared `server/` tests run in EVERY lane** — that is why the cross-product guards live there
+  (`isolation.test.ts`, `registry-consistency.test.ts`, `docs-hygiene.test.ts`): a violation introduced
+  by any product fails that product's own lane.
+- **A diff touching one product runs only its lane**; anything on the shared surface runs all four.
+  Unknown-by-default is *run everything*, never *skip* ([ci.yml](../.github/workflows/ci.yml)).
+- **Sibling safety** (`node scripts/check-sibling-safety.mjs`, [ADR-W-017](06w-decisions-workspace.md)) runs in
+  every lane: a change in one tree must not be able to regress a shipped sibling, and it proves that in seconds.
+- **The fixtures-first rule is per-product.** Each tree has its own saved-figure net with the same contract:
+  drop a saved file in the folder and it becomes permanent coverage, replayed through the real load path
+  with zero per-figure authoring.
 
 ## What we test, per layer
 
@@ -129,6 +153,13 @@ Before a feature or build step is reported as **ready**, all of the following ho
 5. For UI work: the headline scenario is verified (E2E, or a manual check with evidence).
 6. No `.only`, no skipped specs masking gaps, no silent fallback hiding a failure.
 7. Results are reported honestly — failures shown with output, not omitted.
+8. **The requirements and design docs are updated in the same commit** when the change alters what the
+   product promises or how it is built ([ADR-W-041](06w-decisions-workspace.md#adr-w-041), standing rule 6);
+   the ADR carries its `**Requirements:**` / `**Design:**` lines. A doc-only change is gated by
+   `npm run test:docs`, everything else by `test:full`.
+
+**Claim green by READING `reports/suite-verdict.json`** — `green: true`, `mode: "full"`, `sha` equal to
+HEAD, `dirty: false` — never by an exit code ([ADR-W-033](06w-decisions-workspace.md#adr-w-033)).
 
 ## Per-step acceptance gates
 
@@ -150,15 +181,63 @@ Proceed to Step 2 (renderer) only when this gate is green.
 
 ## Out of scope (v1)
 
-- Pixel-perfect visual regression (snapshot / screenshot diffing) — revisit if UI churn warrants it.
+- **Pixel-perfect** visual regression (per-pixel snapshot diffing) — still out. What exists instead is
+  `npm run smoke:visual` (captures real states and fails on blank/refused/error) and
+  [scripts/visual-parity.mjs](../scripts/visual-parity.mjs) (compares a surface ACROSS builders, the
+  docs/28 one-look goal). Neither diffs pixels against a golden image; both are local, not CI.
 - Load / stress and cross-browser matrices — single evergreen target for v1.
 - The LLM's parsing *quality* on arbitrary phrasings — covered by the optional manual smoke, not CI.
 
-## Open decisions (recommendations)
+## Decisions — RESOLVED (2026-09-05, [ADR-W-041](06w-decisions-workspace.md#adr-w-041))
 
-- **fast-check (property-based):** recommend **yes** — stability and geometric invariants are natural properties; small dependency, high value.
-- **Playwright E2E:** recommend a tiny suite for the 2–3 headline flows once the UI exists; manual acceptance is fine until then.
-- **Coverage targets:** recommend high coverage on engine + parser (correctness-critical, pure); lighter on UI. Don't chase 100%.
+These three sat under "Open decisions (recommendations)" from 2026-06-10 until 2026-09-05. Two had in
+fact been settled by what was built; the third is settled here with data.
+
+- **`fast-check` (property-based): NO, and not "not yet".** The recommendation was *yes*, but what got
+  built instead were **hand-rolled seeded generators** — the invariants campaign (343 diagrams,
+  `CAMPAIGN_MULT` widens it) and the coordinate campaign (172 figures, `COORD_MULT`). They give the same
+  invariant coverage with no dependency, and they generate *geometry* rather than arbitrary values, which
+  a generic shrinker is poor at. The tooling table said "proposed" for three months while the capability
+  already existed under another name.
+
+- **Playwright: YES — installed and in use, as a LOCAL gate.** `npm run smoke:visual` drives the real
+  app, captures the states a play sheet will ask about, and fails on a blank capture, a refused line or an
+  uncaught page error ([ADR-W-035](06w-decisions-workspace.md#adr-w-035)). Deliberately **not** CI
+  (ADR-W-005) — it needs a running dev server, like `check:siblings`.
+
+- **Coverage: MEASURED, never gated.** `@vitest/coverage-v8` is installed and `npm run test:coverage`
+  reproduces the run. First measurement, 2026-09-05 over `src/` (the 2-D tree):
+
+  | | statements | branches | functions |
+  | --- | --- | --- | --- |
+  | **`src/` total** | **87.3%** | **90.9%** | **94.7%** |
+
+  Per area, which is the part worth reading:
+
+  | area | lines | | area | lines |
+  | --- | --- | --- | --- | --- |
+  | `parser` | **99.1%** | | `store` | 86.6% |
+  | `replay` | **98.3%** | | `validation` | 76.5% |
+  | `engine` | **97.2%** | | `app` | 67.9% |
+  | `theorems` | **97.1%** | | `render` | 66.1% |
+  | `i18n` | 100% | | `App.tsx` | **0%** |
+
+  **The numbers confirm the strategy rather than challenging it.** The 2026-06-10 recommendation was
+  "high on engine + parser, lighter on UI, don't chase 100%" — and that is exactly the shape: the pure,
+  correctness-critical core sits at 97–99% while the React component is untested. `App.tsx` alone (1,394
+  statements at 0%) accounts for most of the gap between 87% and the core's 97%.
+
+  **It stays a diagnostic, not a gate.** A line-coverage threshold would be a weaker claim dressed as a
+  stronger one: this repo's correctness evidence is the four independent nets below (invariants campaign,
+  the coordinate oracle at 5.6e-15 worst residual, the givens verifier, and the scenario + fixture nets),
+  and `test:full` already fails on any of them. Coverage cannot tell you an assertion is *right*; the
+  mutation result in the tier section — blinding `requirementSamples` passes 5,007 fast tests — is the
+  standing proof that executed is not the same as checked.
+
+  **One item worth a look, not a target:** [`src/app/submitPipeline.ts`](../src/app/submitPipeline.ts) at
+  **56.3%**. CLAUDE.md routes all new submit-path behaviour there specifically to keep it out of the
+  component, so it is engine-layer by intent ([BOUNDARIES.json](../BOUNDARIES.json) classifies it
+  `engine`) while carrying component-level coverage.
 
 ## Validation campaign (property-based, 2026-06-12)
 

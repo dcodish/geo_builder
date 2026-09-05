@@ -26,7 +26,8 @@
     "test:tiers": "node scripts/test-tiers.mjs report",
     "check:siblings": "node scripts/check-sibling-safety.mjs",
     "smoke:visual": "node scripts/visual-smoke.mjs",
-    "test:docs": "node scripts/doc-gate.mjs"
+    "test:docs": "node scripts/doc-gate.mjs",
+    "test:coverage": "vitest run src/ --coverage --coverage.provider=v8 --coverage.reporter=text-summary --coverage.reporter=json-summary --coverage.include='src/**/*.ts' --coverage.include='src/**/*.tsx' --coverage.exclude='src/**/__tests__/**'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
@@ -47,6 +48,7 @@
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^2.1.9",
     "esbuild": "^0.25.12",
     "jszip": "^3.10.1",
     "playwright": "^1.62.1",
