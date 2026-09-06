@@ -12,8 +12,8 @@ import { riderPairsT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
 import { isAnyDiagonal, isSpaceDiagonal, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
-import { isNonLinear, pinSymsOf, symsOfAffine } from './types';
-import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PartialName, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
+import { isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
+import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
   // #305 (ADR-3D-090): every quad pyramid is a 4-ring + apex, whatever its base or top
@@ -312,14 +312,14 @@ function atomEndpoints(c: Construction3, atom: import('./types').VecAtom): [Id, 
   return dv ? [dv.from, dv.to] : null;
 }
 
-/** The vecDef index of a symbol-defined point whose symbol is still FREE (no symbolPin yet), or null.
+/** The still-FREE symbol of a symbol-defined point (no symbolPin on it yet), or null.
  *  ADR-3D-056: the point a seg-perp/seg-par symbol-pin will drive (e.g. E on `AE=t·AS`). */
-function freeSymbolDef(c: Construction3, id: Id): number | null {
+function freeSymbolOf(c: Construction3, id: Id): string | null {
   const pt = c.points.get(id);
   if (!pt || pt.kind !== 'vec-defined') return null;
   const vd = c.vecDefs[pt.def];
   if (!vd?.symbol) return null;
-  return c.symbolPins.some((p) => p.def === pt.def) ? null : pt.def; // already pinned ⇒ can't pin twice
+  return c.symbolPins.some((p) => p.sym === vd.symbol) ? null : vd.symbol; // already pinned ⇒ can't pin twice
 }
 
 /** #324 (ADR-3D-079): a solid's BASE ring — the drawing convention everywhere in the engine is
@@ -420,9 +420,22 @@ function bindPartialNames(
   });
 }
 
-/** #814 — the letter's binding, if it names a free component. Derived, never enumerated. */
-const partialNameOf = (c: Construction3, sym: string): PartialName | undefined =>
-  c.partialNames.find((b) => b.sym === sym);
+/** #902 (ADR-3D-219) — a stated number for ONE component of an injection target, as the injection
+ *  command that lane already lowers (the two other components unstated — null does not constrain).
+ *  How a value reaches a NAMED free component (#814): the name was bound in an injection lane, and the
+ *  value goes back through the same door, so it joins the pivot exactly as any stated coordinate. */
+function componentGiven(target: ComponentTarget, axis: 'x' | 'y' | 'z', value: number): Command3 {
+  const at = (a: 'x' | 'y' | 'z'): number | null => (a === axis ? value : null);
+  const comps = { x: at('x'), y: at('y'), z: at('z') };
+  switch (target.kind) {
+    case 'point':
+      return { type: 'point3', id: target.id, ...comps };
+    case 'vector':
+      return { type: 'inject-vector', name: target.name, ...comps };
+    case 'pair':
+      return { type: 'inject-pair', a: target.a, b: target.b, ...comps };
+  }
+}
 
 /**
  * #801 (ADR-3D-174) — the same one-owner question arriving in the OTHER ORDER, answered by M2
@@ -1696,15 +1709,17 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // called it p). That letter is not a solver unknown and never was; the sign it carries is the
       // component branch selection the engine already performs, so it lowers to exactly that rather
       // than refusing a given the student made.
-      if (c.param !== cmd.sym && !pinSymsOf(c).includes(cmd.sym)) {
-        const bound = partialNameOf(c, cmd.sym);
-        if (!bound) return { ok: false, error: { code: 'unknown-symbol', id: cmd.sym } };
-        const next = clone(c);
-        next.componentSigns.push({ target: bound.target, axis: bound.axis, positive: cmd.positive });
-        return { ok: true, next };
-      }
+      // #902 (ADR-3D-219): which of these the letter is — and it may be more than one — is answered by
+      // the one resolver `symbol-value` asks, so a sign and a value can never disagree about what a
+      // letter denotes. Every owner gets the sign. (A vec-def's ratio symbol is not a sign-selectable
+      // owner — its root pick has no sign lane — so a letter that is ONLY that still refuses, as before.)
+      const owners = symbolOwnersOf(c, cmd.sym);
+      const solverOwned = owners.some((o) => o.kind === 'pin-sym' || o.kind === 'param');
+      const components = owners.filter((o): o is Extract<SymbolOwner, { kind: 'component' }> => o.kind === 'component');
+      if (!solverOwned && components.length === 0) return { ok: false, error: { code: 'unknown-symbol', id: cmd.sym } };
       const next = clone(c);
-      next.paramSigns.push(cmd);
+      if (solverOwned) next.paramSigns.push(cmd);
+      for (const b of components) next.componentSigns.push({ target: b.target, axis: b.axis, positive: cmd.positive });
       return { ok: true, next };
     }
 
@@ -2036,7 +2051,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (cmd.symbol) {
           const target = relPointIds(c, cmd.from, cmd.to, cmd.terms).find((id) => {
             const d = c.points.get(id);
-            return d?.kind === 'vec-defined' && c.vecDefs[d.def].symbol !== undefined && !c.symbolPins.some((p) => p.def === d.def);
+            if (d?.kind !== 'vec-defined') return false;
+            const sym = c.vecDefs[d.def].symbol;
+            return sym !== undefined && !c.symbolPins.some((p) => p.sym === sym);
           });
           if (target) {
             const d = c.points.get(target) as { kind: 'vec-defined'; def: number };
@@ -2081,11 +2098,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         const def = c.points.get(end);
         if (def?.kind === 'vec-defined') {
           const vd = c.vecDefs[def.def];
-          if (vd.symbol && !c.symbolPins.some((p) => p.def === def.def)) {
+          if (vd.symbol && !c.symbolPins.some((p) => p.sym === vd.symbol)) {
             const other = end === cmd.a ? cmd.b : cmd.a;
             if (!c.points.has(other)) return { ok: false, error: { code: 'unknown-point', id: other } };
             const next = clone(c);
-            next.symbolPins.push({ rel: cmd.rel, a: cmd.a, b: cmd.b, plane, def: def.def });
+            next.symbolPins.push({ rel: cmd.rel, a: cmd.a, b: cmd.b, plane, sym: vd.symbol });
             next.segments.push([cmd.a, cmd.b]);
             return { ok: true, next };
           }
@@ -2166,8 +2183,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         const def = next.points.get(end);
         if (def?.kind === 'vec-defined') {
           const vd = next.vecDefs[def.def];
-          if (vd.symbol && !next.symbolPins.some((p) => p.def === def.def)) {
-            next.symbolPins.push({ rel: 'length-rel', a: cmd.a1, b: cmd.b1, pair2, c: cmd.c, def: def.def });
+          if (vd.symbol && !next.symbolPins.some((p) => p.sym === vd.symbol)) {
+            next.symbolPins.push({ rel: 'length-rel', a: cmd.a1, b: cmd.b1, pair2, c: cmd.c, sym: vd.symbol });
             return { ok: true, next };
           }
         }
@@ -2187,29 +2204,44 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'symbol-value': {
-      // הציבו k = ½: pin the named parameter directly — replaces any prior pin on it
-      // (the student substituting the value the earlier relation produced)
-      const idx = c.vecDefs.findIndex((vd) => vd.symbol === cmd.symbol);
-      if (idx < 0) {
-        // ADR-3D-052 (#272) — the letter may instead name an ANGLE («∠SAB = α» then «α = 70»). Resolved
-        // HERE, where the figure is known (parse3 is context-free), and delegated to the ordinary angle
-        // claim so the value DRIVES a free-dim solid and VERIFIES a determined one (M1) like any other
-        // stated angle. Every angle wearing the label is pinned — that is what sharing a name means.
-        const marks = c.angleMarks.filter((m) => m.label === cmd.symbol);
-        if (marks.length > 0) {
-          let r: ApplyResult3 = { ok: true, next: c };
-          for (const mk of marks) {
+      // הציבו k = ½: give a value to a symbol the figure carries. #902 (ADR-3D-219): WHICH mechanism
+      // owns the letter is asked in ONE place (`symbolOwnersOf`) — a vec-def's ratio symbol, a pivot
+      // pin symbol («C(p²,1,0)», an equation's letter), the figure parameter, a labelled angle
+      // (ADR-3D-052) or a NAMED free component («C(p,1,0)», #814) — and every owner gets the value:
+      // that is what sharing a name means. Before, this arm asked the vec-def list and the angle labels
+      // and nothing else, so a letter born in a coordinate two lines earlier was refused as never heard
+      // of — the case `pinSymsOf`'s own docblock had predicted for an enumeration one list short.
+      const owners = symbolOwnersOf(c, cmd.symbol);
+      if (owners.length === 0) return { ok: false, error: { code: 'unknown-symbol', id: cmd.symbol } };
+      let r: ApplyResult3 = { ok: true, next: c };
+      // The three solver-owned lanes share ONE record: a value pin keyed by the NAME, which each lane
+      // reads back on its own terms — the point's k, a substitution into the pivot's unknown layout, the
+      // parameter's one admissible root. It replaces any prior pin on the symbol (the student
+      // substituting the value the earlier relation produced).
+      if (owners.some((o) => o.kind === 'vec-def' || o.kind === 'pin-sym' || o.kind === 'param')) {
+        const next = clone(c);
+        next.symbolPins = next.symbolPins.filter((p) => p.sym !== cmd.symbol);
+        next.symbolPins.push({ rel: 'value', value: cmd.value, sym: cmd.symbol });
+        r = { ok: true, next };
+      }
+      for (const owner of owners) {
+        if (!r.ok) return r;
+        if (owner.kind === 'angle') {
+          // ADR-3D-052 (#272) — the letter names an ANGLE («∠SAB = α» then «α = 70»). Resolved HERE, where
+          // the figure is known (parse3 is context-free), and delegated to the ordinary angle claim so the
+          // value DRIVES a free-dim solid and VERIFIES a determined one (M1) like any other stated angle.
+          // Every angle wearing the label is pinned.
+          for (const mk of owner.marks) {
             if (!r.ok) return r;
             r = applyCommand3(r.next, { type: 'claim', claim: { type: 'angle-seg-eq', a1: mk.vertex, b1: mk.p, a2: mk.vertex, b2: mk.q, deg: cmd.value } });
           }
-          return r;
+        } else if (owner.kind === 'component') {
+          // #814's named free component: the value IS the coordinate given on that component — lowered
+          // to the injection lane that bound the name (M1), so it joins the pivot as any stated number.
+          r = applyCommand3(r.next, componentGiven(owner.target, owner.axis, cmd.value));
         }
-        return { ok: false, error: { code: 'unknown-symbol', id: cmd.symbol } };
       }
-      const next = clone(c);
-      next.symbolPins = next.symbolPins.filter((p) => p.def !== idx);
-      next.symbolPins.push({ rel: 'value', value: cmd.value, def: idx });
-      return { ok: true, next };
+      return r;
     }
 
     // #587 (ADR-3D-152): `ABEC מלבן` is the RECTANGLE instance of the general stated-quad-shape
@@ -2394,14 +2426,14 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (Math.abs(cmd.cos) < 1e-9) {
         const up = atomEndpoints(c, cmd.u);
         const vp = atomEndpoints(c, cmd.v);
-        const uDef = up && (freeSymbolDef(c, up[0]) ?? freeSymbolDef(c, up[1]));
-        const vDef = vp && (freeSymbolDef(c, vp[0]) ?? freeSymbolDef(c, vp[1]));
-        if (up && vp && uDef != null && vDef == null) {
-          next.symbolPins.push({ rel: 'seg-perp', a: up[0], b: up[1], c: vp[0], d: vp[1], def: uDef });
+        const uSym = up && (freeSymbolOf(c, up[0]) ?? freeSymbolOf(c, up[1]));
+        const vSym = vp && (freeSymbolOf(c, vp[0]) ?? freeSymbolOf(c, vp[1]));
+        if (up && vp && uSym != null && vSym == null) {
+          next.symbolPins.push({ rel: 'seg-perp', a: up[0], b: up[1], c: vp[0], d: vp[1], sym: uSym });
           return { ok: true, next };
         }
-        if (up && vp && vDef != null && uDef == null) {
-          next.symbolPins.push({ rel: 'seg-perp', a: vp[0], b: vp[1], c: up[0], d: up[1], def: vDef });
+        if (up && vp && vSym != null && uSym == null) {
+          next.symbolPins.push({ rel: 'seg-perp', a: vp[0], b: vp[1], c: up[0], d: up[1], sym: vSym });
           return { ok: true, next };
         }
       }

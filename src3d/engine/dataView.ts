@@ -465,14 +465,14 @@ export function parametricDecomp(c: Construction3, from: Id, to: Id, seeds: numb
   // a def whose OWN vector decomposes to stable coefficients is determined — its symbol does not vary.
   // `basisDecompose` already answers exactly this (it is why a pinned `AS` prints numerically), so the
   // predicate is a reuse of the shared sample set, never a second sampler (M3).
-  const varies = ({ vd, i }: { vd: VecDef; i: number }) =>
-    !c.symbolPins.some((p) => p.def === i && p.rel === 'value') &&
+  const varies = ({ vd }: { vd: VecDef; i: number }) =>
+    !c.symbolPins.some((p) => p.sym === vd.symbol && p.rel === 'value') &&
     basisDecompose(basis, posArr, vd.from, vd.unknown) === null;
   const syms = c.vecDefs.map((vd, i) => ({ vd, i })).filter(({ vd, i }) => vd.symbol && varies({ vd, i }));
   if (syms.length !== 1) return null; // 0 → nothing parametric; ≥2 → genuinely two-parameter (#301), never faked
   const sym = syms[0];
   const at = (kv: number): [number, number, number] | null => {
-    const posArr = seeds.map((s) => resolve3({ ...c, symbolPins: [...c.symbolPins.filter((p) => p.def !== sym.i), { rel: 'value', value: kv, def: sym.i }] }, s).positions);
+    const posArr = seeds.map((s) => resolve3({ ...c, symbolPins: [...c.symbolPins.filter((p) => p.sym !== sym.vd.symbol), { rel: 'value', value: kv, sym: sym.vd.symbol! }] }, s).positions);
     return basisDecompose(basis, posArr, from, to);
   };
   const c0 = at(0);

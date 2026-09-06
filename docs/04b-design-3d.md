@@ -56,6 +56,23 @@ like success and states a given the student never gave. See [ADR-3D-218](06b-dec
 (#898), where a component reducer summing coefficients and never reading exponents drew «C(p²,p,0)» as
 «C(p,p,0)».
 
+**A letter has one ADDRESS registry, and a pin on it is keyed by the letter.** Five mechanisms can own a
+symbol — a vec-def's ratio («SN = k·SC»), a pivot pin symbol (a point/vector/pair injection or an equation
+written in the letter, `pinSymsOf`), the algebraic lane's figure parameter (`c.param`), a labelled angle,
+and a named free component («D(3,p,0)», `partialNames`). `symbolOwnersOf` (`types.ts`) lists a letter's
+owners in one place, and every statement addressed to a letter («p = 3», «p חיובי») is applied to each of
+them. `symbolPins` is keyed by the symbol's **name**: the relation pins (∥/⟂/length/seg-*) are inherently
+vec-def pins and drive a symbol-defined point; the `value` pin is lane-agnostic and each lane reads it back
+on its own terms — the vec-def lane as the point's k; the **pivot as a substitution** (`openPinSymsOf` is
+the unknown layout — a value-pinned symbol holds no slot, so the layout, the start spread, the seed
+anchors, the continuation walk and the DOF cue shrink by it together); the parameter lane as its one
+admissible root (`pinningGivens` counts it, and `paramRoots` returns the stated value only if every
+geometric pinning given admits it — otherwise the honest `no-roots`, blamed on the statement). A named
+component takes a value through the injection command that bound the name (M1). See
+[ADR-3D-219](06b-decisions-3d.md#adr-3d-219) (#902), where the pins were keyed by the vec-def **index** that
+introduced a symbol, so a coordinate-born letter had no representable pin and «p = 3» refused a letter the
+student had used two lines earlier.
+
 ## Gauge, and why the landing funnel exists
 
 A figure's placement, rotation and scale are a **gauge** — free unless something absolute pins them. The

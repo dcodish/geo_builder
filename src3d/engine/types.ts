@@ -1147,16 +1147,26 @@ export interface Construction3 {
   circles3: Circle3Obj[];
   /** V7 — vector definitions: `X⃗Y = Σ terms`, solving `unknown` (affine; `symbol` = the free coefficient). */
   vecDefs: { from: Id; to: Id; terms: SymTerm[]; unknown: Id; symbol?: string }[];
-  /** V7 — conditions that PIN a vec-def's symbol (∥/⟂ to a plane through points). */
+  /**
+   * V7 — conditions that PIN a figure SYMBOL. #902 (ADR-3D-219): keyed by the symbol's NAME, never by
+   * the vec-def that introduced it. A letter is owned by whichever mechanism carries it — a vec-def's
+   * ratio symbol («SN = k·SC»), a pivot pin symbol («C(p²,1,0)», an equation's letter), the algebraic
+   * lane's figure parameter — and `symbolOwnersOf` is the one place that says which. The relation
+   * pins (∥/⟂/length/seg-*) are inherently vec-def pins: they drive a symbol-defined POINT. The
+   * `value` pin is lane-agnostic — each lane reads its own symbol's value back (`symbolValueOf`):
+   * the vec-def lane as the point's k, the pivot as a substitution into its unknown layout, the
+   * parameter lane as the one admissible root. Keyed by vec-def index, the two other lanes had no
+   * representable pin at all, so «p = 3» after «C(p²,1,0)» refused a letter the figure carried.
+   */
   symbolPins: (
-    | { rel: 'parallel' | 'perp'; a: Id; b: Id; plane: Id[]; def: number }
-    | { rel: 'length-rel'; a: Id; b: Id; pair2: [Id, Id]; c: number; def: number } // |ab| = c·|pair2| pins the symbol
-    | { rel: 'value'; value: number; def: number } // k = ½ — direct assignment
+    | { rel: 'parallel' | 'perp'; a: Id; b: Id; plane: Id[]; sym: string }
+    | { rel: 'length-rel'; a: Id; b: Id; pair2: [Id, Id]; c: number; sym: string } // |ab| = c·|pair2| pins the symbol
+    | { rel: 'value'; value: number; sym: string } // k = ½ — direct assignment, on ANY symbol the figure carries
     // ADR-3D-056 (#286): a ⊥/∥ between two SEGMENTS where one endpoint is this symbol-defined point.
     // «EO⊥AS» with E = A+t·AS pins t to the foot of the perpendicular — one root-find, not a dims drive
     // (the ⊥ was being pushed onto the free solid dims, so it held only at lucky seeds). seg(a,b) is the
     // arm carrying the unknown; seg(c,d) is the fixed reference.
-    | { rel: 'seg-perp' | 'seg-par'; a: Id; b: Id; c: Id; d: Id; def: number }
+    | { rel: 'seg-perp' | 'seg-par'; a: Id; b: Id; c: Id; d: Id; sym: string }
   )[];
   /** Every claim RECORDED by apply (incl. ones composite commands create) — derive3
    *  attributes them to facts by count-delta and verifies them all; a claim can
@@ -1302,6 +1312,61 @@ export function pinSymsOf(c: Construction3): string[] {
   // count, the symbol surfaces and the one-owner guards all see one namespace.
   for (const def of c.lines.values()) if (def.kind === 'parametric' && def.sym !== undefined && !out.includes(def.sym)) out.push(def.sym);
   for (const def of c.planes.values()) if (def.sym !== undefined && !out.includes(def.sym)) out.push(def.sym);
+  return out;
+}
+
+/** #902 (ADR-3D-219) — the value a «p = 3» statement pinned on `sym`, whichever lane owns the letter. */
+export const symbolValueOf = (c: Construction3, sym: string): number | undefined => {
+  const pin = c.symbolPins.find((p) => p.rel === 'value' && p.sym === sym);
+  return pin?.rel === 'value' ? pin.value : undefined;
+};
+
+/**
+ * #902 — the pivot's UNKNOWNS: the pin symbols that carry no stated value. A value-pinned symbol is a
+ * number, substituted at every read; it holds no slot. The unknown layout, the start spread, the seed
+ * anchors, the continuation walk and the DOF count all range over THIS list, so none of them can be one
+ * symbol off from the others (the `pinSymsOf` discipline, one level up).
+ */
+export const openPinSymsOf = (c: Construction3): string[] => pinSymsOf(c).filter((s) => symbolValueOf(c, s) === undefined);
+
+/** #902 — the vec-def whose ratio symbol is `sym`, or −1. Derived where a vec-def is genuinely needed
+ *  (the point it drives); the symbol, not the index, is a pin's identity. */
+export const vecDefOfSymbol = (c: Construction3, sym: string): number => c.vecDefs.findIndex((vd) => vd.symbol === sym);
+
+/**
+ * #902 (ADR-3D-219) — WHAT A LETTER DENOTES, asked in one place. Five mechanisms can own a letter:
+ *  - a vec-def's ratio symbol («SN = k·SC» → k drives N);
+ *  - a pivot pin symbol («C(p²,1,0)», a vector/pair injection, an equation's letter — `pinSymsOf`);
+ *  - the algebraic lane's figure parameter (`c.param`, the m of «x + (m−2)y … = 0»);
+ *  - a labelled angle («∠SAB = α», ADR-3D-052);
+ *  - a NAMED free component («D(3,p,0)» — p is D's y, #814 / ADR-3D-175).
+ * A statement addressed to the letter («p = 3», «p חיובי») is applied to EVERY owner: that is what
+ * sharing a name means (the angle rule's own words). Each command that resolves a letter asks here
+ * — a resolver that consults a subset is exactly how «p = 3» came to refuse a letter the student had
+ * used two lines earlier. The one-owner rule (#801) is about two SOLVERS computing one letter; a
+ * name binding is not a solver, so a letter may be both a component name and a pivot symbol and the
+ * value simply reaches both.
+ *
+ * `figureSymbolsOf` stays the DISPLAY registry (symbols with a solved value to print); this is the
+ * ADDRESS registry, wider by the two kinds a student can name but the panel does not price.
+ */
+export type SymbolOwner =
+  | { kind: 'vec-def'; def: number }
+  | { kind: 'pin-sym' }
+  | { kind: 'param' }
+  | { kind: 'angle'; marks: Construction3['angleMarks'] }
+  | { kind: 'component'; target: ComponentTarget; axis: 'x' | 'y' | 'z' };
+
+export function symbolOwnersOf(c: Construction3, sym: string): SymbolOwner[] {
+  const out: SymbolOwner[] = [];
+  c.vecDefs.forEach((vd, def) => {
+    if (vd.symbol === sym) out.push({ kind: 'vec-def', def });
+  });
+  if (pinSymsOf(c).includes(sym)) out.push({ kind: 'pin-sym' });
+  if (c.param === sym) out.push({ kind: 'param' });
+  const marks = c.angleMarks.filter((m) => m.label === sym);
+  if (marks.length > 0) out.push({ kind: 'angle', marks });
+  for (const b of c.partialNames) if (b.sym === sym) out.push({ kind: 'component', target: b.target, axis: b.axis });
   return out;
 }
 

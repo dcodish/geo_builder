@@ -35,7 +35,7 @@ import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLine
 import { verifyClaim } from '../engine/claims';
 import { dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
-import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Id, type Positions3 } from '../engine/types';
+import { emptyConstruction3, pinSymsOf, symbolValueOf, type Command3, type Construction3, type EngineError3, type Id, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
 import { parse3, parseRename3 } from '../parser/parse3';
 
@@ -177,6 +177,28 @@ function mainDiagonalCandidates(st: { facts: Fact3[]; seed: number }): string {
   return spaceDiagonals(c.solids[0].faces).map(([a, b]) => `${a}${b}`).join(', ');
 }
 
+/**
+ * Every constraint the PIVOT has to satisfy — the pin families, and (#902, ADR-3D-219) a stated VALUE
+ * on a pivot symbol («p = 3» after «C(p²,1,0)»), which is a pivot constraint exactly like the injected
+ * coordinate it was born in. Derived in one place so a fact that CHANGES any of them is a pin owner:
+ * when no placement exists, the refusal names THAT statement rather than reading ok over a figure the
+ * pivot never found. A key, not a count: a second value on the same letter («k = 5» after «k = 2»)
+ * REPLACES its pin and leaves every count unchanged — on a count it would be nobody's statement, and
+ * the contradiction it introduced would be blamed on an earlier, innocent injection.
+ */
+const pivotPinKey = (c: Construction3): string => {
+  const syms = pinSymsOf(c);
+  const values = c.symbolPins.filter((p) => p.rel === 'value' && syms.includes(p.sym));
+  return [c.pins.length, c.vectorPins.length, c.pairPins.length, c.scalarPins.length, c.planePins.length, c.coordPlanePins.length, JSON.stringify(values)].join('|');
+};
+
+/** The parameter-lane twin of {@link pivotPinKey}: the pinning givens (`pinningGivens` — which #902 made
+ *  count a stated value), the param claims, and the VALUE itself — a second value on the parameter
+ *  («m = 100» after «m = -5») leaves both counts unchanged, and on counts alone the no-roots it caused
+ *  was blamed on the earlier value while the new statement read green. */
+const paramPinKey = (c: Construction3): string =>
+  [pinningGivens(c), c.paramGivens.length, c.param !== undefined ? symbolValueOf(c, c.param) ?? '' : ''].join('|');
+
 export function derive3(facts: Fact3[], seed: number): Derived3 {
   let c: Construction3 = emptyConstruction3();
   const status: Record<string, FactStatus3> = {};
@@ -234,10 +256,9 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     }
     let st: FactStatus3 = 'ok';
     const claimsBefore = c.claims.length;
-    const pinsBefore =
-      c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length + c.planePins.length + c.coordPlanePins.length;
+    const pinsBefore = pivotPinKey(c);
     const coordPinsBefore = c.pins.length + c.vectorPins.length;
-    const paramPinsBefore = pinningGivens(c) + c.paramGivens.length;
+    const paramPinsBefore = paramPinKey(c);
     for (const cmd of f.cmds) {
       if (droppedSoft(cmd)) continue; // an explicit ∠=90 on this triangle superseded the soft default
       const r = applyCommand3(c, cmd);
@@ -252,13 +273,9 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     if (c.claims.length > claimsBefore) claimOwners.push({ factId: f.id, from: claimsBefore, to: c.claims.length });
     // pin ownership (same count-delta discipline): a fact that contributed ANY pivot
     // pin must not read ok when the pivot finds no placement (honesty — no silent seed figure)
-    if (
-      c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length + c.planePins.length + c.coordPlanePins.length >
-      pinsBefore
-    )
-      pinOwnerIds.add(f.id);
+    if (pivotPinKey(c) !== pinsBefore) pinOwnerIds.add(f.id);
     if (c.pins.length + c.vectorPins.length > coordPinsBefore) coordPinOwnerIds.add(f.id);
-    if (pinningGivens(c) + c.paramGivens.length > paramPinsBefore) paramPinOwners.push(f.id);
+    if (paramPinKey(c) !== paramPinsBefore) paramPinOwners.push(f.id);
     status[f.id] = st;
   }
 

@@ -17,7 +17,7 @@
  */
 
 import { riderSampleT } from './onSegmentRatio';
-import { evalAffine, pinSymsOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind } from './types';
+import { evalAffine, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, bisectorDir3, cross3, dist3, dot3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -186,9 +186,10 @@ export interface PivotResult {
   transform: (p: Vec3) => Vec3;
   mirror: boolean;
   dims: number[];
-  /** V8-c — the jointly-solved values of the coupled symbols (in `coupled.defs` order). */
+  /** V8-c — the jointly-solved values of the coupled symbols (in `coupled.syms` order). */
   symbols?: number[];
-  /** #325 (ADR-3D-079) — the solved values of the pins' OPEN symbols (`B(2t,t,k)` → t, k). */
+  /** #325 (ADR-3D-079) — the solved values of the pins' OPEN symbols (`B(2t,t,k)` → t, k). #902: plus
+   *  every value-pinned one at its stated value, so the record is the whole namespace a reader asks. */
   pinSymbols?: Record<string, number>;
   /** #820 (ADR-3D-204) — the solved parameters of the free on-segment RIDERS a given drives. */
   riderTs?: Record<Id, number>;
@@ -302,10 +303,10 @@ function offPlaneSpread(pts: Vec3[]): number {
 
 export function solvePivot(
   c: Construction3,
-  evalCanonical: (dims: number[], symbolOverride?: Map<number, number>, riderTs?: ReadonlyMap<Id, number>) => Positions3,
+  evalCanonical: (dims: number[], symbolOverride?: Map<string, number>, riderTs?: ReadonlyMap<Id, number>) => Positions3,
   dims0: number[],
   seed: number,
-  coupled?: { defs: number[]; pins: Construction3['symbolPins'] },
+  coupled?: { syms: string[]; pins: Construction3['symbolPins'] },
   members?: MemberPin[],
   warmStart?: number[],
   /** #375: the figure's resolved lines. An absolute line is not a gauge object, so a residual that
@@ -343,7 +344,7 @@ export function solvePivot(
   // condition is a residual — so t and the dim are solved JOINTLY (the D3 numeric-only
   // path, no CAS). nSym = 0 ⇒ every code path below is bit-identical to before.
   const nDims = dims0.length;
-  const nSym = coupled?.defs.length ?? 0;
+  const nSym = coupled?.syms.length ?? 0;
 
   // #325 (ADR-3D-079): the pins' OPEN symbols (`B(2t,t,k)` → t, k) are pivot unknowns too,
   // appended AFTER the coupled symbols. Unknown layout: [gauge 7 | dims | coupled | pinSyms].
@@ -351,8 +352,28 @@ export function solvePivot(
   // open symbols are pivot unknowns by the same collection. #815: and so is a letter carried only by an
   // EQUATION under a stated membership — ONE derivation (`pinSymsOf`), so the unknown layout can never
   // be one symbol short of the namespace the rest of the engine reasons about.
-  const pinSyms: string[] = pinSymsOf(c);
+  // #902 (ADR-3D-219): a value-pinned symbol («p = 3») is a NUMBER, not an unknown — substituted at
+  // every read (`symAt`) and reported in `pinSymbols` at its stated value, but it holds no slot: the
+  // unknown layout, the start spread, the seed anchors and the continuation walk range over the OPEN
+  // symbols only, from the one derivation the DOF count uses (`openPinSymsOf`).
+  const pinSymsAll: string[] = pinSymsOf(c);
+  const pinnedSyms = new Map<string, number>();
+  for (const sym of pinSymsAll) {
+    const v = symbolValueOf(c, sym);
+    if (v !== undefined) pinnedSyms.set(sym, v);
+  }
+  const pinSyms: string[] = openPinSymsOf(c);
   const nPinSym = pinSyms.length;
+  /** A pin symbol's value at the trial unknowns: its stated value, or its slot; null for a stranger. */
+  const symAt = (x: number[], sym: string): number | null => {
+    const pinned = pinnedSyms.get(sym);
+    if (pinned !== undefined) return pinned;
+    const i = pinSyms.indexOf(sym);
+    return i < 0 ? null : x[7 + nDims + nSym + i];
+  };
+  /** The solved symbol record: every pin symbol, the open ones at their slot, the pinned at their value. */
+  const pinSymbolsAt = (x: number[]): Record<string, number> | undefined =>
+    pinSymsAll.length > 0 ? Object.fromEntries(pinSymsAll.map((sym) => [sym, symAt(x, sym) ?? NaN])) : undefined;
   /**
    * #820 (ADR-3D-204) — A FREE RIDER'S PARAMETER IS A PIVOT UNKNOWN, NOT A SAMPLE.
    *
@@ -383,7 +404,7 @@ export function solvePivot(
     if (typeof comp === 'number') return comp;
     // #509: Σ kᵢ·symᵢ + c — the affine form's ONE evaluation, so a component naming several symbols
     // («C(p+q,1,0)») targets the same residual a single-symbol one does.
-    return evalAffine(comp, (sym) => x[7 + nDims + nSym + pinSyms.indexOf(sym)]);
+    return evalAffine(comp, (sym) => symAt(x, sym) ?? NaN);
   };
   // #325 (ADR-3D-079 Am. 2): an UNDETERMINED pin symbol must VARY with the seed (ADR-052 —
   // a value the sampler never explores is a default masquerading as determined; the params
@@ -425,7 +446,7 @@ export function solvePivot(
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
     const g = { ...unpack(x), mirror };
     const dims = x.slice(7, 7 + nDims);
-    const override = coupled ? new Map(coupled.defs.map((d, i) => [d, x[7 + nDims + i]])) : undefined;
+    const override = coupled ? new Map(coupled.syms.map((s, i) => [s, x[7 + nDims + i]])) : undefined;
     const pos = evalCanonical(dims, override, riderMap(x));
     const out: number[] = [];
     for (const pin of pointPins) {
@@ -915,8 +936,7 @@ export function solvePivot(
       // symbol, so the member's distance to it and the symbol itself are one joint problem.
       if (m.symLine || m.symPlane) {
         const sym = (m.symLine ?? m.symPlane)!.sym;
-        const i = pinSyms.indexOf(sym);
-        const t = i < 0 ? null : x[7 + nDims + nSym + i];
+        const t = symAt(x, sym);
         if (t === null) {
           out.push(10);
           if (m.symLine) out.push(10, 10);
@@ -965,7 +985,7 @@ export function solvePivot(
     // coincide. The threshold is a hard collapse (1e-4 of the solid's own span), so a figure with
     // legitimately close vertices is untouched.
     const dims = x.slice(7, 7 + nDims);
-    const override = coupled ? new Map(coupled.defs.map((d, i) => [d, x[7 + nDims + i]])) : undefined;
+    const override = coupled ? new Map(coupled.syms.map((s, i) => [s, x[7 + nDims + i]])) : undefined;
     const pos = evalCanonical(dims, override, riderMap(x));
     for (const solid of c.solids) {
       const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
@@ -1178,7 +1198,7 @@ export function solvePivot(
   /** A candidate's FINAL positions (gauge applied to gauge points; absolute points verbatim). */
   const atFor = (mirror: boolean, x: number[]): ((id: Id) => Vec3 | undefined) => {
     const g = { ...unpack(x), mirror };
-    const override = coupled ? new Map(coupled.defs.map((d, i) => [d, x[7 + nDims + i]])) : undefined;
+    const override = coupled ? new Map(coupled.syms.map((s, i) => [s, x[7 + nDims + i]])) : undefined;
     const pos = evalCanonical(x.slice(7, 7 + nDims), override, riderMap(x));
     return (id) => {
       const p = pos.get(id);
@@ -1221,7 +1241,7 @@ export function solvePivot(
     const g = { ...unpack(xr), mirror: probe.mirror };
     const dims = xr.slice(7, 7 + nDims);
     const symbols = coupled ? xr.slice(7 + nDims, 7 + nDims + nSym) : undefined;
-    const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((sym, i) => [sym, xr[7 + nDims + nSym + i]])) : undefined;
+    const pinSymbols = pinSymbolsAt(xr);
     const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, xr[riderBase + i]])) : undefined;
     return [{ transform: (q) => applyGauge(q, g), mirror: probe.mirror, dims, symbols, pinSymbols, riderTs, err: pErr(xr), x: [...xr] }];
   }
@@ -1335,7 +1355,7 @@ export function solvePivot(
       seen.add(sig);
       const dims = cx.slice(7, 7 + nDims);
       const symbols = coupled ? cx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
-      const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((s, i) => [s, cx[7 + nDims + nSym + i]])) : undefined;
+      const pinSymbols = pinSymbolsAt(cx);
       const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, cx[riderBase + i]])) : undefined;
       results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, err: rAccept, x: [...cx] });
     };
@@ -1494,7 +1514,7 @@ export function solvePivot(
       const g = { ...unpack(bx), mirror };
       const dims = bx.slice(7, 7 + nDims);
       const symbols = coupled ? bx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
-      const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((s, i) => [s, bx[7 + nDims + nSym + i]])) : undefined;
+      const pinSymbols = pinSymbolsAt(bx);
       const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, bx[riderBase + i]])) : undefined;
       results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, err: bestAccept, x: [...bx] });
     }

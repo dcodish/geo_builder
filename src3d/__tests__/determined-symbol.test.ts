@@ -90,7 +90,8 @@ describe("#302 — the operator's figure: a determined symbol beside a free one"
     const basis = [...c.vectors.entries()].slice(0, 3);
     expect(basis.map(([n]) => n)).toEqual(['v', 'w', 'u']); // declaration order
     for (const kv of [0, 1, 2.5]) {
-      const pinned = { ...c, symbolPins: [...c.symbolPins.filter((p) => p.def !== 1), { rel: 'value' as const, value: kv, def: 1 }] };
+      const sym = c.vecDefs[1].symbol!;
+      const pinned = { ...c, symbolPins: [...c.symbolPins.filter((p) => p.sym !== sym), { rel: 'value' as const, value: kv, sym }] };
       for (const seed of SEEDS) {
         const pos = resolve3(pinned, seed).positions;
         const p = (id: string) => pos.get(id)!;

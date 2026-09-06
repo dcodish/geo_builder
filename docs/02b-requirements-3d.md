@@ -77,6 +77,14 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   quietly discarded, which would state a given the student did not give. *(Realised —
   [ADR-3D-218](06b-decisions-3d.md#adr-3d-218), #898; `power-needs-solid-898.test.ts`. The guidance
   register carries the same precondition, so the hint cannot promise what the next line refuses.)*
+- **FR-VC-2b (Must)** — **A student can give a VALUE to any letter the figure carries, whatever introduced
+  it.** «p = 3» is honoured whether `p` was born as a vec-def ratio («SN = k·SC»), in a coordinate
+  («C(p²,1,0)»), in a vector or pair injection, in a line or plane equation, as the algebraic lane's
+  parameter, as an angle label («∠SAB = α») or as the name of a free component («C(p,1,0)», #814). A
+  letter with more than one owner receives the value at every owner. A value the figure cannot satisfy is
+  **refused, naming the statement**; a letter the figure does not carry is refused as unknown — never a
+  silent no-op. *(Realised — [ADR-3D-219](06b-decisions-3d.md#adr-3d-219), #902; `issue-902.test.ts`,
+  `fixtures3/coord-symbol-value-902.geo3.json`.)*
 - **FR-VC-3 (Must)** — **NO CAS.** Every "symbolic" feature is a numeric root-find, a closed form, or a
   linear solve. Anything needing symbolic solving beyond that is **refused and escalated to the operator**,
   not approximated. This bound is what keeps the engine's answers trustworthy. *(Operator authority,

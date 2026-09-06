@@ -7962,3 +7962,126 @@ symbolic component still builds in the solid-free lane; the SOLID lane still sat
 seeds; and both locales carry the message with the scope hint qualified.
 
 **Not in scope.** Honouring the power where it is refused — that is a capability, deliberately unbuilt.
+
+---
+
+### ADR-3D-219 — A symbol pin is keyed by the LETTER, and one resolver says what a letter denotes (#902)
+
+**Status:** accepted, 2026-09-06 · dedicated session (operator ruling 2026-09-06: "#902 is the next dedicated
+session") · **Requirements:** [02b](02b-requirements-3d.md) FR-VC-2b (new) — a value for any letter the figure
+carries, whatever introduced it · **Design:** [04b](04b-design-3d.md), the solver section — the symbol
+namespace and the pivot's unknown layout
+
+**Context.** The operator, playing #511's T8 (2026-09-05): *"the input is accepted but then i write p=3 and
+get an error."* Measured through the store at HEAD, four rows, one answer each:
+
+```
+תיבה ABCDA'B'C'D' + C(p²,1,0) + p=3      → {"code":"unknown-symbol","id":"p"}    pinSymsOf = ["p"]
+תיבה … + C(p,1,0) + p=3                   → unknown-symbol                         partialNames = [p → C.x]
+תיבה … + C(p²,1,0) + p = 3                → unknown-symbol
+קובייה … + C(p²,1,0) + p=3                → unknown-symbol
+```
+
+The parser was never at fault — every row lowers to `symbol-value`. The refusal is at apply, and the same
+measurement found the same refusal on every other kind of letter a student can write: a vector injection's
+symbol («u = (k-1,k,3)» then «k = 2»), a pair injection's, a plane equation's parameter («מישור π:
+3x+my+(m+6)z+4=0» then «m = 2»), a coord-sym point's («M(k,1,3)» then «k = 3»). Only two kinds worked: a
+vec-def's ratio symbol («SN = k·SC» then «k = 1/2») and an angle label («α = 70»).
+
+**Root cause — two defects, one class.**
+
+1. **`symbol-value` consulted two of five namespaces.** It searched `vecDefs[].symbol`, then
+   `angleMarks[].label`, then refused. A letter can also be a pivot pin symbol (`pinSymsOf` — coordinates,
+   vector/pair injections, equations written in the letter, #325/#794/#815), the algebraic lane's figure
+   parameter (`c.param`), or the NAME of a free component (`partialNames`, #814). `pinSymsOf`'s own
+   docblock, written for #794, describes this failure verbatim: *"an enumeration one list short is how a
+   param-sign on a pair symbol would refuse `unknown-symbol` while the figure carries it."* Same class,
+   different handler.
+2. **`symbolPins` was keyed by `def: number`, an index into `vecDefs`.** That was the identity while
+   vec-defs were the only source of symbols; #794, #509 and #815 each widened the symbol population and
+   none re-keyed the pin family. So even a lookup that FOUND the letter had no representable pin to record
+   — the fix could not be "call `pinSymsOf` here".
+
+**The class** (docs/17 §1): *a statement addressed to a LETTER is resolved against a subset of the mechanisms
+that can own a letter, and the record it writes is keyed by one of those mechanisms rather than by the
+letter.* The measurement corrected the issue's own framing in one respect worth recording: the degree-1
+sibling `C(p,1,0)` is **not a pivot symbol** — a bare letter on an existing point is a #814 component name
+(the component stays a null pin, deliberately: promoting it breaks the partial-injection exam gates). It
+fails for the same class reason, but a fix that widened the lookup to `pinSymsOf` alone would have left
+that reported row red. "Not power-specific" was right; "the identical failure" was two lanes.
+
+**Decision.**
+
+- **`symbolPins[].def` → `sym: string`.** The relation pins (∥/⟂/length-rel/seg-perp/seg-par) are
+  inherently vec-def pins — they drive a symbol-defined point — and keep working through the symbol
+  (`vecDefOfSymbol` where a vec-def is genuinely needed). The `value` pin is lane-agnostic: **one record,
+  read back by each lane on its own terms.** The vec-def lane reads it as the point's k (unchanged
+  behaviour). The pivot reads it as a **substitution**: `openPinSymsOf` — the pin symbols with no stated
+  value — IS the unknown layout; a pinned symbol holds no slot and is substituted at every read
+  (`symAt`), reported in `pinSymbols` at its stated value so every surface prints it (`p = 3`, panel
+  `open: false`). The parameter lane counts it as a pinning given (`pinningGivens`), and `paramRoots`
+  returns the stated value as the only candidate **if every geometric pinning given admits it** — otherwise
+  the honest `no-roots`, blamed on the statement («m = 100» after «l ⊥ π» → «אין אף ערך ממשי של m שבו
+  «m = 100» מתקיים יחד עם l ⊥ π»).
+- **`symbolOwnersOf(c, sym)` — the ADDRESS registry, asked in one place.** Five owner kinds (vec-def,
+  pin-sym, param, angle, component). `symbol-value` and `param-sign` both ask it; a sign and a value can
+  never again disagree about what a letter denotes. **Every owner gets the statement** — the angle rule's
+  own words ("every angle wearing the label is pinned — that is what sharing a name means"): a letter that
+  is both a component name and a pivot symbol («C(p,1,0)» then «D(p²,1,0)») takes «p=3» at both, C.x = 3
+  and D.x = 9. The one-owner rule (#801) is about two SOLVERS computing one letter; a name binding is not a
+  solver. `figureSymbolsOf` stays the DISPLAY registry (symbols with a solved value to print); the address
+  registry is wider by the two kinds a student can name but the panel does not price.
+- **A named component takes its value through the door that bound the name (M1).** «C(p,1,0)» then «p=3»
+  lowers to `point3 C (3, null, null)` — the injection command itself — so the value joins the pivot as
+  any stated coordinate; the vector and pair lanes go through `inject-vector` / `inject-pair` the same way.
+- **Blame is keyed on content, not counts.** The store's pin-owner attribution counted pins; a value pin on
+  a pivot symbol now counts, AND a second value on the same letter («k = 5» after «k = 2») REPLACES its pin
+  without changing any count — on a count it was nobody's statement, and the contradiction it introduced
+  was blamed on an earlier, innocent injection while «k = 5» read green. `pivotPinKey` (counts + the value
+  pins' content) makes the newest statement the owner, so the refusal names it: «הנתונים סותרים זה את זה —
+  אין גוף שמקיים את «k = 5» יחד עם …». The parameter lane had the identical blindness (measured: «m = 100»
+  after «m = -5» under «l ⊥ π» was accepted and the earlier «m = -5» went red with the `no-roots`), and
+  `paramPinKey` closes it the same way. **Attribution by count delta is blind to a REPLACEMENT** — that is
+  the general lesson, and both keys carry it in their docblocks.
+
+**Why not the smaller fix.** "Widen the lookup to `pinSymsOf`" cannot store its answer (defect 2). "Add a
+residual `x_p − 3` to the pivot" keeps a determined number as an unknown — a least-squares balance rather
+than a substitution, so a contradiction would drift the value instead of refusing, and the DOF cue would
+still count it. Substitution is what the plan on the issue named: *a value pin on any figure symbol is a
+substitution into a namespace the solver has had since #794.*
+
+**Standing rule 1 — the sibling audit.** Grepped this tree for every reader of the letter/def key: 26
+references across `apply.ts`, `evaluate.ts`, `solve3.ts`, `dataView.ts`, `types.ts`, `render/rightAngles.ts`
+(the last needs no key — it reads the pin's points) plus `store3.ts` (blame) and one direct test
+(`determined-symbol.test.ts`); `tsc -b` after the last file is what proved none was left stale. **Sibling
+product (`src/`, ADR-W-004):** 2-D's `set-var` binds a value through ONE symbol table (`lower.ts`,
+`slot(name)`), so a value reaches whatever the letter names by construction — the class is not present
+there. **Two members of the class found in this tree and filed, not fixed here (different mechanisms):**
+[#921](https://github.com/dcodish/geo_builder/issues/921) — «E על SA כך ש-SE = t·SA» drops the ratio
+letter at the parser boundary (a `point-on-segment3` with no name; the #814 class at the rider), so
+«t = 1/2» refuses; [#922](https://github.com/dcodish/geo_builder/issues/922) — a sign on a vec-def ratio
+symbol («k חיובי» after «SN = k·SC») still refuses `unknown-symbol` because the root-find lane has no
+sign selection (a capability; the resolver now knows the owner, the lane cannot use it).
+
+**Performance (docs/17 §7).** No new loop, no new residual. A figure with no value pin has an EMPTY pinned
+set, so `pinSyms = pinSymsOf(c)` and the unknown layout, starts and anchors are exactly what they were;
+a figure with one removes an unknown. The failure path is unchanged.
+
+**Locked** in `issue-902.test.ts` (21 cases) and `fixtures3/coord-symbol-value-902.geo3.json` (the operator's
+exact sequence through the real save/load path): the four reported rows build and C lands at (9,1,0) /
+(3,1,0); the class — vector pin, pair pin, equation letter (the #801 prism: «k = 2» honoured, «k = 5»
+refused BY NAME, and «k = 5» after «k = 2» blamed on itself), plane-equation parameter (one branch, printed,
+one DOF fewer), coord-sym point, a named
+component on another axis, a two-owner letter (value AND sign reach both owners), a later value replacing
+the earlier pin; honesty — the panel prints «p = 3», the DOF cue drops by exactly one, six seeds all
+resolve p = 3; refusals — an unknown letter still refuses and mints nothing, a value the figure cannot
+satisfy refuses naming the statement and its partners (keep-prior), a parameter value the geometric givens
+admit no root for is the `no-roots` naming the statement — also when it REPLACES an accepted value; and the
+two routes the re-key could silently
+break — «SN = k·SC» + «k = 1/2» (N at the midpoint) and «∠SAB = α» + «α = 70» (70° at three seeds) — are
+unchanged. The existing nets (`exam-2026-2`, `angle-measures`, `adr-3d-032`, `issue-794/801/814/815`,
+`multi-symbol-affine-509`, `determined-symbol`, the fixture net) pass untouched.
+
+**Not in scope.** #921 and #922 above; a value for an angle label still records no `symbolPins` entry (it
+lowers to the angle claim, ADR-3D-052 — an angle label is not a solver symbol); `figureSymbolsOf` does not
+list component names (#814's ruling that the name is inert on the display surfaces stands).

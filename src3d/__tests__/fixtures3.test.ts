@@ -175,6 +175,11 @@ const SEEDED: Record<string, string[]> = {
   // not meet used to fall out of the drive lane and be refuted `claim-refuted`; it is a GIVEN, and
   // the figure reshapes to honour it. Green replay + no parser drift is exactly the right lock.
   'box-seg-angle-909.geo3.json': ["תיבה ABCDA'B'C'D'", "הזווית בין A'C לבין BC' היא 70"],
+  // #902 (ADR-3D-219) — the operator's exact sequence (playing #511's T8): a coordinate written in a
+  // letter, then a VALUE for that letter. «p=3» used to refuse unknown-symbol — the pins were keyed by
+  // the vec-def that introduced a symbol, so a coordinate-born one had no pin to land in. Green replay
+  // (C at (9,1,0)) + no parser drift is exactly the right lock.
+  'coord-symbol-value-902.geo3.json': ["תיבה ABCDA'B'C'D'", 'C(p²,1,0)', 'p=3'],
 };
 
 if (process.env.GEN_FIXTURES3) {

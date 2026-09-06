@@ -32,7 +32,7 @@ import {
 import { applyGauge, scalePinned, solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3 } from './vecExpr';
-import { absolutePointCount, pinSymsOf } from './types';
+import { absolutePointCount, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
 import { resolveFreePlane } from './freePlane';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
@@ -593,9 +593,12 @@ const paramLinePerps = (c: Construction3): Construction3['linePerps'] =>
     (g) => !c.planes.get(g.plane)?.free && !isFreeLine3(c, g.line) && !planeSym3(c, g.plane) && !lineSym3(c, g.line),
   );
 
-/** How many givens pin the parameter (none ⇒ it is a free sampled DOF). */
+/** How many givens pin the parameter (none ⇒ it is a free sampled DOF). #902 (ADR-3D-219): a stated
+ *  VALUE on the parameter («m = 2») pins it like any other given — counted here, so the DOF cue, the
+ *  root-find gate and the store's blame attribution all see it as one. */
 export const pinningGivens = (c: Construction3): number =>
-  c.planeAngles.length + paramLinePerps(c).length + paramPinningLineRels(c).length;
+  c.planeAngles.length + paramLinePerps(c).length + paramPinningLineRels(c).length +
+  (c.param !== undefined && symbolValueOf(c, c.param) !== undefined ? 1 : 0);
 
 /**
  * All parameter values satisfying EVERY pinning given — 1-DOF numeric root-finding
@@ -605,6 +608,10 @@ export const pinningGivens = (c: Construction3): number =>
  */
 export function paramRoots(c: Construction3): number[] {
   if (pinningGivens(c) === 0) return [];
+  // #902: a stated value is the ONLY candidate — and it must still satisfy every geometric pinning
+  // given, or the set is contradictory (the honest `no-roots`, blamed on the newest pinning statement).
+  const stated = c.param !== undefined ? symbolValueOf(c, c.param) : undefined;
+  if (stated !== undefined) return satisfiesAllPins(c, stated) ? [stated] : [];
   const candidates: number[] = [];
   for (const g of c.planeAngles) {
     const target = Math.cos((g.deg * Math.PI) / 180);
@@ -795,7 +802,8 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     // previously absent from this count altogether.
     for (const p of [...c.pins, ...c.vectorPins, ...c.pairPins])
       pinCount += (p.x !== null ? 1 : 0) + (p.y !== null ? 1 : 0) + (p.z !== null ? 1 : 0);
-    dims += pinSymsOf(c).length;
+    // #902: a value-pinned symbol is a number, not an unknown — only the OPEN ones count.
+    dims += openPinSymsOf(c).length;
     // #803 (ADR-3D-180): the absolute-membership drives consume placement DOF exactly like pins — a
     // plane pin is one residual per member, a pin-symbol line membership two (a line is two planes),
     // an equation-plane membership one. The count omitted all of them, so the exam's fully determined
@@ -1373,7 +1381,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     const evalCanonical = (
       dims: number[],
       cheap = true,
-      override?: Map<number, number>,
+      override?: Map<string, number>,
       riderTs?: ReadonlyMap<Id, number>,
     ): Positions3 => {
       const p2: Positions3 = new Map<Id, Vec3>();
@@ -1386,15 +1394,15 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
 
     // V8-c: a symbol pinned ⟂/∥ a plane is a candidate to co-solve with a free dim.
     const coupledPins = c.symbolPins.filter((p) => p.rel === 'perp' || p.rel === 'parallel');
-    const coupledDefs = [...new Set(coupledPins.map((p) => p.def))];
-    const overrideOf = (sol: PivotResult): Map<number, number> | undefined =>
-      sol.symbols ? new Map(coupledDefs.map((d, i) => [d, sol.symbols![i]])) : undefined;
+    const coupledSyms = [...new Set(coupledPins.map((p) => p.sym))];
+    const overrideOf = (sol: PivotResult): Map<string, number> | undefined =>
+      sol.symbols ? new Map(coupledSyms.map((s, i) => [s, sol.symbols![i]])) : undefined;
     /** #820: the rider twin of `overrideOf` — every re-evaluation of a solution must place a DRIVEN
      *  rider where the pivot put it, or the positions written back would contradict the residuals
      *  that accepted them. */
     const ridersOf = (sol: PivotResult): ReadonlyMap<Id, number> | undefined =>
       sol.riderTs ? new Map(Object.entries(sol.riderTs)) : undefined;
-    const EC = (dims: number[], override?: Map<number, number>, riderTs?: ReadonlyMap<Id, number>) =>
+    const EC = (dims: number[], override?: Map<string, number>, riderTs?: ReadonlyMap<Id, number>) =>
       evalCanonical(dims, true, override, riderTs);
 
     const applySolutions = (solutions: PivotResult[]): void => {
@@ -1504,9 +1512,12 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     // 2) failure-path retry (V8-c): a ⟂/∥-pinned symbol whose point could NOT be placed
     //    (no root-find value exists at the pivot's chosen dims) is COUPLED to a free dim —
     //    re-solve the symbol and the dim JOINTLY (the D3 numeric-only path, no CAS).
-    const unplaced = coupledPins.some((p) => !pos.has(c.vecDefs[p.def].unknown));
-    if (unplaced && coupledDefs.length > 0 && dims0.length > 0) {
-      const retry = solvePivot(cNoPlanes, EC, dims0, seed, { defs: coupledDefs, pins: coupledPins }, undefined, undefined, lines);
+    const unplaced = coupledPins.some((p) => {
+      const def = vecDefOfSymbol(c, p.sym);
+      return def >= 0 && !pos.has(c.vecDefs[def].unknown);
+    });
+    if (unplaced && coupledSyms.length > 0 && dims0.length > 0) {
+      const retry = solvePivot(cNoPlanes, EC, dims0, seed, { syms: coupledSyms, pins: coupledPins }, undefined, undefined, lines);
       if (retry.length > 0) applySolutions(retry);
     }
 
@@ -2165,7 +2176,7 @@ function evaluateSolidsAndPoints(
   lines: Map<string, ResolvedLine>,
   dimOverride?: number[],
   cheapSymbols?: boolean,
-  symbolOverride?: Map<number, number>, // V8-c: def index → jointly-solved symbol value
+  symbolOverride?: Map<string, number>, // V8-c: symbol → jointly-solved value (#902: keyed by the NAME, like every symbol pin)
   freePlaneDofs?: Map<string, number>, // #487: out-param — per-free-plane SAMPLED DOF count (the cue's number)
   freeLineDofs?: Map<string, number>, // #552: the free-line twin
   /** #820 (ADR-3D-204): pivot-solved on-segment rider parameters — a free rider whose `t` a stated
@@ -2271,10 +2282,10 @@ function evaluateSolidsAndPoints(
       // ADR-3D-056: a seg-perp/seg-par pin references points OUTSIDE the vecDef's terms (the fixed
       // reference segment + O), which may be inserted LATER; defer to the 2nd pass once they are placed.
       const segPin =
-        vd.symbol && !symbolOverride?.has(def.def) && !cheapSymbols
+        vd.symbol && !symbolOverride?.has(vd.symbol) && !cheapSymbols
           ? c.symbolPins.find(
               (p): p is Extract<Construction3['symbolPins'][number], { rel: 'seg-perp' | 'seg-par' }> =>
-                (p.rel === 'seg-perp' || p.rel === 'seg-par') && p.def === def.def,
+                (p.rel === 'seg-perp' || p.rel === 'seg-par') && p.sym === vd.symbol,
             )
           : undefined;
       if (segPin && [segPin.a, segPin.b, segPin.c, segPin.d].some((q) => q !== vd.unknown && !pos.has(q))) {
@@ -2283,9 +2294,9 @@ function evaluateSolidsAndPoints(
       }
       let k = 0;
       if (vd.symbol) {
-        const pin = c.symbolPins.find((p) => p.def === def.def);
-        if (symbolOverride?.has(def.def)) {
-          k = symbolOverride.get(def.def)!; // V8-c: the pivot solved this symbol jointly with a dim
+        const pin = c.symbolPins.find((p) => p.sym === vd.symbol);
+        if (symbolOverride?.has(vd.symbol)) {
+          k = symbolOverride.get(vd.symbol)!; // V8-c: the pivot solved this symbol jointly with a dim
         } else if (pin && pin.rel === 'value') {
           k = pin.value; // direct assignment (k = ½) — free even during the cheap pass
         } else if (pin && cheapSymbols) {
@@ -2485,7 +2496,7 @@ function evaluateSolidsAndPoints(
   // only at lucky ones.
   for (const [id, defIdx] of deferredSegPins) {
     const vd = c.vecDefs[defIdx];
-    const pin = c.symbolPins.find((p) => (p.rel === 'seg-perp' || p.rel === 'seg-par') && p.def === defIdx);
+    const pin = c.symbolPins.find((p) => (p.rel === 'seg-perp' || p.rel === 'seg-par') && p.sym === vd.symbol);
     if (!pin) continue;
     const resid = (kk: number) => symbolPinResidual(c, pin, vd, pos, kk);
     const roots = pin.rel === 'seg-perp' ? signChangeRoots(resid) : touchZeroRoots(resid);
