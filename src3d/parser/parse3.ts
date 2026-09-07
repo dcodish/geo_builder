@@ -24,7 +24,7 @@ import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind,
 import { MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX } from '../lexicon/nouns3';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
-import { riderPairsT } from '../engine/onSegmentRatio';
+import { riderPairsT, riderWholeSide, riderWholeT } from '../engine/onSegmentRatio';
 
 export type ParseResult3 =
   | { ok: true; commands: Command3[] }
@@ -1037,7 +1037,33 @@ function ratioT(s: string, id: Id, a: Id, b: Id): number | 'invalid' | undefined
   const m = s.match(/([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*(\d+(?:\.\d+)?)\s*[·×*]?\s*([A-Z]\d*'?)([A-Z]\d*'?)/);
   if (!m) return undefined;
   const [, p, x, num, y, q] = m;
-  return riderPairsT(id, a, b, p, x, y, q, parseFloat(num));
+  const halves = riderPairsT(id, a, b, p, x, y, q, parseFloat(num));
+  if (halves !== 'invalid') return halves;
+  // Not the two halves against each other — try the WHOLE-host shape («SE = 0.4·SA»), the same
+  // statement family, read by the same module (ADR-3D-224). Still 'invalid' ⇒ a ratio clause IS
+  // present and does not describe this rider: refused, never dropped.
+  const side = riderWholeSide(id, a, b, p, x, y, q);
+  return side === 'invalid' ? 'invalid' : riderWholeT(side, parseFloat(num));
+}
+
+/**
+ * The clause's ratio stated with a LETTER — «E על SA כך ש-SE = t·SA» (#921, ADR-3D-224).
+ *
+ * NAME-ONLY: the rider still samples its `t` exactly as a free rider does, and nothing here promotes
+ * `t` to a solver unknown — that is the mistake #814 documents. All this records is that the student
+ * gave the parameter a name, so a later «t = ½» has something to address instead of being refused as a
+ * letter the figure never heard of.
+ *
+ * Returns the letter and which endpoint it is measured from, `'invalid'` when a letter-coefficient
+ * clause is present but does not describe this rider (refused, not dropped), or `undefined` when there
+ * is no such clause.
+ */
+function ratioSym(s: string, id: Id, a: Id, b: Id): { sym: string; fromB: boolean } | 'invalid' | undefined {
+  const m = s.match(/([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*([a-z]\d?)\s*[·×*]\s*([A-Z]\d*'?)([A-Z]\d*'?)/);
+  if (!m) return undefined;
+  const [, p, x, sym, y, q] = m;
+  const side = riderWholeSide(id, a, b, p, x, y, q);
+  return side === 'invalid' ? 'invalid' : { sym, fromB: side === 'from-b' };
 }
 
 /** `K על AA'` (+ optional `כך ש-AK = 2KA'`) / `K on AA' such that AK = 2KA'`. No ratio ⇒ a free slider. */
@@ -1051,6 +1077,12 @@ const onSegment: Rule = (s) => {
   if (id === a || id === b || a === b) return null;
   const t = ratioT(s, id, a, b);
   if (t === 'invalid') return null;
+  if (t === undefined) {
+    // No numeric ratio — but the clause may state one with a LETTER, which must not vanish (#921).
+    const named = ratioSym(s, id, a, b);
+    if (named === 'invalid') return null;
+    if (named) return [{ type: 'point-on-segment3', id, a, b, sym: named.sym, ...(named.fromB ? { symFromB: true as const } : {}) }];
+  }
   return [{ type: 'point-on-segment3', id, a, b, t }];
 };
 

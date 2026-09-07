@@ -336,6 +336,15 @@ export interface PointOnSegment3Command {
   a: Id;
   b: Id;
   t?: number;
+  /**
+   * #921 (ADR-3D-224) — the ratio clause stated its coefficient as a LETTER: «E על SA כך ש-SE = t·SA».
+   * NAME-ONLY. The rider stays free and still samples its `t` per seed exactly as before; this records
+   * that the student named that parameter, so a later «t = ½» has an owner to address. Promoting the
+   * letter to a solver unknown instead is the mistake #814 documents.
+   */
+  sym?: string;
+  /** The named ratio is measured from `b` («AE = t·AS» on host S–A) ⇒ the rider's `t` is `1 − sym`. */
+  symFromB?: true;
 }
 
 /**
@@ -596,6 +605,21 @@ export interface PartialName {
   sym: string;
   target: ComponentTarget;
   axis: 'x' | 'y' | 'z';
+}
+
+/**
+ * #921 (ADR-3D-224) — a letter naming an ON-SEGMENT RIDER's parameter («E על SA כך ש-SE = t·SA»).
+ *
+ * The {@link PartialName} idea one lane over: #814 recorded the letter a student put in a free
+ * COORDINATE, this records the letter they put in a free RATIO. Same discipline in both — the binding is
+ * INERT (the rider samples as it always did) until a statement addresses the letter, and first binding
+ * wins, so re-using a name is not a re-bind.
+ */
+export interface RiderName {
+  sym: string;
+  id: Id;
+  /** the parameter is measured from the host's `b` end ⇒ the rider's `t` is `1 − value` */
+  fromB: boolean;
 }
 
 /** `המישור BC'D` — a plane through existing points (resolved from their positions). */
@@ -1130,6 +1154,8 @@ export interface Construction3 {
    * component branch selection the engine already performs for a coordinate sign given.
    */
   partialNames: PartialName[];
+  /** #921 (ADR-3D-224) — letters naming on-segment riders' parameters. See {@link RiderName}. */
+  riderNames: RiderName[];
   /** #814 (ADR-3D-175) — a sign stated on a NAMED free component («p חיובי» after «D(3,p,0)»). The
    *  coordinate sign given (`signGivens`) one lane wider: the same branch selection, keyed on the
    *  component the letter names rather than on a point+axis, so the vector and pair lanes are not a
@@ -1235,6 +1261,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   vectorPins: [],
   signGivens: [],
   partialNames: [],
+  riderNames: [],
   componentSigns: [],
   pointPlanes: new Map(),
   pointLines: new Map(),
@@ -1339,7 +1366,9 @@ export const vecDefOfSymbol = (c: Construction3, sym: string): number => c.vecDe
  *  - a pivot pin symbol («C(p²,1,0)», a vector/pair injection, an equation's letter — `pinSymsOf`);
  *  - the algebraic lane's figure parameter (`c.param`, the m of «x + (m−2)y … = 0»);
  *  - a labelled angle («∠SAB = α», ADR-3D-052);
- *  - a NAMED free component («D(3,p,0)» — p is D's y, #814 / ADR-3D-175).
+ *  - a NAMED free component («D(3,p,0)» — p is D's y, #814 / ADR-3D-175);
+ *  - a NAMED on-segment RIDER parameter («E על SA כך ש-SE = t·SA» — t is E's position along SA, #921 /
+ *    ADR-3D-224).
  * A statement addressed to the letter («p = 3», «p חיובי») is applied to EVERY owner: that is what
  * sharing a name means (the angle rule's own words). Each command that resolves a letter asks here
  * — a resolver that consults a subset is exactly how «p = 3» came to refuse a letter the student had
@@ -1355,7 +1384,8 @@ export type SymbolOwner =
   | { kind: 'pin-sym' }
   | { kind: 'param' }
   | { kind: 'angle'; marks: Construction3['angleMarks'] }
-  | { kind: 'component'; target: ComponentTarget; axis: 'x' | 'y' | 'z' };
+  | { kind: 'component'; target: ComponentTarget; axis: 'x' | 'y' | 'z' }
+  | { kind: 'rider'; id: Id; fromB: boolean };
 
 export function symbolOwnersOf(c: Construction3, sym: string): SymbolOwner[] {
   const out: SymbolOwner[] = [];
@@ -1367,6 +1397,7 @@ export function symbolOwnersOf(c: Construction3, sym: string): SymbolOwner[] {
   const marks = c.angleMarks.filter((m) => m.label === sym);
   if (marks.length > 0) out.push({ kind: 'angle', marks });
   for (const b of c.partialNames) if (b.sym === sym) out.push({ kind: 'component', target: b.target, axis: b.axis });
+  for (const b of c.riderNames) if (b.sym === sym) out.push({ kind: 'rider', id: b.id, fromB: b.fromB }); // #921
   return out;
 }
 
@@ -1450,6 +1481,14 @@ export type EngineError3 =
   | { code: 'two-unknowns'; id: Id } // a vector relation with more than one undefined point
   | { code: 'size-on-solid' } // a numeric size on a free-dim solid figure — not supported yet (honest boundary)
   | { code: 'unknown-symbol'; id: string } // a value was assigned to a parameter no relation defines
+  /**
+   * #922 (ADR-3D-225) — a SIGN was stated on a letter the figure DOES carry, in a lane that has no sign
+   * to select: a vec-def's ratio symbol (its root pick is `firstNonDegenerateRoot`, with no sign lane)
+   * or an on-segment rider's parameter (confined to (0,1) by the membership that created it, so there is
+   * no branch a sign could choose). Refusing these as `unknown-symbol` told the student the figure had
+   * never heard of a letter it had just been given — a refusal naming a cause the figure contradicts.
+   */
+  | { code: 'sign-not-selectable'; id: string }
   | { code: 'ambiguous-angle'; id: Id } // #251: a single-vertex angle whose arms cannot be resolved (≠2 edges at the vertex)
   | { code: 'no-prism-to-make-right' } // #289: `המנסרה ישרה` but the figure has no prism-like solid to make right
   | { code: 'ambiguous-prism' } // #289: `המנסרה ישרה` with more than one oblique prism — "the prism" is ambiguous

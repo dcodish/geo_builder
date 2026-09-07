@@ -8296,3 +8296,103 @@ LLM call. Not touched.
 the real store (C at (9, 1, 0), no escalation); the prod guards; arm 2's standing behaviour and its
 escaping rows recorded; arm 3's division of labour recorded (does not parse as typed, the nudge candidate
 parses).
+
+### ADR-3D-224 — The rider's ratio clause is read by the rider, not by the utterance that declared it (#921)
+
+**Status:** accepted, 2026-09-07 · fix-round #931 · **Requirements:** none (internal — the honesty
+invariant already states that no stated magnitude is silently dropped) · **Design:**
+[04b](04b-design-3d.md), the parser section — the on-segment rider's ratio clause
+
+**Context.** Found while fixing #902. The exam's own idiom for a rider:
+
+```
+E על SA כך ש-SE = t·SA        parse ok  →  {point-on-segment3, id: E, a: S, b: A}      ← the clause is GONE
+t = 1/2                       refused: unknown-symbol "t"
+```
+
+Two lines after the student writes `t`, the tool says it has never heard of it. But the diagnosis on the
+issue — *"the letter is discarded at the parser boundary"* — measured out one layer deeper than filed:
+**the whole ratio clause was unreadable, letter or no letter.** `ratioT` knows two shapes, both of them
+about the host's two HALVES (`AK = 2KA'`, `AE:EC = 2:1`); «SE = t·SA» sets a half against the **whole**
+host, which matched no reading. A clause the rule cannot read returned `undefined` — the same answer as
+*"no clause was stated"* — so the rider was built free and the given vanished.
+
+And the same statement typed as its **own fact** worked the whole time:
+
+```
+SE = t·SA        →  vec-rel {from S, to E, terms [{coeff {k:0,p:1}, pair S→A}], symbol 't'}
+t = 1/2          →  accepted;  |SE|/|SA| = 0.500000
+```
+
+Two spellings of one construction disagreeing is the #820 class, and [#748](#adr-3d-138)'s rule already
+decides it: *"the reading belongs to the RIDER, not to the utterance that happened to declare it."*
+
+**Decision.**
+
+1. **The whole-host shape is read, in the module that owns rider ratio arithmetic** (`onSegmentRatio.ts`,
+   beside `riderPairsT`): `riderWholeSide` matches one half against the whole host (pairs as SETS — a
+   length pair is unordered, #748's own finding), and `riderWholeT` turns a coefficient into the rider's
+   `t` (`|aR| = k·|ab|` ⇒ `t = k`; `|bR| = k·|ab|` ⇒ `t = 1 − k`). Numeric and named coefficients share
+   it, so «SE = 0.4·SA» and «SE = t·SA» cannot drift apart — the defect this ADR exists to close.
+2. **`t` is confined to the OPEN interval.** «E על SA» is a given too, so a coefficient that would put the
+   rider at or beyond an endpoint contradicts the membership in the same sentence: `'invalid'`, which the
+   caller turns into an honest refusal. Never clamped, and never — as before — silently dropped.
+3. **The letter is kept NAME-ONLY** (`sym` on the command, `riderNames` in the construction, the #814
+   discipline: first binding wins, and the binding is inert until something addresses the letter). The
+   rider still samples its `t` per seed exactly as it always did. Promoting the letter to a solver unknown
+   instead is the mistake [ADR-3D-175](#adr-3d-175) documents.
+4. **`symbolOwnersOf` gains the `rider` kind**, so the ONE resolver [ADR-3D-219](#adr-3d-219) established
+   answers for this lane too, and `symbol-value` lowers a value on it to exactly the `point-on-segment3`
+   given the same ratio typed with a number would have produced — one placement path, not a second.
+
+**Standing rule 1 — the class.** The class is *"a rider's ratio clause is read wherever it is stated"*,
+not «make `t` work». The approval asked whether any OTHER lane still drops a written letter: swept, and
+the answer is no — `symbol-value` refuses `unknown-symbol` only when `symbolOwnersOf` returns nothing,
+which after this is correct for every lane. One neighbouring defect WAS found and is filed rather than
+folded in (#932): the two-FACT spelling («E על SA» then «SE = t·SA») refuses `no-solution: S`, because a
+`vec-rel` cannot define a point that already exists as a rider. Same family, different mechanism (the
+M1 boundary), so it is its own issue per docs/17 §1.
+
+**Locks.** `issue-921-rider-symbol.test.ts`: the operator's sequence puts E at the midpoint to 9 decimals;
+the complement spelling «AE = t·AS» measures from the other end; a value that would push the rider off its
+host refuses; first-binding-wins with two riders sharing a letter; the numeric whole-host form; and the
+guards that matter more — the anonymous rider, both catalog forms byte-unchanged, a clause about some
+other rider still refused, and a value on a letter the figure lacks still `unknown-symbol`.
+
+### ADR-3D-225 — A refusal may not name a cause the figure contradicts (#922)
+
+**Status:** accepted, 2026-09-07 · fix-round #931 · **half 1 only** — the honesty of the message; the
+CAPABILITY (honouring a sign on a ratio symbol) is #930 and is deliberately not built ·
+**Requirements:** none (internal — the honesty invariant) · **Design:** none
+
+**Context.** After «SN = k·SC», writing «k חיובי» refused with *«הפרמטר k לא הוגדר בסרטוט»* — *the
+parameter k isn't defined in the figure*. Which is false: the figure defines `k`, and since
+[ADR-3D-219](#adr-3d-219) the engine can say so — `symbolOwnersOf(c, 'k')` returns the vec-def owner.
+`param-sign` refused anyway, because its guard asked only whether the letter was **sign-selectable**
+(a pivot symbol or a named component) and reported the negative answer with the *unknown-letter* code.
+
+**Decision.** Split the two questions the one code was answering. A letter no mechanism owns still refuses
+`unknown-symbol`. A letter the figure DOES carry, in a lane with no sign to select, refuses
+`sign-not-selectable` — *"the figure defines k, but its value is fixed by the relation that introduced it
+— a sign can't be chosen for it."* Two owner kinds are in that position: a vec-def's ratio symbol (its
+root pick is `firstNonDegenerateRoot`, which has no sign lane) and, after
+[ADR-3D-224](#adr-3d-224), a rider's parameter (confined to (0,1) by its own membership, so there is no
+branch a sign could pick). The two codes must not collapse into one — that is what the locks assert.
+
+**Standing rule 1 — the class.** The class is *"a refusal names a cause the figure contradicts"*, not
+this one message. The approval asked for a sweep of the other refusal paths now that the resolver can
+answer: `symbol-value` (apply.ts) refuses `unknown-symbol` only on `owners.length === 0`, which is
+truthful; `angle-label` refuses on `marks.length === 0`, likewise. **`param-sign` was the only false
+claimant**, and it is fixed here.
+
+**Deviation from the #921 plan, recorded.** That plan asked for `param-sign` to lower to *"a sign on
+`t`"* for a rider. It does not, and should not: after ADR-3D-224 the rider's parameter lives in (0,1) by
+construction, so a positive sign states something already guaranteed and a negative one contradicts the
+membership — there is no branch for a sign to select. Refusing it honestly (this ADR's code) is the
+truthful outcome; inventing a sign lane for a quantity that cannot change sign would be the fiction the
+honesty invariant forbids.
+
+**Locks.** In `issue-921-rider-symbol.test.ts`: «k חיובי» after «SN = k·SC» → `sign-not-selectable`; a
+sign on a letter no mechanism owns → `unknown-symbol` (the two do not collapse); a rider parameter →
+`sign-not-selectable`; and a sign on a PIVOT symbol is still honoured, so the #325/#814 lanes are
+untouched.

@@ -64,10 +64,11 @@ like success and states a given the student never gave. See [ADR-3D-218](06b-dec
 (#898), where a component reducer summing coefficients and never reading exponents drew «C(p²,p,0)» as
 «C(p,p,0)».
 
-**A letter has one ADDRESS registry, and a pin on it is keyed by the letter.** Five mechanisms can own a
+**A letter has one ADDRESS registry, and a pin on it is keyed by the letter.** Six mechanisms can own a
 symbol — a vec-def's ratio («SN = k·SC»), a pivot pin symbol (a point/vector/pair injection or an equation
 written in the letter, `pinSymsOf`), the algebraic lane's figure parameter (`c.param`), a labelled angle,
-and a named free component («D(3,p,0)», `partialNames`). `symbolOwnersOf` (`types.ts`) lists a letter's
+a named free component («D(3,p,0)», `partialNames`), and a named on-segment rider parameter
+(«E על SA כך ש-SE = t·SA», `riderNames`). `symbolOwnersOf` (`types.ts`) lists a letter's
 owners in one place, and every statement addressed to a letter («p = 3», «p חיובי») is applied to each of
 them. `symbolPins` is keyed by the symbol's **name**: the relation pins (∥/⟂/length/seg-*) are inherently
 vec-def pins and drive a symbol-defined point; the `value` pin is lane-agnostic and each lane reads it back
@@ -80,6 +81,25 @@ component takes a value through the injection command that bound the name (M1). 
 [ADR-3D-219](06b-decisions-3d.md#adr-3d-219) (#902), where the pins were keyed by the vec-def **index** that
 introduced a symbol, so a coordinate-born letter had no representable pin and «p = 3» refused a letter the
 student had used two lines earlier.
+
+**A rider's ratio clause is read by the RIDER, not by the utterance that declared it.** An on-segment
+point carries a parameter `t`, and a statement relating its host's parts *determines* `t` in closed form
+— no solving. Two shapes exist and both live in `onSegmentRatio.ts`: the host's two **halves** against
+each other (`|aR| = k·|Rb|`, `riderPairsT`) and one half against the **whole** host (`|aR| = k·|ab|`,
+`riderWholeSide`/`riderWholeT`). Pairs match as SETS, because a length pair is unordered. The parameter is
+confined to the OPEN interval: «R על ab» is itself a given, so a coefficient placing the rider at or beyond
+an endpoint contradicts the membership in the same sentence and is **refused** — never clamped, and never
+dropped. A coefficient written as a LETTER binds the name only (`riderNames`); the rider keeps sampling as
+before, and a later value reaches it through the same `symbolOwnersOf` registry as every other lane. See
+[ADR-3D-224](06b-decisions-3d.md#adr-3d-224) (#921), where the whole-host shape was readable in no spelling
+of the clause, so «E על SA כך ש-SE = t·SA» built a free rider and silently discarded the ratio — while the
+same statement typed as its own fact built and pinned correctly all along.
+
+**A refusal names a cause the figure does not contradict.** When a statement is addressed to a letter, the
+two questions *"does the figure carry this letter?"* and *"does this lane expose what the statement asks
+for?"* have separate answers and separate codes: `unknown-symbol` for the first, `sign-not-selectable` for
+the second. See [ADR-3D-225](06b-decisions-3d.md#adr-3d-225) (#922), where one code answered both and told
+a student the figure had never heard of a letter it had just been given.
 
 ## Gauge, and why the landing funnel exists
 

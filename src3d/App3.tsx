@@ -98,6 +98,10 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.unknownPoint', { id: err.id });
     case 'unknown-symbol':
       return t('err.unknownSymbol', { id: err.id });
+    // #922: the figure DOES carry the letter — say what is actually true (the sign has nothing to
+    // select here), never that the letter is undefined.
+    case 'sign-not-selectable':
+      return t('err.signNotSelectable', { id: err.id });
     case 'ambiguous-angle':
       return t('err.ambiguousAngle', { id: err.id });
     case 'no-prism-to-make-right':

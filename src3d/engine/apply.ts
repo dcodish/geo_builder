@@ -13,7 +13,7 @@ import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
 import { isAnyDiagonal, isSpaceDiagonal, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
-import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
+import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
   // #305 (ADR-3D-090): every quad pyramid is a 4-ring + apex, whatever its base or top
@@ -157,6 +157,7 @@ function clone(c: Construction3): Construction3 {
     vectorPins: [...c.vectorPins],
     signGivens: [...c.signGivens],
     partialNames: [...c.partialNames],
+    riderNames: [...c.riderNames],
     componentSigns: [...c.componentSigns],
     pointPlanes: new Map(c.pointPlanes),
     pointLines: new Map(c.pointLines),
@@ -405,6 +406,20 @@ const paramLane = (c: Construction3, param: string | undefined): { sym?: string;
  * to a pivot symbol already has an owner, and a second binding would be the two-mechanisms bug (#801)
  * arriving through the naming door. One recorder for the three lanes: the `pinSymsOf` discipline.
  */
+/**
+ * #921 (ADR-3D-224) — record the letter a student put in a rider's ratio clause («SE = t·SA»).
+ *
+ * {@link bindPartialNames}'s discipline, one lane over: NAME-ONLY (the rider keeps sampling its `t`
+ * exactly as before, so nothing about the drawn figure changes until a statement addresses the letter),
+ * and FIRST BINDING WINS — re-using a name is not a re-bind, so a second rider written with the same
+ * letter does not steal it from the first.
+ */
+function bindRiderName(next: Construction3, cmd: PointOnSegment3Command): void {
+  if (!cmd.sym) return;
+  if (next.riderNames.some((b) => b.sym === cmd.sym)) return;
+  next.riderNames.push({ sym: cmd.sym, id: cmd.id, fromB: cmd.symFromB === true });
+}
+
 function bindPartialNames(
   next: Construction3,
   target: ComponentTarget,
@@ -1037,6 +1052,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (missing) return { ok: false, error: missing };
       const next = clone(c);
       next.points.set(cmd.id, { kind: 'on-segment', a: cmd.a, b: cmd.b, t: cmd.t });
+      bindRiderName(next, cmd); // #921 — the student named this rider's parameter
       return { ok: true, next };
     }
 
@@ -1713,10 +1729,19 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // the one resolver `symbol-value` asks, so a sign and a value can never disagree about what a
       // letter denotes. Every owner gets the sign. (A vec-def's ratio symbol is not a sign-selectable
       // owner — its root pick has no sign lane — so a letter that is ONLY that still refuses, as before.)
+      // #922 (ADR-3D-225) — HONESTY OF THE REFUSAL. Two owner kinds carry a letter but expose no sign to
+      // select: a vec-def's ratio symbol (root pick is `firstNonDegenerateRoot`) and a rider's parameter
+      // (confined to (0,1) by its own membership). Refusing those as `unknown-symbol` stated something the
+      // figure contradicts — «הפרמטר k לא הוגדר בסרטוט» about a letter the figure defines. Now the message
+      // says what is actually true: the sign is not selectable for THIS kind of letter. A letter no
+      // mechanism owns still refuses `unknown-symbol`, and the two must not collapse into one.
       const owners = symbolOwnersOf(c, cmd.sym);
       const solverOwned = owners.some((o) => o.kind === 'pin-sym' || o.kind === 'param');
       const components = owners.filter((o): o is Extract<SymbolOwner, { kind: 'component' }> => o.kind === 'component');
-      if (!solverOwned && components.length === 0) return { ok: false, error: { code: 'unknown-symbol', id: cmd.sym } };
+      if (!solverOwned && components.length === 0) {
+        const code = owners.length ? ('sign-not-selectable' as const) : ('unknown-symbol' as const);
+        return { ok: false, error: { code, id: cmd.sym } };
+      }
       const next = clone(c);
       if (solverOwned) next.paramSigns.push(cmd);
       for (const b of components) next.componentSigns.push({ target: b.target, axis: b.axis, positive: cmd.positive });
@@ -2239,6 +2264,17 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           // #814's named free component: the value IS the coordinate given on that component — lowered
           // to the injection lane that bound the name (M1), so it joins the pivot as any stated number.
           r = applyCommand3(r.next, componentGiven(owner.target, owner.axis, cmd.value));
+        } else if (owner.kind === 'rider') {
+          // #921's named rider parameter: the value DETERMINES the rider, so it lowers to exactly the
+          // `point-on-segment3` given the same ratio typed with a number would have produced — the same
+          // store, the same (0,1) guard, no second placement path.
+          const rp = r.next.points.get(owner.id);
+          if (rp?.kind !== 'on-segment') return { ok: false, error: { code: 'unknown-point', id: owner.id } };
+          const t = owner.fromB ? 1 - cmd.value : cmd.value;
+          if (!(t > 0 && t < 1)) return { ok: false, error: { code: 'no-solution', id: owner.id } };
+          const next = clone(r.next);
+          next.points.set(owner.id, { kind: 'on-segment', a: rp.a, b: rp.b, t });
+          r = { ok: true, next };
         }
       }
       return r;

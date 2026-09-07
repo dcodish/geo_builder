@@ -122,6 +122,7 @@
     "badFile": "This is not a valid Space Builder figure file",
     "newerSchema": "The file was saved by a newer version of the tool — refresh the page and try again",
     "unknownSymbol": "the parameter {{id}} isn't defined in the figure",
+    "signNotSelectable": "the figure defines {{id}}, but its value is fixed by the relation that introduced it — a sign can't be chosen for it",
     "ambiguousAngle": "identifying the angle at {{id}} needs exactly two edges in the figure — name all three letters (e.g. ∠AOB = 90)",
     "ambiguousVectorLength": "vector or length? write vector AB = vector CD (or AB⃗ = CD⃗), or |AB| = |CD|",
     "paramRolesConflated": "the letter {{letter}} is used both as the running parameter (outside the parentheses) and as a component inside them — it isn't clear which you meant. Pick a different letter for the running parameter, e.g. x=t({{letter}}-1, 5-{{letter}}, -2)",

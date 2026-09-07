@@ -61,6 +61,45 @@ export function riderPairsT(id: Id, a: Id, b: Id, p1: Id, x: Id, y: Id, q1: Id, 
 }
 
 /**
+ * Which endpoint the rider is measured FROM, for a statement whose second pair is the WHOLE host —
+ * «SE = t·SA», the exam's own rider idiom ([ADR-3D-224](docs/06b-decisions-3d.md), issue #921).
+ *
+ * `riderPairsT` above reads the two HALVES of the host against each other (`|aR| = k·|Rb|`). This is the
+ * other shape a ratio clause can take: one side is a half, the other is the whole segment. It was
+ * readable in NO spelling of the clause — «E על SA כך ש-SE = 2·SA» refused `not-handled`, while the same
+ * statement as its OWN fact («SE = t·SA» → a `vec-rel` with a symbol) built and pinned correctly. Two
+ * spellings of one construction disagreeing is the #820 class, and #748's rule applies unchanged: the
+ * reading belongs to the RIDER, not to the utterance that happened to declare it.
+ *
+ * Pairs are matched as SETS (a LENGTH pair is unordered — #748's own finding), so «SE = t·SA» and
+ * «ES = t·AS» are the same statement.
+ */
+export function riderWholeSide(id: Id, a: Id, b: Id, p1: Id, x: Id, y: Id, q1: Id): 'from-a' | 'from-b' | 'invalid' {
+  if (p1 !== id && x !== id) return 'invalid'; // the first pair must be a HALF — it must name the rider
+  const outer = p1 === id ? x : p1;
+  if (outer === id) return 'invalid'; // a degenerate pair (|EE|)
+  const wholeIsHost = (y === a && q1 === b) || (y === b && q1 === a);
+  if (!wholeIsHost) return 'invalid'; // the second pair must be the WHOLE host — else this is not that shape
+  if (outer === a) return 'from-a';
+  if (outer === b) return 'from-b';
+  return 'invalid';
+}
+
+/**
+ * `|aR| = k·|ab|` ⇒ `t = k`; `|bR| = k·|ab|` ⇒ `t = 1 − k`.
+ *
+ * Confined to the OPEN interval, because «R על ab» is a given too: a coefficient that would put the
+ * rider at or beyond an endpoint contradicts the membership in the same sentence, and 'invalid' is how
+ * that is reported (the caller refuses the utterance) — never silently clamped, and never silently
+ * dropped, which is what this whole shape used to do.
+ */
+export function riderWholeT(side: 'from-a' | 'from-b', k: number): RiderT {
+  if (!Number.isFinite(k)) return 'invalid';
+  const t = side === 'from-a' ? k : 1 - k;
+  return t > 0 && t < 1 ? t : 'invalid';
+}
+
+/**
  * #820 — THE RIDER'S SAMPLED PARAMETER, IN ONE PLACE.
  *
  * A free rider (`K על SB`, no ratio stated) has no determined `t`, so one is SAMPLED per seed. That
