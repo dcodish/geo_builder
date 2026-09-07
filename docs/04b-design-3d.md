@@ -165,8 +165,13 @@ normals** rather than a painter's-algorithm approximation. `scene3.ts` is pure a
 `Figure3.tsx` mounts it. Vector notation (arrows, pairs) is `notation.ts`; general math text comes from
 the shared [`shell/math.tsx`](04w-design-shell.md).
 
-**The stated-angle arc lane ([ADR-3D-221](06b-decisions-3d.md#adr-3d-221), [ADR-3D-222](06b-decisions-3d.md#adr-3d-222)).**
-Vertex arcs are ONE map keyed by wedge (vertex + the unordered ray pair); every producer — `vangle` pins,
+**The stated-angle arc lane ([ADR-3D-221](06b-decisions-3d.md#adr-3d-221), [ADR-3D-222](06b-decisions-3d.md#adr-3d-222),
+[ADR-3D-227](06b-decisions-3d.md#adr-3d-227)).**
+Vertex arcs are ONE map keyed by wedge — the vertex plus its two ray **DIRECTIONS**, matched order-free
+within ±1.5° per ray, so two spellings of one physical corner («∠EAS» and «∠BAS» with E on AB) are one
+wedge and draw one arc. Directions, not point ids, and a tolerance predicate, not a rounded key: rounding
+puts a quantization boundary mid-wedge and double-draws the corners that straddle it. A wedge whose points
+do not resolve falls back to id identity. Every producer — `vangle` pins,
 shared-apex `angle-seg-eq` claims, `angleMarks` — feeds it and it emits once per wedge, reading `degText`
 (the value once stated, the letter until then; the same rule the object-angle lane uses). A stated angle
 between two independent segments (`seg-angle`) is anchored on `meetingPoint` from `rightAngles.ts` — the
