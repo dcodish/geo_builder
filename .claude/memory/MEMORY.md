@@ -31,3 +31,5 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Count-delta attribution misses replacement](count-delta-attribution-misses-replacement.md) — a RESTATED given replaces its record and changes no count, so blame lands on an innocent earlier fact while the new line reads green; measure the second statement too (#902, 2026-09-06)
 - [Plan vs lock collision](plan-vs-lock-collision.md) — grep the locks around a plan's chokepoint before building; a plan can arm what a test forbids on an EARLIER ruling (#924 arm 2, round #927)
 - [Anchor wait predicates](anchor-wait-predicates.md) — `grep -q "3d exit"` matched `build:3d exit 0` and overlapped the batch suite with a lane; markers must not be substrings of each other (round #927)
+- [Measure the plan's "therefore"](measure-the-plans-therefore.md) — the sentence linking mechanism to symptom is a separate hypothesis, and the cheapest one to falsify (#920, round #931)
+- [Try the neighbouring spelling](try-the-neighbouring-spelling.md) — a working alternate spelling turns a "missing capability" into a two-spellings bug, which changes the ROUTE (#921, round #931)
