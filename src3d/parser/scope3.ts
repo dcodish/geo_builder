@@ -1,3 +1,5 @@
+import { EN_STOP, NOUN_EN } from './parse3';
+
 /**
  * #73 (ADR-3D-040): the 3-D GUIDANCE register — the 2-D scope.ts pattern, COPIED per docs/20 §12
  * (never shared). Runs ONLY on a failed parse (App3 consults it before the LLM escalation): a match
@@ -239,17 +241,37 @@ export function classifyGuidance3(utterance: string): ScopeMatch3 | null {
  * have helped: this returns the upper-cased candidate, the caller re-parses it, and the note fires only if
  * that candidate parses. A genuine gap fails either way and stays a genuine gap.
  *
- * Only maximal 2–4 character lowercase runs are lifted — a single lowercase letter is far more likely a
- * vector/parameter than a node, and lifting it would fight the convention being taught.
+ * Any maximal LABEL-SHAPED lowercase run is lifted — letters, digits and primes, two characters or more,
+ * with no upper cap ([ADR-3D-226](../../docs/06b-decisions-3d.md#adr-3d-226), issue #924 arm 2). A single
+ * lowercase letter is still left alone: it is far more likely a vector/parameter than a node, and lifting
+ * it would fight the convention being taught.
+ *
+ * The cap used to be FOUR characters, which is exactly one vertex list too short: «תיבה abcda'b'c'd'» had
+ * its run lifted in the wrong half («abcda'B'C'D'») and «פירמידה sabcd» was not lifted at all, so the
+ * candidate did not parse, the nudge stayed silent, and the App escalated a fully supported figure to the
+ * paid LLM lane. Removing the cap is what lets the convention be TAUGHT for a whole solid — the operator's
+ * standing ruling for this class (#353, reaffirmed 2026-09-07: *"we should not accept this"*).
+ *
+ * What is never lifted is an ENGLISH PROSE WORD — the solid vocabulary and the function words `parse3`
+ * already owns. Without that, «box abcd» would offer «BOX ABCD» and teach a spelling that does not parse;
+ * with it the noun stays put and only the vertex run is corrected. Over-lifting anything else costs
+ * nothing, because the nudge is PROOF-BASED: it fires only when the candidate actually parses, so a run
+ * that was never a label simply fails again and the utterance stays the genuine gap it was.
  */
 /** A plane equation with SYMBOLIC coefficients (`ax+by+cz+d=0`, issue #339) — those lowercase letters are
  *  coefficients, never nodes (operator: "except for the plane equation we have open where aX+bY+cZ+D=0
  *  are not nodes"), so the family is excluded by construction. */
 const SYMBOLIC_PLANE_EQ3 = /[a-z]\s*[xyz]\s*[-+=]/;
+/** The English words that are PROSE, not a label run: the solid vocabulary plus the function words —
+ *  both reused from `parse3`, never re-listed here (one vocabulary, one owner). */
+const EN_WORD = new RegExp('^(?:' + NOUN_EN + ')$', 'i');
+const isEnglishProse = (run: string): boolean => EN_STOP.has(run) || EN_WORD.test(run);
+
 export function upperCasedLabelCandidate3(utterance: string): string | null {
   if (SYMBOLIC_PLANE_EQ3.test(utterance)) return null;
   let changed = false;
-  const out = utterance.replace(/(?<![A-Za-z])([a-z][a-z0-9']{1,3})(?![A-Za-z])/g, (run: string) => {
+  const out = utterance.replace(/(?<![A-Za-z])([a-z][a-z0-9']+)(?![A-Za-z])/g, (run: string) => {
+    if (isEnglishProse(run)) return run;
     changed = true;
     return run.toUpperCase();
   });
