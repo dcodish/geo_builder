@@ -18,7 +18,7 @@ import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -386,7 +386,8 @@ function rtEffectiveIds(cmd: Extract<AnyCommand, { type: 'right-triangle' }>, re
 function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
   // Symbol table over the ENABLED facts, so a value given later (`x = 4`) resolves an
   // earlier `AB = 3x`, and two segments sharing a variable become a proportion (ADR-031).
-  const symtab = buildSymTab(facts.filter((f) => f.enabled).map((f) => f.cmd));
+  const enabledCmds = facts.filter((f) => f.enabled).map((f) => f.cmd);
+  const symtab = buildSymTab(enabledCmds);
   const lenByKey = new Map<string, MeasureLabels['lengths'][number]>();
   const angByKey = new Map<string, MeasureLabels['angles'][number]>();
   const areaByKey = new Map<string, MeasureLabels['areas'][number]>();
@@ -737,6 +738,17 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
         status[f.id] = 'ok';
         continue;
       }
+      // #926 (ADR-483, ADR-W-044): a VALUE for a letter no statement binds — «α = 70» after «∠ABC = α»
+      // was deleted or muted — is a fact whose SUBJECT is gone, the same class as a point whose defining
+      // step is gone (the cascade message below), not a no-op. `set-var` lowers to nothing, so nothing
+      // downstream could ever notice: it sat ✓ in the list while constraining nothing, and the figure
+      // silently stopped honouring a stated given. Judged on the whole-list symbol table, so a
+      // definition re-added AFTER the value row binds it again with no retyping; the retry passes leave
+      // it alone (0 commands ⇒ not deferrable) and the fold memo's prefix signature carries the table.
+      if (f.cmd.type === 'set-var' && !isSymbolBound(symtab, f.cmd.name, enabledCmds)) {
+        status[f.id] = `variable ${f.cmd.name} is not defined by any statement (the step that defined it was removed, muted or failed)`;
+        continue;
+      }
       // A measure annotates the figure regardless of whether it adds a constraint.
       if (isMeasure(f.cmd)) addMeasureLabel(lenByKey, angByKey, areaByKey, f.cmd, measureLabelText(f.cmd, symtab));
       // An angle ALIAS annotates its wedge with the bound name (#235) — a name, not a value, so it
@@ -836,6 +848,11 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
   const classify = (cur: Construction, status: Record<string, FactStatus>) => {
     const failedFacts = facts.filter((f) => f.enabled && status[f.id] !== 'ok' && status[f.id] !== 'disabled');
     const pending = failedFacts.length > 0 && failedFacts.every((f) => {
+      // #926 (ADR-483): a value for a letter no statement binds is WAITING for its definition — the
+      // student may type «x = 4» before «AB = x» (the whole-list table has always allowed it), or may
+      // have deleted the step that used the letter. Either way it is ADR-104's register — recorded,
+      // marked, not yet in effect — not a contradiction; the row says why, the cue says "not yet".
+      if (f.cmd.type === 'set-var') return !isSymbolBound(symtab, f.cmd.name, enabledCmds);
       const ec = lowerOne(f.cmd, symtab);
       return hasDeferrableConstraint(ec) && constraintIsPending(cur, ec); // a deferrable constraint that still FLEXES (not a rigid contradiction)
     });
@@ -1927,7 +1944,9 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
   const all = trialFacts(facts, commands);
   const trial = all.slice(facts.length);
   const after = replay(all, seed);
-  const errored = trial.find((f) => after.status[f.id] !== 'ok');
+  // #926: a `set-var` whose letter nothing binds YET is marked in the fold (a pending row with its reason,
+  // never a silent ✓) but is still data the student may state first — it commits as data-only below.
+  const errored = trial.find((f) => after.status[f.id] !== 'ok' && !(f.cmd.type === 'set-var' && after.pending));
   if (errored) return { produced: false, reason: 'error', detail: after.status[errored.id] };
   // "Built something" = added a shape/constraint/label, OR RESHAPED the figure — a step like "diameter AB"
   // on a cyclic quad adds no new object (it converts a vertex to an antipode and re-places the others), so

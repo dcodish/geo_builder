@@ -74,6 +74,9 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
         : t('err.ambiguousMainDiagonalBare');
     case 'dropped-given':
       return t('err.droppedGiven', { items: err.items });
+    // #926: the change went through; this names the rows it left without effect (they stay, marked).
+    case 'dependents-broken':
+      return t('err.dependentsBroken', { cause: err.cause, items: err.items });
     case 'not-understood':
       return t('err.notUnderstood');
     case 'bad-file':
@@ -541,7 +544,9 @@ export default function App3() {
   const statusDot = (st: FactStatus3 | undefined) => {
     if (st === 'ok') return <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />;
     if (st === 'disabled') return <span className="inline-block h-2 w-2 rounded-full bg-slate-300" />;
-    return <span className="inline-block h-2 w-2 rounded-full bg-amber-500" title={t('status.inactive')} />;
+    // #926: the dot's title is the row's OWN reason — «the parameter α is not defined in the figure» for a
+    // value whose letter is gone — not the one generic "a given it depends on is off" for every red row.
+    return <span className="inline-block h-2 w-2 rounded-full bg-amber-500" title={errorText(t, st ?? null) ?? t('status.inactive')} />;
   };
 
   return (

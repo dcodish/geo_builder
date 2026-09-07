@@ -108,6 +108,21 @@ export function buildSymTab(cmds: AnyCommand[]): SymTab {
   return { vars, radiusCircle, radiusOf };
 }
 
+/**
+ * #926 (ADR-483, ADR-W-044) — does ANY statement give `name` a meaning? A letter is bound when a measure
+ * uses it («∠ABC = α», «AB = 3x»), when a circle carries it as its radius symbol («מעגל שרדיוסו r»), or
+ * when it is the reserved radius R/r and the figure has a circle to denote (ADR-034/071). A `set-var`
+ * on a letter nothing binds — «α = 70» after «∠ABC = α» was deleted or muted — is a value for a subject
+ * the figure no longer has: it lowers to nothing, so without this question it would sit green in the
+ * list while constraining nothing. Asked of the whole-list table, so the definition may sit ANYWHERE
+ * in the list, including after the value row (a definition the student deleted and re-added).
+ */
+export function isSymbolBound(tab: SymTab, name: string, cmds: readonly AnyCommand[]): boolean {
+  if ((tab.vars.get(name)?.bindings.length ?? 0) > 0) return true;
+  if (tab.radiusOf.has(name)) return true;
+  return /^[Rr]$/.test(name) && (tab.radiusCircle !== undefined || cmds.some((c) => c.type === 'circle' || c.type === 'circle-through' || c.type === 'circumcircle'));
+}
+
 /** Lower one command to the engine command(s) it produces (0+). Engine commands pass through unchanged. */
 export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
   switch (cmd.type) {

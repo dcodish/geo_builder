@@ -183,6 +183,9 @@ const PATTERNS: Pattern[] = [
   // geoStore.ts:190 — `can't build: D is no longer available (an earlier step it relies on was removed or failed)`
   { re: /^can't build: (.+) is no longer available/, key: 'errors.noLongerAvailable', params: (m) => ({ ids: m[1] }) },
 
+  // core.ts (#926) — `variable α is not defined by any statement (the step that defined it was removed, muted or failed)`
+  { re: /^variable (\S+) is not defined by any statement/, key: 'errors.unboundVariable', params: (m) => ({ name: m[1] }) },
+
   // step.ts degenerateConstraintError (ADR-202) — `⟂ needs two distinct points on each side — "BB" is a single point, not a segment`
   {
     re: new RegExp(`^(⟂|∥) needs two distinct points on each side ${EMDASH} "(.+)" is a single point, not a segment$`),

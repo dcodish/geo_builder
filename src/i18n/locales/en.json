@@ -155,7 +155,8 @@
     "editDropped": "The edit was not read in full — left unused: {{items}}",
     "statusOk": "OK",
     "statusBroken": "problem",
-    "statusOff": "excluded"
+    "statusOff": "excluded",
+    "editBrokeDependents": "The edit was applied, but {{items}} no longer takes effect — what it refers to is not defined any more"
   },
   "figure": {
     "mismatch": "The figure may not match what you described:",
@@ -223,7 +224,8 @@
     "degenerateSegment": "{{rel}} needs two distinct points on each side — \"{{seg}}\" is a single point, not a segment.",
     "degenerateAngle": "An angle needs three distinct points — \"{{angle}}\" repeats its vertex.",
     "degenerateCollinear": "Collinear points must be distinct — \"{{id}}\" appears twice.",
-    "retryHint": "You can try a different order (enter the givens first), reword it, or build it in a few smaller steps."
+    "retryHint": "You can try a different order (enter the givens first), reword it, or build it in a few smaller steps.",
+    "unboundVariable": "The letter {{name}} is not defined by any statement — the step that defined it was removed, muted or failed. The value stays in the list and takes effect again once the definition is back."
   },
   "display": {
     "title": "Display"

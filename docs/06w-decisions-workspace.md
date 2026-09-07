@@ -2179,3 +2179,52 @@ pasted there and Apache reloaded.** That is a deploy act, and a fix round never 
 **Out of scope, deliberately.** The second comment on #903 proposes replacing the RUNBOOK's
 `server/`-only rebuild rule with a bundle diff — a real defect in the same document, and not in the
 approved scope of this ruling.
+
+## ADR-W-044 — A fact whose SUBJECT is gone is a fact in error, and the action that orphaned it says so (#926)
+
+**Status:** accepted, 2026-09-07 · fix-round #927 · **Requirements:** [02](02-requirements.md) FR-EN-22 (new) ·
+[02b](02b-requirements-3d.md) FR-VC-2c (new) — what the tool owes a stated value whose definition is edited
+away · **Design:** [04](04-design.md) §4 (the fold's orphan check) · [04b](04b-design-3d.md), the claims /
+`derive3` section (the symbol retry pass and the dependents report)
+
+**Context.** Transcribing the operator's #925 answer (2026-09-07): *"if user modified the ∠SAB = α row to
+something else, the α = 70 will still exist but is meaningless at this point. Perhaps it turns red."*
+Measured at `82d87c6`, it was worse than meaningless — and it was the same defect in both trees:
+
+```
+3-D  פירמידה SABCD שבסיסה ריבוע · ∠SAB = α · α = 70
+     replaceFact('∠SAB = α' → '∠SAB = 40')   → returns TRUE, lastError null, «α = 70» still listed, symbolPins []
+     remove('∠SAB = α')                       → lastError null; the same for «C(p²,1,0)»+«p=3» and «SN = k·SC»+«k = 1/2»
+     remove + re-add «∠SAB = α»               → «α = 70» stays red (the fold is strictly in order)
+2-D  משולש ABC · ∠ABC = α · α = 70            → the arc reads «70°»
+     drop «∠ABC = α»                          → status ok / ok, lastError null, labels.angles []   ← a green ✓ on a row that does nothing
+```
+
+CLAUDE.md's honesty invariant — *no stated magnitude is ever silently dropped* — was broken in the fact
+list instead of on the canvas: the student's own list said the figure honoured α = 70, and the figure did
+not know what α was.
+
+**Decision — one rule for every builder.** A statement whose subject no longer exists is a **fact in
+error**: the row stays in the list (the tool never deletes the student's sentence for them), it is marked
+as not in effect with a reason that names the letter, and it takes effect again by itself the moment its
+definition is back — wherever in the list the definition lands, including after the value row. And the
+**action that orphaned it** — a delete, a mute, an edit — is committed as asked but is **not reported as a
+bare success**: it names the rows it took from green to red, in the student's wording. The class is *"a
+fact whose subject no longer exists"*: the symbol lanes (#902's five owners) and the point lanes (a length
+on a point whose defining step was deleted) get the same report from the same seam, because the seam judges
+on the fold's own per-row status and never on a second dependency walk.
+
+**What each tree does** — re-derived, never shared (products do not import each other): 2-D in
+[ADR-483](06-decisions.md#adr-483), 3-D in [ADR-3D-220](06b-decisions-3d.md#adr-3d-220). The two differ
+only where the trees differ: 2-D's symbol table is whole-list and position-independent, so the re-added
+definition binds for free; 3-D's fold is strictly in order, so it gains a bounded retry pass for symbol
+statements alone (nothing that introduces an object is ever re-ordered — the 2-D ADR-104 rule).
+
+**The armed assumption, confirmed by the code.** The operator approved the plan with the session's
+assumption that a re-added definition restores the value silently. In 2-D this held already; in 3-D it
+needed the retry pass, which touches only rows already red with `unknown-symbol`, so no green figure can
+change. Had it required re-ordering the fold, this would have been an escalation.
+
+**Not in scope, recorded.** The plan's "check the same sweep" items were investigation, not licence: a
+length on a deleted point in 3-D was measured to reach the same report through the same seam
+(`issue-926.test.ts`, the last case) and so is covered; a general dependency audit was not started.

@@ -8085,3 +8085,52 @@ unchanged. The existing nets (`exam-2026-2`, `angle-measures`, `adr-3d-032`, `is
 **Not in scope.** #921 and #922 above; a value for an angle label still records no `symbolPins` entry (it
 lowers to the angle claim, ADR-3D-052 — an angle label is not a solver symbol); `figureSymbolsOf` does not
 list component names (#814's ruling that the name is inert on the display surfaces stands).
+
+### ADR-3D-220 — A change that orphans a row reports it, and a symbol statement is retried once its letter exists (#926)
+
+**Status:** accepted, 2026-09-07 · fix-round #927 · the 3-D half of
+[ADR-W-044](06w-decisions-workspace.md#adr-w-044) · **Requirements:** [02b](02b-requirements-3d.md)
+FR-VC-2c (new) · **Design:** [04b](04b-design-3d.md), the claims / `derive3` section
+
+**Context.** Measured at `82d87c6` through the real store, the three symbol lanes
+[ADR-3D-219](#adr-3d-219) widened:
+
+```
+פירמידה SABCD שבסיסה ריבוע · ∠SAB = α · α = 70
+  replaceFact('∠SAB = α' → '∠SAB = 40')  → TRUE, lastError null; «α = 70» status {unknown-symbol α}; scalarPins [vangle 40]
+  remove('∠SAB = α')                      → lastError null; the same status
+  «C(p²,1,0)» + «p=3», «SN = k·SC» + «k = 1/2» — identical after deleting the defining row
+  remove + submit('∠SAB = α') again       → «α = 70» STAYS {unknown-symbol}: the fold is in order and the value row now precedes its definition
+```
+
+So the FOLD was already honest — `symbolOwnersOf` answered "no owner" and the row wore `unknown-symbol`
+(an amber dot whose title read the one generic *"a given it depends on is off"*). Two things were not:
+the ACTION reported nothing (the editor closed on `true`, the banner stayed empty), and the value could
+not come back without being retyped.
+
+**Decision.**
+
+1. **The action reports what it did to the other rows.** `dependentsBroken(before, after, seed, changed)`
+   in `store3.ts` folds both lists and quotes every OTHER row that went from `ok` to an error — a new
+   `StoreError3` `dependents-broken { items, cause }`, rendered «‹cause› השתנה או הוסר, ולכן ‹items› כבר
+   לא בתוקף…». `remove`, `toggle` and `replaceFact` all set it; `replaceFact` still returns `true`
+   (the edit IS committed — the shared FactList closes its editor on `true`, and a `false` would leave the
+   editor open on text the store already holds). Judged on the fold's own status, so a length on a
+   deleted point reaches the same report as a value on a deleted letter — one class, one seam.
+2. **The row's dot says why.** `statusDot`'s title is now the row's OWN `errorText` («הפרמטר α לא הוגדר
+   בסרטוט») — the generic "inactive" text only when the status has no message.
+3. **A symbol statement is retried once the fold is complete.** `derive3`'s per-fact block is one
+   `applyFact` (count-delta attribution included, so a retried fact owns its claims/pins exactly like an
+   in-order one), and a bounded pass re-applies every row still red with `unknown-symbol`. A statement
+   addressed to a letter introduces nothing, so re-ordering it strands no dependent — the exact boundary
+   the 2-D ADR-104 deferral draws — and only already-red rows are touched, so no green figure changes.
+   Submitting «α = 70» before any definition is still refused at submit (keep-prior), exactly as before:
+   the retry only matters for a list that editing has put out of order.
+
+**Locks.** `src3d/__tests__/issue-926.test.ts` — delete on all three lanes; the edit away and the edit
+back; mute and un-mute; the re-add on the angle and pin lanes (C lands at (9,1,0) again, as #902's own
+lock); the happy path unchanged; a delete/mute/edit of a row nothing depends on reports nothing; the
+value-first submit still refused; a POINT dependent («E אמצע AB» under «|EC'| = 4») gets the same report.
+
+**Cost, recorded.** A delete/mute/edit now pays two folds (before and after). 3-D folds are milliseconds
+except the #863 symbolic-equation case, which is its own open item.

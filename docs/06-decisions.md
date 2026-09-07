@@ -9242,3 +9242,50 @@ it; and the invariant across seven figures spanning every carrier family) and, c
 
 **Also folds in** the deferred DOF-cue inflation note under [ADR-065](#adr-065): the inflation it worried
 about would show as exactly this smell, and it does not occur in the corpus.
+
+## ADR-483 — A `set-var` whose letter nothing binds is a fact in error, and the ✎ seam names what it orphaned (#926)
+
+**Status:** accepted, 2026-09-07 · fix-round #927 · the 2-D half of
+[ADR-W-044](06w-decisions-workspace.md#adr-w-044) · **Requirements:** [02](02-requirements.md) FR-EN-22
+(new) · **Design:** [04](04-design.md) §4 — the fold's orphan check
+
+**Context.** Measured at `82d87c6`:
+
+```
+משולש ABC · ∠ABC = α · α = 70      → labels.angles [{B,A,C,"70°"}]                      ✔
+drop «∠ABC = α», keep «α = 70»     → status {ok, ok}, lastError null, labels.angles []   ✗ green, inert
+mute «∠ABC = α»                    → the same
+```
+
+`set-var` lowers to **nothing** (`lowerOne` returns `[]` — "pure data, only its referenced measures produce
+constraints"), so the fold applied it as a no-op and stamped it `ok` whether or not any measure read it.
+The symbol table knew (`vars.get('α')` had a value and zero bindings); nobody asked.
+
+**Decision.**
+
+1. **The fold asks.** `isSymbolBound(tab, name, cmds)` — one predicate in `engine/lower.ts`, next to the
+   table it reads — says whether ANY statement gives the letter a meaning: a measure binding («∠ABC = α»,
+   «AB = 3x»), a per-circle radius symbol («מעגל שרדיוסו r», `radiusOf`), or the reserved R/r while the
+   figure has a circle to denote (ADR-034/071). A `set-var` on an unbound letter gets the status
+   `variable α is not defined by any statement (the step that defined it was removed, muted or failed)` —
+   the register a point whose defining step is gone already uses (`can't build: … is no longer
+   available`), humanised as `errors.unboundVariable`. It is classified **pending** (ADR-104's "recorded,
+   not yet in effect"), not a hard contradiction — because the very same state is reached honestly by
+   typing the value FIRST («x = 4» before «AB = x»), which the whole-list table has always allowed and
+   which the submit dry-run keeps accepting as data-only (`dry-run.test.ts` caught the first cut, which
+   made it a hard error and would have refused an early value). So the row wears ✗ with its reason, the
+   figure-level cue says "not yet in effect", and the value binds the moment a definition exists.
+2. **The whole-list table is the re-add path.** The table is built over every enabled fact and is
+   position-independent, so a definition the student re-adds AFTER the value row binds it again with no
+   retyping — the ruling the operator armed. The fold memo's prefix signature already carries the whole
+   table, so a prefix `set-var` status cannot go stale; the deferral retries never touch it (0 commands ⇒
+   not deferrable).
+3. **The ✎ seam is not a bare success.** `runEditCommit` compares the other rows' statuses before and
+   after `replaceGroup`; an edit that took any from ✓ to ✗ still returns `true` (it was committed) and sets
+   the input note `steps.editBrokeDependents` naming them — «העריכה נקלטה, אבל «α = 70» כבר לא בתוקף».
+
+**Locks.** `src/__tests__/issue-926.test.ts`: the operator's sequence dropped and muted; the length lane;
+value-before-definition builds green; a six-row valued figure is unchanged (the guard that matters most);
+the humanised message names the letter; the ✎ seam's note, its clearing on the edit back, and its silence
+on an edit that orphans nothing. (A corpus scenario cannot express "then delete row 2", so the lock is a
+unit test on the real pipeline rather than a `SCENARIOS` entry.)

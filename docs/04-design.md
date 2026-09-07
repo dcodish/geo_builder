@@ -58,6 +58,7 @@ The figure is a set of **objects**, each with a *definition* referencing earlier
 - **Branches = alternatives:** when an object has N≥2 solutions, the branch index selects one. The "show another configuration" action increments it and re-evaluates. Enumerating branches is how alternatives are produced — for free, not as a special case.
 - **Stability:** DOF parameters (free-point coords, on-object `t`) and branch indices **persist across steps**. A new constraint re-evaluates only what depends on it; unrelated objects keep their parameters, so the figure does not jump.
 - **Over-constraint / contradiction:** before committing a step, check satisfiability. If unsatisfiable, reject the step, keep the previous figure, and surface a clear message. This is general (not triangle-only as in the old code).
+- **A fact whose subject is gone ([ADR-483](06-decisions.md#adr-483), #926):** the fold asks `isSymbolBound` (in `engine/lower.ts`, beside the symbol table it reads) before applying a `set-var`; a value for a letter no statement binds is stamped into the same "no longer available" register as a point whose defining step was removed, so the row and the banner both say so. The table is whole-list, so a definition re-added anywhere binds it again. The ✎ edit seam (`app/editPipeline.ts`) compares the other rows' statuses before/after the replace and names any it orphaned, while still committing the edit.
 - **Fit transform:** map computed coordinates into the viewport; persist the transform so the view is stable across steps.
 
 ## 5. Input layer

@@ -96,8 +96,16 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     setInputNote(t('steps.editDropped', { items: gates.items.join(', ') }));
     return false;
   }
+  // #926 (ADR-483, ADR-W-044): an edit that passes every gate can still take OTHER steps from ✓ to ✗ —
+  // «∠ABC = α» → «∠ABC = 40» leaves «α = 70» with no letter to bind. The edit is committed (the student
+  // asked for it) and the orphaned rows stay in the list, marked; what must not happen is a bare
+  // success. The note names them in the student's own wording — the same report the delete path gets
+  // from the fold's own banner, made explicit at the seam that returned `true`.
+  const wasOk = replay(store().facts, store().seed).status;
   store().replaceGroup(key, r.commands, editText.trim());
   logDebug({ kind: 'action', action: 'edit', detail: `${key} → ${editText.trim()}` }); // #84: so a reported session replays edits
-  setInputNote('');
+  const after = replay(store().facts, store().seed).status;
+  const orphaned = store().facts.filter((f) => wasOk[f.id] === 'ok' && after[f.id] !== 'ok' && after[f.id] !== 'disabled');
+  setInputNote(orphaned.length > 0 ? t('steps.editBrokeDependents', { items: orphaned.map((f) => `«${f.utterance ?? f.cmd.type}»`).join(', ') }) : '');
   return true;
 }

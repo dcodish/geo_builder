@@ -108,6 +108,15 @@ Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a cl
 arriving inside a composite command**. `claims.ts` checks each against four deterministic seeds
 (`claimSeeds`) — the multi-sample discipline that makes a coincidence refutable.
 
+**A change that orphans a row, and the symbol retry pass ([ADR-3D-220](06b-decisions-3d.md#adr-3d-220), #926).**
+`derive3` applies each fact through one `applyFact` (count-delta attribution included) and then re-applies,
+in a bounded pass, every row still red with `unknown-symbol` — a statement addressed to a letter («α = 70»,
+«p חיובי») introduces nothing, so retrying it after the fold strands no dependent, and only already-red
+rows are touched. The store's `remove` / `toggle` / `replaceFact` fold before and after and report, as
+`dependents-broken { items, cause }`, every OTHER row the change took from green to red — judged on the
+fold's own per-row status, never on a second dependency walk, so the symbol lanes and the point lanes
+are one class. `replaceFact` still returns `true` for a committed edit; the report is `lastError`.
+
 ## Rendering
 
 Orthographic orbit, with hidden edges dashed the way a textbook draws them, decided by **numeric outward

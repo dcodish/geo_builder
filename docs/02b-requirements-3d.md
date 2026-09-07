@@ -85,6 +85,16 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   **refused, naming the statement**; a letter the figure does not carry is refused as unknown — never a
   silent no-op. *(Realised — [ADR-3D-219](06b-decisions-3d.md#adr-3d-219), #902; `issue-902.test.ts`,
   `fixtures3/coord-symbol-value-902.geo3.json`.)*
+- **FR-VC-2c (Must)** — **A value whose letter is no longer defined is a fact in error, and the change that
+  undefined it says so.** When the row that introduced the letter («∠SAB = α», «C(p²,1,0)», «SN = k·SC»)
+  is deleted, muted or edited away, the value row («α = 70», «p = 3», «k = 1/2») stays in the list, is
+  marked as not in effect with a reason naming the letter, and the figure does not pretend the value
+  applies; the delete / mute / edit is committed as asked but reports the rows it left without effect,
+  in the student's wording — never a bare success. The value **takes effect again by itself** when a
+  definition is back, even one added after the value row. The same report serves a relation on a point
+  whose defining row is gone — one class, one seam. Suite rule:
+  [ADR-W-044](06w-decisions-workspace.md#adr-w-044). *(Realised — [ADR-3D-220](06b-decisions-3d.md#adr-3d-220),
+  #926; `issue-926.test.ts`.)*
 - **FR-VC-3 (Must)** — **NO CAS.** Every "symbolic" feature is a numeric root-find, a closed form, or a
   linear solve. Anything needing symbolic solving beyond that is **refused and escalated to the operator**,
   not approximated. This bound is what keeps the engine's answers trustworthy. *(Operator authority,

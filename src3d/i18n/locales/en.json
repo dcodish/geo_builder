@@ -133,7 +133,8 @@
     "ambiguousMainDiagonal": "The solid has several main diagonals: {{pairs}}. Name the letters of the one you mean (e.g. \"diagonal AC'\").",
     "ambiguousMainDiagonalBare": "Name the letters of the main diagonal you mean (e.g. \"diagonal AC'\").",
     "notADiagonal": "«{{pair}}» is not a diagonal of the solid — it is an edge. A diagonal joins non-adjacent vertices.",
-    "notASpaceDiagonal": "«{{pair}}» is not a MAIN diagonal — it is a face diagonal. A main diagonal passes through the solid, joining opposite vertices."
+    "notASpaceDiagonal": "«{{pair}}» is not a MAIN diagonal — it is a face diagonal. A main diagonal passes through the solid, joining opposite vertices.",
+    "dependentsBroken": "«{{cause}}» was changed or removed, so {{items}} no longer takes effect — what it refers to is not defined any more. The row stays in the list and takes effect again once the definition is back"
   },
   "examples": {
     "title": "Examples",

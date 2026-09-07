@@ -74,6 +74,12 @@ export type StoreError3 =
   /** The LLM decomposition lost part of the stated input (docs/24 S2.3 honesty gates) — `items` names
    *  the dropped labels/magnitudes; nothing was committed. */
   | { code: 'dropped-given'; items: string }
+  /** #926 (ADR-3D-220, ADR-W-044): a change to one row — deleted, muted or edited (`cause`, the row's
+   *  wording BEFORE the change) — took OTHER rows from green to red: `items` quotes them. The change IS
+   *  committed (the student asked for it) and the rows stay in the list, marked; this is the report that
+   *  the change did not leave the figure as the list reads. The honesty invariant: a stated given is never
+   *  silently dropped — a row that now constrains nothing must say so, and so must the action that did it. */
+  | { code: 'dependents-broken'; items: string; cause: string }
   /** #578 (ADR-3D-211): a RENAME that could not be done. Typed, NOT `not-understood`: the sentence
    *  was understood perfectly, so escalating it to the LLM would pay for a guess at a question already
    *  answered. `from`/`to` are echoed so the message can name the letters the student typed. */
@@ -249,11 +255,12 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     }
     return false;
   };
-  for (const f of facts) {
-    if (!f.enabled) {
-      status[f.id] = 'disabled';
-      continue;
-    }
+  /**
+   * Apply ONE fact's commands and attribute what it added by count-delta — claims, pivot pins, coordinate
+   * pins, parameter pins. ONE function for the in-order fold and the #926 retry pass below, so a retried
+   * fact owns its additions exactly as an in-order one does (the 2-D `recordOwnership` discipline).
+   */
+  const applyFact = (f: Fact3): FactStatus3 => {
     let st: FactStatus3 = 'ok';
     const claimsBefore = c.claims.length;
     const pinsBefore = pivotPinKey(c);
@@ -276,7 +283,34 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     if (pivotPinKey(c) !== pinsBefore) pinOwnerIds.add(f.id);
     if (c.pins.length + c.vectorPins.length > coordPinsBefore) coordPinOwnerIds.add(f.id);
     if (paramPinKey(c) !== paramPinsBefore) paramPinOwners.push(f.id);
-    status[f.id] = st;
+    return st;
+  };
+  for (const f of facts) {
+    if (!f.enabled) {
+      status[f.id] = 'disabled';
+      continue;
+    }
+    status[f.id] = applyFact(f);
+  }
+  // #926 (ADR-3D-220, ADR-W-044): a statement addressed to a LETTER — «α = 70», «p חיובי» — whose
+  // definition sits LATER in the list is retried once the fold is complete. The list reaches that shape
+  // only by editing: the student deleted (or edited away) «∠SAB = α» and re-added it, so the value row
+  // now precedes the row that gives the letter its meaning. The fold is otherwise strictly in order and
+  // must stay so (a point-introducing fact re-ordered to the end would strand its dependents — the 2-D
+  // ADR-104 rule); a symbol statement introduces nothing and is pure data on a name, so retrying it is
+  // safe, and only rows that are ALREADY red with `unknown-symbol` are touched — no green figure changes.
+  // Bounded like the 2-D deferral: a pass that makes no progress ends it.
+  for (let pass = 0; pass < facts.length; pass++) {
+    let progressed = false;
+    for (const f of facts) {
+      const st = status[f.id];
+      if (typeof st === 'string' || st.code !== 'unknown-symbol') continue;
+      const retried = applyFact(f);
+      if (typeof retried !== 'string' && retried.code === 'unknown-symbol') continue; // still undefined — stays red
+      status[f.id] = retried;
+      progressed = true;
+    }
+    if (!progressed) break;
   }
 
   const resolved = resolve3(c, seed);
@@ -691,6 +725,24 @@ export interface Geo3State {
 const sameStatement = (a: readonly Command3[], b: readonly Command3[]): boolean =>
   a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
 
+/**
+ * #926 (ADR-3D-220, ADR-W-044) — what a change to ONE row did to the OTHERS. A delete, a mute or an edit
+ * of `changed` is committed as asked, but the rows it took from green to red — a value whose letter it
+ * used to define, a relation on a point it used to introduce — are reported, quoted in the student's own
+ * wording, or `null` when nothing else changed status. Judged on the fold's own per-row status (the
+ * one place that knows), never by a second dependency walk; `unknown-symbol` on the value row is what
+ * the resolver `symbolOwnersOf` answers when no owner is left, so the symbol lanes and the point lanes
+ * are one class here. A change that breaks nothing pays two folds and reports nothing — the happy path
+ * is unchanged.
+ */
+function dependentsBroken(before: Fact3[], after: Fact3[], seed: number, changed: Fact3): StoreError3 {
+  const was = derive3(before, seed).status;
+  const now = derive3(after, seed).status;
+  const broken = after.filter((f) => f.id !== changed.id && was[f.id] === 'ok' && now[f.id] !== 'ok' && now[f.id] !== 'disabled');
+  if (broken.length === 0) return null;
+  return { code: 'dependents-broken', items: broken.map((f) => `«${f.utterance}»`).join(', '), cause: changed.utterance };
+}
+
 export const useGeo3 = create<Geo3State>()(
   temporal(
     (set, get) => ({
@@ -828,10 +880,21 @@ export const useGeo3 = create<Geo3State>()(
         set({ facts: candidate, lastError: null, lastNotice: null });
       },
 
-      toggle: (factId) =>
-        set({ facts: get().facts.map((f) => (f.id === factId ? { ...f, enabled: !f.enabled } : f)), lastError: null }),
+      toggle: (factId) => {
+        const { facts, seed } = get();
+        const target = facts.find((f) => f.id === factId);
+        if (!target) return;
+        const next = facts.map((f) => (f.id === factId ? { ...f, enabled: !f.enabled } : f));
+        set({ facts: next, lastError: dependentsBroken(facts, next, seed, target) });
+      },
 
-      remove: (factId) => set({ facts: get().facts.filter((f) => f.id !== factId), lastError: null }),
+      remove: (factId) => {
+        const { facts, seed } = get();
+        const target = facts.find((f) => f.id === factId);
+        if (!target) return;
+        const next = facts.filter((f) => f.id !== factId);
+        set({ facts: next, lastError: dependentsBroken(facts, next, seed, target) });
+      },
 
       replaceFact: (factId, utterance) => {
         utterance = stripFormatControls(utterance); // #751 (ADR-W-029)
@@ -883,7 +946,10 @@ export const useGeo3 = create<Geo3State>()(
           set({ lastError: { code: 'bound-unsatisfiable', id: '' } });
           return false;
         }
-        set({ facts: candidate, seed: found, lastError: null });
+        // #926: the edit is committed (it passed its own gate), but an edit that took OTHER rows from
+        // green to red — «∠SAB = α» → «∠SAB = 40» leaves «α = 70» with no letter to bind — is not a bare
+        // success: `lastError` names them. `true` still means "committed" (the editor closes on it).
+        set({ facts: candidate, seed: found, lastError: dependentsBroken(facts, candidate, found, old) });
         return true;
       },
 
