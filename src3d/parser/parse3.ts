@@ -63,7 +63,7 @@ const NOT_HANDLED: ParseResult3 = { ok: false, reason: 'not-handled' };
  * a run is uplifted only when it isn't an English function word ("angle of …", "point of intersection").
  * New label-demanding anchors join HERE — the one chokepoint — never per-rule.
  */
-const EN_STOP = new Set(['of', 'at', 'in', 'on', 'is', 'to', 'the', 'and', 'are', 'for', 'its', 'was', 'has', 'be', 'by', 'a', 'an', 'no', 'not', 'it', 'all', 'any', 'one', 'two']);
+export const EN_STOP = new Set(['of', 'at', 'in', 'on', 'is', 'to', 'the', 'and', 'are', 'for', 'its', 'was', 'has', 'be', 'by', 'a', 'an', 'no', 'not', 'it', 'all', 'any', 'one', 'two']);
 function upliftLowercaseLabels(s: string): string {
   const LIST = String.raw`[A-Za-z][A-Za-z0-9']{0,5}(?:\s*(?:,|ו-?|\band\b)\s*[A-Za-z][A-Za-z0-9']{0,5})*(?![A-Za-z])`;
   const upTokens = (list: string, en: boolean) =>
@@ -978,7 +978,7 @@ const solidNounOf = (word: string | undefined, en: boolean): SolidNoun | null =>
   return null;
 };
 const NOUN_HE = SOLID_NOUNS_HE.map(([src]) => src).join('|');
-const NOUN_EN = SOLID_NOUNS_EN.map(([src]) => src).join('|');
+export const NOUN_EN = SOLID_NOUNS_EN.map(([src]) => src).join('|');
 
 const volumePolyClaim: Rule = (s) => {
   const RUN = String.raw`(?:[A-Z]\d*'?){3,}`;

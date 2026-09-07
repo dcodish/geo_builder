@@ -81,6 +81,19 @@ component takes a value through the injection command that bound the name (M1). 
 introduced a symbol, so a coordinate-born letter had no representable pin and «p = 3» refused a letter the
 student had used two lines earlier.
 
+**Case is taught, never silently accepted — and the two mechanisms divide the work by ANCHOR.** Node
+labels are uppercase; lowercase is the vector/parameter/coordinate namespace, so 3-D cannot take a blanket
+case-insensitive read. `normalize3`'s uplift (`upliftLowercaseLabels`) lifts a run only where an ANCHOR
+proves it is a label — an angle glyph, a point noun, or a `label(…)` coordinate at the sentence start
+([ADR-3D-223](06b-decisions-3d.md#adr-3d-223)); everything else is the NUDGE's business, which offers the
+corrected spelling and lets the student retype it. A solid noun is deliberately **not** an anchor (the
+#353/#498 ruling, reaffirmed 2026-09-07), so «תיבה abcd» is taught rather than auto-lettered. The nudge
+lifts any label-shaped run of two or more characters — never a single letter, and never an English prose
+word (`NOUN_EN`/`EN_STOP`, reused from `parse3`) — and is PROOF-BASED: it runs only on a failed parse and
+fires only if the candidate parses, so a genuine gap is never masked as a style complaint. See
+[ADR-3D-226](06b-decisions-3d.md#adr-3d-226) (#924 arm 2), where a four-character cap was one vertex list
+too short and sent «תיבה abcda'b'c'd'» to the paid LLM lane.
+
 ## Gauge, and why the landing funnel exists
 
 A figure's placement, rotation and scale are a **gauge** — free unless something absolute pins them. The

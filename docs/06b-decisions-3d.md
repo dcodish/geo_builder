@@ -8296,3 +8296,59 @@ LLM call. Not touched.
 the real store (C at (9, 1, 0), no escalation); the prod guards; arm 2's standing behaviour and its
 escaping rows recorded; arm 3's division of labour recorded (does not parse as typed, the nudge candidate
 parses).
+
+### ADR-3D-226 — The nudge teaches a WHOLE vertex run; the solid noun stays un-anchored (#924 arm 2)
+
+**Status:** accepted, 2026-09-07 · fix-round #931 · completes [ADR-3D-223](#adr-3d-223) (arm 1 landed in
+round #927; arm 2 escalated there and is ruled here) · amends [ADR-3D-092](#adr-3d-092), the nudge's run
+shape · **Requirements:** none — [02b](02b-requirements-3d.md) FR-SP-8 already says an un-anchored run is
+TAUGHT; this makes it true for the runs that were escaping · **Design:**
+[04b](04b-design-3d.md), the parser section — the normalisation seam
+
+**Context.** Round #927 built arm 2 as #924's plan armed it — the solid nouns as an uplift ANCHOR, so
+«תיבה abcd» would parse like its uppercase twin — and hit two obstacles. The first was measurable: the
+English anchor uppercased the PROSE after a solid noun («prism **WITH** a triangle base»), and the 3-D
+lane failed **35 tests in 15 files**. The second was a collision between two operator rulings — the plan
+said *accept silently*, while the standing `lowercase-nudge.test.ts` lock (#498, on the #353 ruling
+*"insist on uppercase and give a message"*) says *teach*. A round does not choose between two of the
+operator's own words, so it escalated.
+
+**Operator ruling, 2026-09-07:** *"we should not accept this."* → **TEACH.** The #353 ruling stands, the
+#498 lock stands, and a solid noun is **not** an uplift anchor.
+
+So the defect is in the NUDGE, and it is a one-character cap. `upperCasedLabelCandidate3` lifted only
+2–4-character runs (`[a-z][a-z0-9']{1,3}`) — exactly one vertex list too short:
+
+```
+תיבה abcda'b'c'd'   →  candidate «תיבה abcda'B'C'D'»   ← the wrong half lifted; does not parse
+פירמידה sabcd       →  candidate none                   ← a 5-letter run is not lifted at all
+```
+
+Candidate does not parse ⇒ the nudge stays silent ⇒ the App escalates a **fully supported** figure to the
+paid LLM lane. The convention could be taught for `as=w` but not for the solid the student actually typed.
+
+**Decision.**
+
+1. **The cap goes.** Any maximal label-shaped lowercase run — letters, digits and primes, two or more
+   characters (`[a-z][a-z0-9']+`) — is lifted. The single-letter exclusion stays: a lone lowercase letter
+   is a vector, parameter or coordinate, and lifting it would fight the very convention being taught.
+2. **An English PROSE word is never lifted** — the solid vocabulary (`NOUN_EN`) and the function words
+   (`EN_STOP`), both **reused** from `parse3` rather than re-listed (one vocabulary, one owner; writing a
+   third list is how the two drift). This is what makes «box abcd» offer «box **ABCD**» instead of the
+   unparseable «BOX ABCD».
+3. **Nothing about the uplift changes.** `normalize3` still refuses an un-anchored run, so no solid is
+   ever silently auto-lettered — the #498 lock and arm 1 (ADR-3D-223) are untouched.
+
+**Why over-lifting is safe, and what it leaves.** The nudge is PROOF-BASED: it runs only on an utterance
+that already FAILED to parse, and it fires only if the candidate parses. A run that was never a label
+simply fails again and the utterance stays the genuine gap it was. Two English prose words outside both
+lists (`with`, `from`) are still lifted when the nudge is consulted directly — harmless for the same
+reason, and strictly better than before, since `EN_STOP` was not consulted at all until now.
+
+**Locks.** `issue-924-nudge-run.test.ts`: the operator's «תיבה abcda'b'c'd'» and «פירמידה sabcd» taught
+with their corrected spellings; «box abcd» keeping its noun; all four solid forms still refusing to BUILD
+as typed; and the standing guards — the #498 row, «as=w», the single-letter exclusion, the #339 plane
+equation, a genuine gap not masked, the guidance register, and the prod-log lowercase names (`l ⊥ π`,
+`ℓ ∥ π1`, the parametric line's `t(…)`, `u = (k-1,k,3)`, `k = 2`, arm 1's `c(p²,0,1)`) all still parsing
+exactly as typed. `issue-924.test.ts`'s round-#927 measurement of the escaping rows FLIPS here, which is
+what recording it was for.

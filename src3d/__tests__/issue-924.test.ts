@@ -56,21 +56,28 @@ describe('#924 arm 1 — the coordinate definition: a lowercase label before a 3
   });
 });
 
-describe('#924 arm 2 — a solid noun is NOT an uplift anchor (escalated: it collides with the #353/#498 lock that a lowercase solid is TAUGHT)', () => {
+describe('#924 arm 2 — a solid noun is NOT an uplift anchor; the whole run is TAUGHT (operator ruling 2026-09-07)', () => {
   it('«תיבה abcd» stays taught by the nudge, exactly as lowercase-nudge.test.ts locks it', () => {
     expect(normalize3('תיבה abcd')).toBe('תיבה abcd');
     expect(parse3('תיבה abcd').ok).toBe(false);
     expect(upperCasedLabelCandidate3('תיבה abcd')).toBe('תיבה ABCD');
   });
 
-  it('the rows that still reach the LLM — recorded, not fixed here: a solid run the nudge cannot lift (long / primed / 5+ letters)', () => {
+  /**
+   * This block was written in round #927 as a MEASUREMENT of what still escaped to the paid LLM lane,
+   * pending the operator's ruling on arm 2 — *"a solid noun is an uplift anchor, or the nudge widens?"*
+   * The ruling landed 2026-09-07 (*"we should not accept this"* → TEACH), and round #931 widened the
+   * nudge's run shape ([ADR-3D-226](../../docs/06b-decisions-3d.md#adr-3d-226)). So the rows flip here
+   * from "recorded as escaping" to "taught", which is the whole point of having recorded them.
+   */
+  it('a long or primed solid run is now taught, not escalated — the #927 measurement, flipped', () => {
     for (const [u, cand] of [
-      ["תיבה abcda'b'c'd'", "תיבה abcda'B'C'D'"], // the nudge lifts only 2–4-character runs, so it lifts the wrong half
-      ['פירמידה sabcd', null],
+      ["תיבה abcda'b'c'd'", "תיבה ABCDA'B'C'D'"],
+      ['פירמידה sabcd', 'פירמידה SABCD'],
     ] as const) {
-      expect(parse3(u).ok, u).toBe(false);
+      expect(parse3(u).ok, `${u} is still not ACCEPTED as typed — the #353/#498 ruling stands`).toBe(false);
       expect(upperCasedLabelCandidate3(u), u).toBe(cand);
-      if (cand) expect(parse3(cand).ok, `${u}: the nudge's candidate does not parse either`).toBe(false);
+      expect(parse3(cand).ok, `${u}: the nudge's candidate parses, so the note fires instead of the LLM`).toBe(true);
     }
   });
 });
