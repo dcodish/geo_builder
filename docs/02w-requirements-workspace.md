@@ -108,6 +108,13 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
 - **FR-SL-4 (Should)** — **The file body is the product's own replay inputs, not its positions**, so a
   later engine that lays the same facts out differently still loads the file. *(Generalises
   [FR-HS-10](02-requirements.md).)*
+- **FR-SL-5 (Must)** — **A builder opens EMPTY.** Every load — from the switcher, a bookmark, or a
+  refresh — starts with a clean canvas and an empty list; no product restores a previous session from
+  browser storage, and no product tree reads or writes a session key. Durable work is the explicit
+  save to a file (FR-SL-1…4). One rule for all builders, so a student opening a tool to start a new
+  question is never evaluated against a figure they did not build. *(Operator ruling 2026-09-06 —
+  [ADR-W-046](06w-decisions-workspace.md#adr-w-046), #919; withdraws [02](02-requirements.md) FR-HS-4.
+  Lock: `src-complex/__tests__/no-session-restore-919.test.ts`, a grep guard over every product tree.)*
 
 ## Export
 

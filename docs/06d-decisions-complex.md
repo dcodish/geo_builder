@@ -2285,3 +2285,15 @@ filter being read rather than hard-coded to the fourth; «z ברביע הרבי�
 nothing bound; zero-match, multi-match and no-enumeration all refusing and quoting the statement; and
 the neighbouring F5 sentences reading exactly as before. Plus the fixture
 `exam-2023a-quadrant-selection.complex.json`.
+
+## ADR-CX-038 — The session-restore seam is REMOVED: the builder opens empty like its siblings (#919)
+
+**Status:** Accepted (2026-09-07) · **Stage:** none (app bootstrap) · **Operator ruling** (2026-09-06) · **Round:** #927 · **Requirements:** [02w](02w-requirements-workspace.md) FR-SL-5; [02](02-requirements.md) FR-HS-4 withdrawn · **Design:** none
+
+The suite rule and its reasoning live in [ADR-W-046](06w-decisions-workspace.md#adr-w-046) — a
+cross-product decision. This entry records the complex-builder side: `src-complex/app/session.ts`
+(the `bootSession` restore-and-persist seam, ADR-CX-023's home for re-submitting stored lines) is
+**deleted**, together with its call in `main.tsx`; `hydrateSession` in `app/submit.ts` stays, because
+the file-load path shares it. `localStorage['complex-proto-session']` is neither read nor written; a
+browser that still holds one from before this deploy is simply ignored. Lock:
+`__tests__/no-session-restore-919.test.ts`.
