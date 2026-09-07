@@ -8296,3 +8296,60 @@ LLM call. Not touched.
 the real store (C at (9, 1, 0), no escalation); the prod guards; arm 2's standing behaviour and its
 escaping rows recorded; arm 3's division of labour recorded (does not parse as typed, the nudge candidate
 parses).
+
+### ADR-3D-227 — A wedge is its two ray DIRECTIONS, so two spellings of one corner draw one arc (#928)
+
+**Status:** accepted, 2026-09-07 · fix-round #931 · amends [ADR-3D-221](#adr-3d-221) §4 (the arc map's key)
+· **Requirements:** none — FR-RD-4 already says one arc per wedge; this widens what *wedge* means, and says
+so · **Design:** [04b](04b-design-3d.md), rendering
+
+**Context.** [ADR-3D-221](#adr-3d-221) (#923) unified every arc producer onto one map and keyed it on the
+vertex plus the unordered POINT-ID pair, recording the alternate-spelling question as measured-but-unarmed:
+*"«∠SAB = α» and «∠SAB = β» name the same wedge only if the rays coincide, and a box's collinear points make
+that reachable — measure the alternate-spelling case in 3-D before choosing."* Round #927 measured it, on
+the fixed lane:
+
+```
+פירמידה SABCD שבסיסה ריבוע · E אמצע AB · ∠EAS = α · ∠BAS = 40
+  angleMarks [{A, E, S, α}]   scalarPins [{vangle A B S 40}]
+  scene.angles = TWO arcs at A: «40°» (label 215.68/305.46) and «α» (label 129.84/322.30)
+```
+
+E lies on AB, so rays AE and AB coincide: ∠EAS and ∠BAS are **one physical wedge**, stroked twice at two
+radii (AE being the shorter arm). Under #923's own ruling — a value on the wedge wins — it should read
+«40°», once.
+
+**Decision.** The arc map keys on the **vertex plus its two ray DIRECTIONS**, taken from the drawn
+positions, matched order-free within **±1.5° per ray**. Every producer already feeds that one map, so the
+change is the key function alone; the text rule is untouched (a value on ANY spelling of the wedge wins, the
+letter shows until then).
+
+Three things this deliberately keeps:
+
+- **A tolerance PREDICATE, never a rounded key.** Rounding directions into a string key puts a hard
+  quantization boundary mid-wedge, so two rays of the same corner a hair either side of it key differently
+  and double-draw. That is 2-D's recorded regression (F7/REN-9), and adopting its answer without its
+  correction would have re-imported the bug.
+- **An id FALLBACK** when a wedge's points do not resolve to positions: nothing about the unresolvable case
+  changes.
+- **Different corners stay different.** Identity needs the vertex AND both rays, so ∠BAS and ∠DAS at one
+  vertex, or the same ray pair at two vertices, still draw their own arcs.
+
+**This is a choice made HERE, not a rule inherited from 2-D.** [ADR-W-045](06w-decisions-workspace.md#adr-w-045)
+deliberately leaves *which spellings name the same wedge* per-builder. 2-D answers by ray direction
+(`wedgeOf`, and the ADR-167 Am. dedup: *"they are ONE angle and must draw ONE arc, not two stacked rings"*),
+and the measurement above says 3-D has the same reachable case for the same reason — a point on a ray. So
+the answer is ported on the strength of that measurement, and would be revisited if 3-D ever had a reason
+to distinguish spellings that 2-D does not.
+
+**The knee was MEASURED, not assumed** (the plan's third step). `rightAngles.ts`'s `wedgeKey` already keys
+on the world-space vertex plus arm directions rather than ids, so the alternate-spelling case collapses
+there with no change — «∠BAS = 90» + «∠EAS = 90» with E on AB draws ONE knee. That is now asserted rather
+than believed, so an edit moving that key back onto ids fails instead of silently double-drawing. (Its key
+IS the rounded kind this ADR rejects for arcs; it is left alone because nothing measured misbehaves, and
+changing a working dedup on theory is the patch this round's rules forbid.)
+
+**Locks.** `issue-928-wedge-direction.test.ts`: the reported figure → exactly one arc reading «40°», in
+either statement order; the letter alone → one «α» arc; two genuinely different corners at one vertex and
+one ray pair at two vertices still separate; #923's own case unchanged; and the knee's single-knee
+measurement.

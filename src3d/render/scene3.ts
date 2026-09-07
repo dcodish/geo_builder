@@ -603,15 +603,41 @@ export function buildScene3(
   // MARKERS («∠SDB» / «∠SDB = α», a pedagogical arc carrying the label and no number). Two independent
   // loops used to push into `wAngles` with byte-identical geometry, so an angle that carried both a name
   // and a value — the normal bagrut phrasing — was stroked twice with «α» and «70°» at one pixel. The map
-  // emits once per wedge with `degText`'s reading. Keyed on point ids, as both loops always were; the
-  // direction-keyed identity 2-D uses (`wedgeOf`, F7/REN-9) is deliberately NOT adopted here — measured
-  // and recorded in ADR-3D-221, not armed.
+  // emits once per wedge with `degText`'s reading.
+  //
+  // A wedge is identified by the vertex plus its two ray DIRECTIONS, not by the point ids
+  // ([ADR-3D-227](../../docs/06b-decisions-3d.md#adr-3d-227), issue #928). ADR-3D-221 keyed on ids and
+  // recorded the alternate-spelling question as measured-but-unarmed; the measurement came back positive —
+  // with E on AB, «∠EAS = α» and «∠BAS = 40» are ONE physical corner and drew two stacked arcs at two
+  // radii. Identity by direction is 2-D's answer (`wedgeOf`, F7/REN-9, and the ADR-167 Am. dedup: *"they
+  // are ONE angle and must draw ONE arc, not two stacked rings"*); ADR-W-045 leaves the question
+  // per-builder, so this is a choice made HERE on that measurement, not a rule inherited.
+  //
+  // Matching is a TOLERANCE predicate, never a rounded key: rounding puts a hard quantization boundary
+  // mid-wedge, so two rays of the same corner a hair apart key differently and double-draw — the exact
+  // regression 2-D's F7/REN-9 records. A wedge whose points do not resolve falls back to id identity, so
+  // nothing about the unresolvable case changes.
   {
-    const wedges = new Map<string, { vertex: Id; p: Id; q: Id; deg?: number; label?: string }>();
+    type Wedge = { vertex: Id; p: Id; q: Id; u1: Vec3 | null; u2: Vec3 | null; deg?: number; label?: string };
+    const RAY_TOL = Math.cos((1.5 * Math.PI) / 180); // ±1.5° per ray, the 2-D tolerance
+    const rayNear = (a: Vec3, b: Vec3) => dot3(a, b) >= RAY_TOL;
+    /** The wedge's two unit rays from the drawn positions, or null when it has none to compare. */
+    const raysOf = (vertex: Id, p: Id, q: Id): [Vec3, Vec3] | null => {
+      const v = positions.get(vertex), pp = positions.get(p), qq = positions.get(q);
+      if (!v || !pp || !qq) return null;
+      const a = sub3(pp, v), b = sub3(qq, v);
+      return norm3(a) < 1e-9 || norm3(b) < 1e-9 ? null : [normalize3(a), normalize3(b)];
+    };
+    const wedges: Wedge[] = [];
     const wedgeOf = (vertex: Id, p: Id, q: Id) => {
-      const key = `${vertex}|${[p, q].sort().join('|')}`;
-      let w = wedges.get(key);
-      if (!w) wedges.set(key, (w = { vertex, p, q }));
+      const d = raysOf(vertex, p, q);
+      const same = (w: Wedge) =>
+        w.vertex === vertex &&
+        (d && w.u1 && w.u2
+          ? (rayNear(w.u1, d[0]) && rayNear(w.u2, d[1])) || (rayNear(w.u1, d[1]) && rayNear(w.u2, d[0]))
+          : (w.p === p && w.q === q) || (w.p === q && w.q === p));
+      let w = wedges.find(same);
+      if (!w) wedges.push((w = { vertex, p, q, u1: d?.[0] ?? null, u2: d?.[1] ?? null }));
       return w;
     };
     for (const sp of c.scalarPins) if (sp.kind === 'vangle') wedgeOf(sp.vertex, sp.p, sp.q).deg ??= sp.deg;
@@ -620,7 +646,7 @@ export function buildScene3(
       const w = wedgeOf(mk.vertex, mk.p, mk.q);
       w.label ??= mk.label ?? '';
     }
-    for (const w of wedges.values()) {
+    for (const w of wedges) {
       // #307: a right angle is drawn as a KNEE (rightAngles3), not an arc labelled "90°" — and since the
       // value wins, a named angle later valued at 90° is a knee too, not a knee UNDER an «α» arc.
       if (w.deg !== undefined && isRightAngleValue(w.deg)) continue;
