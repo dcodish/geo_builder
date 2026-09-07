@@ -8085,3 +8085,105 @@ unchanged. The existing nets (`exam-2026-2`, `angle-measures`, `adr-3d-032`, `is
 **Not in scope.** #921 and #922 above; a value for an angle label still records no `symbolPins` entry (it
 lowers to the angle claim, ADR-3D-052 — an angle label is not a solver symbol); `figureSymbolsOf` does not
 list component names (#814's ruling that the name is inert on the display surfaces stands).
+
+### ADR-3D-221 — One wedge draws ONE arc, and the value wins once a named angle has one (#923)
+
+**Status:** accepted, 2026-09-07 · fix-round #927 · operator ruling 2026-09-07 (the text: «70°», the
+value alone) · the 3-D half of [ADR-W-045](06w-decisions-workspace.md#adr-w-045) · **Requirements:**
+[02b](02b-requirements-3d.md) FR-RD-4 (new) — what the canvas shows for an angle the student both named
+and valued · **Design:** [04b](04b-design-3d.md), the rendering section — the scene builder's arc lane
+
+**Context.** The operator, playing #902's sheet (T10, 2026-09-07): *"the α = 70 is not displayed
+correctly on canvas"* — the arc at A read `7ᾱ°`. Measured at `82d87c6` through the real store and
+`buildScene3`:
+
+```
+פירמידה SABCD שבסיסה ריבוע · ∠SAB = α · α = 70
+  angleMarks  [{A, S, B, label α}]        scalarPins [{vangle A S B 70}]
+  scene.angles = TWO entries — the same 13 arc points, labelX 251.02 / labelY 325.77 twice — texts "70°" and "α"
+∠SAB = α alone → one arc «α»      ∠SAB = 70 alone → one arc «70°»      (each half correct; the pair doubled)
+```
+
+`scene3.ts` built the vertex arcs in **two independent loops** keyed on their own record kind — the
+stated-value loop over `scalarPins`/shared-apex claims and the #94 marker loop over `angleMarks` — each
+computing the identical geometry and each pushing into `wAngles`. Nothing asked *"is there already an
+arc on this wedge?"*. Not a #902 regression: the file was untouched by it; #902's T10 was the first case
+to name AND value one angle and then look at the canvas. 2-D settled the same class twice in
+`src/render/scene.ts` (`sameWedge`, ADR-167 Am.: *"they are ONE angle and must draw ONE arc"*), and 2-D
+already reads exactly the ruled way — measured: «∠ABC = α» → `α`; + «α = 70» → `70°`; one label per wedge.
+
+**Decision.**
+
+1. **One map, keyed by wedge.** Every producer — `vangle` pins, `angle-seg-eq` claims with a shared apex
+   (incl. `paramGivens`), `angleMarks` — feeds ONE map keyed on `vertex` + the unordered `{p, q}`; the map
+   emits once per wedge. The old `seen` set keyed on `deg` as well, so it could never merge a name with a
+   value. The geometry is one `wedgeArc` helper (13 points, `r = 0.3·min(d1,d2)`, label on the bisector
+   at `1.6r`) rather than two copies.
+2. **The value wins.** `degText(deg, label)` — the reading rule the object-angle lane already had at
+   ~line 650, now hoisted so both lanes share it — prints `${deg}°` when a value exists and the letter
+   until then. The operator's reasoning: the two displays are two MOMENTS of one exam question (*"in
+   part 1 the user works with the parameter α; later α is given"*), and the canvas follows the student
+   to the part they are in. Option A («α = 70°») and C («α» alone) were considered and declined.
+3. **A named angle valued at 90° is a knee, not a knee under an «α» arc.** Measured at HEAD: «∠SAB = α»
+   + «α = 90» drew the knee AND the «α» arc. With the value winning, the wedge is skipped like any stated
+   right angle (#307).
+4. **Identity stays id-keyed.** The direction-keyed wedge identity 2-D uses (`wedgeOf`, ±1.5°, F7/REN-9)
+   was NOT armed. Measured, it IS reachable in 3-D: «פירמידה SABCD שבסיסה ריבוע» · «E אמצע AB» ·
+   «∠EAS = α» · «∠BAS = 40» draws two arcs («40°», «α») on one physical wedge at A, at different radii
+   (AE is shorter than AB). That is the alternate-spelling case the parity note predicted; it is filed as
+   its own issue rather than widened into this fix, because it changes what "the same angle" means for
+   every producer and deserves the 2-D file's reasoning, not a round's.
+
+**Locks.** `issue-923-917.test.ts` (T10 → exactly one arc «70°»; «α» alone / «70°» alone unchanged;
+«∠BAS = 70» after «∠SAB = α» → one «70°»; two DIFFERENT wedges at A → two arcs, two places; named +
+90 → knee, no arc; a bare «∠SAB» marker still draws blank; one value stated twice → once) and the fixture
+`pyramid-named-valued-angle-923.geo3.json`.
+
+### ADR-3D-222 — A stated angle is marked where the segments MEET, not where they were named (#917)
+
+**Status:** accepted, 2026-09-07 · fix-round #927 · the #909 remainder · **Requirements:**
+[02b](02b-requirements-3d.md) FR-RD-5 (new) — the honesty invariant *"everything the student stated is
+visible on the figure"* on the angle lane: the mark follows the MEETING, not the naming ·
+**Design:** [04b](04b-design-3d.md), the rendering section
+
+**Context.** The operator, playing round #915 (T3, 2026-09-06): *"if lines intersect, the angle should
+be drawn. in T2 this happens. in T1 they dont intersect that its ok. T3 — should show where the angle is."*
+Measured at `38f7461` and again at `82d87c6`:
+
+```
+T1  תיבה … · הזווית בין A'C לבין BC' היא 70    seg-angle   SKEW (gap 0.397)             scene.angles 0   ✔ honest
+T3  תיבה … · הזווית בין AC' לבין BD' היא 55    seg-angle   CROSS at t = s = 0.500        scene.angles 0   ✘
+T2  תיבה … · הזווית בין AC לבין BA היא 40      vangle      shared endpoint               scene.angles 1   ✔
+    תיבה … · הזווית בין AC לבין BD היא 90      seg-angle   → rightAngles3 emits the KNEE                   ✔ (#909)
+```
+
+The arc lane's two arms both required a shared NAMED endpoint — a `vertex` id to hang the arc on. A
+`seg-angle` pin ([ADR-3D-217](#adr-3d-217)) carries two independent segments and no vertex, so it matched
+neither. The lane was keyed on *how the angle was named*, when what decides whether an arc can be drawn
+is *whether the segments meet* — the same split #383 closed for line↔plane, and the knee in
+`rightAngles.ts` already answers it for the 90° case.
+
+**Decision.**
+
+1. **One crossing helper.** `meetingPoint` in `rightAngles.ts` — a shared endpoint, or a crossing
+   strictly inside both drawn spans; null for skew, parallel, or off the ink — is exported and is the
+   arc's anchor too. Two renderers computing "do these meet" differently is how they drift.
+2. **A third arm in `scene3.ts`.** Every non-right `seg-angle` pin whose segments meet gets the arc at
+   the meeting point, its arms toward the farther endpoint of each segment (the knee's `armDir` rule),
+   oriented to show the stated undirected (≤ 90°) wedge, radius `0.3 ×` the nearest endpoint distance,
+   text through the shared `degText`. Skew or off-ink pairs draw **nothing** — the R³ honesty rule the
+   operator confirmed for T1; the 90° case stays the knee's (#307).
+3. **Not keyed** on the solid, on diagonals, or on `t = 0.5`: any interior crossing is the same case.
+   A shared endpoint never reaches this arm — #909 normalizes all four spellings to `vangle` — so T2's
+   arc is untouched.
+
+**The neighbours, checked.** `angle|segment|plane-run` and the `lineRels` angle rows are drawn by the
+object-angle lane (`objectAngleArc`, ADR-3D-185), which resolves operands to geometry and places the arc
+where they meet — no named-vs-meeting split there. The distance witnesses (ADR-3D-108) are anchored on
+closest points by construction.
+
+**Locks.** `issue-923-917.test.ts` (T3 → one arc «55°», anchored on the true crossing — `meetingPoint`
+within 1e-6 of the box centre, label beside the projected centre; T1 → still zero arcs; T2 unchanged;
+the 90° knee unchanged and no arc; a crossing arc and a vertex arc on one figure, each once) and the
+fixture `box-seg-angle-cross-917.geo3.json`. **Placement, for #918:** a label off the ink along the
+wedge bisector at `1.6r`; the length label should reuse the same "beside, not on" answer.

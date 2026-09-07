@@ -180,6 +180,15 @@ const SEEDED: Record<string, string[]> = {
   // the vec-def that introduced a symbol, so a coordinate-born one had no pin to land in. Green replay
   // (C at (9,1,0)) + no parser drift is exactly the right lock.
   'coord-symbol-value-902.geo3.json': ["תיבה ABCDA'B'C'D'", 'C(p²,1,0)', 'p=3'],
+  // #923 (ADR-3D-221) — #902's own T10, the normal bagrut phrasing: an angle NAMED in part 1 and VALUED
+  // in part 2. Two arc producers each drew the wedge, so «α» and «70°» were painted at one pixel; the
+  // scene now emits one arc per wedge reading the value. Green replay + no drift locks the SEQUENCE; the
+  // one-arc assertion is in issue-923-917.test.ts.
+  'pyramid-named-valued-angle-923.geo3.json': ['פירמידה SABCD שבסיסה ריבוע', '∠SAB = α', 'α = 70'],
+  // #917 (ADR-3D-222) — round #915's T3: two space diagonals that CROSS at the box centre. The stated
+  // angle drove the figure (#909) but the arc lane was keyed on a shared NAME, so nothing was drawn
+  // where they meet.
+  'box-seg-angle-cross-917.geo3.json': ["תיבה ABCDA'B'C'D'", "הזווית בין AC' לבין BD' היא 55"],
 };
 
 if (process.env.GEN_FIXTURES3) {

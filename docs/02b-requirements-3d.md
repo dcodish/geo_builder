@@ -126,6 +126,23 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   `shell/math.tsx`, [ADR-W-040](06w-decisions-workspace.md#adr-w-040).)*
 - **FR-RD-3 (Should)** — **A number appears on the canvas only when FR-SP-4 permits it** — invariant
   across the sampled gauge. This is the rendering face of the same honesty rule.
+- **FR-RD-4 (Must)** — **One arc per wedge; the value wins once stated.** An angle the student marked
+  draws ONE arc at its vertex whatever combination of records carries it — a name («∠SAB = α»), a value
+  («∠SAB = 70»), or both, in either order. The arc reads the **stated value** once one exists («70°») and
+  the **letter** until then («α»); it never prints both, and never two labels at one pixel. A right-angle
+  value draws the textbook knee and no arc, even when the angle was first named. Two genuinely different
+  wedges at one vertex draw two arcs. Suite rule: [ADR-W-045](06w-decisions-workspace.md#adr-w-045).
+  *(Realised — [ADR-3D-221](06b-decisions-3d.md#adr-3d-221), #923; `issue-923-917.test.ts`,
+  `pyramid-named-valued-angle-923.geo3.json`. The identity of a wedge is by point ids; the
+  alternate-spelling collapse 2-D does by ray direction is filed separately.)*
+- **FR-RD-5 (Must)** — **A stated angle is marked where the segments MEET.** «הזווית בין AC' לבין BD' היא
+  55» on segments that genuinely cross draws the arc + value at the crossing, exactly as a shared-vertex
+  angle draws it at the vertex; a stated angle between segments that are **skew**, parallel, or would
+  meet only beyond the drawn ink draws **nothing** on the canvas (the R³ honesty rule — a mark there
+  would assert an intersection the figure does not have) and stays in the data panel. A stated 90° is
+  the knee, never an arc labelled 90°. The mark follows the meeting, not the spelling. *(Realised —
+  [ADR-3D-222](06b-decisions-3d.md#adr-3d-222), #917; `issue-923-917.test.ts`,
+  `box-seg-angle-cross-917.geo3.json`.)*
 
 ## Coverage
 

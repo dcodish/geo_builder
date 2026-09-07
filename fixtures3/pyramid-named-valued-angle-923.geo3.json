@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-09-07T18:52:18.844Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "פירמידה SABCD שבסיסה ריבוע",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramid4g",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "S"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "∠SAB = α",
+      "cmds": [
+        {
+          "type": "angle-mark",
+          "vertex": "A",
+          "p": "S",
+          "q": "B",
+          "label": "α"
+        }
+      ]
+    },
+    {
+      "utterance": "α = 70",
+      "cmds": [
+        {
+          "type": "symbol-value",
+          "symbol": "α",
+          "value": 70
+        }
+      ]
+    }
+  ]
+}

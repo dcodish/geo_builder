@@ -115,6 +115,14 @@ normals** rather than a painter's-algorithm approximation. `scene3.ts` is pure a
 `Figure3.tsx` mounts it. Vector notation (arrows, pairs) is `notation.ts`; general math text comes from
 the shared [`shell/math.tsx`](04w-design-shell.md).
 
+**The stated-angle arc lane ([ADR-3D-221](06b-decisions-3d.md#adr-3d-221), [ADR-3D-222](06b-decisions-3d.md#adr-3d-222)).**
+Vertex arcs are ONE map keyed by wedge (vertex + the unordered ray pair); every producer — `vangle` pins,
+shared-apex `angle-seg-eq` claims, `angleMarks` — feeds it and it emits once per wedge, reading `degText`
+(the value once stated, the letter until then; the same rule the object-angle lane uses). A stated angle
+between two independent segments (`seg-angle`) is anchored on `meetingPoint` from `rightAngles.ts` — the
+one answer the knee uses for "do these meet" — and draws nothing for skew or off-ink pairs. `wedgeArc` is
+the one arc geometry (13 points, `r = 0.3·min arm`, label on the bisector at `1.6r`).
+
 ## Known gaps
 
 Recorded here because a design doc that omits its weakest properties is not describing the system.
