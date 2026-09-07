@@ -8236,3 +8236,63 @@ within 1e-6 of the box centre, label beside the projected centre; T1 → still z
 the 90° knee unchanged and no arc; a crossing arc and a vertex arc on one figure, each once) and the
 fixture `box-seg-angle-cross-917.geo3.json`. **Placement, for #918:** a label off the ink along the
 wedge bisector at `1.6r`; the length label should reuse the same "beside, not on" answer.
+
+### ADR-3D-223 — The coordinate definition joins the uplift chokepoint; the solid noun is escalated (#924)
+
+**Status:** accepted, 2026-09-07 · fix-round #927 · arm 1 of the plan delivered; arm 2 escalated (a
+ruling collision, below) · **Requirements:** [02b](02b-requirements-3d.md) FR-SP-8 (new) — case in
+labels: where the grammar uplifts, where it teaches · **Design:** [04b](04b-design-3d.md), the parser
+section — the normalisation seam
+
+**Context.** The operator, playing #902's sheet (T1, 2026-09-07): *"if I copy-paste C(p²,1,0) it works
+immediately; if I use the power button from symbols, it took a while indicating it perhaps escalated to
+the LLM."* The session log settles it — the palette was innocent, the case was not:
+
+```
+07:29:51  parser ok             'C(p²,1,0)'
+07:31:42  parser not-understood 'c(p²,0,1)'   →  07:31:44  llm ok → ['C(p²,0,1)']     ← the wait
+```
+
+[ADR-3D-039](#adr-3d-039)'s `upliftLowercaseLabels` (#181) lifts a lowercase run only after an ANCHOR
+that proves it is a label, because 3-D has case-significant tokens 2-D lacks (axes x/y/z, parameters
+k/m/t, vector names u/v/w, R vs r, ℓ). [ADR-3D-092](#adr-3d-092)'s convention nudge (#353) teaches the
+un-anchored remainder — but only 2–4-character runs, by design (*"a single lowercase letter is far
+likelier a vector/parameter/coordinate"*). Measured at `82d87c6`, the class as the App sees it:
+
+```
+c(p²,0,1) · c(p,1,0) · a(1,2,3)        not-handled, nudge candidate null          → LLM   (single letter)
+תיבה abcda'b'c'd' · פירמידה sabcd       not-handled, candidate none / «abcda'B'C'D'» → LLM   (long / primed run)
+ab = 5 · ac ⊥ bd · קובייה abcd · …      not-handled, nudge candidate PARSES         → taught, no LLM
+```
+
+**Decision — arm 1, the coordinate definition.** A run at the START of the sentence (after an optional
+«נתונה») followed by a 3-tuple is a label: «c(p²,0,1)» → «C(p²,0,1)», at the one chokepoint, never a
+rule. Anchored to the sentence start on purpose: a parametric line carries `t(m-2,m,m+2)` mid-sentence
+and that `t` is the parameter (prod: «ישר l x=(1,2,3)+t(m-2,m,m+2)»). The lone axis letters stay
+lowercase as in every other position. This meets #181's own criterion (the anchor proves the run is a
+label), so it uplifts silently like «∠sdb», and it is exactly the row #353 could not reach.
+
+**Arm 2 — the solid noun — is NOT built, and the reason is a ruling collision, not a code problem.**
+The plan (approved 2026-09-07) armed «תיבה abcda'b'c'd'» to parse like its uppercase twin. The standing
+lock `lowercase-nudge.test.ts` (#498, on the #353 ruling *"insist on uppercase and give a message"*)
+asserts the opposite for the same input shape: *"a lowercase run with NO uplift anchor gets the nudge,
+not a silently auto-lettered solid"* — «תיבה abcd» must be TAUGHT. Both are the operator's words; a
+round does not pick between them. Escalated on #924 with the question. What that leaves: «תיבה abcd»
+and «קובייה abcd» are taught (no LLM call, as today); the long or primed solid runs the nudge cannot
+lift («תיבה abcda'b'c'd'», «פירמידה sabcd») still reach the LLM until the ruling lands — recorded in
+`issue-924.test.ts` as a measurement, not a lock.
+
+**Arm 3 — the un-anchored operand runs** («ab = 5», «ac ⊥ bd», «הזווית בין ac לבין ab») — was armed
+only if the exclusion set could be made total, and the measurement shows a better answer already in
+place: the #353 nudge teaches every one of those rows with the corrected spelling and never pays for an
+LLM call. Not touched.
+
+**Guards (from the prod log, not imagined):** `l ⊥ π`, `ℓ ∥ π1`, `l ⊥BCK`, `u = (k-1,k,3)`, `k = 2`,
+`t>0`, `AE=t*AS`, `D(3,p,0)`, `M(k,1,3)`, «נקודה x», «מישור π: 3x+my+(m+6)z+4=0», «CD = v»,
+«הזווית בין AB לבין v היא 60», the vector namings — all byte-unchanged through `normalize3`.
+
+**Locks.** `issue-924.test.ts`: arm 1 against its uppercase twins (primed, with the «נתונה» prefix, the
+#181 noun form unchanged); the mid-sentence `t(…)` and `x(…)` non-uplifts; the operator's row through
+the real store (C at (9, 1, 0), no escalation); the prod guards; arm 2's standing behaviour and its
+escaping rows recorded; arm 3's division of labour recorded (does not parse as typed, the nudge candidate
+parses).

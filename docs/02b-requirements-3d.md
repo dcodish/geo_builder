@@ -160,6 +160,19 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it.
   *(Realised — [docs/20](20-space-vectors-tool.md) §14, V8 complete. Documented remaining niches are
   low-frequency and coordinate-expressible: orthoscheme and the dihedral face↔base angle.)*
+- **FR-SP-8 (Must)** — **Case in labels: where the anchor proves a run is a label, it is read as one;
+  elsewhere the convention is taught, never guessed.** Point labels are uppercase by convention, and 3-D
+  carries case-significant tokens 2-D lacks (axes x/y/z, parameters k/m/t, vector names u/v/w, R vs r,
+  ℓ), so a blanket case-fold is not available. A lowercase run **parses like its uppercase twin** in a
+  position only a label can occupy — after the angle glyph/word or a point/vertex noun (#181), or at the
+  head of a coordinate definition («c(p²,0,1)», #924). An un-anchored lowercase run («ab = 5»,
+  «ac ⊥ bd», «תיבה abcd») is **taught** — the corrected spelling is shown (#353) — and is never sent to
+  the paid fallback. The case-significant lanes are byte-unchanged: `t(m-2,m,m+2)` in a line equation is
+  the parameter, «נקודה x» stays the student's to disambiguate. *(Realised —
+  [ADR-3D-039](06b-decisions-3d.md#adr-3d-039), [ADR-3D-092](06b-decisions-3d.md#adr-3d-092),
+  [ADR-3D-223](06b-decisions-3d.md#adr-3d-223); `lowercase-labels.test.ts`, `lowercase-nudge.test.ts`,
+  `issue-924.test.ts`. Whether a SOLID noun should become an anchor — «תיבה abcda'b'c'd'», a run the
+  nudge cannot lift — is escalated on #924: two rulings collide there.)*
 
 ## Non-goals
 
