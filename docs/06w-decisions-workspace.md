@@ -2228,3 +2228,33 @@ change. Had it required re-ordering the fold, this would have been an escalation
 **Not in scope, recorded.** The plan's "check the same sweep" items were investigation, not licence: a
 length on a deleted point in 3-D was measured to reach the same report through the same seam
 (`issue-926.test.ts`, the last case) and so is covered; a general dependency audit was not started.
+
+## ADR-W-045 — An angle arc reads ONE text per wedge: the value once stated, the letter until then (#923)
+
+**Status:** accepted, 2026-09-07 · fix-round #927 · operator ruling 2026-09-07 · **Requirements:**
+[02b](02b-requirements-3d.md) FR-RD-4 (new); 2-D already keeps it structurally (`wedgeOf` + `perVertex`
+rank in `src/render/scene.ts`, ADR-167 Am.) · **Design:** [04b](04b-design-3d.md), the rendering section;
+2-D: none (already built)
+
+**Context.** The 3-D builder painted «α» and «70°» at one pixel for an angle the student first named and
+then valued (#923). 2-D, measured on the same sequence, already reads the way the operator ruled:
+
+```
+משולש ABC · ∠ABC = α           → labels.angles [{B,A,C,"α"}]
+משולש ABC · ∠ABC = α · α = 70  → labels.angles [{B,A,C,"70°"}]
+משולש ABC · ∠ABC = 70          → labels.angles [{B,A,C,"70°"}]
+```
+
+**Decision — the suite rule, so the two cannot drift again.** In every builder, an angle the student
+marked draws **one arc per wedge**, and its text is **the stated value once one exists** («70°»), **the
+letter until then** («α»), never both concatenated and never two labels. The operator's reason is the
+shape of the exam: *"in part 1 of the question the user needs to work with the parameter α, and in a
+later part α is given"* — two moments of one question, and the canvas follows the student to the moment
+they are in. A right-angle value draws the textbook knee and no arc in either builder. Re-derived per
+tree, never shared: 2-D as built, 3-D in [ADR-3D-221](06b-decisions-3d.md#adr-3d-221).
+
+**Left open, on purpose.** *Which spellings name the same wedge* is a per-builder question: 2-D matches
+by ray DIRECTION (±1.5°) because F7/REN-9 taught it that «∠AFD» and «∠GFH» at one corner are one angle;
+3-D matches by point ids, and the alternate-spelling case is reachable there (ADR-3D-221 §4, filed
+separately). The toggle chip letting a student flip an arc between the letter and the value is #925 —
+a capability, built on this rule, not part of it.

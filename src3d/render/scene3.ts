@@ -19,7 +19,7 @@ import type { Construction3, Id, Operand3, Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
 import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
-import { isRightAngleValue, rightAngles3 } from './rightAngles';
+import { isRightAngleValue, meetingPoint, rightAngles3 } from './rightAngles';
 
 export interface ScenePoint3 {
   id: Id;
@@ -575,65 +575,88 @@ export function buildScene3(
     wAngles.push({ pts, label, text: `${g.deg}°` });
   }
 
-  // A STATED angle between two segments from a shared vertex (ADR-3D-032 Am.) gets an
-  // arc + its value at the vertex — marked only because the student said it (the 2-D
-  // stated-angle rule). Sources: vangle scalar pins (driving givens) and recorded
-  // shared-apex angle claims (incl. paramGivens — they live in claims too).
+  /**
+   * What an angle arc READS — one rule for every arc lane in this builder (the vertex arcs here, the
+   * object-angle arcs below): a STATED value IS the given, so it prints; a NAMED angle draws its name
+   * and leaves the number to the panel (the #371 / ADR-3D-030 Am. 2 knowledge rule). #923 (operator
+   * ruling 2026-09-07, ADR-W-045): once a named angle is given a value, the VALUE wins — «∠SAB = α»
+   * then «α = 70» reads «70°», not «α = 70°» and not both — the arc follows the student to the part of
+   * the question they are in.
+   */
+  const degText = (deg: number | undefined, label: string | undefined): string => (deg !== undefined ? `${deg}°` : (label ?? ''));
+  /** The vertex-arc geometry: a 13-point arc of radius `r` from arm `u1` to arm `u2` about `v`, label on the bisector. */
+  const wedgeArc = (v: Vec3, u1: Vec3, u2: Vec3, r: number): { pts: Vec3[]; label: Vec3 } => {
+    const pts: Vec3[] = [];
+    for (let s = 0; s <= 12; s++) {
+      const m = add3(scale3(u1, 1 - s / 12), scale3(u2, s / 12));
+      if (norm3(m) < 1e-9) continue;
+      pts.push(add3(v, scale3(normalize3(m), r)));
+    }
+    const bis = add3(u1, u2);
+    return { pts, label: add3(v, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : u1, r * 1.6)) };
+  };
+
+  // ---- ONE WEDGE, ONE ARC (#923, ADR-3D-221 / ADR-W-045) ---------------------------------------------
+  // A vertex arc is keyed by its WEDGE — the vertex and the unordered ray pair — and every producer
+  // feeds the same map: the stated values (vangle scalar pins — driving givens — and recorded shared-apex
+  // angle claims, incl. paramGivens, which live in claims too; ADR-3D-032 Am.) and the #94 named-angle
+  // MARKERS («∠SDB» / «∠SDB = α», a pedagogical arc carrying the label and no number). Two independent
+  // loops used to push into `wAngles` with byte-identical geometry, so an angle that carried both a name
+  // and a value — the normal bagrut phrasing — was stroked twice with «α» and «70°» at one pixel. The map
+  // emits once per wedge with `degText`'s reading. Keyed on point ids, as both loops always were; the
+  // direction-keyed identity 2-D uses (`wedgeOf`, F7/REN-9) is deliberately NOT adopted here — measured
+  // and recorded in ADR-3D-221, not armed.
   {
-    const stated = [
-      ...c.scalarPins.flatMap((sp) => (sp.kind === 'vangle' ? [{ vertex: sp.vertex, p: sp.p, q: sp.q, deg: sp.deg }] : [])),
-      ...c.claims.flatMap((cl) =>
-        cl.type === 'angle-seg-eq' && cl.a1 === cl.a2 ? [{ vertex: cl.a1, p: cl.b1, q: cl.b2, deg: cl.deg }] : [],
-      ),
-    ];
-    const seen = new Set<string>();
-    for (const g of stated) {
-      // #307: a right angle is drawn as a KNEE (the textbook mark), not an arc labelled "90°"
-      if (isRightAngleValue(g.deg)) continue;
-      const key = `${g.vertex}|${[g.p, g.q].sort().join('|')}|${g.deg}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const v = positions.get(g.vertex);
-      const p = positions.get(g.p);
-      const q = positions.get(g.q);
+    const wedges = new Map<string, { vertex: Id; p: Id; q: Id; deg?: number; label?: string }>();
+    const wedgeOf = (vertex: Id, p: Id, q: Id) => {
+      const key = `${vertex}|${[p, q].sort().join('|')}`;
+      let w = wedges.get(key);
+      if (!w) wedges.set(key, (w = { vertex, p, q }));
+      return w;
+    };
+    for (const sp of c.scalarPins) if (sp.kind === 'vangle') wedgeOf(sp.vertex, sp.p, sp.q).deg ??= sp.deg;
+    for (const cl of c.claims) if (cl.type === 'angle-seg-eq' && cl.a1 === cl.a2) wedgeOf(cl.a1, cl.b1, cl.b2).deg ??= cl.deg;
+    for (const mk of c.angleMarks) {
+      const w = wedgeOf(mk.vertex, mk.p, mk.q);
+      w.label ??= mk.label ?? '';
+    }
+    for (const w of wedges.values()) {
+      // #307: a right angle is drawn as a KNEE (rightAngles3), not an arc labelled "90°" — and since the
+      // value wins, a named angle later valued at 90° is a knee too, not a knee UNDER an «α» arc.
+      if (w.deg !== undefined && isRightAngleValue(w.deg)) continue;
+      const v = positions.get(w.vertex);
+      const p = positions.get(w.p);
+      const q = positions.get(w.q);
       if (!v || !p || !q) continue;
       const d1 = dist3(p, v);
       const d2 = dist3(q, v);
       if (d1 < 1e-9 || d2 < 1e-9) continue;
-      const u1 = normalize3(sub3(p, v));
-      const u2 = normalize3(sub3(q, v));
-      const r = Math.min(d1, d2) * 0.3;
-      const pts: Vec3[] = [];
-      for (let s = 0; s <= 12; s++) {
-        const m = add3(scale3(u1, 1 - s / 12), scale3(u2, s / 12));
-        if (norm3(m) < 1e-9) continue;
-        pts.push(add3(v, scale3(normalize3(m), r)));
-      }
-      const bis = add3(u1, u2);
-      const label = add3(v, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : u1, r * 1.6));
-      wAngles.push({ pts, label, text: `${g.deg}°` });
+      wAngles.push({ ...wedgeArc(v, normalize3(sub3(p, v)), normalize3(sub3(q, v)), Math.min(d1, d2) * 0.3), text: degText(w.deg, w.label) });
     }
   }
 
-  // #94 — named-angle MARKERS (`∠SDB` / `∠SDB = α`): a pedagogical arc at the vertex, drawing NO numeric
-  // value on the canvas (a single-seed number would violate the ADR-3D-030 knowledge rule — the measure is
-  // a seed-invariant panel derivation). The arc carries the display LABEL (α) when one was named, else blank.
-  for (const mk of c.angleMarks) {
-    const v = positions.get(mk.vertex), p = positions.get(mk.p), q = positions.get(mk.q);
-    if (!v || !p || !q) continue;
-    const d1 = dist3(p, v), d2 = dist3(q, v);
-    if (d1 < 1e-9 || d2 < 1e-9) continue;
-    const u1 = normalize3(sub3(p, v)), u2 = normalize3(sub3(q, v));
-    const r = Math.min(d1, d2) * 0.3;
-    const pts: Vec3[] = [];
-    for (let sIdx = 0; sIdx <= 12; sIdx++) {
-      const mid = add3(scale3(u1, 1 - sIdx / 12), scale3(u2, sIdx / 12));
-      if (norm3(mid) < 1e-9) continue;
-      pts.push(add3(v, scale3(normalize3(mid), r)));
-    }
-    const bis = add3(u1, u2);
-    const label = add3(v, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : u1, r * 1.6));
-    wAngles.push({ pts, label, text: mk.label ?? '' });
+  // ---- A STATED ANGLE BETWEEN TWO SEGMENTS THAT CROSS (#917, ADR-3D-222) ------------------------------
+  // The arc's anchor is where the segments MEET, not a named vertex. A `seg-angle` pin (ADR-3D-217, #909)
+  // carries two independent segments and no vertex id, so neither producer above could see it — «הזווית
+  // בין AC' לבין BD' היא 55», two space diagonals crossing dead centre, drew nothing. The meeting point is
+  // the SAME answer the knee uses (`meetingPoint` in rightAngles.ts — a shared endpoint, or a crossing
+  // strictly inside both drawn spans); skew, parallel, or a crossing off the ink draws NOTHING — the R³
+  // honesty rule the operator confirmed for the skew pair. A right angle stays the knee's. A shared
+  // endpoint never reaches here (#909 normalizes all four spellings to `vangle`), so the arc above is
+  // untouched. Not keyed on the solid, on diagonals, or on where along the segments they cross.
+  for (const sp of c.scalarPins) {
+    if (sp.kind !== 'seg-angle' || isRightAngleValue(sp.deg)) continue;
+    const x = meetingPoint({ a: sp.a1, b: sp.b1, c: sp.a2, d: sp.b2 }, positions, radius);
+    if (!x) continue;
+    const ends = [sp.a1, sp.b1, sp.a2, sp.b2].map((id) => positions.get(id)!);
+    /** the arm of a segment seen from the crossing: toward its farther endpoint (the knee's `armDir` rule) */
+    const arm = (e1: Vec3, e2: Vec3) => normalize3(sub3(dist3(e1, x) >= dist3(e2, x) ? e1 : e2, x));
+    const u1 = arm(ends[0], ends[1]);
+    let u2 = arm(ends[2], ends[3]);
+    if (dot3(u1, u2) < 0) u2 = scale3(u2, -1); // the stated angle is the undirected (≤ 90°) one — show that wedge
+    const r = Math.min(...ends.map((e) => dist3(e, x))) * 0.3;
+    if (r < 1e-9) continue;
+    wAngles.push({ ...wedgeArc(x, u1, u2, r), text: degText(sp.deg, undefined) });
   }
 
   /**
@@ -646,10 +669,7 @@ export function buildScene3(
   if (showObjectAngles) {
     const atA = (id: Id) => positions.get(id) ?? null;
     const absA = { lines: resolved.lines, planes: resolved.planes };
-    const degText = (deg: number | undefined, label: string | undefined): string =>
-      // a STATED value IS the given, so it may print; a NAMED angle draws its name and leaves the
-      // number to the panel — the #371 / ADR-3D-030 Am. 2 knowledge rule the vertex marks follow
-      deg !== undefined ? `${deg}°` : (label ?? '');
+    // `degText` — the one reading rule, hoisted above so the vertex arcs and these share it (#923)
     const pairs: { a: Operand3; b: Operand3; text: string; deg?: number }[] = [
       ...c.claims.flatMap((cl) =>
         cl.type === 'plane-rel' && cl.rel === 'angle'

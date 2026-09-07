@@ -46,7 +46,7 @@ export interface RightAngle3 {
 }
 
 /** A perpendicularity between two SEGMENTS, named by their endpoint ids. */
-interface SegPair {
+export interface SegPair {
   a: Id;
   b: Id;
   c: Id;
@@ -83,8 +83,11 @@ function planeFromIds(ids: Id[], pos: Positions3): ResolvedPlane | null {
  * Where two segments genuinely share a point — a shared endpoint, or a true crossing
  * strictly inside both. Null for skew, parallel, or a crossing off the drawn segments:
  * marking those would assert an intersection the figure does not have.
+ *
+ * Exported (#917, ADR-3D-222): the stated-angle ARC in `scene3.ts` hangs on the same answer as the
+ * knee here. One function, so the two renderers can never disagree about whether "the angle is here".
  */
-function meetingPoint(seg: SegPair, pos: Positions3, scale: number): Vec3 | null {
+export function meetingPoint(seg: SegPair, pos: Positions3, scale: number): Vec3 | null {
   const shared = [seg.a, seg.b].filter((id) => id === seg.c || id === seg.d);
   if (shared.length === 1) return pos.get(shared[0]) ?? null;
   if (shared.length > 1) return null; // the same segment twice — no angle to mark
