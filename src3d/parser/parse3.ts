@@ -68,9 +68,21 @@ function upliftLowercaseLabels(s: string): string {
   const LIST = String.raw`[A-Za-z][A-Za-z0-9']{0,5}(?:\s*(?:,|ו-?|\band\b)\s*[A-Za-z][A-Za-z0-9']{0,5})*(?![A-Za-z])`;
   const upTokens = (list: string, en: boolean) =>
     list.replace(/\b[a-z][a-z0-9']*/g, (t) => (/^[xyz]$/.test(t) || (en && EN_STOP.has(t)) ? t : t.toUpperCase()));
+  // #924 (ADR-3D-223): one more POSITION where only a label can stand, joining the chokepoint rather
+  // than a second rule — the coordinate definition: a run at the START of the sentence followed by a
+  // 3-tuple, «c(p²,0,1)». Anchored to the sentence start on purpose: a parametric line carries
+  // `t(m-2,m,m+2)` mid-sentence, and that `t` is the parameter. It is the anchor criterion #181 set (the
+  // anchor PROVES the run is a label), so it uplifts silently like «∠sdb». A single letter is exactly what
+  // the #353 convention nudge deliberately leaves alone ("far likelier a vector/parameter/coordinate"),
+  // which is why this row escaped both mechanisms and reached the paid LLM lane. The un-anchored
+  // remainder («ab = 5», «ac ⊥ bd») stays with that nudge, which already teaches it; a lowercase run after
+  // a SOLID noun («תיבה abcd») is likewise taught, not lifted — that is a standing lock
+  // (lowercase-nudge.test.ts, #498/#353), and whether a solid noun should become an anchor is the
+  // operator's call, escalated from #924. The lone axis letters stay theirs to disambiguate, as ever.
   return s
     .replace(new RegExp(String.raw`((?:[∠∡∢]|זו?וית|ה?קודקוד(?:ים)?|ה?נקוד(?:ה|ות))\s*)(${LIST})`, 'g'), (_m, pre: string, list: string) => `${pre}${upTokens(list, false)}`)
-    .replace(new RegExp(String.raw`(\b(?:angle|points?|vert(?:ex|ices))\s+)(${LIST})`, 'gi'), (_m, pre: string, list: string) => `${pre}${upTokens(list, true)}`);
+    .replace(new RegExp(String.raw`(\b(?:angle|points?|vert(?:ex|ices))\s+)(${LIST})`, 'gi'), (_m, pre: string, list: string) => `${pre}${upTokens(list, true)}`)
+    .replace(/^((?:נתונה\s+)?)([a-z]\d*'?)(?=\s*\([^()]*,[^()]*,[^()]*\))/, (m: string, pre: string, id: string) => (/^[xyz]$/.test(id) ? m : `${pre}${id.toUpperCase()}`));
 }
 
 /** Normalise an utterance: strip invisible bidi/format controls, unify primes to `'`, strip vector

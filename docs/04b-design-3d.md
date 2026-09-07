@@ -33,6 +33,14 @@ context-carrying parser has to guess earlier, with less information.
 Consequence for anyone adding a rule: **reach for M1 duality before adding a construct.** It is the most
 productive pattern in this tree precisely because the seam exists.
 
+**The normalisation seam and case ([ADR-3D-039](06b-decisions-3d.md#adr-3d-039), [ADR-3D-223](06b-decisions-3d.md#adr-3d-223)).**
+`normalize3` is the one boundary every rule reads: format controls stripped, primes and minus unified,
+script transitions split — and lowercase labels uplifted by `upliftLowercaseLabels`, the ONE chokepoint,
+only in positions an anchor proves are labels (the angle glyph/word, a point/vertex noun, the head of a
+coordinate definition). New label-demanding positions join that function, never a rule. What no anchor
+proves is left to the #353 convention nudge in `scope3.ts` (`upperCasedLabelCandidate3`, consulted by
+`App3` before the LLM seam), which teaches the spelling rather than guessing it.
+
 ## The solver — a coordinate-injection pivot, not a general CAS
 
 `solve3.ts` handles the case the corpus actually asks for: a gauge-free figure built in the geometric
