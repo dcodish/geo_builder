@@ -2,13 +2,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nextProvider } from 'react-i18next';
 import { App } from './App';
-import { bootSession } from './app/session';
 import { complexI18n } from './i18n';
 import './styles.css';
 
-// Which engine owns the session, and the session already open — read BEFORE the first paint, so the
-// restored figure IS the first paint rather than something that arrives after it (app/session.ts).
-bootSession();
+// A builder opens EMPTY — no session is restored from browser storage (#919, ADR-W-046; operator ruling
+// 2026-09-06: "clean canvas always", one rule for every tool). Durable work is an explicit save to a file.
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -2258,3 +2258,40 @@ by ray DIRECTION (±1.5°) because F7/REN-9 taught it that «∠AFD» and «∠G
 3-D matches by point ids, and the alternate-spelling case is reachable there (ADR-3D-221 §4, filed
 separately). The toggle chip letting a student flip an arc between the letter and the value is #925 —
 a capability, built on this rule, not part of it.
+
+## ADR-W-046 — A builder opens EMPTY; durable work is an explicit save to a file (#919)
+
+**Status:** accepted, 2026-09-07 · fix-round #927 · operator ruling 2026-09-06 (`/decisions` pass:
+*"clean canvas always"*) · **Requirements:** [02w](02w-requirements-workspace.md) FR-SL-5 (new — the suite
+rule); [02](02-requirements.md) FR-HS-4 **withdrawn** · **Design:** none (a seam is removed, not built) ·
+Cross-referenced from [ADR-CX-038](06d-decisions-complex.md#adr-cx-038)
+
+**Context.** The operator, playing round #915 (2026-09-06): *"complex builder — when i move to this tool
+from another tool, the last values are always there and not a clean canvas like in 2d and 3d tools."*
+Measured at `38f7461`: `src-complex/app/session.ts` restored `localStorage['complex-proto-session']` on
+every load — re-submitting every stored line through the grammar — and wrote it back on every store
+change; the product switcher is a plain `<a href>`, so arriving from another tool IS a page load and
+indistinguishable from F5. Neither sibling does this: `src/` touches `localStorage` only for the
+one-time About dialog flag, `src3d/` not at all. The harm was more than clutter — the next line a student
+typed was evaluated against a figure they did not build.
+
+**The class.** Not "complex restores": *the suite never decided whether a builder survives a reload, so
+each product answered differently by accident.* The complex builder honoured a written requirement
+(FR-HS-4, *"persist the current construction across page reloads"*) that the other two never realised.
+
+**Decision — clean canvas always, one rule for every builder.** A builder opens empty on every load,
+whether reached by the switcher, a bookmark, or a refresh. Durable work is the explicit save/load to a
+file (FR-HS-10 / FR-SL-1…4), which every builder already has. The restore seam is **deleted whole** —
+`session.ts` and its `main.tsx` call, the write half included (a subscription filling a key nothing
+reads would read as intentional to the next person); nothing is left disabled. `hydrateSession`, shared
+with the file-load path, is untouched.
+
+**What this withdraws, deliberately.** FR-HS-4 is struck: the operator was told it was a written
+requirement and chose this anyway (the session had recommended the refresh-only option on its strength).
+An accidental refresh mid-question now loses the lines in the complex builder, as it always has in 2-D
+and 3-D. Recorded plainly so nobody re-opens it as an oversight.
+
+**Locks.** `src-complex/__tests__/no-session-restore-919.test.ts`: a populated session key is ignored on
+boot (the store imports empty) and no product tree reads or writes a session key (a grep guard, so
+`src-analytic/` cannot inherit the coin flip); the fixtures net (`fixtures.test.ts`) stays the proof that
+file load still works.
