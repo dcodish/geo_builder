@@ -24,6 +24,8 @@ function makeDeps() {
     cleared: 0,
     busy: [] as boolean[],
     resolved: 0,
+    /** #943: [raw engine error, the student's own sentence] as handed to the display layer. */
+    explained: [] as [string, string | undefined][],
   };
   const deps: SubmitDeps = {
     t: (key, opts) => (opts ? `${key}:${JSON.stringify(opts)}` : key),
@@ -44,7 +46,7 @@ function makeDeps() {
     nextPaint: async () => {},
     resolveAfterCommit: () => calls.resolved++,
     llmAbortRef: { current: null },
-    explainError: (raw) => raw ?? '',
+    explainError: (raw, said) => { calls.explained.push([raw ?? '', said]); return raw ?? ''; },
   };
   const notes = () => calls.notes.filter(Boolean); // drop the pipeline's initial '' reset
   return { deps, calls, notes };
@@ -379,5 +381,32 @@ describe('submit pipeline — a restated fact succeeds, adds no row, and says so
     await runSubmit('נקודה G על AD', deps);
     expect(notes()).toEqual([]);
     expect(useGeoStore.getState().facts.length).toBeGreaterThan(before);
+  });
+});
+
+/**
+ * #943 (ADR-487) — THE REFUSAL PATH THIS FIX WAS REPORTED ON.
+ *
+ * A contradicting line is refused BEFORE it becomes a fact: the pipeline keeps the text in the box and
+ * shows the reason as an input note. So the fact-list lookup the error BANNER uses has nothing to find
+ * here, and the first cut of #943 left this call site with one argument on the reasoning that "there is
+ * no fact yet" — which is true and beside the point. The sentence needs no lookup at all on this path:
+ * it is the text the student just typed. Found by driving the operator's own sequence in a browser and
+ * reading the screen (the message was still the old one); the unit tests were all green.
+ */
+describe('#943 — a pre-commit refusal quotes the sentence that was refused', () => {
+  it('the utterance reaches the display layer as `said`', async () => {
+    const { deps: d1 } = makeDeps();
+    for (const u of ['משולש ABC', 'זוית B ישרה', 'ריבוע DEFG חסום במשולש ABC']) await runSubmit(u, d1);
+
+    const { deps, calls, notes } = makeDeps();
+    await runSubmit('D = חיתוך AB ו-BC', deps);
+
+    expect(notes().length, 'the refusal is shown as an input note').toBeGreaterThan(0);
+    expect(calls.cleared, 'the text stays so the student can edit it').toBe(0);
+    expect(calls.explained.length, 'the engine string went through the humanising layer').toBeGreaterThan(0);
+    const [raw, said] = calls.explained[calls.explained.length - 1];
+    expect(raw, 'the engine reason').toMatch(/over-constrained|cannot hold/);
+    expect(said, 'and the student’s own sentence as the subject').toBe('D = חיתוך AB ו-BC');
   });
 });

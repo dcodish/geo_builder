@@ -9637,3 +9637,22 @@ constraints, plus a minimal-conflict search for the case where several givens jo
 chokepoint change with its own ADR and its own session, and the operator ruled it must not gate this
 half. #943 stays open for it. It is explicitly **not** to be bolted onto `humanizeError`, which is
 figure-free by design (docs/17 §3 — no second enumeration).
+
+**Amendment 1 (2026-09-08, same round) — the reported case takes a THIRD path, and the first cut missed
+it.** This ADR wired the two display sites that read the fact list: the error banner and the broken-step
+row. `submitPipeline`'s call site was deliberately left with one argument, on the reasoning that text
+which produced nothing has no fact yet. True, and beside the point: **a contradicting line is refused
+BEFORE it becomes a fact** — the pipeline keeps the text in the box and shows the reason as an input
+note — so that is the path the operator's own sequence actually takes, and the fact-list lookup has
+nothing to find there. The sentence needs no lookup at all on that path; it is the text they just typed.
+
+Every unit test was green and the message on screen was still the old one. It was found by driving the
+reported sequence in a real browser and READING the result — the mechanism was verified and the surface
+was not, which is the failure mode this repo keeps paying for. The sweep over the other refusal surfaces
+came back clean: every other `setInputNote` uses a dedicated key whose subject is already something the
+student typed (a circle name, a noun, a vertex, a symbol); this is the only site that routes a raw engine
+string through the humanising layer.
+
+Locked in `src/app/__tests__/submitPipeline.test.ts` — the operator's sequence through the real pipeline,
+asserting the engine reason AND the sentence reach the display layer, that the note is shown, and that the
+text is kept so the line can be edited.
