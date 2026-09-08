@@ -1293,12 +1293,29 @@ export const emptyConstruction3 = (): Construction3 => ({
  *
  * Derived rather than enumerated, so a fourth symbol kind reaches every surface by adding it here
  * (`src3d/CLAUDE.md`: *an enumeration is not a rule*).
+ *
+ * #939 ([ADR-3D-230](docs/06b-decisions-3d.md#adr-3d-230)) — AND THE DERIVATION IS FROM THE ADDRESS
+ * REGISTRY, so the two cannot drift. This used to list three of {@link symbolOwnersOf}'s six owner
+ * kinds by hand, and the split was documented as deliberate: *"`figureSymbolsOf` stays the DISPLAY
+ * registry; this is the ADDRESS registry, wider by the two kinds a student can name but the panel does
+ * not price."* Measured, it had grown to THREE unpriced kinds — a named component («D(3,p,0)», #814),
+ * an angle letter («∠SAB = α»), and an on-segment rider's ratio («SE = t·SA», #921) — and a student
+ * who wrote «t = 1/2» saw the letter nowhere afterwards while «p = 3» from the coordinate lane
+ * survived. Two lanes of one product disagreeing about whether a valued symbol still exists.
+ *
+ * A letter the student bound is displayable, whatever lane consumed it. What varies is only HOW it is
+ * priced, and that lives with the panel (`dataView`) — one place per owner kind, dispatching on the
+ * kind this function no longer has to know about.
  */
 export function figureSymbolsOf(c: Construction3): string[] {
   const out = new Set<string>();
   for (const vd of c.vecDefs) if (vd.symbol) out.add(vd.symbol);
   for (const s of pinSymsOf(c)) out.add(s);
   if (c.param) out.add(c.param);
+  // The three kinds the address registry knew and the panel did not price (#939).
+  for (const b of c.partialNames) out.add(b.sym);
+  for (const b of c.riderNames) out.add(b.sym);
+  for (const m of c.angleMarks) if (m.label) out.add(m.label);
   return [...out];
 }
 
@@ -1376,8 +1393,10 @@ export const vecDefOfSymbol = (c: Construction3, sym: string): number => c.vecDe
  * name binding is not a solver, so a letter may be both a component name and a pivot symbol and the
  * value simply reaches both.
  *
- * `figureSymbolsOf` stays the DISPLAY registry (symbols with a solved value to print); this is the
- * ADDRESS registry, wider by the two kinds a student can name but the panel does not price.
+ * `figureSymbolsOf` is the DISPLAY registry and is DERIVED from this one (#939/ADR-3D-230): every
+ * letter a student can address is a letter the panel prices. The two used to differ, and the
+ * difference was a defect rather than a design — «t = 1/2» vanished from the panel while «p = 3»
+ * survived, because the display side listed three of the six owner kinds by hand.
  */
 export type SymbolOwner =
   | { kind: 'vec-def'; def: number }

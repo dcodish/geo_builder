@@ -17,8 +17,8 @@
 import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
 import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
-import { figureSymbolsOf } from './types';
-import { angleBetweenOperands, containmentDeviation, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
+import { figureSymbolsOf, symbolOwnersOf } from './types';
+import { angleBetweenOperands, componentValue, containmentDeviation, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import type { Construction3, Id, MutualRel3, Operand3, Positions3 } from './types';
 
 /** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
@@ -1118,7 +1118,55 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       params.push(text ? { sym, text: `${sym} = ${text}`, open: false } : { sym, text: `${sym} = ?`, open: true });
       continue;
     }
-    const vals = resolved.map((r) => r.pivot?.pinSymbols?.[sym]);
+    /**
+     * #939 ([ADR-3D-230](docs/06b-decisions-3d.md#adr-3d-230)) — the three owner kinds the panel did
+     * not price. Each is read from the SAME sampled resolutions the rest of this loop uses, so the
+     * seed-stability gate below applies unchanged: an undetermined letter still reads `?` and `open`,
+     * in every lane. No second sampler, and no second registry — {@link symbolOwnersOf} is asked what
+     * the letter denotes, exactly as every command that resolves a letter does.
+     */
+    const owners = symbolOwnersOf(c, sym);
+    const priced = owners.length > 0 && !owners.some((o) => o.kind === 'pin-sym' || o.kind === 'vec-def')
+      ? resolved.map((r) => {
+          const at = (id: Id) => r.positions.get(id);
+          for (const o of owners) {
+            if (o.kind === 'rider') {
+              // The rider's own parameter, read off the drawn figure: how far along its host it sits.
+              // `fromB` says the student measured from the far end, so the letter is 1 − that.
+              const def = c.points.get(o.id);
+              if (def?.kind !== 'on-segment') continue;
+              const a = at(def.a);
+              const b = at(def.b);
+              const e = at(o.id);
+              if (!a || !b || !e) continue;
+              const ab = sub3(b, a);
+              const len2 = dot3(ab, ab);
+              if (!(len2 > 1e-12)) continue;
+              const t = dot3(sub3(e, a), ab) / len2;
+              return o.fromB ? 1 - t : t;
+            }
+            if (o.kind === 'component') {
+              // #814's own resolver, so the panel and the sign gate cannot disagree about the value.
+              const v = componentValue(c, o.target, o.axis, at);
+              if (v !== undefined) return v;
+            }
+            if (o.kind === 'angle') {
+              const m = o.marks[0];
+              const V = at(m.vertex);
+              const P = at(m.p);
+              const Q = at(m.q);
+              if (!V || !P || !Q) continue;
+              const u = sub3(P, V);
+              const w = sub3(Q, V);
+              const den = Math.sqrt(dot3(u, u) * dot3(w, w));
+              if (!(den > 1e-12)) continue;
+              return (Math.acos(Math.max(-1, Math.min(1, dot3(u, w) / den))) * 180) / Math.PI;
+            }
+          }
+          return undefined;
+        })
+      : null;
+    const vals = priced ?? resolved.map((r) => r.pivot?.pinSymbols?.[sym]);
     const nums = vals.filter((v): v is number => v !== undefined && Number.isFinite(v));
     // #797 (ADR-3D-168 Am. 1): seed-stability alone is not determinedness — a symbol restricted to
     // DISCRETE roots (k ∈ {1,2} after two of Q2's three vectors) cannot be moved off a root by the

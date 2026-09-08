@@ -143,6 +143,21 @@ away. Reuse is checked on the residual's MEANING, not its field list — `cos-an
 operands and the wrong (signed) quantity, and a drive that targets something other than what its verifier
 measures produces figures its own claim then refutes. See [ADR-3D-217](06b-decisions-3d.md#adr-3d-217).
 
+## The symbol registries — one address, one display, derived from each other
+
+A letter a student names is answered in two places, and they are deliberately different questions.
+`symbolOwnersOf` is the **address** registry ([#902](06b-decisions-3d.md#adr-3d-217)): what does this
+letter denote — a vec-def's ratio, a pin's open coordinate, the algebraic parameter, an angle mark, a
+named component ([#814](06b-decisions-3d.md#adr-3d-175)), an on-segment rider's parameter
+([#921](06b-decisions-3d.md#adr-3d-224))? A statement addressed to a letter reaches EVERY owner: that is
+what sharing a name means. `figureSymbolsOf` is the **display** registry — which letters the data panel
+and the ask lane show — and it is **derived from the address one**
+([ADR-3D-230](06b-decisions-3d.md#adr-3d-230)): a letter the student bound is displayable, whatever lane
+consumed it. It used to list a hand-written subset, and the subset fell three kinds behind, so «t = 1/2»
+vanished from the panel while «p = 3» survived. What varies per owner kind is only HOW the letter is
+PRICED, and that lives with the panel, one branch each, each using the resolver that already exists. The
+knowledge discipline is shared and unchanged: an undetermined letter reads `?` in every lane.
+
 ## Claims
 
 Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape by
