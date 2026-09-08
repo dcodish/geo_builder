@@ -8,20 +8,27 @@
  * A manual testing session's saved figure becomes PERMANENT coverage by dropping
  * the file into `fixtures3/`.
  *
- * Regenerate the seeded corpus fixtures with:  GEN_FIXTURES3=1 npx vitest run src3d/__tests__/fixtures3.test.ts
+ * Add the MISSING seeded fixtures with:  GEN_FIXTURES3=1 npx vitest run src3d/__tests__/fixtures3.test.ts
+ *
+ * That writes only files that are not on disk. Rebuilding the WHOLE corpus is a separate, deliberate
+ * act — `GEN_FIXTURES3_ALL=1` — because a blanket rewrite is a schema MIGRATION of every stored file
+ * and silently deletes the older generations' load coverage (#916, ADR-3D-232). The coverage itself is
+ * asserted below, so any route to that loss fails rather than passing as churn.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { deserializeFigure3, serializeFigure3 } from '../store/figureFile3';
-import { derive3, useGeo3 } from '../store/store3';
+import { deserializeFigure3 } from '../store/figureFile3';
+import { derive3 } from '../store/store3';
 import { parse3 } from '../parser/parse3';
+import { generateSeeded, schemaVersionCoverage, supportedSchemaVersions, versionsWithoutCoverage } from './fixtures3-gen';
+import type { SeededCorpus } from './fixtures3-gen';
 
 const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
-const SEEDED: Record<string, string[]> = {
+const SEEDED: SeededCorpus = {
   'prism-2020-q2.geo3.json': [
     'מנסרה ישרה משולשת ABC',
     "M אמצע B'C'",
@@ -191,19 +198,15 @@ const SEEDED: Record<string, string[]> = {
   'box-seg-angle-cross-917.geo3.json': ["תיבה ABCDA'B'C'D'", "הזווית בין AC' לבין BD' היא 55"],
 };
 
-if (process.env.GEN_FIXTURES3) {
+// #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
+// effect of adding one fixture. The arithmetic lives in `fixtures3-gen.ts` so it is testable against a
+// temp directory (`issue-916-fixture-corpus.test.ts`) instead of only by running this env-gated block.
+if (process.env.GEN_FIXTURES3 || process.env.GEN_FIXTURES3_ALL) {
   describe('fixtures3 — GENERATE the seeded corpus files (env-gated)', () => {
-    it('writes every seeded session through the real pipeline', () => {
-      mkdirSync(DIR, { recursive: true });
-      for (const [name, seq] of Object.entries(SEEDED)) {
-        useGeo3.setState({ facts: [], seed: 0, lastError: null });
-        useGeo3.temporal.getState().clear();
-        for (const u of seq) {
-          useGeo3.getState().submit(u);
-          expect(useGeo3.getState().lastError, `${name}: ${u}`).toBeNull();
-        }
-        writeFileSync(join(DIR, name), serializeFigure3(useGeo3.getState().facts, useGeo3.getState().seed), 'utf8');
-      }
+    it('writes the seeded sessions through the real pipeline', () => {
+      const { written, skipped } = generateSeeded(DIR, SEEDED, { all: !!process.env.GEN_FIXTURES3_ALL });
+      // eslint-disable-next-line no-console
+      console.log(`fixtures3: wrote ${written.length} (${written.join(', ') || 'none'}), left ${skipped.length} untouched`);
     });
   });
 }
@@ -213,6 +216,30 @@ describe('fixtures3 — the regression net', () => {
 
   it('the net is not empty (the seeded corpus files exist)', () => {
     expect(files.length).toBeGreaterThanOrEqual(3);
+  });
+
+  /**
+   * #916 (ADR-3D-232) — EVERY SCHEMA GENERATION THE LOAD PATH ACCEPTS KEEPS A FIXTURE.
+   *
+   * `deserializeFigure3` reads any `schemaVersion <= SCHEMA_VERSION_3D`, and a student's saved figure
+   * is whatever version it was saved at — so the older generations are a live promise, not history.
+   * Their only coverage is these files. A regeneration migrates them all to the current version and
+   * the suite stayed green, so the coverage could vanish as review-invisible churn. This is what
+   * notices.
+   */
+  it('every supported schemaVersion still has load coverage', () => {
+    const coverage = schemaVersionCoverage(DIR);
+    const lost = versionsWithoutCoverage(DIR);
+    expect(
+      lost,
+      lost.length === 0
+        ? ''
+        : `schemaVersion ${lost.join(', ')} has NO fixture left — the backward-compatible load path for ` +
+          `${lost.length > 1 ? 'those generations is' : 'that generation is'} now untested. A blanket ` +
+          `GEN_FIXTURES3_ALL rebuild migrates every file to v${supportedSchemaVersions().slice(-1)[0]}; ` +
+          `restore one file at each lost version (git checkout it, or save one from that generation). ` +
+          `Present: ${[...coverage].map(([v, f]) => `v${v}×${f.length}`).join(' ') || 'nothing'}`,
+    ).toEqual([]);
   });
 
   for (const file of files) {

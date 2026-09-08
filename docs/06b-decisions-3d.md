@@ -8747,3 +8747,81 @@ asserted **byte-unchanged** (the guard that this is an addition, not a rewrite);
 over the registries themselves — every displayable symbol has an owner, and the letters this figure binds
 are both addressable and displayable — on a figure that carries the previously-missing kinds, so it is
 exercised rather than vacuous.
+
+### ADR-3D-232 — A fixture generator writes what is MISSING, and losing a schema generation's load coverage FAILS (#916)
+
+**Status:** accepted, 2026-09-08 (fix-round #946, item 5) · **Issue:** #916 · **Approved:** operator, 2026-09-08 (*"Approve both"*)
+**Requirements:** none (internal — test-infrastructure integrity; no product promise changes)
+**Design:** [08](08-testing-strategy.md) — the per-product fixtures-first contract gains the coverage rule
+
+#### The report
+
+Found in round #915 while adding a fixture for #909. `GEN_FIXTURES3=1` — the documented way to add one,
+per `fixtures3.test.ts`'s own header — regenerated **every** entry of `SEEDED`, so adding a single
+fixture produced 14 modified files.
+
+The diff was not cosmetic. It was a schema **migration**:
+
+```diff
+-  "schemaVersion": 1,          -              "sym": "k",
++  "schemaVersion": 2,          +              "terms": [ { "sym": "k", "k": 1 } ],
+```
+
+`deserializeFigure3` accepts any `schemaVersion <= SCHEMA_VERSION_3D`, so a student's figure saved
+under the older generation must keep loading — and those v1 files are the **only** coverage of that
+path. Committing the regeneration would have converted the corpus to v2 and deleted the coverage, while
+reading in review as harmless churn.
+
+**And the suite was green before and after.** Round #915 caught it only because the churn was inspected
+line by line. That is the actual defect: *nothing failed when the coverage disappeared.*
+
+#### The decision — both halves, because they are not alternatives
+
+The issue offered two candidate fixes. They are compatible and both cheap, so both land; but they do
+different jobs, and only the second addresses the class.
+
+**1 — The generator writes only what is MISSING.** `GEN_FIXTURES3=1` now writes the seeded entries that
+are not on disk and touches nothing else; the blanket rebuild moved to its own flag,
+**`GEN_FIXTURES3_ALL=1`**, so the destructive form has to be asked for by name and can no longer happen
+as a side effect of adding one fixture. Measured on the real corpus: `GEN_FIXTURES3=1` now reports
+*"wrote 0 (none), left 18 untouched"* and leaves `git status` clean, where before it rewrote all 18.
+
+**2 — The loss is DETECTABLE, not merely unlikely.** The net asserts that the corpus holds **≥1 fixture
+at every `schemaVersion` the load path still accepts**, failing with a message naming the version that
+lost coverage and saying how to restore it. Per standing rule 1 the class is *"silently losing a schema
+generation's load coverage"*, not *"this one env flag is too eager"* — so any other route to the same
+loss (a hand-edit, a bulk rewrite, the last v1 file deleted as stale) fails the same lock. Item 1 makes
+the accident unlikely; item 2 is what makes it visible, and it is the one that matters.
+
+The supported set is **derived** from `SCHEMA_VERSION_3D` (1..current), never re-listed — a version bump
+moves it by itself. A bump therefore also demands a fixture at the new generation before the suite is
+green again, which is correct: a serialization generation with no saved file has no load coverage. The
+failure message says exactly that and how to satisfy it, so the guard costs one deliberate action rather
+than a puzzle.
+
+#### Why the generator moved to its own module
+
+`generateSeeded` lives in `src3d/__tests__/fixtures3-gen.ts`, a plain module, because the property that
+matters — *adding one entry writes one file* — has to be **exercised** to be locked, and driving an
+env-gated `describe` from inside the same file cannot do that. It is now run against a temp directory
+with its own two-session corpus, so the assertions are direct and cost milliseconds. It also throws on a
+session that does not build rather than writing a fixture of a broken figure, which the old inline block
+did with an `expect` that only reported after the write.
+
+#### Locks
+
+`__tests__/issue-916-fixture-corpus.test.ts` (10):
+
+- **The fix itself** — with the corpus present, adding one entry writes exactly the new file and leaves
+  every other file **byte-identical**; an existing file is not rewritten even when its content is
+  deliberately stale (the v1 stand-in), which is the #915 situation exactly.
+- **The escape hatch still works** — `all: true` does rewrite, including over the stale file. A guard
+  that quietly disabled the deliberate rebuild would be a different bug.
+- **A non-building session throws and writes nothing.**
+- **The coverage rule** — supported versions derived from the load path's own constant; a healthy corpus
+  reporting no loss; deleting the last v1 file **detected and the version named**; and an unparseable or
+  version-less file ignored rather than counted as coverage (a corpus of junk must not read as covered).
+- **The real corpus, asserted as a NUMBER** — v1 carries more than five files, not merely "≥ 1", so a
+  rebuild that migrated 18 of 19 could not pass as still-covered.
+
+Plus the rule itself in `fixtures3.test.ts`, where it runs over the live corpus on every 3-D lane.
