@@ -24,6 +24,10 @@ import { useGeoStore, replay, separatedView, meetsRequirements } from '@/store/g
 import { parse } from '@/parser';
 import { ctxOf } from './scenario-pipeline';
 import { buildScene } from '@/render/scene';
+import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Figure } from '@/render/Figure';
 
 const SEQ = ['משולש ABC', 'זוית B ישרה', 'ריבוע DEFG חסום במשולש ABC'];
 
@@ -130,5 +134,60 @@ describe('#942 — the canvas writes the collision', () => {
       const pt = scene.points.find((p) => p.id === id);
       if (pt) expect(pt.label, `${id} keeps its own label`).toBe(id);
     }
+  }, 900000);
+});
+
+/**
+ * #942 (ADR-486) — THE COINCIDENCE ACTUALLY REACHES THE CANVAS.
+ *
+ * The label lock above hands `buildScene` an explicit `[['B','D']]`. That proves the renderer MERGES,
+ * and proves nothing about whether a real figure's coincidences ever arrive there. The path is three
+ * hops — `replay` → `display.coincidences` → `<Figure coincidences>` → `buildScene` — and the last two
+ * are the prop passes this very commit added, so an injection-only lock cannot see them break.
+ *
+ * Found validating the fix with the operator (2026-09-08): the ONLY evidence that chain worked was a
+ * browser screenshot nobody would re-take. Each hop is now locked at the cheapest honest level, over
+ * the sequence from the play sheet.
+ */
+describe('#942 — a real figure’s coincidence reaches the canvas', () => {
+  const MIDPOINTS = ['משולש ABC', 'D אמצע AB', 'E אמצע AB'];
+
+  it('hop 1 — the merged label is built from the FIGURE’s own coincidences, not an injected pair', () => {
+    build(MIDPOINTS);
+    const st = useGeoStore.getState();
+    const f = replay(st.facts, st.seed);
+    expect(f.lastError).toBeNull();
+    expect(f.coincidences).toEqual([['D', 'E']]);
+    // A DISPLAYABLE view, not the amber "no configuration found" fallback — the distinction #944 is about.
+    expect(meetsRequirements(st.facts, st.seed)).toBe(true);
+    const scene = buildScene(f.construction, f.positions, undefined, undefined, { coincidences: f.coincidences });
+    const labels = scene.points.filter((p) => p.id === 'D' || p.id === 'E').map((p) => p.label);
+    expect(labels.sort()).toEqual(['', 'D=E']);
+  }, 900000);
+
+  it('hop 2 — <Figure coincidences={…}> renders «D=E» into the SVG', () => {
+    build(MIDPOINTS);
+    const st = useGeoStore.getState();
+    const f = replay(st.facts, st.seed);
+    const svg = renderToStaticMarkup(
+      createElement(Figure, {
+        construction: f.construction,
+        positions: f.positions,
+        circles: f.circles,
+        coincidences: f.coincidences,
+      }),
+    );
+    expect(svg).toContain('D=E');
+    // The defect this replaced: two separate labels stacked on one dot. Neither may survive alone.
+    expect(svg).not.toContain('>D<');
+    expect(svg).not.toContain('>E<');
+  }, 900000);
+
+  it('hop 3 — App passes the display’s coincidences to <Figure> (the one-line prop this commit added)', () => {
+    const app = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8');
+    // Destructured off the derived display, then handed to the canvas. Losing either line silently
+    // restores the two-stacked-labels defect with every other lock still green.
+    expect(app).toContain('coincidences, forcedOffArc } = display');
+    expect(app).toContain('coincidences={coincidences}');
   }, 900000);
 });

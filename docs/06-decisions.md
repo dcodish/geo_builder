@@ -9509,3 +9509,15 @@ not bought by relaxing something else; ADR-123's own kite still building, still 
 meeting requirements, and honestly reporting `separatedView === false`; the canvas emitting exactly one
 «B=D» with both points retained; and an untouched figure keeping every label, so this is an addition rather
 than a rewrite. `store/__tests__/coincidence.test.ts`'s operator freeze is re-run unchanged.
+
+**Amendment 1 (2026-09-08, after the operator's play) — the locks now follow the coincidence all the way to
+the canvas.** The label lock above hands `buildScene` an explicit `[['B','D']]`. That proves the renderer
+merges and proves nothing about whether a real figure's coincidences ever arrive there: the path is three
+hops — `replay` → `display.coincidences` → `<Figure coincidences>` → `buildScene` — and the last two are the
+prop passes this ADR added, so an injection-only lock cannot see them break. Validating the fix, the only
+evidence that chain worked was a browser screenshot. Three locks now cover it over the play-sheet sequence
+«משולש ABC · D אמצע AB · E אמצע AB»: the merged label built from the figure's OWN `coincidences` (and that
+view being displayable, not the amber fallback); `<Figure>` rendered to static markup emitting «D=E» into the
+SVG; and a grep lock on `App.tsx`'s two lines. Each was mutation-tested — dropping `coincidences` from
+`Figure`'s `buildScene` call fails hop 2, deleting the `App.tsx` prop fails hop 3 — because a lock nobody has
+seen fail is a hypothesis. **Requirements:** none (internal) · **Design:** none (internal).
