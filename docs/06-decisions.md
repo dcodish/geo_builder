@@ -9521,3 +9521,119 @@ view being displayable, not the amber fallback); `<Figure>` rendered to static m
 SVG; and a grep lock on `App.tsx`'s two lines. Each was mutation-tested — dropping `coincidences` from
 `Figure`'s `buildScene` call fails hop 2, deleting the `App.tsx` prop fails hop 3 — because a lock nobody has
 seen fail is a hypothesis. **Requirements:** none (internal) · **Design:** none (internal).
+
+## ADR-487 — A REFUSAL'S SUBJECT IS THE STUDENT'S OWN SENTENCE, NOT THE ENGINE'S FRAGMENT (#943)
+
+**Status:** accepted, 2026-09-08 (fix-round #946, item 3) · **Issue:** #943 · **Operator ruling:** 2026-09-08 (option A)
+**Requirements:** [02](02-requirements.md) FR-EN-8 — amended · **Design:** [04](04-design.md) §9 (`app/errorSubject.ts`)
+
+### The report
+
+Playing round #942's T2, the operator had «משולש ABC» + «∠ABC = 90» + «ריבוע DEFG חסום במשולש ABC» on
+the canvas, so `D` was already the square's vertex. He typed «D = חיתוך AB ו-BC», which would force `D`
+onto `B` and break the square. **Refusing is correct.** What he was shown was not:
+
+> לא ניתן: הנתון **D מתלכדת עם הנקודה שנבנתה לה** סותר **נתון קודם** — אי אפשר לקיים את שניהם יחד.
+
+CLAUDE.md's honesty invariant is *"Error messages name the conflicting **statement**, never internal
+state."* This message misses both halves. The subject is a paraphrase of the **lowered constraint** —
+correct as far as it goes, and deliberately vague about the `~`-helper (`solve.ts`) — but it is not the
+sentence the student wrote. And «נתון קודם» never says *which* earlier given, so the three remedies the
+message offers (reorder, reword, smaller steps) are all guesses, and none of them is the real fix here
+(choose a different letter).
+
+### Why the humanising layer could not do it
+
+`humanizeError` is a pure UI string-pattern consumer with **no figure**: it matches
+`/^over-constrained: (.+) cannot hold$/` and passes the captured fragment through as `{{what}}`. Its own
+docblock states the limit — *"naming the STEP that made it needs the figure, out of scope here"*. Nor
+does the upstream data carry the link: there is no provenance field on `Constraint`, so a constraint
+cannot say which fact lowered it.
+
+That splits the work by what is actually **available**, and the operator ruled the split:
+
+| piece | available | ruled |
+| --- | --- | --- |
+| the NEW statement (the step that failed) | **yes** | **built here** |
+| the OLD conflicting given | no — needs constraint→fact provenance | remainder, its own session |
+
+> *"the refusal must quote back the line the student just typed, so they know which of their sentences
+> was rejected. The internal fragment stops being the headline and becomes a secondary reason line."*
+
+### The decision
+
+**A refusal whose own subject cannot identify the rejected statement takes the student's sentence as its
+subject, and demotes the engine fragment to a reason clause.** Three parts, and the first is the one that
+makes this a class rather than a template fix.
+
+**1 — the rule is a flag on the pattern, never a list of templates.** `Pattern.saysSubject` marks a
+refusal whose honest subject is the student's sentence; when one is supplied, `humanizeError` renders the
+key's `_said` variant with a `{{said}}` param. The flag's own docblock states the test a template must
+meet to earn it: *a student reading this cannot tell which of their sentences was rejected* — either
+because the subject is a lowered-constraint fragment, or because there is no subject at all.
+
+**2 — the sentence is an ARGUMENT, not a lookup.** `humanizeError(raw, t, said?)` stays a pure mapping
+(ADR-228 Am.6): it is told the sentence, it never asks the store for one. The lookup lives in the new
+`src/app/errorSubject.ts` — `utteranceForError(facts, status, raw)`, pure over its three inputs — and the
+two display sites in `App.tsx` call it. **No new plumbing was needed**: `Fact.utterance` already holds
+verbatim what the student typed (#751/ADR-W-029), and ADR-398 already makes the banner's `lastError` and
+the failing row's `status` the *same string* on purpose, so the owning fact is found by that identity.
+The submit path, which has no fact yet for text that produced nothing, keeps calling with one argument.
+
+**3 — the fallback is byte-identical to today.** A fact built from a direct command, or loaded from a
+save that predates the utterance record, carries no `utterance`; a blank one is treated the same. The
+base key renders, so a refusal never shows an empty «» or the word `undefined`.
+
+### The class sweep, and what was deliberately LEFT
+
+Standing rule 1 forbids landing this on the one template that reported it, so every refusal template was
+audited against the flag's own test. **Swept (3):**
+
+| key | why its subject fails the test |
+| --- | --- |
+| `overConstrained` | `{{what}}` is a lowered-constraint fragment — the reported case |
+| `unknownPoint` | `{{what}}` is likewise a constraint fragment («\|AB\| = \|AD\| references an unknown point») |
+| `nonFinite` | **no subject at all** — «לא הצלחתי לחשב מיקום סופי לצורה» names nothing |
+
+**Left, deliberately (the audit half):** `alreadyDefined` (`{{id}}`), `cannotPlaceOnSegment`
+(`{{id}}`/`{{seg}}`), `sameSpot` (`{{a}}`/`{{b}}`), `unresolvedDeps` / `noLongerAvailable` (`{{ids}}`),
+`unknownCircle`, `circlesDontMeet`, `tangent*`, `towardAtCentre`, `degenerate*` — every one of these
+already names a **letter the student typed**, so the sentence is identifiable without the echo, and the
+`notDetermined*` pair is ADR-476's deliberately non-blaming wording («הנתונים שלך תקינים»), which an
+echoed sentence would work against. Adding any of them later is then a decision, not a drift: a test
+asserts they render identically with and without a sentence.
+
+The `metricImpossible*` pair is untouched for a different reason — it already states the geometry that
+makes the figure impossible, which is a stronger answer than an echo.
+
+### Why a flag and not a wrapper
+
+The obvious cheap shape is one wrapper string («לא ניתן לקיים את «{{said}}» — {{reason}}») applied to a
+set of keys. It reads badly the moment the wrapped template already opens with its own «לא ניתן», which
+`overConstrained` does, and it forces every swept template into one sentence shape. Per-key `_said`
+variants keep each message's own wording and cost three strings per locale — and the flag is what keeps
+it a rule, since `SAID_SUBJECT_KEYS` is **derived** from `PATTERNS`, never re-listed.
+
+### Locks
+
+`src/i18n/__tests__/humanize-error-said.test.ts` (6): the operator's exact sequence through the real
+parse → replay → **real Hebrew locale**, asserting the message contains «D = חיתוך AB ו-BC» and still
+carries «סותר נתון קודם» as the reason; the fallback byte-identical for `undefined` / `''` / `'   '`,
+with explicit «»/`undefined` guards; `utteranceForError`'s four negative cases (a muted row, a fact with
+no utterance, a blank one, nothing owning the error); **the class ratchet** — every key in
+`SAID_SUBJECT_KEYS` has a `_said` variant in BOTH locales carrying `{{said}}`, so flagging a template
+without writing its strings fails the suite instead of rendering a raw i18n key at a student; and the
+audit lock that the three unswept templates are unchanged when a sentence IS available.
+
+Scenario `over-constrained-refusal-attributes-to-the-typed-step-943` (corpus 4) locks the **attribution**
+the echo depends on: the banner error is owned by exactly one typed step — the last one — and the three
+earlier steps stay `ok`. Quoting the student's sentence is only honest if the failure is genuinely theirs;
+a change that re-attributed it would otherwise quote the wrong sentence rather than fail visibly.
+
+### The remainder — NOT built, and not folded in
+
+Naming the **conflicting earlier given** needs a fact id carried on `Constraint` where facts lower to
+constraints, plus a minimal-conflict search for the case where several givens jointly conflict. That is a
+chokepoint change with its own ADR and its own session, and the operator ruled it must not gate this
+half. #943 stays open for it. It is explicitly **not** to be bolted onto `humanizeError`, which is
+figure-free by design (docs/17 §3 — no second enumeration).

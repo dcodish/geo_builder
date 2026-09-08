@@ -107,6 +107,12 @@ src/
                  llm/llmShared (the LLM-fallback seam; re-parse + gate battery)
   app/           submitPipeline.ts — the text→command orchestration, extracted from App.tsx and
                  directly tested (S0.4)
+                 - errorSubject.ts (ADR-487, #943): `utteranceForError(facts, status, raw)` — WHICH
+                   sentence a refusal is about. Pure over its three inputs; it exists because
+                   `humanizeError` is deliberately figure-free (ADR-228 Am.6), so the student's own
+                   wording must be handed to it by the layer that has the fact list. The link needs no
+                   plumbing: ADR-398 already makes the banner's `lastError` and the failing row's
+                   `status` the same string, so the owning fact is found by that identity
   replay/        core.ts — the PURE replay layer (S1.2): fold memo + deferral + HOIST + seed/config
                  searches + the shared sample core; engine ← replay ← store enforced by test
                  — the config searches RANK rather than merely accept (ADR-486, #942): a view that

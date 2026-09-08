@@ -100,6 +100,21 @@ interface Pattern {
   keyOf?: (m: RegExpMatchArray) => string;
   /** Map the regex match groups to interpolation params for the i18n key. */
   params?: (m: RegExpMatchArray) => Record<string, string>;
+  /**
+   * #943 — this refusal's honest SUBJECT is the student's own sentence, not the engine fragment.
+   *
+   * The rule, not a list: a template earns the flag when a student reading it cannot tell WHICH of
+   * their sentences was rejected — because the subject is a lowered-constraint fragment («D coincides
+   * with its constructed target») or there is no subject at all («I couldn't compute a final
+   * position»). A template whose subject is already a letter the student typed (`alreadyDefined`'s
+   * `{{id}}`, `cannotPlaceOnSegment`'s `{{id}}`/`{{seg}}`, `sameSpot`'s `{{a}}`/`{{b}}`) identifies
+   * itself and does NOT take the flag — see the ADR for the full audit.
+   *
+   * When set AND a sentence is supplied, {@link humanizeError} renders the `_said` variant of the key,
+   * which makes the sentence the subject and demotes the engine fragment to a reason clause. With no
+   * sentence available the base key renders exactly as it does today.
+   */
+  saysSubject?: true;
 }
 
 // Order matters only where one pattern's text is a prefix of another's; each regex below is
@@ -134,13 +149,13 @@ const PATTERNS: Pattern[] = [
   { re: /^unresolved dependencies for: (.+)$/, key: 'errors.unresolvedDeps', params: (m) => ({ ids: m[1] }) },
 
   // evaluate.ts:855 — `non-finite position computed`
-  { re: /^non-finite position computed$/, key: 'errors.nonFinite' },
+  { re: /^non-finite position computed$/, key: 'errors.nonFinite', saysSubject: true },
 
   // evaluate.ts:887 — `|AB| = |AD| references an unknown point`
-  { re: /^(.+) references an unknown point$/, key: 'errors.unknownPoint', params: (m) => ({ what: m[1] }) },
+  { re: /^(.+) references an unknown point$/, key: 'errors.unknownPoint', params: (m) => ({ what: m[1] }), saysSubject: true },
 
   // evaluate.ts:891 — `over-constrained: |AC| = 9 cannot hold`
-  { re: /^over-constrained: (.+) cannot hold$/, key: 'errors.overConstrained', params: (m) => ({ what: m[1] }) },
+  { re: /^over-constrained: (.+) cannot hold$/, key: 'errors.overConstrained', params: (m) => ({ what: m[1] }), saysSubject: true },
 
   // replay/core.ts (#855, ADR-476) — the SAMPLED-VALUE degradation of the row above. The conflict is with
   // a placement the tool invented, so the message must not read as «your given contradicts an earlier
@@ -199,10 +214,19 @@ const PATTERNS: Pattern[] = [
 ];
 
 /**
+ * The refusal keys whose honest SUBJECT is the student's own sentence (#943) — DERIVED from
+ * {@link Pattern.saysSubject}, never re-listed. Exported for the ratchet in
+ * `__tests__/humanize-error-said.test.ts`, which asserts each one has a `_said` variant in BOTH
+ * locales: flagging a new template without writing its strings then fails the suite instead of
+ * rendering a raw i18n key at a student.
+ */
+export const SAID_SUBJECT_KEYS: readonly string[] = [...new Set(PATTERNS.filter((p) => p.saysSubject).map((p) => p.key))];
+
+/**
  * Translate a raw engine error to a student-facing message. Returns the raw string
  * unchanged when no known shape matches (so it is never worse than the current text).
  */
-export function humanizeError(raw: string | null | undefined, t: Translate): string {
+export function humanizeError(raw: string | null | undefined, t: Translate, said?: string): string {
   if (!raw) return '';
   // Sanitize FIRST (#200): the patterns then match a clean string and every extracted param (`circle: m[1]`)
   // is already the student's letter — no internal id can reach the message, matched or fall-through.
@@ -218,7 +242,14 @@ export function humanizeError(raw: string | null | undefined, t: Translate): str
     const translated = params
       ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t)]))
       : undefined;
-    return t(p.keyOf ? p.keyOf(m) : p.key, translated);
+    const key = p.keyOf ? p.keyOf(m) : p.key;
+    // #943: the student's own sentence becomes the SUBJECT where the template's own subject cannot
+    // identify which statement was refused. Still a pure mapping (ADR-228 Am.6) — the sentence is an
+    // argument, not something this layer looks up. A missing/blank `said` renders the base key, which
+    // is byte-identical to today, so a fact with no recorded utterance never yields an empty «».
+    const sub = said?.trim();
+    if (p.saysSubject && sub) return t(`${key}_said`, { ...translated, said: sub });
+    return t(key, translated);
   }
   // No known shape — still translate the vocabulary, so an unmatched message is never worse and never
   // leaks an English word we already know how to say.
