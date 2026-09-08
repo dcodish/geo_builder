@@ -995,6 +995,7 @@ export default function App() {
             promoteLabel={t('actions.promotePoint')}
             labels={labels}
             angleMarks={angleMarks}
+            coincidences={coincidences}
             relations={relationsLayer}
             statedEqual={statedClasses}
             showMeasures={showMeasures}

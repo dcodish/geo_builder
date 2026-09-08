@@ -13,6 +13,7 @@ import type { Construction, Id, Circle, Vec } from '@/engine/types';
 import { isGeoPoint } from '@/engine/types';
 import { len, rot90, sub, unit } from '@/engine/geometry';
 import { formatMeasure, formatAngle } from '@/format';
+import { visibleCoincidences } from './pointDescriptions';
 import { resolveCircle, resolveDrawnLines, orientArc, type DefiniteAngle, type DefiniteLength, type RelationsResult, type ResolvedCircle } from '@/engine';
 
 export interface ScenePoint {
@@ -243,12 +244,59 @@ export function buildScene(
   positions: Map<Id, Vec>,
   labels?: MeasureLabels,
   angleMarkSpecs?: { vertex: Id; ray1: Id; ray2: Id; right: boolean }[],
-  opts?: { showCenters?: boolean; circles?: Map<Id, ResolvedCircle>; mirrored?: boolean },
+  opts?: {
+    showCenters?: boolean;
+    circles?: Map<Id, ResolvedCircle>;
+    mirrored?: boolean;
+    /** #942 (ADR-486): pairs the geometry drove onto one spot — drawn as ONE label, «B=D». */
+    coincidences?: [Id, Id][];
+  },
 ): Scene {
   // "Show circle centres": reveal every circle's centre with its label (O, P, …), even an AUTO one
   // that nothing is drawn from — so the student can tell two unnamed circles apart and address each
   // (operator request). Default off keeps the clean FR-RN-8 behaviour (an unused auto-centre is hidden).
   const showCenters = opts?.showCenters ?? false;
+  /**
+   * #942 ([ADR-486](docs/06-decisions.md#adr-486)) — TWO POINTS AT ONE SPOT GET ONE LABEL.
+   *
+   * The operator's rule ends *"…and write that they collide"*. A figure whose givens genuinely force a
+   * coincidence is legal and still draws (ADR-123), and until now the only sign of it was a notice
+   * BELOW the input — while the canvas, where the student is actually looking, printed two labels on
+   * top of each other and looked like a bug.
+   *
+   * The merge is by LABEL only: both points keep their ids, their positions and their hover targets, so
+   * nothing about selection or picking changes. One member of each group carries the joined text and the
+   * others carry `''` — an empty label is an existing, supported state here (an anonymous promotable
+   * point uses it). The carrier is the alphabetically first id, so the text is stable across re-renders.
+   */
+  const mergedLabel = new Map<Id, string>();
+  {
+    const groupOf = new Map<Id, Id>(); // id → its group's representative
+    const find = (x: Id): Id => {
+      let r = x;
+      while (groupOf.get(r) !== undefined && groupOf.get(r) !== r) r = groupOf.get(r)!;
+      return r;
+    };
+    for (const [a, b] of visibleCoincidences(opts?.coincidences ?? [])) {
+      if (!groupOf.has(a)) groupOf.set(a, a);
+      if (!groupOf.has(b)) groupOf.set(b, b);
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) groupOf.set(rb, ra);
+    }
+    const members = new Map<Id, Id[]>();
+    for (const id of groupOf.keys()) {
+      const r = find(id);
+      members.set(r, [...(members.get(r) ?? []), id]);
+    }
+    for (const ids of members.values()) {
+      if (ids.length < 2) continue;
+      const sorted = [...ids].sort();
+      mergedLabel.set(sorted[0], sorted.join('='));
+      for (const id of sorted.slice(1)) mergedLabel.set(id, '');
+    }
+  }
+
   const points: ScenePoint[] = [];
   const segments: SceneSegment[] = [];
   const polygons: ScenePolygon[] = [];
@@ -321,7 +369,7 @@ export function buildScene(
         if (pos) points.push({ id: o.id, pos, label: '', promotable: true, labelDir: outwardDir(incident.get(o.id)) });
         continue;
       }
-      if (pos) points.push({ id: o.id, pos, label: o.id, labelDir: outwardDir(incident.get(o.id)) });
+      if (pos) points.push({ id: o.id, pos, label: mergedLabel.get(o.id) ?? o.id, labelDir: outwardDir(incident.get(o.id)) });
       continue;
     }
     if (o.kind === 'segment') {

@@ -9435,3 +9435,77 @@ producing NO row and a `scale` note with the #427 unit rows asserted byte-unchan
 נתון row; TWO letters (the case that proves the lanes are separate readings); an angle letter at 70° on a
 scale-free figure; an unmentioned letter still `not-understood`; and the parser precedence battery showing
 the var rule cannot swallow «AB», «שטח ABC» or «∠ABC».
+
+## ADR-486 — A COINCIDENCE IS A LAST RESORT, NOT A PERMITTED OUTCOME: every search prefers a separated view, and the canvas writes the collision (#942)
+
+**Status:** accepted, 2026-09-08 · amends [ADR-123](#adr-123) (a forced coincidence stays legal, but is
+never PREFERRED) and rides the tier ladders of [ADR-474](#adr-474)/#194 and [ADR-142](#adr-142) ·
+**Requirements:** [02](02-requirements.md) FR-ALT-5 · **Design:** [04](04-design.md), the config search
+
+**Context.** Operator, playing round #940 T3 (2026-09-08): *"first attempt was good but pressing new config
+broke it"*, and in his original #938 report: *"took me through cases where B and one of the square nodes
+were overlapping which should never happen."*
+
+Measured on the FIRST press of «הציגו תצורה אחרת» for
+«משולש ABC · זוית B ישרה · ריבוע DEFG חסום במשולש ABC», through the real store → `replay` path:
+
+| quantity | measured |
+| --- | --- |
+| sides DE, EF, FG, GD | 2.2980, 2.2980, 2.2980, 2.2980 |
+| diagonals DF, EG | 3.2498, 3.2498 |
+| angles at D, E, F, G | 90.00, 90.00, 90.00, 90.00 |
+| E→line AB · G→line BC · F→line AC | 0.000000 · 0.000000 · 0.000000 |
+| \|DB\| | 0.000000 |
+| `violations` | `[]` |
+
+**The figure is not broken.** It is a perfect inscribed square with two sides along the legs BA and BC, so
+its corner D lands on the right-angle vertex B — the classical *square in the corner*, the first
+configuration a textbook draws. What is wrong is that it was **offered** while seatings that separate the
+labels were available: presses 1, 2 and 4 of 25 collide, presses 5 and 6 do not.
+
+**Not a regression.** The identical probe at `3ebdfdb2` (before round #940's push) and at `68e4a3d9`
+(after) is byte-identical — 4 coincident views in 25 presses on both.
+
+**The ruling.**
+
+> **Operator, 2026-09-08:** *"we have a rule that nodes never collide if there is an option to show them in
+> a different way. only when there is no other config, we should do that and write that they collide"*
+
+**Decision.**
+
+1. **The distinction is LEGAL vs PREFERRED, and it was missing.** `pointsDistinct` answers legality: a
+   figure whose givens genuinely force two points together must still draw (ADR-123), or the searches hunt
+   forever for a separation that does not exist — the property `store/__tests__/coincidence.test.ts` froze
+   on the operator's own instruction. `separatedView(fig)` is the new predicate for the second question,
+   and every search consults it to RANK.
+2. **A coincident candidate becomes a TIER, never an equal.** `searchAnotherView` returns a separated
+   candidate outright and holds a coincident one back, returning it only after the whole search — discrete
+   combos and the plain resample — finds nothing separated. `firstSatisfyingSeed` gains the same rung,
+   above the relaxed fallback and below every separated view. `findValidConfig` no longer short-circuits on
+   a stacked view. Three searches, one predicate, consulted once each — the shape those functions already
+   use for #194's legibility preference and ADR-142's relaxed bar.
+3. **The canvas writes the collision** — one label «B=D» instead of two stacked. Until now the only sign
+   was a notice BELOW the input, while the surface the student is looking at printed two labels on top of
+   each other and looked like a bug. The merge is by LABEL only: both points keep their ids, positions and
+   hover targets, so selection and picking are untouched, and the carrier is the alphabetically first id so
+   the text is stable across renders.
+
+**The armed plan asked for something else, and measurement changed it.** Its item 1 said *"`pointsDistinct`
+stops taking the drawing's own coincidences as licence"* — remove the `allowed` exemption. That would have
+broken two things the code already gets right: `fig.coincidences` is **already** filtered to forced pairs by
+the [ADR-378](#adr-378) separability split, and the exemption is what keeps a genuinely forced coincidence
+from triggering a futile auto-resolve search. The real gap is narrower and the ruling names it exactly:
+forced *in this configuration* is not forced *in every* configuration, and that is a question about
+RANKING, not legality. So the exemption stays and the preference is added above it.
+
+**Standing rule 1 — the class.** *"A property of one sampled drawing read as a property of the figure."*
+The swept question is which other gates take their permit set from the drawing they are judging: the
+coincidence exemption was the one, and it is now paired with a cross-configuration preference. `pointsDistinct`'s
+other escape hatch, a `coincide` CONSTRAINT, is a GIVEN and is unaffected — the student asked for it.
+
+**Locks.** `src/__tests__/issue-942-coincident-views.test.ts`: 25 presses yielding no coincident view (the
+pre-fix tree fails at presses 1, 2 and 4); every offered view still meeting requirements, so separation was
+not bought by relaxing something else; ADR-123's own kite still building, still recording `N=O`, still
+meeting requirements, and honestly reporting `separatedView === false`; the canvas emitting exactly one
+«B=D» with both points retained; and an untouched figure keeping every label, so this is an addition rather
+than a rewrite. `store/__tests__/coincidence.test.ts`'s operator freeze is re-run unchanged.

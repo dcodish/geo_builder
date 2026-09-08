@@ -64,6 +64,9 @@ export interface FigureProps {
   labels?: MeasureLabels;
   /** Angle marks the student asserted — right-angle squares / angle arcs. */
   angleMarks?: { vertex: Id; ray1: Id; ray2: Id; right: boolean }[];
+  /** #942 (ADR-486): pairs the geometry drove onto one spot. Drawn as ONE label («B=D») instead of two
+   *  stacked ones, so the collision is legible on the CANVAS and not only in the notice below the input. */
+  coincidences?: [Id, Id][];
   /** The "view relations" ground-truth layer (ADR-134): equal-segment ticks + equal-angle arcs. When set,
    *  it's drawn on the current figure; omit/undefined = layer off. */
   relations?: RelationsResult | null;
@@ -175,6 +178,7 @@ export function Figure({
   promoteLabel,
   labels,
   angleMarks,
+  coincidences,
   relations,
   statedEqual,
   showMeasures = true,
@@ -274,7 +278,7 @@ export function Figure({
     // A single flip is an odd isometry — it reverses the CCW sense of the pre-oriented positions the
     // scene is built from, so the arc resolver must know the parity or every arc draws as its
     // complement (ADR-356, issue #170 — «רבע מעגל» flipped drew the 270° arc).
-    const s = buildScene(construction, oriented, labels, angleMarks, { showCenters, circles, mirrored: o.flipX !== o.flipY });
+    const s = buildScene(construction, oriented, labels, angleMarks, { showCenters, circles, mirrored: o.flipX !== o.flipY, coincidences });
     // View stability (F4): keep the previous fit while the figure still fits — refit only on
     // overflow / gross shrink, or when the viewport/orientation genuinely changed.
     const vp = { width: vw, height: vh, padding };

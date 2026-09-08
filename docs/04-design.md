@@ -109,6 +109,10 @@ src/
                  directly tested (S0.4)
   replay/        core.ts — the PURE replay layer (S1.2): fold memo + deferral + HOIST + seed/config
                  searches + the shared sample core; engine ← replay ← store enforced by test
+                 — the config searches RANK rather than merely accept (ADR-486, #942): a view that
+                   stacks two named points is legal (ADR-123 — a forced coincidence must still draw)
+                   but is the LAST tier, below every separated one. `separatedView` is that predicate,
+                   consulted once each by searchAnotherView / firstSatisfyingSeed / findValidConfig
   store/         geoStore.ts (Zustand + zundo: the fact list as source of truth, actions,
                  rename/swap/merge; re-exports the replay layer), figureFile (save/load), loadAudit,
                  geoWork/geoWorker (the Web-Worker seam)
@@ -119,6 +123,8 @@ src/
                    (`Derived.sampledFailure`), not only when it builds and looks bad.
   render/        transform + scene (pure figure→primitives) + Figure.tsx (declarative SVG, pan/zoom,
                  hover picks); a pure consumer of engine output
+                 — #942 (ADR-486): points the geometry drove onto one spot are drawn as ONE label
+                   («B=D»); the merge is by label only, so ids, positions and hover targets are intact
   theorems/      the authored theorem table + coverage disposition map + rank bands + audit harness
   validation/    the differential coordinate oracle (engine-import-free; dev/CI only)
   export/        question export (.docx)

@@ -1511,6 +1511,9 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   // (ADR-476: the fold accepted these rows, so a working configuration demonstrably exists) — and a
   // genuine contradiction leaves it false, so an honest refusal still costs one replay, as today.
   if (!hasExt && !hasOnSeg && !hasCross && !base0.sampledFailure) return from; // nothing to satisfy → keep the seed
+  // #942 (ADR-486): separation is the FIRST preference, ahead of #194's legibility one — a squashed
+  // wedge is hard to read, two labels at one point are impossible to read. A candidate that stacks them
+  // is still acceptable (it may be the only seating), so it enters as a lower tier rather than failing.
   const ok = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig) && intersectionsWithinSegments(fig) && segmentsCrossWithin(facts, fig.positions);
   // The ADR-142 acceptance bar: a SHARED-ENDPOINT extension counts on EITHER side (see extensionsClear).
   const okRelaxed = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig, true) && intersectionsWithinSegments(fig) && segmentsCrossWithin(facts, fig.positions);
@@ -1540,8 +1543,10 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   // #194 (ADR-474): the STRICT-but-squashed fallback — the seed today would have returned. Recorded
   // while sweeping (ADR-267: one interleaved pass, never a second) so the preference costs no extra
   // replay: tier 1 is strict AND well spread, tier 2 is strict (today), tier 3 the relaxed fallback.
-  let strictOnly = ok(base0) ? from : -1;
+  let strictOnly = ok(base0) && separatedView(base0) ? from : -1;
   let strictOnlyScore = strictOnly >= 0 ? spreadScore(base0) : -1;
+  // #942: acceptable but stacked — used only if no separated candidate is found at all.
+  let coincidentOnly = ok(base0) && !separatedView(base0) ? from : -1;
   let sinceStrict = 0; // candidates examined since the first acceptable answer (SPREAD_EXTRA_TRIES)
   // The same deadline is ARMED inside the solve ladder (engine/solveBudget.ts): the between-replay check
   // below caps the sweep, and the in-ladder consult caps a single pathological candidate (issue #59 —
@@ -1551,7 +1556,9 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
       if (Date.now() > deadline) break; // out of budget — settle for the best seen so far
       if (strictOnly >= 0 && ++sinceStrict > SPREAD_EXTRA_TRIES) break; // bounded improvement, then settle
       const fig = replay(facts, s);
-      if (ok(fig)) {
+      if (ok(fig) && !separatedView(fig)) {
+        if (coincidentOnly < 0) coincidentOnly = s; // #942: remembered, never preferred
+      } else if (ok(fig)) {
         if (spreadOk(fig)) return s; // tier 1 — satisfying AND legible: nothing can beat it, stop here
         // tier 2 — satisfying but tight. Keep the LEAST tight one seen (see spreadScore): on a figure
         // with no legible configuration this is the difference between a 5.8° drawing and a 0.16° one.
@@ -1565,7 +1572,9 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
     }
     // Past the sweep or the deadline: settle for the best tier seen, exactly as before the preference
     // existed. A figure with no well-spread configuration lands on the same seed it used to.
-    return strictOnly >= 0 ? strictOnly : fallback >= 0 ? fallback : from;
+    // #942 (ADR-486): a stacked-but-satisfying seed sits between them — better than a relaxed fallback
+    // that fails a stated requirement, worse than any separated view.
+    return strictOnly >= 0 ? strictOnly : coincidentOnly >= 0 ? coincidentOnly : fallback >= 0 ? fallback : from;
   });
 }
 
@@ -1637,6 +1646,28 @@ export function meetsRequirements(facts: Fact[], seed = 0, relaxExtensions = fal
 }
 
 /**
+ * DOES THIS VIEW KEEP THE NAMED POINTS APART? (#942, [ADR-486](docs/06-decisions.md#adr-486))
+ *
+ * The operator's rule, 2026-09-08: *"we have a rule that nodes never collide if there is an option to
+ * show them in a different way. only when there is no other config, we should do that and write that
+ * they collide."*
+ *
+ * So a coincidence is a LAST RESORT rather than a permitted outcome, and the distinction that makes
+ * that expressible is between LEGAL and PREFERRED. {@link pointsDistinct} answers the first — a figure
+ * whose givens genuinely force two points together is legal, and must still draw
+ * ([ADR-123](docs/06-decisions.md#adr-123)), or the config searches would hunt forever for a separation
+ * that does not exist. This answers the second, and every search consults it to RANK: a separated
+ * candidate beats a coincident one, and a coincident one is returned only when nothing else was found.
+ *
+ * Why the ranking has to live here and not in `pointsDistinct`: `fig.coincidences` is already filtered
+ * to FORCED pairs by the ADR-378 separability split, but forced *in this configuration* is not forced
+ * *in every* configuration. On «משולש ABC · זוית B ישרה · ריבוע DEFG חסום» presses 1, 2 and 4 of «הציגו
+ * תצורה אחרת» put D on B — the corner-seated square, a perfectly valid seating — while presses 5 and 6
+ * separate them. Both are legal; only one should be offered first.
+ */
+export const separatedView = (fig: Derived): boolean => fig.coincidences.length === 0;
+
+/**
  * Before drawing, VERIFY the figure meets every requirement and, if not, LOOP over alternative
  * configurations — continuous (seeds) AND discrete (branch choices: which intersection / arc side / root) —
  * for one that does ([ADR-106](docs/06-decisions.md#adr-106)). Returns the chosen facts (branches set) +
@@ -1666,12 +1697,14 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
   let meetingScore = -1;
   if (meetsRequirements(facts, s0)) {
     const fig0 = replay(facts, s0);
-    if (spreadOk(fig0)) {
+    // #942 (ADR-486): a stacked view never short-circuits the search — it is remembered the same way a
+    // squashed one is, so the tiers below get their chance to find a seating that separates the labels.
+    if (spreadOk(fig0) && separatedView(fig0)) {
       lastConfigTier = 'current';
       return { facts, seed: s0 };
     }
     meetingOnly = s0;
-    meetingScore = spreadScore(fig0);
+    meetingScore = separatedView(fig0) ? spreadScore(fig0) : -0.5; // below every separated candidate
   }
   // ADR-142 acceptance (issue #19 / ADR-267): `firstSatisfyingSeed` may have returned its shared-endpoint
   // FALLBACK — every seed it examined failed the strict extension direction, so the RELAXED bar is the right
@@ -1931,6 +1964,12 @@ export function searchAnotherView(
   for (let r = 1; r < nSeat; r++) combos.push([0, 0, r]);
 
   let fallback: { facts: Fact[]; seed: number } | null = null;
+  /**
+   * #942 (ADR-486): a candidate that MEETS every requirement but stacks two named points is held back
+   * rather than returned. It is legal — it may even be the only seating — so it is kept as a tier above
+   * the relaxed `fallback`, and returned only if the whole search finds nothing separated.
+   */
+  let coincident: { facts: Fact[]; seed: number } | null = null;
   let k = 0;
   const total = combos.length * (hasDofs ? 4 : 1) + (hasDofs ? 24 : 0);
   for (const [b, v, r] of combos) {
@@ -1941,7 +1980,12 @@ export function searchAnotherView(
     for (const s of seeds) {
       if (Date.now() > deadline) break;
       onProgress?.(++k, total);
-      if (withSolveBudget(deadline, () => meetsRequirements(fc, s))) return { facts: fc, seed: s };
+      if (withSolveBudget(deadline, () => meetsRequirements(fc, s))) {
+        // #942: separated wins outright; coincident is remembered and only used if nothing else turns up.
+        if (withSolveBudget(deadline, () => separatedView(replay(fc, s)))) return { facts: fc, seed: s };
+        if (!coincident) coincident = { facts: fc, seed: s };
+        continue;
+      }
       if (!curStrict && !fallback && withSolveBudget(deadline, () => meetsRequirements(fc, s, true))) fallback = { facts: fc, seed: s };
     }
   }
@@ -1950,7 +1994,10 @@ export function searchAnotherView(
     const s = searchResample(facts, seed, (kk, n) => onProgress?.(Math.min(k + kk, total), Math.max(total, k + n)), Math.max(0, deadline - Date.now()));
     if (s !== null) return { facts, seed: s };
   }
-  return fallback;
+  // #942 (ADR-486): the coincident view is offered only now, with every separated option exhausted —
+  // "only when there is no other config". It still beats the RELAXED fallback, which fails a stated
+  // requirement rather than merely stacking two labels.
+  return coincident ?? fallback;
 }
 
 /** #85 ([ADR-293](docs/06-decisions.md#adr-293)) — is this derived state DRAWABLE? Positions exist and
