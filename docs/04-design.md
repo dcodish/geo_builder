@@ -107,6 +107,11 @@ src/
   store/         geoStore.ts (Zustand + zundo: the fact list as source of truth, actions,
                  rename/swap/merge; re-exports the replay layer), figureFile (save/load), loadAudit,
                  geoWork/geoWorker (the Web-Worker seam)
+                 — the drawn figure is `(facts, seed)`: a STRUCTURAL edit (remove/removeGroup/
+                   replaceGroup/toggle/setGroupEnabled) resets the seed to 0 so re-entering a line
+                   reproduces its first result, while undo/load/rename keep it (ADR-484, #938). The
+                   satisfying-seed search runs whenever the figure does not build at the current seed
+                   (`Derived.sampledFailure`), not only when it builds and looks bad.
   render/        transform + scene (pure figure→primitives) + Figure.tsx (declarative SVG, pan/zoom,
                  hover picks); a pure consumer of engine output
   theorems/      the authored theorem table + coverage disposition map + rank bands + audit harness
