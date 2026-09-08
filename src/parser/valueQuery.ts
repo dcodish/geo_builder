@@ -31,6 +31,17 @@ const rx = {
   perimeter: new RegExp(String.raw`^(?:ה?היקף\s+(?:של\s+)?|perimeter\s+(?:of\s+)?)((?:${PT}){3,})$`, 'i'),
   /** «AB» / «|AB|» — a bare pair is a LENGTH. Last, so it cannot swallow the named forms. */
   length: new RegExp(String.raw`^\|?(${PT})(${PT})\|?$`),
+  /**
+   * «x» / «α» / «x1» — a LETTER THE STUDENT NAMED (#929). Latin or Greek, optional digit subscript
+   * and prime, and it must be ALONE: it is tried after every other rule, so a pair «AB» is still a
+   * length and «שטח ABC» is still an area.
+   *
+   * Whether the letter means anything is not decided here — the engine answers from the figure's own
+   * symbol table, and a letter this figure never mentions comes back «not understood», exactly as an
+   * unrecognised string does today. That is why matching broadly costs nothing: the shapes this adds
+   * are precisely the ones that returned null before.
+   */
+  var: new RegExp(String.raw`^([A-Za-zΑ-ω]\d*'?)$`),
 };
 
 /** Split a glued label run («ABC», «A1B'C») into its individual labels. */
@@ -65,5 +76,7 @@ export function parseValueQuery(text: string): ValueQuery | null {
   }
   const l = s.match(rx.length);
   if (l && l[1] !== l[2]) return { kind: 'length', a: l[1], b: l[2] };
+  const v = s.match(rx.var);
+  if (v) return { kind: 'var', name: v[1] };
   return null;
 }

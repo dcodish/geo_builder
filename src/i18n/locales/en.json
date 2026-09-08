@@ -449,7 +449,7 @@
     "queryAdd": "Compute",
     "queryRemove": "Remove",
     "queryHint": "Type an angle, segment, area or perimeter — the value appears when the givens pin it",
-    "q.not-understood": "Not recognised — try ∠ABC, AB, area ABC or perimeter ABC",
+    "q.not-understood": "Not recognised — try ∠ABC, AB, area ABC, perimeter ABC, or a letter you named — x",
     "q.unavailable": "Those points are not in the figure",
     "q.undetermined": "Not determined by the givens",
     "q.pending": "waiting — press «compute values»",

@@ -96,7 +96,12 @@ src/
                  carrier pick), evaluate (topological sweep + the numeric driven solvers), step
                  (applyStep/applyCoupledStep + the failure ladder — contract in docs/LADDER.md, trace on
                  StepResult.ladder), sample, verify (givens verifier), relations/detectShapes (read-only
-                 detection over the shared sample core), inscribe/variants, solveBudget
+                 detection over the shared sample core), inscribe/variants, solveBudget,
+                 valuesPanel (the derived-values rows + the ask lane, over the ONE shared sample pool)
+                 - its SYMBOL lane (ADR-485, #929) reads the ADR-031 symbol table the #427 unit lane
+                   FILTERS, enumerated instead: every letter the student named is a quantity, so it gets
+                   a row (natun when valued, nigzar when the figure forces it) and is askable by name
+                   through the `var` query. One lane feeds both seams - never a second enumeration.
   parser/        parse.ts (deterministic bilingual grammar, ordered rules + post-pass chokepoints +
                  honesty gates), catalog, context (buildParseCtx — the docs/17 §3b registry), scope,
                  llm/llmShared (the LLM-fallback seam; re-parse + gate battery)

@@ -449,7 +449,7 @@
     "queryAdd": "חשב",
     "queryRemove": "הסר",
     "queryHint": "הקלידו זווית, קטע, שטח או היקף — הערך יוצג אם הנתונים קובעים אותו",
-    "q.not-understood": "לא זוהה — נסו ∠ABC, AB, שטח ABC או היקף ABC",
+    "q.not-understood": "לא זוהה — נסו ∠ABC, AB, שטח ABC, היקף ABC או אות שנתתם שם — x",
     "q.unavailable": "הנקודות האלו אינן בציור",
     "q.undetermined": "לא נקבע על ידי הנתונים",
     "q.pending": "ממתין לחישוב — לחצו «חשב ערכים»",

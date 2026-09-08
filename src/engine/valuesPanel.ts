@@ -19,7 +19,7 @@ import { polygonArea } from './geometry';
 import type { AnyCommand, Construction, Id, Vec } from './types';
 
 export interface ValueRow {
-  kind: 'length' | 'angle' | 'radius' | 'area' | 'perimeter';
+  kind: 'length' | 'angle' | 'radius' | 'area' | 'perimeter' | 'symbol';
   /** ids to highlight on the canvas when the row is clicked (endpoints / wedge / polygon / centre). */
   ids: Id[];
   /** the math label — 'AB', '∠ABC', 'O' (radius), 'ABC' (area). The App adds the i18n dressing. */
@@ -79,6 +79,62 @@ export function declaredLengthUnit(cmds: AnyCommand[]): DeclaredUnit | null {
   return bySym.size === 1 ? [...bySym.values()][0] : null;
 }
 
+/**
+ * A LETTER THE STUDENT NAMED IS A QUANTITY (#929, [ADR-485](docs/06-decisions.md#adr-485)).
+ *
+ * Operator, playing round #927: *"the data panel should know what x is."* On «AB = 3x, AC = x,
+ * BC = 10, ∠BAC = 120» the panel printed AB = 8.32 and AC = 2.77 and never said **x = 2.77**, though
+ * the figure determines it (the cosine rule gives 13x² = 100) — and «x» was not askable. The letter
+ * was first-class to the LOWERING (ADR-031's symbol table) and to the UNIT lane (#427), and was not a
+ * QUANTITY in either the panel or the ask lane: both grammars were built around named OBJECTS (a
+ * segment, a wedge, a polygon) and a named UNKNOWN was in neither.
+ *
+ * This is the same symbol table {@link declaredLengthUnit} reads, enumerated instead of filtered.
+ * The two differ deliberately:
+ *
+ *  - the UNIT lane needs exactly ONE symbol (two would make «CD = 1.5a» arithmetic the student never
+ *    wrote), and excludes a VALUED var because a pinned scale makes plain numbers the right answer;
+ *  - a QUANTITY has neither restriction. «AB = 3x, CD = 2y» names two letters and both are quantities,
+ *    and «x = 4» is the most knowable of all — it is a נתון.
+ *
+ * 3-D has done this since [ADR-3D-219](../../docs/06b-decisions-3d.md#adr-3d-219) (`figureSymbolsOf`,
+ * the DISPLAY registry of symbols with a solved value); this is that idea in 2-D's own terms.
+ */
+export type SymbolBinding = {
+  sym: string;
+  /** נתון (the student valued it outright) vs נגזר (the figure determines it). */
+  stated: boolean;
+} & (
+  | { via: 'value'; value: number }
+  /** |a→b| = coef · sym, so sym = |a→b| / coef. */
+  | { via: 'length'; a: Id; b: Id; coef: number }
+  /** ∠(ray1, vertex, ray2) = coef · sym — SCALE-FREE, so it prints under a free gauge too. */
+  | { via: 'angle'; vertex: Id; ray1: Id; ray2: Id; coef: number }
+);
+
+/**
+ * Every letter the student bound, with how the figure determines it.
+ *
+ * A binding qualifies on the same terms the unit lane uses — exponent 1, no additive constant, positive
+ * coefficient — because those are what make `sym = measure / coef` true rather than an inversion the
+ * student never asked for («12√x» and «k+2» are not linear multiples). A VALUED var wins over its
+ * geometric bindings: the student said what it is, so there is nothing to derive.
+ */
+export function symbolBindings(cmds: AnyCommand[]): SymbolBinding[] {
+  const out = new Map<string, SymbolBinding>();
+  // Valued first, so a geometric binding for the same letter never overwrites a stated value.
+  for (const c of cmds) if (c.type === 'set-var') out.set(c.name, { sym: c.name, stated: true, via: 'value', value: c.value });
+  const linear = (e: { coef: number; var: string; pow?: number; const?: number }): boolean =>
+    (e.pow ?? 1) === 1 && (e.const ?? 0) === 0 && e.coef > 0;
+  for (const c of cmds) {
+    if (c.type === 'measure-length' && 'var' in c.expr && linear(c.expr) && !out.has(c.expr.var))
+      out.set(c.expr.var, { sym: c.expr.var, stated: false, via: 'length', a: c.a, b: c.b, coef: c.expr.coef });
+    if (c.type === 'measure-angle' && 'var' in c.expr && linear(c.expr) && !out.has(c.expr.var))
+      out.set(c.expr.var, { sym: c.expr.var, stated: false, via: 'angle', vertex: c.vertex, ray1: c.ray1, ray2: c.ray2, coef: c.expr.coef });
+  }
+  return [...out.values()];
+}
+
 /** Areas in a fixed small-rational ratio though neither absolute value is known: S, 2S, ½S… */
 export interface AreaClassRow {
   /** polygon labels, e.g. ['ABD', 'ACD'] */
@@ -102,7 +158,9 @@ export type ValueQuery =
   | { kind: 'angle'; vertex: Id; ray1: Id; ray2: Id }
   | { kind: 'length'; a: Id; b: Id }
   | { kind: 'area'; ids: Id[] }
-  | { kind: 'perimeter'; ids: Id[] };
+  | { kind: 'perimeter'; ids: Id[] }
+  /** A letter the student named (#929) — «x», «α». Answered from the same lane that prints its row. */
+  | { kind: 'var'; name: string };
 
 /** Why a query could not be answered. Never a sampled number dressed as a fact (ADR-052). */
 /**
@@ -173,12 +231,18 @@ export function queryLabel(q: ValueQuery): string {
     case 'length': return `${q.a}${q.b}`;
     case 'area': return `(${q.ids.join('')})`;
     case 'perimeter': return `${q.ids.join('')}`;
+    case 'var': return q.name;
   }
 }
 
 /** The point ids a query refers to — all of them must exist before it can be answered. */
 const queryIds = (q: ValueQuery): Id[] =>
-  q.kind === 'angle' ? [q.ray1, q.vertex, q.ray2] : q.kind === 'length' ? [q.a, q.b] : q.ids;
+  q.kind === 'angle' ? [q.ray1, q.vertex, q.ray2]
+  : q.kind === 'length' ? [q.a, q.b]
+  // A var names no points of its own; whether its BINDING's points exist is decided where it is
+  // answered, so an unbound letter reads «not understood» rather than «not in the figure».
+  : q.kind === 'var' ? []
+  : q.ids;
 
 const invariant = (vals: number[]): number | null => {
   if (vals.length === 0 || vals.some((v) => !Number.isFinite(v))) return null;
@@ -211,6 +275,8 @@ export function computeValuesPanel(
   unit?: DeclaredUnit | null,
   /** the student's own questions (#477) — answered from THIS pool, never a second sampler (M3). */
   queries: QueryInput[] = [],
+  /** every letter the student named (#929) — printed as a row and askable by name. */
+  symbols: SymbolBinding[] = [],
 ): ValuesPanelResult {
   const c = constructions[0];
   const rows: ValueRow[] = [];
@@ -320,6 +386,48 @@ export function computeValuesPanel(
       const q = pos.get(b);
       return p && q ? dist(p, q) : null;
     });
+  }
+
+  // ---- the SYMBOL lane (#929, ADR-485) ---------------------------------------------------------
+  /**
+   * A letter is measured through its own binding, in the SAME pool as every other row (M3 — never a
+   * second sampler), so it obeys the same knowledge discipline: a number appears only when it is
+   * identical across every sampled configuration.
+   *
+   * The scale question splits the two binding kinds, and the split is the honest one:
+   *  - a LENGTH-bound letter is a magnitude, so it needs a pinned scale. Under a free gauge `x` IS the
+   *    unit and the unit lane already prints «AB = 3x»; printing `x = 2.77` there would assert the
+   *    drawing's own scale as a given ([ADR-052](docs/06-decisions.md#adr-052), the #426/ADR-421 rule).
+   *  - an ANGLE-bound letter is scale-free and prints whenever the shape is determined, exactly as the
+   *    angle rows beside it do.
+   *  - a VALUED letter needs no figure at all: the student said what it is.
+   */
+  const symbolMeasure = (b: SymbolBinding): Measure | null => {
+    if (b.via === 'value') return () => b.value;
+    if (b.via === 'length')
+      return (pos) => {
+        const p = pos.get(b.a);
+        const q = pos.get(b.b);
+        return p && q ? dist(p, q) / b.coef : null;
+      };
+    return (pos) => {
+      const V = pos.get(b.vertex);
+      const P = pos.get(b.ray1);
+      const Q = pos.get(b.ray2);
+      return V && P && Q ? angleAt(V, P, Q) / b.coef : null;
+    };
+  };
+  /** The points a symbol row highlights — its representative segment or wedge; a value has none. */
+  const symbolIds = (b: SymbolBinding): Id[] =>
+    b.via === 'length' ? [b.a, b.b] : b.via === 'angle' ? [b.vertex, b.ray1, b.ray2] : [];
+  for (const b of symbols) {
+    // A length-bound letter under a free gauge stays silent for the same reason a length does.
+    if (b.via === 'length' && !sized) continue;
+    const f = symbolMeasure(b);
+    if (!f) continue;
+    const val = per(f);
+    if (val === null) continue;
+    rows.push({ kind: 'symbol', ids: symbolIds(b), label: b.sym, value: val, exact: exactOrNull(val), stated: b.stated });
   }
 
   // ---- angles at polygon corners + stated wedges ------------------------------------------------
@@ -461,6 +569,25 @@ export function computeValuesPanel(
     if (!q) return { ...base, note: 'not-understood' as const };
     const ids = queryIds(q);
     if (ids.some((id) => !known.has(id))) return { ...base, note: 'unavailable' as const };
+
+    /**
+     * #929 — a letter is answered from the SAME lane that prints its row (M3: one pool, never a second
+     * sampler). The notes are the existing vocabulary, never a new register: a letter this figure never
+     * mentions is `not-understood` (it is not a quantity HERE, which is the truth), a length-bound
+     * letter under a free gauge is `scale`, and one the givens do not pin is `undetermined`.
+     */
+    if (q.kind === 'var') {
+      const b = symbols.find((x) => x.sym === q.name);
+      if (!b) return { ...base, note: 'not-understood' as const };
+      const bIds = symbolIds(b);
+      if (bIds.some((id) => !known.has(id))) return { ...base, ids: bIds, note: 'unavailable' as const };
+      if (b.via === 'length' && !sized) return { ...base, ids: bIds, note: 'scale' as const };
+      const f = symbolMeasure(b);
+      const val = f ? per(f) : null;
+      return val === null
+        ? { ...base, ids: bIds, note: 'undetermined' as const }
+        : { ...base, ids: bIds, value: val, exact: exactOrNull(val) };
+    }
 
     const measure: Measure =
       q.kind === 'angle'

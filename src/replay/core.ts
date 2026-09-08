@@ -15,7 +15,7 @@
 
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
 import { metricImpossibility } from '@/engine/metricFeasibility';
-import { computeValuesPanel, declaredLengthUnit, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
+import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
@@ -2289,8 +2289,12 @@ export function computeValues(facts: Fact[], queries: QueryInput[] = []): Values
   }
   // #427: the student's declared length unit («AB = a») — read off the ENABLED facts, so deselecting the
   // statement that named it returns the panel to plain magnitudes.
-  const unit = declaredLengthUnit(facts.filter((f) => f.enabled).map((f) => f.cmd));
-  return computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter, unit, queries);
+  const enabledCmds = facts.filter((f) => f.enabled).map((f) => f.cmd);
+  const unit = declaredLengthUnit(enabledCmds);
+  // #929 (ADR-485): every letter the student named, from the SAME symbol table the unit lane reads —
+  // enabled facts only, so deselecting the statement that named it removes its row with it.
+  const symbols = symbolBindings(enabledCmds);
+  return computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter, unit, queries, symbols);
 }
 
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */
