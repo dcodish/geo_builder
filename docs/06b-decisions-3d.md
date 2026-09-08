@@ -8509,3 +8509,86 @@ changing a working dedup on theory is the patch this round's rules forbid.)
 either statement order; the letter alone → one «α» arc; two genuinely different corners at one vertex and
 one ray pair at two vertices still separate; #923's own case unchanged; and the knee's single-knee
 measurement.
+
+### ADR-3D-229 — Every annotation `scene3` emits is sized in PIXELS; the angle arc was the last one that was not (#935)
+
+**Status:** accepted, 2026-09-08 · fix-round #940 · extends [#374](https://github.com/dcodish/geo_builder/issues/374)'s
+screen-space annotation rule from the right-angle knee to the arc lane, and amends
+[ADR-3D-221](#adr-3d-221) §the arc geometry (`r = 0.3·min arm`, label at `1.6r`) · **Requirements:** none
+(internal — legibility, no promise changes) · **Design:** [04b](04b-design-3d.md), rendering
+
+**Context.** Operator, playing round #931 (T11): *"the location of the 40 is very far from the angle and
+the angle itself is quite far from the point A."*
+
+Measured through the real `parse3 → derive3 → buildScene3` path at seed 0, 640×460 — the radius as its
+outer value, the gap from the arc's own mid point to the value beside it:
+
+| figure | arc radius | % of shortest projected arm | label gap from its arc |
+| --- | --- | --- | --- |
+| `פירמידה SABCD שבסיסה ריבוע` · `∠BAS = 40` | 113.9 px | **49 %** | 65.6 px |
+| `קובייה ABCD` · `∠BAC = 45` | 79.3 px | **52 %** | 47.2 px |
+| the pyramid from another camera | 104.9 px | 44 % | 53.0 px |
+
+So the arc reached halfway down the arm it annotates, and the value sat far enough away to belong to
+nothing in particular. The camera row is the second half of it: **one unchanged figure drew its arc at
+113.9 px from one view and 104.9 px from another**, because a world radius is whatever the projection
+makes of it. (Neither half was caused by round #931 — the same numbers appear on a figure with a single
+stated angle, which the #928 wedge dedup never touches.)
+
+**Root cause — a screen ANNOTATION sized in WORLD units, in all four arc producers.** The radius came from
+the figure's own dimensions — `Math.min(d1, d2) * 0.3` at a vertex and at a `seg-angle` crossing,
+`h * 0.38` for the dihedral and object-angle lanes — and the label sat at `r × 1.6` along the world
+bisector, 60 % beyond the arc **by construction** and only then projected. A label's offset from its arc
+is a quantity a reader measures with their eye; nothing about the world distance is meaningful to them.
+
+This is precisely the class [#374](https://github.com/dcodish/geo_builder/issues/374) fixed for the
+right-angle knee, whose docblock sits 270 lines below the arc code and says so: *"a knee is an ANNOTATION
+— its size belongs to the screen, not to the world."* The knee moved to `KNEE_PX / k`; **the arc never
+received that fix**, and gained a world-proportional label offset on top of it.
+
+**Decision.**
+
+1. **A producer records the WEDGE, not a baked arc.** `wAngles` carries `{ v, mk(r), clamp, text }` — the
+   corner, a builder at a given world radius, and the arm data for the clamp. The radius is chosen ONCE,
+   after the viewport fit is known, so all four producers get the same rule by construction instead of by
+   four copies of a constant.
+2. **`ARC_PX = 26`, a measured choice.** The old rule drew 113.9 px on the pyramid (49 % of its arm) and
+   79.3 px on the cube (52 %); a textbook angle mark reads at roughly a fifth of a short arm, and this
+   file's own screen constant is `KNEE_PX = 13` for a square whose diagonal is ~18 px. 26 px sits just
+   above that and holds a two-digit value comfortably. The world radius is `ARC_PX / k`, exactly as the
+   knee does it, so a wedge still foreshortens as a three-dimensional annotation should — what is pinned
+   is its SCALE, not its projection.
+3. **The clamp is taken on the PROJECTED arm** (`ARM_FRAC = 0.22`). A pixel radius alone is wrong when the
+   arms are genuinely short, and `Math.min(d1, d2)` in world units was the original defect — a
+   foreshortened arm is short on the page whatever it measures in the world. Measured: an arm of 43 px
+   gets an arc of 8.9 px rather than the flat 26.
+4. **The label is placed in pixels from the projected arc** (`LABEL_GAP_PX = 11`), outward along the
+   projected bisector, so the gap is the same on every figure and from every camera. Measured: 11.0 px in
+   all three rows above, against 65.6 / 47.2 / 53.0 before.
+5. **The arc no longer takes part in the viewport fit; its ANCHOR does.** Sizing in pixels needs `k`, and
+   `k` cannot depend on what it sizes. The anchor is what actually matters for framing — a dihedral seam
+   or a segment crossing can sit outside the point hull — while the arc's own points only ever ran INWARD
+   along the bisector and now measure a couple of dozen pixels. This is the same non-circularity the knee
+   already relies on (*"marks take no part in computing `k` … so reading it here is not circular"*).
+
+**Standing rule 1 — the class, swept.** Every annotation `scene3.ts` emits, and where its size comes from:
+
+| annotation | sized in | status |
+| --- | --- | --- |
+| right-angle knee | `KNEE_PX / k` | screen — #374 |
+| distance witness label | `+9 / −7` on the projected midpoint | screen |
+| vector name label | `mx + px * 17` on projected coordinates | screen |
+| axis label | `12 px` along the projected direction | screen |
+| point label | `LABEL_OFFSET` on the projected point | screen |
+| plane-crossing dot | projected point, constant radius | screen |
+| **angle arc + its label** | **`0.3 × world arm`, label at `1.6 r`** | **the one exception — this ADR** |
+
+So the file is now entirely screen-sized, and the sweep is the evidence rather than an assertion. Fixing
+the arc alone would have repeated #374; the table is here so the next annotation added is measured against
+it.
+
+**Locks.** `render/__tests__/issue-935-arc-screen-size.test.ts` — the radius and the label gap in stated
+pixel bands on the operator's figure and on a cube, a camera-invariance lock (the two views' radii within
+6 px, against 9.0 px apart on `main`), and a short-corner guard on a 43 px arm. All five **fail on `main`**
+with the numbers quoted above, and they assert the PROJECTED scene, because a world-space assertion passes
+on every broken build.

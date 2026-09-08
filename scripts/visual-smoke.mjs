@@ -56,7 +56,8 @@ export const APPS = {
     urlPath: '/3d.html',
     inputHint: 'הקלידו נתון',
     // he.json examples.ex1 / ex3 / ex5 — a solid, a derived point on it, and the vector notation.
-    sequence: ['קובייה ABCD', "M אמצע BB'", "נסמן: AB = u, AD = v, AA' = w"],
+    // #935: plus a STATED ANGLE, so the arc and its value are captured — the surface T11 reported.
+    sequence: ['קובייה ABCD', "M אמצע BB'", '∠BAC = 45', "נסמן: AB = u, AD = v, AA' = w"],
   },
   complex: {
     urlPath: '/complex.html',

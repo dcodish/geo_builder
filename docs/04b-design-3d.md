@@ -176,7 +176,13 @@ shared-apex `angle-seg-eq` claims, `angleMarks` — feeds it and it emits once p
 (the value once stated, the letter until then; the same rule the object-angle lane uses). A stated angle
 between two independent segments (`seg-angle`) is anchored on `meetingPoint` from `rightAngles.ts` — the
 one answer the knee uses for "do these meet" — and draws nothing for skew or off-ink pairs. `wedgeArc` is
-the one arc geometry (13 points, `r = 0.3·min arm`, label on the bisector at `1.6r`).
+the one arc geometry (13 points), and its RADIUS is a screen quantity
+([ADR-3D-229](06b-decisions-3d.md#adr-3d-229)): a producer records the wedge and a builder, and the
+radius is chosen once after the viewport fit as `min(ARC_PX, ARM_FRAC × shortest PROJECTED arm) / k`,
+with the value placed a fixed pixel gap outside the projected arc. The arc's ANCHOR takes part in the
+fit; its points do not, since they are chosen from `k`. **Every annotation this builder emits is sized
+in pixels** — the knee (#374), the witness and vector and axis and point labels, the crossing dots, and
+now the arc, which was the last world-sized one.
 
 ## Known gaps
 
