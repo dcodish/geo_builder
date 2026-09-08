@@ -178,6 +178,17 @@ between two independent segments (`seg-angle`) is anchored on `meetingPoint` fro
 one answer the knee uses for "do these meet" — and draws nothing for skew or off-ink pairs. `wedgeArc` is
 the one arc geometry (13 points, `r = 0.3·min arm`, label on the bisector at `1.6r`).
 
+**Row direction ([ADR-3D-228](06b-decisions-3d.md#adr-3d-228)).** A display row's base direction is a
+CONTENT decision and comes from `textDir3` — the shared seam 2-D's box and the shared `InputArea`
+preview already use — never from `dir="auto"`, which keys off the first strong character and so gives an
+LTR base to every fact opening with a Latin point label. Under an LTR base the isolated technical runs are
+neutral objects and the Hebrew words between them reverse against each other, so the row states something
+the student did not type. The decision lives in `factRowDir3` (`render/FactRow3.tsx`) beside the content
+routing, and an inventory lock bans `dir="auto"` in `src3d/` and `src-complex/` outside editable fields.
+Structural renderers carry their own direction: `VecMath` wraps a Hebrew row in an RTL container and emits
+each expression as one `<math dir="ltr">` island, so the row orders as Hebrew while the mathematics inside
+each island reads forward.
+
 ## Known gaps
 
 Recorded here because a design doc that omits its weakest properties is not describing the system.

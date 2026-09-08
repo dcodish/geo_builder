@@ -41,7 +41,7 @@ import { auditLoad3 } from './store/loadAudit3';
 import { useStore } from 'zustand';
 import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
 import { planeChipsByFact } from './store/planeChips';
-import { FactRowText3 } from './render/FactRow3';
+import { FactRowText3, factRowDir3 } from './render/FactRow3';
 import { VecMath } from './render/VecMath';
 
 /** #492/#425: the student's own statements, quoted and comma-joined, for a refusal that names the
@@ -710,9 +710,15 @@ export default function App3() {
                   ) : (
                     statusDot(derived.status[f.id])
                   )}
-                  <span dir="auto" className="min-w-0 flex-1 truncate text-sm">
+                  <span
+                    dir={factRowDir3(f, new Set(derived.construction.vectors.keys()))}
+                    className="min-w-0 flex-1 truncate text-sm"
+                  >
                     {/* #900 (ADR-3D-216): the routing lives in FactRow3, not in this callback — a decision
-                        inside a `rows={facts.map(...)}` ternary is one no test can reach. */}
+                        inside a `rows={facts.map(...)}` ternary is one no test can reach. #934
+                        (ADR-3D-228): and neither is the row's DIRECTION — this was `dir="auto"`, which
+                        keys off the first strong character, so every fact opening with a Latin label
+                        took an LTR base and its Hebrew words swapped. */}
                     <FactRowText3 f={f} vecNames={new Set(derived.construction.vectors.keys())} />
                   </span>
                   {/* #842 (ADR-3D-192): the chip goes on the row that MATERIALISED the plane, not on
@@ -952,13 +958,16 @@ export default function App3() {
                   },
                   {
                     /* #274 (ADR-3D-057): the query lane — a question, never a fact. #398
-                       (ADR-3D-108): per-ROW dir="auto" — a Hebrew query lays out RTL with the math
-                       tokens as isolated LTR islands; a symbol-only query (|AB|, w·v) stays LTR. */
+                       (ADR-3D-108): per-ROW direction — a Hebrew query lays out RTL with the math
+                       tokens as isolated LTR islands; a symbol-only query (|AB|, w·v) stays LTR.
+                       #934 (ADR-3D-228): that per-row direction comes from `textDir3`, not from
+                       `dir="auto"` — this comment's own neighbour at the relations section (#559)
+                       had already said why, and these rows start with a Latin label just as often. */
                     key: 'ask',
                     title: t('dataPanel.secAsk'),
                     dir: 'app',
                     rows: queryResults.map((r, i) => (
-                      <span key={r.text + i} dir="auto" className="flex items-center justify-between gap-2">
+                      <span key={r.text + i} dir={textDir3(r.text)} className="flex items-center justify-between gap-2">
                         <span>
                           <VecMath text={r.text} vecNames={new Set(derived.construction.vectors.keys())} />
                           {r.answer !== null ? (

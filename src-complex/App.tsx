@@ -618,7 +618,15 @@ export function App() {
                   title: t('secAsk'),
                   dir: 'app',
                   rows: askRows.map((r, i) => (
-                    <span key={`${r.text}-${i}`} dir="auto" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                    <span
+                      key={`${r.text}-${i}`}
+                      /* #934 (ADR-3D-228, adopted here): a DISPLAY row's base direction comes from the
+                         shared content seam, never from `dir="auto"` — an ask row routinely opens with a
+                         Latin symbol («z1 שווה…»), and auto keys off the first strong character, which
+                         reorders the Hebrew words around the isolated technical runs. */
+                      dir={complexBidi.textDir(r.text)}
+                      style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}
+                    >
                       <span>
                         <AskText text={r.text} />
                         {r.note !== null ? (

@@ -8509,3 +8509,93 @@ changing a working dedup on theory is the patch this round's rules forbid.)
 either statement order; the letter alone → one «α» arc; two genuinely different corners at one vertex and
 one ray pair at two vertices still separate; #923's own case unchanged; and the knee's single-knee
 measurement.
+
+### ADR-3D-228 — A row's base direction is a CONTENT decision owned by `textDir`; `dir="auto"` is banned on a display surface (#934, #933)
+
+**Status:** accepted, 2026-09-08 · fix-round #940 · adopts the [ADR-312](06-decisions.md#adr-312)/#118 seam
+in `src3d/` and `src-complex/`, and corrects the mechanism recorded in #933
+· **Requirements:** none (internal — RTL correctness is already FR) · **Design:**
+[04b](04b-design-3d.md), rendering
+
+**Context.** The operator, playing round #931: *"still we have a bidi issue on the display of the input. I
+want you to do a more detailed review on this matter and fix the root cause and not case by case."* The
+fact row had been "fixed" five times — [ADR-3D-116](#adr-3d-116), [ADR-3D-121](#adr-3d-121),
+[ADR-3D-123](#adr-3d-123), [ADR-3D-156](#adr-3d-156), [ADR-431](06-decisions.md#adr-431) — and every one of
+those fixes was real. They all hardened **string isolation**: `isolateLtrRuns3` returning the right
+characters. Every one of their locks asserts a STRING, and the string was correct on every broken build.
+
+Measured in a real browser (Playwright, per-glyph `Range` rectangles on `/3d.html`), the row the operator
+was looking at:
+
+```
+typed     K על AA' כך ש-AK = 2KA'
+before    dir attr "auto" → resolved LTR    visual L→R:  K · כך ש · AA' · על · -AK = 2KA'
+                                            i.e. it read «K כך ש AA' על AK = 2KA'»
+after     dir attr "rtl"  → resolved RTL    visual L→R:  AK = 2KA' · - · כך ש · AA' · על · K
+                                            an RTL row reads right-to-left: «K על AA' כך ש-AK = 2KA'» ✓
+```
+
+**Root cause.** `src3d/App3.tsx` set `dir="auto"` on the fact row (`:713`) and on the ask row (`:961`).
+`dir="auto"` resolves an element's base direction from its **first strong character**, and a 3-D fact
+routinely opens with a Latin point label — «K על …», «E אמצע AB», «∠BAS = 40», «t = 1/4». Those rows took an
+LTR base while «תיבה …»/«פירמידה …» stayed RTL.
+
+**And the isolation is what turns a wrong base direction into a swap.** `isolateLtrRuns3` wraps each LTR run
+in U+2066…U+2069, which the bidi algorithm treats as one neutral object. Under an LTR base the row is
+`OBJ על OBJ כך ש- OBJ`; the neutral between two RTL runs resolves to RTL, so «על», the isolate and «כך ש-»
+become **one** level-1 run and reverse together. The mechanism that protects the technical runs is precisely
+what glues the Hebrew words into a reversed block — and under an RTL base the same isolates are harmless.
+
+The lesson was already written down in three places, with the helper beside it: `shell/bidi.ts`
+(*"`dir="auto"` keys off the FIRST strong character and gets «C במרחק…» wrong; the #118/ADR-312 lesson"*),
+`shell/frame/InputArea.tsx` (*"never `dir="auto"`"*) and `src3d/i18n/bidi.ts` (the same warning again).
+2-D adopted `textDir` for its box and preview; **3-D's fact row never did** — and the same file's own
+relations section (#559) had already switched to `textDir3` for exactly this reason, four hundred lines
+below the row that had not.
+
+**Decision.**
+
+1. **A display row's `dir` comes from `textDir3(<the string the renderer receives>)`.** For a vector fact
+   that string is `factDisplay3(f, vecNames)`, not the raw utterance, or the container and its content can
+   disagree about what the row is. The decision lives in `factRowDir3` in `render/FactRow3.tsx`, beside the
+   content routing and for the same [ADR-3D-216](#adr-3d-216) reason: a `dir` written inline in a
+   `rows={facts.map(...)}` callback is a decision no test can reach, which is how this survived.
+2. **`dir="auto"` is banned in `src3d/` and `src-complex/` product code**, enforced by an inventory lock
+   rather than advice — the advice existed and was not enough. The allowlist holds exactly one entry: the
+   complex ask **input**, an editable field that must re-resolve per keystroke (forcing a direction on an
+   editable value is what #118 reverted).
+3. **The sibling adoption travels with it.** The class is *"a surface that derives its base direction from
+   the TEXT ITSELF rather than from the shared `textDir` seam"*, so `src-complex/App.tsx`'s ask display row
+   moves to `complexBidi.textDir` in the same change. #934's own sweep reported complex as clean because it
+   measured only rendered elements and the complex ask lane was empty; the grep is the honest sweep.
+4. **`shell/`'s `dir={editDir ? editDir(...) : 'auto'}` fallbacks stay.** They are defaults for props a
+   caller supplies, on **editable** fields, and shell may not decide a product's direction policy for it.
+   The lock is on the product trees, which is where the policy belongs.
+
+**#933 — the vector row does NOT read backwards, and this is the correction.** #933 was filed from the same
+operator report with a different mechanism: *"`VecMath` emits each token as its own element, and a sequence
+of LTR islands with no isolate and no LTR container is laid out by the paragraph direction"*, concluding the
+«נסמן: AB = u, AD = v, AS = w» list ran in reverse. **Measured, that premise is false.** `VecMath` already
+wraps a Hebrew row in `<span dir="rtl" style="unicode-bidi:isolate">` and emits the expression as ONE
+`<math dir="ltr">` island ([ADR-3D-196](#adr-3d-196)/#848, whose lock asserts exactly that island count):
+
+```
+<span dir="rtl"><span>נסמן: </span><math dir="ltr">AB→ = u_, AD→ = v_, AS→ = w_</math></span>
+```
+
+In the browser this lays out with «נסמן:» **rightmost** and the island to its left reading internally
+left-to-right — which an RTL reader reads as «נסמן: AB = u, AD = v, AS = w», the typed order. #933's
+x-position table records those same positions; the reversal was in reading the island's LTR contents
+right-to-left by hand. The row's only real defect was the one this ADR fixes: its outer span resolved LTR
+(`dir="auto"` skips content inside an isolate when looking for a first strong character, and the whole row
+IS an isolate), so it left-aligned in a right-aligned panel — the ragged look in the screenshot. Both rows
+are correct after (1). **No LTR container was added to `VecMath`**, and none should be: doing so would have
+been a change with no defect under it.
+
+**Locks.** `issue-934-row-direction.test.tsx` — a battery of Hebrew rows (Latin-first, symbol-first,
+Hebrew-first, and the vector row) each asserting `rtl`, a Latin-only row asserting `ltr` so this is not
+"always RTL", and the first-strong rule spelled out so the regression is legible without a browser.
+`issue-934-dir-auto-ban.test.ts` — the inventory, which fails on the pre-fix tree naming all four offenders.
+`scripts/visual-smoke.mjs` gains «K על BB' כך ש-BK = 2KB'» to the 3-D sequence: a Latin-first row with
+Hebrew words on **both** sides of a technical run, which is the shape that reorders and which no screenshot
+in that file held.
