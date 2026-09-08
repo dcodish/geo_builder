@@ -8747,3 +8747,105 @@ asserted **byte-unchanged** (the guard that this is an addition, not a rewrite);
 over the registries themselves — every displayable symbol has an owner, and the letters this figure binds
 are both addressable and displayable — on a figure that carries the previously-missing kinds, so it is
 exercised rather than vacuous.
+
+### ADR-3D-231 — The rider-ratio chokepoint reads BOTH ratio shapes, and the symbolic coefficient with them (#932)
+
+**Status:** accepted, 2026-09-08 (fix-round #946, item 4) · **Issue:** #932 · **Approved:** operator, 2026-09-08 (*"Approve both"*)
+**Requirements:** none (internal — FR already promises the given holds; this is a spelling reaching it)
+**Design:** [04b](04b-design-3d.md) §apply — the retarget chokepoint's reading · **Ladder:** pre-apply normalisation (docs/LADDER — before any stage; the statement is rewritten into the given it is)
+
+#### The report, and what measurement changed about it
+
+Found in round #931 while fixing #921. «E על SA» then «SE = t·SA» then «t = ½» — declare the rider, then
+say what pins it, the incremental order this product is built around — refused `no-solution: S`, then
+`unknown-symbol: t`. The issue's own diagnosis was *"the `vec-rel` arm reads that as a DEFINITION of an
+unknown point, finds `E` taken, and falls through"*, and its fix sketch was *"lower it to the
+`point-on-segment3` given — the branch #748 already built"*.
+
+That is right in substance and one seam off in location, which matters because the sketch would have
+fixed one spelling. **Measured at HEAD**, all six spellings of the same student intent on
+`פירמידה SABCD שבסיסה ריבוע` + `נסמן: AB = u, AD = v, AS = w`:
+
+| spelling | before |
+| --- | --- |
+| «E על SA כך ש-SE = t·SA» · «t = ½» — the clause, letter | ✔ E at the midpoint |
+| «E על SA כך ש-SE = 0.5·SA» — the clause, number | ✔ |
+| «SE = t·SA» · «t = ½» — the vec-rel alone | ✔ |
+| «E על SA» · «SE = 1·EA» — two facts, the HALVES shape | ✔ *(#748's path)* |
+| **«E על SA» · «SE = t·SA» · «t = ½»** — two facts, letter | ✘ `no-solution: S` → `unknown-symbol: t` |
+| **«E על SA» · «SE = 0.5·SA»** — two facts, NUMBER | ✘ `claim-refuted` |
+
+The last two rows locate the class, and the fourth row refutes the framing. It is **not** *"the `vec-rel`
+arm cannot see an existing rider"* — the halves shape as two facts has worked since #748. It is that the
+shared retarget chokepoint (`riderRatioRetarget`, at `applyCommand3Inner`'s entry) read only **one of the
+two ratio SHAPES**:
+
+- **halves vs halves** — `|aR| = k·|Rb|`, «SE = 1·EA» — read by `riderPairsT`, reachable from parse3 and
+  from apply alike since #748;
+- **half vs the WHOLE host** — `|aR| = k·|ab|`, «SE = t·SA», *the exam's own rider idiom* — read by
+  `riderWholeSide`/`riderWholeT` (ADR-3D-224), and reachable **only from parse3's `onSegment` clause rule**.
+
+And on top of that, the reader excluded a symbolic coefficient outright (`if (cmd.symbol) return null`).
+So the numeric whole-host twin failed too, one line apart from a working sibling, and **no report had ever
+named it** — the letter version was reported because the exam uses a letter.
+
+#### The decision
+
+**A ratio statement about a free rider is read by the RIDER at the one chokepoint, in every shape and with
+either kind of coefficient.** #748's own rule (*"the reading belongs to the rider, not to the utterance
+that happened to declare it"*), applied to the shape axis it had not yet reached.
+
+1. **`ratioHalves` becomes `ratioStatement`**, and its coefficient becomes `{ k: number } | { sym: string }`.
+   A `vec-rel` carrying a symbol is read when the coefficient is the **bare** letter (`k = 0, p = 1`) —
+   `t` *is* the ratio. Anything richer (`2t`, `t + 1`) is a linear expression this closed-form reading has
+   no arithmetic for and falls through untouched, as before.
+2. **`riderRatioRetarget` tries both shapes** per orientation. The whole-host arm offers every label of the
+   half-side pair to `riderWholeSide`, which validates the shape itself — rather than pre-filtering with
+   the directed chain rule, which is exactly what made this unreachable (for «SE = t·SA» the chain test
+   `P[1] === Q[0]` asks `E === S` and yields no candidate at all).
+3. **A symbolic coefficient is read in the stated orientation only.** The numeric arm also tries the
+   flipped spelling («SA = 2·SE» is «SE = ½·SA»); a letter has no reciprocal to write down — `1/t` is not a
+   name — so the flipped symbolic spelling falls through rather than being guessed at.
+4. **`point-on-segment3` gains the existing-rider `sym` branch.** #748 gave that branch a numeric `t`
+   («the rider exists and is free, so a stated `t` DETERMINES it»); the symbolic twin had no branch, so a
+   retarget carrying `sym` would have fallen to the claim lane. It is **name-only**, exactly as the clause
+   spelling: the rider keeps sampling its `t`, and all that is recorded is that a later «t = ½» has an
+   owner. `symFromB` is normalised against the rider's **stored** host, the same way the `t` branch
+   normalises with `1 − t`, so «AE = t·AS» on a rider stored as S–A binds the right end.
+
+#### The blame half (ADR-3D-225's rule, this arm)
+
+The `vec-rel` arm's fall-through refused with `{ code: 'no-solution', id: cmd.from }`, so «SE = t·SA»
+reported «אין מיקום של **S** שמקיים את התנאי» — S being the pyramid's **apex**, a determined vertex the
+sentence says nothing about and whose position was never in question. It now names `cmd.to`, the head of
+the stated vector: the one point the statement is trying to place, and the only one a student would
+recognise as its subject.
+
+The other reported blame, `unknown-symbol: t`, needs **no change and gets none** — measured, it was the
+*consequence* of the first refusal (the statement that would have named `t` was rejected, so the letter
+genuinely had no owner when «t = ½» arrived). With the retarget in place the naming statement commits and
+the value lands. A fix aimed at that message would have been the symptom patch.
+
+#### Sweep — what else could have the same shape
+
+The question the plan asked: which other two-fact spellings reach a `vec-rel` arm whose one-fact sibling is
+already lowered? Answered by enumeration over `ratioStatement`'s own readers rather than by guess: the
+three command shapes it reads (`vec-rel`, `length-rel`, the `length-ratio` claim) now all reach both ratio
+shapes, so the numeric length spellings («|SE| = 0.5|SA|», «SE:SA = 1:2») gain the whole-host reading in
+the same change. The symbolic arm is `vec-rel`-only because that is the only shape whose grammar carries a
+symbol today.
+
+#### Locks
+
+`__tests__/issue-932-rider-ratio-two-facts.test.ts` (9). The load-bearing one is the **equivalence** lock —
+the defect is a divergence between paths, so what must hold is that all seven spellings (including the
+flipped whole-host one) draw the *same* figure, not that one of them works. Plus: the operator's exact
+sequence with all five statements committed; the letter reaching `symbolOwnersOf` identically from the
+two-fact and clause spellings (#902's one resolver); the flipped-host normalisation; and four guards that
+nothing which refused for a good reason now builds — a ratio that would push the rider off its host, a
+rider whose `t` is already stated (still a claim, still refuted), first-binding-wins across spellings, and
+the re-blamed refusal asserted **unconditionally** on an isolated construction rather than behind an
+`if (lastError)` that could pass by checking nothing.
+
+**No fixture.** The essence is bespoke (an equivalence between paths), and `GEN_FIXTURES3` currently
+rewrites the entire seeded corpus on any addition — the defect #916 fixes in this same round.
