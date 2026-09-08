@@ -9368,3 +9368,70 @@ constant fails rather than silently passing), the operator's exact delete-and-re
 append-at-a-broken-seed case with no delete involved (defect 2 alone), the undo carve-out asserting facts
 AND seed are byte-identical to before the delete, a toggle resetting, a rename not resetting, and the
 banner/owner agreement above.
+
+## ADR-485 — A LETTER THE STUDENT NAMED IS A QUANTITY: printed when the figure determines it, askable by name (#929)
+
+**Status:** accepted, 2026-09-08 · fix-round #940 · extends [ADR-410](#adr-410) (the values panel gains a
+row kind) and [ADR-477](#adr-477)/#477 (the ask lane gains a query kind); reads the
+[ADR-031](#adr-031) symbol table the #427 unit lane already reads · **Requirements:**
+[02](02-requirements.md) FR-RV-7 · **Design:** [04](04-design.md), the values panel
+
+**Context.** Operator, playing round #927 (T9): *"the data panel should know what x is."* The figure:
+
+```
+משולש ABC · AB = 3x · AC = x · BC=10 · ∠BAC = 120
+```
+
+The panel listed AB = 8.32, AC = 2.77, BC = 10 as נתון and the other angles, the area and the perimeter as
+נגזר — and never said **x = 2.77**, although the figure determines it (the cosine rule gives 13x² = 100, so
+x = 10/√13). Asking «x» answered *"לא זוהה"*.
+
+Measured at `7f55e3e`: the symbol table knows the letter (`declaredLengthUnit` returns
+`{sym: x, a: A, b: B, coef: 3}` on that very figure) and the unit lane uses it — with the scale free the
+panel prints «AB = 3x», «BC = √13·x». So the letter was first-class to the LOWERING and to the UNIT lane,
+and a QUANTITY in neither the panel nor the ask lane. **Two seams, one gap:** both grammars were built
+around named OBJECTS — a segment, a wedge, a polygon — and a named UNKNOWN was in neither.
+
+Not a bug: nothing shown was wrong, a quantity that could be shown was not. Relabelled `feature` per
+CLAUDE.md and routed as a PR.
+
+**Decision — ONE symbol lane feeds both seams** (docs/17 §3: no second enumeration; M3: one sample pool).
+
+1. **`symbolBindings(cmds)`** enumerates the symbol table `declaredLengthUnit` filters. A binding
+   qualifies on the same terms the unit lane uses — exponent 1, no additive constant, positive
+   coefficient — because those are what make `sym = measure / coef` true rather than an inversion the
+   student never wrote («12√x», «k+2»). Three kinds: a `set-var` value, a length binding
+   («AB = 3x» ⇒ x = |AB|/3), an angle binding («∠ABC = α»). A valued letter wins over its geometric
+   bindings: the student said what it is, so there is nothing to derive.
+2. **The two lanes differ deliberately, and this is why it is a second READING rather than a reuse.**
+   The unit lane needs exactly ONE symbol (two would make «CD = 1.5a» arithmetic the student never wrote)
+   and excludes a valued var (a pinned scale makes plain numbers the right answer). A quantity has neither
+   restriction: «AB = 3x, CD = 2y» names two letters and both are quantities, and «x = 4» is the most
+   knowable of all.
+3. **A `symbol` row**, measured in the same pool as every other row and through the same seed-invariance
+   gate (`per`). A valued letter is **נתון**; a determined one is **נגזר**.
+4. **The scale discipline is unchanged, and it splits the binding kinds honestly.** A LENGTH-bound letter
+   is a magnitude and needs a pinned scale — under a free gauge `x` IS the unit, the unit lane already
+   prints «AB = 3x», and printing `x = 1.94` there would assert the drawing's own scale as a given
+   ([ADR-052](#adr-052), the [#426](#adr-421) rule). An ANGLE-bound letter is scale-free and prints
+   whenever the shape is determined, exactly as the angle rows beside it do.
+5. **A `var` query**, answered from the same lane, with the EXISTING note vocabulary and no new register:
+   a letter this figure never mentions is `not-understood` (it is not a quantity *here*, which is the
+   truth, and it is the pre-#929 answer unchanged), a length-bound letter under a free gauge is `scale`,
+   one the givens do not pin is `undetermined`. The rule is tried LAST in `parseValueQuery`, after every
+   named form, so «AB» is still a length and «שטח ABC» still an area — the shapes it newly matches are
+   precisely the ones that returned null before.
+6. **Clicking a symbol row highlights what binds it** — the segment «AB = 3x» annotates, or the wedge
+   «∠ABC = α». A valued letter binds to no ink and highlights nothing, which is honest: it came from the
+   student, not from the figure.
+
+**Precedent.** 3-D has printed solved symbols since [ADR-3D-219](06b-decisions-3d.md#adr-3d-219)
+(`figureSymbolsOf`, the DISPLAY registry of symbols with a solved value — «k = ½», «p = 3»). This is that
+idea in 2-D's own terms, pattern-copied and not imported (docs/20 §12).
+
+**Locks.** `engine/__tests__/issue-929-symbol-quantity.test.ts`: the operator's figure printing x = 10/√13
+and the AC row agreeing with it to 1e-6; «x» asked returning the same number; the free-gauge case
+producing NO row and a `scale` note with the #427 unit rows asserted byte-unchanged; a valued letter as a
+נתון row; TWO letters (the case that proves the lanes are separate readings); an angle letter at 70° on a
+scale-free figure; an unmentioned letter still `not-understood`; and the parser precedence battery showing
+the var rule cannot swallow «AB», «שטח ABC» or «∠ABC».

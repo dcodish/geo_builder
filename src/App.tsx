@@ -1473,6 +1473,12 @@ export default function App() {
                           const hl: [Id, Id][] =
                             r.kind === 'length' ? [[r.ids[0], r.ids[1]]]
                             : r.kind === 'angle' ? [[r.ids[1], r.ids[0]], [r.ids[1], r.ids[2]]]
+                            // #929 (ADR-485): a SYMBOL row highlights whatever binds it — the segment
+                            // the student wrote «AB = 3x» on, or the wedge «∠ABC = α» — so clicking «x»
+                            // shows where the letter comes from. A valued letter («x = 4») binds to no
+                            // ink and highlights nothing, which is honest: it came from the student.
+                            : r.kind === 'symbol' && r.ids.length === 2 ? [[r.ids[0], r.ids[1]]]
+                            : r.kind === 'symbol' && r.ids.length === 3 ? [[r.ids[0], r.ids[1]], [r.ids[0], r.ids[2]]]
                             : (r.kind === 'area' || r.kind === 'perimeter') && r.ids.length >= 3 ? r.ids.map((id, k) => [id, r.ids[(k + 1) % r.ids.length]] as [Id, Id])
                             : [];
                           setValueHl((cur) => (cur && JSON.stringify(cur) === JSON.stringify(hl) ? null : hl));
