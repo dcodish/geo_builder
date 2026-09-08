@@ -472,8 +472,16 @@ function commitCommands(
     // start the same search the extension/meet breaks do; before, the gate never asked, so the stack
     // was drawn even though seeds that separate the pair exist.
     if (
-      fig.lastError === null &&
-      (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig) || !pointsDistinct(fig.construction, fig.positions, fig.coincidences))
+      // #938 ([ADR-484](docs/06-decisions.md#adr-484)): the search was armed ONLY for a figure that
+      // builds and looks bad, and disarmed for the one case that needs it most — a figure that does not
+      // build at this seed at all. `fig.lastError === null` read as "the view is worth improving"; a
+      // broken view is not worth improving, it is worth REPLACING. `sampledFailure` is the licence: the
+      // fold accepted these rows, so a configuration where every given holds demonstrably exists
+      // (ADR-476), and 197 of 200 seeds draw the operator's figure while the tool sat on one of the 3.
+      // A genuine contradiction leaves the flag false and still refuses at once — no futile sweep.
+      fig.sampledFailure ||
+      (fig.lastError === null &&
+        (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig) || !pointsDistinct(fig.construction, fig.positions, fig.coincidences)))
     ) {
       const s = firstSatisfyingSeed(next, seed);
       if (s !== seed) {
@@ -535,25 +543,51 @@ export const useGeoStore = create<GeoState>()(
         set({ facts: get().facts.map((f) => (f.id === id ? { ...f, cmd, utterance } : f)) });
       },
 
+      /**
+       * A STRUCTURAL EDIT RESETS THE SEED (#938, [ADR-484](docs/06-decisions.md#adr-484)) — the
+       * operator's ruling, 2026-09-08: *"option a is the right one"*.
+       *
+       * The four actions below all change WHICH FACTS REPLAY, and the configuration the student had
+       * cycled to was chosen for a different fact list. Leaving the seed behind is how the operator's
+       * report happened: ~18 «הצג תצורה אחרת» presses walked the session onto a seed, deleting the
+       * square left that seed in place, and re-typing the identical line replayed it there — *"the same
+       * line was there a second ago"*. Not non-determinism, and not a parser regression: hidden state
+       * the student could not see and did not choose. After the reset, the same input gives the same
+       * figure, which is the model a student actually holds.
+       *
+       * The cost the operator accepted with it, recorded so nobody re-opens it: deleting an unrelated
+       * line discards a configuration chosen with «הצג תצורה אחרת», and it must be cycled to again.
+       *
+       * WHAT DOES **NOT** RESET, and the reasons are not symmetric:
+       *  - **undo / redo** — `zundo` restores a prior STATE, and the store already restores `facts` and
+       *    `seed` together. Resetting here would make undo not the inverse of the action it undoes; an
+       *    undone delete must put back the seed the delete cleared. This is the carve-out a naive
+       *    reading of the ruling gets wrong, and it has its own lock.
+       *  - **load a saved file** — `seed: file.seed` IS the saved configuration.
+       *  - **swap / rename** — relabelling, not a change to the construction.
+       *  - **submitting a new fact** — an append, not an edit; `commitCommands` runs its own search.
+       */
       toggle: (id) => {
-        set({ facts: get().facts.map((f) => (f.id === id ? { ...f, enabled: !f.enabled } : f)) });
+        set({ facts: get().facts.map((f) => (f.id === id ? { ...f, enabled: !f.enabled } : f)), seed: 0 });
       },
 
       remove: (id) => {
         set({
           facts: get().facts.filter((f) => f.id !== id),
           selectedId: get().selectedId === id ? null : get().selectedId,
+          seed: 0,
         });
       },
 
       setGroupEnabled: (key, enabled) => {
-        set({ facts: get().facts.map((f) => (groupKey(f) === key ? { ...f, enabled } : f)) });
+        set({ facts: get().facts.map((f) => (groupKey(f) === key ? { ...f, enabled } : f)), seed: 0 });
       },
 
       removeGroup: (key) => {
         set({
           facts: get().facts.filter((f) => groupKey(f) !== key),
           selectedId: get().selectedId === key ? null : get().selectedId,
+          seed: 0,
         });
       },
 
@@ -579,11 +613,17 @@ export const useGeoStore = create<GeoState>()(
         // extension's directional order, a segment-meet, or point DISTINCTNESS (#232/ADR-378) at the
         // current seed just like an appended one — search upward for a satisfying view in the SAME
         // transition (one undo restores both, ADR-241).
-        const seed = get().seed;
+        // #938 (ADR-484): an EDIT is a structural edit, so the seed resets first — the edited line is a
+        // different statement and the configuration chosen for the old one has no claim on it — and the
+        // search then runs from 0. Reset-then-search, in that order, or the search would start from a
+        // seed the edit has just made meaningless.
+        const seed = 0;
+        patch.seed = seed;
         const fig = replay(next, seed);
         if (
-          fig.lastError === null &&
-          (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig) || !pointsDistinct(fig.construction, fig.positions, fig.coincidences))
+          fig.sampledFailure ||
+          (fig.lastError === null &&
+            (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig) || !pointsDistinct(fig.construction, fig.positions, fig.coincidences)))
         ) {
           const s = firstSatisfyingSeed(next, seed);
           if (s !== seed) {

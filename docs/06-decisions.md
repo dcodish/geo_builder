@@ -9290,6 +9290,85 @@ the humanised message names the letter; the ✎ seam's note, its clearing on the
 on an edit that orphans nothing. (A corpus scenario cannot express "then delete row 2", so the lock is a
 unit test on the real pipeline rather than a `SCENARIOS` entry.)
 
+## ADR-484 — A STRUCTURAL EDIT RESETS THE SEED, AND A FIGURE THAT DOES NOT BUILD IS REPLACED RATHER THAN SHOWN (#938)
+
+**Status:** accepted, 2026-09-08 · fix-round #940 · extends [ADR-476](#adr-476) (the sampled-value guard
+gains a structural twin) and [ADR-474](#adr-474) (the satisfying-seed search's early return); **upholds**
+[ADR-398](#adr-398) against this issue's third clause · **Requirements:**
+[02](02-requirements.md) — the source of truth is `(facts, seed)`, and a structural edit resets the seed ·
+**Design:** [04](04-design.md), the store's edit actions
+
+**Context.** Operator, 2026-09-08, session `gdqn7w0n`: *"at first run the square was drawn in the triangle
+correctly. pressing show another config, took me through cases … next i delete the square line and tried to
+re-enter it and now its refused although the same line was there a second ago."*
+
+Measured through the real parse→store→replay path, `['משולש ABC', 'זוית B ישרה', 'ריבוע DEFG חסום במשולש ABC']`
+at 200 seeds: **197 build, 3 refuse — seeds 4, 37, 139**. At a refusing seed the evaluate fails, so nothing
+at all is placed (`positions.size === 0`) and the banner reads *"not determined: B, A, C are still free, so
+∠ABC = 90° cannot be judged in this configuration"*.
+
+The whole report, reproduced in the store:
+
+```
+after build      seed=0  builds
+forced seed 4    seed=4  refuses          ← what ~18 «הצג תצורה אחרת» presses reached
+after delete     seed=4  builds (4 facts) ← the seed SURVIVED the delete
+after re-enter   seed=4  refuses          ← "the same line was there a second ago"
+```
+
+Not non-determinism and not a parser regression: hidden state the student could not see and did not choose.
+
+**Two defects compose, and the second is the one this issue's plan did not name.**
+
+1. `remove`/`removeGroup` dropped the fact and never touched `seed`.
+2. **The satisfying-seed search was armed for a figure that builds and looks bad, and disarmed for a
+   figure that does not build at all.** Both `commitCommands` and `replaceGroup` gated it on
+   `fig.lastError === null`, and `firstSatisfyingSeed` itself returns `from` unexamined unless the figure
+   carries a DISCRETE requirement (an extension's far side, a meet within its span, a crossing). This
+   figure has none, so a caller could ask for a satisfying configuration, be handed the failing one back,
+   and have no way to tell — while 197 of 200 seeds drew it.
+
+**Decision.**
+
+1. **A structural edit resets the seed to 0** — the operator's ruling (*"option a is the right one"*), and
+   the cost he accepted with it: deleting an unrelated line discards a configuration chosen with «הצג תצורה
+   אחרת» and it must be cycled to again. Applies to `remove`, `removeGroup`, `replaceGroup`, `toggle` and
+   `setGroupEnabled` — every action that changes WHICH FACTS REPLAY. It does **not** apply to undo/redo
+   (a state restore; undo must put back the seed the delete cleared, or it stops being the inverse of the
+   action it undoes), to loading a file (`seed: file.seed` IS the saved configuration), to swap/rename
+   (relabelling), or to submitting a new fact (an append, which runs its own search).
+2. **`Derived.sampledFailure`** — the structural twin of the message ADR-476 writes. `true` when this
+   seed's sample broke a figure the FOLD accepted, which by ADR-476's own premise means a configuration
+   where every given holds demonstrably exists. It is the licence to look for one, and a caller can now ask
+   that question without matching a string.
+3. **A figure that does not build is replaced, not shown.** `sampledFailure` arms the search in
+   `commitCommands` and `replaceGroup`, and lifts `firstSatisfyingSeed`'s early return. A genuine
+   contradiction leaves the flag false, so an honest refusal still costs one replay and no futile sweep —
+   which is what keeps [#259](https://github.com/dcodish/geo_builder/issues/259)'s concern off this path.
+
+**What this issue asked for and did NOT get, with the reason.** The plan's clause 2 was *"a step that
+placed nothing may not report `ok`"* — the observation that at seed 4 «ריבוע DEFG חסום במשולש ABC» read
+green beside an empty figure and an empty `violations` list, so the panel appeared to say "all clear".
+**Measured, it does not.** The OWNING row (the right angle) carries the error and the banner is red; only
+the innocent rows stay green. That is [ADR-398](#adr-398) working exactly as ruled — attribution is
+PRECISE, and `status-attribution.test.ts` locks it in the operator's own words (*"the square is innocent"*,
+*"no blanket reddening"*). Implementing the clause turned that lock red, which is the lock doing its job: a
+row answers WHO IS TO BLAME, and reddening every row to express "the figure does not exist" destroys the
+one thing the step list is for. The clause is withdrawn and the correction is recorded here so it is not
+re-derived; the measurement is a positive lock instead.
+
+**Likewise the plan's headline framing** — *"a stated given is being routed to the judgement lane"* — is
+half right. The «cannot be judged» wording is ADR-476's deliberate softening, and it is the honest thing to
+say about a SAMPLE. The harm was never the sentence; it was that the tool sat on the sample instead of
+taking one of the 197 that work. Fixing the seed choice removes the sentence from the student's view
+without weakening the honesty the sentence exists to protect.
+
+**Locks.** `store/__tests__/issue-938-structural-edit-seed.test.ts`: the 197/3 seed census (so a stale
+constant fails rather than silently passing), the operator's exact delete-and-re-enter round trip, the
+append-at-a-broken-seed case with no delete involved (defect 2 alone), the undo carve-out asserting facts
+AND seed are byte-identical to before the delete, a toggle resetting, a rename not resetting, and the
+banner/owner agreement above.
+
 ## ADR-485 — A LETTER THE STUDENT NAMED IS A QUANTITY: printed when the figure determines it, askable by name (#929)
 
 **Status:** accepted, 2026-09-08 · fix-round #940 · extends [ADR-410](#adr-410) (the values panel gains a

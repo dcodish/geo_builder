@@ -118,6 +118,17 @@ export interface Derived {
    *  unavoidable and the figure is right), surfaced as a notice so ink appearing where the student drew
    *  none is never silent. Distinct from the amber `point-off-arc` violation, which is tier 2. [#433] */
   forcedOffArc: ForcedOffArc[];
+  /**
+   * This seed's SAMPLE broke a figure the fold had accepted (#938,
+   * [ADR-484](docs/06-decisions.md#adr-484)) — not a contradiction of the student's givens.
+   *
+   * It is the structural twin of the message {@link sampledConfigError} writes, and it exists because
+   * a caller must be able to ask that question WITHOUT matching the string. The fold marked the
+   * affected rows `ok`, so a configuration in which every given holds demonstrably exists (the
+   * [ADR-476](docs/06-decisions.md#adr-476) premise) — which makes this a reason to change seed, and
+   * never a reason to refuse. A genuine build failure leaves it false.
+   */
+  sampledFailure: boolean;
 }
 
 /** A free circle radius the student can drag: `base` is the stable seed radius (for the slider range),
@@ -1030,6 +1041,10 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   // #855: the accusation is degraded ONCE, here, so `lastError` (the banner) and the per-row status
   // below can never disagree about whose fault the failed sample was.
   const seedErr = e.ok ? '' : sampledConfigError(e.error, e.violated, figure);
+  // #938 ([ADR-484](docs/06-decisions.md#adr-484)): the same fact, structurally. `!e.ok` with the FOLD
+  // clean means this seed's sample broke a figure that folds fine — the caller may act on that (search
+  // for a configuration that works) instead of showing the student a figure that does not exist.
+  const sampledFailure = !e.ok && !lastError;
   if (!e.ok && !lastError) lastError = seedErr;
   // #360 ([ADR-398](docs/06-decisions.md#adr-398)): attribute a PER-SEED evaluate failure to the fact
   // rows that own the violated constraint / stuck object. `status` came from the seed-independent fold
@@ -1055,6 +1070,21 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
       const f = facts[fi];
       if (f && f.enabled && status[f.id] === 'ok') status[f.id] = seedErr;
     }
+    /**
+     * #938 asked for a third clause here — *"a step that placed nothing may not report `ok`"*, since a
+     * failed evaluate publishes NO positions and every non-owning row still reads green beside an empty
+     * figure. It is NOT implemented, and the reason is a ruling that already exists.
+     *
+     * [ADR-398](docs/06-decisions.md#adr-398) decided the opposite on purpose: attribution is PRECISE,
+     * and `status-attribution.test.ts` locks it — *"the square is innocent"*, *"no blanket reddening"*.
+     * A row answers WHO IS TO BLAME, and reddening every row to express "the figure does not exist"
+     * destroys the one thing the panel is for: pointing at the line that failed.
+     *
+     * The issue's premise was that the panel reads "all clear". Measured, it does not: at the reported
+     * seed the OWNING row carries the error and the banner is red — only the innocent rows stay green,
+     * which is the ruling working. That is asserted as a lock in
+     * `store/__tests__/issue-938-structural-edit-seed.test.ts` rather than left as a claim.
+     */
   }
   // #474: a stated magnitude labels from the FACT, not only from a SURVIVING constraint.
   //
@@ -1143,7 +1173,7 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   // on a semicircle is always on the other half. Allowed, never a violation (flagging it would be
   // unsatisfiable), but said out loud, the way a forced coincidence is.
   const forcedOffArc: ForcedOffArc[] = e.ok ? forcedOffArcs(figure, e.positions, e.circles) : [];
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, coincidences, forcedOffArc };
+  return { construction: figure, positions: e.ok ? e.positions : new Map(), circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, coincidences, forcedOffArc, sampledFailure };
 }
 
 /** The (a, b, id, circle) triples every enabled `extend-onto-circle` step asserts ("המשך a·b onto `circle` at id"). */
@@ -1473,7 +1503,14 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   // replay and returns, exactly as before — the spread preference rides only the sweeps that already
   // exist (below, and in `findValidConfig`/`searchResample`), so a figure that draws fine never pays
   // for the preference and a figure that does not is re-seeded by the auto-resolver that already runs.
-  if (!hasExt && !hasOnSeg && !hasCross) return from; // nothing to satisfy → keep the seed
+  // #938 ([ADR-484](docs/06-decisions.md#adr-484)): a figure that DOES NOT BUILD at this seed has
+  // something to satisfy — building. The bar below was a list of DISCRETE requirements (an extension's
+  // far side, a meet within its span, a crossing), and a figure with none of them returned `from`
+  // unexamined however broken it was, so a caller could ask for a satisfying configuration, be handed
+  // the failing one back, and have no way to tell. `sampledFailure` is exactly the licence to look
+  // (ADR-476: the fold accepted these rows, so a working configuration demonstrably exists) — and a
+  // genuine contradiction leaves it false, so an honest refusal still costs one replay, as today.
+  if (!hasExt && !hasOnSeg && !hasCross && !base0.sampledFailure) return from; // nothing to satisfy → keep the seed
   const ok = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig) && intersectionsWithinSegments(fig) && segmentsCrossWithin(facts, fig.positions);
   // The ADR-142 acceptance bar: a SHARED-ENDPOINT extension counts on EITHER side (see extensionsClear).
   const okRelaxed = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig, true) && intersectionsWithinSegments(fig) && segmentsCrossWithin(facts, fig.positions);

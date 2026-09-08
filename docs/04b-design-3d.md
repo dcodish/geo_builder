@@ -143,6 +143,21 @@ away. Reuse is checked on the residual's MEANING, not its field list — `cos-an
 operands and the wrong (signed) quantity, and a drive that targets something other than what its verifier
 measures produces figures its own claim then refutes. See [ADR-3D-217](06b-decisions-3d.md#adr-3d-217).
 
+## The symbol registries — one address, one display, derived from each other
+
+A letter a student names is answered in two places, and they are deliberately different questions.
+`symbolOwnersOf` is the **address** registry ([#902](06b-decisions-3d.md#adr-3d-217)): what does this
+letter denote — a vec-def's ratio, a pin's open coordinate, the algebraic parameter, an angle mark, a
+named component ([#814](06b-decisions-3d.md#adr-3d-175)), an on-segment rider's parameter
+([#921](06b-decisions-3d.md#adr-3d-224))? A statement addressed to a letter reaches EVERY owner: that is
+what sharing a name means. `figureSymbolsOf` is the **display** registry — which letters the data panel
+and the ask lane show — and it is **derived from the address one**
+([ADR-3D-230](06b-decisions-3d.md#adr-3d-230)): a letter the student bound is displayable, whatever lane
+consumed it. It used to list a hand-written subset, and the subset fell three kinds behind, so «t = 1/2»
+vanished from the panel while «p = 3» survived. What varies per owner kind is only HOW the letter is
+PRICED, and that lives with the panel, one branch each, each using the resolver that already exists. The
+knowledge discipline is shared and unchanged: an undetermined letter reads `?` in every lane.
+
 ## Claims
 
 Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape by
@@ -176,7 +191,24 @@ shared-apex `angle-seg-eq` claims, `angleMarks` — feeds it and it emits once p
 (the value once stated, the letter until then; the same rule the object-angle lane uses). A stated angle
 between two independent segments (`seg-angle`) is anchored on `meetingPoint` from `rightAngles.ts` — the
 one answer the knee uses for "do these meet" — and draws nothing for skew or off-ink pairs. `wedgeArc` is
-the one arc geometry (13 points, `r = 0.3·min arm`, label on the bisector at `1.6r`).
+the one arc geometry (13 points), and its RADIUS is a screen quantity
+([ADR-3D-229](06b-decisions-3d.md#adr-3d-229)): a producer records the wedge and a builder, and the
+radius is chosen once after the viewport fit as `min(ARC_PX, ARM_FRAC × shortest PROJECTED arm) / k`,
+with the value placed a fixed pixel gap outside the projected arc. The arc's ANCHOR takes part in the
+fit; its points do not, since they are chosen from `k`. **Every annotation this builder emits is sized
+in pixels** — the knee (#374), the witness and vector and axis and point labels, the crossing dots, and
+now the arc, which was the last world-sized one.
+
+**Row direction ([ADR-3D-228](06b-decisions-3d.md#adr-3d-228)).** A display row's base direction is a
+CONTENT decision and comes from `textDir3` — the shared seam 2-D's box and the shared `InputArea`
+preview already use — never from `dir="auto"`, which keys off the first strong character and so gives an
+LTR base to every fact opening with a Latin point label. Under an LTR base the isolated technical runs are
+neutral objects and the Hebrew words between them reverse against each other, so the row states something
+the student did not type. The decision lives in `factRowDir3` (`render/FactRow3.tsx`) beside the content
+routing, and an inventory lock bans `dir="auto"` in `src3d/` and `src-complex/` outside editable fields.
+Structural renderers carry their own direction: `VecMath` wraps a Hebrew row in an RTL container and emits
+each expression as one `<math dir="ltr">` island, so the row orders as Hebrew while the mathematics inside
+each island reads forward.
 
 ## Known gaps
 

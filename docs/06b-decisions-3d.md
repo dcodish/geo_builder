@@ -8509,3 +8509,241 @@ changing a working dedup on theory is the patch this round's rules forbid.)
 either statement order; the letter alone → one «α» arc; two genuinely different corners at one vertex and
 one ray pair at two vertices still separate; #923's own case unchanged; and the knee's single-knee
 measurement.
+
+### ADR-3D-228 — A row's base direction is a CONTENT decision owned by `textDir`; `dir="auto"` is banned on a display surface (#934, #933)
+
+**Status:** accepted, 2026-09-08 · fix-round #940 · adopts the [ADR-312](06-decisions.md#adr-312)/#118 seam
+in `src3d/` and `src-complex/`, and corrects the mechanism recorded in #933
+· **Requirements:** none (internal — RTL correctness is already FR) · **Design:**
+[04b](04b-design-3d.md), rendering
+
+**Context.** The operator, playing round #931: *"still we have a bidi issue on the display of the input. I
+want you to do a more detailed review on this matter and fix the root cause and not case by case."* The
+fact row had been "fixed" five times — [ADR-3D-116](#adr-3d-116), [ADR-3D-121](#adr-3d-121),
+[ADR-3D-123](#adr-3d-123), [ADR-3D-156](#adr-3d-156), [ADR-431](06-decisions.md#adr-431) — and every one of
+those fixes was real. They all hardened **string isolation**: `isolateLtrRuns3` returning the right
+characters. Every one of their locks asserts a STRING, and the string was correct on every broken build.
+
+Measured in a real browser (Playwright, per-glyph `Range` rectangles on `/3d.html`), the row the operator
+was looking at:
+
+```
+typed     K על AA' כך ש-AK = 2KA'
+before    dir attr "auto" → resolved LTR    visual L→R:  K · כך ש · AA' · על · -AK = 2KA'
+                                            i.e. it read «K כך ש AA' על AK = 2KA'»
+after     dir attr "rtl"  → resolved RTL    visual L→R:  AK = 2KA' · - · כך ש · AA' · על · K
+                                            an RTL row reads right-to-left: «K על AA' כך ש-AK = 2KA'» ✓
+```
+
+**Root cause.** `src3d/App3.tsx` set `dir="auto"` on the fact row (`:713`) and on the ask row (`:961`).
+`dir="auto"` resolves an element's base direction from its **first strong character**, and a 3-D fact
+routinely opens with a Latin point label — «K על …», «E אמצע AB», «∠BAS = 40», «t = 1/4». Those rows took an
+LTR base while «תיבה …»/«פירמידה …» stayed RTL.
+
+**And the isolation is what turns a wrong base direction into a swap.** `isolateLtrRuns3` wraps each LTR run
+in U+2066…U+2069, which the bidi algorithm treats as one neutral object. Under an LTR base the row is
+`OBJ על OBJ כך ש- OBJ`; the neutral between two RTL runs resolves to RTL, so «על», the isolate and «כך ש-»
+become **one** level-1 run and reverse together. The mechanism that protects the technical runs is precisely
+what glues the Hebrew words into a reversed block — and under an RTL base the same isolates are harmless.
+
+The lesson was already written down in three places, with the helper beside it: `shell/bidi.ts`
+(*"`dir="auto"` keys off the FIRST strong character and gets «C במרחק…» wrong; the #118/ADR-312 lesson"*),
+`shell/frame/InputArea.tsx` (*"never `dir="auto"`"*) and `src3d/i18n/bidi.ts` (the same warning again).
+2-D adopted `textDir` for its box and preview; **3-D's fact row never did** — and the same file's own
+relations section (#559) had already switched to `textDir3` for exactly this reason, four hundred lines
+below the row that had not.
+
+**Decision.**
+
+1. **A display row's `dir` comes from `textDir3(<the string the renderer receives>)`.** For a vector fact
+   that string is `factDisplay3(f, vecNames)`, not the raw utterance, or the container and its content can
+   disagree about what the row is. The decision lives in `factRowDir3` in `render/FactRow3.tsx`, beside the
+   content routing and for the same [ADR-3D-216](#adr-3d-216) reason: a `dir` written inline in a
+   `rows={facts.map(...)}` callback is a decision no test can reach, which is how this survived.
+2. **`dir="auto"` is banned in `src3d/` and `src-complex/` product code**, enforced by an inventory lock
+   rather than advice — the advice existed and was not enough. The allowlist holds exactly one entry: the
+   complex ask **input**, an editable field that must re-resolve per keystroke (forcing a direction on an
+   editable value is what #118 reverted).
+3. **The sibling adoption travels with it.** The class is *"a surface that derives its base direction from
+   the TEXT ITSELF rather than from the shared `textDir` seam"*, so `src-complex/App.tsx`'s ask display row
+   moves to `complexBidi.textDir` in the same change. #934's own sweep reported complex as clean because it
+   measured only rendered elements and the complex ask lane was empty; the grep is the honest sweep.
+4. **`shell/`'s `dir={editDir ? editDir(...) : 'auto'}` fallbacks stay.** They are defaults for props a
+   caller supplies, on **editable** fields, and shell may not decide a product's direction policy for it.
+   The lock is on the product trees, which is where the policy belongs.
+
+**#933 — the vector row does NOT read backwards, and this is the correction.** #933 was filed from the same
+operator report with a different mechanism: *"`VecMath` emits each token as its own element, and a sequence
+of LTR islands with no isolate and no LTR container is laid out by the paragraph direction"*, concluding the
+«נסמן: AB = u, AD = v, AS = w» list ran in reverse. **Measured, that premise is false.** `VecMath` already
+wraps a Hebrew row in `<span dir="rtl" style="unicode-bidi:isolate">` and emits the expression as ONE
+`<math dir="ltr">` island ([ADR-3D-196](#adr-3d-196)/#848, whose lock asserts exactly that island count):
+
+```
+<span dir="rtl"><span>נסמן: </span><math dir="ltr">AB→ = u_, AD→ = v_, AS→ = w_</math></span>
+```
+
+In the browser this lays out with «נסמן:» **rightmost** and the island to its left reading internally
+left-to-right — which an RTL reader reads as «נסמן: AB = u, AD = v, AS = w», the typed order. #933's
+x-position table records those same positions; the reversal was in reading the island's LTR contents
+right-to-left by hand. The row's only real defect was the one this ADR fixes: its outer span resolved LTR
+(`dir="auto"` skips content inside an isolate when looking for a first strong character, and the whole row
+IS an isolate), so it left-aligned in a right-aligned panel — the ragged look in the screenshot. Both rows
+are correct after (1). **No LTR container was added to `VecMath`**, and none should be: doing so would have
+been a change with no defect under it.
+
+**Locks.** `issue-934-row-direction.test.tsx` — a battery of Hebrew rows (Latin-first, symbol-first,
+Hebrew-first, and the vector row) each asserting `rtl`, a Latin-only row asserting `ltr` so this is not
+"always RTL", and the first-strong rule spelled out so the regression is legible without a browser.
+`issue-934-dir-auto-ban.test.ts` — the inventory, which fails on the pre-fix tree naming all four offenders.
+`scripts/visual-smoke.mjs` gains «K על BB' כך ש-BK = 2KB'» to the 3-D sequence: a Latin-first row with
+Hebrew words on **both** sides of a technical run, which is the shape that reorders and which no screenshot
+in that file held.
+
+### ADR-3D-229 — Every annotation `scene3` emits is sized in PIXELS; the angle arc was the last one that was not (#935)
+
+**Status:** accepted, 2026-09-08 · fix-round #940 · extends [#374](https://github.com/dcodish/geo_builder/issues/374)'s
+screen-space annotation rule from the right-angle knee to the arc lane, and amends
+[ADR-3D-221](#adr-3d-221) §the arc geometry (`r = 0.3·min arm`, label at `1.6r`) · **Requirements:** none
+(internal — legibility, no promise changes) · **Design:** [04b](04b-design-3d.md), rendering
+
+**Context.** Operator, playing round #931 (T11): *"the location of the 40 is very far from the angle and
+the angle itself is quite far from the point A."*
+
+Measured through the real `parse3 → derive3 → buildScene3` path at seed 0, 640×460 — the radius as its
+outer value, the gap from the arc's own mid point to the value beside it:
+
+| figure | arc radius | % of shortest projected arm | label gap from its arc |
+| --- | --- | --- | --- |
+| `פירמידה SABCD שבסיסה ריבוע` · `∠BAS = 40` | 113.9 px | **49 %** | 65.6 px |
+| `קובייה ABCD` · `∠BAC = 45` | 79.3 px | **52 %** | 47.2 px |
+| the pyramid from another camera | 104.9 px | 44 % | 53.0 px |
+
+So the arc reached halfway down the arm it annotates, and the value sat far enough away to belong to
+nothing in particular. The camera row is the second half of it: **one unchanged figure drew its arc at
+113.9 px from one view and 104.9 px from another**, because a world radius is whatever the projection
+makes of it. (Neither half was caused by round #931 — the same numbers appear on a figure with a single
+stated angle, which the #928 wedge dedup never touches.)
+
+**Root cause — a screen ANNOTATION sized in WORLD units, in all four arc producers.** The radius came from
+the figure's own dimensions — `Math.min(d1, d2) * 0.3` at a vertex and at a `seg-angle` crossing,
+`h * 0.38` for the dihedral and object-angle lanes — and the label sat at `r × 1.6` along the world
+bisector, 60 % beyond the arc **by construction** and only then projected. A label's offset from its arc
+is a quantity a reader measures with their eye; nothing about the world distance is meaningful to them.
+
+This is precisely the class [#374](https://github.com/dcodish/geo_builder/issues/374) fixed for the
+right-angle knee, whose docblock sits 270 lines below the arc code and says so: *"a knee is an ANNOTATION
+— its size belongs to the screen, not to the world."* The knee moved to `KNEE_PX / k`; **the arc never
+received that fix**, and gained a world-proportional label offset on top of it.
+
+**Decision.**
+
+1. **A producer records the WEDGE, not a baked arc.** `wAngles` carries `{ v, mk(r), clamp, text }` — the
+   corner, a builder at a given world radius, and the arm data for the clamp. The radius is chosen ONCE,
+   after the viewport fit is known, so all four producers get the same rule by construction instead of by
+   four copies of a constant.
+2. **`ARC_PX = 26`, a measured choice.** The old rule drew 113.9 px on the pyramid (49 % of its arm) and
+   79.3 px on the cube (52 %); a textbook angle mark reads at roughly a fifth of a short arm, and this
+   file's own screen constant is `KNEE_PX = 13` for a square whose diagonal is ~18 px. 26 px sits just
+   above that and holds a two-digit value comfortably. The world radius is `ARC_PX / k`, exactly as the
+   knee does it, so a wedge still foreshortens as a three-dimensional annotation should — what is pinned
+   is its SCALE, not its projection.
+3. **The clamp is taken on the PROJECTED arm** (`ARM_FRAC = 0.22`). A pixel radius alone is wrong when the
+   arms are genuinely short, and `Math.min(d1, d2)` in world units was the original defect — a
+   foreshortened arm is short on the page whatever it measures in the world. Measured: an arm of 43 px
+   gets an arc of 8.9 px rather than the flat 26.
+4. **The label is placed in pixels from the projected arc** (`LABEL_GAP_PX = 11`), outward along the
+   projected bisector, so the gap is the same on every figure and from every camera. Measured: 11.0 px in
+   all three rows above, against 65.6 / 47.2 / 53.0 before.
+5. **The arc no longer takes part in the viewport fit; its ANCHOR does.** Sizing in pixels needs `k`, and
+   `k` cannot depend on what it sizes. The anchor is what actually matters for framing — a dihedral seam
+   or a segment crossing can sit outside the point hull — while the arc's own points only ever ran INWARD
+   along the bisector and now measure a couple of dozen pixels. This is the same non-circularity the knee
+   already relies on (*"marks take no part in computing `k` … so reading it here is not circular"*).
+
+**Standing rule 1 — the class, swept.** Every annotation `scene3.ts` emits, and where its size comes from:
+
+| annotation | sized in | status |
+| --- | --- | --- |
+| right-angle knee | `KNEE_PX / k` | screen — #374 |
+| distance witness label | `+9 / −7` on the projected midpoint | screen |
+| vector name label | `mx + px * 17` on projected coordinates | screen |
+| axis label | `12 px` along the projected direction | screen |
+| point label | `LABEL_OFFSET` on the projected point | screen |
+| plane-crossing dot | projected point, constant radius | screen |
+| **angle arc + its label** | **`0.3 × world arm`, label at `1.6 r`** | **the one exception — this ADR** |
+
+So the file is now entirely screen-sized, and the sweep is the evidence rather than an assertion. Fixing
+the arc alone would have repeated #374; the table is here so the next annotation added is measured against
+it.
+
+**Locks.** `render/__tests__/issue-935-arc-screen-size.test.ts` — the radius and the label gap in stated
+pixel bands on the operator's figure and on a cube, a camera-invariance lock (the two views' radii within
+6 px, against 9.0 px apart on `main`), and a short-corner guard on a 43 px arm. All five **fail on `main`**
+with the numbers quoted above, and they assert the PROJECTED scene, because a world-space assertion passes
+on every broken build.
+
+### ADR-3D-230 — The DISPLAY symbol registry is derived from the ADDRESS one: a letter the student bound is displayable, whatever lane consumed it (#939)
+
+**Status:** accepted, 2026-09-08 · fix-round #940 · amends [ADR-3D-219](#adr-3d-219)/#480 (`figureSymbolsOf`
+is no longer a hand-written subset) and the [#902](#adr-3d-217) one-resolver rule (`symbolOwnersOf` now
+feeds the panel too); unblocks [#937](https://github.com/dcodish/geo_builder/issues/937)'s F4 ·
+**Requirements:** none (internal — *everything the student stated is visible* is already FR) ·
+**Design:** [04b](04b-design-3d.md), the data panel
+
+**Context.** Found by the #937 design pass, not reported: **two symbol lanes of one product disagreed
+about whether a valued symbol still exists.** A student writes «t = 1/2», the figure uses it, and the
+panel then behaves as though no `t` had ever been mentioned — while «p = 3» from the coordinate lane sits
+there as a closed row.
+
+Measured through the real `parse3 → derive3 → dataView` path at seed 0, over **every producer that binds
+a symbol** (the sweep is what turned a one-lane report into a three-lane defect):
+
+| the student typed | owner kind | `figureSymbolsOf` | panel row |
+| --- | --- | --- | --- |
+| `c(p²,1,0)` · `p=3` | `pin-sym` | `p` | `p = 3` |
+| `SN = k·SC` | `vec-def` | `k` | `k = ?` |
+| the algebraic parameter | `param` | ✓ | ✓ |
+| `D(3,p,0)` · `p = 2` (#814) | `component` | **—** | **—** |
+| `∠SAB = α` · `α = 70` | `angle` | **—** | **—** |
+| `E על SA כך ש-SE = t·SA` · `t = 1/2` (#921) | `rider` | **—** | **—** |
+
+**Root cause.** [`symbolOwnersOf`](../blob/main/src3d/engine/types.ts) — the ADDRESS registry, #902's one
+answer to *"what does this letter denote"* — knew all six owner kinds. `figureSymbolsOf`, the DISPLAY
+registry, listed **three of them by hand**, and its own docblock justified the gap as deliberate: *"this is
+the ADDRESS registry, wider by the two kinds a student can name but the panel does not price."* That
+sentence was written when the gap was two kinds and one of them was new; by the time #921 added the rider
+it was three, and nothing made adding a lane also join it up. The issue reported the rider; the sweep found
+the other two.
+
+It is a divergence, not a gap: `p` and `t` are both letters a student bound and the figure resolved. There
+is no principle that distinguishes them — one lane simply built a row and the others did not.
+
+**Decision.**
+
+1. **`figureSymbolsOf` is DERIVED from the address registry's own sources**, so the two cannot drift again.
+   A seventh owner kind reaches the panel by existing, not by being remembered.
+2. **The pricing lives with the panel, one branch per owner kind**, because that is the only thing that
+   genuinely differs between lanes — and each branch uses the resolver that already exists rather than a
+   second one:
+   - a **rider** is priced from the drawn figure — how far along its host the point sits, `1 − t` when the
+     student measured from the far end (`fromB`);
+   - a **component** is priced by `componentValue`, #814's own resolver, so the panel and the sign gate
+     cannot disagree about the value;
+   - an **angle letter** is the wedge's measured angle.
+3. **The knowledge discipline is untouched.** All three read from the SAME sampled resolutions the rest of
+   the loop uses, so the existing seed-stability gate applies unchanged: an undetermined letter still reads
+   `?` and `open` in every lane. Measured: «SE = t·SA» with no value reads `t = ?`; with «t = 1/2» it reads
+   `t = 1/2`.
+4. **No second registry**, which is what #902 closed and what this issue explicitly forbade.
+
+**What else this reaches.** `queries.ts` gates the ask lane on `figureSymbolsOf`, so the same three letters
+become **askable** by the same change — one lane feeding both surfaces, which is the shape #929 landed on
+the 2-D side in this round.
+
+**Locks.** `__tests__/issue-939-symbol-display.test.ts`: the reported case as a closed row and its unvalued
+twin as an open one; the named-component and angle lanes in both states; the coordinate and vec-def lanes
+asserted **byte-unchanged** (the guard that this is an addition, not a rewrite); and the invariant stated
+over the registries themselves — every displayable symbol has an owner, and the letters this figure binds
+are both addressable and displayable — on a figure that carries the previously-missing kinds, so it is
+exercised rather than vacuous.

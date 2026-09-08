@@ -315,12 +315,12 @@ export function objectAngleArc(
   ga: OperandGeom,
   gb: OperandGeom,
   opts: { shared: Vec3[]; toward: { a: Vec3 | null; b: Vec3 | null }; center: Vec3; r: number; deg?: number },
-): { pts: Vec3[]; label: Vec3 } | null {
+): { pts: Vec3[]; label: Vec3; v: Vec3 } | null {
   const { shared, toward, center, r, deg } = opts;
   const orient = (u: Vec3, focus: Vec3, mat: Vec3 | null): Vec3 =>
     mat && dot3(u, sub3(mat, focus)) < 0 ? scale3(u, -1) : u;
 
-  const arcAt = (focus: Vec3, a1: Vec3, a2: Vec3): { pts: Vec3[]; label: Vec3 } | null => {
+  const arcAt = (focus: Vec3, a1: Vec3, a2: Vec3): { pts: Vec3[]; label: Vec3; v: Vec3 } | null => {
     let u2 = a2;
     // the drawn angle must be the STATED one when there is one: pick between it and its supplement
     if (deg !== undefined) {
@@ -335,7 +335,9 @@ export function objectAngleArc(
     }
     if (pts.length < 2) return null;
     const bis = add3(a1, u2);
-    return { pts, label: add3(focus, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : a1, r * 1.55)) };
+    // #935 (ADR-3D-229): the world label anchor is kept for callers that draw without a fit; the SCENE
+    // places the label in pixels from the projected arc, which is where a reader's eye measures it.
+    return { pts, label: add3(focus, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : a1, r * 1.55)), v: focus };
   };
 
   // ---- plane × plane
@@ -552,7 +554,38 @@ export function buildScene3(
 
   // A STATED angle between planes gets a dihedral arc at the seam + its value (mark it
   // only because the student said it — the 2-D tool's stated-angle rule).
-  const wAngles: { pts: Vec3[]; label: Vec3; text: string }[] = [];
+  /**
+   * #935 ([ADR-3D-229](../../docs/06b-decisions-3d.md#adr-3d-229)) — AN ARC IS AN ANNOTATION, SO ITS
+   * SIZE BELONGS TO THE SCREEN. Each producer records the WEDGE and how to build its arc at a given
+   * world radius; the radius itself is chosen once, after the viewport fit is known, in pixels.
+   *
+   * Before this, every one of the four producers picked a WORLD radius from the figure's own
+   * dimensions — `min(arm) * 0.3` here and at the seg-angle crossing, `h * 0.38` for the dihedral and
+   * object-angle lanes — and the label went at `r × 1.6` along the world bisector. Measured on the
+   * operator's pyramid the arc drew at 107–114 px, 49 % of its shortest arm, with the label 175 px
+   * from the vertex (74 % of that arm, 61 px clear of its own arc); on a cube the same rule drew a
+   * radius of 156–163 px — 106 % of the arm, LONGER than the side it annotates — with the label
+   * *inside* the arc. And because the size was world-space it swung with the camera: 107–114 px from
+   * one view and 69–105 px from another, on one unchanged figure.
+   *
+   * This is the [#374](https://github.com/dcodish/geo_builder/issues/374) class, whose fix — a knee is
+   * an annotation, `KNEE_PX / k` — sits 270 lines below and was applied to the knee alone.
+   */
+  type WedgeSpec3 = {
+    /** the corner the arc is drawn about — also what keeps it inside the viewport fit */
+    v: Vec3;
+    /** build the arc at a world radius */
+    mk: (r: number) => { pts: Vec3[]; label: Vec3; v: Vec3 } | null;
+    /**
+     * The arms, for the short-corner clamp: a pixel radius alone is wrong when the arms are genuinely
+     * short. `arm` is the shorter arm in WORLD units and `u1`/`u2` its directions, so the bound can be
+     * taken on the PROJECTED arm — a screen length, like the radius it bounds. `null` where the sides
+     * are OBJECTS (a plane has no arm to be shorter than).
+     */
+    clamp: { arm: number; u1: Vec3; u2: Vec3 } | null;
+    text: string;
+  };
+  const wAngles: WedgeSpec3[] = [];
   for (const g of c.planeAngles) {
     const pair = pairLines.find((p) => (p.n1 === g.p1 && p.n2 === g.p2) || (p.n1 === g.p2 && p.n2 === g.p1));
     if (!pair) continue;
@@ -563,16 +596,19 @@ export function buildScene3(
     let u2 = normalize3(cross3(pl2.n, d));
     const deg = (Math.acos(Math.max(-1, Math.min(1, dot3(u1, u2)))) * 180) / Math.PI;
     if (Math.abs(deg - g.deg) > Math.abs(180 - deg - g.deg)) u2 = scale3(u2, -1);
-    const r = h * 0.38;
-    const pts: Vec3[] = [];
-    for (let s = 0; s <= 12; s++) {
-      const m = add3(scale3(u1, 1 - s / 12), scale3(u2, s / 12));
-      if (norm3(m) < 1e-9) continue;
-      pts.push(add3(pair.focus, scale3(normalize3(m), r)));
-    }
-    const bis = add3(u1, u2);
-    const label = add3(pair.focus, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : u1, r * 1.55));
-    wAngles.push({ pts, label, text: `${g.deg}°` });
+    const focus = pair.focus;
+    const mk = (r: number) => {
+      const pts: Vec3[] = [];
+      for (let s = 0; s <= 12; s++) {
+        const m = add3(scale3(u1, 1 - s / 12), scale3(u2, s / 12));
+        if (norm3(m) < 1e-9) continue;
+        pts.push(add3(focus, scale3(normalize3(m), r)));
+      }
+      const bis = add3(u1, u2);
+      return { pts, label: add3(focus, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : u1, r * 1.55)), v: focus };
+    };
+    // A dihedral has no arms — the two half-planes run on — so only the pixel size governs.
+    wAngles.push({ v: focus, mk, clamp: null, text: `${g.deg}°` });
   }
 
   /**
@@ -585,7 +621,7 @@ export function buildScene3(
    */
   const degText = (deg: number | undefined, label: string | undefined): string => (deg !== undefined ? `${deg}°` : (label ?? ''));
   /** The vertex-arc geometry: a 13-point arc of radius `r` from arm `u1` to arm `u2` about `v`, label on the bisector. */
-  const wedgeArc = (v: Vec3, u1: Vec3, u2: Vec3, r: number): { pts: Vec3[]; label: Vec3 } => {
+  const wedgeArc = (v: Vec3, u1: Vec3, u2: Vec3, r: number): { pts: Vec3[]; label: Vec3; v: Vec3 } => {
     const pts: Vec3[] = [];
     for (let s = 0; s <= 12; s++) {
       const m = add3(scale3(u1, 1 - s / 12), scale3(u2, s / 12));
@@ -593,7 +629,7 @@ export function buildScene3(
       pts.push(add3(v, scale3(normalize3(m), r)));
     }
     const bis = add3(u1, u2);
-    return { pts, label: add3(v, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : u1, r * 1.6)) };
+    return { pts, label: add3(v, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : u1, r * 1.6)), v };
   };
 
   // ---- ONE WEDGE, ONE ARC (#923, ADR-3D-221 / ADR-W-045) ---------------------------------------------
@@ -657,7 +693,9 @@ export function buildScene3(
       const d1 = dist3(p, v);
       const d2 = dist3(q, v);
       if (d1 < 1e-9 || d2 < 1e-9) continue;
-      wAngles.push({ ...wedgeArc(v, normalize3(sub3(p, v)), normalize3(sub3(q, v)), Math.min(d1, d2) * 0.3), text: degText(w.deg, w.label) });
+      const u1 = normalize3(sub3(p, v));
+      const u2 = normalize3(sub3(q, v));
+      wAngles.push({ v, mk: (r) => wedgeArc(v, u1, u2, r), clamp: { arm: Math.min(d1, d2), u1, u2 }, text: degText(w.deg, w.label) });
     }
   }
 
@@ -680,9 +718,9 @@ export function buildScene3(
     const u1 = arm(ends[0], ends[1]);
     let u2 = arm(ends[2], ends[3]);
     if (dot3(u1, u2) < 0) u2 = scale3(u2, -1); // the stated angle is the undirected (≤ 90°) one — show that wedge
-    const r = Math.min(...ends.map((e) => dist3(e, x))) * 0.3;
-    if (r < 1e-9) continue;
-    wAngles.push({ ...wedgeArc(x, u1, u2, r), text: degText(sp.deg, undefined) });
+    const armLen = Math.min(...ends.map((e) => dist3(e, x)));
+    if (armLen < 1e-9) continue;
+    wAngles.push({ v: x, mk: (r) => wedgeArc(x, u1, u2, r), clamp: { arm: armLen, u1, u2 }, text: degText(sp.deg, undefined) });
   }
 
   /**
@@ -730,14 +768,17 @@ export function buildScene3(
       if (!ga || !gb) continue;
       const sharedIds =
         pr.a.kind === 'plane-run' && pr.b.kind === 'plane-run' ? pr.a.ids.filter((id) => (pr.b as { ids: Id[] }).ids.includes(id)) : [];
-      const arc = objectAngleArc(ga, gb, {
+      const opts = {
         shared: sharedIds.map(atA).filter((x): x is Vec3 => !!x),
         toward: { a: materialOf(pr.a), b: materialOf(pr.b) },
         center,
-        r: h * 0.38,
         deg: pr.deg,
-      });
-      if (arc) wAngles.push({ ...arc, text: pr.text });
+      };
+      // Probed once at a nominal radius purely to learn WHERE the arc sits (and whether there is one
+      // at all — a parallel pair has no dihedral). The drawn arc is rebuilt at the pixel radius below.
+      const probe = objectAngleArc(ga, gb, { ...opts, r: h * 0.38 });
+      // Sides that are OBJECTS have no arm, so no clamp — the pixel size governs alone.
+      if (probe) wAngles.push({ v: probe.v, mk: (r) => objectAngleArc(ga, gb, { ...opts, r }), clamp: null, text: pr.text });
     }
   }
 
@@ -907,7 +948,10 @@ export function buildScene3(
     ...wLines.flatMap((l) => [l.a, l.b]),
     ...wAxes.flatMap((a) => [a.a, a.b]),
     ...wSeams.flatMap((s) => [s.a, s.b]),
-    ...wAngles.flatMap((a) => [...a.pts, a.label]),
+    // #935: the arc's ANCHOR keeps it in frame — a dihedral seam or a segment crossing can sit outside
+    // the point hull. Its points no longer do: they are chosen in PIXELS, after this fit, so including
+    // them would be circular. They only ever ran INWARD along the bisector anyway.
+    ...wAngles.map((a) => a.v),
     ...wCurves.flatMap((cu) => cu.pts),
     ...wWitnesses.flatMap((wt) => [wt.a, wt.b]), // #397: the witness stays in frame
   ].map(projOf);
@@ -1123,9 +1167,53 @@ export function buildScene3(
     return { x1: sa.x, y1: sa.y, x2: sb.x, y2: sb.y };
   });
 
-  const angles: SceneAngle3[] = wAngles.map(({ pts, label, text }) => {
-    const sl = w2s(label);
-    return { pts: pts.map(w2s), labelX: sl.x, labelY: sl.y, text };
+  /**
+   * #935 (ADR-3D-229) — THE ARC IS SIZED AND ITS LABEL PLACED IN PIXELS, HERE, WHERE `k` IS KNOWN.
+   *
+   * `ARC_PX` is a measured choice, not a guess. On the operator's pyramid the old rule drew 107-114 px
+   * (49 % of the shortest arm) and on a cube 156-163 px (106 % — longer than the side it annotates);
+   * a textbook angle mark reads at roughly a fifth of a short arm, and the knee's own screen constant
+   * is 13 px for a square whose diagonal is ~18 px. 26 px sits just above that and holds its two-digit
+   * value comfortably.
+   *
+   * `ARM_FRAC` is the short-corner clamp, and it is taken on the PROJECTED arm — a screen length, like
+   * the radius it bounds. `Math.min(d1, d2)` in world units was the original defect; a foreshortened
+   * arm is short on the page whatever it measures in the world.
+   *
+   * `LABEL_GAP_PX` puts the value a fixed distance OUTSIDE the arc along the projected bisector, so
+   * the gap a reader sees is the same on every figure and from every camera. The world offset it
+   * replaces (`r x 1.6`) was 60 % beyond the arc BY CONSTRUCTION and then projected, which is how the
+   * label landed 61 px clear on one figure and 53 px INSIDE its arc on another.
+   */
+  const ARC_PX = 26;
+  const ARM_FRAC = 0.22;
+  const LABEL_GAP_PX = 11;
+  const angles: SceneAngle3[] = wAngles.flatMap(({ mk, clamp, text }) => {
+    // Both bounds are expressed as a WORLD radius, which is what `mk` takes. In the clamp the fit scale
+    // cancels — bounding the drawn radius by `ARM_FRAC × armPx` means `r·k ≤ ARM_FRAC · arm · projLen · k`
+    // — so the clamp survives a figure whose `k` is extreme. It has to: the ADR-3D-032 box carries
+    // coordinates large enough that `k` is 5.4e-10, and a pixel-space threshold there erased the arc.
+    let rWorld = ARC_PX / k;
+    if (clamp) {
+      const projMin = Math.min(projLen(clamp.u1), projLen(clamp.u2));
+      // An arm pointing (almost) straight at the camera has no length on the page, so there is nothing
+      // to clamp against — the pixel size governs, and the arc draws as a line either way.
+      if (projMin > 1e-3) rWorld = Math.min(rWorld, ARM_FRAC * clamp.arm * projMin);
+    }
+    if (!Number.isFinite(rWorld) || !(rWorld > 0)) return [];
+    const a = mk(rWorld);
+    if (!a || a.pts.length < 2) return [];
+    const pts = a.pts.map(w2s);
+    const sv = w2s(a.v);
+    const mid = pts[Math.floor(pts.length / 2)];
+    const dx = mid.x - sv.x;
+    const dy = mid.y - sv.y;
+    const L = Math.hypot(dx, dy);
+    // A degenerate projection (the wedge seen exactly edge-on) leaves no outward direction to push
+    // along; the label then sits on the arc rather than in an arbitrary place.
+    const ux = L > 1e-6 ? dx / L : 0;
+    const uy = L > 1e-6 ? dy / L : 0;
+    return [{ pts, labelX: mid.x + ux * LABEL_GAP_PX, labelY: mid.y + uy * LABEL_GAP_PX, text }];
   });
 
   const curves: SceneCurve3[] = wCurves.map(({ pts, hidden }) => ({ pts: pts.map(w2s), hidden }));
