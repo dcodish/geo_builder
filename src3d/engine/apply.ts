@@ -8,7 +8,7 @@ import { isAbsolute, isPlanar, lineDirCarriesParam, planeNormalCarriesParam, sam
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { FREE_LINE_TOKEN } from './freeLine';
-import { riderPairsT } from './onSegmentRatio';
+import { riderPairsT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
 import { isAnyDiagonal, isSpaceDiagonal, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
@@ -663,25 +663,41 @@ function materializePlaneRun(next: Construction3, ids: Id[]): void {
   if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...ids]);
 }
 
+/** The coefficient a ratio statement puts between its two pairs: a number, or the LETTER the student
+ *  wrote for it (`SE = t·SA` — name-only, ADR-3D-224). */
+type RatioCoeff = { k: number } | { sym: string };
+
 /**
- * #748: the two halves of an on-segment rider's host, as stated by a ratio — `(pair1, pair2, k)`
- * meaning `|pair1| = k·|pair2|`. Reads the THREE command shapes the same statement can arrive as, so
- * the utterance family has ONE semantics:
+ * #748 / #932: a ratio statement about an on-segment rider, as `(pair1, pair2, coeff)` meaning
+ * `|pair1| = coeff·|pair2|`. Reads the command shapes the same statement can arrive as, so the
+ * utterance family has ONE semantics:
  *
- * - `AE = 2*EA'`    → `vec-rel` (single pair term, no π, no symbol)
+ * - `AE = 2*EA'`    → `vec-rel` (single pair term, no π)
+ * - `SE = t*SA`     → `vec-rel` carrying a SYMBOL — the coefficient is the letter itself (#932)
  * - `|AE| = 2|EA'|` → `length-rel`
  * - `AE:EA' = 2:1`  → the `length-ratio` claim
+ *
+ * The symbolic arm is what #932 added. A `vec-rel` with a symbol used to be excluded outright, so the
+ * one spelling the exam actually uses — declare the rider, then say what pins it — never reached
+ * {@link riderRatioRetarget} at all.
  */
-function ratioHalves(
+function ratioStatement(
   c: Construction3,
   cmd: Command3,
-): { pair1: [Id, Id]; pair2: [Id, Id]; k: number; directed: boolean } | null {
+): { pair1: [Id, Id]; pair2: [Id, Id]; coeff: RatioCoeff; directed: boolean } | null {
   if (cmd.type === 'vec-rel') {
     const [term] = cmd.terms;
-    if (cmd.symbol || cmd.terms.length !== 1 || term.atom.kind !== 'pair' || term.coeff.p !== 0) return null;
+    if (cmd.terms.length !== 1 || term.atom.kind !== 'pair') return null;
+    const pairs = { pair1: [cmd.from, cmd.to] as [Id, Id], pair2: [term.atom.from, term.atom.to] as [Id, Id] };
     // DIRECTED: `AE = 2·A'E` is a different statement from `AE = 2·EA'` (t = 2 vs t = ⅔), so the rider
     // must be the shared MIDDLE letter — the one shape where the vector and length readings agree.
-    return { pair1: [cmd.from, cmd.to], pair2: [term.atom.from, term.atom.to], k: term.coeff.k, directed: true };
+    // A bare symbol coefficient (`t`, i.e. k=0 p=1) IS the ratio; anything richer (`2t`, `t+1`) is a
+    // linear expression this closed-form reading has no arithmetic for, and falls through untouched.
+    if (cmd.symbol) {
+      return term.coeff.k === 0 && term.coeff.p === 1 ? { ...pairs, coeff: { sym: cmd.symbol }, directed: true } : null;
+    }
+    if (term.coeff.p !== 0) return null;
+    return { ...pairs, coeff: { k: term.coeff.k }, directed: true };
   }
   if (cmd.type === 'length-rel') {
     const pair2: [Id, Id] | null =
@@ -691,11 +707,11 @@ function ratioHalves(
             const d = c.vectors.get(cmd.rhs.vec);
             return d ? ([d.from, d.to] as [Id, Id]) : null;
           })();
-    return pair2 ? { pair1: [cmd.a1, cmd.b1], pair2, k: cmd.c, directed: false } : null;
+    return pair2 ? { pair1: [cmd.a1, cmd.b1], pair2, coeff: { k: cmd.c }, directed: false } : null;
   }
   if (cmd.type === 'claim' && cmd.claim.type === 'length-ratio') {
     const { a1, b1, a2, b2, p, q } = cmd.claim;
-    return { pair1: [a1, b1], pair2: [a2, b2], k: p / q, directed: false };
+    return { pair1: [a1, b1], pair2: [a2, b2], coeff: { k: p / q }, directed: false };
   }
   return null;
 }
@@ -718,23 +734,59 @@ function ratioHalves(
  * - `k > 0`, which is also why a driven `t` can never leave the segment (`riderChainT`)
  */
 function riderRatioRetarget(c: Construction3, cmd: Command3): Command3 | null {
-  const halves = ratioHalves(c, cmd);
-  if (!halves) return null;
-  const { pair1, pair2, k, directed } = halves;
-  // either side may carry the rider's half first — «|EA'| = ½|AE|» is «|AE| = 2|EA'|»
-  for (const [P, Q, kk] of [
-    [pair1, pair2, k],
-    [pair2, pair1, 1 / k],
-  ] as const) {
+  const st = ratioStatement(c, cmd);
+  if (!st) return null;
+  const { pair1, pair2, coeff, directed } = st;
+  const k = 'k' in coeff ? coeff.k : null;
+  // Either side may carry the rider's half first — «|EA'| = ½|AE|» is «|AE| = 2|EA'|», and «SA = 2·SE»
+  // is «SE = ½·SA». A SYMBOLIC coefficient has no reciprocal to write down (the letter names `t`
+  // itself, name-only per ADR-3D-224 — `1/t` is not a name), so it is read in the stated orientation
+  // only; the flipped spelling falls through to the ordinary lane rather than being guessed at.
+  const orientations: [[Id, Id], [Id, Id], number | null][] =
+    k === null ? [[pair1, pair2, null]] : [[pair1, pair2, k], [pair2, pair1, 1 / k]];
+
+  /** A free rider of the host this statement is about, or null — the guard shared by both shapes.
+   *  A rider whose `t` is already STATED is genuinely being claimed about and falls through to the
+   *  claim lane, where an inconsistent ratio still refuses (#748's rule, unchanged). */
+  const freeRider = (id: Id) => {
+    const def = c.points.get(id);
+    return def?.kind === 'on-segment' && def.t === undefined ? def : null;
+  };
+
+  for (const [P, Q, kk] of orientations) {
+    // ── the HALVES shape (#748): the host's two halves against each other, `|aR| = k·|Rb|`.
     // The rider is a label the two pairs SHARE. A directed statement additionally fixes where it must
     // sit (`X→R` against `R→Y`); for a LENGTH statement a pair is an unordered set, so every shared
     // label is a candidate — «|AE| = 2|A'E|» must reach the same given as «|AE| = 2|EA'|».
-    const candidates = directed ? (P[1] === Q[0] ? [P[1]] : []) : P.filter((l) => Q.includes(l));
-    for (const rider of candidates) {
-      const def = c.points.get(rider);
-      if (def?.kind !== 'on-segment' || def.t !== undefined) continue;
-      const t = riderPairsT(rider, def.a, def.b, P[0], P[1], Q[0], Q[1], kk);
-      if (t !== 'invalid') return { type: 'point-on-segment3', id: rider, a: def.a, b: def.b, t };
+    if (kk !== null) {
+      const candidates = directed ? (P[1] === Q[0] ? [P[1]] : []) : P.filter((l) => Q.includes(l));
+      for (const rider of candidates) {
+        const def = freeRider(rider);
+        if (!def) continue;
+        const t = riderPairsT(rider, def.a, def.b, P[0], P[1], Q[0], Q[1], kk);
+        if (t !== 'invalid') return { type: 'point-on-segment3', id: rider, a: def.a, b: def.b, t };
+      }
+    }
+    // ── the WHOLE-HOST shape (ADR-3D-224): one side is a HALF, the other the whole host —
+    // «SE = t·SA», the exam's own rider idiom. `riderWholeSide` validates the whole shape given a
+    // candidate, so every label of the half-side pair is offered to it rather than pre-filtered by a
+    // chain rule that does not apply here (that rule is what made this shape unreachable: for
+    // «SE = t·SA» the chain test `P[1] === Q[0]` asks E === S and yields no candidate at all).
+    for (const rider of P) {
+      const def = freeRider(rider);
+      if (!def) continue;
+      const side = riderWholeSide(rider, def.a, def.b, P[0], P[1], Q[0], Q[1]);
+      if (side === 'invalid') continue;
+      if (kk !== null) {
+        // A coefficient that would put the rider at or beyond an endpoint contradicts the membership
+        // the student also stated: 'invalid', so the statement falls through and is refused — never
+        // silently clamped (`riderWholeT`).
+        const t = riderWholeT(side, kk);
+        if (t !== 'invalid') return { type: 'point-on-segment3', id: rider, a: def.a, b: def.b, t };
+      } else {
+        const { sym } = coeff as { sym: string };
+        return { type: 'point-on-segment3', id: rider, a: def.a, b: def.b, sym, ...(side === 'from-b' ? { symFromB: true as const } : {}) };
+      }
     }
   }
   return null;
@@ -1004,13 +1056,33 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // has not been placed yet, and refute the given that was about to place it.) A rider whose
         // `t` is already stated falls through: that IS a claim, and it is verified as one.
         const rider = c.points.get(cmd.id);
-        if (cmd.t !== undefined && rider?.kind === 'on-segment' && rider.t === undefined) {
-          const flipped = rider.a === cmd.b && rider.b === cmd.a; // the host named the other way round
-          if ((rider.a === cmd.a && rider.b === cmd.b) || flipped) {
-            const next = clone(c);
-            next.points.set(cmd.id, { kind: 'on-segment', a: rider.a, b: rider.b, t: flipped ? 1 - cmd.t : cmd.t });
-            return { ok: true, next };
-          }
+        const sameHost =
+          rider?.kind === 'on-segment' &&
+          ((rider.a === cmd.a && rider.b === cmd.b) || (rider.a === cmd.b && rider.b === cmd.a));
+        const hostFlipped = rider?.kind === 'on-segment' && rider.a === cmd.b && rider.b === cmd.a;
+        if (cmd.t !== undefined && rider?.kind === 'on-segment' && rider.t === undefined && sameHost) {
+          const next = clone(c);
+          next.points.set(cmd.id, { kind: 'on-segment', a: rider.a, b: rider.b, t: hostFlipped ? 1 - cmd.t : cmd.t });
+          return { ok: true, next };
+        }
+        /**
+         * #932 — THE SAME RULE FOR A NAMED PARAMETER, not only a numeric one.
+         *
+         * «E על SA» then «SE = t·SA»: the rider exists and is free, and the second statement NAMES its
+         * parameter. The branch above handles the numeric twin («SE = 0.5·SA» ⇒ it determines `t`);
+         * without this one, the same sentence with a letter fell through to the vec-rel dual and was
+         * refused `no-solution` — the exam's own incremental order failing where its one-utterance
+         * spelling (ADR-3D-224) succeeded. NAME-ONLY, exactly as the clause spelling: the rider keeps
+         * sampling its `t`, and all that is recorded is that a later «t = ½» has an owner.
+         *
+         * `symFromB` is relative to the RIDER's stored host, so a statement that names the host the
+         * other way round flips it — the same normalisation the `t` branch does with `1 − t`.
+         */
+        if (cmd.sym !== undefined && rider?.kind === 'on-segment' && rider.t === undefined && sameHost) {
+          const next = clone(c);
+          const fromB = (cmd.symFromB === true) !== hostFlipped;
+          bindRiderName(next, { ...cmd, id: cmd.id, a: rider.a, b: rider.b, ...(fromB ? { symFromB: true as const } : { symFromB: undefined }) });
+          return { ok: true, next };
         }
         /**
          * #343 play-finding — THE SAME RULE, ONE RIDER KIND OVER.
@@ -2088,7 +2160,17 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
             next.points.set(target, { kind: 'vec-pair', def1: d.def, def2 });
             return { ok: true, next };
           }
-          return { ok: false, error: { code: 'no-solution', id: cmd.from } };
+          /**
+           * #932 (the blame half) — NAME THE POINT THE STATEMENT IS ABOUT, not its other endpoint.
+           *
+           * This blamed `cmd.from`, so «SE = t·SA» reported «אין מיקום של S שמקיים את התנאי» — S being
+           * the pyramid's apex, a determined vertex the student said nothing about in this sentence and
+           * whose position was never in question. `cmd.to` is the head of the stated vector: the one
+           * point this statement is trying to place, and the only one the student would recognise as
+           * the subject. The ADR-3D-225 rule (a refusal may not name a cause the figure contradicts)
+           * applied to this arm.
+           */
+          return { ok: false, error: { code: 'no-solution', id: cmd.to } };
         }
         const asClaim = applyCommand3(c, {
           type: 'claim',
