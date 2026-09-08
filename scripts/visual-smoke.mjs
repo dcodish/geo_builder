@@ -59,7 +59,8 @@ export const APPS = {
     // #934: plus a LATIN-FIRST rider row carrying Hebrew words on BOTH sides of a technical run.
     // That is the shape `dir="auto"` reordered — «K כך ש BB' על …» for a student who typed «K על
     // BB' כך ש…» — and no screenshot in this file held one, so five bidi fixes shipped past it.
-    sequence: ['קובייה ABCD', "M אמצע BB'", "K על BB' כך ש-BK = 2KB'", "נסמן: AB = u, AD = v, AA' = w"],
+    // #935: plus a STATED ANGLE, so the arc and its value are captured — the surface T11 reported.
+    sequence: ['קובייה ABCD', "M אמצע BB'", "K על BB' כך ש-BK = 2KB'", '∠BAC = 45', "נסמן: AB = u, AD = v, AA' = w"],
   },
   complex: {
     urlPath: '/complex.html',
