@@ -27,6 +27,7 @@ import { normalizeLabel3, renameFacts3, renamePlaneDisplay3, renameQueries3, typ
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { stripFormatControls } from '../../shell/bidi';
+import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { applyCommand3, freeDims } from '../engine/apply';
 import { spaceDiagonals } from '../engine/baseShapes';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
@@ -702,6 +703,15 @@ export interface Geo3State {
    *  state, not a fact — saved with the file and undoable, like `queries`; reset by `clear`. */
   planeDisplay: PlaneDisplayMode3Map;
   togglePlaneDisplay: (name: string) => void;
+  /**
+   * #937 (ADR-W-047): which form a VALUED parameter shows on the figure — the student's choice, keyed
+   * by the fact that VALUED it («α = 70»). A display preference, not a geometric fact, so it never
+   * enters the ordered fact list; saved with the file and undoable, exactly like `planeDisplay`. The
+   * key is a fact id, which survives a reseed and a branch cycle — that is what makes the operator's
+   * *"show another config and save/reload should keep the choice"* work with no positions stored.
+   */
+  displayMode: DisplayModeMap;
+  toggleDisplayMode: (factId: string) => void;
   /** The figure's NAME (issue #42) - shown on the page, used as the save filename, derived from the
    *  loaded file's name. Session metadata: NOT in the undo history (partialize is facts+seed only);
    *  reset by `clear`. */
@@ -710,7 +720,7 @@ export interface Geo3State {
   resample: () => void;
   dismissError: () => void;
   /** Load a deserialised figure — ONE undoable set (never destructive: undo restores the prior session). */
-  loadFigure: (facts: Fact3[], seed: number, queries?: string[], planeDisplay?: PlaneDisplayMode3Map) => void;
+  loadFigure: (facts: Fact3[], seed: number, queries?: string[], planeDisplay?: PlaneDisplayMode3Map, displayMode?: DisplayModeMap) => void;
   /** Surface a file-load refusal through the normal error banner. */
   reportLoadError: (reason: 'bad-file' | 'newer-schema') => void;
 }
@@ -750,6 +760,7 @@ export const useGeo3 = create<Geo3State>()(
       seed: 0,
       queries: [],
       planeDisplay: {},
+      displayMode: {},
       figureName: '',
       lastError: null,
       lastNotice: null,
@@ -977,7 +988,7 @@ export const useGeo3 = create<Geo3State>()(
         });
         return { ok: true };
       },
-      clear: () => set({ facts: [], queries: [], planeDisplay: {}, figureName: '', lastError: null, lastNotice: null }),
+      clear: () => set({ facts: [], queries: [], planeDisplay: {}, displayMode: {}, figureName: '', lastError: null, lastNotice: null }),
 
       // A query is a QUESTION about the figure, never a fact (ADR-3D-057): it never enters replay.
       // Duplicates are dropped (asking twice adds nothing); trimmed; capped so the panel stays sane.
@@ -1003,6 +1014,14 @@ export const useGeo3 = create<Geo3State>()(
         set({ planeDisplay: next });
       },
 
+      // #937: flip ONE valuing row's choice between the student's letter and its value. The map is
+      // pruned to the live facts on every flip, so a choice whose row was deleted cannot linger in the
+      // session or ride the save file into a recycled id.
+      toggleDisplayMode: (factId) => {
+        const { facts, displayMode } = get();
+        set({ displayMode: pruneDisplayMode(toggleDisplayMode(displayMode, factId), facts.map((f) => f.id)) });
+      },
+
       setFigureName: (name) => set({ figureName: name }),
 
       // "show another configuration": the next seed whose configuration still satisfies every stated
@@ -1017,16 +1036,20 @@ export const useGeo3 = create<Geo3State>()(
 
       dismissError: () => set({ lastError: null }),
 
-      loadFigure: (facts, seed, queries = [], planeDisplay = {}) => set({ facts, seed, queries, planeDisplay, lastError: null }),
+      loadFigure: (facts, seed, queries = [], planeDisplay = {}, displayMode = {}) =>
+        // #937: a file saved before the chip shipped carries no map, so it loads showing values —
+        // today's behaviour, no migration, and the load audit stays green.
+        set({ facts, seed, queries, planeDisplay, displayMode: pruneDisplayMode(displayMode, facts.map((f) => f.id)), lastError: null }),
 
       reportLoadError: (reason) => set({ lastError: { code: reason } }),
     }),
     {
       // History tracks the durable inputs only; lastError is transient UI state,
       // and `equality` keeps error-only sets from pushing duplicate snapshots.
-      partialize: (s) => ({ facts: s.facts, seed: s.seed, queries: s.queries, planeDisplay: s.planeDisplay }) as Geo3State,
+      partialize: (s) => ({ facts: s.facts, seed: s.seed, queries: s.queries, planeDisplay: s.planeDisplay, displayMode: s.displayMode }) as Geo3State,
       equality: (past, current) =>
-        past.facts === current.facts && past.seed === current.seed && past.queries === current.queries && past.planeDisplay === current.planeDisplay,
+        past.facts === current.facts && past.seed === current.seed && past.queries === current.queries &&
+        past.planeDisplay === current.planeDisplay && past.displayMode === current.displayMode,
     },
   ),
 );

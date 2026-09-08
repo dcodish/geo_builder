@@ -8747,3 +8747,72 @@ asserted **byte-unchanged** (the guard that this is an addition, not a rewrite);
 over the registries themselves — every displayable symbol has an owner, and the letters this figure binds
 are both addressable and displayable — on a figure that carries the previously-missing kinds, so it is
 exercised rather than vacuous.
+
+### ADR-3D-233 — The angle arc is the first surface where a valued parameter's two forms compete, and the student chooses (#925, #937)
+
+**Status:** accepted, 2026-09-08 (fix-round #946, item 1) · **Issues:** #925 (this adoption), #937 (the rule)
+**Rule:** [ADR-W-047](06w-decisions-workspace.md#adr-w-047) — cited, not re-decided
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-3 — amended · **Design:** [04b](04b-design-3d.md) — the display seam
+
+#### What this adoption owes
+
+[ADR-W-047](06w-decisions-workspace.md#adr-w-047) states the pedagogy rule and the shared parts. This
+is its **first adoption**, and the one that proves the design: the 3-D canvas arc, where «∠SAB = α»
+followed by «α = 70» replaced the letter with `70°` and left no surface showing `α` at all. The
+operator asked for it twice — as the #925 proposal, and again playing round #927 T1 (*"works but we
+wanted a chip to switch views"*).
+
+Its prerequisite, ADR-3D-221 (#923, one arc per wedge), landed in round #927: until then two arcs were
+painted at one pixel and a toggle would only have chosen which of two overlapping labels was wrong.
+
+#### The seam — one reading rule, one resolver, no new enumeration
+
+`degText` is the ONE rule for what an arc reads (ADR-3D-221 established that; the vertex arcs and the
+object-angle arcs share it). It gains one question: for a symbol the student valued **and chose to see
+as a letter**, the label wins. With no resolver, or for a symbol they never valued, the reading is
+byte-identical to before.
+
+The resolver is threaded through `App3` → `Figure3` → `buildScene3`, the same path `planeDisplay` and
+`showObjectAngles` already take — the established seam for *"how this is drawn"*, and a fourth caller
+of it is not a new mechanism. **`symbolOwnersOf`** stays the one answer to *what a letter denotes*
+(#902); this resolver answers a different question — *which form of it to show* — and never duplicates
+that one.
+
+#### The competing predicate, and why the wedge collection moved
+
+The rule's predicate is *"some surface holds both forms"*. For this surface that is exactly *"a wedge
+carrying both a `label` and a `deg`"* — a corner that renders the letter while the value is absent and
+the value once it arrives.
+
+The wedge collection was inline in `buildScene3`, and the fact list is a **second reader** of it: it
+must know which valued parameters actually compete before it offers a chip. Re-deriving it beside the
+renderer would be the second enumeration docs/17 §3 forbids, and it would go stale the first time a new
+producer learned to feed a wedge. So it moved WHOLE to `render/wedges.ts` — `collectWedges` plus
+`competingArcSymbols` — with ADR-3D-227's identity rules (direction-based, tolerance-matched, never a
+rounded key) intact and documented there. The move is behaviour-neutral by construction and by the
+existing arc suites, which pass unchanged.
+
+`store/paramChips.ts` then decides ownership from the FACT LIST — the #769/#842 pattern — with the two
+conditions the ruling gives: the fact carries a `symbol-value` command, and its symbol competes. A
+muted row owns nothing (it is not in effect, so its chip would do nothing, and the chrome never fakes
+an affordance); when two rows value one symbol the first keeps it, matching the first-binding-wins
+discipline the symbol lanes already use.
+
+#### The measured boundary case, recorded because it looks like a bug and is not
+
+«∠SAB = α» then «∠SAB = 70» draws `70°` and offers **no chip**. The student valued the ANGLE, not the
+letter: 70 is a magnitude they stated about that corner, so drawing it is honest, and α's value is
+*computed*, which clause 3 keeps in the panel. No row valued α, so there is nothing to choose between.
+Locked, because the tempting alternative — treating the second line as a valuing of α — would invent a
+valuing statement the student never made.
+
+#### Locks
+
+`__tests__/issue-937-param-display-chip.test.ts` (16): the chip on the valuing row and not on the row
+that used the letter; **no competing display, no chip** (a valued rider parameter `t`, which no arc
+draws, and a value with no letter at all); a muted row owning nothing; the arc actually switching both
+ways; the choice being per parameter (flipping α leaves β); persistence across «הצג תצורה אחרת» and a
+save/load round trip, with the file asserted to key by POSITION; a pre-#937 file loading to values with
+no migration; an untouched figure writing no key; delete-then-undo restoring the fact and its choice
+together; the boundary case above; and the shared state shape's own unit behaviour including its lenient
+read of a persisted map.

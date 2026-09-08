@@ -62,6 +62,7 @@
     "planeFace": "Face only",
     "planeFull": "Full plane",
     "planeToggleTitle": "Plane {{name}} display — click cycles full → face → hidden",
+    "paramDisplayTitle": "Show {{sym}} instead of the value, or the other way round",
     "planeHide": "Hide plane"
   },
   "status": {

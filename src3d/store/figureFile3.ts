@@ -12,6 +12,7 @@
 
 import { nanoid } from 'nanoid';
 import { stripFormatControls } from '../../shell/bidi';
+import { displayModeFromIndexed, displayModeToIndexed, type DisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import type { Command3 } from '../engine/types';
 import type { Fact3 } from './store3';
 
@@ -33,6 +34,9 @@ export interface FigureFile3 {
   /** Per-plane patch display (#318): plane name → 'face' (patch = the defining polygon only).
    *  Absent key = 'full' (the default growing patch), so only non-defaults are stored. */
   planeDisplay?: PlaneDisplayMode3Map;
+  /** #937 — the parameter DISPLAY choice. Keyed by the fact's INDEX, not its id: a load re-parses
+   *  the utterances into fresh ids, so position is the only handle that survives the file. */
+  displayMode?: Record<string, DisplayMode>;
 }
 
 /** #318 + #395 (ADR-3D-108): a named plane's patch display — 'full' (default: the growing
@@ -136,6 +140,9 @@ export function serializeFigure3(
   name?: string,
   queries: string[] = [],
   planeDisplay: PlaneDisplayMode3Map = {},
+  /** #937 (ADR-W-047): the parameter DISPLAY choice, keyed by the valuing fact's id. Written only
+   *  when non-empty, so an untouched figure's file is byte-identical to before. */
+  displayMode: DisplayModeMap = {},
 ): string {
   const file: FigureFile3 = {
     schemaVersion: SCHEMA_VERSION_3D,
@@ -146,12 +153,16 @@ export function serializeFigure3(
     facts: facts.map((f) => ({ utterance: f.utterance, cmds: f.cmds, ...(f.enabled ? {} : { enabled: false }) })),
     ...(queries.length ? { queries } : {}),
     ...(Object.keys(planeDisplay).length ? { planeDisplay } : {}),
+    ...(() => {
+      const indexed = displayModeToIndexed(displayMode, facts.map((f) => f.id));
+      return Object.keys(indexed).length ? { displayMode: indexed } : {};
+    })(),
   };
   return JSON.stringify(file, null, 2);
 }
 
 export type LoadResult3 =
-  | { ok: true; facts: Fact3[]; seed: number; queries: string[]; planeDisplay: PlaneDisplayMode3Map }
+  | { ok: true; facts: Fact3[]; seed: number; queries: string[]; planeDisplay: PlaneDisplayMode3Map; displayMode: DisplayModeMap }
   | { ok: false; reason: 'bad-file' | 'newer-schema' };
 
 /**
@@ -215,7 +226,7 @@ export function deserializeFigure3(text: string): LoadResult3 {
       if (v === 'face' || v === 'full' || v === 'hidden') planeDisplay[k] = v;
     }
   }
-  return { ok: true, facts, seed: file.seed, queries, planeDisplay };
+  return { ok: true, facts, seed: file.seed, queries, planeDisplay, displayMode: displayModeFromIndexed(file.displayMode, facts.map((f) => f.id)) };
 }
 
 /** This product's save-file suffix (issue #20; registry: docs/22-workflow.md §9). COPIED per product

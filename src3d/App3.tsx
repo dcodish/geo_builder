@@ -5,7 +5,7 @@
  * src/ — docs/20 §12 rule 1).
  */
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 // The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
 import { AppFrame } from '../shell/frame/AppFrame';
@@ -41,6 +41,9 @@ import { auditLoad3 } from './store/loadAudit3';
 import { useStore } from 'zustand';
 import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
 import { planeChipsByFact } from './store/planeChips';
+import { paramChipsByFact } from './store/paramChips';
+import { collectWedges, competingArcSymbols } from './render/wedges';
+import { displayModeOf } from '../shell/displayMode';
 import { FactRowText3, factRowDir3 } from './render/FactRow3';
 import { VecMath } from './render/VecMath';
 
@@ -251,6 +254,8 @@ export default function App3() {
   const removeQuery = useGeo3((s) => s.removeQuery);
   const planeDisplay = useGeo3((s) => s.planeDisplay);
   const togglePlaneDisplay = useGeo3((s) => s.togglePlaneDisplay);
+  const displayMode = useGeo3((s) => s.displayMode);
+  const toggleDisplayMode = useGeo3((s) => s.toggleDisplayMode);
   const reportLoadError = useGeo3((s) => s.reportLoadError);
 
   const submitSteps = useGeo3((s) => s.submitSteps);
@@ -280,6 +285,28 @@ export default function App3() {
   const planeChips = useMemo(
     () => planeChipsByFact(facts, (id) => derived.status[id] === 'ok'),
     [facts, derived.status],
+  );
+
+  /**
+   * #937 (ADR-3D-233 / ADR-W-047) — the parameter DISPLAY chips.
+   *
+   * `competingArcSymbols` asks the display builder's OWN wedge collection which symbols carry both a
+   * letter and a value on the canvas arc; `paramChipsByFact` then puts the chip on the row that
+   * VALUED such a symbol. Neither step enumerates kinds, so a surface that learns to hold both forms
+   * — the coordinate lane's panel row, next in the adoption order — starts offering the chip by
+   * contributing to the competing set, with no change to the row code.
+   */
+  const paramChips = useMemo(
+    () => paramChipsByFact(facts, competingArcSymbols(collectWedges(derived.construction, derived.resolved.positions))),
+    [facts, derived.construction, derived.resolved],
+  );
+  /** The resolver the display builders consult: a symbol with no chip is never switched. */
+  const symbolDisplay = useCallback(
+    (sym: string): 'letter' | 'value' => {
+      for (const [factId, chip] of paramChips) if (chip.sym === sym) return displayModeOf(displayMode, factId);
+      return 'value';
+    },
+    [paramChips, displayMode],
   );
 
   // responsive canvas: track the HOST's box (V5; #718: height too)
@@ -372,7 +399,7 @@ export default function App3() {
       name = (window.prompt(t('actions.saveNamePrompt')) ?? '').trim();
       if (name) setFigureName(name);
     }
-    const blob = new Blob([serializeFigure3(facts, seed, name || undefined, queries, planeDisplay)], { type: 'application/json' });
+    const blob = new Blob([serializeFigure3(facts, seed, name || undefined, queries, planeDisplay, displayMode)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -390,7 +417,7 @@ export default function App3() {
     const r = deserializeFigure3(await f.text());
     if (r.ok) {
       logDebug3({ kind: 'action', action: 'load', detail: `${r.facts.length} facts` }); // #182: a load replaces the figure — the replay must know
-      loadFigure(r.facts, r.seed, r.queries, r.planeDisplay);
+      loadFigure(r.facts, r.seed, r.queries, r.planeDisplay, r.displayMode);
       setFigureName(figureNameFromFileName3(f.name)); // the FILENAME names the figure (issue #42)
       // #309 (ADR-3D-087): deserializing checks the SCHEMA, not the OUTCOME. A file this build cannot
       // rebuild used to load with lastError cleared and an empty canvas. The load still opens the file
@@ -701,6 +728,19 @@ export default function App3() {
             rows={facts.map((f) => ({
               id: f.id,
               disabled: !f.enabled,
+              // #937 (ADR-W-047): the row that VALUED a parameter offers the display choice — the
+              // shared chrome renders it; which rows get one is the derivation above, never a list.
+              ...(paramChips.has(f.id)
+                ? {
+                    chip: {
+                      letter: paramChips.get(f.id)!.sym,
+                      value: `${paramChips.get(f.id)!.value}°`,
+                      mode: displayModeOf(displayMode, f.id),
+                      onToggle: () => toggleDisplayMode(f.id),
+                      title: t('facts.paramDisplayTitle', { sym: paramChips.get(f.id)!.sym }),
+                    },
+                  }
+                : {}),
               content: (
                 <span className="flex min-w-0 items-center gap-2">
                   {f.cmds.some((c) => c.type === 'claim') && derived.status[f.id] === 'ok' ? (
@@ -773,6 +813,7 @@ export default function App3() {
               planeDisplay={planeDisplay}
               showWitnesses={showWitness}
               showObjectAngles={showData}
+              symbolDisplay={symbolDisplay}
               coordLabels={showData && dataPanel ? dataPanel.pointCoords : undefined}
               width={canvasSize.w}
               height={canvasSize.h}

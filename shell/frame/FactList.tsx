@@ -29,6 +29,28 @@ export interface FactRow {
   disabled?: boolean;
   /** A SELECTED row (2-D: the row whose elements highlight on the canvas) gets the amber accent. */
   selected?: boolean;
+  /**
+   * #937 (ADR-W-047) — the PARAMETER DISPLAY chip, on the row that VALUED a parameter («α = 70»,
+   * «p = 3»): a two-state control flipping what the figure shows between the student's LETTER and its
+   * value. A bagrut question is worked in parts, and which form belongs on screen depends on the part
+   * the student is in — which the tool cannot infer and must not guess.
+   *
+   * Chrome only, per the ADR-W-016 contract: the caller supplies both strings and receives the
+   * toggle. This module knows no geometry, no product and no symbol semantics, and in particular it
+   * does NOT decide which rows get a chip — that predicate ("do the two forms actually COMPETE on
+   * some surface?") is derived per product over its own display builders. A row the product passes
+   * no chip for renders none.
+   */
+  chip?: {
+    /** The two forms, as the product renders them — e.g. `α` and `70°`. */
+    letter: string;
+    value: string;
+    /** Which one the figure is showing now. */
+    mode: 'letter' | 'value';
+    onToggle: () => void;
+    /** Tooltip / aria-label, the product's string. */
+    title?: string;
+  };
 }
 
 export interface FactListProps {
@@ -145,6 +167,21 @@ export function FactList({
               </div>
             )}
             <span style={rowActions}>
+              {/* #937: the chip sits with the row's OTHER actions, before ✎/✕ — it is an affordance
+                  on the statement, not part of the statement's text. It shows the form the student
+                  would switch TO, so the control reads as an offer rather than a status light. */}
+              {row.chip && editing?.id !== row.id && (
+                <button
+                  type="button"
+                  title={row.chip.title}
+                  aria-label={row.chip.title}
+                  aria-pressed={row.chip.mode === 'letter'}
+                  style={chipBtn}
+                  onClick={row.chip.onToggle}
+                >
+                  {row.chip.mode === 'value' ? row.chip.letter : row.chip.value}
+                </button>
+              )}
               {editValueOf && onEditCommit && editing?.id !== row.id && (
                 <button
                   type="button"
@@ -175,6 +212,20 @@ export function FactList({
     </div>
   );
 }
+
+/** The #937 display chip: a quiet outlined pill, distinct from the ✎/✕ icon buttons beside it. */
+const chipBtn: CSSProperties = {
+  flexShrink: 0,
+  whiteSpace: 'nowrap',
+  border: `1px solid ${color.border}`,
+  borderRadius: 6,
+  background: color.surface,
+  color: color.faint,
+  fontSize: 11,
+  lineHeight: '16px',
+  padding: '1px 6px',
+  cursor: 'pointer',
+};
 
 const wrap: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };
 const list: CSSProperties = { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 };
