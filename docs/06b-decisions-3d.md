@@ -8509,3 +8509,68 @@ changing a working dedup on theory is the patch this round's rules forbid.)
 either statement order; the letter alone → one «α» arc; two genuinely different corners at one vertex and
 one ray pair at two vertices still separate; #923's own case unchanged; and the knee's single-knee
 measurement.
+
+### ADR-3D-230 — The DISPLAY symbol registry is derived from the ADDRESS one: a letter the student bound is displayable, whatever lane consumed it (#939)
+
+**Status:** accepted, 2026-09-08 · fix-round #940 · amends [ADR-3D-219](#adr-3d-219)/#480 (`figureSymbolsOf`
+is no longer a hand-written subset) and the [#902](#adr-3d-217) one-resolver rule (`symbolOwnersOf` now
+feeds the panel too); unblocks [#937](https://github.com/dcodish/geo_builder/issues/937)'s F4 ·
+**Requirements:** none (internal — *everything the student stated is visible* is already FR) ·
+**Design:** [04b](04b-design-3d.md), the data panel
+
+**Context.** Found by the #937 design pass, not reported: **two symbol lanes of one product disagreed
+about whether a valued symbol still exists.** A student writes «t = 1/2», the figure uses it, and the
+panel then behaves as though no `t` had ever been mentioned — while «p = 3» from the coordinate lane sits
+there as a closed row.
+
+Measured through the real `parse3 → derive3 → dataView` path at seed 0, over **every producer that binds
+a symbol** (the sweep is what turned a one-lane report into a three-lane defect):
+
+| the student typed | owner kind | `figureSymbolsOf` | panel row |
+| --- | --- | --- | --- |
+| `c(p²,1,0)` · `p=3` | `pin-sym` | `p` | `p = 3` |
+| `SN = k·SC` | `vec-def` | `k` | `k = ?` |
+| the algebraic parameter | `param` | ✓ | ✓ |
+| `D(3,p,0)` · `p = 2` (#814) | `component` | **—** | **—** |
+| `∠SAB = α` · `α = 70` | `angle` | **—** | **—** |
+| `E על SA כך ש-SE = t·SA` · `t = 1/2` (#921) | `rider` | **—** | **—** |
+
+**Root cause.** [`symbolOwnersOf`](../blob/main/src3d/engine/types.ts) — the ADDRESS registry, #902's one
+answer to *"what does this letter denote"* — knew all six owner kinds. `figureSymbolsOf`, the DISPLAY
+registry, listed **three of them by hand**, and its own docblock justified the gap as deliberate: *"this is
+the ADDRESS registry, wider by the two kinds a student can name but the panel does not price."* That
+sentence was written when the gap was two kinds and one of them was new; by the time #921 added the rider
+it was three, and nothing made adding a lane also join it up. The issue reported the rider; the sweep found
+the other two.
+
+It is a divergence, not a gap: `p` and `t` are both letters a student bound and the figure resolved. There
+is no principle that distinguishes them — one lane simply built a row and the others did not.
+
+**Decision.**
+
+1. **`figureSymbolsOf` is DERIVED from the address registry's own sources**, so the two cannot drift again.
+   A seventh owner kind reaches the panel by existing, not by being remembered.
+2. **The pricing lives with the panel, one branch per owner kind**, because that is the only thing that
+   genuinely differs between lanes — and each branch uses the resolver that already exists rather than a
+   second one:
+   - a **rider** is priced from the drawn figure — how far along its host the point sits, `1 − t` when the
+     student measured from the far end (`fromB`);
+   - a **component** is priced by `componentValue`, #814's own resolver, so the panel and the sign gate
+     cannot disagree about the value;
+   - an **angle letter** is the wedge's measured angle.
+3. **The knowledge discipline is untouched.** All three read from the SAME sampled resolutions the rest of
+   the loop uses, so the existing seed-stability gate applies unchanged: an undetermined letter still reads
+   `?` and `open` in every lane. Measured: «SE = t·SA» with no value reads `t = ?`; with «t = 1/2» it reads
+   `t = 1/2`.
+4. **No second registry**, which is what #902 closed and what this issue explicitly forbade.
+
+**What else this reaches.** `queries.ts` gates the ask lane on `figureSymbolsOf`, so the same three letters
+become **askable** by the same change — one lane feeding both surfaces, which is the shape #929 landed on
+the 2-D side in this round.
+
+**Locks.** `__tests__/issue-939-symbol-display.test.ts`: the reported case as a closed row and its unvalued
+twin as an open one; the named-component and angle lanes in both states; the coordinate and vec-def lanes
+asserted **byte-unchanged** (the guard that this is an addition, not a rewrite); and the invariant stated
+over the registries themselves — every displayable symbol has an owner, and the letters this figure binds
+are both addressable and displayable — on a figure that carries the previously-missing kinds, so it is
+exercised rather than vacuous.
