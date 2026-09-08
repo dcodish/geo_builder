@@ -33,3 +33,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Anchor wait predicates](anchor-wait-predicates.md) — `grep -q "3d exit"` matched `build:3d exit 0` and overlapped the batch suite with a lane; markers must not be substrings of each other (round #927)
 - [Measure the plan's "therefore"](measure-the-plans-therefore.md) — the sentence linking mechanism to symptom is a separate hypothesis, and the cheapest one to falsify (#920, round #931)
 - [Try the neighbouring spelling](try-the-neighbouring-spelling.md) — a working alternate spelling turns a "missing capability" into a two-spellings bug, which changes the ROUTE (#921, round #931)
+- [Play sheet is copy-pasteable lines](playsheet-is-copy-pasteable-lines.md) — every utterance one per line in a code block in the CHAT report, never a table and never a pointer to the issue
