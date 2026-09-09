@@ -514,8 +514,17 @@ const rootsAgree = (a: number, b: number, scale: number): boolean =>
 
 const sameVec = (a: Vec3, b: Vec3) => near(a.x, b.x) && near(a.y, b.y) && near(a.z, b.z);
 
-/** Stated magnitudes: |pair| = value, from driving pins and recorded claims. */
-function statedLengths(c: Construction3): Map<string, number> {
+/**
+ * Stated magnitudes: |pair| = value, from driving pins and recorded claims.
+ *
+ * EXPORTED for the renderer (#918, ADR-3D-235): the canvas draws a stated length beside its segment,
+ * and it must read the same list the data panel reads. Two enumerations of "what lengths did the
+ * student state" that have to agree is precisely the drift docs/17 §3 warns about — so there is one,
+ * and `render/` consumes it as the pure consumer of engine output that it is.
+ *
+ * Keyed by the UNORDERED pair, which is what makes «AB = 5» and «BA = 5» one statement and one label.
+ */
+export function statedLengths(c: Construction3): Map<string, number> {
   const out = new Map<string, number>();
   const key = (a: Id, b: Id) => [a, b].sort().join('|');
   for (const pin of c.scalarPins) if (pin.kind === 'length') out.set(key(pin.a, pin.b), pin.value);

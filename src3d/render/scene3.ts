@@ -21,6 +21,7 @@ import { cameraFrame, project3, type Camera3 } from './camera';
 import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
 import { isRightAngleValue, meetingPoint, rightAngles3 } from './rightAngles';
 import { collectWedges } from './wedges';
+import { statedLengths } from '../engine/dataView';
 
 export interface ScenePoint3 {
   id: Id;
@@ -147,6 +148,23 @@ export interface SceneWitness3 {
   text: string;
 }
 
+/**
+ * #918 (ADR-3D-235): a STATED LENGTH, drawn beside its segment.
+ *
+ * A stated distance already draws a witness line with its value, and a stated angle an arc with its
+ * value; a stated length was the one kind of magnitude that reached the data panel and never the
+ * canvas. This is a LABEL only — no line, because the segment is already drawn and a second line over
+ * it would be noise.
+ */
+export interface SceneMeasure3 {
+  /** The unordered pair this labels, so a test (or a hover lane) can say WHICH segment it belongs to. */
+  a: Id;
+  b: Id;
+  labelX: number;
+  labelY: number;
+  text: string;
+}
+
 export interface Scene3 {
   points: ScenePoint3[];
   edges: SceneEdge3[];
@@ -159,6 +177,8 @@ export interface Scene3 {
   angles: SceneAngle3[];
   curves: SceneCurve3[];
   witnesses: SceneWitness3[];
+  /** #918 — stated lengths, labelled at their segment's projected midpoint. */
+  measures: SceneMeasure3[];
   /** #483 — determined-but-unnamed line∩plane crossings the student can click to name. */
   crossings: SceneCrossing3[];
 }
@@ -931,7 +951,7 @@ export function buildScene3(
   ].map(projOf);
   const all = [...proj.values(), ...extras];
   if (all.length === 0) {
-    return { points: [], edges: [], vectors: [], axes: [], planes: [], lines: [], marks: [], seams: [], angles: [], curves: [], witnesses: [], crossings: [] };
+    return { points: [], edges: [], vectors: [], axes: [], planes: [], lines: [], marks: [], seams: [], angles: [], curves: [], witnesses: [], measures: [], crossings: [] };
   }
 
   const xs = all.map((p) => p.x);
@@ -1199,6 +1219,28 @@ export function buildScene3(
     return { x1: p.x, y1: p.y, x2: q.x, y2: q.y, labelX: (p.x + q.x) / 2 + 9, labelY: (p.y + q.y) / 2 - 7, text: wt.text };
   });
 
+  /**
+   * #918 (ADR-3D-235): every STATED length, labelled at its segment's projected midpoint.
+   *
+   * Deliberately NOT gated by `showWitnesses` — the precedent is in this file for the arcs: a stated
+   * given is not a debug overlay. Operator ruling 2026-09-06: *stated lengths, always*, at the midpoint,
+   * **including on a dashed back edge** — a number that comes and goes as you orbit reads as the tool
+   * losing your given, and that option was explicitly rejected.
+   *
+   * The list comes from the engine's `statedLengths`, the same one the data panel reads, so the canvas
+   * and the panel cannot disagree about what the student stated.
+   */
+  const measures: SceneMeasure3[] = [];
+  for (const [key, value] of statedLengths(c)) {
+    const [a, b] = key.split('|') as [Id, Id];
+    const pa = positions.get(a);
+    const pb = positions.get(b);
+    if (!pa || !pb) continue; // an unresolved endpoint has nowhere to put the label
+    const p = w2s(pa);
+    const q = w2s(pb);
+    measures.push({ a, b, labelX: (p.x + q.x) / 2 + 9, labelY: (p.y + q.y) / 2 - 7, text: fmt(value) });
+  }
+
   // #483 — the crossings the givens determine and nobody has named. The SET is the engine's call
   // (`openCrossings3` owns the honesty gate); the renderer only says where each one lands on screen.
   const crossings: SceneCrossing3[] = openCrossings3(c, resolved).map((k) => {
@@ -1206,5 +1248,5 @@ export function buildScene3(
     return { line: k.line, plane: k.plane, x: s.x, y: s.y };
   });
 
-  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves, witnesses, crossings };
+  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves, witnesses, measures, crossings };
 }

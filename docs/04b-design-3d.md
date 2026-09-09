@@ -268,3 +268,24 @@ Three pieces:
 
 `DEGENERATE_FLAT_RATIO` is calibrated against the near-miss family, not against comfortable figures —
 the ADR carries the table and the corpus sweep is kept as a lock.
+## The stated-magnitude lane (#918, [ADR-3D-235](06b-decisions-3d.md#adr-3d-235))
+
+Three kinds of stated magnitude reach the canvas, and they now share one principle: **what the student
+said is drawn where they said it, in amber, in screen space.**
+
+| kind | scene record | shape |
+| --- | --- | --- |
+| distance | `SceneWitness3` | dashed closest-point segment **+** value |
+| angle | `SceneAngle3` | arc **+** value |
+| **length** | **`SceneMeasure3`** | **value only** — the segment is already drawn |
+
+`SceneMeasure3` is deliberately the smallest of the three: a position, the text, and the pair it
+belongs to. A witness-shaped record would draw a second line over the segment's own ink.
+
+The list comes from `statedLengths` in `engine/dataView.ts`, **exported and shared with the data
+panel** rather than re-derived in the renderer — one answer to "what did the student state", so the
+canvas and the panel cannot disagree. Keyed by the unordered pair, which is what makes a restatement one
+label.
+
+Not gated by `showWitnesses` (a stated given is not a debug overlay) and not gated by edge visibility
+(the operator's ruling — see the ADR).
