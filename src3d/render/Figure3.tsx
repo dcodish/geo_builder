@@ -298,6 +298,24 @@ export default function Figure3({ construction, resolved, width = 640, height = 
             </text>
           </g>
         ))}
+        {/* #918 (ADR-3D-235): a STATED LENGTH beside its segment — the label only, since the segment
+            is already drawn. Same amber as the other stated-magnitude annotations (a distance witness,
+            an angle arc), because it IS one: what the student said, shown where they said it. Drawn on
+            a hidden back edge too — operator ruling; a number that comes and goes as you orbit reads as
+            the tool losing your given. */}
+        {scene.measures.map((m, i) => (
+          <text
+            key={`measure-${i}`}
+            data-testid="stated-length"
+            x={m.labelX}
+            y={m.labelY}
+            fontSize={12}
+            fill="#b45309"
+            style={{ paintOrder: 'stroke', stroke: '#fff', strokeWidth: 3 }}
+          >
+            {ltr(m.text)}
+          </text>
+        ))}
         {scene.angles.map((a, i) => (
           <g key={`angle-${i}`} data-testid="plane-angle">
             <polyline

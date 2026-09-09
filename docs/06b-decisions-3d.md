@@ -9059,3 +9059,67 @@ as a bug. Re-author it with a non-complementary pair (e.g. 50/60) before it is p
 **Revolutions are out of scope, deliberately.** Cones and cylinders live in `c.revolutions`, a separate
 carrier with its own extent notion and no measured case. The predicate covers every polyhedral solid
 uniformly; extending it to revolutions wants its own measurement rather than a guessed threshold.
+### ADR-3D-235 — A stated LENGTH is drawn beside its segment, from the same list the data panel reads (#918)
+
+**Status:** accepted, 2026-09-09 (fix-round #949, item 4) · **Issue:** #918 · **Operator ruling:** 2026-09-06 (`/decisions` pass)
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-8 (new) · **Design:** [04b](04b-design-3d.md) — the stated-magnitude lane
+
+**Context.** The operator, playing round #915's T5: *"might be a new request but when we say AB=5 should
+5 be drawn next to AB?"* Ruled: **stated lengths, always**, at the segment midpoint, **including on a
+dashed back edge**.
+
+The issue was filed as a 3-D-vs-2-D parity gap. Measured, it is smaller and sharper than that — an
+inconsistency **inside 3-D**:
+
+| statement | what the scene emitted |
+| --- | --- |
+| «המרחק בין A למישור BCC'B' הוא 5» (a `distance` pin) | a witness line labelled **"5"** |
+| «הזווית בין AC לבין BA היא 40» | an arc labelled **"40°"** |
+| «AB = 5» (a `length` pin) | **nothing** |
+
+So the honesty invariant *"everything the student stated is visible on the figure"* held for two
+magnitude kinds out of three, and the missing one is the commonest in the corpus.
+
+**Decision.**
+
+1. **One source, not two.** `statedLengths` in `src3d/engine/dataView.ts` — `length` pins plus
+   `length-eq` claims, keyed by the unordered pair — is **exported** and consumed by `scene3.ts`.
+   Writing a second "what lengths did the student state" enumeration inside the renderer is the drift
+   docs/17 §3 warns about; the direction is legal because `render/` is a pure consumer of engine output.
+   Keying by the unordered pair is also what makes «AB = 5» and «BA = 5» one statement and one label.
+2. **A label, not a witness.** `SceneMeasure3` carries a position, the text and the pair. A
+   `SceneWitness3` is a LINE plus a label, which is the wrong shape here: the segment is already drawn,
+   so a second line over it would be noise.
+3. **Not gated by `showWitnesses`.** The precedent is in the file for the arcs — a stated given is not
+   a debug overlay.
+4. **Hidden edges are labelled too.** The operator's ruling, and the alternative was explicitly
+   rejected: a number that comes and goes as you orbit reads as the tool losing the given. Locked
+   against a figure that really has hidden edges, so a later "cleanup" cannot quietly drop it.
+5. **Stated only.** 2-D's `MeasureLabels` is built from the FACT and derived values surface on hover
+   (ADR-326); same rule here. A derived length on the drawing turns it into an answer sheet.
+
+**The class sweep, measured** (the fix plan asked for it before shipping):
+
+- **`mag-val`** — «נסמן: AB = u» + «|u| = 5» **lowers to a `length` pin**, so it is already this lane
+  and needs nothing further. Measured through the real `derive3 → buildScene3` path and locked, so the
+  next session does not go looking for it.
+- **`distance` / `vangle`** — already drawn (witness line, arc). Unchanged, and asserted unchanged.
+- **`length-rel`** («|AB| = 2|CD|») — the relational half, **deliberately deferred by the operator's
+  ruling**: which segment carries the text and what it says has no obvious right answer, and it is
+  better judged once plain lengths are on a real figure. File separately if wanted.
+- **Areas / volumes** — no anchor on a wireframe; out of scope, unchanged from the filing.
+
+**Screen space, by construction.** `SceneAngle3` and `SceneWitness3` already carry projected
+`labelX`/`labelY`, so labels are upright under orbit with no choice to make — one of the two questions
+the issue was filed with turned out to be already answered by the record rather than by the ruling.
+
+**Locks** (`src3d/__tests__/issue-918-stated-length.test.ts`, 11): «AB = 5» draws exactly one label
+reading «5» at the projected midpoint; two stated lengths draw two; a restatement draws one; a derived
+length draws none; a figure with no stated length draws none; **a hidden edge still carries its label**
+on a figure asserted to have hidden edges; a stated distance keeps its witness and a stated angle its
+arc, neither growing a length label; «|u| = 5» is shown to be the same lane; and the canvas's labels are
+asserted to equal the engine's `statedLengths` exactly — the no-second-enumeration guard.
+
+**Coupled with #917**, the arc for a stated angle between crossing segments: same surface, same play
+session. Whichever lands second reuses this placement answer (projected midpoint, small offset, amber)
+rather than inventing a second one.
