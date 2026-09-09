@@ -254,6 +254,15 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   // declared right triangle / isosceles to resolve it against, or the role is genuinely ambiguous
   // (two legs). Say what is missing and keep the text; never guess a side, never a paid LLM call
   // that would have to invent one.
+  // #957 ([ADR-494](../../docs/06-decisions.md#adr-494)): a side clause on a shape whose sides are not
+  // equal by definition. The grammar READ the sentence; what is missing is which side, and inventing it
+  // is the ADR-052 cardinal sin — so ask, keep the text, and never spend a paid call on a guess.
+  if (!r.ok && r.reason === 'side-unspecified') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `side-unspecified:${r.noun}` });
+    ui.setInputNote(t('input.sideUnspecified', { noun: r.noun, value: r.value, a: 'AB' }));
+    ui.setBusy(false);
+    return;
+  }
   if (!r.ok && r.reason === 'role-side-unresolved') {
     logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `role-side-unresolved:${r.role}` });
     ui.setInputNote(t('input.roleSideUnresolved', { role: r.role }));

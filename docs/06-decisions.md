@@ -10090,3 +10090,96 @@ student's right angle.
 assertion, the pinned-corner closed-form oracle and the plain-triangle baseline, all retained. Scenario
 `inscribed-square-on-a-right-triangle-builds-920` (corpus 4) locks the student-facing sequence at all
 three vertices.
+
+## ADR-494 — A DELIBERATELY-REFUSED FORM ASKS; and a clarification is recognised by derivation, not by a list of two (#957)
+
+**Status:** accepted, 2026-09-10 (round #961) · **Issue:** #957
+**Requirements:** [02](02-requirements.md) FR-IN-9 — a member of the ask-don't-guess promise [ADR-490](#adr-490) added, not a new promise · **Design:** [04](04-design.md) — the clarification family
+
+**The report.** The operator, playing round #949 T13: *"the refusal should be meaningful such as
+יש לציין איזו צלע."* He is right, and the measurement was worse than a weak message: there was **no
+refusal at all**. Measured on `main`:
+
+```
+מלבן ABCD שהצלע שלו 6      → not-handled → the paid LLM
+מלבן ABCD שצלעו 6          → not-handled → the paid LLM
+מלבן ABCD שכל צלע שלו 6    → not-handled → the paid LLM
+טרפז ABCD שהצלע שלו 6      → not-handled → the paid LLM
+מקבילית ABCD שהצלע שלו 6   → not-handled → the paid LLM
+ריבוע ABCD שהצלע שלו 6     → ✅ builds
+```
+
+`not-handled` is the **escalation seam**. A form the tool has *deliberately decided to refuse* was
+being handed to a paid model whose only way to answer is to invent the very thing that is missing —
+WHICH side — which is the ADR-052 cardinal sin arriving with a green ✓.
+
+**The scoping decision is correct and is not revisited.** `SIDE_CLAUSE` is scoped to `SIDE_SHAPES`
+(square, rhombus, equilateral) because on those every side is equal *by definition*, so «its side»
+names one length; on a rectangle it is an unstated pick. The code says exactly that in its own header.
+What was missing is that the rule expressed the decision by **not matching**, and a non-match is
+indistinguishable from *"the grammar has never heard of this sentence"*.
+
+**Decision — the ask.** A new `Clarify` member `side-unspecified` carries the student's own shape noun
+and the magnitude they typed, so the note can offer the concrete form back:
+«ב**מלבן** הצלעות אינן שוות זו לזו, ולכן «הצלע שלו» אינה מציינת צלע מסוימת — יש לציין איזו צלע, למשל
+"AB = 6".» It is raised where the side clause is consumed, from `SIDE_SHAPES` **membership** — never a
+second list of shapes to keep in sync: whatever that set does not cover is, by construction, a shape
+where «its side» is a guess. The text stays in the box, so the sentence is completed in place. Same
+route as [ADR-490](#adr-490) (#777) and #775's `role-side-unresolved`.
+
+**The second defect, which is the one that matters (docs/17 §3).** With the member written and routed
+correctly through `refusalOf`, the five rows *still* returned `not-handled`. `parseResolved` has a gate
+that refuses to second-guess a clarification — a clarification names no commands, so the dropped-noun
+gate sees the whole utterance unconsumed and would otherwise convert the question into an escalation —
+but it recognised one by a **two-name list**:
+
+```ts
+const isAmbiguityQuestion = (reason) => reason === 'ambiguous-shape' || reason === 'ambiguous-construct';
+```
+
+That list has now caused this bug three times. [#461](../issues/461) is it happening once already
+(«ריבוע ABCD עם אלכסון» — the tool's *"which diagonal?"* became `not-handled`), the comment above it
+states the correct rule in prose — *"a clarification is a rule's genuine question — propagate it,
+never second-guess it with a split"* — and #957 is a new clarification silently converted back to an
+escalation because nobody knew the list existed.
+
+**The first fix for that was WRONG, and the record of why is the useful part.** The obvious reading is
+that this is a stale enumeration of "clarifications" — the docs/17 §3 smell — so the first attempt
+derived it from the `Clarify` tags with a compile-time exhaustiveness guard. The 2-D lane refuted it in
+one test: `clause-split.test.ts` asserts that «משולש שווה שוקיים שבו זווית B=40» builds an isosceles
+triangle with ∠B resolved from its neighbours. That utterance makes the angle rule ask *"name all three
+letters"* — a question that is itself the **symptom of a dropped shape noun**, and the ADR-264 Am. 1
+split is what rescues it. Deriving the predicate pulled `ambiguous-angle` in and let the misleading
+question win.
+
+So the list is **a deliberate whitelist, not a stale one**, and the distinction is the finding: a
+clarification belongs in it when the asking rule has genuinely CONSUMED the shape noun, so there is
+nothing for the split to rescue and the only alternatives are the question or a paid guess. That is true
+of `ambiguous-shape`/`ambiguous-construct` (the noun IS the subject) and of `side-unspecified`
+(«מלבן ABCD שהצלע שלו 6» — the rectangle rule matched and is asking WHICH side; splitting would build
+«מלבן ABCD» and silently drop the 6, the honesty violation the ask exists to prevent). It is false of
+`ambiguous-angle`. Adding a member is therefore an ADR-worthy decision **about that member**, exactly as
+docs/17 §3 requires — the list stays explicit, each entry carries its reason, and a comment now tells the
+next session that deriving it was tried and measured wrong.
+
+**Sibling sweep** (the plan asked for it). The other possessive clause, «שרדיוסו» / «whose radius», is
+scoped to CIRCLES, where "its radius" is unambiguous by definition — there is no family for which it
+would be an unstated pick, so it has no sibling defect. The dimensions pair («במידות 4×4») names both
+magnitudes explicitly. Nothing else in the parser scopes an "its X" possessive to a shape family.
+
+**The boundary is NOT widened.** A rectangle still never gets a side length from this phrasing; #891's
+lock that «מלבן ABCD שהצלע שלו 6» must not produce `set-distance` keeps passing unchanged. Only the
+voice changed.
+
+**Locks.** `src/parser/__tests__/issue-957-side-unspecified.test.ts` (12): the five measured rows
+return the ask and specifically **not** `not-handled` (that assertion is the fix, since `not-handled`
+is what routes to the paid call), with the right noun and value; the English row; both locales carry
+the string with all three interpolation slots; the four equal-sided forms still BUILD; the boundary is
+not widened; bare shapes are untouched; and a genuinely unreadable sentence still reaches
+`not-handled`, so the ask has not swallowed the escalation seam.
+
+**No corpus scenario, deliberately.** The scenario harness replays `factsOf`, and a step that does not
+parse fails the scenario by construction — which is correct, since a refusal produces no figure to
+assert about. Writing one would mean asserting a state the pipeline cannot reach, which is exactly the
+defect [#960](../issues/960) exists to stop. The parser-level unit test is the lock, and the refusal is
+also covered end-to-end by #891's own boundary test.

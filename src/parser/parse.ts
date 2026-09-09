@@ -74,6 +74,13 @@ export type ParseResult =
   /** #775: a side named by its ROLE («ליתר», «לבסיס») with no unique referent in the figure —
    *  clarify rather than guess a side or burn an escalation on a form the LLM must not invent for. */
   | { ok: false; reason: 'role-side-unresolved'; role: string }
+  /** #957: a side clause («שהצלע שלו 6») on a shape whose sides are NOT equal by definition — a
+   *  rectangle, trapezoid, parallelogram, kite, general quad. The grammar reads the sentence
+   *  perfectly well; what is missing is WHICH side, and only the student can supply it. Falling
+   *  through to `not-handled` sent a deliberately-refused form to the paid LLM, whose only way to
+   *  answer is to invent the very given that must not be guessed (ADR-052). `value` is the
+   *  magnitude they typed, so the ask can offer the concrete form back to them. */
+  | { ok: false; reason: 'side-unspecified'; noun: string; value: string }
   /** #835: a polygon noun outside the supported bare set (מחומש/משושה/מתומן) — the operator's ruling is
    *  that the rest are NOT supported and say so by name, rather than escalating to an LLM that would
    *  invent a figure. `noun` is the student's word; `offer` names what does build, so the message can
@@ -245,7 +252,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string };
+type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -841,6 +848,26 @@ const dimCommands = (ids: Id[], values: number[]): AnyCommand[] =>
  */
 let sideShapeRe: RegExp | null = null;
 let sideClauseRe: RegExp | null = null;
+
+/**
+ * #957 — the side clause's stated value, read WITHOUT the {@link SIDE_SHAPES} restriction.
+ *
+ * {@link statedSideLength} answers *"is this a side given I can lower?"* and correctly says no on a
+ * rectangle, where «its side» is an unstated pick of WHICH side (ADR-052). But it says no by returning
+ * `null`, and a null falls through to `not-handled` — the ESCALATION seam — so a form the tool has
+ * deliberately decided to refuse was handed to a paid LLM that can only answer by inventing the missing
+ * given. This reader exists to tell the two nulls apart: the clause is THERE and carries a real value,
+ * so the sentence was understood and the ask is the honest reply ([ADR-490](../../docs/06-decisions.md
+ * #adr-490): `not-handled` is right for a phrasing the grammar cannot READ, wrong for one it reads
+ * perfectly well that is missing a given).
+ */
+let sideClauseAnyRe: RegExp | null = null;
+function sideClauseValue(s: string): string | null {
+  sideClauseAnyRe ??= new RegExp(`${SIDE_CLAUSE}${NUMEXPR('sd')}`, 'i');
+  const m = s.match(sideClauseAnyRe);
+  if (!m?.groups) return null;
+  return numexprVal(m.groups, 'sd')?.text ?? null;
+}
 function statedSideLength(s: string): { text: string; strip: RegExp } | null {
   // Lazily compiled: this module defines NUMEXPR/SIDE_CLAUSE below, and these regexes are built on
   // first PARSE (well after module init) rather than at definition time.
@@ -890,6 +917,15 @@ const shapeMacro =
     // sentence can only carry one; `dims` is tried first purely to keep that order deterministic.
     const dims = n === 4 ? statedDims(s) : null;
     const side = dims ? null : statedSideLength(s);
+    // #957: the clause is present and carries a value, but this shape's sides are not equal by
+    // definition — so `statedSideLength` declined it (rightly) and we must ASK which side rather than
+    // fall through to the escalation seam. Derived from SIDE_SHAPES membership, never a second list of
+    // shapes to keep in sync: whatever that set does not cover is, by construction, a shape where
+    // «its side» is a guess. The noun is the trigger's own first token, so it is the student's word.
+    if (!dims && !side) {
+      const stated = sideClauseValue(s);
+      if (stated) return { clarify: 'side-unspecified', noun: trigger.exec(s)?.[0]?.trim().split(/\s+/)[0] ?? '', value: stated };
+    }
     const own = dims ?? side;
     const bare = (own ? s.replace(own.strip, ' ') : s).replace(strip, ' ');
     /** `'stop'` when a stated side cannot be lowered — escalate rather than drop the magnitude. */
@@ -9866,8 +9902,31 @@ const withReservedGuard = (r: ParseResult, ctx: ParseContext): ParseResult => {
  * `not-handled` sends a recognised ambiguity to the LLM — whose job is to guess, which is the #516
  * class this tree keeps closing (#461, #889).
  */
+/**
+ * The clarifications the dropped-noun gate below must NOT second-guess.
+ *
+ * It is a **whitelist, deliberately — not the set of all clarifications**, and the difference is the
+ * whole point. A clarification names no commands, so `droppedShapeNoun` sees the utterance unconsumed
+ * and would send the question to `not-handled` (the escalation seam) unless it is listed here. But some
+ * questions are themselves the SYMPTOM of a dropped shape noun and deserve to be second-guessed:
+ * «משולש שווה שוקיים שבו זווית B=40» makes the angle rule ask *"name all three letters"*, which is
+ * misleading — the utterance declares a triangle, and the ADR-264 Am. 1 split rescues it into the
+ * isosceles shape plus ∠B resolved from its neighbours. So `ambiguous-angle` is EXCLUDED on purpose.
+ *
+ * A member belongs here when the asking rule has genuinely consumed the shape noun, so there is nothing
+ * for the split to rescue and the only alternatives are the question or a paid guess:
+ *
+ * - `ambiguous-shape` / `ambiguous-construct` (#461) — the noun IS the subject of the question.
+ * - `side-unspecified` (#957, [ADR-494](../../docs/06-decisions.md#adr-494)) — «מלבן ABCD שהצלע שלו 6».
+ *   The rectangle rule matched and is asking WHICH side; splitting would build «מלבן ABCD» and silently
+ *   drop the magnitude, which is the honesty violation the ask exists to prevent.
+ *
+ * **Do not derive this from the `Clarify` union.** That was tried in round #961 and measured wrong: it
+ * pulls in `ambiguous-angle` and breaks the rescue above. Adding a member is an ADR-worthy decision
+ * about that member (docs/17 §3), which is why the list is explicit and each entry carries its reason.
+ */
 const isAmbiguityQuestion = (reason: string): boolean =>
-  reason === 'ambiguous-shape' || reason === 'ambiguous-construct';
+  reason === 'ambiguous-shape' || reason === 'ambiguous-construct' || reason === 'side-unspecified';
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
   let s = normalizeUtterance(raw);
   if (!s) return { ok: false, reason: 'not-handled' };
@@ -10393,6 +10452,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };
   if (res.clarify === 'alias-taken') return { ok: false, reason: 'alias-taken', name: res.name };
   if (res.clarify === 'role-side-unresolved') return { ok: false, reason: 'role-side-unresolved', role: res.role };
+  if (res.clarify === 'side-unspecified') return { ok: false, reason: 'side-unspecified', noun: res.noun, value: res.value };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 

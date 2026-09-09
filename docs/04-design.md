@@ -105,6 +105,16 @@ src/
   parser/        parse.ts (deterministic bilingual grammar, ordered rules + post-pass chokepoints +
                  honesty gates), catalog, context (buildParseCtx — the docs/17 §3b registry), scope,
                  llm/llmShared (the LLM-fallback seam; re-parse + gate battery)
+                 - THE CLARIFICATION FAMILY (ADR-490, ADR-494): a rule may return a `Clarify` instead
+                   of commands, which `refusalOf` maps to a refusal reason of the SAME NAME and
+                   `submitPipeline` renders as an input note that keeps the text. `not-handled` is the
+                   escalation seam — right for a phrasing the grammar cannot READ, wrong for one it
+                   reads perfectly well that is missing a given. `isAmbiguityQuestion` is the explicit
+                   whitelist of clarifications `parseResolved` may not second-guess back into an
+                   escalation. It is deliberate, NOT derivable from the `Clarify` union: a member
+                   belongs when the asking rule CONSUMED the shape noun, and `ambiguous-angle` is
+                   excluded because that question can be the symptom of a dropped noun, which the
+                   ADR-264 Am. 1 split rescues (deriving it was tried in round #961 and refuted)
   app/           submitPipeline.ts — the text→command orchestration, extracted from App.tsx and
                  directly tested (S0.4)
                  - errorSubject.ts (ADR-487, #943): `utteranceForError(facts, status, raw)` — WHICH
