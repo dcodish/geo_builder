@@ -106,6 +106,18 @@ that worked. A **letter** coefficient is read in the stated orientation only (`1
 flipped spelling is not guessed at), and reaching an existing free rider it binds the name and nothing
 else, exactly as the clause does. See [ADR-3D-231](06b-decisions-3d.md#adr-3d-231) (#932).
 
+**A VALUED parameter's two forms compete on one surface, and the student picks.** `degText` is the one
+rule for what an arc reads, so it is also where the choice lands: a symbol whose valuing row is set to
+`letter` reads its letter instead of its value, and everything else is byte-identical. The resolver
+rides the `App3 → Figure3 → buildScene3` seam that `planeDisplay` and `showObjectAngles` already use.
+Which rows OFFER the choice is derived, never listed: `collectWedges` (moved out of `buildScene3` so the
+fact list can read it too — one collection, two readers) yields the wedges, `competingArcSymbols` picks
+those carrying BOTH a label and a value, and `store/paramChips.ts` puts the chip on the enabled fact
+whose `symbol-value` command named such a symbol. The choice itself is `displayMode` in the store,
+keyed by that fact's id — and by its INDEX in the save file, because a load re-parses utterances into
+fresh ids. See [ADR-3D-233](06b-decisions-3d.md#adr-3d-233) (#925/#937) and the cross-product rule
+[ADR-W-047](06w-decisions-workspace.md#adr-w-047).
+
 **A refusal names a cause the figure does not contradict.** When a statement is addressed to a letter, the
 two questions *"does the figure carry this letter?"* and *"does this lane expose what the statement asks
 for?"* have separate answers and separate codes: `unknown-symbol` for the first, `sign-not-selectable` for

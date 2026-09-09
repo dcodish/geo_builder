@@ -20,6 +20,7 @@ import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3,
 import { cameraFrame, project3, type Camera3 } from './camera';
 import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
 import { isRightAngleValue, meetingPoint, rightAngles3 } from './rightAngles';
+import { collectWedges } from './wedges';
 
 export interface ScenePoint3 {
   id: Id;
@@ -385,6 +386,9 @@ export function buildScene3(
    *  these appear only while «ארגון נתונים» is open, so the canvas stays clean by default. The VERTEX
    *  arcs (#94 and the stated-vangle marks) are NOT gated and keep drawing unconditionally. */
   showObjectAngles = false,
+  /** #937 (ADR-W-047): which form a VALUED parameter shows — the student's choice, made on the fact
+   *  row that valued it. Absent ⇒ the value, which is this builder's behaviour before #937. */
+  symbolDisplay?: (sym: string) => 'letter' | 'value',
 ): Scene3 {
   const positions = resolved.positions;
   const frame = cameraFrame(cam);
@@ -619,7 +623,18 @@ export function buildScene3(
    * then «α = 70» reads «70°», not «α = 70°» and not both — the arc follows the student to the part of
    * the question they are in.
    */
-  const degText = (deg: number | undefined, label: string | undefined): string => (deg !== undefined ? `${deg}°` : (label ?? ''));
+  /**
+   * #937 (ADR-3D-233 / ADR-W-047): and once the student has stated that value themselves, they may
+   * send the arc back to the letter — a bagrut question is worked in parts, and which form belongs on
+   * screen depends on the part they are in. `symbolDisplay` answers per symbol; with no resolver, or
+   * for a symbol the student never valued, the reading above is unchanged. A `letter` choice with no
+   * label to show falls back to the value rather than rendering nothing.
+   */
+  const degText = (deg: number | undefined, label: string | undefined): string => {
+    if (deg === undefined) return label ?? '';
+    if (label && symbolDisplay?.(label) === 'letter') return label;
+    return `${deg}°`;
+  };
   /** The vertex-arc geometry: a 13-point arc of radius `r` from arm `u1` to arm `u2` about `v`, label on the bisector. */
   const wedgeArc = (v: Vec3, u1: Vec3, u2: Vec3, r: number): { pts: Vec3[]; label: Vec3; v: Vec3 } => {
     const pts: Vec3[] = [];
@@ -634,69 +649,28 @@ export function buildScene3(
 
   // ---- ONE WEDGE, ONE ARC (#923, ADR-3D-221 / ADR-W-045) ---------------------------------------------
   // A vertex arc is keyed by its WEDGE — the vertex and the unordered ray pair — and every producer
-  // feeds the same map: the stated values (vangle scalar pins — driving givens — and recorded shared-apex
-  // angle claims, incl. paramGivens, which live in claims too; ADR-3D-032 Am.) and the #94 named-angle
-  // MARKERS («∠SDB» / «∠SDB = α», a pedagogical arc carrying the label and no number). Two independent
-  // loops used to push into `wAngles` with byte-identical geometry, so an angle that carried both a name
-  // and a value — the normal bagrut phrasing — was stroked twice with «α» and «70°» at one pixel. The map
-  // emits once per wedge with `degText`'s reading.
+  // feeds the same collection: the stated values (vangle scalar pins and recorded shared-apex angle
+  // claims, incl. paramGivens) and the #94 named-angle MARKERS. Two independent loops used to push into
+  // `wAngles` with byte-identical geometry, so an angle carrying both a name and a value — the normal
+  // bagrut phrasing — was stroked twice with «α» and «70°» at one pixel.
   //
-  // A wedge is identified by the vertex plus its two ray DIRECTIONS, not by the point ids
-  // ([ADR-3D-227](../../docs/06b-decisions-3d.md#adr-3d-227), issue #928). ADR-3D-221 keyed on ids and
-  // recorded the alternate-spelling question as measured-but-unarmed; the measurement came back positive —
-  // with E on AB, «∠EAS = α» and «∠BAS = 40» are ONE physical corner and drew two stacked arcs at two
-  // radii. Identity by direction is 2-D's answer (`wedgeOf`, F7/REN-9, and the ADR-167 Am. dedup: *"they
-  // are ONE angle and must draw ONE arc, not two stacked rings"*); ADR-W-045 leaves the question
-  // per-builder, so this is a choice made HERE on that measurement, not a rule inherited.
-  //
-  // Matching is a TOLERANCE predicate, never a rounded key: rounding puts a hard quantization boundary
-  // mid-wedge, so two rays of the same corner a hair apart key differently and double-draw — the exact
-  // regression 2-D's F7/REN-9 records. A wedge whose points do not resolve falls back to id identity, so
-  // nothing about the unresolvable case changes.
-  {
-    type Wedge = { vertex: Id; p: Id; q: Id; u1: Vec3 | null; u2: Vec3 | null; deg?: number; label?: string };
-    const RAY_TOL = Math.cos((1.5 * Math.PI) / 180); // ±1.5° per ray, the 2-D tolerance
-    const rayNear = (a: Vec3, b: Vec3) => dot3(a, b) >= RAY_TOL;
-    /** The wedge's two unit rays from the drawn positions, or null when it has none to compare. */
-    const raysOf = (vertex: Id, p: Id, q: Id): [Vec3, Vec3] | null => {
-      const v = positions.get(vertex), pp = positions.get(p), qq = positions.get(q);
-      if (!v || !pp || !qq) return null;
-      const a = sub3(pp, v), b = sub3(qq, v);
-      return norm3(a) < 1e-9 || norm3(b) < 1e-9 ? null : [normalize3(a), normalize3(b)];
-    };
-    const wedges: Wedge[] = [];
-    const wedgeOf = (vertex: Id, p: Id, q: Id) => {
-      const d = raysOf(vertex, p, q);
-      const same = (w: Wedge) =>
-        w.vertex === vertex &&
-        (d && w.u1 && w.u2
-          ? (rayNear(w.u1, d[0]) && rayNear(w.u2, d[1])) || (rayNear(w.u1, d[1]) && rayNear(w.u2, d[0]))
-          : (w.p === p && w.q === q) || (w.p === q && w.q === p));
-      let w = wedges.find(same);
-      if (!w) wedges.push((w = { vertex, p, q, u1: d?.[0] ?? null, u2: d?.[1] ?? null }));
-      return w;
-    };
-    for (const sp of c.scalarPins) if (sp.kind === 'vangle') wedgeOf(sp.vertex, sp.p, sp.q).deg ??= sp.deg;
-    for (const cl of c.claims) if (cl.type === 'angle-seg-eq' && cl.a1 === cl.a2) wedgeOf(cl.a1, cl.b1, cl.b2).deg ??= cl.deg;
-    for (const mk of c.angleMarks) {
-      const w = wedgeOf(mk.vertex, mk.p, mk.q);
-      w.label ??= mk.label ?? '';
-    }
-    for (const w of wedges) {
-      // #307: a right angle is drawn as a KNEE (rightAngles3), not an arc labelled "90°" — and since the
-      // value wins, a named angle later valued at 90° is a knee too, not a knee UNDER an «α» arc.
-      if (w.deg !== undefined && isRightAngleValue(w.deg)) continue;
-      const v = positions.get(w.vertex);
-      const p = positions.get(w.p);
-      const q = positions.get(w.q);
-      if (!v || !p || !q) continue;
-      const d1 = dist3(p, v);
-      const d2 = dist3(q, v);
-      if (d1 < 1e-9 || d2 < 1e-9) continue;
-      const u1 = normalize3(sub3(p, v));
-      const u2 = normalize3(sub3(q, v));
-      wAngles.push({ v, mk: (r) => wedgeArc(v, u1, u2, r), clamp: { arm: Math.min(d1, d2), u1, u2 }, text: degText(w.deg, w.label) });
-    }
+  // The collection itself moved to `./wedges` when #937 needed a SECOND reader (the fact list asks
+  // which valued parameters actually compete with a letter on this surface); its identity rules —
+  // direction-based, tolerance-matched, ADR-3D-227 — live there with their reasoning.
+  for (const w of collectWedges(c, positions)) {
+    // #307: a right angle is drawn as a KNEE (rightAngles3), not an arc labelled "90°" — and since the
+    // value wins, a named angle later valued at 90° is a knee too, not a knee UNDER an «α» arc.
+    if (w.deg !== undefined && isRightAngleValue(w.deg)) continue;
+    const v = positions.get(w.vertex);
+    const p = positions.get(w.p);
+    const q = positions.get(w.q);
+    if (!v || !p || !q) continue;
+    const d1 = dist3(p, v);
+    const d2 = dist3(q, v);
+    if (d1 < 1e-9 || d2 < 1e-9) continue;
+    const u1 = normalize3(sub3(p, v));
+    const u2 = normalize3(sub3(q, v));
+    wAngles.push({ v, mk: (r) => wedgeArc(v, u1, u2, r), clamp: { arm: Math.min(d1, d2), u1, u2 }, text: degText(w.deg, w.label) });
   }
 
   // ---- A STATED ANGLE BETWEEN TWO SEGMENTS THAT CROSS (#917, ADR-3D-222) ------------------------------

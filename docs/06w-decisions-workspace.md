@@ -2295,3 +2295,117 @@ and 3-D. Recorded plainly so nobody re-opens it as an oversight.
 boot (the store imports empty) and no product tree reads or writes a session key (a grep guard, so
 `src-analytic/` cannot inherit the coin flip); the fixtures net (`fixtures.test.ts`) stays the proof that
 file load still works.
+
+## ADR-W-047 — A parameter the student VALUES gets a display choice on the valuing line; one they never valued is never replaced (#937, #925)
+
+**Status:** accepted, 2026-09-08 (fix-round #946, item 1) · **Issues:** #937 (the rule), #925 (its first adoption)
+**Operator ruling:** 2026-09-08, playing round #931 T10, with three scope answers the same day
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-3 — amended · **Design:** [04b](04b-design-3d.md) — the display seam
+**Adoptions:** 3-D angle arc — [ADR-3D-233](06b-decisions-3d.md#adr-3d-233), this PR. 2-D, the 3-D coordinate lane and complex follow as their own issues.
+
+### The ruling, and why it is a rule rather than a feature
+
+> *"the general pedagogy rule that needs to propagate to all cases is that if a point, line, vector,
+> angle, segment size or anything is defined by a parameter, and later in input we define that
+> parameter, the user will have a chip toggle where he can decide if he wants to see the parameter
+> display or the value display. this chip will be on the input line that defined the parameter - i.e.
+> on the line with p=3. … if the value of the parameter is computable, but user did not enter it, the
+> canvas always shows the parameter and data panel can show the computed values."*
+
+**A bagrut question is worked in PARTS.** Part 1 reasons with the letter and every line the student
+writes is *about* «α»; a later part supplies 70. The figure serves both, and which form belongs on
+screen depends on **where in the question the student is** — which the tool cannot infer and must not
+guess. So the default follows their last statement, and the chip lets them go back.
+
+Measured before this change, through the real path: after «∠SAB = α» the arc reads `α`; after «α = 70»
+it reads `70°` and **no surface anywhere still shows `α`.** The form the student typed was
+unrecoverable. Same defect one lane over for a coordinate (`c(p²,1,0)` · `p=3` → `C(9, 1, 0)`, the
+report that produced this ruling), and one tree over in 2-D (`AB = 3x` · `x = 4` → `12`).
+
+### The three clauses, and the operator's answers
+
+**1 — Scope is every parametrised quantity, not angles.** A point, line, vector, angle, segment
+length — anything defined in terms of a parameter the student later values.
+
+**2 — The chip lives on the line that VALUED the parameter** (`α = 70`, `p = 3`), not on the line that
+used it. Same ownership he settled for #925 on 2026-09-07, and it is the row whose statement the choice
+is about.
+
+**3 — A parameter the student did NOT value is never silently replaced.** If the figure can *compute*
+it, the canvas still shows the letter and the panel may show the computed value. **There is no chip in
+this case — there is nothing the student chose between.** This is the honesty half and the more
+important one: a value the student never wrote must not appear on the figure as though they had.
+
+His three scope answers, all 2026-09-08:
+
+- **Only where the displays COMPETE** — *"only when displays compete"*. The wider literal reading of
+  clause 1 is not taken.
+- **The choice PERSISTS** — *"show another config and save/reload should keep the choice"*. This
+  reverses #925's earlier session-level recommendation.
+- **Clause 3 is a LOCK, not new work** — *"what works today is good. i just wrote it so there is no
+  confusion"*, confirmed by measurement in both trees.
+
+### The decision — what is shared, and what each product derives
+
+**`shell/displayMode.ts` — the state shape and its pure operations.** `DisplayModeMap` is
+`factId → 'letter' | 'value'`, default `value`, plus toggle, prune, and the file-boundary converters.
+No strings, no geometry, no opinion about which surfaces compete: ADR-W-016's contract as written.
+
+**`shell/frame/FactList.tsx` — the affordance.** A row may carry `chip: { letter, value, mode,
+onToggle, title }`; it renders a two-state control showing the form the student would switch *to*, and
+calls back. It knows no product and no symbol semantics, and in particular it does **not** decide which
+rows get one.
+
+**The COMPETING predicate is derived per product, over its own display builders.** *"Compete"* is a
+property of a **surface**, not of the figure — an angle's two forms compete on the canvas arc, a
+coordinate's compete in the data panel, and a symbol nothing renders competes nowhere. So the rule is:
+
+> a valued parameter offers a chip **iff some display surface holds both its parametric form and its
+> value** — i.e. renders the letter while the value is absent and the value once it arrives.
+
+Each product answers that from the data its builders already carry, never from a list of quantity
+KINDS. A surface that learns to hold both forms starts offering the chip by itself; a per-kind
+enumeration is the case-by-case shape this ruling exists to avoid.
+
+**Deviation from #937's design comment, stated plainly.** D1 defined the predicate as a *replay diff*:
+replay without the valuing fact and with it, and compare the rendered strings. That is a correct
+**definition** and a poor implementation — it is a second solve per valuing row on every render. The
+structural form above is the same predicate computed from what the surface already holds (a wedge with
+both a label and a `deg` renders the letter without the value and the value with it — that is exactly
+what `degText` does), and it is O(1). Nothing else about D1–D7 changed.
+
+### Why the store keys by fact id and the FILE keys by position
+
+The choice is keyed by the id of the fact that valued the parameter. That id survives a reseed and a
+branch cycle — the figure is derived from the fact list and the id is not — which is what makes the
+persistence half of ruling 2 work with no positions stored. It is a display preference and **not a
+geometric fact**, so it never enters the ordered fact list; CLAUDE.md's source-of-truth rule is
+untouched. It sits beside `seed` in the store, in `partialize`, and in the save file, exactly as each
+product's other display preferences already do.
+
+**Across a FILE, the id means nothing.** A load re-parses the saved utterances into fresh facts with
+fresh ids — the point of the format is that it stores what the student *said*, so an old file picks up
+parser and engine fixes automatically. A first cut keyed the file by id and silently lost the choice on
+every reload while looking correct in the store; the round-trip lock is what caught it. The file
+therefore keys by the fact's **index**, the file's own stable handle, converted at that boundary and
+only there.
+
+A file saved before this shipped carries no map and loads showing values — today's behaviour, so there
+is no migration and the load audit stays green. A figure with no choice writes no key at all, so an
+untouched file is byte-identical.
+
+### Locks
+
+Per-product, and clause 3 is locked **in every tree the rule reaches**, whether or not that tree has a
+chip yet — it is the half that binds today. 3-D: `issue-937-param-display-chip.test.ts` (16). 2-D:
+`issue-937-clause3-2d.test.ts` (4) — the free scale, the DETERMINED scale, the determined named angle,
+and the boundary case where the student *did* state the value, so the two halves cannot be confused by
+a later change.
+
+### What this does NOT settle
+
+The remaining adoptions, each its own issue with its own product ADR: **2-D**'s angle and length chips,
+the **3-D coordinate lane** (panel-competing — the first non-canvas chip, and the case that proves the
+predicate is not canvas-specific), and **complex**, whose render side is still unmeasured (#937's design
+pass measured its parser only, and says so). Per docs/20 §12 each copies the pattern rather than
+importing it; what they share is this ADR and `shell/`.

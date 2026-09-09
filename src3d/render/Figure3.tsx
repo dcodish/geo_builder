@@ -34,6 +34,8 @@ export interface Figure3Props {
   showWitnesses?: boolean;
   /** #542 (ADR-3D-185): draw the arcs of angles whose sides are OBJECTS — fed from «ארגון נתונים». */
   showObjectAngles?: boolean;
+  /** #937 (ADR-W-047): which form a VALUED parameter shows — the student's per-row choice. */
+  symbolDisplay?: (sym: string) => 'letter' | 'value';
   /** #483: a determined-but-unnamed ℓ∩π crossing was clicked — the App names it through the normal
    *  submit path. Absent = the offer is not drawn at all, which keeps this component a pure view. */
   onNameCrossing?: (c: SceneCrossing3) => void;
@@ -95,7 +97,7 @@ const ltr = (s: string) => `⁦${s}⁩`;
  */
 const CANVAS_DIR = { direction: 'ltr' } as const;
 
-export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay, showWitnesses = true, showObjectAngles = false, onNameCrossing, onRenamePoint, renameText, crossingLabel, presetLabels }: Figure3Props) {
+export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay, showWitnesses = true, showObjectAngles = false, symbolDisplay, onNameCrossing, onRenamePoint, renameText, crossingLabel, presetLabels }: Figure3Props) {
   /**
    * #5 — the HOME camera for THIS figure. A purely planar figure is read face-on (`planarNormal` /
    * `faceOnView`, engine/defaultView); everything else keeps the ¾ textbook view. Derived from the
@@ -137,8 +139,8 @@ export default function Figure3({ construction, resolved, width = 640, height = 
   const view = cam ?? home;
 
   const scene = useMemo(
-    () => buildScene3(construction, resolved, view, { width, height }, zoom, planeDisplay, showWitnesses, showObjectAngles),
-    [construction, resolved, view, width, height, zoom, planeDisplay, showWitnesses, showObjectAngles],
+    () => buildScene3(construction, resolved, view, { width, height }, zoom, planeDisplay, showWitnesses, showObjectAngles, symbolDisplay),
+    [construction, resolved, view, width, height, zoom, planeDisplay, showWitnesses, showObjectAngles, symbolDisplay],
   );
 
   const onPointerDown = (e: RPointerEvent<SVGSVGElement>) => {

@@ -145,6 +145,20 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   *(Realised — [ADR-3D-221](06b-decisions-3d.md#adr-3d-221), #923; `issue-923-917.test.ts`,
   `pyramid-named-valued-angle-923.geo3.json`. The identity of a wedge is by point ids; the
   alternate-spelling collapse 2-D does by ray direction is filed separately.)*
+- **FR-RD-6 (Should)** — **A parameter the student VALUED offers a display choice; one they never
+  valued is never replaced.** A bagrut question is worked in parts: part 1 reasons with «α» and a later
+  part supplies 70, so which form belongs on the figure depends on where in the question the student
+  is — which the tool cannot infer and must not guess. Once they state the value themselves, the figure
+  shows it (FR-RD-4) **and the line that valued it carries a chip that sends the figure back to the
+  letter**, per parameter, kept across «הצג תצורה אחרת» and a save/load round trip. The chip appears
+  only where the two forms actually COMPETE on a surface — a surface that showed the letter before the
+  value arrived and the value after it — so a letter nothing draws offers no choice. And a parameter the
+  student did **not** value is never substituted: even when the figure determines it, the canvas keeps
+  their letter and the computed value stays in the data panel. That second half is an honesty invariant
+  — a value the student never wrote must not appear on the figure as though they had. One rule for every
+  builder ([ADR-W-047](06w-decisions-workspace.md#adr-w-047)). *(Realised for the angle arc —
+  [ADR-3D-233](06b-decisions-3d.md#adr-3d-233), #925/#937; `issue-937-param-display-chip.test.ts`. The
+  coordinate lane's panel chip is a later adoption.)*
 - **FR-RD-5 (Must)** — **A stated angle is marked where the segments MEET.** «הזווית בין AC' לבין BD' היא
   55» on segments that genuinely cross draws the arc + value at the crossing, exactly as a shared-vertex
   angle draws it at the vertex; a stated angle between segments that are **skew**, parallel, or would
