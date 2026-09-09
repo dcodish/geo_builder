@@ -2442,4 +2442,22 @@ export const SCENARIOS_4: Scenario[] = [
       expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), 'the figure draws 60° at B').toBeCloseTo(60, 2);
     },
   },
+  {
+    id: 'inscribed-square-on-a-right-triangle-builds-920',
+    title: '#920: «ריבוע DEFG חסום במשולש ABC» on a RIGHT triangle builds — at every right-angle vertex',
+    guards:
+      "operator report (#920): an inscribed square that USED to draw began refusing «over-constrained: ∠ABC = 90° cannot hold» — accusing the student's own right angle, which holds perfectly well. Bisected to 499d35c..615e329. Measured across all 36 configurations (2 shapes × 3 right-angle vertices × 6 variants): 35 build and exactly one refuses (square@B#3, reachable only by cycling), so the DEFAULT the student sees builds at every vertex — which is what this scenario locks, because a regression that made the default refuse is the reported symptom. ADR-493 arm 1 fixed the accusation itself: `newCons` counted only LISTED constraints, and this macro attaches all four of its own (|DE|=|EF|, |EF|=|FG|, |FG|=|GD|, GD ⟂ DE) as SOLVE DIRECTIVES, so `blameNewStatement` — which exists to name the student's new statement instead of a collateral casualty — was handed an empty list and silently no-opped, letting the primary solve's violated set (a prior given) reach the student verbatim. The one remaining refusal is a KNOWN OPEN GAP held by the operator's 2026-09-09 ruling pending a second case in its class, and it is recorded in the 36-cell outcome map in src/engine/__tests__/inscribe-joint-solve.test.ts rather than hidden — that map replaced a MARGINAL set which asserted a state that had stopped occurring and so passed by checking nothing for six weeks.",
+    steps: ['משולש ABC', 'זוית B ישרה', 'ריבוע DEFG חסום במשולש ABC'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the square verifies against its givens').toEqual([]);
+      for (const id of ['D', 'E', 'F', 'G']) expect(fig.positions.has(id), `${id} is placed`).toBe(true);
+      const P = (id: string) => at(fig, id);
+      const sides = [dist(P('D'), P('E')), dist(P('E'), P('F')), dist(P('F'), P('G')), dist(P('G'), P('D'))];
+      expect(Math.max(...sides) - Math.min(...sides), 'all four sides equal — it really is a square').toBeLessThan(1e-2);
+      expect(angle(P('G'), P('D'), P('E')), 'and a right angle at D').toBeCloseTo(90, 1);
+      // the student's own right angle survives, which is the given the refusal used to accuse
+      expect(angle(P('A'), P('B'), P('C')), 'the stated right angle at B still holds').toBeCloseTo(90, 1);
+    },
+  },
 ];

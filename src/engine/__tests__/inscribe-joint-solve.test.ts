@@ -38,33 +38,65 @@ function withVariant(prefix: string[], shape: 'square' | 'rectangle', variant: n
 }
 
 /**
- * MARGINAL CONVERGENCE (filed separately — do NOT widen this set to make a failure pass).
+ * THE 36-CONFIGURATION OUTCOME MAP (#920 arm 2, [ADR-493](docs/06-decisions.md#adr-493)).
  *
- * `square` @ right-angle-B, variant 3 lands with the ⟂ residual at 1.44e-6 against a 1e-6 tolerance — a
- * 1.44× miss, i.e. a square to ~1e-4 DEGREES. Every other config converges to ~1e-8 (100× inside), so this
- * is the derivative-free Nelder-Mead cost minimiser stopping just short on one basin, not a wrong figure —
- * and it is surfaced HONESTLY (the verifier raises it amber; it is not green-and-wrong). It is still a
- * strict improvement on the baseline, which REFUSED two of this vertex's variants and gave two violations
- * on this one. Tracked as its own issue (solver convergence precision on the coupled path); when that lands,
- * this set empties and the `toEqual([])` below forces the flip — the miss can never go silent.
+ * This replaces a `MARGINAL = new Set(['square@B#3'])` that asserted a state which had **stopped
+ * occurring**: that configuration no longer lands green-with-violations, it REFUSES, so the `marginals`
+ * list was always empty and its `toEqual([])` passed by checking nothing. #920 — an inscribed square that
+ * used to draw and now refuses — went unseen for six weeks behind exactly that.
+ *
+ * The map form cannot degrade that way: every cell is named with its expected outcome, so a change in ANY
+ * of the 36 fails by construction — a refusal that starts building, a build that starts refusing, and a
+ * refusal whose blamed subject changes are each a different diff. It is the memory note *"locks and gates
+ * are hypotheses"* made structural.
+ *
+ * Measured on `main` at the round-#961 tip. `square@B#3` is the one refusal and it is a **KNOWN OPEN
+ * GAP**, recorded here rather than hidden: the hypotenuse seating genuinely exists and the refusal is
+ * wrong, but three mechanisms have been refuted (tolerance; a Levenberg polish rung that converges 8,700×
+ * and changes nothing; "re-listed obligations are enforced", measured false). The operator's 2026-09-09
+ * ruling holds it pending a **second case in the same class** — constructive per-variant seeding stays the
+ * leading candidate and gets a session when a case arrives, not a slot on speculation. Do NOT flip this
+ * cell to make a change pass; if it starts building, that is the gap CLOSING and the cell is updated in
+ * the same commit as the fix that closed it.
  */
-const MARGINAL = new Set(['square@B#3']);
+type Outcome = 'builds' | { refuses: RegExp };
+const OUTCOMES: Record<string, Outcome> = Object.fromEntries([
+  ...(['A', 'B', 'C'] as const).flatMap((rt) =>
+    [0, 1, 2, 3, 4, 5].flatMap((v) => [
+      [`square@${rt}#${v}`, 'builds' as Outcome],
+      [`rectangle@${rt}#${v}`, 'builds' as Outcome],
+    ]),
+  ),
+  // the one open gap — and after ADR-493 arm 1 it names the SQUARE'S OWN obligation, never the
+  // student's «∠ABC = 90°», which holds perfectly well and which they must not be sent to change.
+  ['square@B#3', { refuses: /\|DE\| = \|EF\|/ } as Outcome],
+]);
 
 describe('a macro\'s defining constraints are solved as one coupled system (ADR-338 / #166)', () => {
   for (const shape of ['square', 'rectangle'] as const) {
     for (const rt of ['A', 'B', 'C'] as const) {
-      it(`${shape} inscribed — right angle at ${rt}: every variant builds a verified shape or refuses honestly`, () => {
-        const marginals: string[] = [];
+      it(`${shape} inscribed — right angle at ${rt}: every variant matches its cell in the 36-outcome map`, () => {
         for (let v = 0; v < 6; v++) {
           const key = `${shape}@${rt}#${v}`;
+          const expected = OUTCOMES[key];
+          expect(expected, `${key}: every configuration has a cell`).toBeDefined();
           const fig = replay(withVariant(['משולש ABC', `זוית ${rt} ישרה`], shape, v), 0);
           const failed = Object.values(fig.status).filter((s) => s !== 'ok');
-          if (failed.length) {
+
+          if (expected !== 'builds') {
+            expect(failed.length, `${key}: the map says this configuration refuses`).toBeGreaterThan(0);
             // Refusing is allowed — but only HONESTLY: nothing of the failed step may remain (ADR-337).
             for (const id of ['D', 'E', 'F', 'G'])
               expect(fig.positions.has(id), `${key}: refused, so ${id} must not exist`).toBe(false);
+            // ADR-493 arm 1: the named constraint is one the MACRO added…
+            expect(fig.lastError, `${key}: the refusal names the macro's own obligation`).toMatch(expected.refuses);
+            // …and never the student's own prior given, which holds perfectly well. This is the
+            // honesty assertion in general form: whatever the prefix stated must not be accused.
+            expect(fig.lastError, `${key}: the student's «זוית ${rt} ישרה» is not accused`).not.toMatch(new RegExp(`∠\\w*${rt}\\w*\\s*=\\s*90`));
             continue;
           }
+
+          expect(failed, `${key}: the map says this configuration builds`).toEqual([]);
           const [d, e, f, g] = ['D', 'E', 'F', 'G'].map((id) => fig.positions.get(id)!);
           const sides = [dist(d, e), dist(e, f), dist(f, g), dist(g, d)];
           const angles = [angle(g, d, e), angle(d, e, f), angle(e, f, g), angle(f, g, d)];
@@ -76,16 +108,19 @@ describe('a macro\'s defining constraints are solved as one coupled system (ADR-
           if (shape === 'square')
             expect(Math.max(...sides) - Math.min(...sides), `${key}: all four sides equal`).toBeLessThan(1e-2);
           // …and it must SATISFY ITS GIVENS (the ADR-053 verifier) — the green-but-violating case.
-          if (fig.violations.length) {
-            marginals.push(key);
-            expect(MARGINAL.has(key), `${key}: unexpected verifier violation — ${JSON.stringify(fig.violations.map((x) => x.message))}`).toBe(true);
-          }
+          expect(fig.violations, `${key}: builds AND verifies`).toEqual([]);
         }
-        // No silent drift: a known marginal that gets FIXED must force this list to be updated.
-        expect(marginals.filter((k) => !MARGINAL.has(k)), 'unexpected marginals').toEqual([]);
       });
     }
   }
+
+  it('the map covers every configuration exactly once — no cell can be quietly dropped', () => {
+    const keys = (['square', 'rectangle'] as const).flatMap((shape) =>
+      (['A', 'B', 'C'] as const).flatMap((rt) => [0, 1, 2, 3, 4, 5].map((v) => `${shape}@${rt}#${v}`)),
+    );
+    expect(keys).toHaveLength(36);
+    expect(Object.keys(OUTCOMES).sort()).toEqual(keys.sort());
+  });
 
   it('the PINNED corner variant reaches the t=0 boundary and matches the closed-form oracle (ADR-338)', () => {
     // Variant 0 with the right angle at A forces D exactly onto A — the corner square of side

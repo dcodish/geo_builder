@@ -10007,3 +10007,86 @@ refusal is still blamed itself; a restated value blames the **last** one, as the
 the length lane; and a **prefix-sweep oracle** — for a sequence whose first infeasible prefix is known, the
 red row IS that prefix's last line, which is the ruling stated executably, over four sequences. Scenario
 `blame-lands-on-the-value-line-956` (corpus 4).
+
+## ADR-493 — A REFUSAL NAMES A CONSTRAINT THE STEP ADDED, INCLUDING THE ONES IT ATTACHED AS DIRECTIVES; and the inscribe gate becomes a 36-cell outcome map (#920)
+
+**Status:** accepted, 2026-09-10 (round #961) · **Issue:** #920 (stays OPEN — see *the known gap*) · **Ruling:** operator, 2026-09-09 `/decisions` pass — *"land the blame fix and the gate NOW; hold the missing seating"*
+**Requirements:** [02](02-requirements.md) FR-EN-8 — the same promise; this ADR records a **known open gap** against it rather than adding a promise · **Design:** [04](04-design.md) — blame attribution at the failure ladder
+
+**The report.** An inscribed square that used to draw is refused with «**∠ABC = 90° cannot hold**» —
+a statement the student made, which holds perfectly well. Bisected to `499d35c..615e329`.
+
+**Arm 1 — the root cause, measured.** Sweeping all 36 configurations (2 shapes × 3 right-angle vertices
+× 6 variants) at the round tip: 35 build, `square@B#3` refuses. Instrumenting that one:
+
+```
+ladder : ["preserve:reject","coupled:refuse"]
+error  : "over-constrained: ∠ABC = 90° cannot hold"
+violated: ∠ABC = 90°                          ← a PRIOR given of the student's
+prev.constraints = 1   next.constraints = 1
+newCons (what blameNewStatement is given) = 0  ← EMPTY
+driven constraints ADDED by this unit     = 4  ← |DE|=|EF|, |EF|=|FG|, |FG|=|GD|, GD ⟂ DE
+```
+
+`blameNewStatement` exists precisely to stop this — *"an over-constrained refusal names the STUDENT'S new
+statement, not a collateral casualty"* (#37) — and it opens with `if (!newCons.length) return error`. It
+was handed an empty list, so it silently did nothing and the primary solve's violated set reached the
+student verbatim.
+
+`newCons` is `next.constraints.slice(prev.constraints.length)` — the **listed** half only. `applyCommand`'s
+`driveOrCheck` case (1) embeds an obligation in a carrier's `solve` directive **without listing it**, so a
+step whose constraints all went that way adds nothing to `next.constraints`, and every blame decision
+downstream is made over an empty set.
+
+**Class, not instance** (docs/17 §1). *A step whose constraints are recorded as SOLVE DIRECTIVES rather
+than listed checks contributes nothing to the "what did this step add" list, so the blame-honesty
+substitution silently no-ops and the refusal names whatever the primary solve happened to violate —
+typically an earlier given of the student's.* Every multi-command macro can hit it: `inscribe` (ADR-262),
+`shape-variant` (ADR-138), the named shapes (ADR-110), regular polygon (ADR-111), common tangent
+(ADR-239), the concentric pair (ADR-244). Nothing here is about `inscribePlacements`, which is why the fix
+is not there.
+
+**Decision.** `addedConstraints(prev, next)` (`engine/step.ts`) — listed added **plus** driven added —
+feeds the two blame sites in `runFailureLadder`. `drivenConstraintsOf` is the companion enumeration
+[ADR-398](#adr-398) already introduced for exactly this asymmetry (*"driven constraints are NOT in
+`c.constraints`"*), so this reuses the existing accessor instead of adding a second way to ask what a step
+attached. Measured after: the one refusal now reads «**|DE| = |EF| cannot hold**» — the square's own
+seating obligation — and the other 35 configurations are bit-identical.
+
+Scoped to **blame only**. The acceptance paths (`stepAccepted`, `ensureOwnership`, the preservation
+gate's repair) keep reading the listed slice unchanged: widening what counts as "new" there would change
+which figures are *accepted*, which is a different question from which sentence a refusal *names*, and
+this issue has already refuted three mechanisms that reached into the solve.
+
+**Arm 2 — the gate that hid it for six weeks.** `inscribe-joint-solve.test.ts` carried
+`MARGINAL = new Set(['square@B#3'])`, asserting that configuration lands *green with verifier violations*.
+It no longer does — it REFUSES — so the `marginals` list was always empty and its `toEqual([])` passed by
+checking nothing. Replaced by a **36-cell outcome map**: every configuration named with its expected
+outcome, and for the refusal the constraint its message must name. A change in any cell now fails by
+construction — a refusal that starts building, a build that starts refusing, and a refusal whose blamed
+subject changes are three different diffs. A companion test asserts the map covers all 36 keys exactly
+once, so a cell cannot be quietly dropped. The refusal cell is provably non-vacuous: it matches
+`|DE| = |EF|`, a message that only exists after arm 1.
+
+This is the memory note *"locks and gates are hypotheses"* made structural — a gate asserting a state that
+stopped occurring passes by checking nothing, exactly like one with an early return.
+
+**The known gap, recorded rather than hidden.** `square@B#3` still refuses, and the refusal is still
+wrong: the hypotenuse seating genuinely exists. Three mechanisms have been refuted — tolerance (measured);
+a Levenberg polish rung (built, converges 8,700×, changes nothing); "re-listed obligations are enforced"
+(measured false, `missingAreDriven=[false,false,false,false]`). The operator's 2026-09-09 ruling holds it
+pending **a second case in the same class**: constructive per-variant seeding stays the leading candidate
+and gets a session when a case arrives, not a slot on speculation. **#920 therefore stays OPEN as the
+record and its `auto-ok` is removed**, so no round picks it up automatically. The map cell is where a
+future session finds the current truth; do not flip it to make a change pass.
+
+**What a student sees now.** The reported utterance sequence — «משולש ABC» · «זוית B ישרה» · «ריבוע DEFG
+חסום במשולש ABC» — builds at every right-angle vertex (ADR-339 settles the default to a building
+configuration), and that is locked by a scenario. The change is on «הצג תצורה אחרת»: cycling into the one
+unreachable configuration now says the square's own side equality cannot hold, instead of accusing the
+student's right angle.
+
+**Locks.** `src/engine/__tests__/inscribe-joint-solve.test.ts` (9): the 36-cell map, the coverage
+assertion, the pinned-corner closed-form oracle and the plain-triangle baseline, all retained. Scenario
+`inscribed-square-on-a-right-triangle-builds-920` (corpus 4) locks the student-facing sequence at all
+three vertices.

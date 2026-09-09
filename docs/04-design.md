@@ -121,6 +121,14 @@ src/
                    the fold-time twin of ADR-398's per-seed override. `symbolsConsumedBy` (engine/
                    lower.ts) is the shared list of what reads the symbol table, derived from
                    `lowerOne`'s own call sites so the two cannot drift
+                 - WHICH CONSTRAINT a refusal names (ADR-493, #920): `addedConstraints(prev, next)`
+                   in engine/step.ts is listed-added ∪ driven-added, and it feeds the two blame sites
+                   in `runFailureLadder`. `driveOrCheck` case (1) embeds an obligation in a carrier
+                   WITHOUT listing it, so a macro whose constraints all go that way adds nothing to
+                   `next.constraints` — and `blameNewStatement`, which bails on an empty list, then
+                   silently no-ops and the primary solve's violated set (an earlier given of the
+                   student's) reaches them verbatim. Blame only: the acceptance paths keep reading
+                   the listed slice, since what counts as "new" for ACCEPTANCE is a different question
   replay/        core.ts — the PURE replay layer (S1.2): fold memo + deferral + HOIST + seed/config
                  searches + the shared sample core; engine ← replay ← store enforced by test
                  — the config searches RANK rather than merely accept (ADR-486, #942): a view that

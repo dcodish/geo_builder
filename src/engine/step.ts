@@ -11,7 +11,7 @@ import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObjec
 import { LEN_EPS, isGeoPoint, isOrderConstraint } from './types';
 import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeLowersToConstraints, wouldInvertDependency } from './apply';
 import { lower } from './lower';
-import { evaluate, resolveDriven } from './evaluate';
+import { evaluate, resolveDriven, drivenConstraintsOf } from './evaluate';
 import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist, sub } from './geometry';
 import { budgetExceeded } from './solveBudget';
@@ -310,6 +310,40 @@ function stepAccepted(c: Construction, positions: Map<Id, Vec>, newCons: Constra
  * stated list (the `collinear-order`), so the refusal names what the student typed; fall back to a
  * violated NEW member, then to the first. A single-member statement keeps its exact description.
  */
+/**
+ * The constraints a step ACTUALLY ADDED — listed checks **plus** the ones it attached as solve
+ * DIRECTIVES ([ADR-493](../../docs/06-decisions.md#adr-493), #920).
+ *
+ * `next.constraints.slice(prev.constraints.length)` sees only the LISTED half. `applyCommand`'s
+ * `driveOrCheck` case (1) embeds an obligation in a carrier's `solve` directive **without listing it**,
+ * so a step whose constraints all went that way adds nothing to `next.constraints` — and every blame
+ * decision downstream is then made over an EMPTY set. That is why an inscribed square could be refused
+ * with «∠ABC = 90° cannot hold», naming a prior given of the student's that holds perfectly well:
+ * `blameNewStatement` exists precisely to substitute the student's new statement for a collateral
+ * casualty, and it bails out on `!newCons.length`, so it silently did nothing and the primary solve's
+ * violated set — an earlier given — reached the student verbatim.
+ *
+ * `drivenConstraintsOf` is the companion enumeration [ADR-398](../../docs/06-decisions.md#adr-398)
+ * already introduced for exactly this asymmetry ("driven constraints are NOT in `c.constraints`"), so
+ * this reuses the existing accessor rather than adding a second way to ask what a step attached.
+ *
+ * Used ONLY where blame is decided. The acceptance paths keep reading the listed slice unchanged —
+ * widening what counts as "new" there would change which figures are accepted, which is a different
+ * question from which sentence a refusal names.
+ */
+function addedConstraints(prev: Construction, next: Construction): Constraint[] {
+  const listed = next.constraints.slice(prev.constraints.length);
+  const seen = new Set(listed.map(constraintKey));
+  const before = new Set(drivenConstraintsOf(prev).map(constraintKey));
+  for (const con of drivenConstraintsOf(next)) {
+    const k = constraintKey(con);
+    if (before.has(k) || seen.has(k)) continue;
+    seen.add(k);
+    listed.push(con);
+  }
+  return listed;
+}
+
 function describeNewStatement(newCons: Constraint[], violated?: Constraint[]): Constraint {
   const real = newCons.filter((k) => !isOrderConstraint(k));
   // #536: when every violated NEW member is an ORDER (the collinear triple of «ישר ADB» builds fine;
@@ -586,8 +620,11 @@ function runFailureLadder(
   }
   // Honest refusal: name the STUDENT'S new statement (blame honesty, issue #37); a solve that "passed"
   // only vacuously (the non-vacuous gate refused it) reports the same over-constraint shape.
-  const vacuousErr = newCons.length ? `over-constrained: ${describeConstraint(describeNewStatement(newCons))} cannot hold` : 'over-constrained';
-  return { ok: false, error: primary.ok ? vacuousErr : blameNewStatement(primary.error, newCons, primary.violated), construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:refuse`] };
+  // #920 (ADR-493): blame from what the step ACTUALLY added — a macro whose constraints all became
+  // solve directives lists none, and both messages below were being built from an empty set.
+  const blameCons = addedConstraints(prev, next);
+  const vacuousErr = blameCons.length ? `over-constrained: ${describeConstraint(describeNewStatement(blameCons))} cannot hold` : 'over-constrained';
+  return { ok: false, error: primary.ok ? vacuousErr : blameNewStatement(primary.error, blameCons, primary.violated), construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:refuse`] };
 }
 
 /**
