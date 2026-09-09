@@ -9911,3 +9911,99 @@ no evaluate, no sampling; not measurable against the tail's single `evaluate`.
 α-definition line takes the refusal; independent, this ADR changes only what is displayed. #948 — the
 ruling's corollary: a refused parameter's chip shows no value; with no label on the corner nothing competes
 for α, so the «α = 70» row gets no chip (locked).
+
+## ADR-492 — BLAME THE LAST STATEMENT THAT TURNED THE FIGURE INFEASIBLE (#956)
+
+**Status:** accepted, 2026-09-10 (round #961) · **Issue:** #956 · **Ruling:** operator, 2026-09-09 `/decisions` pass
+**Requirements:** [02](02-requirements.md) FR-EN-8 — extended: *which* of the student's sentences is named · **Design:** [04](04-design.md) — the `errorSubject`/attribution note; the fold's post-settle attribution pass
+
+**The report.** The operator, playing round #949 T2: *"when alpha cannot be 70 … the failing line should
+be the alpha=70 and not that the angle is alpha."*
+
+```
+משולש ABC · זווית BCA = 50 · זווית CAB = 70 · זווית ABC = α · α = 70
+```
+
+| fact | lowers to | status, before this ADR |
+| --- | --- | --- |
+| «זווית ABC = α» | `measure-angle` | **`over-constrained: ∠ABC = 70° cannot hold`** |
+| «α = 70» | `set-var` | **ok** ✓ |
+
+The student was sent to «זווית ABC = α» — a statement that is perfectly fine, that was green one line
+earlier, and that they must not change — and told a number they wrote on the line *below* cannot hold,
+while that line sat green. The one line they would have to edit was the one the tool called correct.
+
+**The ruling.** Three options were offered (a provenance carrier with a minimal-conflict search; redden
+the whole symbol chain; reword). The operator declined all three and gave the rule instead, verbatim:
+
+> *"maybe the issue is with the last command that added the issue? before it was added, all was good and
+> now its not"*
+
+**Blame the last statement whose addition turned a feasible figure infeasible** — formally, the shortest
+infeasible prefix, blame its last fact. It is the pedagogically right rule for an incremental builder and
+it is cheaper than every option offered; it also **retires the minimal-conflict search** from this issue.
+
+**Root cause.** `lower.ts` — `case 'set-var': return []`. A value lowers to **zero** commands, and blame
+works on constraints: a step is refused when *its own* lowered constraint cannot hold, so a fact that
+produces none can never be the subject of a refusal. The number then travels into the measure through
+`buildSymTab`, which reads the **whole enabled list** ([ADR-483](#adr-483)), and the measure — which does
+own a constraint — takes the blame for a magnitude it did not state.
+
+**Class, not instance** (docs/17 §1). *A constraint's VALUE can arrive from a different row than the one
+that shaped it; blame names the shaping row regardless of which arrived later.* Measured — the length lane
+has it too, by construction, and it is the same defect one noun over:
+
+| lane | sequence | blamed before | blamed now |
+| --- | --- | --- | --- |
+| angle, value last | «…50» «…70» «∠ABC = α» «α = 70» | «זווית ABC = α» | **«α = 70»** |
+| length, value last | «BC = 4» «AC = 5» «∠ABC = 90» «AB = x» «x = 8» | «AB = x» | **«x = 8»** |
+| angle, value FIRST | «α = 70» «∠ABC = α» «זווית CAB = 70» | «זווית CAB = 70» | unchanged — already right |
+
+The third row is the correction this ADR makes to the issue's own framing: it was filed as blaming "a
+third, unrelated statement", but under the ruling «זווית CAB = 70» **is** the line that flipped the
+figure, so naming it is correct. It is locked as-is, and it is the case a careless fix breaks.
+
+**Mechanism — attribution only, after everything has settled.** A failing constraint is produced
+**jointly** by the row that shaped it and the row that valued its symbol; blame the **later of them in
+list order**. That is exactly "the last command that added the issue" and it needs no prefix re-folding.
+
+- `symbolsConsumedBy(cmd)` (`engine/lower.ts`) — the symbol names a command READS from the table,
+  derived from `lowerOne`'s own `tab.vars.get` sites so the two cannot drift: the measure lanes, plus
+  `measure-order` and `measure-bound`. Everything else returns `[]`, which is why the rule costs nothing
+  on an ordinary figure.
+- The redirect runs in `computeFold` **after** the deferral retries, the atomic-group poisoning and the
+  HOIST rescue have settled, and moves only an error string — never which constraints were applied, which
+  figure is drawn, or what the solver did. It is the fold-time twin of [ADR-398](#adr-398)'s per-seed
+  attribution override: the machinery decides *what happened*, this decides *whose fault it is*. Placing
+  it in the solve loop instead would have made the shaped row `ok` before the deferral retry could try it
+  again, which is why it is not there.
+- It never redirects onto a row that already carries its own failure.
+
+**The #955 interaction, and why both rulings survive it.** The redirected row goes **green** — naming an
+angle is always possible. But its constraint was still not applied, and [ADR-491](#adr-491) emits a label
+only from a fact's **success** branch, so the corner stays unlabelled and the refused magnitude still
+reaches no canvas. Green does not mean labelled. This is asserted directly, because it is what a careless
+future change breaks: it would reprint «70°» on a corner drawn at 60° — the P1 this round shipped.
+
+It also removes the premise of a rejected #955 option. That ruling refused to keep «α» on the corner
+because *"«α = 70» still reads green in the fact list, so a student reading both still concludes 70°"*.
+After this ADR «α = 70» reads **red**. The behaviour is not revisited here — the operator's "write
+nothing" stands and is what shipped — but a future session proposing the symbolic form should know the
+objection is now weaker, and should ask rather than assume.
+
+**Not in scope.** Naming the conflicting *earlier* given — #943's half B — stays deferred by the
+2026-09-08 ruling. This ADR makes the *right row* red; that one would additionally name the other side.
+
+**The ×3 observation, resolved.** The issue asked whether one utterance produces three red rows. It does,
+and it is correct: «זווית CAB = 70» lowers to `segment`+`segment`+`set-angle`, and the atomic-group rule
+([ADR-337](#adr-337)) poisons all members of a group with a hard-failed member, because an utterance is
+all-or-nothing. The panel groups by `groupKey`, so the student sees **one** row. No defect; locked by the
+scenario's row-level assertion, which counts utterances rather than facts.
+
+**Locks.** `src/__tests__/issue-956-blame-later-fact.test.ts` (14): ordering A blames the value line and
+greens the definition; the banner quotes that sentence through the real `utteranceForError` path; the
+#955 no-label interaction; ordering B unchanged; an unbound value keeps its #926 status; a plain numeric
+refusal is still blamed itself; a restated value blames the **last** one, as the symbol table resolves it;
+the length lane; and a **prefix-sweep oracle** — for a sequence whose first infeasible prefix is known, the
+red row IS that prefix's last line, which is the ruling stated executably, over four sequences. Scenario
+`blame-lands-on-the-value-line-956` (corpus 4).

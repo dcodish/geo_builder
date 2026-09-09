@@ -123,6 +123,31 @@ export function isSymbolBound(tab: SymTab, name: string, cmds: readonly AnyComma
   return /^[Rr]$/.test(name) && (tab.radiusCircle !== undefined || cmds.some((c) => c.type === 'circle' || c.type === 'circle-through' || c.type === 'circumcircle'));
 }
 
+/**
+ * The symbol names a command READS from the table ([ADR-492](../../docs/06-decisions.md#adr-492), #956).
+ *
+ * This is the whole class of "a magnitude arrives from a row other than the row that shaped it": every
+ * command below lowers using `tab.vars`, so its constraint's VALUE can come from a `set-var` the student
+ * wrote on a different line. Derived from {@link lowerOne}'s own `tab.vars.get` sites, so the two cannot
+ * drift: if a future command starts reading the table, it belongs here and the blame rule covers it for
+ * free. A command that reads nothing returns `[]` — the overwhelming majority, including every plain
+ * numeric given, which is why the rule costs nothing on ordinary figures.
+ */
+export function symbolsConsumedBy(cmd: AnyCommand): string[] {
+  switch (cmd.type) {
+    case 'measure-length':
+    case 'measure-angle':
+    case 'measure-area':
+      return 'var' in cmd.expr ? [cmd.expr.var] : [];
+    case 'measure-order':
+      return [cmd.left, cmd.right];
+    case 'measure-bound':
+      return [cmd.name];
+    default:
+      return [];
+  }
+}
+
 /** Lower one command to the engine command(s) it produces (0+). Engine commands pass through unchanged. */
 export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
   switch (cmd.type) {

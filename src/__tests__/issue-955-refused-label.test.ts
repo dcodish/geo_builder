@@ -36,7 +36,12 @@ describe('#955 — the reported figure stops claiming a magnitude it does not ha
 
   it('the α line is the refused one, and the corner it names carries NO label', () => {
     expect(fig.lastError, 'the figure is genuinely over-constrained').toMatch(/cannot hold/);
-    expect(statusOf(fig, facts, 'זווית ABC = α'), 'the refused statement is the α measure').not.toBe('ok');
+    // #956 ([ADR-492](../../docs/06-decisions.md#adr-492)) moved the BLAME to the value line — «α = 70»
+    // is the statement that turned a feasible figure infeasible. The α-definition is green again, and
+    // that is exactly why this file matters: green does NOT mean labelled. Its constraint was still
+    // refused, so it never reached the success branch that writes a label.
+    expect(statusOf(fig, facts, 'α = 70'), 'the value line carries the refusal').not.toBe('ok');
+    expect(statusOf(fig, facts, 'זווית ABC = α'), 'and naming an angle stays green').toBe('ok');
     expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), 'the figure draws 60° at B').toBeCloseTo(60, 2);
     expect(angleLabelAt(fig, 'B'), 'nothing is written at B — not 70°, and not α').toBeUndefined();
   });
@@ -72,7 +77,9 @@ describe('#955 — the four lanes of the ruling’s table (angle/length × symbo
     const facts = factsOf(['משולש ABC', 'AB = 3', 'AB = x', 'x = 8']);
     const fig = replayFacts(facts);
     expect(fig.lastError).toMatch(/cannot hold/);
-    expect(statusOf(fig, facts, 'AB = x'), 'the symbolic length is the refused statement').not.toBe('ok');
+    // as above: after ADR-492 the VALUE line is the blamed one, and «AB = x» is green but unapplied.
+    expect(statusOf(fig, facts, 'x = 8'), 'the value line carries the refusal').not.toBe('ok');
+    expect(statusOf(fig, facts, 'AB = x'), 'and the symbolic length stays green').toBe('ok');
     const drawn = Math.hypot(at(fig, 'A').x - at(fig, 'B').x, at(fig, 'A').y - at(fig, 'B').y);
     expect(drawn, '|AB| is the 3 that held').toBeCloseTo(3, 3);
     expect(lengthLabel(fig, 'A', 'B')?.text, 'the surviving given labels the segment').toBe('3');

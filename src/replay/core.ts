@@ -18,7 +18,7 @@ import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -1007,6 +1007,60 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       }
     }
   }
+  /**
+   * #956 ([ADR-492](docs/06-decisions.md#adr-492)) — BLAME THE LAST STATEMENT THAT TURNED THE FIGURE
+   * INFEASIBLE, not the one that happens to own the constraint.
+   *
+   * The operator, ruling this: *"maybe the issue is with the last command that added the issue? before it
+   * was added, all was good and now its not"*. Formally: the shortest infeasible prefix — blame its last
+   * fact.
+   *
+   * The defect it fixes: a constraint's value can arrive from a DIFFERENT row than the one that shaped it.
+   * «זווית ABC = α» shapes an angle constraint; «α = 70» supplies its number, from anywhere in the list
+   * (the symbol table is built over the whole enabled list — [ADR-483](docs/06-decisions.md#adr-483)).
+   * Blame goes to the fact that OWNS the constraint, so the student was sent to «זווית ABC = α» — a
+   * statement that was green a moment ago, that they must not change — and told «∠ABC = 70° cannot hold»,
+   * quoting a number they wrote on the line below, which sat green because `set-var` lowers to ZERO
+   * commands and a fact with no constraint can never be blamed.
+   *
+   * The rule, in the form that generalises: a failing constraint is produced JOINTLY by the row that
+   * shaped it and the row that valued its symbol — blame the LATER of them in list order. That is exactly
+   * "the last command that added the issue", and it needs no prefix re-folding. When the value row comes
+   * FIRST (the student typed «α = 70» before «זווית ABC = α») the shaping row IS the later one and keeps
+   * the blame, which is already correct today and is locked as such.
+   *
+   * Attribution ONLY — placed here, after the deferral retries, the atomic-group poisoning and the HOIST
+   * rescue have settled, so it moves an error string and never changes which constraints were applied,
+   * which figure is drawn, or what the solve did. That is deliberate: it is the fold-time twin of
+   * [ADR-398](docs/06-decisions.md#adr-398)'s per-seed attribution override, which moves blame in the
+   * tail for the same reason — the machinery decides WHAT HAPPENED, this decides WHOSE FAULT IT IS.
+   *
+   * The redirected row goes green because it is: «זווית ABC = α» names an angle, and naming is always
+   * possible. Its constraint was still not applied, so — since a fact labels the figure only from its
+   * SUCCESS branch ([ADR-491](docs/06-decisions.md#adr-491), #955) — the corner stays unlabelled and the
+   * refused magnitude still reaches no canvas. The two rulings compose without either being weakened.
+   */
+  const blameTargetOf = (fi: number): number => {
+    const syms = symbolsConsumedBy(facts[fi].cmd);
+    let last = fi;
+    for (const s of syms) {
+      if (symtab.vars.get(s)?.value === undefined) continue; // no number arrived — nothing was imported
+      for (let j = facts.length - 1; j > last; j--) {
+        const g = facts[j];
+        if (g.enabled && g.cmd.type === 'set-var' && g.cmd.name === s) { last = j; break; }
+      }
+    }
+    return last;
+  };
+  for (const f of failedFacts) {
+    const fi = facts.indexOf(f);
+    const bi = blameTargetOf(fi);
+    if (bi === fi) continue;
+    if (status[facts[bi].id] !== 'ok') continue; // the later row already carries its own failure — leave it
+    status[facts[bi].id] = status[f.id];
+    status[f.id] = 'ok';
+  }
+  ({ failedFacts, pending } = classify(cur, status));
   const buildError = !pending && failedFacts.length ? (status[failedFacts[failedFacts.length - 1].id] as string) : null;
   return {
     cur,

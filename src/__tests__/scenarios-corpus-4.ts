@@ -2386,9 +2386,13 @@ export const SCENARIOS_4: Scenario[] = [
     steps: ['משולש ABC', 'זווית BCA = 50', 'זווית CAB = 70', 'זווית ABC = α', 'α = 70'],
     check(fig) {
       expect(fig.lastError, 'the α line is genuinely refused').toMatch(/cannot hold/);
-      // anti-vacuity: the refused row is the α measure — «α = 70» itself is a set-var and stays green (#956)
-      const alpha = Object.entries(fig.status).find(([id]) => id.startsWith('g3.'));
-      expect(alpha?.[1], 'the «זווית ABC = α» step is the refused one').not.toBe('ok');
+      // anti-vacuity: the figure really is in the refused state. #956 (ADR-492) moved the BLAME to the
+      // VALUE line — «α = 70» is the statement that turned a feasible figure infeasible — so g4 is the
+      // red row and the α-definition (g3) is green again. That green is exactly why this scenario still
+      // matters: its constraint was never applied, so ADR-491 writes no label, and green ≠ labelled.
+      const statusOfGroup = (g: string) => Object.entries(fig.status).find(([id]) => id.startsWith(g + '.'))?.[1];
+      expect(statusOfGroup('g4'), 'the «α = 70» step carries the refusal').not.toBe('ok');
+      expect(statusOfGroup('g3'), 'and «זווית ABC = α» stays green').toBe('ok');
       expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), 'the figure draws 60° at B').toBeCloseTo(60, 2);
       expect(fig.labels.angles.find((a) => a.vertex === 'B'), 'B carries NO label — not 70°, and not α').toBeUndefined();
       expect(fig.labels.angles.find((a) => a.vertex === 'A')?.text, 'A really is 70°').toBe('70°');
@@ -2410,6 +2414,32 @@ export const SCENARIOS_4: Scenario[] = [
       const AB = fig.labels.lengths.find((l) => [l.a, l.b].sort().join('') === 'AB');
       expect(AB?.text, 'the surviving given labels the segment').toBe('3');
       expect(fig.violations).toEqual([]);
+    },
+  },
+  {
+    id: 'blame-lands-on-the-value-line-956',
+    title: '#956: «α = 70» is the red row — the refusal names the line that turned the figure impossible, not the line that named the angle',
+    guards:
+      "operator, playing round #949 T2 (2026-09-09): \"when alpha cannot be 70 … the failing line should be the alpha=70 and not that the angle is alpha.\" Measured before ADR-492: «זווית ABC = α» carried «over-constrained: ∠ABC = 70° cannot hold» while «α = 70» — the line that supplied the impossible number — sat GREEN, because `set-var` lowers to zero commands and blame works on constraints, so a fact with none can never be blamed. The student was sent to a statement that was correct, was green a line earlier, and must not change; the one line they had to edit was the one the tool called fine. Operator ruling, verbatim: \"maybe the issue is with the last command that added the issue? before it was added, all was good and now its not\" — the shortest infeasible prefix, blame its last fact. ADR-492 implements it as an attribution pass after the fold settles: a failing constraint is produced jointly by the row that shaped it and the row that valued its symbol, and blame goes to the LATER of them. This scenario is the operator's exact sequence. It also locks the #955 interaction, which is what a careless change breaks: the α-definition is green again, but its constraint was never applied, so the corner still carries NO label — green does not mean labelled.",
+    steps: ['משולש ABC', 'זווית BCA = 50', 'זווית CAB = 70', 'זווית ABC = α', 'α = 70'],
+    expectViolations: true, // the α line is INTENTIONALLY refused — the kept figure is the prior one
+    check(fig) {
+      expect(fig.lastError, 'the honest over-constrained refusal').toMatch(/cannot hold/);
+      // `factsOf` groups by typed step: g4 is «α = 70». The refusal must be owned by that group and by
+      // no other — counting GROUPS, not facts, because one utterance can lower to several commands.
+      const redGroups = new Set(
+        Object.entries(fig.status)
+          .filter(([, v]) => v !== 'ok' && v !== 'disabled')
+          .map(([id]) => id.split('.')[0]),
+      );
+      expect(redGroups, 'only the value line is red').toEqual(new Set(['g4']));
+      // and the statement the student must NOT change is green
+      for (const [id, st] of Object.entries(fig.status)) {
+        if (!id.startsWith('g4.')) expect(st, `${id} is untouched`).toBe('ok');
+      }
+      // #955 (ADR-491) still holds: the refused magnitude reaches no canvas, even though its row is green
+      expect(fig.labels.angles.find((a) => a.vertex === 'B'), 'B carries no label').toBeUndefined();
+      expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), 'the figure draws 60° at B').toBeCloseTo(60, 2);
     },
   },
 ];

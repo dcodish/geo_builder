@@ -113,6 +113,14 @@ src/
                    wording must be handed to it by the layer that has the fact list. The link needs no
                    plumbing: ADR-398 already makes the banner's `lastError` and the failing row's
                    `status` the same string, so the owning fact is found by that identity
+                 - WHICH row owns it is decided one layer down (ADR-492, #956): `computeFold` runs an
+                   attribution pass after the deferral/poisoning/HOIST have settled, moving a refusal
+                   from the row that SHAPED a constraint to the row that VALUED its symbol when that
+                   row is later in the list — "the last statement that turned the figure infeasible".
+                   Attribution only: it changes no applied constraint and no drawn figure, and it is
+                   the fold-time twin of ADR-398's per-seed override. `symbolsConsumedBy` (engine/
+                   lower.ts) is the shared list of what reads the symbol table, derived from
+                   `lowerOne`'s own call sites so the two cannot drift
   replay/        core.ts — the PURE replay layer (S1.2): fold memo + deferral + HOIST + seed/config
                  searches + the shared sample core; engine ← replay ← store enforced by test
                  — the config searches RANK rather than merely accept (ADR-486, #942): a view that
