@@ -67,6 +67,14 @@ are 2-D unless stated; the **structure** around them is workspace-wide:
 - **The fixtures-first rule is per-product.** Each tree has its own saved-figure net with the same contract:
   drop a saved file in the folder and it becomes permanent coverage, replayed through the real load path
   with zero per-figure authoring.
+- **A fixture corpus keeps a file at every schema generation the load path still accepts**
+  ([ADR-3D-232](06b-decisions-3d.md#adr-3d-232), #916). Save files are versioned and older versions keep
+  loading, so the older generations are a live promise whose only coverage is these files — and a bulk
+  regeneration MIGRATES them all, deleting that coverage while reading as churn in review. So the
+  generator writes only what is **missing** (a blanket rebuild is a separate, named flag), and the net
+  asserts the per-version coverage directly, naming any generation that lost it. The rule is the second
+  half: it catches every route to the loss, not just the eager generator that revealed it. Implemented in
+  3-D; the sibling trees copy the pattern when their corpora gain a second schema version.
 
 ## What we test, per layer
 

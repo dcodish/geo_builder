@@ -84,8 +84,10 @@ export interface SubmitDeps {
   resolveAfterCommit(): void;
   /** Shared abort slot so the UI's cancel button reaches the in-flight LLM call. */
   llmAbortRef: { current: AbortController | null };
-  /** Humanized engine error + retry hint (display-layer concern, injected). */
-  explainError(raw: string | null | undefined): string;
+  /** Humanized engine error + retry hint (display-layer concern, injected). `said` is the student's
+   *  own sentence, which becomes the refusal's SUBJECT where the engine fragment cannot identify the
+   *  rejected statement (#943, ADR-487). */
+  explainError(raw: string | null | undefined, said?: string): string;
 }
 
 export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<void> {
@@ -433,7 +435,11 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
       // "produced nothing". (ADR-156 follow-up — the "impossible with the current data" message.)
       if (outcome.reason === 'error') {
         logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `conflict:${outcome.detail ?? ''}`, commands: r.commands });
-        ui.setInputNote(outcome.detail ? deps.explainError(outcome.detail) : t('input.producedNothing'));
+        // #943 (ADR-487): the refusal names the STATEMENT. On this path the sentence needs no lookup at
+        // all — it is the text the student just typed, still in the box, and this is the path the
+        // reported case actually takes: a contradicting line is refused BEFORE it becomes a fact, so
+        // the fact-list lookup the banner uses has nothing to find here.
+        ui.setInputNote(outcome.detail ? deps.explainError(outcome.detail, utterance) : t('input.producedNothing'));
         ui.setBusy(false);
         return; // keep the text so the student can edit/delete it
       }

@@ -2337,4 +2337,26 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.max(...L) / Math.min(...L), 'the sides are NOT all equal').toBeGreaterThan(1.02);
     },
   },
+  {
+    id: 'over-constrained-refusal-attributes-to-the-typed-step-943',
+    title: '#943: the refusal is ATTRIBUTED to the sentence the student just typed — the row that owns the banner error is the last step, not an earlier given',
+    guards:
+      "operator, playing round #942 T2 (2026-09-08). With «ריבוע DEFG חסום במשולש ABC» on the canvas, D was already the square's vertex, so «D = חיתוך AB ו-BC» must be refused — and it is. What he was shown named NEITHER statement: «לא ניתן: הנתון D מתלכדת עם הנקודה שנבנתה לה סותר נתון קודם» — a paraphrase of the LOWERED CONSTRAINT as the subject, and «נתון קודם» for the given it conflicts with. The half-A fix echoes the student's own sentence as the subject, which is only honest if the banner error is genuinely OWNED by the step they just typed. That ownership is what this scenario locks: `lastError` is the status of the LAST group and of no earlier one, so a future change that re-attributes the failure would quote the wrong sentence at the student rather than fail silently. The message rendering itself is locked in src/i18n/__tests__/humanize-error-said.test.ts.",
+    steps: ['משולש ABC', 'זוית B ישרה', 'ריבוע DEFG חסום במשולש ABC', 'D = חיתוך AB ו-BC'],
+    expectViolations: true, // the last step is INTENTIONALLY refused — the kept figure is the prior one
+    check(fig) {
+      expect(fig.lastError, 'the honest over-constrained refusal').toMatch(/over-constrained|cannot hold/);
+      // `factsOf` groups by typed step: g0 = the triangle, g1 = the right angle, g2 = the square, g3 = the
+      // contradictory intersection. ADR-398 makes the banner string and the owning row's status the SAME
+      // string, which is what lets the display layer quote the student's sentence (#943).
+      const ownersOf = (err: string) =>
+        new Set(Object.entries(fig.status).filter(([, v]) => v === err).map(([id]) => id.split('.')[0]));
+      const owners = ownersOf(fig.lastError as string);
+      expect(owners, 'exactly one typed step owns the banner error').toEqual(new Set(['g3']));
+      // and the three earlier steps are still green — the refusal did not smear onto the givens
+      for (const [id, st] of Object.entries(fig.status)) {
+        if (!id.startsWith('g3.')) expect(st, `${id} is untouched`).toBe('ok');
+      }
+    },
+  },
 ];

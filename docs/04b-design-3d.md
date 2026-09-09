@@ -95,6 +95,17 @@ before, and a later value reaches it through the same `symbolOwnersOf` registry 
 of the clause, so «E על SA כך ש-SE = t·SA» built a free rider and silently discarded the ratio — while the
 same statement typed as its own fact built and pinned correctly all along.
 
+**Both shapes, and either kind of coefficient, are read at ONE chokepoint.** `riderRatioRetarget` sits at
+`applyCommand3Inner`'s entry and rewrites a ratio statement into the `point-on-segment3` given it is,
+before any stage of the ladder sees it — so the three command shapes the same sentence can arrive as
+(`vec-rel`, `length-rel`, the `length-ratio` claim) share one semantics. It used to read only the
+**halves** shape and to reject a symbolic coefficient outright, which left the whole-host shape reachable
+from parse3's clause rule alone: «E על SA» followed by «SE = t·SA» — the incremental order this product is
+built around — refused, and so did its numeric twin «SE = 0.5·SA», one line apart from the halves spelling
+that worked. A **letter** coefficient is read in the stated orientation only (`1/t` is not a name, so the
+flipped spelling is not guessed at), and reaching an existing free rider it binds the name and nothing
+else, exactly as the clause does. See [ADR-3D-231](06b-decisions-3d.md#adr-3d-231) (#932).
+
 **A VALUED parameter's two forms compete on one surface, and the student picks.** `degText` is the one
 rule for what an arc reads, so it is also where the choice lands: a symbol whose valuing row is set to
 `letter` reads its letter instead of its value, and everything else is byte-identical. The resolver

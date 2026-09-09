@@ -8748,6 +8748,185 @@ over the registries themselves — every displayable symbol has an owner, and th
 are both addressable and displayable — on a figure that carries the previously-missing kinds, so it is
 exercised rather than vacuous.
 
+### ADR-3D-231 — The rider-ratio chokepoint reads BOTH ratio shapes, and the symbolic coefficient with them (#932)
+
+**Status:** accepted, 2026-09-08 (fix-round #946, item 4) · **Issue:** #932 · **Approved:** operator, 2026-09-08 (*"Approve both"*)
+**Requirements:** none (internal — FR already promises the given holds; this is a spelling reaching it)
+**Design:** [04b](04b-design-3d.md) §apply — the retarget chokepoint's reading · **Ladder:** pre-apply normalisation (docs/LADDER — before any stage; the statement is rewritten into the given it is)
+
+#### The report, and what measurement changed about it
+
+Found in round #931 while fixing #921. «E על SA» then «SE = t·SA» then «t = ½» — declare the rider, then
+say what pins it, the incremental order this product is built around — refused `no-solution: S`, then
+`unknown-symbol: t`. The issue's own diagnosis was *"the `vec-rel` arm reads that as a DEFINITION of an
+unknown point, finds `E` taken, and falls through"*, and its fix sketch was *"lower it to the
+`point-on-segment3` given — the branch #748 already built"*.
+
+That is right in substance and one seam off in location, which matters because the sketch would have
+fixed one spelling. **Measured at HEAD**, all six spellings of the same student intent on
+`פירמידה SABCD שבסיסה ריבוע` + `נסמן: AB = u, AD = v, AS = w`:
+
+| spelling | before |
+| --- | --- |
+| «E על SA כך ש-SE = t·SA» · «t = ½» — the clause, letter | ✔ E at the midpoint |
+| «E על SA כך ש-SE = 0.5·SA» — the clause, number | ✔ |
+| «SE = t·SA» · «t = ½» — the vec-rel alone | ✔ |
+| «E על SA» · «SE = 1·EA» — two facts, the HALVES shape | ✔ *(#748's path)* |
+| **«E על SA» · «SE = t·SA» · «t = ½»** — two facts, letter | ✘ `no-solution: S` → `unknown-symbol: t` |
+| **«E על SA» · «SE = 0.5·SA»** — two facts, NUMBER | ✘ `claim-refuted` |
+
+The last two rows locate the class, and the fourth row refutes the framing. It is **not** *"the `vec-rel`
+arm cannot see an existing rider"* — the halves shape as two facts has worked since #748. It is that the
+shared retarget chokepoint (`riderRatioRetarget`, at `applyCommand3Inner`'s entry) read only **one of the
+two ratio SHAPES**:
+
+- **halves vs halves** — `|aR| = k·|Rb|`, «SE = 1·EA» — read by `riderPairsT`, reachable from parse3 and
+  from apply alike since #748;
+- **half vs the WHOLE host** — `|aR| = k·|ab|`, «SE = t·SA», *the exam's own rider idiom* — read by
+  `riderWholeSide`/`riderWholeT` (ADR-3D-224), and reachable **only from parse3's `onSegment` clause rule**.
+
+And on top of that, the reader excluded a symbolic coefficient outright (`if (cmd.symbol) return null`).
+So the numeric whole-host twin failed too, one line apart from a working sibling, and **no report had ever
+named it** — the letter version was reported because the exam uses a letter.
+
+#### The decision
+
+**A ratio statement about a free rider is read by the RIDER at the one chokepoint, in every shape and with
+either kind of coefficient.** #748's own rule (*"the reading belongs to the rider, not to the utterance
+that happened to declare it"*), applied to the shape axis it had not yet reached.
+
+1. **`ratioHalves` becomes `ratioStatement`**, and its coefficient becomes `{ k: number } | { sym: string }`.
+   A `vec-rel` carrying a symbol is read when the coefficient is the **bare** letter (`k = 0, p = 1`) —
+   `t` *is* the ratio. Anything richer (`2t`, `t + 1`) is a linear expression this closed-form reading has
+   no arithmetic for and falls through untouched, as before.
+2. **`riderRatioRetarget` tries both shapes** per orientation. The whole-host arm offers every label of the
+   half-side pair to `riderWholeSide`, which validates the shape itself — rather than pre-filtering with
+   the directed chain rule, which is exactly what made this unreachable (for «SE = t·SA» the chain test
+   `P[1] === Q[0]` asks `E === S` and yields no candidate at all).
+3. **A symbolic coefficient is read in the stated orientation only.** The numeric arm also tries the
+   flipped spelling («SA = 2·SE» is «SE = ½·SA»); a letter has no reciprocal to write down — `1/t` is not a
+   name — so the flipped symbolic spelling falls through rather than being guessed at.
+4. **`point-on-segment3` gains the existing-rider `sym` branch.** #748 gave that branch a numeric `t`
+   («the rider exists and is free, so a stated `t` DETERMINES it»); the symbolic twin had no branch, so a
+   retarget carrying `sym` would have fallen to the claim lane. It is **name-only**, exactly as the clause
+   spelling: the rider keeps sampling its `t`, and all that is recorded is that a later «t = ½» has an
+   owner. `symFromB` is normalised against the rider's **stored** host, the same way the `t` branch
+   normalises with `1 − t`, so «AE = t·AS» on a rider stored as S–A binds the right end.
+
+#### The blame half (ADR-3D-225's rule, this arm)
+
+The `vec-rel` arm's fall-through refused with `{ code: 'no-solution', id: cmd.from }`, so «SE = t·SA»
+reported «אין מיקום של **S** שמקיים את התנאי» — S being the pyramid's **apex**, a determined vertex the
+sentence says nothing about and whose position was never in question. It now names `cmd.to`, the head of
+the stated vector: the one point the statement is trying to place, and the only one a student would
+recognise as its subject.
+
+The other reported blame, `unknown-symbol: t`, needs **no change and gets none** — measured, it was the
+*consequence* of the first refusal (the statement that would have named `t` was rejected, so the letter
+genuinely had no owner when «t = ½» arrived). With the retarget in place the naming statement commits and
+the value lands. A fix aimed at that message would have been the symptom patch.
+
+#### Sweep — what else could have the same shape
+
+The question the plan asked: which other two-fact spellings reach a `vec-rel` arm whose one-fact sibling is
+already lowered? Answered by enumeration over `ratioStatement`'s own readers rather than by guess: the
+three command shapes it reads (`vec-rel`, `length-rel`, the `length-ratio` claim) now all reach both ratio
+shapes, so the numeric length spellings («|SE| = 0.5|SA|», «SE:SA = 1:2») gain the whole-host reading in
+the same change. The symbolic arm is `vec-rel`-only because that is the only shape whose grammar carries a
+symbol today.
+
+#### Locks
+
+`__tests__/issue-932-rider-ratio-two-facts.test.ts` (9). The load-bearing one is the **equivalence** lock —
+the defect is a divergence between paths, so what must hold is that all seven spellings (including the
+flipped whole-host one) draw the *same* figure, not that one of them works. Plus: the operator's exact
+sequence with all five statements committed; the letter reaching `symbolOwnersOf` identically from the
+two-fact and clause spellings (#902's one resolver); the flipped-host normalisation; and four guards that
+nothing which refused for a good reason now builds — a ratio that would push the rider off its host, a
+rider whose `t` is already stated (still a claim, still refuted), first-binding-wins across spellings, and
+the re-blamed refusal asserted **unconditionally** on an isolated construction rather than behind an
+`if (lastError)` that could pass by checking nothing.
+
+**No fixture.** The essence is bespoke (an equivalence between paths), and `GEN_FIXTURES3` currently
+rewrites the entire seeded corpus on any addition — the defect #916 fixes in this same round.
+### ADR-3D-232 — A fixture generator writes what is MISSING, and losing a schema generation's load coverage FAILS (#916)
+
+**Status:** accepted, 2026-09-08 (fix-round #946, item 5) · **Issue:** #916 · **Approved:** operator, 2026-09-08 (*"Approve both"*)
+**Requirements:** none (internal — test-infrastructure integrity; no product promise changes)
+**Design:** [08](08-testing-strategy.md) — the per-product fixtures-first contract gains the coverage rule
+
+#### The report
+
+Found in round #915 while adding a fixture for #909. `GEN_FIXTURES3=1` — the documented way to add one,
+per `fixtures3.test.ts`'s own header — regenerated **every** entry of `SEEDED`, so adding a single
+fixture produced 14 modified files.
+
+The diff was not cosmetic. It was a schema **migration**:
+
+```diff
+-  "schemaVersion": 1,          -              "sym": "k",
++  "schemaVersion": 2,          +              "terms": [ { "sym": "k", "k": 1 } ],
+```
+
+`deserializeFigure3` accepts any `schemaVersion <= SCHEMA_VERSION_3D`, so a student's figure saved
+under the older generation must keep loading — and those v1 files are the **only** coverage of that
+path. Committing the regeneration would have converted the corpus to v2 and deleted the coverage, while
+reading in review as harmless churn.
+
+**And the suite was green before and after.** Round #915 caught it only because the churn was inspected
+line by line. That is the actual defect: *nothing failed when the coverage disappeared.*
+
+#### The decision — both halves, because they are not alternatives
+
+The issue offered two candidate fixes. They are compatible and both cheap, so both land; but they do
+different jobs, and only the second addresses the class.
+
+**1 — The generator writes only what is MISSING.** `GEN_FIXTURES3=1` now writes the seeded entries that
+are not on disk and touches nothing else; the blanket rebuild moved to its own flag,
+**`GEN_FIXTURES3_ALL=1`**, so the destructive form has to be asked for by name and can no longer happen
+as a side effect of adding one fixture. Measured on the real corpus: `GEN_FIXTURES3=1` now reports
+*"wrote 0 (none), left 18 untouched"* and leaves `git status` clean, where before it rewrote all 18.
+
+**2 — The loss is DETECTABLE, not merely unlikely.** The net asserts that the corpus holds **≥1 fixture
+at every `schemaVersion` the load path still accepts**, failing with a message naming the version that
+lost coverage and saying how to restore it. Per standing rule 1 the class is *"silently losing a schema
+generation's load coverage"*, not *"this one env flag is too eager"* — so any other route to the same
+loss (a hand-edit, a bulk rewrite, the last v1 file deleted as stale) fails the same lock. Item 1 makes
+the accident unlikely; item 2 is what makes it visible, and it is the one that matters.
+
+The supported set is **derived** from `SCHEMA_VERSION_3D` (1..current), never re-listed — a version bump
+moves it by itself. A bump therefore also demands a fixture at the new generation before the suite is
+green again, which is correct: a serialization generation with no saved file has no load coverage. The
+failure message says exactly that and how to satisfy it, so the guard costs one deliberate action rather
+than a puzzle.
+
+#### Why the generator moved to its own module
+
+`generateSeeded` lives in `src3d/__tests__/fixtures3-gen.ts`, a plain module, because the property that
+matters — *adding one entry writes one file* — has to be **exercised** to be locked, and driving an
+env-gated `describe` from inside the same file cannot do that. It is now run against a temp directory
+with its own two-session corpus, so the assertions are direct and cost milliseconds. It also throws on a
+session that does not build rather than writing a fixture of a broken figure, which the old inline block
+did with an `expect` that only reported after the write.
+
+#### Locks
+
+`__tests__/issue-916-fixture-corpus.test.ts` (10):
+
+- **The fix itself** — with the corpus present, adding one entry writes exactly the new file and leaves
+  every other file **byte-identical**; an existing file is not rewritten even when its content is
+  deliberately stale (the v1 stand-in), which is the #915 situation exactly.
+- **The escape hatch still works** — `all: true` does rewrite, including over the stale file. A guard
+  that quietly disabled the deliberate rebuild would be a different bug.
+- **A non-building session throws and writes nothing.**
+- **The coverage rule** — supported versions derived from the load path's own constant; a healthy corpus
+  reporting no loss; deleting the last v1 file **detected and the version named**; and an unparseable or
+  version-less file ignored rather than counted as coverage (a corpus of junk must not read as covered).
+- **The real corpus, asserted as a NUMBER** — v1 carries more than five files, not merely "≥ 1", so a
+  rebuild that migrated 18 of 19 could not pass as still-covered.
+
+Plus the rule itself in `fixtures3.test.ts`, where it runs over the live corpus on every 3-D lane.
+
 ### ADR-3D-233 — The angle arc is the first surface where a valued parameter's two forms compete, and the student chooses (#925, #937)
 
 **Status:** accepted, 2026-09-08 (fix-round #946, item 1) · **Issues:** #925 (this adoption), #937 (the rule)

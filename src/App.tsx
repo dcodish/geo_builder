@@ -63,6 +63,7 @@ import { runViewResolve } from '@/app/resolveView';
 import { runEditCommit } from '@/app/editPipeline';
 import { anonPointDescriptor, visibleCoincidences } from '@/render/pointDescriptions';
 import { humanizeError, translateParams } from '@/i18n/humanizeError';
+import { utteranceForError } from '@/app/errorSubject';
 /**
  * Resolve AFTER the browser has had a chance to paint. A just-set React state (e.g. a "thinking"
  * spinner) is only committed to the DOM on the next frame; a blocking SYNCHRONOUS solve started in
@@ -87,8 +88,12 @@ export default function App() {
   // describes what's SEEN, not how to construct it, so a single complex line may not build — the hint points
   // the student at the manual decomposition). Appended only to real errors, at the display layer, so
   // `humanizeError` stays a pure mapping. (ADR-228 Am.6.)
-  const explainError = (raw: string | null | undefined): string => {
-    const m = humanizeError(raw, t);
+  // #943: `said` is the student's OWN sentence — the honest subject of a refusal whose engine
+  // fragment cannot say which statement was rejected. Passed in by the display sites (which have the
+  // fact list) rather than looked up here, so `humanizeError` stays a pure mapping (ADR-228 Am.6) and
+  // the submit path, which has no fact yet, keeps calling with one argument.
+  const explainError = (raw: string | null | undefined, said?: string): string => {
+    const m = humanizeError(raw, t, said);
     return m ? `${m} ${t('errors.retryHint')}` : m;
   };
   const facts = useGeoStore((s) => s.facts);
@@ -1194,7 +1199,7 @@ export default function App() {
             </InputArea>
           </div>
 
-          {lastError && <div role="status" aria-live="polite" style={errorBanner}>⚠ {explainError(lastError)}</div>}
+          {lastError && <div role="status" aria-live="polite" style={errorBanner}>⚠ {explainError(lastError, utteranceForError(facts, status, lastError))}</div>}
 
           {pending && <div role="status" aria-live="polite" style={infoBanner}>ⓘ {t('figure.pending')}</div>}
 
@@ -1266,7 +1271,7 @@ export default function App() {
                   const anyOn = g.facts.some((f) => f.enabled);
                   const brokenFact = g.facts.find((f) => f.enabled && status[f.id] !== 'ok');
                   const state = !anyOn ? 'disabled' : brokenFact ? 'broken' : 'ok';
-                  const errText = brokenFact ? explainError(status[brokenFact.id] as string) : undefined;
+                  const errText = brokenFact ? explainError(status[brokenFact.id] as string, utteranceForError(g.facts, status, status[brokenFact.id] as string)) : undefined;
                   const label = stepLabel(g.facts.map((f) => f.cmd), g.facts[0].utterance, canonLocale);
                   return {
                     id: g.key,
