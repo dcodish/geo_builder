@@ -694,7 +694,18 @@ export default function App3() {
                           statement: t(`notice.stated.${n.rel}`, { a: n.subject, b: n.object ?? '', shape: n.shape ? t(`notice.shape.${n.shape}`) : '' }),
                           why: t(`notice.follows.${n.rel}`),
                         })
-                      : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
+                      : n.kind === 'solid-degenerate'
+                        ? /* #936 (ADR-3D-234): the givens force the named solid FLAT. Not a warning —
+                             every fact is honoured and the drawing is the only one that satisfies
+                             them; what would be dishonest is saying nothing. The message names the
+                             student's own STATEMENTS, which is the half the DOF cue was rejected for. */
+                          t(n.because.length ? 'notice.solidDegenerate' : 'notice.solidDegenerateBare', {
+                            ids: n.ids.join(''),
+                            because: n.because
+                              .map((b) => t(`notice.cause.${b.kind}`, { ids: b.ids.join(''), value: b.value }))
+                              .join(t('notice.causeJoin')),
+                          })
+                        : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
             </div>
           ))}
           {lastNotice && !lastError && !busy && (
