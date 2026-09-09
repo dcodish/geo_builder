@@ -33,5 +33,17 @@ half-applied edit does not, and the "success" line still prints.
 - After any scripted edit, **read the changed lines back** before committing. Two mangled comments in
   round #869 were caught only by reading; nothing else would have.
 
+**A third mode, and this one destroys the FILE, not a comment (2026-09-09, #777):**
+`String.prototype.replace(from, to)` treats a `$` sequence inside the REPLACEMENT string as a
+substitution pattern: `$&` is the match, ``$``` is everything BEFORE it, and `$'` everything after.
+A replacement whose text ended in a regex anchor — `\s*$` followed by a closing backtick — made
+`replace` splice the entire file-before-the-match into `parse.ts`, so the file got its own header
+inserted mid-line and `tsc` reported six unrelated syntax errors. Nothing in the script warned; it
+printed its success line.
+
+**Always pass a FUNCTION replacement** — `s.replace(from, () => to)` — in these edit scripts. A function
+return value is used literally, so no `$` sequence can be special. It costs nothing and removes the whole
+class.
+
 Related: [[gh-body-at-dash-eats-issues]] — same class, same lesson (the tool reports success while the
 content is gone).
