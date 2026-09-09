@@ -14,13 +14,14 @@
 
 import type { Command, Constraint, Construction, Id, Vec } from './types';
 import type { ResolvedCircle } from './evaluate';
-import { dist, pointInPolygon } from './geometry';
+import { angleDeg, dist, pointInPolygon, polygonArea } from './geometry';
 import { angleOffSpans, angleOnSpans, drawnArcSpans, type ArcSpan } from './arcs';
-import { constraintRefs, describeConstraint, isSatisfied, residual } from './solve';
+import { constraintRefs, describeConstraint, isSatisfied, residual, residualTolerance } from './solve';
+import { formatMeasure } from '../format';
 
 export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
-  relation: 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'line-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | 'point-off-arc' | 'convexity' | Constraint['type'];
+  relation: 'label' | 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'line-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | 'point-off-arc' | 'convexity' | Constraint['type'];
   ids: Id[];
   /** English fallback, e.g. "E should lie on circle P (radius 3.60) but is 7.42 from its centre". */
   message: string;
@@ -766,3 +767,76 @@ export function forcedOffArcs(
   return auditDrawnArcs(construction, positions, circles).forced;
 }
 
+
+/**
+ * The measure labels a figure PRINTS, in the shape the verifier needs — structurally what replay's
+ * `MeasureLabels` carries (minus the arcs, which are per-seed constraint values and never fact-sourced).
+ * Declared here rather than imported because the layering is engine ← replay, never the reverse.
+ */
+export interface PrintedLabels {
+  lengths: { a: Id; b: Id; text: string }[];
+  angles: { vertex: Id; ray1: Id; ray2: Id; text: string }[];
+  areas: { ids: Id[]; text: string }[];
+}
+
+/**
+ * The decimal a printed label asserts, or null when it asserts none. A symbolic form («3x», «α», «k + 2»),
+ * an exact form («12√2», «2π»), a radius multiple («1.6R») and an alias name («1», «K1» — an angle-alias
+ * prints its digit WITHOUT a degree sign) are the student's own writing, not a number the figure must
+ * measure up to; only a plain decimal — with the degree sign for an angle, without one otherwise — is.
+ */
+const labelNumber = (text: string, unit: '°' | ''): number | null => {
+  const m = (unit === '°' ? /^(\d+(?:\.\d+)?)°$/ : /^(\d+(?:\.\d+)?)$/).exec(text.trim());
+  return m ? Number(m[1]) : null;
+};
+
+/** `fmtNum` prints 2 decimals, so a true value may sit half a unit of the last place off its own label. */
+const PRINT_HALF_UNIT = 0.005 + 1e-9;
+
+/**
+ * #955 ([ADR-491](docs/06-decisions.md#adr-491)) — every NUMERIC label must agree with the figure it annotates.
+ *
+ * The verifier checks CONSTRAINTS, and a label is not one: the reported figure wrote «70°» at a corner drawn
+ * at 60° and returned `violations = []`, because the number had come from a fact the engine refused. A label
+ * is an assertion the canvas makes to the student, so it is held to the standard of a stated given — the
+ * same residual tolerance as the constraint it would correspond to, plus the half-unit the 2-dp print rounds
+ * away. A measure whose constraint is ALREADY reported in `prior` is not reported twice — the given's own
+ * violation says it, and this check exists for the label that has no constraint behind it.
+ */
+export function checkLabels(labels: PrintedLabels, positions: Map<Id, Vec>, prior: GivenViolation[] = []): GivenViolation[] {
+  const out: GivenViolation[] = [];
+  const reported = new Set(prior.map((v) => [...v.ids].sort().join('|')));
+  const get = (id: Id) => positions.get(id);
+  const check = (ids: Id[], what: string, text: string, unit: '°' | '', drawn: number, tol: number) => {
+    const said = labelNumber(text, unit);
+    if (said === null || !Number.isFinite(drawn)) return; // asserts no decimal / a degenerate measure — nothing to hold it to
+    if (reported.has([...ids].sort().join('|'))) return;
+    if (Math.abs(said - drawn) <= tol + PRINT_HALF_UNIT) return;
+    const shown = formatMeasure(drawn) + unit;
+    out.push({
+      relation: 'label',
+      ids,
+      message: `label «${text}» on ${what} does not match the drawing (${shown})`,
+      messageKey: 'figure.v.label',
+      params: { what, label: text, drawn: shown },
+    });
+  };
+  for (const l of labels.lengths) {
+    const A = get(l.a), B = get(l.b);
+    if (!A || !B) continue;
+    const d = dist(A, B);
+    check([l.a, l.b], `${l.a}${l.b}`, l.text, '', d, residualTolerance({ type: 'distance', a: l.a, b: l.b, value: d }, d));
+  }
+  for (const l of labels.angles) {
+    const V = get(l.vertex), P = get(l.ray1), Q = get(l.ray2);
+    if (!V || !P || !Q) continue;
+    check([l.vertex, l.ray1, l.ray2], `∠${l.ray1}${l.vertex}${l.ray2}`, l.text, '°', angleDeg(V, P, Q), residualTolerance({ type: 'angle', vertex: l.vertex, ray1: l.ray1, ray2: l.ray2, value: 0 }));
+  }
+  for (const l of labels.areas) {
+    const pts = l.ids.map(get);
+    if (pts.some((p) => !p)) continue;
+    const a = polygonArea(pts as Vec[]);
+    check(l.ids, l.ids.join(''), l.text, '', a, residualTolerance({ type: 'area', ids: l.ids, value: a }, a));
+  }
+  return out;
+}

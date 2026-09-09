@@ -6,10 +6,11 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-09-08",
+  "updatedAt": "2026-09-09",
   "slow": [
     "src/__tests__/issue-566.test.ts",
     "src/__tests__/issue-942-coincident-views.test.ts",
+    "src/__tests__/issue-955-refused-label.test.ts",
     "src/__tests__/scenarios-e2e-1.test.ts",
     "src/__tests__/scenarios-e2e-2.test.ts",
     "src/__tests__/scenarios-e2e-4.test.ts",

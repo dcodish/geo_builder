@@ -9785,3 +9785,129 @@ verdict, because the defect was never in the drawing — it was in the gate that
 **Left open, deliberately.** The issue's third bullet — whether the amber wording should ever appear on a
 figure whose `violations` are empty and whose every step is `ok` — is a separate honesty question about
 the banner's trigger, not about this predicate. Not folded in; file it if the class recurs.
+
+## ADR-491 — A REFUSED MEASURE WRITES NOTHING: a label comes only from a fact that HELD, and the verifier holds every label to the drawing (#955)
+
+**Status:** accepted, 2026-09-09 (P1, found playing round #949 T2) · **Issue:** #955 · **Ruling:** 2026-09-09 `/decisions` pass (on the issue)
+**Requirements:** [02](02-requirements.md) FR-RN-2 — amended: a refused measure never prints, not even its letter · **Design:** [04](04-design.md) — *"The three label sources, and the rule they all obey"*; `engine/verify.ts` gains `checkLabels`
+
+**The report.** The operator, playing T2: *"despite getting an honest error message that it is impossible,
+the diagram still put 70 instead of alpha."* Measured through the real `factsOf → replay` path:
+
+```
+משולש ABC · זווית BCA = 50 · זווית CAB = 70 · זווית ABC = α · α = 70
+```
+
+| | |
+| --- | --- |
+| refused fact | «זווית ABC = α» (`over-constrained: ∠ABC = 70° cannot hold`) |
+| canvas labels | `B=70°`  `C=50°`  `A=70°` — **sum 190°** |
+| figure actually DRAWN | A=70.00°  B=**60.00°**  C=50.00° |
+| `violations` | **`[]`** |
+
+The drawing was right — 70 + 50 leaves 60 at B, and the refused α-constraint was correctly not applied.
+The **label** was not: a student read «70°» at a corner drawn at 60°, and the verifier said nothing,
+because a label is not a constraint. CLAUDE.md promises *"everything the student stated is visible on the
+figure"*; this was its converse — something **not** true of the figure displayed as though it were, the
+same cardinal sin as drawing a figure that violates its givens.
+
+**Class** (docs/17 §1). *A **label sourced from a statement** is written **before the statement's outcome is
+known**, so a statement the engine REFUSES still annotates the figure — with a number resolved through the
+whole-list symbol table.* Measured across the lanes at HEAD `1ac04549`:
+
+| lane | statement | label written | truth | verdict |
+| --- | --- | --- | --- | --- |
+| angle, symbol | «∠ABC = α» then «α = 70» (refused) | `70°` | drawn 60° | **lied** |
+| length, symbol | «AB = 3», «AB = x», «x = 8» (refused) | `8` | \|AB\| = 3 | **lied** |
+| angle, numeric | «∠ABC = 80» refused | *(none)* | — | honest |
+| length, numeric | «AB = 3» then «AB = 8» refused | `3` | \|AB\| = 3 | honest |
+
+So the honest behaviour already shipped one code path over; only the **symbol-resolved** path lied, and it
+lied in both lanes. That is one defect, not two, and the fix is the general one — gate label emission on the
+fact's outcome — not a special case for `set-var`.
+
+**Root cause — one label source out of three was not gated on the outcome.** A 2-D measure label comes from:
+
+| source | where | gate before this ADR |
+| --- | --- | --- |
+| the symbolic-measure seam (`isMeasure(f.cmd)`, and the `angle-alias` name beside it) | **inside the fold, at the top of the per-fact loop** | **none** — emitted before `applyStep` |
+| #474's stated-magnitude pass | `runTail`, post-fold | `status[f.id] === 'ok'` |
+| the surviving-constraint fill | `runTail`, post-fold | a constraint that survived |
+
+The seam's own comment — *"a measure annotates the figure regardless of whether it adds a constraint"* —
+is the right rule for a measure that HELD without constraining anything («AB = 3x» with x unvalued lowers
+to nothing and still prints «3x», #474's flagship case) and the wrong rule for one the engine REFUSED. The
+two were never distinguished, because the emission ran before the distinction existed. Two things had to
+coincide for the label to be false, which is why it survived from `4be08377` (2026-07-24): the measure had
+to be refused, *and* its text had to be resolved through a value stated on another line (`buildSymTab`
+reads the whole enabled list). Without the second the stale label read «α» and asserted nothing.
+
+**Decision.**
+
+1. **A fact labels the figure only once it HELD.** The two emissions are one closure, `labelFrom(f)`,
+   called from the in-order pass's success branch **and** from the ADR-104 deferral retry's success branch
+   — a measure honoured on the retry labels exactly like an in-order one (locked; a fix that gated only the
+   in-order pass would have silently dropped every label the deferral ever rescued). A refused fact writes
+   **nothing** — the operator's ruling, with the two alternatives closed on the issue: not its letter
+   («α = 70» still reads green in the fact list, so «α» on the corner would still say 70 to a student
+   reading both), and not the value the figure actually has (a number the student never stated, on the
+   canvas as if it were a given — [ADR-052](#adr-052)). The key stays free for whatever a **surviving**
+   constraint gives it, which is what the drawing actually has: «AB = 3 · AB = x · x = 8» prints the 3.
+2. **The verifier holds every numeric label to the drawing.** `checkLabels` (`engine/verify.ts`, run
+   last in `runTail` on the assembled labels, whatever source produced them) compares each label that
+   asserts a decimal — a plain number, with the degree sign for an angle — against the drawn length, angle
+   or area, to the verifier's own residual tolerance plus the half-unit the 2-dp print rounds away, and
+   reports a disagreement as a violation (`figure.v.label`, both locales). Symbolic («3x», «α», «k + 2»),
+   exact («12√2», «2π»), radius-multiple («1.6R») and alias texts («1», «K1» — an alias prints its digit
+   without a degree sign) are the student's own writing and are not measured. A measure whose constraint
+   is already a reported violation is not reported twice. This is the ruling's required guard: without it
+   this class goes silent again the next time a label source is added.
+3. **The alias seam is gated with the measure seam.** A name asserts no magnitude, so a refused alias could
+   not lie the way a measure did; it moves for one reason — every fact-sourced label obeys one rule, *from a
+   fact that held* — not because it needed to.
+
+**Why not an id on the label (the first attempt, branch `fix/955-refused-label` @ `8347a473`).** It added
+`owner` (the fact id) to every label and pruned post-fold where `status` is final. The 2-D lane went red
+in 4 files / 14 tests, for two reasons that are one design mistake. Label objects are asserted by shape
+across the suite (`toEqual`), so a *defined* new field is churn everywhere. Worse, the fold memo is keyed by
+command **content** and stores statuses by fact **index** precisely so a dry-run trial array and the
+committed array — same content, different ids — share one fold; an id stored on a memoised label therefore
+named a fact that did not exist in the next replay (measured: the same commands under fresh ids restored
+the cached label carrying `owner: "f2"`, `status["f2"]` was `undefined`, the prune read that as "not ok",
+and a healthy figure lost its label). Nothing that carries fact identity may ride the memo. The fold's own
+status already distinguishes held from refused *at the emission site*, once the emission waits for the
+outcome — so no provenance is needed at all, and the memo is untouched: the label maps are fold state
+like `applied`, content-determined, correct for every fact list sharing the node; the #365 resume copies
+the prefix maps verbatim, which were built under the same rule; a HOIST rescue builds its own.
+
+**Sibling audit** (docs/17 §1). `src3d/`: the 3-D canvas draws a stated length from
+`statedLengths(c)` ([ADR-3D-235](06b-decisions-3d.md#adr-3d-235)), which enumerates the construction's
+`scalarPins` and `claims` — what the apply **committed**; a refused 3-D statement never reaches it. Class
+not present. Within 2-D: angle MARKS were already gated (`status === 'ok'`, plus the ADR-223 Am. honesty
+gate that drops an unrealised knee); arc labels ([ADR-335](#adr-335)) come from constraints only. All
+fact-sourced labels now sit behind one rule.
+
+**Perf** (docs/17 §7). `checkLabels` is one linear pass over the figure's labels per tail — no replay,
+no evaluate, no sampling; not measurable against the tail's single `evaluate`.
+
+**Locks.**
+- `src/__tests__/issue-955-refused-label.test.ts` (13): the reported figure — the α row is the refused
+  one (anti-vacuity), B carries no label, A's legitimate «70°» and C's «50°» survive (a blanket "no 70°
+  anywhere" would forbid a true label), the labels no longer sum to 190°, no chip offers α; the ruling's
+  four lanes; and what must not change — a holding measure keeps its value **and** its #948 chip, an
+  unvalued letter prints, the #474 flagship «זווית GBA = 37» still prints 37°, a measure honoured on the
+  ADR-104 **retry** still labels, a muted fact labels nothing, an ordinary figure is unchanged.
+- `src/engine/__tests__/label-honesty.test.ts` (11): `checkLabels` directly, with lying labels injected
+  (after the fix no natural figure produces one — that is the point): a false length / angle / area is a
+  violation with the right key and params; truthful labels pass; symbolic, exact and alias texts are never
+  measured; an already-reported measure is not reported twice; unplaced and degenerate measures are
+  skipped; the tolerance is the verifier's own.
+- `src/replay/__tests__/issue-955-label-check-wired.test.ts`: replay actually CALLS the check on the
+  figure it publishes — the exercised-counter a guard with an early return needs.
+- Scenarios `refused-measure-writes-nothing-955` (the operator's exact sequence) and
+  `refused-symbolic-length-writes-nothing-955` (corpus 4).
+
+**Related.** #956 — the same report's other half: «α = 70» is structurally unblameable, so the
+α-definition line takes the refusal; independent, this ADR changes only what is displayed. #948 — the
+ruling's corollary: a refused parameter's chip shows no value; with no label on the corner nothing competes
+for α, so the «α = 70» row gets no chip (locked).

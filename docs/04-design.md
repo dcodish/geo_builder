@@ -198,3 +198,35 @@ Fact ids DO survive a round trip here — `sanitizeFactIn` keeps them — but on
 them; a hand-written or id-less file gets fresh nanoids and an id-keyed choice would then attach to the
 wrong row. Position is a property of the file itself and cannot drift, and it matches 3-D so the shared
 converters in `shell/displayMode.ts` have one usage shape.
+
+## The three label sources, and the rule they all obey (#955, [ADR-491](06-decisions.md#adr-491))
+
+A measure label on the 2-D canvas comes from one of three places:
+
+| source | when it runs | gate |
+| --- | --- | --- |
+| the fact seam — a symbolic measure's forms, an angle-alias name (`labelFrom` in `computeFold`) | inside the fold, **from the fact's success branch** — the in-order pass and the ADR-104 retry alike | the fact HELD |
+| #474's stated-magnitude pass | `runTail`, post-fold | `status[f.id] === 'ok'` |
+| the surviving-constraint fill | `runTail`, post-fold | the constraint survived |
+
+One rule: **a label is written from a fact only once the fact held.** Until ADR-491 the first source ran at
+the top of the per-fact loop, before `applyStep`, which is how a refused «∠ABC = α» came to print the `70°`
+that «α = 70» supplied on another line. A refused fact now writes nothing, and the key stays free for a
+surviving constraint to fill.
+
+The seam stays *inside* the fold on purpose: labels are fold state like `applied`, content-determined, so
+the fold memo (ADR-280) carries them correctly for every fact list sharing a node, and the #365 resume
+copies a prefix's maps verbatim. What may **not** ride the memo is fact identity — statuses are stored by
+index for exactly that reason — so no provenance field is stored on a label (the first attempt did, and a
+same-content replay under fresh ids lost its labels).
+
+**The verifier's last word.** After the labels are assembled, `checkLabels` (`engine/verify.ts`) holds
+every label that asserts a decimal to the drawn length / angle / area, at the verifier's own tolerance plus
+the half-unit the 2-dp print rounds away, and reports a disagreement as a violation (`figure.v.label`).
+Symbolic, exact and alias texts are the student's writing and are not measured; a measure already reported
+as a violated given is not reported twice. This runs on the assembled labels **whatever source produced
+them**, so a future fourth source that forgets the rule is caught on the first figure it lies about.
+
+**The rule to carry forward:** a new label source states which of these three shapes it is, and emits only
+from a fact that held or a constraint that survived. If it cannot know the outcome where it runs, it is in
+the wrong place.

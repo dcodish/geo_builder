@@ -2378,4 +2378,38 @@ export const SCENARIOS_4: Scenario[] = [
       expect(intersectionsWithinSegments(fig), 'the within-segment gate agrees with the figure').toBe(true);
     },
   },
+  {
+    id: 'refused-measure-writes-nothing-955',
+    title: '#955: a REFUSED measure writes nothing on the figure — «זווית ABC = α» + «α = 70» no longer prints 70° on a corner drawn at 60°',
+    guards:
+      "operator, playing round #949 T2 (2026-09-09): \"despite getting an honest error message that it is impossible, the diagram still put 70 instead of alpha.\" Measured: the α line was correctly refused (70 + 50 leaves 60 at B), the figure was drawn right, and the canvas STILL wrote «70°» at B — the three labels summed to 190° — with violations = [], because a label is not a constraint. The symbolic-measure label seam ran at the top of the fold loop, BEFORE applyStep, so a fact that was then refused had already annotated the figure with a number resolved through the whole-list symbol table («α = 70» binds wherever it sits). The other two label sources (#474's stated-magnitude pass, the constraint fill) were always gated on the outcome; this one was not. ADR-491 moves the seam to the fact's SUCCESS branch (in-order pass AND the ADR-104 retry) and adds the verifier check the ruling required — a numeric label must agree with the drawing. Ruling: a refused measure writes NOTHING, not its letter either («α = 70» still reads green in the list, so «α» on the corner would still say 70). This scenario is the operator's exact sequence: B carries no label, A and C keep their true 70° and 50°, the drawn angle at B is 60°, and the printed labels no longer sum to 190°.",
+    steps: ['משולש ABC', 'זווית BCA = 50', 'זווית CAB = 70', 'זווית ABC = α', 'α = 70'],
+    check(fig) {
+      expect(fig.lastError, 'the α line is genuinely refused').toMatch(/cannot hold/);
+      // anti-vacuity: the refused row is the α measure — «α = 70» itself is a set-var and stays green (#956)
+      const alpha = Object.entries(fig.status).find(([id]) => id.startsWith('g3.'));
+      expect(alpha?.[1], 'the «זווית ABC = α» step is the refused one').not.toBe('ok');
+      expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), 'the figure draws 60° at B').toBeCloseTo(60, 2);
+      expect(fig.labels.angles.find((a) => a.vertex === 'B'), 'B carries NO label — not 70°, and not α').toBeUndefined();
+      expect(fig.labels.angles.find((a) => a.vertex === 'A')?.text, 'A really is 70°').toBe('70°');
+      expect(fig.labels.angles.find((a) => a.vertex === 'C')?.text).toBe('50°');
+      const printed = fig.labels.angles.map((a) => Number(a.text.replace('°', ''))).reduce((s, v) => s + v, 0);
+      expect(printed, 'the labels no longer sum to 190°').toBe(120);
+      expect(fig.violations, 'and the verifier, now checking labels too, finds nothing').toEqual([]);
+    },
+  },
+  {
+    id: 'refused-symbolic-length-writes-nothing-955',
+    title: '#955: the LENGTH lane had the identical defect — «AB = 3» · «AB = x» · «x = 8» prints the 3 that held, never the refused 8',
+    guards:
+      "the length twin of the reported angle case, from the ruling's own class table (issue #955, 2026-09-09): «AB = 3» holds, «AB = x» with «x = 8» stated afterwards is refused, and before ADR-491 the segment was labelled «8» while |AB| = 3 — the same pre-apply emission, one lane over. Locked so the two lanes cannot drift apart again: the surviving given's value labels the segment, the refused symbol's does not.",
+    steps: ['משולש ABC', 'AB = 3', 'AB = x', 'x = 8'],
+    check(fig) {
+      expect(fig.lastError, 'the x line is refused').toMatch(/cannot hold/);
+      expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| is the 3 that held').toBeCloseTo(3, 3);
+      const AB = fig.labels.lengths.find((l) => [l.a, l.b].sort().join('') === 'AB');
+      expect(AB?.text, 'the surviving given labels the segment').toBe('3');
+      expect(fig.violations).toEqual([]);
+    },
+  },
 ];

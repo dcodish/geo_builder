@@ -18,7 +18,7 @@ import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -714,6 +714,41 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       for (const [k, v] of start.node.areas) areaByKey.set(k, v);
       for (let i = 0; i < start.count; i++) status[facts[i].id] = start.node.statusByIndex[i];
     }
+    // #955 ([ADR-491](docs/06-decisions.md#adr-491)): the ONE place a FACT writes a label on the figure,
+    // and it runs only after the fact's transactional build COMMITTED (the in-order pass and the ADR-104
+    // retry below both call it from their success branch). It used to run at the top of the loop, before
+    // `applyStep` — "a measure annotates regardless of whether it adds a constraint" — which is the right
+    // rule for a measure that HELD without constraining anything («AB = 3x» with x unvalued lowers to
+    // nothing and still prints «3x», #474) and the wrong rule for one the engine REFUSED: its text is
+    // resolved through the whole-list symbol table, so a refused «∠ABC = α» with «α = 70» stated on
+    // another line wrote 70° on a corner drawn at 60°, and the verifier — which checks constraints, and a
+    // label is not one — reported nothing. The other label sources (#474's stated-magnitude pass and the
+    // constraint fill, both in runTail) were always gated on the outcome; this seam was the one that
+    // could lie. A refused measure now writes NOTHING (the operator's ruling — not its letter either:
+    // «α = 70» still reads green in the list, so «α» on the corner would still say 70 to a student
+    // reading both). The key stays free for whatever a SURVIVING constraint gives it.
+    const labelFrom = (f: Fact) => {
+      // A measure annotates the figure regardless of whether it adds a constraint — once it held.
+      if (isMeasure(f.cmd)) {
+        // #948: the ONE seam where a student's symbolic measure becomes figure text, so the one place
+        // that knows both forms. Everything below fills plain numbers from constraints and competes with
+        // nothing.
+        const forms = measureLabelForms(f.cmd, symtab);
+        addMeasureLabel(lenByKey, angByKey, areaByKey, f.cmd, forms.text, false, { letter: forms.letter, sym: forms.sym });
+      }
+      // An angle ALIAS annotates its wedge with the bound name (#235) — a name, not a value, so it
+      // rides the same label stream as a symbolic measure (the arc comes from angleMarkFor). The book
+      // convention draws the DIGIT alone when the name is the vertex letter + digits (the vertex's own
+      // point label already shows the letter — «A1» next to «A» duplicated it, #263); a name bound at
+      // a DIFFERENT letter keeps the full name (unambiguous). A name asserts no magnitude, so a refused
+      // alias could not lie the way a measure did; it is gated with the measure for ONE reason — every
+      // fact-sourced label obeys one rule, "from a fact that held" — not because it needed to be.
+      if (f.cmd.type === 'angle-alias') {
+        const digits = f.cmd.name.startsWith(f.cmd.vertex) ? f.cmd.name.slice(f.cmd.vertex.length) : '';
+        const text = /^\d+$/.test(digits) ? digits : f.cmd.name;
+        addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: f.cmd.vertex, ray1: f.cmd.ray1, ray2: f.cmd.ray2 }, text);
+      }
+    };
     for (const [fi, f] of facts.entries()) {
       if (start && fi < start.count) continue; // #365: already folded — resumed from the cached prefix
       // Lower the fact to the engine command(s) it produces (symbolic measures →
@@ -779,24 +814,6 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
         status[f.id] = `variable ${f.cmd.name} is not defined by any statement (the step that defined it was removed, muted or failed)`;
         continue;
       }
-      // A measure annotates the figure regardless of whether it adds a constraint.
-      if (isMeasure(f.cmd)) {
-        // #948: the ONE seam where a student's symbolic measure becomes figure text, so the one place
-        // that knows both forms. Everything below fills plain numbers from constraints and competes with
-        // nothing.
-        const forms = measureLabelForms(f.cmd, symtab);
-        addMeasureLabel(lenByKey, angByKey, areaByKey, f.cmd, forms.text, false, { letter: forms.letter, sym: forms.sym });
-      }
-      // An angle ALIAS annotates its wedge with the bound name (#235) — a name, not a value, so it
-      // rides the same label stream as a symbolic measure (the arc comes from angleMarkFor). The book
-      // convention draws the DIGIT alone when the name is the vertex letter + digits (the vertex's own
-      // point label already shows the letter — «A1» next to «A» duplicated it, #263); a name bound at
-      // a DIFFERENT letter keeps the full name (unambiguous).
-      if (f.cmd.type === 'angle-alias') {
-        const digits = f.cmd.name.startsWith(f.cmd.vertex) ? f.cmd.name.slice(f.cmd.vertex.length) : '';
-        const text = /^\d+$/.test(digits) ? digits : f.cmd.name;
-        addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: f.cmd.vertex, ray1: f.cmd.ray1, ray2: f.cmd.ray2 }, text);
-      }
       // A point a lowered command would (re)create that an earlier fact owns but which
       // isn't in the figure now ⇒ its definition is gone, so this fact can't build either.
       const broken = intro.filter((id) => owned.has(id) && !cur.objects.some((o) => o.id === id));
@@ -831,6 +848,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
         status[f.id] = 'ok';
         applied.push(...(engineCmds as Command[]));
         recordOwnership(fi); // #360: whatever this commit added, this fact owns
+        labelFrom(f); // #955: the fact held — now, and only now, it may annotate the figure
       }
       claim();
     }
@@ -869,6 +887,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
           status[f.id] = 'ok';
           applied.push(...(engineCmds as Command[]));
           recordOwnership(fi); // #360: a deferral-retry commit owns its additions just like an in-order one
+          labelFrom(f); // #955: a measure honoured on the retry labels exactly like an in-order one
           progressed = true;
         } else failedWith.set(f.id, cur);
       }
@@ -1189,6 +1208,12 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   // Verify the OUTPUT against the ORIGINAL givens: relations the input asserted that don't actually
   // hold in the final coordinates (a point off its circle, …) — caught even when every step is 'ok'.
   const violations = e.ok ? checkGivens(applied, e.positions, e.circles, figure) : [];
+  // #955 ([ADR-491](docs/06-decisions.md#adr-491)): the verifier was blind to a LABEL that contradicts the
+  // figure — a label is not a constraint, so the reported 70°-on-a-60°-corner arrived with `violations = []`.
+  // Every numeric label must agree with what it annotates, to the verifier's own tolerance, and a
+  // disagreement is a violation like any other — so this class cannot go silent again the next time a
+  // label source is added. Checked LAST, on the assembled labels, whatever source produced them.
+  if (e.ok) violations.push(...checkLabels(labels, e.positions, violations));
   // Free-radius circles the student can dial (base = stable seed radius for the slider range; current =
   // what's drawn). Read from the pre-seed construction so the range doesn't shift as the value changes.
   // Distinct points the geometry drove onto the same spot — allowed (not an error), surfaced as a notice
