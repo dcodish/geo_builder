@@ -37,3 +37,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Play sheet is copy-pasteable lines](playsheet-is-copy-pasteable-lines.md) — every utterance one per line in a code block in the CHAT report, never a table and never a pointer to the issue
 - [Drive the reported path](drive-the-reported-path.md) — a display fix must be driven through the path the REPORT takes; a refused line may never become a fact, so fact-keyed wiring never fires (#943, round #946)
 - [Play cases pass the gate](play-cases-pass-the-gate.md) — a factsOf sequence commits lines the submit gate REFUSES; validate every play case through the real dry-run gate before listing it, or the sheet dies at line 3 (#955 T2/T6, 2026-09-09)
+- [Negated closing keywords still close](negated-closing-keywords-still-close.md) — GitHub matches `close #NNN` in a commit body regardless of the negation around it; "Does NOT close #920" closed #920 (round #961, 2026-09-10)
