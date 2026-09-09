@@ -247,9 +247,19 @@ describe('#812 — the tier artifact holds no per-machine state', () => {
       writeFileSync(p, serializeTiers(files.map((file, i) => ({ file, ms: ms + i }))));
       return p;
     };
+    // #958: LABEL the three sides. Without `-L`, git writes each input's ABSOLUTE PATH into the
+    // conflict markers — «<<<<<<< C:\\Users\\owner\\AppData\\Local\\Temp\\tiers-merge-qxHBYI\\ours.json» —
+    // so the rendered conflict text carries the machine's temp path, and any assertion over it inherits
+    // whatever digits that path happens to contain. Labels are exactly what this flag is for: the markers
+    // become deterministic (`<<<<<<< ours`) and they read as the three SIDES, which is also a better
+    // failure message when the test legitimately fails than three long Windows paths.
     const r = spawnSync(
       'git',
-      ['merge-file', '-p', w('ours.json', ours, 900_000), w('base.json', base, 100_000), w('theirs.json', theirs, 5_000)],
+      [
+        'merge-file', '-p',
+        '-L', 'ours', '-L', 'base', '-L', 'theirs',
+        w('ours.json', ours, 900_000), w('base.json', base, 100_000), w('theirs.json', theirs, 5_000),
+      ],
       { encoding: 'utf8' },
     );
     rmSync(dir, { recursive: true, force: true });
@@ -273,8 +283,23 @@ describe('#812 — the tier artifact holds no per-machine state', () => {
     // lines, which is the whole difference from the timing churn this replaces.
     const r = mergeStatus(BASE, [...BASE, 'm/zz1.test.ts'], [...BASE, 'm/zz2.test.ts']);
     expect(r.status, 'the tail case is the known residue').not.toBe(0);
-    const conflicted = r.stdout.split('\n').filter((l) => /^[<=>]{7}/.test(l) || l.includes('.test.ts'));
-    expect(conflicted.join('\n'), 'no timing ever appears in a conflict').not.toMatch(/\d{4,}/);
+    // #958: the digit check belongs on the JSON CONTENT, never on the rendered conflict text. The
+    // marker lines are not payload — they are git's framing — and asserting over them made this gate's
+    // verdict depend on the machine's temp path (measured: a 4-digit directory name failed it outright).
+    // A gate that can go red for a reason it is not testing is worse than no gate: it cost a ~20-minute
+    // CI lane and blocked PR #954, and the honest reading of a red gate — "something is wrong with my
+    // change" — was false. Split into its two real halves:
+    const lines = r.stdout.split('\n');
+    const markers = lines.filter((l) => /^[<=>]{7}/.test(l));
+    // (a) there IS a conflict, and it is framed by the three LABELLED sides — not by anyone's paths
+    expect(markers.map((l) => l.trim()), 'the conflict is framed by labelled sides').toEqual([
+      '<<<<<<< ours',
+      '=======',
+      '>>>>>>> theirs',
+    ]);
+    // (b) the PAYLOAD carries no timing — the membership-not-machines property #812 established
+    const payload = lines.filter((l) => !/^[<=>]{7}/.test(l) && l.includes('.test.ts'));
+    expect(payload.join('\n'), 'no timing ever appears in a conflict').not.toMatch(/\d{4,}/);
     expect(r.stdout).toContain('m/zz1.test.ts');
     expect(r.stdout).toContain('m/zz2.test.ts');
   });
