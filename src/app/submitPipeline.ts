@@ -269,6 +269,17 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     ui.setBusy(false);
     return;
   }
+  // #777: a comparative with no COMPARAND («צלע AD גדולה פי 2» — twice WHAT?). The second operand is
+  // simply absent, so the only way to build it is to invent one — a given the student never stated
+  // (ADR-052), shown with a green ✓. Escalating is the same error one step removed: the LLM would have
+  // to guess precisely the missing thing, and whatever it guesses the tool then teaches back. Ask, and
+  // keep the text so they can complete it in place.
+  if (!r.ok && r.reason === 'incomplete-comparative') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `incomplete-comparative:${r.subject}` });
+    ui.setInputNote(t('input.incompleteComparative', { subject: r.subject, factor: r.factor }));
+    ui.setBusy(false);
+    return;
+  }
   // A BOUND radius symbol («R» after «רדיוס מעגל O הוא R») reused as a POINT label («מיתר AR») — once bound,
   // the letter IS the parametric radius, never a node (operator ruling, #198). Say so deterministically and
   // keep the text so the student renames the point; never a paid LLM call that would mint the node R.

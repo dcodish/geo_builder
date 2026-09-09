@@ -30,6 +30,11 @@ export type ParseResult =
   // WHICH angle is meant is ambiguous (or its arms don't exist yet). Surfaced as a clarification — "name all
   // three letters" — NOT escalated to the LLM (which would only guess). `vertex` is the named vertex.
   | { ok: false; reason: 'ambiguous-angle'; vertex: string }
+  // #777: a comparative whose COMPARAND is missing («צלע AD גדולה פי 2» — twice WHAT?). The only way
+  // to "handle" it is to invent the second operand, and an invented comparand is a given the student
+  // never stated (ADR-052) — committed with a green ✓ and one Enter from the figure. So it ASKS, and
+  // it never escalates: the LLM would have to guess exactly the thing that must not be guessed.
+  | { ok: false; reason: 'incomplete-comparative'; subject: string; factor: string }
   // #770: a definite SHAPE reference («אלכסוני הריבוע») whose named kind has no declared match in the
   // figure — the statement is refused BY NAME (the honesty invariant: name the conflicting statement),
   // never bound to "whichever quad exists" and never guessed by the LLM. `noun` is the student's word.
@@ -252,7 +257,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string };
+type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -2691,6 +2696,40 @@ const ratioConstraint: Rule = (s) => {
   return null;
 };
 
+/**
+ * #777 — A COMPARATIVE WITH NO COMPARAND ASKS; it never guesses and never escalates.
+ *
+ * Prod, session `9xejwvfv`: «צלע AD גדולה פי 2» — twice WHAT? The comparand is simply absent, and the
+ * only way to turn this into commands is to INVENT the segment it is compared to. That is the ADR-052
+ * cardinal sin with a green ✓ on it: a magnitude the student never stated, one Enter from the figure.
+ *
+ * Escalating is the wrong destination for the same reason — the LLM would have to guess the one thing
+ * that must not be guessed, and whatever it guesses the tool then TEACHES. So this is a clarification in
+ * the `ambiguous-*` family, the same pedagogical spine as the role-side ask (#775): name what is
+ * missing, and keep the student's text so they can complete it in place.
+ *
+ * Registered AFTER {@link ratioConstraint}, so a COMPLETE comparative («AD גדול פי 2 מ-AB», «AB = 2AD»)
+ * is claimed there and never reaches here — the ask fires only when the operand is genuinely absent.
+ */
+const incompleteComparative: Rule = (s) => {
+  // A segment LHS, an optional comparative adjective, «פי» + a factor — and then END OF LINE. The
+  // anchor is the whole rule: «מ» (glued or spaced, with or without a segment noun) introduces the
+  // second operand, so any line that HAS a comparand simply does not match.
+  const m = s.match(
+    new RegExp(
+      // Composed from the LEXICON atom, never a fresh inline copy. The lexical ratchet
+      // (`lexical-ratchet.test.ts`, docs/24 S2.1) caught this rule inlining two more label fragments
+      // and refused it — those ceilings only ever go DOWN, and a brand-new rule is exactly what they
+      // exist to catch.
+      String.raw`(?<![A-Za-z\d])(?<a>${LABEL})\s*(?<b>${LABEL})\b[^=]{0,24}?פי\s*${NUMEXPR('k')}\s*$`,
+    ),
+  );
+  if (!m) return null;
+  const g = m.groups ?? {};
+  const k = numexprVal(g, 'k');
+  if (!k) return null;
+  return { clarify: 'incomplete-comparative', subject: `${up(g.a!)}${up(g.b!)}`, factor: k.text ?? String(k.value) };
+};
 /**
  * "AE/ED = 2/3" / "AE/ED = 2" — a ratio of two segment LENGTHS set to a fraction:
  * |AE|/|ED| = 2/3 ⇒ |AE| = (2/3)·|ED|. Runs before the numeric/distance rules, which
@@ -8936,6 +8975,9 @@ export const RULES: Rule[] = [
   diagonals, // "אלכסונים" / "AC ו-BD אלכסוני הריבוע" — the quad's diagonals; before `segment` (which owns the singular "אלכסון AC")
   twoSidesValues, // "צלע אחת 10 צלע שניה 5" — two adjacent sides of THE unique polygon (#185); full-match, before the generic value rules
   ratioConstraint, // "AB = 2 AD" / "אורך AC גדול פי √3 מהקטע CO" — BEFORE `segment` (its "מהקטע"/"קטע" would else half-parse the relational ratio into a bare segment, dropping the factor — the dividesInRatio class, #105) and before equal/distance
+  // #777: the comparative whose COMPARAND is missing. Directly after `ratioConstraint`, which owns the
+  // complete form — so this asks only when the second operand is genuinely absent.
+  incompleteComparative,
   segment,
   pointsOnSegments, // "F, G, H on AB, AC, CB" — N points placed PAIRWISE on N segments, before the others
   pointsOnSegment, // "L and K are points on AC" — TWO points on a segment, before the single pointOnSegment
@@ -10453,6 +10495,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'alias-taken') return { ok: false, reason: 'alias-taken', name: res.name };
   if (res.clarify === 'role-side-unresolved') return { ok: false, reason: 'role-side-unresolved', role: res.role };
   if (res.clarify === 'side-unspecified') return { ok: false, reason: 'side-unspecified', noun: res.noun, value: res.value };
+  if (res.clarify === 'incomplete-comparative') return { ok: false, reason: 'incomplete-comparative', subject: res.subject, factor: res.factor };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 

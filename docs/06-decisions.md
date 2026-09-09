@@ -10251,3 +10251,58 @@ re-entry no-op, and a deferrable constraint typed EARLY still committing (ADR-10
 case a careless gate would break); and `driveThroughGate` leaving no fact behind for a refused line,
 **with an explicit assertion that this is exactly where it differs from `factsOf`** — the difference this
 ADR exists for.
+## ADR-490 — An incomplete comparative ASKS; it is never guessed and never escalated (#777)
+
+**Status:** accepted, 2026-09-09 (fix-round #949, item 7) · **Issue:** #777 · **Operator approval:** `/log-triage` 2026-08-24 ("fix this")
+**Requirements:** [02](02-requirements.md) FR-IN-9 (new) · **Design:** [04](04-design.md) — the clarification family
+
+**The report.** Prod session `9xejwvfv`, on a parallelogram:
+
+```
+[parser/ok]         מקבילית ABCD
+[llm/built-nothing] צלע AD גדולה פי 2
+```
+
+Twice **what**? The comparand is simply absent. Measured at HEAD, the whole family reached the
+escalation seam:
+
+| utterance | before |
+| --- | --- |
+| `AD גדול פי 2 מ AB` | ✅ `set-ratio` — comparand present |
+| `צלע AD גדולה פי 2` | ❌ `not-handled` → LLM |
+| `AD גדולה פי 2` | ❌ `not-handled` → LLM |
+| `AD ארוכה פי 2` | ❌ `not-handled` → LLM |
+
+**Why `not-handled` is the wrong answer, and why the LLM is a worse one.** The only way to turn this
+utterance into commands is to **invent** the second operand. An invented comparand is a magnitude the
+student never stated — [ADR-052](#adr-052)'s cardinal sin — and it would arrive with a green ✓, one
+Enter from the figure. Escalating is the same error one step removed: the model would have to guess
+precisely the thing that must not be guessed, and whatever it guesses the tool then **teaches back**.
+The LLM returned nothing on this occasion; the defect is that it was asked at all.
+
+**Decision.** `incompleteComparative` returns a clarification in the `ambiguous-*` family —
+`{ reason: 'incomplete-comparative', subject, factor }` — and `submitPipeline` renders it as an input
+note, keeping the student's text so they can complete it in place. The same pedagogical spine as the
+role-side ask ([#775](../../issues/775)): *name what is missing*, never guess it.
+
+**Scoping — the ask fires only where the operand is genuinely absent.**
+
+- Registered **immediately after `ratioConstraint`** in the rule list, so every complete comparative is
+  claimed before this rule is consulted.
+- The pattern is **anchored at end of line** after the factor. «מ» — glued, spaced, or carrying a
+  segment noun («מהקטע CO») — introduces the comparand, so any line that *has* one simply does not
+  match. This is why the rule cannot steal a form `ratioConstraint` merely failed to read for some
+  other reason: absence is structural here, not inferred.
+- It owns only «פי N». «צלע AD גדולה» with no factor stays `not-handled`, because a bare comparative is
+  a different (and much vaguer) shape and this ADR does not claim it.
+
+**Locks** (`src/parser/__tests__/issue-777-incomplete-comparative.test.ts`, 11): the reported line and
+its two siblings return the clarification with the subject and the factor; it is asserted **not** to be
+`not-handled`, which is the seam that used to send it to a paid call; «AD גדול פי 2 מ AB», the glued and
+noun-carrying comparand forms, and the equational «AB = 2AD» all still lower to `set-ratio`; a plain
+length and a shape declaration are unaffected; a factor-less comparative stays `not-handled`; and both
+locales carry the ask with both slots.
+
+**Not claimed here.** A comparative whose comparand is resolvable *from context* — if such a form is
+ever added — would be a different rule: this one answers only the case where nothing in the sentence
+could be the second operand.
