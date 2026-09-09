@@ -45,6 +45,7 @@ import type { AnyCommand, Id, Vec } from '@/engine';
 
 import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad } from './scenarios-harness';
+import { intersectionsWithinSegments } from '@/replay/core';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -2357,6 +2358,24 @@ export const SCENARIOS_4: Scenario[] = [
       for (const [id, st] of Object.entries(fig.status)) {
         if (!id.startsWith('g3.')) expect(st, `${id} is untouched`).toBe('ok');
       }
+    },
+  },
+  {
+    id: 'shared-endpoint-intersection-is-not-a-near-miss-944',
+    title: '#944: «D = חיתוך AB ו-BC» draws the one correct answer AND passes the requirement gate — no amber contradiction',
+    guards:
+      "found while verifying #942's play case (2026-09-08). The figure was exactly right — the crossing of AB and BC IS B, so D lands on B, the canvas writes «B=D» (ADR-486) and a blue notice says they coincide — while the input panel simultaneously showed «לא נמצאה תצורה שמקיימת את כל הדרישות יחד … בדקו את הנתון האחרון שהוזן». Two surfaces, opposite claims. `intersectionsWithinSegments` was the single failing conjunct: it requires a declared intersection to sit strictly INSIDE both carriers by WITHIN_MARGIN, and two segments sharing a vertex cross ONLY at that vertex, in every configuration — so no seed could satisfy it and the amber fallback became permanent. Fixed by a STRUCTURAL exemption (do the carriers share an endpoint?), never a slackened margin: loosening WITHIN_MARGIN would re-admit the near-collapse basin #569 exists to catch. ADR-489. This scenario locks the whole-pipeline verdict — the figure builds, D≡B is surfaced as a coincidence, and the requirement gate agrees — because the defect was never in the drawing, it was in the gate that judged it.",
+    steps: ['משולש ABC', 'D = חיתוך AB ו-BC'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'no violated given').toEqual([]);
+      const B = at(fig, 'B');
+      const D = at(fig, 'D');
+      expect(dist(B, D), 'D IS B — the only answer, and it is drawn').toBeLessThan(1e-6);
+      expect(fig.coincidences, 'the coincidence is surfaced, not silent').toContainEqual(['B', 'D']);
+      // THE regression: the requirement gate must agree with the drawing. Before ADR-489 this was
+      // false at every seed, which is what put the amber banner on a correct figure for good.
+      expect(intersectionsWithinSegments(fig), 'the within-segment gate agrees with the figure').toBe(true);
     },
   },
 ];

@@ -156,3 +156,19 @@ src3d/           the sibling 3-D product (pattern-copied, never imported — see
 - **R1 — Engine expressiveness.** Does the constructive/branch model cover the v1 figure vocabulary cleanly? Mitigation: prove the slice (step 1) before building outward.
 - **R2 — Parser coverage vs. fallback rate.** If the grammar parser is too narrow, API usage (and cost) rises. Mitigation: design the grammar from real bagrut phrasings; measure fallback rate.
 - **R3 — Stability under attachment.** Keeping shared/derived geometry stable as constraints accumulate. Mitigation: persistent DOF/branch indices + the stability test.
+
+## The within-segment gate and its structural exemption (#944, [ADR-489](06-decisions.md#adr-489))
+
+`intersectionsWithinSegments` exists to catch a crossing that has wandered off the end of its segment —
+the signature of a wrong configuration, which the reflection sampler is meant to fix. It therefore
+assumes the crossing *could* be interior.
+
+That assumption fails for exactly one construction shape: **the two carriers share a vertex**. «D = חיתוך
+AB ו-BC» names the crossing of AB and BC, and two segments meeting at B cross only at B — so "strictly
+inside both spans" is not a tight tolerance, it is unsatisfiable. `shareEndpoint` is the guard, and it is
+structural (does the construction give the carriers a common endpoint?) rather than numeric, because a
+wider `WITHIN_MARGIN` would re-admit the near-collapse basin #569 exists to catch.
+
+The question is asked at **three** sites and all three take the exemption: the gate itself,
+`segmentsCrossWithin` (the point-free sibling from ADR-383), and `reflectMaskForFailing`, which picks
+reflection culprits from the same test — an exempt meet is not failing, so it must not be blamed.

@@ -9656,3 +9656,67 @@ string through the humanising layer.
 Locked in `src/app/__tests__/submitPipeline.test.ts` — the operator's sequence through the real pipeline,
 asserting the engine reason AND the sentence reach the display layer, that the note is shown, and that the
 text is kept so the line can be edited.
+
+## ADR-489 — An intersection at the carriers' SHARED ENDPOINT is the answer, not a near-miss (#944)
+
+**Status:** accepted, 2026-09-09 (fix-round #949, item 5) · **Issue:** #944
+**Requirements:** [02](02-requirements.md) FR-ALT-5 — **no change**; the promise already held and this restores it · **Design:** [04](04-design.md) — the accept gate · [LADDER](LADDER.md) — the requirement gate, unchanged in shape
+
+**The report.** Found while verifying #942's play case:
+
+```
+משולש ABC
+D = חיתוך AB ו-BC
+```
+
+The figure was **exactly right**. The crossing of AB and BC is B, so D lands on B, the canvas writes the
+merged label «B=D» ([ADR-486](#adr-486)) and a blue notice says they coincide. And on the same screen the
+input panel said:
+
+> לא נמצאה תצורה שמקיימת את כל הדרישות יחד — הציור המוצג עשוי להיות מנוגד … בדקו את הנתון האחרון שהוזן.
+
+Two surfaces, opposite claims — the tool drawing the one correct answer while telling the student to go
+check what they typed. Pre-existing; ADR-486 only made it visible, by making a forced coincidence a
+legitimate last-resort view the tool is supposed to draw and label.
+
+**Root cause, measured clause by clause.** `meetsRequirements` was false, and exactly one conjunct
+failed: `intersectionsWithinSegments`, which requires a declared intersection to sit strictly *inside*
+both carriers by `WITHIN_MARGIN`. Every other clause — including `pointsDistinct`, whose ADR-123
+exemption was doing its job — passed.
+
+**Why the margin rule was asking the impossible.** `WITHIN_MARGIN` guards against a crossing that has
+wandered off the end of a segment: a sign the configuration is wrong (an apex pointing the wrong way),
+which the reflection sampler should fix. That assumes the crossing *could* be interior. When the two
+carriers **share a vertex** the assumption is false — two segments meeting at B cross **only** at B, in
+every configuration of every such figure, because their lines are not parallel and their single
+intersection *is* the shared vertex. So the requirement was not a tolerance set too tight; it was one no
+seed could ever satisfy. The auto-resolver searched, found nothing, and the amber fallback became
+permanent.
+
+**Decision — a STRUCTURAL exemption, derived from the construction.** `shareEndpoint(a, b, c, d)` asks
+whether the two carriers have a vertex in common; if they do, the within-margin test does not apply to
+that crossing. Explicitly **not** a slackened `WITHIN_MARGIN`: loosening the margin would re-admit the
+coincident-vertex near-collapse basin [#569](../../issues/569) exists to catch, which is the opposite of
+what this figure needs.
+
+**The sweep — three sites, not one.** The same shape appears wherever this question is asked, and fixing
+only the reported predicate would have left the class one utterance away:
+
+| site | what it does | why it needed the exemption |
+| --- | --- | --- |
+| `intersectionsWithinSegments` | the reported gate | the amber banner |
+| `segmentsCrossWithin` | the same question for a point-free «CD חותך את AB» (ADR-383) | identical defect, no named point |
+| `reflectMaskForFailing` | blames the endpoints of a failing meet, to aim the reflection search | an exempt meet is not failing, so it must never be recruited as a culprit — otherwise the sampler hunts a non-problem |
+
+**Locks.** `src/__tests__/issue-944-shared-endpoint.test.ts` (8): the reported figure builds with D≡B
+surfaced as a coincidence and every fact `ok`; the gate now passes, with an **anti-vacuity assertion**
+that the figure really carries the object the predicate judges; an ordinary interior crossing is still
+gated, and still *refuses* when asked with an impossible margin (so the predicate is proved to be doing
+work, not short-circuited); the shared-endpoint case passes at **any** margin, which is what "structural,
+not a tolerance" means; and the sibling predicate is exercised on both a shared and a non-shared pair.
+Scenario `shared-endpoint-intersection-is-not-a-near-miss-944` (corpus 4) locks the whole-pipeline
+verdict, because the defect was never in the drawing — it was in the gate that judged it.
+
+**Left open, deliberately.** The issue's third bullet — whether the amber wording should ever appear on a
+figure whose `violations` are empty and whose every step is `ok` — is a separate honesty question about
+the banner's trigger, not about this predicate. Not folded in; file it if the class recurs.

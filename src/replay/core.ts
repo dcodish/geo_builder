@@ -1353,6 +1353,27 @@ function segParam(fig: Derived, a: Id, b: Id, p: Id): number | null {
 }
 
 /**
+ * #944 ([ADR-489](docs/06-decisions.md#adr-489)) — do the two carriers SHARE an endpoint?
+ *
+ * The within-margin rule exists to catch a crossing that has wandered off the end of a segment: a sign
+ * the configuration is wrong (an apex pointing the wrong way), which the reflection sampler should fix.
+ * It assumes the crossing COULD be interior.
+ *
+ * When the two carriers share a vertex that assumption is false. «D = חיתוך AB ו-BC» on a triangle names
+ * the crossing of AB and BC, and two segments meeting at B cross **only** at B, for every configuration
+ * of every such figure — the lines are not parallel, so their single intersection IS the shared vertex.
+ * Demanding it sit strictly inside both spans is not a tolerance that is too tight; it is a requirement
+ * no configuration can satisfy, so the auto-resolver searched every seed, found none, and the figure was
+ * drawn under the amber "may be contradictory" fallback while being exactly right.
+ *
+ * So this is a STRUCTURAL exemption, derived from the construction, not a slackened margin — loosening
+ * `WITHIN_MARGIN` would re-admit the near-collapse basin [#569](../../issues/569) exists to catch.
+ */
+function shareEndpoint(a: Id, b: Id, c: Id, d: Id): boolean {
+  return a === c || a === d || b === c || b === d;
+}
+
+/**
  * Does every plain SEGMENT meet land WITHIN both its segments ([ADR-166](docs/06-decisions.md#adr-166))?
  * A `line-line-intersection` flagged `onSeg` (the student named two segments, no "המשך"/"הישר") must have
  * its crossing inside both spans, not on the continuation — the operator's rule "two segments meet ON the
@@ -1363,6 +1384,7 @@ function segParam(fig: Derived, a: Id, b: Id, p: Id): number | null {
 export function intersectionsWithinSegments(fig: Derived, margin = WITHIN_MARGIN): boolean {
   for (const o of fig.construction.objects) {
     if (o.kind !== 'line-line-intersection' || !(o.onSeg || o.onSeg1 || o.onSeg2)) continue;
+    if (shareEndpoint(o.a, o.b, o.c, o.d)) continue; // #944 — see shareEndpoint
     // Per-operand (issue #22): a single-sided bare operand (`onSeg1`/`onSeg2`) gates only its own segment.
     const t1 = o.onSeg || o.onSeg1 ? segParam(fig, o.a, o.b, o.id) : null;
     const t2 = o.onSeg || o.onSeg2 ? segParam(fig, o.c, o.d, o.id) : null;
@@ -1397,6 +1419,7 @@ export function segmentsCrossWithin(facts: Fact[], posn: Map<Id, Vec>, margin = 
     const cmd = f.cmd;
     if (!f.enabled || cmd.type !== 'segments-cross') continue;
     if (![cmd.a, cmd.b, cmd.c, cmd.d].every((id) => posn.has(id))) continue; // pending — skip
+    if (shareEndpoint(cmd.a, cmd.b, cmd.c, cmd.d)) continue; // #944 — the same structural exemption
     const t = crossParamsAt(posn, cmd.a, cmd.b, cmd.c, cmd.d);
     if (!t || t.t1 < margin || t.t1 > 1 - margin || t.t2 < margin || t.t2 > 1 - margin) return false;
   }
@@ -1411,6 +1434,7 @@ function reflectMaskForFailing(fig: Derived, facts: Fact[] = []): number {
   const culprits = new Set<Id>();
   for (const o of fig.construction.objects) {
     if (o.kind !== 'line-line-intersection' || !(o.onSeg || o.onSeg1 || o.onSeg2)) continue;
+    if (shareEndpoint(o.a, o.b, o.c, o.d)) continue; // #944: exempt from the gate ⇒ never a culprit for it
     const t1 = o.onSeg || o.onSeg1 ? segParam(fig, o.a, o.b, o.id) : null;
     const t2 = o.onSeg || o.onSeg2 ? segParam(fig, o.c, o.d, o.id) : null;
     if (t1 !== null && (t1 < WITHIN_MARGIN || t1 > 1 - WITHIN_MARGIN)) { culprits.add(o.a); culprits.add(o.b); }
