@@ -3845,7 +3845,10 @@ const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: b
     const v = numexprVal(rFrac.groups!, 'r');
     if (v && v.value > 0) return { radius: v.value, numeric: true, symbolic: false };
   }
-  const rNum = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*${num}`, 'i'));
+  // #891: the optional COPULA, so «מעגל O שרדיוסו הוא 5» reads like «מעגל O שרדיוסו 5». The quotient
+  // form above already accepted it and this one did not — an inconsistency between two spellings of
+  // one statement, which is the kind a student hits before anything else.
+  const rNum = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*(?:=|:|הוא|היא|שווה(?:\s+ל-?)?|\bis\b)?\s*${num}`, 'i'));
   if (rNum) return { radius: parseFloat(rNum[1]), numeric: true, symbolic: false };
   // A SYMBOLIC radius — any single letter, not only the reserved R/r (issue #54: "שרדיוסו T" names the
   // radius T). The letter (case kept — R vs r are different radii) is returned so the binding post-pass
@@ -9708,7 +9711,13 @@ const normalizeWordEquality = (s: string): string =>
  * `shapeMacro` mints them. {@link statedSideLength} now owns the phrasing at that seam, where the ids
  * are resolved, and serves both forms from one rule.
  */
-const SIDE_CLAUSE = String.raw`\s*(?:שצלעו|שאורך\s+צלעו|שכל\s+צלע\s+שלו|whose\s+side(?:\s+length)?|with\s+side(?:\s+length)?)\s*(?:הוא|היא|שווה(?:\s+ל-?)?|is|=)?\s*(?=[√\d(])`;
+// #891: «שהצלע שלו/שלה» is «שכל צלע שלו» with a DEFINITE determiner instead of a distributive one —
+// the same clause, one more spelling, and the textbook one. Added to the alternation rather than to
+// `SUCH_THAT`: this phrasing never reaches the splitter, and splitting is what would turn one readable
+// line into two unreadable halves. The `SIDE_SHAPES` restriction above is what keeps it honest — on a
+// rectangle "its side" would be an unstated pick of WHICH side (ADR-052), so «מלבן … שהצלע שלו 6»
+// stays refused, and there is a lock saying so.
+const SIDE_CLAUSE = String.raw`\s*(?:שצלעו|שאורך\s+צלעו|שכל\s+צלע\s+שלו|שהצלע\s+שלו|שהצלע\s+שלה|whose\s+side(?:\s+length)?|with\s+side(?:\s+length)?)\s*(?:הוא|היא|שווה(?:\s+ל-?)?|is|=)?\s*(?=[√\d(])`;
 const SIDE_SHAPES = String.raw`ריבוע|מעוין|square|rhombus|(?:משולש\s+)?שווה[\s-]?צלעות|equilateral(?:\s+triangle)?`;
 
 export function normalizeUtterance(raw: string): string {

@@ -1,0 +1,61 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-09-09T12:00:00.000Z",
+  "name": "issue-891",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "ריבוע ABCD שהצלע שלו 6",
+      "group": "g0",
+      "cmd": {
+        "type": "square",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "ריבוע ABCD שהצלע שלו 6",
+      "group": "g0",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "ריבוע ABCD שהצלע שלו 6",
+      "group": "g0",
+      "cmd": {
+        "type": "set-distance",
+        "a": "A",
+        "b": "B",
+        "value": 6
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.3",
+      "utterance": "מעגל O שרדיוסו הוא 5",
+      "group": "g1",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}
