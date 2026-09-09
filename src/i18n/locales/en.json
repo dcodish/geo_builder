@@ -156,7 +156,8 @@
     "statusOk": "OK",
     "statusBroken": "problem",
     "statusOff": "excluded",
-    "editBrokeDependents": "The edit was applied, but {{items}} no longer takes effect — what it refers to is not defined any more"
+    "editBrokeDependents": "The edit was applied, but {{items}} no longer takes effect — what it refers to is not defined any more",
+    "paramDisplayTitle": "Show {{sym}}: letter or value"
   },
   "figure": {
     "mismatch": "The figure may not match what you described:",
@@ -207,8 +208,8 @@
     },
     "overConstrained": "Can't do that: {{what}} contradicts an earlier given — they can't both hold.",
     "overConstrained_said": "Can't do that: «{{said}}» contradicts an earlier given — they can't both hold. The reason: {{what}}.",
-    "notDeterminedHere": "Your givens are fine. {{who}} are not determined yet, and in the placement the tool picked for them {{what}} can't hold \u2014 press \u00abshow another configuration\u00bb.",
-    "notDeterminedHereBare": "Your givens are fine. In the placement the tool picked, {{what}} can't hold \u2014 press \u00abshow another configuration\u00bb.",
+    "notDeterminedHere": "Your givens are fine. {{who}} are not determined yet, and in the placement the tool picked for them {{what}} can't hold — press «show another configuration».",
+    "notDeterminedHereBare": "Your givens are fine. In the placement the tool picked, {{what}} can't hold — press «show another configuration».",
     "unknownPoint": "{{what}} refers to a point that hasn't been defined yet. Create it first.",
     "unknownPoint_said": "«{{said}}» refers to a point that hasn't been defined yet ({{what}}). Create it first.",
     "unresolvedDeps": "This step relies on {{ids}}, which aren't defined yet (or an earlier step it depends on failed). Define them first.",

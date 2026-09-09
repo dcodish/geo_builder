@@ -60,14 +60,17 @@ describe('symbolic length relations', () => {
 
   it('labels show the expression while unresolved, the number once resolved (user choice)', () => {
     const rel = replay(facts('quadrilateral ABCD', 'AB = 3x', 'AD = x'));
+    // #948: UNRESOLVED — one form only, so no `letter`/`sym` and no chip anywhere. The boundary.
     expect(rel.labels.lengths).toEqual([
       { a: 'A', b: 'B', text: '3x' },
       { a: 'A', b: 'D', text: 'x' },
     ]);
     const resolved = replay(facts('quadrilateral ABCD', 'AB = 3x', 'AD = x', 'x = 4'));
+    // #948 (ADR-488): a resolved label also carries the form the student wrote, so the chip on «x = 4»
+    // can send the figure back to it. `text` — what actually prints — is unchanged.
     expect(resolved.labels.lengths).toEqual([
-      { a: 'A', b: 'B', text: '12' },
-      { a: 'A', b: 'D', text: '4' },
+      { a: 'A', b: 'B', text: '12', letter: '3x', sym: 'x' },
+      { a: 'A', b: 'D', text: '4', letter: 'x', sym: 'x' },
     ]);
   });
 
@@ -109,7 +112,7 @@ describe('symbolic √ (square-root) lengths', () => {
     const rel = replay(facts('quadrilateral ABCD', 'AD = 12√x'));
     expect(rel.labels.lengths).toEqual([{ a: 'A', b: 'D', text: '12√x' }]);
     const resolved = replay(facts('quadrilateral ABCD', 'AD = 12√x', 'x = 4'));
-    expect(resolved.labels.lengths).toEqual([{ a: 'A', b: 'D', text: '24' }]);
+    expect(resolved.labels.lengths).toEqual([{ a: 'A', b: 'D', text: '24', letter: '12√x', sym: 'x' }]); // #948: the radical form is recoverable
   });
 
   it('two segments both √x form a proportion — the radical cancels (12√x : 3√x = 4:1)', () => {
@@ -161,7 +164,7 @@ describe('symbolic powers (x², xⁿ)', () => {
     const d = replay(facts('quadrilateral ABCD', 'AB = 2x²', 'x = 3'));
     expect(d.lastError).toBeNull();
     expect(len(d.positions, 'A', 'B')).toBeCloseTo(18, 3);
-    expect(d.labels.lengths).toEqual([{ a: 'A', b: 'B', text: '18' }]);
+    expect(d.labels.lengths).toEqual([{ a: 'A', b: 'B', text: '18', letter: '2x²', sym: 'x' }]); // #948: the power form is recoverable
   });
 
   it('same-exponent segments link as a ratio (4x² : x² = 4:1); mixed exponents do not', () => {
@@ -287,9 +290,10 @@ describe('symbolic angle relations (Greek variables)', () => {
       { vertex: 'C', ray1: 'A', ray2: 'B', text: 'α' },
     ]);
     const resolved = replay(facts('triangle ABC', 'angle ABC = 2α', 'angle ACB = α', 'α = 30'));
+    // #948 (ADR-488): both Greek labels keep their symbolic form alongside the degrees.
     expect(resolved.labels.angles).toEqual([
-      { vertex: 'B', ray1: 'A', ray2: 'C', text: '60°' },
-      { vertex: 'C', ray1: 'A', ray2: 'B', text: '30°' },
+      { vertex: 'B', ray1: 'A', ray2: 'C', text: '60°', letter: '2α', sym: 'α' },
+      { vertex: 'C', ray1: 'A', ray2: 'B', text: '30°', letter: 'α', sym: 'α' },
     ]);
   });
 

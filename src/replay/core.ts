@@ -18,7 +18,7 @@ import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -36,12 +36,31 @@ export interface Fact {
   enabled: boolean;
 }
 
-/** A measure label to print on the figure (ADR-031): a length along a segment, or an angle at a vertex. */
+/**
+ * A measure label to print on the figure (ADR-031): a length along a segment, or an angle at a vertex.
+ *
+ * #948 / [ADR-W-047](../../docs/06w-decisions-workspace.md#adr-w-047): a label whose student-written
+ * SYMBOLIC form differs from the number it prints carries both, so the display choice is a swap at the
+ * render seam rather than a re-fold. That matters twice over — the toggle is instant on a figure whose
+ * cold fold costs seconds, and the `displayMode` map never enters the replay memo's key (docs/08).
+ *
+ * `letter` present **is** the competing predicate: the two forms compete on this surface exactly when
+ * the builder produced two of them.
+ */
+export interface MeasureLabelForm {
+  /** What prints by default — the resolved number once the parameter has a value. */
+  text: string;
+  /** The symbolic form ("3x", "α"), present only when it DIFFERS from `text`. */
+  letter?: string;
+  /** The parameter whose value made them differ — whose chip governs this label. */
+  sym?: string;
+}
+
 export interface MeasureLabels {
-  lengths: { a: Id; b: Id; text: string }[];
-  angles: { vertex: Id; ray1: Id; ray2: Id; text: string }[];
-  areas: { ids: Id[]; text: string }[]; // a polygon's area label, printed at its centroid (ADR-118)
-  arcs: { circle: Id; a: Id; b: Id; text: string }[]; // an ARC measure's value, printed ON the arc (ADR-335)
+  lengths: ({ a: Id; b: Id } & MeasureLabelForm)[];
+  angles: ({ vertex: Id; ray1: Id; ray2: Id } & MeasureLabelForm)[];
+  areas: ({ ids: Id[] } & MeasureLabelForm)[]; // a polygon's area label, printed at its centroid (ADR-118)
+  arcs: ({ circle: Id; a: Id; b: Id } & MeasureLabelForm)[]; // an ARC measure's value, printed ON the arc (ADR-335)
 }
 
 /**
@@ -761,7 +780,13 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
         continue;
       }
       // A measure annotates the figure regardless of whether it adds a constraint.
-      if (isMeasure(f.cmd)) addMeasureLabel(lenByKey, angByKey, areaByKey, f.cmd, measureLabelText(f.cmd, symtab));
+      if (isMeasure(f.cmd)) {
+        // #948: the ONE seam where a student's symbolic measure becomes figure text, so the one place
+        // that knows both forms. Everything below fills plain numbers from constraints and competes with
+        // nothing.
+        const forms = measureLabelForms(f.cmd, symtab);
+        addMeasureLabel(lenByKey, angByKey, areaByKey, f.cmd, forms.text, false, { letter: forms.letter, sym: forms.sym });
+      }
       // An angle ALIAS annotates its wedge with the bound name (#235) — a name, not a value, so it
       // rides the same label stream as a symbolic measure (the arc comes from angleMarkFor). The book
       // convention draws the DIGIT alone when the name is the vertex letter + digits (the vertex's own
@@ -2149,19 +2174,22 @@ function addMeasureLabel(
     | { type: 'measure-area'; ids: Id[] },
   text: string,
   fillOnly = false,
+  /** #948: the SWITCHABLE half — supplied only by the symbolic-measure seam, absent for a plain number. */
+  alt: { letter?: string; sym?: string } = {},
 ): void {
+  const { letter, sym } = alt;
   if (m.type === 'measure-area') {
     const key = m.ids.join(''); // the polygon, in boundary order (ABC ≠ ACB — different shape)
     if (fillOnly && areaByKey.has(key)) return;
-    areaByKey.set(key, { ids: m.ids, text });
+    areaByKey.set(key, { ids: m.ids, text, letter, sym });
   } else if (m.type === 'measure-angle') {
     const key = `${m.vertex}:${[m.ray1, m.ray2].sort().join('')}`;
     if (fillOnly && angByKey.has(key)) return;
-    angByKey.set(key, { vertex: m.vertex, ray1: m.ray1, ray2: m.ray2, text });
+    angByKey.set(key, { vertex: m.vertex, ray1: m.ray1, ray2: m.ray2, text, letter, sym });
   } else {
     const key = [m.a, m.b].sort().join('');
     if (fillOnly && lenByKey.has(key)) return;
-    lenByKey.set(key, { a: m.a, b: m.b, text });
+    lenByKey.set(key, { a: m.a, b: m.b, text, letter, sym });
   }
 }
 

@@ -31,6 +31,7 @@ export * from '@/replay/core';
 import { replay, groupKey, firstSatisfyingSeed, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, pointsDistinct, commandPointIds, extensionsClear, intersectionsWithinSegments, BRANCH_CYCLE_KINDS } from '@/replay/core';
 import type { DetectAllResult, Fact } from '@/replay/core';
 import { geoWork, geoValues, isCancelled } from './geoWork';
+import { pruneDisplayMode, toggleDisplayMode, displayModeFromIndexed, type DisplayModeMap } from '../../shell/displayMode';
 
 /**
  * Run the shared detection sweep for `facts` off the main thread and return its verdicts, or null when
@@ -254,6 +255,15 @@ export interface GeoState {
   /** Sampling seed for the figure's residual freedom (ADR-018); 0 = canonical. IN the undo history
    *  (E5/STO-5): undo restores the view the student actually saw, not the reverted facts at a later seed. */
   seed: number;
+  /**
+   * #948 / [ADR-W-047](../../docs/06w-decisions-workspace.md#adr-w-047) — per-VALUING-ROW choice of
+   * which form of a parameter the figure shows. Keyed by the fact id of the row that valued the letter
+   * («x = 4»), so the choice survives a reseed and a branch cycle: the figure is derived from the fact
+   * list, and the id is not rebuilt by either. A DISPLAY preference, never a geometric fact, so it stays
+   * out of the ordered fact list and CLAUDE.md's source-of-truth rule is untouched. IN the undo slice,
+   * beside `seed`, because the student SAW the choice.
+   */
+  displayMode: DisplayModeMap;
   /** Show measure labels on the figure (ADR-031); UI-only, not undoable. Default true. */
   showMeasures: boolean;
   /** Reveal every circle's centre + label (ADR-059); UI-only, not undoable. Default false.
@@ -388,6 +398,8 @@ export interface GeoState {
   /** Fold one point into another (e.g. F → E, both already present) — drops F's definition,
    *  rewrites F→E everywhere, drops facts that collapsed; one undo entry. */
   merge: (from: Id, to: Id) => MergeResult;
+  /** Flip one valuing row's letter/value choice (#948). Prunes entries whose fact is gone. */
+  toggleDisplayMode: (factId: string) => void;
   /** Reset to no facts and wipe undo/redo history. */
   clear: () => void;
   /** Replace the whole session with a saved figure file (FR-HS-10): the facts, the seed, the dialed
@@ -499,6 +511,7 @@ export const useGeoStore = create<GeoState>()(
       selectedId: null,
       figureName: '',
       seed: 0,
+      displayMode: {},
       showMeasures: true,
       showCenters: false,
       hidden: [],
@@ -584,10 +597,14 @@ export const useGeoStore = create<GeoState>()(
       },
 
       removeGroup: (key) => {
+        const facts = get().facts.filter((f) => groupKey(f) !== key);
         set({
-          facts: get().facts.filter((f) => groupKey(f) !== key),
+          facts,
           selectedId: get().selectedId === key ? null : get().selectedId,
           seed: 0,
+          // #948: a deleted row's display choice dies with it — a stale entry would silently re-apply
+          // if the same id were ever minted again.
+          displayMode: pruneDisplayMode(get().displayMode, facts.map((f) => f.id)),
         });
       },
 
@@ -608,6 +625,8 @@ export const useGeoStore = create<GeoState>()(
         const patch: Partial<GeoState> = {
           facts: next,
           selectedId: get().selectedId === key ? null : get().selectedId,
+          // #948: an edit MINTS fresh fact ids for the group, so the old rows own nothing any more.
+          displayMode: pruneDisplayMode(get().displayMode, next.map((f) => f.id)),
         };
         // Edit-path parity with the submit path (commitCommands): an edited command can break an
         // extension's directional order, a segment-meet, or point DISTINCTNESS (#232/ADR-378) at the
@@ -932,8 +951,13 @@ export const useGeoStore = create<GeoState>()(
         return { ok: true };
       },
 
+      toggleDisplayMode: (factId) => {
+        const { facts, displayMode } = get();
+        set({ displayMode: pruneDisplayMode(toggleDisplayMode(displayMode, factId), facts.map((f) => f.id)) });
+      },
+
       clear: () => {
-        set({ facts: [], selectedId: null, figureName: '', seed: 0, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, values: null, shapes: null, queries: [] });
+        set({ facts: [], selectedId: null, figureName: '', seed: 0, displayMode: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, values: null, shapes: null, queries: [] });
         useGeoStore.temporal.getState().clear();
       },
 
@@ -947,6 +971,7 @@ export const useGeoStore = create<GeoState>()(
           selectedId: null,
           relations: null,
           shapes: null,
+          displayMode: displayModeFromIndexed(file.display?.displayMode, file.facts.map((f) => f.id)),
           hidden: file.display?.hidden ?? [],
           segStyle: file.display?.segStyle ?? {},
           hiddenCircles: file.display?.hiddenCircles ?? [],
@@ -961,9 +986,9 @@ export const useGeoStore = create<GeoState>()(
       // student a figure they never saw — undo now rolls the view back with the data. Transient
       // selection and the dialed-radius scratchpad stay out (the store's `undo`/`redo` wrappers clear
       // the overrides instead — a per-drag slider value must not flood the history).
-      partialize: (s) => ({ facts: s.facts, seed: s.seed }),
+      partialize: (s) => ({ facts: s.facts, seed: s.seed, displayMode: s.displayMode }) as GeoState,
       // Skip history entries when neither changed (e.g. selecting a fact only sets selectedId).
-      equality: (a, b) => a.facts === b.facts && a.seed === b.seed,
+      equality: (a, b) => a.facts === b.facts && a.seed === b.seed && a.displayMode === b.displayMode,
       limit: 100,
     },
   ),
