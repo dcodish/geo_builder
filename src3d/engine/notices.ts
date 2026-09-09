@@ -19,6 +19,7 @@ import { CYCLIC_MEMBER, CYCLIC_MEMBER_NAME, QUAD_PYRAMIDS } from './baseShapes';
 import { isSelfDetermined, lineDirCarriesParam, operandLabel, planeNormalCarriesParam } from './operands';
 import type { QuadBase } from './baseShapes';
 import { cross3, dot3, norm3, sub3 } from './vec3';
+import type { Vec3 } from './vec3';
 import type { Resolved3 } from './evaluate';
 import type { Construction3, Id, Operand3, SolidKind } from './types';
 
@@ -32,8 +33,72 @@ import type { Construction3, Id, Operand3, SolidKind } from './types';
 export const ALREADY_KNOWN_RELS = ['shape', 'objects', 'contained', 'perp', 'parallel'] as const;
 export type AlreadyKnownRel = (typeof ALREADY_KNOWN_RELS)[number];
 
+/**
+ * #936 ([ADR-3D-234](../../docs/06b-decisions-3d.md), [ADR-W-048](../../docs/06w-decisions-workspace.md)) —
+ * a STATED GIVEN that forces a solid flat, in the student's own words.
+ *
+ * The display order is the order the student writes it: an angle is `[p, vertex, q]` so the UI joins
+ * it to «BAS», a length is `[a, b]` → «AB». The engine carries ids and a number; the wording is the
+ * chrome's (the honesty invariant: name the STATEMENT, never internal state).
+ */
+export interface DegenerateCause {
+  kind: 'angle' | 'length';
+  /** Display order — angle: [p, vertex, q]; length: [a, b]. */
+  ids: Id[];
+  value: number;
+}
+
+/**
+ * How flat is FLAT (#936). A solid's greatest out-of-plane deviation, divided by its own greatest
+ * vertex separation, so the test is scale-free — a figure drawn ten times bigger is not ten times
+ * less degenerate.
+ *
+ * CALIBRATED, not chosen (the calibration is the deliverable — see ADR-3D-234). Measured through the
+ * real `derive3` path:
+ *
+ * | figure | ratio |
+ * | --- | --- |
+ * | the reported «∠BAS = 40» + «∠DAS = 50» pyramid | **1.8e-3** |
+ * | **«∠BAS = 41» + «∠DAS = 50» — one degree off, the nearest THIN pyramid** | **9.8e-2** |
+ * | 42/50 · 35/56 · 30/61 (the rest of the near-miss family) | 1.5e-1 · 9.4e-2 · 8.8e-2 |
+ * | the same pyramid at 50/60 (comfortably healthy) | 5.8e-1 |
+ * | a bare pyramid · a cube | 8.3e-1 · 5.8e-1 |
+ * | every solid across the `fixtures3/` corpus | no notice (swept as a lock, not a measurement) |
+ *
+ * The band that matters is not the distance to a cube — it is the distance to the nearest figure that
+ * is genuinely thin rather than collapsed, and that had to be measured by walking the family: ONE
+ * degree off complementary moves the ratio 1.8e-3 → 9.8e-2, a 54× step. 1e-2 sits **5.4× above the
+ * degenerate case and 9.8× below the nearest legitimate one** — about a decade of margin each way, on
+ * a quantity that jumps by two orders across a single degree of input.
+ *
+ * Both edges are locked in `issue-936-degenerate.test.ts` (40/50 notices, 41/50 does not), so
+ * widening this constant fails the suite rather than shipping a false notice to a student.
+ */
+export const DEGENERATE_FLAT_RATIO = 1e-2;
+
+/**
+ * Solid kinds that are FLAT BY DEFINITION — the V8-g 2-D vector lane, modelled as solids so they reuse
+ * the dims sampler. Their extent has not collapsed; they never had one, so the notice would be false.
+ * This is the only exemption, and it is a property of the kind's definition rather than a list of
+ * figures that tripped the predicate.
+ */
+const FLAT_BY_DESIGN: ReadonlySet<SolidKind> = new Set<SolidKind>(['polygon3', 'polygon4', 'polygon5']);
+
 /** A non-error message attached to a successfully built figure. */
 export type BuildNotice3 =
+  | {
+      /**
+       * #936: the givens force a named SOLID flat — its vertices are coplanar, so the solid the
+       * student named has no volume. NOT a refusal: every given is honoured and the drawing is the
+       * only one that satisfies them, which is exactly why the tool must say so rather than hand back
+       * a flat «פירמידה» with every fact green.
+       */
+      kind: 'solid-degenerate';
+      /** The solid's vertex ids, so the UI names it the way the student did. */
+      ids: Id[];
+      /** The stated givens that constrain this solid — the statements responsible. */
+      because: DegenerateCause[];
+    }
   | {
       /** A stated base was constrained into the cyclic member of its family so «ישרה» could hold. */
       kind: 'base-constrained';
@@ -301,6 +366,89 @@ function alreadyKnown(c: Construction3, samples: readonly Resolved3[]): BuildNot
 }
 
 /**
+ * Is this point set COPLANAR relative to its own size? (#936)
+ *
+ * Best-fit plane by the widest-spread normal rather than the first three points: three nearly-collinear
+ * vertices give a near-zero normal and would call every solid flat. Returns the out-of-plane deviation
+ * as a fraction of the set's own greatest separation, or `null` when the set is too small or too
+ * collapsed to have a meaningful answer (a solid shrunk to a point is a different failure).
+ */
+function flatnessRatio(pts: readonly Vec3[]): number | null {
+  if (pts.length < 4) return null;
+  let extent = 0;
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) extent = Math.max(extent, norm3(sub3(pts[i], pts[j])));
+  }
+  if (!(extent > 1e-9)) return null; // collapsed to a point — not this predicate's business
+  // The best-supported plane: the triple whose normal is longest is the most numerically trustworthy.
+  let bestN: Vec3 | null = null;
+  let bestLen = 0;
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      for (let k = j + 1; k < pts.length; k++) {
+        const n = cross3(sub3(pts[j], pts[i]), sub3(pts[k], pts[i]));
+        const len = norm3(n);
+        if (len > bestLen) { bestLen = len; bestN = n; }
+      }
+    }
+  }
+  if (!bestN || !(bestLen > 1e-12)) return 0; // every triple collinear ⇒ flat (degenerately so)
+  const anchor = pts[0];
+  let maxOff = 0;
+  for (const q of pts) maxOff = Math.max(maxOff, Math.abs(dot3(sub3(q, anchor), bestN) / bestLen));
+  return maxOff / extent;
+}
+
+/**
+ * The stated givens that constrain a solid's own vertices — the statements a degeneracy notice names.
+ *
+ * Derived from the recorded scalar pins, filtered to those whose referenced points all belong to the
+ * solid, so the solid's DECLARATION («פירמידה SABCD…» — not a pin) is correctly absent and an unrelated
+ * given elsewhere on the figure is not blamed. Reading the pins rather than listing "the kinds of thing
+ * that can flatten a pyramid" is what makes this the class rather than the instance.
+ */
+function causesFor(c: Construction3, ids: readonly Id[]): DegenerateCause[] {
+  const own = new Set(ids);
+  const out: DegenerateCause[] = [];
+  for (const pin of c.scalarPins) {
+    if (pin.kind === 'vangle') {
+      if (own.has(pin.vertex) && own.has(pin.p) && own.has(pin.q)) {
+        out.push({ kind: 'angle', ids: [pin.p, pin.vertex, pin.q], value: pin.deg });
+      }
+    } else if (pin.kind === 'length') {
+      if (own.has(pin.a) && own.has(pin.b)) out.push({ kind: 'length', ids: [pin.a, pin.b], value: pin.value });
+    }
+  }
+  return out;
+}
+
+/**
+ * #936 — every named solid whose givens have forced it FLAT.
+ *
+ * Uniform over every solid kind (the exemption is only for the kinds that are flat by definition), so a
+ * prism of zero height and a tetrahedron whose apex falls into its base are the same fact as the
+ * reported pyramid — the class, not the instance (standing rule 1).
+ */
+function degenerateSolids(c: Construction3, samples: readonly Resolved3[]): BuildNotice3[] {
+  const positions = samples[0]?.positions;
+  if (!positions) return [];
+  const out: BuildNotice3[] = [];
+  for (const s of c.solids) {
+    if (FLAT_BY_DESIGN.has(s.kind)) continue;
+    const pts: Vec3[] = [];
+    for (const id of s.ids) {
+      const p = positions.get(id);
+      if (p) pts.push(p);
+    }
+    if (pts.length !== s.ids.length) continue; // an unresolved vertex — not this guard's concern
+    const ratio = flatnessRatio(pts);
+    if (ratio === null || ratio >= DEGENERATE_FLAT_RATIO) continue;
+    out.push({ kind: 'solid-degenerate', ids: [...s.ids], because: causesFor(c, s.ids) });
+  }
+  return out;
+}
+
+/**
  * Every notice the figure currently warrants. Recomputed on each derive — a notice is a property of
  * the built figure, never a one-shot event, so undo/redo and load all show the right thing.
  */
@@ -330,6 +478,8 @@ export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = 
   // The four cases that used to live here inline (a redundant shape, a relation between two
   // self-determined objects, an entailed containment, an implied ∥/⟂) are cases of `alreadyKnown`.
   out.push(...alreadyKnown(c, samples));
+  // #936 (ADR-3D-234): the givens force a named solid flat — said out loud, never a silent flat solid.
+  out.push(...degenerateSolids(c, samples));
 
   return out;
 }

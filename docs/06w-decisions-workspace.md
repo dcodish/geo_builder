@@ -2409,3 +2409,42 @@ the **3-D coordinate lane** (panel-competing — the first non-canvas chip, and 
 predicate is not canvas-specific), and **complex**, whose render side is still unmeasured (#937's design
 pass measured its parser only, and says so). Per docs/20 §12 each copies the pattern rather than
 importing it; what they share is this ADR and `shell/`.
+
+## ADR-W-048 — A figure whose givens force a named object FLAT says so, in the student's own words (#936, #945)
+
+**Status:** accepted, 2026-09-09 (fix-round #949, item 3) · **Issues:** #936 (the 3-D half), #945 (the 2-D half)
+**Operator ruling:** 2026-09-08 (`/decisions` pass on #936)
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-7 (new) · **Design:** [04b](04b-design-3d.md) — the notice channel
+**Adoptions:** 3-D — [ADR-3D-234](06b-decisions-3d.md#adr-3d-234), this PR. 2-D — #945, which cites this rule rather than re-deciding it.
+
+**Context.** The operator, playing round #931's T12: *"the image collapsed to a 2d diagram."* He was
+right about what he saw and the tool was right too — «∠BAS = 40» + «∠DAS = 50» at a right-angled corner
+puts the apex exactly in the base plane, because `cos²40° + cos²50° ≡ 1`. Every given was honoured and
+the drawing was the only one satisfying them. What was missing is that nothing **told** him. A student
+who types «פירמידה» and gets a flat quadrilateral with every fact green concludes the app is broken —
+which is what happened to an operator who knows the tool well.
+
+**The rule, stated once for every builder.** When a figure's givens force a named object's defining
+extent to collapse, the tool says so, **in the student's own words, naming the statements responsible**.
+It never draws a degenerate figure in silence with every fact green.
+
+Two things the ruling settled explicitly:
+
+- **A notice, not the DOF cue.** The cue is a number; it cannot name *which statements* forced the
+  collapse, and naming them is the honest half. Routing this through the cue was considered and rejected.
+- **A notice, not a refusal.** The figure is correct and the student may well have meant to discover
+  exactly this. Refusing would be the opposite error — withholding a valid drawing.
+
+**Both products.** The operator ruled for 2-D as well, wider than the session's own recommendation
+(which was 3-D first, 2-D on evidence). Recorded as his decision, not the session's.
+
+**Copied, never imported** (docs/20 §12): products never share code, so one rule lands as two
+independently derived implementations, each with its own calibration. #945 must **measure its own 2-D
+trigger family** rather than transposing the 3-D one — a collapsed polygon is not the same predicate as
+a coplanar solid, and the corpora differ.
+
+**The tolerance is the deliverable, in each product.** It must be relative to the figure's own scale
+(never absolute) and calibrated against that product's fixture corpus, with the calibration evidence in
+the product ADR and the corpus sweep kept as a **lock** rather than a one-off measurement. The
+false-positive net — an ordinary figure must stay silent — is the half that matters: a false degeneracy
+notice on a legitimate drawing is worse than the silence it replaces.

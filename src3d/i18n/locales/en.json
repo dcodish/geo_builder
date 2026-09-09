@@ -243,7 +243,14 @@
       "perp": "it already follows from the solid you defined",
       "parallel": "it already follows from the solid you defined"
     },
-    "alreadyStated": "That is already stated («{{utterance}}») — the figure is unchanged and no row was added"
+    "alreadyStated": "That is already stated («{{utterance}}») — the figure is unchanged and no row was added",
+    "solidDegenerate": "What you stated forces {{ids}} to be flat — {{because}}. The drawing satisfies every given, but the solid has no volume.",
+    "solidDegenerateBare": "What you stated forces {{ids}} to be flat. The drawing satisfies every given, but the solid has no volume.",
+    "causeJoin": " and ",
+    "cause": {
+      "angle": "angle {{ids}} = {{value}}°",
+      "length": "{{ids}} = {{value}}"
+    }
   },
   "display": {
     "witnesses": "Show the distance witness segment (the height)"

@@ -8995,3 +8995,67 @@ save/load round trip, with the file asserted to key by POSITION; a pre-#937 file
 no migration; an untouched figure writing no key; delete-then-undo restoring the fact and its choice
 together; the boundary case above; and the shared state shape's own unit behaviour including its lenient
 read of a persisted map.
+
+### ADR-3D-234 — A solid whose givens force it COPLANAR is said out loud, naming the statements (#936)
+
+**Status:** accepted, 2026-09-09 (fix-round #949, item 3) · **Issue:** #936 · **Adopts:** [ADR-W-048](06w-decisions-workspace.md#adr-w-048)
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-7 (new) · **Design:** [04b](04b-design-3d.md) — the notice channel
+
+**Measured at HEAD** through the real `derive3` path, before the change: for
+`['פירמידה SABCD שבסיסה ריבוע','זווית BAS = 40','זווית DAS = 50']` the apex resolved into the base
+plane with **all three fact statuses `ok` and `notices = []`**. Not a bug in the arithmetic —
+`cos²θ + cos²(90−θ) ≡ 1` flattens the apex for *any* complementary pair at a right-angled corner, so
+this is a family rather than one input.
+
+**Decision — the predicate is COPLANARITY, over every solid.** `degenerateSolids` in
+`src3d/engine/notices.ts` asks, of each solid's resolved vertices, whether the greatest out-of-plane
+deviation divided by the set's own greatest separation falls below `DEGENERATE_FLAT_RATIO`. Scale-free
+by construction: a figure drawn ten times bigger is not ten times less degenerate.
+
+Uniform over every `SolidKind` — a prism of zero height and a tetrahedron whose apex falls into its
+base are the same fact as the reported pyramid, which is what makes this the class rather than the
+instance (standing rule 1). The one exemption is `polygon3/4/5`, the V8-g 2-D vector lane: those are
+**flat by definition** and never had an extent to collapse, so a notice there would be false. That is a
+property of the kind's definition, not a list of figures that tripped the predicate.
+
+Best-fit plane by the **widest-spread normal** rather than the first three vertices: three nearly
+collinear points give a near-zero normal and would call every solid flat.
+
+**Naming the statements.** `causesFor` reads the recorded `scalarPins` and keeps those whose referenced
+points all belong to the solid. On the reported figure that is exactly the two `vangle` pins and *not*
+the «פירמידה SABCD…» declaration — which is not a pin at all, and blaming it would send the student to
+the wrong line. Reading the pins rather than listing "the kinds of thing that can flatten a pyramid" is
+what keeps this derived. The engine carries ids and a number; the wording is the chrome's, per the
+honesty invariant (name the statement, never internal state).
+
+**The calibration, which is the real deliverable.** The band that matters is not the distance to a cube
+— it is the distance to the nearest figure that is genuinely **thin** rather than collapsed, and that
+had to be found by walking the family:
+
+| figure | flatness ratio |
+| --- | --- |
+| the reported 40/50 pyramid | **1.8e-3** |
+| **41/50 — one degree off, the nearest thin pyramid** | **9.8e-2** |
+| 42/50 · 35/56 · 30/61 | 1.5e-1 · 9.4e-2 · 8.8e-2 |
+| 50/60 (comfortably healthy) | 5.8e-1 |
+| a bare pyramid · a cube | 8.3e-1 · 5.8e-1 |
+
+One degree moves the ratio 54×. `DEGENERATE_FLAT_RATIO = 1e-2` sits **5.4× above the degenerate case
+and 9.8× below the nearest legitimate one**. An earlier draft of this ADR claimed ~50× of headroom by
+comparing against a cube; walking the near-miss family corrected it to ~10×, and the corrected figure is
+the one the constant is defended on.
+
+**Locks** (`src3d/__tests__/issue-936-degenerate.test.ts`, 12): the reported sequence produces exactly
+one notice naming both angle statements and not the declaration; every fact stays `ok` (a notice, never
+a refusal); three more complementary pairs trip it (the class); the non-complementary sibling, a bare
+pyramid, a cube, a box and a prism stay silent; the flat-by-design polygon lane is exempt; **41/50 and
+the rest of the near-miss family stay silent** (the assertion that guards the constant); the whole
+`fixtures3/` corpus produces no notice, with an exercised-counter so a sweep that examined no solids
+cannot pass silently; and both languages carry every string.
+
+**Knock-on:** round #931's **T12** play case handed the operator a degenerate figure and therefore read
+as a bug. Re-author it with a non-complementary pair (e.g. 50/60) before it is played again.
+
+**Revolutions are out of scope, deliberately.** Cones and cylinders live in `c.revolutions`, a separate
+carrier with its own extent notion and no measured case. The predicate covers every polyhedral solid
+uniformly; extending it to revolutions wants its own measurement rather than a guessed threshold.

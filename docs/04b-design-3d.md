@@ -249,3 +249,22 @@ Recorded here because a design doc that omits its weakest properties is not desc
 - **The DOF cue does not count the six placement DOFs** the sampler now varies, so the number a student
   sees and the freedom the engine has can disagree.
   **[#370](https://github.com/dcodish/geo_builder/issues/370)** — needs a ruling on the cue's semantics.
+
+## The degeneracy notice (#936, [ADR-3D-234](06b-decisions-3d.md#adr-3d-234))
+
+`degenerateSolids` joins the existing `buildNotices3` channel rather than opening a new one, which buys
+the channel's two standing properties for free: it is **derived purely from the construction plus the
+resolved sample**, so a typed figure and a loaded one behave identically and undo/redo need no plumbing;
+and it needs no submit-path wiring at all.
+
+Three pieces:
+
+- `flatnessRatio(pts)` — greatest out-of-plane deviation ÷ greatest vertex separation. Scale-free, and
+  the plane is chosen by the **widest-spread normal** so three nearly-collinear vertices cannot fake a
+  collapse.
+- `FLAT_BY_DESIGN` — the `polygon3/4/5` V8-g lane, exempt because those kinds never had an extent.
+- `causesFor(c, ids)` — the stated `scalarPins` whose points all lie in the solid. This is what makes
+  the notice name «זווית BAS = 40» rather than «פירמידה SABCD»: the declaration is not a pin.
+
+`DEGENERATE_FLAT_RATIO` is calibrated against the near-miss family, not against comfortable figures —
+the ADR carries the table and the corpus sweep is kept as a lock.
