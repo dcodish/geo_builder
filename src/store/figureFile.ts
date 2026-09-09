@@ -39,6 +39,14 @@ export interface FigureFileDisplay {
   hiddenCircles?: Id[];
   showMeasures?: boolean;
   showCenters?: boolean;
+  /**
+   * #948 / ADR-W-047 — the parameter display choice, keyed by the fact POSITION in this file, not by
+   * fact id. Ids DO survive a save/load here (see sanitizeFactIn), but only when the file carries them:
+   * a hand-written or id-less file gets fresh nanoids, and the choice would then silently attach to the
+   * wrong row. Position is a property of the file itself, so it cannot drift. Same shape as 3-D, so the
+   * shared converters have one usage.
+   */
+  displayMode?: Record<string, 'letter' | 'value'>;
 }
 
 /** The persisted session: the replay inputs plus an informational header. */
@@ -161,6 +169,9 @@ export function deserializeFigure(text: string): FigureLoadResult {
     hiddenCircles: Array.isArray(d.hiddenCircles) ? d.hiddenCircles.filter((x): x is Id => typeof x === 'string') : [],
     ...(typeof d.showMeasures === 'boolean' ? { showMeasures: d.showMeasures } : {}),
     ...(typeof d.showCenters === 'boolean' ? { showCenters: d.showCenters } : {}),
+    // Passed through raw; the store validates against the parsed facts via displayModeFromIndexed, so a
+    // stale or out-of-range index is dropped rather than refusing the file (the lenient-load posture).
+    ...(isRecord(d.displayMode) ? { displayMode: d.displayMode as Record<string, 'letter' | 'value'> } : {}),
   };
 
   return {

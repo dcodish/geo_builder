@@ -49,6 +49,8 @@ import { cyclableSeat, groupKey, introducedIds, meetsRequirements, primeFoldFor,
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
+import { applyDisplayMode, competingSymbols, paramChipsByFact } from '@/store/paramChips';
+import { displayModeOf, displayModeToIndexed } from '../shell/displayMode';
 import { questionLines } from '@/export/questionLines';
 import { bidiSegments, isolateLtrRuns } from '@/i18n/bidi';
 // #742: the exports live in the TOP TOOL ROW now (ADR-W-024) — App rasterises the canvas svg itself.
@@ -104,6 +106,8 @@ export default function App() {
   const figureName = useGeoStore((s) => s.figureName);
   const setFigureName = useGeoStore((s) => s.setFigureName);
   const seed = useGeoStore((s) => s.seed);
+  const displayMode = useGeoStore((s) => s.displayMode);
+  const toggleDisplayMode = useGeoStore((s) => s.toggleDisplayMode);
   const showMeasures = useGeoStore((s) => s.showMeasures);
   const setShowMeasures = useGeoStore((s) => s.setShowMeasures);
   const showCenters = useGeoStore((s) => s.showCenters);
@@ -353,6 +357,8 @@ export default function App() {
           hiddenCircles: st.hiddenCircles,
           showMeasures: st.showMeasures,
           showCenters: st.showCenters,
+          // #948: by POSITION — see FigureFileDisplay.displayMode for why not by fact id.
+          displayMode: displayModeToIndexed(st.displayMode, st.facts.map((f) => f.id)),
         },
         queries: st.queries, // #477: questions travel with the figure
       },
@@ -610,7 +616,26 @@ export default function App() {
   const display = searchHold || viewStale ? lastGoodViewRef.current! : derivedRaw;
   // GEOMETRY from the displayable state; STATUS/ERROR from the real current state (the step list and the
   // error banner must tell the truth about what just happened).
-  const { construction, positions, circles, labels, angleMarks, violations, coincidences, forcedOffArc } = display;
+  const { construction, positions, circles, labels: builtLabels, angleMarks, violations, coincidences, forcedOffArc } = display;
+  /**
+   * #948 ([ADR-W-047](docs/06w-decisions-workspace.md#adr-w-047)) — the PARAMETER DISPLAY chips.
+   *
+   * `competingSymbols` asks the label builder which parameters actually offer two forms on the figure
+   * (it produced a `letter` for them); `paramChipsByFact` then puts the chip on the row that VALUED
+   * each one. A parameter the student never valued has no chip and is never replaced — the ruling's
+   * clause 3, already locked by issue-937-clause3-2d.test.ts.
+   *
+   * The swap happens HERE, on the built labels, not inside the fold: `displayMode` therefore never
+   * enters the replay memo's key, so toggling is instant even on a figure whose cold fold costs
+   * seconds (docs/08's fold-memo rule).
+   */
+  const competing = useMemo(() => competingSymbols(builtLabels), [builtLabels]);
+  const paramChips = useMemo(() => paramChipsByFact(facts, competing), [facts, competing]);
+  const labels = useMemo(() => {
+    const letterFor = new Set<string>();
+    for (const [factId, chip] of paramChips) if (displayModeOf(displayMode, factId) === 'letter') letterFor.add(chip.sym);
+    return letterFor.size ? applyDisplayMode(builtLabels, (sym) => letterFor.has(sym)) : builtLabels;
+  }, [builtLabels, paramChips, displayMode]);
   const { status, lastError, pending } = derivedRaw;
   // #574 (ADR-447): the one seam turning an anonymous id into words the student can act on.
   const describePoint = (id: string): string => {
@@ -1273,10 +1298,25 @@ export default function App() {
                   const state = !anyOn ? 'disabled' : brokenFact ? 'broken' : 'ok';
                   const errText = brokenFact ? explainError(status[brokenFact.id] as string, utteranceForError(g.facts, status, status[brokenFact.id] as string)) : undefined;
                   const label = stepLabel(g.facts.map((f) => f.cmd), g.facts[0].utterance, canonLocale);
+                  // #948: rows are GROUPS but a chip is owned by the FACT that valued the letter —
+                  // find the owning fact inside this group.
+                  const chipFact = g.facts.find((f) => paramChips.has(f.id));
+                  const chipOwned = chipFact ? paramChips.get(chipFact.id)! : undefined;
                   return {
                     id: g.key,
                     disabled: !anyOn,
                     selected: g.key === selectedId,
+                    ...(chipFact && chipOwned
+                      ? {
+                          chip: {
+                            letter: chipOwned.sym,
+                            value: formatMeasure(chipOwned.value),
+                            mode: displayModeOf(displayMode, chipFact.id),
+                            title: t('steps.paramDisplayTitle', { sym: chipOwned.sym }),
+                            onToggle: () => toggleDisplayMode(chipFact.id),
+                          },
+                        }
+                      : {}),
                     content: (
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                         <span style={{ fontSize: 12, width: 16, textAlign: 'center', flexShrink: 0 }}>

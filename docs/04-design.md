@@ -172,3 +172,29 @@ wider `WITHIN_MARGIN` would re-admit the near-collapse basin #569 exists to catc
 The question is asked at **three** sites and all three take the exemption: the gate itself,
 `segmentsCrossWithin` (the point-free sibling from ADR-383), and `reflectMaskForFailing`, which picks
 reflection culprits from the same test — an exempt meet is not failing, so it must not be blamed.
+## The measure-label seam and the display choice (#948, [ADR-488](06-decisions.md#adr-488))
+
+A symbolic measure becomes figure text at exactly one place — `measureLabelForms` in
+`src/engine/lower.ts`, reached from the fold's symbolic-measure branch in `src/replay/core.ts`.
+`measureLabelText` is now that function's `text` half, so the printed string and the switchable one
+cannot drift.
+
+The seam produces BOTH forms when they differ: `text` (the resolved number) and `letter` (the
+student's own expression), plus the `sym` they differ over. Three consequences, and each is the reason
+for a design choice rather than an incidental effect:
+
+- **The competing predicate is `letter !== undefined`**, derived from the builder itself. There is no
+  list of label kinds to keep in sync, so a future fourth kind starts offering the display chip with no
+  change to the chip code (docs/17 §3 — no second enumeration).
+- **The swap happens at the RENDER seam** (`applyDisplayMode`, called in `App.tsx` on the built
+  labels), never inside the fold. So `displayMode` never enters the replay memo's key: toggling is
+  instant even on a figure whose cold fold costs seconds, and the fold-memo rule (docs/08) is untouched.
+- **The choice is state, not geometry.** It lives beside `seed` in `geoStore` — in `partialize`, in
+  the temporal `equality`, cleared by `clear`, pruned on remove/replace — and never enters the ordered
+  fact list, so CLAUDE.md's `(facts, seed)` source-of-truth rule stands.
+
+In the save file the map is keyed by fact **position**, not fact id (`FigureFileDisplay.displayMode`).
+Fact ids DO survive a round trip here — `sanitizeFactIn` keeps them — but only when the file carries
+them; a hand-written or id-less file gets fresh nanoids and an id-keyed choice would then attach to the
+wrong row. Position is a property of the file itself and cannot drift, and it matches 3-D so the shared
+converters in `shell/displayMode.ts` have one usage shape.

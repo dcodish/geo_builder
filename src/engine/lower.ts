@@ -269,22 +269,61 @@ export function isMeasure(cmd: AnyCommand): cmd is Extract<SymbolicCommand, { ty
 }
 
 /**
+ * The two forms a measure label can take ([ADR-488](../../docs/06-decisions.md), issue #948 — the 2-D
+ * adoption of [ADR-W-047](../../docs/06w-decisions-workspace.md#adr-w-047)).
+ *
+ * `text` is what prints today. `letter` is present **only when the student's own symbolic form differs
+ * from it** — which is exactly the operator's *"only when displays compete"*: the same label can be
+ * drawn two ways and the tool must not choose for them. So the competing predicate is not a list of
+ * kinds to keep in sync; it is `letter !== undefined`, derived from the label builder itself. A measure
+ * whose expression is a plain number, or one whose symbol stays symbolic anyway (a radius letter,
+ * ADR-034), offers nothing to switch between and reports no `letter`.
+ */
+export interface MeasureLabelForms {
+  /** What the figure prints by default — the resolved number once the variable has a value. */
+  text: string;
+  /** The SYMBOLIC form ("3x", "α"), present only when it differs from `text`. */
+  letter?: string;
+  /** The parameter whose VALUE made the forms differ — the letter whose chip governs this label. */
+  sym?: string;
+}
+
+/**
+ * Both forms of a symbolic measure's figure label. {@link measureLabelText} is the `text` half and
+ * stays the one authority for it, so the printed string cannot drift from the switchable one.
+ */
+export function measureLabelForms(
+  cmd: Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' | 'measure-area' }>,
+  tab: SymTab,
+): MeasureLabelForms {
+  const e: MeasureExpr = cmd.expr;
+  const isAngle = cmd.type === 'measure-angle';
+  // A concrete value: show its faithful text ("12√2", "2π") if the parser kept one, else the number.
+  if ('value' in e) return { text: e.text ?? fmtNum(e.value) + (isAngle ? '°' : '') };
+  const symbolic = (): string => e.text ?? (e.coef === 1 ? '' : fmtNum(e.coef)) + powVar(e.var, e.pow);
+  // The radius symbol stays symbolic on the figure ("1.6R") even when its value is known (ADR-034) —
+  // it's a size relative to the radius, not a number the student picked. Applies to the reserved R/r
+  // AND to any explicitly-bound per-circle radius symbol (issue #54). Already symbolic ⇒ nothing competes.
+  if (/^[Rr]$/.test(e.var) || tab.radiusOf.has(e.var)) return { text: symbolic() };
+  const info = tab.vars.get(e.var);
+  // Resolved (the variable has a value): the computed number prints — and the symbolic form is the
+  // alternative the student can switch back to. THIS is the competing case.
+  if (info?.value !== undefined) {
+    return {
+      text: fmtNum(e.coef * Math.pow(info.value, e.pow ?? 1) + (e.const ?? 0)) + (isAngle ? '°' : ''),
+      letter: symbolic(),
+      sym: e.var,
+    };
+  }
+  // Unresolved: the faithful original ("7k/5", "k+2") if kept, else derive from coef + exponent.
+  return { text: symbolic() };
+}
+
+/**
  * The text to print on the figure for a symbolic measure: the resolved number once
  * its variable has a value (the user's choice — "3x" → "12"), else the expression
  * ("3x", "2α"). Angles get a trailing degree sign only when numeric/resolved.
  */
 export function measureLabelText(cmd: Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' | 'measure-area' }>, tab: SymTab): string {
-  const e: MeasureExpr = cmd.expr;
-  const isAngle = cmd.type === 'measure-angle';
-  // A concrete value: show its faithful text ("12√2", "2π") if the parser kept one, else the number.
-  if ('value' in e) return e.text ?? fmtNum(e.value) + (isAngle ? '°' : '');
-  // The radius symbol stays symbolic on the figure ("1.6R") even when its value is known (ADR-034) —
-  // it's a size relative to the radius, not a number the student picked. Applies to the reserved R/r
-  // AND to any explicitly-bound per-circle radius symbol (issue #54).
-  if (/^[Rr]$/.test(e.var) || tab.radiusOf.has(e.var)) return e.text ?? (e.coef === 1 ? '' : fmtNum(e.coef)) + powVar(e.var, e.pow);
-  const info = tab.vars.get(e.var);
-  // Resolved (the variable has a value): always the computed number — the symbolic text no longer applies.
-  if (info?.value !== undefined) return fmtNum(e.coef * Math.pow(info.value, e.pow ?? 1) + (e.const ?? 0)) + (isAngle ? '°' : '');
-  // Unresolved: the faithful original ("7k/5", "k+2") if kept, else derive from coef + exponent.
-  return e.text ?? (e.coef === 1 ? '' : fmtNum(e.coef)) + powVar(e.var, e.pow);
+  return measureLabelForms(cmd, tab).text;
 }

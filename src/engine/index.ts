@@ -41,7 +41,8 @@ export { detectShapes, detectShapesAcross, classifyShapesFromSamples } from './d
 export type { ShapeType, DetectedShape, SimilarClass, ShapesResult, ShapeDetectOptions } from './detectShapes';
 export { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 export type { Carrier, CarrierFamily } from './carriers';
-export { lower, lowerOne, buildSymTab, isSymbolBound, measureLabelText, isMeasure } from './lower';
+export { lower, lowerOne, buildSymTab, isSymbolBound, measureLabelText, measureLabelForms, isMeasure } from './lower';
+export type { MeasureLabelForms } from './lower';
 export type { SymTab } from './lower';
 export { expandShapeVariant, eqMatchesPair, pinsSoftVariant, statedShapeEqualities, VARIANT_COUNT } from './shapeVariants';
 export type { StatedShapeEquality, VariantShape } from './shapeVariants';

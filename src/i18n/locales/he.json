@@ -156,7 +156,8 @@
     "statusOk": "תקין",
     "statusBroken": "בעיה",
     "statusOff": "לא נכלל",
-    "editBrokeDependents": "העריכה נקלטה, אבל {{items}} כבר לא בתוקף — מה שהוא מתייחס אליו אינו מוגדר עוד"
+    "editBrokeDependents": "העריכה נקלטה, אבל {{items}} כבר לא בתוקף — מה שהוא מתייחס אליו אינו מוגדר עוד",
+    "paramDisplayTitle": "הצגת {{sym}}: אות או ערך"
   },
   "figure": {
     "mismatch": "ייתכן שהאיור אינו תואם למה שתיארתם:",
@@ -207,8 +208,8 @@
     },
     "overConstrained": "לא ניתן: הנתון {{what}} סותר נתון קודם — אי אפשר לקיים את שניהם יחד.",
     "overConstrained_said": "לא ניתן: «{{said}}» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.",
-    "notDeterminedHere": "\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc\u05da \u05ea\u05e7\u05d9\u05e0\u05d9\u05dd. {{who}} \u05e2\u05d3\u05d9\u05d9\u05df \u05dc\u05d0 \u05e0\u05e7\u05d1\u05e2\u05d5, \u05d5\u05d1\u05ea\u05e6\u05d5\u05e8\u05d4 \u05e9\u05e0\u05d1\u05d7\u05e8\u05d4 \u05e2\u05d1\u05d5\u05e8\u05dd {{what}} \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc \u05dc\u05d4\u05ea\u05e7\u05d9\u05d9\u05dd \u2014 \u05dc\u05d7\u05e5 \u00ab\u05d4\u05e6\u05d2 \u05ea\u05e6\u05d5\u05e8\u05d4 \u05d0\u05d7\u05e8\u05ea\u00bb.",
-    "notDeterminedHereBare": "\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc\u05da \u05ea\u05e7\u05d9\u05e0\u05d9\u05dd. \u05d1\u05ea\u05e6\u05d5\u05e8\u05d4 \u05e9\u05e0\u05d1\u05d7\u05e8\u05d4 {{what}} \u05dc\u05d0 \u05d9\u05db\u05d5\u05dc \u05dc\u05d4\u05ea\u05e7\u05d9\u05d9\u05dd \u2014 \u05dc\u05d7\u05e5 \u00ab\u05d4\u05e6\u05d2 \u05ea\u05e6\u05d5\u05e8\u05d4 \u05d0\u05d7\u05e8\u05ea\u00bb.",
+    "notDeterminedHere": "הנתונים שלך תקינים. {{who}} עדיין לא נקבעו, ובתצורה שנבחרה עבורם {{what}} לא יכול להתקיים — לחץ «הצג תצורה אחרת».",
+    "notDeterminedHereBare": "הנתונים שלך תקינים. בתצורה שנבחרה {{what}} לא יכול להתקיים — לחץ «הצג תצורה אחרת».",
     "unknownPoint": "הנתון {{what}} מתייחס לנקודה שעדיין לא הוגדרה. הגדירו אותה תחילה.",
     "unknownPoint_said": "הנתון «{{said}}» מתייחס לנקודה שעדיין לא הוגדרה ({{what}}). הגדירו אותה תחילה.",
     "unresolvedDeps": "הצעד הזה מסתמך על {{ids}} שעדיין לא הוגדרו (או שצעד קודם שעליו הוא נשען נכשל). הגדירו אותם תחילה.",

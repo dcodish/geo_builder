@@ -9657,6 +9657,71 @@ Locked in `src/app/__tests__/submitPipeline.test.ts` — the operator's sequence
 asserting the engine reason AND the sentence reach the display layer, that the note is shown, and that the
 text is kept so the line can be edited.
 
+## ADR-488 — A VALUED PARAMETER OFFERS A DISPLAY CHOICE ON ITS VALUING LINE, IN 2-D (#948)
+
+**Status:** accepted, 2026-09-09 (fix-round #949, item 2) · **Issue:** #948 · **Adopts:** [ADR-W-047](06w-decisions-workspace.md#adr-w-047)
+**Requirements:** [02](02-requirements.md) FR-RN-12 (new), FR-RN-2 (amended) · **Design:** [04](04-design.md) — the measure-label seam and the display choice
+
+**Context.** The operator, validating fix-round #946: *"I notice that the chip works for 3d but not 2d
+yet."* Correct, and it was the shipped scope rather than a defect —
+[ADR-W-047](06w-decisions-workspace.md#adr-w-047) states the rule for every builder and #937's design
+pass ordered the adoptions, 3-D's angle arc first (#925, PR #947). This is the 2-D half. The rule is
+**cited, not re-decided**.
+
+Measured in 2-D at `262a41f` through the real `factsOf → replay` path, the two rows that needed it:
+
+| the student typed | canvas labels | before |
+| --- | --- | --- |
+| «AB = 3x» · «AC = x» · **«x = 4»** | `12`, `4` | replaced, **unrecoverable** |
+| «זווית ABC = α» · **«α = 70»** | `70°` | replaced, **unrecoverable** |
+
+Clause 3 (a parameter they never valued is never replaced) already held and was locked by
+`issue-937-clause3-2d.test.ts`; those locks still pass unchanged.
+
+**Decision.** The label builder produces BOTH forms, and the display choice is a swap at the render seam.
+
+1. `measureLabelForms` (`src/engine/lower.ts`) returns `{ text, letter?, sym? }`, with `letter`
+   present **only when the symbolic form differs from what prints**. `measureLabelText` becomes its
+   `text` half, so there is still exactly one authority for the printed string.
+2. `MeasureLabels` entries carry the extra pair; the fold's symbolic-measure branch is the only site
+   that fills it (every other `addMeasureLabel` call fills a plain number from a constraint and
+   competes with nothing).
+3. **The competing predicate is `letter !== undefined`** — asked of the builder's own output rather
+   than of a list of label kinds. This is the part that generalises: 2-D has two competing kinds where
+   3-D had one (a stated LENGTH and a stated ANGLE both compete, and areas/arcs ride the same shape),
+   and enumerating them is precisely what ADR-W-047 says not to do.
+4. `src/store/paramChips.ts` derives chip ownership from the FACT LIST — the enabled fact whose
+   `set-var` values a competing symbol, first-binding-wins. Copied from `src3d/store/paramChips.ts`,
+   never imported (docs/20 §12); the two real differences are the command shape (`set-var` vs
+   `symbol-value`) and the two competing kinds.
+5. `displayMode` sits beside `seed` in `geoStore` — `partialize`, temporal `equality`, cleared by
+   `clear`, pruned on `removeGroup`/`replaceGroup` — and is applied by `applyDisplayMode` in
+   `App.tsx`, **outside the fold**, so it never enters the replay memo's key and the toggle is instant.
+
+**Why the save file is keyed by POSITION — and a correction to the issue's stated reason.** #948's body
+says *"2-D's loader re-parses utterances into fresh fact ids, so an id-keyed map does not survive a
+file."* **That is not true of this tree**: `sanitizeFactIn` (`src/store/figureFile.ts`) preserves a
+saved fact's id and only mints a nanoid when the file has none. Position-indexing is kept anyway, for
+the reason that does hold: a hand-written or id-less file gets fresh ids, and an id-keyed choice would
+then attach to the wrong row — while position is a property of the file itself. It also matches 3-D, so
+the shared converters have one usage shape. Recorded because a wrong reason in an issue body outlives
+the issue.
+
+**Alternatives rejected.** Threading `displayMode` into `replay` and its cache key: correct but it
+makes a display toggle re-fold the figure, which on the corpus's heavy files costs seconds (#68 measured
+one cold fold at 27 s) — a toggle must not pay that. Storing the chosen form as a fact: it is a display
+preference, not something the student stated, so it must not enter the ordered fact list (ADR-W-029).
+
+**Locks** — `src/__tests__/issue-948-param-chip-2d.test.ts`: the two measured rows flip both ways; the
+chip sits on the VALUING row and the row that merely USED the letter has none; **no competing display ⇒
+no chip**; per-parameter independence; a MUTED valuing row owns no chip; the save/load round trip keeps
+the choice with the file asserted to key by POSITION and to contain no fact id; a pre-#948 save loads
+showing values unchanged; and the chip's ownership is stable across seeds, which is what makes «הצג
+תצורה אחרת» keep the choice.
+
+**Remaining adoptions**, for the record: the 3-D **coordinate** lane (panel-competing — the first
+non-canvas chip, and the case that proves the predicate is not canvas-specific) and **complex**, whose
+render side is still unmeasured.
 ## ADR-489 — An intersection at the carriers' SHARED ENDPOINT is the answer, not a near-miss (#944)
 
 **Status:** accepted, 2026-09-09 (fix-round #949, item 5) · **Issue:** #944
