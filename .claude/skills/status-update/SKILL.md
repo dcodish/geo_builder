@@ -14,7 +14,15 @@ value/complexity grades come from the rubrics below so two sessions grade the sa
 ```sh
 gh issue list --state open --limit 200 --json number,title,labels,updatedAt,url
 gh pr list --state open --json number,title,headRefName,updatedAt,url
+git fetch --prune --quiet && git branch -r --no-merged origin/main   # work in flight that no PR records
 ```
+
+**Read the third list too.** A pushed branch that is neither merged nor the head of an open PR is
+work someone started and did not finish — typically a fix begun on the other PC. It is invisible to
+both `gh` queries, and the operator may believe it is done (2026-09-09: `fix/955-refused-label` sat
+pushed with a red lane and no PR while the report listed #955 as untouched). For each such branch,
+read its tip commit subject and the issue thread it names, and carry it into "Waiting on you" as
+*work in flight with no PR* — with its real state (green / red / unknown), never assumed finished.
 
 For grading you also need the bodies of issues you don't already know. Fetch them in bulk (one call,
 not N):
@@ -99,7 +107,9 @@ reason the report exists as a habit. Its four sub-lists:
    NOT arm — a plan that is a sketch with open options — each with one line on what's missing. An
    issue with NO plan is not a candidate; it belongs in the tables, flagged per the honesty rule.
 3. **PRs awaiting play-and-approve** — every open PR (`gh pr list`): finished, unplayed work
-   (ADR-W-007). One row: PR#, what it delivers, which issues it closes.
+   (ADR-W-007). One row: PR#, what it delivers, which issues it closes. **Plus every pushed branch
+   with no PR** (Step 1's third list), one row each: branch, the issue it names, and its measured
+   state — a red lane is reported as red, not as "ready".
 4. **Fix-round output awaiting validation** — open issues labeled `awaiting-play`: each is a
    round's play sheet the operator has not yet worked through (closing it is the validation
    signal — see the fix-round skill). An open **`in-round`** issue also lands here, flagged
