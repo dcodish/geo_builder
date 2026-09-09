@@ -35,3 +35,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Try the neighbouring spelling](try-the-neighbouring-spelling.md) — a working alternate spelling turns a "missing capability" into a two-spellings bug, which changes the ROUTE (#921, round #931)
 - [Cases declare their start state](playsheet-cases-declare-start-state.md) — a play-sheet case written for a fresh canvas fails when he continues from the previous case; say «נקה הכל» or say it continues (2026-09-08 #942 T2)
 - [Play sheet is copy-pasteable lines](playsheet-is-copy-pasteable-lines.md) — every utterance one per line in a code block in the CHAT report, never a table and never a pointer to the issue
+- [Drive the reported path](drive-the-reported-path.md) — a display fix must be driven through the path the REPORT takes; a refused line may never become a fact, so fact-keyed wiring never fires (#943, round #946)
