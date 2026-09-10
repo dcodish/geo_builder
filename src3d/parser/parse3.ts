@@ -442,6 +442,68 @@ const mainDiagonalRef: Rule = (s) => {
   return null;
 };
 
+/**
+ * #893 ([ADR-3D-237](../../docs/06b-decisions-3d.md)) — «<solid> ABCD עם <construct>»: declare the solid
+ * AND the construct in one line. The 3-D half of the shape-plus-construct family, mirroring #461/ADR-430.
+ *
+ * This discharges a deferral both {@link mainDiagonalRef} (#836/ADR-3D-200) and the base-diagonals rule
+ * (#834/ADR-3D-199) recorded by name — *"the user's full line «קובייה ABCD עם אלכסון ראשי» additionally
+ * needs the shape-plus-construct family (#461) and resolves through both once that lands"*. #461 landed
+ * 2-D-only and closed, so the promise outlived the issue that carried it and the row stayed
+ * `not-handled` → escalated → the LLM silently picked one of four space diagonals.
+ *
+ * A SPLITTER, not a solid×construct table — the #461 shape, MIRRORED rather than imported (products never
+ * import each other; ADR-3D-113 is the standing precedent for copying this shape of fix as a pattern).
+ * Each half re-enters the grammar through the rule that already owns it, so every solid that lane reads
+ * and every construct that lane reads are supported here by construction:
+ *
+ *   «קובייה ABCD»            → the solid lane          «אלכסון ראשי AC'» → `bareSegment` (#449)
+ *   «מנסרה ABCDEF»           → the prism lane          «אלכסוני בסיס»    → `quad-diagonals` (#834)
+ *
+ * AMBIGUITY ASKS, IT NEVER GUESSES ([ADR-052](../../docs/06-decisions.md#adr-052)). A bare «אלכסון ראשי»
+ * over a solid names none of the FOUR space diagonals, so it takes #836's own question rather than a
+ * pick — the splitter must never flatten a clarify into a choice. With letters it simply builds.
+ *
+ * Declining (returning `null`) is always safe: the line falls through to the rules that own it today,
+ * which is what keeps #438's «תיבה ABCD עם אלכסון תיבה» — read inside the cube rule itself — unchanged.
+ */
+const SOLID_WITH_SPLIT = /^(?<left>.+?)\s+(?:עם|with)\s+(?:an?\s+|the\s+)?(?<right>.+?)\s*$/i;
+const solidWithConstruct: Rule = (s) => {
+  const m = s.match(SOLID_WITH_SPLIT);
+  if (!m?.groups) return null;
+  const left = m.groups.left.trim();
+  const right = m.groups.right.trim();
+  // The LEFT half must be a SOLID this grammar already reads. Re-entering the real rule (rather than
+  // testing for a solid noun) is what makes every solid come along by construction.
+  // The RIGHT half must be a CONSTRUCT clause, read from the SAME vocabulary `droppedConstructNoun3`
+  // gates on ({@link CONSTRUCT_NOUNS}) — one list, so what counts as a construct here and what the
+  // honesty gate demands a command for can never drift apart.
+  //
+  // This is the guard that keeps the rule narrow, and it was measured rather than assumed: without it
+  // the splitter claimed «פירמידה SABCD עם בסיס מקבילית», whose «עם» clause SPECIFIES THE SOLID rather
+  // than adding a construct to it — building a default pyramid plus a stray reading instead of the
+  // parallelogram-base pyramid the declaration lane builds. Six test files caught it, the shadow-matrix
+  // rule-claiming gate among them, which is precisely what that gate is for.
+  if (!CONSTRUCT_NOUNS.test(right)) return null;
+  const lr = parse3(left);
+  if (!lr.ok || !lr.commands.some((c) => c.type === 'solid')) return null;
+  // A bare main-diagonal ROLE over a solid: four candidates, so ask (#836's question, in this sentence).
+  // `mainDiagonalRef` deliberately declines when a solid declaration shares the utterance — that is the
+  // deferral this rule discharges — so the flag is set HERE, after the recursive parses, which reset it.
+  if (MAIN_DIAGONAL_ROLE.test(right) && labelTokens(right).length === 0) {
+    MAIN_DIAGONAL_AMBIGUOUS = true;
+    return null;
+  }
+  const rr = parse3(right);
+  if (!rr.ok) return null; // a construct this grammar cannot read — leave the line exactly as it is today
+  // A construct clause is NOT a solid declaration. «תיבה ABCD עם אלכסון תיבה» (#438) has a right half
+  // whose own noun re-matches the box lane, so splitting it produced TWO solids for one figure —
+  // measured, and the reason this guard exists rather than being assumed unnecessary. Declining hands
+  // the line back to the cube rule, which reads that phrasing itself and has since #438.
+  if (rr.commands.some((c) => c.type === 'solid')) return null;
+  return [...lr.commands, ...rr.commands];
+};
+
 /** cube / box: 8 vertices as given, or 4 base vertices auto-primed to the top face.
  *
  *  #438: the sentence may state a SPACE DIAGONAL along with the solid («תיבה מלבנית עם אלכסון תיבה»,
@@ -4142,6 +4204,10 @@ export const RULES: Rule[] = [
   // #324: FIRST — gated by the lowercase-coordinate object so it can never steal, while the
   // polygon rules WOULD steal its polygon-noun subjects (building the shape, dropping the clause)
   coordPlaneRel,
+  // #893: BEFORE the solid lanes. They claim «<solid> ABCD עם <construct>» and read only the solid,
+  // so the construct clause would be dropped (the honesty gate then refuses the line — honest, but not
+  // support). Declining falls through to them unchanged, so #438's «עם אלכסון תיבה» is untouched.
+  solidWithConstruct,
   gated(cubeOrBox, SPACE_DIAGONAL_RE), // #498: the fail-closed declaration gate, applied at the ONE seam
   gated(rhombusPrism),
   gated(rightPrism),

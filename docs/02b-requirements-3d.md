@@ -63,6 +63,13 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
 - **FR-SP-6 (Must)** — **A stated new label must land on the figure.** A decomposition that loses a point
   the student named is **refused, naming the label** — never committed with the point missing. A label
   that already exists is context, not a drop. *(Realised — `droppedNewLabels3`, `honesty3.test.ts`.)*
+- **FR-SP-7 (Should)** — **One line may declare a solid AND a construct on it.** «קובייה ABCD עם אלכסון AC'»
+  builds both; the student writes the sentence they were going to write anyway rather than splitting it to
+  suit the grammar. Every solid and every construct the tool already reads compose by construction — the
+  reading is a SPLIT into the two rules that own the halves, never a table of supported pairs. Where the
+  construct is ambiguous the composed form inherits its half's question: «עם אלכסון ראשי» on a box names
+  none of the four space diagonals, so it ASKS (ADR-052), and a clarify is never flattened into a pick.
+  *(Realised — [ADR-3D-237](06b-decisions-3d.md#adr-3d-237), #893; the 2-D counterpart is ADR-430/#461.)*
 
 ## Vectors — the geometric lane
 

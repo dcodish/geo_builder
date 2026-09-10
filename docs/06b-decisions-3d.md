@@ -9191,3 +9191,61 @@ owns is still refused (asserted on the store's `lastError`, because the submit g
 becomes a fact — the 3-D twin of what [ADR-495](06-decisions.md#adr-495) documents for 2-D), while the
 same sentence on a real symbol is accepted; and a second ratio symbol keeps its own default, so a sign
 never leaks across symbols.
+## ADR-3D-237 — «<solid> ABCD עם <construct>»: the 3-D half of the shape-plus-construct family (#893)
+
+**Status:** accepted, 2026-09-10 (round #962) · **Issue:** #893
+**Requirements:** [02b](02b-requirements-3d.md) — one line may declare a solid AND a construct on it · **Design:** [04b](04b-design-3d.md) — the splitter, mirrored from 2-D
+
+**Not a new gap — an EXPIRED DEFERRAL.** Two ADRs parked this exact line by name:
+
+> [ADR-3D-200](#adr-3d-200) (#836): *"The user's full line «קובייה ABCD **עם** אלכסון ראשי» additionally
+> needs the shape-plus-construct family (#461) and resolves through both once that lands."*
+>
+> [ADR-3D-199](#adr-3d-199) (#834): *"The users' fuller line … is the shape-plus-construct family (#461)"*
+
+**#461 landed 2026-09-02 as `feat(2d)` only, and closed.** The deferral's condition was met and its
+promise was not: the row stayed `not-handled` → escalated → the LLM silently picked one of four space
+diagonals, which is exactly what #836's operator ruling forbade (*"there is more than one אלכסון ראשי so
+we should ask user to indicate the letters"*). The issue both 3-D ADRs parked it on no longer existed to
+carry it — which is the failure mode worth naming: **a deferral whose carrier closes is a promise with
+nobody holding it.**
+
+**Decision — a SPLITTER, mirrored not imported.** `solidWithConstruct` peels
+`<solid declaration> עם <construct clause>` and re-enters each half through the rule that already owns
+it. Products never import each other; [ADR-3D-113](#adr-3d-113) is the standing precedent for copying
+this shape of fix as a pattern, and #461's own body cites it in the opposite direction.
+
+The point of a splitter over a solid×construct table is that nothing is enumerated: every solid that lane
+reads and every construct that lane reads are supported here **by construction**. Measured, the halves
+already parse standalone — no synthesis was needed:
+
+| composed line | left | right | result |
+| --- | --- | --- | --- |
+| «קובייה … עם אלכסון AC'» | `solid` | `segment3` (#449) | builds both |
+| «תיבה … עם אלכסוני בסיס» | `solid` | `quad-diagonals` (#834) | builds both |
+| «קובייה … עם אלכסון ראשי» | `solid` | four candidates | **asks** (#836's question) |
+
+**Ambiguity asks, it never guesses** ([ADR-052](06-decisions.md#adr-052)). A bare main-diagonal role over
+a solid names none of the four space diagonals, so the composed form takes #836's own question rather
+than a pick — the splitter must never flatten a clarify into a choice. `mainDiagonalRef` deliberately
+declines when a solid declaration shares the utterance (that is the deferral this ADR discharges), so the
+flag is set here, **after** the recursive parses, which reset it.
+
+**The guard the measurement forced.** Without it, «תיבה ABCD עם אלכסון תיבה» — #438's line, read inside
+the cube rule itself since 2026 — split into a left solid and a right half whose own noun re-matched the
+box lane, producing `[solid, solid, segment3]`: **two solids for one figure.** A construct clause is not a
+solid declaration, so a right half that declares one makes the rule decline, handing the line back to the
+owner it has always had. This was found by running the composed forms, not by reasoning about them, and
+it is locked.
+
+**Declining is always safe.** The rule returns `null` whenever the left half is not a solid or the right
+half is a construct this grammar cannot read, so every line it does not claim behaves exactly as it did —
+including «קובייה ABCD עם אלכסון», where the solid lane claims it and the honesty gate refuses downstream.
+Registered BEFORE the solid lanes, which would otherwise read only the solid and drop the clause.
+
+**Locks.** `src3d/__tests__/issue-893-solid-with-construct.test.ts` (11): the reported line and two
+siblings ask instead of escalating, asserted specifically as **not** `not-handled`, since that is the
+value that routes to the LLM; the bare reference keeps its own answer; the two composed forms build; the
+halves' standalone readings, which is what "by construction" means here; and the must-not-change set —
+#438's line still building ONE solid, a bare solid untouched, an unreadable construct unchanged, and a
+non-solid left half left to its own rules.
