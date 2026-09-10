@@ -2448,3 +2448,72 @@ a coplanar solid, and the corpora differ.
 the product ADR and the corpus sweep kept as a **lock** rather than a one-off measurement. The
 false-positive net — an ordinary figure must stay silent — is the half that matters: a false degeneracy
 notice on a legitimate drawing is worse than the silence it replaces.
+
+## ADR-W-049 — THE THREAD IS THE AUTHORITY ON WHETHER A QUESTION IS OPEN; a status pass may CLEAR `needs-operator`, never apply it (#959)
+
+**Status:** accepted, 2026-09-10 (round #962) · **Issue:** #959
+**Requirements:** none (internal — workflow) · **Design:** [22](22-workflow.md) §2d (the label's lifecycle) · the `/status-update` skill
+
+**The defect.** A status pass reads an issue's title and body, sees an open question, and applies
+`needs-operator` — over a ruling already sitting in the issue's **comment thread**. The question then
+costs the operator a decision slot in the next `/decisions` pass, where it is discovered to have been
+answered weeks earlier. **Four recurrences, three of them on one day** (#551 ×3, #370, #364), with the
+2026-09-01 self-correction stating the exact lesson and it recurring twice afterwards — which is the
+evidence that a note in a thread is not a fix.
+
+**Root cause — a structural conflict between two correct rules,** not carelessness:
+
+1. *An issue body is written once and never revised; the ruling lives in a comment* (#509, #659). This
+   is right — a revised body destroys the record of what was originally asked.
+2. A status pass triages from the body, because the body is what states the issue.
+
+Given (1), **the body of a ruled issue is guaranteed to still contain the open question**, so a pass
+reading only the body will relabel *every* ruled issue, forever.
+
+It has a second, worse direction: an issue whose LABEL says `needs-operator` while its THREAD says ruled
+is equally likely to be read the other way by a fix round — armed work skipped because the label says
+blocked.
+
+**Decision — two halves, because they fix opposite directions.**
+
+**(a) Ruled-ness is a QUERY, not a reading-comprehension task.** `scripts/queue-hygiene.mjs` holds pure
+predicates over a plain `{ labels, comments }` shape — `isRulingComment`, `rulingComments`,
+`labelThreadDisagreement`, `auditQueue` — plus a thin CLI that pulls the live queue and reports both
+directions, exiting non-zero when any disagreement exists. The marker vocabulary is **measured from the
+real corpus**, not invented: `/decisions` passes have been writing «## Operator ruling — DATE»,
+«Operator decision (DATE)» and «**Ruled: …**» all along, and nothing ever asked.
+
+**Recency decides, not mere presence.** A ruling that PRE-dates the newest escalation is not stale: round
+#961 escalated #960 with a genuine new question on an issue whose thread already held older rulings, and
+the operator answered it one message later. Both states are locked.
+
+**(b) A status pass may CLEAR the label; only a `/decisions` pass or a fix-round ESCALATION may apply
+it.** The `/status-update` skill previously instructed the opposite — *"the label lags reality, so scan
+for the questions, and add the label where it's missing … so the queue converges on the truth"* — which
+is precisely the instruction that produced all four recurrences. A `/decisions` pass applies it while
+transcribing the operator; a fix-round escalation applies it having hit the code, so it is a genuine new
+question by construction. A status pass has neither warrant: it is reading the same body that already
+contained the question when the ruling was given.
+
+**Why not "read the thread carefully" alone.** That was tried — the 2026-09-01 self-correction said
+exactly that, and the bug recurred twice within nine days. A habit a pass can forget is not a mechanism.
+
+**What running it immediately taught, and why that is in the ADR.** The first live run reported #960 as
+*"an unanswered escalation but no `needs-operator`"* — a false positive, because that morning's operator
+answer had been written under «## **Operator answer** — 2026-09-10», a heading the vocabulary did not
+know. The shapes were widened to the measured set (`ruling|decision|answer`) and the queue then read
+clean: **64 open issues, label and thread agree everywhere.** The lesson is recorded in the file itself:
+a vocabulary of what passes are *supposed* to write is worth nothing; this one is measured from what they
+*do* write, and widening it is expected maintenance rather than a defect.
+
+**Locks.** `scripts/__tests__/queue-hygiene.test.ts` (16), offline against fixtures taken from the real
+threads: every measured ruling shape is recognised, including the `answer` heading that running it
+surfaced; a session's own analysis («Plan correction … **Not a ruling; no approval implied**», an
+`auto-ok` audit comment citing the standing ruling) is NOT read as a ruling, which is what stops the
+guard clearing labels nobody answered; the reported stale-label case (#370's «count them»); both label
+shapes `gh --json` returns; an escalation after the last ruling keeps its label, and the operator's
+answer to it makes the label stale again; the reverse direction; and an empty queue is clean, not an
+error.
+
+**Not in scope.** The guard reports; it does not edit. Applying or clearing a label stays a deliberate
+act by the pass that has the warrant, so an automated relabel can never be the thing that goes wrong.

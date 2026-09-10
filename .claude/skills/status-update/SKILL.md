@@ -96,9 +96,26 @@ the issue; omit an empty sub-list with a one-line "none")
 reason the report exists as a habit. Its four sub-lists:
 
 1. **Decisions** — `needs-operator`-labeled issues PLUS any issue whose body or your comments
-   explicitly pose an unanswered operator question (a ruling, an A/B choice, a scope decision) —
-   the label lags reality, so scan for the questions, and add the label where it's missing
-   (`gh issue edit N --add-label needs-operator`) so the queue converges on the truth.
+   explicitly pose an unanswered operator question (a ruling, an A/B choice, a scope decision).
+
+   **This pass may CLEAR `needs-operator`; it may NEVER apply it** ([ADR-W-049](../../../docs/06w-decisions-workspace.md), #959).
+   An issue body is written once and never revised — the ruling lives in a comment — so the body of a
+   *ruled* issue still contains its original question, and a pass that adds the label from the body
+   relabels every ruled issue forever. That happened four times, three of them in one day, each costing
+   an operator decision slot to re-decide something already decided. Only a `/decisions` pass
+   (transcribing the operator) or a fix-round ESCALATION (which hit the code, so the question is new by
+   construction) may apply it.
+
+   Run the guard instead of judging by eye — it reports BOTH directions and is the "waiting on you"
+   section's real input:
+
+   ```sh
+   node scripts/queue-hygiene.mjs
+   ```
+
+   A `stale-label` row is a label to CLEAR (say so, with the ruling it quotes). An
+   `unlabelled-question` row is an unanswered escalation missing its label — report it here; applying
+   that label belongs to the round that escalated.
 2. **Plans awaiting your `auto-ok`** — since ADR-W-014 Am. 1 ("a clear plan is itself the
    approval") this list should normally be EMPTY: an open issue with a concrete, self-contained
    fix plan (root cause + mechanism + files, per docs/22 §2b), no `needs-operator`, and no open
