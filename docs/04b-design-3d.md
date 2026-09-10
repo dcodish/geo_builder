@@ -233,6 +233,43 @@ Structural renderers carry their own direction: `VecMath` wraps a Hebrew row in 
 each expression as one `<math dir="ltr">` island, so the row orders as Hebrew while the mathematics inside
 each island reads forward.
 
+## The clarification family: under-specified is not unsupported (#866, [ADR-3D-239](06b-decisions-3d.md#adr-3d-239))
+
+A statement can fail in three ways that feel identical to whoever wrote it and are completely different
+to us:
+
+| | what it is | what the student needs to hear |
+| --- | --- | --- |
+| **unsupported** | the tool does not implement this | say so — the scope register's voice |
+| **under-specified** | understood, but it does not pin one figure | which detail to add |
+| **unknown** | the grammar does not own the sentence | escalate (the LLM lane) |
+
+Collapsing the middle row into either neighbour is a recurring defect, and each direction fails
+differently. Read as *unsupported*, a student is sent away from a form that works. Read as *unknown*, the
+line escalates to the paid model — whose job is to guess, which is precisely the guess the ambiguity was
+refusing to make; #836 measured the LLM answering «אלכסון ראשי» by **picking one** of four, and #866
+measured the vertex-only bisector reaching no register at all, so its message came from the model rather
+than from any decision of ours.
+
+**Where each half lives.** `parse3` is context-free by design (see above), so it can recognise an
+ambiguity but cannot enumerate the alternatives — those depend on the figure. The division is therefore
+fixed: the **parser** returns a *typed* refusal carrying whatever the sentence itself supplied (the
+vertex, the rider, the letter), and the **store** — which holds the construction — derives the candidates
+and composes the message. `ambiguous-main-diagonal` (#836) and `ambiguous-angle-vertex` (#866) are the
+same shape, and a third member should be built by copying it rather than by inventing a fourth route.
+
+**The rule that keeps an ask honest: only ask when the figure is genuinely ambiguous.** #866's message
+says *"more than one angle meets at A"*. On a triangle exactly one does — so the sentence would be false,
+and the tool would be demanding a disambiguation it does not need. Where the figure yields exactly one
+reading, the statement is **resolved and built**: one reading is not a guess. Concretely the store
+rebuilds the canonical sentence and runs it through `parse3`, so the grammar stays the only authority on
+meaning and no command is ever synthesised outside it; the student's own wording stays on the fact.
+
+This is also where 3-D and 2-D legitimately diverge. 2-D's [ADR-164](06-decisions.md#adr-164) resolves
+«זווית A» from the figure unconditionally, because a 2-D vertex almost never carries more than two edges.
+3-D does not port that rule — it asks whenever the figure gives more than one reading. The products agree
+wherever the figures agree, and differ exactly where 3-D has information 2-D does not.
+
 ## Known gaps
 
 Recorded here because a design doc that omits its weakest properties is not describing the system.

@@ -72,6 +72,7 @@ export type StoreError3 =
   // the message can name the candidates instead of asking a bare "which one?" that leaves a student who
   // does not know the prime convention no better off.
   | { code: 'ambiguous-main-diagonal'; pairs: string }
+  | { code: 'ambiguous-angle-vertex'; vertex: string; angles: string }
   /** The LLM decomposition lost part of the stated input (docs/24 S2.3 honesty gates) — `items` names
    *  the dropped labels/magnitudes; nothing was committed. */
   | { code: 'dropped-given'; items: string }
@@ -182,6 +183,36 @@ function mainDiagonalCandidates(st: { facts: Fact3[]; seed: number }): string {
   const c = derive3(st.facts, st.seed).construction;
   if (c.solids.length !== 1) return '';
   return spaceDiagonals(c.solids[0].faces).map(([a, b]) => `${a}${b}`).join(', ');
+}
+
+/**
+ * #866 — the angles that «זווית A» could mean, named in the student's own notation.
+ *
+ * The parser recognises the under-specified frame; only the figure knows which edges meet at the
+ * vertex, so the enumeration lives here — the same division of labour `mainDiagonalCandidates` uses.
+ * Every unordered PAIR of distinct neighbours of the vertex is one candidate angle, written as the
+ * three-letter form the student should type instead, so the message hands back sentences that build.
+ *
+ * Returns '' when the figure cannot answer (the vertex is unknown, or fewer than two edges meet it) —
+ * the caller then shows the bare ask rather than an empty list, exactly as the main-diagonal path does.
+ */
+function angleCandidatesAt(st: { facts: Fact3[]; seed: number }, vertex: string): string[] {
+  const c = derive3(st.facts, st.seed).construction;
+  const nb = new Set<string>();
+  for (const [a, b] of c.segments) {
+    if (a === vertex) nb.add(b);
+    else if (b === vertex) nb.add(a);
+  }
+  for (const s of c.solids) for (const f of s.faces) for (let i = 0; i < f.length; i++) {
+    const [x, y] = [f[i], f[(i + 1) % f.length]];
+    if (x === vertex) nb.add(y);
+    else if (y === vertex) nb.add(x);
+  }
+  const ids = [...nb].sort();
+  if (ids.length < 2) return [];
+  const out: string[] = [];
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) out.push(`${ids[i]}${vertex}${ids[j]}`);
+  return out;
 }
 
 /**
@@ -783,7 +814,16 @@ export const useGeo3 = create<Geo3State>()(
           get().rename(rn.from, rn.to);
           return;
         }
-        const parsed = parse3(utterance);
+        let parsed = parse3(utterance);
+        // #866 (ADR-3D-239) — a vertex carrying exactly ONE angle is not ambiguous, and asking there
+        // would make the clarification's own sentence false ("more than one angle meets at A" when one
+        // does). The figure is known here, so the canonical three-letter sentence is rebuilt and read by
+        // the SAME grammar: no command is synthesised in the store, and the student's own wording stays
+        // on the fact. Two or more candidates is the operator's case and still asks.
+        if (!parsed.ok && parsed.reason === 'ambiguous-angle-vertex') {
+          const only = angleCandidatesAt(get(), parsed.vertex);
+          if (only.length === 1) parsed = parse3(`${parsed.vertex}${parsed.rider} חוצה זווית ${only[0]}`);
+        }
         if (!parsed.ok) {
           // #516: every TYPED refusal keeps its identity — only a genuine `not-handled` may read as
           // not-understood, because not-understood is what the App escalates to the LLM lane.
@@ -795,7 +835,9 @@ export const useGeo3 = create<Geo3State>()(
                   ? { code: 'param-roles-conflated', letter: parsed.letter }
                   : parsed.reason === 'ambiguous-main-diagonal'
                     ? { code: 'ambiguous-main-diagonal', pairs: mainDiagonalCandidates(get()) }
-                    : { code: 'not-understood' },
+                    : parsed.reason === 'ambiguous-angle-vertex'
+                      ? { code: 'ambiguous-angle-vertex', vertex: parsed.vertex, angles: angleCandidatesAt(get(), parsed.vertex).join(', ') }
+                      : { code: 'not-understood' },
           });
           return;
         }
@@ -918,7 +960,16 @@ export const useGeo3 = create<Geo3State>()(
         const { facts, seed } = get();
         const old = facts.find((f) => f.id === factId);
         if (!old) return false;
-        const parsed = parse3(utterance);
+        let parsed = parse3(utterance);
+        // #866 (ADR-3D-239) — a vertex carrying exactly ONE angle is not ambiguous, and asking there
+        // would make the clarification's own sentence false ("more than one angle meets at A" when one
+        // does). The figure is known here, so the canonical three-letter sentence is rebuilt and read by
+        // the SAME grammar: no command is synthesised in the store, and the student's own wording stays
+        // on the fact. Two or more candidates is the operator's case and still asks.
+        if (!parsed.ok && parsed.reason === 'ambiguous-angle-vertex') {
+          const only = angleCandidatesAt(get(), parsed.vertex);
+          if (only.length === 1) parsed = parse3(`${parsed.vertex}${parsed.rider} חוצה זווית ${only[0]}`);
+        }
         if (!parsed.ok) {
           // the same #516 identity-preserving refusal mapping as `submit`
           set({
@@ -929,7 +980,9 @@ export const useGeo3 = create<Geo3State>()(
                   ? { code: 'param-roles-conflated', letter: parsed.letter }
                   : parsed.reason === 'ambiguous-main-diagonal'
                     ? { code: 'ambiguous-main-diagonal', pairs: mainDiagonalCandidates(get()) }
-                    : { code: 'not-understood' },
+                    : parsed.reason === 'ambiguous-angle-vertex'
+                      ? { code: 'ambiguous-angle-vertex', vertex: parsed.vertex, angles: angleCandidatesAt(get(), parsed.vertex).join(', ') }
+                      : { code: 'not-understood' },
           });
           return false;
         }
