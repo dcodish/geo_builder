@@ -1505,9 +1505,12 @@ const diagonals: Rule = (s, ctx) => {
   // (A) named diagonals: two label-pairs joined by ו/and/comma
   const named = s.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:ו-?|,|and)\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (named && named.slice(1, 5).every(isUpperLabel)) {
+    // #966: explicitly NAMED diagonals make the same role claim the singular does, so they carry the
+    // same flag. Form (B) below DERIVES the pairs from the ring and is correct by construction — there
+    // is no claim there to check, and flagging it would only re-verify our own arithmetic.
     return [
-      { type: 'segment', a: up(named[1]), b: up(named[2]) },
-      { type: 'segment', a: up(named[3]), b: up(named[4]) },
+      { type: 'segment', a: up(named[1]), b: up(named[2]), diagonal: true },
+      { type: 'segment', a: up(named[3]), b: up(named[4]), diagonal: true },
     ];
   }
   // (B) the diagonals of a polygon — a named 4+ run, else the figure's single polygon
@@ -1525,12 +1528,22 @@ const diagonals: Rule = (s, ctx) => {
   return out.length ? out : null;
 };
 
-/** "segment AC" / "diagonal AC" / "קטע AC" / "אלכסון AC" — connect two points. */
+/**
+ * "segment AC" / "diagonal AC" / "קטע AC" / "אלכסון AC" — connect two points.
+ *
+ * #966 (ADR-499): «אלכסון» is not a synonym for «קטע». It is a CLAIM ABOUT the pair — that these two
+ * vertices are non-adjacent on some ring — and until now the word was consumed purely as a way of
+ * POINTING at a segment, so «אלכסון AB» on a rectangle (a side) and «אלכסון AB» on a triangle (which
+ * has no diagonals at all) both drew a green ✓. The claim is recorded here and checked where the
+ * figure is known; the segment it draws is unchanged.
+ */
 const segment: Rule = (s) => {
   if (!/segment|diagonal|connect|קטע|אלכסון|חבר/i.test(s)) return null;
   if (POINT_ON_CARRIER.test(s)) return null; // "E on segment AC" is a point ON the carrier — pointOnSegment owns it
   const ids = labelRun(s.replace(/segment|diagonal|connect|קטע|אלכסון|חבר/gi, ' '), 2);
-  return ids ? [{ type: 'segment', a: ids[0], b: ids[1] }] : null;
+  if (!ids) return null;
+  const claimsDiagonal = /\bdiagonals?\b|אלכסון/i.test(s);
+  return [{ type: 'segment', a: ids[0], b: ids[1], ...(claimsDiagonal ? { diagonal: true as const } : {}) }];
 };
 
 /**

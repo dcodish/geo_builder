@@ -7,13 +7,13 @@
  * the Phase-1 gate needs.)
  */
 
-import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, SolveDirective, Vec } from './types';
+import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Polygon, SolveDirective, Vec } from './types';
 import { LEN_EPS, isGeoPoint, isOrderConstraint } from './types';
 import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeLowersToConstraints, wouldInvertDependency } from './apply';
 import { lower } from './lower';
 import { evaluate, resolveDriven, drivenConstraintsOf } from './evaluate';
 import type { EvalResult } from './evaluate';
-import { circleCircleIntersect, dist, sub } from './geometry';
+import { circleCircleIntersect, dist, isRingDiagonal, sub } from './geometry';
 import { budgetExceeded } from './solveBudget';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 import { componentOf, minimalComponentOf } from './components';
@@ -69,6 +69,28 @@ const SHAPE_CORNER_KINDS = new Set(['derived', 'perp-offset', 'parallelogram-ver
  * The candidate objects are produced against an empty construction so we compare
  * against the command's *canonical* definition, independent of evaluation.
  */
+/** The rings the figure currently carries, newest last. */
+function ringsOf(c: Construction): Id[][] {
+  return c.objects.filter((o): o is Polygon => o.kind === 'polygon').map((o) => o.vertices);
+}
+
+/**
+ * #966 (ADR-499) — the message for a diagonal claim the CURRENT figure already contradicts, or null.
+ *
+ * Names the statement, never internal state (the CLAUDE.md honesty invariant): it quotes the pair the
+ * student wrote and the shape it belongs to, and it distinguishes the two ways the claim fails, because
+ * they are different mistakes — naming a SIDE, and naming a diagonal of a shape that has none.
+ */
+export function diagonalClaimRefusal(prev: Construction, cmd: Command): string | null {
+  if (cmd.type !== 'segment' || !cmd.diagonal) return null;
+  const holders = ringsOf(prev).filter((r) => r.includes(cmd.a) && r.includes(cmd.b));
+  if (!holders.length) return null; // nothing to check against yet — the verifier has the last word
+  if (holders.some((r) => isRingDiagonal(r, cmd.a, cmd.b))) return null; // it IS a diagonal of one of them
+  const ring = holders[0];
+  if (ring.length < 4) return `${cmd.a}${cmd.b} is not a diagonal — ${ring.join('')} has no diagonals`;
+  return `${cmd.a}${cmd.b} is not a diagonal of ${ring.join('')} — it is a side`;
+}
+
 export function commandConflict(prev: Construction, cmd: Command): string | null {
   const produced = applyCommand(emptyConstruction(), cmd).objects;
   // A command "reuses or creates" its base points when applying it CREATES free-points — a shape's
@@ -783,6 +805,23 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   if (metricErr) {
     return { ok: false, error: metricImpossibilityError(metricErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
+
+  // #966 (ADR-499) — A ROLE CLAIM IS CHECKED AGAINST THE FIGURE THAT IS ALREADY THERE.
+  //
+  // «אלכסון AB» on «מלבן ABCD» names a SIDE, and «אלכסון AB» on a triangle names a diagonal of a shape
+  // that has none. Both used to answer "already drawn" — which does not merely stay silent, it AFFIRMS
+  // the student's false claim, telling them the diagonal of a triangle is already on the canvas. The
+  // operator's #859 ruling is that the word must be sure of itself, and explicitly "for all tools".
+  //
+  // Refused only on EVIDENCE: some polygon already carries BOTH labels, and no polygon that carries
+  // both makes them a diagonal. A pair the current figure cannot speak about (no polygon holds both —
+  // a not-yet-declared quad, or two labels from different shapes) is NOT refused here; that claim is
+  // deferred to the givens verifier, which sees the FINAL figure. That split is deliberate and was
+  // forced by measurement: «אלכסון AC» typed BEFORE «מלבן ABCD» is a legitimate order that ends up
+  // perfectly true, and an apply-time refusal of every unsupported pair would reject it (ADR-104's
+  // deferral principle — a claim that is not yet checkable is not yet false).
+  const roleRefusal = diagonalClaimRefusal(prev, cmd);
+  if (roleRefusal) return { ok: false, error: roleRefusal, construction: prev, positions: prevPositions, ladder: ['role:diagonal-refuse'] };
 
   // Rotate a shape's vertices so an existing edge lands on its free base slots —
   // lets a shape build on an existing edge wherever that edge sits in the name

@@ -1,6 +1,6 @@
 /** Pure 2D geometry helpers. No state. */
 
-import type { Vec } from './types';
+import type { Vec, Id } from './types';
 
 export const add = (a: Vec, b: Vec): Vec => ({ x: a.x + b.x, y: a.y + b.y });
 export const sub = (a: Vec, b: Vec): Vec => ({ x: a.x - b.x, y: a.y - b.y });
@@ -231,6 +231,24 @@ export function circleCircleIntersect(c1: Vec, r1: number, c2: Vec, r2: number):
 /** Whether a closed ring is SIMPLE — no two non-adjacent edges cross. True for any convex ring; the part
  *  of the convexity guard that a stated-concave polygon must still satisfy (a dart is simple, a tangled
  *  quad is not). */
+/**
+ * #966 (ADR-499) — IS THIS PAIR A DIAGONAL OF THIS RING? The one place that answers it.
+ *
+ * A diagonal joins two vertices of a ring that are NOT adjacent along it. Both the apply-time refusal
+ * and the givens verifier ask through here, so "what counts as a diagonal" cannot come to mean two
+ * different things in the two layers — the split that let #859's 3-D fix leave 2-D untouched for a week.
+ *
+ * A TRIANGLE has no diagonals at all (every pair of its vertices is an edge), and that falls out of the
+ * adjacency test rather than being special-cased: with n = 3 every pair is adjacent.
+ */
+export function isRingDiagonal(ring: Id[], a: Id, b: Id): boolean {
+  const i = ring.indexOf(a);
+  const j = ring.indexOf(b);
+  if (i < 0 || j < 0 || i === j) return false; // not both on this ring
+  const gap = Math.abs(i - j);
+  return gap !== 1 && gap !== ring.length - 1; // adjacent, or wrap-adjacent, ⇒ an EDGE
+}
+
 export function ringSimple(pts: Vec[]): boolean {
   const n = pts.length;
   const seg = (i: number): [Vec, Vec] => [pts[i], pts[(i + 1) % n]];

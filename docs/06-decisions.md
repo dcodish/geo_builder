@@ -10596,3 +10596,88 @@ in the same round. Its ADR and this one stay separate, as #969's own thread inst
 different halves, and the value half's fix (one *value* reader) is what this one's fix (one *naming*
 reader) composes with. Together they mean an angle statement now has exactly one reader for each of its
 two questions.
+## ADR-499 — A ROLE NOUN IS A CLAIM, AND IT IS CHECKED IN THE LAYER THAT CAN ANSWER IT (#966)
+
+**Status:** accepted, 2026-09-10 · **Issue:** #966 (the 2-D half of #859's operator ruling)
+**Requirements:** [02](02-requirements.md) FR-IN-4c (new) · **Design:** [04](04-design.md) — "A role noun is a claim: «אלכסון»"
+
+**The ruling this completes.** The operator, on #859 (2026-09-01): *"the term אלכסון should be sure to be a
+diagonal and **this is true for all tools**. if the word is used."* 3-D shipped it. 2-D never checked the
+pair at all — the role word was stripped as filler beside «קטע»/`segment`/«חבר», so by the time the command
+reached the engine nothing recorded that the student had claimed anything.
+
+**Two silent wrongs, measured on HEAD through the real submit path:**
+
+| prefix | utterance | before | after |
+| --- | --- | --- | --- |
+| `מלבן ABCD` | `אלכסון AC` | ✓ built | ✓ built (a real diagonal) |
+| `מלבן ABCD` | `אלכסון AB` | ○ **"already drawn"** | ✗ refused: *AB is not a diagonal of ABCD — it is a side* |
+| `משולש ABC` | `אלכסון AB` | ○ **"already drawn"** | ✗ refused: *AB is not a diagonal — ABC has no diagonals* |
+| `משולש ABC`, `משולש DEF` | `אלכסון AD` | ✓ **built, +1 object** | ✓ built, **verifier flags it** |
+
+The "already drawn" rows are the worse half, and worse than 3-D's symptom: they do not merely stay silent,
+they **affirm the student's false claim** — telling someone who wrote "the diagonal AB" of a *triangle*
+that that diagonal is already on the canvas. The last row is 3-D's symptom exactly: fresh ink drawn and
+called a diagonal of nothing.
+
+**Class, per docs/17.** A stated **role claim is neither enforced nor verified** — the family of #536 (a
+stated collinear ORDER, figure shows A–B–D and reports ✓) and #859 (the 3-D twin). The noun is consumed as
+a way of *pointing at* an object rather than as an assertion *about* it. So the fix is the role-claim
+check, not a special case for `אלכסון` on a triangle: the parser records the claim, and one predicate
+answers "is this pair a diagonal of this ring" for everyone.
+
+**The decision — ONE predicate, TWO layers, and the split is forced by measurement.** The plan said to
+mirror 3-D at apply time. Measuring first showed that is not sufficient, and would introduce a *stricter*
+bug than the one being fixed:
+
+```
+אלכסון AC          ← typed BEFORE the quad
+מלבן ABCD          ← now AC genuinely IS a diagonal
+```
+
+That sequence is green today and must stay green. It has the same shape as the cross-figure row — *no
+polygon holds both labels* — so a rule that refuses every unsupported pair at apply time rejects a
+perfectly correct order. Hence:
+
+- **`applyStep` refuses on EVIDENCE** — some polygon already carries both labels and none of those makes
+  them a diagonal. This is 3-D's guard and delivers the immediate, teaching refusal the ruling asked for.
+- **The givens verifier settles the rest** — a `diagonal` claim no ring in the FINAL figure supports is a
+  violation. This is [ADR-104](#adr-104)'s principle applied to a structural claim: *a claim that is not
+  yet checkable is not yet false.*
+
+Both layers ask `isRingDiagonal` (`geometry.ts`), so "what counts as a diagonal" cannot come to mean two
+different things in two places — which is exactly how #859's 3-D fix left 2-D untouched. A **triangle has
+no diagonals** falls out of the adjacency test (with n = 3 every pair is adjacent) rather than being
+special-cased on the noun, and the **wrap** pair (D–A) is a side, which an index-distance test forgets.
+
+**Two refusal sentences, deliberately.** Naming a *side* and naming a diagonal of a shape that *has none*
+are different mistakes, and "AB is a side" teaches nothing to a student who drew it on a triangle. Both
+name the statement — the pair the student wrote and the shape it belongs to — never internal state, and
+both are localised (`errors.diagonalIsSide` / `errors.diagonalNoneHere`, he + en) through `humanizeError`.
+
+**What stays claim-free.** The DERIVED plural («אלכסונים», «אלכסוני ABCD») computes the pairs from the ring
+itself and is correct by construction; flagging it would only re-verify our own arithmetic. The two
+explicitly NAMED diagonals («AC ו-BD אלכסוני הריבוע») make the same claim the singular does and carry it.
+
+**Locks.** `src/engine/__tests__/diagonal-role-claim.test.ts` (16) — the predicate (quad, both diagonals,
+all four sides *including the wrap*, triangle, pentagon, off-ring, self-pair), the apply-time refusal with
+both sentences, and the DEFERRAL asserted explicitly for both shapes that reach it;
+`src/parser/__tests__/diagonal-claim.test.ts` (11) — the claim recorded in four spellings across both
+languages, absent for «קטע»/`segment`/`connect`/a bare pair, and the drawn segment asserted byte-identical
+with and without the noun. Four scenarios: the two refusals (each numbered separately, per the standing
+rule that a refusal case is the easiest thing to leave untested), the verifier catch, and the
+forward-declaration guard whose whole job is to fail if anyone collapses the two layers into one.
+
+**The belief was written down.** The parser's own corpus test for this word was named
+**`it('diagonal synonym', ...)`** and asserted «diagonal BD» ≡ «קטע BD». The mistaken premise — that a
+role noun is a *synonym* for the plain noun — was not an oversight buried in a regex; it was stated, in a
+test name, and had been passing for months. It now reads *"a segment PLUS the role claim"*. Worth noting
+next to ADR-498's finding that the shadow allowlist carried #969's defect as approved: in both cases the
+gate that should have caught the bug had been taught the bug's assumption.
+
+**Deviation from the issue's plan, recorded.** The plan said *"the check belongs where the figure is known
+(apply time), mirroring the 3-D implementation"*. Apply time alone leaves the reported cross-figure row
+unfixed **and** breaks the forward declaration. The verifier arm is an addition in the direction the
+issue's own class analysis points — #536 is cited there as "neither enforced **nor verified**" — not a
+departure from it. 3-D's own guard has the same apply-time-only limit and therefore the same gap; that is
+recorded on #859's tree rather than fixed here (#978).

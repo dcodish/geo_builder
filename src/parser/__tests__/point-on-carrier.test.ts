@@ -47,10 +47,17 @@ describe('point on a named carrier', () => {
   });
 
   it('still parses a bare carrier DEFINITION (no "on") as the carrier itself', () => {
-    for (const u of ['קטע AC', 'segment AC', 'אלכסון AC']) {
+    for (const u of ['קטע AC', 'segment AC']) {
       const r = parse(u);
       expect(r.ok, u).toBe(true);
       if (r.ok) expect(r.commands, u).toEqual([{ type: 'segment', a: 'A', b: 'C' }]);
     }
+    // «אלכסון AC» draws the SAME carrier, and additionally records the role claim it makes (#966,
+    // ADR-499). Asserted separately rather than folded into the list above, so this test keeps saying
+    // what it is for — a bare definition is the carrier, not a point-on-carrier — while the claim flag
+    // stays visible instead of being absorbed into a loosened matcher.
+    const diag = parse('אלכסון AC');
+    expect(diag.ok).toBe(true);
+    if (diag.ok) expect(diag.commands).toEqual([{ type: 'segment', a: 'A', b: 'C', diagonal: true }]);
   });
 });
