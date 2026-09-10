@@ -121,9 +121,17 @@ describe('#921 — the rider ratio letter is kept, bound, and addressable', () =
 describe('#922 — a refusal may not claim the figure never defined a letter it defines', () => {
   beforeEach(() => state().clear());
 
-  it('«k חיובי» after «SN = k·SC» says the sign is not selectable — NOT that k is undefined', () => {
+  it('«k חיובי» after «SN = k·SC» is now HONOURED — #930 superseded the refusal this case locked', () => {
+    // This case asserted `sign-not-selectable`, which was #922's whole point: say truthfully that the
+    // sign is not selectable for THIS kind of letter, rather than falsely claim the figure never defined
+    // k. #930 (ADR-3D-236) is the capability half that #922's own text promised — it makes a vec-def's
+    // ratio symbol sign-selectable, so the honest refusal is replaced by honouring the given.
+    //
+    // #922's invariant is NOT weakened, and the two cases below are where it now lives: a letter no
+    // mechanism owns still refuses `unknown-symbol`, and a RIDER parameter — genuinely confined to (0,1)
+    // by its own membership — still refuses `sign-not-selectable`. The two must not collapse into one.
     const { st } = build(['פירמידה ABCDS שבסיסה ריבוע', 'נסמן: AD = u, AB = v, AS = w', 'SN = k·SC', 'k חיובי']);
-    expect(st.lastError).toEqual({ code: 'sign-not-selectable', id: 'k' });
+    expect(st.lastError, 'the sign is honoured, not refused').toBeNull();
   });
 
   it('a sign on a letter NO mechanism owns still refuses unknown-symbol — the two must not collapse', () => {

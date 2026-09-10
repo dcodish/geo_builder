@@ -9123,3 +9123,71 @@ asserted to equal the engine's `statedLengths` exactly — the no-second-enumera
 **Coupled with #917**, the arc for a stated angle between crossing segments: same surface, same play
 session. Whichever lands second reuses this placement answer (projected midpoint, small offset, amber)
 rather than inventing a second one.
+
+## ADR-3D-236 — A SIGN STATED FOR A VEC-DEF'S RATIO SYMBOL IS HONOURED, on both the pinned and the sampled path (#930)
+
+**Status:** accepted, 2026-09-10 (round #962) · **Issue:** #930 (the capability half of #922)
+**Requirements:** [02b](02b-requirements-3d.md) — a stated sign is honoured for every kind of letter the figure defines · **Design:** [04b](04b-design-3d.md) — the symbol-sign lane
+
+**What the student writes.** The exam states a ratio's sign exactly this way:
+
+```
+פירמידה ABCDS שבסיסה ריבוע
+נסמן: AD = u, AB = v, AS = w
+SN = k·SC
+k חיובי                        ← was refused
+```
+
+[ADR-3D-225](#adr-3d-225) (#922) made that refusal **truthful** — `sign-not-selectable`, instead of
+falsely claiming the figure never defined `k`. This is the half that makes it *selectable*, so the given
+is honoured rather than honestly declined.
+
+**Mechanism — the #325 shape, third lane.** Three places, as the plan said:
+
+1. **`apply.ts`** — a `vec-def` owner now joins `pin-sym`/`param` as sign-recordable; the sign rides the
+   same `paramSigns` list every other lane uses. `sign-not-selectable` remains for the rider parameter,
+   whose (0,1) confinement genuinely exposes no sign to pick, so #922's two-way distinction survives.
+2. **`firstNonDegenerateRoot`** — the eligible roots are filtered by the sign **before** the degeneracy
+   walk, never after (or a sign could be "honoured" by a root the walk had already rejected). Filtered
+   by `sym` deliberately: the other sign consumers in `evaluate.ts` apply `paramSigns.every` to every
+   root regardless of which symbol each sign names — sound while a figure has one symbol, and not
+   something to copy. Locked by a two-ratio case.
+3. **The store's verify pass** — `resolved.ratioSymbols` publishes each vec-def symbol's chosen value,
+   written by the code that picks it, so the two can never disagree about which value was used.
+
+**Two things the measurement corrected, both worth recording.**
+
+*(a) The verify pass is not optional.* The first attempt skipped it, reasoning that an unsatisfiable sign
+leaves the point unplaced and the existing `vec-rel` check refuses honestly. Measured: accepting the sign
+in apply immediately turned the refusal into **`sign-unsatisfiable`**, because the verifier knew how to
+read a figure parameter, a pin symbol and a named component — every kind of letter EXCEPT this one. It
+was reporting a figure that honoured the sign as one that did not.
+
+*(b) The sampled path matters more than the pinned one.* Recording `k` only where a root is *picked*
+left the reported case still failing, because in that figure `k` is **unpinned** — a free DOF, sampled
+from `(0.2, 0.8)`. That has a sharper consequence than a missing record: sampling that range
+unconditionally made «k חיובי» **vacuously** true and «k שלילי» **falsely** `sign-unsatisfiable`. The
+figure can perfectly well put N beyond S on the SC line; the sampler simply never looked there. A default
+that survives a contradicting statement is asserting a given the student never gave
+([ADR-052](06-decisions.md#adr-052)), so the sampled range now follows the sign.
+
+Shipping without (b) would have been the worse outcome of the two: a positive sign passing without
+anything reading it, and a negative one refused against a figure that satisfies it.
+
+**Measured, `k` read back from the DRAWING** (the projection of SN onto SC, never asking the engine what
+it chose):
+
+| statement | drawn k |
+| --- | --- |
+| *(no sign)* | +0.7732 |
+| «k חיובי» | +0.7732 |
+| «k שלילי» | **−0.2268** |
+
+**Locks.** `src3d/__tests__/issue-930-ratio-sign.test.ts` (7): the exam's sentence is accepted and the
+drawn k is positive; **the negative direction, which is the anti-vacuity assertion** — a positive sign
+alone proves nothing, since the default range would satisfy it whether or not anything read it; the two
+signs put N in genuinely different places; an unsigned ratio keeps its default; a letter no mechanism
+owns is still refused (asserted on the store's `lastError`, because the submit gate refuses it before it
+becomes a fact — the 3-D twin of what [ADR-495](06-decisions.md#adr-495) documents for 2-D), while the
+same sentence on a real symbol is accepted; and a second ratio symbol keeps its own default, so a sign
+never leaks across symbols.
