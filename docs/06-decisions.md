@@ -10532,3 +10532,67 @@ maqaf of «ל-» read as a minus sign by the number grammar. Measured identical 
 it is pre-existing and independent (#975). Likewise «זווית ABC היא זווית DEF» is `not-handled` while the `=`
 spelling builds: the same copula asymmetry in `angleEquality`, whose right-hand side is an angle rather than a
 value, so it is a different reader and a different fix (#976).
+
+## ADR-500 — THE ONE READER BECOMES THE ONLY READER: `angleAcuteness` and `boundOperand` migrate (#970)
+
+**Status:** accepted, 2026-09-10 · **Issue:** #970 (debt, found while building #967)
+**Requirements:** none (internal) · **Design:** [04](04-design.md) — "Addressing an angle: one reader, many value kinds"
+
+**The debt.** #831/[ADR-468](#adr-468) made `angleArms` *"the one place that answers WHICH angle is being
+named"*, so that a rule decides only what its **value** means and *"a third value kind cannot reopen the
+hole by forgetting to copy the lane."* Two rules never migrated. `angleAcuteness` and `boundOperand` kept
+their own hand-copies of the triple and single-vertex lanes, so the reader that exists to be the single
+answer had **three** implementations and the stated guarantee was simply not true.
+
+**The bill arrived with #967.** A new naming mode — an angle addressed by its two SIDES — went into
+`angleArms`, and the numeric and symbolic value lanes inherited it for free. Acuteness and bounds did not:
+the mode had to be pasted into both copies by hand, additively, and the duplication was recorded in
+docs/04 rather than left implicit. A **fourth** mode would have had to be copied three times, and whichever
+copy was forgotten reproduces #831's defect exactly — one spelling that works for a value and not for a
+bound, with nothing failing loudly.
+
+**The decision.** Both copies are retired; both rules read through `angleArms`. `boundOperand`'s return
+type gains the refusal channel it never had (`BoundOperand | Clarify | null`), and its five call sites
+propagate it — the type change **enumerated those five sites for us**, which is the argument for making it
+at the type level rather than returning `null` and preserving the old silence.
+
+**The migration was MEASURED, not assumed** — the issue required exactly this, naming two edges. A
+498-case differential (naming × tail × context, plus every angle line in the catalog) run before and after:
+**132 cells changed, 0 real regressions.**
+
+| | cells | what changed |
+| --- | --- | --- |
+| **Refusal quality** | **115** | `not-handled` (escalate to the paid model) → a **named clarification**. |
+| **Arms drawn** | 16 | The single-vertex acuteness form now draws its arms, as the triple form always did. |
+| **Stricter naming** | 1 | «זווית A B קהה» — two spaced labels — now escalates instead of resolving to the first. |
+
+**Edge 2 resolved in favour of asking.** The copies returned `null` where `angleArms` returns a `Clarify`,
+so «הזווית בין BD ל-CA גדולה מ-40» — two segments that never meet — escalated to the paid model, while the
+**identical naming in a value statement** was refused by name. The same sentence got two answers depending
+on which rule happened to read it, and the worse answer cost money. Now all three lanes answer
+`angle-sides-disjoint`, quoting both segments; an ambiguous single vertex answers `ambiguous-angle`, naming
+the vertex. That is [ADR-490](#adr-490)'s ruling (an ask beats a paid guess) reaching two lanes that had
+been excluded from it by an accident of return type.
+
+**Edge 1 resolved in favour of honesty.** `angleArms` requires `upperCount + lowerLoners === 1` for the
+single-vertex lane; the copies used `labelRun(_, 1)`, which returns the first label **even when others are
+present**. So «זווית A B קהה» built an acuteness at A and silently dropped B — the dropped-magnitude class
+in its naming half. One measured cell, not a real spelling, and the new answer (escalate) is the honest one.
+
+**The 16 arm-drawing cells are a documentation bug closing.** `angleAcuteness`'s own docstring says it
+*"draws the arms (idempotent)"*. The triple lane did; the single-vertex lane did not. In that lane the arms
+come from `ctx.neighbors` and therefore already exist, so the commands are no-ops on the canvas — the
+change is consistency, not new ink.
+
+**Locks.** `src/parser/__tests__/angle-arms-one-reader.test.ts` (11). The first test is the one that
+matters structurally: for each of the three naming modes, the **value**, **acuteness** and **bound** lanes
+are asserted to name the *same* angle. A fourth naming mode should need one row added there and no change
+to `parse.ts` beyond `angleArms` — and if anyone re-copies a lane, one of those three columns drifts and
+the row fails. The refusal parity, the arm drawing, and the untouched length/variable/range forms are
+asserted alongside.
+
+**Related, deliberately not merged:** #969/[ADR-498](#adr-498) is the same rule pair's **value** half, done
+in the same round. Its ADR and this one stay separate, as #969's own thread instructed — same pair,
+different halves, and the value half's fix (one *value* reader) is what this one's fix (one *naming*
+reader) composes with. Together they mean an angle statement now has exactly one reader for each of its
+two questions.

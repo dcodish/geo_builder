@@ -301,13 +301,27 @@ Two segments that share exactly one endpoint **are** a vertex angle, so the mode
 triple and every downstream layer — constraint, arc, value chip, verifier — is untouched. That equivalence
 is the whole fix; there is no new constraint kind and no new rendering path.
 
-**Where the mode had to be added by hand, and why that is recorded rather than tidied.** `angleArms` has
-two callers (the numeric and symbolic value lanes). `angleAcuteness` and `boundOperand` still keep their
-**own copies** of the triple/single-vertex lanes — the #831 remainder, never migrated — so the new mode was
-added to them explicitly, *additively*, leaving their existing lanes untouched so no reading changes. The
-duplication is the standing hazard: a fourth naming mode would have to be copied three times. Retiring
-those copies in favour of `angleArms` is filed separately; it is a behaviour-preserving refactor, and doing
-it inside a feature slice would have hidden a regression surface inside a feature's locks.
+**The mode had to be added by hand to two rules — and that duplication is now retired**
+(#970, [ADR-500](06-decisions.md#adr-500)). When #967 landed, `angleArms` had only two callers (the
+numeric and symbolic value lanes), while `angleAcuteness` and `boundOperand` still kept their **own
+copies** of the triple/single-vertex lanes — the #831 remainder, never migrated. So the new mode was added
+to them explicitly and *additively*, leaving their existing lanes untouched so no reading changed, and the
+duplication was recorded here rather than left implicit: a fourth naming mode would have had to be copied
+three times, and the forgotten copy reproduces #831's defect exactly.
+
+ADR-500 retired both copies. All three call sites now read through `angleArms`, and the migration was
+measured rather than assumed — a 498-case differential, 132 cells changed, **0 real regressions**, of which
+115 were a refusal *improving* from an escalation to a named clarification. Two things fall out that are
+worth keeping in view when the next mode is added:
+
+- **A refusal channel is part of a reader's contract.** `boundOperand` could not carry one — its return
+  type had no room for it — so «הזווית בין BD ל-CA גדולה מ-40» escalated to the paid model while the
+  identical naming in a *value* statement was refused by name. Widening the type enumerated the five call
+  sites that had to propagate it; returning `null` would have preserved the silence and told no one.
+- **The chokepoint is only real when nothing else answers the same question.** #831 declared this
+  chokepoint and was still true of the code it touched; the guarantee failed because two rules that also
+  answered "which angle is named" were never brought in. A declared single reader with unmigrated callers
+  is not a chokepoint, it is a convention — and conventions are what #967 paid three edits for.
 
 **The refusal is part of the capability.** Two segments that never meet have no vertex between them, and
 2-D has no line-line angle constraint — *every* angle constraint here is vertex-anchored

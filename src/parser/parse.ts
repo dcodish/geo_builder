@@ -2341,25 +2341,21 @@ const numChunk = (t: string): number => parseFloat(t.replace(/°/g, '').trim());
  * figure like ADR-164), "|AB|" / "AB", or a bare named measure "α". Returns null when the chunk names
  * no measure — the rule then defers rather than guessing.
  */
-const boundOperand = (raw: string, ctx: ParseContext): BoundOperand | null => {
+const boundOperand = (raw: string, ctx: ParseContext): BoundOperand | Clarify | null => {
   const t = raw.trim();
   if (!t) return null;
   if (new RegExp(String.raw`^${VAR}$`).test(t)) return { kind: 'var', name: t };
   if (/(?:∠|∢|angle|זוו?ית)/i.test(t)) {
     const stripped = t.replace(/∠|∢|angle|זוו?ית|the|של|את/gi, ' ');
-    // #967: the segment-pair addressing («הזווית בין BD ל-BA גדולה מ-40»). ADDITIVE, as in `angleAcuteness`.
-    // A disjoint pair falls through to this function's own "never guess a triple" null — the operand type
-    // carries no refusal, so the honest note is the one the bound rule already gives for an unreadable operand.
-    const sidesB = angleBetweenSides(stripped);
-    if (sidesB && !('clarify' in sidesB)) return { kind: 'ang', v: sidesB.vertex, r1: sidesB.ray1, r2: sidesB.ray2 };
-    const tri = labelRun(stripped, 3);
-    if (tri) return { kind: 'ang', v: tri[1], r1: tri[0], r2: tri[2] };
-    const one = labelRun(stripped, 1);
-    if (one) {
-      const nb = (ctx.neighbors ?? {})[one[0]] ?? [];
-      if (nb.length === 2) return { kind: 'ang', v: one[0], r1: nb[0], r2: nb[1] };
-    }
-    return null; // an angle we can't resolve — never guess a triple
+    // #970 (ADR-500): the ONE reader, here too. The copy this replaced could not carry a REFUSAL — its
+    // return type had no channel for one — so «הזווית בין BD ל-CA גדולה מ-40» (two segments that never
+    // meet) escalated to the paid model instead of being told what was wrong, while the identical
+    // naming in a VALUE statement was refused by name. Same sentence, two answers, decided by which
+    // rule happened to read it. The type now carries the clarify, and every caller propagates it.
+    const arms = angleArms(stripped, ctx);
+    if (!arms) return null; // an angle we can't resolve — never guess a triple
+    if ('clarify' in arms) return arms;
+    return { kind: 'ang', v: arms.vertex, r1: arms.ray1, r2: arms.ray2 };
   }
   const seg = t.match(new RegExp(String.raw`^\|?\s*(${PT})\s*(${PT})\s*\|?$`));
   if (seg) return { kind: 'len', a: up(seg[1]), b: up(seg[2]) };
@@ -2406,6 +2402,7 @@ const measureBound: Rule = (s, ctx) => {
   if (between) {
     const op = boundOperand(between[1].replace(/\b(?:is|are|נמצאת|נמצא|הוא|היא)\b/gi, ' '), ctx);
     if (!op) return null;
+    if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
     const lo = Math.min(parseFloat(between[2]), parseFloat(between[3]));
     const hi = Math.max(parseFloat(between[2]), parseFloat(between[3]));
     return boundCommands(op, lo, hi);
@@ -2416,6 +2413,7 @@ const measureBound: Rule = (s, ctx) => {
   if (word) {
     const op = boundOperand(word[1].replace(/\b(?:is|are|הוא|היא)\b/gi, ' '), ctx);
     if (!op) return null;
+    if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
     const n = parseFloat(word[4]);
     return boundCommands(op, word[2] ? n : undefined, word[3] ? n : undefined);
   }
@@ -2430,11 +2428,13 @@ const measureBound: Rule = (s, ctx) => {
     if (isNumChunk(r)) {
       const op = boundOperand(l, ctx);
       if (!op) return null;
+    if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
       const n = numChunk(r);
       return boundCommands(op, isLess(o) ? undefined : n, isLess(o) ? n : undefined); // X < n ⇒ max
     }
     const op = boundOperand(r, ctx);
     if (!op) return null;
+    if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
     const n = numChunk(l);
     return boundCommands(op, isLess(o) ? n : undefined, isLess(o) ? undefined : n); // n < X ⇒ min
   }
@@ -2443,6 +2443,7 @@ const measureBound: Rule = (s, ctx) => {
     if (!isNumChunk(a) || !isNumChunk(c) || isLess(o1) !== isLess(o2)) return null; // "40 < α > 60" states nothing
     const op = boundOperand(mid, ctx);
     if (!op) return null;
+    if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
     const [lo, hi] = isLess(o1) ? [numChunk(a), numChunk(c)] : [numChunk(c), numChunk(a)];
     return boundCommands(op, lo, hi);
   }
@@ -2454,32 +2455,18 @@ const angleAcuteness: Rule = (s, ctx) => {
   const acute = /חדה|acute/i.test(s);
   if (obtuse === acute) return null; // need exactly one of obtuse/acute (and not both)
   const stripped = s.replace(/angle|∠|∢|זוו?ית|הזוו?ית|קהה|obtuse|חדה|acute|is|the|של|את/gi, ' ');
-  // #967: the segment-pair addressing («הזווית בין BD ל-BA קהה»). ADDITIVE — the triple and single-vertex
-  // lanes below are untouched, so nothing that resolved before resolves differently. This rule keeps its own
-  // copy of those two lanes (the #831 remainder: `angleArms` never became its reader), so the new mode has to
-  // be added here rather than inherited; see the issue filed alongside #967.
-  const sidesA = angleBetweenSides(stripped);
-  if (sidesA && !('clarify' in sidesA))
-    return [
-      { type: 'segment', a: sidesA.vertex, b: sidesA.ray1 },
-      { type: 'segment', a: sidesA.vertex, b: sidesA.ray2 },
-      { type: 'set-angle-acuteness', vertex: sidesA.vertex, ray1: sidesA.ray1, ray2: sidesA.ray2, obtuse },
-    ];
-  if (sidesA) return sidesA; // two segments that never meet — refused by name, not escalated
-  const tri = labelRun(stripped, 3);
-  if (tri) {
-    return [
-      { type: 'segment', a: tri[1], b: tri[0] },
-      { type: 'segment', a: tri[1], b: tri[2] },
-      { type: 'set-angle-acuteness', vertex: tri[1], ray1: tri[0], ray2: tri[2], obtuse },
-    ];
-  }
-  const one = labelRun(stripped, 1);
-  if (one) {
-    const nb = (ctx.neighbors ?? {})[one[0]] ?? [];
-    if (nb.length === 2) return [{ type: 'set-angle-acuteness', vertex: one[0], ray1: nb[0], ray2: nb[1], obtuse }];
-  }
-  return null;
+  // #970 (ADR-500): the ONE reader. This rule used to carry a hand-copy of the triple and single-vertex
+  // lanes, so #967's segment-pair mode had to be pasted in by hand and #831/ADR-468's stated guarantee
+  // — "`angleArms` is the one place that answers WHICH angle is being named" — was not actually true.
+  // A rule decides only what its VALUE means; naming is this function's business, for every value kind.
+  const arms = angleArms(stripped, ctx);
+  if (!arms) return null;
+  if ('clarify' in arms) return arms; // a disjoint segment pair, or an ambiguous single vertex — ASK
+  return [
+    { type: 'segment', a: arms.vertex, b: arms.ray1 },
+    { type: 'segment', a: arms.vertex, b: arms.ray2 },
+    { type: 'set-angle-acuteness', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2, obtuse },
+  ];
 };
 
 /**
