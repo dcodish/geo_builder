@@ -114,7 +114,8 @@
     "measureCaseNote": "The letter {{letter}} was read as a measure symbol (a radius) — lowercase letters are for measures; point labels are uppercase.",
     "canonicalHint": "Got it. Next time you can write: {{canonical}} — that form always works.",
     "polygonNotSupported": "The polygon \"{{noun}}\" is not supported. Supported: {{offer}} — add \"regular\" for a regular one (e.g. \"regular pentagon\").",
-    "incompleteComparative": "{{factor}} times WHAT? Name the segment it is compared to — e.g. \"{{subject}} is {{factor}} times AB\"."
+    "incompleteComparative": "{{factor}} times WHAT? Name the segment it is compared to — e.g. \"{{subject}} is {{factor}} times AB\".",
+    "angleSidesDisjoint": "The segments {{s1}} and {{s2}} do not meet, so there is no angle between them. Name two sides that share an endpoint, or name the angle by its three letters."
   },
   "explore": {
     "title": "Explore the figure"
