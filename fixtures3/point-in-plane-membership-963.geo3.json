@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-09-10T15:11:44.772Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "תיבה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "box",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "E מוכלת במישור ABCD",
+      "cmds": [
+        {
+          "type": "plane-through",
+          "name": "ABCD",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "type": "on-planes",
+          "id": "E",
+          "plane": "ABCD"
+        }
+      ]
+    },
+    {
+      "utterance": "המישור A'B'C'D' מכיל את F",
+      "cmds": [
+        {
+          "type": "plane-through",
+          "name": "A'B'C'D'",
+          "ids": [
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        },
+        {
+          "type": "on-planes",
+          "id": "F",
+          "plane": "A'B'C'D'"
+        }
+      ]
+    }
+  ]
+}
