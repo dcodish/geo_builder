@@ -1075,6 +1075,18 @@ export type PointDef =
   | { kind: 'bisector-ray'; a: Id; b: Id; apex: Id }
   // V8-g: the foot of the ⟂ from `from` onto the line through a,b (a triangle altitude's foot)
   | { kind: 'foot-seg'; from: Id; a: Id; b: Id }
+  /**
+   * #601 (ADR-3D-240): the MIRROR IMAGE of `from` across the line through a,b.
+   *
+   * A kite's fourth corner is exactly this — «דלתון ABCD» constrains |AB|=|AD| and |CB|=|CD|, which
+   * makes D the reflection of B across the axis AC. Determined, but NOT the parallelogram point, so
+   * the existing one-unknown arm could not serve it.
+   *
+   * A point KIND rather than an auto-minted foot point, by the operator's ruling (2026-08-16): a
+   * helper point on the canvas is visible work the student never asked for. `foot-seg` + `vec-rel`
+   * could express the same closed form at the cost of that extra ink, so the kind carries it instead.
+   */
+  | { kind: 'reflect-line'; from: Id; a: Id; b: Id }
   // V8-j (G12): the apex on segment a–b positioned so pyramid (base, apex) is RIGHT — i.e. the
   // point on a–b that sits directly above the base's centroid (closed-form t; no CAS)
   | { kind: 'right-pyramid-apex'; a: Id; b: Id; base: Id[] }

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-09-10T15:48:55.103Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "דלתון ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "kite",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    }
+  ]
+}
