@@ -71,7 +71,7 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, impliedPointBinding, buildParseCtx, classifyOutOfScope,
-  looksLikeLatex, wordRootMagnitude, statedNegation, splitGuidance, upperCasedLabelCandidate,
+  looksLikeLatex, wordRootMagnitude, statedNegation, splitGuidance, upperCasedLabelCandidate, hebrewLabelCandidate,
   droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs, droppedCompoundRelation,
 } from '../../../src/parser/index.ts';
 // #829: `independentConstructs` (#763) lives in the APP layer, not the parser — the seam is a submit-path
@@ -254,6 +254,16 @@ function guidedAtSeam(u, pctx, parsed) {
     if (lifted) {
       const lr = parse(lifted, pctx);
       if (lr.ok && lr.commands.length > 0) return { now: 'guided', detail: 'scope:lowercase-labels' };
+    }
+  }
+  // 5 — #968: the same nudge one ALPHABET over — Hebrew-letter vertex labels («מלבן אבגד»). Proof-based
+  // in the same way, and pre-LLM, so a triage row reads 'guided' exactly where the App now answers
+  // instead of paying for the call the prod session wasted.
+  if (!parsed) {
+    const latin = hebrewLabelCandidate(u);
+    if (latin) {
+      const hr = parse(latin, pctx);
+      if (hr.ok && hr.commands.length > 0) return { now: 'guided', detail: 'scope:hebrew-labels' };
     }
   }
   return null;

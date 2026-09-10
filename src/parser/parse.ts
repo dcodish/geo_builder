@@ -10909,6 +10909,53 @@ export function upperCasedLabelCandidate(utterance: string): string | null {
 }
 
 /**
+ * #968 — HEBREW-LETTER vertex labels: «מלבן אבגד» / «אלכסון בד». The direct sibling of
+ * {@link upperCasedLabelCandidate}, one alphabet over, and it works the same way: lift the candidate and
+ * let the caller PROOF re-parse it, so the note fires only when the corrected sentence really parses and a
+ * genuine gap stays a genuine gap.
+ *
+ * Israeli textbooks name vertices א-ב-ג-ד where we name them A-B-C-D, so a student reaching for it is
+ * following their book, not making a mistake. In prod it logged **not-understood** — the paid LLM fallback
+ * failed too — so that session produced nothing at all. The operator's ruling (2026-09-10) is to REJECT with
+ * a notice pointing at uppercase Latin letters, not to support the alphabet: real support would have to
+ * reach labels, RTL text direction (#549's class), export and every deterministic element id (`seg-AB`).
+ *
+ * **Which Hebrew tokens are labels.** Every construct noun in the grammar is also Hebrew letters, so this
+ * cannot key on script alone. It keys on the RANGE instead: vertex labels are drawn from the START of the
+ * alphabet (א-ט ⇒ A-I, nine letters — more vertices than any figure here needs), exactly as Latin ones come
+ * from A-H, while the geometry nouns essentially all carry a later letter — «מלבן» has מ, «אלכסון» has ל/כ/ס,
+ * «זווית» has ת, «בין» has י. Measured over the real vocabulary, that separates them cleanly. A leading
+ * «ל» — and ONLY «ל», the directional particle that actually precedes a label («לבא» = "to בא") — is stripped
+ * when the REMAINDER still qualifies; the unstripped reading is preferred, so «בד» stays the label BD rather
+ * than ב + ד. Widening the particle set to ב/ה/ו/מ/ש/כ was measured and REJECTED: it rewrites «שווה» to
+ * «ש-FFE», which forfeits a legitimate suggestion on any sentence carrying that very common word, and buys
+ * nothing the real input needs. `NEUTRAL_HE_WORDS` («היא», «של», «הוא») is excluded outright — belt and
+ * braces, since «היא» is already out of range via י.
+ *
+ * A wrong guess is harmless by construction: the candidate simply fails to parse and the caller says nothing.
+ */
+const HE_ALEF = 'א'.charCodeAt(0);
+/** Final forms fold to their medial letter before the position is read (the lexicon's ADR-3D-035 trap). */
+const HE_FINALS: Record<string, string> = { 'ך': 'כ', 'ם': 'מ', 'ן': 'נ', 'ף': 'פ', 'ץ': 'צ' };
+/** Highest alphabet position read as a label: א(1)…ט(9) ⇒ A…I. */
+const HE_LABEL_MAX = 9;
+const HE_PARTICLES = /^ל/;
+const NEUTRAL_HE_RE = rx(`^(?:${NEUTRAL_HE_WORDS})$`);
+const hePos = (ch: string): number => (HE_FINALS[ch] ?? ch).charCodeAt(0) - HE_ALEF + 1;
+const heLabelRun = (t: string): boolean => t.length >= 2 && t.length <= 8 && [...t].every((c) => { const p = hePos(c); return p >= 1 && p <= HE_LABEL_MAX; });
+const heToLatin = (t: string): string => [...t].map((c) => String.fromCharCode(64 + hePos(c))).join('');
+export function hebrewLabelCandidate(utterance: string): string | null {
+  let changed = false;
+  const out = utterance.replace(/[א-ת]+/g, (tok) => {
+    if (NEUTRAL_HE_RE.test(tok)) return tok;
+    if (heLabelRun(tok)) { changed = true; return heToLatin(tok); } // the unstripped reading wins — «בד» is BD
+    if (HE_PARTICLES.test(tok) && heLabelRun(tok.slice(1))) { changed = true; return `${tok[0]}-${heToLatin(tok.slice(1))}`; }
+    return tok;
+  });
+  return changed ? out : null;
+}
+
+/**
  * #536 — the SEQUENCE honesty gate, the third MIRROR half of the family (sibling of
  * {@link introducedNewLabels}). Every `dropped*` gate asks what the decomposition LOST; #255 asks what
  * it ADDED. Neither asks whether what survived was REORDERED — yet for a stated point-run the sequence

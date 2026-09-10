@@ -10371,3 +10371,61 @@ asserts ∠DBA really measures 30° on the drawing.
 **Found and not claimed here.** «זווית ABC היא 2α» silently commits **2°** — `measureAngle` requires `=`, so
 the «היא» spelling bypasses it and the numeric lane grabs the coefficient. Pre-existing on the *untouched*
 triple form (measured on the same HEAD), so it is neither caused nor fixed by this ADR; filed separately.
+## ADR-497 — HEBREW-LETTER VERTEX LABELS ARE TAUGHT, NOT SUPPORTED (#968)
+
+**Status:** accepted, 2026-09-10 · **Issue:** #968 (prod log-triage 2026-09-10, 1 distinct user)
+**Requirements:** [02](02-requirements.md) FR-IN-4b · **Design:** [04](04-design.md) — "Telling a LABEL from a WORD in Hebrew"
+
+**The report.** Prod: «מלבן אבגד , אלכסון בד , זוית בין בד לבא היא 30°». It logged **`not-understood`** —
+the deterministic grammar did not read it *and the paid LLM fallback failed too* — so the session
+produced nothing at all, having spent a call to get there.
+
+Hebrew-letter vertex naming (א-ב-ג-ד for A-B-C-D) is a real Israeli textbook convention. A student
+reaching for it is copying their book, not making a mistake.
+
+**Decision (operator ruling, 2026-09-10).** *"should be rejected with notice to user to use uppercase
+english letters."* So: a **nudge**, not alphabet support. The tool shows the corrected sentence and
+commits nothing.
+
+Real support was priced and declined: the label space reaches rendering, RTL text direction (the #549
+class), export, and every deterministic element id (`seg-AB`). That is a wide blast radius for a
+convention one line of guidance can redirect.
+
+**Mechanism — the #779 sibling, not a new one.** `upperCasedLabelCandidate` already does exactly this for
+lowercase Latin labels: lift the candidate, let the caller **re-parse** it, and show the note only if it
+parses. `hebrewLabelCandidate` is that function one alphabet over, wired at the same seam and **pre-LLM**,
+so the wasted call the prod session made cannot happen again. Reusing the mechanism is the point: this is
+one convention nudge with two alphabets, not two features.
+
+**The hard part is telling a LABEL from a WORD**, because every construct noun here is also Hebrew
+letters — script alone discriminates nothing. The rule is the alphabet **RANGE**: labels come from א-ט
+(⇒ A-I) as Latin ones come from A-H, while «מלבן» carries מ, «אלכסון» carries ל/כ/ס, «זווית» carries ת
+and «בין» carries י. Measured across the real vocabulary, that separates them cleanly (the table is in
+04-design).
+
+Two narrowings, both from measurement rather than reasoning:
+- **Final forms fold before the position is read** (ך→כ, ם→מ, ן→נ, ף→פ, ץ→צ) — they sit past ת in the
+  code block, so an unfolded read would exclude them for the wrong reason and break on a label using one.
+  The lexicon's ADR-3D-035 final-letter trap, one layer down.
+- **Only «ל» is stripped as a leading particle** («לבא» = "to בא"), unstripped reading preferred so «בד»
+  stays BD. Widening to ב/ה/ו/מ/ש/כ was tried and **rejected**: it rewrites «שווה» to «ש-FFE», forfeiting
+  the nudge on any sentence carrying that word.
+
+**Why a heuristic is acceptable here, and would not be elsewhere.** The proof gate inverts the cost of
+being wrong: a misread token yields a candidate that does not parse, and the caller then says nothing, so
+the student gets today's escalation. The failure mode of a bad guess is a **missed suggestion, never a
+wrong one** — and nothing is ever committed on the student's behalf. That is the same reasoning ADR-490
+uses for asking rather than guessing, applied to a detector instead of a rule.
+
+**Locks** (`src/parser/__tests__/hebrew-letter-labels.test.ts`, 24): «מלבן אבגד»/«משולש אבג»/«אלכסון בד»
+suggest their Latin sentences and those sentences parse; positional transliteration through a hexagon;
+final-form folding; the «ל» strip and the unstripped-preferred rule; the operator's **exact prod line**
+transliterated verbatim; eleven ordinary Hebrew sentences asserted **untouched** (the real risk in the
+change), «שווה» among them with the reason recorded; and the proof gate asserted to stay silent when the
+candidate does not parse. `triage-mirror.test.ts` fired on this change and the harness seam was mirrored
+in the same commit, as ADR-346 requires.
+
+**Composes with [ADR-496](#adr-496).** The full prod line transliterates to
+«מלבן ABCD , אלכסון BD , זוית בין BD ל-BA היא 30°» — which parses only once #967's segment-pair angle
+lands. The two together turn that student's session from nothing into a figure; each alone gets part-way.
+That is why this ADR's lock asserts the *transliteration* (its own job) rather than the end-to-end parse.
