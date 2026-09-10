@@ -1102,14 +1102,14 @@ function ratioT(s: string, id: Id, a: Id, b: Id): number | 'invalid' | undefined
   const halves = riderPairsT(id, a, b, p, x, y, q, parseFloat(num));
   if (halves !== 'invalid') return halves;
   // Not the two halves against each other — try the WHOLE-host shape («SE = 0.4·SA»), the same
-  // statement family, read by the same module (ADR-3D-224). Still 'invalid' ⇒ a ratio clause IS
+  // statement family, read by the same module (ADR-3D-238). Still 'invalid' ⇒ a ratio clause IS
   // present and does not describe this rider: refused, never dropped.
   const side = riderWholeSide(id, a, b, p, x, y, q);
   return side === 'invalid' ? 'invalid' : riderWholeT(side, parseFloat(num));
 }
 
 /**
- * The clause's ratio stated with a LETTER — «E על SA כך ש-SE = t·SA» (#921, ADR-3D-224).
+ * The clause's ratio stated with a LETTER — «E על SA כך ש-SE = t·SA» (#921, ADR-3D-238).
  *
  * NAME-ONLY: the rider still samples its `t` exactly as a free rider does, and nothing here promotes
  * `t` to a solver unknown — that is the mistake #814 documents. All this records is that the student
@@ -4107,6 +4107,38 @@ const planeRelGiven: Rule = (s0) => {
       }
     }
     if (a.op.kind === 'axis' || b.op.kind === 'axis') return null; // the axis cells have no drive yet
+    // #963 (ADR-3D-238) — CONTAINMENT IS NOT A DIRECTION RELATION, so the bail below does not govern it.
+    //
+    // That one-line guard ("a point has no direction") is correct for perp/parallel/angle and wrong for
+    // `contained`: a point inside a plane is MEMBERSHIP, the most ordinary thing a solid-geometry
+    // question says, and the engine has had the command for it since ADR-3D-015. The whole containment
+    // FRAME — «מוכל ב…», «נמצא ב…», «מונח על…», "is contained in", "lies in" — was therefore readable
+    // for a line and unreadable for a point, in BOTH languages: «C מוכלת במישור π1» and
+    // "C lies in plane π1" both escalated, while «C על המישור π1» and "C lies on plane π1" built.
+    // So this is not a missing-Hebrew-spelling bug (the shape #963 was filed as); it is one operand
+    // kind missing from one frame, which is why it is fixed at the frame and not by adding spellings.
+    //
+    // Lowers to the EXISTING `on-planes` — no new command, per #641's instruction that this be one
+    // `object ⊂ plane` membership over the shared operand reader rather than a fourth bespoke rule.
+    if (rel === 'contained' && (a.op.kind === 'point' || b.op.kind === 'point')) {
+      const pt = a.op.kind === 'point' ? a : b;
+      const container = (pt === a ? b : a).op;
+      if (pt.op.kind !== 'point') return null;
+      // The CONTAINER must be a plane. «C מוכלת ב-AB» names a segment, which contains points but is not
+      // this relation's container — refused rather than given an invented meaning (the same boundary
+      // the line lane draws).
+      if (container.kind === 'plane-named') return [{ type: 'on-planes', id: pt.op.id, plane: canonicalPlane(container.name) }];
+      // A point-RUN container is materialised first, exactly as `pointRelPlane` does for «E על המישור ABC»,
+      // so the two spellings of one statement reach the same pair of commands.
+      if (container.kind === 'plane-run') {
+        const name = container.ids.join('');
+        return [
+          { type: 'plane-through', name, ids: container.ids },
+          { type: 'on-planes', id: pt.op.id, plane: name },
+        ];
+      }
+      return null;
+    }
     if (a.op.kind === 'point' || b.op.kind === 'point') return null; // a point has no direction
     if (sameOperand(a.op, b.op)) return null;
     // the frozen segment × POINT-RUN owners keep their cells (they run earlier; defensive)
