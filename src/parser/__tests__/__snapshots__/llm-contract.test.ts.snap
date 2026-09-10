@@ -1706,6 +1706,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "tangent",
     ],
   },
+  "the angle between BD and BA is 30": {
+    "en": [
+      "segment",
+      "segment",
+      "set-angle",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "set-angle",
+    ],
+  },
   "the centre of the circle": {
     "en": [
       "circle",

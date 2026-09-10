@@ -10307,6 +10307,70 @@ locales carry the ask with both slots.
 ever added — would be a different rule: this one answers only the case where nothing in the sentence
 could be the second operand.
 
+## ADR-496 — AN ANGLE IS ADDRESSED BY ITS TWO SIDES, NOT ONLY BY THREE LETTERS (#967)
+
+**Status:** accepted, 2026-09-10 · **Issue:** #967 (prod log-triage 2026-09-10, 2 distinct users)
+**Requirements:** [02](02-requirements.md) FR-IN-7c · **Design:** [04](04-design.md) — "Addressing an angle: one reader, many value kinds"
+
+**The report.** Prod, 2 distinct users / 3 submits:
+«מלבן ABCD , אלכסון AB , זוית בין BD לBA היא 30°». A third user typed the same sentence with Hebrew-letter
+labels and it logged **`not-understood`** — the paid LLM fallback failed too, so that student got nothing.
+
+**Root cause, measured before anything was changed.** Two plausible diagnoses were falsified first, which
+is why this is not a phrasing patch:
+
+- **Not the comma splitter.** «מלבן ABCD , אלכסון BD» builds both clauses; so does «משולש ABC , ריבוע WERT».
+  The splitter is all-or-nothing, so one unreadable clause fails the whole line — but the splitter is sound.
+- **Not a spelling slip.** Every neighbouring spelling failed identically (defective «זוית», `ל-`/`ל `/«לבין»,
+  with and without «מעלות», and the English form), so tolerating a variant would have fixed nothing.
+
+The decisive measurement was the same line with the angle clause respelled:
+«מלבן ABCD , אלכסון BD , **זווית DBA = 30**» → builds, verifier-clean. Exactly one clause was responsible,
+and what it needed was a way to **name** the angle, not a way to phrase a value.
+
+The real gap: 2-D's angle family is rich — value, Greek symbol, word-numbers, right-angle word, acuteness,
+bound, range — and **every member was reachable through exactly one spelling**, the vertex triple. Naming an
+angle by the two sides that form it, which is how a textbook says it, had no form at all. 3-D has shipped
+that mode since #534/#523/#917.
+
+**Decision.** Add the **addressing mode** at the chokepoint that exists for precisely this question.
+`angleBetweenSides` resolves a pair of named segments to the endpoint they share and returns the ordinary
+`{ray1, vertex, ray2}`: BD and BA meet at B, so the student means ∠DBA — *the identical constraint the
+triple spelling emits*. Nothing downstream changes; no new constraint kind, no new rendering path.
+
+Placed in `angleArms` (#831/[ADR-468](#adr-468)), the mode is inherited by both value lanes that share that
+reader rather than copied per phrasing. `angleAcuteness` and `boundOperand` keep their own copies of the
+triple/single-vertex lanes — the #831 remainder — so the mode was added there **additively**, leaving those
+lanes untouched, and the duplication is recorded in 04-design and filed separately rather than refactored
+inside a feature slice (which would have hidden a regression surface inside a feature's locks).
+
+**Two guards carry the safety, and both are deliberate.** Labels are read **uppercase-only**, because the
+English spelling puts lowercase words between the operands ("between BD **and** BA **is** 30") and a
+case-insensitive read would take "and" for the labels A,N,D — #497's exact defect ("draw a square ABCD"
+building square D,R,A,W). Pairs are read **contiguous**, because `\b([A-Z])([A-Z])\b` cannot match inside
+«ABC», so the triple spelling can never be re-read as a segment pair. The lane is additionally gated on the
+«בין»/"between" connective and only ever runs from a rule that has already matched an angle keyword, so the
+point-between form «E בין A ל-B» (#95) is untouched.
+
+**A disjoint pair is refused BY NAME, and that is part of the capability.** Two segments that never meet
+have no vertex between them, and 2-D has no line-line angle constraint — every angle constraint here is
+vertex-anchored. Picking a nearby vertex would assert a given the student never stated
+([ADR-052](#adr-052)); escalating hands the model the same invention to make. So it returns
+`angle-sides-disjoint`, quoting both segment names back (the honesty invariant), and the text stays for
+editing in place. 3-D accepts these only because it has a direction/`claim` substrate 2-D does not — the
+parity delivered here is the **addressing mode**, not the constraint kinds behind it.
+
+**Locks.** `src/parser/__tests__/angle-between-sides.test.ts` (26): the operator's utterance verbatim —
+defective «זוית», no space in «לBA», the ° glyph — plus eight spellings across both languages, all resolving
+to ∠DBA; the arms are drawn; the mode carries a Greek symbol, a word-number, the right-angle word,
+acuteness, a bound and a range; the three disjoint/degenerate pairs are refused by name in both the value
+and acuteness lanes; and the triple, single-vertex, «E בין A ל-B», «AB מאונך ל-CD» and length-bound readings
+are asserted unchanged. Scenario `angle-named-by-its-two-sides-967` (corpus 4) replays the prod line and
+asserts ∠DBA really measures 30° on the drawing.
+
+**Found and not claimed here.** «זווית ABC היא 2α» silently commits **2°** — `measureAngle` requires `=`, so
+the «היא» spelling bypasses it and the numeric lane grabs the coefficient. Pre-existing on the *untouched*
+triple form (measured on the same HEAD), so it is neither caused nor fixed by this ADR; filed separately.
 ## ADR-497 — HEBREW-LETTER VERTEX LABELS ARE TAUGHT, NOT SUPPORTED (#968)
 
 **Status:** accepted, 2026-09-10 · **Issue:** #968 (prod log-triage 2026-09-10, 1 distinct user)

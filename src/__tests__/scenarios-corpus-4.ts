@@ -2460,4 +2460,19 @@ export const SCENARIOS_4: Scenario[] = [
       expect(angle(P('A'), P('B'), P('C')), 'the stated right angle at B still holds').toBeCloseTo(90, 1);
     },
   },
+  {
+    id: 'angle-named-by-its-two-sides-967',
+    title: '#967: «זוית בין BD לBA היא 30°» — an angle named by its two SIDES lands as a real given',
+    guards:
+      "prod log-triage 2026-09-10, 2 distinct users / 3 submits: «מלבן ABCD , אלכסון AB , זוית בין BD לBA היא 30°». 2-D's angle family (value, symbol, word-numbers, acuteness, bound, range) was reachable ONLY through the three-letter vertex triple, so naming the angle by the two segments that form it — how a textbook says it — was not-handled in every spelling, while 3-D has shipped the mode since #534/#523/#917. One of the two prod occurrences logged not-understood: the LLM failed too, so that student got nothing. Measured before the fix: the identical line with the angle respelled «זווית DBA = 30» built and verified, which is what proved exactly one clause was responsible and that the comma splitter was NOT at fault. The fix is an ADDRESSING MODE in `angleArms` (the #831/ADR-468 chokepoint that exists to answer 'which angle is named' once), so the mode is inherited by every value kind rather than copied per rule. This scenario locks the operator's exact utterance, verbatim — defective «זוית», no space in «לBA», and the ° glyph — because each of those was a separately plausible point of failure.",
+    steps: ['מלבן ABCD', 'אלכסון BD', 'זוית בין BD לBA היא 30°'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the figure verifies against its givens').toEqual([]);
+      // The whole point: the stated 30° is a REAL given on ∠DBA, not a dropped magnitude (honesty
+      // invariant) and not a default that happened to match — the segment pair BD/BA shares B, so the
+      // angle it names is ∠DBA, the identical constraint the triple spelling emits.
+      expect(angle(at(fig, 'D'), at(fig, 'B'), at(fig, 'A')), '∠DBA is the stated 30°').toBeCloseTo(30, 1);
+    },
+  },
 ];

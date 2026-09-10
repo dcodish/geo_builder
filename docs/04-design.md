@@ -278,6 +278,44 @@ The scoping discipline is the same for any future member: register the ask **aft
 the complete form, and make the absence **structural** (here, an end-of-line anchor after the factor, so
 a line carrying «מ…» cannot match) rather than inferred from the other rule having failed.
 
+## Addressing an angle: one reader, many value kinds (#967, [ADR-496](06-decisions.md#adr-496))
+
+An angle statement has two independent halves: **which angle** is named, and **what is said about it**.
+The value half is a family — a number, a Greek symbol, a word-number, a right-angle word, an acuteness, a
+bound, a range. The naming half was, until #967, a single spelling: the three-letter vertex triple.
+
+That asymmetry is a defect generator, and #831/[ADR-468](06-decisions.md#adr-468) had already named it
+once: when each value rule resolved the vertex for itself, only one of them ever grew the single-vertex
+lane, so «זווית A = α» fell between two rules that each handled half of it. The answer then was to make
+**`angleArms` the one place that answers "which angle is being named"**, so a rule decides only what its
+value *means*.
+
+#967 is the same shape one axis over — the naming half had one spelling where it should have had two —
+and it gets the same answer rather than a new rule per phrasing:
+
+```
+«הזווית בין BD ל-BA»  ──►  angleBetweenSides  ──►  { ray1: D, vertex: B, ray2: A }  ──►  the existing family
+```
+
+Two segments that share exactly one endpoint **are** a vertex angle, so the mode resolves to the ordinary
+triple and every downstream layer — constraint, arc, value chip, verifier — is untouched. That equivalence
+is the whole fix; there is no new constraint kind and no new rendering path.
+
+**Where the mode had to be added by hand, and why that is recorded rather than tidied.** `angleArms` has
+two callers (the numeric and symbolic value lanes). `angleAcuteness` and `boundOperand` still keep their
+**own copies** of the triple/single-vertex lanes — the #831 remainder, never migrated — so the new mode was
+added to them explicitly, *additively*, leaving their existing lanes untouched so no reading changes. The
+duplication is the standing hazard: a fourth naming mode would have to be copied three times. Retiring
+those copies in favour of `angleArms` is filed separately; it is a behaviour-preserving refactor, and doing
+it inside a feature slice would have hidden a regression surface inside a feature's locks.
+
+**The refusal is part of the capability.** Two segments that never meet have no vertex between them, and
+2-D has no line-line angle constraint — *every* angle constraint here is vertex-anchored
+(`set-angle`, `-bound`, `-ratio`, `-order`, `-acuteness`, `measure-angle`). So the honest answer is neither
+a guessed vertex nor an escalation (which hands the model the same invention to make): it is
+`angle-sides-disjoint`, quoting both segment names back — a member of the clarification family above, by
+the same reasoning. 3-D accepts these because it has a direction/`claim` substrate that 2-D does not; the
+parity is in the *addressing mode*, not in the constraint kinds behind it.
 ## Telling a LABEL from a WORD in Hebrew (#968, [ADR-497](06-decisions.md#adr-497))
 
 The convention nudge (#779) lifts `abcd` to `ABCD`, checks the corrected sentence parses, and shows it

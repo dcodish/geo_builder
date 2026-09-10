@@ -281,6 +281,17 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     ui.setBusy(false);
     return;
   }
+  // #967: an angle addressed by its two SIDES whose segments do not MEET («הזווית בין AB ל-CD»). Two
+  // disjoint segments have no vertex between them, so there is no angle of the kind this tool constrains
+  // (that would be a line-line angle — a constraint kind 2-D does not have). Picking some nearby vertex
+  // would assert a given the student never stated; escalating hands the LLM the same invention to make.
+  // So it is refused BY NAME, quoting the two segments back (the honesty invariant), and the text stays.
+  if (!r.ok && r.reason === 'angle-sides-disjoint') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `angle-sides-disjoint:${r.s1}/${r.s2}` });
+    ui.setInputNote(t('input.angleSidesDisjoint', { s1: r.s1, s2: r.s2 }));
+    ui.setBusy(false);
+    return;
+  }
   // A BOUND radius symbol («R» after «רדיוס מעגל O הוא R») reused as a POINT label («מיתר AR») — once bound,
   // the letter IS the parametric radius, never a node (operator ruling, #198). Say so deterministically and
   // keep the text so the student renames the point; never a paid LLM call that would mint the node R.

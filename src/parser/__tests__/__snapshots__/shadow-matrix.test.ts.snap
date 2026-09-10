@@ -1119,6 +1119,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "the angle between BD and BA is 30",
+    "winner": "angle",
+  },
+  {
+    "lang": "he",
+    "text": "הזווית בין BD ל-BA היא 30",
+    "winner": "angle",
+  },
+  {
+    "lang": "en",
     "text": "angle ABC equals thirty degrees",
     "winner": "angle",
   },
