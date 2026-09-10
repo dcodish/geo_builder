@@ -488,11 +488,17 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
         // («D(3,p,0)» → D's y). Its value is that component's, read from the final positions. The
         // verifier has to know every kind of letter apply routes, or a correctly-applied sign reports
         // `sign-unsatisfiable` against a figure that honours it.
+        // #930 (ADR-3D-236): ...and the FOURTH — a vec-def RATIO symbol («SN = k·SC»). The verifier
+        // knew every kind of letter apply routes EXCEPT this one, so a correctly-honoured «k חיובי»
+        // reported `sign-unsatisfiable` against a figure that honours it. Measured: that is exactly what
+        // happened the moment apply started accepting the sign. `ratioSymbols` is published by the code
+        // that picks the root, so the two can never disagree about which value was used.
         const bound = c.partialNames.find((b) => b.sym === cmd.sym);
         const v =
           resolved.param?.name === cmd.sym
             ? resolved.param.value
             : (resolved.pivot?.pinSymbols?.[cmd.sym] ??
+               resolved.ratioSymbols?.[cmd.sym] ??
                (bound ? componentValue(c, bound.target, bound.axis, (id) => positions.get(id)) : undefined));
         if (v === undefined || !Number.isFinite(v) || (cmd.positive ? v <= 1e-9 : v >= -1e-9)) {
           status[f.id] = { code: 'sign-unsatisfiable', id: cmd.sym };

@@ -84,7 +84,13 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   letter with more than one owner receives the value at every owner. A value the figure cannot satisfy is
   **refused, naming the statement**; a letter the figure does not carry is refused as unknown — never a
   silent no-op. *(Realised — [ADR-3D-219](06b-decisions-3d.md#adr-3d-219), #902; `issue-902.test.ts`,
-  `fixtures3/coord-symbol-value-902.geo3.json`.)*
+  `fixtures3/coord-symbol-value-902.geo3.json`.)* **The same holds for a stated SIGN** («k חיובי»,
+  «k שלילי»): it is honoured for every kind of letter the figure defines, selecting among the roots where
+  the symbol is pinned and choosing which half of the free range where it is not — a sign is the student
+  saying WHICH branch they meant, and a default that survived it would assert a given they never gave
+  (ADR-052). A sign no letter in the figure can carry is refused as unknown; one this kind of letter
+  genuinely cannot expose (a rider parameter, confined to (0,1) by its own membership) says exactly that.
+  *(Realised — [ADR-3D-236](06b-decisions-3d.md#adr-3d-236), #930/#922.)*
 - **FR-VC-2c (Must)** — **A value whose letter is no longer defined is a fact in error, and the change that
   undefined it says so.** When the row that introduced the letter («∠SAB = α», «C(p²,1,0)», «SN = k·SC»)
   is deleted, muted or edited away, the value row («α = 70», «p = 3», «k = 1/2») stays in the list, is

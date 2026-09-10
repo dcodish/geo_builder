@@ -1802,13 +1802,21 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // letter denotes. Every owner gets the sign. (A vec-def's ratio symbol is not a sign-selectable
       // owner — its root pick has no sign lane — so a letter that is ONLY that still refuses, as before.)
       // #922 (ADR-3D-225) — HONESTY OF THE REFUSAL. Two owner kinds carry a letter but expose no sign to
-      // select: a vec-def's ratio symbol (root pick is `firstNonDegenerateRoot`) and a rider's parameter
+      // select: a rider's parameter
       // (confined to (0,1) by its own membership). Refusing those as `unknown-symbol` stated something the
       // figure contradicts — «הפרמטר k לא הוגדר בסרטוט» about a letter the figure defines. Now the message
       // says what is actually true: the sign is not selectable for THIS kind of letter. A letter no
       // mechanism owns still refuses `unknown-symbol`, and the two must not collapse into one.
+      // #930: the vec-def half of that refusal is now a CAPABILITY — see above. `sign-not-selectable`
+      // remains for the rider parameter, whose (0,1) confinement genuinely exposes no sign to pick.
+      // #930 (ADR-3D-236) — the CAPABILITY half of #922. A vec-def's ratio symbol («SN = k·SC») is
+      // pinned by a relation with two roots, so it carries a real branch choice and «k חיובי» is the
+      // student saying WHICH. #922 made the refusal truthful (`sign-not-selectable` instead of falsely
+      // claiming the figure never defined k); this makes it selectable, so the given is honoured rather
+      // than honestly declined. The sign rides the SAME `paramSigns` list every other lane uses —
+      // {@link firstNonDegenerateRoot} reads it, filtered to this symbol.
       const owners = symbolOwnersOf(c, cmd.sym);
-      const solverOwned = owners.some((o) => o.kind === 'pin-sym' || o.kind === 'param');
+      const solverOwned = owners.some((o) => o.kind === 'pin-sym' || o.kind === 'param' || o.kind === 'vec-def');
       const components = owners.filter((o): o is Extract<SymbolOwner, { kind: 'component' }> => o.kind === 'component');
       if (!solverOwned && components.length === 0) {
         const code = owners.length ? ('sign-not-selectable' as const) : ('unknown-symbol' as const);

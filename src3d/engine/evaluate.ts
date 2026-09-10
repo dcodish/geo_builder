@@ -384,6 +384,12 @@ export interface Resolved3 {
    *  branch choice. A coordinate is knowledge only when these agree; without it, a deterministic
    *  branch pick reads seed-stable and prints as fact. */
   pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number> } | null;
+  /** #930 (ADR-3D-236) — each vec-def RATIO symbol's solved value («SN = k·SC» → k), so a consumer can
+   *  read what the branch pick actually chose. The sign verifier needs it: without it a correctly
+   *  honoured «k חיובי» reported `sign-unsatisfiable`, because the verifier knew how to read a figure
+   *  parameter, a pin symbol and a named component — every kind of letter EXCEPT this one. Published by
+   *  the code that picks the root, so the two can never disagree about which value was used. */
+  ratioSymbols: Record<string, number>;
   /** V6 — resolved solids of revolution (world centre/apex + numeric radius/height) for the renderer. */
   revolutions: { kind: 'cylinder' | 'cone' | 'sphere'; center: Vec3; apex?: Vec3; r: number; h: number }[];
   /** V8-i — resolved circles in R³ (world centre + unit normal + radius + in-plane basis) for the renderer + on-circle checks. */
@@ -976,7 +982,20 @@ function firstNonDegenerateRoot(
   roots: number[],
 ): number | undefined {
   const tol = 1e-6 * figureScale(pos);
-  for (const k of roots) if (pinDrivenSegLen(c, pin, vd, pos, k) > tol) return k;
+  // #930 (ADR-3D-236): a stated sign for THIS vec-def's symbol selects among the roots. A length-rel
+  // pin typically has two, and «k חיובי» is the student saying which branch they meant — so the
+  // eligible set is filtered BEFORE the degeneracy walk, never after, or a sign could be "honoured"
+  // by a root the walk had already rejected.
+  //
+  // Filtered by `sym` deliberately. The other sign consumers in this file apply `paramSigns.every`
+  // to every root regardless of which symbol each sign names — sound while a figure has one symbol,
+  // and not something to copy: here a second vec-def's sign must not constrain this one's branch.
+  const signs = c.paramSigns.filter((g) => g.sym === vd.symbol);
+  const eligible = signs.length ? roots.filter((k) => signs.every((g) => (g.positive ? k > 1e-9 : k < -1e-9))) : roots;
+  for (const k of eligible) if (pinDrivenSegLen(c, pin, vd, pos, k) > tol) return k;
+  // No root honours the sign: return nothing, so the point stays UNPLACED and the store's existing
+  // vec-rel check refuses honestly. A sign that cannot be satisfied must never fall back to a root
+  // the student excluded — that would draw the branch they ruled out and call it green.
   return undefined;
 }
 
@@ -1233,8 +1252,9 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   }
 
   const freePlaneDofs = new Map<string, number>();
+  const ratioSymbols = new Map<string, number>(); // #930: vec-def ratio symbol → the value the root pick chose
   const freeLineDofs = new Map<string, number>();
-  evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs, freeLineDofs);
+  evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs, freeLineDofs, undefined, ratioSymbols);
   // #487: a free plane pinned by a member that was itself only placed DURING the pass (a midpoint, a
   // rider of another carrier) resolves against stale positions the first time — re-run the point pass
   // so riders and derived points read the pinned plane.
@@ -1253,7 +1273,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     const movedP = resolveFreePlanes3(c, seed, pos, planes, lines, freePlaneDofs);
     const movedL = resolveFreeLines3(c, seed, pos, planes, lines, freeLineDofs);
     if (!movedP && !movedL) break;
-    evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs, freeLineDofs);
+    evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs, freeLineDofs, undefined, ratioSymbols);
   }
 
   // ---- ADR-3D-032: a given referencing a coord-sym point pins the parameter — a
@@ -2160,6 +2180,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     freePlaneDofs,
     freeLineDofs,
     placementSampled,
+    ratioSymbols: Object.fromEntries(ratioSymbols),
   };
 }
 
@@ -2182,6 +2203,9 @@ function evaluateSolidsAndPoints(
   /** #820 (ADR-3D-204): pivot-solved on-segment rider parameters — a free rider whose `t` a stated
    *  given DRIVES is placed at the solved value, not at the seed's sample. */
   riderTOverride?: ReadonlyMap<Id, number>,
+  /** #930 (ADR-3D-236): out-param — each vec-def ratio symbol's CHOSEN value, recorded by the code that
+   *  picks the root so the sign verifier reads what was actually used rather than re-deriving it. */
+  ratioSymbols?: Map<string, number>,
 ): void {
   let dimCursor = 0;
   c.solids.forEach((solid, i) => {
@@ -2341,9 +2365,21 @@ function evaluateSolidsAndPoints(
           if (chosen === undefined) continue; // no non-degenerate root — unpositioned, store refuses (no-solution)
           k = chosen;
         } else {
-          k = sample(seed, `sym-${vd.symbol}-${vd.unknown}`, 0.2, 0.8); // an unpinned symbol is a FREE DOF
+          // #930 (ADR-3D-236): an unpinned symbol is a FREE DOF — and a stated SIGN is the student
+          // choosing which half of it. Sampling (0.2, 0.8) unconditionally made «k חיובי» vacuously true
+          // and «k שלילי» falsely `sign-unsatisfiable`: the figure can perfectly well put N beyond S on
+          // the SC line, the sampler just never looked there. A default that survives a contradicting
+          // statement is asserting a given the student never gave (ADR-052), so the range follows the sign.
+          const neg = c.paramSigns.some((g) => g.sym === vd.symbol && !g.positive);
+          k = neg
+            ? sample(seed, `sym-${vd.symbol}-${vd.unknown}`, -0.8, -0.2)
+            : sample(seed, `sym-${vd.symbol}-${vd.unknown}`, 0.2, 0.8);
         }
       }
+      // #930 (ADR-3D-236): record the value ACTUALLY used, on every path — the pinned root pick above
+      // and the sampled free DOF alike. Recording per-branch missed the sampled case, and the sign
+      // verifier then reported `sign-unsatisfiable` on a figure whose k was a perfectly positive sample.
+      if (vd.symbol) ratioSymbols?.set(vd.symbol, k);
       const P = solveVecDef(c, vd, pos, k);
       if (P) pos.set(id, P);
     } else if (def.kind === 'vec-pair') {
