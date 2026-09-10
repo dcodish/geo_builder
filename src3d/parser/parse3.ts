@@ -3280,16 +3280,33 @@ const onAxes: Rule = (s) => {
   return null;
 };
 
+/**
+ * #977 (ADR-3D-241) — THE ANGLE NOUN AND THE COPULA, SPELLED ONCE.
+ *
+ * Both angle-statement rules used to carry their own inline copy of each, and the two copies had already
+ * drifted: `vertexAngleClaim` accepted a bare "angle ABC", `angleMarker` required "the angle ABC", and
+ * NEITHER knew «שווה» — so «זווית ABC שווה 40» was refused while «זווית ABC היא 40» built, and
+ * "angle ABC = α" was refused while «זווית ABC = α» built. Two rules, four vocabularies, three gaps.
+ *
+ * This is #969/[ADR-498]'s shape one product over, and it gets that ADR's answer rather than its code:
+ * the vocabulary is defined once and both rules read it, so a spelling added here serves every rule at
+ * once and no rule can quietly know a word its sibling does not.
+ */
+const ANGLE_PRE_3 = String.raw`(?:∠|ה?זו?וית\s+|(?:the\s+)?angle\s+(?:at\s+)?)`;
+/** «היא» · «הוא» · «שווה» · «שווה ל-» · `=` · "is" · "equals". A copula carries no meaning the tool
+ *  needs; it must never decide whether a statement is understood. */
+const ANGLE_COPULA_3 = String.raw`(?:היא|הוא|שווה\s*ל?\s*-?|equals?|is|=)`;
+
 /** `∠PC'C = 82.1` / `הזווית PC'C היא 90` — the vertex form lowers to the angle-between-segments claim.
  *  #251 (ADR-3D-049): also the `ישרה`/`is right` word-form (deg 90), and the SINGLE-VERTEX form
  *  (`זוית O ישרה`, `זווית O = 90`, `angle at O is right`) → `vertex-angle`, arms resolved at APPLY. */
 const vertexAngleClaim: Rule = (s0) => {
   const s = stripStatementPrefix(s0);
   const L = String.raw`([A-Z]\d*'?)`;
-  const PRE = String.raw`(?:∠|ה?זו?וית\s+|the angle\s+(?:at\s+)?|angle\s+(?:at\s+)?)`;
+  const PRE = ANGLE_PRE_3; // #977: the shared noun — a rule may not know a spelling its sibling does not
   const RIGHT = String.raw`(?:היא\s+|הוא\s+)?ישרה|is\s+(?:a\s+)?right(?:\s+angle)?`;
   const m =
-    s.match(new RegExp(`^${PRE}${L}${L}${L}\\s*(?:היא|הוא|is|=)\\s*(${NUM})\\s*°?$`)) ??
+    s.match(new RegExp(`^${PRE}${L}${L}${L}\\s*${ANGLE_COPULA_3}\\s*(${NUM})\\s*°?$`)) ??
     s.match(new RegExp(`^${PRE}${L}${L}${L}\\s+(?:${RIGHT})$`));
   if (m) {
     const [, p, vertex, q, deg] = m;
@@ -3300,7 +3317,7 @@ const vertexAngleClaim: Rule = (s0) => {
     ];
   }
   const sv =
-    s.match(new RegExp(`^${PRE}${L}\\s*(?:היא|הוא|is|=)\\s*(${NUM})\\s*°?$`)) ??
+    s.match(new RegExp(`^${PRE}${L}\\s*${ANGLE_COPULA_3}\\s*(${NUM})\\s*°?$`)) ??
     s.match(new RegExp(`^${PRE}${L}\\s+(?:${RIGHT})$`));
   if (sv) return [{ type: 'vertex-angle', vertex: sv[1], deg: sv[2] !== undefined ? +sv[2] : 90 }];
   return null;
@@ -3476,12 +3493,20 @@ const angleEquality3: Rule = (s0) => {
  *  query (owned by scope3). A single-LETTER RHS (`= α`, Greek or Latin) is a display NAME for the angle. */
 const angleMarker: Rule = (s0) => {
   const s = stripStatementPrefix(s0).trim();
+  // #977: the shared noun and copula, plus an optional COEFFICIENT on the symbol — «זווית ABC = 2α» is
+  // the form a bagrut question uses when two angles are in a stated ratio, and it was unreadable behind
+  // every copula including `=`, while the bare «= α» built. The coefficient rides the mark; the value
+  // that later lands on the letter is multiplied by it, so «2α» with «α = 30» is a 60° angle.
   const m = s.match(
-    new RegExp(`^(?:∠|ה?זו?וית\\s+|the angle\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*(?:(?:=|היא|הוא|is)\\s*([A-Za-zα-ωΑ-Ω]))?\\s*$`),
+    new RegExp(`^${ANGLE_PRE_3}([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*(?:${ANGLE_COPULA_3}\\s*(\\d+(?:\\.\\d+)?)?\\s*[*·]?\\s*([A-Za-zα-ωΑ-Ω]))?\\s*$`),
   );
   if (!m) return null;
-  const [, p, vertex, q, label] = m;
-  return [{ type: 'angle-mark', vertex, p, q, ...(label ? { label } : {}) }];
+  const [, p, vertex, q, coefRaw, label] = m;
+  const coef = coefRaw ? parseFloat(coefRaw) : undefined;
+  // A coefficient with no symbol is a NUMBER, and `vertexAngleClaim` owns those (it runs first). Reaching
+  // here with one and no letter would mean the regex matched something this rule cannot mean.
+  if (coef !== undefined && !label) return null;
+  return [{ type: 'angle-mark', vertex, p, q, ...(label ? { label } : {}), ...(coef !== undefined ? { coef } : {}) }];
 };
 
 /** Build a VecAtom from a regex operand triple: a lowercase name, or a point pair. */

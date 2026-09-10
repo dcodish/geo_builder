@@ -410,6 +410,9 @@ export interface AngleMark3Command {
   p: Id;
   q: Id;
   label?: string;
+  /** #977: the symbol's COEFFICIENT — «∠ABC = 2α» carries 2. A value later given to the letter is
+   *  multiplied by it, so the same letter can name two angles in a stated ratio. Absent ⇒ 1. */
+  coef?: number;
 }
 
 /** `E מפגש התיכונים של משולש BC'D` — the centroid of three existing points. */
@@ -1097,7 +1100,9 @@ export interface Construction3 {
   /** Auxiliary drawn segments (beyond the solids' own edges). */
   segments: [Id, Id][];
   /** #94 — named-angle MARKERS (`∠SDB` / `∠SDB = α`): pedagogical arc highlights, no DOF, no verification. */
-  angleMarks: { vertex: Id; p: Id; q: Id; label?: string }[];
+  /** #977: `coef` is the symbol's multiplier — «∠ABC = 2α» stores 2, so a value later given to the
+   *  letter drives this angle to `coef × value`. Absent ⇒ 1. */
+  angleMarks: { vertex: Id; p: Id; q: Id; label?: string; coef?: number }[];
   /** #319 — LABELED line↔plane angle measures («זוית בין SB ומישור ABC היא α»): pedagogical naming,
    *  never a driver; the panel prints `label = X°` when the angle is seed-stable (angles are
    *  scale-free, so no scale gate — the ADR-3D-054 taxonomy). */

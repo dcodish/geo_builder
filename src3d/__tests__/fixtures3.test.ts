@@ -29,6 +29,10 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #977 (ADR-3D-241) — a symbolic angle with a COEFFICIENT, stated behind a copula that was unreadable
+  // before. The figure must build AND the drawn angle must be 2 × 30: the fixture nets the parse and the
+  // drive together, which is what makes it the right lock for "this sentence now works end to end".
+  'angle-coef-symbol-977.geo3.json': ['משולש ABC', 'זווית ABC שווה 2α', 'α = 30'],
   'prism-2020-q2.geo3.json': [
     'מנסרה ישרה משולשת ABC',
     "M אמצע B'C'",

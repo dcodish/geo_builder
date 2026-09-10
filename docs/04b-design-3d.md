@@ -166,6 +166,21 @@ away. Reuse is checked on the residual's MEANING, not its field list — `cos-an
 operands and the wrong (signed) quantity, and a drive that targets something other than what its verifier
 measures produces figures its own claim then refutes. See [ADR-3D-217](06b-decisions-3d.md#adr-3d-217).
 
+**Vocabulary is not a rule's private property** (#977, [ADR-3D-241](06b-decisions-3d.md#adr-3d-241)).
+Two rules read angle statements, and each carried its own inline copy of the angle NOUN and the COPULA.
+The copies had drifted before anyone noticed: one accepted a bare `angle ABC` and the other demanded
+`the angle ABC`, and neither knew «שווה». The student's sentence was therefore understood or refused
+according to which rule happened to read it — a coin-flip they cannot see and cannot learn.
+
+The repair is the one #969/[ADR-498](06-decisions.md#adr-498) reached in 2-D, and it is worth stating as a
+rule of thumb rather than an incident: **when two rules must agree about a word, the word gets a name.**
+A shared constant makes drift impossible; a comment asking the next author to keep two regexes in step
+does not. The corollary for review is cheap to apply — if a rule contains a literal list of spellings,
+ask which other rule needs the same list.
+
+Note also what the copula is *for*: nothing. It carries no meaning the tool needs, which is exactly why it
+must never be the thing that decides whether a statement is understood.
+
 ## The symbol registries — one address, one display, derived from each other
 
 A letter a student names is answered in two places, and they are deliberately different questions.

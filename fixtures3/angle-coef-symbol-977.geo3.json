@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-09-10T16:00:22.713Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "זווית ABC שווה 2α",
+      "cmds": [
+        {
+          "type": "angle-mark",
+          "vertex": "B",
+          "p": "A",
+          "q": "C",
+          "label": "α",
+          "coef": 2
+        }
+      ]
+    },
+    {
+      "utterance": "α = 30",
+      "cmds": [
+        {
+          "type": "symbol-value",
+          "symbol": "α",
+          "value": 30
+        }
+      ]
+    }
+  ]
+}
