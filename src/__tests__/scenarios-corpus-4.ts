@@ -2475,4 +2475,30 @@ export const SCENARIOS_4: Scenario[] = [
       expect(angle(at(fig, 'D'), at(fig, 'B'), at(fig, 'A')), '∠DBA is the stated 30°').toBeCloseTo(30, 1);
     },
   },
+  {
+    id: 'symbolic-angle-behind-any-copula-969',
+    title: '#969: «זווית ABC היא 2α» binds the symbol — the copula «היא» no longer silently commits 2°',
+    guards:
+      "P1 honesty breach, found by measurement while building #967 and ruled by the operator into this round. «זווית ABC היא 2α» committed set-angle value:2 — the coefficient read as the whole value, the student's α discarded — and it did so GREEN: applied, drawn, verifier-clean, so no honesty gate caught it. The operator, playing the reproduction: 'we need to be able to keep the same syntax users use for a regular angle so for instance: זוית A שווה 2α and alike needs to be supported.' Measured on 78440ea the hole was every copula but '=' («היא», «הוא», «שווה», «שווה ל-», is, equals), every naming mode, and BOTH alphabets (2α and 2x) — 40+ silently-wrong cells, not the one that was filed. Root cause: the rule pair split its VALUE read by VOCABULARY — the numeric rule located its number positionally (so every copula worked and none was ever written down), the symbolic rule located its symbol syntactically after a literal '='. ADR-498 gives the value half the answer #831/ADR-468 gave the naming half: ONE reader (angleValueOf), positional for both kinds, so the copula stops being load-bearing and a seventh spelling cannot reopen it. This scenario pins α afterwards, because the strongest statement of the fix is that the «היא» spelling and the '=' spelling produce the SAME figure.",
+    steps: ['משולש ABC', 'זווית ABC היא 2α', 'α = 20'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the figure verifies against its givens').toEqual([]);
+      // The defect drew 2°. The fix binds ∠ABC to 2α, so pinning α = 20 must land the angle at 40 —
+      // the student's magnitude survived the parse instead of being replaced by its coefficient.
+      expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), '∠ABC is 2α = 40°').toBeCloseTo(40, 1);
+    },
+  },
+  {
+    id: 'symbolic-angle-copula-matches-equals-969',
+    title: '#969: «זוית A שווה 2α» — the operator’s own spelling builds the same figure as «זוית A = 2α»',
+    guards:
+      "The operator's scope ruling on #969 stated the requirement as a CLASS rather than a spelling: every spelling that works for a NUMERIC angle must work for a SYMBOLIC one. This is the single-vertex naming lane («זוית A», whose arms are resolved from the figure) behind «שווה» — a different cell of the matrix from the reported «זווית ABC היא 2α», and one the operator named themselves. Its value is that it fails for a DIFFERENT reason than the sibling above if the fix is ever narrowed back to one copula or one naming mode.",
+    steps: ['משולש ABC', 'זוית A שווה 2α', 'α = 25'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the figure verifies against its givens').toEqual([]);
+      expect(angle(at(fig, 'B'), at(fig, 'A'), at(fig, 'C')), '∠BAC is 2α = 50°').toBeCloseTo(50, 1);
+    },
+  },
 ];

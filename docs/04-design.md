@@ -316,6 +316,54 @@ a guessed vertex nor an escalation (which hands the model the same invention to 
 `angle-sides-disjoint`, quoting both segment names back — a member of the clarification family above, by
 the same reasoning. 3-D accepts these because it has a direction/`claim` substrate that 2-D does not; the
 parity is in the *addressing mode*, not in the constraint kinds behind it.
+### The other half of the same statement: the VALUE (#969, [ADR-498](06-decisions.md#adr-498))
+
+The section above unifies **which angle is named**. #969 was the same defect in the half it does not
+cover — **what is said about it** — and it is worth reading the two together, because the second one
+happened *while the first one's guarantee was true*.
+
+The value half splits by kind: a number goes to `angle`, a symbol to `measureAngle`. Until #969 they did
+not merely take different values, they **located** them differently:
+
+| | how it finds the value | copulas it accepts |
+| --- | --- | --- |
+| `angle` (numeric) | **positionally** — any standalone number in the line | all of them, implicitly; it never needed one |
+| `measureAngle` (symbolic) | **syntactically** — after a literal `=` | exactly one |
+
+So «זווית ABC = 2α» bound the symbol, and «זווית ABC היא 2α» fell through to the numeric lane, whose
+number scan found the **coefficient** `2` and committed 2° — the student's α gone, the line green.
+
+The repair is not a copula list. The numeric lane has no list to copy: a list would be incomplete against
+its sibling on the day it was written. Both kinds are located the same way instead —
+
+```
+stripped ──► angleValueOf ──► { kind: 'num', … } ──► angle          (set-angle)
+                          └─► { kind: 'sym', … } ──► measureAngle   (measure-angle)
+```
+
+— with a symbolic value read as the **trailing expression** of the statement, exactly as a numeric one is
+a standalone number in it. Two guards are what let the `=` go, and both exist because a symbol is spelled
+like a label where a number is self-identifying: the symbolic read is **end-anchored** and must be
+**preceded by a non-letter**. Without them «זוית abc» reads as the value `c`, and "angle ABC is acute" as
+the value `e`.
+
+Three consequences worth stating, because each is a place the old shape leaked:
+
+- **A comparison is a region, not a value** — in *both* alphabets now. «זווית ABC גדולה מ-α» would have
+  been claimed as the equality ∠ABC = α once the `=` requirement went, so `COMPARES_WITH_SYMBOL` joins
+  [ADR-390](06-decisions.md#adr-390)'s numeric tripwire. Both bails live with the reader, not in one rule:
+  a guard only one lane applies is the exact shape of this bug.
+- **The numeric rule refuses a symbol instead of valuing it.** Reaching `angle` with a symbolic value means
+  the symbolic rule could not *name* the angle; committing the coefficient there would be #969 again. It
+  returns `null`, and the utterance escalates honestly.
+- **The naming modes come along for free.** #967's segment-pair mode was added to `angleArms` alone, so
+  «הזווית בין BD ל-BA היא 2α» binds the symbol with no new code. That is the property both halves of this
+  rule pair exist to have, and it is asserted in the locks rather than assumed.
+
+The general lesson, and the reason this is documented next to its sibling rather than in its own section:
+**a chokepoint that unifies one half of a statement leaves the other half free to re-split.** #831 unified
+the naming half and said so; the value half stayed split for eleven months underneath that sentence.
+
 ## Telling a LABEL from a WORD in Hebrew (#968, [ADR-497](06-decisions.md#adr-497))
 
 The convention nudge (#779) lifts `abcd` to `ABCD`, checks the corrected sentence parses, and shows it

@@ -10429,3 +10429,106 @@ in the same commit, as ADR-346 requires.
 «מלבן ABCD , אלכסון BD , זוית בין BD ל-BA היא 30°» — which parses only once #967's segment-pair angle
 lands. The two together turn that student's session from nothing into a figure; each alone gets part-way.
 That is why this ADR's lock asserts the *transliteration* (its own job) rather than the end-to-end parse.
+
+## ADR-498 — THE COPULA IS NOT PART OF THE VALUE READER'S VOCABULARY (#969)
+
+**Status:** accepted, 2026-09-10 · **Issue:** #969 (P1 — honesty; found by measurement while building #967)
+**Requirements:** [02](02-requirements.md) FR-IN-6 (amended) · **Design:** [04](04-design.md) — "Addressing an angle: one reader, many value kinds"
+
+**The defect.** «זווית ABC היא 2α» committed **`set-angle value:2`**. The coefficient of `2α` was taken for
+the whole value and the student's `α` was discarded — and the line was *applied, drawn, and verifier-clean*,
+so no honesty gate caught it. A student who wrote "the angle is 2α" got a figure asserting 2°. That breaches
+both invariants in CLAUDE.md at once: a stated magnitude vanished, and the figure showed a given nobody gave.
+
+**Measured before anything was changed** (`78440ea`, through the real `parse`, then through the submit path):
+the hole was **every copula but `=`** — «היא», «הוא», «שווה», «שווה ל-», "is", "equals" — for **every** naming
+mode (triple, definite triple, single-vertex, English) and **both** alphabets (`2α` *and* `2x`). The issue was
+filed on one cell; it was forty-odd. Only the `=` column was correct.
+
+The asymmetry that made it *silent* rather than merely unsupported is worth keeping in view: with no
+coefficient («היא α») there is no number to grab, so the tool escalated honestly. It is precisely the
+**coefficient** form that turned an unsupported spelling into a *confident wrong given*.
+
+**Root cause — a value read split by VOCABULARY.** The rule pair splits by value kind: `angle` takes a number,
+`measureAngle` takes a symbol. They located that value in two different ways:
+
+| | how it finds the value | copulas it accepts |
+| --- | --- | --- |
+| `angle` (numeric) | **positionally** — any standalone number in the line | all of them, implicitly; it never needed one |
+| `measureAngle` (symbolic) | **syntactically** — after a literal `=` | exactly one |
+
+So `measureAngle` declined on every other copula, control fell through to `angle`, and `angle`'s
+number-grabbing greed found the `2` of `2α`.
+
+**Why the fix is not a longer copula list.** The obvious repair — teach `measureAngle` «היא» and «שווה» — was
+rejected, and the operator's own scope ruling rejected it first (*"we need to be able to keep the same syntax
+users use for a regular angle … and alike"*). The numeric lane has **no list to copy**: it needs no copula at
+all. Any enumeration is therefore a list that is *already* incomplete against its sibling — the seventh
+spelling reopens the hole exactly as the sixth did, and the measurement above (which found three copulas the
+issue had not named) is the evidence that this is not hypothetical.
+
+**The decision.** The two kinds are located the **same way**, by one reader:
+
+```
+stripped ──► angleValueOf ──► { kind: 'num', value, rest }   ──► `angle`        (set-angle)
+                          └─► { kind: 'sym', coef, sym, rest } ──► `measureAngle` (measure-angle)
+```
+
+A symbolic value is the **trailing expression** of the statement, exactly as a numeric one is a standalone
+number in it. The copula stops being load-bearing for either lane, so it cannot go stale against the other.
+This completes for the **value** half what [ADR-468](#adr-468) (#831) did for the **naming** half of this same
+rule pair — and leaving the value half split is precisely why ADR-468's stated guarantee could be true while
+this bug existed anyway. That is the root cause worth naming: *a chokepoint that unifies one half of a
+statement leaves the other half free to re-split.*
+
+**The two guards that let the `=` go, both measured rather than reasoned.** A number is self-identifying; a
+symbol is not — it is spelled like a label. So the symbolic read is (a) **anchored at the end** of the
+statement and (b) **preceded by a non-letter**. Without those it would read «זוית abc» as the value `c` and
+"angle ABC is acute" as the value `e`.
+
+Two hazards the plan did not anticipate, both found by probing the neighbours before committing:
+
+- **A symbolic BOUND would have been stolen.** «זווית ABC גדולה מ-α» is `not-handled` today (an honest
+  escalation — `measureBound` is numeric). A bare trailing read would have claimed it as the *equality*
+  ∠ABC = α: a REGION silently committed as an exact value, which is [ADR-390](#adr-390)'s defect in the
+  symbolic alphabet. Hence `COMPARES_WITH_SYMBOL`, the twin of `COMPARES_WITH_NUMBER`. It is deliberately
+  case-insensitive: over-bailing costs an escalation, under-bailing costs a wrong given.
+- **"…is a right angle" ends in a stray article.** `angle` strips the word "right", leaving a trailing `a`
+  that reads as a variable. The right-angle word is answered *before* the symbolic refusal.
+
+**`angle` refuses a symbol rather than valuing it.** Reaching `angle` with a symbolic value means
+`measureAngle` declined — it could not *name* the angle (an ambiguous vertex, say). Committing `2α` as 2°
+there would be this bug exactly, so the numeric rule now recognises the kind and returns `null`: the utterance
+escalates honestly and the magnitude is never silently replaced by its coefficient. The two shared bails (the
+comparison tripwire and the multi-angle givens-list bail) moved to the shared reader for the same reason —
+`measureAngle` applied neither, and only its `=` requirement had been hiding that.
+
+**What this buys beyond the report.** Because the *naming* half is already one reader, #967's segment-pair
+mode inherits the symbolic lane for free: «הזווית בין BD ל-BA היא 2α» now binds the symbol without a line of
+new code. That inheritance is asserted, not assumed.
+
+**Locks.** `src/parser/__tests__/angle-copula-value.test.ts` (187): the exhaustive naming × copula × value-kind
+matrix — a seventh copula added to that list must pass without touching `parse.ts`; the numeric column
+asserted **unchanged**; the reported utterance and the operator's own «זוית A שווה 2α» verbatim; the ° glyph;
+the lowercase vertex (#45); and the negative half — symbolic bounds, acuteness, both right-angle word forms,
+bare references, «זוית abc», the angle alias (#267), and the un-nameable angle that must escalate rather than
+fall back to its coefficient. Scenarios `symbolic-angle-behind-any-copula-969` and
+`symbolic-angle-copula-matches-equals-969` pin `α` afterwards, because the strongest statement of the fix is
+that the «היא» spelling and the `=` spelling produce the **same figure**.
+
+**The gate had the bug's fingerprint in its allowlist.** `shadow-matrix.test.ts` records, per catalog
+utterance, which rule wins and which later rule would have claimed it *differently*. «זווית ABC = 2α»
+carried the reviewed, approved pair **`measureAngle → angle`** — i.e. the corpus had on record that the
+numeric rule reads that sentence divergently, which is this defect, stated in the gate's own vocabulary.
+It sat there because rule ORDER hid it: `measureAngle` won the `=` spelling, so the divergence never
+surfaced — until a copula the symbolic rule did not know handed the sentence to the shadow. The pair is
+now gone (the numeric rule recognises a symbolic value and refuses it), and the allowlist's comment
+records the lesson: **a shadow that is a WRONG reading is not made safe by being shadowed.** A divergent
+pair is a latent defect waiting for a rule-order or vocabulary change to expose it, not merely a note
+about precedence.
+
+**Found and filed, not fixed here** (scope kept to the ruling): «זווית ABC שווה ל-90» commits **−90°** — the
+maqaf of «ל-» read as a minus sign by the number grammar. Measured identical before and after this change, so
+it is pre-existing and independent (#975). Likewise «זווית ABC היא זווית DEF» is `not-handled` while the `=`
+spelling builds: the same copula asymmetry in `angleEquality`, whose right-hand side is an angle rather than a
+value, so it is a different reader and a different fix (#976).
