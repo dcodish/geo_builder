@@ -43,6 +43,7 @@ import {
   lowercaseLabelFold,
   lowercaseMeasureLetters,
   upperCasedLabelCandidate,
+  hebrewLabelCandidate,
   parse,
   parseMerge,
   parseNameCenter,
@@ -546,6 +547,25 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
       if (lr.ok && lr.commands.length > 0) {
         logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:lowercase-labels' });
         ui.setInputNote(t('input.scope.lowercase-labels', { corrected: lifted }));
+        ui.setBusy(false);
+        return;
+      }
+    }
+  }
+  // #968 — HEBREW-LETTER vertex labels («מלבן אבגד»), the same nudge one alphabet over. Israeli textbooks
+  // name vertices א-ב-ג-ד, so the student is following their book; our label space is uppercase Latin. In
+  // prod this logged not-understood — the LLM failed too — so the session produced nothing. Operator ruling
+  // (2026-09-10): REJECT with a notice pointing at uppercase Latin letters, rather than supporting the
+  // alphabet (real support would reach labels, RTL direction, export and every `seg-AB` id). Proof-based
+  // like #779 above: the note fires only when the transliterated sentence actually parses, so a genuine
+  // gap still escalates. Pre-LLM, so the wasted paid call the prod session made cannot happen again.
+  if (!r.ok) {
+    const latin = hebrewLabelCandidate(utterance);
+    if (latin) {
+      const hr = parse(latin, parseCtxNow());
+      if (hr.ok && hr.commands.length > 0) {
+        logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:hebrew-labels' });
+        ui.setInputNote(t('input.scope.hebrew-labels', { corrected: latin }));
         ui.setBusy(false);
         return;
       }

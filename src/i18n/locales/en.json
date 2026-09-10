@@ -69,7 +69,8 @@
       "latex": "It looks like you pasted a LaTeX formula (with $ or commands like \\triangle). Write it in plain notation — the toolbar has buttons: △ ∥ ∠ ⊥ √. E.g. \"triangle ABC\", \"DE ∥ BC\", \"AD:DB = 1:2\".",
       "negation": "Negation (\"{{word}}\") isn't supported yet. State what IS given instead — e.g. \"angle A = 50\" or \"angle A is acute\". Anything you don't state stays free.",
       "word-root": "Write the root value with the √ symbol — there's a √() button in the toolbar. E.g. \"√27\" instead of the word \"root 27\".",
-      "lowercase-labels": "Point labels are written in UPPERCASE letters. Try: {{corrected}}"
+      "lowercase-labels": "Point labels are written in UPPERCASE letters. Try: {{corrected}}",
+      "hebrew-labels": "Vertices are named with uppercase Latin letters here, not Hebrew ones. Did you mean: {{corrected}}"
     },
     "shapeNotFound": "There is no {{noun}} in this figure — check the shape name, or declare it first (e.g. \"{{noun}} ABCD\").",
     "producedNothing": "I understood that but it didn't build anything on the figure — I tried rephrasing it too. Check the names/relations, or word it differently.",

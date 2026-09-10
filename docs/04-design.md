@@ -277,3 +277,44 @@ both keep the student's text so the sentence is completed in place rather than r
 The scoping discipline is the same for any future member: register the ask **after** the rule that owns
 the complete form, and make the absence **structural** (here, an end-of-line anchor after the factor, so
 a line carrying «מ…» cannot match) rather than inferred from the other rule having failed.
+
+## Telling a LABEL from a WORD in Hebrew (#968, [ADR-497](06-decisions.md#adr-497))
+
+The convention nudge (#779) lifts `abcd` to `ABCD`, checks the corrected sentence parses, and shows it
+without committing. #968 is the same mechanism one **alphabet** over — Israeli textbooks name vertices
+א-ב-ג-ד — and it runs into a problem the Latin half never had: **every construct noun in this grammar is
+also made of Hebrew letters.** «מלבן», «אלכסון», «זווית» and a label run like «אבגד» are the same script,
+so the detector cannot key on script at all.
+
+It keys on the alphabet **range** instead. Vertex labels are drawn from the START of the alphabet —
+א-ט ⇒ A-I, nine letters, more vertices than any figure here needs — exactly as Latin labels come from
+A-H. The geometry vocabulary essentially all carries a later letter:
+
+| token | letters | verdict |
+| --- | --- | --- |
+| `אבגד` | א1 ב2 ג3 ד4 | **label** → `ABCD` |
+| `בד` | ב2 ד4 | **label** → `BD` |
+| `מלבן` | **מ13** ל12 ב2 ן(נ14) | word |
+| `אלכסון` | א1 **ל12 כ11 ס15** ו6 ן14 | word |
+| `זווית` | ז7 ו6 ו6 **י10 ת22** | word |
+| `בין` | ב2 **י10** ן14 | word |
+
+Two narrowings, both measured rather than assumed:
+
+- **Final forms fold first** (ך→כ, ם→מ, ן→נ, ף→פ, ץ→צ). They sit past ת in the code block, so an
+  unfolded read would place every one of them out of range by accident — right answer, wrong reason,
+  and it would break the moment a label used one. This is the lexicon's ADR-3D-035 final-letter trap
+  one layer down.
+- **Only «ל» is stripped as a leading particle.** The real input needs it («לבא» = "to בא"), and the
+  unstripped reading is preferred so «בד» stays the label BD. Widening the set to ב/ה/ו/מ/ש/כ was tried
+  and **rejected on measurement**: it rewrites «שווה» to «ש-FFE», forfeiting the nudge on any sentence
+  carrying that very common word, and buying nothing the real input needs.
+
+**The proof gate is what makes the heuristic safe to be wrong.** A misread token simply produces a
+candidate that does not parse, and the caller then says nothing at all — the student gets today's
+escalation. So the failure mode of a bad guess is a *missed suggestion*, never a wrong one, and never a
+rewritten sentence: nothing here is ever committed on the student's behalf.
+
+Support for the alphabet itself is deliberately **not** built (operator ruling, 2026-09-10). It would
+have to reach labels, RTL text direction (the #549 class), export, and every deterministic element id
+(`seg-AB`) — a wide blast radius for a convention the notice can redirect in one line.

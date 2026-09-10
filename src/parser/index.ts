@@ -2,7 +2,7 @@
 
 export { parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, impliedPointBinding, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedWordRelations, droppedCompoundRelation, droppedGivenVerbs,
   droppedComparison, droppedRadiusSymbol, introducedNewLabels, droppedRegionSubject, droppedMidsegment, droppedConstructNoun, normalizeUtterance,
-  statedLabelTokens, lowercaseLabelFold, lowercaseMeasureLetters, upperCasedLabelCandidate, VERB_GATES } from './parse';
+  statedLabelTokens, lowercaseLabelFold, lowercaseMeasureLetters, upperCasedLabelCandidate, hebrewLabelCandidate, VERB_GATES } from './parse';
 export type { ParseResult, ParseContext } from './parse';
 export { buildParseCtx } from './context';
 export { classifyOutOfScope, looksCompound, looksLikeLatex, splitGuidance, statedNegation, wordRootMagnitude, SHAPE_NOUNS_HE, SHAPE_NOUNS_EN } from './scope';
