@@ -35,6 +35,12 @@ export type ParseResult =
   // never stated (ADR-052) — committed with a green ✓ and one Enter from the figure. So it ASKS, and
   // it never escalates: the LLM would have to guess exactly the thing that must not be guessed.
   | { ok: false; reason: 'incomplete-comparative'; subject: string; factor: string }
+  // #967: an angle addressed by its two SIDES («הזווית בין AB ל-CD») whose named segments do not MEET.
+  // The vertex-anchored angle family has no member for the angle between two disjoint segments (that
+  // would be a line-line angle — a different constraint kind), so the statement is refused BY NAME
+  // rather than bound to some nearby vertex or guessed by the LLM. `s1`/`s2` are the student's own
+  // segment names, so the note can quote them back.
+  | { ok: false; reason: 'angle-sides-disjoint'; s1: string; s2: string }
   // #770: a definite SHAPE reference («אלכסוני הריבוע») whose named kind has no declared match in the
   // figure — the statement is refused BY NAME (the honesty invariant: name the conflicting statement),
   // never bound to "whichever quad exists" and never guessed by the LLM. `noun` is the student's word.
@@ -257,7 +263,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string };
+type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -2144,7 +2150,47 @@ const centralAngle: Rule = (s, ctx) => {
  * Latin letter be counted as a second label.
  */
 type AngleArms = { ray1: Id; vertex: Id; ray2: Id };
+/**
+ * #967 — the SEGMENT-PAIR addressing mode: «הזווית בין BD ל-BA היא 30» / «angle between BD and BA is 30».
+ *
+ * A textbook names an angle by the two SIDES that form it at least as often as by its three vertices, and
+ * 2-D had no form for it at all — every angle constraint (`set-angle`, `-bound`, `-ratio`, `-order`,
+ * `-acuteness`, `measure-angle`) is vertex-anchored, so the whole family was reachable through exactly one
+ * spelling. 3-D has shipped this mode since #534/#523/#917. Because the mode lives HERE, in the one place
+ * that answers "which angle is being named" (#831/ADR-468), every value kind inherits it at once — the
+ * numeric lane and the Greek-symbol lane both, and any future third kind, without copying a lane.
+ *
+ * Two named segments sharing exactly ONE endpoint ARE a vertex angle: BD and BA meet at B, so the student
+ * means ∠DBA — the identical constraint the triple spelling emits, with its arc, value chip and verifier
+ * support. That equivalence is the whole fix; nothing downstream changes.
+ *
+ * Labels are read UPPERCASE-only and CONTIGUOUS (`BD`, not `B D`). Both restrictions are deliberate: the
+ * English spelling puts lowercase words between the operands ("between BD **and** BA **is** 30"), and a
+ * case-insensitive read would take "and" for the labels A,N,D — #497's exact defect ("draw a square ABCD"
+ * building square D,R,A,W). Contiguity likewise keeps a THREE-letter run out: `\b([A-Z])([A-Z])\b` cannot
+ * match inside «ABC», so the triple spelling can never be re-read as a segment pair.
+ */
+const ANGLE_SIDE_PAIR_RE = /\b([A-Z]\d*)([A-Z]\d*)\b/g;
+function angleBetweenSides(text: string): AngleArms | Clarify | null {
+  // Gated on the connective, so this lane can only fire on the "between" phrasing and never shadows a
+  // reading the triple/single-vertex lanes already own.
+  if (!/בין|between/i.test(text)) return null;
+  const pairs = [...text.matchAll(ANGLE_SIDE_PAIR_RE)].map((m) => [up(m[1]), up(m[2])] as [Id, Id]);
+  if (pairs.length !== 2) return null; // not two segments — let the other lanes try
+  const [p1, p2] = pairs;
+  if (p1[0] === p1[1] || p2[0] === p2[1]) return null; // «BB» is not a segment
+  const shared = p1.filter((x) => p2.includes(x));
+  // Exactly one shared endpoint ⇒ the angle at it. Two shared ⇒ the same segment named twice («בין AB ל-BA»),
+  // which states nothing; none ⇒ the segments never meet. Neither is a vertex angle, and inventing a vertex
+  // for either would assert a given the student did not state (ADR-052), so both are refused BY NAME.
+  if (shared.length !== 1) return { clarify: 'angle-sides-disjoint', s1: p1.join(''), s2: p2.join('') };
+  const v = shared[0];
+  return { ray1: p1.find((x) => x !== v)!, vertex: v, ray2: p2.find((x) => x !== v)! };
+}
+
 function angleArms(text: string, ctx: ParseContext): AngleArms | Clarify | null {
+  const sides = angleBetweenSides(text);
+  if (sides) return sides;
   const three = labelRun(text, 3);
   if (three) return { ray1: three[0], vertex: three[1], ray2: three[2] };
   // SINGLE-vertex form — «∠B = …». Well-defined only when the named vertex has EXACTLY two edges in
@@ -2239,6 +2285,11 @@ const boundOperand = (raw: string, ctx: ParseContext): BoundOperand | null => {
   if (new RegExp(String.raw`^${VAR}$`).test(t)) return { kind: 'var', name: t };
   if (/(?:∠|∢|angle|זוו?ית)/i.test(t)) {
     const stripped = t.replace(/∠|∢|angle|זוו?ית|the|של|את/gi, ' ');
+    // #967: the segment-pair addressing («הזווית בין BD ל-BA גדולה מ-40»). ADDITIVE, as in `angleAcuteness`.
+    // A disjoint pair falls through to this function's own "never guess a triple" null — the operand type
+    // carries no refusal, so the honest note is the one the bound rule already gives for an unreadable operand.
+    const sidesB = angleBetweenSides(stripped);
+    if (sidesB && !('clarify' in sidesB)) return { kind: 'ang', v: sidesB.vertex, r1: sidesB.ray1, r2: sidesB.ray2 };
     const tri = labelRun(stripped, 3);
     if (tri) return { kind: 'ang', v: tri[1], r1: tri[0], r2: tri[2] };
     const one = labelRun(stripped, 1);
@@ -2341,6 +2392,18 @@ const angleAcuteness: Rule = (s, ctx) => {
   const acute = /חדה|acute/i.test(s);
   if (obtuse === acute) return null; // need exactly one of obtuse/acute (and not both)
   const stripped = s.replace(/angle|∠|∢|זוו?ית|הזוו?ית|קהה|obtuse|חדה|acute|is|the|של|את/gi, ' ');
+  // #967: the segment-pair addressing («הזווית בין BD ל-BA קהה»). ADDITIVE — the triple and single-vertex
+  // lanes below are untouched, so nothing that resolved before resolves differently. This rule keeps its own
+  // copy of those two lanes (the #831 remainder: `angleArms` never became its reader), so the new mode has to
+  // be added here rather than inherited; see the issue filed alongside #967.
+  const sidesA = angleBetweenSides(stripped);
+  if (sidesA && !('clarify' in sidesA))
+    return [
+      { type: 'segment', a: sidesA.vertex, b: sidesA.ray1 },
+      { type: 'segment', a: sidesA.vertex, b: sidesA.ray2 },
+      { type: 'set-angle-acuteness', vertex: sidesA.vertex, ray1: sidesA.ray1, ray2: sidesA.ray2, obtuse },
+    ];
+  if (sidesA) return sidesA; // two segments that never meet — refused by name, not escalated
   const tri = labelRun(stripped, 3);
   if (tri) {
     return [
@@ -10496,6 +10559,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'role-side-unresolved') return { ok: false, reason: 'role-side-unresolved', role: res.role };
   if (res.clarify === 'side-unspecified') return { ok: false, reason: 'side-unspecified', noun: res.noun, value: res.value };
   if (res.clarify === 'incomplete-comparative') return { ok: false, reason: 'incomplete-comparative', subject: res.subject, factor: res.factor };
+  if (res.clarify === 'angle-sides-disjoint') return { ok: false, reason: 'angle-sides-disjoint', s1: res.s1, s2: res.s2 };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 
