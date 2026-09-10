@@ -24,6 +24,10 @@
  *                      reshaped it) — a real given, landed
  *   no-change        — parsed + committed but nothing moved (re-entry / annotation / a default the
  *                      constraint already matched). Not a failure; judge whether the line is needed.
+ *   refused-pre-commit — parsed, but the APP would refuse it before it became a fact: the student gets
+ *                      an input note and the text stays in the box. The line is DROPPED from the prefix,
+ *                      because that is what the UI holds. This is NOT `error-now`: nothing is committed,
+ *                      there is no red row, and no later given can rescue it (#960, ADR-495).
  *   error-now        — parsed + committed, but its fact status errs at THIS prefix. May legitimately
  *                      clear once later givens pin the figure (the ADR-104 deferral) — judged again
  *                      in the FINAL section; only a final non-ok is a failure.
@@ -68,6 +72,9 @@ const moved = (prevPos, pos) => {
 if (app === '2d') {
   // The REAL app path, via the harness — not a re-mirror (see header).
   const { factsOf, replayFacts } = await import('../../../src/__tests__/scenario-pipeline.ts');
+  // #960 (ADR-495): the ONE submit-gate driver. `factsOf` commits every step; the APP does not, and a
+  // sequence that only builds under `factsOf` is one no student can type.
+  const { gateVerdict } = await import('../../../src/__tests__/submit-gate.ts');
   const { parse, buildParseCtx, classifyOutOfScope } = await import('../../../src/parser/index.ts');
   const { replay } = await import('../../../src/store/geoStore.ts');
 
@@ -77,6 +84,29 @@ if (app === '2d') {
   let anyErrorNow = false;
 
   for (const u of lines) {
+    // #960 (ADR-495): would the APP accept this line here? `factsOf` below would commit it either way,
+    // so without this a refused line silently joins the prefix and every later verdict describes a
+    // figure the student could never have reached. Measured on the #955 play sheet: two cases died at
+    // line 3 on the operator's canvas while reporting green headlessly.
+    let gate = null;
+    try {
+      gate = gateVerdict(factsOf(steps), u, 0);
+    } catch { /* the prefix itself is unbuildable — the parse diagnosis below is the better message */ }
+    if (gate && gate.kind === 'refused' && gate.reason !== 'parse') {
+      say(`✗ refused-pre-commit  ${u}`);
+      say(`               the app refuses this BEFORE it becomes a fact (${gate.reason}${gate.detail ? `: ${gate.detail}` : ''}) —`);
+      say(`               the student sees a note and the text stays in the box; dropped from the prefix`);
+      failed = true;
+      continue;
+    }
+    if (gate && gate.kind === 'noop') {
+      // ADR-156's friendly "already drawn": the app commits NOTHING here either, so the prefix must not
+      // keep it. Not a failure — the line is simply redundant at this point in the sequence — but it is
+      // reported, because a sequence carrying a line that does nothing is usually an authoring mistake.
+      say(`○ already-drawn  ${u}`);
+      say(`               the app answers "already drawn" and commits nothing; dropped from the prefix`);
+      continue;
+    }
     steps.push(u);
     let facts;
     try {

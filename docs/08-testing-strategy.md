@@ -118,6 +118,33 @@ are 2-D unless stated; the **structure** around them is workspace-wide:
 
 - Every translation key exists in both `he` and `en` (a key-parity test).
 
+## The submit GATE vs. the fact list ([ADR-495](06-decisions.md#adr-495), #960)
+
+A scenario is built with `factsOf`, which parses each step with context and pushes the fact
+**unconditionally**. The app does not: `submitPipeline.ts` refuses some lines *before* they become
+facts — a contradiction that is not deferral-worthy, a dropped label or magnitude, a re-entry that
+produces nothing — and shows an input note instead, keeping the text in the box. So the two disagree
+on exactly one thing, and it is the thing that matters: **a scenario can lock a state the UI cannot
+reach**, and its refusal appears only as a replay status the scenario then asserts on.
+
+`src/__tests__/submit-gate.ts` is the ONE answer to *"would the app accept this line here?"*:
+
+- `gateVerdict(facts, utterance, seed)` → `commit` | `noop` | `refused{reason}` — the deterministic
+  half of `App.submit`, mirroring parse → the dropped-label/number honesty gates → `dryRunOutcome` →
+  commit-or-defer. It imports no `vitest`, so `run-sequence.mjs` uses it under vite-node.
+- `driveThroughGate(utterances)` → the fact list the UI **would hold**, plus the lines it refused.
+
+Rules that follow:
+
+- **Never hand-copy the gate.** `scenarios-props-submit-gate.test.ts` carried it inline twice before
+  this; two hand-copies of a decision that lives elsewhere is the ADR-346 drift shape.
+- **Validate a play case through `gateVerdict` before listing it.** Two #955 cases died at line 3 on
+  the operator's canvas because they were authored headlessly (memory: `play-cases-pass-the-gate`).
+- **`refused-pre-commit` is not `error-now`.** The first commits nothing and no later given can
+  rescue it; the second is a committed fact whose status may clear once the figure is pinned.
+- A scenario that deliberately locks a REFUSAL is legitimate — but know which of the two surfaces it
+  models. 22 of 324 scenarios currently contain a gate-refused step; that list is #960 part 2 and is
+  deliberately unresolved rather than guessed at.
 ## Golden fixtures
 
 A shared set of canonical figures, expressed as command sequences, reused across engine/store/theorem/E2E tests. Initial set:

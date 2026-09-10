@@ -10183,3 +10183,71 @@ parse fails the scenario by construction — which is correct, since a refusal p
 assert about. Writing one would mean asserting a state the pipeline cannot reach, which is exactly the
 defect [#960](../issues/960) exists to stop. The parser-level unit test is the lock, and the refusal is
 also covered end-to-end by #891's own boundary test.
+
+## ADR-495 — A SCENARIO'S FACT LIST IS WHAT THE UI WOULD HOLD: one submit-gate driver, and a `refused-pre-commit` verdict (#960)
+
+**Status:** accepted, 2026-09-10 (round #962) · **Issue:** #960 (part 1; part 2 recorded, not armed)
+**Requirements:** none (internal) · **Design:** [08](08-testing-strategy.md) — the harness path; `.claude/skills/exercise-sequence/run-sequence.mjs` header
+
+**The report.** The operator, playing the #955 sheet (2026-09-09): *"after writing AB=3 (works) i enter
+AB=x and it refuses … the test never reaches the x=8 input"* and *"DE=x refuses correctly so we never
+reach the lines after."* **Both refusals are correct.** The defect was ours: those cases — and the locks
+behind them — were authored with the scenario harness, which commits lines the app refuses.
+
+**Root cause.** `factsOf` parses each step with context and pushes the fact **unconditionally**. The app
+does not: `submitPipeline.ts` refuses some lines before they become facts, and says so in its own words —
+
+> *a contradicting line is refused BEFORE it becomes a fact, so the fact-list lookup the banner uses has
+> nothing to find here* … `ui.setInputNote(…); return; // keep the text so the student can edit/delete it`
+
+So a scenario can lock a state the UI cannot reach, and its refusal shows up only as a replay status —
+which the scenario then asserts on as though it were the UI's behaviour.
+
+**Class.** *A lock built from a FACT LIST is judged by `replay`, while the student's line is judged by
+the submit GATE first; the two disagree exactly on refusals, and nothing in the harness said so.* It is
+the authoring-side twin of #943's lesson (a refused line never becomes a fact, so fact-keyed wiring never
+fires).
+
+**Decision — part 1, the unambiguous half.**
+
+1. **One driver.** `src/__tests__/submit-gate.ts` exports `gateVerdict(facts, utterance, seed)` →
+   `commit | noop | refused{reason}`, plus `driveThroughGate(utterances)` which returns the fact list the
+   UI *would* hold and the lines it refused. Deterministic half only — the LLM lane is mocked and
+   non-deterministic, and a `refused` verdict is precisely where the app escalates or shows a note. No
+   `vitest` import, so `run-sequence.mjs` can use it under vite-node (the #567 layering split).
+2. **The two hand-copies are gone.** `scenarios-props-submit-gate.test.ts` carried the deterministic path
+   inline **twice** (`submit` and `classify`) — the ADR-346 mirror-drift shape. Both now consume the
+   driver, and all 8 of that file's tests pass unchanged, which is the proof the extraction is
+   behaviour-identical.
+3. **`run-sequence.mjs` gains `refused-pre-commit`**, distinct from `error-now`: nothing is committed,
+   there is no red row, and no later given can rescue it. The line is dropped from the prefix, because
+   that is what the UI holds.
+
+**What building it immediately corrected.** The first run reported «AB = x» as *committed, no-change* —
+the driver had answered `noop`, and `run-sequence` pushed it into the prefix anyway. In the app a no-op
+(ADR-156's friendly "already drawn") commits **nothing** either, so that was the same drift one branch
+over. With it fixed, the tool finally tells the operator's own truth: «AB = x» is dropped, `x` is
+therefore never bound, and «x = 8» reports the #926 *"variable x is not defined"* — which is exactly what
+his canvas showed.
+
+**A note on play sheets.** Round #961's T5 said *"«x = 8» is the red row"*. Measured through the driver,
+that line is refused **pre-commit**, so the student sees a note quoting «x = 8» and there is no row at
+all. The student-visible substance was right — «x = 8» named, no label on AB — which is why it played
+green, but the mechanism in the wording was not. Play cases are validated through `gateVerdict` before
+they are listed; the memory note `play-cases-pass-the-gate` carries the habit.
+
+**Part 2 — recorded, deliberately NOT armed.** The audit (run first, as a measurement) found **22 of 324
+scenarios** contain a step the gate refuses: 15 `gate:error`, 5 `gate:empty`, 2 honesty-gate. Most are
+deliberate refusal locks, and choosing which of the UI's two refusal surfaces each should model —
+pre-commit note vs. post-commit red row — is a judgement per scenario on load-bearing regressions. The
+operator could no longer reproduce the originating case (2026-09-10: *"i cannot reproduce this now"*), so
+there is no live evidence to decide them against; guessing would silently weaken them. Part 1 makes the
+mismatch visible and queryable, and the audit is a ~40-line script to re-run when a real case appears.
+
+**Locks.** `src/__tests__/issue-960-submit-gate-driver.test.ts` (10): the operator's two dead cases as the
+gate sees them (T2 `noop`, T6 `refused/error` naming the unknown point); each verdict measured — an
+ordinary commit with its commands, `parse` as the LLM seam, a contradiction refused with its detail, a
+re-entry no-op, and a deferrable constraint typed EARLY still committing (ADR-104 order-independence, the
+case a careless gate would break); and `driveThroughGate` leaving no fact behind for a refused line,
+**with an explicit assertion that this is exactly where it differs from `factsOf`** — the difference this
+ADR exists for.

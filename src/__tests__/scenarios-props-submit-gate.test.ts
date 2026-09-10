@@ -3,6 +3,7 @@ import { parse, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, dr
 import { replay, useGeoStore, dryRunOutcome, deferralWorthwhile } from '@/store/geoStore';
 import { humanizeError } from '@/i18n/humanizeError';
 import { ctxOf, at, dist } from './scenarios-corpus';
+import { gateVerdict } from './submit-gate';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand, Id } from '@/engine';
 
@@ -17,17 +18,13 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
   it('[q4-commit-deferred-perpendicular] CE⟂AB typed before CD=36/DE=18 commits and resolves through the real submit gate', () => {
     const st = useGeoStore.getState();
     st.clear();
-    // Mirror App.submit's deterministic path for each utterance.
+    // #960 (ADR-495): the deterministic path lives in ONE place now — `gateVerdict`. This used to be
+    // a hand-copy of it, and a second copy sat forty lines below; two hand-copies of a decision that
+    // lives elsewhere is the ADR-346 mirror-drift shape.
     const submit = (utterance: string, llm?: AnyCommand[]) => {
-      const facts = useGeoStore.getState().facts;
-      const ctx = ctxOf(facts);
-      const r = parse(utterance, ctx);
-      let commands: AnyCommand[] | null = null;
-      if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0 && droppedGivenNumbers(utterance, r.commands).length === 0) {
-        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed);
-        if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands))) commands = r.commands;
-      }
-      if (!commands) commands = llm ?? null; // LLM second attempt (mocked: pass the canonical commands)
+      const v = gateVerdict(useGeoStore.getState().facts, utterance, useGeoStore.getState().seed);
+      // the LLM second attempt is mocked by passing the canonical commands
+      const commands = v.kind === 'commit' ? v.commands : (llm ?? null);
       expect(commands, `step did not commit: ${utterance}`).not.toBeNull();
       const group = `g${utterance}`;
       for (const c of commands!) useGeoStore.getState().execute(c, utterance, group);
@@ -57,20 +54,12 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
   it('[re-entry-noop-message] re-typing an existing construct is a friendly no-op, not an escalation (ADR-156)', () => {
     const st = useGeoStore.getState();
     st.clear();
-    // Mirror App.submit's classification of the deterministic path: commit | noop ("already drawn") | escalate.
+    // #960 (ADR-495): the same one driver. `escalate` is what a refusal MEANS at this seam — the app
+    // hands the utterance to the LLM — so the mapping is a rename, not a second classification.
     const classify = (utterance: string): { kind: 'commit' | 'noop' | 'escalate'; commands?: AnyCommand[] } => {
-      const facts = useGeoStore.getState().facts;
-      const ctx = ctxOf(facts);
-      const r = parse(utterance, ctx);
-      if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0 && droppedGivenNumbers(utterance, r.commands).length === 0) {
-        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed);
-        if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands))) return { kind: 'commit', commands: r.commands };
-        if (outcome.reason === 'empty') {
-          const existing = new Set((ctx.points ?? []).map((p) => p.toUpperCase()));
-          const newLabels = [...new Set(utterance.match(/[A-Z]\d*/g) ?? [])].filter((l) => !existing.has(l));
-          if (newLabels.length === 0) return { kind: 'noop' };
-        }
-      }
+      const v = gateVerdict(useGeoStore.getState().facts, utterance, useGeoStore.getState().seed);
+      if (v.kind === 'commit') return { kind: 'commit', commands: v.commands };
+      if (v.kind === 'noop') return { kind: 'noop' };
       return { kind: 'escalate' };
     };
     const commit = (u: string) => {
