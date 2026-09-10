@@ -169,7 +169,10 @@ describe('parser — Phase-5a constructs (he/en)', () => {
   it('parallelogram (hebrew, reversed)', () => one('ABCD מקבילית', { type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] }));
   it('quadrilateral', () => one('quadrilateral PQRS', { type: 'quadrilateral', ids: ['P', 'Q', 'R', 'S'] }));
   it('segment', () => one('segment AC', { type: 'segment', a: 'A', b: 'C' }));
-  it('diagonal synonym', () => one('diagonal BD', { type: 'segment', a: 'B', b: 'D' }));
+  // #966 (ADR-499): «אלכסון»/"diagonal" is NOT a synonym for «קטע» — it is a CLAIM about the pair, and
+  // the command records it so it can be checked. The segment drawn is unchanged, which is what the
+  // neighbouring `segment` cases assert; this one now also pins the claim flag.
+  it('diagonal — a segment PLUS the role claim', () => one('diagonal BD', { type: 'segment', a: 'B', b: 'D', diagonal: true }));
   it('segment (hebrew)', () => one('קטע AC', { type: 'segment', a: 'A', b: 'C' }));
   it('line∩line intersection (english)', () =>
     has('E is the intersection of AC and BD', { type: 'line-line-intersection', id: 'E', a: 'A', b: 'C', c: 'B', d: 'D', onSeg: true }));

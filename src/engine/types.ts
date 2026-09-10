@@ -996,7 +996,10 @@ export type Command =
   | { type: 'point-on-segment'; id: Id; a: Id; b: Id; t?: number; branch?: number; extension?: boolean } // branch: which root, once a constraint drives it (ADR-043); extension: an unstated t>1 default, recruitable not eager (ADR-073)
   | { type: 'point-by-distances'; id: Id; from1: Id; dist1: number; from2: Id; dist2: number; branch?: number }
   | { type: 'line-line-intersection'; id: Id; a: Id; b: Id; c: Id; d: Id; dir1?: boolean; dir2?: boolean; onSeg?: boolean; onSeg1?: boolean; onSeg2?: boolean } // dir1/dir2: a "המשך" operand — A must be BEYOND the 2nd point (ADR-054). onSeg: a plain SEGMENT meet — the crossing must land WITHIN both segments (ADR-166). onSeg1/onSeg2: only THAT operand is bare — within that segment alone, driven by collinear-order (issue #22)
-  | { type: 'segment'; a: Id; b: Id }
+  // `diagonal`: the student called this pair a DIAGONAL («אלכסון AC» / "diagonal AC"). The segment it
+  // draws is identical — the flag records the ROLE CLAIM the noun makes, so it can be checked instead of
+  // being consumed as a way of pointing at a pair (#966, ADR-499; the 2-D half of #859's ruling).
+  | { type: 'segment'; a: Id; b: Id; diagonal?: true }
   | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number; arcOf?: Id } // arcOf: the value is an ARC measure on that circle (vertex = centre) — constraint identical, display on the arc, no centre wedge (ADR-116/335)
   | { type: 'set-distance'; a: Id; b: Id; value: number }
   | { type: 'set-radius'; circle: Id; value: number } // a circle's radius = value (no segment drawn — ADR-087)

@@ -2475,4 +2475,57 @@ export const SCENARIOS_4: Scenario[] = [
       expect(angle(at(fig, 'D'), at(fig, 'B'), at(fig, 'A')), '∠DBA is the stated 30°').toBeCloseTo(30, 1);
     },
   },
+  {
+    id: 'diagonal-claim-refused-on-a-side-966',
+    title: '#966: «אלכסון AB» on a rectangle is refused BY NAME — it is a side, and "already drawn" affirmed the student’s false claim',
+    guards:
+      "The 2-D half of the operator's #859 ruling, which was explicit that it spans the workspace: 'the term אלכסון should be sure to be a diagonal and this is true for all tools. if the word is used.' 3-D got it; 2-D never checked the pair at all, and the role word was decoration — consumed as a way of POINTING at a segment rather than as an assertion ABOUT it. Measured before the fix: «מלבן ABCD» then «אלכסון AB» answered 'already drawn', which is worse than staying silent because it AFFIRMS the false claim — it tells a student who wrote 'the diagonal AB' that that diagonal is already on the canvas. ADR-499 records the claim at parse and checks it through ONE predicate (isRingDiagonal) in TWO layers: applyStep refuses what the figure can already contradict, the givens verifier settles what only the final figure can answer. This scenario is the apply-time half; the refusal names the pair and the shape, never internal state.",
+    steps: ['מלבן ABCD', 'אלכסון AB'],
+    expectViolations: false,
+    check(fig) {
+      // The line is REFUSED before it becomes a fact, so the kept figure is the rectangle alone.
+      expect(fig.lastError, 'the refusal names the pair and the shape').toMatch(/AB is not a diagonal of ABCD/);
+      expect(fig.violations, 'the rectangle itself is untouched and verifies').toEqual([]);
+      for (const id of ['A', 'B', 'C', 'D']) expect(fig.positions.has(id), `${id} is placed`).toBe(true);
+    },
+  },
+  {
+    id: 'diagonal-claim-on-a-triangle-refused-966',
+    title: '#966: «אלכסון AB» on a TRIANGLE is refused — a triangle has no diagonals at all, and it is told so in its own words',
+    guards:
+      "The second of #966's two silent wrongs, and the one that most clearly shows the word was never read as a claim: a triangle has no diagonals whatsoever, yet «משולש ABC» then «אלכסון AB» answered 'already drawn'. It gets a DIFFERENT sentence from the side case on purpose — telling a student who drew it on a triangle that 'AB is a side' teaches nothing about why the request was impossible. The no-diagonals-at-all case falls out of the shared adjacency predicate (with n = 3 every pair is adjacent) rather than being special-cased on the noun, which is what keeps this from being a patch for the one reported input.",
+    steps: ['משולש ABC', 'אלכסון AB'],
+    expectViolations: false,
+    check(fig) {
+      expect(fig.lastError, 'the refusal says the shape has none').toMatch(/AB is not a diagonal .* ABC has no diagonals/);
+      expect(fig.violations, 'the triangle verifies').toEqual([]);
+    },
+  },
+  {
+    id: 'diagonal-of-nothing-is-caught-by-the-verifier-966',
+    title: '#966: «אלכסון AD» across two triangles draws ink and the VERIFIER catches it — the 3-D #859 symptom, 2-D edition',
+    guards:
+      "The row that cannot be caught at apply time without breaking a legitimate order. «משולש ABC» · «משולש DEF» · «אלכסון AD» drew FRESH INK and called it a diagonal, green ✓ — 3-D's #859 symptom exactly. But the same shape ('no polygon holds both labels') is also what a student produces by typing «אלכסון AC» BEFORE «מלבן ABCD», which ends up perfectly true; measured green before the fix and locked green by its sibling scenario. So the claim is DEFERRED rather than refused, and settled by the givens verifier against the finished figure — ADR-104's principle that a claim which is not yet checkable is not yet false. This is the case that forced the two-layer design, and it is why the plan's 'mirror 3-D at apply time' was not enough on its own.",
+    steps: ['משולש ABC', 'משולש DEF', 'אלכסון AD'],
+    expectViolations: true, // the ink is drawn; the figure is reported as not matching its givens
+    check(fig) {
+      const v = fig.violations.filter((x) => x.relation === 'not-a-diagonal');
+      expect(v, 'exactly one diagonal claim is unsupported').toHaveLength(1);
+      expect(v[0].params.pair).toBe('AD');
+      // Both triangles are still real and untouched — the claim is flagged, the figure is not destroyed.
+      for (const id of ['A', 'B', 'C', 'D', 'E', 'F']) expect(fig.positions.has(id), `${id} is placed`).toBe(true);
+    },
+  },
+  {
+    id: 'diagonal-declared-before-its-quad-stays-green-966',
+    title: '#966: «אלכסון AC» typed BEFORE «מלבן ABCD» stays green — the deferral is the point, not a loophole',
+    guards:
+      "The regression guard that keeps #966's fix from becoming a stricter bug than the one it replaced. A student may name the diagonal first and the quad second; by the end AC genuinely IS a diagonal of ABCD, so refusing at apply time — the plan's letter — would reject a correct sequence. Measured green before the fix, and it must stay green after: the claim is recorded, deferred, and verified once the ring exists. Its value is that it fails the moment anyone 'simplifies' the two-layer design into a single apply-time refusal of every unsupported pair.",
+    steps: ['אלכסון AC', 'מלבן ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the claim is true by the end, so nothing is flagged').toEqual([]);
+      expect(fig.violations.filter((x) => x.relation === 'not-a-diagonal')).toEqual([]);
+    },
+  },
 ];

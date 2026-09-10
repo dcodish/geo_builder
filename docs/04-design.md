@@ -316,6 +316,56 @@ a guessed vertex nor an escalation (which hands the model the same invention to 
 `angle-sides-disjoint`, quoting both segment names back — a member of the clarification family above, by
 the same reasoning. 3-D accepts these because it has a direction/`claim` substrate that 2-D does not; the
 parity is in the *addressing mode*, not in the constraint kinds behind it.
+## A role noun is a claim: «אלכסון» (#966, [ADR-499](06-decisions.md#adr-499))
+
+Most nouns in this grammar NAME a thing: «קטע AB» says "the segment AB". A few instead assign a **role**,
+and a role is an assertion — «אלכסון AB» says *AB is a diagonal*, which is either true of the figure or
+not. The parser used to strip «אלכסון» as filler beside «קטע», so the claim never survived to be checked,
+and the tool drew the segment either way.
+
+That is a defect **generator**, not one bug: the same shape produced #536 (a stated collinear ORDER is
+neither enforced nor verified) and #859 (this noun's 3-D twin). Whenever a word carries an assertion and
+the pipeline treats it as a pointer, the assertion is silently dropped — and the failures are invisible in
+the prod logs by construction, because the student is told it worked.
+
+### One predicate, two layers
+
+`isRingDiagonal(ring, a, b)` in `geometry.ts` is the only place that answers *is this pair a diagonal of
+this ring* — a pair non-adjacent along it, wrap included. Two layers consult it, and the division of labour
+is not stylistic:
+
+| layer | judges | because |
+| --- | --- | --- |
+| `applyStep` | claims the figure can ALREADY contradict — some polygon holds both labels and none makes them a diagonal | an immediate refusal is what teaches; this is 3-D's #859 guard |
+| the givens verifier | claims only the FINISHED figure can settle — no ring holds both labels | the shape is not yet known, so the claim is not yet false |
+
+The second row exists because of a measurement, not a preference. These two sequences are the *same shape*
+at the moment the diagonal is typed — no polygon holds both labels:
+
+```
+משולש ABC · משולש DEF · אלכסון AD     ← fresh ink called a diagonal of nothing   (must be caught)
+אלכסון AC · מלבן ABCD                 ← by the end, AC really IS a diagonal      (must stay green)
+```
+
+A single apply-time rule cannot separate them, and tightening the guard to refuse both rejects a correct
+order. Deferring separates them for free, because by verification time the figure has stopped changing.
+This is [ADR-104](06-decisions.md#adr-104)'s deferral principle applied to a **structural** claim rather
+than a metric one: a claim that is not yet checkable is not yet false.
+
+### The refusals teach
+
+Two sentences, because they are two different mistakes: *"AB is not a diagonal of ABCD — it is a side"* and
+*"AB is not a diagonal — ABC has no diagonals"*. The second is not a special case in the code — with n = 3
+every pair of vertices is adjacent, so it falls out of the same predicate — but it is a special case in the
+*explanation*, and telling a student who drew it on a triangle that "AB is a side" would teach nothing.
+Both quote the statement, never internal state.
+
+### What carries a claim, and what does not
+
+The DERIVED plural («אלכסונים», «אלכסוני ABCD») computes its pairs from the ring and is right by
+construction — checking it would only re-verify our own arithmetic. The explicitly NAMED pair form
+(«AC ו-BD אלכסוני הריבוע») makes the same claim the singular does, and carries it.
+
 ## Telling a LABEL from a WORD in Hebrew (#968, [ADR-497](06-decisions.md#adr-497))
 
 The convention nudge (#779) lifts `abcd` to `ABCD`, checks the corrected sentence parses, and shows it
