@@ -256,3 +256,24 @@ them**, so a future fourth source that forgets the rule is caught on the first f
 **The rule to carry forward:** a new label source states which of these three shapes it is, and emits only
 from a fact that held or a constraint that survived. If it cannot know the outcome where it runs, it is in
 the wrong place.
+## The clarification family, and where an ASK beats an escalation (#777, [ADR-490](06-decisions.md#adr-490))
+
+`not-handled` is the escalation seam: whatever reaches it becomes a paid LLM call. That is the right
+destination for a sentence the grammar cannot *read* — and the wrong one for a sentence it reads
+perfectly well but which is **missing a given**.
+
+The distinction is worth stating because it decides the routing:
+
+| the utterance | destination |
+| --- | --- |
+| a phrasing the grammar does not know | `not-handled` → the LLM can legitimately try |
+| a phrasing the grammar knows, with an operand genuinely ABSENT | a `Clarify` → ask the student |
+
+In the second case anything the tool supplies is a given the student never stated (ADR-052), and asking
+the model to supply it only moves the invention one layer down — where it also becomes something the
+tool *teaches*. `incompleteComparative` (#777) and the role-side ask (#775) are the two members so far;
+both keep the student's text so the sentence is completed in place rather than retyped.
+
+The scoping discipline is the same for any future member: register the ask **after** the rule that owns
+the complete form, and make the absence **structural** (here, an end-of-line anchor after the factor, so
+a line carrying «מ…» cannot match) rather than inferred from the other rule having failed.
