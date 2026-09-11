@@ -301,13 +301,27 @@ Two segments that share exactly one endpoint **are** a vertex angle, so the mode
 triple and every downstream layer — constraint, arc, value chip, verifier — is untouched. That equivalence
 is the whole fix; there is no new constraint kind and no new rendering path.
 
-**Where the mode had to be added by hand, and why that is recorded rather than tidied.** `angleArms` has
-two callers (the numeric and symbolic value lanes). `angleAcuteness` and `boundOperand` still keep their
-**own copies** of the triple/single-vertex lanes — the #831 remainder, never migrated — so the new mode was
-added to them explicitly, *additively*, leaving their existing lanes untouched so no reading changes. The
-duplication is the standing hazard: a fourth naming mode would have to be copied three times. Retiring
-those copies in favour of `angleArms` is filed separately; it is a behaviour-preserving refactor, and doing
-it inside a feature slice would have hidden a regression surface inside a feature's locks.
+**The mode had to be added by hand to two rules — and that duplication is now retired**
+(#970, [ADR-500](06-decisions.md#adr-500)). When #967 landed, `angleArms` had only two callers (the
+numeric and symbolic value lanes), while `angleAcuteness` and `boundOperand` still kept their **own
+copies** of the triple/single-vertex lanes — the #831 remainder, never migrated. So the new mode was added
+to them explicitly and *additively*, leaving their existing lanes untouched so no reading changed, and the
+duplication was recorded here rather than left implicit: a fourth naming mode would have had to be copied
+three times, and the forgotten copy reproduces #831's defect exactly.
+
+ADR-500 retired both copies. All three call sites now read through `angleArms`, and the migration was
+measured rather than assumed — a 498-case differential, 132 cells changed, **0 real regressions**, of which
+115 were a refusal *improving* from an escalation to a named clarification. Two things fall out that are
+worth keeping in view when the next mode is added:
+
+- **A refusal channel is part of a reader's contract.** `boundOperand` could not carry one — its return
+  type had no room for it — so «הזווית בין BD ל-CA גדולה מ-40» escalated to the paid model while the
+  identical naming in a *value* statement was refused by name. Widening the type enumerated the five call
+  sites that had to propagate it; returning `null` would have preserved the silence and told no one.
+- **The chokepoint is only real when nothing else answers the same question.** #831 declared this
+  chokepoint and was still true of the code it touched; the guarantee failed because two rules that also
+  answered "which angle is named" were never brought in. A declared single reader with unmigrated callers
+  is not a chokepoint, it is a convention — and conventions are what #967 paid three edits for.
 
 **The refusal is part of the capability.** Two segments that never meet have no vertex between them, and
 2-D has no line-line angle constraint — *every* angle constraint here is vertex-anchored
@@ -316,6 +330,103 @@ a guessed vertex nor an escalation (which hands the model the same invention to 
 `angle-sides-disjoint`, quoting both segment names back — a member of the clarification family above, by
 the same reasoning. 3-D accepts these because it has a direction/`claim` substrate that 2-D does not; the
 parity is in the *addressing mode*, not in the constraint kinds behind it.
+### The other half of the same statement: the VALUE (#969, [ADR-498](06-decisions.md#adr-498))
+
+The section above unifies **which angle is named**. #969 was the same defect in the half it does not
+cover — **what is said about it** — and it is worth reading the two together, because the second one
+happened *while the first one's guarantee was true*.
+
+The value half splits by kind: a number goes to `angle`, a symbol to `measureAngle`. Until #969 they did
+not merely take different values, they **located** them differently:
+
+| | how it finds the value | copulas it accepts |
+| --- | --- | --- |
+| `angle` (numeric) | **positionally** — any standalone number in the line | all of them, implicitly; it never needed one |
+| `measureAngle` (symbolic) | **syntactically** — after a literal `=` | exactly one |
+
+So «זווית ABC = 2α» bound the symbol, and «זווית ABC היא 2α» fell through to the numeric lane, whose
+number scan found the **coefficient** `2` and committed 2° — the student's α gone, the line green.
+
+The repair is not a copula list. The numeric lane has no list to copy: a list would be incomplete against
+its sibling on the day it was written. Both kinds are located the same way instead —
+
+```
+stripped ──► angleValueOf ──► { kind: 'num', … } ──► angle          (set-angle)
+                          └─► { kind: 'sym', … } ──► measureAngle   (measure-angle)
+```
+
+— with a symbolic value read as the **trailing expression** of the statement, exactly as a numeric one is
+a standalone number in it. Two guards are what let the `=` go, and both exist because a symbol is spelled
+like a label where a number is self-identifying: the symbolic read is **end-anchored** and must be
+**preceded by a non-letter**. Without them «זוית abc» reads as the value `c`, and "angle ABC is acute" as
+the value `e`.
+
+Three consequences worth stating, because each is a place the old shape leaked:
+
+- **A comparison is a region, not a value** — in *both* alphabets now. «זווית ABC גדולה מ-α» would have
+  been claimed as the equality ∠ABC = α once the `=` requirement went, so `COMPARES_WITH_SYMBOL` joins
+  [ADR-390](06-decisions.md#adr-390)'s numeric tripwire. Both bails live with the reader, not in one rule:
+  a guard only one lane applies is the exact shape of this bug.
+- **The numeric rule refuses a symbol instead of valuing it.** Reaching `angle` with a symbolic value means
+  the symbolic rule could not *name* the angle; committing the coefficient there would be #969 again. It
+  returns `null`, and the utterance escalates honestly.
+- **The naming modes come along for free.** #967's segment-pair mode was added to `angleArms` alone, so
+  «הזווית בין BD ל-BA היא 2α» binds the symbol with no new code. That is the property both halves of this
+  rule pair exist to have, and it is asserted in the locks rather than assumed.
+
+The general lesson, and the reason this is documented next to its sibling rather than in its own section:
+**a chokepoint that unifies one half of a statement leaves the other half free to re-split.** #831 unified
+the naming half and said so; the value half stayed split for eleven months underneath that sentence.
+## A role noun is a claim: «אלכסון» (#966, [ADR-499](06-decisions.md#adr-499))
+
+Most nouns in this grammar NAME a thing: «קטע AB» says "the segment AB". A few instead assign a **role**,
+and a role is an assertion — «אלכסון AB» says *AB is a diagonal*, which is either true of the figure or
+not. The parser used to strip «אלכסון» as filler beside «קטע», so the claim never survived to be checked,
+and the tool drew the segment either way.
+
+That is a defect **generator**, not one bug: the same shape produced #536 (a stated collinear ORDER is
+neither enforced nor verified) and #859 (this noun's 3-D twin). Whenever a word carries an assertion and
+the pipeline treats it as a pointer, the assertion is silently dropped — and the failures are invisible in
+the prod logs by construction, because the student is told it worked.
+
+### One predicate, two layers
+
+`isRingDiagonal(ring, a, b)` in `geometry.ts` is the only place that answers *is this pair a diagonal of
+this ring* — a pair non-adjacent along it, wrap included. Two layers consult it, and the division of labour
+is not stylistic:
+
+| layer | judges | because |
+| --- | --- | --- |
+| `applyStep` | claims the figure can ALREADY contradict — some polygon holds both labels and none makes them a diagonal | an immediate refusal is what teaches; this is 3-D's #859 guard |
+| the givens verifier | claims only the FINISHED figure can settle — no ring holds both labels | the shape is not yet known, so the claim is not yet false |
+
+The second row exists because of a measurement, not a preference. These two sequences are the *same shape*
+at the moment the diagonal is typed — no polygon holds both labels:
+
+```
+משולש ABC · משולש DEF · אלכסון AD     ← fresh ink called a diagonal of nothing   (must be caught)
+אלכסון AC · מלבן ABCD                 ← by the end, AC really IS a diagonal      (must stay green)
+```
+
+A single apply-time rule cannot separate them, and tightening the guard to refuse both rejects a correct
+order. Deferring separates them for free, because by verification time the figure has stopped changing.
+This is [ADR-104](06-decisions.md#adr-104)'s deferral principle applied to a **structural** claim rather
+than a metric one: a claim that is not yet checkable is not yet false.
+
+### The refusals teach
+
+Two sentences, because they are two different mistakes: *"AB is not a diagonal of ABCD — it is a side"* and
+*"AB is not a diagonal — ABC has no diagonals"*. The second is not a special case in the code — with n = 3
+every pair of vertices is adjacent, so it falls out of the same predicate — but it is a special case in the
+*explanation*, and telling a student who drew it on a triangle that "AB is a side" would teach nothing.
+Both quote the statement, never internal state.
+
+### What carries a claim, and what does not
+
+The DERIVED plural («אלכסונים», «אלכסוני ABCD») computes its pairs from the ring and is right by
+construction — checking it would only re-verify our own arithmetic. The explicitly NAMED pair form
+(«AC ו-BD אלכסוני הריבוע») makes the same claim the singular does, and carries it.
+
 ## Telling a LABEL from a WORD in Hebrew (#968, [ADR-497](06-decisions.md#adr-497))
 
 The convention nudge (#779) lifts `abcd` to `ABCD`, checks the corrected sentence parses, and shows it

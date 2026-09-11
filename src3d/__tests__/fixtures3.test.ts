@@ -29,6 +29,20 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #963 (ADR-3D-238) — point-in-plane membership through the CONTAINMENT frame, both frames and both
+  // languages. The lock is "these sentences build and the figure verifies", so it is a fixture rather
+  // than a hand-authored scenario: it also nets any parser drift on the eight spellings the issue
+  // measured. E and F are new ids, so each rides its plane as a free point (2 DOF) — the ADR-3D-015
+  // reading, reached now from a frame that previously refused every point.
+  'point-in-plane-membership-963.geo3.json': [
+    "תיבה ABCDA'B'C'D'",
+    'E מוכלת במישור ABCD',
+    "המישור A'B'C'D' מכיל את F",
+  ],
+  // #601 (ADR-3D-240) — the KITE's one-unknown completion. The essence is "this figure now builds and
+  // verifies", so a fixture is the right lock; the bespoke assertions (D is the REFLECTION and not the
+  // parallelogram point, at several seeds) live in issue-601.test.ts alongside it.
+  'kite-corner-completion-601.geo3.json': ['משולש ABC', 'דלתון ABCD'],
   // #977 (ADR-3D-241) — a symbolic angle with a COEFFICIENT, stated behind a copula that was unreadable
   // before. The figure must build AND the drawn angle must be 2 × 30: the fixture nets the parse and the
   // drive together, which is what makes it the right lock for "this sentence now works end to end".

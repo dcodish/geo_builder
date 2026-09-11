@@ -1041,7 +1041,7 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 }
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'bisector-ray', 'foot-seg', 'right-pyramid-apex', 'right-apex', 'free3']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'bisector-ray', 'foot-seg', 'reflect-line', 'right-pyramid-apex', 'right-apex', 'free3']);
 
 /**
  * #367: is anything in the figure stated in ABSOLUTE coordinates — a typed parametric line, a plane
@@ -2464,6 +2464,16 @@ function evaluateSolidsAndPoints(
       const A = pos.get(def.a);
       const B = pos.get(def.b);
       if (from && A && B) pos.set(id, footOnLine(from, { anchor: A, dir: sub3(B, A) }));
+    } else if (def.kind === 'reflect-line') {
+      // #601: the mirror of `from` across the line a–b — the foot of the ⟂, then the same distance
+      // again beyond it. Closed form; no root-find, and no helper point on the canvas.
+      const from = pos.get(def.from);
+      const A = pos.get(def.a);
+      const B = pos.get(def.b);
+      if (from && A && B) {
+        const foot = footOnLine(from, { anchor: A, dir: sub3(B, A) });
+        pos.set(id, add3(from, scale3(sub3(foot, from), 2)));
+      }
     } else if (def.kind === 'right-pyramid-apex') {
       // V8-j: the point on segment a–b whose in-plane offset from the base centroid is 0 (apex
       // directly above the centre ⇒ a right pyramid). Closed-form t*; unplaced if no such point.

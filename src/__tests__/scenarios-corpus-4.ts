@@ -2475,4 +2475,83 @@ export const SCENARIOS_4: Scenario[] = [
       expect(angle(at(fig, 'D'), at(fig, 'B'), at(fig, 'A')), '∠DBA is the stated 30°').toBeCloseTo(30, 1);
     },
   },
+  {
+    id: 'symbolic-angle-behind-any-copula-969',
+    title: '#969: «זווית ABC היא 2α» binds the symbol — the copula «היא» no longer silently commits 2°',
+    guards:
+      "P1 honesty breach, found by measurement while building #967 and ruled by the operator into this round. «זווית ABC היא 2α» committed set-angle value:2 — the coefficient read as the whole value, the student's α discarded — and it did so GREEN: applied, drawn, verifier-clean, so no honesty gate caught it. The operator, playing the reproduction: 'we need to be able to keep the same syntax users use for a regular angle so for instance: זוית A שווה 2α and alike needs to be supported.' Measured on 78440ea the hole was every copula but '=' («היא», «הוא», «שווה», «שווה ל-», is, equals), every naming mode, and BOTH alphabets (2α and 2x) — 40+ silently-wrong cells, not the one that was filed. Root cause: the rule pair split its VALUE read by VOCABULARY — the numeric rule located its number positionally (so every copula worked and none was ever written down), the symbolic rule located its symbol syntactically after a literal '='. ADR-498 gives the value half the answer #831/ADR-468 gave the naming half: ONE reader (angleValueOf), positional for both kinds, so the copula stops being load-bearing and a seventh spelling cannot reopen it. This scenario pins α afterwards, because the strongest statement of the fix is that the «היא» spelling and the '=' spelling produce the SAME figure.",
+    steps: ['משולש ABC', 'זווית ABC היא 2α', 'α = 20'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the figure verifies against its givens').toEqual([]);
+      // The defect drew 2°. The fix binds ∠ABC to 2α, so pinning α = 20 must land the angle at 40 —
+      // the student's magnitude survived the parse instead of being replaced by its coefficient.
+      expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), '∠ABC is 2α = 40°').toBeCloseTo(40, 1);
+    },
+  },
+  {
+    id: 'symbolic-angle-copula-matches-equals-969',
+    title: '#969: «זוית A שווה 2α» — the operator’s own spelling builds the same figure as «זוית A = 2α»',
+    guards:
+      "The operator's scope ruling on #969 stated the requirement as a CLASS rather than a spelling: every spelling that works for a NUMERIC angle must work for a SYMBOLIC one. This is the single-vertex naming lane («זוית A», whose arms are resolved from the figure) behind «שווה» — a different cell of the matrix from the reported «זווית ABC היא 2α», and one the operator named themselves. Its value is that it fails for a DIFFERENT reason than the sibling above if the fix is ever narrowed back to one copula or one naming mode.",
+    steps: ['משולש ABC', 'זוית A שווה 2α', 'α = 25'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the figure verifies against its givens').toEqual([]);
+      expect(angle(at(fig, 'B'), at(fig, 'A'), at(fig, 'C')), '∠BAC is 2α = 50°').toBeCloseTo(50, 1);
+    },
+  },
+  {
+    id: 'diagonal-claim-refused-on-a-side-966',
+    title: '#966: «אלכסון AB» on a rectangle is refused BY NAME — it is a side, and "already drawn" affirmed the student’s false claim',
+    guards:
+      "The 2-D half of the operator's #859 ruling, which was explicit that it spans the workspace: 'the term אלכסון should be sure to be a diagonal and this is true for all tools. if the word is used.' 3-D got it; 2-D never checked the pair at all, and the role word was decoration — consumed as a way of POINTING at a segment rather than as an assertion ABOUT it. Measured before the fix: «מלבן ABCD» then «אלכסון AB» answered 'already drawn', which is worse than staying silent because it AFFIRMS the false claim — it tells a student who wrote 'the diagonal AB' that that diagonal is already on the canvas. ADR-499 records the claim at parse and checks it through ONE predicate (isRingDiagonal) in TWO layers: applyStep refuses what the figure can already contradict, the givens verifier settles what only the final figure can answer. This scenario is the apply-time half; the refusal names the pair and the shape, never internal state.",
+    steps: ['מלבן ABCD', 'אלכסון AB'],
+    expectViolations: false,
+    check(fig) {
+      // The line is REFUSED before it becomes a fact, so the kept figure is the rectangle alone.
+      expect(fig.lastError, 'the refusal names the pair and the shape').toMatch(/AB is not a diagonal of ABCD/);
+      expect(fig.violations, 'the rectangle itself is untouched and verifies').toEqual([]);
+      for (const id of ['A', 'B', 'C', 'D']) expect(fig.positions.has(id), `${id} is placed`).toBe(true);
+    },
+  },
+  {
+    id: 'diagonal-claim-on-a-triangle-refused-966',
+    title: '#966: «אלכסון AB» on a TRIANGLE is refused — a triangle has no diagonals at all, and it is told so in its own words',
+    guards:
+      "The second of #966's two silent wrongs, and the one that most clearly shows the word was never read as a claim: a triangle has no diagonals whatsoever, yet «משולש ABC» then «אלכסון AB» answered 'already drawn'. It gets a DIFFERENT sentence from the side case on purpose — telling a student who drew it on a triangle that 'AB is a side' teaches nothing about why the request was impossible. The no-diagonals-at-all case falls out of the shared adjacency predicate (with n = 3 every pair is adjacent) rather than being special-cased on the noun, which is what keeps this from being a patch for the one reported input.",
+    steps: ['משולש ABC', 'אלכסון AB'],
+    expectViolations: false,
+    check(fig) {
+      expect(fig.lastError, 'the refusal says the shape has none').toMatch(/AB is not a diagonal .* ABC has no diagonals/);
+      expect(fig.violations, 'the triangle verifies').toEqual([]);
+    },
+  },
+  {
+    id: 'diagonal-of-nothing-is-caught-by-the-verifier-966',
+    title: '#966: «אלכסון AD» across two triangles draws ink and the VERIFIER catches it — the 3-D #859 symptom, 2-D edition',
+    guards:
+      "The row that cannot be caught at apply time without breaking a legitimate order. «משולש ABC» · «משולש DEF» · «אלכסון AD» drew FRESH INK and called it a diagonal, green ✓ — 3-D's #859 symptom exactly. But the same shape ('no polygon holds both labels') is also what a student produces by typing «אלכסון AC» BEFORE «מלבן ABCD», which ends up perfectly true; measured green before the fix and locked green by its sibling scenario. So the claim is DEFERRED rather than refused, and settled by the givens verifier against the finished figure — ADR-104's principle that a claim which is not yet checkable is not yet false. This is the case that forced the two-layer design, and it is why the plan's 'mirror 3-D at apply time' was not enough on its own.",
+    steps: ['משולש ABC', 'משולש DEF', 'אלכסון AD'],
+    expectViolations: true, // the ink is drawn; the figure is reported as not matching its givens
+    check(fig) {
+      const v = fig.violations.filter((x) => x.relation === 'not-a-diagonal');
+      expect(v, 'exactly one diagonal claim is unsupported').toHaveLength(1);
+      expect(v[0].params.pair).toBe('AD');
+      // Both triangles are still real and untouched — the claim is flagged, the figure is not destroyed.
+      for (const id of ['A', 'B', 'C', 'D', 'E', 'F']) expect(fig.positions.has(id), `${id} is placed`).toBe(true);
+    },
+  },
+  {
+    id: 'diagonal-declared-before-its-quad-stays-green-966',
+    title: '#966: «אלכסון AC» typed BEFORE «מלבן ABCD» stays green — the deferral is the point, not a loophole',
+    guards:
+      "The regression guard that keeps #966's fix from becoming a stricter bug than the one it replaced. A student may name the diagonal first and the quad second; by the end AC genuinely IS a diagonal of ABCD, so refusing at apply time — the plan's letter — would reject a correct sequence. Measured green before the fix, and it must stay green after: the claim is recorded, deferred, and verified once the ring exists. Its value is that it fails the moment anyone 'simplifies' the two-layer design into a single apply-time refusal of every unsupported pair.",
+    steps: ['אלכסון AC', 'מלבן ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the claim is true by the end, so nothing is flagged').toEqual([]);
+      expect(fig.violations.filter((x) => x.relation === 'not-a-diagonal')).toEqual([]);
+    },
+  },
 ];

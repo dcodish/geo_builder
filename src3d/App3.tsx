@@ -75,6 +75,13 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return err.pairs
         ? t('err.ambiguousMainDiagonal', { pairs: err.pairs })
         : t('err.ambiguousMainDiagonalBare');
+    // #866: UNDER-SPECIFIED, not unsupported — the operator's ruling on which voice this gets. When the
+    // figure can name the candidate angles it does; otherwise it still asks, rather than showing an
+    // empty list (the same two-form shape as the main-diagonal ask above).
+    case 'ambiguous-angle-vertex':
+      return err.angles
+        ? t('err.ambiguousAngleVertex', { vertex: err.vertex, angles: err.angles })
+        : t('err.ambiguousAngleVertexBare', { vertex: err.vertex });
     case 'dropped-given':
       return t('err.droppedGiven', { items: err.items });
     // #926: the change went through; this names the rows it left without effect (they stay, marked).

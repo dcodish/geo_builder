@@ -170,6 +170,7 @@
     "converge": "{{a}} and {{b}} have landed at the same point.",
     "offArcNotice": "{{point}} necessarily lies on the part of circle {{circle}} that is not drawn — the construction forces it there.",
     "v": {
+      "notADiagonal": "{{pair}} is drawn as a diagonal, but it is not a diagonal of any shape in the figure",
       "onCircle": "{{point}} should lie on circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
       "tangent": "tangency point {{point}} should lie on circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
       "constraint": "{{desc}} does not hold in the final figure",
@@ -221,6 +222,8 @@
     "unknownCircle": "Circle {{center}} is not defined — there is no circle by that name in the figure. You can name an existing circle, e.g.: the centre of the circle is {{center}}.",
     "noLongerAvailable": "Can't build: {{ids}} is no longer available — an earlier step it relies on was removed or failed.",
     "sameSpot": "With these givens {{a}} and {{b}} land at the same place. Check whether you meant a single point, or add a given that separates them.",
+    "diagonalIsSide": "{{pair}} is not a diagonal of {{shape}} — it is a side of it. A diagonal joins two corners that are not next to each other.",
+    "diagonalNoneHere": "{{pair}} is not a diagonal — {{shape}} has no diagonals at all (every pair of its corners is a side).",
     "alreadyDefined": "{{id}} is already defined and can't be redefined as something different. To change it, edit or delete the earlier step.",
     "cannotPlaceOnSegment": "I couldn't place {{id}} on segment {{seg}} so that {{what}} holds — there may be no such position on the segment.",
     "circlesDontMeet": "Can't build {{id}}: circles {{c1}} and {{c2}} don't intersect. The sizes may need adjusting.",

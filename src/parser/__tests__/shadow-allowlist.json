@@ -1,5 +1,5 @@
 {
-  "_comment": "The REVIEWED set of divergent shadow pairs ('winner → later divergent claimer') over the catalog corpus — the hard gate of shadow-matrix.test.ts (A1/PAR-11; hardened per the 2026-07-03 review, M2: the snapshot form was silently absorbable by `vitest -u`). Every pair here was inspected and is intentional (a more-specific rule deliberately running before a coarser sibling that reads the same words differently). A NEW pair failing the gate means a rule edit created a fresh divergence: inspect it, fix the ordering/regex if it's a real shadow, or — only after review — add it here with the reason understood. '(anon)' entries are unnamed arrow-function rules (position-stable).",
+  "_comment": "The REVIEWED set of divergent shadow pairs ('winner → later divergent claimer') over the catalog corpus — the hard gate of shadow-matrix.test.ts (A1/PAR-11; hardened per the 2026-07-03 review, M2: the snapshot form was silently absorbable by `vitest -u`). Every pair here was inspected and is intentional (a more-specific rule deliberately running before a coarser sibling that reads the same words differently). A NEW pair failing the gate means a rule edit created a fresh divergence: inspect it, fix the ordering/regex if it's a real shadow, or — only after review — add it here with the reason understood. A pair that DISAPPEARS is equally meaningful and must be removed here in the same commit, naming the ADR: 'measureAngle → angle' was dropped by ADR-498 (#969). It had been the bug's own fingerprint sitting in this list as approved — on «זווית ABC = 2α» the numeric rule diverged by reading the coefficient 2 as the degree value, which is exactly the honesty breach #969 reported; `angle` now recognises a symbolic value and refuses it, so the divergence no longer exists. A shadow that is a WRONG reading is not made safe by being shadowed — rule order was the only thing hiding it. '(anon)' entries are unnamed arrow-function rules (position-stable).",
   "shadowPairs": [
     "arcMidpoint → midpoint",
     "arcValue → ratioConstraint",
@@ -20,7 +20,6 @@
     "lengthProduct → equalSegments",
     "lineCutsCircleTwice → lineLineIntersection",
     "lineCutsCircleTwice → lineMeetsCircle",
-    "measureAngle → angle",
     "measureSum → arcEquality",
     "midsegment → segment",
     "nameCenter → circle",

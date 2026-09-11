@@ -71,6 +71,33 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   none of the four space diagonals, so it ASKS (ADR-052), and a clarify is never flattened into a pick.
   *(Realised — [ADR-3D-237](06b-decisions-3d.md#adr-3d-237), #893; the 2-D counterpart is ADR-430/#461.)*
 
+- **FR-SP-8 (Must)** — **A relation the tool reads is read for every OPERAND KIND it is meaningful for.**
+  A student who has seen «הישר ℓ מוכל במישור π» accepted expects «C מוכלת במישור π» — the same relation,
+  said about a point — to be accepted too, and a frame that serves one kind and silently escalates
+  another is indistinguishable to them from the tool not knowing the relation at all. So a relation's
+  operand coverage is a promise, not an implementation detail: **membership** («מוכל ב…», «נמצא ב…»,
+  «מונח על…», "is contained in", "lies in", and the container-headed «המישור π מכיל את …») reads a point
+  and a line alike, in **both languages and both frames**, and lowers each to the command that kind
+  already has. Where a kind genuinely has no meaning under a relation the answer is a **refusal**, never
+  silence: a point has no direction, so «C מאונך למישור π1» is refused rather than escalated. The
+  corollary that matters in review: a relation extended to a new spelling must be extended for every kind
+  at once, and a relation extended to a new kind must serve every spelling at once — which is only
+  affordable because the frame reads its sides through the shared operand reader (ADR-3D-100).
+  *(Realised — [ADR-3D-238](06b-decisions-3d.md#adr-3d-238), #963; the frame itself is
+  [ADR-3D-189](06b-decisions-3d.md#adr-3d-189), #614.)*
+- **FR-SP-9 (Must)** — **An UNDER-SPECIFIED statement is told what is missing; only an UNSUPPORTED one is
+  told the tool cannot do it.** The two are different failures and must not share a voice: a student who
+  wrote a sentence the tool understands but cannot pin down needs to know *which detail* to add, while
+  "this is not supported" sends them away from a form that works. So a statement the parser RECOGNISES as
+  ambiguous surfaces a typed clarification that **names the alternatives in the student's own notation**
+  — «זווית A» on a vertex where three edges meet lists the angles it could mean — and never escalates to
+  the LLM lane, whose job is to guess, nor borrows the scope register's unsupported wording. The
+  corollary that keeps this honest: **the tool asks only when the figure really is ambiguous.** Where the
+  same sentence has exactly one reading, it is resolved and built — asking there would make the
+  clarification's own sentence untrue, and a single reading is not a guess.
+  *(Realised — [ADR-3D-239](06b-decisions-3d.md#adr-3d-239), #866; the earlier members of the family are
+  ADR-3D-131, #836's main-diagonal ask, and #467's ambiguous height.)*
+
 ## Vectors — the geometric lane
 
 - **FR-VC-1 (Must)** — Accept a **named basis** on a solid and reason affinely over it: sums, scalar

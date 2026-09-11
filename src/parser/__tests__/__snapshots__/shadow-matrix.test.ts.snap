@@ -127,22 +127,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
-      "angle",
-    ],
-    "text": "angle ABC = 2α",
-    "winner": "measureAngle",
-  },
-  {
-    "lang": "he",
-    "shadowedBy": [
-      "angle",
-    ],
-    "text": "זווית ABC = 2α",
-    "winner": "measureAngle",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
       "circle",
     ],
     "text": "circle centered at O radius 5",
