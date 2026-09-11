@@ -1502,3 +1502,7 @@ over all four (ADR-041).
 ### `diagonal-declared-before-its-quad-stays-green-966` — the deferral is the point, not a loophole (#966, ADR-499)
 
 **Guards against:** #966's fix becoming a stricter bug than the one it replaced. A student may name the diagonal first and the quad second — «אלכסון AC» then «מלבן ABCD» — and by the end AC genuinely **is** a diagonal of ABCD. Measured green before the fix; it must stay green after. **Asserts** every step ok and no violations at all. Its whole value is that it fails the moment anyone collapses the two layers into a single apply-time refusal of every unsupported pair, which is the obvious "simplification" and is wrong.
+
+### `incremental-tangent-pair-crossing-554` — «המשיקים נחתכים בנקודה E» after two drawn tangents builds E at the crossing (#554, ADR-503)
+
+**Guards against:** the prod REC-2 gap where both tangents were already drawn via the named form and the follow-up «המשיקים נחתכים בנקודה E» was not-handled (the paid LLM failed too). The contextual plural now reaches the tangents-at-points family through `ctx.tangentLines`; E is the pole of chord BC — equal tangent lengths, OB ⟂ BE, OC ⟂ CE, outside the circle.

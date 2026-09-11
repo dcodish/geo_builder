@@ -73,6 +73,8 @@ export type ParseResult =
   | { ok: false; reason: 'ambiguous-construct'; noun: string; options: string[] }
   // Every common tangent of the requested kind is already drawn (two of a kind / four in all) — a
   // further one does not exist; refuse deterministically, never a solver grind (#197 Am. 3).
+  // #554: «המשיקים נחתכים בנקודה E» with MORE than two tangents drawn — which two is the student's to say.
+  | { ok: false; reason: 'tangents-ambiguous'; points: string[] }
   | { ok: false; reason: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' }
   // «נסמן זוית BAM כ-A1» whose NAME is already taken (an existing point, or an alias bound to a
   // DIFFERENT angle) — the collision is the student's to resolve (pick another name), never a silent
@@ -144,6 +146,8 @@ export interface ParseContext {
    *  single tangent from the SAME external apex take the OTHER branch of the circle∩aux intersection, so
    *  the two tangents from a point don't collapse onto one touch ([issue #142](https://github.com/dcodish/geo_builder/issues/142)). */
   tangentAuxes?: string[];
+  /** #554: the drawn tangent-at-point lines — id, circle, touch point (`tangentsAtPointsMeet`). */
+  tangentLines?: { id: string; circle: string; at: string }[];
   /** Vertex lists of polygons already in the figure — lets a DEFINITE unnamed shape reference
    *  ("במרובע חסום מעגל" typed after מרובע ABCD exists) bind to THE existing polygon instead of minting
    *  a fresh auto-named one (the ADR-029 implicit-reference pattern, polygon edition). */
@@ -263,7 +267,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -6127,6 +6131,41 @@ const twoTangentsMeet: Rule = (s, ctx) => {
 };
 
 /**
+ * #554 ([ADR-503](docs/06-decisions.md#adr-503)): «המשיקים נחתכים בנקודה E» / «המשיקים נפגשים בנקודה E» / "the
+ * tangents meet at E" — the INCREMENTAL twin of `twoTangentsMeet`. The two tangents were drawn on EARLIER
+ * lines («משיק למעגל O בנקודה B», «… בנקודה C»); this line names only their crossing, which is the product's
+ * defining interaction (one fact per line) and was the one row in the prod triage window where the paid LLM
+ * failed too. The definite plural resolves against the DRAWN tangent lines (`ctx.tangentLines`): exactly
+ * two ⇒ their crossing, named; more ⇒ a clarification listing the touch points, never a guess; fewer ⇒ not
+ * this rule. Mirrors the common-tangent family's «המשיקים נפגשים» (`tangentsMeet`), which owns the
+ * two-circle figure — that rule reads `ctx.commonTangents` and this one `ctx.tangentLines`, so neither
+ * shadows the other. Emits the same crossing shape as the one-utterance form (a `line-intersection` of the
+ * two tangent lines, plus the reach segments from each touch to E).
+ */
+const TANGENTS_MEET_AT = rx(String.raw`(?:נפגש\w*|נחתכ\w*|מפגש|פוגש\w*|\bmeet\w*|\bintersect\w*|\bcross\w*|חות[כך]\w*)[^A-Za-z]{0,14}?(?:בנקודה|\bat\b|ב-)\s*(${LABEL})`);
+const tangentsAtPointsMeet: Rule = (s, ctx) => {
+  if (!/המשיקים|\bthe\s+tangents\b/i.test(s)) return null;
+  if (!(INTERSECT_KW.test(s) || /נפגש|מפגש/.test(s))) return null;
+  const meetM = s.match(TANGENTS_MEET_AT); // composed from the lexicon's LABEL atom (the ratchet: no inline label fragment)
+  if (!meetM) return null;
+  const E = up(meetM[1]);
+  // The definite plural names NO tangent of its own: any other label means a named form another rule owns.
+  // Letter RUNS split into labels («BE ו-CE» → B,E,C,E — the tangentsMeet pattern); lowercase words are ignored.
+  const labels = [...new Set((dropCircleRef(s).match(rx(String.raw`\b(?:${ULABEL}){1,2}\b`, 'g')) ?? []).flatMap((t) => t.match(rx(ULABEL, 'g')) ?? []))];
+  if (labels.some((l) => l !== E)) return null;
+  const drawn = ctx.tangentLines ?? [];
+  if (drawn.length < 2) return null;
+  if (drawn.length > 2) return { clarify: 'tangents-ambiguous', points: drawn.map((tl) => tl.at) };
+  const [t1, t2] = drawn;
+  if (t1.at === E || t2.at === E) return null; // the meet point cannot be a touch point (two tangents cross OUTSIDE)
+  return [
+    { type: 'line-intersection', id: E, line1: t1.id, line2: t2.id },
+    { type: 'segment', a: t1.at, b: E }, // reach ink: from each touch to the crossing, whichever side E lands on
+    { type: 'segment', a: t2.at, b: E },
+  ];
+};
+
+/**
  * The tangent at D and a line AB meet at E — both phrasings, He/En, with the circle
  * named or implicit (the figure's one circle): "E is the intersection of the tangent
  * to circle O at D and AB", "the tangent at D and the extension of AB meet at E",
@@ -9043,6 +9082,7 @@ export const RULES: Rule[] = [
   bisectorSegmentIntersection, // one bisector ∩ a segment
   cornerTangentCircle, // "AB and AD tangent to circle O" — a circle tangent to two sides of a corner; before the tangent/line rules (the משיק keyword makes lineLineIntersection 'stop')
   twoTangentsMeet, // TWO tangents (at two on-circle points) meeting at a point — before tangent∩segment
+  tangentsAtPointsMeet, // #554: «המשיקים נחתכים בנקודה E» — the INCREMENTAL twin of the line above (the drawn tangents, unnamed)
   tangentLineIntersection, // tangent ∩ a segment
   parallelCircleIntersection, // a parallel line ∩ the circle
   commonTangent, // a COMMON tangent of two circles ("משיק משותף") — before circlesTangent (which would misread it as mutual tangency of new circles)
@@ -10643,6 +10683,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'ambiguous-container') return { ok: false, reason: 'ambiguous-container', centers: res.centers };
   if (res.clarify === 'ambiguous-shape') return { ok: false, reason: 'ambiguous-shape', noun: res.noun, shapes: res.shapes };
   if (res.clarify === 'ambiguous-construct') return { ok: false, reason: 'ambiguous-construct', noun: res.noun, options: res.options };
+  if (res.clarify === 'tangents-ambiguous') return { ok: false, reason: 'tangents-ambiguous', points: res.points };
   if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };
   if (res.clarify === 'alias-taken') return { ok: false, reason: 'alias-taken', name: res.name };
   if (res.clarify === 'role-side-unresolved') return { ok: false, reason: 'role-side-unresolved', role: res.role };

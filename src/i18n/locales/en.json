@@ -78,6 +78,7 @@
     "sideUnspecified": "A {{noun}} does not have all sides equal, so \"its side\" does not name a particular one — say WHICH side, for example \"{{a}} = {{value}}\".",
     "roleSideUnresolved": "The figure has no single side matching \"{{role}}\" — declare the matching triangle first (e.g. \"right triangle ABC\" for the hypotenuse, \"isosceles triangle ABC\" for the base), or name the side by its letters (e.g. \"median to side AB\").",
     "ambiguousAngle": "There's more than one angle at {{vertex}}, so I can't tell which one you mean. Name all three letters of the angle — e.g. \"∠A{{vertex}}C = 90\" — or give it a name: \"denote angle A{{vertex}}C as {{vertex}}1\".",
+    "tangentsAmbiguous": "More than two tangents are drawn here ({{points}}), so it is unclear which two meet. Name them — e.g. «the tangent at {{a}} and the tangent at {{b}} meet at E».",
     "aliasTaken": "The name {{name}} is already taken on this figure, so it can't name an angle. Pick another name — e.g. a letter with a different digit.",
     "reservedSymbol": "The letter {{symbol}} denotes the circle's radius, not a point. Pick another letter for a point on the circle.",
     "ambiguousCircle": "There are two circles around {{center}}, so I can't tell which one you mean. Say \"the outer circle\" or \"the inner circle\".",
