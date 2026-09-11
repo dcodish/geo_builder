@@ -16,7 +16,7 @@
  * supplies the explicit equalities for the pin), and `VARIANT_COUNT` drives the cycle ("show another").
  */
 
-import type { Command, Id } from './types';
+import type { AnyCommand, Command, Id } from './types';
 
 export type VariantShape = 'kite' | 'isosceles' | 'midsegment';
 
@@ -191,6 +191,112 @@ export function statedShapeEqualities(
       .filter((c): c is Extract<Command, { type: 'set-equal' }> => c.type === 'set-equal')
       .map((c) => [[c.a, c.b], [c.c, c.d]] as [Id, Id][]);
     if (classes.length > 0) out.push({ shape: cmd.shape, ids: [...cmd.ids], classes });
+  }
+  return out;
+}
+
+// ── #973 ([ADR-502](docs/06-decisions.md#adr-502)): the choices the tool is CURRENTLY making for an unstated given ──
+//
+// ADR-052 made every unstated magnitude free, and ADR-138 made "which pair is equal" a cyclable variant
+// rather than a fixed assumption. What neither did was SAY so: a student who typed «משולש שווה שוקיים ABC»
+// saw one drawing with one visibly equal pair and could reasonably read it as the tool asserting |AB|=|AC|.
+// The figure was honest; its silence was not. This derivation names, per figure, every choice the tool is
+// making on the student's behalf — for as long as the student has not made it (operator ruling 2026-09-11:
+// persistent, never a one-shot; it disappears the moment the choice is stated).
+//
+// Pure over the fact list, like everything else here: derived on every render, so it appears with the
+// fact, follows «הציגו תצורה אחרת» (the drawn pair is read from the ACTIVE variant), and vanishes when a
+// later fact pins the choice or the fact is disabled or removed. Nothing is stored; nothing can go stale.
+//
+// It is a TABLE keyed on the fact's commands, so a new shape is a row, not a mechanism:
+//   • kite / isosceles  → `equal-pair`   (which sides are equal; pinned by a stated equality, ADR-138)
+//   • base-less midsegment → `free-endpoint` (which side the free end rides; pinned by «G על PR», ADR-412)
+//   • isosceles trapezoid  → `parallel-pair` (the `trapezoid` lowering ASSUMES AB ∥ DC, so the legs follow;
+//                            pinned by a stated ∥ on two of the ring's sides). A plain «טרפז ABCD» makes the
+//                            same assumption and gets NO row — deliberately, per the ruling's scope.
+
+export type UnstatedChoiceKind = 'equal-pair' | 'parallel-pair' | 'free-endpoint';
+/** Runtime list — the i18n net walks it against both locale files (the #882 discipline). */
+export const UNSTATED_CHOICE_KINDS: readonly UnstatedChoiceKind[] = ['equal-pair', 'parallel-pair', 'free-endpoint'];
+
+export type UnstatedChoice =
+  | {
+      factId: string;
+      kind: 'equal-pair';
+      shape: 'isosceles' | 'kite';
+      ids: Id[];
+      /** The equal classes AS DRAWN by the active variant — each inner array is two equal segments. */
+      pairs: [[Id, Id], [Id, Id]][];
+    }
+  | {
+      factId: string;
+      kind: 'free-endpoint';
+      shape: 'midsegment';
+      ids: Id[];
+      /** The free endpoint, the side it rides in the active variant, and the side the midsegment is therefore parallel to. */
+      point: Id;
+      side: [Id, Id];
+      parallelTo: [Id, Id];
+    }
+  | {
+      factId: string;
+      kind: 'parallel-pair';
+      shape: 'isosceles-trapezoid';
+      ids: Id[];
+      /** The pair the lowering ASSUMED parallel, and the legs that equality therefore fell on. */
+      parallel: [[Id, Id], [Id, Id]];
+      legs: [[Id, Id], [Id, Id]];
+    };
+
+/** The minimal fact shape this derivation reads — the store's `Fact` satisfies it structurally. */
+export interface ChoiceFact {
+  id: string;
+  enabled: boolean;
+  cmd: AnyCommand;
+}
+
+const sameSeg = (p: [Id, Id], q: [Id, Id]): boolean => seg(p[0], p[1]) === seg(q[0], q[1]);
+
+export function unstatedChoices(facts: readonly ChoiceFact[]): UnstatedChoice[] {
+  const enabled = facts.filter((f) => f.enabled);
+  const explicitEqs = enabled.map((f) => f.cmd).filter((c): c is Extract<AnyCommand, { type: 'set-equal' }> => c.type === 'set-equal');
+  const onSegs = enabled.map((f) => f.cmd).filter((c): c is Extract<AnyCommand, { type: 'point-on-segment' }> => c.type === 'point-on-segment');
+  const parallels = enabled.map((f) => f.cmd).filter((c): c is Extract<AnyCommand, { type: 'set-parallel' }> => c.type === 'set-parallel');
+  const out: UnstatedChoice[] = [];
+
+  for (const f of enabled) {
+    const c = f.cmd;
+    if (c.type === 'shape-variant') {
+      if (c.shape === 'midsegment') {
+        const [p, q, r, , g] = c.ids;
+        const pinned = onSegs.some((o) => o.id === g && (sameSeg([o.a, o.b], [p, r]) || sameSeg([o.a, o.b], [q, r])));
+        if (pinned) continue;
+        const v = ((c.variant % 2) + 2) % 2;
+        out.push({ factId: f.id, kind: 'free-endpoint', shape: 'midsegment', ids: [...c.ids], point: g, side: v === 0 ? [p, r] : [q, r], parallelTo: v === 0 ? [q, r] : [p, r] });
+        continue;
+      }
+      // kite / isosceles: a stated equality on ANY variant's pair pins the choice (the ADR-138 rule
+      // `expandShapeVariant` applies) — the same predicate, asked the other way round.
+      const pinned = variantPairs(c.shape, c.ids).some((variant) => variant.some((pair) => explicitEqs.some((eq) => eqMatchesPair(eq, pair))));
+      if (pinned) continue;
+      const pairs = expandShapeVariant(c, [])
+        .filter((e): e is Extract<Command, { type: 'set-equal' }> => e.type === 'set-equal')
+        .map((e) => [[e.a, e.b], [e.c, e.d]] as [[Id, Id], [Id, Id]]);
+      out.push({ factId: f.id, kind: 'equal-pair', shape: c.shape, ids: [...c.ids], pairs });
+      continue;
+    }
+    if (c.type === 'trapezoid') {
+      const [a, b, cc, d] = c.ids;
+      // Only the ISOSCELES trapezoid carries a choice the ruling says to name: the macro's leg equality
+      // |AD| = |BC| is where the assumed parallel pair silently decided which sides are the legs.
+      const legsStated = explicitEqs.some((eq) => eqMatchesPair(eq, [a, d, b, cc]));
+      if (!legsStated) continue;
+      const ring: [Id, Id][] = [[a, b], [b, cc], [cc, d], [d, a]];
+      const onRing = (x: Id, y: Id) => ring.some((s) => sameSeg(s, [x, y]));
+      const pinned = parallels.some((pl) => onRing(pl.a, pl.b) && onRing(pl.c, pl.d));
+      if (pinned) continue;
+      out.push({ factId: f.id, kind: 'parallel-pair', shape: 'isosceles-trapezoid', ids: [...c.ids], parallel: [[a, b], [d, cc]], legs: [[a, d], [b, cc]] });
+    }
   }
   return out;
 }
