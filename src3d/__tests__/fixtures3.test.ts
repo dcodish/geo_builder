@@ -47,6 +47,10 @@ const SEEDED: SeededCorpus = {
   // now builds and verifies" (DC ∥ AB by construction, the ratio a free DOF); the bespoke locks — the ratio
   // resamples, a later given drives it through the rider lane — live in issue-985.test.ts.
   'trapezoid-corner-completion-985.geo3.json': ['משולש ABC', 'טרפז ABCD'],
+  // #863 (ADR-3D-245) — the operator's slow figure: a symbolic pair injection, then a symbolic line equation on
+  // the same solid. The essence is 'this sequence builds and verifies at every seed'; the perf lock (the pivot's
+  // residual loop samples nothing) lives in issue-863-sample-hoist.test.ts alongside it.
+  'symbolic-line-equation-863.geo3.json': ["מנסרה ישרה משולשת ABCA'B'C'", "AA'=(k-1,k-7,k+1)", "AC על הישר x=(8,-1,-1)+t(k+1,0,k-3)"],
   // #977 (ADR-3D-241) — a symbolic angle with a COEFFICIENT, stated behind a copula that was unreadable
   // before. The figure must build AND the drawn angle must be 2 × 30: the fixture nets the parse and the
   // drive together, which is what makes it the right lock for "this sentence now works end to end".

@@ -1399,7 +1399,11 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       symDrives.length > 0) && // #815: a pin-symbol membership with NO pin beside it enters the pivot too
     c.solids.length > 0
   ) {
-    const dims0 = c.solids.flatMap((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed, solid.oblique));
+    // #863 (ADR-3D-245): the solids' seeded dims are sampled ONCE here and threaded into every residual
+    // evaluation — `evalCanonical` runs per LM iteration (680 k times on the issue's figure), and re-sampling
+    // the same (seed, key) inside it was the whole 2 s. `dims0` is the same vector, flattened, exactly as before.
+    const perSolidDims = c.solids.map((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed, solid.oblique));
+    const dims0 = perSolidDims.flat();
     const evalCanonical = (
       dims: number[],
       cheap = true,
@@ -1410,7 +1414,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       for (const [id, def] of c.points) {
         if (def.kind === 'coord') p2.set(id, v3(def.x, def.y, def.z));
       }
-      evaluateSolidsAndPoints(c, seed, p2, planes, lines, dims, cheap, override, undefined, undefined, riderTs);
+      evaluateSolidsAndPoints(c, seed, p2, planes, lines, dims, cheap, override, undefined, undefined, riderTs, undefined, perSolidDims);
       return p2;
     };
 
@@ -2208,12 +2212,18 @@ function evaluateSolidsAndPoints(
   /** #930 (ADR-3D-236): out-param — each vec-def ratio symbol's CHOSEN value, recorded by the code that
    *  picks the root so the sign verifier reads what was actually used rather than re-deriving it. */
   ratioSymbols?: Map<string, number>,
+  /** #863 (ADR-3D-245): the solids' SAMPLED dims, resolved ONCE per (construction, seed) by the caller and
+   *  threaded in — the pivot's residual calls this pass hundreds of thousands of times per solve, and each
+   *  call used to re-derive the same seeded samples (the measured figure: 2.04 M `sample()` calls, 3 distinct
+   *  keys). A pure per-seed quantity is derived once; the residual closes over figure constants. Omitted
+   *  (the one-shot callers) ⇒ sampled here, exactly as before. */
+  sampledSolidDims?: readonly number[][],
 ): void {
   let dimCursor = 0;
   c.solids.forEach((solid, i) => {
     const key = `solid-${solid.kind}-${solid.ids.join('')}`;
     const origin = v3(i * 2.5, 0, 0); // side-by-side when a figure ever holds two solids
-    const own = solidDims(solid.kind, key, seed, solid.oblique);
+    const own = sampledSolidDims?.[i] ?? solidDims(solid.kind, key, seed, solid.oblique);
     const dims = dimOverride ? dimOverride.slice(dimCursor, dimCursor + own.length) : own;
     dimCursor += own.length;
     const ps = solidPositions(solid.kind, dims, origin, solid.oblique);

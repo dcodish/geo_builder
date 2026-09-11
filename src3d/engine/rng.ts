@@ -30,8 +30,18 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
+/** #863: the sample-call counter — the perf canary for the "a pure per-seed quantity is derived ONCE per
+ *  (construction, seed)" law. A test asserts a figure's resolve costs O(distinct keys) calls, never O(iterations). */
+export const sampleStats = {
+  calls: 0,
+  /** the subset keyed `solid-…` — a solid's seeded dims, the member of the class the pivot's residual loop re-derived. */
+  solidCalls: 0,
+};
+
 /** One stable sample in [min,max), keyed by (seed, key). */
 export function sample(seed: number, key: string, min: number, max: number): number {
+  sampleStats.calls++;
+  if (key.startsWith('solid-')) sampleStats.solidCalls++;
   const r = mulberry32(hashKey(key) ^ Math.imul(seed + 1, 0x9e3779b1))();
   return min + r * (max - min);
 }
