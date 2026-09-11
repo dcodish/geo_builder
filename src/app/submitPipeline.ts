@@ -237,6 +237,14 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   // A single-vertex angle ("∠B = 90") the parser flagged as ambiguous (the vertex has ≠2 edges, so WHICH
   // angle is meant is unclear) — ask the student to name all three letters instead of escalating to the LLM
   // (which would only guess). Keep the text so they can edit it into the three-letter form.
+  // #554: «המשיקים נחתכים בנקודה E» with more than two tangents drawn — ask WHICH two (name them, as the
+  // one-utterance form does) instead of guessing or paying the LLM to guess.
+  if (!r.ok && r.reason === 'tangents-ambiguous') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `tangents-ambiguous:${r.points.join(',')}` });
+    ui.setInputNote(t('input.tangentsAmbiguous', { points: r.points.join(', '), a: r.points[0] ?? 'A', b: r.points[1] ?? 'B' }));
+    ui.setBusy(false);
+    return;
+  }
   if (!r.ok && r.reason === 'ambiguous-angle') {
     logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `ambiguous-angle:${r.vertex}` });
     ui.setInputNote(t('input.ambiguousAngle', { vertex: r.vertex }));

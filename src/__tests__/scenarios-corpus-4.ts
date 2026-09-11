@@ -2554,4 +2554,28 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.violations.filter((x) => x.relation === 'not-a-diagonal')).toEqual([]);
     },
   },
+  {
+    id: 'incremental-tangent-pair-crossing-554',
+    title: '#554: «המשיקים נחתכים בנקודה E» after two tangents drawn one per line — the exact prod sequence builds E at the crossing',
+    guards:
+      "Prod log-triage 2026-08-11 REC-2, the one row where the paid LLM failed too: both tangents already drawn via the fully-supported named form, then the follow-up «המשיקים נחתכים בנקודה E» was not-handled. The contextual plural existed only for the common-tangent (two-circle) family. ADR-503 adds the tangents-at-points twin: the definite plural resolves against the DRAWN tangent lines; two ⇒ their crossing, named. This is the product's defining interaction — one fact per line.",
+    steps: ['מעגל O', 'משיק למעגל O בנקודה B', 'משיק למעגל O בנקודה C', 'המשיקים נחתכים בנקודה E'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const E = fig.positions.get('E')!;
+      const O = fig.positions.get('O')!;
+      const B = fig.positions.get('B')!;
+      const C = fig.positions.get('C')!;
+      expect(E, 'E is placed').toBeTruthy();
+      // E is the pole of chord BC: equidistant from the two touches (equal tangent lengths) and outside the circle
+      const eb = Math.hypot(E.x - B.x, E.y - B.y);
+      const ec = Math.hypot(E.x - C.x, E.y - C.y);
+      expect(Math.abs(eb - ec)).toBeLessThan(1e-6 * Math.max(1, eb));
+      expect(Math.hypot(E.x - O.x, E.y - O.y)).toBeGreaterThan(Math.hypot(B.x - O.x, B.y - O.y));
+      // each tangent is ⟂ its radius at the touch: OB ⟂ BE, OC ⟂ CE
+      expect(Math.abs((B.x - O.x) * (E.x - B.x) + (B.y - O.y) * (E.y - B.y))).toBeLessThan(1e-6 * eb * Math.hypot(B.x - O.x, B.y - O.y));
+      expect(Math.abs((C.x - O.x) * (E.x - C.x) + (C.y - O.y) * (E.y - C.y))).toBeLessThan(1e-6 * ec * Math.hypot(C.x - O.x, C.y - O.y));
+    },
+  },
 ];
