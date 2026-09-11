@@ -209,11 +209,13 @@ describe('#587 — the three apply arms', () => {
     expect(d.positions.has('E'), 'the unknown corner was completed').toBe(true);
   });
 
-  it('ARM 2: a family that does NOT determine the corner refuses instead of inventing it (ADR-052)', () => {
+  it('ARM 2: a family that does NOT determine the corner MINTS it free (#985, ADR-3D-244 — was a refusal)', () => {
     submit('מקבילית ABCD');
-    submit('טרפז ABCE'); // one parallel pair leaves E with a free DOF — nothing determines it
-    expect(state().lastError, 'an underdetermined corner must be refused, never defaulted').not.toBe(null);
-    expect(state().facts).toHaveLength(1);
+    submit('טרפז ABCE'); // one parallel pair leaves E with a free DOF — that DOF is minted, not refused
+    expect(state().lastError, 'an under-determined corner is created carrying its freedom (FR-SP-2)').toBe(null);
+    expect(state().facts).toHaveLength(2);
+    const d = build(0);
+    expect(d.positions.has('E'), 'the free corner was placed').toBe(true);
   });
 
   it('ARM 3 (all known): a TRUE statement verifies green and adds no points', () => {

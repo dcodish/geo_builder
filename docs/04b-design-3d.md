@@ -326,7 +326,7 @@ This is also where 3-D and 2-D legitimately diverge. 2-D's [ADR-164](06-decision
 «זווית A» from the figure unconditionally, because a 2-D vertex almost never carries more than two edges.
 3-D does not port that rule — it asks whenever the figure gives more than one reading. The products agree
 wherever the figures agree, and differ exactly where 3-D has information 2-D does not.
-## A stated quad shape has three arms, and the third is decided by geometry (#587/#601)
+## A stated quad shape has three arms, and the middle one always CREATES the corner (#587/#601/#985)
 
 `quad-shape` dispatches on **how many corners already exist** — in `apply`, not in the parser, because
 `parse3` is context-free and cannot know:
@@ -334,11 +334,13 @@ wherever the figures agree, and differ exactly where 3-D has information 2-D doe
 | unknown corners | arm | what it means |
 | --- | --- | --- |
 | 2+ | **declaration** — the flat `polygon4` carries the free dims and the constraint set takes some away |
-| 1 | **completion** — the corner is derived, *if the family determines it* |
+| 1 | **completion** — the corner is CREATED; the family only decides *how* (derived, or minted carrying the freedom the shape leaves open) |
 | 0 | **statement** about existing points — the constraints M1-route to claims, so a false one is refused |
 
 The middle arm is where the families genuinely differ, and the difference is geometric rather than a
-matter of which nouns we chose to support:
+matter of which nouns we chose to support. `quadCornerDef` in `baseShapes.ts` is that difference written
+as the family table's **second column** — beside `quadShapeConstraints`, which is what each family *states*,
+it says how each family's one missing corner is *created* ([ADR-3D-244](06b-decisions-3d.md#adr-3d-244)):
 
 - **parallelogram family** (square, rectangle, rhombus, parallelogram) — the corner IS the parallelogram
   point. [ADR-3D-152](06b-decisions-3d.md#adr-3d-152).
@@ -347,13 +349,33 @@ matter of which nouns we chose to support:
   parallelogram arm's list would have been wrong and a construct was needed
   ([ADR-3D-240](06b-decisions-3d.md#adr-3d-240)), and why the corner is read from the **ring** rather
   than from the letters' order.
-- **trapezoid** and general **quad** — genuinely undetermined: one free DOF the student never stated.
-  The refusal is the CORRECT answer ([ADR-052](06-decisions.md#adr-052)), not a gap awaiting a fix.
+- **trapezoid** — one relation, one freedom. The corner is a `scaled-offset` point, `anchor + k·(to − from)`,
+  with **k free**: DC ∥ AB holds by construction, and the ratio the student never stated is a sampled DOF
+  that resamples on «הציגו תצורה אחרת» and that the pivot's rider lane (#820) drives when a later given reads
+  it. It is the parallelogram corner with its coefficient released — k = 1 *is* the parallelogram point —
+  and it is the same kind 2-D uses for the same corner. ADR-3D-152 refused this case as an "unstated
+  given"; that read under-determination as an error, which FR-SP-2 says it is not. The operator's ruling
+  (2026-09-11): *"when a user asks for a shape, we respect it and create nodes as needed with dof."*
+  [ADR-3D-244](06b-decisions-3d.md#adr-3d-244).
+- general **quad** — nothing stated beyond flatness: a plane rider on the known three (2 DOF), which is how
+  #774's mixed run already minted «מרובע ABCD»'s corner — that noun never reached this arm, and now the arm
+  answers the same way it would have.
+
+**Why the first attempt at the trapezoid failed, and what it teaches.** Minting the corner as a plane rider
+and then lowering `DC ∥ AB` moves the refusal from `unknown-point` to `claim-refuted`: a rider's position is
+**sampled**, not part of the pivot's unknown vector, so a ∥ pin can only *verify* it against the sample —
+[ADR-3D-191](06b-decisions-3d.md#adr-3d-191)'s finding from a second direction. A relation that must *place*
+a point has to be absorbed into the point's own construction, leaving only the genuine remainder free.
 
 **The lesson worth carrying:** a refusal shared by several families can be hiding a member that does not
 belong in it. #587's arm refused three families with one condition, and two of those refusals were right
 for a reason the third did not share. When a family list is the guard, the question to ask is whether
 every member fails for the *same* reason — the kite failed only because the arm knew one closed form.
+
+**A point determined UP TO a scalar becomes a kind with the scalar free.** `scaled-offset` carries the
+trapezoid's DC ∥ AB in its construction and leaves k as a real DOF — counted, sampled, and driven through
+the same rider lane as an `on-segment` point's `t`. The two `PointDef` twins say it in one line:
+`parallelogram-point` is `scaled-offset` with k = 1.
 
 **A derived point that needs a helper should usually become a KIND.** `reflect-line` exists rather than
 minting a foot point and a `vec-rel`, because the helper would appear on the canvas as visible work the

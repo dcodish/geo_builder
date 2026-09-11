@@ -25,7 +25,7 @@
 
 import { sample } from './rng';
 import { dist3, dot3, norm3, ringCircumcentre2, sub3, type Vec3 } from './vec3';
-import type { Command3, Id, SolidKind } from './types';
+import type { Command3, Id, PointDef, SolidKind } from './types';
 
 /** The quadrilateral base shapes a solid can stand on. */
 export type QuadBase = 'square' | 'rectangle' | 'rhombus' | 'parallelogram' | 'kite' | 'trapezoid' | 'quad';
@@ -94,6 +94,46 @@ export function quadShapeConstraints(base: QuadBase, ring: Id[]): Command3[] {
       return [par(d, c, a, b)];
     case 'quad':
       return []; // a general quadrilateral states nothing beyond being one
+  }
+}
+
+/**
+ * #985 (ADR-3D-244): HOW a stated quad's ONE missing corner is created — the family table's second
+ * column, beside {@link quadShapeConstraints} (what the family states). Read from the RING as named,
+ * never from the letters' order (the #601 rule), so «טרפז ABCD» missing B behaves exactly as one missing D.
+ *
+ * Operator ruling (2026-09-11): *"when a user asks for a shape, we respect it and create nodes as needed
+ * with dof."* So every row CREATES the corner; the family only decides how:
+ *
+ *   determined by a closed form   → DERIVED — the parallelogram point (#587/#984), the kite's reflection (#601)
+ *   one relation, one freedom     → `scaled-offset` with k FREE — the trapezoid: DC ∥ AB by construction,
+ *                                   the ratio the student never stated a sampled, drivable DOF
+ *   nothing stated                → a plane rider (2 DOF), as #774's mixed run already mints «מרובע ABCD»'s
+ *
+ * The trapezoid row is the parallelogram row with its coefficient released: the corner sits at its PARTNER
+ * along the parallel pair (index i^1), offset by k times the opposite side read in ring-consistent
+ * direction; k = 1 is exactly `parallelogram-point`. Superseded by this: ADR-3D-152's refusal of the
+ * under-determined families, which treated a supported state (FR-SP-2) as an error.
+ */
+export function quadCornerDef(base: QuadBase, ring: readonly Id[], i: number): PointDef {
+  const at = (j: number): Id => ring[((j % 4) + 4) % 4];
+  const opp = at(i + 2);
+  const n1 = at(i + 1);
+  const n2 = at(i + 3);
+  switch (base) {
+    case 'square':
+    case 'rectangle':
+    case 'rhombus':
+    case 'parallelogram':
+      return { kind: 'parallelogram-point', opp, n1, n2 };
+    case 'kite':
+      return { kind: 'reflect-line', from: opp, a: n1, b: n2 };
+    case 'trapezoid': {
+      const partner = i ^ 1; // d↔c (3↔2) and a↔b (0↔1): the two members of a parallel pair
+      return { kind: 'scaled-offset', anchor: at(partner), from: at(i + 2), to: at(partner + 2) };
+    }
+    case 'quad':
+      return { kind: 'on-plane', plane: ring.filter((_, j) => j !== i).join('') };
   }
 }
 

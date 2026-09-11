@@ -41,6 +41,10 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
 - **FR-SP-2 (Must)** — **Under-determination is welcome.** An unstated dimension stays a free degree of
   freedom that resamples on "another configuration", while everything the student *did* pin stands still.
   A figure that is not fully determined is a normal state, not an error.
+  **Corollary (operator ruling 2026-09-11, [ADR-3D-244](06b-decisions-3d.md#adr-3d-244)):** a stated shape is
+  *respected* — the nodes it needs are created, carrying exactly the degrees of freedom the shape leaves
+  open. A corner the shape does not determine is minted free (and drivable by later givens), never refused
+  and never invented at a specific value.
 - **FR-SP-3 (Must)** — **Defaults yield to statements; nothing unstated is ever invented.** A prism not
   stated to be right is **oblique**. A qualifier the parser recognises must be one it can lower — a
   recognised-but-dropped qualifier is a silent given, the same cardinal sin as drawing a figure that
