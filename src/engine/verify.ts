@@ -12,16 +12,16 @@
  * tangency point. Expandable to constraint residuals (distance/angle/parallel/⟂) and collinearity.
  */
 
-import type { Command, Constraint, Construction, Id, Vec } from './types';
+import type { Command, Constraint, Construction, Id, Polygon, Vec } from './types';
 import type { ResolvedCircle } from './evaluate';
-import { angleDeg, dist, pointInPolygon, polygonArea } from './geometry';
+import { angleDeg, dist, isRingDiagonal, pointInPolygon, polygonArea } from './geometry';
 import { angleOffSpans, angleOnSpans, drawnArcSpans, type ArcSpan } from './arcs';
 import { constraintRefs, describeConstraint, isSatisfied, residual, residualTolerance } from './solve';
 import { formatMeasure } from '../format';
 
 export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
-  relation: 'label' | 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'line-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | 'point-off-arc' | 'convexity' | Constraint['type'];
+  relation: 'label' | 'not-a-diagonal' | 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'line-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | 'point-off-arc' | 'convexity' | Constraint['type'];
   ids: Id[];
   /** English fallback, e.g. "E should lie on circle P (radius 3.60) but is 7.42 from its centre". */
   message: string;
@@ -115,6 +115,38 @@ export function checkGivens(
   construction?: Construction,
 ): GivenViolation[] {
   const violations: GivenViolation[] = [];
+
+  /**
+   * #966 (ADR-499) — a DIAGONAL claim the final figure does not support.
+   *
+   * «אלכסון» asserts that the pair is non-adjacent on some ring. `applyStep` refuses the claims the
+   * figure could already contradict; the ones it cannot yet speak about — a pair whose polygon is not
+   * declared until later, or a pair belonging to no polygon at all — land HERE, against the finished
+   * drawing. That is what lets «אלכסון AC» typed BEFORE «מלבן ABCD» be accepted and still be honest:
+   * it is checked once the quad exists, and it passes.
+   *
+   * The one that must NOT pass is the reverse: «משולש ABC» · «משולש DEF» · «אלכסון AD» drew fresh ink
+   * and called it a diagonal of nothing at all — 3-D's #859 symptom exactly, and by construction it can
+   * never appear in the prod logs as a failure, because the student is told it worked.
+   */
+  if (construction) {
+    const rings = construction.objects.filter((o): o is Polygon => o.kind === 'polygon').map((o) => o.vertices);
+    const claimed = new Set<string>();
+    for (const c of commands) {
+      if (c.type !== 'segment' || !c.diagonal) continue;
+      const key = `${c.a}${c.b}`;
+      if (claimed.has(key)) continue;
+      claimed.add(key);
+      if (rings.some((r) => isRingDiagonal(r, c.a, c.b))) continue;
+      violations.push({
+        relation: 'not-a-diagonal',
+        ids: [c.a, c.b],
+        message: `${c.a}${c.b} is drawn as a diagonal but is not a diagonal of any shape in the figure`,
+        messageKey: 'figure.v.notADiagonal',
+        params: { a: c.a, b: c.b, pair: `${c.a}${c.b}` },
+      });
+    }
+  }
 
   const seen = new Set<string>();
   for (const { point, circle } of onCircleRefs(commands)) {

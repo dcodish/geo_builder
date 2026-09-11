@@ -9250,6 +9250,146 @@ halves' standalone readings, which is what "by construction" means here; and the
 #438's line still building ONE solid, a bare solid untouched, an unreadable construct unchanged, and a
 non-solid left half left to its own rules.
 
+## ADR-3D-238 — CONTAINMENT IS NOT A DIRECTION RELATION: a POINT is a legal contained side (#963)
+
+**Status:** accepted, 2026-09-10 · **Issue:** #963 (measured while composing fix-round #962)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-8 (new) · **Design:** [04b](04b-design-3d.md) — the membership family
+
+**The report, and the correction measurement forced.** #963 was filed as *"point-in-plane membership
+exists **ONLY in English** — «C on plane π1» works, all 8 Hebrew spellings are not-handled"*, with a
+table of eight rows. Re-measured on `78440ea` before any change, that headline is **wrong**:
+
+| spelling | before |
+| --- | --- |
+| `C על המישור π1` · `הנקודה C על המישור π1` · `C על מישור π1` | ✅ built — Hebrew, and always did |
+| `C on plane π1` · `C lies on plane π1` | ✅ built |
+| `C מוכלת/מוכל במישור π1` · `C נמצאת/נמצא במישור π1` · `C מונחת במישור π1` | ○ not-handled |
+| `המישור π1 מכיל את C` · `המישור π1 מכיל את הנקודה C` | ○ not-handled |
+| **`C lies in plane π1`** · **`point C lies in plane π1`** | ○ **not-handled** |
+
+Hebrew membership was never missing. What was missing is the **containment FRAME** for a point — and it
+was missing in **both languages**: English "lies **in**" failed exactly as «מוכלת ב» did, while "lies
+**on**" worked. The axis of the defect is the *frame*, not the *language*.
+
+That correction changes the fix. Filed as a language gap, the natural repair is a list of Hebrew
+spellings bolted onto a rule — the enumeration habit `src3d/CLAUDE.md` warns about, and it would have
+left "lies in" broken. Diagnosed correctly, it is **one operand kind missing from one frame**, and a
+single edit serves every spelling in the table at once, in both languages, including the two English
+rows nobody had noticed.
+
+**Root cause, one line.** #614/[ADR-3D-189](#adr-3d-189) built the containment frame over the shared
+operand reader and wired both directions — «ℓ מוכל במישור π» and the container-headed
+«המישור π מכיל את ℓ». It wired them for a **line**. A point fell out at this guard in `planeRelGiven`:
+
+```ts
+if (a.op.kind === 'point' || b.op.kind === 'point') return null; // a point has no direction
+```
+
+The comment is the bug and is also the fix: the guard reasons about **direction**, and it governs
+perp/parallel/angle correctly — a point genuinely has none. Containment is not a direction relation. A
+point inside a plane is **membership**, the most ordinary statement a solid-geometry question makes, and
+the engine has had `on-planes` for it since [ADR-3D-015](#adr-3d-015).
+
+**The decision.** Containment is exempted from the direction bail and reads a point side, lowering to the
+**existing** `on-planes` — no new command, per #641's instruction that this be *one* `object ⊂ plane`
+membership over the shared operand reader rather than a fourth bespoke rule. A point-run container
+(«C מוכלת במישור ABD») is materialised with `plane-through` first, exactly as `pointRelPlane` does for
+the «על» spelling, so the two spellings of one statement reach the identical pair of commands — which is
+the round-trip property #614 exists to protect.
+
+**The refusals are part of it, and each was measured after the change.** A **segment** is not a
+container («C מוכלת ב-AB» — it does contain points, but this relation's container is a plane, the same
+boundary the line lane draws); the **coordinate frame and axes** keep their own cells (#614/#512 —
+falling through here would record a second spelling of a relation that already has one owner); a point
+**contained in itself** states nothing; and, most importantly, a point still has **no direction** —
+«C מאונך למישור π1» and «C מקביל למישור π1» stay refused. Exempting containment must not exempt the rest,
+and that is asserted rather than assumed.
+
+**Locks.** `src3d/__tests__/issue-963.test.ts` (20): the issue's eight rows verbatim; the two English
+containment rows and the three Hebrew «על» rows that were *always* fine, asserted together so the
+corrected diagnosis cannot quietly revert to "a Hebrew problem"; the point-run container asserted to
+produce the *same* commands from both frames; and the five refusals above. Fixture
+`fixtures3/point-in-plane-membership-963.geo3.json` — the essence is "these sentences build and the
+figure verifies", so a fixture is the right lock (zero authoring, and it nets parser drift on the
+spellings too).
+
+**Sibling recorded, not fixed:** the whole-face form («משולש ACS מונח על מישור π2», a POLYGON contained in
+a plane) is still not-handled. It is #532 capability 2 and is scoped there; this ADR deliberately did not
+widen to it, since a face is a different operand kind with its own lowering question (one fact or N).
+## ADR-3D-239 — «זווית A» IN 3-D IS UNDER-SPECIFIED, NOT UNSUPPORTED — and one candidate is not ambiguous (#866)
+
+**Status:** accepted, 2026-09-10 · **Issue:** #866 (the #343 remainder, split out in round #864)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-9 (new) · **Design:** [04b](04b-design-3d.md) — the clarification family
+
+**The form.** «AD חוצה את זווית A» / "AD bisects angle A" — the bisected angle named by its **vertex
+alone**. Four of #343's five bisector frames build; this is the fifth, and it needed a ruling rather than
+code.
+
+**Why it is not simply a wider regex.** In 2-D a vertex usually carries exactly two edges, so
+[ADR-164](06-decisions.md#adr-164) resolves «זווית A» from the figure and there is one reading. **In 3-D
+it usually does not**: a pyramid apex has three or more incident edges, a box vertex three. So the
+sentence names one of several angles, and picking one would assert a given the student never gave
+([ADR-052](06-decisions.md#adr-052)) — drawing a bisector of the **wrong angle with a green ✓**, the
+silent-wrong-ink class that by construction can never appear in the prod logs as a failure.
+
+**The operator's ruling settles the message CLASS** (2026-09-02, playing PR #867):
+
+> *"error message specifically here should be that there is more than one A angle so user should specify
+> which. current message should be used when the tool doesnt support the command — not when it's not
+> fully defined."*
+
+So the frame is **under-specified**, not unsupported. It must be recognised, it must surface a typed
+ambiguity that names the candidates, and it must **not** borrow the scope register's "not supported here"
+voice. Measured before the fix, the line reached **no register at all** — `parse3` → `not-handled`,
+`classifyGuidance3` → `null`, store → `not-understood` — so it escalated to the **paid model**, and
+whatever text the operator saw came from there rather than from a decision of ours. Both halves needed
+building: the recognition and the refusal.
+
+**The decision — and where each half lives.** `parse3` is context-free by design, so it cannot know which
+edges meet at A. The division of labour is #836's exactly (`ambiguous-main-diagonal`,
+which has the same shape and the same reason): the **parser** recognises the frame and returns a typed
+refusal carrying the vertex *and the rider*; the **store**, which knows the figure, enumerates the
+candidate angles and composes the message. The recogniser is spelled from the same parts as the
+three-letter rule it is the under-specified twin of — same verbs, same optional «את», same English
+"bisects" / "is the bisector of" — so the two cannot drift apart and leave one frame recognised and the
+other escalating.
+
+**One candidate is not an ambiguity, and asking there would say something FALSE.** This is the residual
+the issue left open, and measurement decided it. On «משולש ABC» exactly one angle meets at A, so the
+clarification's own sentence — *"more than one angle meets at A"* — would be untrue. A vertex carrying
+one angle has one reading, and resolving it is **not a guess**; the guess the ruling forbids is choosing
+among several. So:
+
+| angles at the vertex | behaviour |
+| --- | --- |
+| 0–1 known (no figure yet, or a lone edge) | ask, in the **bare** form that names no candidates |
+| exactly 1 | **resolve** — the canonical three-letter sentence is rebuilt and read by the same grammar |
+| 2 or more | **ask**, listing every candidate in the student's own notation |
+
+That is also the recommendation recorded when the issue was armed (*"ask whenever the vertex carries
+three or more incident edges"*). **The 2-D divergence, noted rather than silently ported:** 2-D's ADR-164
+resolves this form from the figure *always*, because a 2-D vertex is almost never ambiguous. 3-D does not
+port that rule; it asks whenever the figure gives it more than one reading. The two products agree
+wherever the figure agrees, and differ exactly where 3-D has information 2-D does not.
+
+**No command is synthesised in the store.** The unique-candidate path rebuilds the canonical sentence and
+runs it through `parse3`, so the grammar stays the single authority on what a sentence means, and the
+honesty gates downstream see an ordinary parse. The student's **own wording stays on the fact** — the
+panel shows what they typed, and replay folds the commands that were attached (facts carry `cmds`; the
+fold never re-parses).
+
+**Locks.** `src3d/__tests__/issue-866.test.ts` (16): the frame recognised in six spellings across both
+languages, each asserted to be the *typed* refusal rather than `not-handled`; the rider carried, from
+either letter of the segment; `classifyGuidance3` asserted **null**, which is what keeps the operator's
+message-class ruling from silently reverting; the three-letter form still building; a sentence whose
+vertex is not on the bisecting segment staying a genuine gap; and the three figure-dependent outcomes —
+the pyramid's `BAC, BAD, CAD`, the box's `A'AB, A'AD, BAD`, and the triangle **resolving** with the
+student's utterance preserved on the fact.
+
+**Found alongside, filed not fixed:** the Hebrew verb with the ∠ glyph («AD חוצה ∠BAC») is `not-handled`
+while the English «AD bisects ∠BAC» builds. Pre-existing and **symmetric** — the vertex-only twin here
+mirrors the three-letter form's spelling set exactly, so this ADR introduces no new asymmetry — but it is
+the #963 class (one language's spelling missing where the sibling's works) and is filed as #979.
 ## ADR-3D-240 — A KITE'S FOURTH CORNER IS DETERMINED, BY A DIFFERENT CLOSED FORM (#601)
 
 **Status:** accepted, 2026-09-10 · **Issue:** #601 (the #587 remainder, split out in round #596)
