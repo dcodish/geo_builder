@@ -482,6 +482,8 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
       // #984: the parallelogram corner was a `vec-defined` point until ADR-3D-243 gave it its own
       // kind — it stays in this set, or the rename would silently drop its coincidence refusal.
       'parallelogram-point',
+      // #985: its released-ratio twin — derived only when the ratio is STATED; free-ratio is a rider (below).
+      'scaled-offset',
     ]);
     const order = [...c.points.keys()];
     const minter = new Map<Id, string>();
@@ -489,6 +491,7 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     for (const [id, def] of c.points) {
       if (!DERIVED.has(def.kind)) continue;
       if (def.kind === 'on-segment' && def.t === undefined) continue; // a free rider, not a derived point
+      if (def.kind === 'scaled-offset' && def.k === undefined) continue; // #985: a free-ratio corner is a rider too
       const fid = minter.get(id);
       if (fid === undefined || status[fid] !== 'ok') continue;
       const P = positions.get(id);

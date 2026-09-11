@@ -9630,3 +9630,100 @@ asserted untouched.
 **Sequencing note.** #985 widens this same arm to every quad noun. It is built on top of this, so the
 minting path it adds copies a mechanism that draws nothing instead of working around one that does.
 
+---
+
+### ADR-3D-244 — a stated shape is RESPECTED: an under-determined corner is minted with its freedom, never refused
+
+**Status:** accepted, 2026-09-11 · **Issue:** #985 (P2 — a refusal of a statement the product's own contract says is buildable; operator report, round #974 T15/T16, then *"take another look at 985"*)
+**Requirements:** [02b](02b-requirements-3d.md) — FR-SP-2 gains its corollary (a stated shape mints the nodes it needs, carrying the DOF the shape leaves open) · **Design:** [04b](04b-design-3d.md) — the quad-shape arms; the family table's second column
+**Supersedes:** [ADR-3D-152](#adr-3d-152)'s refusal of the under-determined families (the arm itself stands); the *"deliberately unchanged"* line in [ADR-3D-240](#adr-3d-240)
+
+**The report.** «משולש ABC» · «טרפז ABCD» refused `unknown-point: D` while «ריבוע» / «מלבן» / «מעוין» /
+«מקבילית» / «דלתון» all invented the corner and «מרובע» quietly declared it free. From the student's seat:
+five shapes complete, one refuses, one shrugs.
+
+**The ruling (operator, 2026-09-11), verbatim:** *"when a user asks for a shape, we respect it and create
+nodes as needed with dof. so yes — we support trapezoid as well as all other shapes."* And, sending it back
+after the round escalated it: *"I see no reason that a parallelogram can be built and trapezoid cannot …
+it's an indication that something is not wired correctly. the 2d tool does this sequence with no issue at
+all."*
+
+**Why ADR-3D-152 was wrong, precisely.** It refused because the fourth corner is *"genuinely not determined
+— one free DOF the student never stated"*, and completing it *"would assert an unstated given"*
+([ADR-052](06-decisions.md#adr-052)). The premise is true; the conclusion does not follow. Inventing a
+**specific** corner asserts a given. Minting a corner that is **free exactly where the shape leaves it free**
+asserts nothing — it is what FR-SP-2 promises for every unstated dimension: *"a figure that is not fully
+determined is a normal state, not an error."* The refusal treated a supported state as a failure.
+
+**What the first attempt taught — the escalation, measured.** Round #988 built the issue's own plan
+(*"ARM 1 does precisely this: declare, apply the constraints, let the rest stay free"*): mint the corner as
+a plane rider the way #774's mixed run mints «מרובע ABCD»'s, then lower `DC ∥ AB`. The refusal moved from
+`unknown-point` to **`claim-refuted`**. ARM 1 works because a `polygon4` **solid** carries driveable dims;
+a rider's position is **sampled**, not part of the pivot's unknown vector, so the ∥ pin could only *verify*
+it against the sample — [ADR-3D-191](#adr-3d-191)'s finding, arriving from a second direction. A relation
+that must *place* a point has to live in the point's own construction.
+
+**The mechanism — the operator's pointer, followed.** 2-D builds this sequence by minting D as a
+`scaled-offset` vertex: `anchor + k·(to − from)`. 3-D now has the same kind:
+
+```
+{ kind: 'scaled-offset', anchor, from, to, k? }      position = anchor + k·(to − from)
+```
+
+with **k undefined ⇒ a genuinely free scalar**: one DOF counted by `freeDofCount3`, sampled per seed
+through `offsetSampleK` (never ≈ 1, never ≤ 0 — a stated trapezoid must never *look* like a parallelogram
+or collapse, the `baseShapes` sampling rule), and **driven by the pivot's rider lane** (#820) whenever a
+later given reads it — the same lane, same soft anchor, same one-key discipline as an `on-segment` rider's
+`t`. The trapezoid's one relation, DC ∥ AB, holds by construction; what the student never stated stays free.
+
+**The twin.** With k = 1 this construction *is* [ADR-3D-243](#adr-3d-243)'s `parallelogram-point`. The
+trapezoid corner is the parallelogram corner with its ratio released — which is also why the derivation is
+read from the **ring**, never from the letters' order (the #601 rule): whichever corner is missing, it sits
+at its partner along the parallel pair, offset by k times the opposite side, and DC ∥ AB is the answer
+every time. Asserted for all four missing positions.
+
+**The family table gains its second column.** `quadCornerDef(base, ring, i)` in `baseShapes.ts` says, per
+family, *how* the one missing corner is created — beside `quadShapeConstraints`, which says what the family
+*states*. ARM 2 collapses to one path through it:
+
+| the corner is… | created as | families |
+| --- | --- | --- |
+| determined by a closed form | **derived** — `parallelogram-point` (#587/#984), `reflect-line` (#601) | square, rectangle, rhombus, parallelogram, kite |
+| one relation, one freedom | **`scaled-offset`, k free** | trapezoid |
+| nothing stated beyond flatness | **a plane rider** (2 DOF), exactly as #774 already mints «מרובע» | quad |
+
+No family list guards the arm any more; the kite's and the parallelogram's branches are gone into the table.
+The next noun is a row, not a branch.
+
+**Wired, not just drawn — measured.** «משולש ABC» · «טרפז ABCD» · «|DC| = 0.5|AB|»: the ratio lands at
+**0.5 exactly** at every seed, `pivot.riderTs.D = 0.5000000035` — the pivot's own record that the rider
+lane solved it. |DC| = k·|AB| identically, so nothing else could have. Before the given the record is empty
+and the ratio differs across seeds (0.4–1.7, the sampling range): counted, sampled, driven — the three
+halves of ADR-052 conformance, each asserted.
+
+**Two deliberate flips, recorded.** `issue-601.test.ts` locked *"a TRAPEZOID's fourth corner stays refused"*
+and `issue-587-quad-shape.test.ts` locked *"a family that does NOT determine the corner refuses instead of
+inventing it"*. Both now assert the build. They were not wrong tests — they locked ADR-3D-152's decision
+faithfully; the decision is what changed, by ruling.
+
+**Found and filed, not fixed here.** Two things the build surfaced, each its own issue rather than a rider on
+this one:
+
+- **#989 (2-D)** — «טרפז ABCD» makes a *different* pair of sides parallel depending on what was typed before
+  it (AB ∥ DC alone, BC ∥ AD after «משולש ABC»): the mixed-run lowering rotates the ring so the unknown
+  lands in the template's slot. 3-D reads the ring as named and does not have this; the fix there is the
+  #601 rule applied to 2-D.
+- **#990 (3-D)** — the DOF cue subtracts one dim per scalar pin, so a pin the corner's construction already
+  satisfies is over-counted: a parallelogram completion reports **0** where the triangle keeps **2** — on
+  `main` today, for five of the seven nouns. The trapezoid inherits it (cue 2, truth 3). The lock here
+  therefore asserts the mechanism (`riderTs`), not the cue's number, and says so in the test.
+
+**Locks.** `src3d/__tests__/issue-985.test.ts` (23): the build at four seeds with DC ∥ AB and |DC|/|AB|
+visibly ≠ 1; the kind and its fields, and the k = 1 twin asserted numerically against A + C − B; the
+ratio in the rider lane un-driven and different across seeds; all four missing positions; the ink (two
+sides, no diagonal — ADR-3D-243 holds here); the drive through the rider lane at three seeds with an
+anti-luck check; every quad noun creating its corner with the expected kind; «מרובע» unchanged (+2 DOF);
+`quadCornerDef`'s trapezoid row for every index and the determined rows equal to #984's and #601's exact
+definitions. Fixture `fixtures3/trapezoid-corner-completion-985.geo3.json` carries the "builds and
+verifies" half. The two flipped locks above.
+

@@ -43,6 +43,10 @@ const SEEDED: SeededCorpus = {
   // verifies", so a fixture is the right lock; the bespoke assertions (D is the REFLECTION and not the
   // parallelogram point, at several seeds) live in issue-601.test.ts alongside it.
   'kite-corner-completion-601.geo3.json': ['משולש ABC', 'דלתון ABCD'],
+  // #985 (ADR-3D-244) — the TRAPEZOID's one-unknown completion, refused until now. The essence is "this figure
+  // now builds and verifies" (DC ∥ AB by construction, the ratio a free DOF); the bespoke locks — the ratio
+  // resamples, a later given drives it through the rider lane — live in issue-985.test.ts.
+  'trapezoid-corner-completion-985.geo3.json': ['משולש ABC', 'טרפז ABCD'],
   // #977 (ADR-3D-241) — a symbolic angle with a COEFFICIENT, stated behind a copula that was unreadable
   // before. The figure must build AND the drawn angle must be 2 × 30: the fixture nets the parse and the
   // drive together, which is what makes it the right lock for "this sentence now works end to end".

@@ -16,7 +16,7 @@
  * (`שיעור ה-z של C' חיובי`) select among the surviving solutions, else the seed.
  */
 
-import { riderSampleT } from './onSegmentRatio';
+import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { evalAffine, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
@@ -392,9 +392,16 @@ export function solvePivot(
    * rider off its host segment is not a figure at all (`degenerate`).
    */
   const riderBase = 7 + nDims + nSym + nPinSym;
-  let riders: { id: Id; t0: number }[] = [];
-  for (const [id, def] of c.points)
-    if (def.kind === 'on-segment' && def.t === undefined) riders.push({ id, t0: riderSampleT(seed, id, def.a, def.b) });
+  // #985 (ADR-3D-244): a `scaled-offset` corner's FREE ratio rides the same lane — the trapezoid's
+  // unstated ratio is a DOF a later given can drive. Each rider carries its own HOST bounds: a segment
+  // rider lives in [0, 1]; a ratio is any positive number (k > 1 is a trapezoid whose far side is the
+  // longer one, a legitimate figure), and only k ≤ 0 — the corner collapsed onto its anchor or dragged
+  // across the ring — is not a figure at all.
+  let riders: { id: Id; t0: number; lo: number; hi: number }[] = [];
+  for (const [id, def] of c.points) {
+    if (def.kind === 'on-segment' && def.t === undefined) riders.push({ id, t0: riderSampleT(seed, id, def.a, def.b), lo: 0, hi: 1 });
+    else if (def.kind === 'scaled-offset' && def.k === undefined) riders.push({ id, t0: offsetSampleK(seed, id), lo: 1e-3, hi: Infinity });
+  }
   /** The trial rider parameters at `x` — `undefined` when the lane is empty (every path stays bit-identical). */
   const riderMap = (x: number[]): ReadonlyMap<Id, number> | undefined =>
     riders.length === 0 ? undefined : new Map(riders.map((r, i) => [r.id, x[riderBase + i]]));
@@ -1012,7 +1019,7 @@ export function solvePivot(
     // #820: a candidate that slid a rider OFF its host segment is not a figure either — «K על SB»
     // is a given like any other, so a solution reaching the relation at t = 1.4 has not satisfied
     // the student's statements. Checked here because every acceptance site already asks `degenerate`.
-    return riders.some((_, i) => !(x[riderBase + i] >= -1e-9 && x[riderBase + i] <= 1 + 1e-9));
+    return riders.some((r, i) => !(x[riderBase + i] >= r.lo - 1e-9 && x[riderBase + i] <= r.hi + 1e-9));
   };
 
   /**

@@ -115,3 +115,15 @@ export function riderWholeT(side: 'from-a' | 'from-b', k: number): RiderT {
 export function riderSampleT(seed: number, id: Id, a: Id, b: Id): number {
   return sample(seed, `t-${id}-${a}-${b}`, 0.22, 0.78);
 }
+
+/**
+ * #985 (ADR-3D-244): the seed's sample for a `scaled-offset` corner's FREE ratio — shared by placement
+ * (`evaluate`) and by the pivot's rider lane (`solve3`, its soft anchor), the #820 one-key discipline.
+ * The range keeps a stated TRAPEZOID visibly a trapezoid at every seed (ADR-052 / the `baseShapes`
+ * sampling rule): never ≈ 1 — that is the parallelogram — and never ≤ 0, where the corner would collapse
+ * onto its anchor or cross the ring. Both a shorter and a longer far side are reached across seeds.
+ */
+export function offsetSampleK(seed: number, id: Id): number {
+  const k = sample(seed, `offset-k-${id}`, 0.4, 1.7);
+  return Math.abs(k - 1) < 0.15 ? (k < 1 ? 0.85 : 1.15) : k;
+}

@@ -11,7 +11,7 @@ import { FREE_LINE_TOKEN } from './freeLine';
 import { riderPairsT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { isAnyDiagonal, isSpaceDiagonal, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
+import { isAnyDiagonal, isSpaceDiagonal, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
 
@@ -2436,54 +2436,32 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         return r.ok ? { ok: true, next: recordShape(drawRing(r.next), cmd.base, cmd.ids) } : r;
       }
 
-      // ARM 2 — exactly one unknown corner, completed FROM THE FAMILY'S OWN DEFINITION.
-      // Only the parallelogram family determines the fourth corner as the parallelogram point; a
-      // KITE determines it differently (the reflection of `b` across the axis `ac`, #601) and a
-      // TRAPEZOID/general QUAD does not determine it at all — one free DOF the student never
-      // stated. Completing those anyway would assert an unstated given, the ADR-052 cardinal sin,
-      // so they refuse honestly and name the corner instead.
+      // ARM 2 — exactly one unknown corner. The corner is CREATED either way; the family only decides HOW
+      // (#985, ADR-3D-244 — operator ruling 2026-09-11: *"when a user asks for a shape, we respect it and
+      // create nodes as needed with dof"*). `quadCornerDef` is the family table's second column:
+      //
+      //   determined by a closed form   → DERIVED: parallelogram point (#587/#984), kite reflection (#601)
+      //   one relation, one freedom     → `scaled-offset` with k FREE — the trapezoid: DC ∥ AB holds by
+      //                                   construction; the ratio the student never stated stays a sampled
+      //                                   DOF that the pivot's rider lane (#820) drives if a later given reads it
+      //   nothing stated                → a plane rider, as #774's mixed run already mints «מרובע ABCD»'s
+      //
+      // ADR-3D-152 refused the second row as an "unstated given" (ADR-052). Half right: inventing a
+      // SPECIFIC corner asserts a given; minting one that is free where the shape leaves it free asserts
+      // nothing — FR-SP-2's "a figure that is not fully determined is a normal state, not an error". The
+      // refusal treated a supported state as a failure, and it showed: five nouns invented the corner and
+      // «טרפז» alone refused. Why not a plane rider + the ∥ pin (round #988's first attempt): a rider's
+      // position is SAMPLED, not part of the pivot's unknown vector, so the pin could only VERIFY DC ∥ AB
+      // and refused `claim-refuted` — ADR-3D-191's finding, arriving from a second direction.
       if (unknowns.length === 1) {
-        const PARALLELOGRAM_FAMILY: QuadBase[] = ['square', 'rectangle', 'rhombus', 'parallelogram'];
-        const i0 = cmd.ids.indexOf(unknowns[0]);
-        // #601 (ADR-3D-240) — the KITE's corner IS determined, by a different closed form. «דלתון ABCD»
-        // constrains |AB|=|AD| and |CB|=|CD|, so the missing corner is the REFLECTION of the opposite
-        // corner across the other diagonal — not the parallelogram point, which is why the arm above
-        // cannot serve it and why this was refused until now.
-        //
-        // Whichever position is missing, the geometry is the same: the corner mirrors the one OPPOSITE
-        // it across the diagonal through its two NEIGHBOURS. The axis is therefore read from the ring,
-        // never from the letters' order, so «דלתון ABCD» missing B behaves exactly as one missing D.
-        if (cmd.base === 'kite') {
-          const opposite = cmd.ids[(i0 + 2) % 4];
-          const axis1 = cmd.ids[(i0 + 1) % 4];
-          const axis2 = cmd.ids[(i0 + 3) % 4];
-          // The three points the corner is derived FROM must already exist; otherwise this is arm 1's
-          // declaration, not a completion, and refusing by name beats inventing two points.
-          for (const need of [opposite, axis1, axis2]) {
-            if (!c.points.has(need)) return { ok: false, error: { code: 'unknown-point', id: need } };
-          }
-          const withCorner = clone(c);
-          withCorner.points.set(unknowns[0], { kind: 'reflect-line', from: opposite, a: axis1, b: axis2 });
-          const rk = lower(withCorner);
-          return rk.ok ? { ok: true, next: recordShape(drawRing(rk.next), cmd.base, cmd.ids) } : rk;
-        }
-        if (!PARALLELOGRAM_FAMILY.includes(cmd.base)) {
-          return { ok: false, error: { code: 'unknown-point', id: unknowns[0] } };
-        }
-        const i = i0;
-        const opp = cmd.ids[(i + 2) % 4];
-        const n1 = cmd.ids[(i + 1) % 4];
-        const n2 = cmd.ids[(i + 3) % 4];
-        // #984 (ADR-3D-243) — a POINT KIND, not a `vec-rel`. The closed form is the same
-        // (n1 + n2 - opp), but `vec-rel` emits a carrier `segment3` for the vector it relates, and
-        // here that vector is scaffolding: it drew `BD`, a diagonal nobody asked for, on every
-        // member of the family. The kite one screen above already derives its corner as a point kind
-        // for exactly this reason (the 2026-08-16 ruling on invisible helpers); the two arms converge.
+        const def = quadCornerDef(cmd.base, cmd.ids, cmd.ids.indexOf(unknowns[0]));
         const withCorner = clone(c);
-        withCorner.points.set(unknowns[0], { kind: 'parallelogram-point', opp, n1, n2 });
-        // the corner is now DERIVED, so every constraint lands on a determined ring and verifies —
-        // a ring that isn't the stated shape refuses it honestly (today's rectangle behaviour, now
-        // for four nouns instead of one).
+        if (def.kind === 'on-plane') materializePlaneRun(withCorner, cmd.ids.filter((id) => id !== unknowns[0]));
+        withCorner.points.set(unknowns[0], def);
+        // a DERIVED corner lands every constraint on a determined ring, which verifies — a ring that is
+        // not the stated shape refuses honestly (the rectangle's old behaviour, for every noun); a FREE
+        // corner satisfies its family's relation by construction, so the same lowering verifies green
+        // and leaves the rest free.
         const r = lower(withCorner);
         return r.ok ? { ok: true, next: recordShape(drawRing(r.next), cmd.base, cmd.ids) } : r;
       }

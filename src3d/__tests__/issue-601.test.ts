@@ -4,9 +4,9 @@
  * #587/ADR-3D-152 gave `quad-shape` a one-unknown arm that completes the fourth corner for the
  * **parallelogram family** — square, rectangle, rhombus, parallelogram — where the corner IS the
  * parallelogram point. For the other three families it refused honestly, naming the corner. Two of
- * those refusals are CORRECT and stay: a trapezoid's and a general quad's fourth corner is genuinely
- * undetermined — one free DOF the student never stated, and completing it would assert an unstated
- * given (ADR-052, the cardinal sin).
+ * those refusals were believed CORRECT at the time — a trapezoid's and a general quad's fourth corner is
+ * genuinely undetermined. #985 (ADR-3D-244) later showed the conclusion did not follow: minting the corner
+ * FREE where the shape leaves it free asserts nothing (FR-SP-2), so those two now build as well.
  *
  * The kite is the exception the refusal was hiding. «דלתון ABCD» constrains |AB|=|AD| and |CB|=|CD|,
  * which makes D the **reflection of B across the axis AC** — determined, but not the parallelogram
@@ -81,13 +81,14 @@ describe('#601 — «משולש ABC» then «דלתון ABCD» completes the cor
   });
 });
 
-describe('#601 — the refusals that are CORRECT and must not move', () => {
-  it('a TRAPEZOID’s fourth corner stays refused, naming the corner', () => {
-    // Genuinely undetermined — one free DOF the student never stated. Completing it would be ADR-052's
-    // cardinal sin, so this refusal is the right answer and #601 deliberately did not touch it.
+describe('#601 — the sibling arms, re-asserted', () => {
+  it('a TRAPEZOID’s fourth corner now BUILDS — free where the shape leaves it free (#985, ADR-3D-244)', () => {
+    // Locked here as a refusal until #985: "genuinely undetermined, so completing it would be ADR-052's
+    // cardinal sin". Half right — inventing a SPECIFIC corner would be. Minting one that stays free asserts
+    // nothing, which is FR-SP-2's whole point; the full lock lives in issue-985.test.ts.
     const { st, pos } = build(['משולש ABC', 'טרפז ABCD']);
-    expect(st.lastError).toEqual({ code: 'unknown-point', id: 'D' });
-    expect(pos.has('D')).toBe(false);
+    expect(st.lastError).toBeNull();
+    expect(pos.has('D')).toBe(true);
   });
 
   it('the four PARALLELOGRAM-family completions are unchanged', () => {

@@ -1125,6 +1125,21 @@ export type PointDef =
    * point KIND carries the closed form and draws nothing, so the two one-unknown arms now converge.
    */
   | { kind: 'parallelogram-point'; opp: Id; n1: Id; n2: Id }
+  /**
+   * #985 (ADR-3D-244): `anchor + k·(to − from)` — a point offset from `anchor` PARALLEL to `from→to`. The
+   * 3-D twin of 2-D's `scaled-offset` vertex, which is how 2-D builds «משולש ABC» · «טרפז ABCD» (the
+   * operator's pointer: *"the 2d tool does this sequence with no issue at all"*).
+   *
+   * `k` undefined ⇒ a genuinely FREE scalar (ADR-052): one sampled DOF, counted by `freeDofCount3`,
+   * resampled on «הציגו תצורה אחרת», and DRIVEN by the pivot's rider lane (#820) when a later given
+   * reads it — exactly as an `on-segment` rider's `t`. `k` set ⇒ a determined 0-DOF point.
+   *
+   * A trapezoid's fourth corner is this with `k` free: the parallelogram corner one line above with its
+   * ratio released (k = 1 IS the parallelogram point). The family's one relation, DC ∥ AB, holds BY
+   * CONSTRUCTION and what the student never stated stays free. That is what makes it buildable where a
+   * plane rider was not: a rider is SAMPLED, so a ∥ pin could only VERIFY it, never place it (ADR-3D-191).
+   */
+  | { kind: 'scaled-offset'; anchor: Id; from: Id; to: Id; k?: number }
   // V8-j (G12): the apex on segment a–b positioned so pyramid (base, apex) is RIGHT — i.e. the
   // point on a–b that sits directly above the base's centroid (closed-form t; no CAS)
   | { kind: 'right-pyramid-apex'; a: Id; b: Id; base: Id[] }

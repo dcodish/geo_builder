@@ -13,7 +13,7 @@
  */
 
 import { sample } from './rng';
-import { riderSampleT } from './onSegmentRatio';
+import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { defaultViewFrame } from './defaultView';
 import {
   isAbsolute,
@@ -787,6 +787,8 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     // second opinion about it (the ADR-3D-124 rule that closed the ADR-052 conformance smell for
     // free planes: the count and the sampling share one source).
     if (def.kind === 'on-segment' && def.t === undefined && resolved.pivot?.riderTs?.[id] === undefined) freeT++;
+    // #985 (ADR-3D-244): a scaled-offset corner whose ratio was never stated — one free DOF, unless the pivot drove it.
+    if (def.kind === 'scaled-offset' && def.k === undefined && resolved.pivot?.riderTs?.[id] === undefined) freeT++;
     if (def.kind === 'free3') freeT += 3; // #774: a mixed-run minted point — three genuine free DOFs
     if (def.kind === 'on-plane') freeT += def.side ? 3 : 2; // a plane rider slides in-plane; a side point also floats
     if (def.kind === 'on-line') freeT += 1; // a line rider slides along its line (ADR-3D-031)
@@ -1041,7 +1043,7 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 }
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'bisector-ray', 'foot-seg', 'reflect-line', 'parallelogram-point', 'right-pyramid-apex', 'right-apex', 'free3']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'bisector-ray', 'foot-seg', 'reflect-line', 'parallelogram-point', 'scaled-offset', 'right-pyramid-apex', 'right-apex', 'free3']);
 
 /**
  * #367: is anything in the figure stated in ABSOLUTE coordinates — a typed parametric line, a plane
@@ -2464,6 +2466,16 @@ function evaluateSolidsAndPoints(
       const A = pos.get(def.a);
       const B = pos.get(def.b);
       if (from && A && B) pos.set(id, footOnLine(from, { anchor: A, dir: sub3(B, A) }));
+    } else if (def.kind === 'scaled-offset') {
+      // #985 (ADR-3D-244): anchor + k·(to − from). A DRIVEN k comes from the pivot's rider lane (#820); a
+      // stated k wins over the sample; with neither, the seed's sample — via the one key `solve3` anchors
+      // to (`offsetSampleK`), so the lane's soft anchor and the placement agree by construction.
+      const anchor = pos.get(def.anchor);
+      const from = pos.get(def.from);
+      const to = pos.get(def.to);
+      if (!anchor || !from || !to) continue;
+      const k = riderTOverride?.get(id) ?? def.k ?? offsetSampleK(seed, id);
+      pos.set(id, add3(anchor, scale3(sub3(to, from), k)));
     } else if (def.kind === 'parallelogram-point') {
       // #984: the fourth corner of a parallelogram — n1 + n2 - opp. Closed form; no root-find, and
       // (unlike the vec-rel that used to express it) no segment drawn to carry it.
