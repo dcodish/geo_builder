@@ -1051,7 +1051,7 @@ const solidNounOf = (word: string | undefined, en: boolean): SolidNoun | null =>
   if (word === undefined) return 'any';
   const table = en ? SOLID_NOUNS_EN : SOLID_NOUNS_HE;
   for (const [src, noun] of table) {
-    if (new RegExp(`^(?:the\s+)?(?:${src})$`, en ? 'i' : '').test(word.trim())) return noun;
+    if (new RegExp(`^(?:the\\s+)?(?:${src})$`, en ? 'i' : '').test(word.trim())) return noun;
   }
   return null;
 };
@@ -1426,11 +1426,11 @@ const quadDiagonals: Rule = (s) => {
   const EN_DIAGS = String.raw`(?:the\s+)?diagonals\s+(?:of\s+)?`;
   const BASE = String.raw`(?:ה?בסיס(?:\s+(?:של\s+)?ה?\S+)?|(?:the\s+)?base(?:\s+of\s+the\s+\S+)?)`;
   // (a) THE BASE — the sentinel; apply resolves it to the single solid's base ring.
-  if (new RegExp(`^${IMP}(?:${HE_DIAGS}|${EN_DIAGS})${BASE}\s*$`, 'i').test(s.trim())) {
+  if (new RegExp(`^${IMP}(?:${HE_DIAGS}|${EN_DIAGS})${BASE}\\s*$`, 'i').test(s.trim())) {
     return [{ type: 'quad-diagonals', face: [] }];
   }
   // (b) A NAMED QUAD — «אלכסוני ABCD» — the same lowering with the ring spelled out.
-  const named = new RegExp(`^${IMP}(?:${HE_DIAGS}|${EN_DIAGS})((?:${LBL})+)\s*$`, 'i').exec(s.trim());
+  const named = new RegExp(`^${IMP}(?:${HE_DIAGS}|${EN_DIAGS})((?:${LBL})+)\\s*$`, 'i').exec(s.trim());
   if (named) {
     const ids = named[1].match(TOKEN) ?? [];
     if (ids.length === 4 && new Set(ids).size === 4) return [{ type: 'quad-diagonals', face: ids }];

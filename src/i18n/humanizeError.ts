@@ -119,7 +119,12 @@ interface Pattern {
 
 // Order matters only where one pattern's text is a prefix of another's; each regex below is
 // anchored and specific enough that the first match is the right one.
-const PATTERNS: Pattern[] = [
+/**
+ * #983: EXPORTED for `humanize-error.test.ts`'s coverage gate — every entry must be exercised by a
+ * real engine message in that file's `CASES`. A pattern nothing matches is a dead entry, and a dead
+ * entry is English on a Hebrew screen; that is exactly how the two diagonal refusals shipped broken.
+ */
+export const PATTERNS: Pattern[] = [
   // metricFeasibility.ts (#420, ADR-417) — `impossible: |AC| = 9 exceeds 8, the distance from A to C via B`
   //
   // TWO wordings, because the message must state the geometry that actually applies. With exactly one
@@ -191,8 +196,15 @@ const PATTERNS: Pattern[] = [
 
   // step.ts — #966 (ADR-499) the diagonal ROLE CLAIM refusals. Two messages, because they are two
   // different mistakes: naming a SIDE, and naming a diagonal of a shape that has none.
-  { re: new RegExp(`^(\S+) is not a diagonal of (\S+) ${EMDASH} it is a side$`), key: 'errors.diagonalIsSide', params: (m) => ({ pair: m[1], shape: m[2] }) },
-  { re: new RegExp(`^(\S+) is not a diagonal ${EMDASH} (\S+) has no diagonals$`), key: 'errors.diagonalNoneHere', params: (m) => ({ pair: m[1], shape: m[2] }) },
+  //
+  // #983 — these two shipped with a SINGLE backslash inside the template literal, which JavaScript
+  // collapses to a literal "S" before RegExp ever sees it, so both patterns matched nothing and a
+  // Hebrew-first student read the raw English. A template-literal regex needs the escape DOUBLED; the neighbouring
+  // tangent pattern above already spells it that way. Guarded now by `regex-escape-hygiene.test.ts`
+  // (the collapse, workspace-wide) and by the PATTERNS-coverage gate below (a pattern no message
+  // exercises).
+  { re: new RegExp(`^(\\S+) is not a diagonal of (\\S+) ${EMDASH} it is a side$`), key: 'errors.diagonalIsSide', params: (m) => ({ pair: m[1], shape: m[2] }) },
+  { re: new RegExp(`^(\\S+) is not a diagonal ${EMDASH} (\\S+) has no diagonals$`), key: 'errors.diagonalNoneHere', params: (m) => ({ pair: m[1], shape: m[2] }) },
 
   // step.ts:91 — `'O' is already defined — it can't be redefined as something different`
   { re: new RegExp(`^'(.+)' is already defined ${EMDASH} it can't be redefined as something different$`), key: 'errors.alreadyDefined', params: (m) => ({ id: m[1] }) },
