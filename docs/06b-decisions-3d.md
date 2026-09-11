@@ -9316,3 +9316,77 @@ spellings too).
 **Sibling recorded, not fixed:** the whole-face form («משולש ACS מונח על מישור π2», a POLYGON contained in
 a plane) is still not-handled. It is #532 capability 2 and is scoped there; this ADR deliberately did not
 widen to it, since a face is a different operand kind with its own lowering question (one fact or N).
+## ADR-3D-239 — «זווית A» IN 3-D IS UNDER-SPECIFIED, NOT UNSUPPORTED — and one candidate is not ambiguous (#866)
+
+**Status:** accepted, 2026-09-10 · **Issue:** #866 (the #343 remainder, split out in round #864)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-9 (new) · **Design:** [04b](04b-design-3d.md) — the clarification family
+
+**The form.** «AD חוצה את זווית A» / "AD bisects angle A" — the bisected angle named by its **vertex
+alone**. Four of #343's five bisector frames build; this is the fifth, and it needed a ruling rather than
+code.
+
+**Why it is not simply a wider regex.** In 2-D a vertex usually carries exactly two edges, so
+[ADR-164](06-decisions.md#adr-164) resolves «זווית A» from the figure and there is one reading. **In 3-D
+it usually does not**: a pyramid apex has three or more incident edges, a box vertex three. So the
+sentence names one of several angles, and picking one would assert a given the student never gave
+([ADR-052](06-decisions.md#adr-052)) — drawing a bisector of the **wrong angle with a green ✓**, the
+silent-wrong-ink class that by construction can never appear in the prod logs as a failure.
+
+**The operator's ruling settles the message CLASS** (2026-09-02, playing PR #867):
+
+> *"error message specifically here should be that there is more than one A angle so user should specify
+> which. current message should be used when the tool doesnt support the command — not when it's not
+> fully defined."*
+
+So the frame is **under-specified**, not unsupported. It must be recognised, it must surface a typed
+ambiguity that names the candidates, and it must **not** borrow the scope register's "not supported here"
+voice. Measured before the fix, the line reached **no register at all** — `parse3` → `not-handled`,
+`classifyGuidance3` → `null`, store → `not-understood` — so it escalated to the **paid model**, and
+whatever text the operator saw came from there rather than from a decision of ours. Both halves needed
+building: the recognition and the refusal.
+
+**The decision — and where each half lives.** `parse3` is context-free by design, so it cannot know which
+edges meet at A. The division of labour is #836's exactly (`ambiguous-main-diagonal`,
+which has the same shape and the same reason): the **parser** recognises the frame and returns a typed
+refusal carrying the vertex *and the rider*; the **store**, which knows the figure, enumerates the
+candidate angles and composes the message. The recogniser is spelled from the same parts as the
+three-letter rule it is the under-specified twin of — same verbs, same optional «את», same English
+"bisects" / "is the bisector of" — so the two cannot drift apart and leave one frame recognised and the
+other escalating.
+
+**One candidate is not an ambiguity, and asking there would say something FALSE.** This is the residual
+the issue left open, and measurement decided it. On «משולש ABC» exactly one angle meets at A, so the
+clarification's own sentence — *"more than one angle meets at A"* — would be untrue. A vertex carrying
+one angle has one reading, and resolving it is **not a guess**; the guess the ruling forbids is choosing
+among several. So:
+
+| angles at the vertex | behaviour |
+| --- | --- |
+| 0–1 known (no figure yet, or a lone edge) | ask, in the **bare** form that names no candidates |
+| exactly 1 | **resolve** — the canonical three-letter sentence is rebuilt and read by the same grammar |
+| 2 or more | **ask**, listing every candidate in the student's own notation |
+
+That is also the recommendation recorded when the issue was armed (*"ask whenever the vertex carries
+three or more incident edges"*). **The 2-D divergence, noted rather than silently ported:** 2-D's ADR-164
+resolves this form from the figure *always*, because a 2-D vertex is almost never ambiguous. 3-D does not
+port that rule; it asks whenever the figure gives it more than one reading. The two products agree
+wherever the figure agrees, and differ exactly where 3-D has information 2-D does not.
+
+**No command is synthesised in the store.** The unique-candidate path rebuilds the canonical sentence and
+runs it through `parse3`, so the grammar stays the single authority on what a sentence means, and the
+honesty gates downstream see an ordinary parse. The student's **own wording stays on the fact** — the
+panel shows what they typed, and replay folds the commands that were attached (facts carry `cmds`; the
+fold never re-parses).
+
+**Locks.** `src3d/__tests__/issue-866.test.ts` (16): the frame recognised in six spellings across both
+languages, each asserted to be the *typed* refusal rather than `not-handled`; the rider carried, from
+either letter of the segment; `classifyGuidance3` asserted **null**, which is what keeps the operator's
+message-class ruling from silently reverting; the three-letter form still building; a sentence whose
+vertex is not on the bisecting segment staying a genuine gap; and the three figure-dependent outcomes —
+the pyramid's `BAC, BAD, CAD`, the box's `A'AB, A'AD, BAD`, and the triangle **resolving** with the
+student's utterance preserved on the fact.
+
+**Found alongside, filed not fixed:** the Hebrew verb with the ∠ glyph («AD חוצה ∠BAC») is `not-handled`
+while the English «AD bisects ∠BAC» builds. Pre-existing and **symmetric** — the vertex-only twin here
+mirrors the three-letter form's spelling set exactly, so this ADR introduces no new asymmetry — but it is
+the #963 class (one language's spelling missing where the sibling's works) and is filed as #979.

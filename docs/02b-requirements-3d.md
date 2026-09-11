@@ -85,6 +85,18 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   affordable because the frame reads its sides through the shared operand reader (ADR-3D-100).
   *(Realised — [ADR-3D-238](06b-decisions-3d.md#adr-3d-238), #963; the frame itself is
   [ADR-3D-189](06b-decisions-3d.md#adr-3d-189), #614.)*
+- **FR-SP-9 (Must)** — **An UNDER-SPECIFIED statement is told what is missing; only an UNSUPPORTED one is
+  told the tool cannot do it.** The two are different failures and must not share a voice: a student who
+  wrote a sentence the tool understands but cannot pin down needs to know *which detail* to add, while
+  "this is not supported" sends them away from a form that works. So a statement the parser RECOGNISES as
+  ambiguous surfaces a typed clarification that **names the alternatives in the student's own notation**
+  — «זווית A» on a vertex where three edges meet lists the angles it could mean — and never escalates to
+  the LLM lane, whose job is to guess, nor borrows the scope register's unsupported wording. The
+  corollary that keeps this honest: **the tool asks only when the figure really is ambiguous.** Where the
+  same sentence has exactly one reading, it is resolved and built — asking there would make the
+  clarification's own sentence untrue, and a single reading is not a guess.
+  *(Realised — [ADR-3D-239](06b-decisions-3d.md#adr-3d-239), #866; the earlier members of the family are
+  ADR-3D-131, #836's main-diagonal ask, and #467's ambiguous height.)*
 
 ## Vectors — the geometric lane
 

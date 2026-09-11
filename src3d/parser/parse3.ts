@@ -45,7 +45,23 @@ export type ParseResult3 =
   // to prevent. The candidate PAIRS are not listed here — `parse3` is context-free by design — they are
   // derived from the figure's own rings where the construction is known (the store), so the message can
   // name them.
-  | { ok: false; reason: 'ambiguous-main-diagonal' };
+  | { ok: false; reason: 'ambiguous-main-diagonal' }
+  // #866: «AD חוצה את זווית A» — the bisected angle named by its VERTEX alone. In 2-D a vertex usually
+  // has exactly two incident edges, so ADR-164 resolves it from the figure; in 3-D it usually does not
+  // (a pyramid apex has three or more, a box vertex three), so «זווית A» names one of several angles
+  // and picking one would assert a given the student never gave — with a green ✓ on a bisector of the
+  // wrong angle, the silent-wrong-ink class that never appears in the logs as a failure.
+  //
+  // Operator ruling, 2026-09-02 (playing PR #867): *"error message specifically here should be that
+  // there is more than one A angle so user should specify which. current message should be used when
+  // the tool doesnt support the command — not when it's not fully defined."* So this is UNDER-SPECIFIED,
+  // not unsupported: a typed refusal, never `not-handled` (which would escalate to the paid lane whose
+  // job is to guess), and never the scope register's "not supported here" voice.
+  //
+  // The candidate angles are NOT listed here — `parse3` is context-free by design, exactly as
+  // `ambiguous-main-diagonal` above — they are derived from the figure in the store, which knows which
+  // edges meet at the vertex.
+  | { ok: false; reason: 'ambiguous-angle-vertex'; vertex: string; rider: string };
 
 const NOT_HANDLED: ParseResult3 = { ok: false, reason: 'not-handled' };
 
@@ -3602,6 +3618,37 @@ const bisectorPoint: Rule = (s) => {
  * the angle's middle letter. So «OD חוצה זווית AOC» and «AD חוצה זווית BAC» are one rule, and a pair
  * that does not touch the angle's vertex correctly declines.
  */
+/**
+ * #866 (ADR-3D-239) — the VERTEX-ONLY bisector frame: «AD חוצה את זווית A».
+ *
+ * The under-specified twin of `bisectorRay` below, and deliberately spelled from the same parts —
+ * same verbs, same optional «את», same English "bisects" / "is the bisector of" — so the two cannot
+ * drift apart on spelling and leave one frame recognised and the other escalating.
+ *
+ * It is NOT a rule: a `Rule` returns commands, and this sentence must produce a typed REFUSAL. It is
+ * raised in `parse3` alongside `ambiguous-main-diagonal`, which has exactly this shape and exactly
+ * this reason (#836).
+ *
+ * The vertex must be one of the two letters of the bisecting segment — a bisector of the angle at A
+ * starts at A. Without that guard the pattern would claim sentences that are a genuine gap, and a
+ * clarification offered for a sentence the tool does not understand at all is worse than silence.
+ */
+const BISECTOR_VERTEX_ONLY = [
+  /^([A-Z]\d*'?)([A-Z]\d*'?)\s+חוצ[הת]?\s*-?\s*(?:את\s+)?(?:ה?זו?וית\s+)?([A-Z]\d*'?)\s*$/,
+  /^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:is\s+the\s+bisector\s+of|bisects)\s+(?:the\s+)?(?:angle\s+|∠)?([A-Z]\d*'?)\s*$/i,
+];
+/** The vertex «זווית A» names and the segment's OTHER letter, or null when this is not that frame.
+ *  The rider is carried so the store — which knows the figure — can rebuild the canonical three-letter
+ *  sentence when the vertex turns out to carry exactly one angle. */
+function bisectorVertexOnly(s: string): { vertex: string; rider: string } | null {
+  for (const re of BISECTOR_VERTEX_ONLY) {
+    const m = s.match(re);
+    if (m && m[3] === m[1]) return { vertex: m[1], rider: m[2] };
+    if (m && m[3] === m[2]) return { vertex: m[2], rider: m[1] };
+  }
+  return null;
+}
+
 const bisectorRay: Rule = (s0) => {
   const s = stripStatementPrefix(s0).trim();
   if (!/חוצ|bisect/i.test(s)) return null;
@@ -4419,6 +4466,11 @@ export function parse3(utterance: string): ParseResult3 {
   // #836: «אלכסון ראשי» names none of a solid's four space diagonals — ask which, never pick one. A
   // RECOGNISED ambiguity is reported, never rewritten around, so it is checked before the #837 seam.
   if (MAIN_DIAGONAL_AMBIGUOUS) return { ok: false, reason: 'ambiguous-main-diagonal' };
+  // #866: «AD חוצה את זווית A» — the bisected angle named by its VERTEX alone. Checked AFTER every rule,
+  // so the three-letter form «AD חוצה זווית BAC» (which builds) can never reach it, and the frame is
+  // reported as under-specified rather than escalated to the lane whose job is to guess.
+  const bisectorVertex = bisectorVertexOnly(stripStatementPrefix(s).trim());
+  if (bisectorVertex) return { ok: false, reason: 'ambiguous-angle-vertex', ...bisectorVertex };
   // #837: LAST — a declarative noun prefix is normalised away and the line is re-read ONCE. Reaching
   // here means every rule declined, so this can only turn a refusal into a parse, never alter one.
   if (!REWRITING) {
