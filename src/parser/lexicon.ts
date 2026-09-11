@@ -28,8 +28,6 @@
 export const LABEL = String.raw`[A-Za-z]\d*`;
 /** An explicitly-uppercase label (the student-vertex convention). */
 export const ULABEL = String.raw`[A-Z]\d*`;
-/** A RUN of ≥2 glued uppercase labels — a segment/polygon name (`AB`, `ABCD`, `A1B2`). */
-export const LABEL_RUN = String.raw`(?:[A-Z]\d*){2,}`;
 
 // ── Numbers ───────────────────────────────────────────────────────────────────────────────────────
 /** The one number fragment: optional sign, decimal point allowed. NO capture — wrap at use site.
@@ -94,14 +92,25 @@ export const ANGLE_KW = String.raw`(?:∠|${wordForm(String.raw`זו?וי`, 'ang
 export const PERP_KW = String.raw`(?:${heWord(`מאונ${KAF}`)}|${heWord('ניצב')}|${enWord('perpendicular')})`;
 /** Parallel (word forms). The `מקביל` ⊂ `מקבילית` / `parallel` ⊂ `parallelogram` pair is #771's. */
 export const PARALLEL_KW = String.raw`(?:${wordForm('מקביל', 'parallel')})`;
-/** Meet/cut verbs — the ADR-3D-055 lesson: BOTH nun forms (`נפגש` meet, `פוגש`), both cut families
- *  (`חותך`, `נחתך`), medial-kaf plurals included via KAF+suffix. */
-export const MEET_KW = String.raw`(?:${heWord(String.raw`נ?פגש`)}|${heWord('פוגש')}|${heWord(`נ?חת${KAF}`)}|${heWord(`חות${KAF}`)}|${enWord('meet')}|${enWord('intersect')}|${enWord('cut')}|${enWord('cross', String.raw`es`)})`;
+/**
+ * Meet/cut verbs — THE grammar's alternation, moved here from parse.ts's `INTERSECT_KW` (#361,
+ * [ADR-501](docs/06-decisions.md#adr-501)). It carries the ADR-3D-055 lesson in the form the rules actually
+ * parse: BOTH nun forms (`נפגש` meet, `פוגש`/`פגש`), both cut families (`חותך` with either kaf, `נחתך`/`נחתכ`
+ * for the medial-kaf plurals), the `חיתוך` noun and the `∩` symbol, and the word-bounded English verbs.
+ *
+ * This file used to carry a SECOND spelling of the same vocabulary (a `heWord`-bounded one) that no rule
+ * consumed — vocabulary registered here that the grammar did not parse, the exact defect #361 names. One
+ * vocabulary, one home: `parse.ts` compiles this fragment (`rx(MEET_KW)`) and every guard that says
+ * "a meeting EVENT owns this phrasing" reads the same atom. Bit-identical to the constant it replaces.
+ */
+export const MEET_KW = String.raw`intersect|∩|חיתוך|נחתך|נחתכ|נפגש|פוגש|פגש|חות[כך]|\bcuts?\b|\bmeets?\b`;
 /** Tangent (word forms): משיק/משיקים/tangent. */
 export const TANGENT_KW = String.raw`(?:${wordForm('משיק', 'tangent')})`;
-/** Bisect (word forms): חוצה/חוצי/חוצים/חוצות + the English derivation family — `bisector` included,
- *  which is why this stem declares its own `enSuffix`. */
-export const BISECT_KW = String.raw`(?:${wordForm('חוצ', 'bisect', String.raw`s|ed|ing|ors|or|ion`)})`;
+/** Bisector keyword — the grammar's alternation, moved here from parse.ts's `BISECTOR_KW` (#361, ADR-501):
+ *  the bare Hebrew stem `חוצ` reaches חוצה / חוצי / חוצים / חוצות, and English `bisector`. The honesty gate's
+ *  VERB form (`חוצה`/`bisects` with the derivation family) is composed separately through {@link heWord} /
+ *  {@link enWord} in `VERB_GATES`, where the boundary discipline matters; this is the RULE keyword. */
+export const BISECT_KW = String.raw`bisector|חוצ`;
 
 // ── Gate-neutral vocabulary (#497 — the fail-closed leftover gate) ───────────────────────────────
 /** Hebrew tokens a shape rule may legitimately leave unconsumed: bare connectives/copulas a construct

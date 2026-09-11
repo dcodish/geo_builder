@@ -10759,3 +10759,50 @@ the **shipped Hebrew strings** — `toBe(i18n.t('errors.diagonalIsSide', …))`,
 message"; the coverage gate both ways; a non-emptiness assertion on the table and the corpus; and the
 three new evidence rows.
 
+
+## ADR-501 — A LEXICON ATOM IS LOAD-BEARING OR IT DOES NOT EXIST: four dead atoms adopted or deleted, and a guard (#361)
+
+**Status:** accepted, 2026-09-11 · **Issue:** #361 (debt, P3) · round #992
+**Requirements:** none (internal — no utterance parses differently, measured) · **Design:** [04](04-design.md) §5 — the one vocabulary home; [17](17-design-rules.md) §3 — the chokepoint registry row this makes enforceable
+
+**The finding, re-measured at `2865f2b`.** `src/parser/lexicon.ts` is a registered chokepoint whose rule says
+*new rules compose their regexes from these atoms*. Four exported atoms had **no consumer anywhere** in
+non-test source: `PARALLEL_KW`, `MEET_KW`, `BISECT_KW`, `LABEL_RUN`. (`HE_SUFFIX` and `EN_END` are consumed
+inside the file by `heWord`/`enWord`, which every live keyword atom composes from — load-bearing, not dead;
+the 2026-09-01 count of six counted files rather than composition.) Meanwhile `parse.ts` carried its **own**
+alternations for two of them — `INTERSECT_KW` (30 call sites) and `BISECTOR_KW` — that every meet/cut and
+bisector rule actually used. So the vocabulary the grammar parsed lived in the grammar, and the lexicon held a
+second, never-exercised spelling of it: *vocabulary registered in the honesty layer that no rule can parse*,
+the issue's title, exactly.
+
+**The class (standing rule 1).** *A chokepoint that is declared but not load-bearing.* The ratchet test guards
+the opposite direction (inline fragments may only shrink) and could not see this one; nothing failed when an
+atom was added decoratively. The fix is therefore a **guard**, plus the honest disposition of each atom — never
+"six speculative consumers to make the table look adopted" (the retargeted plan's own warning).
+
+**Decision, per atom.**
+
+| atom | disposition | why |
+| --- | --- | --- |
+| `LABEL_RUN` | **deleted** | no site in the tree ever spelled its shape (`(?:[A-Z]\d*){2,}`); the one `{2,}` run in `parse.ts` is a dash-separated list, a different token |
+| `MEET_KW` | **converged** — now the grammar's alternation, verbatim; `parse.ts` compiles it (`INTERSECT_KW = rx(MEET_KW)`) | the `heWord`-bounded spelling was never validated against a rule; the grammar's carries the same ADR-3D-055 lessons (both nun forms, both kaf forms, the `חיתוך` noun, `∩`) in the form 30 guards depend on. Bit-identical regex, same flags |
+| `BISECT_KW` | **converged** the same way (`BISECTOR_KW = rx(BISECT_KW)`) | the rule keyword is the bare stem `חוצ` + `bisector`; the VERB form with the derivation family stays composed in `VERB_GATES` through `heWord`/`enWord`, where the boundary matters |
+| `PARALLEL_KW` | **adopted** at the three parallel RULES' keyword pre-tests (`parallelConstraint`, `parallelCircleIntersection`, `parallelLine`) through one `PARALLEL_PRETEST = rx(\`${PARALLEL_KW}\|∥\`)` | these are the sites where the keyword IS the rule's subject. The inline substring `מקביל` entered all three on every «מקבילית» sentence (the #771 class — `parallel ⊂ parallelogram`); first-match-wins kept that harmless, the bounded form makes it structural |
+
+Left as they are, listed so nobody reads them as missed: the substring `מקביל` inside guard-style tests
+(`HAS_RELATION`, the scope `stop` sniff, the radius/⟂-line deferrals) — those are heuristics over whole
+utterances whose semantics were never "a stated parallel relation", and changing them is a parse-behaviour
+decision, not an adoption. The 3-D leaf (`src3d/lexicon/nouns3.ts`, ADR-3D-188) is untouched — per-product
+homes, never a cross-tree import (the plan's correction of its own step 2).
+
+**Measured: no utterance parses differently.** The full 2-D lane — every catalog example both ways, the
+scenario corpus, the fixtures net, the span-shadow sweep — is green with **no test moved** (counts in the
+round ledger). The convergences are bit-identical regexes; the adoption changes only which rule a
+parallelogram sentence *fails to enter*, and nothing reached those rules through that door.
+
+**The guard.** `lexicon-consumers.test.ts` reads the lexicon and every non-test source file **as text** (the
+ADR-500 lesson: importing would prove the atoms exist, never that anything reaches them) and asserts every
+`export const` is LIVE — referenced outside the lexicon, or composed into a live atom (`HE_SUFFIX → heWord →
+ANGLE_KW`). It asserts its own reach (≥ 12 atoms, the parser's import line seen) and its own detector (a
+synthetic `DECORATIVE_KW` is reported dead; composed into a live atom it is reported live), so it cannot rot
+into a scan that passes by checking nothing. Adding a decorative atom now fails the suite.
