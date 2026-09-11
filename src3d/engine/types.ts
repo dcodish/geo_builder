@@ -1111,6 +1111,20 @@ export type PointDef =
    * could express the same closed form at the cost of that extra ink, so the kind carries it instead.
    */
   | { kind: 'reflect-line'; from: Id; a: Id; b: Id }
+  /**
+   * #984 (ADR-3D-243): the PARALLELOGRAM POINT — `n1 + n2 - opp`, the fourth corner of the
+   * parallelogram whose other three corners are `n1`, `opp`, `n2` in ring order.
+   *
+   * #587/ADR-3D-152 derived this corner with a `vec-rel` command instead, and `vec-rel` EMITS A
+   * CARRIER SEGMENT — «AB = u» draws the vector it names, which is right when the student pointed at
+   * the vector. Here the vec-rel is pure machinery for "where D goes", so its carrier drew a diagonal
+   * (`BD`) nobody asked for, on all four parallelogram nouns.
+   *
+   * Same ruling as the kite's `reflect-line` one screen above (operator, 2026-08-16): a construction's
+   * internal scaffolding must not appear on the canvas as visible work the student never asked for. A
+   * point KIND carries the closed form and draws nothing, so the two one-unknown arms now converge.
+   */
+  | { kind: 'parallelogram-point'; opp: Id; n1: Id; n2: Id }
   // V8-j (G12): the apex on segment a–b positioned so pyramid (base, apex) is RIGHT — i.e. the
   // point on a–b that sits directly above the base's centroid (closed-form t; no CAS)
   | { kind: 'right-pyramid-apex'; a: Id; b: Id; base: Id[] }

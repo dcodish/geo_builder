@@ -479,6 +479,9 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     const DERIVED = new Set([
       'on-segment', 'centroid', 'in-span', 'right-apex', 'foot-plane', 'foot-line', 'line-plane', 'plane-cut',
       'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'vec-defined', 'vec-pair',
+      // #984: the parallelogram corner was a `vec-defined` point until ADR-3D-243 gave it its own
+      // kind — it stays in this set, or the rename would silently drop its coincidence refusal.
+      'parallelogram-point',
     ]);
     const order = [...c.points.keys()];
     const minter = new Map<Id, string>();

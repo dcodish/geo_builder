@@ -360,6 +360,14 @@ minting a foot point and a `vec-rel`, because the helper would appear on the can
 student never asked for. The composition is still available and still correct; what the kind buys is the
 absence of ink.
 
+**And it is not only points — the same rule caught a segment (#984).** The parallelogram arm derived its
+corner by issuing a `vec-rel` command, which emits a **carrier segment** for the vector it relates. That
+carrier is the student's own object when they named a vector («נסמן: AB = u»); here it was scaffolding,
+and it drew a diagonal `BD` nobody asked for on all four nouns. [ADR-3D-243](06b-decisions-3d.md#adr-3d-243)
+gives that corner the kind `parallelogram-point` too, so both one-unknown arms now derive their corner the
+same way and neither emits ink. **The general form: when a construction reaches for a COMMAND to compute
+something, it inherits everything that command does for a student — including what it draws.**
+
 ## Known gaps
 
 Recorded here because a design doc that omits its weakest properties is not describing the system.

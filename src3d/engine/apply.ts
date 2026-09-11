@@ -2474,20 +2474,17 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         const opp = cmd.ids[(i + 2) % 4];
         const n1 = cmd.ids[(i + 1) % 4];
         const n2 = cmd.ids[(i + 3) % 4];
-        const asDef = applyCommand3(c, {
-          type: 'vec-rel',
-          from: opp,
-          to: unknowns[0],
-          terms: [
-            { coeff: { k: 1, p: 0 }, atom: { kind: 'pair', from: opp, to: n1 } },
-            { coeff: { k: 1, p: 0 }, atom: { kind: 'pair', from: opp, to: n2 } },
-          ],
-        });
-        if (!asDef.ok) return asDef;
+        // #984 (ADR-3D-243) — a POINT KIND, not a `vec-rel`. The closed form is the same
+        // (n1 + n2 - opp), but `vec-rel` emits a carrier `segment3` for the vector it relates, and
+        // here that vector is scaffolding: it drew `BD`, a diagonal nobody asked for, on every
+        // member of the family. The kite one screen above already derives its corner as a point kind
+        // for exactly this reason (the 2026-08-16 ruling on invisible helpers); the two arms converge.
+        const withCorner = clone(c);
+        withCorner.points.set(unknowns[0], { kind: 'parallelogram-point', opp, n1, n2 });
         // the corner is now DERIVED, so every constraint lands on a determined ring and verifies —
         // a ring that isn't the stated shape refuses it honestly (today's rectangle behaviour, now
         // for four nouns instead of one).
-        const r = lower(asDef.next);
+        const r = lower(withCorner);
         return r.ok ? { ok: true, next: recordShape(drawRing(r.next), cmd.base, cmd.ids) } : r;
       }
 

@@ -1041,7 +1041,7 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 }
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'bisector-ray', 'foot-seg', 'reflect-line', 'right-pyramid-apex', 'right-apex', 'free3']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'bisector-ray', 'foot-seg', 'reflect-line', 'parallelogram-point', 'right-pyramid-apex', 'right-apex', 'free3']);
 
 /**
  * #367: is anything in the figure stated in ABSOLUTE coordinates — a typed parametric line, a plane
@@ -2464,6 +2464,13 @@ function evaluateSolidsAndPoints(
       const A = pos.get(def.a);
       const B = pos.get(def.b);
       if (from && A && B) pos.set(id, footOnLine(from, { anchor: A, dir: sub3(B, A) }));
+    } else if (def.kind === 'parallelogram-point') {
+      // #984: the fourth corner of a parallelogram — n1 + n2 - opp. Closed form; no root-find, and
+      // (unlike the vec-rel that used to express it) no segment drawn to carry it.
+      const O = pos.get(def.opp);
+      const P1 = pos.get(def.n1);
+      const P2 = pos.get(def.n2);
+      if (O && P1 && P2) pos.set(id, sub3(add3(P1, P2), O));
     } else if (def.kind === 'reflect-line') {
       // #601: the mirror of `from` across the line a–b — the foot of the ⟂, then the same distance
       // again beyond it. Closed form; no root-find, and no helper point on the canvas.

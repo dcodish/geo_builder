@@ -9563,3 +9563,70 @@ the bare-symbol and bare-marker cases unchanged; and the chip's set asserted to 
 
 **Prod exposure, closed.** The defect reached `main` in PR #982 and was live for the window between that
 merge and this commit. No `prod/*` tag was cut in between, so it never reached a student.
+
+---
+
+### ADR-3D-243 — a derived corner is a POINT KIND, never a `vec-rel`: scaffolding must not draw
+
+**Status:** accepted, 2026-09-11 · **Issue:** #984 (P2 — unrequested ink; operator report, round #974 T16)
+**Requirements:** none · **Design:** [04b](04b-design-3d.md) — the quad-shape arms, the "derived point ⇒ a KIND" paragraph
+
+**The defect.** Operator, playing T16: *"On the parallelogram, BD is drawn and no one asked for it so that
+is wrong implementation"*. «משולש ABC» · «מקבילית ABCD» drew three segments:
+
+| drawn | what it is |
+| --- | --- |
+| `DC`, `AD` | the ring's own missing sides — correct, a stated shape leaves a visible trace (ADR-3D-035) |
+| **`BD`** | **a diagonal of the quad the student never mentioned** |
+
+Measured across the family on `main`: every one of `מקבילית` / `ריבוע` / `מלבן` / `מעוין` drew it. Not
+introduced by round #974 — it shipped with [ADR-3D-152](#adr-3d-152)'s one-unknown arm.
+
+**Root cause.** The arm derived the corner by issuing a `vec-rel` command:
+
+```ts
+applyCommand3(c, { type: 'vec-rel', from: opp, to: unknowns[0], terms: [ …pair(opp,n1), …pair(opp,n2) ] })
+```
+
+and `vec-rel` **emits its own carrier `segment3`** — the tree's own comment at the `segment3` case says
+so: *"Many commands emit a `segment3` as a CARRIER — «נסמן: AB = u» draws the vector's segment before
+naming it"*. With ring `ABCD` and `D` missing, `opp = B`, so the carrier is `BD`.
+
+For a **vector naming** that carrier is the thing the student pointed at, and drawing it is right. For a
+**derived corner** the vec-rel is pure machinery — an implementation detail of *where D goes* — and its
+carrier is ink for a segment nobody named.
+
+**The class: a construction's internal scaffolding becoming visible work.** This is the segment half of
+the operator's 2026-08-16 ruling on [ADR-3D-240](#adr-3d-240) (#601), where an auto-minted foot point was
+rejected because *"a helper point appears on the canvas as visible work the student never asked for"*.
+The cross-check that proved the diagnosis before anything was built: the kite arm derives its corner with
+a `reflect-line` **PointDef** and draws no diagonal, while four nouns one screen away derive theirs with
+a `vec-rel` and all four do. Two arms, one difference, and it is exactly the mechanism.
+
+**The decision — option (a) of the two the issue priced.** The parallelogram corner gets its own point
+kind, `parallelogram-point {opp, n1, n2}`, evaluated `n1 + n2 − opp`. The alternative — a "don't draw"
+flag on `vec-rel` — was rejected: it puts a suppression mode on a command whose carrier is *right* in its
+other use, which is the shape that invites the third caller to forget the flag. **The repair removes the
+concept of "a vec-rel that shouldn't draw" rather than adding a switch for it**, and it converges the two
+one-unknown arms on one mechanism, which is what makes the next family cheap.
+
+**What else moved with the kind, and why it had to.** The old corner was a `vec-defined` point, which sits
+in `store3`'s `DERIVED` set — the [ADR-3D-183](#adr-3d-183) rule that refuses to mint a derived point
+landing on an existing named one. Renaming the kind without adding it to that set would have silently
+dropped that refusal for four nouns: a rename is a behaviour change everywhere the old name was *read*.
+`GAUGE_KINDS` takes it for the same reason.
+
+**Deliberately not changed.** `pointEntailedInPlane` (the "already known" containment notice) has no case
+for the new kind, exactly as it had none for `vec-defined` — adding one would newly emit notices about
+statements this fix has no measurement for. The kind's coplanarity is true; whether to *say* so is a
+different decision than this one.
+
+**Locks.** `src3d/__tests__/issue-984.test.ts` (14): no `BD` — and no `AC` — for any of the four nouns;
+the ring's own missing sides still drawn; the corner still exactly the parallelogram point `A + C − B` at
+four seeds with both pairs of opposite sides equal; the mechanism itself (`parallelogram-point`, and
+`vecDefs` empty — so getting the behaviour back by *filtering the drawing* fails the lock); #601's kite
+asserted untouched.
+
+**Sequencing note.** #985 widens this same arm to every quad noun. It is built on top of this, so the
+minting path it adds copies a mechanism that draws nothing instead of working around one that does.
+
