@@ -43,6 +43,10 @@ const SEEDED: SeededCorpus = {
   // verifies", so a fixture is the right lock; the bespoke assertions (D is the REFLECTION and not the
   // parallelogram point, at several seeds) live in issue-601.test.ts alongside it.
   'kite-corner-completion-601.geo3.json': ['משולש ABC', 'דלתון ABCD'],
+  // #977 (ADR-3D-241) — a symbolic angle with a COEFFICIENT, stated behind a copula that was unreadable
+  // before. The figure must build AND the drawn angle must be 2 × 30: the fixture nets the parse and the
+  // drive together, which is what makes it the right lock for "this sentence now works end to end".
+  'angle-coef-symbol-977.geo3.json': ['משולש ABC', 'זווית ABC שווה 2α', 'α = 30'],
   'prism-2020-q2.geo3.json': [
     'מנסרה ישרה משולשת ABC',
     "M אמצע B'C'",

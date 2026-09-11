@@ -194,6 +194,20 @@ Two things generalise, and both are cheap to check in review:
   is one edit serving every spelling in both languages. Whenever a report's axis is a language, a spelling
   or a single input, measure the neighbouring cells before believing it (the FR-SP-8 promise is written
   against the corrected axis, not the reported one).
+**Vocabulary is not a rule's private property** (#977, [ADR-3D-241](06b-decisions-3d.md#adr-3d-241)).
+Two rules read angle statements, and each carried its own inline copy of the angle NOUN and the COPULA.
+The copies had drifted before anyone noticed: one accepted a bare `angle ABC` and the other demanded
+`the angle ABC`, and neither knew «שווה». The student's sentence was therefore understood or refused
+according to which rule happened to read it — a coin-flip they cannot see and cannot learn.
+
+The repair is the one #969/[ADR-498](06-decisions.md#adr-498) reached in 2-D, and it is worth stating as a
+rule of thumb rather than an incident: **when two rules must agree about a word, the word gets a name.**
+A shared constant makes drift impossible; a comment asking the next author to keep two regexes in step
+does not. The corollary for review is cheap to apply — if a rule contains a literal list of spellings,
+ask which other rule needs the same list.
+
+Note also what the copula is *for*: nothing. It carries no meaning the tool needs, which is exactly why it
+must never be the thing that decides whether a statement is understood.
 
 ## The symbol registries — one address, one display, derived from each other
 

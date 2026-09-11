@@ -9441,3 +9441,63 @@ the parallelogram point. Fixture `fixtures3/kite-corner-completion-601.geo3.json
 `polygon4` declaration, so a general quad's fourth corner is a free sampled vertex rather than a
 completion. That is the ADR-052-correct behaviour and it was checked rather than inferred from the issue's
 prose, which grouped quad with trapezoid as a *refusal*.
+## ADR-3D-241 — ONE COPULA VOCABULARY, ONE ANGLE NOUN, AND A COEFFICIENT ON THE SYMBOL (#977)
+
+**Status:** accepted, 2026-09-10 · **Issue:** #977 (filed on the operator's mid-round direction, round #974)
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-2d (new) · **Design:** [04b](04b-design-3d.md) — relations as a disposition map
+
+**How this arose, and the measurement that shaped it.** While #969 (the 2-D honesty breach where
+«זווית ABC היא 2α» silently committed **2°**) was under its gates, the operator asked whether the fix
+should cover 3-D. It was measured before answering, and the answer was **no — 3-D does not have that
+bug**: every symbolic angle escalated honestly, so no student ever got a wrong figure, and porting
+`angleValueOf` would have fixed nothing. The operator then ruled the *real* 3-D gaps into the round.
+
+**What 3-D actually had — three gaps, measured on `78440ea`:**
+
+| | before |
+| --- | --- |
+| «זווית ABC **שווה** 40» | ○ `not-handled`, while «זווית ABC היא 40» built — «שווה» appeared in no angle rule |
+| "**angle** ABC = α" | ○ `not-handled`, while «זווית ABC = α» built — the marker required "**the** angle" |
+| «זווית ABC = **2α**» | ○ `not-handled` behind **every** copula, `=` included — no coefficient anywhere |
+
+**Root cause of the first two — the same shape as #969, one product over.** Two rules state angle
+statements, and each carried its **own inline copy** of the angle noun and the copula. The copies had
+already drifted: `vertexAngleClaim` accepted a bare `angle ABC`, `angleMarker` demanded `the angle ABC`,
+and **neither** knew «שווה». Two rules, four vocabularies, and a student's sentence understood or refused
+according to which rule happened to read it.
+
+**The decision.** [ADR-498](06-decisions.md#adr-498)'s *answer* applies unchanged — **define the
+vocabulary once and have both rules read it** — while its *code* does not port, because a 3-D angle is a
+`claim` over two segments rather than 2-D's vertex-anchored `set-angle`. `ANGLE_PRE_3` and
+`ANGLE_COPULA_3` are now the single spelling of the noun and the copula; a word added to either serves
+every angle rule at once, and no rule can quietly know a spelling its sibling does not.
+
+**The coefficient is the capability half, and it needed no new command.** A symbol already binds to an
+angle through the mark's `label`, and [ADR-3D-052](#adr-3d-052)/#272 already drives every angle wearing a
+letter when a value lands on it. So the coefficient **rides the mark** (`coef`), and the drive multiplies:
+«∠ABC = 2α» with «α = 30» is 60°. Measured end to end, exactly 60.00°.
+
+**A shared letter with DIFFERENT coefficients is a RATIO, not an equality — and that is a real edge.**
+ADR-3D-052 makes a reused label an equality (`cos-eq`), which is right when both wear the letter bare.
+With coefficients it stops being true: «∠ABC = 2α» and «∠BCA = α» state that one is twice the other, and
+pinning them equal would assert a given the student never gave ([ADR-052](06-decisions.md#adr-052)). The
+equality is therefore claimed only when the coefficients **agree**; each angle is still driven correctly
+by its own coefficient. Measured: 60° and 30° from «α = 30», and 50°/50° when both wear α bare.
+
+**What deliberately did not change.** The right-angle word form; queries (`∠ABC=?` stays scope3's, and a
+coefficient group that swallowed one would turn a question into a silent mark); the bare reference
+(`∠ABC` marks with no label and no coefficient); and — the one that would have been a silent honesty
+breach — a **numeric** value never becomes a coefficient without a symbol, so «זווית ABC = 40» still
+reaches the claim lane rather than becoming a valueless mark with the student's 40 discarded.
+
+**Locks.** `src3d/__tests__/issue-977.test.ts` (115): the full **5 namings × 7 copulas × {number, bare
+symbol, coefficient+symbol}** matrix, so a spelling added to either shared list must pass without touching
+a rule; the Latin symbol alongside the Greek; the three end-to-end drives (the coefficient, the bare
+symbol, and a coefficient behind «שווה»); the ratio-vs-equality pair; and the four must-not-change rows.
+Fixture `fixtures3/angle-coef-symbol-977.geo3.json` nets the parse and the drive together.
+
+**Scope correction recorded on the issue.** The body's headline — *"an angle's value has no symbolic
+form"* — was too strong, and the correction was posted before building: 3-D has one, and had it working
+end to end. What it lacked was the **coefficient** form and two spellings. Filing an issue from a
+measurement and then measuring again before building is what turned a "new symbolic lane" into an
+optional capture group and a shared constant.

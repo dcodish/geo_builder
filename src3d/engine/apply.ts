@@ -1243,11 +1243,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         m.vertex === cmd.vertex && ((m.p === cmd.p && m.q === cmd.q) || (m.p === cmd.q && m.q === cmd.p));
       const existing = next.angleMarks.find(same);
       if (!existing) {
-        next.angleMarks.push({ vertex: cmd.vertex, p: cmd.p, q: cmd.q, ...(cmd.label ? { label: cmd.label } : {}) });
+        next.angleMarks.push({ vertex: cmd.vertex, p: cmd.p, q: cmd.q, ...(cmd.label ? { label: cmd.label } : {}), ...(cmd.coef !== undefined ? { coef: cmd.coef } : {}) });
       } else if (cmd.label && existing.label !== cmd.label) {
         // «∠SDB» then «∠SDB = α» — naming an already-marked angle UPGRADES its display label (new object, no
         // prior-construction mutation since clone shares the refs).
-        next.angleMarks = next.angleMarks.map((m) => (m === existing ? { ...m, label: cmd.label } : m));
+        next.angleMarks = next.angleMarks.map((m) => (m === existing ? { ...m, label: cmd.label, ...(cmd.coef !== undefined ? { coef: cmd.coef } : {}) } : m));
       }
       for (const arm of [cmd.p, cmd.q]) if (!next.segments.some((s) => samePair(s, cmd.vertex, arm))) next.segments.push([cmd.vertex, arm]);
       // ADR-3D-052 (#271) — REUSING a label is how a student says "these two angles are equal". It used
@@ -1255,7 +1255,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // figure did not make equal: a stated given silently dropped. A label BINDS to its angle, and a
       // second binding of the same letter is the equality (M1-routed exactly like the explicit form).
       if (cmd.label) {
-        const prior = c.angleMarks.find((m) => m.label === cmd.label && !same(m));
+        // #977: two angles wearing the same letter are equal only when they wear it with the SAME
+        // coefficient. «∠A = 2α» and «∠B = α» share a letter and state a RATIO, not an equality —
+        // pinning them equal would assert a given the student did not give (ADR-052). Each is still
+        // driven correctly by its own coefficient when a value lands on the letter.
+        const prior = c.angleMarks.find((m) => m.label === cmd.label && !same(m) && (m.coef ?? 1) === (cmd.coef ?? 1));
         if (prior) {
           const pair = (v: Id, x: Id): VecAtom => ({ kind: 'pair', from: v, to: x });
           const [a, b, cc, d] = [pair(prior.vertex, prior.p), pair(prior.vertex, prior.q), pair(cmd.vertex, cmd.p), pair(cmd.vertex, cmd.q)];
@@ -2348,7 +2352,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           // Every angle wearing the label is pinned.
           for (const mk of owner.marks) {
             if (!r.ok) return r;
-            r = applyCommand3(r.next, { type: 'claim', claim: { type: 'angle-seg-eq', a1: mk.vertex, b1: mk.p, a2: mk.vertex, b2: mk.q, deg: cmd.value } });
+            // #977: the mark's coefficient scales the value — «∠ABC = 2α» with «α = 30» is 60°.
+            r = applyCommand3(r.next, { type: 'claim', claim: { type: 'angle-seg-eq', a1: mk.vertex, b1: mk.p, a2: mk.vertex, b2: mk.q, deg: (mk.coef ?? 1) * cmd.value } });
           }
         } else if (owner.kind === 'component') {
           // #814's named free component: the value IS the coordinate given on that component — lowered

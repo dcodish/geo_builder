@@ -135,6 +135,17 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   whose defining row is gone — one class, one seam. Suite rule:
   [ADR-W-044](06w-decisions-workspace.md#adr-w-044). *(Realised — [ADR-3D-220](06b-decisions-3d.md#adr-3d-220),
   #926; `issue-926.test.ts`.)*
+- **FR-VC-2d (Must)** — **A SYMBOLIC ANGLE may carry a coefficient, and no copula decides whether a
+  statement is understood.** «זווית ABC = 2α» states that the angle is twice the letter's value, and a
+  value later given to the letter drives it accordingly — the form a question uses when two angles stand
+  in a stated ratio. The **naming** and the **copula** are shared vocabulary, not a rule's private list:
+  «היא», «הוא», «שווה», «שווה ל-», `=`, "is" and "equals" are interchangeable, and «זווית», «הזווית»,
+  `∠`, "angle" and "the angle" name the same thing — so a spelling accepted for one angle statement is
+  accepted for every angle statement. Two angles wearing the same letter with the **same** coefficient
+  are equal; with **different** coefficients they state a **ratio** and must not be pinned equal, since
+  that would assert a given the student never gave. *(Realised —
+  [ADR-3D-241](06b-decisions-3d.md#adr-3d-241), #977; the letter-binding it builds on is
+  [ADR-3D-052](06b-decisions-3d.md#adr-3d-052).)*
 - **FR-VC-3 (Must)** — **NO CAS.** Every "symbolic" feature is a numeric root-find, a closed form, or a
   linear solve. Anything needing symbolic solving beyond that is **refused and escalated to the operator**,
   not approximated. This bound is what keeps the engine's answers trustworthy. *(Operator authority,
