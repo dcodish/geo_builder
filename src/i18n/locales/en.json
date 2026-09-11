@@ -161,7 +161,16 @@
     "statusBroken": "problem",
     "statusOff": "excluded",
     "editBrokeDependents": "The edit was applied, but {{items}} no longer takes effect — what it refers to is not defined any more",
-    "paramDisplayTitle": "Show {{sym}}: letter or value"
+    "paramDisplayTitle": "Show {{sym}}: letter or value",
+    "unstatedEqualPair": "The tool does not know which sides are equal — currently drawn: {{drawn}}. To decide, type e.g. «{{stateIt}}», or press «{{another}}».",
+    "unstatedFreeEndpoint": "The tool does not know which side {{point}} lies on — currently {{drawn}} ({{parallel}}). To decide, type e.g. «{{stateIt}}», or press «{{another}}».",
+    "unstatedParallelPair": "The tool assumed {{drawn}} (legs {{legs}}). To decide which sides are parallel, type e.g. «{{stateIt}}».",
+    "unstatedTitle": "Choices the tool made for you — until you state them",
+    "stateIsosceles": "isosceles triangle {{ids}} ({{pair}})",
+    "stateKite": "{{pair}}",
+    "stateOnSide": "{{point}} on {{side}}",
+    "stateParallel": "{{a}} parallel to {{b}}",
+    "drawnParallel": "{{a}} ∥ {{b}}"
   },
   "figure": {
     "mismatch": "The figure may not match what you described:",

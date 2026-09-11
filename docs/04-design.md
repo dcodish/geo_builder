@@ -473,3 +473,24 @@ rewritten sentence: nothing here is ever committed on the student's behalf.
 Support for the alphabet itself is deliberately **not** built (operator ruling, 2026-09-10). It would
 have to reach labels, RTL text direction (the #549 class), export, and every deterministic element id
 (`seg-AB`) — a wide blast radius for a convention the notice can redirect in one line.
+
+## An unstated choice is SAID (#973, [ADR-502](06-decisions.md#adr-502))
+
+The engine leaves an unstated choice free (ADR-052) and cyclable (ADR-138); this layer **names** it. One
+pure derivation, one table, one text builder, two render sites:
+
+- **`unstatedChoices(facts)`** (`engine/shapeVariants.ts`, the file that owns "which pair is unstated")
+  folds the enabled facts into the choices the tool is currently making. It is a table keyed on the fact's
+  commands — `equal-pair` (kite / isosceles: the drawn pairs read from the ACTIVE variant, pinned by a stated
+  equality on any variant's pair), `free-endpoint` (a base-less midsegment: which side the free end rides,
+  pinned by «G על PR»), `parallel-pair` (the isosceles trapezoid: the lowering assumed AB ∥ DC, pinned by a
+  stated ∥ on two ring sides). A new shape is a row. **Derived on every render** like `hasVariant`, so the
+  note appears with the fact, follows the cycle, and vanishes when a later fact pins the choice or the fact
+  is disabled, removed or broken. Nothing is stored.
+- **`unstatedChoiceText(choice, t)`** (`ui/unstatedChoice.ts`) builds the sentence in the student's
+  language: what is drawn, the canonical pinning sentence (a form the i18n net types as the next line and
+  asserts removes the note — measured, never assumed), and the cycle button's own label. Templates under
+  `steps.unstated*` / `steps.state*` in both locales; the kind list is a runtime export the net walks.
+- **Render:** on the fact's own row (persistent), plus one quiet cue beside «הציגו תצורה אחרת» with the
+  same sentences as its tooltip. The plain «טרפז ABCD» gets no note — the lock asserts the absence so
+  widening the scope is a visible flip, not drift.

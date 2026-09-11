@@ -161,7 +161,16 @@
     "statusBroken": "בעיה",
     "statusOff": "לא נכלל",
     "editBrokeDependents": "העריכה נקלטה, אבל {{items}} כבר לא בתוקף — מה שהוא מתייחס אליו אינו מוגדר עוד",
-    "paramDisplayTitle": "הצגת {{sym}}: אות או ערך"
+    "paramDisplayTitle": "הצגת {{sym}}: אות או ערך",
+    "unstatedEqualPair": "הכלי לא יודע אילו צלעות שוות — כרגע מצוירות {{drawn}}. כדי לקבוע כתבו למשל «{{stateIt}}», או לחצו «{{another}}».",
+    "unstatedFreeEndpoint": "הכלי לא יודע על איזו צלע נמצאת {{point}} — כרגע {{drawn}} ({{parallel}}). כדי לקבוע כתבו למשל «{{stateIt}}», או לחצו «{{another}}».",
+    "unstatedParallelPair": "הכלי הניח ש-{{drawn}} (השוקיים {{legs}}). כדי לקבוע אילו צלעות מקבילות כתבו למשל «{{stateIt}}».",
+    "unstatedTitle": "בחירות שהכלי עשה במקומכם — עד שתכתבו אותן",
+    "stateIsosceles": "משולש שווה שוקיים {{ids}} ({{pair}})",
+    "stateKite": "{{pair}}",
+    "stateOnSide": "{{point}} על {{side}}",
+    "stateParallel": "{{a}} מקביל ל-{{b}}",
+    "drawnParallel": "{{a}} ∥ {{b}}"
   },
   "figure": {
     "mismatch": "ייתכן שהאיור אינו תואם למה שתיארתם:",

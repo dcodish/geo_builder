@@ -10806,3 +10806,57 @@ ADR-500 lesson: importing would prove the atoms exist, never that anything reach
 ANGLE_KW`). It asserts its own reach (≥ 12 atoms, the parser's import line seen) and its own detector (a
 synthetic `DECORATIVE_KW` is reported dead; composed into a live atom it is reported live), so it cannot rot
 into a scan that passes by checking nothing. Adding a decorative atom now fails the suite.
+## ADR-502 — A CHOICE THE TOOL MAKES FOR AN UNSTATED GIVEN IS SAID, FOR AS LONG AS IT IS UNSTATED (#973)
+
+**Status:** accepted, 2026-09-11 · **Issue:** #973 (feature, P3) · round #992 · feature route (PR)
+**Requirements:** [02](02-requirements.md) FR-HS-13 (new) — the honesty invariant's communication half
+**Design:** [04](04-design.md) — "An unstated choice is SAID"
+
+**The request (operator, 2026-09-10).** *"When we draw a משולש שווה שוקיים or דלתון we should draw as we do
+today but add a message that the image doesn't know or assume which of the sides are equal and that the
+user should specifically say which are equal."* Rulings on the three open questions (2026-09-11): the
+shapes are the isosceles triangle, the kite, the **base-less midsegment** (the tool picks the side) and the
+**isosceles trapezoid** (the tool assumes the parallel pair); the message stays up **for as long as the
+choice is undefined**; every such figure, never a one-shot. Others later if needed.
+
+**Why the engine needed nothing.** [ADR-052](#adr-052) made every unstated magnitude free and
+[ADR-138](#adr-138) made "which pair is equal" a cyclable `shape-variant` — «הציגו תצורה אחרת» walks the
+three apexes / two axes, and a stated equality PINS the variant (`pinsSoftVariant`). The tool really does
+not assume. What it never did was **say** so: the only surfacing of that freedom was the boolean that lit
+the cycle button (`hasVariant`, App.tsx). A student saw one drawing with one visibly equal pair and could
+read it as the tool asserting |AB|=|AC|. The figure was honest; its silence was not. This is the
+communication half of ADR-052, the same family as [ADR-W-030](06w-decisions-workspace.md#adr-w-030)
+(non-canonical input is taught) and [ADR-497](#adr-497) (a convention is answered with a note).
+
+**Decision — one pure derivation, one table, one text builder, two render sites.**
+
+1. **`unstatedChoices(facts)`** (`engine/shapeVariants.ts`, the file that already owns "which pair is
+   unstated") folds the enabled facts and returns, per figure, every choice the tool is currently making:
+   `equal-pair` (kite / isosceles — the drawn pairs read from the ACTIVE variant via `expandShapeVariant`,
+   pinned by a stated equality on any variant's pair, the ADR-138 predicate asked the other way round),
+   `free-endpoint` (a base-less midsegment — which side the free end rides, pinned by «G על PR»,
+   [ADR-412](#adr-412)), and `parallel-pair` (the isosceles trapezoid — the `trapezoid` lowering ASSUMES
+   AB ∥ DC so the macro's leg equality fell on AD, BC; pinned by a stated ∥ on two of the ring's sides).
+   It is a table keyed on the fact's commands: a new shape is a row. **Derived on every render, like
+   `hasVariant`** — the note appears with the fact, follows the cycle, and vanishes when a later fact pins
+   the choice or the fact is disabled, removed, or broken. Nothing is stored; nothing can go stale.
+2. **`unstatedChoiceText(choice, t)`** (`ui/unstatedChoice.ts`) builds the sentence in the student's
+   language: what is drawn now (*«כרגע מצוירות AB = AC»*), the canonical sentence that pins it — a form
+   **measured to parse** («משולש שווה שוקיים ABC (AB=AC)», «AB=AD», «E על AC», «AB מקביל ל-DC»; the i18n net
+   types each one as the next line and asserts the note disappears) — and the cycle button's own label.
+3. **Rendered persistently on the fact's row** (the row is where a student re-reads what they said), plus
+   **one quiet cue beside «הציגו תצורה אחרת»** — the button the notes point at — carrying the same
+   sentences as its tooltip. Both through `t()`, `steps.unstated*` / `steps.state*`, both locales.
+
+**Scope, deliberately.** A plain «טרפז ABCD» makes the same AB ∥ DC assumption and gets **no** note — the
+operator named the isosceles one and said *"add if needed in future"*; it is one row, and the lock asserts
+the absence so widening it is a visible flip. Found by the probe, filed, not fixed here: #989 («טרפז שווה
+שוקיים ABCD, AD מקביל ל-BC» keeps the leg equality on AD/BC regardless of the pair declared parallel).
+
+**Locks.** `unstated-choices.test.ts` (16): present for each of the four rows with the exact drawn pair;
+absent for each pinned form and for the plain trapezoid, a plain triangle, a square, an equilateral;
+the note follows `withVariant`; adding the pinning fact removes it and disabling that fact restores it;
+the note is keyed to the fact that made the choice. `unstated-choice-notes.test.ts` (18): every kind and
+every template in both locales (the #882 discipline over a runtime kind list); each Hebrew sentence names
+the drawn pair and the button, and its quoted pinning sentence, typed next, removes the note; the English
+sentence builds with no placeholder left. Not a fixture — this is display; the figure is unchanged.

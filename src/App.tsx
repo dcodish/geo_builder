@@ -26,7 +26,8 @@ import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 import registry from '../products.json';
-import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
+import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, unstatedChoices, VARIANT_COUNT } from '@/engine';
+import { unstatedChoiceText } from '@/ui/unstatedChoice';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, stepLabel } from '@/parser';
 import { Figure } from '@/render';
 import { crossingCommands } from '@/engine';
@@ -836,6 +837,15 @@ export default function App() {
   // A kite/isosceles whose equal-pair is a cyclable VARIANT (ADR-138) — so "show another configuration"
   // offers to flip which sides are equal even when the shape is otherwise determined.
   const hasVariant = facts.some((f) => f.enabled && f.cmd.type === 'shape-variant' && VARIANT_COUNT[f.cmd.shape] > 1);
+  // #973 (ADR-502): the choices the tool is making for an UNSTATED given — which pair is equal, which
+  // side a free endpoint rides, which pair a trapezoid assumed parallel — SAID for as long as the student
+  // has not stated them (operator ruling 2026-09-11: persistent, never a one-shot). Derived from the fact
+  // list on every render exactly like `hasVariant` above, so the note appears with the fact, follows
+  // «הציגו תצורה אחרת» (the drawn pair is read from the active variant), and vanishes when a later fact
+  // pins the choice or the fact is disabled or removed. Nothing stored; nothing can go stale. A fact whose
+  // row is broken draws nothing, so it names no choice either.
+  const unstated = useMemo(() => unstatedChoices(facts.filter((f) => f.enabled && status[f.id] === 'ok')), [facts, status]);
+  const unstatedByFact = useMemo(() => new Map(unstated.map((c) => [c.factId, c])), [unstated]);
   // #751 (ADR-W-029): the chips submit what they show, so what they hold must be the RAW command.
   // `postProcess: []` asks i18next for the value BEFORE the bidi-isolate post-processor; the chip
   // re-applies isolation for DISPLAY only. Without this the fact list, the saved file, the prod log
@@ -1158,6 +1168,12 @@ export default function App() {
               </span>
             )}
             {altNote && <span style={{ fontSize: 12, color: '#64748b' }}>{altNote}</span>}
+            {/* #973: the same choices, as one quiet line beside the button that cycles them — the row notes carry the detail. */}
+            {unstated.length > 0 && !resampling && (
+              <span data-testid="unstated-choice-cue" style={{ fontSize: 12, color: '#b45309' }} title={unstated.map((c) => unstatedChoiceText(c, t)).join('\n')}>
+                {t('steps.unstatedTitle')}
+              </span>
+            )}
             {/* #738 — the relations/shapes buttons moved INTO the נתונים panel (operator: the row
                 should match the other tools, which have no such buttons here at all). */}
             <span style={{ flex: 1 }} />
@@ -1326,6 +1342,16 @@ export default function App() {
                           <button type="button" style={factLabel(state)} onClick={() => select(g.key)} dir={textDir(label)} title={state === 'broken' ? errText : undefined}>
                             {hasMath(label) ? <MathText text={label} /> : label}
                           </button>
+                          {/* #973 (ADR-502): a choice the tool made for this row's unstated given — SAID here, on the
+                              row where the student re-reads what they said, until they state it. */}
+                          {g.facts.map((f) => unstatedByFact.get(f.id)).filter((c): c is NonNullable<typeof c> => !!c).map((c) => {
+                            const note = unstatedChoiceText(c, t);
+                            return (
+                              <span key={c.factId} data-testid="unstated-choice" role="note" style={{ fontSize: 11, color: '#b45309', paddingInlineStart: 6 }} dir={textDir(note)}>
+                                {note}
+                              </span>
+                            );
+                          })}
                           {state === 'broken' && errText && g.key === selectedId && (
                             <span style={{ fontSize: 11, color: '#dc2626', paddingInlineStart: 6 }} dir={textDir(errText)}>
                               {errText}
