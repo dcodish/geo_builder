@@ -10681,3 +10681,81 @@ unfixed **and** breaks the forward declaration. The verifier arm is an addition 
 issue's own class analysis points — #536 is cited there as "neither enforced **nor verified**" — not a
 departure from it. 3-D's own guard has the same apply-time-only limit and therefore the same gap; that is
 recorded on #859's tree rather than fixed here (#978).
+
+---
+
+### ADR-500 — a pattern that must recognise an engine message is a JOIN, and the join is tested
+
+**Status:** accepted, 2026-09-11 · **Issue:** #983 (P2 — a Hebrew-first product showing English; operator report, round #974 T5)
+**Requirements:** none (FR-SU-5 / the honesty invariant that a refusal names the student's statement already promises it) · **Design:** none (internal)
+
+**The defect.** Operator, playing T5: *"the message is mixed hebrew and english and should be hebrew only"*.
+Both refusals [ADR-499](#adr-499) added reached the student as raw English inside a Hebrew UI:
+
+```
+מלבן ABCD  ·  אלכסון AB   →  "AB is not a diagonal of ABCD — it is a side"
+משולש ABC  ·  אלכסון AB   →  "AB is not a diagonal — ABC has no diagonals"
+```
+
+T4 carried the identical defect and passed unnoticed — one bug with two visible instances.
+
+**Root cause, measured through the display path.** `humanizeError`'s two new patterns were built inside a
+**template literal**, and `\S` in a template literal is not a regex escape — JavaScript collapses it to the
+letter `S` before `RegExp` ever sees it:
+
+```js
+new RegExp(`^(\S+) is not a diagonal of (\S+) — it is a side$`).source
+// => "^(S+) is not a diagonal of (S+) — it is a side$"     ← matches nothing
+```
+
+The Hebrew strings were present and correct in `he.json` the whole time. Nothing reached them. **The
+failure mode is silence**: no throw, no missing-key warning, and the banner still shows *a* message.
+
+**Class (docs/17): a message the engine emits and the localizer must recognise is a contract between two
+files, and nothing tested the join.** Every `PATTERNS` entry is a hand-written copy of an engine string; a
+typo in either half degrades silently to English and the UI still "works". The same shape as
+[ADR-346](#adr-346)'s mirror-drift class: two places must agree, and only one is exercised.
+
+**So the repair is three things, and the two backslashes are the least of them.**
+
+**1 — the mechanism guard.** `server/__tests__/regex-escape-hygiene.test.ts` reads the SOURCE of every
+tree and fails on a lone escape inside any ```new RegExp(`…`)``` — workspace-wide, because the hazard is
+JavaScript's, not this table's. **Proven against the pre-fix file before it was trusted**: run on
+`main:src/i18n/humanizeError.ts` it names lines 194 and 195. It also asserts its own detector in both
+directions, so it cannot rot into a regex that matches nothing — which would be this very bug inside the
+test that exists to prevent it.
+
+**2 — the coverage gate.** `PATTERNS` is exported, and `humanize-error.test.ts` now asserts that **every
+entry is matched by a real engine message in `CASES`** (and that every `CASES` row reaches a pattern). A
+dead entry is either a typo — it will render English — or a message the engine stopped emitting. Both are
+worth failing on, and both were invisible.
+
+**The gate paid for itself on its first run**, finding two more patterns with no evidence row at all:
+`errors.metricImpossible` (#420 — *both* wordings, the triangle sentence and the path sentence) and
+`errors.unboundVariable` (#926). Neither was broken; neither had ever been exercised through the display
+path. Their rows are added here.
+
+**3 — the audit, and what it found beyond the reported file.** The same scan over the whole workspace
+found three more collapsed escapes, all in `src3d/parser/parse3.ts`: `(?:the\s+)?` in `solidNounOf`, and
+`\s*$` in the two `quadDiagonals` arms.
+
+**All three are LATENT, and that is measured rather than assumed** — the volume rule strips the article
+outside its capture group before `solidNounOf` sees the word, and both `quadDiagonals` arms run on
+`s.trim()`, so a trailing-whitespace matcher has nothing left to match. They are repaired anyway: each is
+one caller away from being a live defect, and leaving a known-broken regex in place after finding it is
+the opposite of what the audit was for. One behaviour DOES change, in the honest direction — `s*$` also
+matched a trailing literal *"s"*, so «the diagonals of the bases» (plural, on a prism with two of them)
+silently drew one base's diagonals and now escalates instead of guessing which.
+
+**Why the original commit's verification passed.** It checked that the i18n *keys* existed
+(`grep -c diagonalIsSide`) and never that a pattern *matched its message* — a gate that looked green
+while checking the wrong thing. That is the generalisable lesson, and it is why the fix is a gate rather
+than a repair: **evidence that a string exists is not evidence that anything reaches it.**
+
+**Locks.** `regex-escape-hygiene.test.ts` (3): the workspace scan, the scan's own reach (>200 files, and
+`humanizeError.ts` among them — an audit that reads nothing passes by checking nothing), and the detector
+asserted both ways. `humanize-error.test.ts` (62, from 56): the two reported messages asserted to render
+the **shipped Hebrew strings** — `toBe(i18n.t('errors.diagonalIsSide', …))`, not merely "not the raw
+message"; the coverage gate both ways; a non-emptiness assertion on the table and the corpus; and the
+three new evidence rows.
+
