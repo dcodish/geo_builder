@@ -68,6 +68,12 @@ A single boundary: `utterance → command[]`.
 - **Primary — deterministic grammar parser.** Handles the common, bounded geometry phrasings in Hebrew and English (shapes, points-on, distances, angles, special lines). Free, offline, instant.
 - **Fallback — Claude API.** Only when the parser cannot confidently parse. Model: `claude-haiku-4-5` (sufficient for short structured extraction; far cheaper than Opus/Fable). Calls go through a **server-side proxy** that holds the key (never in the browser), is gated, and is rate-limited. `max_tokens` and prompt size kept minimal.
 - The engine is agnostic to which path produced the commands.
+- **One vocabulary home (#361, [ADR-501](06-decisions.md#adr-501)).** `src/parser/lexicon.ts` holds the
+  keyword and token atoms the grammar composes from — and only atoms the grammar actually consumes. A rule's
+  keyword alternation (`INTERSECT_KW`, `BISECTOR_KW`, the parallel pre-test) is compiled from the lexicon
+  fragment, never spelled a second time; `lexicon-consumers.test.ts` fails on any exported atom nothing
+  composes from, the twin of the ratchet that fails on inline fragments growing. The 3-D grammar keeps its own
+  leaf (`src3d/lexicon/nouns3.ts`); the trees never share vocabulary by import.
 
 ## 6. Rendering
 

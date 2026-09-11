@@ -20,7 +20,7 @@
  */
 
 import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
-import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF } from './lexicon';
+import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW } from './lexicon';
 import { stripFormatControls } from '../../shell/bidi';
 
 export type ParseResult =
@@ -1580,7 +1580,8 @@ const bareSegment: Rule = (s) => {
  * half-parse "the diagonals AC and BD intersect at E" into just "segment AC",
  * silently dropping the intersection point.
  */
-const INTERSECT_KW = /intersect|∩|חיתוך|נחתך|נחתכ|נפגש|פוגש|פגש|חות[כך]|\bcuts?\b|\bmeets?\b/i; // incl. "חותך" (cuts), active "פוגש"/"פגש" (meets), "cuts"
+// #361 (ADR-501): the alternation lives in the lexicon (`MEET_KW`) — one vocabulary home; compiled here, same flags.
+const INTERSECT_KW = rx(MEET_KW); // incl. "חותך" (cuts), active "פוגש"/"פגש" (meets), "cuts"
 /**
  * TWO TANGENTS' MEET (#197 Am. 6): «המשיקים [המשותפים] נפגשים בנקודה K» / "the [common] tangents meet
  * at K" — the classic construction (the tangents extended to their crossing, the homothety centre) —
@@ -1894,7 +1895,7 @@ const bareVertexAngle: Rule = (s, ctx) => {
   return [{ type: 'set-angle', vertex: v, ray1: nb[0], ray2: nb[1], value: Number(m[2]) }];
 };
 
-const BISECTOR_KW = /bisector|חוצ/i; // English "bisector"; Hebrew חוצה / חוצי
+const BISECTOR_KW = rx(BISECT_KW); // #361 (ADR-501): the lexicon's `BISECT_KW` — English "bisector"; Hebrew חוצה / חוצי
 
 /**
  * "E is the intersection of the bisectors of angle BAC and angle BCA" /
@@ -3739,8 +3740,15 @@ const lengthOrder: Rule = (s) => {
  * relation also DRAWS them (segment is idempotent — a no-op if already on the
  * figure), so "AB ∥ CD" puts both lines on the canvas without a separate request.
  */
+/**
+ * #361 (ADR-501): the WORD-form parallel keyword from the lexicon (`PARALLEL_KW` — מקביל and its inflections,
+ * `parallel(s)`, both word-BOUNDED so «מקבילית»/«parallelogram» is not read as a stated ∥, the #771 class) plus the
+ * symbol. The three parallel rules used to spell the bare substring `מקביל` inline, which entered them on every
+ * parallelogram sentence; first-match-wins kept that harmless, and the bounded form makes it structural.
+ */
+const PARALLEL_PRETEST = rx(`${PARALLEL_KW}|∥`);
 const parallelConstraint: Rule = (s, ctx) => {
-  if (!/parallel|∥|מקביל/i.test(s)) return null;
+  if (!PARALLEL_PRETEST.test(s)) return null;
   // strip the keyword AND filler words (so "to"/"of" aren't read as 2-letter labels)
   const t = s.replace(/parallel(?:\s*to)?|∥|מקביל(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
   const m = t.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
@@ -6260,7 +6268,7 @@ const secantFromExternal: Rule = (s, ctx) => {
 
 /** "G is where the line through F parallel to AB meets circle O" — a parallel line ∩ the circle. */
 const parallelCircleIntersection: Rule = (s, ctx) => {
-  if (!/parallel|מקביל/i.test(s) || !/circle|מעגל/i.test(s)) return null;
+  if (!PARALLEL_PRETEST.test(s) || !/circle|מעגל/i.test(s)) return null;
   const center = resolveCenter(s, ctx);
   const throughM = s.match(/(?:through|דרך)\s+([A-Za-z]\d*)\b/i);
   const toM = s.match(/(?:parallel\s+to|מקביל\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
@@ -7786,7 +7794,7 @@ const perpendicularLine: Rule = (s, ctx) => {
 
 /** "line through P parallel to AB" / "ישר דרך P מקביל ל-AB" / "DE מקביל ל-AB בנקודה C" — a *drawn* parallel line through a point. */
 const parallelLine: Rule = (s, ctx) => {
-  if (!/parallel|∥|מקביל/i.test(s)) return null;
+  if (!PARALLEL_PRETEST.test(s)) return null;
   // Anchor the line at its through-point — "through P" / "דרך P", OR the "from a point" origin (#127).
   // Within a `מקביל`/parallel utterance a "from X" is unambiguously the origin (the parallel-TO segment
   // uses `מקביל ל-`, never a bare `מ-`/`from`), so FROM_PT is safe here where it would not be on the ⟂ rule.
