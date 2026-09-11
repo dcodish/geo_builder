@@ -189,6 +189,11 @@ const PATTERNS: Pattern[] = [
   // step.ts:167 — `C and E would be at the same point`
   { re: /^(\S+) and (\S+) would be at the same point$/, key: 'errors.sameSpot', params: (m) => ({ a: m[1], b: m[2] }) },
 
+  // step.ts — #966 (ADR-499) the diagonal ROLE CLAIM refusals. Two messages, because they are two
+  // different mistakes: naming a SIDE, and naming a diagonal of a shape that has none.
+  { re: new RegExp(`^(\S+) is not a diagonal of (\S+) ${EMDASH} it is a side$`), key: 'errors.diagonalIsSide', params: (m) => ({ pair: m[1], shape: m[2] }) },
+  { re: new RegExp(`^(\S+) is not a diagonal ${EMDASH} (\S+) has no diagonals$`), key: 'errors.diagonalNoneHere', params: (m) => ({ pair: m[1], shape: m[2] }) },
+
   // step.ts:91 — `'O' is already defined — it can't be redefined as something different`
   { re: new RegExp(`^'(.+)' is already defined ${EMDASH} it can't be redefined as something different$`), key: 'errors.alreadyDefined', params: (m) => ({ id: m[1] }) },
 

@@ -71,6 +71,20 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   none of the four space diagonals, so it ASKS (ADR-052), and a clarify is never flattened into a pick.
   *(Realised — [ADR-3D-237](06b-decisions-3d.md#adr-3d-237), #893; the 2-D counterpart is ADR-430/#461.)*
 
+- **FR-SP-8 (Must)** — **A relation the tool reads is read for every OPERAND KIND it is meaningful for.**
+  A student who has seen «הישר ℓ מוכל במישור π» accepted expects «C מוכלת במישור π» — the same relation,
+  said about a point — to be accepted too, and a frame that serves one kind and silently escalates
+  another is indistinguishable to them from the tool not knowing the relation at all. So a relation's
+  operand coverage is a promise, not an implementation detail: **membership** («מוכל ב…», «נמצא ב…»,
+  «מונח על…», "is contained in", "lies in", and the container-headed «המישור π מכיל את …») reads a point
+  and a line alike, in **both languages and both frames**, and lowers each to the command that kind
+  already has. Where a kind genuinely has no meaning under a relation the answer is a **refusal**, never
+  silence: a point has no direction, so «C מאונך למישור π1» is refused rather than escalated. The
+  corollary that matters in review: a relation extended to a new spelling must be extended for every kind
+  at once, and a relation extended to a new kind must serve every spelling at once — which is only
+  affordable because the frame reads its sides through the shared operand reader (ADR-3D-100).
+  *(Realised — [ADR-3D-238](06b-decisions-3d.md#adr-3d-238), #963; the frame itself is
+  [ADR-3D-189](06b-decisions-3d.md#adr-3d-189), #614.)*
 - **FR-SP-9 (Must)** — **An UNDER-SPECIFIED statement is told what is missing; only an UNSUPPORTED one is
   told the tool cannot do it.** The two are different failures and must not share a voice: a student who
   wrote a sentence the tool understands but cannot pin down needs to know *which detail* to add, while

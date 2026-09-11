@@ -166,6 +166,35 @@ away. Reuse is checked on the residual's MEANING, not its field list — `cos-an
 operands and the wrong (signed) quantity, and a drive that targets something other than what its verifier
 measures produces figures its own claim then refutes. See [ADR-3D-217](06b-decisions-3d.md#adr-3d-217).
 
+**A frame's operand coverage is part of the relation, and the guard that limits it must say what it is
+about.** #963 (ADR-3D-238) is the cheapest possible illustration. The containment frame (#614) read its
+sides through the shared operand reader and served a LINE; a POINT fell out here:
+
+```ts
+if (a.op.kind === 'point' || b.op.kind === 'point') return null; // a point has no direction
+```
+
+The comment is accurate and the guard is correctly placed — for **perp, parallel and angle**. It is the
+wrong guard for **containment**, which is not a direction relation at all: a point inside a plane is
+membership, and `on-planes` has existed since ADR-3D-015. One guard reasoning about direction was
+silently deciding a question about containment, so a student could write «הישר ℓ מוכל במישור π» and be
+understood, then write «C מוכלת במישור π» — the same relation about a point — and be escalated to the
+paid model.
+
+Two things generalise, and both are cheap to check in review:
+
+- **A bail whose comment names a PROPERTY must be scoped to the relations that property governs.** The
+  comment here was not stale or wrong; it was true of the relations it was written for and had quietly
+  acquired jurisdiction over one it was never about. That is harder to spot than a wrong comment, because
+  reading the line tells you nothing is amiss.
+- **The defect's axis is not always the one in the report.** #963 was filed as *"membership exists only in
+  English"* with eight Hebrew rows. Measured, Hebrew «C על המישור π1» always worked and English "C lies
+  **in** plane π1" was equally broken — the axis was the *frame*, not the language. Fixed as filed it
+  would have been a list of Hebrew spellings that still left an English row failing; fixed at the frame it
+  is one edit serving every spelling in both languages. Whenever a report's axis is a language, a spelling
+  or a single input, measure the neighbouring cells before believing it (the FR-SP-8 promise is written
+  against the corrected axis, not the reported one).
+
 ## The symbol registries — one address, one display, derived from each other
 
 A letter a student names is answered in two places, and they are deliberately different questions.

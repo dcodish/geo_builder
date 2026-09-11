@@ -1505,9 +1505,12 @@ const diagonals: Rule = (s, ctx) => {
   // (A) named diagonals: two label-pairs joined by ו/and/comma
   const named = s.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:ו-?|,|and)\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (named && named.slice(1, 5).every(isUpperLabel)) {
+    // #966: explicitly NAMED diagonals make the same role claim the singular does, so they carry the
+    // same flag. Form (B) below DERIVES the pairs from the ring and is correct by construction — there
+    // is no claim there to check, and flagging it would only re-verify our own arithmetic.
     return [
-      { type: 'segment', a: up(named[1]), b: up(named[2]) },
-      { type: 'segment', a: up(named[3]), b: up(named[4]) },
+      { type: 'segment', a: up(named[1]), b: up(named[2]), diagonal: true },
+      { type: 'segment', a: up(named[3]), b: up(named[4]), diagonal: true },
     ];
   }
   // (B) the diagonals of a polygon — a named 4+ run, else the figure's single polygon
@@ -1525,12 +1528,22 @@ const diagonals: Rule = (s, ctx) => {
   return out.length ? out : null;
 };
 
-/** "segment AC" / "diagonal AC" / "קטע AC" / "אלכסון AC" — connect two points. */
+/**
+ * "segment AC" / "diagonal AC" / "קטע AC" / "אלכסון AC" — connect two points.
+ *
+ * #966 (ADR-499): «אלכסון» is not a synonym for «קטע». It is a CLAIM ABOUT the pair — that these two
+ * vertices are non-adjacent on some ring — and until now the word was consumed purely as a way of
+ * POINTING at a segment, so «אלכסון AB» on a rectangle (a side) and «אלכסון AB» on a triangle (which
+ * has no diagonals at all) both drew a green ✓. The claim is recorded here and checked where the
+ * figure is known; the segment it draws is unchanged.
+ */
 const segment: Rule = (s) => {
   if (!/segment|diagonal|connect|קטע|אלכסון|חבר/i.test(s)) return null;
   if (POINT_ON_CARRIER.test(s)) return null; // "E on segment AC" is a point ON the carrier — pointOnSegment owns it
   const ids = labelRun(s.replace(/segment|diagonal|connect|קטע|אלכסון|חבר/gi, ' '), 2);
-  return ids ? [{ type: 'segment', a: ids[0], b: ids[1] }] : null;
+  if (!ids) return null;
+  const claimsDiagonal = /\bdiagonals?\b|אלכסון/i.test(s);
+  return [{ type: 'segment', a: ids[0], b: ids[1], ...(claimsDiagonal ? { diagonal: true as const } : {}) }];
 };
 
 /**
@@ -2211,35 +2224,97 @@ function angleArms(text: string, ctx: ParseContext): AngleArms | Clarify | null 
   return { clarify: 'ambiguous-angle', vertex: v };
 }
 
-const angle: Rule = (s, ctx) => {
-  if (!/(?:angle|∠|זוו?ית)/i.test(s)) return null;
-  // A COMPARISON is not a value (ADR-390, issue #277): "∠ABC > 40" states a REGION, and reading its
-  // bound as the degree value silently committed a figure the student never described. `measureBound`
-  // owns those — bail here too, so this rule's number-grabbing greed can't re-open the hole if rule
-  // ordering ever changes.
-  if (COMPARES_WITH_NUMBER.test(s)) return null;
-  // The right-angle WORD form (#45 / ADR-299): "זוית B ישרה" / "זוית ABC ישרה" / "angle ABC is a right
-  // angle" ≡ "= 90". Detected on the raw utterance; the "right angle" phrase is NOT a second angle
-  // reference (the multi-angle guard below counts on a copy with the phrase removed).
-  const rightWord = /ישרה|right[\s-]?angle/i.test(s);
+/**
+ * #969 (ADR-498) — THE VALUE OF AN ANGLE STATEMENT, READ ONCE FOR BOTH VALUE KINDS.
+ *
+ * `angleArms` above made "WHICH angle is named" one reader's business. The other half of the same
+ * statement — WHAT VALUE it states — stayed split, and split along a VOCABULARY: `angle` located its
+ * number POSITIONALLY (any standalone number in the line), so every copula worked and none was ever
+ * written down; `measureAngle` located its symbol SYNTACTICALLY, after a literal `=`. So
+ * «זווית ABC = 2α» bound the symbol while «זווית ABC היא 2α» fell through to the numeric lane, which
+ * read the COEFFICIENT as the whole value and silently committed 2° — the student's α discarded, a
+ * breach of both honesty invariants (a stated magnitude vanished; the figure showed a given nobody gave).
+ *
+ * Measured on `78440ea`, the defect was every copula but `=` — «היא», «שווה», «שווה ל-», «הוא»,
+ * "is", "equals" — across every naming mode. That is why the fix is NOT a longer copula list: the
+ * numeric lane never HAD a list to copy (it needs no copula at all), so a seventh spelling would
+ * reopen the hole exactly as the sixth did. The two kinds are located the SAME way instead, and the
+ * copula stops being load-bearing — a symbolic value is the trailing expression of the statement,
+ * just as a numeric one is a standalone number in it.
+ *
+ * This completes for the VALUE half what #831/ADR-468 did for the NAMING half of this same rule pair;
+ * leaving the value half split is what let #831's stated guarantee be true and this bug exist anyway.
+ */
+type AngleValue =
+  | { kind: 'num'; value: number; rest: string }
+  | { kind: 'sym'; coef: number; sym: string; rest: string };
+
+/**
+ * The guards every value-bearing angle rule shares. Kept HERE rather than in one rule, because a guard
+ * that only one lane applies is the shape this bug had: `angle` bailed on comparisons (ADR-390) and on
+ * multi-angle lines, `measureAngle` did neither, and only its `=` requirement hid that.
+ */
+function angleValueBlocked(s: string): boolean {
+  // A COMPARISON states a REGION, not a value (ADR-390, #277): "∠ABC > 40" / «זווית ABC גדולה מ-α».
+  // `measureBound` owns those. The symbolic twin is new with #969 — measured before the change,
+  // «זווית ABC גדולה מ-α» was `not-handled`, so without this bail the trailing-value read would have
+  // turned an honest escalation into a silently WRONG equality ∠ABC = α.
+  if (COMPARES_WITH_NUMBER.test(s) || COMPARES_WITH_SYMBOL.test(s)) return true;
   // TWO+ angle REFERENCES in one line ("זווית ABC = 40, זווית DEF = 60") is a multi-angle GIVENS list —
   // the `multiStatement` splitter owns it. If it reaches here unsplit, bail rather than silently claim
-  // only the first triple (PAR-2, defence in depth); the whole then escalates instead of half-parsing.
+  // only the first reference (PAR-2, defence in depth); the whole then escalates instead of half-parsing.
   // Count REFERENCES, not raw keyword tokens: the word immediately followed by the glyph ("זווית ∠ABC",
   // a student typing the word then pressing the ∠ toolbar button) is ONE angle — counting it as two
   // regressed that form to an LLM escalation (review 2026-07-03, P2).
-  if (((s.replace(/right[\s-]?angle/gi, ' ').match(/(?:angle|זוו?ית)(?:\s*∠)?|∠/gi) ?? []).length) > 1) return null;
-  const stripped = s.replace(/angle|∠|זוו?ית|ישרה|right/gi, ' ');
+  return ((s.replace(/right[\s-]?angle/gi, ' ').match(/(?:angle|זוו?ית)(?:\s*∠)?|∠/gi) ?? []).length) > 1;
+}
+
+/**
+ * WHERE the value sits and WHICH kind it is. `stripped` must arrive with the angle nouns removed.
+ *
+ * The symbolic read is anchored at the END of the statement and must be preceded by a non-letter. Both
+ * restrictions are what let it drop the `=` safely: a number is self-identifying, a symbol is not, and
+ * an unanchored single-letter scan would take a LABEL for a value («זוית abc» → "c") or a word's last
+ * letter ("angle ABC is acute" → "e"). End-anchored and letter-guarded, it can match neither.
+ */
+function angleValueOf(stripped: string): AngleValue | null {
+  // SYMBOLIC first: «2α» would otherwise be read by the numeric branch as the bare number 2 — #969's
+  // defect exactly. An optional ° is consumed with it («= 2α°» parses today and must keep parsing).
+  const sym = stripped.match(new RegExp(String.raw`(?<![A-Za-z])(${COEF})?\s*[*·]?\s*(${VAR})\s*°?\s*[.,;]?\s*$`));
+  if (sym) return { kind: 'sym', coef: sym[1] ? parseFloat(sym[1]) : 1, sym: sym[2], rest: stripped.replace(sym[0], ' ') };
   // A degree value must be a standalone number, NEVER a label's subscript digit: «∠CAD=A1» (an angle
   // ALIAS, #267) used to read the "1" of "A1" as value 1° and silently set ∠CAD=1°. The lookbehind keeps
-  // this rule from grabbing a digit glued to a preceding letter (a subscripted label), so such input
-  // falls through to `angleAliasRule` / an honest escalation instead of a silent wrong given.
-  const valM = stripped.match(new RegExp(String.raw`(?<![A-Za-z])` + num));
-  if (!valM && !rightWord) return null; // no degree value AND not a right-angle word → not this rule
-  const value = valM ? parseFloat(valM[1]) : 90;
-  // #831: the numeric text is removed before the vertex is read, so a value can never be counted as
+  // this from grabbing a digit glued to a preceding letter (a subscripted label), so such input falls
+  // through to `angleAliasRule` / an honest escalation instead of a silent wrong given.
+  const numM = stripped.match(new RegExp(String.raw`(?<![A-Za-z])` + num));
+  if (numM) return { kind: 'num', value: parseFloat(numM[1]), rest: stripped.replace(numM[0], ' ') };
+  return null;
+}
+
+const angle: Rule = (s, ctx) => {
+  if (!/(?:angle|∠|זוו?ית)/i.test(s)) return null;
+  // The comparison bail (ADR-390) and the multi-angle bail now live WITH the value reader (#969), so
+  // the numeric and symbolic lanes can never again apply a different set of them.
+  if (angleValueBlocked(s)) return null;
+  // The right-angle WORD form (#45 / ADR-299): "זוית B ישרה" / "זוית ABC ישרה" / "angle ABC is a right
+  // angle" ≡ "= 90". Detected on the raw utterance; the "right angle" phrase is NOT a second angle
+  // reference (`angleValueBlocked` counts on a copy with the phrase removed).
+  const rightWord = /ישרה|right[\s-]?angle/i.test(s);
+  const stripped = s.replace(/angle|∠|זוו?ית|ישרה|right/gi, ' ');
+  const val = angleValueOf(stripped);
+  // #969: this rule can now SEE a symbolic value instead of mistaking its coefficient for degrees — but
+  // it never claims one. `measureAngle` runs first and owns that kind, so a symbol reaching here means
+  // that rule declined (it could not name the angle); committing «2α» as 2° would be this bug exactly.
+  // Refuse, and the utterance escalates honestly.
+  //
+  // rightWord is answered FIRST because "…is a right angle" strips to a stray English article "a",
+  // which the symbolic read would otherwise take for a variable.
+  if (!rightWord && val?.kind === 'sym') return null;
+  if (!val && !rightWord) return null; // no value AND not a right-angle word → not this rule
+  const value = val?.kind === 'num' ? val.value : 90; // a stated number outranks the right-angle word
+  // #831: the value text is removed before the vertex is read, so a value can never be counted as
   // a label — the shared reader then answers the same question for both value kinds.
-  const arms = angleArms(valM ? stripped.replace(valM[0], ' ') : stripped, ctx);
+  const arms = angleArms(val?.kind === 'num' ? val.rest : stripped, ctx);
   if (!arms || 'clarify' in arms) return arms;
   const { ray1: r1, vertex: v, ray2: r2 } = arms;
   return [
@@ -2279,25 +2354,21 @@ const numChunk = (t: string): number => parseFloat(t.replace(/°/g, '').trim());
  * figure like ADR-164), "|AB|" / "AB", or a bare named measure "α". Returns null when the chunk names
  * no measure — the rule then defers rather than guessing.
  */
-const boundOperand = (raw: string, ctx: ParseContext): BoundOperand | null => {
+const boundOperand = (raw: string, ctx: ParseContext): BoundOperand | Clarify | null => {
   const t = raw.trim();
   if (!t) return null;
   if (new RegExp(String.raw`^${VAR}$`).test(t)) return { kind: 'var', name: t };
   if (/(?:∠|∢|angle|זוו?ית)/i.test(t)) {
     const stripped = t.replace(/∠|∢|angle|זוו?ית|the|של|את/gi, ' ');
-    // #967: the segment-pair addressing («הזווית בין BD ל-BA גדולה מ-40»). ADDITIVE, as in `angleAcuteness`.
-    // A disjoint pair falls through to this function's own "never guess a triple" null — the operand type
-    // carries no refusal, so the honest note is the one the bound rule already gives for an unreadable operand.
-    const sidesB = angleBetweenSides(stripped);
-    if (sidesB && !('clarify' in sidesB)) return { kind: 'ang', v: sidesB.vertex, r1: sidesB.ray1, r2: sidesB.ray2 };
-    const tri = labelRun(stripped, 3);
-    if (tri) return { kind: 'ang', v: tri[1], r1: tri[0], r2: tri[2] };
-    const one = labelRun(stripped, 1);
-    if (one) {
-      const nb = (ctx.neighbors ?? {})[one[0]] ?? [];
-      if (nb.length === 2) return { kind: 'ang', v: one[0], r1: nb[0], r2: nb[1] };
-    }
-    return null; // an angle we can't resolve — never guess a triple
+    // #970 (ADR-500): the ONE reader, here too. The copy this replaced could not carry a REFUSAL — its
+    // return type had no channel for one — so «הזווית בין BD ל-CA גדולה מ-40» (two segments that never
+    // meet) escalated to the paid model instead of being told what was wrong, while the identical
+    // naming in a VALUE statement was refused by name. Same sentence, two answers, decided by which
+    // rule happened to read it. The type now carries the clarify, and every caller propagates it.
+    const arms = angleArms(stripped, ctx);
+    if (!arms) return null; // an angle we can't resolve — never guess a triple
+    if ('clarify' in arms) return arms;
+    return { kind: 'ang', v: arms.vertex, r1: arms.ray1, r2: arms.ray2 };
   }
   const seg = t.match(new RegExp(String.raw`^\|?\s*(${PT})\s*(${PT})\s*\|?$`));
   if (seg) return { kind: 'len', a: up(seg[1]), b: up(seg[2]) };
@@ -2344,6 +2415,7 @@ const measureBound: Rule = (s, ctx) => {
   if (between) {
     const op = boundOperand(between[1].replace(/\b(?:is|are|נמצאת|נמצא|הוא|היא)\b/gi, ' '), ctx);
     if (!op) return null;
+    if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
     const lo = Math.min(parseFloat(between[2]), parseFloat(between[3]));
     const hi = Math.max(parseFloat(between[2]), parseFloat(between[3]));
     return boundCommands(op, lo, hi);
@@ -2354,6 +2426,7 @@ const measureBound: Rule = (s, ctx) => {
   if (word) {
     const op = boundOperand(word[1].replace(/\b(?:is|are|הוא|היא)\b/gi, ' '), ctx);
     if (!op) return null;
+    if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
     const n = parseFloat(word[4]);
     return boundCommands(op, word[2] ? n : undefined, word[3] ? n : undefined);
   }
@@ -2368,11 +2441,13 @@ const measureBound: Rule = (s, ctx) => {
     if (isNumChunk(r)) {
       const op = boundOperand(l, ctx);
       if (!op) return null;
+    if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
       const n = numChunk(r);
       return boundCommands(op, isLess(o) ? undefined : n, isLess(o) ? n : undefined); // X < n ⇒ max
     }
     const op = boundOperand(r, ctx);
     if (!op) return null;
+    if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
     const n = numChunk(l);
     return boundCommands(op, isLess(o) ? n : undefined, isLess(o) ? undefined : n); // n < X ⇒ min
   }
@@ -2381,6 +2456,7 @@ const measureBound: Rule = (s, ctx) => {
     if (!isNumChunk(a) || !isNumChunk(c) || isLess(o1) !== isLess(o2)) return null; // "40 < α > 60" states nothing
     const op = boundOperand(mid, ctx);
     if (!op) return null;
+    if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
     const [lo, hi] = isLess(o1) ? [numChunk(a), numChunk(c)] : [numChunk(c), numChunk(a)];
     return boundCommands(op, lo, hi);
   }
@@ -2392,32 +2468,18 @@ const angleAcuteness: Rule = (s, ctx) => {
   const acute = /חדה|acute/i.test(s);
   if (obtuse === acute) return null; // need exactly one of obtuse/acute (and not both)
   const stripped = s.replace(/angle|∠|∢|זוו?ית|הזוו?ית|קהה|obtuse|חדה|acute|is|the|של|את/gi, ' ');
-  // #967: the segment-pair addressing («הזווית בין BD ל-BA קהה»). ADDITIVE — the triple and single-vertex
-  // lanes below are untouched, so nothing that resolved before resolves differently. This rule keeps its own
-  // copy of those two lanes (the #831 remainder: `angleArms` never became its reader), so the new mode has to
-  // be added here rather than inherited; see the issue filed alongside #967.
-  const sidesA = angleBetweenSides(stripped);
-  if (sidesA && !('clarify' in sidesA))
-    return [
-      { type: 'segment', a: sidesA.vertex, b: sidesA.ray1 },
-      { type: 'segment', a: sidesA.vertex, b: sidesA.ray2 },
-      { type: 'set-angle-acuteness', vertex: sidesA.vertex, ray1: sidesA.ray1, ray2: sidesA.ray2, obtuse },
-    ];
-  if (sidesA) return sidesA; // two segments that never meet — refused by name, not escalated
-  const tri = labelRun(stripped, 3);
-  if (tri) {
-    return [
-      { type: 'segment', a: tri[1], b: tri[0] },
-      { type: 'segment', a: tri[1], b: tri[2] },
-      { type: 'set-angle-acuteness', vertex: tri[1], ray1: tri[0], ray2: tri[2], obtuse },
-    ];
-  }
-  const one = labelRun(stripped, 1);
-  if (one) {
-    const nb = (ctx.neighbors ?? {})[one[0]] ?? [];
-    if (nb.length === 2) return [{ type: 'set-angle-acuteness', vertex: one[0], ray1: nb[0], ray2: nb[1], obtuse }];
-  }
-  return null;
+  // #970 (ADR-500): the ONE reader. This rule used to carry a hand-copy of the triple and single-vertex
+  // lanes, so #967's segment-pair mode had to be pasted in by hand and #831/ADR-468's stated guarantee
+  // — "`angleArms` is the one place that answers WHICH angle is being named" — was not actually true.
+  // A rule decides only what its VALUE means; naming is this function's business, for every value kind.
+  const arms = angleArms(stripped, ctx);
+  if (!arms) return null;
+  if ('clarify' in arms) return arms; // a disjoint segment pair, or an ambiguous single vertex — ASK
+  return [
+    { type: 'segment', a: arms.vertex, b: arms.ray1 },
+    { type: 'segment', a: arms.vertex, b: arms.ray2 },
+    { type: 'set-angle-acuteness', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2, obtuse },
+  ];
 };
 
 /**
@@ -3240,6 +3302,16 @@ const VAR = String.raw`[a-zα-ω]`;
 // A length's RHS variable also admits the reserved radius symbol R/r ("AC = 1.6R") — ADR-034.
 // (Only as a size: the `(?![a-zA-Z])` guard keeps "AB = RS"/"AB = AR" reading R as a vertex.)
 const LVAR = String.raw`[a-zα-ωR]`;
+/** A comparison against a SYMBOL anywhere in the utterance — the #969 twin of the tripwire below.
+ *  «זווית ABC גדולה מ-α» states a REGION; measured before #969 it was an honest escalation, and once
+ *  the symbolic value read stopped requiring an `=` it would otherwise have been claimed as the
+ *  EQUALITY ∠ABC = α. Case-insensitive on purpose: over-bailing costs an escalation, under-bailing
+ *  costs a wrong given. Declared before COMPARES_WITH_NUMBER only so both read as one pair. */
+export const COMPARES_WITH_SYMBOL = new RegExp(
+  String.raw`(?:<=|>=|<|>|≤|≥)\s*(?:${COEF})?\s*[*·]?\s*${VAR}(?![A-Za-z0-9])|(?:${CMP_BIG}|${CMP_SMALL})\s*(?:than\s+|מ-?|מן\s+)?\s*(?:${COEF})?\s*[*·]?\s*${VAR}(?![A-Za-z0-9])`,
+  'i',
+);
+
 // R and r are DISTINCT variables (issue #54 — the bagrut convention names two circles' radii R vs r);
 // the old fold `r → R` merged them into one reserved symbol, which is wrong the moment a second circle
 // binds its own letter. An UNBOUND R/r still both denote "the" circle's radius via the symbol table's
@@ -3540,21 +3612,30 @@ const measurePower: Rule = (s) => {
 };
 
 /**
- * "angle ABC = 2α" / "זווית ABC = α" — an angle as `coef·var`. Runs before `angle`,
- * which would otherwise read the coefficient as the angle's degree value. A numeric
- * angle ("angle ABC = 37") has no variable here and falls through to `angle`.
+ * "angle ABC = 2α" / «זווית ABC היא 2α» / «זוית A שווה 2x» — an angle as `coef·var`. Runs before
+ * `angle`, which would otherwise read the coefficient as the angle's degree value. A numeric angle
+ * ("angle ABC = 37") has no variable and falls through to `angle`.
+ *
+ * #969: this rule used to require a literal `=`, so every other copula fell to the numeric lane and
+ * silently committed the coefficient as degrees. It now locates its value through the SHARED reader
+ * (`angleValueOf`), which is positional exactly as the numeric read is — so the copula is no longer
+ * part of this rule's vocabulary, and cannot go stale against the other lane's.
  */
 const measureAngle: Rule = (s, ctx) => {
   if (!/angle|∠|זוו?ית/i.test(s)) return null;
+  if (angleValueBlocked(s)) return null;
+  // The right-angle WORD is 90°, never a symbol — and «…is a right angle» ends in a letter this rule
+  // must not read as one. `angle` owns that form.
+  if (/ישרה|right[\s-]?angle/i.test(s)) return null;
   const stripped = s.replace(/angle|∠|זוו?ית/gi, ' ');
-  const m = stripped.match(new RegExp(String.raw`=\s*(${COEF})?\s*[*·]?\s*(${VAR})(?![a-zA-Z])`));
-  if (!m) return null; // numeric or unreadable → let `angle` take the numeric case
+  const v = angleValueOf(stripped);
+  if (v?.kind !== 'sym') return null; // numeric or unreadable → let `angle` take the numeric case
   // #831: the SAME vertex reader the numeric lane uses — so «זווית A = α» resolves its arms from
   // `ctx.neighbors` exactly as «זווית A = 40» does. The value expression is removed first, or a
   // symbol spelled with a Latin letter would be counted as a second label.
-  const arms = angleArms(stripped.replace(m[0], ' '), ctx);
+  const arms = angleArms(v.rest, ctx);
   if (!arms || 'clarify' in arms) return arms;
-  return [{ type: 'measure-angle', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2, expr: { coef: m[1] ? parseFloat(m[1]) : 1, var: m[2] } }];
+  return [{ type: 'measure-angle', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2, expr: { coef: v.coef, var: v.sym } }];
 };
 
 /**

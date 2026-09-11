@@ -9250,6 +9250,72 @@ halves' standalone readings, which is what "by construction" means here; and the
 #438's line still building ONE solid, a bare solid untouched, an unreadable construct unchanged, and a
 non-solid left half left to its own rules.
 
+## ADR-3D-238 — CONTAINMENT IS NOT A DIRECTION RELATION: a POINT is a legal contained side (#963)
+
+**Status:** accepted, 2026-09-10 · **Issue:** #963 (measured while composing fix-round #962)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-8 (new) · **Design:** [04b](04b-design-3d.md) — the membership family
+
+**The report, and the correction measurement forced.** #963 was filed as *"point-in-plane membership
+exists **ONLY in English** — «C on plane π1» works, all 8 Hebrew spellings are not-handled"*, with a
+table of eight rows. Re-measured on `78440ea` before any change, that headline is **wrong**:
+
+| spelling | before |
+| --- | --- |
+| `C על המישור π1` · `הנקודה C על המישור π1` · `C על מישור π1` | ✅ built — Hebrew, and always did |
+| `C on plane π1` · `C lies on plane π1` | ✅ built |
+| `C מוכלת/מוכל במישור π1` · `C נמצאת/נמצא במישור π1` · `C מונחת במישור π1` | ○ not-handled |
+| `המישור π1 מכיל את C` · `המישור π1 מכיל את הנקודה C` | ○ not-handled |
+| **`C lies in plane π1`** · **`point C lies in plane π1`** | ○ **not-handled** |
+
+Hebrew membership was never missing. What was missing is the **containment FRAME** for a point — and it
+was missing in **both languages**: English "lies **in**" failed exactly as «מוכלת ב» did, while "lies
+**on**" worked. The axis of the defect is the *frame*, not the *language*.
+
+That correction changes the fix. Filed as a language gap, the natural repair is a list of Hebrew
+spellings bolted onto a rule — the enumeration habit `src3d/CLAUDE.md` warns about, and it would have
+left "lies in" broken. Diagnosed correctly, it is **one operand kind missing from one frame**, and a
+single edit serves every spelling in the table at once, in both languages, including the two English
+rows nobody had noticed.
+
+**Root cause, one line.** #614/[ADR-3D-189](#adr-3d-189) built the containment frame over the shared
+operand reader and wired both directions — «ℓ מוכל במישור π» and the container-headed
+«המישור π מכיל את ℓ». It wired them for a **line**. A point fell out at this guard in `planeRelGiven`:
+
+```ts
+if (a.op.kind === 'point' || b.op.kind === 'point') return null; // a point has no direction
+```
+
+The comment is the bug and is also the fix: the guard reasons about **direction**, and it governs
+perp/parallel/angle correctly — a point genuinely has none. Containment is not a direction relation. A
+point inside a plane is **membership**, the most ordinary statement a solid-geometry question makes, and
+the engine has had `on-planes` for it since [ADR-3D-015](#adr-3d-015).
+
+**The decision.** Containment is exempted from the direction bail and reads a point side, lowering to the
+**existing** `on-planes` — no new command, per #641's instruction that this be *one* `object ⊂ plane`
+membership over the shared operand reader rather than a fourth bespoke rule. A point-run container
+(«C מוכלת במישור ABD») is materialised with `plane-through` first, exactly as `pointRelPlane` does for
+the «על» spelling, so the two spellings of one statement reach the identical pair of commands — which is
+the round-trip property #614 exists to protect.
+
+**The refusals are part of it, and each was measured after the change.** A **segment** is not a
+container («C מוכלת ב-AB» — it does contain points, but this relation's container is a plane, the same
+boundary the line lane draws); the **coordinate frame and axes** keep their own cells (#614/#512 —
+falling through here would record a second spelling of a relation that already has one owner); a point
+**contained in itself** states nothing; and, most importantly, a point still has **no direction** —
+«C מאונך למישור π1» and «C מקביל למישור π1» stay refused. Exempting containment must not exempt the rest,
+and that is asserted rather than assumed.
+
+**Locks.** `src3d/__tests__/issue-963.test.ts` (20): the issue's eight rows verbatim; the two English
+containment rows and the three Hebrew «על» rows that were *always* fine, asserted together so the
+corrected diagnosis cannot quietly revert to "a Hebrew problem"; the point-run container asserted to
+produce the *same* commands from both frames; and the five refusals above. Fixture
+`fixtures3/point-in-plane-membership-963.geo3.json` — the essence is "these sentences build and the
+figure verifies", so a fixture is the right lock (zero authoring, and it nets parser drift on the
+spellings too).
+
+**Sibling recorded, not fixed:** the whole-face form («משולש ACS מונח על מישור π2», a POLYGON contained in
+a plane) is still not-handled. It is #532 capability 2 and is scoped there; this ADR deliberately did not
+widen to it, since a face is a different operand kind with its own lowering question (one fact or N).
 ## ADR-3D-239 — «זווית A» IN 3-D IS UNDER-SPECIFIED, NOT UNSUPPORTED — and one candidate is not ambiguous (#866)
 
 **Status:** accepted, 2026-09-10 · **Issue:** #866 (the #343 remainder, split out in round #864)
