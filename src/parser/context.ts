@@ -135,6 +135,10 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     // #805 play (ADR-465 Am. 2): existing altitude feet — repeated auto-named altitudes reuse them
     feet: construction.objects.flatMap((o) => (o.kind === 'foot' ? [{ id: o.id, from: o.from, a: o.a, b: o.b }] : [])),
     lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // idempotent construct reuse
+    // #554 (ADR-503): the DRAWN tangent-at-point lines («משיק למעגל O בנקודה B»), so the definite plural «המשיקים
+    // נחתכים בנקודה E» on a LATER line can resolve which two lines cross — the incremental twin of the
+    // one-utterance «המשיק בנקודה B והמשיק בנקודה C … נפגשים בנקודה E». Read off the objects, never guessed.
+    tangentLines: construction.objects.flatMap((o) => (o.kind === 'line' && o.spec.via === 'tangent' ? [{ id: o.id, circle: o.spec.circle, at: o.spec.at }] : [])),
     tangentAuxes: construction.objects.flatMap((o) => (o.kind === 'circle' && o.id.startsWith('tanaux-') ? [o.id] : [])), // existing Thales tangent-aux circles — a 2nd single tangent from the SAME apex takes the OTHER branch (issue #142)
     polygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])), // definite "the quad" binds to the existing one
     // #770: the DECLARED kind travels with each ring, so a definite shape noun («אלכסוני הריבוע»)

@@ -10806,3 +10806,41 @@ ADR-500 lesson: importing would prove the atoms exist, never that anything reach
 ANGLE_KW`). It asserts its own reach (≥ 12 atoms, the parser's import line seen) and its own detector (a
 synthetic `DECORATIVE_KW` is reported dead; composed into a live atom it is reported live), so it cannot rot
 into a scan that passes by checking nothing. Adding a decorative atom now fails the suite.
+## ADR-503 — THE CONTEXTUAL PLURAL REACHES THE TANGENTS-AT-POINTS FAMILY: «המשיקים נחתכים בנקודה E» after two drawn tangents (#554)
+
+**Status:** accepted, 2026-09-11 · **Issue:** #554 (feature, P3 — prod REC-2, log-triage 2026-08-11) · round #992 · feature route (PR)
+**Requirements:** none (the catalog gains a row; no promise changes) · **Design:** [04](04-design.md) §5 — the contextual-plural resolvers
+
+**The evidence.** A prod student drew both tangents through the fully-supported named form — «משיק
+למעגל O בנקודה B», «משיק למעגל O בנקודה C» — and then typed the natural next line, «המשיקים נחתכים
+בנקודה E» (and «נפגשים»). Both were `not-handled`, and this was the **only** row in the triage window
+where the paid LLM failed too (`not-understood` twice): the student had no path at all. The one-utterance
+form («המשיק בנקודה B והמשיק בנקודה C למעגל O נפגשים בנקודה E») was covered; the incremental one — the
+product's **defining interaction**, one fact per line — was not. The contextual plural «the tangents meet
+at X» existed only for the common-tangent (two-circle) family (`tangentsMeet`, ADR-197 Am. 6).
+
+**Decision.** A new rule, `tangentsAtPointsMeet`, right after `twoTangentsMeet` in the rule list — its
+incremental twin. It fires on the definite plural (`המשיקים` / *the tangents*) with a meet verb and a named
+meet point and **no other label** (letter runs split into labels, so «המשיקים BE ו-CE …» is another
+rule's), and resolves against a new parse-context field, **`ctx.tangentLines`** — the drawn
+tangent-at-point lines read off the construction (`line` objects whose spec is `via: 'tangent'`), never
+guessed. Exactly two ⇒ their crossing: the same shape the one-utterance form emits (a
+`line-intersection` of the two tangent lines, plus the reach segments from each touch to E, so the ink
+covers whichever side E lands on). **More than two ⇒ a clarification, never a guess**: a new
+`tangents-ambiguous` member of the ADR-490 clarification family, refused with the touch points listed
+and the named form offered (*«המשיק בנקודה B והמשיק בנקודה C נפגשים בנקודה E»*). Fewer ⇒ not this rule.
+`tangentsMeet` reads `ctx.commonTangents` and this rule reads `ctx.tangentLines`, so neither shadows the
+other, and the named form is byte-identical (locked).
+
+**Class (standing rule 1).** *A follow-up form that exists in one family and not its sibling* — the same
+shape as ADR-3D-055's verb gap, one level up: the vocabulary (`המשיקים … נפגשים`) was already parsed, for
+the wrong family only. The fix reaches the family through its own context registry rather than a
+special case of the common-tangent rule.
+
+**Locks.** `issue-554-tangents-meet.test.ts` (9): the exact three-line prod sequence builds with E on both
+tangents and outside the circle, for «נחתכים», «נפגשים» and both English verbs; three tangents drawn ⇒
+`tangents-ambiguous` naming B, C, D; no tangents ⇒ still `not-handled` (no figure is invented); one
+tangent ⇒ not this rule; the named one-utterance form byte-identical; a named pair beside the plural is
+not claimed. Standing rule 4: scenario `incremental-tangent-pair-crossing-554` (corpus 4) — E is the pole
+of chord BC (equal tangent lengths, OB ⟂ BE, OC ⟂ CE), the bespoke assertion a fixture cannot carry.
+Catalog: the incremental form is described on the one-utterance row (a follow-up plural cannot parse on an empty figure, so it is not a standalone catalog example — the same footing as the common-tangent «המשיקים נפגשים»).

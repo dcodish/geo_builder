@@ -74,6 +74,14 @@ A single boundary: `utterance → command[]`.
   fragment, never spelled a second time; `lexicon-consumers.test.ts` fails on any exported atom nothing
   composes from, the twin of the ratchet that fails on inline fragments growing. The 3-D grammar keeps its own
   leaf (`src3d/lexicon/nouns3.ts`); the trees never share vocabulary by import.
+- **Contextual plurals resolve against a per-family context registry (#554, [ADR-503](06-decisions.md#adr-503)).**
+  A follow-up line that names no object of its own — «המשיקים נחתכים בנקודה E» — resolves the definite
+  plural against what the figure already holds, read off the construction into `ParseContext`: the
+  common-tangent family through `ctx.commonTangents`, the tangents-at-points family through
+  `ctx.tangentLines`. Exactly two candidates ⇒ build; more ⇒ a clarification of the ADR-490 family
+  naming the candidates (`tangents-ambiguous`), never a guess; fewer ⇒ not that rule. A family's
+  one-utterance form and its incremental twin emit the same commands, so the figure cannot depend on
+  which spelling the student chose.
 
 ## 6. Rendering
 
