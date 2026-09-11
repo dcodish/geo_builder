@@ -2439,10 +2439,33 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // so they refuse honestly and name the corner instead.
       if (unknowns.length === 1) {
         const PARALLELOGRAM_FAMILY: QuadBase[] = ['square', 'rectangle', 'rhombus', 'parallelogram'];
+        const i0 = cmd.ids.indexOf(unknowns[0]);
+        // #601 (ADR-3D-240) — the KITE's corner IS determined, by a different closed form. «דלתון ABCD»
+        // constrains |AB|=|AD| and |CB|=|CD|, so the missing corner is the REFLECTION of the opposite
+        // corner across the other diagonal — not the parallelogram point, which is why the arm above
+        // cannot serve it and why this was refused until now.
+        //
+        // Whichever position is missing, the geometry is the same: the corner mirrors the one OPPOSITE
+        // it across the diagonal through its two NEIGHBOURS. The axis is therefore read from the ring,
+        // never from the letters' order, so «דלתון ABCD» missing B behaves exactly as one missing D.
+        if (cmd.base === 'kite') {
+          const opposite = cmd.ids[(i0 + 2) % 4];
+          const axis1 = cmd.ids[(i0 + 1) % 4];
+          const axis2 = cmd.ids[(i0 + 3) % 4];
+          // The three points the corner is derived FROM must already exist; otherwise this is arm 1's
+          // declaration, not a completion, and refusing by name beats inventing two points.
+          for (const need of [opposite, axis1, axis2]) {
+            if (!c.points.has(need)) return { ok: false, error: { code: 'unknown-point', id: need } };
+          }
+          const withCorner = clone(c);
+          withCorner.points.set(unknowns[0], { kind: 'reflect-line', from: opposite, a: axis1, b: axis2 });
+          const rk = lower(withCorner);
+          return rk.ok ? { ok: true, next: recordShape(drawRing(rk.next), cmd.base, cmd.ids) } : rk;
+        }
         if (!PARALLELOGRAM_FAMILY.includes(cmd.base)) {
           return { ok: false, error: { code: 'unknown-point', id: unknowns[0] } };
         }
-        const i = cmd.ids.indexOf(unknowns[0]);
+        const i = i0;
         const opp = cmd.ids[(i + 2) % 4];
         const n1 = cmd.ids[(i + 1) % 4];
         const n2 = cmd.ids[(i + 3) % 4];

@@ -9390,3 +9390,54 @@ student's utterance preserved on the fact.
 while the English «AD bisects ∠BAC» builds. Pre-existing and **symmetric** — the vertex-only twin here
 mirrors the three-letter form's spelling set exactly, so this ADR introduces no new asymmetry — but it is
 the #963 class (one language's spelling missing where the sibling's works) and is filed as #979.
+## ADR-3D-240 — A KITE'S FOURTH CORNER IS DETERMINED, BY A DIFFERENT CLOSED FORM (#601)
+
+**Status:** accepted, 2026-09-10 · **Issue:** #601 (the #587 remainder, split out in round #596)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-3 (unchanged — this is the realisation, not a new promise) · **Design:** [04b](04b-design-3d.md) — the quad-shape arms
+
+**What #587 left.** [ADR-3D-152](#adr-3d-152) gave `quad-shape` a **one-unknown arm** that completes the
+fourth corner for the **parallelogram family** — square, rectangle, rhombus, parallelogram — where the
+corner *is* the parallelogram point. That already generalised the old `rect-complete` from one noun to
+four. For the other families it refused honestly, naming the corner:
+
+- **trapezoid** and general **quad** — the corner is **genuinely not determined**: one free DOF the
+  student never stated. Refusing is the CORRECT answer under [ADR-052](06-decisions.md#adr-052), and
+  completing it anyway would be the cardinal sin. **Deliberately unchanged.**
+- **kite** — the corner IS determined, and the refusal was hiding that. This ADR.
+
+**The geometry.** A kite `[a,b,c,d]` constrains `|ab|=|ad|` and `|cb|=|cd|`, so `d` is the **reflection
+of `b` across the axis `ac`** — the second intersection of the two circles, the first being `b` itself.
+Determined, but **not the parallelogram point**, which is precisely why the existing arm could not serve
+it and why this needed a construct rather than a wider `includes`.
+
+**The corner is read from the RING, not from the letters' order.** Whichever position is missing, the
+same relation holds: the corner mirrors the corner **opposite** it across the diagonal through its two
+**neighbours**. So «דלתון ABCD» missing B behaves exactly as one missing D, and the arm needs no case
+analysis over which letter was omitted.
+
+**The decision — a `PointDef` kind, not an auto-minted foot.** The issue carried one open question and
+the operator delegated it (2026-08-16: *"doesn't need my inputs."*), with the reason recorded on the
+thread: `foot-seg` + `vec-rel` can already express this closed form — the foot of the ⟂ from `b` onto
+`ac`, then `d = b + 2·(foot − b)` — but doing it that way **mints a helper point that appears on the
+canvas**, which is visible work the student never asked for. A new kind, `reflect-line`, carries the same
+closed form with no extra ink. It is evaluated exactly as `foot-seg` is, one step further: foot, then the
+same distance again beyond it. No root-find, no CAS.
+
+**Where the refusal still fires.** The three deriving points must already exist — the opposite corner and
+both axis ends. If one is missing this is not a completion at all but arm 1's declaration, and refusing by
+name beats inventing two points at once.
+
+**Locks.** `src3d/__tests__/issue-601.test.ts` (11): both kite relations asserted at **four seeds** (the
+corner is derived, so a single seed can pass on a lucky placement — the ADR-3D-030 seed-invariance rule);
+**D asserted to DIFFER from the parallelogram point** on a scalene ABC, which is the discriminator the
+issue asked for by name and the one assertion that fails if the kite is ever routed through the
+parallelogram arm; the point's own definition (mirror source, and the axis as a *set* — the axis is a
+line, so which neighbour lands in `a` carries no meaning); the two new ring edges drawn; and the refusals
+that must not move — the trapezoid's, and the four parallelogram completions asserted to still land on
+the parallelogram point. Fixture `fixtures3/kite-corner-completion-601.geo3.json` carries the
+"builds and verifies" half.
+
+**Measured, not assumed:** «מרובע ABCD» does **not** reach this arm at all — it lowers to a plain
+`polygon4` declaration, so a general quad's fourth corner is a free sampled vertex rather than a
+completion. That is the ADR-052-correct behaviour and it was checked rather than inferred from the issue's
+prose, which grouped quad with trapezoid as a *refusal*.

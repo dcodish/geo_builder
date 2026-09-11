@@ -39,6 +39,10 @@ const SEEDED: SeededCorpus = {
     'E מוכלת במישור ABCD',
     "המישור A'B'C'D' מכיל את F",
   ],
+  // #601 (ADR-3D-240) — the KITE's one-unknown completion. The essence is "this figure now builds and
+  // verifies", so a fixture is the right lock; the bespoke assertions (D is the REFLECTION and not the
+  // parallelogram point, at several seeds) live in issue-601.test.ts alongside it.
+  'kite-corner-completion-601.geo3.json': ['משולש ABC', 'דלתון ABCD'],
   'prism-2020-q2.geo3.json': [
     'מנסרה ישרה משולשת ABC',
     "M אמצע B'C'",

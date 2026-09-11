@@ -298,6 +298,39 @@ This is also where 3-D and 2-D legitimately diverge. 2-D's [ADR-164](06-decision
 «זווית A» from the figure unconditionally, because a 2-D vertex almost never carries more than two edges.
 3-D does not port that rule — it asks whenever the figure gives more than one reading. The products agree
 wherever the figures agree, and differ exactly where 3-D has information 2-D does not.
+## A stated quad shape has three arms, and the third is decided by geometry (#587/#601)
+
+`quad-shape` dispatches on **how many corners already exist** — in `apply`, not in the parser, because
+`parse3` is context-free and cannot know:
+
+| unknown corners | arm | what it means |
+| --- | --- | --- |
+| 2+ | **declaration** — the flat `polygon4` carries the free dims and the constraint set takes some away |
+| 1 | **completion** — the corner is derived, *if the family determines it* |
+| 0 | **statement** about existing points — the constraints M1-route to claims, so a false one is refused |
+
+The middle arm is where the families genuinely differ, and the difference is geometric rather than a
+matter of which nouns we chose to support:
+
+- **parallelogram family** (square, rectangle, rhombus, parallelogram) — the corner IS the parallelogram
+  point. [ADR-3D-152](06b-decisions-3d.md#adr-3d-152).
+- **kite** — the corner is determined too, but by a *different* closed form: the reflection of the
+  opposite corner across the diagonal through its two neighbours. That is why widening the
+  parallelogram arm's list would have been wrong and a construct was needed
+  ([ADR-3D-240](06b-decisions-3d.md#adr-3d-240)), and why the corner is read from the **ring** rather
+  than from the letters' order.
+- **trapezoid** and general **quad** — genuinely undetermined: one free DOF the student never stated.
+  The refusal is the CORRECT answer ([ADR-052](06-decisions.md#adr-052)), not a gap awaiting a fix.
+
+**The lesson worth carrying:** a refusal shared by several families can be hiding a member that does not
+belong in it. #587's arm refused three families with one condition, and two of those refusals were right
+for a reason the third did not share. When a family list is the guard, the question to ask is whether
+every member fails for the *same* reason — the kite failed only because the arm knew one closed form.
+
+**A derived point that needs a helper should usually become a KIND.** `reflect-line` exists rather than
+minting a foot point and a `vec-rel`, because the helper would appear on the canvas as visible work the
+student never asked for. The composition is still available and still correct; what the kind buys is the
+absence of ink.
 
 ## Known gaps
 
