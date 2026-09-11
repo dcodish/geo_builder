@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-09-11T11:27:33.584Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מנסרה ישרה משולשת ABCA'B'C'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "prism3",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "A'",
+            "B'",
+            "C'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AA'=(k-1,k-7,k+1)",
+      "cmds": [
+        {
+          "type": "inject-pair",
+          "a": "A",
+          "b": "A'",
+          "x": null,
+          "y": null,
+          "z": null,
+          "symExprs": [
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": -1
+            },
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": -7
+            },
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": 1
+            }
+          ],
+          "syms": [
+            "k",
+            "k",
+            "k"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AC על הישר x=(8,-1,-1)+t(k+1,0,k-3)",
+      "cmds": [
+        {
+          "type": "line3",
+          "name": "AC",
+          "anchor": [
+            {
+              "k": 8,
+              "p": 0
+            },
+            {
+              "k": -1,
+              "p": 0
+            },
+            {
+              "k": -1,
+              "p": 0
+            }
+          ],
+          "dir": [
+            {
+              "k": 1,
+              "p": 1
+            },
+            {
+              "k": 0,
+              "p": 0
+            },
+            {
+              "k": -3,
+              "p": 1
+            }
+          ],
+          "src": "x = (8,-1,-1) + t·(k+1,0,k-3)",
+          "param": "k"
+        },
+        {
+          "type": "on-line",
+          "id": "A",
+          "line": "AC"
+        },
+        {
+          "type": "on-line",
+          "id": "C",
+          "line": "AC"
+        }
+      ]
+    }
+  ]
+}

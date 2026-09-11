@@ -49,6 +49,15 @@ for the **similarity** — translate, rotate, scale — *plus* the figure's free
 them. Numerically: least-squares over the dims, Levenberg–Marquardt with a central-difference Jacobian,
 seed-rotated multi-start.
 
+**The sampling law inside the solve (#863, [ADR-3D-245](06b-decisions-3d.md#adr-3d-245)).** A quantity that
+depends only on `(construction, seed)` — a solid's seeded dims, any `sample(seed, key, …)` — is derived
+**once per resolve** and threaded into the residual (`sampledSolidDims`), never re-derived per iteration:
+the pivot's residual runs hundreds of thousands of times per solve, and one figure paid 2 M redundant samples
+for three values. `rng.ts` exports `sampleStats` (the twin of 2-D's `sampleStats.sweeps`), so a lock asserts a
+figure's resolve costs O(distinct keys) calls — a count ceiling, never a wall-clock one. The free-line /
+free-plane resolvers still sample inside the same residual; measured at ~0.1 s on the worst fixture and left,
+with the counter making any growth visible.
+
 This is the concrete meaning of [`FR-VC-3`](02b-requirements-3d.md)'s **NO CAS** bound. Every "symbolic"
 feature here is a numeric root-find, a closed form, or a linear solve; anything beyond that goes back to
 the operator rather than being approximated. The bound is what makes the answers trustworthy — an

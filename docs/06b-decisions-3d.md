@@ -9727,3 +9727,62 @@ anti-luck check; every quad noun creating its corner with the expected kind; «�
 definitions. Fixture `fixtures3/trapezoid-corner-completion-985.geo3.json` carries the "builds and
 verifies" half. The two flipped locks above.
 
+
+### ADR-3D-245 — a pure per-seed quantity is derived ONCE per (construction, seed), never inside the residual loop (#863)
+
+**Status:** accepted, 2026-09-11 · **Issue:** #863 (debt, P3 — stays OPEN, see *What this does not fix*) · round #992
+**Requirements:** none (internal — a pure-performance change; every drawing is byte-identical)
+**Design:** [04b](04b-design-3d.md) — "The solver", the sampling law · **LADDER stage:** the pivot's residual (solve, not build)
+
+**The figure.** The operator's «מנסרה ישרה משולשת ABCA'B'C'» · «AA'=(k-1,k-7,k+1)» · «AC על הישר
+x=(8,-1,-1)+t(k+1,0,k-3)» — a symbolic pair injection, then a symbolic line equation on the same
+solid — took *"a long time"* on the third line (PR #861 play, 2026-09-01). Profiled in the issue: ONE
+`derive3` made **2.87 M** `sample()` calls over exactly **3** distinct keys. Re-measured here at `2865f2b`
+with a counter on the seam: **2,042,796** calls, 3 keys, 2.0 s.
+
+**Root cause (class-first).** `evaluateSolidsAndPoints` is the pivot's residual — `evalCanonical` runs it
+once per Levenberg–Marquardt residual evaluation, **680,702** times on this figure — and its first line
+re-sampled every solid's seeded dims (`solidDims`) on each call, only to read their **length** (the values
+were overridden by the solve's `dimOverride`). `sample(seed, key, …)` is a pure function of its
+arguments; deriving it inside the loop is a pure per-seed quantity re-derived per iteration. The class
+(docs/17 §7): *a quantity that depends only on (construction, seed) computed inside a search loop.* It is
+not the symbolic lane's doing — the canonical spelling was the slowest of the three, and #837 only made a
+previously-refused spelling reach the same solve.
+
+**Decision — hoist, thread, count.** `resolve3` samples each solid's dims **once** (`perSolidDims`; `dims0`
+is the same vector flattened, so the pivot's start is bit-identical) and threads them into every residual
+evaluation through a new `sampledSolidDims` parameter of `evaluateSolidsAndPoints`. The one-shot callers
+(the pre-pivot pass and the #508 fixpoint) pass nothing and sample exactly as before. The seam gains
+`sampleStats` — `calls` and the `solid-…` subset `solidCalls` — the perf canary, the twin of the 2-D
+`sampleStats.sweeps` (M3): a lock can now assert a figure's resolve costs O(distinct keys), never
+O(iterations). The plan's alternative — a memo at the `sample` seam scoped to one resolve — was **not**
+built: hoisting was not structurally impossible, and a cache with module-level scope is the weaker
+mechanism when the structural fix is three lines.
+
+**Measured effect.**
+
+| | before | after |
+| --- | --- | --- |
+| `sample()` calls, one `derive3` of the figure | 2,042,796 | **6** |
+| the same, 12 pivot-lane `fixtures3/` figures | 72 k – 205 k each | 4 – 12 each |
+| wall time, one `derive3` of the figure (this machine) | 2.01 s | 1.69 s |
+| positions, every `fixtures3/` figure at its seed and seed+1, plus this figure | — | **57 / 57 byte-identical** |
+
+**What this does NOT fix — stated honestly, the issue stays open.** The sampling was **~16 %** of the
+solve, not the bulk. The remaining 1.7 s is solver **volume**: one `derive3` runs **372**
+`leastSquares` solves × ~1,830 residual evaluations each (120 iterations × a central-difference
+Jacobian over 7 unknowns) — multi-start × restart × the retry ladder, on a 3-dim problem. And the submit
+path runs roughly two derives per line (measured 3.6 s for the third line here; the operator saw ~12 s on
+a slower machine). That is a different root cause with no plan yet; it is recorded on #863 for re-triage,
+and this ADR claims only what the table shows. The **second member of the class** — the free-line /
+free-plane resolvers sample inside the same residual (`free-line-552-play`: 257 k calls, ~0.1 s of a
+0.25 s derive) — is measured and left: hoisting it threads a sample table through five signatures for a
+tenth of a second on the worst fixture, and the counter now makes its cost visible if it ever grows.
+
+**Worst-case cost statement (docs/17 §7).** Per `derive3`: solids × dims samples, once. The residual's
+per-iteration cost is unchanged in kind and lower by one `solidDims` per solid per evaluation.
+
+**Locks.** `issue-863-sample-hoist.test.ts` (3): the figure's derive ≤ 64 calls (pre-fix 2.04 M); the counter
+counts (a solid samples ≥ 1); every `fixtures3/` figure's `solid-…` samples ≤ 64 at two seeds (pre-fix 12
+figures between 72 k and 205 k). Standing rule 4: the three-line sequence is
+`fixtures3/symbolic-line-equation-863.geo3.json` (builds and verifies at every seed the net sweeps).
