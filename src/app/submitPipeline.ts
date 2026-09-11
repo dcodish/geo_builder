@@ -432,8 +432,20 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
         // ADR-428 obligation 2 — TEACH on acceptance. The step committed; if the phrasing was understood
         // but is not the canonical form, show the canonical spelling so the habit the student builds is
         // one we can promise to honour. A note on a SUCCESSFUL step, never a refusal.
-        const teach = teachCanonical(utterance, r.commands, locale);
-        if (teach) ui.setInputNote(t('input.canonicalHint', { canonical: teach }));
+        // #786 (ADR-460 Am. 2, operator ruling 2026-08-26): the deterministic clause fallback BUILT a line the
+        // student packed with ≥2 INDEPENDENT constructs («משולש ABC, ריבוע WERT» / "triangle ABC and square WERT").
+        // The figure IS what they asked for, so it draws — and the same one-at-a-time teaching #763 gives at the
+        // escalation seam is given here as an ADVISORY on the successful step, never a refusal. Judged by the
+        // same discriminator (`independentConstructs`: every clause parses and builds standalone, no shared
+        // label, no back-reference), so a supported connector compound («ריבוע ABCD, נקודה G על AD») — whose
+        // later clause CONSTRAINS the earlier — gets no tip. A false "independent" here costs a spurious tip,
+        // not a refusal: the safe direction, which is why the check may sit in the deterministic lane at all.
+        const packed = independentConstructs(utterance);
+        const teach = packed ? null : teachCanonical(utterance, r.commands, locale);
+        if (packed) {
+          logDebug({ kind: 'input', utterance, locale, source: 'parser', result: 'advisory:independent-clauses', commands: r.commands });
+          ui.setInputNote(t('input.scope.split-advisory', packed.params));
+        } else if (teach) ui.setInputNote(t('input.canonicalHint', { canonical: teach }));
         // #779 Am. (operator ruling 2026-08-25): a lowercase MEASURE letter the parse bound
         // case-preserved («שרדיוסו r») gets a non-blocking note saying WHY lowercase passed here —
         // measure letters keep their case (the exam's R vs r), point labels are uppercase.
