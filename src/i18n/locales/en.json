@@ -54,6 +54,7 @@
     "serviceBusy": "The parsing service is busy right now — please try again in a little while.",
     "scope": {
       "split-statements": "One given per line — that way the tool can build and verify each one separately. We spotted two givens here; try entering them as two steps: {{all}}",
+      "split-advisory": "We drew both givens you wrote on one line: {{all}}. Better to enter one given per line — the tool then builds and verifies each one separately, and a single step is easier to fix.",
       "analytic": "This tool builds geometric constructions on a free canvas, not graphs on a coordinate system — so axes, coordinates, slopes and line equations aren't supported here. A separate tool for analytic (coordinate) geometry is planned. For now, describe the figure itself — e.g. \"triangle ABC\" or \"point D on AB\".",
       "angle-relation": "That's an angle relationship the tool highlights for you once you draw the figure (e.g. two parallel lines and a transversal) — not something to type. Draw the figure and the relationships appear on their own.",
       "proof": "The tool draws the figure from the givens — it doesn't write proofs. Enter the givens and the figure builds and verifies as you go.",

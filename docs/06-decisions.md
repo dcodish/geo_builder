@@ -7943,6 +7943,24 @@ residual forms parse as single catalog rules and never take that path at all. Th
 on #786 is the advisory note: reclassified **feature P3** (was bug P2) — the drawing behaviour it
 pinned as wrong is now the sanctioned behaviour.
 
+**Amendment 3 (2026-09-11, #786, round #992) — the advisory is DELIVERED.** The remaining work the
+2026-08-26 amendment left — *"the advisory note"* — lands at the one commit seam every deterministic
+parse passes (`submitPipeline.ts`, the `produced` branch): after `executeMany`, the utterance is judged by
+the **same discriminator** the escalation seam uses (`independentConstructs` — every clause parses and
+builds standalone, no shared label, no back-reference), and when it says "independent" the successful
+step carries `input.scope.split-advisory` — *"we drew both givens you wrote on one line: (1) … (2) …;
+better one given per line"* — in place of the canonical-form hint. It is a note on a SUCCESSFUL step,
+never a refusal, and the refusal form (`split-statements`) is locked never to fire on a built line. A
+supported connector compound whose later clause CONSTRAINS the earlier («ריבוע ABCD, נקודה G על AD»,
+«דלתון ABCD, AB=AD») shares a label, so the discriminator says "dependent" and no tip appears; a single
+construct gets none either. The four ADR-460 residual false positives are single catalog rules — they
+never take this branch as compounds, and a false "independent" here would cost a spurious tip, not a
+refusal, which is why the check may sit in the deterministic lane at all. `submitPipeline.test.ts`'s
+pinned #786 block flips from *"recorded, not fixed"* to *"builds WITH the advisory"* (7 cases, plus the
+two no-tip guards and the single-construct guard). Requirements: none (02's one-fact-per-line teaching,
+FR-IN, is unchanged in promise — it gains a lane). Design: [04](04-design.md) §5, the clarification
+family note stands; this is the same posture on the success path.
+
 ## ADR-461 — the honesty-gate battery is a FUNCTION, and every commit seam calls it (#782)
 
 **Operator ruling (2026-08-25):** *"The ✎ seam refuses inline and does NOT escalate to the LLM."*
