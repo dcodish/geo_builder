@@ -24,7 +24,7 @@
  *  - a wedge whose points do not resolve falls back to id identity, so nothing about the unresolvable
  *    case changes.
  */
-import type { Construction3, Id, Positions3 } from '../engine/types';
+import { angleMarkText, type Construction3, type Id, type Positions3 } from '../engine/types';
 import { dot3, norm3, normalize3, sub3, type Vec3 } from '../engine/vec3';
 
 export interface Wedge {
@@ -35,8 +35,14 @@ export interface Wedge {
   u2: Vec3 | null;
   /** The stated value, when some given fixed this corner. */
   deg?: number;
-  /** The student's name for it — `''` for a bare `∠SDB` marker with no letter. */
+  /** What the arc SHOWS — the expression the student wrote («2α»), `''` for a bare `∠SDB` marker.
+   *  Composed by `angleMarkText`; never the bare letter when a coefficient was stated (#986). */
   label?: string;
+  /** The BINDING letter behind that expression («α»), or undefined when the marker names none.
+   *  Separate from `label` for the same reason the mark separates `coef` from `label`: one is for the
+   *  student to read, the other is an identity other machinery matches on — and #986 is what happens
+   *  when a consumer reaches for the wrong one. */
+  sym?: string;
 }
 
 const RAY_TOL = Math.cos((1.5 * Math.PI) / 180); // ±1.5° per ray, the 2-D tolerance
@@ -67,7 +73,10 @@ export function collectWedges(c: Construction3, positions: Positions3): Wedge[] 
   for (const cl of c.claims) if (cl.type === 'angle-seg-eq' && cl.a1 === cl.a2) wedgeOf(cl.a1, cl.b1, cl.b2).deg ??= cl.deg;
   for (const mk of c.angleMarks) {
     const w = wedgeOf(mk.vertex, mk.p, mk.q);
-    w.label ??= mk.label ?? '';
+    // #986: the arc shows the EXPRESSION, not the binding letter — «2α», not «α» — while `sym` keeps
+    // the letter for the machinery that matches on it (the #937 chip below).
+    w.label ??= angleMarkText(mk);
+    w.sym ??= mk.label;
   }
   return wedges;
 }
@@ -89,6 +98,8 @@ export function collectWedges(c: Construction3, positions: Positions3): Wedge[] 
  */
 export function competingArcSymbols(wedges: readonly Wedge[]): Set<string> {
   const out = new Set<string>();
-  for (const w of wedges) if (w.deg !== undefined && w.label) out.add(w.label);
+  // #986: the SYMBOL, not the displayed expression — a set containing «2α» would match no fact's letter
+  // and the chip would quietly stop appearing for every coefficient mark.
+  for (const w of wedges) if (w.deg !== undefined && w.sym) out.add(w.sym);
   return out;
 }

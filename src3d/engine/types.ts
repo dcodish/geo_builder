@@ -517,6 +517,27 @@ export interface SymAffine {
  * arithmetic INSIDE a component, which is a different reader and the operator's sanctioned permanent
  * boundary.
  */
+/**
+ * #986 (ADR-3D-242) — WHAT AN ANGLE MARK SAYS ON SCREEN, COMPOSED IN ONE PLACE.
+ *
+ * A mark carries its symbol in two fields, and they answer two different questions:
+ *   `label` is the mark's IDENTITY — `symbolOwnersOf` collects marks by it and ADR-3D-052's reused-label
+ *   equality compares it, so it must stay the bare letter;
+ *   `coef` is part of what the student WROTE — «∠ABC = 2α» is not the same statement as «∠ABC = α».
+ *
+ * Every surface that shows the mark to a student wants the second thing, and #986 happened because the
+ * two surfaces each read `label` directly: the canvas drew «α» on an angle the solver was driving to 2α,
+ * and the data panel printed «α = 60°» beside a «α = 30°» from another mark. The figure was right and the
+ * drawing lied — the honesty invariant's worse direction, since a wrong label is not silence.
+ *
+ * So the composition lives here, in the engine, beside the type — one function, both surfaces, and a third
+ * surface cannot reintroduce the bug by reaching for `label` because there is somewhere better to reach.
+ *
+ * Returns '' for a bare marker with no letter (`∠SDB`), which is what the renderer already means by ''.
+ */
+export const angleMarkText = (mk: { label?: string; coef?: number }): string =>
+  mk.label ? `${mk.coef ?? ''}${mk.label}` : '';
+
 export const MAX_SYM_DEGREE = 3;
 
 /** The name every existing consumer knows this carrier by. */

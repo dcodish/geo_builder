@@ -206,6 +206,20 @@ A shared constant makes drift impossible; a comment asking the next author to ke
 does not. The corollary for review is cheap to apply — if a rule contains a literal list of spellings,
 ask which other rule needs the same list.
 
+**A field that is both an identity and a display string will be read as the wrong one** (#986,
+[ADR-3D-242](06b-decisions-3d.md#adr-3d-242)). ADR-3D-241 gave the angle mark two fields — `label`, the
+binding letter that `symbolOwnersOf` and the reused-label equality match on, and `coef`, part of what the
+student wrote. Every display surface wants the *expression*; each one reached for `label`, because that is
+the field that looks like a name. The canvas drew «α» on an angle being solved to 2α, and the panel printed
+`α = 60°` beside an `α = 30°`.
+
+The repair is not "remember which consumer wants which": it is to compose the display text **once**
+(`angleMarkText`, beside the type) and to give every downstream carrier the same split — `Wedge.label` is
+what is shown, `Wedge.sym` is what is matched. That second half is not optional. Making the arc read «2α»
+without it would have silently broken the #937 chip, whose set is compared against the facts' letters: a
+set holding «2α» matches nothing and the chip vanishes. One display bug fixed, another introduced, neither
+caught by a test that checks the record rather than the render.
+
 Note also what the copula is *for*: nothing. It carries no meaning the tool needs, which is exactly why it
 must never be the thing that decides whether a statement is understood.
 

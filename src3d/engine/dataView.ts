@@ -17,7 +17,7 @@
 import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
 import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
-import { figureSymbolsOf, symbolOwnersOf } from './types';
+import { angleMarkText, figureSymbolsOf, symbolOwnersOf } from './types';
 import { angleBetweenOperands, componentValue, containmentDeviation, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import type { Construction3, Id, MutualRel3, Operand3, Positions3 } from './types';
 
@@ -994,7 +994,9 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     if (degs.some((d) => d === null)) continue;
     const [g0, g1, g2] = degs as number[];
     if (Math.abs(g0 - g1) > 0.05 || Math.abs(g0 - g2) > 0.05) continue; // seed-varying → not knowledge, no value
-    relations.push(`${mk.label ?? `∠${mk.p}${mk.vertex}${mk.q}`} = ${cleanNum(g0)}°`);
+    // #986: the row names the statement the student made — «2α = 60°», never «α = 60°» beside an
+    // «α = 30°» from a mark wearing the same letter with a different coefficient.
+    relations.push(`${angleMarkText(mk) || `∠${mk.p}${mk.vertex}${mk.q}`} = ${cleanNum(g0)}°`);
   }
 
   // #297 — forced/stated ANGLE EQUALITIES (∠SAD = ∠SAB): when two+ markers are equal in EVERY sampled

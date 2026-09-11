@@ -9501,3 +9501,65 @@ form"* — was too strong, and the correction was posted before building: 3-D ha
 end to end. What it lacked was the **coefficient** form and two spellings. Filing an issue from a
 measurement and then measuring again before building is what turned a "new symbolic lane" into an
 optional capture group and a shared constant.
+
+## ADR-3D-242 — AN ANGLE MARK'S DISPLAY IS COMPOSED ONCE, AND IT IS NOT THE BINDING LETTER (#986)
+
+**Status:** accepted, 2026-09-11 · **Issue:** #986 (P1 — display honesty; operator report, round #974 T17)
+**Requirements:** none (FR-VC-2d already promises the coefficient is *stated*; this is its display half) · **Design:** [04b](04b-design-3d.md) — relations as a disposition map
+
+**The defect.** «זווית ABC שווה 2α» drove the angle to **60.00°** — correctly — and drew the arc labelled
+**«α»**. The figure was right and the drawing lied, which is the worse direction of the honesty invariant
+*"everything the student stated is visible on the figure"*: not silence, but a **wrong** label.
+
+**Why P1 rather than cosmetic.** With two marks the display contradicts the solver:
+
+```
+זווית ABC = 2α        drawn at 60°, arc read «α»
+זווית BCA = α         drawn at 30°, arc read «α»
+```
+
+[ADR-3D-241](#adr-3d-241) deliberately withholds the reused-label equality when the coefficients differ —
+those angles state a *ratio*, not an equality. The canvas then re-asserted that equality visually: one
+letter on two visibly different angles. The data panel did the same, printing `α = 60°` beside `α = 30°`.
+
+**Root cause.** ADR-3D-241 split the symbol across two fields, for good reasons:
+
+| field | answers | read by |
+| --- | --- | --- |
+| `label` | *which letter binds this angle* | `symbolOwnersOf`; ADR-3D-052's reused-label equality |
+| `coef` | *what the student wrote* | the solver, when a value lands on the letter |
+
+Every **display** surface wants the second thing — and each one reached for `label` directly, because
+that is the field that looks like a name. Two surfaces, two identical bugs, and a third (the #937 chip)
+waiting to acquire it.
+
+**The decision.** The display text is composed in **one** place — `angleMarkText(mk)` in
+`engine/types.ts`, beside the type it reads — and both surfaces call it. A third surface cannot
+reintroduce the bug by reaching for `label`, because there is now somewhere better to reach.
+
+**The `Wedge` gains the same split, and that is the part worth remembering.** Making the arc show `2α`
+would have silently broken the #937 parameter chip, whose set is matched against the facts' **letters**:
+a set containing `"2α"` matches nothing, and the chip would have stopped appearing for every coefficient
+mark — a second silent display defect introduced while fixing the first. So `Wedge.label` is the text and
+`Wedge.sym` is the letter, mirroring the mark. **A field that is both an identity and a display string
+will be read as the wrong one by somebody**; the repair is to stop overloading it, not to remember which
+consumer wants which.
+
+**Caught by following the fix plan's own step 3** (*"check the #937 competing-symbol chip"*), not by a
+test — `issue-937-param-display-chip.test.ts` passes either way, because it exercises the chip against
+marks that carry no coefficient. Its coefficient row is added here.
+
+**Why the round's own tests missed the original defect.** #977 shipped 115 tests that asserted the
+*command* (`{label:'α', coef:2}`) and the *driven angle* (60°), and never asserted **what is drawn**. The
+record was right the whole time. That is [docs/17](17-design-rules.md)'s drive-the-reported-path rule in
+its display form: **a display fact must be asserted on the display builder's own output.** Every
+assertion in `issue-986.test.ts` comes from `collectWedges`, `dataView` or `competingArcSymbols`.
+
+**Locks.** `src3d/__tests__/issue-986.test.ts` (10): the composer (coefficient prepended, bare letter
+untouched, no-letter marker → `''`); the reported arc; **T18's two arcs asserted to differ**, which is the
+assertion that makes the ratio visible and that fails if anyone re-merges the two fields; both panel rows;
+the bare-symbol and bare-marker cases unchanged; and the chip's set asserted to contain `α` and **not**
+`2α`.
+
+**Prod exposure, closed.** The defect reached `main` in PR #982 and was live for the window between that
+merge and this commit. No `prod/*` tag was cut in between, so it never reached a student.
