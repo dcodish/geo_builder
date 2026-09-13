@@ -547,3 +547,22 @@ pure derivation, one table, one text builder, two render sites:
   (#996, ADR-502 Am. 1) — the table gained a row, which is what the table is for. A suggested pin sentence is
   always a bare next line (#997): a parenthesised Latin run inside a Hebrew sentence reorders in the box while
   it is typed.
+
+## The meeting re-seat is routed by a predicate (#260, [ADR-512](06-decisions.md#adr-512))
+
+- **The question, asked once.** `meetingCarriers(objects, cmd)` (`engine/apply.ts`) decides whether a
+  command asserts that a point is the MEETING of two carriers — a named segment-meet (`onSeg`), the
+  point-free crossing statement (`segments-cross`), a rider named onto a second host (a `set-collinear`
+  whose one on-segment rider's host differs from the other two points). `applyCommand` asks it before its
+  switch and calls `reseatLooseMeetEndpoint` (ADR-255) with the two carriers; no case calls the re-seat by
+  itself. A new member of the family is a row in the predicate, never a fourth call site.
+- **Which endpoint moves.** Every endpoint of both carriers is a candidate once the crossing lies off either
+  segment: fewest dependents first (the point the figure leans on least), the off-segment's own endpoints
+  first on a tie (so the older sites behave as before). Only a non-pinned free point that no constraint
+  references and no directive drives is ever moved; the aim is the ray from its mate through the other
+  carrier's midpoint, kept in general position and on the same side of every circle (ADR-253/254).
+- **Anchors.** The general-position test ignores the carriers' own on-segment riders — they follow the
+  endpoints, and the meeting rider is what the statement re-solves (a free rider sits at its host's
+  midpoint by default, exactly on the aim line).
+- **Positions ride along.** `reinterpretAsCollinear` (step.ts) passes the previous positions into
+  `applyCommand`, so the second-membership path sees where the crossing lies.

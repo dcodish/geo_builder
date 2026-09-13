@@ -594,6 +594,31 @@ function degeneratePlacement(c: Vec, pts: Vec[], existing: Vec[], span: number):
  * the point on the SAME SIDE of every resolvable circle (a stated "M מחוץ למעגל" survives, ADR-254)
  * and in general position (ADR-253). The point stays a free DOF — this is a better default, not a pin.
  */
+/**
+ * #260 ([ADR-512](../../docs/06-decisions.md#adr-512)): does this statement assert that a point is the MEETING
+ * of two carriers? The ONE routing predicate for {@link reseatLooseMeetEndpoint} — the semantic fact, never
+ * the command kind that happened to produce it. Three members today: a named segment-meet (`onSeg`), the
+ * point-free crossing statement, and a rider named onto a SECOND host («P על AB» then «P על CD» — P is
+ * already a rider of AB, and the second membership lowers to `set-collinear` P,C,D: the rider edition of
+ * the crossing statement). The reseat used to be reachable from the first two only, by call site; the
+ * rider case rooted P's slide against C,D's DEFAULT placement and refused a trivially satisfiable line.
+ */
+export function meetingCarriers(objects: GeoObject[], cmd: Command): [[Id, Id], [Id, Id]] | null {
+  if (cmd.type === 'line-line-intersection') return cmd.onSeg ? [[cmd.a, cmd.b], [cmd.c, cmd.d]] : null;
+  if (cmd.type === 'segments-cross') return [[cmd.a, cmd.b], [cmd.c, cmd.d]];
+  if (cmd.type === 'set-collinear') {
+    const ids = [cmd.a, cmd.b, cmd.c];
+    const riders = ids.filter((id) => objects.some((o) => o.id === id && o.kind === 'on-segment'));
+    if (riders.length !== 1) return null;
+    const r = objects.find((o) => o.id === riders[0]) as Extract<GeoObject, { kind: 'on-segment' }>;
+    const others = ids.filter((id) => id !== r.id) as [Id, Id];
+    if (others.includes(r.a) || others.includes(r.b)) return null; // the same host restated — no second carrier
+    if (!others.every((id) => objects.some((o) => o.id === id && isGeoPoint(o)))) return null;
+    return [[r.a, r.b], others];
+  }
+  return null;
+}
+
 function reseatLooseMeetEndpoint(
   objects: GeoObject[],
   constraints: Constraint[],
@@ -627,9 +652,15 @@ function reseatLooseMeetEndpoint(
     Object.entries(o).some(([k, v]) => k !== 'id' && (v === id || (Array.isArray(v) && (v as unknown[]).includes(id))));
   const deps = (id: Id): number => objects.filter((o) => o.id !== id && refsId(o, id)).length;
   type Cand = { id: Id; mate: Id; other: [Vec, Vec] };
+  // #260 (ADR-512): EVERY endpoint is a candidate once the crossing is off either segment — re-aiming the
+  // other carrier through this one's midpoint lands the crossing inside both just as well. Fewest
+  // dependents first (the carrier the figure leans on least); on a tie the off-segment's own endpoints
+  // keep their precedence, so every figure the two older call sites re-seated is re-seated as before.
   const cands: Cand[] = [];
   if (off1) cands.push({ id: seg1[0], mate: seg1[1], other: [c, d] }, { id: seg1[1], mate: seg1[0], other: [c, d] });
   if (off2) cands.push({ id: seg2[0], mate: seg2[1], other: [a, b] }, { id: seg2[1], mate: seg2[0], other: [a, b] });
+  if (!off1) cands.push({ id: seg1[0], mate: seg1[1], other: [c, d] }, { id: seg1[1], mate: seg1[0], other: [c, d] });
+  if (!off2) cands.push({ id: seg2[0], mate: seg2[1], other: [a, b] }, { id: seg2[1], mate: seg2[0], other: [a, b] });
   const picks = cands.filter((x) => loose(x.id)).sort((x, y) => deps(x.id) - deps(y.id));
   const keepsCircleSides = (oldP: Vec, newP: Vec): boolean =>
     objects.every((o) => {
@@ -655,7 +686,16 @@ function reseatLooseMeetEndpoint(
     const mid = { x: (cand.other[0].x + cand.other[1].x) / 2, y: (cand.other[0].y + cand.other[1].y) / 2 };
     const dir = sub(mid, S);
     if (dir.x * dir.x + dir.y * dir.y < 1e-12) continue; // the mate sits on the other segment's midpoint — aim elsewhere
-    const existing = [...pos.entries()].filter(([id]) => id !== cand.id && id !== cand.mate).map(([, v]) => v);
+    // #260 (ADR-512): the carriers' own RIDERS are not anchors to stay in general position from — their
+    // positions follow the endpoints, and the meeting rider is the very point the statement re-solves. A
+    // free rider defaults to its host's MIDPOINT, which is exactly where this aim line passes, so leaving
+    // it in `existing` rejected every candidate on the other carrier and moved the wrong endpoint.
+    const onCarrier = new Set(
+      objects
+        .filter((o) => o.kind === 'on-segment' && [seg1, seg2].some(([u, v]) => (o.a === u && o.b === v) || (o.a === v && o.b === u)))
+        .map((o) => o.id),
+    );
+    const existing = [...pos.entries()].filter(([id]) => id !== cand.id && id !== cand.mate && !onCarrier.has(id)).map(([, v]) => v);
     const span = spanAround(S, existing.length ? existing : [mid]);
     for (const k of [1.7, 2.0, 2.4, 1.5, 2.9]) {
       const F = add(S, scale(dir, k)); // beyond the other segment ⇒ the crossing lands inside both
@@ -961,6 +1001,11 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     return acc;
   }
 
+  // #260 (ADR-512): a statement that makes a point the MEETING of two carriers re-seats a genuinely loose
+  // endpoint FIRST (ADR-255), routed by the semantic predicate — whichever command kind carried it.
+  const meet = meetingCarriers(objects, cmd);
+  if (meet) reseatLooseMeetEndpoint(objects, constraints, pos, meet[0], meet[1]);
+
   switch (cmd.type) {
     case 'free-point': {
       // An `ifAbsent` free point is the parser's ensure-exists (a NEW point named onto a line, whose
@@ -1182,7 +1227,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // seed jitter explores only a small neighbourhood of the default (session gaawv4fr). Endpoints
       // that carry constraints (e.g. ADR-166's equilateral apexes) are left to their own mechanism
       // (reflection DOFs); a meet with no loose endpoint keeps today's behaviour (verifier amber).
-      if (cmd.onSeg) reseatLooseMeetEndpoint(objects, constraints, pos, [cmd.a, cmd.b], [cmd.c, cmd.d]);
+      // (the re-seat itself now runs before the switch, routed by `meetingCarriers` — #260 / ADR-512)
       addObj(objects, { kind: 'line-line-intersection', id: cmd.id, a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d, ...(cmd.onSeg ? { onSeg: true } : {}), ...(cmd.onSeg1 ? { onSeg1: true } : {}), ...(cmd.onSeg2 ? { onSeg2: true } : {}) });
       // A "המשך" operand is DIRECTIONAL — A must be BEYOND the named 2nd point (ADR-054). Emit a
       // `collinear-order` (A is already collinear via the crossing); when the current free DOFs put the
@@ -1587,8 +1632,8 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // (figure.v.segmentsCross) and `meetsRequirements` / the shared sample core gate sampling and
       // "show another" on it — nothing is pushed to `constraints` (the ADR-244 radius-order shape).
       // Here we only improve the DEFAULT, exactly as a NAMED `onSeg` meet does: a genuinely loose
-      // endpoint is re-seated so the stated crossing exists at the starting placement (ADR-255).
-      reseatLooseMeetEndpoint(objects, constraints, pos, [cmd.a, cmd.b], [cmd.c, cmd.d]);
+      // endpoint is re-seated so the stated crossing exists at the starting placement (ADR-255) — by the
+      // `meetingCarriers` route before the switch (#260 / ADR-512).
       break;
 
     case 'point-on-circle': {

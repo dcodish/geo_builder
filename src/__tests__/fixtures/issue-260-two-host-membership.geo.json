@@ -1,0 +1,76 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-09-13T22:00:00.000Z",
+  "name": "issue-260",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "VnYUuOosCCXXVeNxnp82j",
+      "utterance": "AB",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "IEUyF12nvXaGA6Fu-w2Mg",
+      "utterance": "P על AB",
+      "group": "tJOSeuo-xveZFKYwbPEkw",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "_6ugobhcbkOnZ2ab33hII",
+      "utterance": "P על AB",
+      "group": "tJOSeuo-xveZFKYwbPEkw",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "P",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "MLNlH6HQFHCQ_Oy5Iqlqf",
+      "utterance": "CD",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "GsgYzgpjC-nPjEcGgwwJn",
+      "utterance": "P על CD",
+      "group": "GW3yf0x3SzzC2b61jSRz_",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "TYSjBESw2I8ejAbhMFr2s",
+      "utterance": "P על CD",
+      "group": "GW3yf0x3SzzC2b61jSRz_",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "P",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    }
+  ]
+}

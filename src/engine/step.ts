@@ -1749,7 +1749,8 @@ function reinterpretAsCollinear(prev: Construction, cmd: Command, prevPos?: Map<
     );
     return { objects, constraints: [...prev.constraints] };
   }
-  const next = applyCommand(prev, { type: 'set-collinear', a: cmd.id, b: cmd.a, c: cmd.b });
+  // #260 (ADR-512): the positions ride along so the meeting re-seat can judge where the crossing lies.
+  const next = applyCommand(prev, { type: 'set-collinear', a: cmd.id, b: cmd.a, c: cmd.b }, prevPos);
   const objects = [...next.objects];
   const constraints = [...next.constraints];
   addCollinearOrder(objects, constraints, cmd.extension ? [cmd.a, cmd.b, cmd.id] : [cmd.a, cmd.id, cmd.b]);
