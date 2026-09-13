@@ -1,0 +1,84 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-09-13T12:00:00.000Z",
+  "name": "issue-975",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "זווית ABC שווה ל-90",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "utterance": "זווית ABC שווה ל-90",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.3",
+      "utterance": "זווית ABC שווה ל-90",
+      "group": "g1",
+      "cmd": {
+        "type": "set-angle",
+        "vertex": "B",
+        "ray1": "A",
+        "ray2": "C",
+        "value": 90
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.4",
+      "utterance": "מעגל שמרכזו O",
+      "group": "g2",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3.5",
+      "utterance": "רדיוס המעגל שווה ל-5",
+      "group": "g3",
+      "cmd": {
+        "type": "set-radius",
+        "circle": "circle-O",
+        "value": 5
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

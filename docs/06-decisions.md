@@ -10980,3 +10980,34 @@ tangent ⇒ not this rule; the named one-utterance form byte-identical; a named 
 not claimed. Standing rule 4: scenario `incremental-tangent-pair-crossing-554` (corpus 4) — E is the pole
 of chord BC (equal tangent lengths, OB ⟂ BE, OC ⟂ CE), the bespoke assertion a fixture cannot carry.
 Catalog: the incremental form is described on the one-utterance row (a follow-up plural cannot parse on an empty figure, so it is not a standalone catalog example — the same footing as the common-tangent «המשיקים נפגשים»).
+
+## ADR-505 — A HEBREW PARTICLE'S MAQAF IS NOT A SIGN: «שווה ל-90» reads +90 in every value rule (#975)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #975 (bug, P2 — found while fixing #969) · round #998 · bug route (landed on `main`)
+**Requirements:** [02](02-requirements.md) FR-IN-6 — one line (a value after a Hebrew particle is the stated value) · **Design:** [04](04-design.md) §2 — the lexicon's number atom
+
+**The defect.** «זווית ABC שווה ל-90» committed **−90°**; «רדיוס המעגל שווה ל-5» committed **−5**. The one
+number atom `NUM` (`src/parser/lexicon.ts`) read ANY leading hyphen as a sign, and the label guard some
+consumers add (`(?<![A-Za-z])`) blocks a Latin subscript, not the maqaf of a Hebrew particle («ל-», «מ-»,
+«ב-», «כ-»). Only the spaced «ל- 90» read correctly — the accident, not the spelling students type. A
+stated magnitude silently replaced by another is the ADR-498 honesty class, reached by a different
+mechanism; nothing refused it, and a negative angle is not a given the student ever stated.
+
+**Class (standing rule 1).** *The number reader treats a hyphen used as a Hebrew particle as a sign.* The
+atom is composed at 64 sites in `parse.ts`, so the exposure is every value rule (lengths do not reach it
+only because «AB שווה ל-6» is not yet a spelling they read). The check is "was this hyphen a particle or
+a sign", and it wants ONE answer — a rule-local «ל-» check in the angle rule would be the patch tripwire.
+
+**Decision.** The sign arm of `NUM` becomes `(?<![א-ת])-?` — a hyphen immediately preceded by a Hebrew
+letter is not consumed as a sign; the digits still match, so «ל-90» reads +90 with no rule knowing about
+particles. The lookbehind is zero-width, so `NUM` stays a NO-capture fragment and every use-site wrapper
+(`num`, `COEF`, `NUM_G`) is unchanged; no `parse.ts` edit. A genuine negative — after a space, `=`, `(`,
+`,`, or at line start — is untouched, and a Latin letter before the hyphen is still not a particle (the
+consumers' own label guard owns that case).
+
+**Locks.** `issue-975-maqaf-not-sign.test.ts` (12): the two measured lines commit +90 and +5; the spaced
+form unchanged; a decimal after the particle; «שווה ל-2α» still routes to the ADR-498 symbolic lane;
+genuine negatives after a space, `=`, `(`, `,` and at line start stay negative; the atom is still
+capture-free. Standing rule 4: fixture `issue-975-maqaf-not-sign.geo.json` (the triangle + angle + circle
++ radius sequence, green and verified). The lexical ratchet and `lexicon-consumers` are byte-identical
+(the atom's spelling changed, not its inline count).

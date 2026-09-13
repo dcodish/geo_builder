@@ -31,8 +31,14 @@ export const ULABEL = String.raw`[A-Z]\d*`;
 
 // ── Numbers ───────────────────────────────────────────────────────────────────────────────────────
 /** The one number fragment: optional sign, decimal point allowed. NO capture — wrap at use site.
- *  (parse.ts's legacy `num` aliases `(${NUM})`; `COEF`/`isNumChunk` are its other historical names.) */
-export const NUM = String.raw`-?\d+(?:\.\d+)?`;
+ *  (parse.ts's legacy `num` aliases `(${NUM})`; `COEF`/`isNumChunk` are its other historical names.)
+ *
+ *  #975 (ADR-504) — a hyphen glued to a preceding HEBREW letter is the maqaf of a particle («ל-90»,
+ *  «מ-5», «ב-», «כ-»), never a minus sign. The sign arm refuses it with a zero-width lookbehind, so
+ *  the digits still match and «שווה ל-90» reads +90 without any rule knowing about particles; a
+ *  genuine negative (after a space, `=`, `(`, `,`, or at line start) is untouched. Total over every
+ *  consumer — the `(?<![A-Za-z])` guard some rules add blocks a LATIN label, not a Hebrew particle. */
+export const NUM = String.raw`(?<![א-ת])-?\d+(?:\.\d+)?`;
 
 // ── Keywords (bilingual, morphology handled ONCE) ────────────────────────────────────────────────
 /** Hebrew kaf in both positional forms — the ADR-3D-035 recorded trap (`מאונ[ךכ]` — a final-ך-only

@@ -79,6 +79,11 @@ A single boundary: `utterance → command[]`.
   fragment, never spelled a second time; `lexicon-consumers.test.ts` fails on any exported atom nothing
   composes from, the twin of the ratchet that fails on inline fragments growing. The 3-D grammar keeps its own
   leaf (`src3d/lexicon/nouns3.ts`); the trees never share vocabulary by import.
+- **The number atom refuses a Hebrew particle's maqaf as a sign (#975, [ADR-505](06-decisions.md#adr-505)).**
+  `NUM` is `(?<![א-ת])-?\d+(?:\.\d+)?`: a hyphen glued to a preceding Hebrew letter («ל-90», «מ-5») is the
+  particle, so the digits match unsigned; a hyphen after a space, `=`, `(`, `,` or at line start is a sign.
+  The guard is zero-width, so the atom stays capture-free and every consumer inherits it — "particle or
+  sign" is answered once, in the lexicon, never per rule.
 - **Contextual plurals resolve against a per-family context registry (#554, [ADR-503](06-decisions.md#adr-503)).**
   A follow-up line that names no object of its own — «המשיקים נחתכים בנקודה E» — resolves the definite
   plural against what the figure already holds, read off the construction into `ParseContext`: the
