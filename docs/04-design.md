@@ -547,3 +547,18 @@ pure derivation, one table, one text builder, two render sites:
   (#996, ADR-502 Am. 1) — the table gained a row, which is what the table is for. A suggested pin sentence is
   always a bare next line (#997): a parenthesised Latin run inside a Hebrew sentence reorders in the box while
   it is typed.
+
+## The submit transaction: facts commit, the seed resolves after (#364, [ADR-510](06-decisions.md#adr-510))
+
+- **The commit** (`commitCommands` / `replaceGroup`, `store/geoStore.ts`) is the facts alone, in one zundo
+  entry, at the student's CURRENT seed (an ✎ edit resets to 0 first — ADR-484). No synchronous seed search
+  runs inside it any more; `main-thread-sweeps.test.ts` records `firstSatisfyingSeed` at 0 on the store.
+- **The resolve** is the post-commit `resolveAfterCommit` (App) → `runViewResolve` (`app/resolveView.ts`) →
+  `geoWork.autoResolve` (the worker): `meetsRequirements` decides whether anything is wrong (statuses,
+  violations, extension orders, segment-meets, distinctness, convexity — a superset of the old trigger), and
+  `findValidConfig(facts, seed)` sweeps FROM THE CURRENT SEED (its first tier is `firstSatisfyingSeed`), so
+  the view the student holds is preferred over any other valid one (M2). The found view is applied under a
+  paused history, merging into the commit's entry — one undo removes the fact and restores the seed.
+- **What the student sees:** the violating configuration may paint for ONE frame before the worker's answer
+  lands (the flash the operator accepted, 2026-09-11) instead of a tab frozen for up to 2.5 s. While the
+  search runs, the keep-prior slot (#573) holds the last good view where it exists.

@@ -11170,3 +11170,49 @@ the app's replay path.
 fold) was not needed: `ownerByConKey` (ADR-398) already is that provenance, and the search removes whole
 statements rather than tracking constraint ids. The plan said "disable" — measured: disabling cascades
 the dependents, removal is the question actually asked.
+
+## ADR-510 — THE SUBMIT COMMIT IS THE FACTS ALONE: the seed auto-advance leaves the UI thread ("accept the flash") (#364)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #364 (debt, P3 — the operator's 2026-09-11 ruling *"364 - accept"*) · round #1001 · debt route (landed on `main`) · completes [ADR-401](#adr-401)'s ratchet (the last recorded main-thread sweep goes to 0); the transaction shape of [ADR-098](#adr-098)/[ADR-484](#adr-484) changes as ruled
+**Requirements:** none (internal — no requirements line promises a freeze-free submit; the student-visible change is one frame, recorded here) · **Design:** [04](04-design.md) — "The submit transaction: facts commit, the seed resolves after"
+
+**What the student saw.** A submit that left the figure violating an extension order, a segment-meet, point
+distinctness, or a seed that does not build at all (ADR-098/166/378/484) FROZE the tab for up to 2.5 s
+(`SEARCH_BUDGET_MS`): `commitCommands` and `replaceGroup` ran `firstSatisfyingSeed` synchronously inside the
+commit so that facts and the found seed landed in ONE undo entry and the violating configuration was never
+painted. Measured on the #157 figure at 0–4192 ms per candidate seed, so whenever seed 0 was invalid the
+whole budget went on roughly one candidate. ADR-401 moved every other sweep off-thread and recorded this
+one in `main-thread-sweeps.test.ts` as the operator's call: freeze, or a visible flash.
+
+**Decision — the operator chose the flash.**
+
+1. **The store-side search is deleted** (both sites). `commitCommands` commits the facts at the student's
+   CURRENT seed; `replaceGroup` commits at seed 0 (ADR-484's structural-edit reset, unchanged) — nothing
+   else. The ratchet baseline for `firstSatisfyingSeed` on `geoStore.ts` drops 2 → 0 — a deliberate flip.
+2. **The post-commit `autoResolve` owns it** (ADR-106/290/446 — `resolveAfterCommit` → `runViewResolve` →
+   the worker). Its trigger, `meetsRequirements`, is a SUPERSET of the deleted one (`extensionsClear` ∧
+   `intersectionsWithinSegments` ∧ `pointsDistinct`, plus statuses, violations and convexity — a seed that
+   does not build fails it, which is the ADR-484 licence), and `findValidConfig`'s first tier IS
+   `firstSatisfyingSeed`. No capability is lost; the violating configuration may paint for one frame before
+   the worker's answer lands via `applyView`.
+3. **The sweep starts from the student's CURRENT seed**, not 0 — in the worker, the no-Worker fallback and
+   the store's own `autoResolve` action alike (`findValidConfig(facts, seed)`). The figure the student is
+   looking at is preferred over any other valid one (the M2 stability property); a parameter, not a
+   mechanism. The ✎ path resets to 0 first, so its sweep starts at 0 as before.
+4. **The transaction shape, asserted.** The resolve applies its view under a PAUSED history (the App's
+   `resolveAfterCommit`, unchanged), so it merges into the commit's own entry: one undo removes the fact AND
+   restores the seed it was appended at — the body's own concern, now a lock.
+
+**Locks** (`issue-364-accept-the-flash.test.ts`, 6, on #938's measured figure — `SEQ` refuses at seed 4): the
+commit lands at the broken seed (the flash); the resolve lands the first valid seed at-or-after it (every
+skipped seed asserted invalid); the history length is unchanged by the resolve and one undo removes the
+fact and restores the seed; a clean append pays nothing; the store's `autoResolve` gives `findValidConfig`'s
+answer from the current seed; the ✎ path resets to 0, searches nothing synchronously, and resolves the
+same way. `main-thread-sweeps.test.ts`: baseline 0. `issue-938-structural-edit-seed.test.ts`: the
+"appending at a broken seed searches" lock now drives the resolve explicitly — the guard it locked lives
+in `meetsRequirements`.
+
+**Measured, so the plan's other named case is not a lock.** The #157 trapezoid-midsegment figure builds
+clean at seed 0 on all eight steps (`meetsRequirements` true after each; the last step 3.0 s of fold, no
+search); the body's "0–4192 ms per candidate seed" was the cost of a search that this figure no longer
+triggers. Nothing freezes there before or after.
