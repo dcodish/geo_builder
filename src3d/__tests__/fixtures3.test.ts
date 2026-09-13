@@ -47,6 +47,12 @@ const SEEDED: SeededCorpus = {
   // now builds and verifies" (DC ∥ AB by construction, the ratio a free DOF); the bespoke locks — the ratio
   // resamples, a later given drives it through the rider lane — live in issue-985.test.ts.
   'trapezoid-corner-completion-985.geo3.json': ['משולש ABC', 'טרפז ABCD'],
+  // #978 (ADR-3D-246) — the diagonal claim's VERIFIER arm. Two disjoint solids on the canvas (the case the
+  // apply moment cannot judge), then a TRUE face diagonal of the cube: the essence is "this builds green and
+  // the final-figure judge does not false-fire"; the refusals (an edge, a face diagonal called main) live in
+  // issue-978-diagonal-verifier.test.ts, since a refusal cannot be a fixture.
+  'diagonal-two-solids-978.geo3.json': ["קובייה ABCDA'B'C'D'", 'פירמידה SEFGH', 'אלכסון AC', "אלכסון ראשי AC'"],
+  'diagonal-after-solid-978.geo3.json': ['מלבן ABCD', 'אלכסון AC'],
   // #863 (ADR-3D-245) — the operator's slow figure: a symbolic pair injection, then a symbolic line equation on
   // the same solid. The essence is 'this sequence builds and verifies at every seed'; the perf lock (the pivot's
   // residual loop samples nothing) lives in issue-863-sample-hoist.test.ts alongside it.

@@ -253,6 +253,17 @@ Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a cl
 arriving inside a composite command**. `claims.ts` checks each against four deterministic seeds
 (`claimSeeds`) — the multi-sample discipline that makes a coincidence refutable.
 
+**The diagonal claim's two layers ([ADR-3D-203](06b-decisions-3d.md#adr-3d-203), [ADR-3D-246](06b-decisions-3d.md#adr-3d-246), #978).**
+«אלכסון AB» / «אלכסון ראשי AB» is a claim about a solid, answered by ONE predicate — `diagonalClaimVerdict`
+in `baseShapes.ts`, beside the face/space diagonal enumerators: the solids holding both letters judge the
+pair, the claim holds when every judging solid has it as a diagonal of the claimed kind, and `null` means
+no solid can judge it yet. The apply arm (`segment3`, guarded to a single solid) refuses on `false` — the
+teaching refusal; `derive3` asks the same predicate again over the FINAL figure for every ok diagonal row
+after the fold and the symbol-retry pass, so the case the apply moment could not judge (two solids on the
+canvas, the pair inside one of them) gets the same `not-a-diagonal { a, b, kind }` on its own row, and
+`submit` refuses it through the fold with the same words. A pair reaching a free point or straddling two
+solids stays accepted: not yet checkable is not yet false.
+
 **A change that orphans a row, and the symbol retry pass ([ADR-3D-220](06b-decisions-3d.md#adr-3d-220), #926).**
 `derive3` applies each fact through one `applyFact` (count-delta attribution included) and then re-applies,
 in a bounded pass, every row still red with `unknown-symbol` — a statement addressed to a letter («α = 70»,

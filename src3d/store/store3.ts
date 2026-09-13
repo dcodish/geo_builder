@@ -29,7 +29,7 @@ import { nanoid } from 'nanoid';
 import { stripFormatControls } from '../../shell/bidi';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { applyCommand3, freeDims } from '../engine/apply';
-import { spaceDiagonals } from '../engine/baseShapes';
+import { spaceDiagonals, diagonalClaimVerdict } from '../engine/baseShapes';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { scalePinned } from '../engine/solve3';
 import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
@@ -343,6 +343,24 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
       progressed = true;
     }
     if (!progressed) break;
+  }
+  // #978 (ADR-3D-246): the VERIFIER arm of the «אלכסון» claim (#859 / ADR-3D-203). The apply moment
+  // judges the claim only when ONE solid holds both letters; with two solids on the canvas, or a pair the
+  // figure could not yet place, the claim was accepted and never revisited — «אלכסון AB» on a cube's edge
+  // stayed a green row because a pyramid stood beside the cube. The FINAL figure knows every solid, so
+  // every ok diagonal row is asked the same question once more, through the same predicate: a pair no
+  // solid holds stays unjudged (ADR-104: not yet checkable is not yet false); a pair some solid holds must
+  // be a diagonal of the claimed kind in every solid that holds it. The row's own status carries the
+  // verdict — the statement is named, never the solid's internals — and `submit` keeps its prior on it.
+  for (const f of facts) {
+    if (!f.enabled || status[f.id] !== 'ok') continue;
+    for (const cmd of f.cmds) {
+      if (cmd.type !== 'segment3' || !cmd.diagonal) continue;
+      if (diagonalClaimVerdict(c.solids, cmd.a, cmd.b, cmd.diagonal) === false) {
+        status[f.id] = { code: 'not-a-diagonal', a: cmd.a, b: cmd.b, kind: cmd.diagonal };
+        break;
+      }
+    }
   }
 
   const resolved = resolve3(c, seed);

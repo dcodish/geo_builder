@@ -120,8 +120,16 @@ describe('#859 — the guard: "I cannot tell" is never a refusal', () => {
     expect(err?.code).not.toBe('not-a-diagonal');
   });
 
-  it('with TWO solids, the check stands down rather than guessing which rings to use', () => {
-    expect(build(['קובייה ABCD', "קובייה EFGHE'F'G'H'", 'אלכסון AB'])).toBeNull();
+  // #978 (ADR-3D-246) — DELIBERATELY FLIPPED. This lock read "with two solids, stand down" as a feature;
+  // it was the gap #978 measured: «אלכסון AB» beside a second solid drew the first cube's EDGE and stayed
+  // green. The guard's INTENT — never guess WHICH ring to read — is kept exactly: the solids that hold
+  // BOTH letters judge the pair (no guessing, the letters decide), and a pair no solid holds still stands
+  // down. The verdict now arrives through the final-figure arm (`derive3`), with the same words.
+  it('with TWO solids, a pair INSIDE one of them is judged — an edge called a diagonal is refused', () => {
+    expect(build(['קובייה ABCD', "קובייה EFGHE'F'G'H'", 'אלכסון AB'])).toEqual({ code: 'not-a-diagonal', a: 'A', b: 'B', kind: 'any' });
+  });
+  it('with TWO solids, a pair STRADDLING them stands down — no solid can judge it', () => {
+    expect(build(['קובייה ABCD', "קובייה EFGHE'F'G'H'", 'אלכסון AE'])).toBeNull();
   });
 
   it('a pair reaching a point OUTSIDE the solid is not checked', () => {

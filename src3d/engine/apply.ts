@@ -11,7 +11,7 @@ import { FREE_LINE_TOKEN } from './freeLine';
 import { riderPairsT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { isAnyDiagonal, isSpaceDiagonal, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
+import { diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
 
@@ -1180,14 +1180,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
        * "I cannot tell" must not become a refusal (the figure would lose ink it is entitled to).
        */
       if (cmd.diagonal && c.solids.length === 1) {
-        const faces = c.solids[0].faces;
-        const ids = c.solids[0].ids;
-        if (ids.includes(cmd.a) && ids.includes(cmd.b)) {
-          const ok = cmd.diagonal === 'space'
-            ? isSpaceDiagonal(faces, cmd.a, cmd.b)
-            : isAnyDiagonal(faces, cmd.a, cmd.b);
-          if (!ok) return { ok: false, error: { code: 'not-a-diagonal', a: cmd.a, b: cmd.b, kind: cmd.diagonal } };
-        }
+        // #978 (ADR-3D-246): the verdict is the ONE predicate `derive3` asks again over the final figure,
+        // so the apply-time arm and the verifier arm can never drift. `null` (no solid holds both letters)
+        // is "cannot tell", never a refusal.
+        const verdict = diagonalClaimVerdict(c.solids, cmd.a, cmd.b, cmd.diagonal);
+        if (verdict === false) return { ok: false, error: { code: 'not-a-diagonal', a: cmd.a, b: cmd.b, kind: cmd.diagonal } };
       }
       /**
        * #840 (ADR-3D-191) — AN UNSTATED ENDPOINT IS A FREE POINT, not a refusal.

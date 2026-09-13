@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-09-13T12:36:53.856Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "פירמידה SEFGH",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramid4gr",
+          "ids": [
+            "E",
+            "F",
+            "G",
+            "H",
+            "S"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "אלכסון AC",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "C",
+          "bare": true,
+          "diagonal": "any"
+        }
+      ]
+    },
+    {
+      "utterance": "אלכסון ראשי AC'",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "C'",
+          "bare": true,
+          "diagonal": "space"
+        }
+      ]
+    }
+  ]
+}

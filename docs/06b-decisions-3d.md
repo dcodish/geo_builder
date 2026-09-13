@@ -9786,3 +9786,44 @@ per-iteration cost is unchanged in kind and lower by one `solidDims` per solid p
 counts (a solid samples ≥ 1); every `fixtures3/` figure's `solid-…` samples ≤ 64 at two seeds (pre-fix 12
 figures between 72 k and 205 k). Standing rule 4: the three-line sequence is
 `fixtures3/symbolic-line-equation-863.geo3.json` (builds and verifies at every seed the net sweeps).
+
+### ADR-3D-246 — the «אלכסון» claim gets its VERIFIER arm: what the apply moment cannot judge, the final figure judges (#978)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #978 (bug, P3 — found while building #966, the 2-D twin) · round #998 · bug route (landed on `main`)
+**Requirements:** [02b](02b-requirements-3d.md) FR-CL-2 — one sentence (a role-noun claim is verified on the final figure)
+**Design:** [04b](04b-design-3d.md) — "Claims", the diagonal claim's two layers · **LADDER stage:** the fold's post-apply judge (build, not solve)
+
+**Measured on `d440f01`** through the real `submit → derive3` path. [ADR-3D-203](#adr-3d-203)'s apply-time
+check is guarded to ONE solid holding both letters, so: «קובייה ABCDA'B'C'D'» · «אלכסון AB» is refused
+`not-a-diagonal` (right); but «קובייה …» · «פירמידה SEFGH» · «אלכסון AB» — the same edge, a second solid
+beside the cube — is **accepted and its row stays green**, and so is «אלכסון ראשי AC» (a face diagonal
+called main). The plan's other two rows are moot or correct: a diagonal typed before any solid is refused
+upstream (`unknown-point` — there is no letter to hang it on, so nothing ever commits to revisit), and a
+pair reaching a free point or straddling two solids is genuinely unjudgeable and must stay accepted.
+
+**Class (standing rule 1).** *A claim checked only at the moment of application, with no arm over the
+final figure* — the 3-D twin of #966 / [ADR-499](06-decisions.md#adr-499). The guard was right (*"I cannot
+tell" must not become a refusal*); what was missing is the second layer that answers once the figure can.
+
+**Decision — one predicate, two layers.** `diagonalClaimVerdict(solids, a, b, kind)` (`engine/baseShapes.ts`,
+beside `isAnyDiagonal` / `isSpaceDiagonal`, so the two arms import one function and cannot drift): the
+solids that hold BOTH letters judge the pair; the claim holds when every judging solid has it as a diagonal
+of the claimed kind; **`null` when no solid holds both** — not yet checkable is not yet false (the 2-D
+ADR-104 rule). The apply arm (`segment3`, single-solid guard kept exactly as #859 built it) refuses on
+`false`; `derive3` asks the same question over the FINAL figure for every ok diagonal row after the fold
+and the symbol-retry pass, setting the row's own status to the same `not-a-diagonal { a, b, kind }` — the
+statement is named («אלכסון AB»), never the solid's internals, and the existing message pair (`notADiagonal`
+/ `notASpaceDiagonal`) renders it. Because `submit` keeps its prior on a red candidate row, the two-solid
+case is now refused at submit time through the fold, with the same words as the one-solid case.
+
+**Locks.** `issue-978-diagonal-verifier.test.ts` (14): two solids + an edge → refused naming the
+statement; two solids + a face diagonal claimed main → refused with the space kind; two solids + a true face
+diagonal / a true space diagonal → green; a straddling pair and a free-point pair stay accepted; the
+apply-time arm byte-identical (one solid, both kinds); the legitimate orders green; the no-solid row refused
+upstream; the predicate unit-locked on a cube and a pyramid (null / false / true, both kinds, both
+orientations). Standing rule 4: fixtures `diagonal-two-solids-978.geo3.json` (two disjoint solids, a face
+diagonal and a main diagonal, green — the false-positive net) and `diagonal-after-solid-978.geo3.json`
+(the legitimate order). `fixtures3/` sweep unchanged. **One lock flipped, deliberately:** ADR-3D-203's
+`issue-859-diagonal-claim.test.ts` pinned *"with two solids, the check stands down"* — that row IS the
+gap this issue measured, so it now asserts the refusal, and a new row keeps the guard's actual intent
+(a pair STRADDLING two solids still stands down: no solid holds both letters, so nothing guesses).

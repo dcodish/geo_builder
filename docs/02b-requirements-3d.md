@@ -178,7 +178,11 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   make the tool agree with the student instead of checking them.
 - **FR-CL-2 (Must)** — **No claim can escape by hiding inside a composite.** Every claim is recorded on
   the construction and verified on evaluation, so a claim arriving as part of a larger command is checked
-  like any other. *(Realised — `Construction3.claims`, verified in `derive3`.)*
+  like any other. *(Realised — `Construction3.claims`, verified in `derive3`.)* A **role noun** is a claim
+  of the same kind: «אלכסון AB» / «אלכסון ראשי AB» is checked at the apply moment when one solid can judge
+  it, and **again on the final figure** for every solid that holds both letters — a pair no solid holds
+  stays unjudged, never refused ([ADR-3D-203](06b-decisions-3d.md#adr-3d-203),
+  [ADR-3D-246](06b-decisions-3d.md#adr-3d-246)).
 - **FR-CL-3 (Must)** — **A refusal names the student's statement, not internal state**
   ([FR-SU-5](02w-requirements-workspace.md)).
 

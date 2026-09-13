@@ -557,3 +557,24 @@ export function isAnyDiagonal(faces: string[][], a: string, b: string): boolean 
 export function isSpaceDiagonal(faces: string[][], a: string, b: string): boolean {
   return spaceDiagonals(faces).some(([p, q]) => (p === a && q === b) || (p === b && q === a));
 }
+
+/**
+ * #978 ([ADR-3D-246](../../docs/06b-decisions-3d.md#adr-3d-246)) — THE diagonal-claim verdict, one predicate for
+ * both layers (the ADR-499 shape, ported): does «אלכסון AB» / «אלכסון ראשי AB» hold against the solids that
+ * can judge it? A solid judges the pair when its vertex set holds BOTH endpoints; the claim holds when
+ * every judging solid has the pair as a diagonal of the claimed kind. `null` = no solid holds both
+ * endpoints — not yet checkable is not yet false (ADR-104): a pair reaching a free point, or straddling two
+ * solids, stays unjudged rather than refused. `applyStep` asks this at the apply moment (the teaching
+ * refusal, #859); `derive3` asks it again over the FINAL figure, so a claim the apply moment could not
+ * judge — two solids on the canvas, the pair inside one of them — is judged once the fold is complete.
+ */
+export function diagonalClaimVerdict(
+  solids: readonly { ids: readonly string[]; faces: string[][] }[],
+  a: string,
+  b: string,
+  kind: 'any' | 'space',
+): boolean | null {
+  const judges = solids.filter((s) => s.ids.includes(a) && s.ids.includes(b));
+  if (judges.length === 0) return null;
+  return judges.every((s) => (kind === 'space' ? isSpaceDiagonal(s.faces, a, b) : isAnyDiagonal(s.faces, a, b)));
+}

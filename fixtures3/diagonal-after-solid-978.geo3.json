@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-09-13T12:36:53.887Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מלבן ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "rectangle",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "אלכסון AC",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "C",
+          "bare": true,
+          "diagonal": "any"
+        }
+      ]
+    }
+  ]
+}
