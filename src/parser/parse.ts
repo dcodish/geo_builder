@@ -1066,14 +1066,17 @@ const equilateral = shapeMacro(
 );
 
 /** "isosceles trapezoid ABCD" / "טרפז שווה שוקיים ABCD" → a trapezoid (AB∥DC) + equal legs |AD|=|BC|.
- *  Fires only when BOTH the isosceles and the trapezoid keyword are present (either order). */
+ *  Fires only when BOTH the isosceles and the trapezoid keyword are present (either order). The leg equality
+ *  is tagged `trapezoidLegs`: WHICH sides are the legs follows from the ASSUMED base pair, so when a stated ∥
+ *  pins the other pair («AD מקביל ל-BC») replay re-seats the equality onto the legs in force (|AB| = |DC|)
+ *  instead of asking the same pair to be both parallel and the equal legs (#989, ADR-506). */
 const isoscelesTrapezoid = shapeMacro(
   /(?:isosceles|שווה[\s-]?שוקיים)[\s\S]*(?:trapezoid|trapezium|טרפז)|(?:trapezoid|trapezium|טרפז)[\s\S]*(?:isosceles|שווה[\s-]?שוקיים)/i,
   /isosceles|שווה[\s-]?שוקיים|trapezoid|trapezium|טרפז/gi,
   4,
   (ids) => [
     { type: 'trapezoid', ids: [ids[0], ids[1], ids[2], ids[3]] },
-    { type: 'set-equal', a: ids[0], b: ids[3], c: ids[1], d: ids[2] }, // |AD| = |BC| (the two legs; AB ∥ DC)
+    { type: 'set-equal', a: ids[0], b: ids[3], c: ids[1], d: ids[2], trapezoidLegs: true }, // |AD| = |BC| (the two legs; AB ∥ DC assumed)
   ],
 );
 
@@ -1218,6 +1221,16 @@ function trapezoidMidsegment(s: string, ctx: ParseContext): AnyCommand[] | null 
     verts = [w, x, y, z];
     legs = [[x, y], [z, w]]; // sides XY and ZW — the legs (bases WX ∥ YZ)
     if (!verts.every((v) => (ctx.points ?? []).includes(v))) build = { type: 'trapezoid', ids: [w, x, y, z] };
+    else {
+      // #989 (ADR-506): a DRAWN trapezoid's bases are the pair IN FORCE, not the letters' order — a stated
+      // «BC מקביל ל-AD» re-seated the lowering, and the figure's own parallel edge-pair (ADR-169's
+      // `ctx.parallels`) is the one reader that cannot disagree with it. The named form keeps its
+      // letter-order default only for a ring the figure does not yet hold.
+      const sides: [Id, Id][] = [[w, x], [x, y], [y, z], [z, w]];
+      const sideOf = (e: readonly Id[]) => sides.findIndex((s) => (s[0] === up(e[0]) && s[1] === up(e[1])) || (s[0] === up(e[1]) && s[1] === up(e[0])));
+      const basePair = (ctx.parallels ?? []).map(([e1, e2]) => [sideOf(e1), sideOf(e2)]).find(([i, j]) => i >= 0 && j >= 0 && (i + j) % 2 === 0);
+      if (basePair) legs = sides.filter((_, i) => i !== basePair[0] && i !== basePair[1]) as [Id, Id][];
+    }
   } else {
     // (2) INCREMENTAL — the trapezoid is already drawn; resolve its bases from the figure's unique
     //     vertex-disjoint parallel edge-pair, and its legs from the adjacency (ADR-169's `ctx.parallels`).

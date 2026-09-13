@@ -8,6 +8,7 @@
  */
 
 import type { AnyCommand, Id } from '../engine/types';
+import { trapezoidRingInForce } from '../engine/shapeVariants';
 import type { Fact } from '../replay/core';
 import { commandPointIds } from '../replay/core';
 import type { DiscoveryLevel, MatchCtx, TheoremMatch } from './types';
@@ -375,12 +376,17 @@ export function parallelFacts(ctx: MatchCtx): Fact[] {
  */
 export function parallelPairs(ctx: MatchCtx): { pair: [[Id, Id], [Id, Id]]; fact: Fact }[] {
   const out: { pair: [[Id, Id], [Id, Id]]; fact: Fact }[] = [];
+  const stated = ctx.facts.map(cmdOf).filter((c): c is Extract<AnyCommand, { type: 'set-parallel' }> => c.type === 'set-parallel');
   for (const f of ctx.facts) {
     const c = cmdOf(f);
     if (c.type === 'set-parallel') {
       out.push({ pair: [[c.a, c.b], [c.c, c.d]], fact: f });
     } else if (PARALLEL_SIDED.has(c.type)) {
-      const [A, B, C, D] = (c as { ids: Id[] }).ids;
+      const ids = (c as { ids: Id[] }).ids;
+      // #989 (ADR-506): a trapezoid's one base-pair is the pair IN FORCE — the ring's sides 0/2 as named unless
+      // a stated ∥ pinned the other pair — read through the engine's one predicate, so the theorem spine can
+      // never surface the parallels family on a pair the figure no longer draws.
+      const [A, B, C, D] = c.type === 'trapezoid' ? trapezoidRingInForce(ids, stated).ring : ids;
       out.push({ pair: [[A, B], [C, D]], fact: f }); // AB ∥ DC
       if (c.type !== 'trapezoid') out.push({ pair: [[B, C], [D, A]], fact: f }); // BC ∥ AD (two-pair shapes)
     }

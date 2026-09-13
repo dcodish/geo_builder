@@ -1,0 +1,75 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-09-13T12:00:00.000Z",
+  "name": "issue-989-iso-pinned",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "טרפז שווה שוקיים ABCD, AD מקביל ל-BC",
+      "group": "g0",
+      "cmd": {
+        "type": "trapezoid",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "טרפז שווה שוקיים ABCD, AD מקביל ל-BC",
+      "group": "g0",
+      "cmd": {
+        "type": "set-equal",
+        "a": "A",
+        "b": "D",
+        "c": "B",
+        "d": "C",
+        "trapezoidLegs": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "טרפז שווה שוקיים ABCD, AD מקביל ל-BC",
+      "group": "g0",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.3",
+      "utterance": "טרפז שווה שוקיים ABCD, AD מקביל ל-BC",
+      "group": "g0",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.4",
+      "utterance": "טרפז שווה שוקיים ABCD, AD מקביל ל-BC",
+      "group": "g0",
+      "cmd": {
+        "type": "set-parallel",
+        "a": "A",
+        "b": "D",
+        "c": "B",
+        "d": "C"
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

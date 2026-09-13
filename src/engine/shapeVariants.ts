@@ -257,6 +257,45 @@ export interface ChoiceFact {
 
 const sameSeg = (p: [Id, Id], q: [Id, Id]): boolean => seg(p[0], p[1]) === seg(q[0], q[1]);
 
+/** A ring's sides as segments, by index: side i = [ids[i], ids[i+1]] (cyclic). */
+const ringSides = (ids: readonly Id[]): [Id, Id][] => ids.map((_, i) => [ids[i], ids[(i + 1) % ids.length]] as [Id, Id]);
+
+/**
+ * #989 ([ADR-506](docs/06-decisions.md#adr-506)) — a trapezoid's RING IN FORCE. The `trapezoid` lowering makes
+ * sides 0 and 2 of the ring it receives parallel (AB ∥ DC for «טרפז ABCD»): which pair is parallel is a
+ * property of the noun and the letters AS NAMED, never of typing order or of which vertex happens to be
+ * built last (the 3-D rule of ADR-3D-240, ported). A student who then STATES the other pair («BC מקביל
+ * ל-AD») is not adding a second parallel pair — that would be a parallelogram — but naming which pair the
+ * trapezoid's is: the stated pair PINS the assumption, so the ring rotates by one and the lowering builds THAT
+ * pair. Both pairs stated is a parallelogram the student asked for (the ring stays as named; the second pair
+ * remains a constraint and the verifier's trapezoid-morph flag says so honestly). ONE predicate for every
+ * reader of "which pair is parallel": the replay pre-scan (which re-seats the lowering and the isosceles
+ * macro's legs), the theorem spine (`parallelPairs`) and `unstatedChoices` (is the choice still the tool's).
+ */
+export function trapezoidRingInForce(
+  ids: readonly Id[],
+  parallels: readonly { a: Id; b: Id; c: Id; d: Id }[],
+): { ring: [Id, Id, Id, Id]; pinned: boolean } {
+  const [a, b, c, d] = ids as [Id, Id, Id, Id];
+  const sides = ringSides(ids);
+  const statesPair = (i: number, j: number) =>
+    parallels.some(
+      (p) =>
+        (sameSeg([p.a, p.b], sides[i]) && sameSeg([p.c, p.d], sides[j])) ||
+        (sameSeg([p.a, p.b], sides[j]) && sameSeg([p.c, p.d], sides[i])),
+    );
+  const pair02 = statesPair(0, 2);
+  const pair13 = statesPair(1, 3);
+  if (pair13 && !pair02) return { ring: [b, c, d, a], pinned: true };
+  return { ring: [a, b, c, d], pinned: pair02 || pair13 };
+}
+
+/** The LEGS of a trapezoid ring — sides 3 and 1 (the non-parallel pair), as the |AD| = |BC| tuple the
+ *  isosceles macro states them. */
+export function trapezoidLegs(ring: readonly Id[]): [[Id, Id], [Id, Id]] {
+  return [[ring[0], ring[3]], [ring[1], ring[2]]];
+}
+
 export function unstatedChoices(facts: readonly ChoiceFact[]): UnstatedChoice[] {
   const enabled = facts.filter((f) => f.enabled);
   const explicitEqs = enabled.map((f) => f.cmd).filter((c): c is Extract<AnyCommand, { type: 'set-equal' }> => c.type === 'set-equal');
@@ -291,10 +330,9 @@ export function unstatedChoices(facts: readonly ChoiceFact[]): UnstatedChoice[] 
       // AB ∥ DC for the plain «טרפז ABCD» exactly as for the isosceles one. The isosceles macro's leg equality
       // |AD| = |BC| additionally tells the student which sides that assumption made the legs.
       const legsStated = explicitEqs.some((eq) => eqMatchesPair(eq, [a, d, b, cc]));
-      const ring: [Id, Id][] = [[a, b], [b, cc], [cc, d], [d, a]];
-      const onRing = (x: Id, y: Id) => ring.some((s) => sameSeg(s, [x, y]));
-      const pinned = parallels.some((pl) => onRing(pl.a, pl.b) && onRing(pl.c, pl.d));
-      if (pinned) continue;
+      // #989 (ADR-506): pinned = a stated ∥ on either opposite pair — the ONE predicate the replay pre-scan
+      // re-seats the lowering by, so "the note is gone" and "the figure draws the stated pair" never disagree.
+      if (trapezoidRingInForce(c.ids, parallels).pinned) continue;
       out.push(
         legsStated
           ? { factId: f.id, kind: 'parallel-pair', shape: 'isosceles-trapezoid', ids: [...c.ids], parallel: [[a, b], [d, cc]], legs: [[a, d], [b, cc]] }

@@ -505,6 +505,18 @@ pure derivation, one table, one text builder, two render sites:
   stated ∥ on two ring sides). A new shape is a row. **Derived on every render** like `hasVariant`, so the
   note appears with the fact, follows the cycle, and vanishes when a later fact pins the choice or the fact
   is disabled, removed or broken. Nothing is stored.
+- **The trapezoid's ring in force (#989, [ADR-506](06-decisions.md#adr-506)).** The `trapezoid` lowering makes
+  sides 0 and 2 of the ring it receives parallel, and `trapezoidRingInForce(ids, statedParallels)` (same file)
+  is the ONE reader of which ring that is: as named (AB ∥ DC for «טרפז ABCD»), rotated by one when a stated ∥
+  names sides 1/3 and none names 0/2 — so a stated pair PINS the assumption instead of stacking a second
+  parallel pair (a parallelogram under the morph flag). The replay pre-scan (the ADR-341 `trapRotate` seam)
+  lowers the fact on that ring and re-seats the isosceles macro's leg equality (tagged `trapezoidLegs`, the
+  ADR-239 `softPair` shape) onto the legs in force; the theorem spine's `parallelPairs` and `unstatedChoices`
+  (pinned ⇒ no note) read the same ring. In `apply.ts` the derived vertex is whichever ring vertex is still
+  missing (`trapezoidDerivedSlot`) and `trapezoidOffset` derives it so the ring's pair is parallel from every
+  seat — the trapezoid's ring is never rotated by the composition normaliser, because a rotation by one is
+  exactly what swapped the pair with typing order («משולש ABC» then «טרפז ABCD» drew BC ∥ AD). Not cyclable:
+  #973's ruling — an assumption the tool SAYS until the student states it.
 - **`unstatedChoiceText(choice, t)`** (`ui/unstatedChoice.ts`) builds the sentence in the student's
   language: what is drawn, the canonical pinning sentence (a form the i18n net types as the next line and
   asserts removes the note — measured, never assumed), and the cycle button's own label. Templates under

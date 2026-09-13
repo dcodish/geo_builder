@@ -183,7 +183,10 @@ On-demand, **opt-in** annotation of what the figure geometrically *is* — the *
   row says so**: what is drawn now, the sentence that would state it, and that «הציגו תצורה אחרת» cycles
   it. The note is persistent, never a one-shot: it disappears the moment the student states the choice, and
   returns if that statement is turned off. The suggested sentence is always one the student can type as the
-  next line — never a parenthesised run inside a Hebrew sentence. *(Realised —
+  next line — never a parenthesised run inside a Hebrew sentence. For a trapezoid the assumed pair is a
+  property of the **noun and the letters as named** (AB ∥ DC for «טרפז ABCD»), never of typing order or of
+  which vertex is drawn last, and a stated pair **pins** it: «BC מקביל ל-AD» re-seats the trapezoid onto
+  that pair — it never adds a second parallel pair ([ADR-506](06-decisions.md#adr-506)). *(Realised —
   [ADR-502](06-decisions.md#adr-502), #973; the plain trapezoid joined the rule on the first play, #996.)*
 - **FR-HS-7 (Should)** — **Relabel** a point everywhere (`rename E to G` / `שנה שם E ל-G`) so the lettering can match a textbook figure, without changing the geometry. The rename rewrites that letter across every step and is undoable; it refuses to relabel onto a letter already in use (no silent merge of two points). Pairs with the naming-order + orientation levers documented in [12-letter-placement.md](12-letter-placement.md). (See [ADR-035](06-decisions.md#adr-035).)
 - **FR-HS-8 (Should)** — **Merge** two *existing* points into one (`merge F into E` / `מזג F ל-E`) — the explicit fold the rename deliberately refuses. The target survives; the source's own definition is dropped, every reference to the source is rewritten to the target, and any fact that collapses (a `segment EF` → `EE`) is removed. Undoable as one step. Refuses to fold a **shape vertex** (it has no standalone definition to drop — edit the shape instead) and refuses when either point is missing (merging into a *new* letter is a rename, not a merge).

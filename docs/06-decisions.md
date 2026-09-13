@@ -11011,3 +11011,67 @@ genuine negatives after a space, `=`, `(`, `,` and at line start stay negative; 
 capture-free. Standing rule 4: fixture `issue-975-maqaf-not-sign.geo.json` (the triangle + angle + circle
 + radius sequence, green and verified). The lexical ratchet and `lexicon-consumers` are byte-identical
 (the atom's spelling changed, not its inline count).
+
+## ADR-506 — A TRAPEZOID'S PARALLEL PAIR IS A PROPERTY OF THE RING AS NAMED, AND A STATED PAIR PINS IT (#989)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #989 (bug, P2 — found while building #985; amended by the operator's PR #993 play, T11) · round #998 · bug route (landed on `main`)
+**Requirements:** [02](02-requirements.md) FR-HS-13 — one sentence (the assumed pair is a property of the noun and letters; a stated pair pins it) · **Design:** [04](04-design.md) "An unstated choice is SAID" — the trapezoid's ring in force
+
+**The defect, measured on `d440f01`.** Which pair «טרפז ABCD» made parallel depended on what was typed before
+it: alone, AB ∥ DC; after «משולש ABC», **BC ∥ AD** (sin(AB, DC) = 0.41 at every seed). And when the student
+then STATED a pair — «BC מקביל ל-AD» — the tool kept its own pair and added theirs: a parallelogram, drawn
+under the amber trapezoid-morph flag, with the ADR-502 note gone (a stated ∥ counts as "stated") while the
+figure did the opposite of what the note promised. «טרפז שווה שוקיים ABCD, AD מקביל ל-BC» asked the same pair
+to be both parallel and the equal legs.
+
+**Class (standing rule 1).** *Three readers of "which pair is parallel" each read it off letter order in a
+template slot.* (1) The standalone lowering derived slot 2 from slot 3 along slot 0→1; (2) the composed path
+rotated the ring so the missing vertex landed on slot 2 (`normalizeShapeComposition`) and then read the
+pair against the rotated letters; (3) the isosceles macro hard-coded the legs as AD/BC. The pair was not a
+choice at all — it was baked into a construction — so a later statement could only stack, never re-seat.
+The kite's axis and the isosceles apex get this right because a stated equality PINS the variant
+([ADR-138](#adr-138)); the right-angle seat got it in [ADR-481](#adr-481). The 3-D product had already
+ruled *read from the ring, never from the letters' order* ([ADR-3D-240](06b-decisions-3d.md#adr-3d-240)).
+
+**Decision — one predicate, one derivation, one pre-scan.**
+
+1. **`trapezoidRingInForce(ids, statedParallels)`** (`engine/shapeVariants.ts`, the file that owns "which
+   pair is unstated"): the pair is sides 0 and 2 of the ring AS NAMED (AB ∥ DC for «טרפז ABCD»); a stated ∥
+   on sides 1 and 3 — and none on 0/2 — rotates the ring by one, so the lowering builds the stated pair.
+   Both pairs stated is the parallelogram the student asked for: the ring stays as named, the second pair
+   remains a constraint, and the morph flag says so honestly. Every reader asks this one function: the replay
+   pre-scan, the theorem spine's `parallelPairs`, and `unstatedChoices` (pinned ⇒ no note) — so "the note is
+   gone" and "the figure draws the stated pair" can never disagree again.
+2. **`trapezoidOffset(ring, missing, k)`** (`engine/apply.ts`): the derived vertex leaves its own base
+   partner along the other base, read across the ring — one derivation for every seat, so the pair is the
+   ring's whichever vertex is built last. The `trapezoid` case seats the derived vertex on whichever ring
+   vertex is still missing (`trapezoidDerivedSlot`, slot 2 when free), and the trapezoid's ring is **never
+   rotated** by the composition normaliser (`derivedSlotsOf`): only when all four vertices exist is there a
+   derived-slot clash for M1 to lower. The step-time conflict check learns the same seat rule (the
+   empty-construction probe's slot-2 corner is not where apply will build). The standalone figure is
+   byte-identical to before.
+3. **The replay pre-scan** (the ADR-341 `trapRotate` seam, position-independent): the ring in force replaces
+   the fact's ids at lowering, the ADR-341 length-order rotation composes on it, and the isosceles macro's
+   leg equality — now tagged **`trapezoidLegs`** (the ADR-239 `softPair` shape: a macro output derived from
+   an assumption, marked so the assumption's re-seat can find it) — is re-seated onto the legs of the ring in
+   force. A student's OWN «AD = BC» carries no tag and is never touched. The memo signature (ADR-280) carries
+   the re-seat.
+4. **`trapezoidMidsegment`**'s named form reads a DRAWN ring's bases from the figure's own parallel pair
+   (`ctx.parallels`, ADR-169) instead of letter order — the fourth reader of the same assumption.
+
+**Not cyclable — by ruling.** #973's 2026-09-11 ruling and PR #993: the pair is an assumption the tool SAYS
+on the step row until the student states it, not an ADR-138 variant; «הציגו תצורה אחרת» never flips it. A
+stated pair pins; nothing else moves it.
+
+**Locks.** `issue-989-trapezoid-pair.test.ts` (21): the same pair alone and after each of the four triangles
+(every seat), seeds 0–3, sin < 1e-9, with the stability lock (the triangle's points do not move); the
+standalone figure byte-identical; «BC מקביל ל-AD» / «AD מקביל ל-BC» / after a triangle ⇒ BC ∥ AD only, no
+morph flag, every fact ok; the restated default unchanged; both pairs ⇒ the flagged parallelogram; a length
+order on the pinned bases reads the ring in force («AD > BC» builds green — over-constrained before); the
+ADR-502 note vanishes on the pin and, while unstated, names the pair the figure DRAWS (it said AB ∥ DC over a
+BC ∥ AD figure before); the isosceles macro's legs follow the pinned pair in all three orders (|AB| = |DC|);
+the iso-trapezoid alone unchanged; a student's own equality never re-seated; the midsegment joins the legs in
+force; the predicate, the derivation and the seat picker unit-locked. Standing rule 4: fixtures
+`issue-989-trapezoid-stated-pair`, `issue-989-isosceles-trapezoid-pinned`, `issue-989-trapezoid-after-triangle`.
+Known and unchanged: the iso-trapezoid at raw seed 1 samples a parallelogram (both before and after) — the
+app's seed selection avoids it; the locks use the app's seed.

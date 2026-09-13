@@ -18,7 +18,7 @@ import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -491,14 +491,37 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
     .filter((f) => f.enabled)
     .flatMap((f) => lowerOne(f.cmd, symtab))
     .filter((c): c is Extract<Command, { type: 'set-length-order' }> => c.type === 'set-length-order');
+  // #989 (ADR-506): the trapezoid's parallel pair is the ring's sides 0 and 2 AS NAMED; a stated ∥ on the
+  // OTHER pair («BC מקביל ל-AD») PINS it — the ring rotates by one (`trapezoidRingInForce`, the one predicate
+  // the theorem spine and the unstated-choice note read too), so the lowering builds the stated pair instead
+  // of stacking a second parallel pair onto its own (a parallelogram under an amber flag). The isosceles
+  // macro's leg equality (tagged `trapezoidLegs`) is re-seated onto the legs of the ring in force, so
+  // «טרפז שווה שוקיים ABCD» + «AD מקביל ל-BC» draws equal legs |AB| = |DC| — never the same pair asked to be
+  // both parallel and the equal legs. Position-independent (typed before or after the shape).
+  const statedParallels = facts
+    .filter((f) => f.enabled)
+    .flatMap((f) => lowerOne(f.cmd, symtab))
+    .filter((c): c is Extract<Command, { type: 'set-parallel' }> => c.type === 'set-parallel');
   const trapRotate = new Map<string, [Id, Id, Id, Id]>();
+  const legsReseat = new Map<string, { a: Id; b: Id; c: Id; d: Id }>();
   for (const f of facts) {
     if (!f.enabled || f.cmd.type !== 'trapezoid') continue;
-    const [a, b, c, d] = f.cmd.ids;
+    const named = f.cmd.ids;
+    let ring = trapezoidRingInForce(named, statedParallels).ring;
+    if (ring[0] !== named[0]) {
+      const [[p1, p2], [q1, q2]] = trapezoidLegs(named); // the legs the macro ASSUMED (|AD| = |BC|)
+      const [[r1, r2], [s1, s2]] = trapezoidLegs(ring); // the legs in force
+      for (const g of facts) {
+        if (!g.enabled || g.cmd.type !== 'set-equal' || !g.cmd.trapezoidLegs) continue;
+        if (eqMatchesPair(g.cmd, [p1, p2, q1, q2])) legsReseat.set(g.id, { a: r1, b: r2, c: s1, d: s2 });
+      }
+    }
+    const [a, b, c, d] = ring;
     const samePair = (x1: Id, y1: Id, x2: Id, y2: Id) => (x1 === x2 && y1 === y2) || (x1 === y2 && y1 === x2);
     // `set-length-order {a,b,c,d}` asserts |ab| < |cd| — a conflict names the template-LONG base (a,b) as
-    // the shorter side and the template-short top (c,d) as the longer.
-    if (lengthOrders.some((o) => samePair(o.a, o.b, a, b) && samePair(o.c, o.d, c, d))) trapRotate.set(f.id, [c, d, a, b]);
+    // the shorter side and the template-short top (c,d) as the longer (ADR-341). Read on the ring in force.
+    if (lengthOrders.some((o) => samePair(o.a, o.b, a, b) && samePair(o.c, o.d, c, d))) ring = [c, d, a, b];
+    if (ring.some((id, i) => id !== named[i])) trapRotate.set(f.id, ring);
   }
   // A common-tangent macro's touch↔circle PAIRING is a soft default (`softPair`, ADR-239): "AB משיק
   // משותף" states only that AB touches both circles, never WHICH touch rides WHICH circle — the macro
@@ -605,6 +628,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       soft: [...supersededSoft].filter(inPrefix).map((id) => factIdxById.get(id)).sort((a, b) => a! - b!),
       rt: [...rtReorder].filter(([id]) => inPrefix(id)).map(([id, ids]) => [factIdxById.get(id), ids]),
       trap: [...trapRotate].filter(([id]) => inPrefix(id)).map(([id, ids]) => [factIdxById.get(id), ids]),
+      legs: [...legsReseat].filter(([id]) => inPrefix(id)).map(([id, v]) => [factIdxById.get(id), v]),
       msr: [...msRiderMove].filter(([id]) => inPrefix(id)).map(([id, v]) => [factIdxById.get(id), v]),
       mss: [...msSvMove].filter(([id]) => inPrefix(id)).map(([id, v]) => [factIdxById.get(id), v]),
       ctr: [...centrePromotions].sort(),
@@ -771,6 +795,9 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       // Rotate a trapezoid whose stated base order contradicts the template's long-base default (ADR-341).
       const trot = trapRotate.get(f.id);
       if (trot) engineCmds = engineCmds.map((ec) => (ec.type === 'trapezoid' ? { ...ec, ids: trot } : ec));
+      // Re-seat the isosceles-trapezoid macro's leg equality onto the legs of the ring in force (#989, ADR-506).
+      const legs = legsReseat.get(f.id);
+      if (legs) engineCmds = engineCmds.map((ec) => (ec.type === 'set-equal' ? { ...ec, ...legs } : ec));
       // Promote anonymous centres a semantic centre-use named (ADR-342, '@ctr-O' → 'O').
       engineCmds = promoteCentres(engineCmds as Command[]);
       // Swap a common-tangent group's soft touch↔circle pairing to the explicitly-stated one (ADR-239 pre-scan).

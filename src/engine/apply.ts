@@ -366,8 +366,45 @@ const DERIVED_SLOTS: Partial<Record<Command['type'], number[]>> = {
  * Shared by `applyCommand` (which performs the lowering) and `commandConflict` (which must not refuse
  * what apply will reinterpret) so the two can never drift.
  */
-export function shapeLowersToConstraints(prev: Construction, cmd: Command): boolean {
+/**
+ * The derived slots the rotation / M1 machinery judges for THIS command on THIS construction. Every quad
+ * family reads the static table — except the trapezoid (#989, [ADR-506](../../docs/06-decisions.md#adr-506)):
+ * its apply case seats its own derived vertex on whichever ring vertex is still missing
+ * (`trapezoidDerivedSlot`), because rotating its ring by one would swap WHICH pair the lowering makes
+ * parallel (AB ∥ DC as named became BC ∥ AD after «משולש ABC»). So the trapezoid's ring is never rotated,
+ * and only when every vertex already exists is there a derived-slot clash for M1 to judge.
+ */
+function derivedSlotsOf(prev: Construction, cmd: Command): number[] | undefined {
   const slots = DERIVED_SLOTS[cmd.type];
+  if (cmd.type !== 'trapezoid' || !slots || !('ids' in cmd)) return slots;
+  return (cmd.ids as Id[]).every((id) => prev.objects.some((o) => o.id === id)) ? slots : [];
+}
+
+/** The slot of the trapezoid vertex the lowering DERIVES: the template's top corner (slot 2) when it is
+ *  free, else the first missing vertex — so a trapezoid built on three existing points completes the
+ *  missing one with the ring's NAMED pair (sides 0 and 2) parallel, whichever vertex that is. */
+export function trapezoidDerivedSlot(objects: readonly GeoObject[], ids: readonly Id[]): number {
+  const exists = (i: number) => objects.some((o) => o.id === ids[i]);
+  for (const i of [2, 3, 0, 1]) if (!exists(i)) return i;
+  return 2;
+}
+
+/**
+ * The `scaled-offset` that derives ring vertex `missing` of a trapezoid so that sides 0 and 2 of the ring
+ * AS GIVEN are parallel (#989, [ADR-506](../../docs/06-decisions.md#adr-506)): the vertex leaves its own
+ * base partner along the OTHER base, read across the ring —
+ *   missing P2: P2 = P3 + k·(P1 − P0) · missing P3: P3 = P2 + k·(P0 − P1)
+ *   missing P0: P0 = P1 + k·(P3 − P2) · missing P1: P1 = P0 + k·(P2 − P3)
+ * One derivation for every seat, so "which pair is parallel" is decided by the ring, never by the slot.
+ */
+export function trapezoidOffset(ids: readonly Id[], missing: number, k: number): GeoObject {
+  const partner = [1, 0, 3, 2][missing]; // the missing vertex's base partner (P0↔P1 on side 0, P2↔P3 on side 2)
+  const across = [3, 2, 1, 0]; // the other base's endpoint adjacent to each vertex (P0–P3, P1–P2)
+  return { kind: 'scaled-offset', id: ids[missing], anchor: ids[partner], from: ids[across[partner]], to: ids[across[missing]], k };
+}
+
+export function shapeLowersToConstraints(prev: Construction, cmd: Command): boolean {
+  const slots = derivedSlotsOf(prev, cmd);
   if (!slots || !('ids' in cmd)) return false;
   const ids = cmd.ids as Id[];
   const set = new Set(ids);
@@ -398,7 +435,7 @@ export function shapeLowersToConstraints(prev: Construction, cmd: Command): bool
  * rotates only when it strictly reduces derived-slot clashes.
  */
 export function normalizeShapeComposition(prev: Construction, cmd: Command): Command {
-  const slots = DERIVED_SLOTS[cmd.type];
+  const slots = derivedSlotsOf(prev, cmd);
   if (!slots || !('ids' in cmd)) return cmd;
   const ids = cmd.ids as Id[];
   const n = ids.length;
@@ -1023,11 +1060,17 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     }
 
     case 'trapezoid': {
-      // A,B,D free; C offset from D parallel to AB (so AB ∥ DC), shorter by
-      // default. Long base AB on the x-axis, shorter top DC above it.
+      // Three ring vertices free, the fourth DERIVED so that sides 0 and 2 of the ring AS NAMED are
+      // parallel (AB ∥ DC for «טרפז ABCD»), shorter by default: long base AB on the x-axis, shorter top DC
+      // above it. Which vertex is derived is whichever is still missing (#989, ADR-506) — the ring is never
+      // rotated to move the gap onto a template slot, because that swapped the parallel pair with typing
+      // order («משולש ABC» then «טרפז ABCD» drew BC ∥ AD). `trapezoidOffset` derives the missing vertex from
+      // its base partner along the other base, so the pair is the ring's whichever seat it is built at.
       const [a, b, c, d] = cmd.ids;
-      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: d, x: 1, y: 4 }], pos);
-      addObj(objects, { kind: 'scaled-offset', id: c, anchor: d, from: a, to: b, k: 0.6 });
+      const missing = trapezoidDerivedSlot(objects, cmd.ids);
+      const template = [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 4.6, y: 4 }, { id: d, x: 1, y: 4 }];
+      placeBase(objects, template.filter((_, i) => i !== missing), pos);
+      addObj(objects, trapezoidOffset(cmd.ids, missing, 0.6));
       quadEdges(objects, a, b, c, d, 'trapezoid');
       break;
     }

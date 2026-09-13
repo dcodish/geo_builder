@@ -9,7 +9,7 @@
 
 import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Polygon, SolveDirective, Vec } from './types';
 import { LEN_EPS, isGeoPoint, isOrderConstraint } from './types';
-import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeLowersToConstraints, wouldInvertDependency } from './apply';
+import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
 import { lower } from './lower';
 import { evaluate, resolveDriven, drivenConstraintsOf } from './evaluate';
 import type { EvalResult } from './evaluate';
@@ -130,6 +130,10 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     // case reinterprets it as a right-angle CONSTRAINT (Q8, ADR-223 — semantic vertex order, so it
     // is not in the quad-family DERIVED_SLOTS rotation/lowering machinery).
     if (cmd.type === 'right-triangle' && o.kind === 'perp-offset' && isGeoPoint(existing)) continue;
+    // A trapezoid seats its derived vertex on whichever ring vertex is still MISSING (#989, ADR-506), so the
+    // empty-construction probe's slot-2 corner is not where apply will build: an existing point there is a
+    // reused base, not a redefinition, whenever apply's seat is a different vertex.
+    if (cmd.type === 'trapezoid' && o.kind === 'scaled-offset' && isGeoPoint(existing) && cmd.ids[trapezoidDerivedSlot(prev.objects, cmd.ids)] !== o.id) continue;
     // A QUAD-family shape's derived corner (perp-offset / parallelogram-vertex / rotated /
     // scaled-offset / derived, from the empty-construction probe above) landing on an existing point
     // is NOT a redefinition when apply will LOWER the shape to its defining constraints over the
