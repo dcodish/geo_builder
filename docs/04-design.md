@@ -547,3 +547,22 @@ pure derivation, one table, one text builder, two render sites:
   (#996, ADR-502 Am. 1) — the table gained a row, which is what the table is for. A suggested pin sentence is
   always a bare next line (#997): a parenthesised Latin run inside a Hebrew sentence reorders in the box while
   it is typed.
+
+## A free point's admissible region rides on the point (#556, [ADR-511](06-decisions.md#adr-511))
+
+- **Declaration.** A construction whose success needs a free operand on one side of a circle — the apex
+  of a tangent or a secant, a student's own «M מחוץ למעגל» / «M בתוך המעגל» — says so through the ADR-254
+  side record (`point-circle-side`), emitted right after the operand's own placement. The rule keeps its
+  default; the record is the statement's implication made explicit (ADR-052).
+- **Record.** The `point-circle-side` apply case (`engine/apply.ts`) is the family's ONE chokepoint: it
+  seeds a new free point on the stated side, re-seats an existing non-pinned one only when it is on the
+  wrong side, and in both cases writes the region onto the point — `FreePoint.region: { circle, side }[]`,
+  one entry per circle. A pinned point (the student's explicit placement) is never moved or annotated.
+- **Sampling.** `applySeed` (`engine/sample.ts`) judges each region-bound point on the SAMPLED figure's own
+  circle — one evaluate of the sampled construction, or of the prefix up to the point with the constraints
+  it can satisfy when the full figure cannot build — and re-seats a wrong-side sample radially with the
+  point's own rng (outside → [1.15, 1.8]·r, inside → [0.25, 0.7]·r). Deterministic per seed; seed 0 never
+  samples, so the drawing the student first sees is unchanged.
+- **Judgement stays where it was.** The verifier reports a contradicted side; `meetsRequirements` gates
+  «הציגו תצורה אחרת» on it. The sampler now proposes configurations that pass that bar instead of ones the
+  bar discards (the two-tangents figure lost 7 of 24 seeds that way).

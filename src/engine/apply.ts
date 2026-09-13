@@ -1358,10 +1358,15 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         }
         return { x: c.x + rad, y: c.y };
       };
+      // #556 (ADR-511): the side is also the point's admissible REGION for the sampler — recorded on the
+      // free point itself (`region`), so `applySeed` keeps every sampled configuration on the stated side.
+      const region = { circle: cmd.circle, side: cmd.side };
+      const withRegion = (fp: Extract<GeoObject, { kind: 'free-point' }>): typeof fp =>
+        fp.region?.some((r) => r.circle === region.circle) ? { ...fp, region: fp.region.map((r) => (r.circle === region.circle ? region : r)) } : { ...fp, region: [...(fp.region ?? []), region] };
       const existing = objects.find((o) => o.id === cmd.id);
       if (!existing) {
         const p = seedSpot();
-        objects.push({ kind: 'free-point', id: cmd.id, x: p.x, y: p.y }); // a real free DOF (ADR-052) — not pinned
+        objects.push(withRegion({ kind: 'free-point', id: cmd.id, x: p.x, y: p.y })); // a real free DOF (ADR-052) — not pinned
       } else if (existing.kind === 'free-point' && !existing.pinned && centre) {
         // M1: a side statement about an EXISTING point is a statement about that point, never a
         // re-creation. An under-determined (non-pinned) free point currently on the WRONG side gets its
@@ -1369,11 +1374,9 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         // pinned/derived/parametric point is left where its definition puts it (the verifier reports).
         const d = dist({ x: existing.x, y: existing.y }, centre);
         const wrong = cmd.side === 'outside' ? d <= rr : d >= rr;
-        if (wrong) {
-          const p = seedSpot();
-          const i = objects.findIndex((o) => o.id === cmd.id);
-          objects[i] = { ...existing, x: p.x, y: p.y };
-        }
+        const p = wrong ? seedSpot() : { x: existing.x, y: existing.y };
+        const i = objects.findIndex((o) => o.id === cmd.id);
+        objects[i] = withRegion({ ...existing, x: p.x, y: p.y });
       }
       break;
     }

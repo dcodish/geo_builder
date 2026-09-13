@@ -110,7 +110,10 @@ describe('membership presupposes its circle (#362, ADR-409)', () => {
     // must not be swallowed by pointVsCircle's side reading (its anchored $ guard) — the
     // compound has content after the circle ref and belongs to the tangent rules.
     if (r.ok) {
-      expect(r.commands.some((c) => c.type === 'point-circle-side')).toBe(false);
+      // the tangent construction is what proves ownership; the apex's own outside declaration (#556 /
+      // ADR-511) is the tangents rule speaking, not the side rule claiming the line
+      expect(r.commands.some((c) => c.type === 'circle-circle-intersection'), 'the tangent construction').toBe(true);
+      expect(r.commands.filter((c) => c.type === 'point-circle-side').length, 'exactly the apex declaration').toBe(1);
     }
   });
 });
