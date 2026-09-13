@@ -189,8 +189,7 @@ describe('#942 — a real figure’s coincidence reaches the canvas', () => {
     // restores the two-stacked-labels defect with every other lock still green.
     // #945 (ADR-513) added `degeneracies` to the same destructuring; the pin asks for the coincidences
     // member of that line, not the literal tail.
-    expect(app).toMatch(/coincidences[^
-]*} = display/);
+    expect(app).toMatch(/\bcoincidences\b[^\n]*\} = display/);
     expect(app).toContain('coincidences={coincidences}');
   }, 900000);
 });
