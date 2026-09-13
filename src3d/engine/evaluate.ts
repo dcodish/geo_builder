@@ -383,7 +383,7 @@ export interface Resolved3 {
    *  the pool holds more than one solution, since that is the only case where a coordinate can be a
    *  branch choice. A coordinate is knowledge only when these agree; without it, a deterministic
    *  branch pick reads seed-stable and prints as fact. */
-  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number> } | null;
+  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this). */ scalarConsumed?: () => number } | null;
   /** #930 (ADR-3D-236) — each vec-def RATIO symbol's solved value («SN = k·SC» → k), so a consumer can
    *  read what the branch pick actually chose. The sign verifier needs it: without it a correctly
    *  honoured «k חיובי» reported `sign-unsatisfiable`, because the verifier knew how to read a figure
@@ -770,6 +770,12 @@ function solve3x3(r1: Vec3, r2: Vec3, r3: Vec3, rhs: Vec3): Vec3 | null {
  * (#292) instead of spuriously adding the whole +7 gauge. Closed form (freeGauge folded in):
  *   shapeDof = max(0, dims − max(0, pinCount − 7) − scalarPins) + freeT + param.
  * An estimate by design — honest about what "show another configuration" can still vary.
+ *
+ * Two later corrections, both under the ADR-3D-124 discipline (the count reads the resolution, never a
+ * second opinion): #370 (ADR-3D-247) — when the placement is SAMPLED (`placementSampled3`) its 6 DOFs are
+ * counted and the gauge allowance is the scale alone (7 → 1); #990 (ADR-3D-248) — `scalarPins` is not a
+ * count but the MEASURED rank of the pins' response to the dims (`pivot.scalarConsumed`), so a pin the
+ * corner's construction already satisfies (a quad-shape's one-unknown arm) consumes nothing.
  */
 export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   let dims = 0;
@@ -835,9 +841,19 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     }
     // #292: report SHAPE DOF — subtract the free (unpinned) gauge so a similarity-invariant drive
     // (⊥/angle/ratio) lowers the cue rather than adding +7; scalarPins are those shape-reducing drives.
-    return Math.max(0, dims - Math.max(0, pinCount - 7) - c.scalarPins.length) + freeT + param;
+    // #990 (ADR-3D-248): what the scalar pins CONSUME is measured by the resolution (the rank of their
+    // residuals' response to the dims), not inferred from their count — a pin the corner's construction
+    // already satisfies consumes nothing. The count is the fallback only where no solution recorded it.
+    const consumed = resolved.pivot.scalarConsumed?.() ?? c.scalarPins.length;
+    // #370 (ADR-3D-247 — the 2026-08-13 ruling "count them"): when the placement is SAMPLED (an absolute
+    // object on the canvas, the translation gauge still free — `placementSampled3`, the sampler's own
+    // predicate, so the count and the sampling share one source) the 6 placement DOFs are real: only the
+    // scale is still gauge, so the allowance absolute pins consume before they cost shape drops from 7 to 1.
+    const placement = placementSampled3(c) ? 6 : 0;
+    return Math.max(0, dims + placement - Math.max(0, pinCount - (7 - placement)) - consumed) + freeT + param;
   }
-  return dims + freeT + param;
+  // #370: a floating figure beside an absolute object — its placement is sampled, and counted.
+  return dims + (placementSampled3(c) ? 6 : 0) + freeT + param;
 }
 
 // ---------------------------------------------------------------------------
@@ -1516,6 +1532,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
         pivot = {
           solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err, pinSymbols: chosen.pinSymbols,
           ...(chosen.riderTs ? { riderTs: chosen.riderTs } : {}),
+          ...(chosen.scalarConsumed ? { scalarConsumed: chosen.scalarConsumed } : {}), // #990: lazy, display-path only
           ...(Object.keys(symRoots).length > 0 ? { symRoots } : {}),
           ...(Object.keys(pointRoots).length > 0 ? { pointRoots } : {}),
         };

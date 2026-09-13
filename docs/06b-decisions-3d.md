@@ -9827,3 +9827,67 @@ diagonal and a main diagonal, green — the false-positive net) and `diagonal-af
 `issue-859-diagonal-claim.test.ts` pinned *"with two solids, the check stands down"* — that row IS the
 gap this issue measured, so it now asserts the refusal, and a new row keeps the guard's actual intent
 (a pair STRADDLING two solids still stands down: no solid holds both letters, so nothing guesses).
+
+### ADR-3D-247 — the DOF cue COUNTS the six sampled placement DOFs (#370)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #370 (debt, P3 — the operator's 2026-08-13 ruling *"count them"*) · round #998 · bug route (landed on `main`)
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-9 (new) — the freedom cue counts what is actually still free
+**Design:** [04b](04b-design-3d.md) — "The DOF cue: measured, not inferred" · **LADDER stage:** display (the cue), no solve change
+
+**Context.** [ADR-3D-095](#adr-3d-095) made a solid's placement a sampled DOF once an absolute object (an
+equation plane, a typed parametric line, a coordinate point) is on the canvas and nothing pins it — six real
+DOFs «הציגו תצורה אחרת» varies. `freeDofCount3` never counted them: the #367 figure («פירמידה משולשת ABCD» +
+«l1:x=t(0,m,2m-2)») read 6 (five shape dims + the line's open parameter) while the sampler moved six more.
+The body of #370 asked which semantics the cue should have; the operator ruled it on 2026-08-13 — *count
+them; accepted consequence: the cue jumps by +6 the moment the first absolute object is typed, and "fully
+determined" correctly stops firing for a floating solid.*
+
+**Decision.** One predicate, the sampler's own: `placementSampled3(c)` (the ADR-3D-124 discipline — the count
+and the sampling share one source). Under it the pivot arm counts `dims + 6` and the gauge allowance absolute
+pins consume before they cost shape drops from 7 (place + rotate + scale) to 1 (the scale alone), so a plane
+pin lowers the cue by what it consumes instead of being absorbed by the allowance; the non-pivot arm adds 6.
+For `pinCount ≥ 7` the arithmetic is identical to before (the clamp merely moves), so the #803 exam prism
+(eight plane pins) still reads 0; a figure with no absolute object is byte-identical.
+
+**Locks.** `issue-370-990-dof-cue.test.ts`: the #367 figure reads exactly 6 higher than its floating self
+(5 → 12, at two seeds) with `placementSampled3` true; adding a plane pin lowers it (ADR-3D-060 monotonicity,
+now across the placement term); a pyramid alone, a triangle + quad, a cube with a plane membership, and the
+#803 prism read byte-identical (5, 4, 0, 0). No fixture: the essence is a NUMBER, not "builds green" — the
+figures already build; the lock is the bespoke assertion (standing rule 4).
+
+### ADR-3D-248 — what the scalar pins CONSUME is measured, not inferred from their count (#990)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #990 (bug, P3 — found while building #985) · round #998 · bug route (landed on `main`) · sequenced after ADR-3D-247 (same function, same lock file)
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-9 — the same line (what a relation consumes is measured on the resolved figure)
+**Design:** [04b](04b-design-3d.md) — "The DOF cue: measured, not inferred" · **LADDER stage:** the pivot's solution record (solve), read at display
+
+**Measured on `d440f01`** after «משולש ABC» (which reads 2, correctly): «מקבילית ABCD» **0** (truth 2 — D is
+the parallelogram point, both ∥ pins hold by construction, the triangle is untouched); «דלתון ABCD» **0**
+(truth 2 — D is B's reflection); «מלבן ABCD» / «מעוין ABCD» **0** (truth 1 — one pin drives C, the other
+two follow from the parallelogram point); «ריבוע ABCD» 0 (right, by coincidence); «טרפז ABCD» **2** (truth
+3 — the free ratio IS counted, the ∥ pin wrongly subtracted); then «|DC| = 0.5|AB|» **0** (truth 2 — the given
+consumed the RATIO, not a dim). The declaration arm (ARM 1) reads right in every row.
+
+**Class (standing rule 1).** *A count that infers what the solver did instead of reading it* — the #820 /
+[ADR-3D-204](#adr-3d-204) shape one level up. `− c.scalarPins.length` subtracted one shape dim per pin
+unconditionally; in `quad-shape`'s one-unknown arm the corner's construction already encodes the family
+relation, so some lowered pins are satisfied by construction and consume nothing, while the declaration
+arm's pins genuinely consume `polygon4` dims. Arithmetic cannot know which. The resolution can.
+
+**Decision.** The pivot records, on every solution it returns, **`scalarConsumed`** — the numeric rank of the
+scalar residuals' response to a relative central-difference nudge of each shape dim (`numericRank`: Gaussian
+elimination, a relative pivot threshold with a round-off FLOOR of 1e-6, because a residual that holds by
+construction differs from zero by ~1e-16 and, divided by the step, passed a purely relative test whenever
+every entry was noise — the kite read a different rank at every seed). It is the #820 probe generalised from
+"which riders does a residual read" to "which dims do the pins jointly consume"; ARM 1 and ARM 2 agree
+without either knowing about the other. Lazy and memoised: the cue is the only reader, so the residual
+evaluations happen on the display path, never on a submit. The cue reads `pivot.scalarConsumed` and falls
+back to the count only where no solution recorded it. Every solution site records it — the gauge pivot,
+the placement-alone shortcut, the translation-slide probe, and the similarity-invariant dims-only solve
+(where the quad completions actually land).
+
+**Locks.** `issue-370-990-dof-cue.test.ts`: the table above at seeds 0 and 1 (parallelogram / kite 2,
+rectangle / rhombus 1, square 0, trapezoid 3 then 2, «מרובע» 4, the triangle 2); the kite at four seeds (the
+floor); ARM 1 unchanged (2 / 1 / 0); the #292 drives still consume (4, 2); `numericRank` unit-locked
+(empty, zero, identity, dependent columns, all-noise, a real column beside a noise column, a dependent
+third). `fixtures3/` sweep unchanged. No fixture, for the reason ADR-3D-247 gives.

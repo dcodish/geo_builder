@@ -423,9 +423,29 @@ Recorded here because a design doc that omits its weakest properties is not desc
   describes today's behaviour, not the desired one.
 - **A symbolic line-equation given resolves in ~12 s**, and the *canonical* spelling is the slowest path.
   **[#863](https://github.com/dcodish/geo_builder/issues/863).**
-- **The DOF cue does not count the six placement DOFs** the sampler now varies, so the number a student
-  sees and the freedom the engine has can disagree.
-  **[#370](https://github.com/dcodish/geo_builder/issues/370)** — needs a ruling on the cue's semantics.
+- ~~**The DOF cue does not count the six placement DOFs** the sampler now varies.~~ Resolved — the cue's
+  counting rule below ([ADR-3D-247](06b-decisions-3d.md#adr-3d-247), #370).
+
+## The DOF cue: measured, not inferred (#370, #990 — [ADR-3D-247](06b-decisions-3d.md#adr-3d-247), [ADR-3D-248](06b-decisions-3d.md#adr-3d-248))
+
+`freeDofCount3` («דרגות חופש שטרם נקבעו») is an estimate by design, and its rule is the ADR-3D-124 one:
+**the count reads the resolution, never a second opinion about it.** Two terms follow that rule now:
+
+- **Placement.** When the figure's placement is SAMPLED — an absolute object on the canvas and the
+  translation gauge still free, which is `placementSampled3`, the sampler's own predicate — the six
+  placement DOFs are real and counted (the operator's 2026-08-13 ruling: *count them*). The gauge allowance
+  absolute pins consume before they cost shape drops from the full similarity gauge (7) to the scale alone
+  (1); a floating figure with no absolute object is byte-identical. The cue jumps by +6 the moment the first
+  absolute object is typed, and a plane pin then lowers it (ADR-3D-060 monotonicity across the term).
+- **What the scalar pins consume.** `− scalarPins.length` subtracted one shape dim per pin unconditionally;
+  in `quad-shape`'s one-unknown arm the corner's construction already encodes the family relation (a
+  parallelogram point, a reflection), so its lowered pins hold by construction and consume nothing — the
+  cue read 0 where the triangle still had 2. The pivot now records `scalarConsumed` on every solution: the
+  numeric RANK of the scalar residuals' response to a relative nudge of each shape dim (`numericRank`, a
+  relative pivot threshold with a round-off floor, so a residual that holds to 1e-16 contributes no rank and
+  two pins that move together contribute one). Lazy and memoised — the cue is the only reader, so the
+  residual evaluations happen on the display path, never on a submit. The pin count is the fallback only
+  where no solution recorded the measure.
 
 ## The degeneracy notice (#936, [ADR-3D-234](06b-decisions-3d.md#adr-3d-234))
 
