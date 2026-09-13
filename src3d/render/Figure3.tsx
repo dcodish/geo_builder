@@ -437,6 +437,9 @@ export default function Figure3({ construction, resolved, width = 640, height = 
           scene.crossings.map((k) => (
             <g
               key={`${k.line}|${k.plane}`}
+              // #713 (ADR-W-051): an AFFORDANCE, not figure content — stripped from every exported image by
+              // the shared rasteriser's `[data-noexport]` contract (shell/export/svgToPng).
+              data-noexport="1"
               className="cursor-pointer"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
@@ -467,7 +470,8 @@ export default function Figure3({ construction, resolved, width = 640, height = 
                 : undefined
             }
           >
-            {onRenamePoint && <circle cx={p.x} cy={p.y} r={11} fill="transparent" />}
+            {/* #713 (ADR-W-051): the hit ring is chrome — invisible on screen, absent from the download. */}
+            {onRenamePoint && <circle data-noexport="1" cx={p.x} cy={p.y} r={11} fill="transparent" />}
             <circle cx={p.x} cy={p.y} r={3} fill="#0f172a" />
             <text
               x={p.x + p.labelDx}
