@@ -10806,3 +10806,49 @@ ADR-500 lesson: importing would prove the atoms exist, never that anything reach
 ANGLE_KW`). It asserts its own reach (≥ 12 atoms, the parser's import line seen) and its own detector (a
 synthetic `DECORATIVE_KW` is reported dead; composed into a live atom it is reported live), so it cannot rot
 into a scan that passes by checking nothing. Adding a decorative atom now fails the suite.
+
+## ADR-504 — THE INPUT BOX GETS THE BIDI LIVE PREVIEW 3-D BUILT FOR #482: a mixed line is laid out correctly WHILE it is typed (#997)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #997 (bug, P3 — operator play of PR #993, T8) · bug route → `main`
+**Requirements:** none (internal — the stored text and every parse are unchanged; only what the student sees while typing)
+**Design:** [04](04-design.md) §5 — the input preview seam carries bidi and maths
+
+**The report.** *"When I write this format, the bidi doesn't work well. User is on Hebrew keyboard all the time."*
+The format: «משולש שווה שוקיים ABC (AB=AC)». Typed key by key into the real 2-D box (Playwright, the PR's
+worktree): at «…ABC (» the box shows `( ABC משולש שווה שוקיים` — the open paren detached to the far left;
+at «…ABC (AB=AC» it shows `ABC (AB=AC משולש שווה שוקיים`; only the closed paren renders in place. The
+**stored value is byte-correct at every keystroke** (the caret advances 18 → 22 → 23 → 28 → 29, the step
+commits and pins). The box's *display while typing* is the defect: a neutral at a Latin/Hebrew run boundary
+is re-resolved by the bidi algorithm on every keystroke.
+
+**Root cause — a mechanism that exists one product over and was never adopted here.** This is #482 half (b).
+The operator ruled on it on 2026-08-10, for 3-D: *option 3, a read-only isolated live preview under the input*
+(`inputPreview3`, ADR-3D-123 Am. 1; the live-tail rule, Am. 2). The shared `InputArea` (ADR-W-016) carries the
+seam for exactly that — its own header says *"the product passes its previewer, e.g. its bidi kit's
+`inputPreview`; 2-D's maths renderer rides the same prop at its adoption"* — and 2-D wired the seam for the
+maths renderer only. 2-D even had the isolator (`isolateLtrRuns`, #464 / ADR-431). The class (docs/17 §1,
+the cross-product disparity smell): the student's own text is outside the bidi chokepoint on the one surface
+they are looking at while they type.
+
+**Decision.** Port the mechanism, not the code (product isolation): `inputPreview(s)` in `src/i18n/bidi.ts`
+returns `isolateLtrRuns(s, true, true)` when that differs from `s` and the line contains a Hebrew letter,
+`null` otherwise — so the preview appears exactly when the box is lying about the layout: a pure-Hebrew line
+renders correctly, a pure-Latin line takes an LTR box (`textDir`, the #118 lesson). The new third argument
+is the **live-tail rule**: a line being typed has an incomplete run at its end, never trailing sentence
+punctuation, so the *final* run extends to the end of the string — that is what keeps the unclosed `(` inside
+the isolate. Rendered messages, the post-processor and the .docx export do not pass it and are byte-identical
+(locked). `App.tsx` composes it with the maths preview on the one `preview` prop: maths first, bidi otherwise.
+
+**Why not fix the box.** Isolate characters cannot live inside an editable value without corrupting the text
+and the caret (#482's finding); forcing `dir="ltr"` is what #118 / ADR-312 reverted; a contenteditable
+richtext box was option 4 and was closed by the same ruling. The preview is the surface that can be right.
+
+**The half that belongs to PR #993.** The note had *told* the student to type the paren form. It now suggests
+the bare next-line «AB=AC», which pins identically and is the product's own one-fact-per-line posture
+(ADR-502 Am. 1), and the i18n net asserts no suggested pin contains a parenthesis.
+
+**Locks.** `bidi.test.ts` (+7): the five typing stages of the reported sentence — no preview for pure Hebrew
+or pure Latin, the unclosed `(` inside the run at the tail, the half-typed pin one run, the closed run
+isolated; isolated / byte-for-byte recoverable / idempotent over the student's text; and the live-tail rule
+OFF for messages and the export (a trailing full stop stays outside the run). Driven in the real app: the
+preview under the box shows «משולש שווה שוקיים ABC (» laid out correctly at the stage the box mangles.

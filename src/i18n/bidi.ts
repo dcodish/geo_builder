@@ -74,7 +74,7 @@ export interface BidiSegment {
  * character, then extended over any balanced delimiter pair hugging it. Both consumers below are built on
  * this, so the browser and the .docx can never disagree about what counts as a run.
  */
-export function bidiSegments(s: string, rtlParagraph = false): BidiSegment[] {
+export function bidiSegments(s: string, rtlParagraph = false, liveTail = false): BidiSegment[] {
   // The Hebrew test is a proxy for "this text will be laid out RTL", which is right for a UI message
   // whose direction is derived from its own content. It is WRONG wherever the paragraph direction is
   // imposed from outside — the .docx export forces `w:bidi`, so an all-Latin given like `|BC| = 10` sits
@@ -90,11 +90,17 @@ export function bidiSegments(s: string, rtlParagraph = false): BidiSegment[] {
   };
 
   let gap = ''; // the current non-Hebrew span, accumulated until a Hebrew letter closes it
-  const flush = () => {
+  const flush = (isFinal = false) => {
     let first = [...gap].findIndex((c) => CORE.test(c));
     if (first < 0) { push(gap, false); gap = ''; return; }
     let last = gap.length - 1;
-    while (last > first && !CORE.test(gap[last])) last--;
+    // #997 (ADR-504) — the LIVE-TAIL rule, the 3-D ADR-3D-123 Am. 2 rule one product over: a line being
+    // TYPED has an incomplete run at its end — «…ABC (» half-way to «…ABC (AB=AC)» — never trailing sentence
+    // punctuation, so the final run extends to the end of the string. Without it the unclosed `(` is trimmed
+    // out of the run, resolves as a neutral in the RTL box, mirrors, and jumps to the far edge on every
+    // keystroke until the paren closes. Only the live preview asks for it; rendered messages and the .docx
+    // keep the trimmed run, byte-identical to before.
+    if (!(liveTail && isFinal)) while (last > first && !CORE.test(gap[last])) last--;
 
     /** How many of `ch` sit inside the currently-selected span. */
     const countIn = (ch: string) => {
@@ -141,7 +147,7 @@ export function bidiSegments(s: string, rtlParagraph = false): BidiSegment[] {
   for (const ch of s) {
     if (HEBREW_LETTER.test(ch)) { flush(); push(ch, false); } else gap += ch;
   }
-  flush();
+  flush(true);
   return segs;
 }
 
@@ -152,12 +158,33 @@ export function bidiSegments(s: string, rtlParagraph = false): BidiSegment[] {
  * of a browser. It is NOT true of Word: `.docx` shows U+2066/U+2069 as missing-glyph boxes, so the export
  * uses `bidiSegments` directly and marks direction per RUN instead ([ADR-431](../../docs/06-decisions.md#adr-431) Am. 1).
  */
-export function isolateLtrRuns(s: string, rtlParagraph = false): string {
+export function isolateLtrRuns(s: string, rtlParagraph = false, liveTail = false): string {
   if (s.includes(LRI)) return s; // already isolated — never nest
-  return bidiSegments(s, rtlParagraph)
+  return bidiSegments(s, rtlParagraph, liveTail)
     .map((g) => (g.ltr ? LRI + g.text + PDI : g.text))
     .join('');
 }
+
+/**
+ * #997 ([ADR-504](../../docs/06-decisions.md#adr-504)) — #482 half (b), the operator's 2026-08-10 ruling, in 2-D:
+ * OPTION 3, a read-only live PREVIEW under the input while the student types.
+ *
+ * The box itself cannot be fixed: isolate characters inside an editable value corrupt what the student
+ * typed and where their caret sits, and forcing `dir="ltr"` is what #118 reverted. So the box stays raw
+ * and this seam feeds the shared `InputArea`'s preview with what the line MEANS, laid out correctly, while
+ * it is being typed — the mechanism 3-D built for the same report (`inputPreview3`, ADR-3D-123 Am. 1) and
+ * 2-D never adopted: the preview prop was wired for the maths renderer only.
+ *
+ * Returns the isolated text when isolation would CHANGE the layout of an RTL line, `null` otherwise — a
+ * pure-Hebrew line renders correctly in the box, a pure-Latin line takes an LTR box (`textDir`), and
+ * echoing either underneath is noise. The gate is the transform itself, so the preview appears exactly
+ * when the box is lying about the layout.
+ */
+export const inputPreview = (s: string): string | null => {
+  if (!HEBREW_LETTER.test(s)) return null; // an LTR box (textDir) is not lying
+  const iso = isolateLtrRuns(s, true, true);
+  return iso === s ? null : iso;
+};
 
 /**
  * The i18next post-processor. Registered globally in `./index.ts`, so it covers every message without

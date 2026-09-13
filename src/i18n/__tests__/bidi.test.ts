@@ -15,7 +15,7 @@
  * any message. A sweeping transform that can corrupt one string in 300 is worse than the bug it fixes.
  */
 import { describe, expect, it } from 'vitest';
-import { isolateLtrRuns, RUN_CORE, RUN_DELIMS } from '../bidi';
+import { bidiSegments, inputPreview, isolateLtrRuns, RUN_CORE, RUN_DELIMS } from '../bidi';
 import { GREEK, SYMBOL_SPECS, SYMBOLS } from '@/ui/symbols';
 import he from '../locales/he.json';
 import en from '../locales/en.json';
@@ -185,5 +185,52 @@ describe('#482 — the isolate must COVER the run, and the alphabet must not dri
       const spec = SYMBOL_SPECS.find((x) => x.label === s.label)!;
       expect(spec.before + (spec.after ?? '')).toBe(s.insert);
     }
+  });
+});
+
+describe('#997 (ADR-504) — the bidi live preview under the input: the box is raw, the preview is laid out', () => {
+  const LRI = '⁦';
+  const PDI = '⁩';
+  const strip = (s: string) => s.replace(/[⁦⁩]/g, '');
+  // The operator's sentence, typed key by key on a Hebrew keyboard (measured 2026-09-13): the box showed
+  // «( ABC משולש שווה שוקיים» at stage 3 and «ABC (AB=AC משולש…» at stage 4 — the unclosed paren detached.
+  const STAGES = ['משולש שווה שוקיים ', 'משולש שווה שוקיים ABC ', 'משולש שווה שוקיים ABC (', 'משולש שווה שוקיים ABC (AB=AC', 'משולש שווה שוקיים ABC (AB=AC)'];
+
+  it('a pure-Hebrew line gets no preview — the box already renders it', () => {
+    expect(inputPreview(STAGES[0])).toBeNull();
+    expect(inputPreview('משולש ABC')).not.toBeNull(); // a label IS an LTR run
+  });
+
+  it('a pure-Latin line gets no preview — it takes an LTR box', () => {
+    expect(inputPreview('rectangle ABCD')).toBeNull();
+    expect(inputPreview('')).toBeNull();
+  });
+
+  it('the unclosed «(» stays INSIDE the run at the live tail (the stage the box mangles)', () => {
+    const p = inputPreview(STAGES[2])!;
+    expect(p).toContain(`${LRI}ABC (${PDI}`);
+  });
+
+  it('half-way through the pin, the whole tail is one run', () => {
+    const p = inputPreview(STAGES[3])!;
+    expect(p).toContain(`${LRI}ABC (AB=AC${PDI}`);
+  });
+
+  it('the complete line isolates the balanced run', () => {
+    expect(inputPreview(STAGES[4])).toContain(`${LRI}ABC (AB=AC)${PDI}`);
+  });
+
+  it('isolated, byte-for-byte recoverable, idempotent — over the student’s text, at every stage', () => {
+    for (const s of STAGES) {
+      const p = inputPreview(s);
+      if (p === null) continue;
+      expect(strip(p)).toBe(s);
+      expect(isolateLtrRuns(p, true, true)).toBe(p);
+    }
+  });
+
+  it('the live-tail rule is OFF for rendered messages and the export — a trailing full stop stays outside the run', () => {
+    expect(isolateLtrRuns('הצלע AB.', true)).toBe(`הצלע ${LRI}AB${PDI}.`);
+    expect(bidiSegments('הצלע AB.', true).map((g) => g.text)).toEqual(['הצלע ', 'AB', '.']);
   });
 });

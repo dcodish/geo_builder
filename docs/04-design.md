@@ -68,6 +68,11 @@ A single boundary: `utterance → command[]`.
 - **Primary — deterministic grammar parser.** Handles the common, bounded geometry phrasings in Hebrew and English (shapes, points-on, distances, angles, special lines). Free, offline, instant.
 - **Fallback — Claude API.** Only when the parser cannot confidently parse. Model: `claude-haiku-4-5` (sufficient for short structured extraction; far cheaper than Opus/Fable). Calls go through a **server-side proxy** that holds the key (never in the browser), is gated, and is rate-limited. `max_tokens` and prompt size kept minimal.
 - The engine is agnostic to which path produced the commands.
+- **The input preview seam carries bidi AND maths (#997, [ADR-504](06-decisions.md#adr-504)).** The shared
+  `InputArea`'s `preview` prop is fed by one previewer: the maths renderer when the line has maths, else
+  `inputPreview` — the student's own mixed Hebrew+Latin line through the bidi isolator with the live-tail rule,
+  shown only when isolation would change the layout. The box itself stays raw (isolates cannot live in an
+  editable value; forcing LTR is what #118 reverted). The 3-D twin is `inputPreview3` (ADR-3D-123).
 - **One vocabulary home (#361, [ADR-501](06-decisions.md#adr-501)).** `src/parser/lexicon.ts` holds the
   keyword and token atoms the grammar composes from — and only atoms the grammar actually consumes. A rule's
   keyword alternation (`INTERSECT_KW`, `BISECTOR_KW`, the parallel pre-test) is compiled from the lexicon
