@@ -111,6 +111,12 @@ describe('#938 — the operator’s report', () => {
     expect(fig().lastError).not.toBeNull();
 
     submit('נקודה H על AB');
+    // #364 (ADR-510): the search is the post-commit resolve, no longer inside the commit — the store
+    // commits at the broken seed (the accepted flash) and `autoResolve` (what the App runs next, via the
+    // worker) is what moves it. The guard this test locks lives in `meetsRequirements` now: a seed that
+    // does not build fails it, so the search is armed exactly as ADR-484 required.
+    expect(useGeoStore.getState().seed).toBe(BROKEN_SEED);
+    expect(useGeoStore.getState().autoResolve()).toBe(true);
     expect(useGeoStore.getState().seed).not.toBe(BROKEN_SEED);
     expect(fig().lastError).toBeNull();
   }, 300000);

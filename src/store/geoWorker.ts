@@ -57,7 +57,8 @@ self.onmessage = (e: MessageEvent<GeoWorkRequest>) => {
       }
       // The post-commit search, off-thread with the generous budget — a valid config one bad seed past the
       // 2500ms cap (the CEFO figure, ~2743ms cold) is found on the first submit, not only on a warm retry.
-      const found = findValidConfig(req.facts, 0, WORKER_SEARCH_BUDGET_MS);
+      // #364 (ADR-510): the sweep starts from the student's CURRENT seed (M2: the view in hand is preferred).
+      const found = findValidConfig(req.facts, req.seed, WORKER_SEARCH_BUDGET_MS);
       if (!found) {
         post({ id: req.id, done: { op: 'autoResolve', found: null } });
         return;
