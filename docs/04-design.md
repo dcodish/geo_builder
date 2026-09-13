@@ -547,3 +547,36 @@ pure derivation, one table, one text builder, two render sites:
   (#996, ADR-502 Am. 1) — the table gained a row, which is what the table is for. A suggested pin sentence is
   always a bare next line (#997): a parenthesised Latin run inside a Hebrew sentence reorders in the box while
   it is typed.
+
+## The knowledge pool of a DETERMINED figure is its admissible set (#434, [ADR-509](06-decisions.md#adr-509))
+
+The relations layer's definite values, the values panel and the forced crossing dots all read ONE shared
+sample pool (`samplingJobs` / `sharedSamples`, `replay/core.ts` — the M3 "one sampler" law). Their
+knowledge gates ask "is this the same in every configuration?", and the pool is what "every" means.
+
+- **Under-determined figure (count > 0):** unchanged — every shape-variant config × 16 seeds, filtered by
+  the validity ladder; the gates need ≥ 4 valid samples before a NUMBER prints (ADR-295/#88).
+- **Determined figure (`freeDofCount === 0`, one variant):** the pool was ONE sample, on the theory that one
+  configuration is every configuration. Two things break that theory. A count is arithmetic and can lie
+  (the ADR-424 class — a redundancy pattern pushes it to 0 while the figure still moves with the seed:
+  «AB=BC=8» read 0 and printed ∠ABC = 31°, one seed's accident). And a seed can never reach a BRANCH or a
+  right-angle SEAT — the quarter-circle figure is rigid at each seat, yet the seat at B (admissible, one
+  «הציגו תצורה אחרת» press away) gives |AB| = 11.18 against the printed 18.03. So the pool is now the
+  **admissible set**: seeds {s, s+1, s+2} of the current facts (through the same filter ladder), × every
+  discrete rewrite «הציגו תצורה אחרת» applies — every cyclable branch point's branches crossed with the seat
+  (`admissibleRewrites`) — kept only where `meetsRequirements` holds (the button's own bar). Reflection masks
+  are subsumed by the seed axis (measured on the corpus); the `inscribe` variant stays out (ADR-262).
+- **Bounded, failing CLOSED.** The cross product is capped (`ADMISSIBLE_REWRITE_CAP`); over the cap, or when
+  the sample budget cuts the enumeration short, the pool is marked **not determined** and the gates fall
+  back to their ≥ 4 floor — values and dots withheld, relations still read off the samples in hand — exactly
+  as an under-determined figure is treated. A partial set never prints a number the missing configuration
+  refutes.
+- **The gates trust a MEASUREMENT, not the count.** The pool carries `determined` (count 0 AND the set
+  complete), passed to `detectRelationsAcross` (`opts.determined`), `computeValuesPanel` and
+  `forcedCrossingKeys`; each keeps the count as its fallback for a hand-built pool. Nothing else changes:
+  a value that disagrees across the admissible set is withheld by the "same in every sample" test that
+  already existed; a genuinely determined figure's samples are identical and it prints as before.
+- **Cost:** a few replays per determined figure at panel/relations time in the worker, memoized per fact
+  list, never in the submit path. A rewrite that is INFEASIBLE pays the recruiter ladder to conclude it
+  (the #259 class — 96 s deadline-free on the quarter-circle figure); in prod the 5 s sample budget cuts
+  that and the figure falls to the not-determined branch above.

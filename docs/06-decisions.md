@@ -11170,3 +11170,89 @@ the app's replay path.
 fold) was not needed: `ownerByConKey` (ADR-398) already is that provenance, and the search removes whole
 statements rather than tracking constraint ids. The plan said "disable" — measured: disabling cascades
 the dependents, removal is the question actually asked.
+
+## ADR-509 — A DETERMINED FIGURE'S KNOWLEDGE POOL IS ITS ADMISSIBLE SET, NOT ONE SAMPLE (#434)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #434 (debt, P3 — option (A) of the 2026-09-11 escalation, armed by the operator's 2026-09-13 ruling *"Yes, withhold all 16"*) · round #1001 · debt route (landed on `main`) · amends [ADR-424](#adr-424)'s fast path; the 2-D template for the "a count trusted without measurement" class ([ADR-3D-247](06b-decisions-3d.md#adr-3d-247) / [ADR-3D-248](06b-decisions-3d.md#adr-3d-248) are its 3-D members)
+**Requirements:** [02](02-requirements.md) FR-RV-5 already says it ("the same across every sample") — cited, no change · **Design:** [04](04-design.md) — "The knowledge pool of a DETERMINED figure is its admissible set"
+
+**What the student saw.** «AB=BC=8» alone printed **∠ABC = 31°** on the canvas — an angle no given fixed
+(seed 1 says 21°, seed 3 says 39°). The quarter-circle bagrut figure («ABC משולש ישר זוית · AC=15 · BC=10 ·
+O על AC · D על AB · OCD רבע מעגל») printed **|AB| = 18.03** while the seat at B — admissible, one «הציגו
+תצורה אחרת» press away — gives 11.18. The two-tangents figure printed **∠BAD = 25°** while the other
+tangent point gives 115°. Round #992's harness measured **16 of 58** determined-figure prints across the
+corpus changing under another admissible drawing (15 with the seed, 2 with a branch, 3 with the seat).
+Every one is ADR-052's sin in the epistemic dimension: one observation presented as "the same in every
+valid configuration" (FR-RV-5).
+
+**Root cause (docs/17 §2.2 — a count as a proxy for a measurement).** The shared sample core
+(`samplingJobs`) sampled a `freeDofCount === 0` figure ONCE, and the three knowledge gates
+(`trustDefinite` in `relations.ts`, `enough` in `valuesPanel.ts`, the starved-pool bar in
+`forcedCrossingKeys`) accepted any pool on that count. But the count is arithmetic and can lie — ADR-424
+fixed one redundancy pattern and named the class; «AB=BC=8» is another member (15 of the 16). And a seed
+can never reach a BRANCH or a right-angle SEAT (4 of the 16): a figure genuinely rigid at each seat has
+several admissible seats, and "one configuration is every configuration" is false for it even when the
+count is honest. The 2026-09-07 plan rewrite said the discrete axes were the whole story and the body said
+the seed was — measured, both axes are needed, and neither alone would have shipped an honest panel.
+
+**Decision — the pool IS the admissible set, and the gates trust a measurement.**
+
+1. **`samplingJobs`** (`replay/core.ts`): on a determined figure (count 0, one variant) the pool is seeds
+   {s, s+1, s+2} of the current facts (`ADMISSIBLE_SEEDS`, through the same validity ladder the 16-seed
+   pool passes) × every discrete rewrite «הציגו תצורה אחרת» applies — `admissibleRewrites`: every cyclable
+   branch point's branches crossed with the seat (`cyclableSeat`, rot 0/1/2) — each kept only where
+   `meetsRequirements` holds, the button's own bar. Reflection masks are subsumed by the seed axis (every
+   mask-varying print also varied with the seed, measured); the `inscribe` variant stays out (ADR-262).
+2. **Bounded, failing CLOSED.** The cross product is capped (`ADMISSIBLE_REWRITE_CAP` = 12). Over the cap,
+   or when the sample budget cuts the enumeration short (`sharedSamples` reports completeness to `finish`),
+   the pool is marked **not determined** and the gates fall back to their ≥ 4 floor — values and dots
+   withheld, relations still read off the samples in hand — exactly as an under-determined figure is
+   treated. A partial set never prints a number the missing configuration refutes.
+3. **The gates keep their "determined ⇒ any pool size" branch**, but "determined" is now the pool's
+   MEASURED flag (`SharedSamples.determined` — count 0 AND the set complete), passed as
+   `DetectOptions.determined`, `computeValuesPanel(…, determined)` and read by `forcedCrossingKeys`; each
+   keeps the count as its fallback for a hand-built pool (the direct engine path, tests). No new gate: a
+   value that disagrees across the admissible set is withheld by the "same in every sample" test that
+   already existed.
+4. **Cost.** A few replays per determined figure at panel/relations time in the worker, memoized per fact
+   list, never in the submit path. An INFEASIBLE rewrite pays the recruiter ladder to conclude it — the
+   #259 class, 96.6 s deadline-free on the quarter-circle figure's seat `rot=1` (recorded on #259); in prod
+   the 5 s sample budget cuts that and the figure takes branch 2.
+
+**Corpus evidence (the 2026-09-11 harness re-run on every scenario + fixture, 348 figures, 66 determined).**
+- **Before:** 60 of the 66 printed at least one value off one sample. **After:** 56 print; 48 print the SAME rows
+  (45 byte-identical; two differ in the third decimal, a mean over three seeds; one — scenario
+  `copula-less-symbolic-radius-binds-existing-circle-772` — now prints the value of its two requirement-
+  satisfying seeds, where the single seed-0 sample it printed before fails `meetsRequirements` and only
+  reached the panel through the one-sample fallback of the ladder).
+- **The 16 ruled withheld are withheld**, wholly or in the rows that vary: the quarter-circle figure loses
+  25 rows (keeps AC = 15, BC = 10 and the two 90° at O), `chained-value-marks-every-member` loses ∠ABC = 31°,
+  `inscribe-square-in-right-triangle` 12 rows, `sqrt-times-free-radius` its 8 angles (the radius rows stay —
+  #1002), and so on down the 2026-09-11 list — every one of the 16 changed, none of the 42 lost a row.
+- **Two more, not on the list:** scenario `anonymous-circle-binds-by-membership-beside-second-circle` and
+  fixture `issue-572-load-collapse` — both the #569 figure, whose DEFAULT seat collapses A onto C
+  (`meetsRequirements` false at every seed) while the seat at B is admissible. Their prints were a collapsed
+  drawing's numbers; the seat-rescued view (`findValidConfig` → rot 2) prints its 45°/90°/45° on its own
+  facts (measured). Withholding on the collapsed facts is the honest answer.
+- **Cost:** the 66 determined figures take 786 s deadline-free (was 205 s), five of them over 80 s each —
+  every one an infeasible seat or branch refuted through the recruiter ladder (#259).
+
+**Locks** (`issue-434-admissible-set.test.ts`, 12): «AB=BC=8» prints no ∠ABC and its two stated lengths;
+∠ABC = 40 returns once stated · the quarter-circle figure enumerates rot 0/1/2 once each, withholds |AB|
+(the seat at B joins the pool), keeps AC/BC, and prints |AB| = 18.03 once «זווית ACB = 90» pins the seat ·
+the two-tangents figure with |AO| pinned withholds ∠BAD (identity + the mirror branch) and prints it once
+«B ו-D באותו צד של AO» states the side · a budget-cut set is not determined and withholds even the stated
+8s · over the cap ⇒ `null` · a bare square keeps its right angles (three identical seeds) · an
+under-determined figure takes the 16-seed path and is not "determined" · the memo carries the flag. The
+corpus snapshots `determined-prints-{1..4}.snapshot.json` (`determined-prints-{1..4}.test.ts`, cost-balanced
+shards over `determined-prints-shared.ts`) lock BOTH directions — every determined figure's printed rows, so a
+withdrawn print returning or a kept one vanishing fails. `definite-values.test.ts`: the 3-4-5 hover cases pin
+the seat (they asserted a drawing), and the unpinned form is asserted withheld.
+
+**Deviations from the plan, recorded.** (i) The plan's "prints ∠BAD once a side of the branch is stated"
+needed |AO| pinned first — measured, |AO| is a free length the count misses on that figure, so ∠BAD is not
+knowledge on ANY axis as the scenario stands (the lock states «AO=2R»). (ii) Failing closed is "not
+determined" (the ≥ 4 floor), not an empty pool: relations are still read off the samples in hand, which is
+exactly how an under-determined figure is treated. (iii) A second defect surfaced on the same figure and is
+FILED, not fixed: a free radius that a `length-radius` directive consumes is sampled by nothing, so the
+panel still prints the drawing's radius (#1002 — the CLAUDE.md conformance smell, verbatim).

@@ -18,7 +18,7 @@ import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -2429,7 +2429,10 @@ export function variantConfigs(facts: Fact[]): Fact[][] {
  * (viewRelations' call sites are synchronous) runs the same jobs inline. Invalidated by facts identity,
  * like the relations/shapes layer caches.
  */
-let sampleMemo: { facts: Fact[]; key: string; constructions: Construction[]; samples: Map<Id, Vec>[] } | null = null;
+/** The shared pool. `determined` (#434, ADR-509) is TRUE only when the count said 0 AND the pool is the figure’s
+ *  COMPLETE admissible set — the flag the knowledge gates trust instead of the count alone. */
+export interface SharedSamples { constructions: Construction[]; samples: Map<Id, Vec>[]; determined: boolean }
+let sampleMemo: ({ facts: Fact[]; key: string } & SharedSamples) | null = null;
 /**
  * The sample sweep counter — the perf canary for the M3 "one sampler" law (the twin of
  * {@link foldStats}). A test can assert that N detection layers over one fact list cost ONE sweep.
@@ -2443,7 +2446,7 @@ export const sampleStats = { sweeps: 0 };
  * (~9 s each on the #157 figure). Content-keying is the same discipline {@link foldCache} already uses,
  * and it subsumes identity (a re-used array has the same content).
  */
-function memoHit(facts: Fact[]): { constructions: Construction[]; samples: Map<Id, Vec>[] } | null {
+function memoHit(facts: Fact[]): SharedSamples | null {
   if (!sampleMemo) return null;
   if (sampleMemo.facts === facts) return sampleMemo;
   return sampleMemo.key === foldKey(facts) ? sampleMemo : null;
@@ -2455,27 +2458,119 @@ function memoHit(facts: Fact[]): { constructions: Construction[]; samples: Map<I
  * maintain. A positions map is a unique object, so the lookup survives every filter unchanged.
  */
 const circlesOfSample = new WeakMap<Map<Id, Vec>, Map<Id, ResolvedCircle>>();
-export function samplingJobs(facts: Fact[]) {
-  const constructions = variantConfigs(facts).map((vf) => replay(vf, firstSatisfyingSeed(vf)).construction);
-  const N = constructions.length === 1 && freeDofCount(constructions[0]) === 0 ? 1 : 16;
-  const raw: Map<Id, Vec>[] = [];
-  const jobs = constructions.flatMap((c) =>
-    Array.from({ length: N }, (_, s) => () => {
-      const r = evaluate(applySeed(c, s));
-      if (r.ok) {
-        raw.push(r.positions);
-        circlesOfSample.set(r.positions, r.circles);
+/**
+ * #434 ([ADR-509](docs/06-decisions.md#adr-509)): the bound on a DETERMINED figure's admissible set. The
+ * discrete rewrites (every cyclable branch point's branches × the right-angle seat) are enumerated as a
+ * cross product; a figure whose product exceeds this cap is treated as NOT determined and prints nothing
+ * (failing CLOSED — a truncated admissible set cannot establish "the same in every configuration").
+ */
+export const ADMISSIBLE_REWRITE_CAP = 12;
+/** #434: the seeds a determined figure's admissible set is sampled at — {s, s+1, s+2}. Three is the smallest
+ *  pool that distinguishes "seed-invariant" from "one sample agreeing with itself" (the ADR-424 class:
+ *  a count of 0 that lies — «AB=BC=8» printed ∠ABC = 31° off one drawing; seed 1 says 21°, seed 3 39°). */
+export const ADMISSIBLE_SEEDS = 3;
+/**
+ * The DISCRETE rewrites of a determined figure's admissible set (#434, ADR-509) — the exact fact rewrites
+ * «הציגו תצורה אחרת» applies ({@link searchAnotherView} / `cycleAlt`): every cyclable branch point stepped
+ * through each of its branches, crossed with the right-angle seat ({@link cyclableSeat}, rot ∈ {0,1,2}).
+ * The current facts are element 0 (the identity); a rewrite that changes no fact is dropped. Returns
+ * `null` when the cross product exceeds {@link ADMISSIBLE_REWRITE_CAP} — the caller then fails CLOSED.
+ *
+ * ONLY branch and seat participate: the reflection mask is subsumed by the seed axis (measured on the
+ * corpus, 2026-09-11: every mask-varying print also varied with the seed), and the `inscribe` variant is
+ * a placement/relabeling choice that {@link variantConfigs} deliberately keeps out of the pool (ADR-262).
+ */
+export function admissibleRewrites(facts: Fact[], c: Construction, cap = ADMISSIBLE_REWRITE_CAP): Fact[][] | null {
+  const branchPts = c.objects
+    .filter((o) => 'branch' in o && cyclableBranch(c, o.id))
+    .map((o) => ({ id: o.id, n: Math.max(1, branchCount(c, o.id)) }));
+  const seatFact = cyclableSeat(facts);
+  const nSeat = seatFact ? 3 : 1;
+  const seatRot = seatFact ? ((seatFact.cmd as { rot?: number }).rot ?? 0) : 0;
+  const total = branchPts.reduce((p, b) => p * b.n, 1) * nSeat;
+  if (total > cap) return null;
+  const rewrite = (branches: number[], rot: number): Fact[] =>
+    facts.map((f) => {
+      let cmd = f.cmd;
+      if (f.enabled && BRANCH_CYCLE_KINDS.has(cmd.type) && 'id' in cmd) {
+        const k = branchPts.findIndex((b) => b.id === (cmd as { id?: Id }).id);
+        if (k >= 0 && ((cmd as { branch?: number }).branch ?? 0) !== branches[k]) cmd = { ...cmd, branch: branches[k] } as AnyCommand;
       }
-    }),
-  );
+      if (seatFact && f === seatFact && rot !== seatRot) {
+        const { rot: _prev, ...rest } = cmd as Extract<AnyCommand, { type: 'right-triangle' }>;
+        cmd = (rot === 0 ? rest : { ...rest, rot: rot as 1 | 2 }) as AnyCommand;
+      }
+      return cmd === f.cmd ? f : { ...f, cmd };
+    });
+  const out: Fact[][] = [facts];
+  const walk = (k: number, branches: number[]) => {
+    if (k === branchPts.length) {
+      for (let r = 0; r < nSeat; r++) {
+        const fc = rewrite(branches, (seatRot + r) % nSeat);
+        if (fc.some((f, i) => f !== facts[i])) out.push(fc);
+      }
+      return;
+    }
+    for (let b = 0; b < branchPts[k].n; b++) walk(k + 1, [...branches, b]);
+  };
+  walk(0, []);
+  return out;
+}
+export function samplingJobs(facts: Fact[]) {
+  const configs = variantConfigs(facts);
+  const seed0 = configs.length === 1 ? firstSatisfyingSeed(facts) : 0;
+  const constructions = configs.map((vf) => replay(vf, configs.length === 1 ? seed0 : firstSatisfyingSeed(vf)).construction);
+  // #434 (ADR-509): a DETERMINED figure's pool is its ADMISSIBLE SET, not one sample. `freeDofCount === 0`
+  // is a count, and a count can lie (ADR-424's class — a redundancy pattern pushing it to 0 while the figure
+  // still moves with the seed); and a seed can never reach a branch or a seat. So the pool is every
+  // configuration the student can reach: seeds {s, s+1, s+2} of the current facts (through the same filter
+  // ladder the 16-seed pool passes) × every branch/seat rewrite that `meetsRequirements` accepts — the
+  // button's own bar. The knowledge gates (`trustDefinite`, `enough`) keep their "determined ⇒ any pool
+  // size" branch, because the pool now IS every admissible configuration; a value that disagrees across it
+  // is withheld by the gates that already exist. Over the cap, or past the sample budget before the set is
+  // complete, the pool is EMPTY — nothing prints (failing closed), rather than a partial set printing.
+  const determined = constructions.length === 1 && freeDofCount(constructions[0]) === 0;
+  const rewrites = determined ? admissibleRewrites(facts, constructions[0]) : [facts];
+  const overCap = rewrites === null;
+  const N = determined ? ADMISSIBLE_SEEDS : 16;
+  const raw: Map<Id, Vec>[] = [];
+  const jobs = overCap
+    ? []
+    : constructions.flatMap((c) =>
+        Array.from({ length: N }, (_, s) => () => {
+          const r = evaluate(applySeed(c, s));
+          if (r.ok) {
+            raw.push(r.positions);
+            circlesOfSample.set(r.positions, r.circles);
+          }
+        }),
+      );
+  if (determined && rewrites) {
+    for (const fc of rewrites.slice(1)) {
+      for (let k = 0; k < ADMISSIBLE_SEEDS; k++) {
+        const s = seed0 + k;
+        jobs.push(() => {
+          if (!meetsRequirements(fc, s)) return;
+          const fig = replay(fc, s);
+          raw.push(fig.positions);
+          circlesOfSample.set(fig.positions, fig.circles);
+        });
+      }
+    }
+  }
   // Ground truth = VALID configurations only ([ADR-256](docs/06-decisions.md#adr-256)): a sample that
   // violates a stated configuration requirement — a segment-meet's crossing off its segments
   // (`requirementSamples`), or a "המשך" extension not reaching its far side — is not a configuration of
   // the FIGURE, and counting it suppresses relations forced in every valid config (△OMK ~ △CAK vanished
   // because mirror samples put K past segment CO's end, flipping ∠KOM). Falls back to the unfiltered
   // converged pool when fewer than 2 remain: a thin pool over-claims, the unfiltered one only under-claims.
-  const finish = () => {
+  const finish = (complete = true) => {
     const c0 = constructions[0];
+    // #434 (ADR-509) fail-CLOSED: an admissible set that could not be enumerated (over the cap) or was cut
+    // short by the sample budget is not evidence of "the same in every configuration" — the pool is then
+    // NOT determined: the gates fall back to their pool-size floor (values and dots withheld below 4 samples;
+    // relations still read off the samples in hand), exactly as an under-determined figure is treated.
+    const complete_ = determined && !overCap && complete;
     const converged = convergedSamples(raw);
     // Drop unforced point-collapse degeneracies before the requirement filter (ADR-295 / issue #50): a seed
     // where two independent points coincide only sometimes is not a configuration of the figure, and would
@@ -2485,12 +2580,12 @@ export function samplingJobs(facts: Fact[]) {
     const within = requirementSamples(c0, distinctSamples(c0, converged)).filter((pos) => segmentsCrossWithin(facts, pos));
     const strict = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived));
     const key = foldKey(facts);
-    if (strict.length >= 2) return (sampleMemo = { facts, key, constructions, samples: strict });
+    if (strict.length >= 2) return (sampleMemo = { facts, key, constructions, samples: strict, determined: complete_ });
     // The ADR-267 preference ladder: when the letter-order side is unachievable (no strict samples), the
     // RELAXED shared-endpoint bar (ADR-142) is the figure's real validity — filter by it before giving up
     // to the unfiltered converged pool (which would count wrong-side samples as configurations).
     const relaxed = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived, true));
-    return (sampleMemo = { facts, key, constructions, samples: relaxed.length >= 2 ? relaxed : converged });
+    return (sampleMemo = { facts, key, constructions, samples: relaxed.length >= 2 ? relaxed : converged, determined: complete_ });
   };
   return { jobs, finish };
 }
@@ -2514,11 +2609,12 @@ export function samplingJobs(facts: Fact[]) {
  * configuration", and offering a dot that later vanishes is precisely the harm. A determined figure
  * (`freeDofCount === 0`) has ONE configuration, so its single sample IS every configuration.
  */
-export function forcedCrossingKeys(samples: { constructions: Construction[]; samples: Map<Id, Vec>[] }): Set<string> {
+export function forcedCrossingKeys(samples: Omit<SharedSamples, "determined"> & { determined?: boolean }): Set<string> {
   const { constructions, samples: pool } = samples;
   const c0 = constructions[0];
   if (!c0 || !pool.length) return new Set();
-  if (freeDofCount(c0) !== 0 && pool.length < 4) return new Set(); // starved → withhold (conservative)
+  // #434: the measured flag when the shared core supplied it; the count for a hand-built pool (tests).
+  if (!(samples.determined ?? freeDofCount(c0) === 0) && pool.length < 4) return new Set(); // starved → withhold (conservative)
 
   const perSample = pool.map((pos) => {
     const circles = circlesOfSample.get(pos) ?? new Map<Id, ResolvedCircle>();
@@ -2540,7 +2636,7 @@ export function forcedCrossingKeys(samples: { constructions: Construction[]; sam
 // proceeds on the samples in hand (a smaller ground-truth pool — `samplesUsed` reports it); the FIRST job
 // always runs so there is never an empty pool for a buildable figure. Tests run deadline-free (E2).
 const SAMPLE_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 5000;
-export function sharedSamples(facts: Fact[]): { constructions: Construction[]; samples: Map<Id, Vec>[] } {
+export function sharedSamples(facts: Fact[]): SharedSamples {
   const hit = memoHit(facts);
   if (hit) return hit;
   sampleStats.sweeps++;
@@ -2549,11 +2645,14 @@ export function sharedSamples(facts: Fact[]): { constructions: Construction[]; s
   // Armed inside the solve ladder too (engine/solveBudget.ts, issue #59): a variant job builds NEW fact
   // content whose fold can hit the recruit ladder — the between-job check alone couldn't stop it.
   return withSolveBudget(deadline, () => {
+    let ran = 0;
     for (let i = 0; i < jobs.length; i++) {
       if (i > 0 && Date.now() > deadline) break;
       jobs[i]();
+      ran++;
     }
-    return finish();
+    // #434: a determined figure's admissible set must be COMPLETE to count (the sweep's `finish` fails closed).
+    return finish(ran === jobs.length);
   });
 }
 // `sharedSamplesAsync` — the main-thread BATCHED sampler that yielded to the event loop every 4 samples —
@@ -2600,7 +2699,7 @@ export function detectAll(facts: Fact[]): DetectAllResult {
     .map((f) => f.cmd as { shape: VariantShape; ids: Id[]; variant: number });
   return {
     stated: statedShapeEqualities(variantCmds, explicitEqs),
-    relations: detectRelationsAcross(shared.constructions, { positions: shared.samples }),
+    relations: detectRelationsAcross(shared.constructions, { positions: shared.samples, determined: shared.determined }),
     shapes: classifyShapesFromSamples(shared.constructions[0], shared.samples),
     crossings: forcedCrossingKeys(shared),
   };
@@ -2626,7 +2725,7 @@ export function computeValues(facts: Fact[], queries: QueryInput[] = []): Values
   // #929 (ADR-485): every letter the student named, from the SAME symbol table the unit lane reads —
   // enabled facts only, so deselecting the statement that named it removes its row with it.
   const symbols = symbolBindings(enabledCmds);
-  return computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter, unit, queries, symbols);
+  return computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter, unit, queries, symbols, shared.determined);
 }
 
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */

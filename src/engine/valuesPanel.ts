@@ -277,6 +277,10 @@ export function computeValuesPanel(
   queries: QueryInput[] = [],
   /** every letter the student named (#929) — printed as a row and askable by name. */
   symbols: SymbolBinding[] = [],
+  /** #434 (ADR-509): the pool is the COMPLETE admissible set of a determined figure, as measured by the shared
+   *  sample core — replaces the `freeDofCount === 0` shortcut in the knowledge gate when given (the count is
+   *  arithmetic and can lie, ADR-424; the enumerated set cannot). */
+  determined?: boolean,
 ): ValuesPanelResult {
   const c = constructions[0];
   const rows: ValueRow[] = [];
@@ -294,7 +298,7 @@ export function computeValuesPanel(
     }));
   if (!c || samples.length === 0) return { rows, areaClasses, sampleCount: 0, queryRows: allRefused('undetermined') };
   // the knowledge gate (ADR-295/#88): determined figures print on any pool; sampled ones need ≥4
-  const enough = samples.length >= 4 || freeDofCount(c) === 0;
+  const enough = samples.length >= 4 || (determined ?? freeDofCount(c) === 0);
   if (!enough) return { rows, areaClasses, sampleCount: samples.length, queryRows: allRefused('undetermined') };
 
   type Measure = (pos: Map<Id, Vec>, i: number) => number | null;

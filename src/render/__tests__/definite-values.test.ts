@@ -29,15 +29,26 @@ describe('definite values on hover (#126)', () => {
     expect(rt.res.definiteLengths).toEqual([]);
   });
 
-  it('a SIZED figure has definite lengths equal to the pinned world lengths (3-4-5)', async () => {
+  // #434 (ADR-509): the right angle's SEAT is an unstated, cyclable choice (ADR-481), so on the bare
+  // «right triangle ABC» the seats at A and B are admissible alternatives and BC = 3 is one seat's number
+  // — not knowledge. The operator's 2026-09-13 ruling withholds it; these cases pin the seat, which is
+  // what makes the 3-4-5 lengths knowledge. The unpinned form is asserted withheld below.
+  it('an UNSTATED seat is admissible, so the derived side and angles are withheld until the seat is pinned (#434)', async () => {
     const { res } = await build('right triangle ABC + AB=5 + AC=4');
+    const byPair = Object.fromEntries(res.definiteLengths.map((l) => [[l.a, l.b].sort().join(''), Math.round(l.value)]));
+    expect(byPair, 'only the two STATED lengths').toEqual({ AB: 5, AC: 4 });
+    expect(res.definiteAngles, 'no angle is the same at every seat').toEqual([]);
+  });
+
+  it('a SIZED figure has definite lengths equal to the pinned world lengths (3-4-5)', async () => {
+    const { res } = await build('right triangle ABC + angle ACB = 90 + AB=5 + AC=4');
     const byPair = Object.fromEntries(res.definiteLengths.map((l) => [[l.a, l.b].sort().join(''), Math.round(l.value)]));
     expect(byPair).toEqual({ AB: 5, AC: 4, BC: 3 });
     expect(res.definiteAngles.map((a) => Math.round(a.valueDeg)).sort((x, y) => x - y)).toEqual([37, 53, 90]);
   });
 
   it('hovering a side body picks its length; hovering into a wedge picks its angle', async () => {
-    const { res, pos } = await build('right triangle ABC + AB=5 + AC=4');
+    const { res, pos } = await build('right triangle ABC + angle ACB = 90 + AB=5 + AC=4');
     const A = pos.get('A')!, B = pos.get('B')!, C = pos.get('C')!;
     const seg = 0.5, vert = 0.5; // small screen-proportional reaches
     const midBC = { x: (B.x + C.x) / 2, y: (B.y + C.y) / 2 };
