@@ -67,7 +67,7 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
 - **FR-SP-6 (Must)** — **A stated new label must land on the figure.** A decomposition that loses a point
   the student named is **refused, naming the label** — never committed with the point missing. A label
   that already exists is context, not a drop. *(Realised — `droppedNewLabels3`, `honesty3.test.ts`.)*
-- **FR-SP-7 (Should)** — **One line may declare a solid AND a construct on it.** «קובייה ABCD עם אלכסון AC'»
+- **FR-SP-10 (Should)** — **One line may declare a solid AND a construct on it.** «קובייה ABCD עם אלכסון AC'»
   builds both; the student writes the sentence they were going to write anyway rather than splitting it to
   suit the grammar. Every solid and every construct the tool already reads compose by construction — the
   reading is a SPLIT into the two rules that own the halves, never a table of supported pairs. Where the
@@ -75,7 +75,7 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   none of the four space diagonals, so it ASKS (ADR-052), and a clarify is never flattened into a pick.
   *(Realised — [ADR-3D-237](06b-decisions-3d.md#adr-3d-237), #893; the 2-D counterpart is ADR-430/#461.)*
 
-- **FR-SP-8 (Must)** — **A relation the tool reads is read for every OPERAND KIND it is meaningful for.**
+- **FR-SP-11 (Must)** — **A relation the tool reads is read for every OPERAND KIND it is meaningful for.**
   A student who has seen «הישר ℓ מוכל במישור π» accepted expects «C מוכלת במישור π» — the same relation,
   said about a point — to be accepted too, and a frame that serves one kind and silently escalates
   another is indistinguishable to them from the tool not knowing the relation at all. So a relation's

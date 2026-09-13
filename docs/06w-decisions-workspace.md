@@ -2517,3 +2517,28 @@ error.
 
 **Not in scope.** The guard reports; it does not edit. Applying or clearing a label stays a deliberate
 act by the pass that has the warrant, so an automated relabel can never be the thing that goes wrong.
+
+## ADR-W-050 — AN FR ID IS DEFINED AT MOST ONCE, AND THE GUARD SAYS SO (#987)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #987 (debt, P3 — found while filing ADR-3D-238's requirements line, round #974) · round #998 · debt route (landed on `main`)
+**Requirements:** none · **Design:** none (internal — a documentation-integrity guard)
+
+**The defect.** `docs/02b` defined **FR-SP-7 twice** (2026-09-05, *every exam's space/vectors input is
+expressible*; 2026-09-10, *one line may declare a solid AND a construct*) and **FR-SP-8 twice**
+(2026-09-07, *case in labels*; 2026-09-10, *operand coverage*, #963). Every citation of either id was
+ambiguous, and the suite reported green throughout: [ADR-W-041](#adr-w-041)'s FR guard checks that a cited
+id RESOLVES to a definition — two definitions resolve just fine. An enumeration checked one way and
+unchecked the other is ADR-W-041's own class (that is how `docs/06c` went invisible while green).
+
+**Decision.** `docs-hygiene.test.ts` gains the uniqueness half: across every requirements doc registered
+in `DOCS.json`, each bold declaration `**FR-XX-N (Tier)**` may appear at most once, and a collision is
+reported with both file:line sites. It was run BEFORE the repair and failed naming exactly the two pairs —
+the proof the guard works — and passes after it. **Renumber, newest loses:** the pre-existing definitions
+keep their ids (they are cited from shipped ADRs, and a stable reference that moves is worse than one out
+of order); the later additions moved to the next free ids — the composed-form FR is now **FR-SP-10**, the
+operand-coverage FR **FR-SP-11** — and their citations were repointed in the same commit (`docs/04b` §the
+operand table, [ADR-3D-238](06b-decisions-3d.md#adr-3d-238)'s requirements line, which now says where it
+came from). [ADR-3D-237](06b-decisions-3d.md#adr-3d-237) cites its FR by description, so nothing to move.
+
+**Locks.** The guard itself (the `DEFINED at most once` case in `docs-hygiene.test.ts`, asserted on the
+live docs); `test:docs` green.

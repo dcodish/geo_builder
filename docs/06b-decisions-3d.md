@@ -9253,7 +9253,7 @@ non-solid left half left to its own rules.
 ## ADR-3D-238 — CONTAINMENT IS NOT A DIRECTION RELATION: a POINT is a legal contained side (#963)
 
 **Status:** accepted, 2026-09-10 · **Issue:** #963 (measured while composing fix-round #962)
-**Requirements:** [02b](02b-requirements-3d.md) FR-SP-8 (new) · **Design:** [04b](04b-design-3d.md) — the membership family
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-11 (new; renumbered from a colliding FR-SP-8 by #987, ADR-W-050) · **Design:** [04b](04b-design-3d.md) — the membership family
 
 **The report, and the correction measurement forced.** #963 was filed as *"point-in-plane membership
 exists **ONLY in English** — «C on plane π1» works, all 8 Hebrew spellings are not-handled"*, with a

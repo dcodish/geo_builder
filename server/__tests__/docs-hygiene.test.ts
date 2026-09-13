@@ -194,6 +194,42 @@ describe('every FR id resolves to a definition (ADR-W-041)', () => {
         `(emptied by #${DOCS.frIds.issue}).`,
     ).toEqual([...DOCS.frIds.grandfathered].sort());
   });
+
+  // #987 (ADR-W-050): the UNIQUENESS half. The guard above checks that a cited id RESOLVES; an id defined
+  // twice resolves fine and still means two different promises — FR-SP-7 and FR-SP-8 were each defined
+  // twice in 02b, and every citation of them was ambiguous while the suite reported green. An enumeration
+  // checked one way and unchecked the other is the ADR-W-041 class itself. Defined at most once, across
+  // every registered requirements doc together (an id is a workspace-wide name, not a per-file one).
+  it('every FR id is DEFINED at most once across the registered requirements docs', () => {
+    // Deduplicated: two products may legitimately register ONE requirements doc (the workspace and the
+    // shell share 02w), and a shared doc is not a doc that defines its ids twice.
+    const reqDocs = [
+      ...new Set(
+        entries<Record<string, unknown>>(DOCS.products)
+          .map(([, cfg]) => cfg.requirements as string | null)
+          .filter((p): p is string => Boolean(p)),
+      ),
+    ];
+    const where = new Map<string, string[]>();
+    for (const doc of reqDocs) {
+      const lines = read(doc).split('\n');
+      lines.forEach((line, i) => {
+        for (const m of line.matchAll(/\*\*(FR-[A-Z]+-\d+[a-z]*) \((?:Must|Should|Could|Later|Won't)\)\*\*/g)) {
+          const list = where.get(m[1]) ?? [];
+          list.push(`${doc}:${i + 1}`);
+          where.set(m[1], list);
+        }
+      });
+    }
+    expect(where.size, 'no FR definitions found — the definition matcher is broken').toBeGreaterThan(0);
+    const duplicates = [...where].filter(([, sites]) => sites.length > 1).map(([id, sites]) => `${id} → ${sites.join(', ')}`).sort();
+    expect(
+      duplicates,
+      `FR ids defined more than once. Two definitions under one id are two promises with one name, and every ` +
+        `citation of that id is ambiguous. Renumber the NEWER definition (the older id is already cited from shipped ADRs) ` +
+        `and update its citations in the same commit.`,
+    ).toEqual([]);
+  });
 });
 
 describe('new ADRs declare their requirements and design impact (ADR-W-041)', () => {

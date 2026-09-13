@@ -201,7 +201,7 @@ Two things generalise, and both are cheap to check in review:
   **in** plane π1" was equally broken — the axis was the *frame*, not the language. Fixed as filed it
   would have been a list of Hebrew spellings that still left an English row failing; fixed at the frame it
   is one edit serving every spelling in both languages. Whenever a report's axis is a language, a spelling
-  or a single input, measure the neighbouring cells before believing it (the FR-SP-8 promise is written
+  or a single input, measure the neighbouring cells before believing it (the FR-SP-11 promise is written
   against the corrected axis, not the reported one).
 **Vocabulary is not a rule's private property** (#977, [ADR-3D-241](06b-decisions-3d.md#adr-3d-241)).
 Two rules read angle statements, and each carried its own inline copy of the angle NOUN and the COPULA.
