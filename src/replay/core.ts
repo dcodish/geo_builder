@@ -413,7 +413,31 @@ function rtEffectiveIds(cmd: Extract<AnyCommand, { type: 'right-triangle' }>, re
   return cmd.rot === 1 ? [b, c, a] : cmd.rot === 2 ? [a, c, b] : cmd.ids;
 }
 
-function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
+/**
+ * #943 ([ADR-508](docs/06-decisions.md#adr-508)) — the drop-one search's OWN memo, apart from `foldCache`:
+ * a refusal's search folds a handful of trial prefixes, and letting them into the 8-entry main cache
+ * would evict the figure's own fold (seconds on a hard figure) to store throwaways. Keyed by content
+ * like the main memo; these nodes carry no attribution tails of their own (see `computeFold`'s
+ * `attribute` flag), which is why they must never be served from — or into — the main cache.
+ */
+const searchFoldCache = new Map<string, FoldNode>();
+const SEARCH_FOLD_CACHE_MAX = 24;
+/** #943: how many trial folds the drop-one search has run — the counter lock (zero on every green replay). */
+export const conflictSearchStats = { folds: 0 };
+function foldForSearch(facts: Fact[]): FoldNode {
+  const key = foldKey(facts);
+  const hit = searchFoldCache.get(key);
+  if (hit) return hit;
+  const node = computeFold(facts, 0, false);
+  conflictSearchStats.folds++;
+  if (searchFoldCache.size >= SEARCH_FOLD_CACHE_MAX) searchFoldCache.delete(searchFoldCache.keys().next().value as string);
+  searchFoldCache.set(key, node);
+  return node;
+}
+/** #943: the structured tail an over-constrained status carries once the other side is known — `[vs #<fact index>]`. */
+export const OVER_CONSTRAINED_VS = /^over-constrained: (.+) cannot hold(?: \[vs #(\d+)\])?$/;
+
+function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode {
   // Symbol table over the ENABLED facts, so a value given later (`x = 4`) resolves an
   // earlier `AB = 3x`, and two segments sharing a variable become a proportion (ADR-031).
   const enabledCmds = facts.filter((f) => f.enabled).map((f) => f.cmd);
@@ -1088,6 +1112,72 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
     status[f.id] = 'ok';
   }
   ({ failedFacts, pending } = classify(cur, status));
+  /**
+   * #943 ([ADR-508](docs/06-decisions.md#adr-508)) — THE OTHER SIDE. An over-constrained refusal knew WHICH
+   * statement failed (the ADR-492 pass above) but never asked AGAINST WHAT: «D = חיתוך AB ו-BC» סותר נתון
+   * קודם named no earlier given, and the humaniser — a pure string consumer with no figure — structurally
+   * could not. The answer is a bounded DROP-ONE search in the same block, after every deferral, poisoning
+   * and HOIST rescue has settled: for each earlier enabled STATEMENT (a group — the student's unit, not a
+   * lowered fact) that is relevant — it owns a constraint, or it introduces a point the failing statement
+   * reads — re-fold the prefix up to the failing fact with that statement disabled; the latest whose removal
+   * makes the failing fact hold is the conflicting given (the ADR-492 doctrine: blame the newest). No
+   * single removal restores it ⇒ name none, and today's wording («several givens jointly») stands.
+   *
+   * Attribution ONLY, again: it appends a structured tail `[vs #<index>]` to the status string — an
+   * INDEX, because statuses are stored by index and a dry-run trial array and the committed array share
+   * one fold — and changes no applied constraint, no figure, no solve. Cost only on the refused path: the
+   * search runs when a fact is over-constrained, never on a green fold (the counter lock), through its own
+   * memo (`foldForSearch`, so the figure's fold is never evicted), capped at the latest relevant
+   * statements, and never nested (`attribute` is false inside a trial).
+   */
+  if (attribute && hoistDepth === 0) {
+    const ownerIdx = new Set(ownerByConKey.values());
+    const searched = new Set<string>();
+    for (const f of failedFacts) {
+      const st = status[f.id];
+      if (typeof st !== 'string') continue;
+      const m = OVER_CONSTRAINED_VS.exec(st);
+      if (!m || m[2] !== undefined) continue;
+      // The STATEMENT is the unit: a group's rows share one status (the atomic-group rule), and the
+      // constraint that failed may sit on the group's LAST row while an earlier row is its segment ink —
+      // so the trial prefix runs to the group's end and the whole group must hold for the trial to count.
+      const own = groupKey(f);
+      if (searched.has(own)) continue;
+      searched.add(own);
+      const members = facts.map((x, i) => (groupKey(x) === own ? i : -1)).filter((i) => i >= 0);
+      const gEnd = members[members.length - 1];
+      const fi = members[0];
+      const reads = new Set(members.flatMap((i) => commandPointIds(facts[i].cmd)));
+      const seen = new Set<string>();
+      const candidates: string[] = [];
+      for (let j = fi - 1; j >= 0 && candidates.length < 8; j--) {
+        const g = facts[j];
+        if (!g.enabled) continue;
+        const gk = groupKey(g);
+        if (gk === own || seen.has(gk)) continue;
+        seen.add(gk);
+        const relevant = ownerIdx.has(j) || lowerOne(g.cmd, symtab).some((c) => introducedPointIds(c).some((id) => reads.has(id)));
+        if (relevant) candidates.push(gk);
+      }
+      for (const gk of candidates) {
+        // REMOVE the candidate, never disable it: a disabled statement still OWNS the points it introduced,
+        // so its dependents cascade («D is no longer available») instead of minting afresh — the question
+        // is "had this never been said", which only removal asks. Indices shift; the members' trial
+        // positions are their own minus the removed rows before them.
+        const prefix = facts.slice(0, gEnd + 1);
+        const trial = prefix.filter((x) => groupKey(x) !== gk);
+        const at = (i: number) => i - prefix.slice(0, i).filter((x) => groupKey(x) === gk).length;
+        const node = foldForSearch(trial);
+        if (!members.every((i) => node.statusByIndex[at(i)] === 'ok')) continue;
+        const otherIdx = facts.findIndex((x) => groupKey(x) === gk);
+        const tagged = `${st} [vs #${otherIdx}]`;
+        // every row that carries this very string (the group's siblings share it) gets the tail, so the
+        // banner and the row statuses stay ONE string (ADR-398)
+        for (const h of facts) if (status[h.id] === st) status[h.id] = tagged;
+        break;
+      }
+    }
+  }
   const buildError = !pending && failedFacts.length ? (status[failedFacts[failedFacts.length - 1].id] as string) : null;
   return {
     cur,

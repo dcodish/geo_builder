@@ -36,3 +36,19 @@ export function utteranceForError(
   const said = owner?.utterance?.trim();
   return said ? said : undefined;
 }
+
+/**
+ * #943 half B ([ADR-508](../../docs/06-decisions.md#adr-508)) — the OTHER side: the earlier statement the
+ * refused one conflicts with, when the fold could name one. The fold appends ` [vs #<index>]` to an
+ * over-constrained status (an index, because statuses live by index and a dry-run trial array shares the
+ * committed array's fold); this resolves it to that statement's own words. `undefined` — no tail, an index
+ * off the list, a fact with no recorded utterance — is a first-class answer: the caller renders the
+ * `_said` wording, which never pretends to know what it does not.
+ */
+export function otherUtteranceForError(facts: readonly Fact[], raw: string | null | undefined): string | undefined {
+  const m = raw ? /\[vs #(\d+)\]$/.exec(raw.trim()) : null;
+  if (!m) return undefined;
+  const other = facts[Number(m[1])];
+  const said = other?.enabled ? other.utterance?.trim() : undefined;
+  return said ? said : undefined;
+}

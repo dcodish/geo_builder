@@ -11115,3 +11115,58 @@ values; students spell the rest with `=`. Not this issue's to widen.
 lanes, copula + adjective keeps the right/acute/obtuse lanes, the chain is byte-identical, and segment word
 equality stays `not-handled`. Standing rule 4: fixture `issue-976-angle-equality-copula.geo.json` (two
 triangles + «זווית ABC היא זווית DEF», green and verified).
+
+## ADR-508 — AN OVER-CONSTRAINED REFUSAL NAMES BOTH STATEMENTS: «X» סותר את «Y» (#943, half B)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #943 (bug, P3 — half B, armed by the operator's 2026-09-13 ruling *"Arm it for a fix round"*) · round #998 · bug route (landed on `main`) · amends [ADR-487](#adr-487) (half A), built on [ADR-492](#adr-492)'s seam
+**Requirements:** [02](02-requirements.md) FR-EN-8 — one sentence (the refusal names the conflicting earlier statement when one removal restores feasibility) · **Design:** [04](04-design.md) — the `errorSubject.ts` bullet, the fold's attribution pass
+
+**What the student saw.** «לא ניתן: «D = חיתוך AB ו-BC» סותר נתון קודם — אי אפשר לקיים את שניהם יחד.
+הסיבה: …» — the sentence they typed (half A), and *an earlier given* with no name. The fold knew WHICH
+statement failed (ADR-492 decides "whose fault" after the deferral, the poisoning and the HOIST rescue
+have settled) but never asked AGAINST WHAT; `Constraint` carries no fact provenance, and `humanizeError`
+is a pure string-pattern consumer with no figure, so neither end could answer. The 2026-09-08 deferral
+(a `Constraint → Fact` carrier, #956) turned out unnecessary: #956 was ruled by the prefix rule and needs
+no minimal-conflict search either.
+
+**Decision — one seam, the same block as ADR-492.**
+
+1. **The other side, by a bounded drop-one search** (`computeFold`, right after the ADR-492 pass, ONLY
+   for a statement whose status is `over-constrained` — never on the success path). For each earlier
+   enabled STATEMENT — a group, the student's unit, not a lowered row — that is *relevant* (it owns a
+   constraint, per `ownerByConKey`, or it introduces a point the failing statement reads), the prefix up
+   to the failing statement's last row is re-folded **with that statement removed**; the latest whose
+   removal makes every row of the failing statement hold is the conflicting given (the ADR-492 doctrine:
+   blame the newest). Removed, never disabled — a disabled statement still owns the points it introduced,
+   so its dependents cascade («D is no longer available») instead of minting afresh, and the question is
+   "had this never been said". No single removal restores feasibility ⇒ none is named and today's wording
+   stands — the search never pretends to know what it does not.
+2. **The tail.** The status string gains a structured tail — `over-constrained: <what> cannot hold [vs
+   #<index>]` — an INDEX, because statuses live by index and a dry-run trial array shares the committed
+   array's fold (ADR-280 / ADR-406). Every row that carried the string gets the tail, so the banner and
+   the rows stay ONE string (ADR-398). `humanizeError`'s pattern accepts the optional tail and keeps
+   `what` the bare reason; `otherUtteranceForError` (`app/errorSubject.ts`, beside half A's resolver)
+   turns the index into that statement's words; `humanizeError(raw, t, said, other)` renders the new
+   `overConstrained_said_vs` (He + En) when both sides are known and the `_said` variant otherwise.
+   `OTHER_SUBJECT_KEYS` is derived from the pattern table (a `namesOther` flag), so a missing locale
+   string fails the suite (the ADR-487 ratchet, extended).
+3. **Cost.** Only on a refused submit, after the refusal is already decided: at most 8 trial folds
+   through the search's OWN memo (`foldForSearch` — apart from the 8-entry main cache, which a
+   throwaway trial must never evict), never nested (`attribute` is false inside a trial), and never on a
+   green fold — `conflictSearchStats.folds` is the counter lock. Attribution only: no applied
+   constraint, no figure, no solve changes.
+
+**Locks.** `issue-943-other-side.test.ts` (10): the operator's exact sequence names «ריבוע DEFG חסום
+במשולש ABC» (real locale, both the He message and the En `_said_vs`); a plain length and a plain angle
+conflict name the earlier given; a jointly-infeasible set with no single culprit («∠ABC = 90» + «AB ⟂
+BC» + «∠ABC = 60») keeps the `_said` wording; the banner and the rows carry one string; the counter lock
+(zero search folds on green replays; none on a re-replay of the same content — the tail rides the memo);
+the resolver's three answers; the tail never leaks into a message; the `_said_vs` ratchet. The ADR-492
+lock (`issue-956-blame-later-fact.test.ts`) and the ADR-487 locks are byte-identical. Standing rule 4:
+scenario `over-constrained-refusal-names-the-other-side-943` (corpus 4) — the fold's own answer through
+the app's replay path.
+
+**Deviation from the plan, recorded.** The plan's step 1 (a `Map<constraintId, factIndex>` inside the
+fold) was not needed: `ownerByConKey` (ADR-398) already is that provenance, and the search removes whole
+statements rather than tracking constraint ids. The plan said "disable" — measured: disabling cascades
+the dependents, removal is the question actually asked.

@@ -147,6 +147,14 @@ src/
                    wording must be handed to it by the layer that has the fact list. The link needs no
                    plumbing: ADR-398 already makes the banner's `lastError` and the failing row's
                    `status` the same string, so the owning fact is found by that identity
+                 - AGAINST WHAT (ADR-508, #943 half B): `otherUtteranceForError(facts, raw)` resolves
+                   the structured `[vs #<index>]` tail the fold appends to an over-constrained status
+                   into that earlier statement's words; `humanizeError(raw, t, said, other)` then
+                   renders the `_said_vs` variant («X» סותר את «Y»). The tail is an INDEX because
+                   statuses live by index and a dry-run trial shares the committed fold; the fold names
+                   none when no single earlier statement's removal restores feasibility, and the
+                   `_said` wording stands. The search itself runs in the fold's attribution pass (next
+                   bullet), only on a refused statement, through its own memo, never nested
                  - WHICH row owns it is decided one layer down (ADR-492, #956): `computeFold` runs an
                    attribution pass after the deferral/poisoning/HOIST have settled, moving a refusal
                    from the row that SHAPED a constraint to the row that VALUED its symbol when that

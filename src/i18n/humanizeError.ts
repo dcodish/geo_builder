@@ -115,6 +115,16 @@ interface Pattern {
    * sentence available the base key renders exactly as it does today.
    */
   saysSubject?: true;
+  /**
+   * #943 half B ([ADR-508](../../docs/06-decisions.md#adr-508)) — this refusal can also name the OTHER
+   * side: the earlier given the statement conflicts with. The fold appends a structured `[vs #<index>]`
+   * tail to the status when a single earlier statement's removal restores feasibility; the display
+   * layer resolves the index to that statement's words (`otherUtteranceForError`) and hands it here as
+   * `other`. With both a sentence and an other, the `_said_vs` variant renders («X» סותר את «Y»); with
+   * no other, the `_said` variant renders exactly as before — the fold names none when several givens
+   * are jointly at fault, and the wording must not pretend otherwise.
+   */
+  namesOther?: true;
 }
 
 // Order matters only where one pattern's text is a prefix of another's; each regex below is
@@ -159,8 +169,10 @@ export const PATTERNS: Pattern[] = [
   // evaluate.ts:887 — `|AB| = |AD| references an unknown point`
   { re: /^(.+) references an unknown point$/, key: 'errors.unknownPoint', params: (m) => ({ what: m[1] }), saysSubject: true },
 
-  // evaluate.ts:891 — `over-constrained: |AC| = 9 cannot hold`
-  { re: /^over-constrained: (.+) cannot hold$/, key: 'errors.overConstrained', params: (m) => ({ what: m[1] }), saysSubject: true },
+  // evaluate.ts:891 — `over-constrained: |AC| = 9 cannot hold`; #943 half B: the fold may append the
+  // structured tail ` [vs #<fact index>]` naming the conflicting earlier statement — matched here so
+  // `what` stays the bare reason, and resolved to words by the display layer (`otherUtteranceForError`).
+  { re: /^over-constrained: (.+) cannot hold(?: \[vs #\d+\])?$/, key: 'errors.overConstrained', params: (m) => ({ what: m[1] }), saysSubject: true, namesOther: true },
 
   // replay/core.ts (#855, ADR-476) — the SAMPLED-VALUE degradation of the row above. The conflict is with
   // a placement the tool invented, so the message must not read as «your given contradicts an earlier
@@ -238,12 +250,16 @@ export const PATTERNS: Pattern[] = [
  * rendering a raw i18n key at a student.
  */
 export const SAID_SUBJECT_KEYS: readonly string[] = [...new Set(PATTERNS.filter((p) => p.saysSubject).map((p) => p.key))];
+/** #943 half B: the keys that can name the OTHER side — each must have a `_said_vs` variant in both locales (the same ratchet). */
+export const OTHER_SUBJECT_KEYS: readonly string[] = [...new Set(PATTERNS.filter((p) => p.namesOther).map((p) => p.key))];
 
 /**
  * Translate a raw engine error to a student-facing message. Returns the raw string
  * unchanged when no known shape matches (so it is never worse than the current text).
+ * `said` is the student's refused sentence; `other` (#943 half B) the earlier statement it conflicts
+ * with, when the fold could name one — both are arguments, never looked up here (ADR-228 Am.6).
  */
-export function humanizeError(raw: string | null | undefined, t: Translate, said?: string): string {
+export function humanizeError(raw: string | null | undefined, t: Translate, said?: string, other?: string): string {
   if (!raw) return '';
   // Sanitize FIRST (#200): the patterns then match a clean string and every extracted param (`circle: m[1]`)
   // is already the student's letter — no internal id can reach the message, matched or fall-through.
@@ -265,6 +281,9 @@ export function humanizeError(raw: string | null | undefined, t: Translate, said
     // argument, not something this layer looks up. A missing/blank `said` renders the base key, which
     // is byte-identical to today, so a fact with no recorded utterance never yields an empty «».
     const sub = said?.trim();
+    const oth = other?.trim();
+    // #943 half B: both sides known ⇒ the sentence AND the earlier given it contradicts are the subject.
+    if (p.namesOther && sub && oth) return t(`${key}_said_vs`, { ...translated, said: sub, other: oth });
     if (p.saysSubject && sub) return t(`${key}_said`, { ...translated, said: sub });
     return t(key, translated);
   }

@@ -1506,3 +1506,7 @@ over all four (ADR-041).
 ### `incremental-tangent-pair-crossing-554` — «המשיקים נחתכים בנקודה E» after two drawn tangents builds E at the crossing (#554, ADR-503)
 
 **Guards against:** the prod REC-2 gap where both tangents were already drawn via the named form and the follow-up «המשיקים נחתכים בנקודה E» was not-handled (the paid LLM failed too). The contextual plural now reaches the tangents-at-points family through `ctx.tangentLines`; E is the pole of chord BC — equal tangent lengths, OB ⟂ BE, OC ⟂ CE, outside the circle.
+
+### `over-constrained-refusal-names-the-other-side-943` — the operator's «D = חיתוך AB ו-BC» refusal names «ריבוע DEFG חסום במשולש ABC» as the given it contradicts (#943 half B, ADR-508)
+
+**Guards against:** a refusal that names only the sentence the student typed (half A) and «an earlier given» with no name. The fold now runs a bounded drop-one search over the earlier STATEMENTS (each removed in turn, never disabled — a disabled statement still owns its points and its dependents cascade) and carries the conflicting one as a structured `[vs #<index>]` tail on the status string; index 4 is the square's row. The message-level lock (real Hebrew locale, the En `_said_vs` too) lives in `replay/__tests__/issue-943-other-side.test.ts`; this scenario locks the FOLD's own answer through the app's replay path, and that the three earlier statements stay green.

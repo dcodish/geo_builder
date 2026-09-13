@@ -2578,4 +2578,19 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs((C.x - O.x) * (E.x - C.x) + (C.y - O.y) * (E.y - C.y))).toBeLessThan(1e-6 * ec * Math.hypot(C.x - O.x, C.y - O.y));
     },
   },
+  {
+    id: 'over-constrained-refusal-names-the-other-side-943',
+    title: '#943 half B: the operator’s «D = חיתוך AB ו-BC» refusal names «ריבוע DEFG חסום במשולש ABC» as the given it contradicts',
+    guards:
+      "The operator's exact sequence (2026-09-08). Half A made the refused sentence the subject; the fold now runs a bounded drop-one search over the earlier STATEMENTS and carries the conflicting one as a `[vs #<index>]` tail on the status string — an index, because statuses live by index and a dry-run shares the committed fold. Index 4 is the square's row (the triangle is row 0, «∠ABC = 90» lowers to rows 1–3). The message-level assertion (real Hebrew locale) lives in replay/__tests__/issue-943-other-side.test.ts; this scenario locks the FOLD's answer through the app's real replay path.",
+    steps: ['משולש ABC', '∠ABC = 90', 'ריבוע DEFG חסום במשולש ABC', 'D = חיתוך AB ו-BC'],
+    check(fig) {
+      expect(fig.lastError, 'still refused, still the over-constrained shape').toMatch(/^over-constrained: .+ cannot hold \[vs #4\]$/);
+      // the refused statement's rows carry the banner's string, tail included (ADR-398)
+      const refused = Object.values(fig.status).filter((s) => s === fig.lastError);
+      expect(refused.length).toBeGreaterThan(0);
+      // the three earlier statements stay green — the figure before the refusal is untouched
+      expect(Object.values(fig.status).filter((s) => s === 'ok').length).toBe(5);
+    },
+  },
 ];

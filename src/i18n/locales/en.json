@@ -225,6 +225,7 @@
     },
     "overConstrained": "Can't do that: {{what}} contradicts an earlier given — they can't both hold.",
     "overConstrained_said": "Can't do that: «{{said}}» contradicts an earlier given — they can't both hold. The reason: {{what}}.",
+    "overConstrained_said_vs": "Can't do that: «{{said}}» contradicts «{{other}}» — they can't both hold. The reason: {{what}}.",
     "notDeterminedHere": "Your givens are fine. {{who}} are not determined yet, and in the placement the tool picked for them {{what}} can't hold — press «show another configuration».",
     "notDeterminedHereBare": "Your givens are fine. In the placement the tool picked, {{what}} can't hold — press «show another configuration».",
     "unknownPoint": "{{what}} refers to a point that hasn't been defined yet. Create it first.",
