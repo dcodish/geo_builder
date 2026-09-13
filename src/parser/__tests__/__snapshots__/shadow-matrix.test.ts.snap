@@ -1133,6 +1133,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "angle ABC is angle DEF",
+    "winner": "angleEquality",
+  },
+  {
+    "lang": "he",
+    "text": "זווית ABC היא זווית DEF",
+    "winner": "angleEquality",
+  },
+  {
+    "lang": "en",
     "text": "arc DE = 2 arc CE in circle O",
     "winner": "arcEquality",
   },

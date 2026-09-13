@@ -9972,13 +9972,25 @@ function normalizeWordDegrees(s: string): string {
  * then. This deliberately narrows [ADR-119]'s word-equality ruling to arcs/angles: general word-equality
  * between segments («AB שווה ל CD», «X ו Y שווים») stays out — students spell those with `=` — which is
  * why the value lookahead requires the degree suffix rather than any number.
+ *
+ * #976 ([ADR-507](docs/06-decisions.md#adr-507)) — the BARE copulas join the same seam: «זווית ABC היא
+ * זווית DEF», «הוא», the bare «שווה» (no ל), "angle ABC is angle DEF". This is the relation half of the
+ * #969 copula asymmetry (ADR-498 fixed the value half): `angleEquality` / `arcEquality` / `measureSum`
+ * all split on the literal `=`, so the copula WAS their structure. The seam is located by CONTENT — a
+ * copula immediately followed by a LABELLED angle/arc reference (an optional coefficient, an optional
+ * article, the keyword, a Latin label) — which is what makes it safe: «זווית ABC היא זווית ישרה/קהה/חדה»
+ * and "angle ABC is a right angle" carry no label after the keyword and keep their own lanes, and a
+ * copula before a VALUE («היא 2α», «היא 40») never reaches it (the ADR-498 lane). One chokepoint for
+ * every relation reader — never a copula added to one rule's regex.
  */
 const normalizeWordEquality = (s: string): string =>
   s
     .replace(/שוו(?:ה|ות)\s+ל-?(?=\s*(?:ה?זוו?ית|∠|ה?קשת|⌢))/g, '= ')
     .replace(/שוו(?:ה|ות)\s+(?:ל-?\s*)?(?=-?\d+(?:\.\d+)?\s*(?:°|מעלות))/g, '= ')
     .replace(/\b(?:equals|is\s+equal\s+to)\s+(?=(?:the\s+)?(?:angle|∠|arcs?|⌢))/gi, '= ')
-    .replace(/\b(?:equals|is\s+equal\s+to)\s+(?=-?\d+(?:\.\d+)?\s*(?:°|degrees?))/gi, '= ');
+    .replace(/\b(?:equals|is\s+equal\s+to)\s+(?=-?\d+(?:\.\d+)?\s*(?:°|degrees?))/gi, '= ')
+    .replace(new RegExp(String.raw`(?<![א-ת])(?:היא|הוא|שוו(?:ה|ות))(?![א-ת])\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:ה?זוו?ית|∠|∢|ה?קשת|⌢)\s*${LABEL})`, 'g'), '= ')
+    .replace(new RegExp(String.raw`\b(?:is|are)\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:the\s+)?(?:angle|∠|∢|arcs?|⌢)\s*${LABEL})`, 'gi'), '= ');
 
 /**
  * The vocabulary for "a shape declared WITH its side length" — «ריבוע ABCD שצלעו הוא 1» /

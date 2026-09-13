@@ -401,6 +401,19 @@ Three consequences worth stating, because each is a place the old shape leaked:
 The general lesson, and the reason this is documented next to its sibling rather than in its own section:
 **a chokepoint that unifies one half of a statement leaves the other half free to re-split.** #831 unified
 the naming half and said so; the value half stayed split for eleven months underneath that sentence.
+### The relation half: where the right-hand side starts (#976, [ADR-507](06-decisions.md#adr-507))
+
+ADR-498 stopped the VALUE lanes from locating by copula. The RELATION readers — `angleEquality`,
+`arcEquality`, `measureSum` — still split the line on the literal `=`, so «זווית ABC היא זווית DEF» was
+`not-handled` while «= זווית DEF» and «שווה לזווית DEF» worked. The seam has ONE home: `normalizeWordEquality`
+(the #185 chokepoint) rewrites a word copula to `=` when a labelled angle/arc reference follows — the bare
+«היא» / «הוא» / «שווה» and "is" / "are" now join «שווה ל» / "equals" / "is equal to" there, with an optional
+coefficient and article allowed in the lookahead. The **label requirement** in the lookahead is the guard:
+«היא זווית ישרה / קהה / חדה» and "is a right angle" carry an adjective, not a label, and keep their lanes; a
+copula before a value never reaches the seam. A copula before a bare number or a segment stays out by the
+2026-07-17 ruling (word equality is narrowed to angles/arcs and degree values). No relation rule knows a
+copula — a new spelling is a lookahead row here, never a regex in three rules.
+
 ## A role noun is a claim: «אלכסון» (#966, [ADR-499](06-decisions.md#adr-499))
 
 Most nouns in this grammar NAME a thing: «קטע AB» says "the segment AB". A few instead assign a **role**,

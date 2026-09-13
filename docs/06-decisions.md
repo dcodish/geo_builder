@@ -11075,3 +11075,43 @@ force; the predicate, the derivation and the seat picker unit-locked. Standing r
 `issue-989-trapezoid-stated-pair`, `issue-989-isosceles-trapezoid-pinned`, `issue-989-trapezoid-after-triangle`.
 Known and unchanged: the iso-trapezoid at raw seed 1 samples a parallelogram (both before and after) — the
 app's seed selection avoids it; the locks use the app's seed.
+
+## ADR-507 — THE RELATION SEAM: an angle/arc equality through a BARE copula («זווית ABC היא זווית DEF») (#976)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #976 (bug, P3 — found while fixing #969) · round #998 · bug route (landed on `main`)
+**Requirements:** [02](02-requirements.md) FR-IN-6 — one line (a relation between two measures reads through any copula) · **Design:** [04](04-design.md) "Addressing an angle" — the relation seam
+
+**The gap, measured on `d440f01`.** «זווית ABC = זווית DEF» and «שווה לזווית DEF» / "equals" lowered to
+`set-angle-ratio`; «זווית ABC היא זווית DEF», «הוא», the bare «שווה», "angle ABC is angle DEF" and "∠ABC is
+∠DEF" were `not-handled` — an honest escalation to the paid LLM, no wrong figure. The arc reader («קשת CD
+היא קשת DE», "arc CD is arc DE") had the same hole. This is the **relation half** of the #969 copula
+asymmetry: [ADR-498](#adr-498) made the VALUE half locate its number/symbol by content so the copula
+stopped being load-bearing; `angleEquality`, `arcEquality` and `measureSum` still split the line on the
+literal `=`, so for them the copula WAS the structure.
+
+**Class (standing rule 1).** *"Where does this statement's right-hand side start?" answered per rule, by one
+spelling.* The plan's shape was a shared `splitRelation` helper inside the three rules. The code already
+holds the ONE answer to that question for word copulas: `normalizeWordEquality` (the #185 seam, operator
+ruling 2026-07-17) rewrites «שווה ל» / "equals" / "is equal to" to `=` when — and only when — an angle/arc
+reference or a degree value follows. A second helper would have been a second authority for the same seam
+(the ADR-346 no-mirrors rule), so the fix lands at that chokepoint instead. **Deviation from the plan,
+recorded:** same mechanism (locate the seam by the content that follows it), one home rather than three.
+
+**Decision.** Two rows join `normalizeWordEquality`: the bare Hebrew copulas «היא» / «הוא» / «שווה» (and
+«שוות») and the English "is" / "are", each rewritten to `=` **only when immediately followed by a LABELLED
+angle or arc reference** — an optional coefficient («היא 2 זווית DEF»), an optional article («הזווית», "the
+angle"), the keyword, then a Latin label. The label requirement is what makes a bare copula safe: «זווית ABC
+היא זווית ישרה / קהה / חדה» and "angle ABC is a right angle" carry an ADJECTIVE after the keyword and keep
+their own lanes untouched; a copula before a VALUE («היא 2α», «היא 40») never reaches the seam and stays in
+the ADR-498 lanes; a chain «∠1=∠2=∠3» still has two `=` and stays `chainedEquality`'s. Every relation
+reader gains the copulas at once — `measureSum`'s angle terms included («זווית A + זווית B היא זווית C»).
+**Deliberately still out:** a copula before a bare NUMBER or a SEGMENT («AB היא 5», «AB + CD הוא EF»,
+«זווית A + זווית B היא 180») — the 2026-07-17 ruling narrowed word equality to angles/arcs and degree
+values; students spell the rest with `=`. Not this issue's to widen.
+
+**Locks.** `issue-976-relation-copula.test.ts` (30): fifteen copula spellings × He/En on «זווית ABC ⟨copula⟩
+זווית DEF» → `set-angle-ratio k=1`; the coefficient survives the copula (k=2); the single-vertex «∠B ⟨copula⟩
+∠C» form; the arc reader's five spellings + coefficient; the negatives — copula + value stays in the value
+lanes, copula + adjective keeps the right/acute/obtuse lanes, the chain is byte-identical, and segment word
+equality stays `not-handled`. Standing rule 4: fixture `issue-976-angle-equality-copula.geo.json` (two
+triangles + «זווית ABC היא זווית DEF», green and verified).

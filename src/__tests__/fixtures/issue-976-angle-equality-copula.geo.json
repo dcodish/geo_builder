@@ -1,0 +1,99 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-09-13T12:00:00.000Z",
+  "name": "issue-976",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "משולש DEF",
+      "group": "g1",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "D",
+          "E",
+          "F"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.2",
+      "utterance": "זווית ABC היא זווית DEF",
+      "group": "g2",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.3",
+      "utterance": "זווית ABC היא זווית DEF",
+      "group": "g2",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.4",
+      "utterance": "זווית ABC היא זווית DEF",
+      "group": "g2",
+      "cmd": {
+        "type": "segment",
+        "a": "E",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.5",
+      "utterance": "זווית ABC היא זווית DEF",
+      "group": "g2",
+      "cmd": {
+        "type": "segment",
+        "a": "E",
+        "b": "F"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.6",
+      "utterance": "זווית ABC היא זווית DEF",
+      "group": "g2",
+      "cmd": {
+        "type": "set-angle-ratio",
+        "v1": "B",
+        "a1": "A",
+        "b1": "C",
+        "v2": "E",
+        "a2": "D",
+        "b2": "F",
+        "k": 1
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

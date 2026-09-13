@@ -742,6 +742,22 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "set-angle",
     ],
   },
+  "angle ABC is angle DEF": {
+    "en": [
+      "segment",
+      "segment",
+      "segment",
+      "segment",
+      "set-angle-ratio",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "segment",
+      "segment",
+      "set-angle-ratio",
+    ],
+  },
   "angle ABC is obtuse": {
     "en": [
       "segment",
