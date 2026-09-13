@@ -99,17 +99,16 @@ describe('membership conversion (#236, ADR-384)', () => {
 
   it('a SECOND membership on an existing rider keeps the constraint path — never a silent host swap', () => {
     // The conversion is scoped to FREE-POINT kinds: a rider stays a rider on its FIRST host, and the
-    // second membership goes the constraint route. Today that route CONCLUDES over-constrained at the
-    // default placement (pre-existing, filed as #260 — the crossing-statement family, rider edition);
-    // what this fence locks is the boundary: the kind/host are never silently rewritten, and the
-    // failure is an honest error, not a wrong figure.
+    // second membership goes the constraint route. That route used to CONCLUDE over-constrained at the
+    // default placement (#260); since ADR-512 the statement re-seats the loose second carrier first, so
+    // the fence flipped to CLEAN — what it still locks is the boundary: the kind/host are never silently
+    // rewritten.
     const facts = factsOf(['AB', 'P על AB', 'CD', 'P על CD']);
-    const p = objOf(facts, 'P');
-    expect(p.kind, 'P stays a rider on its first host').toBe('on-segment');
-    expect((p as Extract<GeoObject, { kind: 'on-segment' }>).a + (p as Extract<GeoObject, { kind: 'on-segment' }>).b).toBe('AB');
+    const p = objOf(facts, 'P') as Extract<GeoObject, { kind: 'on-segment' | 'on-segment-solved' }>;
+    expect(['on-segment', 'on-segment-solved'], 'P stays a rider on its first host (solved onto the crossing since ADR-512)').toContain(p.kind);
+    expect(p.a + p.b).toBe('AB');
     const fig = replay(facts);
-    const bad = Object.values(fig.status).filter((s) => s !== 'ok');
-    expect(bad.length === 0 || bad.every((s) => String(s).includes('collinear')), 'built clean OR refused honestly (#260 flips this to clean)').toBe(true);
+    expect(Object.values(fig.status).every((s) => s === 'ok'), 'built clean (#260 / ADR-512)').toBe(true);
   });
 
   it('a PINNED point is never converted — the membership stays a constraint on the stated stretch', () => {

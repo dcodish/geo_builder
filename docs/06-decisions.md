@@ -11385,3 +11385,61 @@ failing at HEAD; the lock says so instead of pretending. The first cut replaced 
 by the family's `seedSpot` — measured, that moved the whole figure's basin (the «ישר ADB» variant lost
 seeds 4, 5, 7 and two more seeds tripped the distinctness floor), so the default was kept and only the
 declaration added. The 3-D sibling audit the plan does not ask for was not run.
+## ADR-512 — A STATEMENT THAT MAKES A POINT THE MEETING OF TWO CARRIERS MOVES THE LOOSE CARRIER — routed by the semantic fact, not the call site (#260)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #260 (bug, P3 — the 2026-08-25 plan) · round #1001 · bug route (landed on `main`) · generalises [ADR-255](#adr-255) (the loose-endpoint re-seat) and completes the crossing-statement family of [ADR-383](#adr-383); the mechanism-exists-wired-at-one-site shape of [ADR-167](#adr-167)
+**Requirements:** none (internal — `AB` · `P על AB` · `CD` · `P על CD` is a satisfiable statement the tool already promised to draw; it refused it) · **Design:** [04](04-design.md) — "The meeting re-seat is routed by a predicate"
+
+**What the student saw.** `AB` · `P על AB` · `CD` · `P על CD` → «cannot place P on segment AB so that P, C, D
+collinear». The statement is how a student names the crossing of two segments, and it is trivially
+satisfiable: P's slide along AB is a free DOF and C, D are free 2-DOF points nothing references.
+
+**Root cause (docs/17 §1 — the class).** *A statement naming an existing point as the meeting of two
+carriers was rooted against the carriers' DEFAULT placement instead of moving the carrier that is
+genuinely loose.* Measured at HEAD: (a) the second membership lowers (`reinterpretAsCollinear`, step.ts)
+to a `set-collinear` P,C,D and a driven collinear on P's slide; line CD met line AB at C itself, beyond B
+(t = 1.8), so the root was clamped off the segment and the drive concluded over-constrained; (b) the
+failure-path recruiter never reached C, D. The mechanism that fixes exactly this — `reseatLooseMeetEndpoint`
+(ADR-255): move a non-pinned, unconstrained endpoint so the crossing lands inside both segments — existed,
+wired at two call sites by COMMAND KIND (`line-line-intersection` with `onSeg`, `segments-cross`); the
+rider edition never reached it. Two smaller obstacles inside the mechanism were measured on the way: it
+considered only the endpoints of the segment the crossing was OFF (here A, B — the student's first
+segment — never C, D), and its general-position test counted the carriers' own riders as anchors, and a
+free rider defaults to its host's MIDPOINT, which is exactly where the aim-through-midpoint line passes.
+
+**Decision.**
+
+1. **One routing predicate.** `meetingCarriers(objects, cmd)` (`engine/apply.ts`) answers the semantic
+   question — does this statement assert that a point is the meeting of two carriers? — for every member:
+   a named segment-meet (`onSeg`), the point-free crossing statement, and a rider named onto a SECOND host
+   (a `set-collinear` whose one rider's host differs from the other two points). `applyCommand` asks it
+   ONCE, before its switch, and re-seats; the two in-case calls are gone (tripwire 2: a third
+   provenance-gated call was the obvious wrong move). `reinterpretAsCollinear` now passes the positions
+   through, so the re-seat can judge where the crossing lies.
+2. **Either carrier may move.** Every endpoint is a candidate once the crossing is off either segment,
+   fewest dependents first — on a tie the off-segment's own endpoints keep precedence, so every figure the
+   two older sites re-seated is re-seated as before. On the reported figure C (one dependent) moves; A and
+   B (a segment and a rider) never do — the stability invariant, M2.
+3. **The carriers' riders are not anchors.** `degeneratePlacement` ignores on-segment riders of either
+   carrier: their positions follow the endpoints, and the meeting rider is the very point the statement
+   re-solves.
+4. **The honest refusal stays.** Four pinned endpoints (stated coordinates) with the lines meeting beyond a
+   segment still refuse, naming P's statement; with only C, D pinned the free segment AB is re-aimed (never
+   a given).
+
+**Sibling audit (docs/17 §1).** `src3d/engine` has no loose-host re-seat of this shape — its apply.ts cites
+the ADR-255 pattern once (an apex seated into a plane) and its containment path notes it "can never bring
+a loose endpoint into the plane" (apply.ts:1740). Nothing to file: the 3-D crossing-statement family
+(#755/#756) owns its cells by rule rather than by re-seat, and no 3-D report of this class exists.
+
+**Locks** (`issue-260-meeting-reseat.test.ts`, 8): the exact sequence builds with P on both segments and A,
+B unmoved; four entry-order permutations (docs/17 §6); mirrored slots and English; four pinned endpoints
+refuse naming P; C, D pinned alone → AB re-aimed, C, D untouched; the predicate's three members and three
+non-members. The `membership-conversion.test.ts` fence flipped to CLEAN as its own comment promised.
+Fixture `issue-260-two-host-membership.geo.json` (standing rule 4).
+
+**Deviations from the plan, recorded.** The plan's "lift the trigger" was necessary but not sufficient —
+two measured obstacles inside the re-seat (candidate set, rider anchors) had to go too, or the routed call
+moved the student's FIRST segment. The plan's "keep the honest refusal for the genuinely-pinned case" holds
+only when every endpoint is pinned; with one segment free the tool draws the figure, which is the
+statement's meaning.
