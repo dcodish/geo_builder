@@ -30,6 +30,7 @@ import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT 
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, stepLabel } from '@/parser';
 import { Figure } from '@/render';
 import { crossingCommands } from '@/engine';
+import { independentConstructs } from '@/app/independence';
 import type { Crossing } from '@/engine';
 import { MathText, hasMath } from '../shell/math';
 import { MathValue } from '@/render/MathValue';
@@ -836,6 +837,15 @@ export default function App() {
   // A kite/isosceles whose equal-pair is a cyclable VARIANT (ADR-138) — so "show another configuration"
   // offers to flip which sides are equal even when the shape is otherwise determined.
   const hasVariant = facts.some((f) => f.enabled && f.cmd.type === 'shape-variant' && VARIANT_COUNT[f.cmd.shape] > 1);
+  // #786 (ADR-460 Am. 3, play amendment 2026-09-13): the one-fact-per-line ADVISORY is a property of the
+  // committed STEP — the line packed two independent constructs — so it lives on the step's row, derived on
+  // every render from the step's own utterance (the same discriminator the seam uses), not only as the
+  // transient input note that clears on the next keystroke. A student who typed the next line before
+  // looking still finds it beside the step it belongs to.
+  const packedByGroup = useMemo(
+    () => new Map(groups.map((g) => [g.key, g.facts.some((f) => f.enabled) ? independentConstructs(g.facts[0].utterance ?? '') : null] as const)),
+    [groups],
+  );
   // #751 (ADR-W-029): the chips submit what they show, so what they hold must be the RAW command.
   // `postProcess: []` asks i18next for the value BEFORE the bidi-isolate post-processor; the chip
   // re-applies isolation for DISPLAY only. Without this the fact list, the saved file, the prod log
@@ -1328,6 +1338,17 @@ export default function App() {
                           <button type="button" style={factLabel(state)} onClick={() => select(g.key)} dir={textDir(label)} title={state === 'broken' ? errText : undefined}>
                             {hasMath(label) ? <MathText text={label} /> : label}
                           </button>
+                          {/* #786: the advisory on the row of the step that packed two givens — persistent, amber, the same sentence the input note showed. */}
+                          {(() => {
+                            const packed = packedByGroup.get(g.key);
+                            if (!packed) return null;
+                            const note = t('input.scope.split-advisory', packed.params);
+                            return (
+                              <span data-testid="packed-advisory" role="note" style={{ fontSize: 11, color: '#b45309', paddingInlineStart: 6 }} dir={textDir(note)}>
+                                {note}
+                              </span>
+                            );
+                          })()}
                           {state === 'broken' && errText && g.key === selectedId && (
                             <span style={{ fontSize: 11, color: '#dc2626', paddingInlineStart: 6 }} dir={textDir(errText)}>
                               {errText}

@@ -7960,6 +7960,11 @@ pinned #786 block flips from *"recorded, not fixed"* to *"builds WITH the adviso
 two no-tip guards and the single-construct guard). Requirements: none (02's one-fact-per-line teaching,
 FR-IN, is unchanged in promise — it gains a lane). Design: [04](04-design.md) §5, the clarification
 family note stands; this is the same posture on the success path.
+*Play amendment (2026-09-13, PR #994 T12 — "not fixed"):* the advisory had been built as the transient input
+note only, which clears on the next keystroke, so a student who typed the next line before looking never saw it.
+The plan said *attach it to the committed step*: it is now also rendered on the step's own row, derived on every
+render from the step's utterance through the same discriminator (`packedByGroup`, App.tsx), persistent like the
+#973 note. The input note stays as the immediate echo.
 
 ## ADR-461 — the honesty-gate battery is a FUNCTION, and every commit seam calls it (#782)
 
