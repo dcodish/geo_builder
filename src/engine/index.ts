@@ -52,3 +52,6 @@ export { variantCountOf, cyclableVariant, withVariant, variantVertices } from '.
 export { computeValuesPanel, queryLabel, valueText } from './valuesPanel';
 export type { QueryInput, QueryNote, QueryRow, ValueQuery } from './valuesPanel';
 export type { ValueRow, AreaClassRow, ValuesPanelResult } from './valuesPanel';
+
+export { degeneratePolygons, DEGENERATE_EXTENT_RATIO } from './degeneracy';
+export type { DegeneratePolygon } from './degeneracy';

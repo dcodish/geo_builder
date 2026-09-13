@@ -44,6 +44,11 @@ function stepsOf(facts: Fact[]): { utterance?: string; cmds: AnyCommand[]; start
   return steps;
 }
 
+/** #945 (ADR-513): the saved figures MEASURED flat on 2026-09-13 (recorded in the ADR); every other fixture must stay silent. */
+const FIXTURE_DEGENERATE: Record<string, string[]> = {
+
+};
+
 describe('figure-file fixtures net', () => {
   it('the net is not empty', () => {
     expect(Object.keys(files).length).toBeGreaterThan(0);
@@ -67,6 +72,12 @@ describe('figure-file fixtures net', () => {
         expect(fig.pending).toBe(false);
         expect(fig.violations).toEqual([]);
         for (const f of facts.filter((f) => f.enabled)) expect(fig.status[f.id], `status of ${f.utterance ?? f.id}`).toBe('ok');
+      });
+
+      it('says so if the givens force a declared polygon flat, and stays SILENT otherwise (#945, ADR-513)', () => {
+        const fig = replay(facts, seed);
+        const want = [...(FIXTURE_DEGENERATE[name] ?? [])].sort();
+        expect(fig.degeneracies.map((d) => d.object).sort(), `degeneracy notices of ${name} (ratios ${fig.degeneracies.map((d) => d.ratio.toExponential(2)).join(', ')})`).toEqual(want);
       });
 
       it('its utterances still lower to the same commands (parser drift)', () => {

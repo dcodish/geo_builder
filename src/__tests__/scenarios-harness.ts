@@ -159,6 +159,27 @@ export function dofHonesty(sc: Scenario, fig: Derived, counter?: { dofChecked: n
 }
 
 /**
+ * #945 ([ADR-513](../../docs/06-decisions.md#adr-513)) — the corpus half of the degeneracy notice, CO-LOCATED
+ * (ADR-394) so it costs nothing: every scenario the e2e slices already fold is judged for a flat declared
+ * polygon. The false-positive net is the half that matters (ADR-W-048): an ordinary figure must stay
+ * SILENT, so any scenario not listed here that produces a notice fails its own test. The scenarios listed
+ * are the corpus figures MEASURED flat on 2026-09-13 (each recorded in the ADR with its ratio) — for those
+ * the notice must name exactly the polygon recorded, so a withdrawn notice fails too.
+ */
+export const DEGENERATE_EXPECTED: Record<string, string[]> = {
+
+};
+
+export function degeneracyHonesty(sc: Scenario, fig: Derived, counter?: { degeneracyChecked: number }): void {
+  if (fig.lastError !== null) return; // a refused figure draws nothing — nothing to be silent about
+  if (counter) counter.degeneracyChecked++;
+  const got = fig.degeneracies.map((d) => d.object).sort();
+  const want = [...(DEGENERATE_EXPECTED[sc.id] ?? [])].sort();
+  expect(got, `[${sc.id}] degeneracy notices — a figure not recorded in DEGENERATE_EXPECTED must stay SILENT; a recorded one must name exactly its polygon (ratios: ${fig.degeneracies.map((d) => d.ratio.toExponential(2)).join(', ')})`).toEqual(want);
+  for (const d of fig.degeneracies) expect(d.statements.length, `[${sc.id}] the notice names the student's statements`).toBeGreaterThan(0);
+}
+
+/**
  * Run the seed sweep for ONE scenario over the fact list its e2e check already built. Throws (failing that
  * scenario's own test) if any displayable config violates the scenario's check — so a cross-seed break is
  * attributed to the scenario that broke, instead of being pooled into one corpus-wide failure list.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SCENARIOS, factsOf, replayFacts, sweepSeeds, roundTripProps, newRoundTripCounters, gateProps, dofHonesty } from './scenarios-corpus';
+import { SCENARIOS, factsOf, replayFacts, sweepSeeds, roundTripProps, newRoundTripCounters, gateProps, dofHonesty, degeneracyHonesty } from './scenarios-corpus';
 
 // Slice 8/8 of the end-to-end scenario corpus (issue #60): membership is index % 8 === 7.
 // Same tests, same assertions as the old single-file loop — sharded so vitest's per-FILE parallelism
@@ -14,6 +14,7 @@ describe('reported scenarios — end-to-end replay of real bug reports (slice 8/
   const rt = newRoundTripCounters();
   const gc = { gateChecked: 0 };
   const dc = { dofChecked: 0 };
+  const dg = { degeneracyChecked: 0 };
 
   for (const [i, sc] of SCENARIOS.entries()) {
     if (i % 8 !== 7) continue;
@@ -28,6 +29,8 @@ describe('reported scenarios — end-to-end replay of real bug reports (slice 8/
       }
       // ADR-052 DOF honesty (#912): freedom the cue CLAIMS must be freedom the sampler HAS.
       dofHonesty(sc, fig, dc);
+      // #945 (ADR-513): a flat declared polygon is said out loud — and an ordinary figure stays SILENT.
+      degeneracyHonesty(sc, fig, dg);
       // The cross-seed oracle (TST-1): every config the app would DISPLAY must honour this same check,
       // not only the default seed — the dominant historical escape class (ADR-085/098/127/166).
       sweepSeeds(sc, facts);
@@ -42,6 +45,10 @@ describe('reported scenarios — end-to-end replay of real bug reports (slice 8/
   // No silent caps: the round-trip properties must have actually run on this slice. If a store-op
   // signature changes so every `swap`/`rename`/`toggle` bails, the properties would pass vacuously —
   // this fails instead. Runs last; vitest executes a file's tests in declaration order.
+  it('the degeneracy notice was judged on this slice (no silent vacuum)', () => {
+    expect(dg.degeneracyChecked).toBeGreaterThan(0);
+  });
+
   it('the round-trip and gate properties were exercised on this slice', () => {
     expect(rt.swapped, 'swap∘swap exercised').toBeGreaterThan(0);
     expect(rt.renamed, 'rename round-trip exercised').toBeGreaterThan(0);

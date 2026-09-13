@@ -11170,3 +11170,73 @@ the app's replay path.
 fold) was not needed: `ownerByConKey` (ADR-398) already is that provenance, and the search removes whole
 statements rather than tracking constraint ids. The plan said "disable" — measured: disabling cascades
 the dependents, removal is the question actually asked.
+
+## ADR-513 — A DECLARED POLYGON THE GIVENS FORCE FLAT IS SAID OUT LOUD, naming the statements — the 2-D half of ADR-W-048 (#945)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #945 (feature, P3 — the 2026-09-13 plan) · round #1001 · feature route (PR) · **Adopts:** [ADR-W-048](06w-decisions-workspace.md#adr-w-048) (ruled 2026-09-08 for both products; the 3-D half is [ADR-3D-234](06b-decisions-3d.md#adr-3d-234)); the channel shape of [ADR-123](#adr-123) (coincidences) and the prefix rule of [ADR-492](#adr-492); layered above the accept gate of [ADR-413](#adr-413)
+**Requirements:** [02](02-requirements.md) FR-RN-13 (new — the 2-D twin of 02b FR-RD-7) · **Design:** [04](04-design.md) — "A declared polygon the givens force FLAT is said out loud"
+
+**Measured at HEAD, before the change** (the plan's step 1 — the 2-D trigger family was to be established by
+measurement, never transposed from 3-D). Every named polygon of every scenario and fixture (248 polygons over
+348 figures), judged by the greatest vertex offset from the line through its two most-separated vertices
+over that separation (the polygon's OWN extent — the same measure the ADR-413 accept gate uses):
+
+| figure | flatness ratio | what it is |
+| --- | --- | --- |
+| «משולש ABC» · «AB = 5» · «BC = 3» · «AC = 8» — the triangle inequality with equality | **1.9e-4** (0.9e-4–2.2e-4 over seeds 0–7) | forced flat; drew silently, every fact `ok`, no notice |
+| «משולש ABC» · «AB = 4» · «BC = 4» · «AC = 8» | **1.5e-4** (0.5e-4–2.3e-4) | the same family |
+| «משולש ABC» · «זווית BAC = 0.1» | 3.0e-4 (1.1e-4–6.9e-4) | a stated sliver — the drawing is a line |
+| the #569 collapse figure (scenario + fixture) | 7.5e-4 | A on C: a COINCIDENCE the requirement bar already rejects (`pointsDistinct`) and the app rescues by seat (ADR-481); never displayed |
+| «משולש ABC» · «זווית BAC = 0.5» | 0.5e-3–3.5e-3 | thin |
+| «משולש ABC» · «זווית BAC = 1» — **the nearest legitimate thin triangle** | **1.4e-3–7.2e-3** | thin, legitimate |
+| «משולש ABC» · «זווית BAC = 90» · «זווית ABC = 90» | 1.9e-3–4.7e-3 | an infeasible pair drawn approximately; fails `meetsRequirements` at every seed, never displayed |
+| «AB = 5» · «BC = 3» · «AC = 7.9» | 7.7e-2 | ordinary |
+| **the thinnest corpus polygon after the #569 figure** (two scenarios' ABC) | **2.3e-2** | ordinary |
+| corpus median | 2.9e-1 | |
+
+Two things the measurement settled. (1) The 2-D family is **collinearity of a declared polygon** and nothing
+else: a segment or circle whose extent collapses is a coincidence of named points, which ADR-123's channel
+already says. (2) The accept gate (ADR-413) already REFUSES a *driven* collapse below 1e-4 — «משולש ABC» ·
+«D אמצע AB» · «משולש ADB» refuses honestly — so the silent family lives in the band just above that floor,
+where a construction the givens force flat settles (the solver lands the 5-3-8 triangle at ~2e-4 because
+the gate forbids anything lower). The notice is layered above the gate; the two never overlap.
+
+**Decision.**
+
+1. **Predicate** — `degeneratePolygons` (`engine/degeneracy.ts`): every declared polygon whose flatness ratio
+   is below `DEGENERATE_EXTENT_RATIO = 5e-4`. Relative to the polygon's own extent (never absolute, never the
+   figure's span — a small polygon in a large figure is judged by its own size).
+2. **Channel** — `Derived.degeneracies` beside `coincidences` and `forcedOffArc`: derived purely from the
+   resolved construction on every replay, so a typed and a loaded figure say the same and nothing is stored.
+   A notice, never a refusal, never amber: every fact stays `ok`.
+3. **Naming the statements** — `nameDegeneracies` walks the enabled statement prefixes (a multi-command line is
+   one unit): the first prefix containing the polygon names its declaring statement, the first at which it is
+   flat names the responsible one — the ADR-492 prefix rule. On the reported family that is «משולש ABC» and
+   «AC = 8» (typed in another order, «BC = 3» — whichever closed the triangle). Runs only when a degeneracy
+   exists, one replay per prefix, and never nests. The engine carries fact ids and a ratio; the chrome
+   renders `figure.degenerate` (He + En) in the student's own words.
+
+**The calibration, which is the deliverable.** `5e-4` sits **2.2× above the forced family's worst seed**
+(2.3e-4), **2.8× below the nearest legitimate thin triangle** (1°, worst seed 1.4e-3) and **46× below the
+thinnest ordinary corpus polygon** (2.3e-2). The band is narrower than 3-D's (ADR-3D-234 found ~10×): a
+0.1°–0.5° stated angle sits inside it and is noticed at some seeds and not others — the predicate telling
+the truth about the drawing, which at that angle is a line, naming the angle statement. The #569 collapse
+figure (7.5e-4) stays silent by design: its collapse is a coincidence the requirement bar rejects, not a
+polygon the givens forced flat, and it is never displayed. **The whole corpus is silent** — 348 figures,
+zero notices — and stays so by the co-located lock below.
+
+**Locks.** `issue-945-degenerate.test.ts` (10): the 5-3-8 sequence → exactly one notice naming «משולש ABC»
+and «AC = 8», every fact `ok`; the 4-4-8 twin and the 0.1° sliver; 90+90 is NOT a member; the responsible
+statement is the LAST of the shortest flat prefix (typing order changes it); the notice survives reload;
+ordinary polygons silent; the 1° triangle, 89°+90°, and 5-3-7.9 silent and measured above the band; a
+driven collapse is refused by ADR-413, not noticed; both locales. **The corpus sweep is a lock, co-located
+(ADR-394) at zero cost:** `degeneracyHonesty` runs in every e2e slice against `DEGENERATE_EXPECTED` (empty —
+every scenario must stay SILENT; a recorded one must name exactly its polygon) with an exercised counter
+per slice, and the fixtures net asserts the same over `FIXTURE_DEGENERATE`.
+
+**Deviations from the plan, recorded.** The plan's predicate was "a named object's defining extent" over
+polygons, segments and circles; measured, only polygons have an extent that can collapse without being a
+coincidence — segments and circles were left to ADR-123's channel (stated). The plan's corpus sweep as a
+standalone lock became a co-located check in the e2e slices and the fixtures net (a standalone fold of the
+corpus costs ~10 min). The requirements line is FR-RN-13, not an FR-RD-7 twin: the 2-D document has no RD
+family, and its rendering promises live under RN.
