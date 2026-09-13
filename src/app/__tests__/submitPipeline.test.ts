@@ -327,21 +327,39 @@ describe('submit pipeline — independent constructs are taught, never decompose
  * These assertions pin TODAY's behaviour on purpose. The day #786 is decided they go red, which is
  * the signal to update them — a documented boundary that cannot rot into an assumption.
  */
-describe('#786 — the clause-fallback lane still builds these (recorded, not fixed here)', () => {
+describe('#786 (ADR-460 Am. 2) — the clause-fallback lane BUILDS these, with the one-at-a-time ADVISORY', () => {
   it.each([
     ['triangle ABC and square WERT'],
     ['triangle ABC, square WERT'],
     ['משולש ABC, ריבוע WERT'],
     ['circle O and square WERT'],
-  ])('«%s» is built by the grammar, so the seam never sees it', async (utterance) => {
-    const { deps } = makeDeps();
+  ])('«%s» draws (the figure IS what was asked) and the step carries the advisory, never a refusal', async (utterance) => {
+    const { deps, notes } = makeDeps();
     await runSubmit(utterance, deps);
-    expect(
-      useGeoStore.getState().facts.length,
-      `«${utterance}» no longer commits — if that is #786 being fixed, update this block; ` +
-        `if not, a supported compound may have regressed`,
-    ).toBeGreaterThan(0);
+    expect(useGeoStore.getState().facts.length, `«${utterance}» must still commit — drawing wins wherever the tool can build`).toBeGreaterThan(0);
+    const note = notes().find((n) => n.startsWith('input.scope.split-advisory'));
+    expect(note, 'the advisory names the clauses it saw').toBeTruthy();
+    expect(note).toContain('(1)');
+    expect(note).toContain('(2)');
+    expect(notes().some((n) => n.startsWith('input.scope.split-statements')), 'the REFUSAL form never fires on a built line').toBe(false);
     expect(llmParseMock, 'the deterministic lane owns it — no LLM cost either way').not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['ריבוע ABCD, נקודה G על AD'], // the connector form ADR-264 exists for: the later clause CONSTRAINS the earlier
+    ['דלתון ABCD, AB=AD'],
+  ])('«%s» — a supported compound whose clauses depend on each other gets NO advisory', async (utterance) => {
+    const { deps, notes } = makeDeps();
+    await runSubmit(utterance, deps);
+    expect(useGeoStore.getState().facts.length).toBeGreaterThan(0);
+    expect(notes().some((n) => n.startsWith('input.scope.split-advisory'))).toBe(false);
+  });
+
+  it('a single construct gets no advisory either (the tip is about PACKING, not about building)', async () => {
+    const { deps, notes } = makeDeps();
+    await runSubmit('משולש ABC', deps);
+    expect(useGeoStore.getState().facts.length).toBeGreaterThan(0);
+    expect(notes().some((n) => n.startsWith('input.scope.split-advisory'))).toBe(false);
   });
 });
 
