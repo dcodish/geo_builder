@@ -9187,6 +9187,20 @@ undefined for one the student pinned with an explicit 90°.
 **The lesson is the one ADR-W-035 exists for.** Half 2's engine-level evidence was real and complete,
 and the feature was still unreachable by a student. A green search is not a usable button.
 
+**Amendment 1 (2026-09-13, round #1001) — the operator question is ANSWERED: half 1 is dropped.** The
+line above ("whether the class deserves a gate at all is now an operator question") was ruled in the
+`/decisions` pass of **2026-09-05**: the coincident-vertex accept-gate half of #569 is **dropped**, and
+refusal-by-measurement stands as the final answer, not as a deferral. A re-check on 2026-09-08 (after an
+operator session reported near-coincident square vertices under «הציגו תצורה אחרת») found the re-open
+trigger **un-fired**: the three cited seeds (85, 63, 120) all fail `meetsRequirements` — `pointsDistinct`'s
+1.5 %-of-span floor already rejects them — and 25 real presses never go below 0.06 of span; the exact
+coincidence the operator saw was #942's, closed by [ADR-486](#adr-486). **Re-open trigger, recorded:** an
+actual figure — prod log, corpus or operator report — that draws a near-collapsed vertex pair *and is
+accepted*. If it appears, the response is option B (re-derive the threshold from the corpus and find the
+real separation between legitimate figures and the basin), never the enumerated exemption refused above.
+#569 is closed by this amendment; no code changed. **Requirements:** none (internal) · **Design:** none
+(internal) — nothing built.
+
 ## ADR-482 — The ADR-052 DOF-honesty audit: the samplable set is COMPLETE, and the audit is now an oracle (#912)
 
 **Status:** accepted, 2026-09-06 · fix-round #915 · **Requirements:** none (internal — nothing the
