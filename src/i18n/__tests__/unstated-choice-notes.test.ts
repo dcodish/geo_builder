@@ -23,7 +23,7 @@ const load = (lang: string): Record<string, Record<string, string>> =>
 const he = load('he');
 const en = load('en');
 const KEY_OF: Record<string, string> = { 'equal-pair': 'unstatedEqualPair', 'parallel-pair': 'unstatedParallelPair', 'free-endpoint': 'unstatedFreeEndpoint' };
-const TEMPLATES = ['unstatedTitle', 'stateIsosceles', 'stateKite', 'stateOnSide', 'stateParallel', 'drawnParallel'];
+const TEMPLATES = ['unstatedTitle', 'unstatedParallelPairPlain', 'stateEqualPair', 'stateOnSide', 'stateParallel', 'drawnParallel'];
 
 /** A minimal `t` over one bundle: `steps.x` / `actions.x`, with {{param}} interpolation. */
 const tOf = (bundle: Record<string, Record<string, string>>) => (key: string, opts: Record<string, string> = {}): string => {
@@ -69,6 +69,7 @@ describe('#973 — the built sentence names the drawn choice and a pinning sente
     ['kite', ['דלתון ABCD'], 'AB = AD', 'AB = AD'],
     ['midsegment', ['משולש ABC', 'קטע אמצעים DE במשולש ABC'], 'E על AC', 'E on AC'],
     ['isosceles trapezoid', ['טרפז שווה שוקיים ABCD'], 'AB ∥ DC', 'AB ∥ DC'],
+    ['plain trapezoid (#996)', ['טרפז ABCD'], 'AB ∥ DC', 'AB ∥ DC'],
   ];
   for (const [name, steps, drawn, drawnEn] of rows) {
     it(`${name}: Hebrew note carries «${drawn}», the button label, and a sentence that pins the choice`, () => {
@@ -79,6 +80,9 @@ describe('#973 — the built sentence names the drawn choice and a pinning sente
       if (choice.kind !== 'parallel-pair') expect(text).toContain(he.actions.another);
       // the quoted sentence, typed as the next line, removes the note (the promise the note makes)
       const pin = quoted(text);
+      // #997: the pin never asks for a parenthesised run inside a Hebrew sentence — a bare line a Hebrew-keyboard
+      // student can type without the box reordering under them.
+      expect(pin, 'no parentheses in a suggested pin sentence').not.toMatch(/[()]/);
       const after = factsFrom([...steps, pin]);
       expect(unstatedChoices(after), `«${pin}» should pin the choice`).toEqual([]);
     });

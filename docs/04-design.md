@@ -497,5 +497,7 @@ pure derivation, one table, one text builder, two render sites:
   asserts removes the note — measured, never assumed), and the cycle button's own label. Templates under
   `steps.unstated*` / `steps.state*` in both locales; the kind list is a runtime export the net walks.
 - **Render:** on the fact's own row (persistent), plus one quiet cue beside «הציגו תצורה אחרת» with the
-  same sentences as its tooltip. The plain «טרפז ABCD» gets no note — the lock asserts the absence so
-  widening the scope is a visible flip, not drift.
+  same sentences as its tooltip. The plain «טרפז ABCD» was excluded at first and joined on the first play
+  (#996, ADR-502 Am. 1) — the table gained a row, which is what the table is for. A suggested pin sentence is
+  always a bare next line (#997): a parenthesised Latin run inside a Hebrew sentence reorders in the box while
+  it is typed.

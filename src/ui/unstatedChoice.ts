@@ -21,7 +21,10 @@ export function unstatedChoiceText(choice: UnstatedChoice, t: Translate): string
       const drawn = choice.pairs.map((p) => `${seg(p[0])} = ${seg(p[1])}`).join(', ');
       const first = choice.pairs[0];
       const pair = `${seg(first[0])}=${seg(first[1])}`;
-      const stateIt = choice.shape === 'isosceles' ? t('steps.stateIsosceles', { ids: choice.ids.join(''), pair }) : t('steps.stateKite', { pair });
+      // #997: the pin is the BARE equality on its own line — never a parenthesised run inside a Hebrew sentence,
+      // which a Hebrew-keyboard student cannot watch themselves type (the box reorders until the paren closes).
+      // One fact per line is the product's own posture, and «AB=AC» as the next line pins exactly as the paren form.
+      const stateIt = t('steps.stateEqualPair', { pair });
       return t('steps.unstatedEqualPair', { drawn, stateIt, another });
     }
     case 'free-endpoint': {
@@ -30,8 +33,10 @@ export function unstatedChoiceText(choice: UnstatedChoice, t: Translate): string
     }
     case 'parallel-pair': {
       const drawn = t('steps.drawnParallel', { a: seg(choice.parallel[0]), b: seg(choice.parallel[1]) });
+      const stateIt = t('steps.stateParallel', { a: seg(choice.parallel[0]), b: seg(choice.parallel[1]) });
+      if (!choice.legs) return t('steps.unstatedParallelPairPlain', { drawn, stateIt }); // #996: the plain «טרפז»
       const legs = choice.legs.map(seg).join(', ');
-      return t('steps.unstatedParallelPair', { drawn, legs, stateIt: t('steps.stateParallel', { a: seg(choice.parallel[0]), b: seg(choice.parallel[1]) }) });
+      return t('steps.unstatedParallelPair', { drawn, legs, stateIt });
     }
   }
 }

@@ -5,8 +5,8 @@
  * The engine was already right — ADR-138 leaves "which pair is equal" free and cyclable — but nothing told
  * the student, so one drawing with one visibly equal pair read as the tool asserting it. `unstatedChoices`
  * derives, per figure, every such choice from the enabled facts. Locks in BOTH directions, per the plan:
- * present for each of the four ruled rows; absent for each pinned form; absent for the plain trapezoid (the
- * ruled scope — widening it is a deliberate flip); follows the variant cycle; disappears when the pinning
+ * present for each of the four ruled rows; absent for each pinned form; present for the plain trapezoid too (#996,
+ * ADR-502 Am. 1 — the 2026-09-13 ruling flipped the original exclusion); follows the variant cycle; disappears when the pinning
  * fact is added and returns when that fact is disabled.
  */
 import { describe, expect, it } from 'vitest';
@@ -65,7 +65,16 @@ describe('#973 — the four ruled rows are SAID', () => {
     expect(ch[0].kind).toBe('parallel-pair');
     if (ch[0].kind !== 'parallel-pair') return;
     expect(ch[0].parallel.map((s) => s.join(''))).toEqual(['AB', 'DC']);
-    expect(ch[0].legs.map((s) => s.join(''))).toEqual(['AD', 'BC']);
+    expect(ch[0].legs?.map((s) => s.join(''))).toEqual(['AD', 'BC']);
+  });
+
+  it('#996 (ADR-502 Am. 1, the flip): a plain «טרפז ABCD» makes the same AB ∥ DC assumption and SAYS so — without a legs clause', () => {
+    const [c] = unstatedChoices(factsFrom(['טרפז ABCD']));
+    expect(c?.kind).toBe('parallel-pair');
+    if (!c || c.kind !== 'parallel-pair') return;
+    expect(c.shape).toBe('trapezoid');
+    expect(c.parallel.map((s) => s.join(''))).toEqual(['AB', 'DC']);
+    expect(c.legs).toBeUndefined();
   });
 
   it('the kind list the i18n net walks is complete and non-empty', () => {
@@ -89,8 +98,8 @@ describe('#973 — pinned forms say NOTHING (the choice is the student’s now)'
   it('«טרפז שווה שוקיים ABCD» then «AB מקביל ל-DC»', () => {
     expect(unstatedChoices(factsFrom(['טרפז שווה שוקיים ABCD', 'AB מקביל ל-DC']))).toEqual([]);
   });
-  it('the ruled scope: a plain «טרפז ABCD» assumes the same pair and gets NO note (widening this is a deliberate flip)', () => {
-    expect(unstatedChoices(factsFrom(['טרפז ABCD']))).toEqual([]);
+  it('#996 (ADR-502 Am. 1): a plain «טרפז ABCD» then «AB מקביל ל-DC» — stated, so no note', () => {
+    expect(unstatedChoices(factsFrom(['טרפז ABCD', 'AB מקביל ל-DC']))).toEqual([]);
   });
   it('a plain triangle, a square, an equilateral triangle: no choice to name', () => {
     expect(unstatedChoices(factsFrom(['משולש ABC']))).toEqual([]);

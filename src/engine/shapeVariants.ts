@@ -212,8 +212,8 @@ export function statedShapeEqualities(
 //   • kite / isosceles  → `equal-pair`   (which sides are equal; pinned by a stated equality, ADR-138)
 //   • base-less midsegment → `free-endpoint` (which side the free end rides; pinned by «G על PR», ADR-412)
 //   • isosceles trapezoid  → `parallel-pair` (the `trapezoid` lowering ASSUMES AB ∥ DC, so the legs follow;
-//                            pinned by a stated ∥ on two of the ring's sides). A plain «טרפז ABCD» makes the
-//                            same assumption and gets NO row — deliberately, per the ruling's scope.
+//                            pinned by a stated ∥ on two of the ring's sides). The plain «טרפז ABCD» makes the
+//                            same assumption and is a row too (#996, ADR-502 Am. 1 — it was excluded at first).
 
 export type UnstatedChoiceKind = 'equal-pair' | 'parallel-pair' | 'free-endpoint';
 /** Runtime list — the i18n net walks it against both locale files (the #882 discipline). */
@@ -241,11 +241,11 @@ export type UnstatedChoice =
   | {
       factId: string;
       kind: 'parallel-pair';
-      shape: 'isosceles-trapezoid';
+      shape: 'isosceles-trapezoid' | 'trapezoid';
       ids: Id[];
-      /** The pair the lowering ASSUMED parallel, and the legs that equality therefore fell on. */
+      /** The pair the lowering ASSUMED parallel — and, for the isosceles one, the legs that equality therefore fell on. */
       parallel: [[Id, Id], [Id, Id]];
-      legs: [[Id, Id], [Id, Id]];
+      legs?: [[Id, Id], [Id, Id]];
     };
 
 /** The minimal fact shape this derivation reads — the store's `Fact` satisfies it structurally. */
@@ -287,15 +287,19 @@ export function unstatedChoices(facts: readonly ChoiceFact[]): UnstatedChoice[] 
     }
     if (c.type === 'trapezoid') {
       const [a, b, cc, d] = c.ids;
-      // Only the ISOSCELES trapezoid carries a choice the ruling says to name: the macro's leg equality
-      // |AD| = |BC| is where the assumed parallel pair silently decided which sides are the legs.
+      // #996 (ADR-502 Am. 1, operator 2026-09-13): EVERY trapezoid carries the choice — the lowering assumed
+      // AB ∥ DC for the plain «טרפז ABCD» exactly as for the isosceles one. The isosceles macro's leg equality
+      // |AD| = |BC| additionally tells the student which sides that assumption made the legs.
       const legsStated = explicitEqs.some((eq) => eqMatchesPair(eq, [a, d, b, cc]));
-      if (!legsStated) continue;
       const ring: [Id, Id][] = [[a, b], [b, cc], [cc, d], [d, a]];
       const onRing = (x: Id, y: Id) => ring.some((s) => sameSeg(s, [x, y]));
       const pinned = parallels.some((pl) => onRing(pl.a, pl.b) && onRing(pl.c, pl.d));
       if (pinned) continue;
-      out.push({ factId: f.id, kind: 'parallel-pair', shape: 'isosceles-trapezoid', ids: [...c.ids], parallel: [[a, b], [d, cc]], legs: [[a, d], [b, cc]] });
+      out.push(
+        legsStated
+          ? { factId: f.id, kind: 'parallel-pair', shape: 'isosceles-trapezoid', ids: [...c.ids], parallel: [[a, b], [d, cc]], legs: [[a, d], [b, cc]] }
+          : { factId: f.id, kind: 'parallel-pair', shape: 'trapezoid', ids: [...c.ids], parallel: [[a, b], [d, cc]] },
+      );
     }
   }
   return out;

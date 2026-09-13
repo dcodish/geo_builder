@@ -10929,3 +10929,16 @@ the note is keyed to the fact that made the choice. `unstated-choice-notes.test.
 every template in both locales (the #882 discipline over a runtime kind list); each Hebrew sentence names
 the drawn pair and the button, and its quoted pinning sentence, typed next, removes the note; the English
 sentence builds with no placeholder left. Not a fixture — this is display; the figure is unchanged.
+
+**Amendment 1 (2026-09-13, play of PR #993 — #996, #997).** Two rulings from the first play. **(1) The plain
+«טרפז ABCD» is a row after all** (#996 — *"the note should appear. it makes sense that we add it on a regular
+trapezoid as well"*): the lowering assumes AB ∥ DC for it exactly as for the isosceles one, so the
+`parallel-pair` row loses its "legs stated" gate; the isosceles case keeps its legs clause, the plain case
+gets `unstatedParallelPairPlain`. The lock that asserted the absence flips to presence, with the pinned
+form («AB מקביל ל-DC») asserted absent. **(2) The suggested pin sentence is the BARE next-line equality**
+(#997's PR half): the note pointed the student at «משולש שווה שוקיים ABC (AB=AC)», and a Hebrew-keyboard
+student cannot watch themselves type a parenthesised Latin run inside a Hebrew sentence — the box reorders
+it until the paren closes (measured key by key, the stored value byte-correct throughout; the box-side
+fix is #997 on `main`). «AB=AC» as the next line pins the apex identically and is the product's own
+one-fact-per-line posture, so `stateIsosceles`/`stateKite` collapse into one `stateEqualPair` and the
+i18n net now asserts no suggested pin contains a parenthesis.

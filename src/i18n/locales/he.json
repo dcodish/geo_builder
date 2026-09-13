@@ -165,10 +165,10 @@
     "paramDisplayTitle": "הצגת {{sym}}: אות או ערך",
     "unstatedEqualPair": "הכלי לא יודע אילו צלעות שוות — כרגע מצוירות {{drawn}}. כדי לקבוע כתבו למשל «{{stateIt}}», או לחצו «{{another}}».",
     "unstatedFreeEndpoint": "הכלי לא יודע על איזו צלע נמצאת {{point}} — כרגע {{drawn}} ({{parallel}}). כדי לקבוע כתבו למשל «{{stateIt}}», או לחצו «{{another}}».",
+    "unstatedParallelPairPlain": "הכלי הניח ש-{{drawn}}. כדי לקבוע אילו צלעות מקבילות כתבו למשל «{{stateIt}}».",
     "unstatedParallelPair": "הכלי הניח ש-{{drawn}} (השוקיים {{legs}}). כדי לקבוע אילו צלעות מקבילות כתבו למשל «{{stateIt}}».",
     "unstatedTitle": "בחירות שהכלי עשה במקומכם — עד שתכתבו אותן",
-    "stateIsosceles": "משולש שווה שוקיים {{ids}} ({{pair}})",
-    "stateKite": "{{pair}}",
+    "stateEqualPair": "{{pair}}",
     "stateOnSide": "{{point}} על {{side}}",
     "stateParallel": "{{a}} מקביל ל-{{b}}",
     "drawnParallel": "{{a}} ∥ {{b}}"
