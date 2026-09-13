@@ -31,6 +31,14 @@ export interface FreePoint {
   y: number;
   pinned?: boolean;
   /**
+   * #556 ([ADR-511](docs/06-decisions.md#adr-511)): the admissible REGION(s) a consuming construction
+   * declared for this point — a side of a circle the statement forces (an external tangent/secant apex,
+   * a stated «M מחוץ למעגל»). Recorded by the `point-circle-side` apply case, the ONE chokepoint of the
+   * ADR-254 family; read by {@link applySeed}, which keeps every sample inside the region instead of
+   * guessing and letting `meetsRequirements` discard the seed afterwards (9 of 24 seeds, measured).
+   */
+  region?: { circle: Id; side: 'inside' | 'outside' }[];
+  /**
    * A base vertex of a fully-committed regular shape (a square): its equal sides and
    * right angles are intrinsic, so a constraint that contradicts the shape is a real
    * over-constraint — the solver must not drive it (ADR-030). Generic shapes

@@ -1,0 +1,192 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-09-13T21:00:00.000Z",
+  "name": "issue-556",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "9e2drX_NU93usOIEhbASu",
+      "utterance": "שני מעגלים משיקים מבחוץ",
+      "group": "0rjOSAKrmfjYe8iyHotIN",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "freeRadius": true,
+        "ifAbsent": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "1ODNXXjaydkM7kKqPx_NT",
+      "utterance": "שני מעגלים משיקים מבחוץ",
+      "group": "0rjOSAKrmfjYe8iyHotIN",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "@ctr-P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "ifAbsent": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "I-TZwgBqhrbPklXgX-JWw",
+      "utterance": "שני מעגלים משיקים מבחוץ",
+      "group": "0rjOSAKrmfjYe8iyHotIN",
+      "cmd": {
+        "type": "circles-tangent",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "at": "M",
+        "external": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "jc13IceMdX1y0CnKk8naN",
+      "utterance": "A על מעגל O1",
+      "group": "3Xv5tqa0v3bRCQmC91qiC",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O1",
+        "center": "O1",
+        "radius": 5,
+        "freeRadius": true,
+        "ifAbsent": true,
+        "implied": true,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "GmhJV76qePnj3yZTRXP4L",
+      "utterance": "A על מעגל O1",
+      "group": "3Xv5tqa0v3bRCQmC91qiC",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O1"
+      },
+      "enabled": true
+    },
+    {
+      "id": "IoimrB4fGMbpPQ-o8-YzX",
+      "utterance": "מנקודה B יוצאים שני משיקים למעגל O2 בנקודות D ו C",
+      "group": "6Y-uNRMjbRu4d-wFrvhoK",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O2",
+        "center": "O2",
+        "radius": 5,
+        "freeRadius": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "nSEZzEwrTecMGUkns1UjH",
+      "utterance": "מנקודה B יוצאים שני משיקים למעגל O2 בנקודות D ו C",
+      "group": "6Y-uNRMjbRu4d-wFrvhoK",
+      "cmd": {
+        "type": "free-point",
+        "id": "B",
+        "x": 6,
+        "y": 0,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "2nOzyIatc8qp_pejHkXXI",
+      "utterance": "מנקודה B יוצאים שני משיקים למעגל O2 בנקודות D ו C",
+      "group": "6Y-uNRMjbRu4d-wFrvhoK",
+      "cmd": {
+        "type": "point-circle-side",
+        "id": "B",
+        "circle": "circle-O2",
+        "side": "outside"
+      },
+      "enabled": true
+    },
+    {
+      "id": "BQFEDCYAuCoJ7nUWP4V_b",
+      "utterance": "מנקודה B יוצאים שני משיקים למעגל O2 בנקודות D ו C",
+      "group": "6Y-uNRMjbRu4d-wFrvhoK",
+      "cmd": {
+        "type": "midpoint",
+        "id": "~tanmid-O2B",
+        "a": "O2",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "zXoaufMfFLUmrlbIFr9Hn",
+      "utterance": "מנקודה B יוצאים שני משיקים למעגל O2 בנקודות D ו C",
+      "group": "6Y-uNRMjbRu4d-wFrvhoK",
+      "cmd": {
+        "type": "circle-through",
+        "id": "tanaux-O2B",
+        "center": "~tanmid-O2B",
+        "through": "O2",
+        "hidden": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "2dN5cK92rq4taDwTaB4nE",
+      "utterance": "מנקודה B יוצאים שני משיקים למעגל O2 בנקודות D ו C",
+      "group": "6Y-uNRMjbRu4d-wFrvhoK",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "D",
+        "circle1": "circle-O2",
+        "circle2": "tanaux-O2B",
+        "branch": 0
+      },
+      "enabled": true
+    },
+    {
+      "id": "k-kYoPiRqdA2M-86rZDlG",
+      "utterance": "מנקודה B יוצאים שני משיקים למעגל O2 בנקודות D ו C",
+      "group": "6Y-uNRMjbRu4d-wFrvhoK",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "C",
+        "circle1": "circle-O2",
+        "circle2": "tanaux-O2B",
+        "branch": 1
+      },
+      "enabled": true
+    },
+    {
+      "id": "EG_M3dNGyRAAOXk-Rik_i",
+      "utterance": "מנקודה B יוצאים שני משיקים למעגל O2 בנקודות D ו C",
+      "group": "6Y-uNRMjbRu4d-wFrvhoK",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "PVuosJSYeo3_wsJKCD5G9",
+      "utterance": "מנקודה B יוצאים שני משיקים למעגל O2 בנקודות D ו C",
+      "group": "6Y-uNRMjbRu4d-wFrvhoK",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    }
+  ]
+}

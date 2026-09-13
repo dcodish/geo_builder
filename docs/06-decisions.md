@@ -11315,3 +11315,73 @@ in `meetsRequirements`.
 clean at seed 0 on all eight steps (`meetsRequirements` true after each; the last step 3.0 s of fold, no
 search); the body's "0–4192 ms per candidate seed" was the cost of a search that this figure no longer
 triggers. Nothing freezes there before or after.
+## ADR-511 — A CONSTRUCTION DECLARES ITS FREE OPERAND'S REGION, AND THE SAMPLER KEEPS IT THERE (#556)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #556 (bug, P3 — the 2026-08-26 re-measured plan; the honesty half had already closed under ADR-445/481) · round #1001 · bug route (landed on `main`) · extends [ADR-254](#adr-254) (the circle-side family) to the sampler; the placement lens of [ADR-052](#adr-052)
+**Requirements:** none (internal — no promise changes; a figure that builds at one seed now builds at the seeds «הציגו תצורה אחרת» reaches, which FR-RD-2 already assumes) · **Design:** [04](04-design.md) — "A free point's admissible region rides on the point"
+
+**What the student saw (measured at HEAD).** «שני מעגלים משיקים מבחוץ» · «A על מעגל O1» · «מנקודה B יוצאים
+שני משיקים למעגל O2 בנקודות D ו C»: seed 0 builds, so nothing was visibly wrong — but 9 of the first 24
+seeds fail `meetsRequirements`, 7 of them because the sampler jittered the FREE from-point B into circle
+O2 and the Thales construction had no touch («cannot construct D: circles circle-O2 and tanaux-O2B do not
+meet»). A third of the configuration space was wasted work, and a figure with no good seed at 0 would
+have had nothing to fall back on. Siblings, same measurement: a single tangent from a new apex lost seed
+12; a student's own «M מחוץ למעגל» lost seed 17.
+
+**Root cause (docs/17 §1 — the class, not the rule).** *A free point whose consuming construction forces
+it into a region was placed and sampled as if unconstrained, and the region was only ever judged AFTER the
+fact.* Two halves. (1) The tangent rules seated their apex as a bare `free-point` at a fixed spot — the
+statement's own implication («from a point OUTSIDE the circle») never reached the engine — while the
+secant rule had long declared its apex through the ADR-254 side record (`point-circle-side outside`): one
+family, two conventions. (2) Even a DECLARED side (a student's «M מחוץ למעגל») reached only the default
+(`seedSpot`) and the verifier / `meetsRequirements`; `applySeed` jittered every free point blindly (a spin
+about the free cluster's centroid plus a 0.22·span jitter) and the requirement discarded the seed
+afterwards. The fix is at the placement seam, as the plan asked, and it is one seam for the whole family.
+
+**Decision.**
+
+1. **The side record is the declaration.** The two tangent rules (`tangentsFromExternal`,
+   `tangentFromExternal`, `parser/parse.ts`) emit `point-circle-side outside` for a NEW apex right after
+   their own `free-point` — the secant rule's exact shape. The rule's default placement stands (the apply
+   case re-seats an existing free point only when it is on the WRONG side), so every seed-0 drawing is
+   byte-identical to before; only sampling changes.
+2. **The region rides on the point.** `FreePoint.region?: { circle, side }[]` (`engine/types.ts`),
+   recorded by the `point-circle-side` apply case — the ONE chokepoint of the family — on creation and on
+   an existing non-pinned free point alike (one entry per circle, the latest side winning). A pinned point
+   is the student's own placement and is never moved or annotated.
+3. **The sampler asks.** `applySeed` (`engine/sample.ts`), after its jitter: for each region-bound free
+   point, judge the side on the SAMPLED figure's own circle — one `evaluate` of the sampled construction;
+   when that cannot build (the very seeds at issue — no tangent from inside), the PREFIX up to the point
+   with the constraints it can satisfy (the circle's own tangency solve included), so the centre and radius
+   are the ones the figure will have — and re-seat a wrong-side sample radially with the point's own rng:
+   outside → [1.15, 1.8]·r (the textbook apex, close to the circle — a far apex enlarges the span and
+   trips the span-relative distinctness floor elsewhere, measured), inside → [0.25, 0.7]·r. Deterministic:
+   a seed stays a seed; seed 0 never samples.
+4. **Nothing else changes.** No constraint, no drive, no DOF: the apex stays a free 2-DOF point a later
+   given can flex; `freeDofs`/`rawMovableDof` are untouched; the verifier still reports a contradicted
+   side (a pinned or derived point on the wrong side).
+
+**Measured, before → after (seeds 0–23 failing `meetsRequirements`).** The reported figure 9 → 2, and the
+two that remain are the pre-existing A-on-the-touch-point collision (seeds 9 and 14: A, free on O1, sampled
+onto M — a different class, `pointsDistinct` rightly rejects it; noted, not built here). The apex is
+outside O2 and the figure BUILDS at all 24 seeds (was 17). Single tangent 1 → 0 · «M מחוץ למעגל» 1 → 0 ·
+«M בתוך המעגל» 0 → 0 · the secant apex 0 → 0. With «ישר ADB» added, D is a true tangency point at every
+seed that meets the bar (|O2D| = |O2C|, O2D ⟂ DB) — the rider claim of the original report does not
+reproduce and is now asserted; one seed (5) that HEAD DREW with the apex 0.8 % outside and the two touch
+points 0.9 apart is now rejected by the side requirement the apex carries, and «הציגו תצורה אחרת» moves
+on — the degenerate near-touch was never a two-tangents figure.
+
+**Locks.** `issue-556-apex-region.test.ts` (11): the reported figure builds at every seed with B outside;
+any remaining failure is distinctness on a pair not involving B, at most two seeds; the ADB rider claim
+asserted over ≥5 seeds; seed 0 untouched and the region recorded; the four class members at zero failing
+seeds; two circles → two region entries; the sampler keeps every sample past 1.05·r; a contradicted side
+refuses or flags. Fixture `issue-556-two-tangents-free-apex.geo.json` (standing rule 4). Fixture
+`2022-summer-a-issue59` re-saved: its tangent step now lowers with the side record (the deliberate
+lowering change; the figure is unchanged).
+
+**Deviations from the plan, recorded.** The plan's lock "succeeds at EVERY seed 0–23" was a hypothesis:
+two seeds fail for a reason that is not this issue's (A sampled onto the circles' touch point) and were
+failing at HEAD; the lock says so instead of pretending. The first cut replaced the rules' fixed default
+by the family's `seedSpot` — measured, that moved the whole figure's basin (the «ישר ADB» variant lost
+seeds 4, 5, 7 and two more seeds tripped the distinctness floor), so the default was kept and only the
+declaration added. The 3-D sibling audit the plan does not ask for was not run.
