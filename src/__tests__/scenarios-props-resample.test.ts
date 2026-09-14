@@ -386,4 +386,33 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       expect(dist(at(fig, 'A'), at(fig, 'B')), `seed ${seed}: |AB| = √2·R`).toBeCloseTo(Math.SQRT2 * r, 2);
     }
   });
+
+  it('[circle-plus-outside-point-has-another-view] #1005: «מעגל O» + «M מחוץ למעגל» — the button finds a genuinely different drawing', () => {
+    // The operator's exact sequence, round #1001 T8: "M has 1 dof. pressing new shape says there are no
+    // other ways to show it. in reality there are many locations for M". The figure's one shape freedom
+    // is |OM| against the free radius — a ratio the point-only fingerprint could not see, because two
+    // named points give ONE distance normalised by itself ([ADR-514](../../docs/06-decisions.md#adr-514)).
+    const st = useGeoStore.getState();
+    st.clear();
+    for (const u of ['מעגל O', 'M מחוץ למעגל']) {
+      const r = parse(u, ctxOf(useGeoStore.getState().facts));
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return;
+      for (const cmd of r.commands) st.execute(cmd, u, `g-${u}`);
+    }
+    const ratio = () => {
+      const { facts, seed } = useGeoStore.getState();
+      const fig = replay(facts, seed);
+      return dist(at(fig, 'O'), at(fig, 'M')) / fig.circles.get('circle-O')!.r;
+    };
+    const before = ratio();
+    const seedBefore = useGeoStore.getState().seed;
+    st.resample();
+    expect(useGeoStore.getState().seed, 'the press moved to another configuration').not.toBe(seedBefore);
+    // Similarity-invariant, so this moving is proof the DRAWING changed, not just its size or angle.
+    expect(Math.abs(ratio() - before) / before, `|OM|/r: ${before} → ${ratio()}`).toBeGreaterThan(0.03);
+    // ...and M is still outside the circle at the new view — the ADR-511 requirement still gates it.
+    expect(ratio(), 'M stays OUTSIDE the circle').toBeGreaterThan(1);
+    st.clear();
+  });
 });

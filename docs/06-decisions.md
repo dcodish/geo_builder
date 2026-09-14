@@ -11512,3 +11512,69 @@ coincidence — segments and circles were left to ADR-123's channel (stated). Th
 standalone lock became a co-located check in the e2e slices and the fixtures net (a standalone fold of the
 corpus costs ~10 min). The requirements line is FR-RN-13, not an FR-RD-7 twin: the 2-D document has no RD
 family, and its rendering promises live under RN.
+
+## ADR-514 — THE "IS THIS ANOTHER DRAWING?" FINGERPRINT READS EVERY EXTENT, NOT THE NAMED POINTS ALONE (#1005)
+
+**Status:** accepted, 2026-09-14 · **Issue:** #1005 (bug, P2) · round #1006 · bug route (landed on `main`) · amends [ADR-065](#adr-065) (the similarity-invariant fingerprint) · serves the [ADR-018](#adr-018) promise ("show me another VALID drawing")
+**Requirements:** none (internal — the ADR-018 promise already covers it; this ADR makes the mechanism keep it) · **Design:** [04](04-design.md) — "What the shape fingerprint reads"
+
+**What the student saw.** «מעגל O» · «M מחוץ למעגל» → the DOF cue says the figure has a freedom, and
+pressing «הציגו תצורה אחרת» answers «אין תצורה אחרת». Operator, playing round #1001 T8: *"M has 1 dof.
+pressing new shape says there are no other ways to show it. in reality there are many locations for M."*
+
+**Measured before the fix** (real `parse → replay → searchResample`, at `efec2f4`): seeds 0–5 give
+|OM|/r = **1.70, 1.61, 2.14, 2.33, 1.82, 3.38** — six drawings that differ by a similarity-invariant
+ratio, every one of them meeting every requirement (M outside at each) — while `searchResample(facts, 0)`
+and `searchAnotherView(facts, 0)` both return **null**. Pre-existing, not the round's: the identical probe
+on the pre-round `main` gives the same null.
+
+**Root cause (docs/17 §1 — the class).** *The fingerprint that decides "is this a different drawing?"
+read named POINTS only, so any shape freedom carried by a non-point extent was invisible to it, and the
+button reported "no other configuration" over drawings that genuinely differ.* `shapeFingerprint`
+(`src/replay/core.ts`) is every pairwise distance between named points, normalised by their mean. A
+circle's radius is a shape DOF the cue counts (`radius.via === 'free'`, ADR-051/052) and the sampler
+varies — and it was not in the vector. In the limit the vector carries no information at all: **two**
+named points give ONE distance normalised by itself, the constant `[1]` at every seed, so `shapeDiffers`
+compares `[1]` with `[1]` and every candidate is rejected as "the same drawing".
+
+**Decision. The fingerprint reads every extent the drawing has** — each pairwise distance between named
+points AND each **drawn** circle's radius — under the same mean normalisation.
+
+**Why that extent list is COMPLETE** (the ADR owes the list, not an enumeration of figures): a drawing's
+shape up to similarity is fixed by the ratios among its LENGTHS, and only two kinds of object carry a
+length of their own. A point pair carries `|PQ|`; a circle carries its radius. Everything else the
+renderer draws is spanned by points already counted — a segment and a polygon edge **are** point pairs, an
+arc's radius is `|centre − endpoint|` and both are named points, and a line has no extent at all. Radii and
+point distances share the one similarity gauge, so `r/mean` is invariant exactly as `d/mean` is: appending
+radii cannot weaken the invariance the function exists for.
+
+A `hidden` circle is excluded: it constrains its points (a concyclic quad) but is not drawn, and this
+function answers *"is this a different DRAWING?"*. Its effect is already carried by the positions of the
+points sitting on it.
+
+**Measured after** (same probe): the reported two-liner returns **seed 2**, |OM|/r **1.70 → 2.14**; the
+«M בתוך המעגל» sibling likewise. The determined controls are unmoved — a bare square still answers "no
+other configuration" (ADR-065's own bar is not loosened), and a bare triangle still finds one.
+
+**One suspected member measured NOT to be one, and it matters.** #1005 listed «מעגל O» + «A על המעגל»
+among the members. It is not: |OA| **is** the radius, so the figure's only ratio is r/r = 1 at every seed
+and every drawing really is the same one, rotated and resized. The fingerprint still answers "no other
+configuration" there, and that is the honest answer — recorded as a lock so it cannot drift into a false
+positive. This is also the **similarity-invariance lock with radii in play**: the radius varies across
+seeds (5.00, 5.32, 4.33, …) and the fingerprint correctly calls the drawings identical.
+
+**Sibling audit (docs/17 §1), stated either way.** 3-D has **no fingerprint at all**: `useGeo3.resample`
+(`src3d/store/store3.ts`) advances to the next seed meeting requirements (`seedForRequirements`) with no
+same-drawing gate. It is therefore structurally immune to this class — it can never report "no other
+configuration" through a fingerprint, because it has none. (Its own honesty question — that it may show a
+view of the same shape — is a different class and is not opened here.)
+
+**Locks.** `issue-1005-fingerprint-extents.test.ts` (5): the reported two-liner finds another
+configuration AND |OM|/r moves by more than the 3% bar; the inside sibling the same; a determined square
+still reports none; the circle-with-a-point-on-it still reports none (the measured non-member above); a
+circle-free figure is untouched. `scenarios-props-resample.test.ts`
+`[circle-plus-outside-point-has-another-view]` drives the operator's exact two utterances through the real
+store and its `resample` action, asserting the seed moves, the invariant ratio moves, and M stays outside
+(the ADR-511 requirement still gates the new view) — standing rule 4.
+
+**Deviations from the plan:** none.

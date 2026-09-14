@@ -2158,7 +2158,7 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
 export function searchResample(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void, budgetMs = SEARCH_BUDGET_MS): number | null {
   const cur = replay(facts, seed);
   if (freeDofs(cur.construction).length === 0) return null; // fully determined — nothing to vary
-  const curFp = shapeFingerprint(cur.construction, cur.positions);
+  const curFp = shapeFingerprint(cur.construction, cur.positions, cur.circles);
   let s = seed;
   const deadline = Date.now() + budgetMs;
   const curStrict = meetsRequirements(facts, seed);
@@ -2171,7 +2171,7 @@ export function searchResample(facts: Fact[], seed: number, onProgress?: (k: num
     const r = withSolveBudget(deadline, () => replay(facts, s));
     // Accept only a view that MEETS EVERY REQUIREMENT — the SAME bar the initial display uses — AND is a
     // genuinely DIFFERENT drawing (see the class notes above; the Q8 two-right-triangles lock).
-    if (!shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions))) continue;
+    if (!shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions, r.circles))) continue;
     if (meetsRequirements(facts, s)) {
       // #194 (ADR-474): «הצג תצורה אחרת» prefers a legible alternative, per press. A squashed-but-valid
       // candidate is remembered, not discarded — when the valid family is ONLY squashed the student must
@@ -2994,19 +2994,45 @@ export function pointsDistinct(c: Construction, positions: Map<Id, Vec>, allowed
 }
 
 /**
- * A similarity-INVARIANT shape fingerprint: every pairwise distance between named points, normalised by
- * their mean. Translation, rotation, scale and reflection don't change it — so two drawings with the
- * same fingerprint are "the same configuration" even if one is bigger or rotated. Used by `resample` to
- * tell a genuinely DIFFERENT drawing from a mere size/rotation jitter (operator: "5 DOF but every 'show
- * another' gives the same figure" — the remaining DOFs were only similarity transforms, not shape).
+ * A similarity-INVARIANT shape fingerprint: **every extent the drawing has** — each pairwise distance
+ * between named points AND each drawn circle's radius — normalised by their mean. Translation, rotation,
+ * scale and reflection don't change it, so two drawings with the same fingerprint are "the same
+ * configuration" even if one is bigger or rotated. Used by `resample` to tell a genuinely DIFFERENT
+ * drawing from a mere size/rotation jitter (operator: "5 DOF but every 'show another' gives the same
+ * figure" — the remaining DOFs were only similarity transforms, not shape).
+ *
+ * **Why the extent list is complete** ([ADR-514](docs/06-decisions.md#adr-514), issue #1005): a drawing's
+ * shape, up to similarity, is fixed by the ratios among its LENGTHS, and only two kinds of object carry a
+ * length of their own. A point pair carries `|PQ|`; a circle carries its radius. Everything else the
+ * renderer draws is spanned by points already counted — a segment and a polygon edge ARE point pairs, an
+ * arc's radius is `|centre−endpoint|` (a point pair, by construction), and a line has no extent at all.
+ * Radii and point distances share the one similarity gauge, so `r/mean` is invariant exactly as
+ * `d/mean` is, and appending them cannot break the invariance the function exists for.
+ *
+ * Reading points ALONE is what made the button lie on «מעגל O» + «M מחוץ למעגל»: two named points give a
+ * single distance normalised by itself — the constant `[1]` at every seed — so the one shape freedom the
+ * figure has (|OM| against the free radius) was invisible, and «הציגו תצורה אחרת» reported "no other
+ * configuration" over six visibly different drawings.
+ *
+ * A `hidden` circle is excluded: it constrains its points (a concyclic quad) but is not drawn, and this
+ * function answers "is this a different DRAWING?". Its effect on the figure is already carried by the
+ * positions of the points that sit on it.
  */
-function shapeFingerprint(c: Construction, positions: Map<Id, Vec>): number[] {
+function shapeFingerprint(c: Construction, positions: Map<Id, Vec>, circles?: Map<Id, ResolvedCircle>): number[] {
   const pts = c.objects
     .filter((o) => isGeoPoint(o) && !o.id.startsWith('~'))
     .map((o) => positions.get(o.id))
     .filter((p): p is Vec => !!p);
   const ds: number[] = [];
   for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) ds.push(Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y));
+  // The non-point extents. `c.objects` order is structural (the same at every seed), so the coordinates
+  // line up index-for-index between two fingerprints of the same figure.
+  if (circles)
+    for (const o of c.objects) {
+      if (o.kind !== 'circle' || o.hidden) continue;
+      const r = circles.get(o.id)?.r;
+      if (r !== undefined && Number.isFinite(r)) ds.push(r);
+    }
   const mean = ds.reduce((a, b) => a + b, 0) / (ds.length || 1);
   return mean > 1e-9 ? ds.map((d) => d / mean) : ds;
 }
