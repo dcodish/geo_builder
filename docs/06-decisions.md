@@ -11512,3 +11512,74 @@ coincidence — segments and circles were left to ADR-123's channel (stated). Th
 standalone lock became a co-located check in the e2e slices and the fixtures net (a standalone fold of the
 corpus costs ~10 min). The requirements line is FR-RN-13, not an FR-RD-7 twin: the 2-D document has no RD
 family, and its rendering promises live under RN.
+
+## ADR-515 — THE ARMED BUDGET IS CONSULTED INSIDE THE JOINT SOLVE, not only between experiments (#259, direction A)
+
+**Status:** accepted, 2026-09-14 · **Issue:** #259 (debt, P3 — the 2026-08-25 plan, direction **A** only) · round #1006 · debt route (landed on `main`) · extends [ADR-281](#adr-281) (budget scope) and the issue-#59 ladder budget · docs/17 §7
+**Requirements:** none (internal — no promise changes; an armed search's outcome semantics are unchanged) · **Design:** [04](04-design.md) — "Where the solve budget is consulted"
+
+**The violation (docs/17 §7).** *"Searches check their deadline inside the innermost replay loop."* They
+did not. `solveBudget` documents its own granularity — consulted *"between recruit experiments, lends, and
+co-drive host seeds"* — and every one of `step.ts`'s **eight** `budgetExceeded()` calls sits at a loop
+boundary. `evaluate.ts` had **zero**. So a single experiment's Nelder–Mead descent ran unbounded, and the
+budget's real floor was one whole experiment.
+
+**Measured, before** (the #207 figure — `ABC משולש ישר זוית` · `AC=15` · `BC=10` · `O על AC` · `D על CB` ·
+`רבע מעגל ODC`, whose infeasibility is CONCLUDED rather than cheap):
+
+| run | wall clock | `budgetExceeded()` true |
+| --- | --- | --- |
+| unarmed | **31.9 s** | 0 |
+| **12 s budget armed** | **32.3 s** | **0 — never once** |
+
+The armed run is the whole finding: the deadline passed at 12 s and the ladder ran another 20 s without a
+single consult, because it never left the descent it was in.
+
+**Decision. The consult goes where docs/17 §7 says it goes** — inside `nelderMead`'s iteration loop, which
+IS the innermost replay loop (every objective evaluation is a full `evaluateCore`). Two cheaper consults
+ride along in `multiStartSolve`: past the deadline it opens no further restart basin and runs no further
+polish pass. An aborted descent returns the best point it has, exactly as an `iters` exhaustion does; the
+caller's `accept` gate still judges it, and `solveBudget.aborts` marks the fold so `computeReplay` refuses
+to memoize a truncated one.
+
+**Measured, after:**
+
+| run | wall clock | aborts | outcome |
+| --- | --- | --- | --- |
+| unarmed | **31.8 s** | 0 | «cannot place O on segment AC so that \|OC\| = \|OD\|» |
+| 12 s budget | **12.1 s** | 836 | *identical message* |
+| 6 s budget | **6.1 s** | 896 | *identical message* |
+| 3 s budget | **3.1 s** | 944 | *identical message* |
+
+Only the time moved. The refusal is the same honest refusal ADR-385 made honest, naming the same statement.
+
+**What is deliberately NOT changed.** Unarmed — the default, **the primary submit fold** (ADR-281), and
+every test — `budgetExceeded()` is a null-check returning false, so the engine is bit-for-bit what it was.
+The unarmed 31.9 s → 31.8 s row above is that guarantee measured, not asserted. The submit fold stays
+uncapped by design: a solvable figure must build whatever it costs, and capping it would refuse valid
+givens (docs/17 §6). **So this does not make the #207 SUBMIT faster** — it makes every *armed* path («הציגו
+תצורה אחרת», the auto-resolve config search, the shared detection sampler, and the ADR-509 admissible-set
+enumeration) actually honour the budget it was given.
+
+**Direction (B) is NOT attempted, deliberately.** The issue's second direction — concluding infeasibility
+early from a one-signed residual — is what would make the *submit* path cheaper, and it is the one carrying
+a **P1 honesty hazard**: ADR-385 records that the same test on a length-vs-**number** residual is UNSOUND
+(sampling explores a bounded scale neighbourhood, so ADR-238's feasible `O1M=9` samples one-signed too) and
+would refuse satisfiable givens. The plan itself rules (A) *"landable on its own if (B) proves too risky for
+the payoff"*, and weighs it explicitly: *"this is P3 debt on an already-honest refusal."* Turning P3 debt
+into a P1 refusal risk is not a trade a fix round takes. **#259 therefore stays OPEN for (B)** — this
+commit does not close it.
+
+**Honest limitation.** Tests never arm the budget, so the suite cannot regress-test armed behaviour except
+through explicit locks like this one. That is why the lock drives `nelderMead` directly in both states
+(armed and unarmed) rather than relying on the corpus.
+
+**Locks.** `issue-259-ladder-budget.test.ts` (3): unarmed, the descent still converges to the minimum and
+counts no abort (the bit-for-bit guarantee); with an expired budget it stops at once and counts the abort
+(so a truncated fold is never memoized); a 3 s budget binds the #207 ladder — `aborts` rises, the run
+finishes far inside the unbudgeted ~32 s, and `lastError` is the unchanged refusal string. The
+machine-independent assertion is `aborts > 0` (the consult fired inside a solve); the wall-clock ceiling is
+deliberately loose so a slow box cannot flake.
+
+**Deviations from plan:** the commit says `Refs #259`, not a closing keyword — (A) is landed, (B) is not,
+and closing the issue would misreport the work.
