@@ -124,6 +124,7 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 - **FR-TH-4 (Must)** — Each feed entry is **traceable**: selecting it highlights on the canvas the exact objects/facts that satisfied the hypothesis (Pedagogy §5.3).
 - **FR-TH-5 (Must)** — Present each theorem bilingually (He/En) with its exact catalog statement ([07](07-theorem-reference.md)) and its **official bagrut number**. Surface **P** (use-it) and **C** (recognition/converse) theorems; **never** surface **O**-tagged items, definitions, or area/perimeter formulas.
 - **FR-TH-6 (Should)** — Within a single fact's surfacing, order most-relevant-first and **cap** the count so one fact never floods the feed.
+- **FR-TH-6a (Should)** — When **«show another configuration»** changes the drawing, the tool **says which unstated choice it moved and which it kept** — «השתנה: המיקום של G · נשמר: הענף של E». This is [ADR-052](06-decisions.md#adr-052) made visible: what varies is exactly what the question did not pin, so the note teaches which parts of the figure are givens and which are the drawer's freedom. It may name only freedoms the figure actually has, and a freedom it cannot judge is reported in neither list — silence, never a guess. Capped like every other surfacing (FR-TH-6). *(Realised — [ADR-517](06-decisions.md#adr-517), #65.)*
 
 ## Shape badges — detect named shapes and link to the book ([ADR-161](06-decisions.md#adr-161))
 
