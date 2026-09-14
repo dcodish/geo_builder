@@ -2542,3 +2542,57 @@ came from). [ADR-3D-237](06b-decisions-3d.md#adr-3d-237) cites its FR by descrip
 
 **Locks.** The guard itself (the `DEFINED at most once` case in `docs-hygiene.test.ts`, asserted on the
 live docs); `test:docs` green.
+
+## ADR-W-051 — A DOWNLOADED IMAGE NEVER CONTAINS ON-SCREEN CHROME, IN EVERY BUILDER — and each product proves it (#713)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #713 (feature, P3 — the operator's 2026-09-08 ruling *"a downloaded image never contains on-screen chrome — in ALL THREE products"*) · round #1001 · feature route (PR) · extends [ADR-W-016](#adr-w-016)/[ADR-W-019](#adr-w-019)'s shared `shell/export`; the 2-D contract of F3/REN-3 made workspace-wide
+**Requirements:** [02w](02w-requirements-workspace.md) FR-EX-3 (new — export is a shared surface, which is where 02b and 02d both send their export promises; the ruling's "each product's requirements doc" resolves to the one document that owns the surface) · **Design:** none (internal — the strip contract and the tagging seam are unchanged; a markup twin of the strip, `shell/export/exportMarkup.ts`, exists so the locks run DOM-free)
+
+**Context — measured at HEAD (2026-09-13).** All three products rasterise through the shared
+`shell/export/svgToPng`, which strips every `[data-noexport]` subtree and reverts the `data-export-*`
+selection accents on a clone before drawing. The opt-in is per-renderer tagging. 2-D tags eight sites
+(crossing offers, promotable points, highlight overlays, hidden-item ghosts, hover relation marks).
+**3-D tagged nothing and painted two interaction-only things inside its SVG:** the #483 crossing OFFER — a
+hollow dashed dot with a transparent hit ring that says "click to name" — and the #578 point hit rings.
+A 3-D worksheet PNG therefore carried a dashed "available" dot that is not part of the figure. **Complex
+tagged nothing and paints nothing interactive** — its plane takes no hover/selection/offer prop; the
+ruling's "neither product tags a single element" was, for complex, the absence of chrome rather than an
+untagged one (a measurement the issue's framing did not distinguish).
+
+**The class (docs/17 §1).** *A clean-export contract that lives in the shared tree but whose opt-in is
+per-product, with nothing making a product opt in.* Fixing 3-D's two sites alone would leave the same
+class open for the next affordance and the next product.
+
+**Decision.**
+
+1. **3-D opts in:** the crossing-offer group and the point hit ring carry `data-noexport`
+   (`src3d/render/Figure3.tsx`).
+2. **The class is closed by a lock per product, never a shared import** (docs/20 §12): each product
+   renders its figure with EVERY chrome affordance its renderer takes as a prop switched ON, strips the
+   markup the way the rasteriser does, and asserts the ink equals its chrome-free render —
+   `src/render/__tests__/clean-export.test.tsx` (crossing offers, highlight overlay + accents, promotable
+   points; the hover marks are internal state, so their tag is asserted at the source),
+   `src3d/render/__tests__/clean-export.test.tsx` (the offer and the hit rings), and
+   `src-complex/__tests__/clean-export.test.tsx` (the strip is the identity and no affordance marker is
+   painted — the measured "no chrome" recorded so it cannot drift). The rule the locks encode: **a chrome
+   affordance is added with its prop ON in the product's lock, or it ships in the download untested.**
+3. **The strip, stated over markup.** Tests run DOM-free (`renderToStaticMarkup`), so
+   `shell/export/exportMarkup.ts` restates the rasteriser's two operations over serialised SVG —
+   `stripNoExport` (every tagged subtree, nested groups included) and `revertExportAccents` (each
+   `data-export-<x>="v"` becomes `<x>="v"`) — with `normalizeForExport` dropping what paints nothing
+   (`class`, cursor styles, `<title>` tooltips) so renders compare by ink. Its own contract is pinned in
+   `shell/__tests__/export-markup.test.ts`. It is the reference every product lock reads; the DOM strip
+   in `svgToPng` is unchanged.
+4. **The conformance row** (#664's matrix, A5): *clean export — every product's export equals its
+   chrome-free render.* Measured 2026-09-13: 2-D ✓ (was already), 3-D ✓ (after 1), complex ✓ (nothing to
+   strip). Recorded here as the row's first cell values; the harness itself is #664's.
+
+**Locks.** 14: the helper's six (self-closing, nested groups, byte-identity when untagged, a look-alike
+attribute, the accent revert, the non-painting normalisation); 2-D four; 3-D two (the chrome is really
+painted and tagged; the stripped ink equals the plain render, no dashed offer, no hit ring); complex two.
+
+**Deviations from the plan, recorded.** The ruling expected the complex plane to carry untagged chrome
+("hover targets, selection marks") — measured, it paints none, so its lock records the absence rather
+than tagging anything. The ruling's requirements lines went to 02w rather than 02b/02d, because both
+product documents state that export is a shared surface owned by 02w. The conformance check is a lock
+per product over a shared markup helper rather than a row in a harness that does not exist yet (#664).

@@ -125,6 +125,15 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
   own numbered givens, Hebrew RTL correct in Word. **Deterministic — never LLM-generated**: the givens are
   the student's own words in entry order. *(Realised — `shell/export/questionDoc.ts`; generalises
   [FR-HS-11](02-requirements.md).)*
+- **FR-EX-3 (Must)** — **A downloaded image never contains on-screen chrome, in every builder.** What is
+  painted only to be interacted with — hover marks, crossing offers, hit rings, hidden-item ghosts,
+  selection accents, edit affordances — is not part of the figure and never reaches a worksheet. The
+  contract is one shared strip (`[data-noexport]` + the `data-export-*` accent reverts in
+  `shell/export/svgToPng.ts`); the opt-in is each renderer's tagging, and each product carries a lock
+  that renders its figure with every chrome affordance ON and asserts the stripped ink is its chrome-free
+  render — so a product cannot ship untagged chrome by forgetting to opt in. *(Realised —
+  [ADR-W-051](06w-decisions-workspace.md#adr-w-051); locks `clean-export.test.tsx` in `src/render`,
+  `src3d/render` and `src-complex`, over `shell/export/exportMarkup.ts`.)*
 
 ## The admin surface
 
