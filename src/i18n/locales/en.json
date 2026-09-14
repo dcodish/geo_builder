@@ -180,6 +180,7 @@
     "pending": "This relation is recorded but not determined yet — add the remaining givens (lengths/angles) to pin the figure, and it will resolve on its own.",
     "converge": "{{a}} and {{b}} have landed at the same point.",
     "offArcNotice": "{{point}} necessarily lies on the part of circle {{circle}} that is not drawn — the construction forces it there.",
+    "degenerate": "{{object}} has collapsed onto a line — the givens force it: {{statements}}.",
     "v": {
       "notADiagonal": "{{pair}} is drawn as a diagonal, but it is not a diagonal of any shape in the figure",
       "onCircle": "{{point}} should lie on circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",

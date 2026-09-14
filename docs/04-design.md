@@ -630,3 +630,20 @@ knowledge gates ask "is this the same in every configuration?", and the pool is 
   midpoint by default, exactly on the aim line).
 - **Positions ride along.** `reinterpretAsCollinear` (step.ts) passes the previous positions into
   `applyCommand`, so the second-membership path sees where the crossing lies.
+## A declared polygon the givens force FLAT is said out loud (#945, [ADR-513](06-decisions.md#adr-513))
+
+- **The channel.** `Derived.degeneracies` (`replay/core.ts`) sits beside `coincidences` and `forcedOffArc`:
+  derived purely from the resolved construction on every replay, so a loaded figure and a typed one say
+  the same thing, and nothing is stored. The App shows it as an ⓘ notice — never a refusal, never amber.
+- **The predicate** (`engine/degeneracy.ts`, `degeneratePolygons`): for each declared polygon, the greatest
+  vertex offset from the line through its two most-separated vertices, over that separation — the same
+  measure the ADR-413 accept gate uses, judged against the polygon's OWN extent (a small polygon in a big
+  figure is judged by its own size), with `DEGENERATE_EXTENT_RATIO` calibrated on the 2-D corpus (the
+  ADR's table). The accept gate refuses a DRIVEN collapse below 1e-4; the notice covers the band above it
+  where a construction the givens force flat used to draw silently. Polygons only: a segment or circle
+  whose extent collapses is a coincidence of named points, which ADR-123's channel already says.
+- **Naming the statements** (`nameDegeneracies`, the ADR-492 prefix rule): walk the enabled statement
+  prefixes; the first that contains the polygon is its declaring statement, the first at which it is flat
+  is the responsible one. Runs only when a degeneracy exists, one replay per prefix, and never nests (a
+  prefix replay inside the scan reports the predicate alone). The engine carries fact ids and a number;
+  the wording is the chrome's, in the student's own words (`figure.degenerate`, He + En).

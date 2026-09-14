@@ -618,7 +618,7 @@ export default function App() {
   const display = searchHold || viewStale ? lastGoodViewRef.current! : derivedRaw;
   // GEOMETRY from the displayable state; STATUS/ERROR from the real current state (the step list and the
   // error banner must tell the truth about what just happened).
-  const { construction, positions, circles, labels: builtLabels, angleMarks, violations, coincidences, forcedOffArc } = display;
+  const { construction, positions, circles, labels: builtLabels, angleMarks, violations, coincidences, forcedOffArc, degeneracies } = display;
   /**
    * #948 ([ADR-W-047](docs/06w-decisions-workspace.md#adr-w-047)) — the PARAMETER DISPLAY chips.
    *
@@ -1272,6 +1272,15 @@ export default function App() {
                   fact rather than reporting an error — the amber `figure.v.pointOffArc` violation stays
                   the channel for a point that merely happens to be driven off the ink. */}
               ⓘ {forcedOffArc.map((f) => t('figure.offArcNotice', { point: f.point, circle: f.circle.replace(/^circle-/, '') })).join(' ')}
+            </div>
+          )}
+
+          {degeneracies.length > 0 && (
+            <div style={infoBanner}>
+              {/* #945 (ADR-513, the 2-D half of ADR-W-048): a declared polygon the givens forced FLAT is said
+                  out loud in the student's own words — the statements responsible, never a bare number — and
+                  never refused: the figure is right, and the student may have meant to discover exactly this. */}
+              ⓘ {degeneracies.map((d) => t('figure.degenerate', { object: d.object, statements: d.statements.map((id) => facts.find((f) => f.id === id)?.utterance?.trim()).filter((s): s is string => !!s).map((s) => `«${s}»`).join(', ') })).join(' ')}
             </div>
           )}
 

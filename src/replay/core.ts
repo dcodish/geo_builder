@@ -13,12 +13,12 @@
  * The store re-exports this module's surface, so existing consumers are untouched.
  */
 
-import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
+import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
 import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -138,6 +138,14 @@ export interface Derived {
    *  none is never silent. Distinct from the amber `point-off-arc` violation, which is tier 2. [#433] */
   forcedOffArc: ForcedOffArc[];
   /**
+   * #945 ([ADR-513](docs/06-decisions.md#adr-513)) — a declared polygon the givens forced FLAT (the 2-D
+   * half of ADR-W-048): allowed, never a refusal (the figure is right and the student may have meant to
+   * discover exactly this), but said out loud, naming the student's own statements — the one that
+   * declared the polygon and the last statement of the shortest prefix at which it collapsed (the ADR-492
+   * prefix rule). Derived purely from the construction, so a loaded figure and a typed one say the same.
+   */
+  degeneracies: DegenerateNotice[];
+  /**
    * This seed's SAMPLE broke a figure the fold had accepted (#938,
    * [ADR-484](docs/06-decisions.md#adr-484)) — not a contradiction of the student's givens.
    *
@@ -215,6 +223,53 @@ function applyReflections(c: Construction, mask: number): Construction {
 const replayCache = new WeakMap<Fact[], { snapshot: readonly Fact[]; bySeed: Map<string, Derived> }>();
 const REPLAY_CACHE_MAX = 512; // per facts-array — above this the sweep is exploring, not re-checking
 export const replayStats = { computes: 0 };
+
+/** #945 — a declared polygon the givens forced flat, with the statements responsible (fact ids). */
+export interface DegenerateNotice {
+  /** The polygon as the student names it (`ABC`). */
+  object: string;
+  vertices: Id[];
+  ratio: number;
+  /** Fact ids: the statement that declared the polygon, then the last statement of the shortest prefix at
+   *  which it is flat — the same fact when the declaration itself is already flat. */
+  statements: string[];
+}
+/** > 0 while a prefix scan is running — its inner replays report the predicate and never scan again. */
+let namingDepth = 0;
+/**
+ * The ADR-492 prefix rule for a flat polygon: walk the enabled fact prefixes in order; the first prefix
+ * that CONTAINS the polygon names its declaring statement, the first at which it is flat names the
+ * responsible one. Statements are the student's units (a fact's group), so a multi-command line names
+ * itself once. Costs one replay per prefix, only when a degeneracy exists.
+ */
+function nameDegeneracies(facts: Fact[], seed: number, flat: DegeneratePolygon[]): DegenerateNotice[] {
+  if (namingDepth > 0) return flat.map((d) => ({ object: d.vertices.join(''), vertices: d.vertices, ratio: d.ratio, statements: [] }));
+  namingDepth++;
+  try {
+    const out: DegenerateNotice[] = [];
+    for (const d of flat) {
+      let declaredBy: string | null = null;
+      let flatBy: string | null = null;
+      for (let k = 1; k <= facts.length && flatBy === null; k++) {
+        const f = facts[k - 1];
+        if (!f.enabled) continue;
+        // a multi-command statement is judged once, at its last row
+        if (k < facts.length && groupKey(facts[k]) === groupKey(f)) continue;
+        const fig = replay(facts.slice(0, k), seed);
+        if (fig.lastError !== null) continue;
+        const poly = fig.construction.objects.find((o) => o.kind === 'polygon' && o.id === d.id);
+        if (!poly) continue;
+        if (declaredBy === null) declaredBy = f.id;
+        if (degeneratePolygons(fig.construction, fig.positions).some((x) => x.id === d.id)) flatBy = f.id;
+      }
+      const statements = [...new Set([declaredBy, flatBy].filter((x): x is string => x !== null))];
+      out.push({ object: d.vertices.join(''), vertices: d.vertices, ratio: d.ratio, statements });
+    }
+    return out;
+  } finally {
+    namingDepth--;
+  }
+}
 
 export function replay(facts: Fact[], seed = 0): Derived {
   const key = `${seed}`;
@@ -1394,7 +1449,13 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   // on a semicircle is always on the other half. Allowed, never a violation (flagging it would be
   // unsatisfiable), but said out loud, the way a forced coincidence is.
   const forcedOffArc: ForcedOffArc[] = e.ok ? forcedOffArcs(figure, e.positions, e.circles) : [];
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, coincidences, forcedOffArc, sampledFailure };
+  // #945 (ADR-513): a declared polygon forced flat — the ADR-123 channel shape, polygon edition. The
+  // statements are named by a prefix scan that runs ONLY when a degeneracy exists (a healthy figure pays
+  // one predicate over its polygons), and never nests: a prefix replay inside the scan reports the
+  // predicate alone.
+  const flat = e.ok && lastError === null ? degeneratePolygons(figure, e.positions) : [];
+  const degeneracies: DegenerateNotice[] = flat.length ? nameDegeneracies(facts, seed, flat) : [];
+  return { construction: figure, positions: e.ok ? e.positions : new Map(), circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, coincidences, forcedOffArc, degeneracies, sampledFailure };
 }
 
 /** The (a, b, id, circle) triples every enabled `extend-onto-circle` step asserts ("המשך a·b onto `circle` at id"). */
