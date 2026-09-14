@@ -378,7 +378,9 @@
     "show": "Show label",
     "apply": "Apply",
     "taken": "Letter already used",
-    "bad": "Invalid letter"
+    "bad": "Invalid letter",
+    "takenBy": "Held by: «{{what}}»",
+    "reclaim": "Take the letter and remove that step"
   },
   "segMenu": {
     "hide": "Hide segment",

@@ -72,7 +72,14 @@ describe('store.rename — relabel across the fact list', () => {
   it('refuses to relabel onto an existing point (no silent merge)', () => {
     s().execute(SQUARE, 'square ABCD');
     const res = s().rename('A', 'B');
-    expect(res).toEqual({ ok: false, reason: 'target-taken' });
+    // The invariant: it REFUSES, with that reason, and the figure is untouched. Asserted on the fields
+    // rather than by whole-object equality, because #238 (ADR-520) added a `holder` to this refusal —
+    // an exact-object match would have to be rewritten by every future field, and the promise is the
+    // refusal, not the shape of the record.
+    expect(res.ok).toBe(false);
+    expect(res.ok === false && res.reason).toBe('target-taken');
+    // #238: and it now says WHO holds B, so the student is not left to find it themselves.
+    expect(res.ok === false && res.reason === 'target-taken' && res.holder?.utterance).toBe('square ABCD');
     expect((s().facts[0].cmd as Extract<Command, { type: 'square' }>).ids).toEqual(['A', 'B', 'C', 'D']); // unchanged
   });
 
