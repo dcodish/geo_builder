@@ -28,7 +28,7 @@ import type { FigureFile } from './figureFile';
 // S1.2 (docs/24): the replay layer moved to src/replay/core.ts — re-exported here so every
 // existing consumer path ('@/store/geoStore') keeps working; the store is now a thin stateful shell.
 export * from '@/replay/core';
-import { replay, groupKey, firstSatisfyingSeed, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, pointsDistinct, commandPointIds, extensionsClear, intersectionsWithinSegments, BRANCH_CYCLE_KINDS } from '@/replay/core';
+import { replay, groupKey, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, commandPointIds, BRANCH_CYCLE_KINDS } from '@/replay/core';
 import type { DetectAllResult, Fact } from '@/replay/core';
 import { geoWork, geoValues, isCancelled } from './geoWork';
 import { pruneDisplayMode, toggleDisplayMode, displayModeFromIndexed, type DisplayModeMap } from '../../shell/displayMode';
@@ -472,36 +472,16 @@ function commitCommands(
     const known = new Set(facts.map((f) => f.id));
     next = settleVariantDefaults(next, (f) => !known.has(f.id), get().seed);
   }
-  const patch: Partial<GeoState> = { facts: next };
-  // The seed auto-advance applies only when the batch APPENDED a step (matching the old per-command
-  // behaviour: a free-point move / circle resize never re-seeds), and only when the current view is
-  // actually broken — searching upward from the current seed keeps a valid hand-picked view.
-  if (next.length > facts.length) {
-    const seed = get().seed;
-    const fig = replay(next, seed);
-    // The trigger covers DISTINCTNESS too (#232 / ADR-378): a default collision at the current seed
-    // (a bare «נקודה D» stacked on A — the ADR-378 collector now honestly refuses to certify it) must
-    // start the same search the extension/meet breaks do; before, the gate never asked, so the stack
-    // was drawn even though seeds that separate the pair exist.
-    if (
-      // #938 ([ADR-484](docs/06-decisions.md#adr-484)): the search was armed ONLY for a figure that
-      // builds and looks bad, and disarmed for the one case that needs it most — a figure that does not
-      // build at this seed at all. `fig.lastError === null` read as "the view is worth improving"; a
-      // broken view is not worth improving, it is worth REPLACING. `sampledFailure` is the licence: the
-      // fold accepted these rows, so a configuration where every given holds demonstrably exists
-      // (ADR-476), and 197 of 200 seeds draw the operator's figure while the tool sat on one of the 3.
-      // A genuine contradiction leaves the flag false and still refuses at once — no futile sweep.
-      fig.sampledFailure ||
-      (fig.lastError === null &&
-        (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig) || !pointsDistinct(fig.construction, fig.positions, fig.coincidences)))
-    ) {
-      const s = firstSatisfyingSeed(next, seed);
-      if (s !== seed) {
-        patch.seed = s;
-      }
-    }
-  }
-  set(patch);
+  // #364 ([ADR-510](docs/06-decisions.md#adr-510)): the facts commit at the student's CURRENT seed — no
+  // synchronous seed search here any more. The search that used to run in this transaction (a newly
+  // appended step breaking an extension order / a segment-meet / point distinctness / a seed that does
+  // not build — ADR-098/166/378/484) is owned by the post-commit `autoResolve` (ADR-106/290/446): it runs
+  // OFF-thread, its trigger (`meetsRequirements`) is a superset of the one that lived here, and its
+  // first tier IS `firstSatisfyingSeed` — sweeping from this seed, so a valid hand-picked view is kept.
+  // What changed is the transaction shape, ruled by the operator (2026-09-11, "accept the flash"): the
+  // violating configuration may paint for one frame before the worker's answer lands via
+  // `resolveAfterCommit` (temporal paused, `applyView`), instead of a ≤2.5 s freeze of the tab.
+  set({ facts: next });
 }
 
 export const useGeoStore = create<GeoState>()(
@@ -636,19 +616,9 @@ export const useGeoStore = create<GeoState>()(
         // different statement and the configuration chosen for the old one has no claim on it — and the
         // search then runs from 0. Reset-then-search, in that order, or the search would start from a
         // seed the edit has just made meaningless.
-        const seed = 0;
-        patch.seed = seed;
-        const fig = replay(next, seed);
-        if (
-          fig.sampledFailure ||
-          (fig.lastError === null &&
-            (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig) || !pointsDistinct(fig.construction, fig.positions, fig.coincidences)))
-        ) {
-          const s = firstSatisfyingSeed(next, seed);
-          if (s !== seed) {
-            patch.seed = s;
-          }
-        }
+        // #364 (ADR-510): the search itself moved off-thread to the post-commit `autoResolve` — the ✎
+        // path commits at seed 0 and the worker sweeps from there (the same shape as the submit path).
+        patch.seed = 0;
         set(patch);
       },
 
@@ -800,7 +770,9 @@ export const useGeoStore = create<GeoState>()(
       autoResolve: () => {
         const { facts, seed } = get();
         if (meetsRequirements(facts, seed)) return true; // already meets every requirement — nothing to search
-        const found = findValidConfig(facts, 0);
+        // #364 (ADR-510): the sweep starts from the student's CURRENT seed, not 0 — the figure they are
+        // looking at is preferred over any other valid one (the M2 stability property, a parameter).
+        const found = findValidConfig(facts, seed);
         if (found) {
           set({ facts: found.facts, seed: found.seed });
           return true;

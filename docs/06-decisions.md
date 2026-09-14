@@ -9187,6 +9187,20 @@ undefined for one the student pinned with an explicit 90°.
 **The lesson is the one ADR-W-035 exists for.** Half 2's engine-level evidence was real and complete,
 and the feature was still unreachable by a student. A green search is not a usable button.
 
+**Amendment 1 (2026-09-13, round #1001) — the operator question is ANSWERED: half 1 is dropped.** The
+line above ("whether the class deserves a gate at all is now an operator question") was ruled in the
+`/decisions` pass of **2026-09-05**: the coincident-vertex accept-gate half of #569 is **dropped**, and
+refusal-by-measurement stands as the final answer, not as a deferral. A re-check on 2026-09-08 (after an
+operator session reported near-coincident square vertices under «הציגו תצורה אחרת») found the re-open
+trigger **un-fired**: the three cited seeds (85, 63, 120) all fail `meetsRequirements` — `pointsDistinct`'s
+1.5 %-of-span floor already rejects them — and 25 real presses never go below 0.06 of span; the exact
+coincidence the operator saw was #942's, closed by [ADR-486](#adr-486). **Re-open trigger, recorded:** an
+actual figure — prod log, corpus or operator report — that draws a near-collapsed vertex pair *and is
+accepted*. If it appears, the response is option B (re-derive the threshold from the corpus and find the
+real separation between legitimate figures and the basin), never the enumerated exemption refused above.
+#569 is closed by this amendment; no code changed. **Requirements:** none (internal) · **Design:** none
+(internal) — nothing built.
+
 ## ADR-482 — The ADR-052 DOF-honesty audit: the samplable set is COMPLETE, and the audit is now an oracle (#912)
 
 **Status:** accepted, 2026-09-06 · fix-round #915 · **Requirements:** none (internal — nothing the
@@ -11171,6 +11185,264 @@ fold) was not needed: `ownerByConKey` (ADR-398) already is that provenance, and 
 statements rather than tracking constraint ids. The plan said "disable" — measured: disabling cascades
 the dependents, removal is the question actually asked.
 
+## ADR-509 — A DETERMINED FIGURE'S KNOWLEDGE POOL IS ITS ADMISSIBLE SET, NOT ONE SAMPLE (#434)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #434 (debt, P3 — option (A) of the 2026-09-11 escalation, armed by the operator's 2026-09-13 ruling *"Yes, withhold all 16"*) · round #1001 · debt route (landed on `main`) · amends [ADR-424](#adr-424)'s fast path; the 2-D template for the "a count trusted without measurement" class ([ADR-3D-247](06b-decisions-3d.md#adr-3d-247) / [ADR-3D-248](06b-decisions-3d.md#adr-3d-248) are its 3-D members)
+**Requirements:** [02](02-requirements.md) FR-RV-5 already says it ("the same across every sample") — cited, no change · **Design:** [04](04-design.md) — "The knowledge pool of a DETERMINED figure is its admissible set"
+
+**What the student saw.** «AB=BC=8» alone printed **∠ABC = 31°** on the canvas — an angle no given fixed
+(seed 1 says 21°, seed 3 says 39°). The quarter-circle bagrut figure («ABC משולש ישר זוית · AC=15 · BC=10 ·
+O על AC · D על AB · OCD רבע מעגל») printed **|AB| = 18.03** while the seat at B — admissible, one «הציגו
+תצורה אחרת» press away — gives 11.18. The two-tangents figure printed **∠BAD = 25°** while the other
+tangent point gives 115°. Round #992's harness measured **16 of 58** determined-figure prints across the
+corpus changing under another admissible drawing (15 with the seed, 2 with a branch, 3 with the seat).
+Every one is ADR-052's sin in the epistemic dimension: one observation presented as "the same in every
+valid configuration" (FR-RV-5).
+
+**Root cause (docs/17 §2.2 — a count as a proxy for a measurement).** The shared sample core
+(`samplingJobs`) sampled a `freeDofCount === 0` figure ONCE, and the three knowledge gates
+(`trustDefinite` in `relations.ts`, `enough` in `valuesPanel.ts`, the starved-pool bar in
+`forcedCrossingKeys`) accepted any pool on that count. But the count is arithmetic and can lie — ADR-424
+fixed one redundancy pattern and named the class; «AB=BC=8» is another member (15 of the 16). And a seed
+can never reach a BRANCH or a right-angle SEAT (4 of the 16): a figure genuinely rigid at each seat has
+several admissible seats, and "one configuration is every configuration" is false for it even when the
+count is honest. The 2026-09-07 plan rewrite said the discrete axes were the whole story and the body said
+the seed was — measured, both axes are needed, and neither alone would have shipped an honest panel.
+
+**Decision — the pool IS the admissible set, and the gates trust a measurement.**
+
+1. **`samplingJobs`** (`replay/core.ts`): on a determined figure (count 0, one variant) the pool is seeds
+   {s, s+1, s+2} of the current facts (`ADMISSIBLE_SEEDS`, through the same validity ladder the 16-seed
+   pool passes) × every discrete rewrite «הציגו תצורה אחרת» applies — `admissibleRewrites`: every cyclable
+   branch point's branches crossed with the seat (`cyclableSeat`, rot 0/1/2) — each kept only where
+   `meetsRequirements` holds, the button's own bar. Reflection masks are subsumed by the seed axis (every
+   mask-varying print also varied with the seed, measured); the `inscribe` variant stays out (ADR-262).
+2. **Bounded, failing CLOSED.** The cross product is capped (`ADMISSIBLE_REWRITE_CAP` = 12). Over the cap,
+   or when the sample budget cuts the enumeration short (`sharedSamples` reports completeness to `finish`),
+   the pool is marked **not determined** and the gates fall back to their ≥ 4 floor — values and dots
+   withheld, relations still read off the samples in hand — exactly as an under-determined figure is
+   treated. A partial set never prints a number the missing configuration refutes.
+3. **The gates keep their "determined ⇒ any pool size" branch**, but "determined" is now the pool's
+   MEASURED flag (`SharedSamples.determined` — count 0 AND the set complete), passed as
+   `DetectOptions.determined`, `computeValuesPanel(…, determined)` and read by `forcedCrossingKeys`; each
+   keeps the count as its fallback for a hand-built pool (the direct engine path, tests). No new gate: a
+   value that disagrees across the admissible set is withheld by the "same in every sample" test that
+   already existed.
+4. **Cost.** A few replays per determined figure at panel/relations time in the worker, memoized per fact
+   list, never in the submit path. An INFEASIBLE rewrite pays the recruiter ladder to conclude it — the
+   #259 class, 96.6 s deadline-free on the quarter-circle figure's seat `rot=1` (recorded on #259); in prod
+   the 5 s sample budget cuts that and the figure takes branch 2.
+
+**Corpus evidence (the 2026-09-11 harness re-run on every scenario + fixture, 348 figures, 66 determined).**
+- **Before:** 60 of the 66 printed at least one value off one sample. **After:** 56 print; 48 print the SAME rows
+  (45 byte-identical; two differ in the third decimal, a mean over three seeds; one — scenario
+  `copula-less-symbolic-radius-binds-existing-circle-772` — now prints the value of its two requirement-
+  satisfying seeds, where the single seed-0 sample it printed before fails `meetsRequirements` and only
+  reached the panel through the one-sample fallback of the ladder).
+- **The 16 ruled withheld are withheld**, wholly or in the rows that vary: the quarter-circle figure loses
+  25 rows (keeps AC = 15, BC = 10 and the two 90° at O), `chained-value-marks-every-member` loses ∠ABC = 31°,
+  `inscribe-square-in-right-triangle` 12 rows, `sqrt-times-free-radius` its 8 angles (the radius rows stay —
+  #1002), and so on down the 2026-09-11 list — every one of the 16 changed, none of the 42 lost a row.
+- **Two more, not on the list:** scenario `anonymous-circle-binds-by-membership-beside-second-circle` and
+  fixture `issue-572-load-collapse` — both the #569 figure, whose DEFAULT seat collapses A onto C
+  (`meetsRequirements` false at every seed) while the seat at B is admissible. Their prints were a collapsed
+  drawing's numbers; the seat-rescued view (`findValidConfig` → rot 2) prints its 45°/90°/45° on its own
+  facts (measured). Withholding on the collapsed facts is the honest answer.
+- **Cost:** the 66 determined figures take 786 s deadline-free (was 205 s), five of them over 80 s each —
+  every one an infeasible seat or branch refuted through the recruiter ladder (#259).
+
+**Locks** (`issue-434-admissible-set.test.ts`, 12): «AB=BC=8» prints no ∠ABC and its two stated lengths;
+∠ABC = 40 returns once stated · the quarter-circle figure enumerates rot 0/1/2 once each, withholds |AB|
+(the seat at B joins the pool), keeps AC/BC, and prints |AB| = 18.03 once «זווית ACB = 90» pins the seat ·
+the two-tangents figure with |AO| pinned withholds ∠BAD (identity + the mirror branch) and prints it once
+«B ו-D באותו צד של AO» states the side · a budget-cut set is not determined and withholds even the stated
+8s · over the cap ⇒ `null` · a bare square keeps its right angles (three identical seeds) · an
+under-determined figure takes the 16-seed path and is not "determined" · the memo carries the flag. The
+corpus snapshots `determined-prints-{1..4}.snapshot.json` (`determined-prints-{1..4}.test.ts`, cost-balanced
+shards over `determined-prints-shared.ts`) lock BOTH directions — every determined figure's printed rows, so a
+withdrawn print returning or a kept one vanishing fails. `definite-values.test.ts`: the 3-4-5 hover cases pin
+the seat (they asserted a drawing), and the unpinned form is asserted withheld.
+
+**Deviations from the plan, recorded.** (i) The plan's "prints ∠BAD once a side of the branch is stated"
+needed |AO| pinned first — measured, |AO| is a free length the count misses on that figure, so ∠BAD is not
+knowledge on ANY axis as the scenario stands (the lock states «AO=2R»). (ii) Failing closed is "not
+determined" (the ≥ 4 floor), not an empty pool: relations are still read off the samples in hand, which is
+exactly how an under-determined figure is treated. (iii) A second defect surfaced on the same figure and is
+FILED, not fixed: a free radius that a `length-radius` directive consumes is sampled by nothing, so the
+panel still prints the drawing's radius (#1002 — the CLAUDE.md conformance smell, verbatim).
+## ADR-510 — THE SUBMIT COMMIT IS THE FACTS ALONE: the seed auto-advance leaves the UI thread ("accept the flash") (#364)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #364 (debt, P3 — the operator's 2026-09-11 ruling *"364 - accept"*) · round #1001 · debt route (landed on `main`) · completes [ADR-401](#adr-401)'s ratchet (the last recorded main-thread sweep goes to 0); the transaction shape of [ADR-098](#adr-098)/[ADR-484](#adr-484) changes as ruled
+**Requirements:** none (internal — no requirements line promises a freeze-free submit; the student-visible change is one frame, recorded here) · **Design:** [04](04-design.md) — "The submit transaction: facts commit, the seed resolves after"
+
+**What the student saw.** A submit that left the figure violating an extension order, a segment-meet, point
+distinctness, or a seed that does not build at all (ADR-098/166/378/484) FROZE the tab for up to 2.5 s
+(`SEARCH_BUDGET_MS`): `commitCommands` and `replaceGroup` ran `firstSatisfyingSeed` synchronously inside the
+commit so that facts and the found seed landed in ONE undo entry and the violating configuration was never
+painted. Measured on the #157 figure at 0–4192 ms per candidate seed, so whenever seed 0 was invalid the
+whole budget went on roughly one candidate. ADR-401 moved every other sweep off-thread and recorded this
+one in `main-thread-sweeps.test.ts` as the operator's call: freeze, or a visible flash.
+
+**Decision — the operator chose the flash.**
+
+1. **The store-side search is deleted** (both sites). `commitCommands` commits the facts at the student's
+   CURRENT seed; `replaceGroup` commits at seed 0 (ADR-484's structural-edit reset, unchanged) — nothing
+   else. The ratchet baseline for `firstSatisfyingSeed` on `geoStore.ts` drops 2 → 0 — a deliberate flip.
+2. **The post-commit `autoResolve` owns it** (ADR-106/290/446 — `resolveAfterCommit` → `runViewResolve` →
+   the worker). Its trigger, `meetsRequirements`, is a SUPERSET of the deleted one (`extensionsClear` ∧
+   `intersectionsWithinSegments` ∧ `pointsDistinct`, plus statuses, violations and convexity — a seed that
+   does not build fails it, which is the ADR-484 licence), and `findValidConfig`'s first tier IS
+   `firstSatisfyingSeed`. No capability is lost; the violating configuration may paint for one frame before
+   the worker's answer lands via `applyView`.
+3. **The sweep starts from the student's CURRENT seed**, not 0 — in the worker, the no-Worker fallback and
+   the store's own `autoResolve` action alike (`findValidConfig(facts, seed)`). The figure the student is
+   looking at is preferred over any other valid one (the M2 stability property); a parameter, not a
+   mechanism. The ✎ path resets to 0 first, so its sweep starts at 0 as before.
+4. **The transaction shape, asserted.** The resolve applies its view under a PAUSED history (the App's
+   `resolveAfterCommit`, unchanged), so it merges into the commit's own entry: one undo removes the fact AND
+   restores the seed it was appended at — the body's own concern, now a lock.
+
+**Locks** (`issue-364-accept-the-flash.test.ts`, 6, on #938's measured figure — `SEQ` refuses at seed 4): the
+commit lands at the broken seed (the flash); the resolve lands the first valid seed at-or-after it (every
+skipped seed asserted invalid); the history length is unchanged by the resolve and one undo removes the
+fact and restores the seed; a clean append pays nothing; the store's `autoResolve` gives `findValidConfig`'s
+answer from the current seed; the ✎ path resets to 0, searches nothing synchronously, and resolves the
+same way. `main-thread-sweeps.test.ts`: baseline 0. `issue-938-structural-edit-seed.test.ts`: the
+"appending at a broken seed searches" lock now drives the resolve explicitly — the guard it locked lives
+in `meetsRequirements`.
+
+**Measured, so the plan's other named case is not a lock.** The #157 trapezoid-midsegment figure builds
+clean at seed 0 on all eight steps (`meetsRequirements` true after each; the last step 3.0 s of fold, no
+search); the body's "0–4192 ms per candidate seed" was the cost of a search that this figure no longer
+triggers. Nothing freezes there before or after.
+## ADR-511 — A CONSTRUCTION DECLARES ITS FREE OPERAND'S REGION, AND THE SAMPLER KEEPS IT THERE (#556)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #556 (bug, P3 — the 2026-08-26 re-measured plan; the honesty half had already closed under ADR-445/481) · round #1001 · bug route (landed on `main`) · extends [ADR-254](#adr-254) (the circle-side family) to the sampler; the placement lens of [ADR-052](#adr-052)
+**Requirements:** none (internal — no promise changes; a figure that builds at one seed now builds at the seeds «הציגו תצורה אחרת» reaches, which FR-RD-2 already assumes) · **Design:** [04](04-design.md) — "A free point's admissible region rides on the point"
+
+**What the student saw (measured at HEAD).** «שני מעגלים משיקים מבחוץ» · «A על מעגל O1» · «מנקודה B יוצאים
+שני משיקים למעגל O2 בנקודות D ו C»: seed 0 builds, so nothing was visibly wrong — but 9 of the first 24
+seeds fail `meetsRequirements`, 7 of them because the sampler jittered the FREE from-point B into circle
+O2 and the Thales construction had no touch («cannot construct D: circles circle-O2 and tanaux-O2B do not
+meet»). A third of the configuration space was wasted work, and a figure with no good seed at 0 would
+have had nothing to fall back on. Siblings, same measurement: a single tangent from a new apex lost seed
+12; a student's own «M מחוץ למעגל» lost seed 17.
+
+**Root cause (docs/17 §1 — the class, not the rule).** *A free point whose consuming construction forces
+it into a region was placed and sampled as if unconstrained, and the region was only ever judged AFTER the
+fact.* Two halves. (1) The tangent rules seated their apex as a bare `free-point` at a fixed spot — the
+statement's own implication («from a point OUTSIDE the circle») never reached the engine — while the
+secant rule had long declared its apex through the ADR-254 side record (`point-circle-side outside`): one
+family, two conventions. (2) Even a DECLARED side (a student's «M מחוץ למעגל») reached only the default
+(`seedSpot`) and the verifier / `meetsRequirements`; `applySeed` jittered every free point blindly (a spin
+about the free cluster's centroid plus a 0.22·span jitter) and the requirement discarded the seed
+afterwards. The fix is at the placement seam, as the plan asked, and it is one seam for the whole family.
+
+**Decision.**
+
+1. **The side record is the declaration.** The two tangent rules (`tangentsFromExternal`,
+   `tangentFromExternal`, `parser/parse.ts`) emit `point-circle-side outside` for a NEW apex right after
+   their own `free-point` — the secant rule's exact shape. The rule's default placement stands (the apply
+   case re-seats an existing free point only when it is on the WRONG side), so every seed-0 drawing is
+   byte-identical to before; only sampling changes.
+2. **The region rides on the point.** `FreePoint.region?: { circle, side }[]` (`engine/types.ts`),
+   recorded by the `point-circle-side` apply case — the ONE chokepoint of the family — on creation and on
+   an existing non-pinned free point alike (one entry per circle, the latest side winning). A pinned point
+   is the student's own placement and is never moved or annotated.
+3. **The sampler asks.** `applySeed` (`engine/sample.ts`), after its jitter: for each region-bound free
+   point, judge the side on the SAMPLED figure's own circle — one `evaluate` of the sampled construction;
+   when that cannot build (the very seeds at issue — no tangent from inside), the PREFIX up to the point
+   with the constraints it can satisfy (the circle's own tangency solve included), so the centre and radius
+   are the ones the figure will have — and re-seat a wrong-side sample radially with the point's own rng:
+   outside → [1.15, 1.8]·r (the textbook apex, close to the circle — a far apex enlarges the span and
+   trips the span-relative distinctness floor elsewhere, measured), inside → [0.25, 0.7]·r. Deterministic:
+   a seed stays a seed; seed 0 never samples.
+4. **Nothing else changes.** No constraint, no drive, no DOF: the apex stays a free 2-DOF point a later
+   given can flex; `freeDofs`/`rawMovableDof` are untouched; the verifier still reports a contradicted
+   side (a pinned or derived point on the wrong side).
+
+**Measured, before → after (seeds 0–23 failing `meetsRequirements`).** The reported figure 9 → 2, and the
+two that remain are the pre-existing A-on-the-touch-point collision (seeds 9 and 14: A, free on O1, sampled
+onto M — a different class, `pointsDistinct` rightly rejects it; noted, not built here). The apex is
+outside O2 and the figure BUILDS at all 24 seeds (was 17). Single tangent 1 → 0 · «M מחוץ למעגל» 1 → 0 ·
+«M בתוך המעגל» 0 → 0 · the secant apex 0 → 0. With «ישר ADB» added, D is a true tangency point at every
+seed that meets the bar (|O2D| = |O2C|, O2D ⟂ DB) — the rider claim of the original report does not
+reproduce and is now asserted; one seed (5) that HEAD DREW with the apex 0.8 % outside and the two touch
+points 0.9 apart is now rejected by the side requirement the apex carries, and «הציגו תצורה אחרת» moves
+on — the degenerate near-touch was never a two-tangents figure.
+
+**Locks.** `issue-556-apex-region.test.ts` (11): the reported figure builds at every seed with B outside;
+any remaining failure is distinctness on a pair not involving B, at most two seeds; the ADB rider claim
+asserted over ≥5 seeds; seed 0 untouched and the region recorded; the four class members at zero failing
+seeds; two circles → two region entries; the sampler keeps every sample past 1.05·r; a contradicted side
+refuses or flags. Fixture `issue-556-two-tangents-free-apex.geo.json` (standing rule 4). Fixture
+`2022-summer-a-issue59` re-saved: its tangent step now lowers with the side record (the deliberate
+lowering change; the figure is unchanged).
+
+**Deviations from the plan, recorded.** The plan's lock "succeeds at EVERY seed 0–23" was a hypothesis:
+two seeds fail for a reason that is not this issue's (A sampled onto the circles' touch point) and were
+failing at HEAD; the lock says so instead of pretending. The first cut replaced the rules' fixed default
+by the family's `seedSpot` — measured, that moved the whole figure's basin (the «ישר ADB» variant lost
+seeds 4, 5, 7 and two more seeds tripped the distinctness floor), so the default was kept and only the
+declaration added. The 3-D sibling audit the plan does not ask for was not run.
+## ADR-512 — A STATEMENT THAT MAKES A POINT THE MEETING OF TWO CARRIERS MOVES THE LOOSE CARRIER — routed by the semantic fact, not the call site (#260)
+
+**Status:** accepted, 2026-09-13 · **Issue:** #260 (bug, P3 — the 2026-08-25 plan) · round #1001 · bug route (landed on `main`) · generalises [ADR-255](#adr-255) (the loose-endpoint re-seat) and completes the crossing-statement family of [ADR-383](#adr-383); the mechanism-exists-wired-at-one-site shape of [ADR-167](#adr-167)
+**Requirements:** none (internal — `AB` · `P על AB` · `CD` · `P על CD` is a satisfiable statement the tool already promised to draw; it refused it) · **Design:** [04](04-design.md) — "The meeting re-seat is routed by a predicate"
+
+**What the student saw.** `AB` · `P על AB` · `CD` · `P על CD` → «cannot place P on segment AB so that P, C, D
+collinear». The statement is how a student names the crossing of two segments, and it is trivially
+satisfiable: P's slide along AB is a free DOF and C, D are free 2-DOF points nothing references.
+
+**Root cause (docs/17 §1 — the class).** *A statement naming an existing point as the meeting of two
+carriers was rooted against the carriers' DEFAULT placement instead of moving the carrier that is
+genuinely loose.* Measured at HEAD: (a) the second membership lowers (`reinterpretAsCollinear`, step.ts)
+to a `set-collinear` P,C,D and a driven collinear on P's slide; line CD met line AB at C itself, beyond B
+(t = 1.8), so the root was clamped off the segment and the drive concluded over-constrained; (b) the
+failure-path recruiter never reached C, D. The mechanism that fixes exactly this — `reseatLooseMeetEndpoint`
+(ADR-255): move a non-pinned, unconstrained endpoint so the crossing lands inside both segments — existed,
+wired at two call sites by COMMAND KIND (`line-line-intersection` with `onSeg`, `segments-cross`); the
+rider edition never reached it. Two smaller obstacles inside the mechanism were measured on the way: it
+considered only the endpoints of the segment the crossing was OFF (here A, B — the student's first
+segment — never C, D), and its general-position test counted the carriers' own riders as anchors, and a
+free rider defaults to its host's MIDPOINT, which is exactly where the aim-through-midpoint line passes.
+
+**Decision.**
+
+1. **One routing predicate.** `meetingCarriers(objects, cmd)` (`engine/apply.ts`) answers the semantic
+   question — does this statement assert that a point is the meeting of two carriers? — for every member:
+   a named segment-meet (`onSeg`), the point-free crossing statement, and a rider named onto a SECOND host
+   (a `set-collinear` whose one rider's host differs from the other two points). `applyCommand` asks it
+   ONCE, before its switch, and re-seats; the two in-case calls are gone (tripwire 2: a third
+   provenance-gated call was the obvious wrong move). `reinterpretAsCollinear` now passes the positions
+   through, so the re-seat can judge where the crossing lies.
+2. **Either carrier may move.** Every endpoint is a candidate once the crossing is off either segment,
+   fewest dependents first — on a tie the off-segment's own endpoints keep precedence, so every figure the
+   two older sites re-seated is re-seated as before. On the reported figure C (one dependent) moves; A and
+   B (a segment and a rider) never do — the stability invariant, M2.
+3. **The carriers' riders are not anchors.** `degeneratePlacement` ignores on-segment riders of either
+   carrier: their positions follow the endpoints, and the meeting rider is the very point the statement
+   re-solves.
+4. **The honest refusal stays.** Four pinned endpoints (stated coordinates) with the lines meeting beyond a
+   segment still refuse, naming P's statement; with only C, D pinned the free segment AB is re-aimed (never
+   a given).
+
+**Sibling audit (docs/17 §1).** `src3d/engine` has no loose-host re-seat of this shape — its apply.ts cites
+the ADR-255 pattern once (an apex seated into a plane) and its containment path notes it "can never bring
+a loose endpoint into the plane" (apply.ts:1740). Nothing to file: the 3-D crossing-statement family
+(#755/#756) owns its cells by rule rather than by re-seat, and no 3-D report of this class exists.
+
+**Locks** (`issue-260-meeting-reseat.test.ts`, 8): the exact sequence builds with P on both segments and A,
+B unmoved; four entry-order permutations (docs/17 §6); mirrored slots and English; four pinned endpoints
+refuse naming P; C, D pinned alone → AB re-aimed, C, D untouched; the predicate's three members and three
+non-members. The `membership-conversion.test.ts` fence flipped to CLEAN as its own comment promised.
+Fixture `issue-260-two-host-membership.geo.json` (standing rule 4).
+
+**Deviations from the plan, recorded.** The plan's "lift the trigger" was necessary but not sufficient —
+two measured obstacles inside the re-seat (candidate set, rider anchors) had to go too, or the routed call
+moved the student's FIRST segment. The plan's "keep the honest refusal for the genuinely-pinned case" holds
+only when every endpoint is pinned; with one segment free the tool draws the figure, which is the
+statement's meaning.
 ## ADR-513 — A DECLARED POLYGON THE GIVENS FORCE FLAT IS SAID OUT LOUD, naming the statements — the 2-D half of ADR-W-048 (#945)
 
 **Status:** accepted, 2026-09-13 · **Issue:** #945 (feature, P3 — the 2026-09-13 plan) · round #1001 · feature route (PR) · **Adopts:** [ADR-W-048](06w-decisions-workspace.md#adr-w-048) (ruled 2026-09-08 for both products; the 3-D half is [ADR-3D-234](06b-decisions-3d.md#adr-3d-234)); the channel shape of [ADR-123](#adr-123) (coincidences) and the prefix rule of [ADR-492](#adr-492); layered above the accept gate of [ADR-413](#adr-413)

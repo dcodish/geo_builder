@@ -548,6 +548,88 @@ pure derivation, one table, one text builder, two render sites:
   always a bare next line (#997): a parenthesised Latin run inside a Hebrew sentence reorders in the box while
   it is typed.
 
+## The knowledge pool of a DETERMINED figure is its admissible set (#434, [ADR-509](06-decisions.md#adr-509))
+
+The relations layer's definite values, the values panel and the forced crossing dots all read ONE shared
+sample pool (`samplingJobs` / `sharedSamples`, `replay/core.ts` — the M3 "one sampler" law). Their
+knowledge gates ask "is this the same in every configuration?", and the pool is what "every" means.
+
+- **Under-determined figure (count > 0):** unchanged — every shape-variant config × 16 seeds, filtered by
+  the validity ladder; the gates need ≥ 4 valid samples before a NUMBER prints (ADR-295/#88).
+- **Determined figure (`freeDofCount === 0`, one variant):** the pool was ONE sample, on the theory that one
+  configuration is every configuration. Two things break that theory. A count is arithmetic and can lie
+  (the ADR-424 class — a redundancy pattern pushes it to 0 while the figure still moves with the seed:
+  «AB=BC=8» read 0 and printed ∠ABC = 31°, one seed's accident). And a seed can never reach a BRANCH or a
+  right-angle SEAT — the quarter-circle figure is rigid at each seat, yet the seat at B (admissible, one
+  «הציגו תצורה אחרת» press away) gives |AB| = 11.18 against the printed 18.03. So the pool is now the
+  **admissible set**: seeds {s, s+1, s+2} of the current facts (through the same filter ladder), × every
+  discrete rewrite «הציגו תצורה אחרת» applies — every cyclable branch point's branches crossed with the seat
+  (`admissibleRewrites`) — kept only where `meetsRequirements` holds (the button's own bar). Reflection masks
+  are subsumed by the seed axis (measured on the corpus); the `inscribe` variant stays out (ADR-262).
+- **Bounded, failing CLOSED.** The cross product is capped (`ADMISSIBLE_REWRITE_CAP`); over the cap, or when
+  the sample budget cuts the enumeration short, the pool is marked **not determined** and the gates fall
+  back to their ≥ 4 floor — values and dots withheld, relations still read off the samples in hand — exactly
+  as an under-determined figure is treated. A partial set never prints a number the missing configuration
+  refutes.
+- **The gates trust a MEASUREMENT, not the count.** The pool carries `determined` (count 0 AND the set
+  complete), passed to `detectRelationsAcross` (`opts.determined`), `computeValuesPanel` and
+  `forcedCrossingKeys`; each keeps the count as its fallback for a hand-built pool. Nothing else changes:
+  a value that disagrees across the admissible set is withheld by the "same in every sample" test that
+  already existed; a genuinely determined figure's samples are identical and it prints as before.
+- **Cost:** a few replays per determined figure at panel/relations time in the worker, memoized per fact
+  list, never in the submit path. A rewrite that is INFEASIBLE pays the recruiter ladder to conclude it
+  (the #259 class — 96 s deadline-free on the quarter-circle figure); in prod the 5 s sample budget cuts
+  that and the figure falls to the not-determined branch above.
+## The submit transaction: facts commit, the seed resolves after (#364, [ADR-510](06-decisions.md#adr-510))
+
+- **The commit** (`commitCommands` / `replaceGroup`, `store/geoStore.ts`) is the facts alone, in one zundo
+  entry, at the student's CURRENT seed (an ✎ edit resets to 0 first — ADR-484). No synchronous seed search
+  runs inside it any more; `main-thread-sweeps.test.ts` records `firstSatisfyingSeed` at 0 on the store.
+- **The resolve** is the post-commit `resolveAfterCommit` (App) → `runViewResolve` (`app/resolveView.ts`) →
+  `geoWork.autoResolve` (the worker): `meetsRequirements` decides whether anything is wrong (statuses,
+  violations, extension orders, segment-meets, distinctness, convexity — a superset of the old trigger), and
+  `findValidConfig(facts, seed)` sweeps FROM THE CURRENT SEED (its first tier is `firstSatisfyingSeed`), so
+  the view the student holds is preferred over any other valid one (M2). The found view is applied under a
+  paused history, merging into the commit's entry — one undo removes the fact and restores the seed.
+- **What the student sees:** the violating configuration may paint for ONE frame before the worker's answer
+  lands (the flash the operator accepted, 2026-09-11) instead of a tab frozen for up to 2.5 s. While the
+  search runs, the keep-prior slot (#573) holds the last good view where it exists.
+## A free point's admissible region rides on the point (#556, [ADR-511](06-decisions.md#adr-511))
+
+- **Declaration.** A construction whose success needs a free operand on one side of a circle — the apex
+  of a tangent or a secant, a student's own «M מחוץ למעגל» / «M בתוך המעגל» — says so through the ADR-254
+  side record (`point-circle-side`), emitted right after the operand's own placement. The rule keeps its
+  default; the record is the statement's implication made explicit (ADR-052).
+- **Record.** The `point-circle-side` apply case (`engine/apply.ts`) is the family's ONE chokepoint: it
+  seeds a new free point on the stated side, re-seats an existing non-pinned one only when it is on the
+  wrong side, and in both cases writes the region onto the point — `FreePoint.region: { circle, side }[]`,
+  one entry per circle. A pinned point (the student's explicit placement) is never moved or annotated.
+- **Sampling.** `applySeed` (`engine/sample.ts`) judges each region-bound point on the SAMPLED figure's own
+  circle — one evaluate of the sampled construction, or of the prefix up to the point with the constraints
+  it can satisfy when the full figure cannot build — and re-seats a wrong-side sample radially with the
+  point's own rng (outside → [1.15, 1.8]·r, inside → [0.25, 0.7]·r). Deterministic per seed; seed 0 never
+  samples, so the drawing the student first sees is unchanged.
+- **Judgement stays where it was.** The verifier reports a contradicted side; `meetsRequirements` gates
+  «הציגו תצורה אחרת» on it. The sampler now proposes configurations that pass that bar instead of ones the
+  bar discards (the two-tangents figure lost 7 of 24 seeds that way).
+## The meeting re-seat is routed by a predicate (#260, [ADR-512](06-decisions.md#adr-512))
+
+- **The question, asked once.** `meetingCarriers(objects, cmd)` (`engine/apply.ts`) decides whether a
+  command asserts that a point is the MEETING of two carriers — a named segment-meet (`onSeg`), the
+  point-free crossing statement (`segments-cross`), a rider named onto a second host (a `set-collinear`
+  whose one on-segment rider's host differs from the other two points). `applyCommand` asks it before its
+  switch and calls `reseatLooseMeetEndpoint` (ADR-255) with the two carriers; no case calls the re-seat by
+  itself. A new member of the family is a row in the predicate, never a fourth call site.
+- **Which endpoint moves.** Every endpoint of both carriers is a candidate once the crossing lies off either
+  segment: fewest dependents first (the point the figure leans on least), the off-segment's own endpoints
+  first on a tie (so the older sites behave as before). Only a non-pinned free point that no constraint
+  references and no directive drives is ever moved; the aim is the ray from its mate through the other
+  carrier's midpoint, kept in general position and on the same side of every circle (ADR-253/254).
+- **Anchors.** The general-position test ignores the carriers' own on-segment riders — they follow the
+  endpoints, and the meeting rider is what the statement re-solves (a free rider sits at its host's
+  midpoint by default, exactly on the aim line).
+- **Positions ride along.** `reinterpretAsCollinear` (step.ts) passes the previous positions into
+  `applyCommand`, so the second-membership path sees where the crossing lies.
 ## A declared polygon the givens force FLAT is said out loud (#945, [ADR-513](06-decisions.md#adr-513))
 
 - **The channel.** `Derived.degeneracies` (`replay/core.ts`) sits beside `coincidences` and `forcedOffArc`:

@@ -7502,7 +7502,10 @@ const tangentsFromExternal: Rule = (s, ctx) => {
   // tangent sketch) rather than far out: a far apex puts directional follow-ups like "המשך BD חותך את
   // המשך OC" in the wrong basin (the extensions then cross on the far side), and a close apex also gives
   // wider, more textbook-like tangents. The touch points stay free DOFs the solver/sampler can still move.
-  if (!ctx.points?.includes(E)) out.push({ type: 'free-point', id: E, x: 6, y: 0, free: true }); // a FREE DOF (ADR-052)
+  // #556 (ADR-511): the apex is then DECLARED outside the circle — the statement forces it — through the
+  // ADR-254 side record (the secant rule's own seam): the default above stands (it is outside), and the
+  // SAMPLER keeps every sampled configuration outside too; it stays a free DOF (ADR-052).
+  if (!ctx.points?.includes(E)) out.push({ type: 'free-point', id: E, x: 6, y: 0, free: true }, { type: 'point-circle-side', id: E, circle: circ, side: 'outside' });
 
   // If EITHER touch point ALREADY EXISTS (e.g. A is a diameter endpoint already on the circle), the Thales
   // circle∩circle construction can't be used — it would RE-CREATE that point ("'A' is already defined",
@@ -7592,7 +7595,10 @@ const tangentFromExternal: Rule = (s, ctx) => {
   // midpoint + aux circle re-emit idempotently (same ids); branch 1 = the other circle∩aux intersection.
   const branch = (ctx.tangentAuxes ?? []).includes(aux) ? 1 : 0;
   const out: AnyCommand[] = [...resolved.prepend];
-  if (placeApex) out.push({ type: 'free-point', id: apex, x: 12, y: 0, free: true }); // the external apex, if new — a FREE DOF (ADR-052): its distance from O is unstated, so a later given (∠ADB = α, |AG| = …) can flex it
+  // The external apex, if new — a FREE DOF (ADR-052): its distance from O is unstated, so a later given
+  // (∠ADB = α, |AG| = …) can flex it. #556 (ADR-511): then DECLARED outside the circle through the ADR-254 side
+  // record (the secant rule's own seam) — the default stands, and the SAMPLER keeps every sample outside.
+  if (placeApex) out.push({ type: 'free-point', id: apex, x: 12, y: 0, free: true }, { type: 'point-circle-side', id: apex, circle: circ, side: 'outside' });
   out.push(
     { type: 'midpoint', id: mid, a: centrePt(ctx, center), b: apex }, // centre of the Thales circle on O-apex
     { type: 'circle-through', id: aux, center: mid, through: centrePt(ctx, center), hidden: true },

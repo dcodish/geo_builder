@@ -71,7 +71,10 @@ describe('parse — point vs circle side (He/En, named/implicit, multi-subject)'
     const r = parse('מנקודה E מחוץ למעגל O שני משיקים נוגעים במעגל בנקודות A ו-B', ctx);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(sideCmds(r.commands)).toEqual([]); // the tangents rule owns it, not the side rule
+    // The tangents rule owns it, not the side rule: the Thales construction is present, and the ONLY side
+    // record is the rule's own apex declaration (#556 / ADR-511 — the apex is declared outside the circle).
+    expect(r.commands.some((c) => c.type === 'circle-circle-intersection'), 'the tangent construction').toBe(true);
+    expect(sideCmds(r.commands)).toEqual([{ type: 'point-circle-side', id: 'E', circle: 'circle-O', side: 'outside' }]);
   });
 });
 

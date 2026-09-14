@@ -20,6 +20,7 @@ import type { Constraint, Construction, FreePoint, GeoObject, Id, OnCirclePoint,
 import { isGeoPoint, isOrderConstraint } from './types';
 import { carrierOf, isShapeCarrier } from './carriers';
 import { constraintRefs } from './solve';
+import { evaluate } from './evaluate';
 
 /**
  * An ORDER/REGION constraint ('angle-order' / 'length-order' / 'collinear-order' / 'angle-acuteness')
@@ -372,6 +373,44 @@ export function applySeed(c: Construction, seed: number): Construction {
     }
     return o;
   });
+  // #556 ([ADR-511](docs/06-decisions.md#adr-511)): a free point whose consuming construction declared an
+  // admissible REGION (`region` — a side of a circle: an external tangent/secant apex, a stated «M מחוץ
+  // למעגל») is kept INSIDE that region by the sampler itself, instead of being jittered blindly and having
+  // `meetsRequirements` discard the seed afterwards (the two-tangents figure lost 9 of 24 seeds that way —
+  // the from-point landed in the target circle and the Thales construction had no touch). The region is
+  // judged on the SAMPLED figure's own circles (one evaluate — the centre may itself be sampled or solved),
+  // and the correction is a deterministic radial re-seat with the point's own rng, so a seed stays a seed.
+  const regioned = objects.filter((o): o is FreePoint => o.kind === 'free-point' && !o.pinned && !!o.region?.length);
+  if (regioned.length) {
+    const full = evaluate({ ...c, objects });
+    for (const fp of regioned) {
+        // A seed that puts the point on the WRONG side is often exactly the seed on which the consuming
+        // construction cannot build at all (no tangent from inside the circle) — so when the full figure
+        // fails, judge the region on the PREFIX up to this point (its circle is defined before it), with
+        // constraints skipped: the circle's sampled centre and radius are what the re-seat needs.
+        const at = objects.findIndex((o) => o.id === fp.id);
+        const prefix = [...objects.slice(0, at), fp];
+        const inPrefix = new Set(prefix.map((o) => o.id));
+        const e = full.ok ? full : evaluate({ ...c, objects: prefix, constraints: c.constraints.filter((k) => constraintRefs(k).every((id) => inPrefix.has(id))) });
+        if (!e.ok) continue;
+        let p = e.positions.get(fp.id);
+        if (!p) continue;
+        const jr = mulberry32((seed ^ hashId(fp.id) ^ 0x5bd1e995) >>> 0);
+        let moved = false;
+        for (const r of fp.region!) {
+          const circ = e.circles.get(r.circle);
+          if (!circ || !(circ.r > 0)) continue;
+          const d = Math.hypot(p.x - circ.center.x, p.y - circ.center.y);
+          const wrong = r.side === 'outside' ? d <= circ.r * REGION_MARGIN_OUT : d >= circ.r * REGION_MARGIN_IN;
+          if (!wrong) continue;
+          const th: number = d > 1e-9 ? Math.atan2(p.y - circ.center.y, p.x - circ.center.x) : jr() * 2 * Math.PI;
+          const k = r.side === 'outside' ? 1.15 + jr() * 0.65 : 0.25 + jr() * 0.45; // outside: [1.15, 1.8]·r (the textbook apex, close to the circle) · inside: [0.25, 0.7]·r
+          p = { x: circ.center.x + circ.r * k * Math.cos(th), y: circ.center.y + circ.r * k * Math.sin(th) };
+          moved = true;
+        }
+        if (moved) objects[at] = { ...fp, x: p.x, y: p.y };
+    }
+  }
   return { ...c, objects: clampToPlacementPreconditions(c, objects) };
 }
 
@@ -411,6 +450,9 @@ export function freeDofs(c: Construction): Id[] {
  * deliberately searches mask>0 seeds. (The reflection itself — mirroring the apex's solver-seed across its
  * anchor line, which needs the evaluated anchor positions — lives in the store's `applyReflections`.)
  */
+/** #556: the sampler's region bars — an 'outside' sample must clear 1.05·r, an 'inside' one stay under 0.95·r. */
+const REGION_MARGIN_OUT = 1.05;
+const REGION_MARGIN_IN = 0.95;
 export const REFLECT_MAX = 4; // cap reflectable points at 4 → mask ∈ [0, 15], bounded combinatorics
 export const REFLECT_STRIDE = 1 << 20; // continuous base seed occupies [0, 2^20); mask = seed >> 20
 export const reflectMaskOf = (seed: number): number => Math.floor(seed / REFLECT_STRIDE);

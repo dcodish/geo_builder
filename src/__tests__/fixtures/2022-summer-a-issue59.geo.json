@@ -4,7 +4,6 @@
   "locale": "he",
   "savedAt": "2026-07-11T06:01:29.298Z",
   "seed": 0,
-  "radiusOverrides": {},
   "facts": [
     {
       "id": "_xWfFzciRf0TurJHE0Tdk",
@@ -48,6 +47,18 @@
       "utterance": "מנקודה A הוציאו משיק למעגל בנקודה B",
       "group": "_ohUT2Ps8iGKmYbtUtiQx",
       "cmd": {
+        "type": "point-circle-side",
+        "id": "A",
+        "circle": "circle-O",
+        "side": "outside"
+      },
+      "enabled": true
+    },
+    {
+      "id": "zIX8DD0iiqDjwwmhfDs_t",
+      "utterance": "מנקודה A הוציאו משיק למעגל בנקודה B",
+      "group": "_ohUT2Ps8iGKmYbtUtiQx",
+      "cmd": {
         "type": "midpoint",
         "id": "~tanmid-OA",
         "a": "O",
@@ -56,7 +67,7 @@
       "enabled": true
     },
     {
-      "id": "zIX8DD0iiqDjwwmhfDs_t",
+      "id": "z5E1DkH-ac1DJfvEHzj_X",
       "utterance": "מנקודה A הוציאו משיק למעגל בנקודה B",
       "group": "_ohUT2Ps8iGKmYbtUtiQx",
       "cmd": {
@@ -69,7 +80,7 @@
       "enabled": true
     },
     {
-      "id": "z5E1DkH-ac1DJfvEHzj_X",
+      "id": "6dxGfi35rPuhK1mj3guyk",
       "utterance": "מנקודה A הוציאו משיק למעגל בנקודה B",
       "group": "_ohUT2Ps8iGKmYbtUtiQx",
       "cmd": {
@@ -82,7 +93,7 @@
       "enabled": true
     },
     {
-      "id": "6dxGfi35rPuhK1mj3guyk",
+      "id": "lEpNeyOntCpWhi3OaJDBo",
       "utterance": "מנקודה A הוציאו משיק למעגל בנקודה B",
       "group": "_ohUT2Ps8iGKmYbtUtiQx",
       "cmd": {
@@ -279,5 +290,6 @@
     "hiddenCircles": [],
     "showMeasures": true,
     "showCenters": false
-  }
+  },
+  "radiusOverrides": {}
 }

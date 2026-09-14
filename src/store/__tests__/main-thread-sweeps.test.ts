@@ -27,10 +27,9 @@ const MAIN_THREAD = ['src/App.tsx', 'src/store/geoStore.ts', 'src/app/submitPipe
 /**
  * The recorded call sites. THIS TABLE MAY ONLY SHRINK.
  *
- * `geoStore.firstSatisfyingSeed` ×2 — the submit/edit seed auto-advance in `commitCommands` and
- * `replaceGroup`. Still synchronous, still budget-capped at `SEARCH_BUDGET_MS` (2.5 s): moving it
- * off-thread splits the one-transaction commit (facts now, seed later) and makes the pre-search
- * configuration briefly visible, which is a UX call for the operator — filed, not smuggled in here.
+ * `geoStore.firstSatisfyingSeed` — was ×2 (the submit/edit seed auto-advance in `commitCommands` and
+ * `replaceGroup`, synchronous under `SEARCH_BUDGET_MS`). Ratcheted to 0 by #364 (ADR-510) on the
+ * operator's ruling "accept the flash": the post-commit `autoResolve` owns that search off-thread.
  *
  * `geoStore.{searchAnotherView,findValidConfig,meetsRequirements}` — the store's own `resample`/
  * `autoResolve` actions. The App does not call them (it uses `geoWork` + `applyView`); they remain as
@@ -38,7 +37,7 @@ const MAIN_THREAD = ['src/App.tsx', 'src/store/geoStore.ts', 'src/app/submitPipe
  */
 const BASELINE: Record<string, Record<string, number>> = {
   'src/App.tsx': {},
-  'src/store/geoStore.ts': { firstSatisfyingSeed: 2, findValidConfig: 1, searchAnotherView: 1 },
+  'src/store/geoStore.ts': { findValidConfig: 1, searchAnotherView: 1 },
   'src/app/submitPipeline.ts': {},
   'src/render/scene.ts': {},
   'src/render/Figure.tsx': {},

@@ -268,6 +268,11 @@ export interface DetectOptions {
   lengthTol?: number;
   /** Absolute tolerance (radians) for two angles to count as equal in a sample (default ~0.1°). */
   angleTol?: number;
+  /** #434 ([ADR-509](docs/06-decisions.md#adr-509)): whether `positions` is the COMPLETE admissible set of a
+   *  determined figure — measured by the shared sample core, which enumerates it. When given it replaces the
+   *  `freeDofCount === 0` shortcut in the definite-value gate: the count is arithmetic and can lie (ADR-424),
+   *  the enumerated set cannot. Absent (the direct engine path), the count is still consulted. */
+  determined?: boolean;
 }
 
 const EPS = 1e-9;
@@ -551,7 +556,7 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
   //    themselves is vacuous, so a configuration-dependent value would print as if fixed. A DETERMINED figure
   //    (0 shape DOF) is seed-invariant, so its lone configuration IS the figure and prints regardless.
   const definiteAngles: DefiniteAngle[] = [];
-  const trustDefinite = freeDofCount(c0) === 0 || samples.length >= MIN_DEFINITE_POOL;
+  const trustDefinite = (opts.determined ?? freeDofCount(c0) === 0) || samples.length >= MIN_DEFINITE_POOL;
   for (let i = 0; trustDefinite && i < angles.length; i++) {
     if (!angUsable[i]) continue;
     const vals = angVal[i];

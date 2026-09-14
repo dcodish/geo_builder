@@ -1166,6 +1166,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     "en": [
       "circle",
       "free-point",
+      "point-circle-side",
       "midpoint",
       "circle-through",
       "circle-circle-intersection",
@@ -1174,6 +1175,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     "he": [
       "circle",
       "free-point",
+      "point-circle-side",
       "midpoint",
       "circle-through",
       "circle-circle-intersection",
@@ -1184,6 +1186,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     "en": [
       "circle",
       "free-point",
+      "point-circle-side",
       "midpoint",
       "circle-through",
       "circle-circle-intersection",
@@ -1194,6 +1197,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     "he": [
       "circle",
       "free-point",
+      "point-circle-side",
       "midpoint",
       "circle-through",
       "circle-circle-intersection",

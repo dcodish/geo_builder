@@ -122,7 +122,7 @@ function call(
       if (op === 'resample') return Promise.resolve({ op, found: searchAnotherView(facts, seed, onProgress) });
       if (op === 'autoResolve') {
         if (meetsRequirements(facts, seed)) return Promise.resolve({ op, ok: true } as AutoResolveDone);
-        const found = findValidConfig(facts, 0);
+        const found = findValidConfig(facts, seed); // #364 (ADR-510): from the current seed
         return Promise.resolve({ op, found: found ? { ...found, fold: null } : null } as AutoResolveDone);
       }
       if (op === 'detect') return Promise.resolve({ op, result: detectAll(facts) });

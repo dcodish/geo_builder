@@ -228,6 +228,8 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
     // its placement can leave "המשך CB" with no crossing beyond B (E lands between C and B). The store's
     // execute now AUTO-ADVANCES the seed to the first configuration where BOTH extensions reach the far
     // side cleanly — the student sees a valid default, never the wrong-side figure (ADR-098).
+    // #364 (ADR-510): the advance is the POST-COMMIT resolve (`autoResolve`, what the App runs after every
+    // commit via the worker), no longer inside the commit itself — so the test drives it explicitly.
     const st = useGeoStore.getState();
     st.clear();
     const steps = [
@@ -241,6 +243,7 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       expect(r.ok, u).toBe(true);
       if (!r.ok) return;
       for (const cmd of r.commands) st.execute(cmd, u);
+      expect(useGeoStore.getState().autoResolve(), 'a valid configuration exists').toBe(true);
     }
     const fig = replay(useGeoStore.getState().facts, useGeoStore.getState().seed);
     expect(fig.violations, `givens not satisfied: ${JSON.stringify(fig.violations.map((v) => v.message))}`).toEqual([]);
