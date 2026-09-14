@@ -90,10 +90,15 @@ describe('#353 — 2-D already accepts lowercase labels (the convention nudge be
     });
   }
 
-  it('«זוית abc» fails for a DIFFERENT reason — a valueless bare angle is not a 2-D construct (#248)', () => {
-    // Both cases fail identically, which is the proof that case is not the issue.
-    expect(parse('זוית abc').ok).toBe(false);
-    expect(parse('זוית ABC').ok).toBe(false);
+  it('«זוית abc» behaves IDENTICALLY to «זוית ABC» — the #353 finding is about case, and case is not the issue', () => {
+    // The two cases behaving identically is the whole point of this row, and it still does. What changed
+    // is the shared outcome: #248 (ADR-516) made a valueless bare angle a MARKER, so both now build the
+    // same commands instead of both failing. Written as an equality so the finding cannot rot either way.
+    const lower = parse('זוית abc');
+    const upper = parse('זוית ABC');
+    expect(lower.ok).toBe(upper.ok);
+    expect(lower.ok).toBe(true);
+    expect(lower.ok && upper.ok && lower.commands).toEqual(upper.ok && upper.commands);
   });
 });
 

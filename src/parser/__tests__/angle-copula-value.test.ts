@@ -139,10 +139,24 @@ describe('#969 — what the widened value read must NOT claim', () => {
     }
   });
 
-  it('a bare angle reference and a lowercase label run stay unclaimed', () => {
+  it('a bare angle reference states NO VALUE — its last letter is never read as one', () => {
     // «זוית abc» must not read its last letter as a value: the label guard is a lookbehind on letters.
-    expect(parses('זווית ABC')).toBe(false);
-    expect(parses('זוית abc')).toBe(false);
+    //
+    // #248 (ADR-516) made the bare reference a MARKER, so these lines now parse. The invariant this test
+    // was written for is untouched and is what it asserts now, directly instead of by proxy: whatever
+    // claims the line, it must produce NO angle VALUE. Asserting «does not parse» only ever stood in for
+    // that while nothing claimed the bare form.
+    for (const u of ['זווית ABC', 'זוית abc']) {
+      const out = cmds(u);
+      expect(out.map((c) => c.type), u).not.toContain('set-angle');
+      expect(out.map((c) => c.type), u).not.toContain('measure-angle');
+      expect(out.some((c) => c.type === 'mark-angle'), `${u} is a valueless MARK`).toBe(true);
+    }
+    // «זוית a» stays unclaimed, and not for a case reason: a LONE Latin letter is exactly the shape of a
+    // symbolic value, so the reader cannot tell the vertex «a» from the symbol «a» without guessing. That
+    // ambiguity is unchanged by #248 — measured before and after — and an honest escalation is the right
+    // answer to it. The uppercase single-vertex form «זוית B» is unambiguous and DOES mark (see #248's own
+    // lock file); a lowercase RUN like «abc» is unambiguous too, and marks above.
     expect(parses('זוית a')).toBe(false);
   });
 

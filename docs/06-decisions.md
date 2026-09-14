@@ -11512,3 +11512,52 @@ coincidence — segments and circles were left to ADR-123's channel (stated). Th
 standalone lock became a co-located check in the e2e slices and the fixtures net (a standalone fold of the
 corpus costs ~10 min). The requirements line is FR-RN-13, not an FR-RD-7 twin: the 2-D document has no RD
 family, and its rendering promises live under RN.
+
+## ADR-516 — A BARE ANGLE REFERENCE IS A HIGHLIGHTABLE MARKER, not an escalation (#248)
+
+**Status:** accepted, 2026-09-14 · **Issue:** #248 (feature, P3 — operator-approved 2026-07-21, log-triage R5) · round #1006 · feature route (PR) · ports the 3-D #94 design (`defc513`) · third reader of the [ADR-468](#adr-468) arms seam and the [ADR-498](#adr-498) value seam · the mark is [#106](#adr-106)'s `mark-angle`
+**Requirements:** [02](02-requirements.md) — FR-IN: a bare angle reference is a statement the tool accepts · **Design:** [04](04-design.md) — the angle-statement seam's three value kinds
+
+**What the student did.** Prod session `quvq3txq` (2026-07-20): `זוית abc` → the scope brush-off. Measured
+at HEAD before this change, **every** bare spelling — «זוית ABC», «זווית ABC», «∠ABC», «angle ABC»,
+«זוית B», and the lowercase form — returned `not-handled`. It was the one member of the angle family with
+no reading at all: «זווית ABC = 40» built, «זווית ABC = α» built, «זוית ABC ישרה» built, «זווית ABC קהה»
+built, «זווית ABC > 40» built. Only *naming* an angle failed.
+
+**Decision. A bare angle reference builds a MARKER** — the 3-D #94 ruling, ported rather than re-invented:
+*a named angle is a highlightable mark, not a valueless-query refusal*. It draws the arc at the wedge,
+draws its arms if they are missing (the FR-IN-7 pattern `centralAngle` already uses), **consumes no DOF,
+constrains nothing and verifies nothing**. That last part is ADR-052 read straight: the student stated no
+magnitude, so the figure must assume none.
+
+**Two things already existed, and this is why the change is small.**
+
+1. **The mark.** `mark-angle` has been the valueless stated-angle arc since #106 (a central angle with no
+   value), and `angleMarkFor` already draws it as an arc, never a knee. No new command, no new render path.
+2. **The reader.** `angleArms` (#831/ADR-468) answers *"which angle is named"* and `angleValueOf`
+   (#969/ADR-498) answers *"what value it states"*. A rule decides only what its value MEANS — and this
+   rule's value is **absent**. So it is the **third reader of an existing seam**, not a fourth spelling of
+   one: the single-vertex lane («זוית B», arms resolved from `ctx.neighbors`, clarifying on ≠ 2 edges) and
+   the segment-pair lane («הזווית בין BA ל-BC», #967) are **inherited, not copied** — exactly the
+   enumeration habit those two ADRs exist to prevent. Both are locked so a future value kind cannot lose them.
+
+**What it deliberately does not take.** Every bail names a form another rule already owns, because taking
+any of them would be theft rather than coverage: a value of any kind, the right-angle WORD (≡ 90°),
+acuteness, a central angle, an alias binding, a comparison or a multi-angle list (through the shared
+`angleValueBlocked`), a dangling copula («זווית ABC =» — an unfinished statement), and a **QUERY**
+(«∠ABC=?», «מצא את זווית ABC»), which stays guidance. Asking for a measure is not stating one — the same
+split #94 draws in 3-D.
+
+**The lowercase interlock was already closed.** The issue expected #244's case-tolerant classification to
+be needed before «זוית abc» could reach this rule. Measured: it reaches it today — `labelRun` uppercases,
+so the lowercase form builds the marker in this change without waiting on #244. Recorded so nobody blocks
+on a gate that is not there.
+
+**Locks.** `issue-248-bare-angle-marker.test.ts` (10): five bare spellings including the prod session's
+lowercase one; the single-vertex lane; the side-pair lane; the mark reaching the figure with
+`freeDofCount` **unchanged**, no violations and never a right-angle knee; queries and the dangling copula
+still refused; and a NO-THEFT row asserting each of the five valued spellings keeps its own command and
+none of them becomes a `mark-angle`. Catalog row added — the in-app commands panel is driven by it, so the
+construct is documented where the student looks.
+
+**Deviations from plan:** none.

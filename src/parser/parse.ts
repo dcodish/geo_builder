@@ -2309,6 +2309,93 @@ function angleValueOf(stripped: string): AngleValue | null {
   return null;
 }
 
+/**
+ * #248 ([ADR-516](docs/06-decisions.md#adr-516)) — A BARE ANGLE REFERENCE IS A MARKER.
+ *
+ * «זוית ABC» / «∠ABC» / «angle ABC» names an angle without saying anything about it. It is how a student
+ * points at a corner — the figure should HIGHLIGHT it — and until now it was the one member of the angle
+ * family with no reading at all: every valued spelling built («זווית ABC = 40», «זווית ABC = α», «זוית B
+ * ישרה»), and the bare one escalated to the LLM.
+ *
+ * This is the 3-D #94 design ported, not invented: *a named angle is a highlightable MARKER, not a
+ * valueless-query refusal*. And it is the THIRD READER of a seam that already existed — `angleArms`
+ * (#831/ADR-468) answers "which angle is named" and `angleValueOf` (#969/ADR-498) answers "what value
+ * it states". A rule decides only what its value MEANS; this one's value is **absent**. So the
+ * single-vertex lane («זוית B», resolved from `ctx.neighbors`, clarifying on ≠ 2 edges) and the
+ * segment-pair lane («הזווית בין BD ל-BA», #967) are inherited rather than copied — the enumeration
+ * habit those two ADRs exist to prevent.
+ *
+ * The mark itself is not new either: `mark-angle` has been the valueless stated-angle arc since #106
+ * (a central angle with no value), and `angleMarkFor` already draws it. It consumes no DOF, constrains
+ * nothing and verifies nothing — a pedagogical highlight, exactly as ADR-052 requires of something the
+ * student did not state a magnitude for.
+ *
+ * The arms are drawn if missing (the FR-IN-7 pattern `centralAngle` already uses): you cannot highlight
+ * a corner whose sides are not on the figure, and segment ids are deterministic, so naming an angle of an
+ * existing triangle re-states its sides idempotently rather than duplicating them.
+ *
+ * **What it deliberately does NOT take** — each bail is a form another rule already owns, and taking any
+ * of them would be theft, not coverage: a value of any kind (`angle`/`measureAngle`), the right-angle
+ * WORD (≡ 90°), acuteness, a central angle, an alias binding, a comparison or a multi-angle list (via
+ * `angleValueBlocked`), a dangling copula (an unfinished statement, not a marker) — and a QUERY
+ * («∠ABC=?», «מצא את זווית ABC», «כמה…»), which stays guidance: asking for a measure is not stating one.
+ */
+/**
+ * What is LEFT of a bare-angle candidate once its labels and the connectives its own naming lanes use are
+ * taken out (#248). Empty ⇒ the statement says nothing but "this angle". The angle noun is already gone
+ * (the caller strips it). Kept deliberately small: the connectives allowed here are exactly the ones
+ * `angleArms` reads — the side-pair "between … and …" words and the Hebrew particles that glue them.
+ */
+function bareAngleResidue(stripped: string): string {
+  // A lowercase LABEL run (#45 / ADR-299: «זוית abc») is only a label when the text has no uppercase
+  // labels at all — the same condition `angleArms` uses before it will read one. Bounded at 3 letters so
+  // an English construct word ("bisector", "tangent") can never be mistaken for a label run and swallowed.
+  const noUpper = !/[A-Z]/.test(stripped);
+  let t = stripped.replace(/[A-Z]\d*/g, ' ');
+  if (noUpper) t = t.replace(/(?<![A-Za-z])[a-z]{1,3}\d*(?![A-Za-z])/g, ' ');
+  return (
+    t
+      // The connectives the naming lanes themselves read. NOTE: no \b — JavaScript word boundaries are
+      // ASCII-only and never fire beside a Hebrew letter, which is why an earlier spelling of this guard
+      // silently kept «בין» in the residue and refused the side-pair form it was written to allow.
+      .replace(/לבין|ובין|בין|between|and|the|of|at|נתונה|נתון|את|של/gi, ' ')
+      // Stray one-letter Hebrew particles left behind by the noun strip («הזווית» → «ה») and the attached
+      // prefixes of the side-pair form («ל-BC» → «ל»).
+      .replace(/(?<![\u0590-\u05FF])[הולבשמכ](?![\u0590-\u05FF])/g, ' ')
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim()
+  );
+}
+
+const bareAngleMark: Rule = (s, ctx) => {
+  if (!/(?:angle|∠|∡|זוו?ית)/i.test(s)) return null;
+  // The comparison + multi-angle bails, shared with every other lane of this family (#969).
+  if (angleValueBlocked(s)) return null;
+  if (/ישרה|right[\s-]?angle/i.test(s)) return null; // ≡ 90° — `angle` owns the word form
+  if (/קהה|חדה|obtuse|acute/i.test(s)) return null; // `angleAcuteness` owns these
+  if (/מרכזית|central\s+angle/i.test(s)) return null; // `centralAngle` owns it
+  if (/נסמן|נסמל|denote/i.test(s)) return null; // `angleAliasRule` owns the naming form
+  // A QUERY asks for the measure; it does not state the angle. Guidance owns it (the 3-D #94 split).
+  if (/[?？]|מצא|חשב|כמה|מהי|מהו|find|calculate|compute|what\s+is/i.test(s)) return null;
+  const stripped = s.replace(/angle|∠|∡|זוו?ית/gi, ' ');
+  if (angleValueOf(stripped) !== null) return null; // ANY value kind ⇒ not the bare form
+  if (/(?:=|היא|הוא|שווה(?:\s+ל-?)?)\s*$/i.test(s.trim())) return null; // «זווית ABC =» — unfinished
+  // THE BARE TEST, and the reason this rule is not a blacklist of the constructs that merely MENTION an
+  // angle. «חוצה זווית ABC» (a bisector), «משיק … זווית», a tangency modifier — all carry the angle noun
+  // and no value, and enumerating their owners would leave the next one to be stolen silently. Instead:
+  // a BARE reference is one with NOTHING ELSE IN IT. After the angle noun, the labels and the connectives
+  // the naming lanes themselves use are removed, any remaining word means the sentence is ABOUT something
+  // else — and this rule declines, so that construct's own rule (or an honest escalation) gets it.
+  if (bareAngleResidue(stripped) !== '') return null;
+  const arms = angleArms(stripped, ctx);
+  if (!arms || 'clarify' in arms) return arms;
+  return [
+    { type: 'segment', a: arms.vertex, b: arms.ray1 },
+    { type: 'segment', a: arms.vertex, b: arms.ray2 },
+    { type: 'mark-angle', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2 },
+  ];
+};
+
 const angle: Rule = (s, ctx) => {
   if (!/(?:angle|∠|זוו?ית)/i.test(s)) return null;
   // The comparison bail (ADR-390) and the multi-angle bail now live WITH the value reader (#969), so
@@ -9152,6 +9239,7 @@ export const RULES: Rule[] = [
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,
   bareVertexAngle, // #447: `A = 40` — the noun-less vertex angle; AFTER setRadius/radiusRelation/area (which own `R = 5` / `S = 13`) and after every angle rule
+  bareAngleMark, // #248: «זוית ABC» with NO value — a highlightable MARKER; LAST of the angle family, so every valued spelling wins first
   tangentsFromExternal, // TWO tangents from an external point — before the single tangentLine
   tangentFromExternal, // ONE tangent from an external point — before tangentLine (tangent AT a point)
   tangentLine, // a *drawn* tangent (after the tangent∩line compound)
