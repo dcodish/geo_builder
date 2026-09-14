@@ -25,6 +25,7 @@ import {
   unit,
 } from './geometry';
 import { constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates } from './solve';
+import { budgetExceeded } from './solveBudget';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
 export interface ResolvedLine {
@@ -431,6 +432,10 @@ export function multiStartSolve(
     }
   };
   for (const start of [seed, ...restarts]) {
+    // #259: past the deadline, don't OPEN another basin — the descent below now aborts mid-flight, but a
+    // restart that never starts is the cheaper saving. The seed pass has already run, so there is always
+    // a candidate to judge.
+    if (start !== seed && budgetExceeded()) break;
     consider(start); // a seeded restart (e.g. the grid-scan / binding-aware seed) may already be a valid solution
     const x = nelderMead(regCost, start, 400, searchStep);
     const fx = regCost(x);
@@ -441,6 +446,7 @@ export function multiStartSolve(
     consider(x);
   }
   for (const st of polishSteps) {
+    if (budgetExceeded()) break; // #259 — same reasoning, for the polish passes
     best = nelderMead(polishCost, best, polishIters, st);
     consider(best);
   }
@@ -857,7 +863,22 @@ function freePolygonVerticesToRecruit(c: Construction, carriers: GeoObject[]): G
   );
 }
 
-/** Nelder–Mead downhill simplex — derivative-free joint minimisation of `f` from `x0`. */
+/**
+ * Nelder–Mead downhill simplex — derivative-free joint minimisation of `f` from `x0`.
+ *
+ * **The armed budget is consulted HERE** ([ADR-515](../../docs/06-decisions.md#adr-515), issue #259).
+ * docs/17 §7 is literal about where a deadline belongs — *"searches check their deadline inside the
+ * innermost replay loop"* — and this iteration is that loop: every `f` is a full `evaluateCore`. The
+ * ladder's eight consults in `step.ts` all sit at loop boundaries BETWEEN experiments, so a single
+ * experiment's joint solve ran unbounded and a 12 s budget could not bind it (measured on the #207
+ * figure: 32.3 s wall-clock, `budgetExceeded()` never once true).
+ *
+ * Unarmed — the default, the primary submit fold (ADR-281), and always under tests — `budgetExceeded()`
+ * is a null check that returns false, so every engine outcome is bit-for-bit what it was. An aborted
+ * descent returns the best point found so far, exactly as an `iters` exhaustion does; the caller's
+ * `accept` gate still judges it, and `solveBudget.aborts` marks the fold so {@link computeReplay}
+ * refuses to memoize a truncated one.
+ */
 export function nelderMead(f: (x: number[]) => number, x0: number[], iters = 300, step = 0.15): number[] {
   const n = x0.length;
   let simplex = [x0.slice(), ...x0.map((_, i) => x0.map((v, j) => (j === i ? v + step : v)))];
@@ -870,6 +891,7 @@ export function nelderMead(f: (x: number[]) => number, x0: number[], iters = 300
   for (let it = 0; it < iters; it++) {
     order();
     if (fv[0] < 1e-14) break;
+    if (budgetExceeded()) break;
     const cen = x0.map((_, j) => simplex.slice(0, n).reduce((s, p) => s + p[j], 0) / n); // centroid sans worst
     const worst = simplex[n];
     const refl = cen.map((cj, j) => cj + (cj - worst[j]));
