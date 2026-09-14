@@ -710,6 +710,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "tangent",
     ],
   },
+  "angle ABC": {
+    "en": [
+      "segment",
+      "segment",
+      "mark-angle",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "mark-angle",
+    ],
+  },
   "angle ABC = 2α": {
     "en": [
       "measure-angle",

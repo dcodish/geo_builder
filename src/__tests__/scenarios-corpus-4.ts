@@ -2593,4 +2593,23 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Object.values(fig.status).filter((s) => s === 'ok').length).toBe(5);
     },
   },
+  {
+    id: 'bare-angle-reference-marks-the-corner-248',
+    title: '#248: the prod session’s bare «זוית abc» marks the angle instead of escalating',
+    guards:
+      'Prod session quvq3txq (2026-07-20): «זוית abc» reached the scope brush-off, and every bare spelling measured not-handled at HEAD while every VALUED spelling built. ADR-516 makes the bare reference the third reader of the angleArms/angleValueOf seam: no value ⇒ mark-angle. The mark must reach the figure as an ARC (never a right-angle knee), state nothing, and cost no freedom — a valued angle in the same figure keeps its own meaning.',
+    steps: ['משולש ABC', 'זוית abc', 'זווית BCA = 40'],
+    check(fig) {
+      // the bare reference is drawn, at the vertex the student named, and as an arc
+      expect(fig.angleMarks).toContainEqual({ vertex: 'B', ray1: 'A', ray2: 'C', right: false });
+      // ...and the VALUED angle in the same figure is still a given that holds
+      const A = fig.positions.get('A')!, B = fig.positions.get('B')!, C = fig.positions.get('C')!;
+      const deg = (Math.acos(
+        ((B.x - C.x) * (A.x - C.x) + (B.y - C.y) * (A.y - C.y)) /
+          (Math.hypot(B.x - C.x, B.y - C.y) * Math.hypot(A.x - C.x, A.y - C.y)),
+      ) * 180) / Math.PI;
+      expect(deg, 'the stated 40° at C still holds — the marker took nothing from it').toBeCloseTo(40, 3);
+      expect(fig.lastError).toBeNull();
+    },
+  },
 ];

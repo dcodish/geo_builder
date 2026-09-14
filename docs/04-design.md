@@ -65,6 +65,7 @@ The figure is a set of **objects**, each with a *definition* referencing earlier
 
 A single boundary: `utterance → command[]`.
 
+- **The angle statement is read by TWO shared seams, and rules differ only in their value kind ([ADR-468](06-decisions.md#adr-468), [ADR-498](06-decisions.md#adr-498), [ADR-516](06-decisions.md#adr-516)).** `angleArms` answers *which* angle is named — three letters, a single vertex (arms from `ctx.neighbors`), or the two sides that form it — and `angleValueOf` answers *what value* it states. A rule then decides only what its value MEANS: a number is `set-angle`, a symbol is `measure-angle`, and **no value at all is `mark-angle`**, the valueless highlight. Adding a value kind therefore cannot lose a naming lane, which is the defect all three ADRs were opened for.
 - **Primary — deterministic grammar parser.** Handles the common, bounded geometry phrasings in Hebrew and English (shapes, points-on, distances, angles, special lines). Free, offline, instant.
 - **Fallback — Claude API.** Only when the parser cannot confidently parse. Model: `claude-haiku-4-5` (sufficient for short structured extraction; far cheaper than Opus/Fable). Calls go through a **server-side proxy** that holds the key (never in the browser), is gated, and is rate-limited. `max_tokens` and prompt size kept minimal.
 - The engine is agnostic to which path produced the commands.

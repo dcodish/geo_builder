@@ -1183,6 +1183,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "angle ABC",
+    "winner": "bareAngleMark",
+  },
+  {
+    "lang": "he",
+    "text": "זוית ABC",
+    "winner": "bareAngleMark",
+  },
+  {
+    "lang": "en",
     "text": "central angle COD",
     "winner": "centralAngle",
   },
