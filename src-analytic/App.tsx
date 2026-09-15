@@ -377,12 +377,56 @@ export function App() {
                   );
                 }),
               },
+              {
+                key: 'lengths',
+                title: t('secLengths'),
+                dir: 'ltr',
+                /**
+                 * Every drawn segment’s length (#1065).
+                 *
+                 * The engine had these all along — `isKnowledge` returns 10 for `|AB|` after
+                 * «AB = 10» and correctly REFUSES to call `|AC|` known until «AB = AC» arrives.
+                 * Nothing printed them, which is #1020’s shape for the third time in this product:
+                 * a mechanism that exists, is correct, and has no caller.
+                 *
+                 * Gated exactly as the coordinate and equation rows are. A length that still moves
+                 * with a free DOF prints `—`, never one seed’s sample.
+                 */
+                rows: uniqueSegments(d.figure.segments).map((s) => {
+                  const [a, b] = s.ends;
+                  const k = isKnowledge(d.construction, (f) => {
+                    const p1 = f.points.find((q) => q.id === a);
+                    const p2 = f.points.find((q) => q.id === b);
+                    return p1 && p2 ? Math.hypot(p2.x - p1.x, p2.y - p1.y) : null;
+                  });
+                  return (
+                    <span key={s.id}>{`${a}${b} = ${k.known ? fmt(k.value) : '—'}`}</span>
+                  );
+                }),
+              },
             ]}
           />
         }
       />
     </AppFrame>
   );
+}
+
+/**
+ * One row per PAIR of endpoints (#1065).
+ *
+ * A polygon emits one drawn piece per side, and a student who also states «הקטע AB» would
+ * otherwise see `AB` twice. The length is a property of the two points, not of how many things
+ * happen to be drawn between them.
+ */
+function uniqueSegments(segments: readonly { id: string; ends: [string, string] }[]) {
+  const seen = new Set<string>();
+  return segments.filter((s) => {
+    const key = [...s.ends].sort().join('\u0000');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /** The product's symbol palette — only the glyphs this tool's grammar actually uses (#525). */

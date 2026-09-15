@@ -116,6 +116,24 @@ export function Figure({ scene, showConstruction = false }: { scene: Scene; show
         ))}
       </g>
 
+      {/*
+        A segment's STATED length, drawn at its midpoint (#1065).
+
+        Only lengths the student's own given pinned reach here — «AB = 10». A derived length is an
+        answer and lives in the data panel instead (ADR-AG-016: the canvas shows the question). The
+        text is nudged off the line so it does not sit on top of it, and carries the same paint-order
+        halo the point labels use so it stays legible over a crossing side.
+      */}
+      <g fontSize={12} fill={INK} textAnchor="middle" paintOrder="stroke" stroke="#fff" strokeWidth={3}>
+        {segments
+          .filter((s) => s.label)
+          .map((s) => (
+            <text key={`${s.id}-len`} x={s.label!.x} y={s.label!.y - 6} data-length-for={s.id}>
+              {s.label!.text}
+            </text>
+          ))}
+      </g>
+
       {/* curves */}
       <g fill="none" stroke={CURVE} strokeWidth={2}>
         {curves.map((c) => (

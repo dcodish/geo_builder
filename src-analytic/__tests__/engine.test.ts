@@ -494,3 +494,74 @@ describe('#1045 — a line that added nothing says so, and is not recorded', () 
     expect(o[5]).toBe('faulted');
   });
 });
+
+/**
+ * #1065 — a known LENGTH becomes visible, on the right surface.
+ *
+ * The operator, playing PR #1064: *"we should have 10 show on the AB line since this is a given and
+ * not calculated. data panel doesnt show that AB=10"* and *"data panel doesnt show AC value (10)
+ * after i write AB=10 and AB=AC"*.
+ *
+ * The engine was already right — `isKnowledge` returned 10 for `|AB|` and correctly refused to call
+ * `|AC|` known until «AB = AC» arrived. Nothing printed either. #1020's shape for the third time in
+ * this product: a mechanism that exists, is correct, and has no caller.
+ *
+ * Their two sentences split along ADR-AG-016's own rule — the canvas shows the QUESTION, the data
+ * panel shows the ANSWER — and their wording drew the line themselves: *"since this is a given and
+ * not calculated."* So the cases below assert WHICH SURFACE, not merely that a number exists.
+ */
+describe('#1065 — a stated length labels the segment; a derived one does not', () => {
+  const pinned = (lines: string[]) =>
+    derive(lines, 0).figure.segments.filter((s) => s.pinnedLength !== undefined).map((s) => s.ends.join(''));
+
+  const lengthOf = (d: ReturnType<typeof derive>, a: string, b: string) =>
+    isKnowledge(d.construction, (f) => {
+      const p = f.points.find((q) => q.id === a);
+      const q = f.points.find((r) => r.id === b);
+      return p && q ? Math.hypot(q.x - p.x, q.y - p.y) : null;
+    });
+
+  it('labels the segment the student pinned, and only that one', () => {
+    expect(pinned(['משולש ABC', 'AB = 10'])).toEqual(['AB']);
+  });
+
+  it('does NOT label a length the tool derived — the operator’s own distinction', () => {
+    // «AB = AC» makes CA knowable, and it is an ANSWER. It belongs in the panel, not on the figure.
+    const d = derive(['משולש ABC', 'AB = 10', 'AB = AC'], 0);
+    expect(pinned(['משולש ABC', 'AB = 10', 'AB = AC'])).toEqual(['AB']);
+    expect(lengthOf(d, 'C', 'A').known).toBe(true);
+  });
+
+  it('the panel value is there for both — stated and derived', () => {
+    const d = derive(['משולש ABC', 'AB = 10', 'AB = AC'], 0);
+    const ab = lengthOf(d, 'A', 'B');
+    const ca = lengthOf(d, 'C', 'A');
+    expect(ab.known && Math.round(ab.value)).toBe(10);
+    expect(ca.known && Math.round(ca.value)).toBe(10);
+  });
+
+  it('a fully placed triangle labels nothing — every length there is derived', () => {
+    expect(pinned(['A(0,0)', 'B(6,0)', 'C(0,8)', 'משולש ABC'])).toEqual([]);
+    const d = derive(['A(0,0)', 'B(6,0)', 'C(0,8)', 'משולש ABC'], 0);
+    expect(lengthOf(d, 'B', 'C').known).toBe(true); // …but the panel still has 10
+  });
+
+  it('a length pinned to a FREE PARAMETER is not a label — #1020’s gate', () => {
+    /**
+     * «AB = a» is a given and is NOT a number. The first draft of this feature printed `3.46` on the
+     * segment — one seed's sample asserted as fact — because the caller hardcoded the knowledge flag.
+     * The gate is the same one `provenanceOf` uses for coordinates: no free symbols in the value.
+     */
+    expect(pinned(['a הוא פרמטר', 'משולש ABC', 'AB = a'])).toEqual([]);
+  });
+
+  it('a relation between two lengths pins NEITHER on its own', () => {
+    // «AB = AC» relates them; whichever becomes known does so through the other, which is derivation.
+    expect(pinned(['משולש ABC', 'AB = AC'])).toEqual([]);
+  });
+
+  it('every drawn segment knows whose endpoints it has', () => {
+    const d = derive(['משולש ABC'], 0);
+    expect(d.figure.segments.map((s) => s.ends.join('')).sort()).toEqual(['AB', 'BC', 'CA']);
+  });
+});

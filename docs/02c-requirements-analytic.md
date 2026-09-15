@@ -748,3 +748,10 @@ object's name. «משוואת AB היא y=2x» ≡ «משוואת הישר AB ה
 each pair is **one object**, because a name is an identity (R44). The name's own shape says what was
 named — a two-point run or the `ℓ` device is a line, a Roman numeral is a circle — while the KIND still
 comes from the fit, so the id records what the student called it and the classifier decides what it is.
+
+**R52 — a length the figure KNOWS is shown, on the surface that matches its provenance**
+([ADR-AG-028](06c-decisions-analytic.md#adr-ag-028)). Every drawn segment's length appears in the data
+panel when it is knowledge, and `—` when it still moves. A length the student's own given **pinned** is
+additionally drawn **on the segment**, because it is part of their question; a length the tool derived
+is not, because it is an answer. A length stated in terms of a free parameter is a given and is **not a
+number**, so it labels nothing — printing one sample of it would assert a value the question never gave.

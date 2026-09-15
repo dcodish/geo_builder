@@ -15,6 +15,7 @@ import { constructionOf, evalRule, type Construction as RuleConstruction, type P
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
+import { pairKey, pinnedLengths } from './lengths';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { freeRank, residual, solveLM, type Constraint } from './solve';
 import { inDomain, isFree, objectById, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
@@ -50,6 +51,25 @@ export interface FigureSegment {
   id: Id;
   a: Pt;
   b: Pt;
+  /**
+   * WHOSE endpoints these are (#1065).
+   *
+   * The positions above are deliberate — the renderer is handed screen-ready pairs and never looks
+   * a vertex up. But a segment that cannot say it is `AB` cannot be given `AB`’s length as a label,
+   * and the operator asked for exactly that. The ids ride alongside; the renderer still consumes
+   * only what it is handed.
+   */
+  ends: [Id, Id];
+  /**
+   * The length to draw ON this segment, when the STUDENT’s own given pinned it — as a NUMBER.
+   *
+   * Decided upstream rather than in `render/`, which keeps the decision beside the honesty gate that
+   * answers it — while FORMATTING stays a display concern, so the engine never owns a rounder.
+   * Absent means draw nothing: a length the tool merely DERIVED belongs in the data panel, not on
+   * the canvas ([ADR-AG-016](../../docs/06c-decisions-analytic.md#adr-ag-016) — the canvas shows the
+   * question, the panel shows the answer).
+   */
+  pinnedLength?: number;
 }
 
 /** A derived point's own construction — what a student would have to draw to find it (#1030).
@@ -241,6 +261,24 @@ function curveAtOf(c: Construction, env: Env): (id: Id) => NumCurve | null {
   };
 }
 
+/**
+ * The label a drawn segment carries — its length, when the student’s own given pinned it (#1065).
+ *
+ * The given must PIN this length by itself and the stated value must be KNOWLEDGE — both decided in
+ * — «AB = 10», not «AB = AC»), and the resulting length must be KNOWLEDGE: a length stated in terms
+ * of a free parameter is stated and still not a number, and printing one sample of it on the canvas
+ * would be [#1020](https://github.com/dcodish/geo_builder/issues/1020) in a new place.
+ *
+ * Returns `undefined` for everything else — including a length the tool DERIVED, which is correct
+ * and belongs in the data panel rather than on the figure (ADR-AG-016).
+ */
+function segmentLabel(
+  pinned: Map<string, number>,
+  ends: [Id, Id],
+): number | undefined {
+  return pinned.get(pairKey(ends[0], ends[1]));
+}
+
 function carrierDofOf(c: Construction, env: Env, free: Map<Id, Pt>, ids: Id[]): number {
   if (ids.length === 0) return 0;
   if (c.constraints.length === 0) return 2 * ids.length;
@@ -349,6 +387,14 @@ export function evaluate(c: Construction, seed = 0): Figure {
   const placed = new Map<Id, Pt>(free);
   const at = (id: Id): Pt | null => placed.get(id) ?? null;
 
+  /**
+   * Which lengths the student PINNED, computed once for this evaluation (#1065).
+   *
+   * Read from the constraints rather than from the figure, because the question "did a given say
+   * this" is about what was STATED and cannot be recovered from where the points ended up.
+   */
+  const pinned = pinnedLengths(c.constraints, env);
+
   for (const o of c.objects) {
     switch (o.kind) {
       case 'point': {
@@ -401,7 +447,15 @@ export function evaluate(c: Construction, seed = 0): Figure {
       case 'segment': {
         const a = at(o.a);
         const b = at(o.b);
-        if (a && b) segments.push({ id: o.id, a, b });
+        if (a && b) {
+          segments.push({
+            id: o.id,
+            a,
+            b,
+            ends: [o.a, o.b],
+            pinnedLength: segmentLabel(pinned, [o.a, o.b]),
+          });
+        }
         else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
@@ -411,7 +465,14 @@ export function evaluate(c: Construction, seed = 0): Figure {
           // Drawn as its closed ring of sides. The renderer stays a pure consumer: it is handed
           // screen-ready pairs, never asked to look a vertex up.
           for (let i = 0; i < vs.length; i += 1) {
-            segments.push({ id: `${o.id}-${i}`, a: vs[i], b: vs[(i + 1) % vs.length] });
+            const ends: [Id, Id] = [o.vertices[i], o.vertices[(i + 1) % vs.length]];
+            segments.push({
+              id: `${o.id}-${i}`,
+              a: vs[i],
+              b: vs[(i + 1) % vs.length],
+              ends,
+              pinnedLength: segmentLabel(pinned, ends),
+            });
           }
         } else vacant.push({ id: o.id, reason: 'vacant' });
         break;

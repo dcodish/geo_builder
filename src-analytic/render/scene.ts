@@ -83,6 +83,15 @@ export interface SceneSegment {
   y1: number;
   x2: number;
   y2: number;
+  /**
+   * The length the STUDENT stated for this segment, ready to draw at its midpoint (#1065).
+   *
+   * Present only when a given pinned it — «AB = 10». A length the tool DERIVED is an answer and
+   * belongs in the data panel, not on the figure
+   * ([ADR-AG-016](../../docs/06c-decisions-analytic.md#adr-ag-016)). The engine decides which is
+   * which; this carries the text and where to put it.
+   */
+  label?: { text: string; x: number; y: number };
 }
 
 /** A derived point's construction, projected to screen space (#1030). Drawn dotted, behind the
@@ -145,13 +154,25 @@ export function buildScene(fig: Figure, box: Box, width: number, height: number)
   // A segment is already resolved to endpoints by `evaluate`, so this is a pure projection — the
   // renderer never looks a vertex up, which is what keeps it a consumer rather than a second
   // geometry implementation.
-  const segments: SceneSegment[] = fig.segments.map((s) => ({
-    id: s.id,
-    x1: t.sx(s.a.x),
-    y1: t.sy(s.a.y),
-    x2: t.sx(s.b.x),
-    y2: t.sy(s.b.y),
-  }));
+  const segments: SceneSegment[] = fig.segments.map((s) => {
+    const x1 = t.sx(s.a.x);
+    const y1 = t.sy(s.a.y);
+    const x2 = t.sx(s.b.x);
+    const y2 = t.sy(s.b.y);
+    return {
+      id: s.id,
+      x1,
+      y1,
+      x2,
+      y2,
+      // Formatting is a DISPLAY concern, so it happens here and not in the engine — and it goes
+      // through the shared formatter, never a local rounder (the #723 chokepoint, and #1029).
+      label:
+        s.pinnedLength === undefined
+          ? undefined
+          : { text: fmtNum(s.pinnedLength), x: (x1 + x2) / 2, y: (y1 + y2) / 2 },
+    };
+  });
 
   const construction: SceneConstruction[] = fig.construction.map((c) => ({
     id: c.id,

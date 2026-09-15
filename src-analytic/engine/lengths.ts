@@ -19,7 +19,8 @@
  * student can type and no corpus phrasing contains, so the encoding cannot collide with a real
  * parameter — `2a·AB` keeps its `a`.
  */
-import { evalExpr, normalizeMath, parseExpr, type Env, type Expr } from './expr';
+import { evalExpr, normalizeMath, parseExpr, symbolsOf, type Env, type Expr } from './expr';
+import { RESERVED_SYMBOLS } from './carriers';
 import type { Pt } from './derived';
 import type { Id } from './types';
 
@@ -108,3 +109,55 @@ export function lengthRefs(le: LengthExpr): Id[] {
 export function describeLengthExpr(le: LengthExpr): string {
   return le.terms.length === 0 ? 'ערך' : le.terms.map((t) => `${t.a}${t.b}`).join('+');
 }
+
+/**
+ * The lengths the STUDENT’s own givens pin, and the value each was pinned to (#1065).
+ *
+ * [ADR-AG-016](../../docs/06c-decisions-analytic.md#adr-ag-016) settled where a value belongs: the
+ * canvas shows the QUESTION, the data panel shows the ANSWER. A length the student STATED is part of
+ * their question and belongs on the segment; one the tool DERIVED is an answer and belongs in the
+ * panel. The operator drew the line themselves — *"since this is a given and not calculated"*.
+ *
+ * So this answers only the narrow question: **is there a given that pins this length by itself?**
+ * That is a `length-eq` with exactly one length term on one side and none on the other — «AB = 10»,
+ * «AB = 4√5». «AB = AC» pins NEITHER on its own: it relates them, and whichever becomes known does
+ * so through the other, which is derivation rather than statement.
+ *
+ * The value is deliberately NOT computed here. Whether a pinned length is knowledge still has to pass
+ * `isKnowledge` — a given written in terms of a free parameter is stated and still not a number — and
+ * that gate lives where the figure does.
+ */
+export function pinnedLengths(
+  constraints: readonly { t: string }[],
+  env: Env,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const k of constraints) {
+    if (k.t !== 'length-eq') continue;
+    const { left, right } = k as unknown as { left: LengthExpr; right: LengthExpr };
+    const sides = [left, right];
+    const lengthy = sides.filter((e) => e.terms.length > 0);
+    // Exactly one side mentions lengths, and it mentions exactly one: that is a length against a
+    // value. Anything else relates two lengths, or combines several, and pins none of them alone.
+    if (lengthy.length !== 1 || lengthy[0].terms.length !== 1) continue;
+    const value = sides.find((e) => e !== lengthy[0]);
+    if (!value) continue;
+    /**
+     * **The stated value must be KNOWLEDGE**, not one seed’s sample of it.
+     *
+     * «AB = a» with a free `a` is a given, and it is not a number: drawing `3.46` on the segment
+     * would assert a value the question never gave — [#1020](https://github.com/dcodish/geo_builder/issues/1020)
+     * in a new place, and the exact thing this function’s first draft did because the caller
+     * hardcoded the gate. The test is the same one `provenanceOf` uses for a point’s coordinates:
+     * every symbol must be one of the plane’s reserved ones, i.e. there are no free parameters.
+     */
+    if (!symbolsOf(value.expr).every((sym) => RESERVED_SYMBOLS.has(sym))) continue;
+    const v = evalExpr(value.expr, env);
+    if (!Number.isFinite(v)) continue;
+    out.set(pairKey(lengthy[0].terms[0].a, lengthy[0].terms[0].b), v);
+  }
+  return out;
+}
+
+/** Unordered: `AB` and `BA` are one length. */
+export const pairKey = (a: Id, b: Id): string => [a, b].sort().join('\u0000');

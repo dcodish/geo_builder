@@ -1731,3 +1731,67 @@ because the corpus consulted was **the corpus of givens** — the inputs the rul
 **Consequences.** `src-analytic` 307 → 311 tests, four of them prose cases that no previous round would
 have thought to write. The branch is otherwise unchanged, and R6 is implemented as it was always meant
 to be.
+
+## ADR-AG-028 — A known length becomes visible, and WHICH SURFACE is the decision (#1065)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R52. **Design:**
+[04c](04c-design-analytic.md) "Lengths as values".
+
+**Context.** Operator, playing PR #1064: *"we should have 10 show on the AB line since this is a given
+and not calculated. data panel doesnt show that AB=10"*, and *"data panel doesnt show AC value (10)
+after i write AB=10 and AB=AC"*.
+
+**The engine already knew.** Measured before building:
+
+```
+משולש ABC · AB = 10          → isKnowledge(|AB|) = { known: true, value: 10 }
+                               isKnowledge(|AC|) = { known: false }   ← correctly still free
+… · AB = AC                  → isKnowledge(|AC|) = { known: true, value: 10 }
+```
+
+Both cases right, including the one that must stay silent. **No surface printed either** — the data
+panel had sections for points and curves and nothing else. This is
+[#1020](https://github.com/dcodish/geo_builder/issues/1020)'s shape for the **third time** in this
+product: a mechanism that exists, is correct, and has no caller. Worth noticing as a pattern rather
+than a coincidence.
+
+**Decision — the two halves of the operator's report are the two halves of a rule this product already
+had.** [ADR-AG-016](#adr-ag-016): the canvas shows the QUESTION, the data panel shows the ANSWER. Their
+own words draw the line: *"since this is a given and not calculated."*
+
+| | surface | because |
+| --- | --- | --- |
+| «AB = 10» → `10` on the segment | **canvas** | the student STATED it; it is their given, like the `A(6,4)` labels #1032 draws |
+| «AB = AC» → `CA = 10` in the panel | **panel** | the tool DERIVED it; it is an answer |
+
+So a length is labelled on the figure only when a given **pins it by itself** — one length term against
+a value. «AB = AC» pins neither: it relates them, and whichever becomes known does so *through* the
+other, which is derivation.
+
+**Three mechanics this needed.**
+
+1. **A drawn segment knows whose endpoints it has.** `FigureSegment` carried resolved positions, with a
+   docblock explaining that this is deliberate so the renderer never looks a vertex up. That is still
+   true — the ids ride *alongside* the positions, and the renderer still consumes only what it is
+   handed.
+2. **The label is decided in the engine and FORMATTED in the renderer.** The engine emits a number; the
+   scene formats it through `shell/format`. Putting a rounder in the engine would break the #723
+   chokepoint the tree relearned in #1029.
+3. **One row per PAIR in the panel**, not per drawn piece. A polygon emits one segment per side, and a
+   student who also states «הקטע AB» would otherwise see `AB` twice. A length is a property of two
+   points, not of how many things are drawn between them.
+
+**The defect this build introduced and caught before landing.** The first draft passed `known: true`
+unconditionally, and «AB = a» with a free parameter printed **3.46** on the canvas — one seed's sample
+asserted as fact, which is #1020 exactly, in a feature whose own docblock warned against it. The gate
+is now the same one `provenanceOf` uses for coordinates: **the stated value must carry no free
+symbols**. Caught by verifying against a case the operator had not reported, which is the habit
+[ADR-AG-027](#adr-ag-027) was written about one round earlier.
+
+**Consequences.** `src-analytic` 311 → 318 tests, each asserting WHICH SURFACE rather than that a number
+exists somewhere. The panel's lengths section shares `isKnowledge` with the coordinate and equation
+rows, so all three answer the same question the same way — and when the measuring lane
+([#1027](https://github.com/dcodish/geo_builder/issues/1027)) lands, «מה אורך AB» must read this same
+value or the tool could report a length two ways.
