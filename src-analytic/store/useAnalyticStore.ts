@@ -10,6 +10,26 @@
  * (`app/submit.ts`), because deciding needs the fold; this holds the state that path writes.
  */
 import { create } from 'zustand';
+import type { LoadAudit } from '../../shell/save';
+
+/**
+ * WHOSE save file this is, and which format (#1087).
+ *
+ * The app id is what makes a foreign file refusable BY NAME — a 2-D save says it belongs to the
+ * plane builder rather than "not a save file", which is the difference between a message that helps
+ * and one that blames the student.
+ */
+export const ANALYTIC_APP = 'analytic-builder';
+export const ANALYTIC_SAVE_VERSION = 1;
+
+/** What a saved session holds — the lines, and the little that is not derivable from them. */
+export interface SavedAnalyticSession {
+  app: string;
+  version: number;
+  lines: string[];
+  seed: number;
+  name?: string;
+}
 
 export type InputError =
   /** No rule matched — the LLM-escalation seam. */
@@ -44,11 +64,27 @@ export type InputError =
   /** «האלכסון הראשי» where the shape distinguishes no principal diagonal (#1070). */
   | { key: 'undistinguished-diagonal'; detail: string }
   /** A given the figure cannot satisfy (#1016). */
-  | { key: 'unsatisfiable'; detail: string };
+  | { key: 'unsatisfiable'; detail: string }
+  /**
+   * A save file this tool will not load (#1087) — and WHICH of the three reasons, because they send
+   * the student to three different places: another builder's file, a newer version of this one, or
+   * something that is not a save file at all.
+   */
+  | { key: 'load-foreign'; detail: string }
+  | { key: 'load-newer'; detail: string }
+  | { key: 'load-unreadable'; detail: string };
 
 interface AnalyticState {
   /** The student's lines, in order. The one source of truth. */
   lines: string[];
+  /**
+   * The figure's NAME (#1087) — what a save is called, and nothing else.
+   *
+   * It is not a given and never reaches the parser: naming a drawing is not a statement about it.
+   */
+  name: string;
+  /** What a LOAD did, when it refused or changed something — the banner's content (#1087). */
+  loadAudit: LoadAudit | null;
   /** Which sampled configuration is drawn — «הציגו תצורה אחרת» advances it (ADR-052). */
   seed: number;
   error: InputError | null;
@@ -73,12 +109,27 @@ interface AnalyticState {
    */
   goToSeed: (seed: number) => void;
   setError: (e: InputError | null) => void;
+  setName: (name: string) => void;
+  setLoadAudit: (audit: LoadAudit | null) => void;
+  /**
+   * The session, for a save file (#1087).
+   *
+   * **The LINES are the whole of it.** No position and no parameter value is stored — the figure is
+   * re-derived by re-parsing them — so a saved file replays through the real parse path and is
+   * therefore also a parser-drift net: a save that stops loading is a grammar that changed under a
+   * student's own work.
+   */
+  serialize: () => SavedAnalyticSession;
+  /** Replace the session with a loaded one. */
+  restore: (session: { lines: string[]; seed?: number; name?: string }) => void;
   setNotice: (n: string | null) => void;
 }
 
-export const useAnalyticStore = create<AnalyticState>((set) => ({
+export const useAnalyticStore = create<AnalyticState>((set, get) => ({
   lines: [],
   seed: 0,
+  name: '',
+  loadAudit: null,
   error: null,
   notice: null,
 
@@ -86,8 +137,24 @@ export const useAnalyticStore = create<AnalyticState>((set) => ({
   removeLine: (index) => set((s) => ({ lines: s.lines.filter((_, i) => i !== index), error: null, notice: null })),
   replaceLine: (index, next) =>
     set((s) => ({ lines: s.lines.map((l, i) => (i === index ? next : l)), error: null, notice: null })),
-  clearAll: () => set({ lines: [], error: null, notice: null, seed: 0 }),
+  clearAll: () => set({ lines: [], error: null, notice: null, seed: 0, name: '', loadAudit: null }),
   goToSeed: (seed) => set({ seed, error: null, notice: null }),
   setError: (error) => set({ error, notice: null }),
   setNotice: (notice) => set({ notice, error: null }),
+  setName: (name) => set({ name }),
+  setLoadAudit: (loadAudit) => set({ loadAudit }),
+
+  serialize: () => {
+    const { lines, seed, name } = get();
+    return {
+      app: ANALYTIC_APP,
+      version: ANALYTIC_SAVE_VERSION,
+      lines: [...lines],
+      seed,
+      ...(name.trim() ? { name: name.trim() } : {}),
+    };
+  },
+
+  restore: ({ lines, seed, name }) =>
+    set({ lines: [...lines], seed: seed ?? 0, name: name ?? '', error: null, notice: null }),
 }));

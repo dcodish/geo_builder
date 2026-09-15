@@ -905,3 +905,23 @@ is refused.
 can be named, a dashed ring marks the spot; clicking it adds «P נקודת החיתוך של הישר AB עם הישר CD»
 to the givens — the same line typing it would add, editable and removable like any other. No ring is
 offered where a point already stands, or where either object has no name the grammar can use.
+
+**R77 — the session can be SAVED, and a load says what it restored**
+([ADR-AG-055](06c-decisions-analytic.md#adr-ag-055)). The figure has a name, the session downloads as
+`<name>-analytic.json`, and opening one replays the student's own lines through the real parser. A
+file from another builder is refused as that builder's, a file from a newer version says to refresh,
+and any line that no longer builds is NAMED rather than dropped — a saved figure holds the sentences,
+not the coordinates, so the tool can always answer "which of my givens did you lose?".
+
+**R78 — the input panel never reorders what the student wrote**
+([ADR-AG-055](06c-decisions-analytic.md#adr-ag-055)). Every line here is a Hebrew sentence carrying an
+equation, so an LTR run laid out under an RTL base does not merely look odd — «(x-3)^2+(y-4)^2=9»
+becomes «2+(y-4)^2=9^(x-3)», a formula the student did not write. Every surface that shows a line —
+the box while typing, its live preview, the example chips, the fact list and its editor — isolates the
+runs and takes its direction from the content.
+
+**R79 — a centre the student NAMED carries its value**
+([ADR-AG-055](06c-decisions-analytic.md#adr-ag-055)). «נתון מעגל O שמשוואתו (x-3)^2+(y-5)^2=25» draws
+`O(3, 5)`: the equation is read, not solved, so the centre is as given as writing `O(3,5)` would be.
+A parametric circle's centre stays open — no sampled number reaches the canvas (ADR-052) — and only
+ONE label is drawn at the place, so nothing can hide anything.

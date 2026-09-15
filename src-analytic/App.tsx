@@ -9,7 +9,7 @@
  * shared chassis existed ([docs/28 §5](../docs/28-product-unification.md) Phase 4), and mounting
  * rather than re-deriving the chrome is the whole return on that work.
  */
-import { useMemo, useState, useRef, type CSSProperties } from 'react';
+import { useMemo, useState, useRef, type ChangeEvent, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import registry from '../products.json';
 import { AppFrame } from '../shell/frame/AppFrame';
@@ -28,6 +28,13 @@ import { domainText, positionalOf, type NumCurve } from './engine/types';
 import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
 import { exprText } from './engine/expr';
 import { MathText } from '../shell/math';
+import { Banner } from '../shell/frame/Banner';
+import { FigureName } from '../shell/frame/FigureName';
+import { ManualScreen } from '../shell/frame/ManualScreen';
+import { svgToPng } from '../shell/export/svgToPng';
+import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
+import { ANALYTIC_APP, ANALYTIC_SAVE_VERSION } from './store/useAnalyticStore';
+import { COMMAND_CATALOG_ANALYTIC } from './parser/catalogAnalytic';
 import { ellipseFoci, parabolaFocus } from './engine/curves';
 import { analyticBidi } from './i18n';
 import { Figure } from './render/Figure';
@@ -83,10 +90,135 @@ function existingKey(error: InputError): string {
 }
 
 export function App() {
-  const { t } = useTranslation();
-  const { lines, seed, error, recordLine, removeLine, replaceLine, clearAll, goToSeed, setError, notice, setNotice } =
-    useAnalyticStore();
+  const { t, i18n } = useTranslation();
+  const {
+    lines,
+    seed,
+    error,
+    recordLine,
+    removeLine,
+    replaceLine,
+    clearAll,
+    goToSeed,
+    setError,
+    notice,
+    setNotice,
+    name,
+    setName,
+    loadAudit,
+    setLoadAudit,
+    serialize,
+    restore,
+  } = useAnalyticStore();
   const [draft, setDraft] = useState('');
+
+  /**
+   * SAVE and LOAD (#1087) — the shared envelope, the shared naming, the sibling’s own order.
+   *
+   * Operator, 2026-09-15: *"there is no load and save and stuff we have on other tools"*. The
+   * machinery was all in `shell/save` and nothing in this product called it.
+   *
+   * What a save HOLDS here is the line list, which is the whole session: no position and no
+   * parameter value is stored, so loading replays the lines through the real parse path. That makes
+   * a save file a parser-drift net as well as a document — a saved figure that stops loading is a
+   * grammar that changed under a student’s own work.
+   */
+  const saveFile = () => {
+    const blob = new Blob([JSON.stringify(serialize(), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    // The shared naming convention, with this product’s suffix from the docs/22 §9 registry.
+    a.download = savedFileName(name, new Date(), 'analytic');
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const onLoadFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    void file.text().then((text) => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        setError({ key: 'load-unreadable', detail: file.name });
+        return;
+      }
+      /**
+       * The envelope NAMES its refusal: a file from another builder says whose it is, and a file
+       * from a newer version says to refresh — never a generic "could not read", which sends a
+       * student to fix a file that was read perfectly well.
+       */
+      const env = readEnvelope(parsed, { app: ANALYTIC_APP, maxVersion: ANALYTIC_SAVE_VERSION });
+      if (!env.ok) {
+        setError({
+          key:
+            env.reason === 'wrong-app'
+              ? 'load-foreign'
+              : env.reason === 'newer-version'
+                ? 'load-newer'
+                : 'load-unreadable',
+          detail: file.name,
+        });
+        return;
+      }
+      const saved = env.data as { lines?: unknown; seed?: unknown; name?: unknown };
+      const savedLines = Array.isArray(saved.lines)
+        ? saved.lines.filter((l): l is string => typeof l === 'string')
+        : [];
+      restore({
+        lines: savedLines,
+        seed: typeof saved.seed === 'number' ? saved.seed : 0,
+        name: typeof saved.name === 'string' ? saved.name : figureNameFromFileName(file.name, 'analytic'),
+      });
+      /**
+       * A LOAD IS AUDITED, not trusted (#1087). The lines are re-parsed on the way in, and a line
+       * that no longer builds is reported rather than dropped in silence — which is the whole value
+       * of storing lines instead of positions.
+       */
+      const replayed = derive(savedLines, 0);
+      setLoadAudit({
+        total: savedLines.length,
+        failed: replayed.faults.map((f) => ({ line: savedLines[f.index] ?? '', reason: f.code })),
+      });
+    });
+  };
+
+  /** The image exports — the shared rasteriser, the top row, as in every sibling (ADR-W-024). */
+  const rasterCanvas = (): Promise<Blob> => {
+    const svg = canvasCard.current?.querySelector('svg');
+    if (!svg) return Promise.reject(new Error('no canvas'));
+    return svgToPng(svg as SVGSVGElement);
+  };
+  const flashExport = (v: 'ok' | 'err') => {
+    setExportFlash(v);
+    window.setTimeout(() => setExportFlash(''), 1400);
+  };
+  const copyImage = async () => {
+    try {
+      const blob = await rasterCanvas();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      flashExport('ok');
+    } catch {
+      flashExport('err');
+    }
+  };
+  const saveImage = async () => {
+    try {
+      const blob = await rasterCanvas();
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = u;
+      a.download = 'figure.png';
+      a.click();
+      URL.revokeObjectURL(u);
+    } catch {
+      flashExport('err');
+    }
+  };
+
   const [zoom, setZoom] = useState(1);
   /**
    * The ASK lane (#1027) — the panel’s own input, and the operator’s request: *"data panel should
@@ -97,6 +229,10 @@ export function App() {
    * the one being read.
    */
   const [askText, setAskText] = useState('');
+  const [manualOpen, setManualOpen] = useState(false);
+  const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>('');
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const canvasCard = useRef<HTMLDivElement | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const askRef = useRef<HTMLInputElement | null>(null);
   const [dataOpen, setDataOpen] = useState(true);
@@ -280,6 +416,10 @@ export function App() {
           'ambiguous-shape': 'errAmbiguousShape',
           'undistinguished-diagonal': 'errNoPrincipalDiagonal',
           'unsatisfiable': 'errUnsatisfiable',
+          // A save file this tool will not open, named by WHICH of the three reasons (#1087).
+          'load-foreign': 'errLoadForeign',
+          'load-newer': 'errLoadNewer',
+          'load-unreadable': 'errLoadUnreadable',
         }[error.key],
         { detail: error.detail, existing: t(existingKey(error)) },
       )
@@ -297,6 +437,41 @@ export function App() {
     <AppFrame
       title={t('title')}
       subtitle={t('subtitle')}
+      /**
+       * ONE look and ONE ORDER for the session actions in every builder (#1087).
+       *
+       * Operator: *"the buttons are not located in same locations"*. The sibling's own comment
+       * states the rule this follows — שמור/טען FIRST, the image exports next, the manual last —
+       * and this product passed no utility actions at all, so the row was simply absent.
+       */
+      utilityActions={
+        <>
+          <ToolButton onClick={saveFile} disabled={lines.length === 0}>
+            💾 {t('save')}
+          </ToolButton>
+          <ToolButton onClick={() => fileRef.current?.click()}>📂 {t('load')}</ToolButton>
+          <ToolButton onClick={() => void copyImage()} disabled={lines.length === 0}>
+            {exportFlash === 'ok' ? `✓ ${t('copied')}` : exportFlash === 'err' ? '✕' : `⧉ ${t('copyImage')}`}
+          </ToolButton>
+          <ToolButton onClick={() => void saveImage()} disabled={lines.length === 0}>
+            ⤓ {t('saveImage')}
+          </ToolButton>
+          <ToolButton onClick={() => setManualOpen(true)}>{t('manualButton')}</ToolButton>
+        </>
+      }
+      banner={
+        loadAudit ? (
+          <Banner kind="notice" onDismiss={() => setLoadAudit(null)} dismissLabel={t('close')}>
+            {loadAudit.failed.length
+              ? t('loadPartial', {
+                  restored: loadAudit.total - loadAudit.failed.length,
+                  total: loadAudit.total,
+                  lines: analyticBidi.isolateLtrRuns(loadAudit.failed.map((f) => f.line).join(' · ')),
+                })
+              : t('loadRestored', { total: loadAudit.total })}
+          </Banner>
+        ) : undefined
+      }
       roster={roster}
       activeProductId="analytic"
       switcherLabel={t('switcherLabel')}
@@ -310,6 +485,17 @@ export function App() {
         closeLabel: t('close'),
       }}
     >
+      {/*
+        The load target must OUTLIVE any menu that opens it, so the input lives here and a button
+        only clicks it — the sibling learned that when its overflow menu unmounted mid-click.
+      */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".json,application/json"
+        style={{ display: 'none' }}
+        onChange={onLoadFile}
+      />
       <Workbench
         emptyOverlay={
           lines.length === 0 ? (
@@ -324,6 +510,8 @@ export function App() {
         }
         inputZone={
           <>
+            {/* The figure's NAME — what a save is called (#1087), in the sibling's position. */}
+            <FigureName value={name} onChange={setName} placeholder={t('namePlaceholder')} />
             <InputArea
               value={draft}
               onChange={setDraft}
@@ -334,6 +522,18 @@ export function App() {
               quickCommands={lines.length > 0 ? QUICK_COMMANDS : undefined}
               onQuickCommand={submit}
               quickDir={() => 'rtl'}
+              /**
+               * THE BIDI SEAMS, all four, as the siblings pass them (#1088).
+               *
+               * Operator, 2026-09-16: *"input panel needs to support bidi in the same way we have
+               * for the other tools"*. Every line in this product is a Hebrew sentence carrying an
+               * equation, so an unisolated LTR run does not merely look odd — it reorders the
+               * equation's characters, and the student reads a formula they did not write.
+               */
+              quickDisplay={(c) => analyticBidi.isolateLtrRuns(c)}
+              preview={(s) => analyticBidi.inputPreview(s)}
+              previewDir={(s) => analyticBidi.textDir(s)}
+              boxDir={(s) => analyticBidi.textDir(s)}
             >
               {errorText && (
                 <p role="alert" style={{ color: color.danger, fontSize: fs.small, margin: '8px 0 0' }}>
@@ -359,6 +559,7 @@ export function App() {
                 error: d.faults.find((f) => f.index === i)?.detail,
               }))}
               emptyHint={t('factsEmpty')}
+              editDir={(s) => analyticBidi.textDir(s)}
               editValueOf={(id) => lines[Number(id)] ?? ''}
               onEditCommit={(id, next) => {
                 const i = Number(id);
@@ -639,6 +840,36 @@ export function App() {
           </DataPanel>
         }
       />
+      {/*
+        THE MANUAL (#1087) — this product has a command catalog and had no screen showing it, so the
+        only way to learn the grammar was to guess. Every entry is one the parse lock already proves
+        builds, so the guide cannot advertise a sentence the tool cannot read.
+      */}
+      <ManualScreen
+        open={manualOpen}
+        onClose={() => setManualOpen(false)}
+        title={t('manualTitle')}
+        intro={t('manualIntro')}
+        closeLabel={t('close')}
+        tryHint={t('manualTry')}
+        sectionCap={6}
+        moreNote={t('manualMore')}
+        sections={MANUAL_SECTIONS.map((section) => ({
+          key: section.key,
+          title: t(section.titleKey),
+          entries: COMMAND_CATALOG_ANALYTIC.filter((e) => e.category === section.key).map((e) => {
+            const raw = i18n.language === 'he' ? e.he : e.en;
+            return {
+              example: analyticBidi.isolateLtrRuns(raw),
+              dir: analyticBidi.textDir(raw) as 'rtl' | 'ltr',
+              onTry: () => {
+                setManualOpen(false);
+                submit(raw);
+              },
+            };
+          }),
+        })).filter((s) => s.entries.length > 0)}
+      />
     </AppFrame>
   );
 }
@@ -798,6 +1029,24 @@ function pointText(
 const braced = (text: string): string => text.replace(/([A-Za-z])_([A-Za-z0-9]+)/g, '$1_{$2}');
 
 const ValueRow = ({ text }: { text: string }) => <MathText text={braced(text)} />;
+
+/**
+ * The manual's sections, in teaching order (#1087).
+ *
+ * The CATEGORIES are the catalog's own; what this adds is the order a student meets them in, which
+ * is a pedagogical choice and not a property of the grammar — points before the things built on
+ * them, relations last because they are statements ABOUT a figure.
+ */
+const MANUAL_SECTIONS = [
+  { key: 'points' as const, titleKey: 'manualPoints' },
+  { key: 'lines' as const, titleKey: 'manualLines' },
+  { key: 'circles' as const, titleKey: 'manualCircles' },
+  { key: 'conics' as const, titleKey: 'manualConics' },
+  { key: 'shapes' as const, titleKey: 'manualShapes' },
+  { key: 'derived' as const, titleKey: 'manualDerived' },
+  { key: 'relations' as const, titleKey: 'manualRelations' },
+  { key: 'parameters' as const, titleKey: 'manualParameters' },
+];
 
 /** An answered question, reading like the inventory rows it sits under. */
 const askRow: CSSProperties = {

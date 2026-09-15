@@ -679,7 +679,7 @@ export function evaluate(raw: Construction, seed = 0): Figure {
     selectorsOk: selectorsHold(c, placed),
     carrierDof: carrierDofOf(c, env, free, ids),
     provenance: Object.fromEntries(
-      points.map((p) => [p.id, provenanceOf(c, p.id, env) ?? { x: { known: false }, y: { known: false } }]),
+      points.map((p) => [p.id, provenanceOf(c, p.id, env, curves) ?? { x: { known: false }, y: { known: false } }]),
     ),
   };
 }
