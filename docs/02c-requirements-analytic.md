@@ -75,6 +75,13 @@ discarded — it stops being the model and becomes *how an equation identifies w
 > **Timing:** this is the cheapest moment the decision is available — one slice built, nothing
 > deployed, no student input. Re-founding later costs every slice built on the old shape as well.
 
+> **RATIFIED — [ADR-AG-009](06c-decisions-analytic.md#adr-ag-009) (2026-09-15).** The operator
+> re-affirmed R1 and directed that the re-founding is the **next slice**, ahead of the relations lane
+> [docs/19 §7](19-analytic-geometry-tool.md) had sequenced first. The consequence above is discharged
+> there: ADR-AG-006 D1 is superseded as a statement about the *model* and retained as a statement about
+> *curve objects*. The timing note held — nothing was built on either shape in the interval, and the
+> three §5 questions were measured through the real path before the ADR was written.
+
 **R2 — The gauge starts free and coordinates consume it.** This is the genuine difference from the
 synthetic tool and most of the engine's spec in one sentence. In `src/` the gauge is *always* free —
 position, rotation and scale are never givens. Here «משולש שווה שוקיים ABC» with no coordinates draws
@@ -97,7 +104,18 @@ layer and a second catalog half for the shape vocabulary.
 | 2 | some coordinates + one shape constraint (`\|AB\| = \|AC\|`) | 1–2 unknowns, the sanctioned numeric root-find |
 | 3 | unanchored with several interacting constraints | a general constraint solver — i.e. the synthetic engine again |
 
-Tier 3 is the boundary between "V1" and "a second constructive engine". **Open: where V1 stops.**
+Tier 3 is the boundary between "V1" and "a second constructive engine". ~~**Open: where V1 stops.**~~
+
+> **RESOLVED — tier 3, by transplant ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009), 2026-09-15).**
+> Measured before ruling, and the table's own framing was the thing that needed correcting. Tier 2 does
+> **not** reach the corpus: §5a interacts a partly-anchored parallelogram, an area value and two
+> tangencies, and §5c derives every vertex from two side lines plus a ratio. And tier 3's *"i.e. the
+> synthetic engine again"* overstates the cost — the synthetic engine's solve core is small and already
+> exists twice (`src/engine/carriers.ts` classifies the DOF, `solve.ts` supplies per-constraint
+> residuals, `evaluate.ts` minimises `Σ jointCostTerm` across every carrier). The 14,102 lines in
+> `src/engine` are overwhelmingly **grammar**, not solver, and grammar breadth is paid per corpus
+> question at either tier. So the **core is transplanted and the grammar is not**; every construct
+> beyond the core is justified by a corpus question or it does not come across.
 
 ---
 
@@ -487,6 +505,51 @@ a **named result that crosses parts**, where a quantity *derived* in part א bec
 3. **R17** — may a stated shape noun narrow a parameter's domain?
 4. **R18** — DOF reporting: passive only, or may it prompt?
 5. **R20** — equation toggle: a single global «הצג משוואות» is likely enough now that R21 makes it a legibility control rather than a gate. Per-object display only if a case demands it.
-6. **R5 / 5b** — where V1 stops: tier 2 vs tier 3, and part ג in or out.
+6. ~~**R5 / 5b** — where V1 stops: tier 2 vs tier 3~~ — **tier 3, by transplant**
+   ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009)). Still open: **part ג of 5b in or out.**
 7. **R28** — what bounds "all computable" in the data panel: pairwise, named-only, or grouped?
 8. The conic-slot removal needs its own ADR superseding the slot decision.
+
+---
+
+## 7 — The teacher lane ([ADR-AG-010](06c-decisions-analytic.md#adr-ag-010))
+
+Sections 1–6 are entirely student-facing, which was an omission rather than a decision: the workspace
+has named teachers and authors a secondary audience since [01 §Audience](01-vision.md), and the three
+shipped products serve them through the shared image and `.docx` export. This section is the analytic
+product's own answer, ruled by the operator on 2026-09-15.
+
+**The asymmetry that makes the question sharper here.** P1's defining fact cuts both ways. 17 of 20
+sampled Q1s print no figure, so the student has nothing to reproduce — and the **teacher preparing that
+lesson has nothing to project or photocopy either**, and must build the coordinate diagram by hand in a
+general construction tool. That is exactly the tedium [01](01-vision.md) named for the authoring
+audience, met at its worst.
+
+**R33 — Worksheet authoring is in scope, on the mechanism that already ships.** A teacher builds the
+figure by describing it and takes away the figure plus its givens: the clean image ([FR-HS-5](02-requirements.md))
+and the `.docx` question page ([FR-HS-11](02-requirements.md), [ADR-251](06-decisions.md#adr-251)),
+inherited from `shell/` rather than re-derived. This is a **conformance-and-fit** requirement, not a new
+capability — what it asks is that the exports are actually good enough to put in front of a class, and
+that this is played rather than assumed.
+
+**R34 — Live demonstration is a design condition, not a feature.** «הציגו תצורה אחרת» and R22's
+determinacy signal are already built, and the ruling is that they are designed and played **for
+projection**: legible at a distance, and the configuration cycle visible as a *change* rather than as a
+figure that silently differs. The teaching content is the thing the tool is uniquely placed to show —
+*why a question has two answers*, and *the moment a set of givens becomes sufficient* (R22).
+
+**R35 — No teacher mode, no role, no separate surface.** The three shipped products have none
+([02 §Actors](02-requirements.md): *"no authentication or distinct roles in v1; all are the same
+anonymous user"*), and nothing here creates one. A teacher uses the student's tool.
+
+**R36 — The teacher lane is gated by expressiveness, not by chrome.** A teacher cannot author an
+analytic worksheet until the tool can build the figure, so R33 and R34 are paid for at
+[ADR-AG-009](06c-decisions-analytic.md#adr-ag-009)'s B3 gate (§5a and §5c building), not before it.
+Stating this prevents the predictable mistake of polishing an export for figures the tool cannot yet
+produce.
+
+**Offered and NOT taken — a corpus question library.** The twenty 572 Q1s as loadable saved figures a
+teacher opens as a starting point. It is nearly free once the tool can express them, because the
+validation fixtures and a teacher's question bank would be the same files, and
+[FR-HS-10](02-requirements.md) already names a built-in library as future. The operator did not select
+it. **Not rejected on the merits — not in scope now**, and nothing above forecloses it.

@@ -71,8 +71,14 @@ applied to the fourth.
 - **Test coverage is thin by the workspace's standards** — 2 test files and ~460 test lines against
   ~2,350 source lines, where the mature trees run better than 1:1. Appropriate for a V0 in build, and
   worth stating plainly so it is a known position rather than an oversight discovered later.
-- **`02c` is still marked IN PROGRESS.** It was captured live from an operator session and its decisions
-  are not all ratified as `ADR-AG-NNN` yet; where it and [docs/19](19-analytic-geometry-tool.md)
-  disagree, docs/19 is authoritative until they are.
+- **`02c` is still marked IN PROGRESS**, though less of it is open than was. It was captured live from an
+  operator session and its decisions are not all ratified as `ADR-AG-NNN` yet; where it and
+  [docs/19](19-analytic-geometry-tool.md) disagree, docs/19 is authoritative until they are. **Ratified
+  since:** R1/R2/R5 — the object-first model and the tier-3 solve
+  ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009)) — and the teacher lane, 02c §7
+  ([ADR-AG-010](06c-decisions-analytic.md#adr-ag-010)).
+- **This document describes the EQUATION-FIRST tree, and stays accurate until ADR-AG-009's B1 lands.**
+  "The three cores" and "Shape" above are a true account of the code as it stands. They are rewritten in
+  the slice's own commit, never in advance of it — an orientation doc describes what exists.
 - **Not deployed** (above). The readmission path is mechanical: flip `enabled` to `true` and drop
   `devOnly` in [`products.json`](../products.json), and add its RUNBOOK row.

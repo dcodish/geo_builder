@@ -523,3 +523,162 @@ classifier's code rather than from a run — the same class as its sibling defec
 a recorded `check-sibling-safety` PASS ([ADR-W-039](06w-decisions-workspace.md#adr-w-039)) had been
 produced by an env var CI could never set. Both were found by running the thing instead of reading
 it; the tests above are what make the claim self-checking from here.
+
+---
+
+## ADR-AG-009 — The model is OBJECT-FIRST; an equation is one way to STATE an object (2026-09-15)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R1, R2, R5 — ratified by this ADR; §5a–5d are its
+evidence. **Design:** [04c](04c-design-analytic.md) "The three cores" and "Shape" — rewritten when the
+slice lands, not in advance of it.
+
+**Context.** The operator ruled on 2026-09-04 that *"the base is geometry with coordinates, because that
+is how the bagrut is built"* — the primitive is the **geometric object** (point, segment, polygon,
+circle, conic), and an equation, a shape noun, or a coordinate pair are three ways a student can *state*
+one. It was captured as [02c](02c-requirements-analytic.md) R1, which flagged its own urgency: *"this is
+the cheapest moment the decision is available — one slice built, nothing deployed, no student input.
+Re-founding later costs every slice built on the old shape as well."*
+
+Eleven days passed and nothing was built on either shape, so the moment is intact. The operator
+re-affirmed the ruling on 2026-09-15 and directed that the **re-founding is the next slice**, ahead of
+the relations (tangency, intersections, the pin) that [docs/19 §7](19-analytic-geometry-tool.md) had
+sequenced first.
+
+**Measured, not assumed.** The three corpus questions in [02c §5](02c-requirements-analytic.md) were run
+through the real `parse → fold → evaluate` path before this was written:
+
+| case | points | curves | outcome |
+| --- | --- | --- | --- |
+| §5a parallelogram + tangent circle | 2 | 0 | 3 of 5 lines refused |
+| §5c triangle by side equations | 0 | 0 | **every line refused** |
+| §5d right triangle, hypotenuse by equation | 1 | 0 | 3 of 4 lines refused |
+| control — point + circle + parabola, all by equation | 1 | 2 | clean |
+
+They do not half-work. §5a's own conclusion — *"an equation-first model cannot express this question at
+all"* — is confirmed from the code rather than from the reading.
+
+**Decision.**
+
+1. **The object is the primitive.** A construction is a dependency graph of geometric objects, each
+   classified by degrees of freedom, exactly as the three siblings model it. A **curve carrying an
+   implicit equation is one object kind among several**, not the model.
+2. **An equation is a STATEMENT FORM, and so is a shape noun, and so is a coordinate pair.** «מקבילית
+   ABCD», `A(3,5)` and `y = x−1` are three ways to say something about the same graph. This is R6 already
+   ruled: the shape noun is optional for an equation and load-bearing for a shape.
+3. **The exact conic fit is kept and demoted.** [ADR-AG-006](#adr-ag-006) D1's *"a curve is ONE thing"*
+   is **superseded as a statement about the model** and **retained as a statement about curve objects**:
+   the seven-probe fit stops being how the product is built and becomes *how an equation identifies which
+   object it names*. Nothing in `conic.ts` is discarded. The canonicity gate and its refusal wiring
+   ([ADR-AG-008](#adr-ag-008)) are untouched.
+4. **The gauge stays pinned, and coordinates stay knowledge.** R2's *"the gauge starts free and
+   coordinates consume it"* is the genuine new behaviour: «משולש שווה שוקיים ABC» with no coordinates
+   draws generically, and `A(0,0)` then `B(4,0)` progressively anchor it. `isKnowledge` generalises to
+   cover it with **no new mechanism** (R3) — an unanchored vertex varies by seed and prints `—`; anchor it
+   and it prints.
+
+**The tier question is settled by measurement, and it is cheaper than 02c assumed.**
+[02c](02c-requirements-analytic.md) R5 tiers the solve cost and calls tier 3 *"a general constraint
+solver — i.e. the synthetic engine again"*, which reads as a reason to stop at tier 2. Two facts decide
+it instead:
+
+- **Tier 2 does not reach the corpus.** §5a interacts a partly-anchored parallelogram, an area value and
+  two tangencies; §5c derives every vertex from two side lines plus a segment ratio. Both exceed "some
+  coordinates plus one shape constraint". Stopping at tier 2 would re-found the model and still not
+  express the questions the re-founding is *for*.
+- **Tier 3 is not an invention — it exists twice and its core is small.** `src/engine/evaluate.ts`
+  minimises `Σ jointCostTerm` over every constraint across every carrier; `src/engine/carriers.ts` is the
+  exhaustive DOF classification (free vertex 2, parametric point 1, on-line offset 1, shape scalar 1);
+  `src/engine/solve.ts` supplies the per-constraint residuals and the 1-DOF root-find whose roots are the
+  branch index. The 14,102 lines in `src/engine` are overwhelmingly **grammar** — `apply.ts` alone is
+  2,484 — and grammar breadth is paid per corpus question whichever tier is chosen.
+
+So: **tier 3, by transplanting the carrier/DOF + joint-solve core; NOT by transplanting the 2-D
+grammar.** The core is small, twice proven (2-D and 3-D), and copied rather than imported — R4 and
+[BOUNDARIES.json](../BOUNDARIES.json) are unchanged, and the cost of a third copy is the acknowledged
+price of the product boundary, not a new argument.
+
+**What this does NOT license.** The NO-CAS boundary ([ADR-AG-001](#adr-ag-001) D1) is untouched: a
+numeric residual minimiser is not symbolic algebra, and the escalation route is unchanged. Nothing here
+authorises simplifying, solving or manipulating an expression symbolically.
+
+**Staging.** The re-founding is a slice, not a rewrite; the four families that build today
+([ADR-AG-006](#adr-ag-006)) must still build when it lands, which is the acceptance condition that keeps
+it honest.
+
+| stage | content | gate |
+| --- | --- | --- |
+| **B1 — the graph** | Objects, carrier/DOF classification, topological evaluate, the free-DOF sampler and the seed. Equation-curves become one object kind. | Every V0 slice-A catalog entry still builds, and the DOF cue is visible |
+| **B2 — the joint solve** | Per-constraint residuals, the joint minimisation, roots as branches, `no-roots` as an honest contradiction | A partly-anchored shape draws generically and anchors as coordinates arrive (R2/R3) |
+| **B3 — the shape vocabulary** | Shape nouns carrying their own constraints, sides addressable as lines, vertices derived from intersections, the axes as objects | **§5a and §5c build**, both possibilities cycled, nothing silently defaulted |
+
+The relations lane ([docs/19 §7](19-analytic-geometry-tool.md) V0's tangency/intersection/pin) is
+**not cancelled and not re-sequenced away** — it lands on B1's object layer, where a tangency is a
+relation between two objects rather than a special case of two equations. Its corpus gate (קיץ א' 2022)
+stands.
+
+**Risks, named.**
+
+- **The re-founding must not become a second 2-D tool.** The transplant is the carrier/DOF core and the
+  joint solve. Every construct beyond that is justified by a corpus question or it does not come across.
+- **`isKnowledge` is doing more work after this, not less.** R16 is still open and now matters more: a
+  value must be invariant across the **discrete** branch choices too, and today the gate re-evaluates
+  across seeds only.
+- **[#1014](https://github.com/dcodish/geo_builder/issues/1014) sits inside B1.** The free-DOF register
+  being fed by declarations rather than by the expressions is precisely the register B1 rebuilds, so the
+  fix belongs to that slice rather than ahead of it.
+- **`src-analytic/CLAUDE.md` and [04c](04c-design-analytic.md) describe the equation-first tree and stay
+  accurate until B1 lands.** They are orientation files for code that exists; they change with the slice,
+  in its commit, never in advance of it.
+
+---
+
+## ADR-AG-010 — The teacher lane: authoring and live demonstration are in scope (2026-09-15)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §7 (new — the teacher lane); workspace
+[01 G6](01-vision.md), [02 US-11](02-requirements.md). **Design:** none (internal) — the mechanisms are
+`shell/`'s existing export and canvas controls; no new design section until a slice needs one.
+
+**Context.** [02c](02c-requirements-analytic.md) was captured live from the 2026-09-04 session and is
+entirely student-facing: it contains **no teacher content at all**. The workspace vision has named
+teachers and authors as a secondary audience since [01 §Audience](01-vision.md) — *"preparing problems,
+demonstrating them live, and authoring materials"* — and the siblings serve them through the shared PNG
+and `.docx` export ([FR-HS-5](02-requirements.md), [FR-HS-11](02-requirements.md)). The analytic product
+inherited that chrome and never asked what, if anything, it owed the audience specifically.
+
+**Why the question is sharper here than in the siblings.** The product's defining fact cuts both ways.
+17 of 20 sampled Q1s print no figure, so the student has nothing to reproduce — and the **teacher
+preparing that lesson has nothing to project or photocopy either**, and must build coordinate diagrams by
+hand in a general tool. That is the tedium [01](01-vision.md) named as the authoring case, at its worst,
+and it is why this is worth a ruling rather than an assumption.
+
+**Decision** (operator, 2026-09-15, choosing from four candidates):
+
+- **IN — worksheet authoring and export.** The figure plus its givens as a clean image and a `.docx`
+  page fit for a worksheet or an exam. The mechanism is already built and shipped in the 2-D tool
+  ([ADR-251](06-decisions.md#adr-251), FR-HS-11) and the chrome is inherited from `shell/`, so this is
+  a conformance-and-fit question, not a new capability.
+- **IN — live classroom demonstration.** «הציגו תצורה אחרת» is designed as a **teaching device** — the
+  way a teacher shows a class *why* a question has two answers — and R22's determinacy signal as a live
+  demonstration of *"were your givens enough?"*. Both are existing behaviours; what this ruling adds is
+  that they are designed and played **for projection**, not only for a student at a laptop.
+- **OUT, for now — a corpus question library.** The twenty 572 Q1s as loadable saved figures was offered
+  (it is nearly free once the tool can express them, since the validation fixtures and a teacher's
+  question bank would be the same files, and [FR-HS-10](02-requirements.md) already calls it "future").
+  The operator did not take it. It is **not rejected on the merits** — it is not in scope now, and
+  nothing in this ADR forecloses it.
+
+**What follows.**
+
+- The teacher lane is **requirements, not a slice of its own**: it is recorded in
+  [02c §7](02c-requirements-analytic.md), and the acceptance gates of the slices that make the tool
+  expressive enough to author with are where it is actually paid for. A teacher cannot author an analytic
+  worksheet until the tool can build the figure, so [ADR-AG-009](#adr-ag-009)'s B3 gates this too.
+- **Projection is a play condition, not a feature.** Where a case in a play sheet exercises the
+  demonstration lane, it says so — legibility at a distance, and the configuration cycle visible as a
+  *change*, which is what [#1009](https://github.com/dcodish/geo_builder/issues/1009) is already building
+  for the 2-D tool.
+
+**Deliberately not decided.** Whether the teacher audience ever justifies a distinct mode, role or
+surface. Nothing in the three shipped products has one ([02 §Actors](02-requirements.md): *"no
+authentication or distinct roles in v1; all are the same anonymous user"*), and this ruling does not
+create one.

@@ -11,7 +11,10 @@ multipart is a workspace model), conformance as a V0 gate by
 [ADR-AG-004](06c-decisions-analytic.md#adr-ag-004), and the **input language** (§10) by
 [ADR-AG-005](06c-decisions-analytic.md#adr-ag-005). **V0 slice A BUILT**
 ([ADR-AG-006](06c-decisions-analytic.md#adr-ag-006)) — the tree is registered and the tool draws;
-it is deliberately **not deployed** ([ADR-AG-007](06c-decisions-analytic.md#adr-ag-007)).**_
+it is deliberately **not deployed** ([ADR-AG-007](06c-decisions-analytic.md#adr-ag-007)).
+**§7 RE-SEQUENCED 2026-09-15** by [ADR-AG-009](06c-decisions-analytic.md#adr-ag-009): the object-first
+re-founding ([02c](02c-requirements-analytic.md) R1) comes before the relations lane, and the
+requirements contract — not this plan — is where the model now lives.**_
 
 The 2-D Geo Builder is **synthetic** plane geometry: relations → a figure, coordinates deliberately
 derived and non-unique. The 3-D Space Builder is **space** — vectors on solids, planes by equation
@@ -282,6 +285,13 @@ fact).
 > so no deployed builder can render a chip pointing at a path that would 404; `devOnly: true` keeps
 > the tool in its own switcher locally. Undeploying is one registry line plus a RUNBOOK row.
 
+> **RE-SEQUENCED, 2026-09-15 — [ADR-AG-009](06c-decisions-analytic.md#adr-ag-009).** The **object-first
+> re-founding** ([02c](02c-requirements-analytic.md) R1, ruled 2026-09-04 and ratified now) comes
+> **before** V0's relations lane, as slices **B1 → B3**. The reason is measured, not stylistic: run
+> through the real path, [02c §5](02c-requirements-analytic.md)'s three corpus questions produce
+> *nothing* on the equation-first model — §5c refuses every line. The relations below are not cancelled
+> and their gate stands; they land on B1's object layer, where a tangency is a relation between two
+> objects rather than a special case of two equations. Slice contents and gates: ADR-AG-009 §Staging.
 
 - **V0 — substrate + tangency** (D2). Axes and the pinned gauge · the four curve types **by
   equation** · point-on, curve∩curve intersections, point–line distance · all five tangency kinds ·
