@@ -1608,3 +1608,69 @@ points, independently of the solver's own verdict.
 than the phrasings. The equal-length kind is the one [#1049](https://github.com/dcodish/geo_builder/issues/1049)
 needs for «ריבוע ABCD» (a rectangle plus `AB = BC`), so the shape-noun round consumes this rather than
 defining its own — the same reason #1052 and #1051 were bundled.
+
+## ADR-AG-026 — A name can be a geometric CLAIM, and «הישר AB» is one (#1066)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R50. **Design:**
+[04c](04c-design-analytic.md) "Relations, and the direction resolver" — the resolver now hands over
+whole curves.
+
+**Context.** The operator, playing PR #1064: «משוואת הישר AB היא y=2x» drew a line, and `A` and `B`
+were nowhere near it. Measured, the decisive case is worse than the screenshot:
+
+```
+A(0,0) · B(5,1) · משוואת הישר AB היא y=2x   → faults: []   B(5,1) on y=2x? NO
+```
+
+Both points fully placed, the student names the line **through them**, gives its equation, and the tool
+accepts it in silence while drawing a line that misses `B`.
+
+**The defect was never missing geometry — it was a name nothing was checking.** `matchCurve` mints
+`line-<name>` for any `LINE_NAME`, and `LINE_NAME` admits both `ℓ1` and a two-point run. For `ℓ1` that
+is right: **an arbitrary name asserts nothing.** For `AB` it is not: **«הישר AB» asserts that the line
+passes through A and through B.** The id merely happened to read `line-AB`, and the figure held two
+unrelated things sharing a name.
+
+This is the class this product spent the day on — [ADR-AG-017](#adr-ag-017)'s name that lies — reaching
+a place neither that ADR nor [#1062](https://github.com/dcodish/geo_builder/issues/1062) touched,
+because nothing was wrong with the constraint layer: **there was no constraint at all.**
+
+**Decision.**
+
+1. **A two-point line name lowers to INCIDENCES.** «משוואת הישר AB היא y=2x» emits `declare A`,
+   `declare B` and two `on-curve` constraints. The curve object stays, so the line still draws and the
+   panel still carries its equation.
+2. **Operator ruling, 2026-09-15: introduce the points, with DOF** — *"when A and B don't exist yet …
+   introduce them with dof"*. That matches the shape nouns ([ADR-AG-013](#adr-ag-013)): a line NAMED by
+   two points is naming them, not mentioning them in passing, and «M אמצע AB»'s refusal is for a
+   sentence that merely *refers*. Measured: two introduced points at 2 DOF each, minus one incidence
+   each, leaves the figure at **2 DOF** — the points slide along the line and the line stays put.
+3. **`on-curve` is the first member of a family named in slice A and left empty.** `carriers.ts` has
+   declared `CarrierFamily = 'free' | 'on-curve'` since the beginning with no members; this is the kind
+   that fills it. `on-line` stays for the axes, whose coefficients are known without a figure.
+4. **The caller-supplied resolver widens from a DIRECTION to a whole curve.** ADR-AG-024 had `evaluate`
+   hand `solve.ts` a line's direction; an incidence needs the curve's own residual, and a direction is
+   meaningful only for a line. So the resolver returns the `NumCurve` and `solve.ts` derives the
+   direction where the distinction already lives. `curves.ts` already owns the distance-like residual
+   for every family, which is what keeps *"is this point on this line"* and *"does this line pass
+   through this point"* one answer instead of two.
+
+**Nothing new was built.** `declare` existed for the cevian rule, the `free` kind for #1017, the
+residual in `curves.ts` since slice A. The fix is a **lowering** decision at the parser, plus widening a
+resolver by one type.
+
+**It only reports the placed case because #1062 landed first.** `A(0,0) B(5,1)` has no free carrier, so
+before the check was separated from the solve this would have gone on being accepted in silence — the
+refusal above is #1062's separation doing its work in a place it was not written for.
+
+**The control is the whole point.** «נתון הישר l1: y=2x» beside a triangle still constrains nothing and
+leaves the figure at 6 DOF. If that ever changes, this ADR has been mis-implemented: the decision is
+about **names**, not about lines.
+
+**Consequences.** `src-analytic` 295 → 301 tests. One existing case was rewritten rather than deleted:
+`carriers.test.ts`'s "keeps ids in disjoint spaces" enumerated `['A', 'line-AC', 'circle-I']` and now
+sees `C` introduced. It asserts the **invariant** it is named after — a point id is a bare letter, a
+curve id is namespaced, and the two cannot collide — instead of a population that this ADR was entitled
+to change.

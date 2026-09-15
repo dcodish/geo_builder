@@ -23,7 +23,8 @@
  * figure that violates its own givens is the defect this whole product is built to avoid.
  */
 import { evalExpr, type Env } from './expr';
-import type { Id } from './types';
+import type { Id, NumCurve } from './types';
+import { residual as curveResidual } from './curves';
 import {
   describeLengthExpr,
   evalLengthExpr,
@@ -90,7 +91,19 @@ export type Constraint =
    * the whole reason it exists: `AB = 10`, `AB = AC`, `AB + BC = 10` and `2·AB = 3·CD` are one
    * kind with different trees rather than four kinds with one form each.
    */
-  | { t: 'length-eq'; left: LengthExpr; right: LengthExpr };
+  | { t: 'length-eq'; left: LengthExpr; right: LengthExpr }
+  /**
+   * A point lies ON a named curve (#1066).
+   *
+   * `on-line` above carries NUMERIC coefficients and exists for the axes, whose direction is
+   * known without a figure. This one names the curve instead, so the coefficients come from the
+   * resolved equation and may carry parameters — and so «משוואת הישר AB היא y=2x» can say the
+   * thing it actually means: `A` and `B` are ON that line.
+   *
+   * It is the first member of the `on-curve` carrier family `carriers.ts` named in slice A and
+   * left empty.
+   */
+  | { t: 'on-curve'; id: Id; curve: Id };
 
 /** Which points a constraint references — the solver's map from constraints to movable carriers. */
 export function constraintRefs(k: Constraint): Id[] {
@@ -111,6 +124,8 @@ export function constraintRefs(k: Constraint): Id[] {
       return dirRefs(k.u);
     case 'length-eq':
       return [...lengthRefs(k.left), ...lengthRefs(k.right)];
+    case 'on-curve':
+      return [k.id];
     default: {
       const unreferenced: never = k;
       throw new Error(`constraint declares no refs: ${JSON.stringify(unreferenced)}`);
@@ -137,6 +152,8 @@ export function describeConstraint(k: Constraint): string {
       return `שיפוע ${describeDir(k.u)}`;
     case 'length-eq':
       return `${describeLengthExpr(k.left)} = ${describeLengthExpr(k.right)}`;
+    case 'on-curve':
+      return `${k.id} על ${k.curve}`;
     default: {
       const undescribed: never = k;
       throw new Error(`constraint has no description: ${JSON.stringify(undescribed)}`);
@@ -188,7 +205,7 @@ function describeDir(d: Direction): string {
 function dirVector(
   d: Direction,
   at: (id: Id) => Pt | null,
-  lineDir?: (id: Id) => Pt | null,
+  curveAt?: (id: Id) => NumCurve | null,
 ): Pt | null {
   let v: Pt | null = null;
   switch (d.k) {
@@ -203,9 +220,15 @@ function dirVector(
       // The axes need no resolution and no figure — that is why they are cheap operands, and why
       // «AB מקביל לציר ה-x» works before anything else on the canvas is determined.
       return d.axis === 'x' ? { x: 1, y: 0 } : { x: 0, y: 1 };
-    case 'curve':
-      v = lineDir?.(d.id) ?? null;
+    case 'curve': {
+      // For `ax + by + c = 0` the direction is `(−b, a)`: the normal is `(a, b)`, and a line runs
+      // perpendicular to its own normal. Only a LINE has a single direction — a circle or a conic
+      // has a different tangent at every point, so relating one is not this constraint’s business.
+      const c = curveAt?.(d.id) ?? null;
+      if (!c || c.kind !== 'line') return null;
+      v = { x: -c.b, y: c.a };
       break;
+    }
     default: {
       const unresolved: never = d;
       throw new Error(`direction cannot be resolved: ${JSON.stringify(unresolved)}`);
@@ -247,11 +270,16 @@ export function residual(
   at: (id: Id) => Pt | null,
   env: Env,
   /**
-   * A named line's direction, when the figure has one (#1052). Optional because most constraints
-   * never ask: only a relation or a slope naming a LINE needs the figure's curves, and a caller that
-   * has no curves resolved simply hands nothing and those operands report "cannot be judged".
+   * The figure's resolved curves, when the caller has them (#1052, #1066).
+   *
+   * Optional because most constraints never ask: only a relation, a slope or an incidence naming a
+   * CURVE needs them, and a caller that has none simply hands nothing — those operands then report
+   * "cannot be judged", exactly as an absent point does.
+   *
+   * A resolver rather than a lookup so `solve.ts` never learns about the classifier: it knows
+   * points by id, and everything else arrives already resolved.
    */
-  lineDir?: (id: Id) => Pt | null,
+  curveAt?: (id: Id) => NumCurve | null,
 ): number[] | null {
   const pts = constraintRefs(k).map(at);
   if (pts.some((p) => p === null)) return null;
@@ -290,15 +318,15 @@ export function residual(
       return [(u.x * v.x + u.y * v.y) / n];
     }
     case 'relation': {
-      const u = dirVector(k.u, at, lineDir);
-      const v = dirVector(k.v, at, lineDir);
+      const u = dirVector(k.u, at, curveAt);
+      const v = dirVector(k.v, at, curveAt);
       if (!u || !v) return null;
       // Both unit, so each product is already in [-1, 1] and needs no further scaling. Parallel
       // drives the CROSS product to zero, perpendicular the DOT — the only difference between them.
       return [k.rel === 'parallel' ? u.x * v.y - u.y * v.x : u.x * v.x + u.y * v.y];
     }
     case 'slope': {
-      const u = dirVector(k.u, at, lineDir);
+      const u = dirVector(k.u, at, curveAt);
       if (!u) return null;
       const m = evalExpr(k.value, env);
       if (!Number.isFinite(m)) return null;
@@ -322,6 +350,16 @@ export function residual(
        * the larger figure dominate a joint solve purely because its numbers are bigger.
        */
       return [(l - r) / Math.max(1, Math.abs(l), Math.abs(r))];
+    }
+    case 'on-curve': {
+      const c = curveAt?.(k.curve) ?? null;
+      if (!c) return null;
+      /**
+       * `curves.ts` already owns the distance-like residual for every curve family, scale-
+       * normalised and zero exactly on the curve. Reusing it is what keeps "is this point on this
+       * line" and "does this line pass through this point" one answer rather than two.
+       */
+      return [curveResidual(c, p[0].x, p[0].y)];
     }
     default: {
       const unmeasured: never = k;

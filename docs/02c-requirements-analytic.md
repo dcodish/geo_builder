@@ -733,3 +733,11 @@ equation between two expressions over lengths. A length is never negative, so a 
 require one is reported as unsatisfiable, naming the student's own statement. **`AB` remains a line's
 name where the sentence says so** — «משוואת הישר AB היא y=2x» is corpus vocabulary too, and the two
 readings are separated by which rule the sentence reaches first, not by the token.
+
+**R50 — a NAME can be a geometric claim, and the tool honours it**
+([ADR-AG-026](06c-decisions-analytic.md#adr-ag-026)). «הישר AB» is the line **through A and B**, so
+giving its equation says something about those points: they lie on it. A student who states it over
+points already placed elsewhere is told, and one who states it before placing them has them introduced
+— free to slide along the line, which is the freedom the sentence actually leaves. An ARBITRARY name
+(«הישר ℓ1») asserts nothing about any point and constrains none; the difference between the two is the
+requirement.

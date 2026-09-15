@@ -228,7 +228,20 @@ describe('the object graph — one list, addressed by id across kinds', () => {
    */
   it('keeps ids in disjoint spaces, which is WHY the clash is unreachable here', () => {
     const c = build(['A(2,6)', 'משוואת הישר AC היא y=-2x+8', 'נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9']);
-    expect(c.objects.map((o) => o.id)).toEqual(['A', 'line-AC', 'circle-I']);
+    /**
+     * Asserts the INVARIANT rather than a list. It used to enumerate `['A', 'line-AC', 'circle-I']`,
+     * and #1066 changed the population: «הישר AC» now introduces `C`, because a line named by two
+     * points is a statement about those points. The enumeration failed; the invariant did not, and
+     * the invariant is what the case is named after — a point id is a bare letter, every curve id is
+     * namespaced by its kind, so no statement pair can make the two collide.
+     */
+    const ids = c.objects.map((o) => o.id);
+    const points = ids.filter((id) => /^[A-Z][0-9]?$/.test(id));
+    const curves = ids.filter((id) => /^(line|circle|curve|parabola|ellipse)-/.test(id));
+    expect(points).toEqual(['A', 'C']);
+    expect(curves).toEqual(['line-AC', 'circle-I']);
+    expect(points.filter((id) => curves.includes(id))).toEqual([]);
+    expect(points.length + curves.length).toBe(ids.length); // nothing in a third space
   });
 });
 

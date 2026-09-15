@@ -456,3 +456,64 @@ describe('#1050 — length arithmetic', () => {
     expect(r.ok && r.facts[0].t).toBe('curve');
   });
 });
+
+/**
+ * #1066 — a line NAMED by two points is a statement about those points.
+ *
+ * «הישר ℓ1» is an arbitrary name and asserts nothing. «הישר AB» asserts that the line passes through
+ * `A` and through `B`. The parser minted `line-AB` either way, so the figure held a line named after
+ * two points it did not touch — and with both points already placed the tool accepted it **in
+ * silence**, which is how the operator found it.
+ *
+ * Operator ruling, 2026-09-15: when the points do not exist yet, **introduce them, with DOF**.
+ */
+describe('#1066 — «משוואת הישר AB היא y=2x» constrains A and B', () => {
+  const onLine = (d: ReturnType<typeof derive>, id: string) => {
+    const p = d.figure.points.find((q) => q.id === id);
+    return p ? Math.abs(p.y - 2 * p.x) < 1e-6 : false;
+  };
+
+  it('REFUSES when the named points are placed off the line — the reported case', () => {
+    const d = derive(['A(0,0)', 'B(5,1)', 'משוואת הישר AB היא y=2x'], 0);
+    expect(d.faults.map((f) => f.code)).toEqual(['unsatisfiable']);
+  });
+
+  it('accepts when they are on it', () => {
+    const d = derive(['A(1,2)', 'B(3,6)', 'משוואת הישר AB היא y=2x'], 0);
+    expect(d.faults).toEqual([]);
+  });
+
+  it('INTRODUCES both points when neither exists, each with freedom along the line', () => {
+    const d = derive(['משוואת הישר AB היא y=2x'], 0);
+    expect(d.faults).toEqual([]);
+    expect(onLine(d, 'A')).toBe(true);
+    expect(onLine(d, 'B')).toBe(true);
+    // Two introduced points at 2 DOF each, minus one incidence each: the figure slides along the
+    // line and the line stays put. This number IS the operator's "with dof".
+    expect(d.figure.carrierDof).toBe(2);
+  });
+
+  it('pulls already-declared vertices onto the line', () => {
+    const d = derive(['משולש ABC', 'משוואת הישר AB היא y=2x'], 0);
+    expect(d.faults).toEqual([]);
+    expect(onLine(d, 'A')).toBe(true);
+    expect(onLine(d, 'B')).toBe(true);
+    expect(onLine(d, 'C')).toBe(false); // C is not named by the line, and must not be dragged onto it
+  });
+
+  it('an ARBITRARY name still asserts nothing — the regression guard', () => {
+    // `ℓ1` names no point, so it constrains none. This is the control that makes the case above a
+    // statement about NAMES rather than about lines.
+    const d = derive(['משולש ABC', 'נתון הישר l1: y=2x'], 0);
+    expect(d.faults).toEqual([]);
+    expect(onLine(d, 'A')).toBe(false);
+    expect(onLine(d, 'B')).toBe(false);
+    expect(d.figure.carrierDof).toBe(6); // untouched
+  });
+
+  it('a Roman-numeral CIRCLE is not caught by the two-point rule', () => {
+    const d = derive(['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9'], 0);
+    expect(d.faults).toEqual([]);
+    expect(d.figure.points).toEqual([]);
+  });
+});

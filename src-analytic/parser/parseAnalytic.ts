@@ -105,6 +105,14 @@ const NAME = '[A-Z][0-9]?';
 /** A line name: `ℓ`, `ℓ1`, `l`, `l1`, or a two-point run like `AC`. */
 const LINE_NAME = '(?:[ℓl][0-9]?|[A-Z][0-9]?[A-Z][0-9]?)';
 
+/**
+ * A line name that is TWO POINT NAMES — `AB`, `A1B2` — as opposed to an arbitrary one like `ℓ1`.
+ *
+ * The distinction is the whole of #1066: an arbitrary name asserts nothing about any point, while a
+ * two-point name asserts that the line passes through both of them.
+ */
+const TWO_POINT_NAME = new RegExp(`^(${NAME})(${NAME})$`);
+
 const trim = (s: string) => s.replace(/\s+/g, ' ').trim();
 
 // ---------------------------------------------------------------------------
@@ -799,6 +807,31 @@ export function parseLine(raw: string): ParseResult {
   } else if (curve) {
     const eq = equationExpr(curve.eqSrc);
     if (!eq) return { ok: false, code: 'bad-equation', detail: trim(curve.eqSrc) };
+    /**
+     * A line NAMED BY TWO POINTS is a statement about those points (#1066).
+     *
+     * «הישר ℓ1» is an arbitrary name and asserts nothing. **«הישר AB» asserts that the line passes
+     * through A and through B** — the name is a geometric claim. Minting a curve whose id merely
+     * happened to read `line-AB` left the figure holding a line that missed both points, and with
+     * both points already placed the tool accepted it in silence.
+     *
+     * Operator ruling, 2026-09-15: when A and B do not exist yet, **introduce them, with DOF** —
+     * matching the shape nouns (ADR-AG-013), because a line named by two points is naming them
+     * rather than mentioning them in passing. `declare` leaves each a 2-DOF free vertex and the two
+     * incidences take one each, so the figure sits at 2 DOF and the points slide along the line.
+     *
+     * Every piece of this already existed: `declare` (the cevian rule), the `free` kind (#1017) and
+     * the incidence. The defect was never missing geometry — it was a name nothing was checking.
+     */
+    const named = curve.kind === 'line' ? TWO_POINT_NAME.exec(curve.name) : null;
+    const through: Fact[] = named
+      ? [
+          { t: 'declare', id: named[1], src: line },
+          { t: 'declare', id: named[2], src: line },
+          { t: 'constraint', k: { t: 'on-curve', id: named[1], curve: curve.id }, src: line },
+          { t: 'constraint', k: { t: 'on-curve', id: named[2], curve: curve.id }, src: line },
+        ]
+      : [];
     return {
       ok: true,
       facts: [
@@ -809,6 +842,7 @@ export function parseLine(raw: string): ParseResult {
           curve: { kind: curve.kind, eq },
           src: line,
         },
+        ...through,
       ],
     };
   }

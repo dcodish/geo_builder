@@ -220,23 +220,24 @@ function place(c: Construction, env: Env, free: Map<Id, Pt>): Map<Id, Pt> {
 /** Carrier freedom left after the constraints — `carriers − rank(J)`, so dependent givens do not
  *  over-count (see `freeRank`). */
 /**
- * A named line's DIRECTION, for the relation vocabulary (#1052).
+ * The figure's resolved CURVES, for the constraints that name one (#1052, #1066).
  *
- * «הישר l1 מקביל לישר l2» relates two objects the constraint layer cannot see: `solve.ts` resolves
- * points by id and knows nothing about curves. Rather than teach it curves — which would drag the
- * whole classifier into the solver — the caller passes this resolver, and a `curve` operand that
- * cannot be resolved simply reports "cannot be judged", exactly as an absent point does.
+ * «הישר l1 מקביל לישר l2» relates a direction; «A על הישר AB» relates an incidence. Both name an
+ * object the constraint layer cannot see: `solve.ts` resolves points by id and knows nothing about
+ * curves. Rather than teach it curves — which would drag the whole classifier into the solver — the
+ * caller passes this resolver, and a curve that cannot be resolved reports "cannot be judged",
+ * exactly as an absent point does.
  *
- * For `ax + by + c = 0` the direction is `(−b, a)`: the normal is `(a, b)`, and a line runs
- * perpendicular to its own normal.
+ * It hands over the whole `NumCurve` rather than a direction, because an incidence needs the curve's
+ * own residual and a direction is only meaningful for a line. Deriving the direction is the caller’s
+ * job, in `solve.ts`, where the distinction between the two already lives.
  */
-function lineDirOf(c: Construction, env: Env): (id: Id) => Pt | null {
+function curveAtOf(c: Construction, env: Env): (id: Id) => NumCurve | null {
   return (id) => {
     const o = objectById(c, id);
     if (!o || o.kind !== 'curve') return null;
     const r = resolveCurve(o.curve, env);
-    if (!r.ok || r.curve.kind !== 'line') return null;
-    return { x: -r.curve.b, y: r.curve.a };
+    return r.ok ? r.curve : null;
   };
 }
 
@@ -248,7 +249,7 @@ function carrierDofOf(c: Construction, env: Env, free: Map<Id, Pt>, ids: Id[]): 
     new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
   return freeRank(vec, (x) => {
     const pos = place(c, env, asMap(x));
-    return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, lineDirOf(c, env)) ?? [0]);
+    return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env)) ?? [0]);
   });
 }
 
@@ -313,7 +314,7 @@ export function evaluate(c: Construction, seed = 0): Figure {
       new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
     const res = solveLM(vec, (x) => {
       const pos = place(c, env, asMap(x));
-      return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, lineDirOf(c, env)) ?? [0]);
+      return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env)) ?? [0]);
     });
     free = asMap(res.values);
   }
@@ -337,7 +338,7 @@ export function evaluate(c: Construction, seed = 0): Figure {
   if (c.constraints.length > 0) {
     const pos = place(c, env, free);
     for (const k of c.constraints) {
-      const r = residual(k, (id) => pos.get(id) ?? null, env, lineDirOf(c, env));
+      const r = residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env));
       // `null` is "cannot be judged", not "false": a constraint naming a point that vanished at this
       // parameter value must not be reported as a given the student got wrong — that would blame the
       // wrong statement, and vacancy is not a fault ([ADR-AG-008]).
