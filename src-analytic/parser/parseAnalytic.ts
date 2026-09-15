@@ -546,8 +546,25 @@ const NEUTRAL_SHAPE_HE = new RegExp(`^${HE_GIVEN}ה?(משולש|מרובע)\\s+(
 const NEUTRAL_SHAPE_EN = new RegExp(`^(triangle|quadrilateral)\\s+(${NAME_RUN})$`, 'i');
 const CONSTRAINED_SHAPE = /^(?:נתו(?:ן|נה)\s+)?ה?(?:מקבילית|טרפז|ריבוע|מעוין|מלבן)\s|^(?:parallelogram|trapezoid|trapezium|square|rhombus|rectangle)\s/i;
 
-const SEGMENT_HE = new RegExp(`^${HE_GIVEN}ה?(?:קטע|צלע)\\s+(${NAME})(${NAME})$`);
-const SEGMENT_EN = new RegExp(`^(?:segment|side)\\s+(${NAME})(${NAME})$`, 'i');
+/**
+ * The NOUN IS OPTIONAL — «EF» is «הקטע EF» (#1074).
+ *
+ * Operator, 2026-09-15: *"when there are 2 points like E and F defined, and I write EF, i want the
+ * segment drawn"*. The exam writes it that way constantly — "חשבו את EF", "העבירו את EF" — and a
+ * student transcribing givens writes what the page writes.
+ *
+ * This is the same class as #1072 and #1069: a matcher written around the FULLEST phrasing the
+ * corpus shows, so every shorter spelling of the same statement falls off the end of the chain into
+ * `not-handled`. It is the third time, which is why the answer is "the noun is optional" as a rule
+ * rather than as a patch.
+ *
+ * Safe in the LAST-but-one position it already occupies: a bare pair of names cannot be a
+ * coordinate (no parentheses), an equation (no `=`) or a relation (no verb), so nothing else has a
+ * claim on it. An `=`-bearing line reaches `parseConstraint` first, which is what keeps «AB = 5» a
+ * LENGTH rather than a segment.
+ */
+const SEGMENT_HE = new RegExp(`^${HE_GIVEN}(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})$`);
+const SEGMENT_EN = new RegExp(`^(?:(?:segment|side)\\s+)?(${NAME})(${NAME})$`, 'i');
 
 /**
  * A segment's id is CANONICAL — «הקטע AB» and «הקטע BA» are one object, so they must be one id.

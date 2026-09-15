@@ -785,3 +785,9 @@ point appears, the line does not. Stating «y=x» on its own line draws it — a
 already there, that line PROMOTES it and is recorded as a change, never answered «כבר ידוע» or «כבר
 נובע». The carrier remains in the data panel throughout, because it is the honest answer to *where
 does B live*.
+**R57 — the segment noun is optional, and naming a segment introduces its endpoints**
+([ADR-AG-033](06c-decisions-analytic.md#adr-ag-033)). «EF» is «הקטע EF»: one object, one id, either
+spelling. Endpoints that do not exist yet are introduced as free vertices with their two degrees of
+freedom, as a shape noun's vertices are — because the sentence NAMES the segment. Referring to a
+point one does not have («M אמצע AB») still refuses (R-level #1028); the difference is naming
+versus mentioning, not which noun was used.
