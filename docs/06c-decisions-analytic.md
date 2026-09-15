@@ -2121,3 +2121,55 @@ case, which is the sign that the generalisation was already implied.
 **Consequences.** `src-analytic` 349 → 355 tests. The deferred half of #1069's note in `derive` —
 whether an exhausted seed search on a figure WITH freedom should be reported — stays deferred and is
 now much rarer, because the common case no longer exhausts anything.
+
+## ADR-AG-036 — A circle MARKS its centre, and the mark is not the label (#1024)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R61. **Design:** none (the renderer).
+
+**Context — an operator ruling**, 2026-09-15:
+
+> T15 - we need to draw the center. **in analytical geo the center is always important.**
+
+and, filing the request:
+
+> when drawing a circle, always mark the center and if center is known, put its values.
+
+**The state it found.** The centre was computed, resolved into every `NumCurve`, and already printed
+in the data panel as «מעגל I: O(3, 4), r = 3». The canvas drew the outline alone. So this was never
+missing geometry — it was a value the tool had and did not show, on the one point of a circle every
+student draws by hand and every corpus question names («ומרכזו בנקודה K»).
+
+**Decision 1: the centre is a FEATURE OF THE CURVE, never a point object.** Minting a `GeoObject` for
+it would spend a letter the student is about to use and put it in the M1 id space — the defect
+[ADR-297](06-decisions.md#adr-297) fixed in the 2-D tree ("a decomposition never spends a student's
+letter"). `SceneCurve` carries the mark; `buildScene` reads it off the resolved curve. It is drawn as
+a small cross rather than a filled dot, so it cannot be mistaken for one of the student's own points.
+
+**Decision 2: the MARK and the LABEL answer two different questions.** The mark says *"this circle
+has a centre, here"*, which is true in every configuration. The label states a VALUE, which
+[ADR-AG-003](#adr-ag-003) §2 permits only when the givens fix it. So `(x-3)²+(y-4)²=9` is marked and
+labelled `(3, 4)`, while `(x-a)²+(y-4)²=9` is **marked and left unlabelled** — the same restraint the
+panel already shows on the same figure, and the reason the two are separate fields rather than one.
+
+**The gate is SUPPLIED, not re-decided.** Whether a value is knowledge is a question about the
+construction across several configurations, and a `Figure` is one configuration — the renderer
+cannot ask it. So `buildScene` takes an optional `SceneKnowledge`, and `App` passes the same
+`knownCurve` the data panel uses. Two consequences, both deliberate: the canvas and the panel cannot
+drift, and a caller that supplies no gate gets the mark WITHOUT a label rather than one sample's
+coordinates printed as if they were given.
+
+**Deliberately NOT here**, and stated rather than quietly skipped:
+
+- the SYMBOLIC label `(a, 4)` the operator also asked for. It needs an `Expr` for the centre, and the
+  centre is derived from NUMERIC conic coefficients — so it needs symbolic coefficient extraction,
+  which is a mechanism, not a display change. Filed; the unlabelled mark is the honest interim, not a
+  silent omission. **`exprText` ([#1023](https://github.com/dcodish/geo_builder/issues/1023)) was
+  deliberately not built here either**: it would have had no caller, which is the pattern this tree
+  has already produced three times (#1020, #1045, #1065).
+- «נתון מעגל» with no equation, which is a 3-DOF free object and belongs to the carrier work.
+
+**Consequences.** `src-analytic` 714 → 720 tests. The mark appears for every drawn circle, including
+one the student stated bare; a CARRIER circle (ADR-AG-032) has no mark because it has no outline
+either.

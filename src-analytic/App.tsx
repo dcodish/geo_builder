@@ -220,7 +220,15 @@ export function App() {
     const cy = (box.minY + box.maxY) / 2;
     const half = ((box.maxX - box.minX) / 2) / zoom;
     const zoomed = { minX: cx - half, maxX: cx + half, minY: cy - half, maxY: cy + half };
-    return buildScene(d.figure, zoomed, CANVAS_W, CANVAS_H);
+    /**
+     * The renderer cannot ask whether a value is KNOWLEDGE — that is a question about the
+     * construction across configurations, and a `Figure` is one configuration (#1024). So the gate
+     * is supplied here, from the same `knownCurve` the data panel uses, rather than re-decided in
+     * the renderer where it would drift from the panel it must agree with.
+     */
+    return buildScene(d.figure, zoomed, CANVAS_W, CANVAS_H, {
+      curveKnown: (id) => knownCurve(d.construction, id) !== null,
+    });
   }, [d, zoom]);
 
   const errorText = error
