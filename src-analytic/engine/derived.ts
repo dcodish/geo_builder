@@ -195,3 +195,184 @@ export function evalRule(r: DerivedRule, at: (id: Id) => Pt | null): Pt | null {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// The CONSTRUCTION — what a student would have to draw (#1030)
+// ---------------------------------------------------------------------------
+
+/**
+ * Why this exists, in the operator's words (2026-09-15): *"the tool can find easily the location of
+ * that point **but what does the student learn from this**… something that will give a student an
+ * understanding of what kind of builds he needs to do to get this solution."*
+ *
+ * A derived point drawn as a bare dot shows the ANSWER and hides the METHOD, and for this topic the
+ * method is the lesson: to find the centroid you draw the medians, they meet at one point, and that
+ * point divides each median 2:1 from the vertex. A teacher at a board draws the medians.
+ *
+ * This is [02c R21](../../docs/02c-requirements-analytic.md)'s own justification — *"for a student
+ * the answer is meaningless without the way"* — supplied on the figure rather than assumed to come
+ * from elsewhere. It is not the tool solving anything: the construction is what the student must
+ * build, and the algebra is still theirs.
+ *
+ * **These are DECORATION, never objects.** They carry no id, take no letter, and never enter the
+ * fact list — a construction line minted as a `GeoObject` would occupy a name the student is about
+ * to use, which is the defect [ADR-297](../../docs/06-decisions.md#adr-297) fixed in the 2-D tree.
+ */
+export interface ConstructionLine {
+  a: Pt;
+  b: Pt;
+/**
+   * Labels written ALONG the line, each at a fraction `at` of the way from `a` to `b`.
+   *
+   * A median carries two — `2x` on the vertex→centroid part and `x` on the rest (operator ruling,
+   * 2026-09-15). Labelling the PARTS rather than stamping `2:1` on the whole is the board
+   * convention, and it is the difference between telling a student the ratio and **handing them the
+   * variables to write the equation with**: `2x + x = ` the median, and the three medians take
+   * different letters so a student can carry all three into one calculation.
+   *
+   * Empty where there is no crisp statement to make — an altitude's defining property is a right
+   * angle at its foot, which wants a mark rather than text.
+   */
+  marks?: Array<{ text: string; at: number }>;
+}
+
+export interface Construction {
+  lines: ConstructionLine[];
+  /** The construction's own auxiliary points — a median's foot on the opposite side. Drawn as small
+   *  dots (operator ruling). They become CLICKABLE when #1025 lands; this feature only shows them. */
+  feet: Pt[];
+}
+
+/**
+ * One letter per median (operator ruling, 2026-09-15: "2x, x and 2y, y and 2z, z").
+ *
+ * NOTE, and worth watching on play: `x` and `y` also name the AXES in this product, which they do
+ * not on a synthetic geometry board. The operator chose these letters deliberately; if a student
+ * reads `2x` as an x-coordinate, this is the line to change.
+ */
+const MEDIAN_SYMBOLS = ['x', 'y', 'z'] as const;
+
+const lerp = (p: Pt, q: Pt, t: number): Pt => ({ x: p.x + t * (q.x - p.x), y: p.y + t * (q.y - p.y) });
+
+/** The foot of the perpendicular from `p` to the line through `u` and `v`. */
+function footOfPerpendicular(p: Pt, u: Pt, v: Pt): Pt | null {
+  const dx = v.x - u.x;
+  const dy = v.y - u.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 1e-24) return null;
+  const t = ((p.x - u.x) * dx + (p.y - u.y) * dy) / len2;
+  return { x: u.x + t * dx, y: u.y + t * dy };
+}
+
+/**
+ * Where the bisector of the angle at `a` meets the opposite side `bc`.
+ *
+ * The angle bisector divides the opposite side in the ratio of the ADJACENT sides — `BD:DC = AB:AC`
+ * — so the foot is a weighted average and needs no trigonometry and no intersection solve.
+ */
+function bisectorFoot(a: Pt, b: Pt, c: Pt): Pt | null {
+  const ab = dist(a, b);
+  const ac = dist(a, c);
+  const s = ab + ac;
+  if (s < 1e-12) return null;
+  return { x: (ac * b.x + ab * c.x) / s, y: (ac * b.y + ab * c.y) / s };
+}
+
+/**
+ * The construction that defines a derived point, ready to draw.
+ *
+ * `null` when a parent is missing or the configuration is degenerate — the same honest vacancy the
+ * point itself reports, so a figure never shows scaffolding for a point that is not there.
+ */
+export function constructionOf(
+  r: DerivedRule,
+  at: (id: Id) => Pt | null,
+  self: Pt,
+): Construction | null {
+  const ps = parentsOf(r).map(at);
+  if (ps.some((p) => p === null)) return null;
+  const p = ps as Pt[];
+
+  switch (r.t) {
+    // The segment the midpoint is the midpoint OF. Worth drawing even when the student never stated
+    // the segment, because otherwise the construction toggle shows nothing at all for this figure.
+    case 'midpoint':
+      return { lines: [{ a: p[0], b: p[1] }], feet: [] };
+
+    case 'centroid': {
+      // Each median runs from a vertex to the midpoint of the opposite side, and the centroid sits
+      // two-thirds along it. The label goes at the MIDDLE of the vertex→centroid part (one third of
+      // the way along the whole median), so `2:1` sits against the part it calls `2`.
+      const lines: ConstructionLine[] = [];
+      const feet: Pt[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        const v = p[i];
+        const foot = midpoint(p[(i + 1) % 3], p[(i + 2) % 3]);
+        feet.push(foot);
+        // The centroid sits TWO THIRDS along, so the long part runs [0, 2/3] and the short part
+        // [2/3, 1]; each label is centred on its own part. A different letter per median, so the
+        // three can appear in one calculation without colliding.
+        const sym = MEDIAN_SYMBOLS[i];
+        lines.push({
+          a: v,
+          b: foot,
+          marks: [
+            { text: `2${sym}`, at: 1 / 3 },
+            { text: sym, at: 5 / 6 },
+          ],
+        });
+      }
+      return { lines, feet };
+    }
+
+    case 'orthocentre': {
+      const lines: ConstructionLine[] = [];
+      const feet: Pt[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        const foot = footOfPerpendicular(p[i], p[(i + 1) % 3], p[(i + 2) % 3]);
+        if (!foot) return null;
+        feet.push(foot);
+        lines.push({ a: p[i], b: foot });
+      }
+      return { lines, feet };
+    }
+
+    case 'incentre': {
+      const lines: ConstructionLine[] = [];
+      const feet: Pt[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        const foot = bisectorFoot(p[i], p[(i + 1) % 3], p[(i + 2) % 3]);
+        if (!foot) return null;
+        feet.push(foot);
+        lines.push({ a: p[i], b: foot });
+      }
+      return { lines, feet };
+    }
+
+    case 'circumcentre': {
+      // Each perpendicular bisector is drawn from the side's midpoint to the centre — the part that
+      // carries the meaning. Drawing the full infinite bisector would need clipping and would say
+      // less.
+      const lines: ConstructionLine[] = [];
+      const feet: Pt[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        const mid = midpoint(p[i], p[(i + 1) % 3]);
+        feet.push(mid);
+        lines.push({ a: mid, b: self });
+      }
+      return { lines, feet };
+    }
+
+    // The two diagonals whose crossing this is.
+    case 'diagonals':
+      return { lines: [{ a: p[0], b: p[2] }, { a: p[1], b: p[3] }], feet: [] };
+
+    default: {
+      const undrawn: never = r;
+      throw new Error(`derived rule has no construction: ${JSON.stringify(undrawn)}`);
+    }
+  }
+}
+
+/** Exported for the renderer: where a mark sits on its line. */
+export const markPoint = (l: ConstructionLine, at: number): Pt => lerp(l.a, l.b, at);

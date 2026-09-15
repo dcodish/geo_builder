@@ -900,3 +900,204 @@ shots, read back by the session (which is how #1029 was found) · `src-analytic`
 *draws*; an entry like «M אמצע AB» is meaningless without A and B, so entries now declare their
 context (`needs`) and the guard builds them in it. Declared rather than inferred — a guard that
 guessed the context would be asserting something the catalog never said.
+
+---
+
+## ADR-AG-014 — A derived point SHOWS ITS CONSTRUCTION: the method, not only the answer (#1030)
+
+**Requirements:** [02c §8](02c-requirements-analytic.md) R40 (new); R21 (this is its own justification,
+supplied on the figure); [ADR-AG-010](#adr-ag-010) R34 (projection legibility, which drove a revision).
+**Design:** [04c](04c-design-analytic.md) "The model" — the construction is carried on the `Figure`
+and rendered behind a toggle.
+
+**Context.** Operator, 2026-09-15, looking at a triangle whose centroid the tool had just found:
+
+> the tool can find easily the location of that point **but what does the student learn from this**.
+> What I would like to have is the [medians] drawn maybe in a dotted line, and the **ratio of 2:1**
+> somehow shown — so something that will give a student an understanding of **what kind of builds he
+> needs to do** to get this solution.
+
+[ADR-AG-013](#adr-ag-013) had just made the tool able to *find* a centroid. It drew the triangle,
+dropped a dot, and printed the coordinates — and **every step a student is graded on was invisible**.
+
+**This is R21's own argument, drawn.** [02c R21](02c-requirements-analytic.md) ruled that showing a
+derived result is correct *because* "for a student the answer is meaningless without the way … a
+student who reads the equation off the canvas cannot write the working that earns the marks." That
+ruling assumed the way came from elsewhere. It now comes from the figure. Nothing here solves
+anything: the construction is what the student must build, and the algebra remains theirs.
+
+**Decision.** Every derived rule knows the construction that defines it — it *is* the closed form's
+own geometry — and can draw it.
+
+| rule | drawn | label |
+| --- | --- | --- |
+| centroid | three medians, vertex → opposite midpoint | the two PARTS labelled **2x / x**, **2y / y**, **2z / z** |
+| orthocentre | three altitudes to their feet | — |
+| incentre | three bisectors, each to its foot on the opposite side | — |
+| circumcentre | each side's midpoint → the centre | — |
+| diagonal meet | the two diagonals | — |
+| midpoint | the segment it bisects | — |
+
+**Operator rulings that shaped it** (2026-09-15, answering the three questions the issue posed):
+
+- **A toggle, not always drawn.** «הצג בנייה», OFF by default. Three medians per derived point buries
+  a real figure, and a real question carries several. **One GLOBAL toggle**, matching how R20 settled
+  the equations toggle — the two controls behave alike rather than each inventing a scope. The button
+  appears only when there *is* a construction, so the control never promises what the figure cannot
+  give.
+- **A label, not tick marks** — and, on a second ruling the same day, the label names the two
+  **PARTS** rather than stamping the ratio on the whole: `2x` and `x` on the first median, `2y`/`y`
+  and `2z`/`z` on the others. The operator's own phrasing, and it is the board convention. The
+  difference is not cosmetic: `2:1` *tells* a student the ratio, while `2x` and `x` **hand them the
+  variables to write the equation with**, and distinct letters let all three medians enter one
+  calculation. The first build stamped `2:1`; this replaced it before the slice shipped.
+
+  *Watch on play:* `x` and `y` also name the **axes** in this product, which they do not on a
+  synthetic geometry board. The letters are the operator's choice; if a student reads `2x` as an
+  x-coordinate, `MEDIAN_SYMBOLS` is the one line to change.
+- **The feet are shown**, as hollow dots. Shown — **not yet clickable**: promoting a foot to a named
+  point is #1025's mechanism, and building a one-off click here would be a second promotion
+  mechanism. The same dots gain the click when that lands.
+
+**Decoration, never objects.** The construction carries no id, spends no letter and never enters the
+fact list. A construction line minted as a `GeoObject` would occupy a name the student is about to
+use — [ADR-297](06-decisions.md#adr-297)'s defect exactly — and the suite asserts the object list is
+unchanged by turning the construction on.
+
+**The tests are about GEOMETRY, not pixels**, because a construction drawn from wrong geometry teaches
+something false, which is worse than teaching nothing. The suite asserts that each median really ends
+at the opposite side's midpoint, that every median really passes through the centroid, that **the part labelled
+`2x` really is twice the part labelled `x`** and that each label sits on its own part (a label on the
+wrong side would teach the ratio backwards), that an altitude really meets its side at a right angle, and that a bisector really divides the opposite side as `AB:AC`.
+
+**Revised after reading the screenshot — the third time in this tree, and the second in two slices.**
+The first render used 12px `#94a3b8` text, which was readable on a laptop and muddy against its own
+dashed median. [ADR-AG-010](#adr-ag-010) R34 makes legibility at **projection size** a design
+condition for exactly this surface, so the ratio — the teaching content, not the context — is now
+larger, darker, and painted stroke-then-fill so it carries its own white halo over any ink.
+
+**Gates.** `npm run test:full` green, read from `reports/suite-verdict.json` · `tsc -b` clean ·
+`build:analytic` clean · 14 new geometry tests (`construction.test.ts`) · driven in a real browser:
+the toggle appears, produces 3 dashed lines, 3 feet and three `2:1` labels, and removes the group
+entirely when switched off. **Not in the shared visual smoke** — that harness types lines and captures,
+it does not click controls; this feature's evidence is the dedicated browser run and its screenshots,
+and that limit is stated rather than papered over.
+
+---
+
+## ADR-AG-015 — B2/B3 BUILT: free vertices, the joint solve, and entry order stops mattering (#1016 #1017 #1033 #1034 #1047)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R19 (entry-order independence), R5 (tier 3,
+ratified by [ADR-AG-009](#adr-ag-009)), P4/R22 (the DOF cue as the determinacy signal), §8 F16/F17.
+**Design:** [04c](04c-design-analytic.md) "The model" — the constraint layer and the solve.
+
+**What landed.** The operator's own worked example, in the operator's own order:
+
+```
+משולש ABC · AD תיכון לצלע BC · שטח המשולש ABC הוא 20 · A(6,4) · D(0,3) · B על החלק החיובי של ציר x
+```
+
+builds and yields **B(2,0), C(−2,6)** — image 7 #6's published answer, which is the independent
+oracle the tests check against rather than this engine's own output.
+
+**Five decisions worth recording.**
+
+1. **A shape noun DECLARES; a reference still may not invent.** [ADR-AG-013](#adr-ag-013) made
+   «משולש ABC» refuse when a vertex was missing, and that reasoning was right for «M אמצע AB» —
+   inventing a point places a position the question never gave ([ADR-052](06-decisions.md#adr-052))
+   and spends a letter the student is about to use ([ADR-297](06-decisions.md#adr-297)). It was wrong
+   for a **declaration**: «משולש ABC» is the student *introducing* A, B and C, and the honest answer
+   is a vertex with two free degrees of freedom. The refusal stays for references and goes for
+   declarations, and `apply` is the one place that tells them apart. A sentence that NAMES a new
+   point emits an explicit `declare` fact, so the distinction is stated rather than inferred.
+
+2. **Entry order stops mattering, and it is an exact substitution rather than a solve.** «A(6,4)»
+   after «משולש ABC» is M1 lowering: the coordinates **consume** the vertex's two DOF, replacing the
+   free object in place. Both orders end at the identical figure — [02c R19](02c-requirements-analytic.md),
+   the sibling's M2 — which matters because every exam paragraph names the shape first and places it
+   later.
+
+3. **Levenberg–Marquardt, not Gauss–Newton.** An area constraint is quadratic in the vertices, so a
+   Gauss–Newton step from a far-off seed overshoots and diverges on the corpus's own figures. The
+   damping is the smallest addition that makes the method survive a bad start; measured, the gate
+   converges to the same answer from three very different ones.
+
+4. **A residual is a VECTOR, one entry per equation — never a norm.** The first build returned the
+   *distance* for a midpoint condition. It converged, and the DOF cue then read **1** on a figure that
+   was fully determined: a norm's Jacobian has rank 1 at the solution, so the figure reported freedom
+   it did not have. Per component, the cue counts 6 → 6 → 5 → 3 → 1 → **0**, reaching zero exactly as
+   the last given lands. That is [R22](02c-requirements-analytic.md) — *"the moment the equation
+   appears is the moment the student learns their givens were sufficient"* — and a cue that never
+   reaches zero teaches its opposite. **Caught by reading the number, not by a failing test.**
+
+5. **The DOF cue reports `carriers − rank(J)`, so a dependent given removes no extra freedom.**
+   Stating the same area twice must not make a figure look over-determined. Counting constraints
+   would; the Jacobian's rank does not.
+
+**Honesty.** A constraint the solve cannot meet is a **fault blamed on the line that stated it** — the
+figure is never drawn as though it satisfied a given it does not. And a **selector** is D7 kind 2, not
+a constraint: «החלק החיובי» consumes no freedom and filters configurations *after* the solve, so a
+draw that fails it advances the seed ([ADR-098](06-decisions.md#adr-098)'s pattern) rather than
+reporting a contradiction. Conflating the two is the bug D7 exists to prevent.
+
+**Also fixed on the way:** `evaluate`'s object switch had no exhaustiveness guard, so the new kind
+compiled clean and would have evaluated to **nothing** — the [#1038](https://github.com/dcodish/geo_builder/issues/1038)
+class again, in a second place. It now ends in a `never` check like every switch in `carriers.ts`.
+
+**Not claimed.** The area *measurement* (#1027), the option list for a two-root pin (#1036), the
+component form `x_M` (#1040), and the bare-equation gap (#1037) are untouched. Only the sentences
+named above parse.
+
+---
+
+## ADR-AG-016 — The canvas shows the QUESTION; the data panel shows the ANSWER (#1032)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R20 (equations/coordinates on the canvas, now
+ruled more precisely), R21/R22. **Design:** [04c](04c-design-analytic.md) — `provenanceOf` and the
+scene's label parts.
+
+**Context.** Operator, 2026-09-15, on a figure the tool had just solved: *"the canvas itself shows the
+inputs on the canvas itself. So point A and D were defined so I want to see them, and point B was
+partially defined so I also want to see that. **Anything that is derived from the figure should stay
+in the data panel**."* Asked what a partially-defined point should read: *"for B, we should show
+`B(x_B, 0)`."*
+
+**The rule, and it is PROVENANCE rather than determinacy.** The obvious implementation gates the label
+on `isKnowledge` — and it is wrong. In image 7 #6 the joint solve determines `B = (2,0)` exactly, so
+the honesty gate calls both coordinates knowledge and a gate-driven label prints `B(2,0)`. The ruling
+says that is the **answer**, and the answer belongs in the panel. The canvas carries what the
+student's own givens pin about that point:
+
+| point | its own givens | canvas | panel |
+| --- | --- | --- | --- |
+| `A(6,4)` | both coordinates | `A(6, 4)` | `A(6, 4)` |
+| `D(0,3)` | both coordinates | `D(0, 3)` | `D(0, 3)` |
+| `B` | «על החלק החיובי של ציר x» — pins `y` only | **`B(x_B, 0)`** | `B(2, 0)` |
+| `C` | nothing about `C` alone | `C` | `C(-2, 6)` |
+
+So **the canvas and the panel deliberately disagree about `B`**, and that disagreement is the feature:
+the figure becomes the question, printable as a worksheet with the givens marked the way a textbook
+marks them, and the solution is somewhere the student can choose not to look. It also keeps the canvas
+legible — a solved figure otherwise carries a coordinate pair on every vertex.
+
+**What "its own givens" means, precisely.** Only constraints whose references are exactly that one
+point. «שטח המשולש ABC הוא 20» names three, so it is provenance for none of them — which is why `C`
+shows its name alone even though the figure fixes it. An axis-parallel `on-line` pins one coordinate;
+a slanted line pins neither on its own.
+
+**The honesty invariant still binds, separately.** A stated coordinate carrying a free parameter —
+`A(-9a, 0)` — is **not** known here either, so the canvas never prints a sampled number. Provenance
+decides *whether the givens say anything*; the honesty gate decides *whether what they say is a
+number*. Both must pass.
+
+**Not MathML, and the reason is recorded so it does not read as an omission.** The operator asked for
+`B(x_B, 0)` "in mathml". Subscripts are drawn with an SVG `<tspan>` at reduced size and a baseline
+offset: MathML inside SVG requires `<foreignObject>`, is unevenly supported across browsers, and would
+not survive the PNG export this product already ships. The rendered subscript is identical. The
+letters match the ruled component notation (02c R31c), so what the canvas *shows* is what the student
+may *type* (#1040) — the same word in both directions.
+
+**Legibility.** Point labels are painted stroke-then-fill with a white halo, as the construction ratios
+already were ([ADR-AG-014](#adr-ag-014)): `B(x_B, 0)` lands on the x-axis and `D(0, 3)` on its own
+segment, and both were muddy without it. [ADR-AG-010](#adr-ag-010) R34 makes that a design condition
+rather than a polish item.

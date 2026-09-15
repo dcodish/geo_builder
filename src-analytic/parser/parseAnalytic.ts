@@ -18,6 +18,7 @@
  * Unmatched input returns `not-handled`, which is the seam where the LLM fallback escalates.
  */
 import type { DerivedRule } from '../engine/derived';
+import type { Constraint } from '../engine/solve';
 import { parseExpr, normalizeMath, type Expr } from '../engine/expr';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id } from '../engine/types';
 
@@ -428,6 +429,98 @@ function parseShape(line: string): Fact[] | null {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Constraints and cevians (#1034, #1047, #1033) — the «lines and points» givens
+// ---------------------------------------------------------------------------
+
+/**
+ * `שטח המשולש ABC הוא 20` — the corpus's commonest PIN (~10 of 40 exercises in 02c §8).
+ *
+ * The noun is optional and so is the definite article, per the morphology rule this tree keeps
+ * relearning: «משולש» / «המשולש» / «משולש ABC ששטחו 20» all name the same thing.
+ */
+const AREA_HE = new RegExp(
+  `^${HE_GIVEN}שטח\\s+(?:ה?משולש|ה?מרובע|ה?מצולע)?\\s*(${NAME_RUN})${HE_IS}\\s*(?:שווה\\s+ל-?)?\\s*(.+)$`,
+);
+const AREA_EN = new RegExp(
+  `^(?:the\\s+)?area\\s+of\\s+(?:triangle\\s+|quadrilateral\\s+|polygon\\s+)?(${NAME_RUN})\\s+is\\s+(.+)$`,
+  'i',
+);
+
+/**
+ * `AD תיכון לצלע BC` · `AD גובה לצלע BC` — a named cevian (#1047).
+ *
+ * NOT the construction decoration of ADR-AG-014: that is anonymous scaffolding attached to a derived
+ * point, while this is an object the student named, measures, and makes the subject of the next
+ * sentence. Same geometry, opposite status.
+ */
+const CEVIAN_HE = new RegExp(
+  `^${HE_GIVEN}(${NAME})(${NAME})${HE_IS}\\s*(?:ה?)(תיכון|גובה)\\s+(?:ל|אל\\s+ה?)?(?:ה?צלע\\s+)?(${NAME})(${NAME})(?:\\s+ב?ה?משולש\\s+${NAME_RUN})?$`,
+);
+const CEVIAN_EN = new RegExp(
+  `^(${NAME})(${NAME})\\s+is\\s+(?:the\\s+)?(median|altitude)\\s+to\\s+(?:side\\s+)?(${NAME})(${NAME})(?:\\s+in\\s+triangle\\s+${NAME_RUN})?$`,
+  'i',
+);
+
+/** `B נמצא על ציר ה-x` / `B על החלק החיובי של ציר x` — incidence, optionally with a side selector. */
+const ON_AXIS_HE = new RegExp(
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת)?\\s+)?על\\s+(?:ה?חלק\\s+(ה?חיובי|ה?שלילי)\\s+של\\s+)?ציר\\s+ה?-?\\s*([xy])$`,
+);
+const ON_AXIS_EN = new RegExp(
+  `^(?:point\\s+)?(${NAME})\\s+is\\s+on\\s+the\\s+(?:(positive|negative)\\s+)?([xy])-axis$`,
+  'i',
+);
+
+function parseConstraint(line: string): Fact[] | null {
+  const area = AREA_HE.exec(line) ?? AREA_EN.exec(line);
+  if (area) {
+    const ids = splitNames(area[1]);
+    const value = parseExpr(normalizeMath(area[2]));
+    if (ids.length >= 3 && value) {
+      return [{ t: 'constraint', k: { t: 'area', ids, value }, src: line }];
+    }
+    return null;
+  }
+
+  const cev = CEVIAN_HE.exec(line) ?? CEVIAN_EN.exec(line);
+  if (cev) {
+    const [, apex, foot, roleSrc, u, v] = cev;
+    const median = /תיכון|median/i.test(roleSrc);
+    return [
+      // The sentence NAMES the foot — «AD תיכון לצלע BC» is where `D` first appears — so it is
+      // declared here. Without this the segment below would refuse it as an unknown reference, which
+      // is right for a sentence that merely mentions a point and wrong for one that introduces it.
+      { t: 'declare', id: apex, src: line },
+      { t: 'declare', id: foot, src: line },
+      // The cevian's own segment, so «AD» is a thing on the canvas and not only a relation.
+      { t: 'segment', id: segmentId(apex, foot), a: apex, b: foot, src: line },
+      median
+        ? { t: 'constraint', k: { t: 'midpoint', id: foot, a: u, b: v }, src: line }
+        : { t: 'constraint', k: { t: 'perpendicular', a: apex, b: foot, c: u, d: v }, src: line },
+    ];
+  }
+
+  const ax = ON_AXIS_HE.exec(line) ?? ON_AXIS_EN.exec(line);
+  if (ax) {
+    const [, id, sideSrc, axis] = ax;
+    // ON the axis is an INCIDENCE; the «positive part» clause is a SELECTOR over the solutions —
+    // D7's two different kinds in one sentence (ADR-AG-005). The incidence is emitted here; the
+    // selector rides as a domain on the surviving coordinate and is applied after the solve.
+    const onX = axis.toLowerCase() === 'x';
+    const k: Constraint = onX
+      ? { t: 'on-line', id, a: 0, b: 1, c: 0 }
+      : { t: 'on-line', id, a: 1, b: 0, c: 0 };
+    const facts: Fact[] = [{ t: 'constraint', k, src: line }];
+    if (sideSrc) {
+      const positive = /חיובי|positive/i.test(sideSrc);
+      facts.push({ t: 'selector', id, axis: onX ? 'x' : 'y', positive, src: line });
+    }
+    return facts;
+  }
+
+  return null;
+}
+
 export function parseLine(raw: string): ParseResult {
   const line = trim(raw);
   if (!line) return { ok: false, code: 'not-handled', detail: raw };
@@ -453,7 +546,7 @@ export function parseLine(raw: string): ParseResult {
     };
   }
 
-  const derived = parseDerived(line) ?? parseShape(line);
+  const derived = parseConstraint(line) ?? parseDerived(line) ?? parseShape(line);
   if (derived) return { ok: true, facts: derived };
 
   const points = parsePoints(line);

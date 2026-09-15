@@ -45,12 +45,42 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
     }
   });
 
+  /** Which line stated each constraint, so an unsatisfiable one is blamed on the right words. */
+  const constraintLine = new Map<string, number>();
+  facts.forEach((f, i) => {
+    if (f.t === 'constraint') {
+      const key = JSON.stringify(f.k);
+      if (!constraintLine.has(key)) constraintLine.set(key, owner[i]);
+    }
+  });
+
   const { construction, errors } = fold(facts);
   errors.forEach((e, i) => {
     if (e) faults.push({ index: owner[i], code: e.code, detail: e.detail });
   });
 
-  const figure = evaluate(construction, seed);
+  /**
+   * A selector chooses among configurations, so a configuration that fails one is not a
+   * contradiction — it is the wrong draw. Advance the seed until one holds, exactly as the sibling's
+   * `firstSatisfyingSeed` does ([ADR-098](../../docs/06-decisions.md#adr-098)), and give up after a
+   * bounded search rather than spinning: if «החלק החיובי» can never hold, that IS worth reporting.
+   */
+  let figure = evaluate(construction, seed);
+  for (let extra = 1; extra <= 24 && !figure.selectorsOk; extra += 1) {
+    const candidate = evaluate(construction, seed + extra);
+    if (candidate.selectorsOk) figure = candidate;
+  }
+
+  /**
+   * A constraint the solve could not meet is a FAULT, blamed on the line that stated it — the
+   * figure is never shown as though it satisfied a given it does not
+   * ([02c](../../docs/02c-requirements-analytic.md) honesty invariants).
+   */
+  for (const k of figure.unsatisfied) {
+    const owner = constraintLine.get(JSON.stringify(k));
+    if (owner === undefined) continue;
+    faults.push({ index: owner, code: 'unsatisfiable', detail: lines[owner] });
+  }
 
   /**
    * The third place a line can fail (#896): it parsed, it applied, and only at EVALUATION did the
@@ -66,7 +96,7 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   // refusal — the same rule `owner` already encodes for apply errors. A `param` fact has no id.
   const lineOf = new Map<string, number>();
   facts.forEach((f, i) => {
-    if (f.t !== 'param' && !lineOf.has(f.id)) lineOf.set(f.id, owner[i]);
+    if (f.t !== 'param' && f.t !== 'constraint' && f.t !== 'selector' && f.t !== 'declare' && !lineOf.has(f.id)) lineOf.set(f.id, owner[i]);
   });
   for (const v of figure.vacant) {
     if (v.reason === 'vacant') continue;
@@ -80,7 +110,7 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
 
 export const EMPTY_DERIVATION: Derivation = {
   construction: EMPTY_CONSTRUCTION,
-  figure: { env: {}, points: [], curves: [], segments: [], vacant: [] },
+  figure: { env: {}, points: [], curves: [], segments: [], construction: [], vacant: [], unsatisfied: [], selectorsOk: true, carrierDof: 0, provenance: {} },
   box: { minX: -10, minY: -10, maxX: 10, maxY: 10 },
   faults: [],
 };

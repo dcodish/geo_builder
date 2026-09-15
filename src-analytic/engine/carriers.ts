@@ -32,7 +32,8 @@
  * is earned — and this function is what will fail first and say so.
  */
 import { parentsOf } from './derived';
-import { symbolsOf } from './expr';
+import { evalExpr, symbolsOf, type Env } from './expr';
+import { constraintRefs } from './solve';
 import { UNBOUNDED, type Construction, type GeoObject, type Id, type ParamDecl } from './types';
 
 /**
@@ -81,9 +82,13 @@ export function carrierOf(o: GeoObject): Carrier | null {
     // and that freedom is already counted once, at the parents.
     case 'derived':
       return null;
-    // Segments and polygons over stated vertices carry no freedom of their own either: they are
-    // drawn FROM their endpoints. A polygon whose vertices are not yet stated would carry 2 DOF per
-    // free vertex — that kind is B3's, and it must claim its freedom here when it arrives.
+    // THE kind this family was declared for (#1017): a named but unplaced point. Two degrees of
+    // freedom, its own — not inherited from a parameter, which is what distinguishes it from the
+    // hand-written `C(t, 4t-9)` workaround where the unknown is figure-wide.
+    case 'free':
+      return { family: 'free', dof: 2 };
+    // Segments and polygons carry no freedom of their own: they are drawn FROM their endpoints, and
+    // a polygon's unplaced vertices are `free` objects in their own right, counted once, there.
     case 'segment':
     case 'polygon':
       return null;
@@ -114,6 +119,7 @@ export function symbolDeps(o: GeoObject): string[] {
       case 'derived':
       case 'segment':
       case 'polygon':
+      case 'free':
         return [];
       default: {
         const unwalked: never = o;
@@ -139,6 +145,8 @@ export function objectDeps(o: GeoObject): Id[] {
     case 'point':
       return [];
     case 'curve':
+      return [];
+    case 'free':
       return [];
     case 'derived':
       return parentsOf(o.rule);
@@ -213,4 +221,92 @@ export function dofCount(c: Construction): number {
   let n = paramRegister(c).length;
   for (const o of c.objects) n += carrierOf(o)?.dof ?? 0;
   return n;
+}
+
+/**
+ * The freedom the STUDENT should be told about — carriers after the constraints have consumed what
+ * they consume, plus the symbolic parameters.
+ *
+ * `dofCount` is the raw count and stays, because the sampler and the tests want it. This is the one
+ * the cue reads: a figure whose four unknowns are pinned by four givens must report **0**, or the
+ * determinacy signal ([02c R22](../../docs/02c-requirements-analytic.md)) says the opposite of the
+ * truth at exactly the moment it matters most.
+ */
+export function reportedDof(c: Construction, carrierDof: number): number {
+  return paramRegister(c).length + carrierDof;
+}
+
+// ---------------------------------------------------------------------------
+// PROVENANCE — what the student's own givens say about one point (#1032)
+// ---------------------------------------------------------------------------
+
+/**
+ * What a single coordinate of a point is, **according to the givens that name that point alone**.
+ *
+ * Deliberately NOT the honesty gate. In image 7 #6 the joint solve determines `B = (2,0)` exactly, so
+ * `isKnowledge` calls both coordinates knowledge — and the operator's ruling (2026-09-15) is that
+ * `B(2,0)` is the **answer**, which belongs in the data panel, while the **canvas** shows the
+ * question: `B(x_B, 0)`, because «על ציר ה-x» pins the `y` and nothing pins the `x`.
+ *
+ * So this asks a different question from `isKnowledge`, and the difference is provenance versus
+ * determinacy. A constraint naming several points — «שטח המשולש ABC הוא 20» — pins nothing about any
+ * one of them on its own, which is why `C` shows only its name even though the figure fixes it.
+ */
+export type Component =
+  /** The givens fix it to a number. */
+  | { known: true; value: number }
+  /** The givens leave it open — shown as `x_B`. */
+  | { known: false };
+
+export interface PointProvenance {
+  x: Component;
+  y: Component;
+}
+
+/**
+ * Read one point's own givens. `null` when the point is not a positional object at all.
+ *
+ * `env` is needed because a stated coordinate may carry a parameter (`A(-9a, 0)`); such a coordinate
+ * is NOT known here, which keeps the canvas from printing a sampled number — the honesty invariant
+ * still binds, separately from provenance.
+ */
+export function provenanceOf(c: Construction, id: Id, env: Env): PointProvenance | null {
+  const o = c.objects.find((q) => q.id === id);
+  if (!o) return null;
+
+  if (o.kind === 'point') {
+    // Its own expressions ARE its givens. A parametric one stays open.
+    const read = (e: Parameters<typeof evalExpr>[0]): Component => {
+      const v = evalExpr(e, env);
+      return Number.isFinite(v) && symbolsOf(e).every((s) => RESERVED_SYMBOLS.has(s))
+        ? { known: true, value: v }
+        : { known: false };
+    };
+    return { x: read(o.x), y: read(o.y) };
+  }
+
+  if (o.kind !== 'free' && o.kind !== 'derived') return null;
+
+  // A derived point's position comes from its parents, never from givens about itself.
+  if (o.kind === 'derived') return { x: { known: false }, y: { known: false } };
+
+  const out: PointProvenance = { x: { known: false }, y: { known: false } };
+  for (const k of c.constraints) {
+    // LOCAL only: a constraint that also names other points says nothing about this one alone.
+    const refs = constraintRefs(k);
+    if (refs.length !== 1 || refs[0] !== id) continue;
+
+    if (k.t === 'coord') {
+      if (k.x !== undefined) out.x = { known: true, value: evalExpr(k.x, env) };
+      if (k.y !== undefined) out.y = { known: true, value: evalExpr(k.y, env) };
+    } else if (k.t === 'on-line') {
+      // An axis-parallel line pins exactly one coordinate; a slanted one pins neither on its own.
+      // `-c/b` yields -0 for the axes themselves; -0 is not a different number and must not
+      // enter the model, where a deep comparison would call it one.
+      const norm = (v: number) => (Object.is(v, -0) ? 0 : v);
+      if (Math.abs(k.a) < 1e-12 && Math.abs(k.b) > 1e-12) out.y = { known: true, value: norm(-k.c / k.b) };
+      else if (Math.abs(k.b) < 1e-12 && Math.abs(k.a) > 1e-12) out.x = { known: true, value: norm(-k.c / k.a) };
+    }
+  }
+  return out;
 }

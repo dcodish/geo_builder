@@ -12,9 +12,16 @@ const AXIS = '#64748b';
 const GRID = '#e2e8f0';
 const INK = '#0f172a';
 const CURVE = '#2563eb';
+/** The construction is deliberately QUIETER than the figure: it is scaffolding a student reads,
+ *  not part of the answer. Same hue, lighter, dashed. */
+const SCAFFOLD = '#94a3b8';
+/** The RATIO label is the teaching content, not context, so it is darker and larger than the lines
+ *  it sits on — ADR-AG-010 R34 makes legibility at projection size a design condition for exactly
+ *  this surface. */
+const SCAFFOLD_TEXT = '#475569';
 
-export function Figure({ scene }: { scene: Scene }) {
-  const { width, height, axes, curves, segments, points } = scene;
+export function Figure({ scene, showConstruction = false }: { scene: Scene; showConstruction?: boolean }) {
+  const { width, height, axes, curves, segments, construction, points } = scene;
   return (
     <svg
       width="100%"
@@ -59,6 +66,48 @@ export function Figure({ scene }: { scene: Scene }) {
         </text>
       </g>
 
+      {/* construction — the medians, altitudes or bisectors that DEFINE a derived point (#1030).
+          Drawn first so the figure proper sits on top of it, and only when asked for: the operator's
+          ruling is a toggle, because three medians per derived point buries a real figure. */}
+      {showConstruction && (
+        <g data-testid="analytic-construction">
+          <g stroke={SCAFFOLD} strokeWidth={1.5} strokeDasharray="5 4" fill="none">
+            {construction.flatMap((c) =>
+              c.lines.map((l, i) => (
+                <line key={`${c.id}-l${i}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} />
+              )),
+            )}
+          </g>
+          {/* The feet — a median's landing point on the opposite side. Hollow, so they read as
+              scaffolding rather than as points the student named. */}
+          <g fill="#fff" stroke={SCAFFOLD} strokeWidth={1.5}>
+            {construction.flatMap((c) =>
+              c.feet.map((f, i) => <circle key={`${c.id}-f${i}`} cx={f.cx} cy={f.cy} r={3} />),
+            )}
+          </g>
+          {/* Painted stroke-then-fill so the label carries its own white halo: a ratio sitting on
+              its own dashed median was legible on a laptop and muddy on a projector. */}
+          <g
+            fill={SCAFFOLD_TEXT}
+            stroke="#fff"
+            strokeWidth={4}
+            strokeLinejoin="round"
+            paintOrder="stroke"
+            fontSize={15}
+            fontWeight={700}
+            textAnchor="middle"
+          >
+            {construction.flatMap((c) =>
+              c.labels.map((l, i) => (
+                <text key={`${c.id}-t${i}`} x={l.x} y={l.y - 6}>
+                  {l.text}
+                </text>
+              )),
+            )}
+          </g>
+        </g>
+      )}
+
       {/* segments — stated segments and polygon sides (#1028). Drawn BEFORE the curves and points so
           a vertex dot and a curve both sit on top of the ink rather than under it. */}
       <g stroke={CURVE} strokeWidth={2} strokeLinecap="round">
@@ -79,14 +128,48 @@ export function Figure({ scene }: { scene: Scene }) {
         {points.map((p) => (
           <g key={p.id}>
             <circle cx={p.cx} cy={p.cy} r={3.5} fill={INK} />
+            {/*
+              The label carries the point's STATED givens — `A(6,4)`, or `B(x_B, 0)` where only the
+              `y` was given (#1032). What the solve derived stays in the data panel: the canvas is
+              the question, the panel is the answer.
+
+              Subscripts are <tspan> with a reduced size and a baseline offset, not MathML: MathML
+              inside SVG needs <foreignObject>, is unevenly supported, and would not survive the
+              image export this product already has. The rendered result is the same subscript.
+            */}
             <text
               x={p.cx + 7}
               y={p.cy - 7}
               fontSize={13}
               fontFamily="system-ui, sans-serif"
               fill={INK}
+              // A coordinate label lands ON the ink it describes — B sits on the axis, D on its own
+              // segment. The halo is what keeps it readable at projection size (ADR-AG-010 R34),
+              // the same treatment the construction ratios needed.
+              stroke="#fff"
+              strokeWidth={3}
+              strokeLinejoin="round"
+              paintOrder="stroke"
             >
               {p.label}
+              {p.coords && (
+                <>
+                  <tspan>(</tspan>
+                  {p.coords.map((part, i) => (
+                    <tspan key={i}>
+                      {i > 0 && <tspan>, </tspan>}
+                      <tspan fontStyle={part.sub ? 'italic' : undefined}>{part.text}</tspan>
+                      {part.sub && (
+                        <tspan fontSize={9} dy={3}>
+                          {part.sub}
+                        </tspan>
+                      )}
+                      {part.sub && <tspan dy={-3} />}
+                    </tspan>
+                  ))}
+                  <tspan>)</tspan>
+                </>
+              )}
             </text>
           </g>
         ))}

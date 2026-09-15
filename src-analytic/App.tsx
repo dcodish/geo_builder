@@ -22,7 +22,7 @@ import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, clampZoom, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
 import { fmtNum } from '../shell/format';
 import { color, fs } from '../shell/theme';
-import { dofCount, paramRegister } from './engine/carriers';
+import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
 import { domainText, positionalOf, type NumCurve } from './engine/types';
 import { isKnowledge, knownCurve } from './engine/evaluate';
@@ -53,6 +53,15 @@ export function App() {
   const [draft, setDraft] = useState('');
   const [zoom, setZoom] = useState(1);
   const [dataOpen, setDataOpen] = useState(true);
+  /**
+   * «הצג בנייה» — the medians, altitudes or bisectors that DEFINE a derived point (#1030).
+   *
+   * OFF by default, on the operator's ruling: three medians per derived point buries a real figure,
+   * and a student asks for the method when they want it. One GLOBAL toggle rather than one per
+   * point, matching how 02c R20 settled the equations toggle — the two controls should behave alike
+   * rather than each inventing a scope.
+   */
+  const [showConstruction, setShowConstruction] = useState(false);
 
   const d = useMemo(() => derive(lines, seed), [lines, seed]);
 
@@ -119,6 +128,7 @@ export function App() {
           'conic-slot-taken': 'errConicTaken',
           'name-kind-clash': 'errNameClash',
           'unknown-reference': 'errUnknownRef',
+          'unsatisfiable': 'errUnsatisfiable',
         }[error.key],
         { detail: error.detail },
       )
@@ -128,7 +138,7 @@ export function App() {
   // Counted from the register, not from the declarations, so an undeclared parameter is reported
   // as the freedom it is rather than silently absent (#1014).
   const register = paramRegister(d.construction);
-  const freeCount = dofCount(d.construction);
+  const freeCount = reportedDof(d.construction, d.figure.carrierDof);
 
   // NO `suiteActions`: AppFrame renders the language toggle AND the About button itself, using this
   // product's own `language` key. Passing a toggle here put two «English» buttons on the suite bar.
@@ -212,7 +222,7 @@ export function App() {
         }
         canvasZone={
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-            <Figure scene={scene} />
+            <Figure scene={scene} showConstruction={showConstruction} />
             <div style={canvasClusterStyle}>
               <button type="button" style={canvasCtrlStyle} onClick={() => setZoom(1)} aria-label="reset">
                 ↺
@@ -234,10 +244,17 @@ export function App() {
                 +
               </button>
             </div>
-            <div style={{ position: 'absolute', insetInlineStart: 12, bottom: 12 }}>
+            <div style={{ position: 'absolute', insetInlineStart: 12, bottom: 12, display: 'flex', gap: 8 }}>
               <ToolButton onClick={nextConfiguration} disabled={freeCount === 0}>
                 {t('another')}
               </ToolButton>
+              {/* Offered only when there IS a construction to show, so the control never promises
+                  something the figure cannot deliver. */}
+              {d.figure.construction.length > 0 && (
+                <ToolButton onClick={() => setShowConstruction((v) => !v)}>
+                  {t(showConstruction ? 'hideConstruction' : 'showConstruction')}
+                </ToolButton>
+              )}
             </div>
           </div>
         }
