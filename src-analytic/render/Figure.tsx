@@ -141,6 +141,48 @@ export function Figure({ scene, showConstruction = false }: { scene: Scene; show
         ))}
       </g>
 
+      {/*
+        A circle's CENTRE (#1024) — operator: "in analytical geo the center is always important".
+
+        Drawn as a cross rather than a filled dot, deliberately: a dot would read as one of the
+        student's own points, and this is a feature of the circle that owns no letter.
+      */}
+      <g>
+        {curves.map((c) =>
+          c.centre ? (
+            <g key={`${c.id}-centre`} data-centre={c.id}>
+              <line
+                x1={c.centre.cx - 4}
+                y1={c.centre.cy}
+                x2={c.centre.cx + 4}
+                y2={c.centre.cy}
+                stroke={INK}
+                strokeWidth={1.5}
+              />
+              <line
+                x1={c.centre.cx}
+                y1={c.centre.cy - 4}
+                x2={c.centre.cx}
+                y2={c.centre.cy + 4}
+                stroke={INK}
+                strokeWidth={1.5}
+              />
+              {c.centre.label && (
+                <text
+                  x={c.centre.cx + 7}
+                  y={c.centre.cy - 7}
+                  fontSize={12}
+                  fill={INK}
+                  style={{ direction: 'ltr', unicodeBidi: 'isolate' }}
+                >
+                  {c.centre.label}
+                </text>
+              )}
+            </g>
+          ) : null,
+        )}
+      </g>
+
       {/* points */}
       <g>
         {points.map((p) => (

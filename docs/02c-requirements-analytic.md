@@ -823,3 +823,10 @@ versus mentioning, not which noun was used.
 draws `C` in that quadrant. It is a REGION: the point keeps both degrees of freedom, moves under
 «הציגו תצורה אחרת» inside its quadrant, and a point already placed elsewhere is refused rather than
 quietly redrawn.
+
+**R61 — a circle marks its centre** ([ADR-AG-036](06c-decisions-analytic.md#adr-ag-036)). Every drawn
+circle shows its centre, because in analytic geometry the centre is always part of the figure. The
+mark appears whenever the circle does; the VALUE beside it appears only when the givens fix it, so a
+circle whose centre rides a parameter is marked and left unlabelled rather than labelled with one
+sample's coordinates. The centre owns no letter — it is part of the circle, not a point the student
+named.
