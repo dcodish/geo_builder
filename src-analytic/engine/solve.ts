@@ -118,7 +118,41 @@ export type Constraint =
    * there. Same cross product, different degenerate behaviour, and the endpoint is a legitimate
    * position on a side.
    */
-  | { t: 'on-line-2pt'; id: Id; a: Id; b: Id };
+  | { t: 'on-line-2pt'; id: Id; a: Id; b: Id }
+  /**
+   * A DISCRETE degree of freedom — exactly one of these holds, and the student has not said which
+   * (#1049).
+   *
+   * «משולש ישר-זווית ABC» does not say WHICH angle is the right one. [02c R14] is explicit that every
+   * unstated choice is a degree of freedom — *"continuous ones sample and resample; discrete ones
+   * cycle"* — so the honest answer is three configurations reached by «הציגו תצורה אחרת», never a
+   * silently chosen seat. Picking one and drawing it would assert a given the question never gave,
+   * which is [ADR-052](../../docs/06-decisions.md#adr-052)'s cardinal sin.
+   *
+   * It is resolved BEFORE the solve, by the seed ({@link resolveChoices}), so no residual, no rank
+   * count and no message ever sees a choice — they see the option this configuration chose. That is
+   * what keeps the whole layer below unaware that discrete freedom exists.
+   *
+   * «זווית B ישרה» then COLLAPSES it: the student naming one of the options replaces the choice with
+   * that option, which is the discrete degree of freedom being consumed exactly as a coordinate
+   * consumes a continuous one.
+   */
+  | { t: 'choice'; options: Constraint[] };
+
+/**
+ * The constraints as THIS configuration sees them — every discrete choice resolved by the seed.
+ *
+ * Cycling rather than sampling is the point: successive seeds walk the options in order, so
+ * «הציגו תצורה אחרת» reaches each one instead of landing on a favourite. A choice with no options
+ * cannot happen (the registry never builds one) and is dropped rather than crashing the figure.
+ */
+export function resolveChoices(ks: readonly Constraint[], seed: number): Constraint[] {
+  return ks.flatMap((k) => {
+    if (k.t !== 'choice') return [k];
+    if (k.options.length === 0) return [];
+    return resolveChoices([k.options[((seed % k.options.length) + k.options.length) % k.options.length]], seed);
+  });
+}
 
 /** Which points a constraint references — the solver's map from constraints to movable carriers. */
 export function constraintRefs(k: Constraint): Id[] {
@@ -143,6 +177,10 @@ export function constraintRefs(k: Constraint): Id[] {
       return [k.id];
     case 'on-line-2pt':
       return [k.id, k.a, k.b];
+    // Every option's points: the choice is about which constraint holds, not about which points
+    // are involved, and a carrier any option could move must be searched over.
+    case 'choice':
+      return [...new Set(k.options.flatMap(constraintRefs))];
     default: {
       const unreferenced: never = k;
       throw new Error(`constraint declares no refs: ${JSON.stringify(unreferenced)}`);
@@ -173,6 +211,8 @@ export function describeConstraint(k: Constraint): string {
       return `${k.id} על ${k.curve}`;
     case 'on-line-2pt':
       return `${k.id} על ${k.a}${k.b}`;
+    case 'choice':
+      return k.options.map(describeConstraint).join(' או ');
     default: {
       const undescribed: never = k;
       throw new Error(`constraint has no description: ${JSON.stringify(undescribed)}`);
@@ -391,6 +431,16 @@ export function residual(
       // every other residual here without further scaling.
       return [((d.x - a.x) * uy - (d.y - a.y) * ux) / n];
     }
+    /**
+     * A discrete choice HAS no residual, by construction (#1049).
+     *
+     * {@link resolveChoices} replaces it with the option this configuration chose before any of this
+     * runs, so reaching here means a caller measured raw constraints instead of resolved ones. Saying
+     * so loudly is the point: silently measuring `options[0]` would draw one seat and call it the
+     * only one, which is the defect the kind exists to prevent.
+     */
+    case 'choice':
+      throw new Error('a choice must be resolved by resolveChoices() before it is measured');
     default: {
       const unmeasured: never = k;
       throw new Error(`constraint has no residual: ${JSON.stringify(unmeasured)}`);

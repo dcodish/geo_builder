@@ -17,7 +17,7 @@ import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
 import { pairKey, pinnedLengths } from './lengths';
 import { provenanceOf, type PointProvenance } from './carriers';
-import { freeRank, residual, solveLM, type Constraint } from './solve';
+import { freeRank, residual, resolveChoices, solveLM, type Constraint } from './solve';
 import { inDomain, isFree, objectById, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
 
 export interface FigurePoint {
@@ -334,7 +334,17 @@ export interface SolveReport {
   unsatisfied: Constraint[];
 }
 
-export function evaluate(c: Construction, seed = 0): Figure {
+export function evaluate(raw: Construction, seed = 0): Figure {
+  /**
+   * DISCRETE freedom is resolved HERE, once, before anything measures a constraint (#1049).
+   *
+   * «משולש ישר-זווית ABC» carries a `choice` over its three possible right angles. Successive seeds
+   * walk the options in order, so «הציגו תצורה אחרת» cycles the seats rather than resampling into a
+   * favourite — 02c R14's *"discrete ones cycle"*. Everything downstream — the solve, the rank
+   * count, the satisfaction check, the provenance — then sees an ordinary constraint and never
+   * learns that discrete freedom exists.
+   */
+  const c: Construction = { ...raw, constraints: resolveChoices(raw.constraints, seed) };
   const env = sampleEnv(c, seed);
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];

@@ -1968,3 +1968,82 @@ than `derived:diagonals` — the engine stays language-free and the locale rende
 corpus noun.
 
 **Consequences.** `src-analytic` 330 → 337 tests.
+
+## ADR-AG-035 — A shape noun is a TABLE ROW, and an unstated choice is a discrete DOF (#1049)
+
+**Status:** accepted, 2026-09-15 · **Supersedes the refusal in** [ADR-AG-013](#adr-ag-013) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R59, R60. **Design:**
+[04c](04c-design-analytic.md) "The shape registry".
+
+**Context.** Operator, 2026-09-15:
+
+> we need support for **all kinds of 2d shapes**. **I don't want to mention each one.** But for
+> instance, the tool doesn't support `משולש ישר זווית`. It also doesn't support `זווית B ישרה` so I
+> can tell the tool what is the right angle.
+
+Measured: 0 of 20 forms. Seven nouns were refused `out-of-scope` by ADR-AG-013 — deliberately,
+because each carried a given the tool could not then honour and drawing a parallelogram as a plain
+ring of four sides would be a stated given vanishing.
+
+**The requirement is about the shape of the CODE, and that is what was built.** «I don't want to
+mention each one» is not a request for ten nouns; it is a request that the eleventh cost nothing.
+`engine/shapes.ts` is a table from noun to constraints, its whole vocabulary is `parallel`, `equal`
+and `rightAngleAt`, and a row that needs a fourth helper is a signal that the CONSTRAINT layer is
+missing a kind — not that the table needs an exception. That is asserted, not hoped for: a test
+walks every row in `SHAPES`, parses `<noun> ABCD`, and requires the facts to be a polygon plus
+exactly the constraints the row declares, so a noun implemented as a special case anywhere else
+fails it.
+
+**ADR-AG-013's refusal is not overturned, it is spent.** Its own comment said *"refused until B3 can
+honour it"*. B3 shipped as ADR-AG-015; the registry uses it; the given is honoured rather than
+dropped. Three locks flipped and the invariant they protected — a noun's given must never silently
+vanish — is now asserted the other way round: the parse must produce constraints, and the SHAPE
+tests verify each one from the placed points at four seeds, because a figure that records «AB ∥ DC»
+and draws something else is the very defect those locks existed to prevent.
+
+**The subtle half: an unstated choice is a DISCRETE degree of freedom.** «משולש ישר-זווית ABC» does
+not say which angle is the right one. [02c R14](02c-requirements-analytic.md) is explicit —
+*"continuous ones sample and resample; discrete ones cycle"* — so a new constraint kind, `choice`,
+carries the seats, and `resolveChoices` picks `options[seed % n]` **before the solve**. Measured:
+seeds 0, 1, 2 put the right angle at A, at B, at C. Nothing below `evaluate` learns that discrete
+freedom exists: the residual, the rank count, the satisfaction check and the provenance all see an
+ordinary constraint, and the residual **throws** if it is ever handed an unresolved choice, because
+silently measuring `options[0]` would draw one seat and call it the only one.
+
+**«זווית B ישרה» is the student consuming that freedom, and it is why it shipped here.** The
+collapse happens at M1: a stated constraint that `namesOption` one of a choice's options REPLACES
+the choice. It reports `narrowed`, not `created` — the constraint count is unchanged and what moved
+is the freedom, the same answer «a<13» gives after «a הוא פרמטר». For that comparison to be
+structural rather than a special case, both sides are built by the same `rightAngleAt`, which sorts
+its rays so the two spellings cannot differ.
+
+**A vertex alone does not name an angle**, so that form lowers to a `right-angle` FACT and the rays
+come from the shape the vertex belongs to, resolved at M1. Where there is no such shape, or more
+than one, it is refused as `ambiguous-angle` and the message names the format that is unambiguous.
+Picking a pair of rays would be ADR-052's cardinal sin in vocabulary form.
+
+**A fourth list of shape nouns was found and removed.** The AREA rule carried its own
+`משולש|מרובע|מצולע`, which is why «שטח הדלתון ABCD» was refused by a tool that had just drawn the
+kite. It reads the registry now. Its noun and its vertices are both optional, and the two absences
+mean different things: «שטח ABCD» needs no noun, while «שטח הדלתון הוא 24» — the operator's own
+phrasing — names the figure by its noun, which is a **contextual reference** and therefore resolved
+at M1 against the construction, unambiguous when exactly one shape answers to it and refused
+(`ambiguous-shape`) otherwise. The polygon object now carries its `noun` so that question can be
+asked at all — which [#1070](https://github.com/dcodish/geo_builder/issues/1070) needs too, since
+«האלכסון הראשי» is meaningless until the figure knows it is a kite.
+
+**A drift found on the way, and fixed positively.** Two places decided "does this fact name an
+object?" by listing the kinds that do NOT, so every new id-less fact had to be remembered in both —
+and `right-angle`, which carries an `id` for a different reason, was silently treated as naming an
+object and collided with the point it merely mentions. `namesObject` states the list positively, so
+a new fact kind is excluded until it says otherwise.
+
+**Deliberately NOT in scope, and stated rather than quietly skipped:** a general angle value.
+«זווית ABC היא 60» needs an angle RESIDUAL, which is its own mechanism; only 90° is understood, and
+a stated value that is not 90 falls through rather than being quietly treated as a right angle.
+
+**Consequences.** `src-analytic` 682 → 714 tests. Ten nouns ship: משולש · משולש ישר-זווית · משולש
+שווה שוקיים · משולש שווה צלעות · מרובע · מקבילית · מלבן · ריבוע · מעוין · טרפז · טרפז שווה שוקיים ·
+טרפז ישר-זווית · דלתון, with the English aliases pointing at the same rows.

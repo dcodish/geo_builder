@@ -230,6 +230,59 @@ a bare equation, depending on the sentence:
 The guard is position, not tokens — and it is asserted in the suite, because the ordering is the whole
 of it.
 
+## The shape registry ([ADR-AG-035](06c-decisions-analytic.md#adr-ag-035))
+
+`engine/shapes.ts` is a table from a noun to the constraints it asserts, and the point of it is the
+operator's own requirement — *"I don't want to mention each one"*. A noun is a row:
+
+```ts
+מקבילית: { arity: 4, givens: ([a, b, c, d]) => [parallel(a, b, d, c), parallel(a, d, b, c)] },
+דלתון:   { arity: 4, givens: ([a, b, c, d]) => [equal(a, b, a, d), equal(c, b, c, d)],
+           principalDiagonal: ([a, , c]) => [a, c] },
+```
+
+Three helpers are the whole vocabulary — `parallel`, `equal`, `rightAngleAt` — and that is a
+deliberate limit: **a row that needs a fourth helper means the constraint layer is missing a kind**,
+not that the table needs an exception. A shape lowers to one `polygon` fact plus its constraints, in
+that order, because the ring is what introduces the vertices and a constraint may not name a point
+the figure does not have yet.
+
+The ring is `ABCD` in order, so `AB` and `DC` are opposite sides and `AC` and `BD` are the diagonals.
+Every row reads its vertices that way and none of them says so.
+
+**The polygon remembers its noun.** Not decoration: «האלכסון הראשי» is meaningless until the figure
+knows it is a kite, and «שטח הדלתון הוא 24» names a shape without naming its vertices. A generic noun
+is promoted by a specific one — «מרובע ABCD» then «דלתון ABCD» is one ring that learns what it is —
+and never demoted.
+
+### Discrete freedom
+
+| the student writes | freedom | how it is drawn |
+| --- | --- | --- |
+| `משולש ABC` | 6, continuous | sampled; resampled by «הציגו תצורה אחרת» |
+| `משולש ישר-זווית ABC` | 5 + a DISCRETE choice of 3 | `options[seed % 3]` — the seats CYCLE |
+| `+ זווית B ישרה` | 5 | the choice is replaced by the option named |
+
+`choice` is a constraint kind, and `resolveChoices(constraints, seed)` runs at the top of `evaluate`,
+before anything measures anything. So the solve, the rank count, the satisfaction check and the
+provenance all see ordinary constraints — and `residual` throws on an unresolved choice rather than
+quietly measuring the first option, which would draw one seat and call it the only one.
+
+A stated constraint that matches one of a choice's options collapses it at the M1 boundary and reports
+`narrowed`: the constraint count is unchanged, and what moved is the freedom.
+
+### Contextual references
+
+Two forms name something without naming its parts, and both are resolved at M1 because both are
+questions about the construction rather than about the sentence:
+
+- «זווית B ישרה» — the rays come from the shape `B` belongs to;
+- «שטח הדלתון הוא 24» — the ring is the one shape answering to that noun.
+
+Each is unambiguous when exactly one object answers, and refused by name (`ambiguous-angle`,
+`ambiguous-shape`) when none or several do. Refusing the ambiguous case is what makes the
+unambiguous one safe to resolve at all.
+
 ## Born after the chassis
 
 This is the **first builder created after `shell/` existed**, and the difference shows in what it did

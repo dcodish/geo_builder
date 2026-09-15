@@ -134,7 +134,7 @@ export type Fact =
   | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve })
   | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule })
   | (FactBase & { t: 'segment'; id: Id; a: Id; b: Id })
-  | (FactBase & { t: 'polygon'; id: Id; vertices: Id[] })
+  | (FactBase & { t: 'polygon'; id: Id; vertices: Id[]; noun?: string })
   /**
    * A statement that must HOLD rather than an object that exists (#1016) — «שטח המשולש ABC הוא 20».
    *
@@ -157,7 +157,29 @@ export type Fact =
    * that follows then says where it is. Emitted by any rule whose sentence NAMES a new point, so
    * that the reference kinds can keep refusing to invent one.
    */
-  | (FactBase & { t: 'declare'; id: Id });
+  | (FactBase & { t: 'declare'; id: Id })
+  /**
+   * «זווית B ישרה» — a right angle named by its VERTEX ALONE (#1049).
+   *
+   * It cannot be lowered in the parser, because `B` names an angle only once the figure says which
+   * two rays meet there. The M1 boundary is where that is known, so this is the one fact whose
+   * constraint is built by `applyFact` rather than handed to it — and where the figure has no single
+   * shape through `B`, it is a refusal that names the format rather than a guess (the R32 discipline).
+   *
+   * «זווית ABC ישרה» needs none of this and lowers to a constraint in the parser, as it should.
+   */
+  | (FactBase & { t: 'right-angle'; id: Id })
+  /**
+   * «שטח הדלתון הוא 24» — a shape named by its NOUN, with no vertices (#1049).
+   *
+   * A CONTEXTUAL reference: "the kite" means the one the student already drew. Which ring that is
+   * is a question about the construction, so like `right-angle` it is resolved at M1 — and where
+   * the figure has no such shape, or more than one, it is refused rather than guessed.
+   *
+   * The corpus is full of these («שיפוע הישר הוא 2», «האלכסונים נפגשים בנקודה O»), and this is the
+   * first of them. Each one still needs its own rule; what they share is this resolution step.
+   */
+  | (FactBase & { t: 'area-of'; noun: string; value: Expr });
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list
@@ -210,7 +232,15 @@ export type GeoObject =
   /** `הקטע AB` — drawn between two points, and what gives «אמצע הצלע BC» a referent. */
   | { kind: 'segment'; id: Id; a: Id; b: Id }
   /** `משולש ABC` over vertices that are ALREADY stated — its sides. Free vertices are B3's job. */
-  | { kind: 'polygon'; id: Id; vertices: Id[] };
+  /**
+   * The NOUN the student used, in its registry spelling (#1049).
+   *
+   * Not decoration: «האלכסון הראשי» is meaningless until the figure knows it is a kite, and
+   * «שטח הדלתון הוא 24» names a shape without naming its vertices. Both are questions about what
+   * this ring IS, which the vertex list alone cannot answer. Absent for a polygon that arrived
+   * some other way.
+   */
+  | { kind: 'polygon'; id: Id; vertices: Id[]; noun?: string };
 
 export type PointObject = Extract<GeoObject, { kind: 'point' }>;
 export type CurveObject = Extract<GeoObject, { kind: 'curve' }>;
@@ -220,6 +250,19 @@ export type PolygonObject = Extract<GeoObject, { kind: 'polygon' }>;
 
 export const isPoint = (o: GeoObject): o is PointObject => o.kind === 'point';
 export const isCurve = (o: GeoObject): o is CurveObject => o.kind === 'curve';
+
+/**
+ * Does this fact NAME AN OBJECT — an id whose collision is a name clash?
+ *
+ * Stated POSITIVELY on purpose (#1049). Two places used to answer it by listing the kinds that do
+ * NOT («param, constraint, selector, declare»), so every new id-less fact had to be remembered in
+ * both — and a new fact that happens to carry an `id` for some other reason, like «זווית B ישרה»,
+ * was silently treated as naming an object and collided with the point it merely mentions. A
+ * positive list gets the new kind wrong in the safe direction: excluded until it says otherwise.
+ */
+export type NamingFact = Extract<Fact, { t: 'point' | 'curve' | 'derived' | 'segment' | 'polygon' }>;
+export const namesObject = (f: Fact): f is NamingFact =>
+  f.t === 'point' || f.t === 'curve' || f.t === 'derived' || f.t === 'segment' || f.t === 'polygon';
 export const isDerived = (o: GeoObject): o is DerivedObject => o.kind === 'derived';
 export const isFree = (o: GeoObject): o is Extract<GeoObject, { kind: 'free' }> => o.kind === 'free';
 

@@ -778,3 +778,18 @@ configuration may yet have the object — that is R-level ADR-AG-008 and it stan
 fixed there is no other configuration, so «מפגש האלכסונים» of a concave quadrilateral, the circumcentre
 of three collinear points and an empty circle are each named as not existing, rather than left absent
 with nothing said.
+
+**R59 — a shape noun carries its givens, and adding a noun is adding a ROW**
+([ADR-AG-035](06c-decisions-analytic.md#adr-ag-035)). «מקבילית ABCD» draws a parallelogram that
+really has `AB ∥ DC`; «דלתון ABCD», «ריבוע», «מעוין», «מלבן», «טרפז», «טרפז שווה שוקיים», «טרפז
+ישר-זווית», «משולש ישר-זווית», «משולש שווה שוקיים» and «משולש שווה צלעות» likewise, with the English
+nouns as aliases onto the same rows. The arity comes from the row, a contradiction («ריבוע ABCD»
+with «AB = 2BC») is reported rather than drawn, and «שטח ה<noun>» names any of them — including by
+the noun alone when the figure has exactly one such shape.
+
+**R60 — an unstated choice CYCLES, and the student can consume it**
+([ADR-AG-035](06c-decisions-analytic.md#adr-ag-035)). «משולש ישר-זווית ABC» does not say which angle
+is right, so «הציגו תצורה אחרת» walks all three — R14's discrete degree of freedom, made real.
+«זווית B ישרה» (also «הזווית B היא 90», «∡B = 90») settles it, and the figure keeps that seat at
+every configuration. A vertex that names no single angle — no shape through it, or several — is
+refused with the format that would work, never resolved by guessing which two rays were meant.

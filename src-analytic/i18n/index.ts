@@ -64,6 +64,10 @@ const he = {
     'אפשר לבחור אות אחרת, או למחוק את ההגדרה הקודמת ולכתוב אותה מחדש.',
   errUnknownRef: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
+  errAmbiguousShape:
+    'בשרטוט הזה אין צורה אחת שאפשר לקרוא לה כך: "{{detail}}". אפשר לציין את הקודקודים, למשל «שטח הדלתון ABCD הוא 24».',
+  errAmbiguousAngle:
+    'האות אחת לא מספיקה כדי לדעת באיזו זווית מדובר: "{{detail}}". אפשר לכתוב את שלוש האותיות, למשל «זווית ABC ישרה», או לציין קודם את הצורה שבה הקודקוד נמצא.',
   errDoesNotExist:
     'בשרטוט הזה {{existing}} לא קיים — הנתונים כבר קובעים את כל הנקודות, ואין תצורה אחרת שבה הוא ' +
     'היה קיים. המשפט "{{detail}}" לא נוסף.',
@@ -146,6 +150,11 @@ const en: typeof he = {
     'restate it.',
   errUnknownRef: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
+  errAmbiguousShape:
+    'No single shape in this figure answers to that: "{{detail}}". Name its vertices — for example "the area of kite ABCD is 24".',
+  errAmbiguousAngle:
+    'One letter is not enough to say which angle is meant: "{{detail}}". Write all three letters ' +
+    '— for example "angle ABC is right" — or state the shape the vertex belongs to first.',
   errDoesNotExist:
     'In this figure {{existing}} does not exist — the givens already fix every point, and there is ' +
     'no other configuration where it would. "{{detail}}" was not added.',

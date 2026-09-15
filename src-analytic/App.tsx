@@ -225,6 +225,8 @@ export function App() {
           'name-kind-clash': 'errNameClash',
           'unknown-reference': 'errUnknownRef',
           'does-not-exist': 'errDoesNotExist',
+          'ambiguous-angle': 'errAmbiguousAngle',
+          'ambiguous-shape': 'errAmbiguousShape',
           'unsatisfiable': 'errUnsatisfiable',
         }[error.key],
         { detail: error.detail, existing: t(existingKey(error)) },

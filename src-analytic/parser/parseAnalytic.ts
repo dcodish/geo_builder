@@ -23,6 +23,7 @@ import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS } from '../engine/carriers';
 import { constantLengthExpr, parseLengthExpr } from '../engine/lengths';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id } from '../engine/types';
+import { EN_SHAPE, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 
 /**
  * Why a line did not become facts.
@@ -542,9 +543,21 @@ function parseDerived(line: string): RuleOutcome {
  * below, which is a refusal the product OWNS rather than a question outsourced to the LLM
  * ([ADR-3D-214](../../docs/06b-decisions-3d.md#adr-3d-214) D2).
  */
-const NEUTRAL_SHAPE_HE = new RegExp(`^${HE_GIVEN}ה?(משולש|מרובע)\\s+(${NAME_RUN})$`);
-const NEUTRAL_SHAPE_EN = new RegExp(`^(triangle|quadrilateral)\\s+(${NAME_RUN})$`, 'i');
-const CONSTRAINED_SHAPE = /^(?:נתו(?:ן|נה)\s+)?ה?(?:מקבילית|טרפז|ריבוע|מעוין|מלבן)\s|^(?:parallelogram|trapezoid|trapezium|square|rhombus|rectangle)\s/i;
+/**
+ * ONE shape rule, over the registry (#1049).
+ *
+ * Operator, 2026-09-15: *"we need support for all kinds of 2d shapes. **I don`t want to mention each
+ * one.**"* — so the noun is CAPTURED, not enumerated, and what decides whether it is a shape is
+ * whether {@link shapeRow} has a row for it. Three hand-written lists of shape nouns had already
+ * drifted apart in this file; replacing them with a lookup is what makes an eleventh noun a table
+ * row rather than a change to the parser.
+ *
+ * The noun is up to three Hebrew words, which covers «משולש ישר-זווית» and «טרפז שווה שוקיים» and
+ * stops well short of a sentence. A phrase with no row FALLS THROUGH rather than refusing, because
+ * this rule has no claim on a sentence it does not recognise.
+ */
+const SHAPE_HE = new RegExp(`^${HE_GIVEN}(ה?[א-ת]+(?:[- ][א-ת]+){0,2})\\s+(${NAME_RUN})$`);
+const SHAPE_EN = new RegExp(`^(?:the\\s+)?([a-z]+(?:[- ][a-z]+){0,2})\\s+(${NAME_RUN})$`, 'i');
 
 const SEGMENT_HE = new RegExp(`^${HE_GIVEN}ה?(?:קטע|צלע)\\s+(${NAME})(${NAME})$`);
 const SEGMENT_EN = new RegExp(`^(?:segment|side)\\s+(${NAME})(${NAME})$`, 'i');
@@ -583,18 +596,31 @@ function parseShape(line: string): RuleOutcome {
     return made([{ t: 'segment', id: segmentId(a, b), a, b, src: line }]);
   }
 
-  const poly = NEUTRAL_SHAPE_HE.exec(line) ?? NEUTRAL_SHAPE_EN.exec(line);
+  const poly = SHAPE_HE.exec(line) ?? SHAPE_EN.exec(line);
   if (poly) {
-    const [, noun, run] = poly;
+    const [, nounSrc, run] = poly;
+    const noun = EN_SHAPE[normalizeShapeNoun(nounSrc).toLowerCase()] ?? nounSrc;
+    const row = shapeRow(noun);
+    // Not a shape noun at all — leave the sentence to the rules after this one.
+    if (!row) return null;
     const vertices = splitNames(run);
     // The noun the student wrote is the assertion to check against — `< 3` only ever caught the
-    // shapeless case and let «משולש ABCD» through as a four-sided triangle (#1042).
-    const stated = arityOf(noun);
-    if (vertices.length < 3 || (stated !== null && vertices.length !== stated)) {
-      return refuse('bad-arity', line);
-    }
+    // shapeless case and let «משולש ABCD» through as a four-sided triangle (#1042). The arity now
+    // comes from the row, so a new noun brings its own answer with it.
+    if (vertices.length !== row.arity) return refuse('bad-arity', line);
     if (hasRepeat(vertices)) return refuse('repeated-vertex', line);
-    return made([{ t: 'polygon', id: polygonId(vertices), vertices, src: line }]);
+    /**
+     * The RING first, then the givens the noun carries.
+     *
+     * Order matters: the polygon introduces the vertices (ADR-AG-013), and a constraint may not
+     * name a point the figure does not have yet. So a shape noun is one object plus N constraints,
+     * and «מקבילית ABCD» is «מרובע ABCD» plus two parallel relations — which is exactly how a
+     * student would describe it.
+     */
+    return made([
+      { t: 'polygon', id: polygonId(vertices), vertices, noun: normalizeShapeNoun(noun), src: line },
+      ...row.givens(vertices).map((k: Constraint) => ({ t: 'constraint' as const, k, src: line })),
+    ]);
   }
 
   return null;
@@ -610,11 +636,24 @@ function parseShape(line: string): RuleOutcome {
  * The noun is optional and so is the definite article, per the morphology rule this tree keeps
  * relearning: «משולש» / «המשולש» / «משולש ABC ששטחו 20» all name the same thing.
  */
+/**
+ * «שטח המשולש ABC הוא 20» — and every other shape the registry knows (#1049).
+ *
+ * This rule had its OWN list of shape nouns — משולש|מרובע|מצולע — which is the FOURTH hand-written
+ * list of them this file held, and the reason «שטח הדלתון ABCD» was refused by a tool that had just
+ * drawn the kite. Lists drift; a lookup cannot (ADR-043 class).
+ *
+ * Both the noun and the vertices are OPTIONAL, and each absence means something different:
+ *
+ *  - «שטח ABCD הוא 24» — no noun, and none is needed: the vertices say which figure;
+ *  - «שטח הדלתון הוא 24» — no vertices, and the NOUN says which figure, provided the student has
+ *    exactly one of them. That resolution needs the construction, so it happens at M1.
+ */
 const AREA_HE = new RegExp(
-  `^${HE_GIVEN}שטח\\s+(?:ה?משולש|ה?מרובע|ה?מצולע)?\\s*(${NAME_RUN})${HE_IS}\\s*(?:שווה\\s+ל-?)?\\s*(.+)$`,
+  `^${HE_GIVEN}שטח\\s+(ה?[א-ת]+(?:[- ][א-ת]+){0,2})?\\s*(${NAME_RUN})?${HE_IS}\\s*(?:שווה\\s+ל-?)?\\s*(.+)$`,
 );
 const AREA_EN = new RegExp(
-  `^(?:the\\s+)?area\\s+of\\s+(?:triangle\\s+|quadrilateral\\s+|polygon\\s+)?(${NAME_RUN})\\s+is\\s+(.+)$`,
+  `^(?:the\\s+)?area\\s+of\\s+(?:the\\s+)?([a-z]+(?:[- ][a-z]+){0,2})?\\s*(${NAME_RUN})?\\s+is\\s+(.+)$`,
   'i',
 );
 
@@ -650,6 +689,29 @@ const ON_OBJECT_EN = new RegExp(
   'i',
 );
 
+/**
+ * A RIGHT ANGLE, named four ways (#1049).
+ *
+ * Operator, 2026-09-15: *"It also doesn`t support זווית B ישרה so I can tell the tool what is the
+ * right angle."* That sentence is what CONSUMES the discrete freedom «משולש ישר-זווית ABC» leaves
+ * open, which is why it ships with the registry rather than after it.
+ *
+ * Three letters name the angle outright. ONE letter names it only relative to a figure, so that
+ * form lowers to a `right-angle` fact and is resolved at the M1 boundary, where the shapes are
+ * known — and refused by name where the vertex belongs to no single shape.
+ *
+ * Only 90° for now: a general «זווית ABC היא 60» needs an angle RESIDUAL, which is its own
+ * mechanism and its own issue. A stated value that is not 90 therefore falls through rather than
+ * being quietly treated as a right angle.
+ */
+const ANGLE_HE = new RegExp(
+  `^${HE_GIVEN}ה?זווית\\s+(${NAME})(${NAME})?(${NAME})?${HE_IS}\\s*(?:ישרה|=\\s*90|90)$`,
+);
+const ANGLE_SIGN = new RegExp(`^${HE_GIVEN}∡\\s*(${NAME})(${NAME})?(${NAME})?\\s*=\\s*90°?$`);
+const ANGLE_EN = new RegExp(
+  `^(?:the\\s+)?angle\\s+(${NAME})(${NAME})?(${NAME})?\\s+(?:is\\s+)?(?:right|=\\s*90°?|90°?)$`,
+  'i',
+);
 const ON_AXIS_HE = new RegExp(
   `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת)?\\s+)?על\\s+(?:ה?חלק\\s+(ה?חיובי|ה?שלילי)\\s+של\\s+)?ציר\\s+ה?-?\\s*([xy])$`,
 );
@@ -788,17 +850,39 @@ function parseConstraint(line: string): RuleOutcome {
       return made([{ t: 'constraint', k: { t: 'length-eq', left, right }, src: line }]);
     }
   }
-  const area = AREA_HE.exec(line) ?? AREA_EN.exec(line);
+  const areaHe = AREA_HE.exec(line);
+  const area = areaHe ?? AREA_EN.exec(line);
   if (area) {
-    const ids = splitNames(area[1]);
-    const value = parseExpr(normalizeMath(area[2]));
-    // The same class as the shape nouns (#1042): this rule recognised its own sentence, so a
-    // figure with too few vertices or an unreadable value is answered rather than handed to
-    // `not-handled` as if the sentence were unintelligible.
-    if (ids.length < 3) return refuse('bad-arity', line);
-    if (hasRepeat(ids)) return refuse('repeated-vertex', line);
-    if (!value) return refuse('bad-equation', trim(area[2]));
-    return made([{ t: 'constraint', k: { t: 'area', ids, value }, src: line }]);
+    const [, nounSrc, run, valueSrc] = area;
+    /**
+     * The COPULA is not part of the noun.
+     *
+     * «שטח הדלתון הוא 24» has no vertices, so the noun group runs on and swallows «הוא» — and
+     * «דלתון הוא» has no registry row, which turned the operator`s own sentence into `not-handled`.
+     * Trimming it here rather than excluding it in the pattern keeps the pattern readable and
+     * covers every gender of the copula at once.
+     */
+    const nounPlain = nounSrc
+      ? normalizeShapeNoun(nounSrc).replace(/\s+(?:הוא|היא|הם|הן)$/, '')
+      : undefined;
+    const noun = nounPlain ? EN_SHAPE[nounPlain.toLowerCase()] ?? nounPlain : undefined;
+    // A word that is not a shape noun means this is not an area sentence about a figure — leave
+    // it rather than refuse it, which is the rule contract for "not my sentence".
+    if (noun && !shapeRow(noun)) return null;
+    const value = parseExpr(normalizeMath(valueSrc));
+    if (!value) return refuse('bad-equation', trim(valueSrc));
+    if (run) {
+      const ids = splitNames(run);
+      // The same class as the shape nouns (#1042): this rule recognised its own sentence, so a
+      // figure with too few vertices is answered rather than handed to `not-handled` as if the
+      // sentence were unintelligible.
+      if (ids.length < 3) return refuse('bad-arity', line);
+      if (hasRepeat(ids)) return refuse('repeated-vertex', line);
+      return made([{ t: 'constraint', k: { t: 'area', ids, value }, src: line }]);
+    }
+    // The noun alone — which figure it names is a question about the CONSTRUCTION, so M1 answers it.
+    if (noun) return made([{ t: 'area-of', noun, value, src: line }]);
+    return null;
   }
 
   const cev = CEVIAN_HE.exec(line) ?? CEVIAN_EN.exec(line);
@@ -888,6 +972,21 @@ function parseConstraint(line: string): RuleOutcome {
     // An AXIS operand belongs to the rule below, which already owns that sentence; anything else is
     // not a thing a point can be on. Fall through rather than returning — a `return null` here would
     // exit `parseConstraint` entirely and skip the area, cevian and axis rules that follow.
+  }
+
+  const ang = ANGLE_HE.exec(line) ?? ANGLE_SIGN.exec(line) ?? ANGLE_EN.exec(line);
+  if (ang) {
+    const [, a, b, c] = ang;
+    // Three letters: the middle one is the vertex and the outer two are the rays. That is the
+    // universal reading of ∡ABC, and it needs no figure.
+    if (b && c) {
+      if (a === b || b === c || a === c) return refuse('repeated-vertex', line);
+      return made([{ t: 'constraint', k: rightAngleAt(b, a, c), src: line }]);
+    }
+    // One letter: the figure decides which rays, so M1 does (see `apply`).
+    if (!b && !c) return made([{ t: 'right-angle', id: a, src: line }]);
+    // Two letters name no angle at all; saying so beats guessing which one was meant.
+    return refuse('bad-operand', line);
   }
 
   const ax = ON_AXIS_HE.exec(line) ?? ON_AXIS_EN.exec(line);
@@ -1011,9 +1110,9 @@ export function parseLine(raw: string): ParseResult {
     parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
   if (matched) return matched;
 
-  // Recognised and deliberately unsupported: a constrained shape noun carries a given this slice
-  // cannot honour, so it is refused BY NAME rather than escalated as if we did not understand it.
-  if (CONSTRAINED_SHAPE.test(line)) return { ok: false, code: 'out-of-scope', detail: line };
+  // NO constrained-shape refusal here any more (#1049). It existed because those nouns carried
+  // givens the tool could not honour (ADR-AG-013); the registry honours them, so keeping it would
+  // reject sentences the tool now understands. Removing it IS the fix, not a side effect of it.
 
   /**
    * F3/F5/F6 WITHOUT the noun — `x-y+2=0`, `y^2=54x`, `(x-3)^2+(y-4)^2=9` (#1037).

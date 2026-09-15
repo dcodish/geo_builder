@@ -152,15 +152,23 @@ describe('a construction may not reference what does not exist', () => {
   });
 });
 
-describe('a shape noun that carries a GIVEN is refused, not silently flattened', () => {
-  it.each(['מקבילית ABCD', 'טרפז ABCD', 'ריבוע ABCD'])('%s', (noun) => {
-    // Drawing a parallelogram as a plain ring of four sides would drop AB ∥ DC — a stated given
-    // vanishing, which the root CLAUDE.md forbids outright. Refused until B3 can honour it.
+describe('a shape noun that carries a GIVEN is HONOURED (#1049, was a refusal)', () => {
+  /**
+   * THIS LOCK IS DELIBERATELY FLIPPED, and the reason is the one it was written with.
+   *
+   * It asserted `out-of-scope` because drawing a parallelogram as a plain ring of four sides would
+   * drop «AB ∥ DC» — a stated given vanishing, which the root CLAUDE.md forbids outright — and the
+   * constraint layer that could honour it did not exist yet. The comment said so: *"refused until
+   * B3 can honour it"*. B3 shipped (ADR-AG-015), the registry (#1049) uses it, and the given is now
+   * honoured rather than dropped. So the invariant the test was protecting is INTACT; what changed
+   * is which answer satisfies it.
+   */
+  it.each(['מקבילית ABCD', 'טרפז ABCD', 'ריבוע ABCD'])('%s builds, with its given kept', (noun) => {
     const r = parseLine(noun);
-    expect(r.ok).toBe(false);
-    // And refused BY NAME rather than escalated: `not-handled` would send input we understand
-    // perfectly to the paid LLM (ADR-3D-214 D2).
-    if (!r.ok) expect(r.code).toBe('out-of-scope');
+    expect(r.ok).toBe(true);
+    // The ring AND the constraints the noun carries — never the ring alone, which is the exact
+    // failure the original test existed to prevent.
+    if (r.ok) expect(r.facts.filter((f) => f.t === 'constraint').length).toBeGreaterThan(0);
   });
 
   it('while the NEUTRAL nouns build, because they assert nothing beyond their vertices', () => {

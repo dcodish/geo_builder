@@ -18,10 +18,12 @@
 import { fitConic } from './conic';
 import { parentsOf } from './derived';
 import { constraintRefs } from './solve';
+import { isGenericNoun, namesOption, rightAngleAt } from './shapes';
 import { evalExpr, type Env } from './expr';
 import {
   EMPTY_CONSTRUCTION,
   isPositional,
+  namesObject,
   objectById,
   type Construction,
   type Curve,
@@ -30,6 +32,7 @@ import {
   type Fact,
   type GeoObject,
   type PointObject,
+  type PolygonObject,
 } from './types';
 
 export type ApplyErrorCode =
@@ -55,6 +58,22 @@ export type ApplyErrorCode =
    * points' circumcentre — in a figure with no freedom left to try elsewhere.
    */
   | 'does-not-exist'
+  /**
+   * «זווית B ישרה» where the vertex alone does not name an angle (#1049).
+   *
+   * A vertex names an angle only when the figure says which two rays meet there. With no shape
+   * through the point — or with more than one — the honest answer is to say so and name the
+   * format that IS unambiguous («זווית ABC ישרה»), rather than pick a pair of rays and assert a
+   * given the student never gave.
+   */
+  | 'ambiguous-angle'
+  /**
+   * «שטח הדלתון הוא 24» with no kite in the figure, or with two of them (#1049).
+   *
+   * The contextual half of `ambiguous-angle`, and the same discipline: a reference that names no
+   * single object is answered by saying so, never by picking one.
+   */
+  | 'ambiguous-shape'
   /** A stated given the solve could not satisfy — reported, never drawn as if it held. */
   | 'unsatisfiable';
 
@@ -160,7 +179,7 @@ function priorOf(
   c: Construction,
   f: Fact,
 ): { same: GeoObject } | { clash: true; prior: GeoObject } | null {
-  if (f.t === 'param' || f.t === 'constraint' || f.t === 'selector' || f.t === 'declare') return null;
+  if (!namesObject(f)) return null;
   const prior = objectById(c, f.id);
   if (!prior) return null;
   // The clash carries the object it collided with, so the refusal can say what the name holds
@@ -319,7 +338,70 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       // may repeat a given without it counting twice against the figure's freedom.
       const dup = c.constraints.some((k) => JSON.stringify(k) === JSON.stringify(f.k));
       if (dup) return { ok: true, effect: 'known', next: c };
+      /**
+       * The student CONSUMING a discrete degree of freedom (#1049).
+       *
+       * «משולש ישר-זווית ABC» carries a choice over three seats; «זווית B ישרה» names one of them.
+       * Adding it as an ordinary constraint would leave the choice in place, and two seeds out of
+       * three would then draw a figure whose right angle sits somewhere else while the student's own
+       * sentence says otherwise. So the choice is REPLACED by the option they named — exactly what a
+       * coordinate does to a continuous degree of freedom.
+       *
+       * It reports `narrowed`, not `created`: the constraint count is unchanged and what moved is the
+       * freedom, which is the same answer «a<13» gives after «a הוא פרמטר».
+       */
+      const seat = c.constraints.findIndex(
+        (k) => k.t === 'choice' && k.options.some((o) => namesOption(o, f.k)),
+      );
+      if (seat >= 0) {
+        const collapsed = [...c.constraints];
+        collapsed[seat] = f.k;
+        return { ok: true, effect: 'narrowed', next: { ...c, constraints: collapsed } };
+      }
       return { ok: true, effect: 'created', next: { ...c, constraints: [...c.constraints, f.k] } };
+    }
+
+    /**
+     * «זווית B ישרה» — the vertex alone, resolved against the figure (#1049).
+     *
+     * `B` names an angle only when the figure says which two rays meet there, so this is the one
+     * fact whose constraint is built HERE rather than in the parser. The rays come from the shape
+     * that has `B` as a vertex; where there is no such shape, or more than one, the honest answer is
+     * to refuse and name the format the student can use instead — never to pick a pair of rays.
+     */
+    /**
+     * «שטח הדלתון הוא 24» — the noun resolved against what the student has drawn (#1049).
+     *
+     * Exactly the `right-angle` shape: a contextual reference is unambiguous when the figure holds
+     * ONE shape of that noun, and a guess otherwise. Refusing the ambiguous case is what makes the
+     * unambiguous one safe.
+     */
+    case 'area-of': {
+      const rings = c.objects.filter(
+        (o) => o.kind === 'polygon' && o.noun === f.noun,
+      ) as PolygonObject[];
+      if (rings.length !== 1) {
+        return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+      }
+      return applyFact(c, { t: 'constraint', k: { t: 'area', ids: rings[0].vertices, value: f.value }, src: f.src });
+    }
+
+    case 'right-angle': {
+      const host = objectById(c, f.id);
+      if (!host || !isPositional(host)) {
+        return { ok: false, error: { code: 'unknown-reference', detail: f.id } };
+      }
+      const rings = c.objects.filter((g) => g.kind === 'polygon' && g.vertices.includes(f.id));
+      if (rings.length !== 1) {
+        return { ok: false, error: { code: 'ambiguous-angle', detail: f.src } };
+      }
+      const ring = (rings[0] as PolygonObject).vertices;
+      const i = ring.indexOf(f.id);
+      // The angle AT a vertex of a ring is the one between its two NEIGHBOURS — the figure's own
+      // convention, and the only reading that is right for a quadrilateral as well as a triangle.
+      const prev = ring[(i - 1 + ring.length) % ring.length];
+      const next = ring[(i + 1) % ring.length];
+      return applyFact(c, { t: 'constraint', k: rightAngleAt(f.id, prev, next), src: f.src });
     }
 
     /** Introduce a named but unplaced point; harmless and absorbed if it already exists. */
@@ -413,7 +495,35 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       if (prior) {
         // M1: restating the same construction is absorbed — no duplicate row, no re-creation. This
         // is what lets a later section of a question name what an earlier one established.
-        if (sameReference(prior, f)) return { ok: true, effect: 'known', next: c };
+        if (sameReference(prior, f)) {
+          /**
+           * A restatement may still TELL US WHAT THE RING IS (#1049).
+           *
+           * «מרובע ABCD» then «דלתון ABCD» is the same ring — the id is identical — and the second
+           * sentence is not a duplicate: it says the quadrilateral is a kite, which is what makes
+           * «האלכסון הראשי» meaningful later. The constraints the noun carries arrive as their own
+           * facts and are absorbed or not on their own merits; this only records the naming.
+           *
+           * One-way, like every other promotion here: a later «מרובע ABCD» does not un-kite it.
+           */
+          const moreSpecific =
+            f.t === 'polygon' &&
+            !!f.noun &&
+            !isGenericNoun(f.noun) &&
+            prior.kind === 'polygon' &&
+            (!prior.noun || isGenericNoun(prior.noun));
+          if (moreSpecific) {
+            return {
+              ok: true,
+              effect: 'narrowed',
+              next: {
+                ...c,
+                objects: c.objects.map((o) => (o.id === f.id ? { ...prior, noun: f.noun } : o)),
+              },
+            };
+          }
+          return { ok: true, effect: 'known', next: c };
+        }
         return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
       }
 
@@ -422,7 +532,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
           ? { kind: 'derived', id: f.id, rule: f.rule }
           : f.t === 'segment'
             ? { kind: 'segment', id: f.id, a: f.a, b: f.b }
-            : { kind: 'polygon', id: f.id, vertices: f.vertices };
+            : { kind: 'polygon', id: f.id, vertices: f.vertices, noun: f.noun };
       return { ok: true, effect: 'created', next: { ...c, objects: [...c.objects, made] } };
     }
   }

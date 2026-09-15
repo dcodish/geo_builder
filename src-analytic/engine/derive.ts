@@ -11,7 +11,7 @@ import { reportedDof } from './carriers';
 import { evaluate, viewBox, type Figure } from './evaluate';
 import type { Box } from './curves';
 import { parseLine, type ParseFailure } from '../parser/parseAnalytic';
-import { EMPTY_CONSTRUCTION, objectById, type Construction, type Fact } from './types';
+import { EMPTY_CONSTRUCTION, namesObject, objectById, type Construction, type Fact } from './types';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
 export interface LineFault {
@@ -134,10 +134,11 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
    * documented "not at this value", and reporting it as a refusal would be the opposite defect.
    */
   // First writer wins: if two lines name the same object, the one that introduced it owns the
-  // refusal — the same rule `owner` already encodes for apply errors. A `param` fact has no id.
+  // refusal — the same rule `owner` already encodes for apply errors. Which facts NAME an object is
+  // `namesObject`, one positive list rather than a second copy of the exclusions (#1049).
   const lineOf = new Map<string, number>();
   facts.forEach((f, i) => {
-    if (f.t !== 'param' && f.t !== 'constraint' && f.t !== 'selector' && f.t !== 'declare' && !lineOf.has(f.id)) lineOf.set(f.id, owner[i]);
+    if (namesObject(f) && !lineOf.has(f.id)) lineOf.set(f.id, owner[i]);
   });
   /**
    * VACANCY NEEDS A PREDICATE (#1058).
