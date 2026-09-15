@@ -21,9 +21,10 @@ import { ToolButton } from '../shell/frame/ToolButton';
 import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, clampZoom, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
 import { color, fs } from '../shell/theme';
+import { dofCount, paramRegister } from './engine/carriers';
 import { derive } from './engine/derive';
-import { domainText, type NumCurve } from './engine/types';
-import { isKnowledge } from './engine/evaluate';
+import { domainText, pointsOf, type NumCurve } from './engine/types';
+import { isKnowledge, knownCurve } from './engine/evaluate';
 import { ellipseFoci, parabolaFocus } from './engine/curves';
 import { analyticBidi } from './i18n';
 import { Figure } from './render/Figure';
@@ -121,7 +122,11 @@ export function App() {
       )
     : null;
 
-  const freeCount = d.construction.params.length;
+  // The DOF cue (02c P4 — an under-determined figure is drawn, and its openness is VISIBLE).
+  // Counted from the register, not from the declarations, so an undeclared parameter is reported
+  // as the freedom it is rather than silently absent (#1014).
+  const register = paramRegister(d.construction);
+  const freeCount = dofCount(d.construction);
 
   // NO `suiteActions`: AppFrame renders the language toggle AND the About button itself, using this
   // product's own `language` key. Passing a toggle here put two «English» buttons on the suite bar.
@@ -247,7 +252,7 @@ export function App() {
                 key: 'params',
                 title: t('secParams'),
                 dir: 'ltr',
-                rows: d.construction.params.map((p) => (
+                rows: register.map((p) => (
                   <span key={p.sym}>{domainText(p.sym, p.domain)}</span>
                 )),
               },
@@ -255,7 +260,7 @@ export function App() {
                 key: 'points',
                 title: t('secPoints'),
                 dir: 'ltr',
-                rows: d.construction.points.map((p) => {
+                rows: pointsOf(d.construction).map((p) => {
                   // The honesty gate (ADR-AG-003 §2): a coordinate is printed only when it is
                   // KNOWLEDGE — the same value at every seed — never one sample's number.
                   const kx = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === p.id)?.x ?? null);
@@ -272,9 +277,16 @@ export function App() {
                 key: 'curves',
                 title: t('secCurves'),
                 dir: 'ltr',
-                rows: d.figure.curves.map((c) => (
-                  <span key={c.id}>{describeCurve(c.label.name || c.id, c.curve)}</span>
-                )),
+                rows: d.figure.curves.map((c) => {
+                  // The SAME honesty gate the point rows use: an equation prints only when every
+                  // coefficient is invariant across the free DOFs. A parabola whose `a` is still
+                  // free is drawn, and its row is open — never a sampled coefficient as fact.
+                  const known = knownCurve(d.construction, c.id);
+                  const name = c.label.name || c.id;
+                  return (
+                    <span key={c.id}>{known ? describeCurve(name, known) : `${name}: —`}</span>
+                  );
+                }),
               },
             ]}
           />

@@ -26,12 +26,40 @@ given, that is a defect in the exam, not a gap the tool should paper over
 
 | Layer | Size | What it is |
 |---|---|---|
-| `engine/` | ~1,000 lines | `expr` (the numeric expression layer), `conic`, `curves`, `apply`, `evaluate`, `derive`, `types` |
+| `engine/` | ~1,200 lines | `expr` (the numeric expression layer), `conic`, `curves`, `apply`, `carriers` (the DOF contract), `evaluate`, `derive`, `types` |
 | `parser/` | ~400 | `parseAnalytic.ts` + `catalogAnalytic.ts` |
 | `render/` | ~215 | `scene.ts` (pure) + `Figure.tsx` |
 | `store/` | ~120 | Zustand, the ordered fact list as source of truth |
 
 Roughly 2,350 source lines against `src/`'s 42,000 — this is a V0, not a peer.
+
+## The model — objects, and the register that makes them free
+
+The primitive is the **geometric object** ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009),
+ratifying [02c](02c-requirements-analytic.md) R1): a `Construction` is `{ params, objects }`, and
+`GeoObject` is a discriminated union — `point` and `curve` are the two *stated* members V0 built, and
+the shape nouns and derived points of [02c §5](02c-requirements-analytic.md) join them as further
+members rather than as a parallel model. An equation, a shape noun and a coordinate pair are three
+ways to *state* an object; the exact conic fit is how an equation identifies **which** object it names.
+
+`engine/carriers.ts` holds the **degree-of-freedom contract**, and two things live there:
+
+- **The register of free parameters is derived from the objects' own expressions**, never from the F11
+  declarations. A declaration *narrows* a symbol's domain; it does not bring the symbol into
+  existence. Reading declarations alone is what made `y²=2ax` — an entry on the tool's own reference
+  card — evaluate to `NaN` and reach the honest "not at this parameter value" path by accident,
+  drawing nothing and saying nothing (#1014).
+- **`carrierOf` / `symbolDeps` / `objectDeps` are exhaustive switches** over `GeoObject`, so a new
+  object kind is a compile error until it declares its freedom, its symbols and its dependencies. The
+  2-D tree learned this the expensive way — the same kind-sets hand-listed across ~7 sites, where a
+  forgotten one was a silent dropped DOF rather than a type error (ADR-043). The pattern is **copied,
+  never imported**, before the vocabulary grew.
+
+**There is deliberately no topological sort yet.** Every object in this slice is stated, so the
+object→object relation is empty and a sort over it could not be exercised by any test — it would pass
+by checking nothing. The object→**parameter** layer is real and every figure exercises it: the
+environment is complete before evaluation begins. `symbolDeps` is that relation, and it is the seam
+the ordering grows from when the first derived kind lands.
 
 ## The three cores
 
@@ -68,17 +96,20 @@ applied to the fourth.
 
 ## Known gaps
 
-- **Test coverage is thin by the workspace's standards** — 2 test files and ~460 test lines against
-  ~2,350 source lines, where the mature trees run better than 1:1. Appropriate for a V0 in build, and
-  worth stating plainly so it is a known position rather than an oversight discovered later.
+- **Test coverage is still thin by the workspace's standards, though less so** — 3 test files and ~713
+  test lines against ~2,650 source lines (110 tests), where the mature trees run better than 1:1. B1
+  added the DOF-contract suite and a second catalog guard. Appropriate for a V0 in build, and worth
+  stating plainly so it is a known position rather than an oversight discovered later.
 - **`02c` is still marked IN PROGRESS**, though less of it is open than was. It was captured live from an
   operator session and its decisions are not all ratified as `ADR-AG-NNN` yet; where it and
   [docs/19](19-analytic-geometry-tool.md) disagree, docs/19 is authoritative until they are. **Ratified
   since:** R1/R2/R5 — the object-first model and the tier-3 solve
   ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009)) — and the teacher lane, 02c §7
   ([ADR-AG-010](06c-decisions-analytic.md#adr-ag-010)).
-- **This document describes the EQUATION-FIRST tree, and stays accurate until ADR-AG-009's B1 lands.**
-  "The three cores" and "Shape" above are a true account of the code as it stands. They are rewritten in
-  the slice's own commit, never in advance of it — an orientation doc describes what exists.
+- **The equation-first descriptions above have been rewritten** for the object model
+  ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009) B1). What has *not* changed is the tree's
+  vocabulary: B1 re-founded the model without adding a single new statement form, so the families this
+  product can express are still V0's. B2 (the joint solve) and B3 (the shape vocabulary) are where that
+  moves.
 - **Not deployed** (above). The readmission path is mechanical: flip `enabled` to `true` and drop
   `devOnly` in [`products.json`](../products.json), and add its RUNBOOK row.

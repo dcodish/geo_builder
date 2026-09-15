@@ -74,11 +74,15 @@ export const APPS = {
     inputHint: '(x-3)^2',
     // Two circles, a line and a point on one pair of axes — the product's whole claim is that it
     // draws what the exam refuses to draw, so the smoke sequence is exactly that.
+    // #1014: the last line carries an UNDECLARED parameter. It drew nothing and said nothing until
+    // the free-DOF register was fed by the objects' own expressions, and it is the shot that shows
+    // the DOF cue with something in it — every other line here is fully pinned.
     sequence: [
       'נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9',
       'נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1',
       'נתון הישר l1: y=x',
       'נתונה הנקודה A(2,6)',
+      'נתונה פרבולה שמשוואתה y^2=2ax',
     ],
   },
 };

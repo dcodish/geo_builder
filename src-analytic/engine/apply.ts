@@ -20,10 +20,15 @@ import { evalExpr, type Env } from './expr';
 import {
   conicSlotTaken,
   EMPTY_CONSTRUCTION,
+  isCurve,
+  isPoint,
+  objectById,
   type Construction,
   type Curve,
+  type CurveObject,
   type Fact,
   type Id,
+  type PointObject,
 } from './types';
 
 export type ApplyErrorCode =
@@ -67,11 +72,17 @@ function sameNumbers(a: unknown, b: unknown): boolean {
   });
 }
 
-function findPoint(c: Construction, id: Id) {
-  return c.points.find((p) => p.id === id);
+/**
+ * Lookup is by ID across the WHOLE object list, not per array, so a name used for two different
+ * kinds is caught by one rule rather than by each kind remembering to ask about the others.
+ */
+function findPoint(c: Construction, id: Id): PointObject | undefined {
+  const o = objectById(c, id);
+  return o && isPoint(o) ? o : undefined;
 }
-function findCurve(c: Construction, id: Id) {
-  return c.curves.find((d) => d.id === id);
+function findCurve(c: Construction, id: Id): CurveObject | undefined {
+  const o = objectById(c, id);
+  return o && isCurve(o) ? o : undefined;
 }
 
 export function applyFact(c: Construction, f: Fact): ApplyOutcome {
@@ -114,7 +125,11 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         }
         return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
       }
-      return { ok: true, absorbed: false, next: { ...c, points: [...c.points, { id: f.id, x: f.x, y: f.y }] } };
+      return {
+        ok: true,
+        absorbed: false,
+        next: { ...c, objects: [...c.objects, { kind: 'point', id: f.id, x: f.x, y: f.y }] },
+      };
     }
 
     case 'curve': {
@@ -141,7 +156,10 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       return {
         ok: true,
         absorbed: false,
-        next: { ...c, curves: [...c.curves, { id: f.id, label: f.label, curve: f.curve }] },
+        next: {
+          ...c,
+          objects: [...c.objects, { kind: 'curve', id: f.id, label: f.label, curve: f.curve }],
+        },
       };
     }
   }

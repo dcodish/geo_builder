@@ -9,12 +9,22 @@
  * moves accordingly: what must be checked is no longer "is this position meaningful" but "is this
  * value invariant across every admissible parameter value".
  *
- * A CURVE IS ONE THING: an implicit equation `f(x, y; params) = 0`, carried as an `Expr` and
- * classified into the canonical family at parse time. That uniformity is deliberate — the corpus
- * hands the tool equations in half a dozen spellings (`(x−3)²+(y−4)²=9`, `x²+y²−2ax−2x=0`,
- * `x²−6x+y²+t=0`), and normalizing them by *fitting* rather than by pattern-matching means a
- * spelling nobody anticipated still lands in the right family. Constructive forms
- * («מעגל שמרכזו M ורדיוסו 5») synthesize the same `Expr`, so there is one representation, not two.
+ * THE PRIMITIVE IS THE GEOMETRIC OBJECT ([ADR-AG-009](../../docs/06c-decisions-analytic.md#adr-ag-009),
+ * ratifying [02c](../../docs/02c-requirements-analytic.md) R1): a construction is a dependency
+ * graph of objects, and an equation, a shape noun or a coordinate pair are three ways a student can
+ * *state* one. The measured reason is that the corpus cannot be expressed otherwise — run through
+ * the real path, 02c §5c's triangle-by-side-equations refuses every line on an equation-first
+ * model, and §5a's parallelogram produces two points and no figure.
+ *
+ * A CURVE IS ONE THING — **as a curve object**. An implicit equation `f(x, y; params) = 0`, carried
+ * as an `Expr` and classified into the canonical family, is how a *curve* is represented and how an
+ * equation identifies which object it names ([ADR-AG-006](../../docs/06c-decisions-analytic.md#adr-ag-006)
+ * D1, superseded as a claim about the model and kept as a claim about curves). That uniformity is
+ * deliberate — the corpus hands the tool equations in half a dozen spellings (`(x−3)²+(y−4)²=9`,
+ * `x²+y²−2ax−2x=0`, `x²−6x+y²+t=0`), and normalizing them by *fitting* rather than by
+ * pattern-matching means a spelling nobody anticipated still lands in the right family.
+ * Constructive forms («מעגל שמרכזו M ורדיוסו 5») synthesize the same `Expr`, so there is one
+ * representation, not two.
  */
 import type { Expr } from './expr';
 
@@ -115,32 +125,59 @@ export type Fact =
 // Construction — the fold of the fact list
 // ---------------------------------------------------------------------------
 
+/**
+ * A parameter DECLARATION — a domain that narrows a symbol (D7 kind 1).
+ *
+ * It does not bring a parameter into existence: the register of free DOFs is derived from what the
+ * objects actually use ([carriers.ts](carriers.ts) `paramRegister`). A symbol used but never
+ * declared is free and unbounded; a symbol declared but not yet used is still reported, because the
+ * student stated it.
+ */
 export interface ParamDecl {
   sym: string;
   domain: Domain;
 }
 
-export interface PointDef {
-  id: Id;
-  x: Expr;
-  y: Expr;
-}
+/**
+ * THE OBJECT — the construction's primitive.
+ *
+ * A discriminated union so that every consumer switches on `kind` rather than on which array an
+ * object happened to live in, and so that adding a kind is a compile error at each place that must
+ * decide something about it ([carriers.ts](carriers.ts): its freedom, its symbols, its
+ * dependencies). The two members here are the *stated* forms V0 built; the shape nouns, derived
+ * points and free points of [02c §5](../../docs/02c-requirements-analytic.md) join them as further
+ * members rather than as a parallel model.
+ */
+export type GeoObject =
+  | { kind: 'point'; id: Id; x: Expr; y: Expr }
+  | { kind: 'curve'; id: Id; label: CurveLabel; curve: Curve };
 
-export interface CurveDef {
-  id: Id;
-  label: CurveLabel;
-  curve: Curve;
-}
+export type PointObject = Extract<GeoObject, { kind: 'point' }>;
+export type CurveObject = Extract<GeoObject, { kind: 'curve' }>;
 
+export const isPoint = (o: GeoObject): o is PointObject => o.kind === 'point';
+export const isCurve = (o: GeoObject): o is CurveObject => o.kind === 'curve';
+
+/**
+ * The fold of the fact list: the objects, in the order the student stated them, plus the parameter
+ * declarations that narrow their symbols.
+ */
 export interface Construction {
   params: ParamDecl[];
-  points: PointDef[];
-  curves: CurveDef[];
+  objects: GeoObject[];
 }
 
-export const EMPTY_CONSTRUCTION: Construction = { params: [], points: [], curves: [] };
+export const EMPTY_CONSTRUCTION: Construction = { params: [], objects: [] };
+
+export const pointsOf = (c: Construction): PointObject[] => c.objects.filter(isPoint);
+export const curvesOf = (c: Construction): CurveObject[] => c.objects.filter(isCurve);
+export const objectById = (c: Construction, id: Id): GeoObject | undefined =>
+  c.objects.find((o) => o.id === id);
 
 /** The at-most-one rule for the anonymous conics (D6). */
 export function conicSlotTaken(c: Construction, kind: CurveKind): boolean {
-  return (kind === 'parabola' || kind === 'ellipse') && c.curves.some((d) => d.curve.kind === kind);
+  return (
+    (kind === 'parabola' || kind === 'ellipse') &&
+    c.objects.some((o) => isCurve(o) && o.curve.kind === kind)
+  );
 }

@@ -682,3 +682,83 @@ and it is why this is worth a ruling rather than an assumption.
 surface. Nothing in the three shipped products has one ([02 §Actors](02-requirements.md): *"no
 authentication or distinct roles in v1; all are the same anonymous user"*), and this ruling does not
 create one.
+
+---
+
+## ADR-AG-011 — B1 BUILT: the object graph, and the register that makes a parameter free (#1015)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R1 (the model), P4 (the DOF cue), R3 (the honesty
+gate generalises — and the half of it that was missing). **Design:** [04c](04c-design-analytic.md)
+"The model — objects, and the register that makes them free" (new section; "Shape" and "Known gaps"
+updated).
+
+**What landed** (`feat/1015-object-graph`). `Construction` is `{ params, objects }`; `GeoObject` is a
+discriminated union whose two stated members are `point` and `curve`. `engine/carriers.ts` is new and
+holds the degree-of-freedom contract. **No statement form was added** — the vocabulary is still V0's,
+and that is the point: the re-founding is proved by every existing catalog entry still building on the
+new model, not by new capability. [ADR-AG-009](#adr-ag-009)'s B1 gate, met.
+
+**Three decisions worth recording.**
+
+1. **The register of free parameters is derived from the OBJECTS' expressions, not from the
+   declarations.** This inverts where freedom comes from. Previously `sampleEnv` read the F11
+   declarations alone, so a symbol occurring only inside an equation was never registered, evaluated
+   to `NaN`, and the curve reached the honest "not at this parameter value" path *by accident*: it
+   drew nothing and said nothing (#1014). `נתונה פרבולה שמשוואתה y^2=2ax` is a **catalog entry**, so
+   the tool's own reference card carried a line that produced an empty canvas. A declaration now
+   **narrows** a symbol's domain; it does not grant existence. A symbol is free because it is *used
+   and unpinned*, which is [ADR-052](06-decisions.md#adr-052) stated at the register rather than at
+   the sampler.
+
+2. **A new object kind cannot be added without declaring its freedom.** `carrierOf`, `symbolDeps` and
+   `objectDeps` are exhaustive switches over `GeoObject`, so the compiler — not a reviewer — stops a
+   kind arriving without a DOF decision. Copied from `src/engine/carriers.ts` (ADR-043), never
+   imported, and deliberately taken across *before* the vocabulary grows, which is the only moment it
+   is cheap. Both stated kinds answer `null`: their freedom is their parameters', and counting it
+   twice would report two DOFs for the one unknown in `A(−9a, 0)`.
+
+3. **No topological sort was built, and that is a decision rather than an omission.** Every object in
+   this slice is stated, so the object→object relation is empty — and a sort over an empty relation is
+   structure no test can exercise, which is the failure mode of *passing by checking nothing*. What is
+   real today is the object→**parameter** layer: the environment is complete before evaluation begins,
+   and every figure exercises it. `symbolDeps` is that relation and the seam the ordering grows from
+   when B3 lands the first derived kind. B1's issue listed "topological evaluate" in scope; it is
+   recorded here as consciously deferred rather than quietly dropped.
+
+**A second honesty hole, found by reading the screenshot (#1020 — P1).** With #1014 fixed, `y²=2ax`
+draws. The data panel then printed it as **`parabola: y² = 6.915870381x, F(1.728967595, 0)`** — one
+seed's sample asserted as fact, on the row [ADR-AG-003](#adr-ag-003) §2 calls the whole honesty
+boundary.
+
+The gate was not missing; **one of its two callers never used it.** `App.tsx` routed the *point* rows
+through `isKnowledge` and read the *curve* rows straight off seed 0. Survivable only while every
+drawable curve was fully pinned — which #1014 had just stopped being true. `knownCurve` now gates a
+curve coefficient by coefficient **through `isKnowledge` itself**, so there is no second definition of
+"invariant", and a curve that is a *different family* at another seed is refused too
+([02c](02c-requirements-analytic.md) R13's third row). An unpinned curve is **drawn and its row is
+open** — `parabola: —` — exactly as an unpinned coordinate shows.
+
+**Worth naming, because it is the second time in this tree.** ADR-AG-006's reversed axis labels were
+found the same way: *by reading the screenshot, not by a test*. Here the suite was green across all
+105 tests while the panel was lying about a number. The visual smoke's own closing line — *"this gate
+proves they are real, not that they are right"* — is the whole argument, and the analytic smoke
+sequence now carries a line with an **undeclared parameter** precisely so the DOF cue and the open row
+are in a captured frame rather than only in a test.
+
+**Found and NOT fixed here, filed instead ([#1019](https://github.com/dcodish/geo_builder/issues/1019)).**
+An unbounded parameter is never sampled negative — measured over seeds 0–39, min 1.115, max 3.965 — so
+the tool asserts `a > 0` for a parameter nobody bounded, and `y² = 2ax` opens rightward in every
+configuration. Pre-existing (it has always applied to a declared-but-unbounded parameter), but B1 makes
+it the **common** case. It is not fixed inside B1 because the fix changes what every existing figure
+looks like at seed 0 — a play-visible change deserving its own decision and its own play case, not a
+silent rider on a refactor.
+
+**Gates.** `npm run test:full` green, read from `reports/suite-verdict.json` ·
+`npx tsc -b` clean · `npm run build:analytic` clean · `visual-smoke --app analytic` 7 shots, read back
+by the session (which is how #1020 was found) · `src-analytic` 110 tests, up from 64.
+
+**The catalog guard grew its missing half.** It asserted that every entry *parses*, in both languages
+— which is exactly how an entry that parses perfectly and draws nothing shipped on the reference card.
+It now also asserts that every entry **produces geometry**, with the `parameters` category exempt by
+its own field (a declaration legitimately draws nothing) rather than by a list of sentences that would
+drift.

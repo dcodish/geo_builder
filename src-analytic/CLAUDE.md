@@ -46,7 +46,8 @@ this tool *supplies* the one the exam withholds.
 | --- | --- |
 | `engine/expr.ts` | The numeric expression layer. Hand-written because the exam's notation multiplies by JUXTAPOSITION (`2a`, `4√5`, `25k²`). Also the single normalization chokepoint (`²`≡`^2`, `−`≡`-`, `√`≡`sqrt`) |
 | `engine/conic.ts` | Equation → curve: the **exact** six-coefficient fit (seven lattice probes, no least squares) and the canonicity gate |
-| `engine/types.ts` | Facts, construction, `Domain`. A curve is ONE thing: an implicit `f(x,y;params)=0` plus its classified kind |
+| `engine/types.ts` | Facts, construction, `Domain`. **The primitive is the OBJECT** ([ADR-AG-009](../docs/06c-decisions-analytic.md#adr-ag-009)): `Construction` is `{ params, objects }`, and `GeoObject` is a discriminated union whose two stated members are `point` and `curve`. A curve is ONE thing *as a curve* — an implicit `f(x,y;params)=0` plus its classified kind |
+| `engine/carriers.ts` | **The DOF contract.** The free-parameter **register**, derived from what the objects' expressions actually use rather than from F11 declarations (a declaration *narrows*, it does not create — #1014); `carrierOf` / `symbolDeps` / `objectDeps`, exhaustive switches so a new object kind cannot be added without declaring its freedom |
 | `engine/curves.ts` | Residuals (scale-normalized), conic roles (focus/directrix/foci), extents, the polylines the renderer draws |
 | `engine/apply.ts` | **The M1 boundary** — the one place that decides new-object vs statement-about-an-existing-one. Here on day one because questions arrive in SECTIONS |
 | `engine/evaluate.ts` | Construction + seed → figure; `sampleParam`, and `isKnowledge` — the honesty gate |
@@ -64,6 +65,15 @@ this tool *supplies* the one the exam withholds.
   honesty boundary.
 - **An unpinned parameter is a FREE DOF sampled inside its domain**, never a fixed default
   ([ADR-052](../docs/06-decisions.md#adr-052)) — it must move when «הציגו תצורה אחרת» advances the seed.
+  **Including one nobody declared.** The register comes from the objects' own expressions
+  (`carriers.ts`), because reading declarations alone is what made `y²=2ax` — a catalog entry — draw
+  nothing and say nothing (#1014). A symbol is free because it is *used* and unpinned, not because a
+  sentence announced it.
+- **Both panel sections are gated, and remembering only one is the recurring failure.** A coordinate
+  goes through `isKnowledge`; a curve equation goes through `knownCurve`, which is built on it. The
+  curve half was missing until #1020, and the suite was green while the panel printed
+  `y² = 6.915870381x` as fact. **A row that prints a number is a claim; find its gate before you add
+  it.**
 - **An inequality is one of THREE things** ([ADR-AG-005](../docs/06c-decisions-analytic.md#adr-ag-005)
   D7), and they are not interchangeable: a **parameter domain** (declaration; filters a pin's roots,
   silently), a **branch selector** (post-solve; picks among branches), a **sweep range** (sampling;
