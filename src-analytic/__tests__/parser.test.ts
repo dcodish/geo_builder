@@ -164,3 +164,106 @@ describe('end to end — a figure builds from typed lines', () => {
     if (circle?.curve.kind === 'circle') expect(circle.curve.r).toBeCloseTo(3, 9);
   });
 });
+
+/**
+ * The OWNED refusals — #1039, #1042, #1046 (round #1056).
+ *
+ * The class these three share: a rule recognised its own sentence, found something wrong with it,
+ * and then answered as though it had never seen it. `null` from a rule means `not-handled` — "I did
+ * not understand you" — which is false about a sentence the rule clearly matched, and which routes
+ * a well-formed statement to the LLM seam instead of answering it. Worse, in two of these cases the
+ * rule did not refuse at all: it built a figure that contradicted the student's own words.
+ *
+ * Each case below asserts the CODE, not merely "not ok": the whole defect was that the wrong code
+ * was reported, so a test that accepts any refusal would have passed before the fix.
+ */
+describe('a rule that matched owes an answer about what it matched', () => {
+  const codeOf = (line: string, before: string[] = []): string => {
+    const d = derive([...before, line], 0);
+    const fault = d.faults.find((f) => f.index === before.length);
+    return fault ? fault.code : 'BUILT';
+  };
+
+  describe('#1039 — x and y name the plane, not a point’s unknown', () => {
+    it('refuses a coordinate written in y, naming the statement', () => {
+      expect(codeOf('M(3,y)')).toBe('reserved-coordinate');
+    });
+
+    it('refuses it in the x slot too — the defect is the symbol, not the position', () => {
+      expect(codeOf('M(x,3)')).toBe('reserved-coordinate');
+    });
+
+    it('was a SILENT drop before: the point committed and was vacant at every configuration', () => {
+      // The regression this locks. `RESERVED_SYMBOLS` filtered `y` out of the free register, so
+      // nothing ever sampled it: the line was accepted, drew nothing, and said nothing.
+      const d = derive(['M(3,y)'], 0);
+      expect(d.figure.points).toHaveLength(0);
+      expect(d.faults).toHaveLength(1); // ← was 0
+    });
+
+    it('still accepts an ordinary unknown, which is the supported form the message names', () => {
+      expect(codeOf('M(3,t)')).toBe('BUILT');
+      expect(codeOf('A(-9a,0)')).toBe('BUILT'); // the catalog's own parameterised point
+    });
+  });
+
+  describe('#1042 — a shape noun asserts a vertex count', () => {
+    it('refuses a triangle with four vertices', () => {
+      expect(codeOf('משולש ABCD')).toBe('bad-arity');
+      expect(codeOf('triangle ABCD')).toBe('bad-arity');
+    });
+
+    it('refuses a quadrilateral with three', () => {
+      expect(codeOf('מרובע ABC')).toBe('bad-arity');
+    });
+
+    it('refuses a repeated label — two vertices cannot share a name', () => {
+      expect(codeOf('משולש ABA')).toBe('repeated-vertex');
+      expect(codeOf('הקטע AA')).toBe('repeated-vertex');
+    });
+
+    const TRI = ['A(0,0)', 'B(6,0)', 'C(0,6)'];
+
+    it('refuses a construct whose vertex count contradicts the construct itself', () => {
+      // A centroid takes three vertices; naming four is not a reason to read the first three.
+      expect(codeOf('M מפגש התיכונים במשולש ABCD', [...TRI, 'D(1,1)'])).toBe('bad-arity');
+      expect(codeOf('G מפגש האלכסונים במרובע ABC', TRI)).toBe('bad-arity');
+    });
+
+    it('refuses a construct whose NOUN contradicts the construct — the silent half', () => {
+      // «מפגש התיכונים במרובע ABC» BUILT a centroid before the fix: the noun was skipped by the
+      // regex, so the student's own word «מרובע» was ignored rather than answered. This is the
+      // case that was not merely mis-coded but wrong on the canvas.
+      expect(codeOf('M מפגש התיכונים במרובע ABC', TRI)).toBe('bad-arity');
+    });
+
+    it('refuses an area given over too few vertices — the same class, a different rule', () => {
+      expect(codeOf('שטח המשולש AB הוא 7')).toBe('bad-arity');
+    });
+
+    it('still builds every shape the catalog teaches', () => {
+      expect(codeOf('משולש ABC')).toBe('BUILT');
+      expect(codeOf('מרובע ABCD')).toBe('BUILT');
+      expect(codeOf('M מפגש התיכונים במשולש ABC', TRI)).toBe('BUILT');
+      expect(codeOf('M אמצע AB', TRI)).toBe('BUILT');
+    });
+  });
+
+  describe('#1046 — a clash says WHAT the name already holds', () => {
+    const TRI = ['A(0,0)', 'B(6,0)', 'C(0,6)'];
+
+    it('carries the existing construct so the message can name it', () => {
+      const d = derive([...TRI, 'M מפגש התיכונים במשולש ABC', 'M(3,c)'], 0);
+      const fault = d.faults.find((f) => f.index === 4);
+      expect(fault?.code).toBe('name-kind-clash');
+      // ← the whole fix: before this the refusal said only "that name belongs to another kind",
+      // which blames the student's choice of letter for a collision they cannot see.
+      expect(fault?.existing).toBe('derived:centroid');
+    });
+
+    it('names the kind in the other direction too', () => {
+      const d = derive([...TRI, 'M(3,c)', 'M מפגש התיכונים במשולש ABC'], 0);
+      expect(d.faults.find((f) => f.index === 4)?.existing).toBe('point');
+    });
+  });
+});

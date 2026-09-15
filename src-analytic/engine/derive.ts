@@ -17,6 +17,8 @@ export interface LineFault {
   index: number;
   code: ParseFailure['code'] | ApplyError['code'];
   detail: string;
+  /** For a name clash: what the name already holds, as a token the locale renders (#1046). */
+  existing?: ApplyError['existing'];
 }
 
 export interface Derivation {
@@ -56,7 +58,7 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
 
   const { construction, errors } = fold(facts);
   errors.forEach((e, i) => {
-    if (e) faults.push({ index: owner[i], code: e.code, detail: e.detail });
+    if (e) faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing });
   });
 
   /**

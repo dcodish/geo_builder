@@ -30,7 +30,7 @@ import { ellipseFoci, parabolaFocus } from './engine/curves';
 import { analyticBidi } from './i18n';
 import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
-import { useAnalyticStore } from './store/useAnalyticStore';
+import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
 import { parseLine } from './parser/parseAnalytic';
 
 declare const __BUILD__: string;
@@ -45,6 +45,36 @@ const QUICK_COMMANDS = [
 
 const CANVAS_W = 720;
 const CANVAS_H = 720;
+
+/**
+ * The locale key describing WHAT a clashing name already holds (#1046).
+ *
+ * The engine hands over a token (`derived:centroid`, `curve:ellipse`) and never a sentence, so the
+ * description is rendered here, in the student's language, from the construct's own corpus noun.
+ * An unrecognised token falls back to the generic noun rather than printing itself: a message
+ * leaking `derived:centroid` at a student would be internal state, which the honesty invariants
+ * forbid outright.
+ */
+function existingKey(error: InputError): string {
+  const token = 'existing' in error ? error.existing : undefined;
+  const byToken: Record<string, string> = {
+    point: 'kindPoint',
+    free: 'kindFree',
+    segment: 'kindSegment',
+    polygon: 'kindPolygon',
+    'curve:line': 'kindLine',
+    'curve:circle': 'kindCircle',
+    'curve:parabola': 'kindParabola',
+    'curve:ellipse': 'kindEllipse',
+    'derived:midpoint': 'kindMidpoint',
+    'derived:centroid': 'kindCentroid',
+    'derived:incentre': 'kindIncentre',
+    'derived:orthocentre': 'kindOrthocentre',
+    'derived:circumcentre': 'kindCircumcentre',
+    'derived:diagonals': 'kindDiagonalMeet',
+  };
+  return (token && byToken[token]) || 'kindObject';
+}
 
 export function App() {
   const { t } = useTranslation();
@@ -102,7 +132,7 @@ export function App() {
     const trial = derive([...lines, line], seed);
     const fault = trial.faults.find((f) => f.index === lines.length);
     if (fault) {
-      setError({ key: fault.code, detail: fault.detail });
+      setError({ key: fault.code, detail: fault.detail, existing: fault.existing } as InputError);
       return;
     }
     recordLine(line);
@@ -124,13 +154,16 @@ export function App() {
           'not-handled': 'errNotHandled',
           'bad-equation': 'errBadEquation',
           'out-of-scope': 'errOutOfScope',
+          'reserved-coordinate': 'errReservedCoordinate',
+          'bad-arity': 'errBadArity',
+          'repeated-vertex': 'errRepeatedVertex',
           'conflicting-restatement': 'errConflict',
           'conic-slot-taken': 'errConicTaken',
           'name-kind-clash': 'errNameClash',
           'unknown-reference': 'errUnknownRef',
           'unsatisfiable': 'errUnsatisfiable',
         }[error.key],
-        { detail: error.detail },
+        { detail: error.detail, existing: t(existingKey(error)) },
       )
     : null;
 

@@ -80,6 +80,37 @@ place. A kind that can forward-reference is what would earn one.
   renderer draws. **Pure**, so the renderer stays a consumer rather than a second geometry implementation
   — the same split every sibling uses.
 
+## The parser's rule contract ([ADR-AG-017](06c-decisions-analytic.md#adr-ag-017))
+
+A rule in `parseAnalytic.ts` answers one of **three** ways, and the third is the one round #1056 added:
+
+| answer | meaning | who gets the last word |
+| --- | --- | --- |
+| `made(facts)` | the sentence lowered | this rule |
+| `refuse(code, line)` | the sentence was RECOGNISED and is wrong | this rule |
+| `null` | not my sentence | the next rule in the chain |
+
+Before this, a rule had only the first and the third, so every "recognised and wrong" case had to be
+spelled `null` — which means `not-handled`, which means *"I did not understand you"*. That is a false
+statement about a sentence the rule matched, and `not-handled` is also the **LLM escalation seam**, so
+well-formed givens were being routed to the model instead of answered. Two of the three defects behind
+this contract were worse than a mis-worded refusal: the rule did not refuse at all and built a figure
+contradicting the student's own words.
+
+The chain in `parseLine` therefore reads `parseConstraint(line) ?? parseDerived(line) ?? parseShape(line)
+?? parsePoints(line)` and returns whatever it gets — `??` falls through on `null` only, which is exactly
+the semantics the three-way answer needs, with no extra plumbing.
+
+**The refusal codes are OWNED, one per class**, each rendered by a locale string that names the
+student's own statement: `reserved-coordinate`, `bad-arity`, `repeated-vertex` alongside the existing
+`bad-equation` and `out-of-scope`. A code per class rather than a message per site is what keeps the
+same wrong input answered the same way whichever rule caught it.
+
+**A clash carries its collision.** `ApplyError.existing` is a stable TOKEN (`derived:centroid`,
+`curve:ellipse`) minted by `existingKindOf` in the engine and rendered into the student's language in
+`App.tsx`. The engine stays language-free and the message can still say *what* the name already holds
+— the split that lets a refusal name a construct without the engine knowing any Hebrew.
+
 ## Born after the chassis
 
 This is the **first builder created after `shell/` existed**, and the difference shows in what it did

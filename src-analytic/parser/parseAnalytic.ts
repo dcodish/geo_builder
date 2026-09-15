@@ -19,18 +19,53 @@
  */
 import type { DerivedRule } from '../engine/derived';
 import type { Constraint } from '../engine/solve';
-import { parseExpr, normalizeMath, type Expr } from '../engine/expr';
+import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
+import { RESERVED_SYMBOLS } from '../engine/carriers';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id } from '../engine/types';
 
+/**
+ * Why a line did not become facts.
+ *
+ * The codes below `out-of-scope` are OWNED refusals: the rule recognised its own sentence and
+ * found something wrong with it. That distinction is the point of #1039/#1042 — a rule that
+ * returns `null` on a sentence it clearly matched sends the student to `not-handled` ("I did not
+ * understand"), which is false and which routes a well-formed statement to the LLM seam instead of
+ * answering it. A rule that matched owes the student an answer about what it matched.
+ */
 export type ParseFailure =
   /** No rule matched — the LLM-escalation seam. */
   | { code: 'not-handled'; detail: string }
   /** A rule matched but the equation would not parse. */
   | { code: 'bad-equation'; detail: string }
   /** Understood, and deliberately outside the product's scope. */
-  | { code: 'out-of-scope'; detail: string };
+  | { code: 'out-of-scope'; detail: string }
+  /**
+   * A coordinate written in `x` or `y` — «M(3,y)» (#1039).
+   *
+   * They are the PLANE's variables, not a point's unknown: `RESERVED_SYMBOLS` keeps them out of the
+   * free register, so a point holding one is never sampled and never drawn. Until this code existed
+   * the filter dropped the symbol by OMISSION and the line committed, drew nothing and said nothing
+   * — a stated given vanishing.
+   */
+  | { code: 'reserved-coordinate'; detail: string }
+  /**
+   * A shape noun and a vertex count that disagree — «משולש ABCD», «מפגש התיכונים במרובע ABC» (#1042).
+   *
+   * Covers both halves: the count the student wrote against the noun they wrote, and the noun
+   * against the construct's own arity.
+   */
+  | { code: 'bad-arity'; detail: string }
+  /** One label used for two vertices of the same figure — «משולש ABA» (#1042). */
+  | { code: 'repeated-vertex'; detail: string };
 
 export type ParseResult = { ok: true; facts: Fact[] } | ({ ok: false } & ParseFailure);
+
+/** A rule's answer: facts, an owned refusal, or `null` for "not my sentence — keep looking". */
+type RuleOutcome = ParseResult | null;
+
+const made = (facts: Fact[]): ParseResult => ({ ok: true, facts });
+const refuse = (code: ParseFailure['code'], detail: string): ParseResult =>
+  ({ ok: false, code, detail }) as ParseResult;
 
 // ---------------------------------------------------------------------------
 // Shared tokens — spelled ONCE (the 3-D lesson: a noun gate re-spelled inline drifts)
@@ -186,7 +221,7 @@ function parseInequality(line: string): Fact | null {
 // ---------------------------------------------------------------------------
 
 /** `A(2,6)`, `B(-9a, 0)`, `F1(0, 3)` — one or more, comma-separated. */
-function parsePoints(line: string): Fact[] | null {
+function parsePoints(line: string): RuleOutcome {
   const body = line
     .replace(new RegExp(`^${HE_GIVEN}${HE_POINT}`), '')
     .replace(/^points?\s+/i, '')
@@ -195,7 +230,6 @@ function parsePoints(line: string): Fact[] | null {
   const facts: Fact[] = [];
   let seen = 0;
   let m: RegExpExecArray | null;
-  let consumed = '';
   while ((m = re.exec(body)) !== null) {
     seen += 1;
     const id = m[1];
@@ -204,15 +238,26 @@ function parsePoints(line: string): Fact[] | null {
     const x = parseExpr(inside[0]);
     const y = parseExpr(inside[1]);
     if (!x || !y) return null;
+    /**
+     * `x` and `y` name the PLANE, so they cannot also name this point's unknown (#1039).
+     *
+     * The decision has to be made here, where the sentence is still in front of us. Downstream,
+     * `RESERVED_SYMBOLS` filters them out of the free register (`carriers.ts`), which is correct for
+     * a curve's equation and silent for a coordinate: the point ends up carrying a symbol nothing
+     * will ever sample, so it is `vacant` at every configuration — drawn nowhere, reported as
+     * nothing. A filter that drops by omission must be a decision at the point of entry instead.
+     */
+    if ([...symbolsOf(x), ...symbolsOf(y)].some((s) => RESERVED_SYMBOLS.has(s))) {
+      return refuse('reserved-coordinate', line);
+    }
     facts.push({ t: 'point', id, x, y, src: line });
-    consumed += m[0];
   }
   if (seen === 0) return null;
   // Everything outside the matched point runs must be separators only — otherwise the line said
   // something more than "here are points", and half-understanding it would drop a given.
   const leftover = body.replace(new RegExp(`(${NAME})\\s*\\(([^()]*)\\)`, 'g'), '').replace(/[, ו-]/g, '');
   if (leftover.length > 0) return null;
-  return facts;
+  return made(facts);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,33 +382,67 @@ const MIDPOINT_EN = new RegExp(
 
 /** `M מפגש התיכונים במשולש ABC` · `G מפגש האלכסונים במרובע ABCD`. */
 const CONCURRENCY_HE = new RegExp(
-  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מפגש\\s+(.+?)\\s+ב-?\\s*(?:ה?(?:משולש|מרובע)\\s+)?(${NAME_RUN})$`,
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מפגש\\s+(.+?)\\s+ב-?\\s*(?:ה?(משולש|מרובע)\\s+)?(${NAME_RUN})$`,
 );
 const CONCURRENCY_EN = new RegExp(
-  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+(?:intersection\\s+of\\s+the\\s+)?(.+?)\\s+of\\s+(?:triangle\\s+|quadrilateral\\s+)?(${NAME_RUN})$`,
+  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+(?:intersection\\s+of\\s+the\\s+)?(.+?)\\s+of\\s+(?:(triangle|quadrilateral)\\s+)?(${NAME_RUN})$`,
   'i',
 );
 
-function parseDerived(line: string): Fact[] | null {
+/**
+ * How many vertices each shape noun asserts. The noun is CAPTURED rather than skipped (#1042),
+ * because a noun the parser cannot see is a noun it cannot check: «משולש ABCD» built a four-sided
+ * "triangle" and «מפגש התיכונים במרובע ABC» built a centroid from a "quadrilateral" of three
+ * points — the student's own word contradicted the figure and nothing said so.
+ */
+const SHAPE_ARITY: ReadonlyArray<{ re: RegExp; n: number }> = [
+  { re: /^(?:משולש|triangle)$/i, n: 3 },
+  { re: /^(?:מרובע|quadrilateral)$/i, n: 4 },
+];
+
+const arityOf = (noun: string | undefined): number | null =>
+  noun ? (SHAPE_ARITY.find((s) => s.re.test(noun))?.n ?? null) : null;
+
+/** A label naming two different vertices of one figure is not a figure — «משולש ABA» (#1042). */
+const hasRepeat = (v: readonly string[]): boolean => new Set(v).size !== v.length;
+
+function parseDerived(line: string): RuleOutcome {
   const mid = MIDPOINT_HE.exec(line) ?? MIDPOINT_EN.exec(line);
   if (mid) {
     const [, id, a, b] = mid;
-    return [{ t: 'derived', id, rule: { t: 'midpoint', a, b }, src: line }];
+    if (a === b) return refuse('repeated-vertex', line); // «M אמצע AA» is a point, not a segment
+    return made([{ t: 'derived', id, rule: { t: 'midpoint', a, b }, src: line }]);
   }
 
   const con = CONCURRENCY_HE.exec(line) ?? CONCURRENCY_EN.exec(line);
   if (con) {
-    const [, id, roleSrc, run] = con;
+    const [, id, roleSrc, noun, run] = con;
     const role = ROLES.find((r) => r.he.test(roleSrc) || r.en.test(roleSrc));
     if (!role) return null; // an unknown role noun is not this rule's business — let it fall through
     const v = splitNames(run);
-    // A wrong vertex count is a real refusal, not a reason to read the first three and hope.
-    if (v.length !== role.n) return null;
+    /**
+     * Three ways this sentence can be wrong about its own vertices, and all three were falling
+     * through to `not-handled` or, worse, building (#1042):
+     *
+     *  - the count disagrees with the CONSTRUCT — «מפגש התיכונים במשולש ABCD» (a centroid takes 3);
+     *  - the count disagrees with the NOUN the student wrote — the noun was skipped by the regex,
+     *    so «מפגש התיכונים במרובע ABC» built a centroid and silently ignored the word «מרובע»;
+     *  - a label repeats.
+     *
+     * The first two are one refusal to the student ("the vertices and the shape do not agree") and
+     * two different mistakes in the code, which is why both are checked here rather than only the
+     * one the reported case happened to hit.
+     */
+    const stated = arityOf(noun);
+    if (v.length !== role.n || (stated !== null && stated !== role.n)) {
+      return refuse('bad-arity', line);
+    }
+    if (hasRepeat(v)) return refuse('repeated-vertex', line);
     const rule: DerivedRule =
       role.t === 'diagonals'
         ? { t: 'diagonals', v: [v[0], v[1], v[2], v[3]] }
         : { t: role.t, v: [v[0], v[1], v[2]] } as DerivedRule;
-    return [{ t: 'derived', id, rule, src: line }];
+    return made([{ t: 'derived', id, rule, src: line }]);
   }
 
   return null;
@@ -379,8 +458,8 @@ function parseDerived(line: string): Fact[] | null {
  * below, which is a refusal the product OWNS rather than a question outsourced to the LLM
  * ([ADR-3D-214](../../docs/06b-decisions-3d.md#adr-3d-214) D2).
  */
-const NEUTRAL_SHAPE_HE = new RegExp(`^${HE_GIVEN}ה?(?:משולש|מרובע)\\s+(${NAME_RUN})$`);
-const NEUTRAL_SHAPE_EN = new RegExp(`^(?:triangle|quadrilateral)\\s+(${NAME_RUN})$`, 'i');
+const NEUTRAL_SHAPE_HE = new RegExp(`^${HE_GIVEN}ה?(משולש|מרובע)\\s+(${NAME_RUN})$`);
+const NEUTRAL_SHAPE_EN = new RegExp(`^(triangle|quadrilateral)\\s+(${NAME_RUN})$`, 'i');
 const CONSTRAINED_SHAPE = /^(?:נתו(?:ן|נה)\s+)?ה?(?:מקבילית|טרפז|ריבוע|מעוין|מלבן)\s|^(?:parallelogram|trapezoid|trapezium|square|rhombus|rectangle)\s/i;
 
 const SEGMENT_HE = new RegExp(`^${HE_GIVEN}ה?(?:קטע|צלע)\\s+(${NAME})(${NAME})$`);
@@ -412,18 +491,26 @@ function polygonId(vertices: string[]): string {
   return `poly-${best}`;
 }
 
-function parseShape(line: string): Fact[] | null {
+function parseShape(line: string): RuleOutcome {
   const seg = SEGMENT_HE.exec(line) ?? SEGMENT_EN.exec(line);
   if (seg) {
     const [, a, b] = seg;
-    return [{ t: 'segment', id: segmentId(a, b), a, b, src: line }];
+    if (a === b) return refuse('repeated-vertex', line); // «הקטע AA» has no length to draw
+    return made([{ t: 'segment', id: segmentId(a, b), a, b, src: line }]);
   }
 
   const poly = NEUTRAL_SHAPE_HE.exec(line) ?? NEUTRAL_SHAPE_EN.exec(line);
   if (poly) {
-    const vertices = splitNames(poly[1]);
-    if (vertices.length < 3) return null;
-    return [{ t: 'polygon', id: polygonId(vertices), vertices, src: line }];
+    const [, noun, run] = poly;
+    const vertices = splitNames(run);
+    // The noun the student wrote is the assertion to check against — `< 3` only ever caught the
+    // shapeless case and let «משולש ABCD» through as a four-sided triangle (#1042).
+    const stated = arityOf(noun);
+    if (vertices.length < 3 || (stated !== null && vertices.length !== stated)) {
+      return refuse('bad-arity', line);
+    }
+    if (hasRepeat(vertices)) return refuse('repeated-vertex', line);
+    return made([{ t: 'polygon', id: polygonId(vertices), vertices, src: line }]);
   }
 
   return null;
@@ -471,22 +558,26 @@ const ON_AXIS_EN = new RegExp(
   'i',
 );
 
-function parseConstraint(line: string): Fact[] | null {
+function parseConstraint(line: string): RuleOutcome {
   const area = AREA_HE.exec(line) ?? AREA_EN.exec(line);
   if (area) {
     const ids = splitNames(area[1]);
     const value = parseExpr(normalizeMath(area[2]));
-    if (ids.length >= 3 && value) {
-      return [{ t: 'constraint', k: { t: 'area', ids, value }, src: line }];
-    }
-    return null;
+    // The same class as the shape nouns (#1042): this rule recognised its own sentence, so a
+    // figure with too few vertices or an unreadable value is answered rather than handed to
+    // `not-handled` as if the sentence were unintelligible.
+    if (ids.length < 3) return refuse('bad-arity', line);
+    if (hasRepeat(ids)) return refuse('repeated-vertex', line);
+    if (!value) return refuse('bad-equation', trim(area[2]));
+    return made([{ t: 'constraint', k: { t: 'area', ids, value }, src: line }]);
   }
 
   const cev = CEVIAN_HE.exec(line) ?? CEVIAN_EN.exec(line);
   if (cev) {
     const [, apex, foot, roleSrc, u, v] = cev;
     const median = /תיכון|median/i.test(roleSrc);
-    return [
+    if (u === v) return refuse('repeated-vertex', line); // «AD תיכון לצלע BB» names no side
+    return made([
       // The sentence NAMES the foot — «AD תיכון לצלע BC» is where `D` first appears — so it is
       // declared here. Without this the segment below would refuse it as an unknown reference, which
       // is right for a sentence that merely mentions a point and wrong for one that introduces it.
@@ -497,7 +588,7 @@ function parseConstraint(line: string): Fact[] | null {
       median
         ? { t: 'constraint', k: { t: 'midpoint', id: foot, a: u, b: v }, src: line }
         : { t: 'constraint', k: { t: 'perpendicular', a: apex, b: foot, c: u, d: v }, src: line },
-    ];
+    ]);
   }
 
   const ax = ON_AXIS_HE.exec(line) ?? ON_AXIS_EN.exec(line);
@@ -515,7 +606,7 @@ function parseConstraint(line: string): Fact[] | null {
       const positive = /חיובי|positive/i.test(sideSrc);
       facts.push({ t: 'selector', id, axis: onX ? 'x' : 'y', positive, src: line });
     }
-    return facts;
+    return made(facts);
   }
 
   return null;
@@ -546,11 +637,14 @@ export function parseLine(raw: string): ParseResult {
     };
   }
 
-  const derived = parseConstraint(line) ?? parseDerived(line) ?? parseShape(line);
-  if (derived) return { ok: true, facts: derived };
-
-  const points = parsePoints(line);
-  if (points) return { ok: true, facts: points };
+  /**
+   * Each rule answers one of three ways: facts, an owned refusal, or `null` for "not my sentence".
+   * Only the third continues the chain — a rule that recognised the sentence and found it wrong
+   * gets the last word, rather than having its refusal overwritten by `not-handled` downstream.
+   */
+  const matched =
+    parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
+  if (matched) return matched;
 
   // Recognised and deliberately unsupported: a constrained shape noun carries a given this slice
   // cannot honour, so it is refused BY NAME rather than escalated as if we did not understand it.

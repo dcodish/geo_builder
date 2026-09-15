@@ -59,9 +59,33 @@ const he = {
   errOutOfScope: 'המשפט מובן, אך אינו נתמך בכלי הזה: "{{detail}}"',
   errConflict: 'המשפט לא נוסף — הוא סותר את מה שכבר נקבע: "{{detail}}"',
   errConicTaken: 'בשרטוט יכולה להיות פרבולה אחת ואליפסה אחת. המשפט מתאר עקום נוסף: "{{detail}}"',
-  errNameClash: 'השם כבר משמש עצם מסוג אחר: "{{detail}}"',
+  errNameClash:
+    'השם הזה כבר תפוס בשרטוט — הוא {{existing}}. אי אפשר לתת לו משמעות שנייה במשפט "{{detail}}". ' +
+    'אפשר לבחור אות אחרת, או למחוק את ההגדרה הקודמת ולכתוב אותה מחדש.',
   errUnknownRef: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
+  errReservedCoordinate:
+    'האותיות x ו-y שמורות לצירי מערכת הצירים, ולכן אי אפשר להשתמש בהן כנעלם בשיעורי נקודה: "{{detail}}". ' +
+    'אפשר להשתמש באות אחרת, למשל M(3,t).',
+  errBadArity:
+    'מספר הקודקודים אינו מתאים לשם הצורה במשפט "{{detail}}" — במשולש שלושה קודקודים ובמרובע ארבעה.',
+  errRepeatedVertex: 'באותו משפט אותה אות מופיעה יותר מפעם אחת: "{{detail}}". לכל קודקוד צריך שם משלו.',
+  // What a taken name already holds, for errNameClash — the construct's own corpus noun.
+  kindObject: 'עצם אחר בשרטוט',
+  kindPoint: 'נקודה שהוגדרה בשיעורים',
+  kindFree: 'קודקוד שהוזכר אך טרם מוקם',
+  kindSegment: 'קטע',
+  kindPolygon: 'מצולע',
+  kindLine: 'ישר',
+  kindCircle: 'מעגל',
+  kindParabola: 'פרבולה',
+  kindEllipse: 'אליפסה',
+  kindMidpoint: 'אמצע קטע',
+  kindCentroid: 'מפגש התיכונים',
+  kindIncentre: 'מפגש חוצי הזוויות',
+  kindOrthocentre: 'מפגש הגבהים',
+  kindCircumcentre: 'מפגש האנכים האמצעיים',
+  kindDiagonalMeet: 'מפגש האלכסונים',
 };
 
 const en: typeof he = {
@@ -103,9 +127,36 @@ const en: typeof he = {
   errOutOfScope: 'Understood, but not supported in this tool: "{{detail}}"',
   errConflict: 'Not added — it contradicts what is already fixed: "{{detail}}"',
   errConicTaken: 'A figure holds one parabola and one ellipse. This describes another: "{{detail}}"',
-  errNameClash: 'That name already belongs to a different kind of object: "{{detail}}"',
+  errNameClash:
+    'That name is already taken in this figure — it is {{existing}}. It cannot take a second ' +
+    'meaning in "{{detail}}". Either choose another letter, or delete the earlier definition and ' +
+    'restate it.',
   errUnknownRef: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
+  errReservedCoordinate:
+    'The letters x and y name the axes, so they cannot be a point\'s unknown: "{{detail}}". ' +
+    'Use another letter — for example M(3,t).',
+  errBadArity:
+    'The number of vertices does not match the shape named in "{{detail}}" — a triangle has three ' +
+    'vertices and a quadrilateral four.',
+  errRepeatedVertex:
+    'The same letter appears more than once in "{{detail}}". Each vertex needs its own name.',
+  // What a taken name already holds, for errNameClash — the construct's own corpus noun.
+  kindObject: 'another object in the figure',
+  kindPoint: 'a point given by coordinates',
+  kindFree: 'a vertex that was named but not yet placed',
+  kindSegment: 'a segment',
+  kindPolygon: 'a polygon',
+  kindLine: 'a line',
+  kindCircle: 'a circle',
+  kindParabola: 'a parabola',
+  kindEllipse: 'an ellipse',
+  kindMidpoint: 'a midpoint',
+  kindCentroid: 'the centroid',
+  kindIncentre: 'the incentre',
+  kindOrthocentre: 'the orthocentre',
+  kindCircumcentre: 'the circumcentre',
+  kindDiagonalMeet: 'the intersection of the diagonals',
 };
 
 export const analyticI18n = createProductI18n({

@@ -1101,3 +1101,77 @@ may *type* (#1040) — the same word in both directions.
 already were ([ADR-AG-014](#adr-ag-014)): `B(x_B, 0)` lands on the x-axis and `D(0, 3)` on its own
 segment, and both were muddy without it. [ADR-AG-010](#adr-ag-010) R34 makes that a design condition
 rather than a polish item.
+
+## ADR-AG-017 — A rule that MATCHED owes an answer about what it matched (#1039 #1042 #1046)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056)
+(analytic batch A, the honesty sweep)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 — R41 (a shape noun asserts its vertex count),
+R42 (`x`/`y` name the plane, not a point's unknown), R43 (a refusal names what it collided with).
+**Design:** [04c](04c-design-analytic.md) "The parser's rule contract" — the three-way rule answer and
+the owned refusal codes.
+
+**Context.** The operator's play session of 2026-09-15 produced three separate reports that measurement
+showed to be one defect wearing three faces:
+
+- «M(3,y)» was **accepted**, drew nothing and said nothing (#1039);
+- «משולש ABCD» **built a four-sided triangle**, and «מפגש התיכונים במרובע ABC» **built a centroid**
+  while ignoring the word «מרובע» the student had typed (#1042);
+- a name clash said «השם כבר משמש עצם מסוג אחר» — *you picked a bad name* — when the student had not
+  picked a bad name at all (#1046).
+
+**The common root: a rule recognised the sentence and then answered as though it had not.** The parser's
+rule functions returned `Fact[] | null`, so a rule with something to say about a sentence it had matched
+had only `null` to say it with — and `null` means `not-handled`, whose message is *"I could not
+understand the statement"*. That is a false statement to the student about a sentence we did parse. It is
+also the **LLM escalation seam**, so well-formed givens were being handed to the model rather than
+answered by the product that understood them.
+
+Two of the three were worse than a mis-worded refusal: `parseShape` checked `vertices.length < 3` and
+`CONCURRENCY_HE` matched the shape noun **non-capturingly**, so the student's own word was invisible to
+the code that should have checked it. The figure then contradicted the sentence that produced it, which
+is a stated given vanishing — the one thing the root CLAUDE.md forbids outright.
+
+**Decision.**
+
+1. **A rule answers three ways, not two** — `made(facts)`, `refuse(code, line)`, or `null` for "not my
+   sentence". `parseLine` chains the rules with `??`, which falls through on `null` alone, so a rule that
+   owns a refusal keeps the last word. The contract is in [04c](04c-design-analytic.md).
+2. **Three owned refusal codes, one per class**: `reserved-coordinate`, `bad-arity`, `repeated-vertex`.
+   Each renders a locale string naming the student's own statement and, where there is one, the supported
+   form («אפשר להשתמש באות אחרת, למשל M(3,t)»).
+3. **The shape noun is CAPTURED and checked**, in both halves — the count against the noun the student
+   typed, and the noun against the construct's own arity. A repeated label is refused: «משולש ABA» is not
+   a triangle, and `polygonId`'s canonical ring is meaningless for one.
+4. **`x` and `y` are decided at the point of entry.** `RESERVED_SYMBOLS` keeps them out of the free
+   register (`carriers.ts`), which is right for a curve's equation and silent for a coordinate. The fix is
+   not to widen the filter but to make the parser answer the case: **a filter that drops by omission must
+   be a decision where the sentence is still in front of us.**
+5. **A clash carries what it collided with.** `ApplyError.existing` is a stable token (`derived:centroid`)
+   minted in the engine and rendered into Hebrew or English in `App.tsx`. The engine stays language-free;
+   the message still says *what* the name holds.
+
+**What the fix is NOT.** It is not three message changes. Two of these cases were building wrong figures,
+and the reported inputs («M(3,y)», «משולש ABCD») are each one member of a class — so the sweep covered
+every rule that can recognise a sentence and find it wrong, including two the reports never mentioned:
+the area given over too few vertices, and a cevian naming a zero-length side.
+
+**Measured before and after, on the merged tip of PR #1055** — the baseline is what makes these tests
+locks rather than descriptions:
+
+| input | before | after |
+| --- | --- | --- |
+| `M(3,y)` | accepted, 0 points, `vacant` | `reserved-coordinate` |
+| `משולש ABCD` | built, 4 vertices | `bad-arity` |
+| `משולש ABA` | built `poly-AAB` over 2 points | `repeated-vertex` |
+| `M מפגש התיכונים במרובע ABC` | **built a centroid** | `bad-arity` |
+| `M מפגש התיכונים במשולש ABCD` | `not-handled` | `bad-arity` |
+| `שטח המשולש AB הוא 7` | `not-handled` | `bad-arity` |
+| clash on a derived `M` | "a different kind of object" | names the centroid |
+
+**Consequences.** `not-handled` now means what it says, which matters beyond the message: it is the
+signal the LLM fallback escalates on, so its precision is a cost control as well as an honesty property.
+The three codes are additions to `ParseFailure`, the store's `InputError` union and `App.tsx`'s code→key
+map — the registry that a new refusal must be added to in all three places, which is itself the thing
+that makes a missing entry a type error rather than a blank message.

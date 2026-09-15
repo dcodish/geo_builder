@@ -56,6 +56,37 @@ export interface ApplyError {
   code: ApplyErrorCode;
   /** The student's own words, so the message can name the STATEMENT and never internal state. */
   detail: string;
+  /**
+   * For a clash: WHAT the name already holds, as a stable token the locale renders (#1046).
+   *
+   * «השם כבר משמש עצם מסוג אחר» told the student they had picked a bad name. They had not — `M` is
+   * a perfectly good name, already taken by something they themselves defined, and the message
+   * sent them to fix the letter instead of showing them the collision. A refusal that misdescribes
+   * the problem is worse than one that is merely narrow.
+   *
+   * A TOKEN, never a sentence: the engine stays language-free, and He/En render it in `App.tsx`.
+   */
+  existing?: ExistingKind;
+}
+
+/** What a name already holds, in terms the student can recognise — see `ApplyError.existing`. */
+export type ExistingKind =
+  | 'point'
+  | 'free'
+  | 'segment'
+  | 'polygon'
+  | `curve:${string}`
+  | `derived:${string}`;
+
+export function existingKindOf(o: GeoObject): ExistingKind {
+  switch (o.kind) {
+    case 'curve':
+      return `curve:${o.label.kind}`;
+    case 'derived':
+      return `derived:${o.rule.t}`;
+    default:
+      return o.kind;
+  }
 }
 
 export type ApplyOutcome =
@@ -101,11 +132,16 @@ function sameNumbers(a: unknown, b: unknown): boolean {
  * defect, which `carriers.ts` was built to prevent and which slipped in here because a predicate is
  * not an exhaustive switch.
  */
-function priorOf(c: Construction, f: Fact): { same: GeoObject } | { clash: true } | null {
+function priorOf(
+  c: Construction,
+  f: Fact,
+): { same: GeoObject } | { clash: true; prior: GeoObject } | null {
   if (f.t === 'param' || f.t === 'constraint' || f.t === 'selector' || f.t === 'declare') return null;
   const prior = objectById(c, f.id);
   if (!prior) return null;
-  return prior.kind === f.t ? { same: prior } : { clash: true };
+  // The clash carries the object it collided with, so the refusal can say what the name holds
+  // rather than only that the name is taken (#1046).
+  return prior.kind === f.t ? { same: prior } : { clash: true, prior };
 }
 
 export function applyFact(c: Construction, f: Fact): ApplyOutcome {
@@ -166,7 +202,10 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
 
       const found = priorOf(c, f);
       if (found && 'clash' in found) {
-        return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
+        return {
+          ok: false,
+          error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(found.prior) },
+        };
       }
       const prior = found?.same as PointObject | undefined;
       if (prior) {
@@ -186,12 +225,18 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'curve': {
       const found = priorOf(c, f);
       if (found && 'clash' in found) {
-        return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
+        return {
+          ok: false,
+          error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(found.prior) },
+        };
       }
       const prior = found?.same as CurveObject | undefined;
       if (prior) {
         if (prior.curve.kind !== f.curve.kind) {
-          return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
+          return {
+            ok: false,
+            error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) },
+          };
         }
         if (sameCurve(prior.curve, f.curve)) return { ok: true, absorbed: true, next: c };
         // The anonymous conics share one id by design (D6), so a DIFFERENT equation under the same
@@ -243,7 +288,10 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       const o = objectById(c, f.id);
       if (o) {
         if (isPositional(o)) return { ok: true, absorbed: true, next: c };
-        return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
+        return {
+          ok: false,
+          error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(o) },
+        };
       }
       return { ok: true, absorbed: false, next: { ...c, objects: [...c.objects, { kind: 'free', id: f.id }] } };
     }
@@ -292,7 +340,12 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       for (const id of refs) {
         const o = objectById(base, id);
         if (o && isPositional(o)) continue;
-        if (o) return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
+        if (o) {
+          return {
+            ok: false,
+            error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(o) },
+          };
+        }
         if (!declares) {
           // Named in the student's own words, never as internal state: the message says WHICH point.
           return { ok: false, error: { code: 'unknown-reference', detail: id } };
@@ -303,7 +356,10 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
 
       const found = priorOf(c, f);
       if (found && 'clash' in found) {
-        return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
+        return {
+          ok: false,
+          error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(found.prior) },
+        };
       }
       const prior = found?.same;
       if (prior) {

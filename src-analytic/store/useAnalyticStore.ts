@@ -18,12 +18,21 @@ export type InputError =
   | { key: 'bad-equation'; detail: string }
   /** Understood, and deliberately outside this product's scope (a rotated conic, a hyperbola). */
   | { key: 'out-of-scope'; detail: string }
+  /** `x` or `y` used as a point's unknown — they are the plane's own variables (#1039). */
+  | { key: 'reserved-coordinate'; detail: string }
+  /** A shape noun and a vertex count that disagree (#1042). */
+  | { key: 'bad-arity'; detail: string }
+  /** One label used for two vertices of the same figure (#1042). */
+  | { key: 'repeated-vertex'; detail: string }
   /** The statement contradicts what an earlier statement already fixed. */
   | { key: 'conflicting-restatement'; detail: string }
   /** A second parabola or ellipse — the anonymous conics are one per figure (D6). */
   | { key: 'conic-slot-taken'; detail: string }
-  /** One name used for two kinds of object. */
-  | { key: 'name-kind-clash'; detail: string }
+  /**
+   * One name used for two kinds of object — carrying WHAT the name already holds (#1046), so the
+   * message can show the student the collision instead of blaming their choice of letter.
+   */
+  | { key: 'name-kind-clash'; detail: string; existing?: string }
   /** A construction that refers to a point the figure does not have yet (#1028). */
   | { key: 'unknown-reference'; detail: string }
   /** A given the figure cannot satisfy (#1016). */

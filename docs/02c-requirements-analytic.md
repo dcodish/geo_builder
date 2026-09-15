@@ -655,3 +655,31 @@ nothing.
 **Still open:** labels for the other constructions. Only the centroid's 2:1 is ruled; an altitude's
 right angle probably wants a mark rather than text, and the others may want nothing at all.
 See [ADR-AG-014](06c-decisions-analytic.md#adr-ag-014).
+
+## 9 — What a REFUSAL owes the student ([ADR-AG-017](06c-decisions-analytic.md#adr-ag-017))
+
+The honesty invariants already say a stated given may never vanish and that a message names the
+STATEMENT rather than internal state. Round #1056 found three ways the tool broke them while every
+test stayed green, and the common shape is worth stating as a requirement in its own right: **a rule
+that recognised the student's sentence owes an answer about that sentence.** Saying "I did not
+understand" about a sentence we did parse is a false statement to the student, and it routes a
+well-formed given to the LLM escalation seam instead of answering it.
+
+**R41 — a shape noun ASSERTS its vertex count, and the assertion is checked.** «משולש» is three
+vertices and «מרובע» is four, in the noun the student typed *and* in the construct they named. Both
+halves are the requirement: «משולש ABCD» must be refused, and so must «מפגש התיכונים במרובע ABC» —
+the second built a centroid and silently ignored the word «מרובע», which is a stated given vanishing
+rather than merely a missed refusal. A label may not name two vertices of one figure: «משולש ABA» is
+not a triangle.
+
+**R42 — `x` and `y` name the PLANE and cannot be a point's unknown.** «M(3,y)» is refused, naming the
+supported form («M(3,t)»). They are the variables every curve equation is written in, so they are
+reserved out of the free-parameter register; a point holding one would be sampled by nothing and drawn
+nowhere. The requirement is that this is a DECISION at the point of entry and not a filter that drops
+by omission — the original defect was accepted input that committed, drew nothing and said nothing.
+
+**R43 — a refusal names what it collided WITH, not only that it collided.** A name clash reports what
+the letter already holds, in the construct's own corpus noun («M is already the centroid»), never in
+internal terms. «השם כבר משמש עצם מסוג אחר» told the student they had picked a bad name; they had not,
+and it sent them to fix the letter instead of showing them the collision. A refusal that misdescribes
+the problem is worse than one that is merely narrow, because the student acts on it.
