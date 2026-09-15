@@ -20,7 +20,6 @@ import { parentsOf } from './derived';
 import { constraintRefs } from './solve';
 import { evalExpr, type Env } from './expr';
 import {
-  conicSlotTaken,
   EMPTY_CONSTRUCTION,
   isPositional,
   objectById,
@@ -35,8 +34,6 @@ import {
 export type ApplyErrorCode =
   /** A restatement that contradicts what the figure already holds. */
   | 'conflicting-restatement'
-  /** A second parabola or a second ellipse — D6: the anonymous conics are one-per-figure. */
-  | 'conic-slot-taken'
   /** A name used for two different kinds of object. */
   | 'name-kind-clash'
   /**
@@ -194,16 +191,13 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
           return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
         }
         if (sameCurve(prior.curve, f.curve)) return { ok: true, absorbed: true, next: c };
-        // The anonymous conics share one id by design (D6), so a DIFFERENT equation under the same
-        // id is not a contradiction about one object — it is a second parabola/ellipse, and it is
-        // told so. Reporting "conflicting restatement" here would name the wrong problem.
-        const code: ApplyErrorCode = conicSlotTaken(c, f.curve.kind)
-          ? 'conic-slot-taken'
-          : 'conflicting-restatement';
-        return { ok: false, error: { code, detail: f.src } };
-      }
-      if (conicSlotTaken(c, f.curve.kind)) {
-        return { ok: false, error: { code: 'conic-slot-taken', detail: f.src } };
+        /**
+         * Same id, different equation, and now that ids are content-derived (#1026) that can only
+         * mean one thing: a NAMED curve being restated inconsistently — «הישר AC» given twice with
+         * two equations. A second anonymous parabola no longer reaches here at all, because it no
+         * longer shares an id with the first.
+         */
+        return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
       }
       return {
         ok: true,

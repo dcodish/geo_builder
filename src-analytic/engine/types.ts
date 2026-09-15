@@ -257,10 +257,14 @@ export const curvesOf = (c: Construction): CurveObject[] => c.objects.filter(isC
 export const objectById = (c: Construction, id: Id): GeoObject | undefined =>
   c.objects.find((o) => o.id === id);
 
-/** The at-most-one rule for the anonymous conics (D6). */
-export function conicSlotTaken(c: Construction, kind: CurveKind): boolean {
-  return (
-    (kind === 'parabola' || kind === 'ellipse') &&
-    c.objects.some((o) => isCurve(o) && o.curve.kind === kind)
-  );
-}
+/*
+ * `conicSlotTaken` lived here — the at-most-one rule for the anonymous conics (D6), deleted by
+ * #1026 ([ADR-AG-018](../../docs/06c-decisions-analytic.md#adr-ag-018)).
+ *
+ * It was never a policy. Anonymous conics shared the fixed ids `parabola` / `ellipse`, so a second
+ * parabola collided with the first on its NAME, and this function turned that collision into a
+ * sentence claiming a figure may hold only one. A content-derived id (`parabola-<hash>`, the same
+ * mechanism unnamed lines and circles already used) removes the collision, and with it the reason
+ * to refuse. A refusal that can no longer happen is deleted rather than left wired, or it becomes
+ * the next reader's false constraint.
+ */

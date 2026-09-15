@@ -225,8 +225,13 @@ corpus's most common `הוכיחו` item) stays deferred separately (D5, R2).
 - **D5 — the notices lane (Lane B) is deferred** (R2, §7).
 - **Multipart is the workspace model, and M1 is not optional here** — the analytic engine inherits
   existing-id lowering at the apply boundary from day one. See §4b.
-- **D6 — naming conventions taken from the corpus**: circles named, conics anonymous (one each,
-  max), lines `ℓ1`/`ℓ2` typed `l1`/`l2` with the 3-D `\w` trap inherited. See §10a.
+- **D6 — naming conventions taken from the corpus**: circles named, conics anonymous, lines
+  `ℓ1`/`ℓ2` typed `l1`/`l2` with the 3-D `\w` trap inherited. See §10a.
+  *(The "one parabola and one ellipse, max" half of D6 was withdrawn by
+  [ADR-AG-018](06c-decisions-analytic.md#adr-ag-018): it was never a decision about figures, only an
+  id collision between two anonymous conics. Anonymous conics now take a content-derived id and a
+  figure may hold as many as the question does — which §5b of [02c](02c-requirements-analytic.md)
+  needs, since a real exam's part ג asks for a second ellipse.)*
 - **D7 — an inequality is one of THREE things** — parameter domain (declaration, filters roots) ·
   branch selector (post-solve, picks among branches) · sweep range (sampling, bounds a free DOF).
   Not interchangeable; V0's gate exam needs the first two at once. See

@@ -125,7 +125,6 @@ export function App() {
           'bad-equation': 'errBadEquation',
           'out-of-scope': 'errOutOfScope',
           'conflicting-restatement': 'errConflict',
-          'conic-slot-taken': 'errConicTaken',
           'name-kind-clash': 'errNameClash',
           'unknown-reference': 'errUnknownRef',
           'unsatisfiable': 'errUnsatisfiable',
@@ -301,9 +300,20 @@ export function App() {
                   // coefficient is invariant across the free DOFs. A parabola whose `a` is still
                   // free is drawn, and its row is open — never a sampled coefficient as fact.
                   const known = knownCurve(d.construction, c.id);
-                  const name = c.label.name || c.id;
+                  /**
+                   * An UNNAMED curve prints no name — never its id (#1026).
+                   *
+                   * The fallback used to be `c.id`, which put `circle-anonq3c8qq` in front of a
+                   * student inside an RTL Hebrew panel: internal state on screen, which the honesty
+                   * invariants forbid and which #1029 had already caught in its other form. It was
+                   * invisible while the ids read `parabola` and `ellipse` and would have become
+                   * unmissable the moment content-derived ids landed. The row needs no name anyway:
+                   * `describeCurve` prints the equation and the focus, which is what tells two
+                   * anonymous parabolas apart — and it is the student's own equation, not ours.
+                   */
+                  const name = c.label.name;
                   return (
-                    <span key={c.id}>{known ? describeCurve(name, known) : `${name}: —`}</span>
+                    <span key={c.id}>{known ? describeCurve(name, known) : `${name ? `${name}: ` : ''}—`}</span>
                   );
                 }),
               },

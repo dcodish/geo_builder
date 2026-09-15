@@ -397,7 +397,7 @@ cannot express this question at all. R1 is not a preference.
 
 | need | today |
 | --- | --- |
-| **two ellipses in one figure** (part ג's «אליפסה קנונית חדשה») | ✗ **BLOCKER** — the conic *slot* refuses it: «בשרטוט יכולה להיות פרבולה אחת ואליפסה אחת» |
+| **two ellipses in one figure** (part ג's «אליפסה קנונית חדשה») | ✔ since [ADR-AG-018](06c-decisions-analytic.md#adr-ag-018) (#1026) — the "slot" was an id collision between two anonymous conics, not a decision; anonymous conics now take a content-derived id and a figure holds as many as the question does |
 | a conic with two symbolic semi-axes | partly — needs measuring |
 | axis intersections as named points (A, A', B, B') | ✗ |
 | foci as nameable objects | partly — `ellipseFoci`/`parabolaFocus` compute them; they are not objects |
