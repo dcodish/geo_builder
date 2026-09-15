@@ -2862,3 +2862,36 @@ gained its noun. The drift was there before and only became observable now.
 **Consequences.** `src-analytic` +8 tests. A noun whose arity disagrees with its vertex run is now
 refused in these sentences too, which is [ADR-AG-019](#adr-ag-019)'s rule reaching the rules it had
 never been applied to.
+
+## ADR-AG-051 — The concurrency VERB is an alternation, and the fifth one-spelling gate (#1081)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** covered by R62. **Design:** none (one alternation).
+
+**Context.** Operator, 2026-09-15: «אלכסוני הדלתון **נחתכים** בנקודה O» — not supported. Measured,
+«נפגשים» on the same figure worked perfectly: the kite resolved, the point was placed, and **the only
+difference was one verb**.
+
+**The finding is not about this verb.** [ADR-AG-037](#adr-ag-037) built the sentence around
+«נפגשים», which is what the corpus examples in front of it used. This is the **fifth** time a gate in
+this parser admitted one spelling of a sentence it fully understands:
+
+| | the gate | the missing spelling |
+| --- | --- | --- |
+| #1069 | the point-on-object nouns | «על הפרבולה» |
+| #1072 | «משוואת הישר AB» | «משוואת AB» |
+| #1074 | «הקטע EF» | «EF» |
+| #1070 | «האלכסונים» | «אלכסוני» — the construct state |
+| **#1081** | «נפגשים» | «נחתכים» |
+
+Each time the student is told the tool did not understand them, about a sentence it understands
+completely. The cost of the fix is one alternation every time; the cost of the defect is a student
+concluding the tool cannot do something it can.
+
+**So the LOCK is the deliverable, not the verb.** It asserts the FORMS — every verb over every role,
+fifteen combinations plus the English — and compares the CONSTRUCTIONS rather than the parses,
+because what must agree is the figure. A sixth spelling now has a place to be added and a test that
+will notice if it is not.
+
+**Consequences.** `src-analytic` +18 tests.

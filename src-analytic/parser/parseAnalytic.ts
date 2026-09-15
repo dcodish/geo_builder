@@ -531,6 +531,12 @@ const ROLES: Array<{ he: RegExp; en: RegExp; t: DerivedRule['t']; n: number }> =
  * both, and D8 is that the student types the exam`s own sentence.
  *
  * One alternation over the SAME `ROLES` table, so «התיכונים נפגשים בנקודה M» and «הגבהים נפגשים
+ *
+ * **The VERB is an alternation too (#1081).** It was written around «נפגשים», which is what the
+ * corpus examples in front of us used; «נחתכים» is the other everyday word for the same thing and
+ * the student who typed it was told the tool did not understand them. That is the fifth
+ * one-spelling gate in this file (#1069, #1072, #1074, #1070, this) — so the lock asserts the
+ * FORMS, every verb over every role, and the sixth spelling has a place to be added.
  * בנקודה H» arrive with it rather than as three more rules.
  *
  * The vertices are OPTIONAL: «אלכסוני המרובע נפגשים בנקודה O» is a contextual reference to the
@@ -556,10 +562,10 @@ const DIAGONAL_EQ_EN = new RegExp(
 );
 
 const MEET_HE = new RegExp(
-  `^${HE_GIVEN}(.+?)\\s+נפגשים\\s+ב-?\\s*(?:ה?נקוד(?:ה|ת))?\\s*(${NAME})$`,
+  `^${HE_GIVEN}(.+?)\\s+(?:נפגשים|נחתכים|מצטלבים)\\s+ב-?\\s*(?:ה?נקוד(?:ה|ת))?\\s*(${NAME})$`,
 );
 const MEET_EN = new RegExp(
-  `^(?:the\\s+)?(.+?)\\s+meet\\s+(?:at\\s+)?(?:the\\s+)?(?:point\\s+)?(${NAME})$`,
+  `^(?:the\\s+)?(.+?)\\s+(?:meet|intersect|cross)\\s+(?:at\\s+)?(?:the\\s+)?(?:point\\s+)?(${NAME})$`,
   'i',
 );
 
