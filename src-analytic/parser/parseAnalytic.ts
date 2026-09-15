@@ -303,6 +303,45 @@ function matchCurve(line: string): CurveHit | null {
   if (heLineNamed) {
     return { id: `line-${heLineNamed[1]}`, name: heLineNamed[1], kind: 'line', eqSrc: heLineNamed[2] };
   }
+  /**
+   * The NOUN is optional after «משוואת», and the NAME survives — «משוואת AB היא y=2x» (#1072).
+   *
+   * [02c R6](../../docs/02c-requirements-analytic.md) ruled the shape noun optional for an equation.
+   * [ADR-AG-019](../../docs/06c-decisions-analytic.md#adr-ag-019) built the half where the noun AND
+   * the name are both dropped (a fully bare `y^2=54x`); this is the commoner half, where the student
+   * keeps the name they gave the object and drops only the noun.
+   *
+   * **The id must match the noun-carrying form exactly**, or the two phrasings become two objects for
+   * one line — the duplication [ADR-AG-023](../../docs/06c-decisions-analytic.md#adr-ag-023) removed
+   * for anonymous curves, for the same reason: a name is an identity. So the NAME’s own shape says
+   * which id to mint, and the corpus is unambiguous about it — a two-point run or the `ℓ` device is a
+   * line, a Roman numeral is a circle.
+   *
+   * The KIND still comes from the fit, per R6: the id records what the student NAMED it, the
+   * classifier decides what it IS, and a mismatch is R7’s named refusal.
+   */
+  const heNamedNoNoun = line.match(
+    new RegExp(`^${HE_GIVEN}${HE_EQ_OF}\\s+(${LINE_NAME})${HE_IS}\\s*:?\\s*(.+)$`),
+  );
+  if (heNamedNoNoun) {
+    return {
+      id: `line-${heNamedNoNoun[1]}`,
+      name: heNamedNoNoun[1],
+      kind: 'line',
+      eqSrc: heNamedNoNoun[2],
+    };
+  }
+  /** The same omission in the colon form — «AB: y=2x», «l1: y=2x». */
+  const heNamedColon = line.match(new RegExp(`^${HE_GIVEN}(${LINE_NAME}):\\s*(.+)$`));
+  if (heNamedColon) {
+    return {
+      id: `line-${heNamedColon[1]}`,
+      name: heNamedColon[1],
+      kind: 'line',
+      eqSrc: heNamedColon[2],
+    };
+  }
+
   const heLineBare = line.match(new RegExp(`^${HE_GIVEN}${HE_LINE}\\s+(.+=.+)$`));
   if (heLineBare) {
     return { id: `curve-${anonIndex(heLineBare[1])}`, name: '', kind: 'line', eqSrc: heLineBare[1] };
@@ -312,6 +351,19 @@ function matchCurve(line: string): CurveHit | null {
   const enLineBare = line.match(/^(?:the\s+)?line\s+(.+=.+)$/i);
   if (enLineBare) {
     return { id: `curve-${anonIndex(enLineBare[1])}`, name: '', kind: 'line', eqSrc: enLineBare[1] };
+  }
+
+  /** The circle numeral with the noun dropped — «משוואת I היא x^2+y^2=9» (#1072). */
+  const heCircleNoNoun = line.match(
+    new RegExp(`^${HE_GIVEN}${HE_EQ_OF}\\s+(I|II|III|IV|V)${HE_IS}\\s*:?\\s*(.+)$`),
+  );
+  if (heCircleNoNoun) {
+    return {
+      id: `circle-${heCircleNoNoun[1]}`,
+      name: `מעגל ${heCircleNoNoun[1]}`,
+      kind: 'circle',
+      eqSrc: heCircleNoNoun[2],
+    };
   }
 
   // --- circle: «נתון מעגל I שמשוואתו …» · «משוואת המעגל …» ---

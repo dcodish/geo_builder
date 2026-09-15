@@ -358,3 +358,74 @@ describe('#1037 — a bare equation builds, and eats nothing', () => {
     expect(d.faults.map((f) => f.code)).toEqual(['conflicting-restatement']);
   });
 });
+
+/**
+ * #1072 — the NOUN is optional after «משוואת», and the NAME survives.
+ *
+ * 02c R6 ruled the shape noun optional for an equation. ADR-AG-019 built the half where the noun AND
+ * the name are both dropped (a fully bare `y^2=54x`); the commoner half — the student keeps the name
+ * they gave the object and drops only the noun — was never built, and the operator hit it immediately.
+ *
+ * The id is what these cases are really about: the noun-less form must mint EXACTLY the id the
+ * noun-carrying form does, or the two phrasings become two objects for one line. That is ADR-AG-023's
+ * duplication, and a name is an identity.
+ */
+describe('#1072 — «משוואת AB היא y=2x» is the same object as «משוואת הישר AB היא y=2x»', () => {
+  const idOf = (line: string): string => {
+    const r = parseLine(line);
+    if (!r.ok) return `REFUSED(${r.code})`;
+    const f = r.facts[0];
+    return 'id' in f ? f.id : f.t;
+  };
+
+  it('accepts the noun-less form for every name shape', () => {
+    expect(idOf('משוואת AB היא y=2x')).toBe('line-AB');
+    expect(idOf('משוואת l1 היא y=2x')).toBe('line-l1');
+    expect(idOf('משוואת I היא x^2+y^2=9')).toBe('circle-I');
+  });
+
+  it('accepts the colon form with the noun dropped', () => {
+    expect(idOf('AB: y=2x')).toBe('line-AB');
+    expect(idOf('l1: y=2x')).toBe('line-l1');
+  });
+
+  it('mints the SAME id as the noun-carrying form — the duplication guard', () => {
+    expect(idOf('משוואת AB היא y=2x')).toBe(idOf('משוואת הישר AB היא y=2x'));
+    expect(idOf('l1: y=2x')).toBe(idOf('נתון הישר l1: y=2x'));
+    expect(idOf('משוואת I היא x^2+y^2=9')).toBe(idOf('משוואת מעגל I היא x^2+y^2=9'));
+  });
+
+  it('so stating a line BOTH ways leaves one object, not two', () => {
+    for (const pair of [
+      ['משוואת הישר AB היא y=2x', 'משוואת AB היא y=2x'],
+      ['נתון הישר l1: y=2x', 'l1: y=2x'],
+      ['משוואת מעגל I היא x^2+y^2=9', 'משוואת I היא x^2+y^2=9'],
+    ]) {
+      const d = derive(pair, 0);
+      expect(d.faults, pair[1]).toEqual([]);
+      expect(d.figure.curves, pair[1]).toHaveLength(1);
+    }
+  });
+
+  it('swallows nothing that belongs to another rule', () => {
+    // A two-point name is also a LENGTH (#1050) and a relation operand (#1052). The new branches
+    // require «משוואת» or a colon, so neither of those sentences can reach them.
+    const r1 = parseLine('AB = 10');
+    expect(r1.ok && r1.facts[0].t).toBe('constraint');
+    const r2 = parseLine('AB = AC');
+    expect(r2.ok && r2.facts[0].t).toBe('constraint');
+    const r3 = parseLine('x-y+2=0');
+    expect(r3.ok && r3.facts[0].t).toBe('curve');
+    const r4 = parseLine('משולש ABC');
+    expect(r4.ok && r4.facts[0].t).toBe('polygon');
+  });
+
+  it('a two-point name still constrains its points — #1066 rides along', () => {
+    const d = derive(['משוואת AB היא y=2x'], 0);
+    expect(d.faults).toEqual([]);
+    for (const id of ['A', 'B']) {
+      const p = d.figure.points.find((q) => q.id === id)!;
+      expect(Math.abs(p.y - 2 * p.x), id).toBeLessThan(1e-6);
+    }
+  });
+});

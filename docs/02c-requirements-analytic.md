@@ -741,3 +741,10 @@ points already placed elsewhere is told, and one who states it before placing th
 — free to slide along the line, which is the freedom the sentence actually leaves. An ARBITRARY name
 («הישר ℓ1») asserts nothing about any point and constrains none; the difference between the two is the
 requirement.
+
+**R51 — the NOUN is optional wherever the NAME is present** ([#1072](https://github.com/dcodish/geo_builder/issues/1072)).
+02c R6 made the shape noun optional for an equation; that applies whether or not the student keeps the
+object's name. «משוואת AB היא y=2x» ≡ «משוואת הישר AB היא y=2x», «l1: y=2x» ≡ «נתון הישר l1: y=2x», and
+each pair is **one object**, because a name is an identity (R44). The name's own shape says what was
+named — a two-point run or the `ℓ` device is a line, a Roman numeral is a circle — while the KIND still
+comes from the fit, so the id records what the student called it and the classifier decides what it is.
