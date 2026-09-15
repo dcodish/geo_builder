@@ -904,8 +904,49 @@ const SLOPE_EN = /^(?:the\s+)?slope\s+of\s+(.+?)\s+is\s+(.+)$/i;
  * A side with no length token at all is a plain number (`10`, `4√5`); a sentence with NO length on
  * either side is not this rule’s business and falls through untouched.
  */
+/**
+ * COMPARISON words, rewritten into the equation they mean (#1075).
+ *
+ * Operator, 2026-09-15: *"שטח ABEF גדול פי 3 משטח משולש CEF - is not supported"*. Measured, the
+ * nouns were not the problem — «שטח המשולש ABC גדול פי 3 משטח המשולש CEF», with both nouns
+ * present, failed identically. What was missing is that a MEASURE can stand on both sides of a
+ * relation at all.
+ *
+ * A REWRITE rather than a constraint kind, and that is the decision: «X גדול פי 3 מ-Y» means
+ * «X = 3Y», which `length-eq` already expresses, so the comparison is vocabulary and not
+ * mechanism. It therefore inherits everything — areas as terms, parameters, the solve, the
+ * refusal — instead of needing each of them again.
+ *
+ * The rewrite runs BEFORE every constraint rule, on the raw line, so nothing downstream learns
+ * that these words exist. «שווה ל-» needs no entry: it IS an equation once the words are gone.
+ */
+const COMPARISONS: Array<{ re: RegExp; eq: (x: string, k: string, y: string) => string }> = [
+  // «X גדול פי 3 מ-Y» — a RATIO. The multiplier sits with the larger side.
+  { re: /^(.+?)\s+(?:גדול|גדולה)\s+פי\s+(.+?)\s+מ-?\s*(.+)$/, eq: (x, k, y) => `${x} = (${k})*(${y})` },
+  { re: /^(.+?)\s+(?:קטן|קטנה)\s+פי\s+(.+?)\s+מ-?\s*(.+)$/, eq: (x, k, y) => `(${k})*(${x}) = ${y}` },
+  // «X גדול ב-5 מ-Y» — a DIFFERENCE. A different word, and a different equation.
+  { re: /^(.+?)\s+(?:גדול|גדולה)\s+ב-?\s*(.+?)\s+מ-?\s*(.+)$/, eq: (x, k, y) => `${x} = ${y} + (${k})` },
+  { re: /^(.+?)\s+(?:קטן|קטנה)\s+ב-?\s*(.+?)\s+מ-?\s*(.+)$/, eq: (x, k, y) => `${x} = ${y} - (${k})` },
+  { re: /^(.+?)\s+is\s+(.+?)\s+times\s+(.+)$/i, eq: (x, k, y) => `${x} = (${k})*(${y})` },
+];
+
+/** The line as an EQUATION, when it was written as a comparison. `null` leaves it untouched. */
+function asEquation(line: string): string | null {
+  for (const c of COMPARISONS) {
+    const m = c.re.exec(line);
+    if (m) return c.eq(trim(m[1]), trim(m[2]), trim(m[3]));
+  }
+  return null;
+}
+
 const LENGTH_EQ = /^(?:נתון\s+כי\s+|נתון\s+)?(.+?)\s*=\s*(.+)$/;
-function parseConstraint(line: string): RuleOutcome {
+function parseConstraint(raw: string): RuleOutcome {
+  /**
+   * A comparison is REWRITTEN into its equation before any rule sees the line (#1075), so every
+   * rule below reads one shape of sentence. The student’s own words still reach the refusals,
+   * because those carry the source from the caller rather than from here.
+   */
+  const line = asEquation(raw) ?? raw;
   /**
    * The relation rules run FIRST among the constraints (#1052).
    *

@@ -807,3 +807,9 @@ vertices of a shape are distinct points, and a configuration that puts two of th
 is not shown — «דלתון ABCD» never draws `B` and `D` together, however well that would satisfy its
 equal sides. It costs no freedom: the figure is as open as the givens leave it, and only the drawing
 is filtered.
+
+**R65 — a measure can be compared to another measure**
+([ADR-AG-040](06c-decisions-analytic.md#adr-ag-040)). «שטח ABC גדול פי 3 משטח CEF», «AB גדול פי 2
+מ-BC», «AB גדול ב-2 מ-BC» and «שטח ABC = שטח CEF + 4» are all givens the figure honours, and areas
+and lengths mix freely in one expression. A comparison a determined figure does not satisfy is
+refused, naming the statement.

@@ -24,18 +24,35 @@ import { RESERVED_SYMBOLS } from './carriers';
 import type { Pt } from './derived';
 import type { Id } from './types';
 
-/** One `|PQ|` in an expression — the pair whose distance the placeholder stands for. */
-export interface LengthTerm {
-  a: Id;
-  b: Id;
-}
+/**
+ * One MEASURE in an expression — what a placeholder stands for (#1075).
+ *
+ * Two members, and the second is why this is a union rather than a pair of ids: «שטח המשולש ABC
+ * גדול פי 3 משטח המשולש CEF» compares one measure to another, and an area is a measure exactly as
+ * a length is. Encoding both the same way means «AB = 2CD» and «שטח ABC = 3·שטח CEF» are ONE
+ * constraint kind with different trees, which is the property `length-eq` was built for.
+ */
+export type MeasureTerm = { kind?: 'length'; a: Id; b: Id } | { kind: 'area'; ids: Id[] };
+
+/** @deprecated the name the union grew out of — kept so existing callers read unchanged. */
+export type LengthTerm = MeasureTerm;
 
 /** A parsed length expression: the tree, plus what each placeholder means. */
 export interface LengthExpr {
   expr: Expr;
   /** Positional: `terms[i]` is bound to `PLACEHOLDER_BASE + i` when the expression is evaluated. */
-  terms: LengthTerm[];
+  terms: MeasureTerm[];
 }
+
+/** The unsigned area of a polygon — the shoelace, which is what the `area` constraint measures too. */
+const polygonArea = (ps: Pt[]): number => {
+  let s = 0;
+  for (let i = 0; i < ps.length; i += 1) {
+    const q = ps[(i + 1) % ps.length];
+    s += ps[i].x * q.y - q.x * ps[i].y;
+  }
+  return Math.abs(s) / 2;
+};
 
 /**
  * The private-use code point the first length term is encoded as.
@@ -55,13 +72,30 @@ const LENGTH_TOKEN = /([A-Z][0-9]?)([A-Z][0-9]?)/g;
  * `null` when the text mentions no length at all — that is not a length expression, and saying so is
  * how the caller knows to leave the sentence to another rule rather than claiming it.
  */
+/**
+ * An AREA inside a measure expression — «שטח המשולש ABC» (#1075).
+ *
+ * Matched BEFORE the length tokens, and that order is the whole of it: `ABC` would otherwise be
+ * read as the length `AB` followed by a stray `C`. An optional Hebrew noun sits between the word
+ * and the vertices because the corpus writes «שטח המשולש ABC» as often as «שטח ABC».
+ */
+const AREA_TOKEN = /(?:שטח|[Aa]rea\s+of)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9]?){3,})/g;
+
 export function parseLengthExpr(src: string): LengthExpr | null {
-  const terms: LengthTerm[] = [];
-  const encoded = normalizeMath(src).replace(LENGTH_TOKEN, (_m, a: string, b: string) => {
+  const terms: MeasureTerm[] = [];
+  // Areas first — see AREA_TOKEN. Each becomes a placeholder before any length token is looked for.
+  const withAreas = normalizeMath(src).replace(AREA_TOKEN, (_m, run: string) => {
+    const ids = run.match(/[A-Z][0-9]?/g) ?? [];
+    const key = ids.join();
+    const at = terms.findIndex((t) => t.kind === 'area' && t.ids.join() === key);
+    const i = at >= 0 ? at : terms.push({ kind: 'area', ids }) - 1;
+    return String.fromCharCode(PLACEHOLDER_BASE + i);
+  });
+  const encoded = withAreas.replace(LENGTH_TOKEN, (_m, a: string, b: string) => {
     // Identical endpoints have zero length always; they are a degenerate statement rather than a
     // term, and admitting them would let `AA = 5` look satisfiable-but-failing instead of wrong.
     if (a === b) return `${a}${b}`;
-    const at = terms.findIndex((t) => t.a === a && t.b === b);
+    const at = terms.findIndex((t) => t.kind !== 'area' && t.a === a && t.b === b);
     const i = at >= 0 ? at : terms.push({ a, b }) - 1;
     return String.fromCharCode(PLACEHOLDER_BASE + i);
   });
@@ -90,11 +124,19 @@ export function evalLengthExpr(
 ): number | null {
   const bound: Record<string, number> = { ...env };
   for (let i = 0; i < le.terms.length; i += 1) {
-    const { a, b } = le.terms[i];
-    const p = at(a);
-    const q = at(b);
-    if (!p || !q) return null;
-    bound[String.fromCharCode(PLACEHOLDER_BASE + i)] = Math.hypot(q.x - p.x, q.y - p.y);
+    const term = le.terms[i];
+    let value: number;
+    if (term.kind === 'area') {
+      const ps = term.ids.map(at);
+      if (ps.some((p) => p === null)) return null;
+      value = polygonArea(ps as Pt[]);
+    } else {
+      const p = at(term.a);
+      const q = at(term.b);
+      if (!p || !q) return null;
+      value = Math.hypot(q.x - p.x, q.y - p.y);
+    }
+    bound[String.fromCharCode(PLACEHOLDER_BASE + i)] = value;
   }
   const v = evalExpr(le.expr, bound);
   return Number.isFinite(v) ? v : null;
@@ -102,12 +144,13 @@ export function evalLengthExpr(
 
 /** Every point a length expression references, so the solver knows which carriers may move. */
 export function lengthRefs(le: LengthExpr): Id[] {
-  return le.terms.flatMap((t) => [t.a, t.b]);
+  return le.terms.flatMap((t) => (t.kind === 'area' ? t.ids : [t.a, t.b]));
 }
 
 /** The student's own words are carried on the fact; this is the internal shorthand for a refusal. */
 export function describeLengthExpr(le: LengthExpr): string {
-  return le.terms.length === 0 ? 'ערך' : le.terms.map((t) => `${t.a}${t.b}`).join('+');
+  if (le.terms.length === 0) return 'ערך';
+  return le.terms.map((t) => (t.kind === 'area' ? `שטח ${t.ids.join('')}` : `${t.a}${t.b}`)).join('+');
 }
 
 /**
@@ -154,7 +197,11 @@ export function pinnedLengths(
     if (!symbolsOf(value.expr).every((sym) => RESERVED_SYMBOLS.has(sym))) continue;
     const v = evalExpr(value.expr, env);
     if (!Number.isFinite(v)) continue;
-    out.set(pairKey(lengthy[0].terms[0].a, lengthy[0].terms[0].b), v);
+    // A pinned LENGTH only: an area term pins no segment, and the `lengthy` filter above already
+    // required exactly one term — this says which kind it must be (#1075).
+    const only = lengthy[0].terms[0];
+    if (only.kind === 'area') continue;
+    out.set(pairKey(only.a, only.b), v);
   }
   return out;
 }

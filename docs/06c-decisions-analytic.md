@@ -2162,3 +2162,41 @@ and worth keeping: **a constraint check cannot catch a degenerate solution, beca
 solution satisfies the constraints.**
 
 **Consequences.** `src-analytic` +6 tests.
+
+## ADR-AG-040 — A measure stands on both sides, and a comparison is VOCABULARY (#1075)
+
+**Status:** accepted, 2026-09-15 · **Generalises** [ADR-AG-025](#adr-ag-025) (lengths as values) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R65. **Design:**
+[04c](04c-design-analytic.md) "Lengths as values" — now measures.
+
+**Context.** Operator, 2026-09-15: *"שטח ABEF גדול פי 3 משטח משולש CEF - is not supported"*.
+
+**Measured before building, and it moved the diagnosis.** The obvious reading is that «ABEF» lacks a
+noun. It is not that: «שטח המשולש ABC גדול פי 3 משטח המשולש CEF», with both nouns present, failed
+identically. The area rule matched its head and handed the tail to the EQUATION parser, which
+correctly refused it. Two separate things were missing.
+
+**1 — A comparison is vocabulary, not mechanism.** «X גדול פי 3 מ-Y» means «X = 3Y», which
+`length-eq` already expresses. So the words are REWRITTEN into the equation before any constraint
+rule sees the line, and nothing downstream learns they exist. The consequence is the reason for the
+shape: the comparison inherits areas as terms, parameters, the solve and the refusal, rather than
+needing each of them again — and the lock asserts that the two spellings produce the IDENTICAL
+construction. «גדול פי» and «גדול ב-» are a ratio and a difference: one word apart, two equations,
+and the table says which is which.
+
+**2 — An AREA is a term.** `LengthTerm` became `MeasureTerm`, a union of a point PAIR and a vertex
+RING, so «שטח ABC» and «AB» are encoded the same way into the same expression. That is exactly what
+ADR-AG-025's placeholder encoding was built to allow, one kind wider: `AB = 10`, `AB = AC`,
+`AB + BC = 10`, `2·AB = 3·CD` and now «שטח ABC = שטח CEF + 4» are one constraint kind with different
+trees. **The area token is matched BEFORE the length tokens**, and that order is the whole of it —
+`ABC` would otherwise read as the length `AB` followed by a stray `C`.
+
+**A refusal is the right answer too, and the operator's own case is one.** With his literal
+coordinates `ABEF` has area 12 and `CEF` has area 6, so «פי 3» is false there and the figure says so.
+A comparison is a given like any other.
+
+**Consequences.** `src-analytic` +9 tests. «שטח הדלתון גדול פי 2 משטח המשולש ABC» works because the
+noun resolution ([ADR-AG-035](#adr-ag-035)) and the comparison meet without either knowing about the
+other.
