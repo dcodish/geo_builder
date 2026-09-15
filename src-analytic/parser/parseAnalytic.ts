@@ -599,7 +599,79 @@ const arityOf = (noun: string | undefined): number | null => {
 /** A label naming two different vertices of one figure is not a figure — «משולש ABA» (#1042). */
 const hasRepeat = (v: readonly string[]): boolean => new Set(v).size !== v.length;
 
+/**
+ * A POINT WHERE TWO THINGS CROSS — «P נקודת החיתוך של המעגל עם ציר ה-x» (#1025).
+ *
+ * The corpus asks for these constantly: where a curve meets an axis, where two lines meet. The
+ * issue was filed as CLICKABLE dots on the canvas; this is the same capability in the product’s own
+ * idiom, which is a sentence — and the sentence is what the exam actually writes.
+ *
+ * ## It needs no new mechanism, which is the point
+ *
+ * An intersection is a point that is ON BOTH things: two incidences, each consuming one of its two
+ * degrees of freedom. So it lowers to a `declare` and two constraints the engine already has, the
+ * joint solve finds a crossing, and — where there are two — different configurations find different
+ * ones and [ADR-AG-047](../../docs/06c-decisions-analytic.md#adr-ag-047) lists both in the panel.
+ *
+ * Modelling it as a DERIVED point would have been the wrong shape: a derived point is one answer in
+ * closed form, and a line meets a circle twice.
+ */
+const INTERSECT_HE = new RegExp(
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה?נקודת|ה?נקודות)?\\s*ה?חיתוך\\s+(?:של\\s+)?(.+?)\\s+(?:עם|ו-?)\\s+(.+)$`
+);
+const INTERSECT_EN = new RegExp(
+  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+intersection\\s+(?:point\\s+)?of\\s+(.+?)\\s+(?:and|with)\\s+(.+)$`
+,  'i',
+);
+
+/**
+ * One operand of an intersection, as the incidence it means.
+ *
+ * The axis cases carry NUMERIC coefficients because an axis needs no figure to be known; everything
+ * else goes through `direction()` — the same resolver the relations use — so «הישר AB», «הצלע AB»
+ * and «הישר l1» mean here exactly what they mean there, and cannot drift.
+ */
+function incidenceOn(operand: string, id: Id): Constraint | null {
+  const axis = AXIS_HE.exec(trim(operand)) ?? AXIS_EN.exec(trim(operand));
+  if (axis) {
+    return axis[1].toLowerCase() === 'x'
+      ? { t: 'on-line', id, a: 0, b: 1, c: 0 }
+      : { t: 'on-line', id, a: 1, b: 0, c: 0 };
+  }
+  /**
+   * A CIRCLE by its numeral — «המעגל I». `direction()` resolves lines and axes, because that is all a
+   * RELATION can be about; an incidence can be about any curve, so the naming forms `matchCurve`
+   * mints are mapped here to the same ids it mints. Same id, or the two rules would build two objects
+   * for one circle (the ADR-AG-023 defect).
+   */
+  const circle = /^ה?מעגל\s+(I|II|III|IV|V)$/.exec(trim(operand)) ?? /^(?:the\s+)?circle\s+(I|II|III|IV|V)$/i.exec(trim(operand));
+  if (circle) return { t: 'on-curve', id, curve: `circle-${circle[1]}` };
+
+  const dir = direction(trim(operand));
+  if (dir?.k === 'curve') return { t: 'on-curve', id, curve: dir.id };
+  if (dir?.k === 'points') return { t: 'on-line-2pt', id, a: dir.a, b: dir.b };
+  return null;
+}
+
+function parseIntersection(line: string): RuleOutcome {
+  const m = INTERSECT_HE.exec(line) ?? INTERSECT_EN.exec(line);
+  if (!m) return null;
+  const [, id, leftSrc, rightSrc] = m;
+  const left = incidenceOn(leftSrc, id);
+  const right = incidenceOn(rightSrc, id);
+  // The verb was understood and an operand was not — #1052’s refusal, which names the formats that
+  // do work rather than calling the whole sentence unintelligible.
+  if (!left || !right) return refuse('bad-operand', line);
+  return made([
+    { t: 'declare', id, src: line },
+    { t: 'constraint', k: left, src: line },
+    { t: 'constraint', k: right, src: line },
+  ]);
+}
 function parseDerived(line: string): RuleOutcome {
+  const crossing = parseIntersection(line);
+  if (crossing) return crossing;
+
   const mid = MIDPOINT_HE.exec(line) ?? MIDPOINT_EN.exec(line);
   if (mid) {
     const [, id, a, b] = mid;

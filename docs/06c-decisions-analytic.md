@@ -2747,3 +2747,37 @@ the shape of the answer and the canvas shows which one is in front of you.
 
 **Consequences.** `src-analytic` +6 tests. The point row now has four answers, in order of how much
 the figure knows: the numbers · the option set · the dependency · the dash.
+
+## ADR-AG-048 — An intersection is a point ON BOTH things (#1025)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R73. **Design:** none (a rule over existing
+constraints).
+
+**Context.** [#1025](https://github.com/dcodish/geo_builder/issues/1025) asked for **clickable**
+intersection dots: a shape's crossings with the axes and with other shapes, promotable to named
+points. This delivers the capability in the product's own idiom — a SENTENCE — which is also what the
+exam writes: «נקודת החיתוך של המעגל עם ציר ה-x».
+
+**It needs no new mechanism, and that is the whole decision.** An intersection is a point that is ON
+BOTH things, so it lowers to a `declare` and two incidences, each consuming one of the point's two
+degrees of freedom. The joint solve finds a crossing; the DOF cue reports 0; nothing was added to the
+engine.
+
+**Modelling it as a DERIVED point would have been the wrong shape.** A derived point is one answer in
+closed form, and **a line meets a circle twice**. As a constrained free point it has two solutions,
+different configurations reach different ones, and [ADR-AG-047](#adr-ag-047) lists both in the panel —
+measured on `(x-3)²+(y-4)²=25` against the x-axis, which gives exactly `(0,0)` and `(6,0)`. The two
+features compose with nothing between them, which is the sign that both are the right shape.
+
+**The operand vocabulary is `direction()`'s**, the same resolver the relations use, so «הישר AB»,
+«הצלע AB» and «הישר l1» mean here what they mean there. A named CIRCLE is mapped alongside it, to the
+id `matchCurve` mints — the same id, or the two rules would build two objects for one circle, which is
+[ADR-AG-023](#adr-ag-023)'s defect. An operand it cannot read is refused as `bad-operand`, naming the
+formats that work.
+
+**What this does NOT do** is the clicking. Dots on the canvas, promotable by pointer, remain #1025's
+own; they are a different interaction and want the selection mechanism #1048 needs too.
+
+**Consequences.** `src-analytic` +7 tests.

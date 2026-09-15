@@ -882,3 +882,8 @@ being open actually means.
 ([ADR-AG-047](06c-decisions-analytic.md#adr-ag-047)). «C נמצאת על הישר 4x-y-9=0» with «שטח המשולש ABC
 הוא 7» reads `(1, -5) או [(3, 3)]` in the data panel, with the drawn one marked — never one of them
 alone, and never a dash. A point with continuous freedom is not an option set and keeps its open row.
+
+**R73 — a crossing can be NAMED** ([ADR-AG-048](06c-decisions-analytic.md#adr-ag-048)).
+«P נקודת החיתוך של המעגל I עם ציר ה-x» places `P` on both, and where there are two crossings the panel
+lists both (R72) while «הציגו תצורה אחרת» moves between them. Two lines, a line and an axis, and a
+curve and an axis all read the same way; an operand the tool cannot read is refused by name.
