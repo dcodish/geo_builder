@@ -299,7 +299,31 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
             error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) },
           };
         }
-        if (sameCurve(prior.curve, f.curve)) return { ok: true, effect: 'known', next: c };
+        if (sameCurve(prior.curve, f.curve)) {
+          /**
+           * PROMOTION (#1076) — the same curve, now stated.
+           *
+           * «נקודה B על הישר y=x» minted `y=x` as a carrier; «y=x» on its own line is the student
+           * asking for the line itself. Because ids are content-derived (ADR-AG-023) these are ONE
+           * object, so the second sentence is not a new curve — it is a change of what the first one
+           * IS, and the figure visibly gains a line. Answering «כבר ידוע» here would be the #1045
+           * mechanism firing on a line that really did something.
+           *
+           * The promotion is one-way. A stated curve is never demoted by a later carrier mention,
+           * because the student already asked to see it and nothing they said withdraws that.
+           */
+          if (f.stated && !prior.stated) {
+            return {
+              ok: true,
+              effect: 'created',
+              next: {
+                ...c,
+                objects: c.objects.map((o) => (o.id === f.id ? { ...prior, stated: true } : o)),
+              },
+            };
+          }
+          return { ok: true, effect: 'known', next: c };
+        }
         /**
          * Same id, different equation, and now that ids are content-derived (#1026) that can only
          * mean one thing: a NAMED curve being restated inconsistently — «הישר AC» given twice with
@@ -313,7 +337,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         effect: 'created',
         next: {
           ...c,
-          objects: [...c.objects, { kind: 'curve', id: f.id, label: f.label, curve: f.curve }],
+          objects: [...c.objects, { kind: 'curve', id: f.id, label: f.label, curve: f.curve, stated: f.stated }],
         },
       };
     }
@@ -462,10 +486,19 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
        * תצורה אחרת», counted in the DOF cue. Refusing here would make the student place three points
        * before they could name the triangle, which inverts how every exam sentence is written.
        *
-       * Segments sit with the references: «הקטע AB» reads as being about points under discussion,
-       * and a student who means to introduce them has a shape noun for it.
+       * **Segments moved to the declaration side** (#1074). They sat with the references on the
+       * reading that «הקטע AB» is about points under discussion — and the operator's ruling on
+       * «הישר AB» (2026-09-15: *"introduce them with dof"*) settles the general question the other
+       * way: NAMING a thing introduces its points, REFERRING to one does not. «הקטע EF» names a
+       * segment; «M אמצע AB» refers to two points while naming a third. #1028's refusal is
+       * untouched, and the tests that lock it are all midpoint tests, which is the distinction
+       * showing through.
+       *
+       * Refusing here forced a student to place both endpoints before they could name the segment,
+       * which inverts how every exam sentence is written — the same argument that made a shape noun
+       * introduce its vertices.
        */
-      const declares = f.t === 'polygon';
+      const declares = f.t === 'polygon' || f.t === 'segment';
       let base = c;
       for (const id of refs) {
         const o = objectById(base, id);

@@ -793,3 +793,20 @@ is right, so «הציגו תצורה אחרת» walks all three — R14's discre
 «זווית B ישרה» (also «הזווית B היא 90», «∡B = 90») settles it, and the figure keeps that seat at
 every configuration. A vertex that names no single angle — no shape through it, or several — is
 refused with the format that would work, never resolved by guessing which two rays were meant.
+**R56 — a curve minted to CARRY a point is not drawn**
+([ADR-AG-032](06c-decisions-analytic.md#adr-ag-032)). «נקודה B על הישר y=x» means *B is (t,t)*: the
+point appears, the line does not. Stating «y=x» on its own line draws it — and when the carrier was
+already there, that line PROMOTES it and is recorded as a change, never answered «כבר ידוע» or «כבר
+נובע». The carrier remains in the data panel throughout, because it is the honest answer to *where
+does B live*.
+**R57 — the segment noun is optional, and naming a segment introduces its endpoints**
+([ADR-AG-033](06c-decisions-analytic.md#adr-ag-033)). «EF» is «הקטע EF»: one object, one id, either
+spelling. Endpoints that do not exist yet are introduced as free vertices with their two degrees of
+freedom, as a shape noun's vertices are — because the sentence NAMES the segment. Referring to a
+point one does not have («M אמצע AB») still refuses (R-level #1028); the difference is naming
+versus mentioning, not which noun was used.
+**R58 — a point can be placed in a QUADRANT** ([ADR-AG-034](06c-decisions-analytic.md#adr-ag-034)).
+«C ברביע השלישי» — and «נמצאת», «הנקודה C», «נתון», and the English «C is in the third quadrant» —
+draws `C` in that quadrant. It is a REGION: the point keeps both degrees of freedom, moves under
+«הציגו תצורה אחרת» inside its quadrant, and a point already placed elsewhere is refused rather than
+quietly redrawn.
