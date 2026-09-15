@@ -26,6 +26,7 @@
  * Constructive forms («מעגל שמרכזו M ורדיוסו 5») synthesize the same `Expr`, so there is one
  * representation, not two.
  */
+import type { DerivedRule } from './derived';
 import type { Expr } from './expr';
 
 export type Id = string;
@@ -119,7 +120,10 @@ export interface FactBase {
 export type Fact =
   | (FactBase & { t: 'param'; sym: string; domain: Domain })
   | (FactBase & { t: 'point'; id: Id; x: Expr; y: Expr })
-  | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve });
+  | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve })
+  | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule })
+  | (FactBase & { t: 'segment'; id: Id; a: Id; b: Id })
+  | (FactBase & { t: 'polygon'; id: Id; vertices: Id[] });
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list
@@ -149,14 +153,40 @@ export interface ParamDecl {
  * members rather than as a parallel model.
  */
 export type GeoObject =
+  /** Stated by coordinates — `A(2,6)`. Its expressions may carry parameters. */
   | { kind: 'point'; id: Id; x: Expr; y: Expr }
-  | { kind: 'curve'; id: Id; label: CurveLabel; curve: Curve };
+  /** Stated by equation — the four-member curve family. */
+  | { kind: 'curve'; id: Id; label: CurveLabel; curve: Curve }
+  /**
+   * DERIVED from points already stated — a midpoint, a centroid, an incentre (#1028). 0-DOF and
+   * solver-free: given its parents there is exactly one answer, in closed form. This is the kind
+   * that makes the object→object dependency relation non-empty for the first time.
+   */
+  | { kind: 'derived'; id: Id; rule: DerivedRule }
+  /** `הקטע AB` — drawn between two points, and what gives «אמצע הצלע BC» a referent. */
+  | { kind: 'segment'; id: Id; a: Id; b: Id }
+  /** `משולש ABC` over vertices that are ALREADY stated — its sides. Free vertices are B3's job. */
+  | { kind: 'polygon'; id: Id; vertices: Id[] };
 
 export type PointObject = Extract<GeoObject, { kind: 'point' }>;
 export type CurveObject = Extract<GeoObject, { kind: 'curve' }>;
+export type DerivedObject = Extract<GeoObject, { kind: 'derived' }>;
+export type SegmentObject = Extract<GeoObject, { kind: 'segment' }>;
+export type PolygonObject = Extract<GeoObject, { kind: 'polygon' }>;
 
 export const isPoint = (o: GeoObject): o is PointObject => o.kind === 'point';
 export const isCurve = (o: GeoObject): o is CurveObject => o.kind === 'curve';
+export const isDerived = (o: GeoObject): o is DerivedObject => o.kind === 'derived';
+
+/**
+ * Anything that resolves to a single position — a stated point or a derived one.
+ *
+ * Callers that want "the points of the figure" must ask for this rather than for `kind === 'point'`,
+ * or a derived point silently stops being a point: absent from the panel, absent from the view box,
+ * and unavailable as another rule's parent.
+ */
+export const isPositional = (o: GeoObject): o is PointObject | DerivedObject =>
+  o.kind === 'point' || o.kind === 'derived';
 
 /**
  * The fold of the fact list: the objects, in the order the student stated them, plus the parameter
@@ -170,6 +200,7 @@ export interface Construction {
 export const EMPTY_CONSTRUCTION: Construction = { params: [], objects: [] };
 
 export const pointsOf = (c: Construction): PointObject[] => c.objects.filter(isPoint);
+export const positionalOf = (c: Construction) => c.objects.filter(isPositional);
 export const curvesOf = (c: Construction): CurveObject[] => c.objects.filter(isCurve);
 export const objectById = (c: Construction, id: Id): GeoObject | undefined =>
   c.objects.find((o) => o.id === id);

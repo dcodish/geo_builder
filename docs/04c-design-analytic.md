@@ -42,6 +42,9 @@ the shape nouns and derived points of [02c §5](02c-requirements-analytic.md) jo
 members rather than as a parallel model. An equation, a shape noun and a coordinate pair are three
 ways to *state* an object; the exact conic fit is how an equation identifies **which** object it names.
 
+The object kinds are `point` and `curve` (stated), `derived` (a midpoint, a centroid, an incentre —
+a pure function of parents already stated), and `segment` / `polygon` (drawn from their endpoints).
+
 `engine/carriers.ts` holds the **degree-of-freedom contract**, and two things live there:
 
 - **The register of free parameters is derived from the objects' own expressions**, never from the F11
@@ -55,11 +58,13 @@ ways to *state* an object; the exact conic fit is how an equation identifies **w
   forgotten one was a silent dropped DOF rather than a type error (ADR-043). The pattern is **copied,
   never imported**, before the vocabulary grew.
 
-**There is deliberately no topological sort yet.** Every object in this slice is stated, so the
-object→object relation is empty and a sort over it could not be exercised by any test — it would pass
-by checking nothing. The object→**parameter** layer is real and every figure exercises it: the
-environment is complete before evaluation begins. `symbolDeps` is that relation, and it is the seam
-the ordering grows from when the first derived kind lands.
+**There is deliberately no topological sort, and since #1028 that is a finding rather than a
+deferral.** Derived points made the object→object relation non-empty — and a sort is still the wrong
+shape, because `apply` refuses a statement naming an object that does not exist yet. A parent is
+therefore always already in the list when its dependent is appended: declaration order is provably a
+valid evaluation order and a cycle is unreachable. The invariant is asserted by
+`depsPrecedeDependents` rather than re-established by a sort that could never find anything out of
+place. A kind that can forward-reference is what would earn one.
 
 ## The three cores
 

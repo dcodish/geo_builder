@@ -47,6 +47,7 @@ this tool *supplies* the one the exam withholds.
 | `engine/expr.ts` | The numeric expression layer. Hand-written because the exam's notation multiplies by JUXTAPOSITION (`2a`, `4√5`, `25k²`). Also the single normalization chokepoint (`²`≡`^2`, `−`≡`-`, `√`≡`sqrt`) |
 | `engine/conic.ts` | Equation → curve: the **exact** six-coefficient fit (seven lattice probes, no least squares) and the canonicity gate |
 | `engine/types.ts` | Facts, construction, `Domain`. **The primitive is the OBJECT** ([ADR-AG-009](../docs/06c-decisions-analytic.md#adr-ag-009)): `Construction` is `{ params, objects }`, and `GeoObject` is a discriminated union whose two stated members are `point` and `curve`. A curve is ONE thing *as a curve* — an implicit `f(x,y;params)=0` plus its classified kind |
+| `engine/derived.ts` | The closed forms for points DERIVED from stated parents — midpoint, centroid, incentre, orthocentre, circumcentre, diagonal meet. 0-DOF and solver-free; a degenerate configuration answers `null`, never a guess |
 | `engine/carriers.ts` | **The DOF contract.** The free-parameter **register**, derived from what the objects' expressions actually use rather than from F11 declarations (a declaration *narrows*, it does not create — #1014); `carrierOf` / `symbolDeps` / `objectDeps`, exhaustive switches so a new object kind cannot be added without declaring its freedom |
 | `engine/curves.ts` | Residuals (scale-normalized), conic roles (focus/directrix/foci), extents, the polylines the renderer draws |
 | `engine/apply.ts` | **The M1 boundary** — the one place that decides new-object vs statement-about-an-existing-one. Here on day one because questions arrive in SECTIONS |
@@ -69,6 +70,16 @@ this tool *supplies* the one the exam withholds.
   (`carriers.ts`), because reading declarations alone is what made `y²=2ax` — a catalog entry — draw
   nothing and say nothing (#1014). A symbol is free because it is *used* and unpinned, not because a
   sentence announced it.
+- **Evaluation needs NO topological sort, and that is load-bearing rather than lazy.** `apply`
+  refuses a statement naming an object that does not exist (`unknown-reference`), so a parent is
+  always already in the list when its dependent is appended — declaration order is provably a valid
+  evaluation order and a cycle is unreachable. The invariant is asserted (`depsPrecedeDependents`),
+  not re-established by a sort that could never find anything out of place. **A kind that can
+  forward-reference is what would earn a real sort**; that function is what fails first and says so.
+- **A shape noun that carries a GIVEN may not be drawn as a plain ring of sides.** «מקבילית» asserts
+  AB ∥ DC. Until the constraint layer can honour it, it is refused BY NAME (`out-of-scope`) — never
+  flattened, because a stated given vanishing is the one thing this product may never do, and never
+  escalated to the LLM, because it is input we understand perfectly.
 - **Both panel sections are gated, and remembering only one is the recurring failure.** A coordinate
   goes through `isKnowledge`; a curve equation goes through `knownCurve`, which is built on it. The
   curve half was missing until #1020, and the suite was green while the panel printed
@@ -83,6 +94,11 @@ this tool *supplies* the one the exam withholds.
   invented command language.
 
 ## Recurring traps
+
+- **This tree has no private display rounder.** Numbers go through `shell/format.ts` `fmtNum` — the
+  operator's two-decimal ruling (#723) is a CHOKEPOINT, not a precision. A local `toPrecision` here
+  printed a centroid as `-1.666666667` and stayed invisible until the tool computed its first
+  non-terminating coordinate (#1029).
 
 - **Hebrew morphology: write out the alternation.** «נתון» ends in FINAL nun (ן) and «נתונה /
   נתונים / נתונות» in medial nun (נ), so `נתונ(ה|ים|ות)?` silently drops the commonest form. This is

@@ -14,7 +14,7 @@ const INK = '#0f172a';
 const CURVE = '#2563eb';
 
 export function Figure({ scene }: { scene: Scene }) {
-  const { width, height, axes, curves, points } = scene;
+  const { width, height, axes, curves, segments, points } = scene;
   return (
     <svg
       width="100%"
@@ -57,6 +57,14 @@ export function Figure({ scene }: { scene: Scene }) {
         <text x={axes.yAxisX - 6} y={axes.xAxisY + 14} textAnchor="end">
           O
         </text>
+      </g>
+
+      {/* segments — stated segments and polygon sides (#1028). Drawn BEFORE the curves and points so
+          a vertex dot and a curve both sit on top of the ink rather than under it. */}
+      <g stroke={CURVE} strokeWidth={2} strokeLinecap="round">
+        {segments.map((s) => (
+          <line key={s.id} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} data-id={s.id} />
+        ))}
       </g>
 
       {/* curves */}

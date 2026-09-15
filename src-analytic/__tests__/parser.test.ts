@@ -41,7 +41,10 @@ describe('catalog — every entry parses, in BOTH languages', () => {
 describe('catalog — every entry PRODUCES something, or says why not', () => {
   for (const entry of COMMAND_CATALOG_ANALYTIC) {
     it(`${entry.family} · ${entry.he}`, () => {
-      const d = derive([entry.he]);
+      // An entry that declares context is built IN that context — «M אמצע AB» is meaningless
+      // without A and B, and failing it for that would be the guard reporting a defect that is not
+      // one. The context is part of the entry, so it is declared rather than guessed here.
+      const d = derive([...(entry.needs ?? []), entry.he]);
       // A declaration legitimately draws nothing: «a הוא פרמטר חיובי» states a domain, not an
       // object. It is the one category exempt, and it is exempt by its own field rather than by a
       // list of sentences that would drift.

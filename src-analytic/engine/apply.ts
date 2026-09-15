@@ -16,17 +16,20 @@
  * lands, and nowhere else.
  */
 import { fitConic } from './conic';
+import { parentsOf } from './derived';
 import { evalExpr, type Env } from './expr';
 import {
   conicSlotTaken,
   EMPTY_CONSTRUCTION,
   isCurve,
   isPoint,
+  isPositional,
   objectById,
   type Construction,
   type Curve,
   type CurveObject,
   type Fact,
+  type GeoObject,
   type Id,
   type PointObject,
 } from './types';
@@ -37,7 +40,17 @@ export type ApplyErrorCode =
   /** A second parabola or a second ellipse — D6: the anonymous conics are one-per-figure. */
   | 'conic-slot-taken'
   /** A name used for two different kinds of object. */
-  | 'name-kind-clash';
+  | 'name-kind-clash'
+  /**
+   * A statement that refers to a point the figure does not have (#1028).
+   *
+   * «M אמצע AB» before `A` exists is not a reason to invent `A` — an auto-created vertex would be a
+   * position the question never gave ([ADR-052](../../docs/06-decisions.md#adr-052)), and it would
+   * silently spend a letter the student is about to use themselves (the ADR-297 class). Refusing
+   * here is also what guarantees a parent always precedes its dependent, which is why evaluation
+   * needs no topological sort (`carriers.ts` `depsPrecedeDependents`).
+   */
+  | 'unknown-reference';
 
 export interface ApplyError {
   code: ApplyErrorCode;
@@ -162,7 +175,67 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         },
       };
     }
+
+    /**
+     * The three REFERENCE kinds (#1028). They share one shape: every id they name must already be a
+     * positional object, and the statement is idempotent under M1 when it says the same thing again.
+     */
+    case 'derived':
+    case 'segment':
+    case 'polygon': {
+      const refs =
+        f.t === 'derived' ? parentsOf(f.rule) : f.t === 'segment' ? [f.a, f.b] : f.vertices;
+      const missing = refs.find((id) => {
+        const o = objectById(c, id);
+        return !o || !isPositional(o);
+      });
+      if (missing !== undefined) {
+        // Named in the student's own words, never as internal state: the message says WHICH point.
+        return { ok: false, error: { code: 'unknown-reference', detail: missing } };
+      }
+
+      const prior = objectById(c, f.id);
+      if (prior) {
+        if (prior.kind !== f.t) {
+          return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
+        }
+        // M1: restating the same construction is absorbed — no duplicate row, no re-creation. This
+        // is what lets a later section of a question name what an earlier one established.
+        if (sameReference(prior, f)) return { ok: true, absorbed: true, next: c };
+        return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+      }
+
+      const made: GeoObject =
+        f.t === 'derived'
+          ? { kind: 'derived', id: f.id, rule: f.rule }
+          : f.t === 'segment'
+            ? { kind: 'segment', id: f.id, a: f.a, b: f.b }
+            : { kind: 'polygon', id: f.id, vertices: f.vertices };
+      return { ok: true, absorbed: false, next: { ...c, objects: [...c.objects, made] } };
+    }
   }
+}
+
+/**
+ * Do an existing reference object and a restating fact say the same thing?
+ *
+ * The answer differs by kind, and the reason is where the DEFINITION lives:
+ *
+ *  - a **segment** and a **polygon** carry a canonical id — `seg-` over the sorted endpoints,
+ *   `poly-` over the smallest rotation/reflection of the vertex ring — so the id *is* the
+ *   definition. Two of them sharing an id are the same figure by construction, and «משולש ABC» /
+ *   «משולש ACB» must absorb rather than conflict. A comparison of the raw vertex order here would
+ *   reject the same triangle written the other way round;
+ *  - a **derived** point's id is the letter the STUDENT chose, which says nothing about the rule, so
+ *   `M אמצע AB` and `M אמצע AC` genuinely conflict and the rule has to be compared.
+ *
+ * Caller has already established that the ids match.
+ */
+function sameReference(prior: GeoObject, f: Fact): boolean {
+  if (prior.kind === 'derived' && f.t === 'derived') {
+    return JSON.stringify(prior.rule) === JSON.stringify(f.rule);
+  }
+  return prior.kind === 'segment' || prior.kind === 'polygon';
 }
 
 function pickTighter(

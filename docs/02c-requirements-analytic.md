@@ -553,3 +553,81 @@ teacher opens as a starting point. It is nearly free once the tool can express t
 validation fixtures and a teacher's question bank would be the same files, and
 [FR-HS-10](02-requirements.md) already names a built-in library as future. The operator did not select
 it. **Not rejected on the merits — not in scope now**, and nothing above forecloses it.
+
+---
+
+## 8 — The «lines and points» corpus, and what it changes
+
+**Status: a SECOND corpus, read 2026-09-15.** Sections 1–7 are written against the שאלון 572 Q1
+corpus — conics, tangency, loci, symbolic parameters ([docs/19 §2](19-analytic-geometry-tool.md)). The
+operator then brought roughly forty exercises from the topic they are **teaching now**: midpoints,
+medians, centroids, incircles, areas, sides given by equation. It is the same product and a different
+exam topic, and it changes the priorities enough to be written down rather than absorbed.
+
+### 8a — What it contains, by frequency
+
+Tallied over the ~40 exercises, most common first:
+
+| construct | ~exercises | example phrasing |
+| --- | --- | --- |
+| shape noun | ~20 | `משולש ABC` · `מקבילית ABCD` · `טרפז ישר-זווית ABCD` |
+| **side or line by equation** | ~18 | `משוואת הצלע AB היא y=2x+9` · `הישר 4x+3y=0` |
+| point on an object / in a region | ~14 | `C נמצאת על הישר 4x-y-9=0` · `B על ציר ה-y` · `ברביע הראשון` |
+| **midpoint** | ~11 | `M אמצע AB` · `אמצע הצלע BC הוא (-1,-2)` |
+| **area as a PIN** | ~10 | `שטח המשולש ABC הוא 24` |
+| concurrency points | ~6 | `מפגש התיכונים` · `מפגש הגבהים` · `מרכז המעגל החסום` |
+| two-case ask | ~6 | «הבחן בין שתי אפשרויות» |
+
+**Three things this corpus does that the 572 one does not**, each with a consequence:
+
+- **It names points far less.** «קצותיו הם (8,1), (-2,-5)», «מפגש התיכונים הוא בנקודה (1,2)» — bare
+  coordinate pairs with no letter. The 572 corpus always names. *(An unnamed point does not parse
+  today; the tool requires a letter.)*
+- **It says «צלע» where the 572 corpus says «ישר».** `משוואת הצלע AC` does not parse while
+  `משוואת הישר AC` does — a one-word gap across three exercises.
+- **It has no conics at all.** The entire canonical-conic layer, which is most of what V0 built, is
+  unused here.
+
+### 8b — Two new input families (F16, F17)
+
+The docs/19 §10 families F1–F15 were extracted from the 572 corpus. These two come from this one, and
+are numbered onward rather than renumbering a settled table.
+
+| # | family | Hebrew | English |
+| --- | --- | --- | --- |
+| **F16** | Derived point by ROLE | `M אמצע AB` · `M מפגש התיכונים במשולש ABC` · `O מפגש חוצי הזוויות במשולש ABC` · `H מפגש הגבהים במשולש ABC` · `P מפגש האנכים האמצעיים במשולש ABC` · `G מפגש האלכסונים במרובע ABCD` | `M is the midpoint of AB` · `M is the centroid of triangle ABC` |
+| **F17** | Segment and NEUTRAL shape noun | `הקטע AB` · `משולש ABC` · `מרובע ABCD` | `segment AB` · `triangle ABC` |
+
+**R37 — a shape noun that carries a GIVEN is not an F17 entry.** «מקבילית» asserts AB ∥ DC, «ריבוע»
+asserts four equal sides. Drawing either as a plain ring of sides would drop a stated given, so they
+are refused by name until the constraint layer can honour them. F17 is deliberately the *neutral*
+nouns only — the ones that assert nothing beyond their vertices.
+
+**R38 — a construction may not reference a point the figure does not have.** «M אמצע AB» before `A`
+exists is refused, naming the missing point. Inventing it would place a position the question never
+gave ([ADR-052](06-decisions.md#adr-052)) and spend a letter the student is about to use
+([ADR-297](06-decisions.md#adr-297)). *Consequence, and a load-bearing one:* it also guarantees a
+parent always precedes its dependent, which is why evaluation needs no topological sort
+([ADR-AG-013](06c-decisions-analytic.md#adr-ag-013)).
+
+**R39 — a derived point contributes NO new degree of freedom.** Its freedom is its parents', already
+counted. The midpoint of `A(-9a,0)` and `B(3,4)` leaves the figure at 1 DOF, not 2 — and its
+coordinates are knowledge exactly when its parents' are.
+
+### 8c — What this corpus says about the roadmap
+
+**It confirms R1 from an independent direction.** The object-first model was ruled from the 572
+corpus's §5 questions; this corpus needs the same thing for entirely different reasons — shape nouns
+and derived points rather than parallelograms and tangency.
+
+**And it re-orders the work.** Midpoints and concurrency points outrank almost everything in B2 and
+B3, and need neither, which is why they landed first
+([ADR-AG-013](06c-decisions-analytic.md#adr-ag-013)). What remains, in this corpus's order: **point on
+an object / in a region** (~14 exercises, on no slice yet), **area as a pin** (~10, needs B2), and the
+constrained shape nouns (needs B3).
+
+**OPEN — the 471 ↔ 572 profile split, again and more sharply.** [§5](#5--capability-inventory-from-the-corpus)
+lists it as deliberately open. This corpus is what that split is *about*: no conics, no parameters,
+heavy on derived points. Whether the two topics are one tool with a profile or simply one tool whose
+catalog covers both is still unanswered — nothing yet forces the question, and
+[ADR-AG-012](06c-decisions-analytic.md#adr-ag-012) explicitly did **not** settle it.

@@ -60,11 +60,21 @@ export interface ScenePoint {
   label: string;
 }
 
+/** A drawn straight piece — a stated segment or one side of a polygon (#1028), in SCREEN space. */
+export interface SceneSegment {
+  id: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
 export interface Scene {
   width: number;
   height: number;
   axes: SceneAxes;
   curves: SceneCurve[];
+  segments: SceneSegment[];
   points: ScenePoint[];
 }
 
@@ -105,6 +115,17 @@ export function buildScene(fig: Figure, box: Box, width: number, height: number)
       .join(' '),
   }));
 
+  // A segment is already resolved to endpoints by `evaluate`, so this is a pure projection — the
+  // renderer never looks a vertex up, which is what keeps it a consumer rather than a second
+  // geometry implementation.
+  const segments: SceneSegment[] = fig.segments.map((s) => ({
+    id: s.id,
+    x1: t.sx(s.a.x),
+    y1: t.sy(s.a.y),
+    x2: t.sx(s.b.x),
+    y2: t.sy(s.b.y),
+  }));
+
   const points: ScenePoint[] = fig.points.map((p) => ({
     id: p.id,
     cx: t.sx(p.x),
@@ -122,6 +143,7 @@ export function buildScene(fig: Figure, box: Box, width: number, height: number)
       yTicks: ticks(box.minY, box.maxY, t.sy),
     },
     curves,
+    segments,
     points,
   };
 }

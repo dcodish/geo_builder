@@ -17,6 +17,7 @@
  *
  * Unmatched input returns `not-handled`, which is the seam where the LLM fallback escalates.
  */
+import type { DerivedRule } from '../engine/derived';
 import { parseExpr, normalizeMath, type Expr } from '../engine/expr';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id } from '../engine/types';
 
@@ -301,6 +302,132 @@ function anonIndex(eqSrc: string): string {
 // The entry point
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Derived points, segments and polygons over STATED vertices (#1028)
+// ---------------------------------------------------------------------------
+
+/** Two or more point names running together — `AB`, `ABC`, `ABCD`. */
+const NAME_RUN = `(?:${NAME})+`;
+
+const splitNames = (run: string): string[] => run.match(/[A-Z][0-9]?/g) ?? [];
+
+/**
+ * The concurrency points, keyed by the role noun the corpus uses.
+ *
+ * Each entry says how many vertices the construct needs, so a miscounted statement
+ * («מפגש התיכונים במרובע ABCD») is refused rather than quietly reading the first three.
+ */
+const ROLES: Array<{ he: RegExp; en: RegExp; t: DerivedRule['t']; n: number }> = [
+  { he: /ה?תיכונים/, en: /centroid|medians/i, t: 'centroid', n: 3 },
+  { he: /חוצי\s+ה?זוויות/, en: /incent(?:re|er)|angle\s+bisectors/i, t: 'incentre', n: 3 },
+  { he: /ה?גבהים/, en: /orthocent(?:re|er)|altitudes/i, t: 'orthocentre', n: 3 },
+  { he: /ה?אנכים\s+ה?אמצעיים/, en: /circumcent(?:re|er)|perpendicular\s+bisectors/i, t: 'circumcentre', n: 3 },
+  { he: /ה?אלכסונים/, en: /diagonals/i, t: 'diagonals', n: 4 },
+];
+
+/** `M אמצע AB` · `M הוא אמצע הצלע AB` · `M is the midpoint of AB`. The corpus's commonest construct. */
+const MIDPOINT_HE = new RegExp(
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*אמצע\\s+(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})$`,
+);
+const MIDPOINT_EN = new RegExp(
+  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+midpoint\\s+of\\s+(?:segment\\s+|side\\s+)?(${NAME})(${NAME})$`,
+  'i',
+);
+
+/** `M מפגש התיכונים במשולש ABC` · `G מפגש האלכסונים במרובע ABCD`. */
+const CONCURRENCY_HE = new RegExp(
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מפגש\\s+(.+?)\\s+ב-?\\s*(?:ה?(?:משולש|מרובע)\\s+)?(${NAME_RUN})$`,
+);
+const CONCURRENCY_EN = new RegExp(
+  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+(?:intersection\\s+of\\s+the\\s+)?(.+?)\\s+of\\s+(?:triangle\\s+|quadrilateral\\s+)?(${NAME_RUN})$`,
+  'i',
+);
+
+function parseDerived(line: string): Fact[] | null {
+  const mid = MIDPOINT_HE.exec(line) ?? MIDPOINT_EN.exec(line);
+  if (mid) {
+    const [, id, a, b] = mid;
+    return [{ t: 'derived', id, rule: { t: 'midpoint', a, b }, src: line }];
+  }
+
+  const con = CONCURRENCY_HE.exec(line) ?? CONCURRENCY_EN.exec(line);
+  if (con) {
+    const [, id, roleSrc, run] = con;
+    const role = ROLES.find((r) => r.he.test(roleSrc) || r.en.test(roleSrc));
+    if (!role) return null; // an unknown role noun is not this rule's business — let it fall through
+    const v = splitNames(run);
+    // A wrong vertex count is a real refusal, not a reason to read the first three and hope.
+    if (v.length !== role.n) return null;
+    const rule: DerivedRule =
+      role.t === 'diagonals'
+        ? { t: 'diagonals', v: [v[0], v[1], v[2], v[3]] }
+        : { t: role.t, v: [v[0], v[1], v[2]] } as DerivedRule;
+    return [{ t: 'derived', id, rule, src: line }];
+  }
+
+  return null;
+}
+
+/**
+ * Shape nouns that carry NO constraint of their own — a triangle is three points and their sides,
+ * a quadrilateral four.
+ *
+ * `מקבילית` / `טרפז` / `ריבוע` are deliberately NOT here: each carries a given (AB ∥ DC, four equal
+ * sides) that this slice cannot honour, and drawing one as a plain ring of sides would silently drop
+ * a stated given — the one thing the root CLAUDE.md says may never happen. They are refused by name
+ * below, which is a refusal the product OWNS rather than a question outsourced to the LLM
+ * ([ADR-3D-214](../../docs/06b-decisions-3d.md#adr-3d-214) D2).
+ */
+const NEUTRAL_SHAPE_HE = new RegExp(`^${HE_GIVEN}ה?(?:משולש|מרובע)\\s+(${NAME_RUN})$`);
+const NEUTRAL_SHAPE_EN = new RegExp(`^(?:triangle|quadrilateral)\\s+(${NAME_RUN})$`, 'i');
+const CONSTRAINED_SHAPE = /^(?:נתו(?:ן|נה)\s+)?ה?(?:מקבילית|טרפז|ריבוע|מעוין|מלבן)\s|^(?:parallelogram|trapezoid|trapezium|square|rhombus|rectangle)\s/i;
+
+const SEGMENT_HE = new RegExp(`^${HE_GIVEN}ה?(?:קטע|צלע)\\s+(${NAME})(${NAME})$`);
+const SEGMENT_EN = new RegExp(`^(?:segment|side)\\s+(${NAME})(${NAME})$`, 'i');
+
+/**
+ * A segment's id is CANONICAL — «הקטע AB» and «הקטע BA» are one object, so they must be one id.
+ *
+ * Deterministic ids are what make re-issuing a statement idempotent (root CLAUDE.md), and M1's
+ * absorb is keyed on the id: without canonicalisation the undirected comparison in `apply` is never
+ * even reached, and the same segment draws twice.
+ */
+const segmentId = (a: string, b: string) => `seg-${[a, b].sort().join('')}`;
+
+/**
+ * A polygon's id is canonical over the ROTATIONS and REFLECTIONS of its vertex ring, which are
+ * exactly the rewritings that name the same figure: `ABCD`, `BCDA` and `ADCB` are one
+ * quadrilateral, while `ABDC` is a genuinely different one and keeps its own id.
+ *
+ * The lexicographically smallest rotation of the ring and of its reverse — the standard canonical
+ * form for a cycle, and the only one that is correct for n > 3 as well as for triangles.
+ */
+function polygonId(vertices: string[]): string {
+  const rings: string[][] = [];
+  for (const base of [vertices, [...vertices].reverse()]) {
+    for (let i = 0; i < base.length; i += 1) rings.push([...base.slice(i), ...base.slice(0, i)]);
+  }
+  const best = rings.map((r) => r.join('')).sort()[0];
+  return `poly-${best}`;
+}
+
+function parseShape(line: string): Fact[] | null {
+  const seg = SEGMENT_HE.exec(line) ?? SEGMENT_EN.exec(line);
+  if (seg) {
+    const [, a, b] = seg;
+    return [{ t: 'segment', id: segmentId(a, b), a, b, src: line }];
+  }
+
+  const poly = NEUTRAL_SHAPE_HE.exec(line) ?? NEUTRAL_SHAPE_EN.exec(line);
+  if (poly) {
+    const vertices = splitNames(poly[1]);
+    if (vertices.length < 3) return null;
+    return [{ t: 'polygon', id: polygonId(vertices), vertices, src: line }];
+  }
+
+  return null;
+}
+
 export function parseLine(raw: string): ParseResult {
   const line = trim(raw);
   if (!line) return { ok: false, code: 'not-handled', detail: raw };
@@ -326,8 +453,15 @@ export function parseLine(raw: string): ParseResult {
     };
   }
 
+  const derived = parseDerived(line) ?? parseShape(line);
+  if (derived) return { ok: true, facts: derived };
+
   const points = parsePoints(line);
   if (points) return { ok: true, facts: points };
+
+  // Recognised and deliberately unsupported: a constrained shape noun carries a given this slice
+  // cannot honour, so it is refused BY NAME rather than escalated as if we did not understand it.
+  if (CONSTRAINED_SHAPE.test(line)) return { ok: false, code: 'out-of-scope', detail: line };
 
   return { ok: false, code: 'not-handled', detail: line };
 }

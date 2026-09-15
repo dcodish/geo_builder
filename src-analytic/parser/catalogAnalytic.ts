@@ -12,14 +12,33 @@
  * syntax.
  */
 
-export type CatalogCategory = 'parameters' | 'points' | 'lines' | 'circles' | 'conics';
+export type CatalogCategory =
+  | 'parameters'
+  | 'points'
+  | 'lines'
+  | 'circles'
+  | 'conics'
+  | 'shapes'
+  | 'derived';
 
 export interface CatalogEntryAnalytic {
   category: CatalogCategory;
   he: string;
   en: string;
-  /** The §10 family this entry belongs to — the coverage map's own index. */
-  family: 'F1' | 'F3' | 'F5' | 'F6' | 'F11';
+  /**
+   * The family this entry belongs to — the coverage map's own index. F1–F11 are the docs/19 §10
+   * families, read from the 572 conic corpus; F16/F17 come from the «lines and points» corpus
+   * (02c §8) and are the first entries whose source is a different exam topic.
+   */
+  family: 'F1' | 'F3' | 'F5' | 'F6' | 'F11' | 'F16' | 'F17';
+  /**
+   * Lines that must be typed BEFORE this one for it to mean anything — «M אמצע AB» needs A and B.
+   *
+   * Declared rather than assumed, because the catalog guard builds every entry and asserts it draws
+   * (#1014): an entry with unstated context would fail that guard for a reason that is not a defect.
+   * Hebrew only — it feeds the build check, while the parse check covers both languages.
+   */
+  needs?: string[];
 }
 
 export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
@@ -65,5 +84,68 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     family: 'F6',
     he: 'נתונה אליפסה שמשוואתה x^2/9+y^2/16=1',
     en: 'ellipse x^2/9+y^2/16=1',
+  },
+
+  // --- F17 · segments and NEUTRAL shape nouns (02c §8) ---
+  // Only the nouns that carry no constraint of their own. «מקבילית» / «טרפז» / «ריבוע» each carry a
+  // given this slice cannot honour, so they are refused by name rather than taught here.
+  { category: 'shapes', family: 'F17', he: 'הקטע AB', en: 'segment AB', needs: ['A(0,0)', 'B(4,3)'] },
+  {
+    category: 'shapes',
+    family: 'F17',
+    he: 'משולש ABC',
+    en: 'triangle ABC',
+    needs: ['A(1,3)', 'B(-4,1)', 'C(-3,8)'],
+  },
+  {
+    category: 'shapes',
+    family: 'F17',
+    he: 'מרובע ABCD',
+    en: 'quadrilateral ABCD',
+    needs: ['A(-2,1)', 'B(4,5)', 'C(5,2)', 'D(-1,-2)'],
+  },
+
+  // --- F16 · derived points over stated vertices (02c §8) ---
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'M אמצע AB',
+    en: 'M is the midpoint of AB',
+    needs: ['A(8,1)', 'B(-2,-5)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'M מפגש התיכונים במשולש ABC',
+    en: 'M is the centroid of triangle ABC',
+    needs: ['A(1,3)', 'B(-4,1)', 'C(-3,8)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'O מפגש חוצי הזוויות במשולש ABC',
+    en: 'O is the incentre of triangle ABC',
+    needs: ['A(-1,-1)', 'B(7,3)', 'C(-4,5)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'H מפגש הגבהים במשולש ABC',
+    en: 'H is the orthocentre of triangle ABC',
+    needs: ['A(0,0)', 'B(4,0)', 'C(1,3)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'P מפגש האנכים האמצעיים במשולש ABC',
+    en: 'P is the circumcentre of triangle ABC',
+    needs: ['A(0,0)', 'B(4,0)', 'C(0,3)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'G מפגש האלכסונים במרובע ABCD',
+    en: 'G is the intersection of the diagonals of ABCD',
+    needs: ['A(-2,1)', 'B(4,5)', 'C(5,2)', 'D(-1,-2)'],
   },
 ];
