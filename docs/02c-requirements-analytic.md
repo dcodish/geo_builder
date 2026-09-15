@@ -791,3 +791,8 @@ spelling. Endpoints that do not exist yet are introduced as free vertices with t
 freedom, as a shape noun's vertices are — because the sentence NAMES the segment. Referring to a
 point one does not have («M אמצע AB») still refuses (R-level #1028); the difference is naming
 versus mentioning, not which noun was used.
+**R58 — a point can be placed in a QUADRANT** ([ADR-AG-034](06c-decisions-analytic.md#adr-ag-034)).
+«C ברביע השלישי» — and «נמצאת», «הנקודה C», «נתון», and the English «C is in the third quadrant» —
+draws `C` in that quadrant. It is a REGION: the point keeps both degrees of freedom, moves under
+«הציגו תצורה אחרת» inside its quadrant, and a point already placed elsewhere is refused rather than
+quietly redrawn.

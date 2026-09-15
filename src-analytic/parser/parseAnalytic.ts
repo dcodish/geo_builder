@@ -673,6 +673,38 @@ const ON_OBJECT_EN = new RegExp(
   'i',
 );
 
+/**
+ * «C ברביע השלישי» — a point placed in a REGION (#1071).
+ *
+ * A quadrant is not a curve and not a value: it is a pair of inequalities. That makes it D7's SECOND
+ * kind — a branch selector, a filter over configurations the solve already produced — and not the
+ * third, a constraint that removes freedom. A point in the third quadrant is still a 2-DOF point; it
+ * is simply not drawn anywhere else. Lowering it to constraints would make the DOF cue lie, which is
+ * the one thing D7 exists to prevent.
+ *
+ * So it needs no new mechanism: it is two `axis-side` selectors, the ones #1033 built for
+ * «B על החלק החיובי של ציר x», stated at once.
+ */
+const QUADRANT_HE = new RegExp(
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת)?\\s+)?ב-?ה?רביע\\s+(ה?ראשון|ה?שני|ה?שלישי|ה?רביעי)$`,
+);
+const QUADRANT_EN = new RegExp(
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?in\\s+(?:the\\s+)?(first|second|third|fourth)\\s+quadrant$`,
+  'i',
+);
+
+/** Which way each axis points in each quadrant — the only thing the rule has to know. */
+const QUADRANT_SIGNS: Record<string, [boolean, boolean]> = {
+  ראשון: [true, true],
+  שני: [false, true],
+  שלישי: [false, false],
+  רביעי: [true, false],
+  first: [true, true],
+  second: [false, true],
+  third: [false, false],
+  fourth: [true, false],
+};
+
 const ON_AXIS_HE = new RegExp(
   `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת)?\\s+)?על\\s+(?:ה?חלק\\s+(ה?חיובי|ה?שלילי)\\s+של\\s+)?ציר\\s+ה?-?\\s*([xy])$`,
 );
@@ -912,6 +944,23 @@ function parseConstraint(line: string): RuleOutcome {
     // An AXIS operand belongs to the rule below, which already owns that sentence; anything else is
     // not a thing a point can be on. Fall through rather than returning — a `return null` here would
     // exit `parseConstraint` entirely and skip the area, cevian and axis rules that follow.
+  }
+
+  const quad = QUADRANT_HE.exec(line) ?? QUADRANT_EN.exec(line);
+  if (quad) {
+    const [, id, ordSrc] = quad;
+    const ord = ordSrc.toLowerCase().replace(/^ה/, '');
+    const signs = QUADRANT_SIGNS[ord];
+    if (signs) {
+      const [px, py] = signs;
+      return made([
+        // It DECLARES, like every other rule that names a point on something (#1069) — a student
+        // saying where a point is has introduced it.
+        { t: 'declare', id, src: line },
+        { t: 'selector', sel: { kind: 'axis-side', id, axis: 'x', positive: px }, src: line },
+        { t: 'selector', sel: { kind: 'axis-side', id, axis: 'y', positive: py }, src: line },
+      ]);
+    }
   }
 
   const ax = ON_AXIS_HE.exec(line) ?? ON_AXIS_EN.exec(line);
