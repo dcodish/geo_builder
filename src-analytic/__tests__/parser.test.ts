@@ -267,3 +267,84 @@ describe('a rule that matched owes an answer about what it matched', () => {
     });
   });
 });
+
+/**
+ * The shape noun is OPTIONAL for an equation — 02c R6, ruled 2026-09-04, built by #1037.
+ *
+ * `y^2=54x` is the requirement's own example and it was `not-handled`: a ruled requirement nobody
+ * implemented, not a missing capability. Everything it needs already existed — `conic.ts` fits six
+ * coefficients and names the family — and the parser simply never asked.
+ *
+ * The cases that MUST NOT be swallowed carry the weight here. A branch matching anything with an
+ * `=` would eat the metric givens and the component form, which is the `[IVX]` Roman-numeral defect
+ * (ADR-AG-006) on a new letter. They are asserted directly because that is the failure mode.
+ */
+describe('#1037 — a bare equation builds, and eats nothing', () => {
+  const outcome = (line: string, before: string[] = []): string => {
+    const lines = [...before, line];
+    const d = derive(lines, 0);
+    const fault = d.faults.find((f) => f.index === before.length);
+    if (fault) return fault.code;
+    const curve = d.figure.curves[d.figure.curves.length - 1];
+    return curve ? `built:${curve.curve.kind}` : 'built:nothing';
+  };
+
+  it('builds each family, with the kind coming from the FIT and no noun given', () => {
+    expect(outcome('x-y+2=0')).toBe('built:line');
+    expect(outcome('y=2x+1')).toBe('built:line');
+    expect(outcome('x=15')).toBe('built:line'); // a vertical line: no y at all
+    expect(outcome('4x+3y=0')).toBe('built:line');
+    expect(outcome('(x-3)^2+(y-4)^2=9')).toBe('built:circle');
+    expect(outcome('y^2=54x')).toBe('built:parabola');
+    expect(outcome('x^2/9+y^2/16=1')).toBe('built:ellipse');
+  });
+
+  it('does NOT swallow a metric given or the component form — the failure mode', () => {
+    // `AB = 4√5` parses as an equation whose symbols are `A` and `B`; they are not the plane's, so
+    // the branch declines. `x_A = 5` does not parse as an equation at all. Both stay unhandled,
+    // which is the correct answer TODAY — they are #1050's and #1040's work, not this branch's.
+    const pts = ['A(0,0)', 'B(4,3)', 'C(1,1)'];
+    for (const line of ['AB = 4√5', 'AB=10', 'x_A = 5', 'AB+BC=10', 'AB = AC']) {
+      expect(outcome(line, pts), line).toBe('not-handled');
+    }
+  });
+
+  it('does not swallow a parameter pin either', () => {
+    expect(outcome('a = 5')).toBe('not-handled');
+    expect(outcome('k=3')).toBe('not-handled');
+  });
+
+  it('still refuses a bare hyperbola or rotated conic BY NAME, not by silence', () => {
+    for (const line of ['xy=1', 'x^2-y^2=1', 'x^2+2xy+y^2=1']) {
+      expect(outcome(line), line).toBe('out-of-scope');
+    }
+  });
+
+  it('leaves every named form exactly as it was', () => {
+    expect(outcome('נתון הישר l1: 4y-3x-20=0')).toBe('built:line');
+    expect(outcome('נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9')).toBe('built:circle');
+    expect(outcome('נתונה פרבולה שמשוואתה y^2=54x')).toBe('built:parabola');
+    expect(outcome('נתונה אליפסה שמשוואתה x^2/9+y^2/16=1')).toBe('built:ellipse');
+  });
+
+  it('reads the noun form and the bare form as ONE curve, not two', () => {
+    // An anonymous curve's identity is its EQUATION, so both spellings mint `curve-<hash>` and the
+    // second is absorbed. Without the shared namespace this change would have introduced a
+    // duplicate: `line-anon…` beside `curve-anon…`, two rows for one line.
+    const d = derive(['הישר x-y+2=0', 'x-y+2=0'], 0);
+    expect(d.faults).toEqual([]);
+    expect(d.figure.curves).toHaveLength(1);
+  });
+
+  it('an unclaimed family does not CONTRADICT a claimed one', () => {
+    // The restatement names no family because R6 says it need not; comparing `undefined` against
+    // `'line'` would report the student's own restatement as a conflicting claim.
+    const d = derive(['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', '(x-3)^2+(y-4)^2=9'], 0);
+    expect(d.faults).toEqual([]);
+  });
+
+  it('a genuinely different equation under a NAMED id is still a conflict', () => {
+    const d = derive(['הישר l1: y=x', 'הישר l1: y=2x'], 0);
+    expect(d.faults.map((f) => f.code)).toEqual(['conflicting-restatement']);
+  });
+});

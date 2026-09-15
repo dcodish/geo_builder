@@ -289,13 +289,13 @@ function matchCurve(line: string): CurveHit | null {
   }
   const heLineBare = line.match(new RegExp(`^${HE_GIVEN}${HE_LINE}\\s+(.+=.+)$`));
   if (heLineBare) {
-    return { id: `line-${anonIndex(heLineBare[1])}`, name: '', kind: 'line', eqSrc: heLineBare[1] };
+    return { id: `curve-${anonIndex(heLineBare[1])}`, name: '', kind: 'line', eqSrc: heLineBare[1] };
   }
   const enLine = line.match(new RegExp(`^(?:the\\s+)?line\\s+(${LINE_NAME})\\s*:?\\s*(?:is\\s+)?(.+)$`, 'i'));
   if (enLine) return { id: `line-${enLine[1]}`, name: enLine[1], kind: 'line', eqSrc: enLine[2] };
   const enLineBare = line.match(/^(?:the\s+)?line\s+(.+=.+)$/i);
   if (enLineBare) {
-    return { id: `line-${anonIndex(enLineBare[1])}`, name: '', kind: 'line', eqSrc: enLineBare[1] };
+    return { id: `curve-${anonIndex(enLineBare[1])}`, name: '', kind: 'line', eqSrc: enLineBare[1] };
   }
 
   // --- circle: «נתון מעגל I שמשוואתו …» · «משוואת המעגל …» ---
@@ -305,7 +305,7 @@ function matchCurve(line: string): CurveHit | null {
   if (heCircle) {
     const roman = heCircle[1] ?? '';
     return {
-      id: roman ? `circle-${roman}` : `circle-${anonIndex(heCircle[2])}`,
+      id: roman ? `circle-${roman}` : `curve-${anonIndex(heCircle[2])}`,
       name: roman ? `מעגל ${roman}` : '',
       kind: 'circle',
       eqSrc: heCircle[2],
@@ -315,7 +315,7 @@ function matchCurve(line: string): CurveHit | null {
   if (enCircle) {
     const roman = enCircle[1] ?? '';
     return {
-      id: roman ? `circle-${roman}` : `circle-${anonIndex(enCircle[2])}`,
+      id: roman ? `circle-${roman}` : `curve-${anonIndex(enCircle[2])}`,
       name: roman ? `circle ${roman}` : '',
       kind: 'circle',
       eqSrc: enCircle[2],
@@ -332,16 +332,22 @@ function matchCurve(line: string): CurveHit | null {
    * the M1 absorb working (restating the same equation is still one object, which is what lets a
    * later section of a question re-state an earlier given) while a different equation is a
    * different object, because it is one.
+   *
+   * The namespace is `curve-`, shared with every other unnamed curve, because an anonymous curve is
+   * identified by its EQUATION and nothing else ([02c R44](../../docs/02c-requirements-analytic.md)).
+   * A kind prefix here would put «נתונה פרבולה שמשוואתה y^2=54x» and the bare «y^2=54x» in different
+   * namespaces, and the figure would hold two objects for one parabola — exactly the duplication
+   * #1037 removed for lines and circles.
    */
   const heParabola = line.match(new RegExp(`^${HE_GIVEN}ה?פרבולה(?:\\s+קנונית)?\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`));
-  if (heParabola) return { id: `parabola-${anonIndex(heParabola[1])}`, name: '', kind: 'parabola', eqSrc: heParabola[1] };
+  if (heParabola) return { id: `curve-${anonIndex(heParabola[1])}`, name: '', kind: 'parabola', eqSrc: heParabola[1] };
   const enParabola = line.match(/^(?:the\s+)?(?:canonical\s+)?parabola\s*:?\s*(?:is\s+)?(.+)$/i);
-  if (enParabola) return { id: `parabola-${anonIndex(enParabola[1])}`, name: '', kind: 'parabola', eqSrc: enParabola[1] };
+  if (enParabola) return { id: `curve-${anonIndex(enParabola[1])}`, name: '', kind: 'parabola', eqSrc: enParabola[1] };
 
   const heEllipse = line.match(new RegExp(`^${HE_GIVEN}ה?אליפסה(?:\\s+קנונית)?\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`));
-  if (heEllipse) return { id: `ellipse-${anonIndex(heEllipse[1])}`, name: '', kind: 'ellipse', eqSrc: heEllipse[1] };
+  if (heEllipse) return { id: `curve-${anonIndex(heEllipse[1])}`, name: '', kind: 'ellipse', eqSrc: heEllipse[1] };
   const enEllipse = line.match(/^(?:the\s+)?(?:canonical\s+)?ellipse\s*:?\s*(?:is\s+)?(.+)$/i);
-  if (enEllipse) return { id: `ellipse-${anonIndex(enEllipse[1])}`, name: '', kind: 'ellipse', eqSrc: enEllipse[1] };
+  if (enEllipse) return { id: `curve-${anonIndex(enEllipse[1])}`, name: '', kind: 'ellipse', eqSrc: enEllipse[1] };
 
   return null;
 }
@@ -659,6 +665,50 @@ export function parseLine(raw: string): ParseResult {
   // Recognised and deliberately unsupported: a constrained shape noun carries a given this slice
   // cannot honour, so it is refused BY NAME rather than escalated as if we did not understand it.
   if (CONSTRAINED_SHAPE.test(line)) return { ok: false, code: 'out-of-scope', detail: line };
+
+  /**
+   * F3/F5/F6 WITHOUT the noun — `x-y+2=0`, `y^2=54x`, `(x-3)^2+(y-4)^2=9` (#1037).
+   *
+   * [02c R6](../../docs/02c-requirements-analytic.md) (operator ruling, 2026-09-04) made the shape
+   * noun **optional for an equation and load-bearing for a shape**, "because the fit already knows
+   * the kind" — and `y^2=54x` is the requirement's own example. It was ruled and never implemented:
+   * every `matchCurve` branch is gated on a noun or a name, so a bare equation fell through every
+   * rule to `not-handled` and escalated to the paid LLM as though we had not understood a sentence
+   * we understand perfectly. The corpus writes figures this way — image 6 gives a triangle as
+   * `4x+3y=0`, `12x-5y=0`, `x=15` — and it is the shortest thing a student can type.
+   *
+   * **It runs LAST, after every named form, parameter declaration, inequality, shape, derived point
+   * and coordinate has had first refusal.** The issue placed it "last in `matchCurve`", but
+   * `matchCurve` itself runs before the point and shape rules, and the protection this branch needs
+   * is precisely that those rules answer first.
+   *
+   * **The discriminator is that the equation is in the PLANE's variables**, read off the PARSED
+   * expression's symbol set rather than by looking for an `x` in the text. That distinction is the
+   * whole defence, and it is the `[IVX]` Roman-numeral trap on a new letter
+   * ([ADR-AG-006](../../docs/06c-decisions-analytic.md#adr-ag-006)): a branch that matched anything
+   * containing `=` would eat `AB = 4√5` (a metric given) and `x_A = 5` (the component form). Measured
+   * against those rather than reasoned about — `AB = 4√5` parses to the symbols `A` and `B`, which
+   * are not the plane's, and `x_A = 5` does not parse as an equation at all.
+   *
+   * No kind is claimed: `classify` fits the six coefficients and names the family, and a bare
+   * hyperbola or rotated conic is still refused BY NAME at evaluation
+   * ([ADR-AG-008](../../docs/06c-decisions-analytic.md#adr-ag-008)).
+   */
+  const bare = equationExpr(line);
+  if (bare && symbolsOf(bare).some((s) => RESERVED_SYMBOLS.has(s))) {
+    return {
+      ok: true,
+      facts: [
+        {
+          t: 'curve',
+          id: `curve-${anonIndex(line)}`,
+          label: { name: '' },
+          curve: { eq: bare },
+          src: line,
+        },
+      ],
+    };
+  }
 
   return { ok: false, code: 'not-handled', detail: line };
 }

@@ -377,3 +377,49 @@ function lines(src: string[]): Fact[] {
 }
 
 export type _Construction = Construction;
+
+/**
+ * The #1026 ↔ #1037 reconciliation (round #1056).
+ *
+ * The two fixes met at the id: #1026 gave anonymous conics a content-derived id, #1037 ruled that an
+ * anonymous curve is identified by its EQUATION and put unnamed lines and circles in one `curve-`
+ * namespace. Landing them separately would have left conics in their own — so «נתונה פרבולה שמשוואתה
+ * y^2=54x» and the bare «y^2=54x» would be two objects for one parabola, which is precisely the
+ * duplication #1037 had just removed for lines. Asserted here because it is a property of the two
+ * TOGETHER and neither branch's own suite could see it.
+ */
+describe('anonymous curves share ONE namespace, whichever phrasing minted them', () => {
+  it('reads the noun form and the bare form of a parabola as one object', () => {
+    const d = derive(['נתונה פרבולה שמשוואתה y^2=54x', 'y^2=54x'], 0);
+    expect(d.faults).toEqual([]);
+    expect(d.figure.curves).toHaveLength(1);
+  });
+
+  it('reads the noun form and the bare form of an ellipse as one object', () => {
+    const d = derive(['נתונה אליפסה שמשוואתה x^2/9+y^2/16=1', 'x^2/9+y^2/16=1'], 0);
+    expect(d.faults).toEqual([]);
+    expect(d.figure.curves).toHaveLength(1);
+  });
+
+  it('still keeps two DIFFERENT conics apart — the #1026 property survives the unification', () => {
+    const d = derive(['נתונה פרבולה שמשוואתה y^2=4x', 'y^2=8x'], 0);
+    expect(d.faults).toEqual([]);
+    expect(d.figure.curves).toHaveLength(2);
+  });
+
+  it('mints every unnamed curve in the same namespace, and no named one', () => {
+    const d = derive([
+      'נתונה פרבולה שמשוואתה y^2=4x',
+      'נתונה אליפסה שמשוואתה x^2/9+y^2/16=1',
+      'הישר y=2x+1',
+      'משוואת המעגל x^2+y^2-2x=0',
+      'נתון הישר l1: y=x',
+      'נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9',
+    ], 0);
+    expect(d.faults).toEqual([]);
+    const ids = d.figure.curves.map((c) => c.id);
+    expect(ids.filter((i) => i.startsWith('curve-'))).toHaveLength(4);
+    expect(ids).toContain('line-l1');
+    expect(ids).toContain('circle-I');
+  });
+});

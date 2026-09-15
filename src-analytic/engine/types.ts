@@ -83,7 +83,16 @@ export function domainText(sym: string, d: Domain): string {
 export type CurveKind = 'line' | 'circle' | 'parabola' | 'ellipse';
 
 export interface Curve {
-  kind: CurveKind;
+  /**
+   * The kind the STATEMENT claimed, when it named one — an EXPECTATION, not the answer.
+   *
+   * `classify` is the authority and derives the family from the six fitted coefficients; this is
+   * passed to it so a refusal can be specific ("you wrote «אליפסה» and this is a hyperbola") rather
+   * than generic. It is **optional** because [02c R6](../../docs/02c-requirements-analytic.md) makes
+   * the shape noun optional for an equation: a bare `y^2=54x` claims nothing, and the fit already
+   * knows the kind (#1037). Absent means "the student named no family", never "unknown kind".
+   */
+  kind?: CurveKind;
   /** `f(x, y; params)`; the curve is the zero set. `x` and `y` are reserved symbols. */
   eq: Expr;
 }
@@ -106,7 +115,8 @@ export type NumCurve =
 export interface CurveLabel {
   /** Display name — `ℓ1`, `מעגל I`, `AB`; '' for the anonymous conics. */
   name: string;
-  kind: CurveKind;
+  /** The family the statement named, if it named one — see {@link Curve.kind}. */
+  kind?: CurveKind;
 }
 
 // ---------------------------------------------------------------------------

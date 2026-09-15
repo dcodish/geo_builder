@@ -80,6 +80,7 @@ place. A kind that can forward-reference is what would earn one.
   renderer draws. **Pure**, so the renderer stays a consumer rather than a second geometry implementation
   — the same split every sibling uses.
 
+<<<<<<< HEAD
 ## The parser's rule contract ([ADR-AG-017](06c-decisions-analytic.md#adr-ag-017))
 
 A rule in `parseAnalytic.ts` answers one of **three** ways, and the third is the one round #1056 added:
@@ -110,6 +111,36 @@ same wrong input answered the same way whichever rule caught it.
 `curve:ellipse`) minted by `existingKindOf` in the engine and rendered into the student's language in
 `App.tsx`. The engine stays language-free and the message can still say *what* the name already holds
 — the split that lets a refusal name a construct without the engine knowing any Hebrew.
+=======
+## The parser's last branch: a bare equation ([ADR-AG-019](06c-decisions-analytic.md#adr-ag-019))
+
+`parseLine` ends with a branch that accepts an equation carrying no noun at all — `x-y+2=0`,
+`y^2=54x`, `(x-3)^2+(y-4)^2=9`. It is the shortest thing a student can type and the way the corpus
+writes figures, and [02c R6](02c-requirements-analytic.md) ruled it in 2026-09-04.
+
+**Two design properties carry it, and both are the point:**
+
+**It runs absolutely last.** Every named form, parameter declaration, inequality, shape noun, derived
+point and coordinate gets first refusal. Position is half the safety.
+
+**The discriminator is the PARSED expression's symbol set, not the text.** The branch accepts only an
+equation in the plane's own variables — `symbolsOf(eq)` containing `x` or `y`. Reading the text for an
+`x` is the `[IVX]` Roman-numeral defect ([ADR-AG-006](06c-decisions-analytic.md#adr-ag-006)) waiting to
+happen again: `AB = 4√5` is a metric given whose symbols are `A` and `B`, and `x_A = 5` is the component
+form. The set was **measured against those corpus lines before the branch was written**, which is the
+standard this tree holds itself to after being bitten twice.
+
+**`Curve.kind` is therefore an EXPECTATION, not an answer**, and optional. `classify` fits six
+coefficients and names the family; the expectation only lets a refusal be specific ("you wrote «אליפסה»
+and this is a hyperbola" — R7). Two consequences follow, and the second is the subtle one:
+
+- an unnamed curve is identified by its equation alone (`curve-<hash>`, [R44](02c-requirements-analytic.md)),
+  so the noun form and the bare form of one curve are one object;
+- **absence of a claim must not read as a conflicting claim** — the M1 absorb and the clash test each
+  require *two* claimed kinds before they disagree. Comparing `undefined` with `'line'` reported a
+  student's own restatement as a contradiction while drawing the figure correctly, which is the shape
+  of defect that ships silently.
+>>>>>>> fix/1037-bare-equation
 
 ## Born after the chassis
 

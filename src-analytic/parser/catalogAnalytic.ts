@@ -61,6 +61,12 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'lines', family: 'F3', he: 'הישר x=-4', en: 'the line x=-4' },
   { category: 'lines', family: 'F3', he: 'הישר y=x', en: 'the line y=x' },
 
+  // The noun is OPTIONAL for an equation (02c R6, #1037) — the fit names the family, and the
+  // corpus writes figures this way: image 6 gives a triangle as `4x+3y=0`, `12x-5y=0`, `x=15`.
+  // Language-neutral by construction, so the He and En halves are the same string.
+  { category: 'lines', family: 'F3', he: 'x-y+2=0', en: 'x-y+2=0' },
+  { category: 'lines', family: 'F3', he: '4x+3y=0', en: '4x+3y=0' },
+
   // --- F5 · circles by equation ---
   {
     category: 'circles',
@@ -85,6 +91,10 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'נתונה אליפסה שמשוואתה x^2/9+y^2/16=1',
     en: 'ellipse x^2/9+y^2/16=1',
   },
+
+  { category: 'circles', family: 'F5', he: '(x-3)^2+(y-4)^2=9', en: '(x-3)^2+(y-4)^2=9' },
+  { category: 'conics', family: 'F6', he: 'y^2=54x', en: 'y^2=54x' },
+  { category: 'conics', family: 'F6', he: 'x^2/9+y^2/16=1', en: 'x^2/9+y^2/16=1' },
 
   // --- F17 · segments and NEUTRAL shape nouns (02c §8) ---
   // Only the nouns that carry no constraint of their own. «מקבילית» / «טרפז» / «ריבוע» each carry a
