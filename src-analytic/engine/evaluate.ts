@@ -11,7 +11,7 @@
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
 import { paramRegister } from './carriers';
-import { evalRule, type Pt } from './derived';
+import { constructionOf, evalRule, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
@@ -50,11 +50,20 @@ export interface FigureSegment {
   b: Pt;
 }
 
+/** A derived point's own construction — what a student would have to draw to find it (#1030).
+ *  Computed always and rendered behind a toggle, so `Figure` stays a complete description of the
+ *  figure and showing it is purely a display decision. */
+export interface FigureConstruction extends RuleConstruction {
+  /** The derived point this scaffolding belongs to. */
+  id: Id;
+}
+
 export interface Figure {
   env: Env;
   points: FigurePoint[];
   curves: FigureCurve[];
   segments: FigureSegment[];
+  construction: FigureConstruction[];
   /** Objects that do not exist at this parameter value — named, never silently dropped. */
   vacant: Vacancy[];
 }
@@ -117,6 +126,7 @@ export function evaluate(c: Construction, seed = 0): Figure {
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];
   const segments: FigureSegment[] = [];
+  const construction: FigureConstruction[] = [];
   const vacant: Vacancy[] = [];
 
   // One walk over the OBJECTS, in the order the student stated them. Two things make a single
@@ -157,6 +167,10 @@ export function evaluate(c: Construction, seed = 0): Figure {
         if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
           points.push({ id: o.id, x: p.x, y: p.y });
           placed.set(o.id, p);
+          // The scaffolding is recorded only where the point itself exists, so a figure never shows
+          // a construction for something that is not there.
+          const built = constructionOf(o.rule, at, p);
+          if (built) construction.push({ id: o.id, ...built });
         } else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
@@ -180,7 +194,7 @@ export function evaluate(c: Construction, seed = 0): Figure {
       }
     }
   }
-  return { env, points, curves, segments, vacant };
+  return { env, points, curves, segments, construction, vacant };
 }
 
 // ---------------------------------------------------------------------------

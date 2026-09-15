@@ -900,3 +900,85 @@ shots, read back by the session (which is how #1029 was found) · `src-analytic`
 *draws*; an entry like «M אמצע AB» is meaningless without A and B, so entries now declare their
 context (`needs`) and the guard builds them in it. Declared rather than inferred — a guard that
 guessed the context would be asserting something the catalog never said.
+
+---
+
+## ADR-AG-014 — A derived point SHOWS ITS CONSTRUCTION: the method, not only the answer (#1030)
+
+**Requirements:** [02c §8](02c-requirements-analytic.md) R40 (new); R21 (this is its own justification,
+supplied on the figure); [ADR-AG-010](#adr-ag-010) R34 (projection legibility, which drove a revision).
+**Design:** [04c](04c-design-analytic.md) "The model" — the construction is carried on the `Figure`
+and rendered behind a toggle.
+
+**Context.** Operator, 2026-09-15, looking at a triangle whose centroid the tool had just found:
+
+> the tool can find easily the location of that point **but what does the student learn from this**.
+> What I would like to have is the [medians] drawn maybe in a dotted line, and the **ratio of 2:1**
+> somehow shown — so something that will give a student an understanding of **what kind of builds he
+> needs to do** to get this solution.
+
+[ADR-AG-013](#adr-ag-013) had just made the tool able to *find* a centroid. It drew the triangle,
+dropped a dot, and printed the coordinates — and **every step a student is graded on was invisible**.
+
+**This is R21's own argument, drawn.** [02c R21](02c-requirements-analytic.md) ruled that showing a
+derived result is correct *because* "for a student the answer is meaningless without the way … a
+student who reads the equation off the canvas cannot write the working that earns the marks." That
+ruling assumed the way came from elsewhere. It now comes from the figure. Nothing here solves
+anything: the construction is what the student must build, and the algebra remains theirs.
+
+**Decision.** Every derived rule knows the construction that defines it — it *is* the closed form's
+own geometry — and can draw it.
+
+| rule | drawn | label |
+| --- | --- | --- |
+| centroid | three medians, vertex → opposite midpoint | the two PARTS labelled **2x / x**, **2y / y**, **2z / z** |
+| orthocentre | three altitudes to their feet | — |
+| incentre | three bisectors, each to its foot on the opposite side | — |
+| circumcentre | each side's midpoint → the centre | — |
+| diagonal meet | the two diagonals | — |
+| midpoint | the segment it bisects | — |
+
+**Operator rulings that shaped it** (2026-09-15, answering the three questions the issue posed):
+
+- **A toggle, not always drawn.** «הצג בנייה», OFF by default. Three medians per derived point buries
+  a real figure, and a real question carries several. **One GLOBAL toggle**, matching how R20 settled
+  the equations toggle — the two controls behave alike rather than each inventing a scope. The button
+  appears only when there *is* a construction, so the control never promises what the figure cannot
+  give.
+- **A label, not tick marks** — and, on a second ruling the same day, the label names the two
+  **PARTS** rather than stamping the ratio on the whole: `2x` and `x` on the first median, `2y`/`y`
+  and `2z`/`z` on the others. The operator's own phrasing, and it is the board convention. The
+  difference is not cosmetic: `2:1` *tells* a student the ratio, while `2x` and `x` **hand them the
+  variables to write the equation with**, and distinct letters let all three medians enter one
+  calculation. The first build stamped `2:1`; this replaced it before the slice shipped.
+
+  *Watch on play:* `x` and `y` also name the **axes** in this product, which they do not on a
+  synthetic geometry board. The letters are the operator's choice; if a student reads `2x` as an
+  x-coordinate, `MEDIAN_SYMBOLS` is the one line to change.
+- **The feet are shown**, as hollow dots. Shown — **not yet clickable**: promoting a foot to a named
+  point is #1025's mechanism, and building a one-off click here would be a second promotion
+  mechanism. The same dots gain the click when that lands.
+
+**Decoration, never objects.** The construction carries no id, spends no letter and never enters the
+fact list. A construction line minted as a `GeoObject` would occupy a name the student is about to
+use — [ADR-297](06-decisions.md#adr-297)'s defect exactly — and the suite asserts the object list is
+unchanged by turning the construction on.
+
+**The tests are about GEOMETRY, not pixels**, because a construction drawn from wrong geometry teaches
+something false, which is worse than teaching nothing. The suite asserts that each median really ends
+at the opposite side's midpoint, that every median really passes through the centroid, that **the part labelled
+`2x` really is twice the part labelled `x`** and that each label sits on its own part (a label on the
+wrong side would teach the ratio backwards), that an altitude really meets its side at a right angle, and that a bisector really divides the opposite side as `AB:AC`.
+
+**Revised after reading the screenshot — the third time in this tree, and the second in two slices.**
+The first render used 12px `#94a3b8` text, which was readable on a laptop and muddy against its own
+dashed median. [ADR-AG-010](#adr-ag-010) R34 makes legibility at **projection size** a design
+condition for exactly this surface, so the ratio — the teaching content, not the context — is now
+larger, darker, and painted stroke-then-fill so it carries its own white halo over any ink.
+
+**Gates.** `npm run test:full` green, read from `reports/suite-verdict.json` · `tsc -b` clean ·
+`build:analytic` clean · 14 new geometry tests (`construction.test.ts`) · driven in a real browser:
+the toggle appears, produces 3 dashed lines, 3 feet and three `2:1` labels, and removes the group
+entirely when switched off. **Not in the shared visual smoke** — that harness types lines and captures,
+it does not click controls; this feature's evidence is the dedicated browser run and its screenshots,
+and that limit is stated rather than papered over.

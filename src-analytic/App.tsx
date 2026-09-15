@@ -53,6 +53,15 @@ export function App() {
   const [draft, setDraft] = useState('');
   const [zoom, setZoom] = useState(1);
   const [dataOpen, setDataOpen] = useState(true);
+  /**
+   * «הצג בנייה» — the medians, altitudes or bisectors that DEFINE a derived point (#1030).
+   *
+   * OFF by default, on the operator's ruling: three medians per derived point buries a real figure,
+   * and a student asks for the method when they want it. One GLOBAL toggle rather than one per
+   * point, matching how 02c R20 settled the equations toggle — the two controls should behave alike
+   * rather than each inventing a scope.
+   */
+  const [showConstruction, setShowConstruction] = useState(false);
 
   const d = useMemo(() => derive(lines, seed), [lines, seed]);
 
@@ -212,7 +221,7 @@ export function App() {
         }
         canvasZone={
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-            <Figure scene={scene} />
+            <Figure scene={scene} showConstruction={showConstruction} />
             <div style={canvasClusterStyle}>
               <button type="button" style={canvasCtrlStyle} onClick={() => setZoom(1)} aria-label="reset">
                 ↺
@@ -234,10 +243,17 @@ export function App() {
                 +
               </button>
             </div>
-            <div style={{ position: 'absolute', insetInlineStart: 12, bottom: 12 }}>
+            <div style={{ position: 'absolute', insetInlineStart: 12, bottom: 12, display: 'flex', gap: 8 }}>
               <ToolButton onClick={nextConfiguration} disabled={freeCount === 0}>
                 {t('another')}
               </ToolButton>
+              {/* Offered only when there IS a construction to show, so the control never promises
+                  something the figure cannot deliver. */}
+              {d.figure.construction.length > 0 && (
+                <ToolButton onClick={() => setShowConstruction((v) => !v)}>
+                  {t(showConstruction ? 'hideConstruction' : 'showConstruction')}
+                </ToolButton>
+              )}
             </div>
           </div>
         }

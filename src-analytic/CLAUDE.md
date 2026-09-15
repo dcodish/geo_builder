@@ -66,25 +66,24 @@ this tool *supplies* the one the exam withholds.
   honesty boundary.
 - **An unpinned parameter is a FREE DOF sampled inside its domain**, never a fixed default
   ([ADR-052](../docs/06-decisions.md#adr-052)) — it must move when «הציגו תצורה אחרת» advances the seed.
-  **Including one nobody declared.** The register comes from the objects' own expressions
-  (`carriers.ts`), because reading declarations alone is what made `y²=2ax` — a catalog entry — draw
-  nothing and say nothing (#1014). A symbol is free because it is *used* and unpinned, not because a
-  sentence announced it.
-- **Evaluation needs NO topological sort, and that is load-bearing rather than lazy.** `apply`
-  refuses a statement naming an object that does not exist (`unknown-reference`), so a parent is
-  always already in the list when its dependent is appended — declaration order is provably a valid
-  evaluation order and a cycle is unreachable. The invariant is asserted (`depsPrecedeDependents`),
-  not re-established by a sort that could never find anything out of place. **A kind that can
-  forward-reference is what would earn a real sort**; that function is what fails first and says so.
+  **Including one nobody declared:** the register comes from the objects' own expressions
+  (`carriers.ts`), so a symbol is free because it is *used* and unpinned, not because a sentence
+  announced it (#1014).
+- **Evaluation needs NO topological sort.** `apply` refuses a statement naming an object that does
+  not exist, so a parent always precedes its dependent and declaration order is provably valid. The
+  invariant is asserted (`depsPrecedeDependents`), never re-established by a sort. A kind that can
+  forward-reference would earn one ([ADR-AG-013](../docs/06c-decisions-analytic.md#adr-ag-013)).
+- **A derived point can SHOW ITS CONSTRUCTION** (`constructionOf`, behind «הצג בנייה») — the medians,
+  altitudes or bisectors that define it, with each median's parts labelled `2x`/`x`. It is
+  **decoration**: no id, no letter, never in the fact list. It must be drawn from the REAL geometry,
+  so its tests assert geometry, not pixels ([ADR-AG-014](../docs/06c-decisions-analytic.md#adr-ag-014)).
 - **A shape noun that carries a GIVEN may not be drawn as a plain ring of sides.** «מקבילית» asserts
-  AB ∥ DC. Until the constraint layer can honour it, it is refused BY NAME (`out-of-scope`) — never
-  flattened, because a stated given vanishing is the one thing this product may never do, and never
-  escalated to the LLM, because it is input we understand perfectly.
-- **Both panel sections are gated, and remembering only one is the recurring failure.** A coordinate
-  goes through `isKnowledge`; a curve equation goes through `knownCurve`, which is built on it. The
-  curve half was missing until #1020, and the suite was green while the panel printed
-  `y² = 6.915870381x` as fact. **A row that prints a number is a claim; find its gate before you add
-  it.**
+  AB ∥ DC; until the constraint layer can honour it, it is refused BY NAME (`out-of-scope`) — never
+  flattened (a stated given may not vanish), never escalated to the LLM (we understand it).
+- **Every surface that prints a number is gated**, and remembering only one is the recurring failure:
+  a coordinate through `isKnowledge`, a curve equation through `knownCurve`. The curve half was
+  missing until #1020 while the suite stayed green. **A row that prints a number is a claim; find its
+  gate before you add it.**
 - **An inequality is one of THREE things** ([ADR-AG-005](../docs/06c-decisions-analytic.md#adr-ag-005)
   D7), and they are not interchangeable: a **parameter domain** (declaration; filters a pin's roots,
   silently), a **branch selector** (post-solve; picks among branches), a **sweep range** (sampling;
