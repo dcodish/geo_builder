@@ -11,6 +11,7 @@
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
 import { paramRegister } from './carriers';
+import { evalRule, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
@@ -41,10 +42,19 @@ export interface Vacancy {
   reason: Extract<ClassifyResult, { ok: false }>['reason'];
 }
 
+/** A drawn straight piece — a stated segment, or one side of a polygon (#1028). Carried as resolved
+ *  endpoints so the renderer never looks a vertex up. */
+export interface FigureSegment {
+  id: Id;
+  a: Pt;
+  b: Pt;
+}
+
 export interface Figure {
   env: Env;
   points: FigurePoint[];
   curves: FigureCurve[];
+  segments: FigureSegment[];
   /** Objects that do not exist at this parameter value — named, never silently dropped. */
   vacant: Vacancy[];
 }
@@ -106,18 +116,28 @@ export function evaluate(c: Construction, seed = 0): Figure {
   const env = sampleEnv(c, seed);
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];
+  const segments: FigureSegment[] = [];
   const vacant: Vacancy[] = [];
 
-  // One walk over the OBJECTS, in the order the student stated them. The environment is complete
-  // before it starts — every parameter assigned — which is the object→parameter dependency layer
-  // (carriers.ts `symbolDeps`); the object→object layer is empty until a derived kind lands, which
-  // is why no topological sort is built on it yet.
+  // One walk over the OBJECTS, in the order the student stated them. Two things make a single
+  // forward pass correct:
+  //   - the environment is complete before it starts (every parameter assigned) — the
+  //     object→parameter layer, `carriers.ts` `symbolDeps`;
+  //   - a parent always PRECEDES its dependent, because `apply` refuses a statement naming an
+  //     object that does not exist yet — so declaration order is a valid topological order and a
+  //     cycle is unreachable (`carriers.ts` `depsPrecedeDependents`, asserted in the suite).
+  const placed = new Map<Id, Pt>();
+  const at = (id: Id): Pt | null => placed.get(id) ?? null;
+
   for (const o of c.objects) {
     switch (o.kind) {
       case 'point': {
         const x = evalExpr(o.x, env);
         const y = evalExpr(o.y, env);
-        if (Number.isFinite(x) && Number.isFinite(y)) points.push({ id: o.id, x, y });
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+          points.push({ id: o.id, x, y });
+          placed.set(o.id, { x, y });
+        }
         // A point whose coordinates do not evaluate is absent at this parameter value, never a
         // scope refusal — there is no such thing as an out-of-scope point.
         else vacant.push({ id: o.id, reason: 'vacant' });
@@ -129,9 +149,38 @@ export function evaluate(c: Construction, seed = 0): Figure {
         else vacant.push({ id: o.id, reason: res.reason });
         break;
       }
+      case 'derived': {
+        // `null` means a parent was vacant at this parameter value, or the configuration is
+        // degenerate (three collinear points have no circumcentre). Both are honest vacancies —
+        // "not at this value" — never a point drawn at NaN and never a fallback position.
+        const p = evalRule(o.rule, at);
+        if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+          points.push({ id: o.id, x: p.x, y: p.y });
+          placed.set(o.id, p);
+        } else vacant.push({ id: o.id, reason: 'vacant' });
+        break;
+      }
+      case 'segment': {
+        const a = at(o.a);
+        const b = at(o.b);
+        if (a && b) segments.push({ id: o.id, a, b });
+        else vacant.push({ id: o.id, reason: 'vacant' });
+        break;
+      }
+      case 'polygon': {
+        const vs = o.vertices.map(at);
+        if (vs.every((v): v is Pt => v !== null)) {
+          // Drawn as its closed ring of sides. The renderer stays a pure consumer: it is handed
+          // screen-ready pairs, never asked to look a vertex up.
+          for (let i = 0; i < vs.length; i += 1) {
+            segments.push({ id: `${o.id}-${i}`, a: vs[i], b: vs[(i + 1) % vs.length] });
+          }
+        } else vacant.push({ id: o.id, reason: 'vacant' });
+        break;
+      }
     }
   }
-  return { env, points, curves, vacant };
+  return { env, points, curves, segments, vacant };
 }
 
 // ---------------------------------------------------------------------------

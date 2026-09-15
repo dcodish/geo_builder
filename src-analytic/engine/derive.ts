@@ -80,7 +80,7 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
 
 export const EMPTY_DERIVATION: Derivation = {
   construction: EMPTY_CONSTRUCTION,
-  figure: { env: {}, points: [], curves: [], vacant: [] },
+  figure: { env: {}, points: [], curves: [], segments: [], vacant: [] },
   box: { minX: -10, minY: -10, maxX: 10, maxY: 10 },
   faults: [],
 };

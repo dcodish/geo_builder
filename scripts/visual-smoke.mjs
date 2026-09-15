@@ -83,6 +83,12 @@ export const APPS = {
       'נתון הישר l1: y=x',
       'נתונה הנקודה A(2,6)',
       'נתונה פרבולה שמשוואתה y^2=2ax',
+      // #1028: the derived-point family — a triangle over stated vertices and its centroid. These
+      // are the constructs the «lines and points» corpus is mostly made of, so a shot must hold one.
+      'B(-4,1)',
+      'C(-3,8)',
+      'משולש ABC',
+      'M מפגש התיכונים במשולש ABC',
     ],
   },
 };

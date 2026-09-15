@@ -20,10 +20,11 @@ import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, clampZoom, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
+import { fmtNum } from '../shell/format';
 import { color, fs } from '../shell/theme';
 import { dofCount, paramRegister } from './engine/carriers';
 import { derive } from './engine/derive';
-import { domainText, pointsOf, type NumCurve } from './engine/types';
+import { domainText, positionalOf, type NumCurve } from './engine/types';
 import { isKnowledge, knownCurve } from './engine/evaluate';
 import { ellipseFoci, parabolaFocus } from './engine/curves';
 import { analyticBidi } from './i18n';
@@ -117,6 +118,7 @@ export function App() {
           'conflicting-restatement': 'errConflict',
           'conic-slot-taken': 'errConicTaken',
           'name-kind-clash': 'errNameClash',
+          'unknown-reference': 'errUnknownRef',
         }[error.key],
         { detail: error.detail },
       )
@@ -260,7 +262,7 @@ export function App() {
                 key: 'points',
                 title: t('secPoints'),
                 dir: 'ltr',
-                rows: pointsOf(d.construction).map((p) => {
+                rows: positionalOf(d.construction).map((p) => {
                   // The honesty gate (ADR-AG-003 §2): a coordinate is printed only when it is
                   // KNOWLEDGE — the same value at every seed — never one sample's number.
                   const kx = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === p.id)?.x ?? null);
@@ -322,9 +324,18 @@ function lineText(a: number, b: number, c: number): string {
   return `${body} = 0`;
 }
 
+/**
+ * Display precision, delegated to the workspace's ONE chokepoint (#1029).
+ *
+ * This tree kept a private `toPrecision(10)` rounder, which is the thing `shell/format.ts` exists to
+ * prevent and which broke the operator's standing two-decimal ruling (#723) the moment the tool
+ * computed its first non-terminating coordinate — a centroid printed as `-1.666666667`.
+ *
+ * The sub-epsilon clamp stays: a derived point that lands on an axis should read `0`, not `-1e-17`
+ * rounded to `-0`.
+ */
 function fmt(v: number): string {
-  const r = Math.abs(v) < 1e-12 ? 0 : Number(v.toPrecision(10));
-  return String(r);
+  return fmtNum(Math.abs(v) < 1e-12 ? 0 : v);
 }
 
 /**

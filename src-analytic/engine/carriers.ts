@@ -22,13 +22,16 @@
  * imported ([BOUNDARIES.json](../../BOUNDARIES.json)) — before the vocabulary grows, which is the
  * only moment it is cheap.
  *
- * **What is deliberately NOT here: a topological sort.** Every object in this slice is *stated*,
- * so the object→object dependency relation is empty, and a sort over an empty relation is
- * structure that no test can exercise — it would pass by checking nothing. What IS real today is
- * the object→parameter layer below: every parameter is assigned before any object evaluates, and
- * every figure exercises it. {@link symbolDeps} is that relation, and it is the seam the ordering
- * grows from when B3 lands the first *derived* object.
+ * **On the topological sort, updated by #1028.** B1 deferred one because every object was *stated*
+ * and the object→object relation was empty. Derived points made it non-empty — and it turned out a
+ * sort is still the wrong shape. `apply` refuses a statement referencing an object that does not
+ * exist yet, so a parent is always already in the list when its dependent is appended: **declaration
+ * order is provably a valid evaluation order and a cycle is unreachable.** The invariant is therefore
+ * *asserted* ({@link depsPrecedeDependents}) rather than re-established by a sort that could never
+ * find anything out of place. If a future kind can forward-reference, that is the moment a real sort
+ * is earned — and this function is what will fail first and say so.
  */
+import { parentsOf } from './derived';
 import { symbolsOf } from './expr';
 import { UNBOUNDED, type Construction, type GeoObject, type Id, type ParamDecl } from './types';
 
@@ -73,6 +76,17 @@ export function carrierOf(o: GeoObject): Carrier | null {
     // A STATED curve: likewise, an equation whose coefficients may carry parameters.
     case 'curve':
       return null;
+    // A DERIVED point is 0-DOF by construction: given its parents there is exactly one answer. Its
+    // freedom is entirely inherited — a midpoint of two parametric points moves because THEY move,
+    // and that freedom is already counted once, at the parents.
+    case 'derived':
+      return null;
+    // Segments and polygons over stated vertices carry no freedom of their own either: they are
+    // drawn FROM their endpoints. A polygon whose vertices are not yet stated would carry 2 DOF per
+    // free vertex — that kind is B3's, and it must claim its freedom here when it arrives.
+    case 'segment':
+    case 'polygon':
+      return null;
     default: {
       const unclassified: never = o;
       throw new Error(`object kind carries no DOF classification: ${JSON.stringify(unclassified)}`);
@@ -94,6 +108,13 @@ export function symbolDeps(o: GeoObject): string[] {
         return [...symbolsOf(o.x), ...symbolsOf(o.y)];
       case 'curve':
         return symbolsOf(o.curve.eq);
+      // These three carry no expressions at all — they are defined by REFERENCE to other objects,
+      // so their dependency on the environment is whatever their parents' is, and registering it
+      // again here would double-count the one unknown.
+      case 'derived':
+      case 'segment':
+      case 'polygon':
+        return [];
       default: {
         const unwalked: never = o;
         throw new Error(`object kind declares no symbol dependencies: ${JSON.stringify(unwalked)}`);
@@ -104,12 +125,14 @@ export function symbolDeps(o: GeoObject): string[] {
 }
 
 /**
- * The ids an object is defined in terms of — the object→object edges a topological evaluation
- * would order.
+ * The ids an object is defined in terms of — the object→object edges of the dependency graph.
  *
- * Empty for every kind in this slice, because every object is stated rather than derived, and that
- * is precisely why no sort is built on it yet (see the module docblock). It is exhaustive so that
- * the first derived kind must say what it depends on.
+ * **Non-empty since #1028**, which is what turned this from a declaration into a working relation.
+ * A stated point or curve depends on nothing; a derived point depends on its rule's parents, and a
+ * segment or polygon on its endpoints.
+ *
+ * The invariant that makes evaluation correct is asserted rather than sorted for — see
+ * {@link depsPrecedeDependents} and the module docblock.
  */
 export function objectDeps(o: GeoObject): Id[] {
   switch (o.kind) {
@@ -117,11 +140,38 @@ export function objectDeps(o: GeoObject): Id[] {
       return [];
     case 'curve':
       return [];
+    case 'derived':
+      return parentsOf(o.rule);
+    case 'segment':
+      return [o.a, o.b];
+    case 'polygon':
+      return [...o.vertices];
     default: {
       const undeclared: never = o;
       throw new Error(`object kind declares no dependencies: ${JSON.stringify(undeclared)}`);
     }
   }
+}
+
+/**
+ * Does every object's dependencies precede it in the list?
+ *
+ * This is the property a topological sort would otherwise have to establish, and it holds **by
+ * construction**: `apply` refuses a statement that references an object which does not exist yet, so
+ * a parent is always already in the list when its dependent is appended, and a cycle is
+ * unreachable. Declaration order is therefore provably a valid evaluation order.
+ *
+ * Exported so the suite can assert it rather than trust it. The honest alternative — building a sort
+ * over a relation that cannot be out of order — would be code no test could exercise, which is the
+ * same "passes by checking nothing" failure the B1 slice avoided by not building one at all.
+ */
+export function depsPrecedeDependents(c: Construction): boolean {
+  const seen = new Set<Id>();
+  for (const o of c.objects) {
+    if (objectDeps(o).some((d) => !seen.has(d))) return false;
+    seen.add(o.id);
+  }
+  return true;
 }
 
 /**

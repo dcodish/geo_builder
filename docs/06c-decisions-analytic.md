@@ -762,3 +762,141 @@ by the session (which is how #1020 was found) · `src-analytic` 110 tests, up fr
 It now also asserts that every entry **produces geometry**, with the `parameters` category exempt by
 its own field (a declaration legitimately draws nothing) rather than by a list of sentences that would
 drift.
+
+---
+
+## ADR-AG-012 — The analytic tool is a FOURTH ENGINE, and the 2-D tree is not touched for it (2026-09-15)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R4 (reaffirmed, and its cost re-priced); the
+"471 ↔ 572 profile split" in [§5 Deliberately still open](19-analytic-geometry-tool.md) is **not**
+settled by this. **Design:** none (internal) — this confirms the existing boundary rather than
+changing one; [04c](04c-design-analytic.md) "Boundaries" already states it.
+
+**Context.** The operator brought a new corpus — roughly forty «lines and points» exercises they are
+teaching now (midpoints, medians, centroids, incircles, areas, sides by equation). Measured against
+it, the analytic tool parsed **4 of 29** candidate inputs. The same exercises were then run through
+the **2-D** tool, which built them and got them right: centroid `M(-2,4)`, midpoint `M(3,-2)`,
+parallelogram diagonal `G(1.5,1.5)`, incentre `O(0,2)`, and a vertex pinned by `שטח המשולש ABC הוא 7`.
+
+That raised a genuine architectural question, and it was put to the operator rather than decided:
+**is the analytic tool a fourth engine, or a profile of the 2-D one?** [docs/22 §9](22-workflow.md)
+already contemplates *"ONE engine with curriculum-level profiles"*, and the overlap measured about
+80% for this corpus.
+
+**A premise of the original plan fell during that measurement, and it is recorded because it will
+mislead the next reader otherwise.** [docs/19 §6](19-analytic-geometry-tool.md) calls the coordinate
+substrate *"New core #1 … the deepest departure from the 2-D tool"*, and
+[`src-analytic/CLAUDE.md`](../src-analytic/CLAUDE.md) warns of *"the gauge inversion"*. Measured, the
+2-D tool **already consumes the gauge**: with `נקודה A ב-(1,3)` stated, `A` sits at exactly `(1,3)` at
+seeds 0, 1, 2 and 5, and so does the derived centroid; without coordinates the same triangle floats
+(`A(2.00,3.60)` → `A(1.72,4.56)`). That is [02c](02c-requirements-analytic.md) R2 — *"the gauge starts
+free and coordinates consume it"* — already shipped in the sibling. It is not an inversion and not a
+departure.
+
+**Decision** (operator, 2026-09-15): *"I dont want to touch the 2d tool or add analytical capabilities
+to it. i want the analytical tool to support it … the 2d should not be impacted in any way since its
+in a good shape."*
+
+- **`src-analytic/` gains the capability. `src/` is not modified for analytic purposes** — not a
+  coordinate frame, not an equation grammar, not a profile flag. The proposal to give the 2-D tool
+  axes (shown only where the gauge is consumed) is **rejected**, and is recorded here so it is not
+  re-proposed as though it were new.
+- The four products stay four products. Capability crosses trees by **copying**, never importing —
+  `BOUNDARIES.json` and `server/__tests__/isolation.test.ts` are unchanged and remain the enforcement.
+
+**Why the operator's reason is the right one.** *"It's in a good shape"* is not conservatism. `src/`
+is the deployed product with the deepest regression history in the workspace, and the constructs at
+issue — midpoint, tangency feet, concurrency points — are precisely where that history is thickest
+([ADR-116](06-decisions.md#adr-116), [ADR-297](06-decisions.md#adr-297),
+[ADR-333](06-decisions.md#adr-333) are all letter-hijacking and branch-selection bugs in this exact
+family). Threading a second product's gauge model through it would put a shipped tool's correctness at
+risk for **zero student benefit**: no student of Q1-analytic opens the synthetic builder.
+
+**What this costs, stated plainly rather than discovered later.** [ADR-AG-009](#adr-ag-009) ruled
+*"transplant the carrier/DOF + joint-solve core, NOT the 2-D grammar; every construct beyond the core
+is justified by a corpus question or it does not come across."* That ruling stands, and this corpus is
+now a large justification: shape nouns (~20 exercises), point-on-object and region (~14), midpoint
+(~11), area as a pin (~10), concurrency points (~6). So a substantial slice of the 2-D **grammar** is
+now corpus-justified, and it will be written a second time.
+
+Two things keep that from becoming "port the whole tool":
+
+- **The corpus is the gate, not the sibling's catalog.** A construct comes across because an exercise
+  needs it, and `src/`'s catalog is a *reference* for how it was solved, never a checklist to mirror.
+- **Most of `src/engine`'s 14k lines are not this.** Theorem surfacing, ink crossings, letter
+  placement, shape detection and the verifier are synthetic-tool concerns with no analytic counterpart.
+
+**What is NOT decided here.** The 471 ↔ 572 profile split *within* the analytic product
+([docs/19 §5](19-analytic-geometry-tool.md)) is untouched — this ruling is about which tree owns the
+capability, not about how one tree serves two curricula. And nothing here says the copied constructs
+must match `src/`'s spelling; the analytic catalog answers to its own corpus.
+
+---
+
+## ADR-AG-013 — B4 BUILT: derived points over stated parents, and the sort that was not needed (#1028)
+
+**Requirements:** [02c §8](02c-requirements-analytic.md) (new — the «lines and points» corpus and its
+families F16/F17); P4 (the DOF cue, unchanged by derived points). **Design:**
+[04c](04c-design-analytic.md) "The model" — the object kinds and the evaluation-order invariant.
+
+**What landed.** Five new object kinds — `derived`, `segment`, `polygon` beside `point` and `curve` —
+and with them the constructs the operator's «lines and points» corpus is mostly made of: the midpoint,
+the centroid, the incentre, the orthocentre, the circumcentre, and a quadrilateral's diagonal meet.
+All solver-free, so they land before B2 (#1016) even though they outrank most of what B2 and B3 carry.
+
+**The values are checked against an INDEPENDENT oracle.** Each gate figure was first built in the 2-D
+tool through its real `parse → replay` path and checked by hand against the closed form, *before* this
+engine existed: midpoint `(3,−2)`, centroid `(−2,4)`, diagonal meet `(1.5,1.5)`, incentre `(0,2)`. A
+test whose expectation came from the code under test proves only self-consistency. The suite also
+asserts the *properties* rather than the numbers — the incentre equidistant from all three sides, the
+circumcentre from all three vertices, a right triangle's orthocentre at its right-angle vertex.
+
+**Three decisions worth recording.**
+
+1. **The topological sort was not needed, and that is a finding rather than a deferral.**
+   [ADR-AG-011](#adr-ag-011) deferred one because the object→object relation was empty. Derived points
+   made it non-empty — and a sort is still the wrong shape. `apply` refuses a statement naming an
+   object that does not exist yet (`unknown-reference`), so **a parent is always already in the list
+   when its dependent is appended**: declaration order is provably a valid evaluation order and a
+   cycle is unreachable. The invariant is *asserted* (`depsPrecedeDependents`) instead of being
+   re-established by a sort that could never find anything out of place. The refusal is not a
+   limitation bolted on to make this true — it is required on its own terms: inventing the missing
+   `B` would place a point the question never gave ([ADR-052](06-decisions.md#adr-052)) and spend a
+   letter the student is about to use ([ADR-297](06-decisions.md#adr-297)).
+
+2. **A shape noun that carries a GIVEN is refused by name, not flattened.** `משולש` and `מרובע` assert
+   nothing beyond their vertices, so they build. `מקבילית`, `טרפז`, `ריבוע` each carry a given
+   (AB ∥ DC, four equal sides) this slice cannot honour, and drawing one as a plain ring of sides
+   would be **a stated given vanishing** — the one thing the root CLAUDE.md forbids outright. They
+   refuse with `out-of-scope`, which is a refusal the product owns rather than a question outsourced
+   to the LLM ([ADR-3D-214](06b-decisions-3d.md#adr-3d-214) D2). B3 (#1017) is where they become
+   buildable.
+
+3. **Identity is canonical, because M1's absorb is keyed on the id.** A segment's id sorts its
+   endpoints and a polygon's takes the smallest rotation/reflection of its vertex ring, so
+   «הקטע AB» ≡ «הקטע BA» and «משולש ABC» ≡ «משולש ACB» are each one object — while `ABCD` and `ABDC`
+   stay two, because they are two different figures. Found by a test: before canonicalisation the
+   same segment drew twice and the same triangle reported a `conflicting-restatement`.
+
+**A degenerate configuration is VACANT, never a fault and never a NaN.** Three collinear points have
+no circumcentre; the point is reported absent at this configuration and nothing is raised, which is
+[ADR-AG-008](#adr-ag-008)'s distinction applied to a new kind. Degeneracy is judged **relative to the
+longest side**, so a large thin triangle is still a triangle.
+
+**Two defects found by READING the slice's own smoke screenshot, which is now three for three in this
+tree.** (ADR-AG-006's reversed axis labels, [#1020](https://github.com/dcodish/geo_builder/issues/1020)'s
+sampled equation, and now [#1029](https://github.com/dcodish/geo_builder/issues/1029): the panel
+printed `M = (-1.666666667, 5)`. `src-analytic/App.tsx` kept a **private `toPrecision(10)` rounder**
+instead of delegating to `shell/format.ts`, breaking the operator's standing two-decimal ruling
+(#723) — and it was invisible until derived points produced the tool's first computed, non-terminating
+coordinate. Every coordinate before today was one the student had typed. Fixed by deleting the private
+rounder, not by changing its precision: #723 is a chokepoint ruling, not a number.
+
+**Gates.** `npm run test:full` green, read from `reports/suite-verdict.json` · `tsc -b` clean ·
+`build:analytic` clean · `visual-smoke --app analytic` extended with a triangle and its centroid, 11
+shots, read back by the session (which is how #1029 was found) · `src-analytic` 154 tests, up from 110.
+
+**The catalog guard grew a third requirement.** [ADR-AG-011](#adr-ag-011) made every entry prove it
+*draws*; an entry like «M אמצע AB» is meaningless without A and B, so entries now declare their
+context (`needs`) and the guard builds them in it. Declared rather than inferred — a guard that
+guessed the context would be asserting something the catalog never said.

@@ -23,7 +23,9 @@ export type InputError =
   /** A second parabola or ellipse — the anonymous conics are one per figure (D6). */
   | { key: 'conic-slot-taken'; detail: string }
   /** One name used for two kinds of object. */
-  | { key: 'name-kind-clash'; detail: string };
+  | { key: 'name-kind-clash'; detail: string }
+  /** A construction that refers to a point the figure does not have yet (#1028). */
+  | { key: 'unknown-reference'; detail: string };
 
 interface AnalyticState {
   /** The student's lines, in order. The one source of truth. */

@@ -58,6 +58,7 @@ const he = {
   errConflict: 'המשפט לא נוסף — הוא סותר את מה שכבר נקבע: "{{detail}}"',
   errConicTaken: 'בשרטוט יכולה להיות פרבולה אחת ואליפסה אחת. המשפט מתאר עקום נוסף: "{{detail}}"',
   errNameClash: 'השם כבר משמש עצם מסוג אחר: "{{detail}}"',
+  errUnknownRef: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
 };
 
 const en: typeof he = {
@@ -98,6 +99,7 @@ const en: typeof he = {
   errConflict: 'Not added — it contradicts what is already fixed: "{{detail}}"',
   errConicTaken: 'A figure holds one parabola and one ellipse. This describes another: "{{detail}}"',
   errNameClash: 'That name already belongs to a different kind of object: "{{detail}}"',
+  errUnknownRef: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
 };
 
 export const analyticI18n = createProductI18n({
