@@ -26,8 +26,6 @@ export type InputError =
   | { key: 'repeated-vertex'; detail: string }
   /** The statement contradicts what an earlier statement already fixed. */
   | { key: 'conflicting-restatement'; detail: string }
-  /** A second parabola or ellipse — the anonymous conics are one per figure (D6). */
-  | { key: 'conic-slot-taken'; detail: string }
   /**
    * One name used for two kinds of object — carrying WHAT the name already holds (#1046), so the
    * message can show the student the collision instead of blaming their choice of letter.

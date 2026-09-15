@@ -154,9 +154,25 @@ describe('knownCurve — an EQUATION is gated exactly as a coordinate is', () =>
   // Found by reading B1's own smoke screenshot, not by a test: with #1014 fixed, `y^2=2ax` draws,
   // and the ungated panel printed it as `y² = 6.915870381x` — one seed's sample asserted as fact,
   // which is the cardinal sin (ADR-052) on the row ADR-AG-003 §2 calls the whole honesty boundary.
+
+  /**
+   * The id of the figure's ONLY curve, read from the construction.
+   *
+   * Hard-coded `'parabola'` / `'ellipse'` here until #1026 gave anonymous conics content-derived
+   * ids — after which `knownCurve` returned `null` because the id did not exist, and these
+   * assertions passed **on an empty construction**. They are the #1020 honesty gate, so passing by
+   * checking nothing is the one way they must not pass. Reading the id back makes the test say what
+   * it means regardless of how ids are minted, and `expect(id).toBeDefined()` is the tripwire.
+   */
+  const onlyCurveId = (c: ReturnType<typeof build>): string => {
+    const ids = c.objects.filter((o) => o.kind === 'curve').map((o) => o.id);
+    expect(ids).toHaveLength(1);
+    return ids[0];
+  };
+
   it('refuses to call a parameter-dependent curve knowledge', () => {
     const c = build(['נתונה פרבולה שמשוואתה y^2=2ax']);
-    expect(knownCurve(c, 'parabola')).toBeNull();
+    expect(knownCurve(c, onlyCurveId(c))).toBeNull();
   });
 
   it('calls a fully pinned curve knowledge, and reports its coefficients', () => {
@@ -168,18 +184,19 @@ describe('knownCurve — an EQUATION is gated exactly as a coordinate is', () =>
     // `x²/9 + y²/b² = 1` has a known semi-axis and an unknown one. A row that printed the known
     // half and silently sampled the other would be the worst of both.
     const c = build(['נתונה אליפסה שמשוואתה x^2/9+y^2/b^2=1']);
-    expect(knownCurve(c, 'ellipse')).toBeNull();
+    expect(knownCurve(c, onlyCurveId(c))).toBeNull();
   });
 
   it('is null for a curve that is not in the figure at all', () => {
-    expect(knownCurve(build(['A(2,6)']), 'parabola')).toBeNull();
+    // This one MEANS the missing id — it is the control the three above accidentally became.
+    expect(knownCurve(build(['A(2,6)']), 'no-such-curve')).toBeNull();
   });
 
   it('agrees with the DECLARED-parameter case, which was already reachable before #1014', () => {
     // The defect predates the register fix — it was simply rare, because a curve had to carry a
     // declared parameter to draw at all. Same verdict either way.
     const c = build(['a הוא פרמטר חיובי', 'נתונה פרבולה שמשוואתה y^2=2ax']);
-    expect(knownCurve(c, 'parabola')).toBeNull();
+    expect(knownCurve(c, onlyCurveId(c))).toBeNull();
   });
 });
 

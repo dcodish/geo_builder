@@ -58,7 +58,6 @@ const he = {
   errBadEquation: 'לא הצלחתי לקרוא את המשוואה: "{{detail}}"',
   errOutOfScope: 'המשפט מובן, אך אינו נתמך בכלי הזה: "{{detail}}"',
   errConflict: 'המשפט לא נוסף — הוא סותר את מה שכבר נקבע: "{{detail}}"',
-  errConicTaken: 'בשרטוט יכולה להיות פרבולה אחת ואליפסה אחת. המשפט מתאר עקום נוסף: "{{detail}}"',
   errNameClash:
     'השם הזה כבר תפוס בשרטוט — הוא {{existing}}. אי אפשר לתת לו משמעות שנייה במשפט "{{detail}}". ' +
     'אפשר לבחור אות אחרת, או למחוק את ההגדרה הקודמת ולכתוב אותה מחדש.',
@@ -126,7 +125,6 @@ const en: typeof he = {
   errBadEquation: 'I could not read the equation: "{{detail}}"',
   errOutOfScope: 'Understood, but not supported in this tool: "{{detail}}"',
   errConflict: 'Not added — it contradicts what is already fixed: "{{detail}}"',
-  errConicTaken: 'A figure holds one parabola and one ellipse. This describes another: "{{detail}}"',
   errNameClash:
     'That name is already taken in this figure — it is {{existing}}. It cannot take a second ' +
     'meaning in "{{detail}}". Either choose another letter, or delete the earlier definition and ' +

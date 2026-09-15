@@ -312,6 +312,10 @@ from the same twenty exams; the decisions are here.
 - **Parabolas and ellipses are anonymous** — `הפרבולה`, `האליפסה`. No exam in twenty carries two
   parabolas or two ellipses, so at most one of each may exist per figure. A second one is a refusal,
   not a silently-shadowed object.
+  > **The one-of-each half is WITHDRAWN** by [ADR-AG-018](#adr-ag-018) (#1026, 2026-09-15). Being
+  > rare in the corpus was a reason not to *name* them; it was never a reason to *refuse* the second
+  > one, and the refusal that shipped was not enforcing this bullet — it was reporting a collision
+  > between two objects minted with the same fixed id. Anonymity stands; the limit does not.
 - **Lines** are `ℓ`, `ℓ1`, `ℓ2` (typed `l`, `l1`, `l2`), or named by two points, or by role
   (`המשיק`). This **inherits the 3-D trap verbatim**: `ℓ` is not a `\w` character, so a `\b` after a
   line name silently fails — use an explicit lookahead ([src3d/CLAUDE.md](../src3d/CLAUDE.md)). The
@@ -1102,6 +1106,7 @@ already were ([ADR-AG-014](#adr-ag-014)): `B(x_B, 0)` lands on the x-axis and `D
 segment, and both were muddy without it. [ADR-AG-010](#adr-ag-010) R34 makes that a design condition
 rather than a polish item.
 
+<<<<<<< HEAD
 ## ADR-AG-017 — A rule that MATCHED owes an answer about what it matched (#1039 #1042 #1046)
 
 **Status:** accepted, 2026-09-15 · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056)
@@ -1175,3 +1180,61 @@ signal the LLM fallback escalates on, so its precision is a cost control as well
 The three codes are additions to `ParseFailure`, the store's `InputError` union and `App.tsx`'s code→key
 map — the registry that a new refusal must be added to in all three places, which is itself the thing
 that makes a missing entry a type error rather than a blank message.
+=======
+## ADR-AG-018 — The conic "slot" was an ID COLLISION, not a policy (#1026)
+
+**Status:** accepted, 2026-09-15 · **Supersedes:** [ADR-AG-005](#adr-ag-005) D6, second bullet (the
+one-parabola-one-ellipse limit; the anonymity it also states is untouched) ·
+**Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §5b — "two ellipses in one figure" moves from
+**BLOCKER** to supported. **Design:** [04c](04c-design-analytic.md) "The three cores" — the id rule for
+unnamed objects, unchanged in mechanism and now applied to one more family.
+
+**Context.** «נתונה אליפסה שמשוואתה x²/9+y²/16=1» followed by a second, different ellipse was refused
+with «בשרטוט יכולה להיות פרבולה אחת ואליפסה אחת» — *a figure holds one parabola and one ellipse*. That
+sentence states a policy, and no one had decided it. What actually happened is that both anonymous
+ellipses were minted with the **fixed id `ellipse`**, so the second collided with the first on its name;
+`conicSlotTaken` then translated the collision into a rule about figures.
+
+The tell was already in the tree: unnamed **lines and circles** had carried a content-derived id
+(`anonIndex`, a hash of the normalized equation) since slice A. Only the conics were given fixed ids,
+and only the conics acquired a "policy".
+
+The cost was not hypothetical. [02c §5b](02c-requirements-analytic.md) listed *two ellipses in one
+figure* as a **BLOCKER** against a real exam whose part ג asks for «אליפסה קנונית חדשה» — a question the
+tool could not reproduce because of a limit nothing had chosen.
+
+**Decision.**
+
+1. **Anonymous conics take a content-derived id** — `parabola-<hash>` / `ellipse-<hash>` — the same
+   mechanism, the same function, as unnamed lines and circles.
+2. **`conicSlotTaken` is DELETED**, with its error code, both locale strings, the store's union member
+   and `App.tsx`'s map entry. A refusal that can no longer happen must not stay wired, or it becomes
+   the next reader's false constraint.
+3. **The M1 absorb is what the content id has to preserve**, and it is asserted directly: restating the
+   same conic is still one object, because the same equation hashes the same. That is what lets a
+   question's section ב re-state section א's given, and it would have failed silently by drawing twice.
+4. **Anonymity stands.** The corpus does not name conics, and this ADR does not name them either.
+
+**A second defect, found by reading the panel's own fallback while making this change.** The data panel
+labelled a curve `c.label.name || c.id`, so an unnamed curve printed its **internal id** at the student:
+today, live, a circle row reads `circle-anonq3c8qq` inside an RTL Hebrew panel. It was invisible while
+the conic ids happened to read `parabola` and `ellipse`, and content-derived ids would have made it
+unmissable. Fixed at the fallback: an unnamed curve prints **no name**. The row needs none — the
+equation, focus and directrix `describeCurve` prints are what distinguish two anonymous parabolas, and
+they are the student's own numbers rather than ours. This is [#1029](https://github.com/dcodish/geo_builder/issues/1029)'s
+class exactly (internal state reaching a surface), which is why it was fixed here rather than filed:
+the change that exposed it is this one.
+
+**Deliberately NOT decided: how a student REFERS to one of two anonymous conics.** With two ellipses on
+a canvas, «האליפסה» is ambiguous, and the honest answer needs corpus evidence — the 5b question's own
+wording — rather than an invented ordinal. Filed as its own issue. Nothing in this ADR depends on it:
+both conics draw, both print their own row, and neither can be named today anyway.
+
+**Consequences.** One fewer refusal code across four files. `conflicting-restatement` on a curve now
+means only what it says — a NAMED curve restated with a different equation — because the anonymous case
+can no longer reach it. `src-analytic` 194 → 197 tests, including the inverted lock: the test that
+asserted the old policy now asserts that two ellipses coexist, with the absorb tested alongside it so
+the content id cannot silently stop deduplicating.
+>>>>>>> fix/1026-two-conics

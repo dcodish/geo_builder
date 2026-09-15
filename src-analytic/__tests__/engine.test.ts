@@ -223,13 +223,58 @@ describe('apply — the M1 boundary, on day one (ADR-AG-003)', () => {
     expect(c.params[0].domain.max).toBe(13);
   });
 
-  it('refuses a SECOND ellipse — the anonymous conics are one per figure (D6)', () => {
+  /**
+   * SUPERSEDED by #1026 / [ADR-AG-018]. This case used to assert the opposite — that a second
+   * ellipse is refused, "the anonymous conics are one per figure (D6)". That was never a decision
+   * about figures: both anonymous ellipses were minted with the fixed id `ellipse`, so the second
+   * collided with the first on its NAME, and `conicSlotTaken` dressed the collision up as a policy.
+   * The ids are content-derived now, so there is no collision and nothing to refuse.
+   */
+  it('accepts a SECOND ellipse — two different equations are two different curves (#1026)', () => {
     const c = fold(lines(['נתונה אליפסה שמשוואתה x^2/9+y^2/16=1'])).construction;
     const second = parseLine('נתונה אליפסה שמשוואתה x^2/25+y^2/4=1');
     if (!second.ok) throw new Error('should parse');
     const out = applyFact(c, second.facts[0]);
-    expect(out.ok).toBe(false);
-    if (!out.ok) expect(out.error.code).toBe('conic-slot-taken');
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(out.next.objects).toHaveLength(2);
+  });
+
+  it('still absorbs the SAME conic restated — the M1 absorb rides on the content id', () => {
+    // The property the content id has to preserve: a question's section ב re-stating section א's
+    // given is one object, not two. Without this the absorb silently stops working and every
+    // restated conic draws twice.
+    const c = fold(lines(['נתונה פרבולה שמשוואתה y^2=54x'])).construction;
+    const again = parseLine('נתונה פרבולה שמשוואתה y^2=54x');
+    if (!again.ok) throw new Error('should parse');
+    const out = applyFact(c, again.facts[0]);
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.absorbed).toBe(true);
+      expect(out.next.objects).toHaveLength(1);
+    }
+  });
+
+  it('a parabola and an ellipse and a second of each all coexist', () => {
+    const c = fold(
+      lines([
+        'נתונה פרבולה שמשוואתה y^2=4x',
+        'נתונה פרבולה שמשוואתה y^2=8x',
+        'נתונה אליפסה שמשוואתה x^2/9+y^2/16=1',
+        'נתונה אליפסה שמשוואתה x^2/25+y^2/4=1',
+      ]),
+    );
+    expect(c.errors.every((e) => e === null)).toBe(true);
+    expect(c.construction.objects).toHaveLength(4);
+    // Four distinct ids, derived from four distinct equations.
+    expect(new Set(c.construction.objects.map((o) => o.id)).size).toBe(4);
+  });
+
+  it('an unnamed curve carries an EMPTY name, so no id can reach the panel (#1026)', () => {
+    // The panel prints `c.label.name`; an id leaking into it would be internal state on screen.
+    const c = fold(lines(['נתונה פרבולה שמשוואתה y^2=4x', 'משוואת המעגל x^2+y^2-2x=0'])).construction;
+    for (const o of c.objects) {
+      if (o.kind === 'curve') expect(o.label.name).toBe('');
+    }
   });
 });
 

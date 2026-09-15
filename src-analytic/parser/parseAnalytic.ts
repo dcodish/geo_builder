@@ -322,16 +322,26 @@ function matchCurve(line: string): CurveHit | null {
     };
   }
 
-  // --- conics: anonymous by D6, so no name is read ---
+  /**
+   * Conics are anonymous (D6 — the corpus never names them), so the id comes from the EQUATION,
+   * exactly as it already did for an unnamed line or circle (#1026).
+   *
+   * The fixed ids `parabola` / `ellipse` made two DIFFERENT parabolas collide on one name, and the
+   * collision was then reported as a policy («a figure holds one parabola and one ellipse») that
+   * nothing had actually decided — an id collision wearing a policy's clothes. A content id keeps
+   * the M1 absorb working (restating the same equation is still one object, which is what lets a
+   * later section of a question re-state an earlier given) while a different equation is a
+   * different object, because it is one.
+   */
   const heParabola = line.match(new RegExp(`^${HE_GIVEN}ה?פרבולה(?:\\s+קנונית)?\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`));
-  if (heParabola) return { id: 'parabola', name: '', kind: 'parabola', eqSrc: heParabola[1] };
+  if (heParabola) return { id: `parabola-${anonIndex(heParabola[1])}`, name: '', kind: 'parabola', eqSrc: heParabola[1] };
   const enParabola = line.match(/^(?:the\s+)?(?:canonical\s+)?parabola\s*:?\s*(?:is\s+)?(.+)$/i);
-  if (enParabola) return { id: 'parabola', name: '', kind: 'parabola', eqSrc: enParabola[1] };
+  if (enParabola) return { id: `parabola-${anonIndex(enParabola[1])}`, name: '', kind: 'parabola', eqSrc: enParabola[1] };
 
   const heEllipse = line.match(new RegExp(`^${HE_GIVEN}ה?אליפסה(?:\\s+קנונית)?\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`));
-  if (heEllipse) return { id: 'ellipse', name: '', kind: 'ellipse', eqSrc: heEllipse[1] };
+  if (heEllipse) return { id: `ellipse-${anonIndex(heEllipse[1])}`, name: '', kind: 'ellipse', eqSrc: heEllipse[1] };
   const enEllipse = line.match(/^(?:the\s+)?(?:canonical\s+)?ellipse\s*:?\s*(?:is\s+)?(.+)$/i);
-  if (enEllipse) return { id: 'ellipse', name: '', kind: 'ellipse', eqSrc: enEllipse[1] };
+  if (enEllipse) return { id: `ellipse-${anonIndex(enEllipse[1])}`, name: '', kind: 'ellipse', eqSrc: enEllipse[1] };
 
   return null;
 }
