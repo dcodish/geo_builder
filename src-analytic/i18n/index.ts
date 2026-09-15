@@ -69,6 +69,9 @@ const he = {
   errBadArity:
     'מספר הקודקודים אינו מתאים לשם הצורה במשפט "{{detail}}" — במשולש שלושה קודקודים ובמרובע ארבעה.',
   errRepeatedVertex: 'באותו משפט אותה אות מופיעה יותר מפעם אחת: "{{detail}}". לכל קודקוד צריך שם משלו.',
+  errBadOperand:
+    'הבנתי את היחס במשפט "{{detail}}", אבל לא זיהיתי את אחד האגפים. אפשר לציין שני קודקודים (AB), ' +
+    'צלע (הצלע AB), ישר (הישר l1) או ציר (ציר ה-x).',
   // What a taken name already holds, for errNameClash — the construct's own corpus noun.
   kindObject: 'עצם אחר בשרטוט',
   kindPoint: 'נקודה שהוגדרה בשיעורים',
@@ -142,6 +145,9 @@ const en: typeof he = {
     'vertices and a quadrilateral four.',
   errRepeatedVertex:
     'The same letter appears more than once in "{{detail}}". Each vertex needs its own name.',
+  errBadOperand:
+    'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +
+    'a side (side AB), a line (line l1) or an axis (the x-axis).',
   // What a taken name already holds, for errNameClash — the construct's own corpus noun.
   kindObject: 'another object in the figure',
   kindPoint: 'a point given by coordinates',

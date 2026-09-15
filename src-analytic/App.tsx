@@ -172,6 +172,7 @@ export function App() {
           'reserved-coordinate': 'errReservedCoordinate',
           'bad-arity': 'errBadArity',
           'repeated-vertex': 'errRepeatedVertex',
+          'bad-operand': 'errBadOperand',
           'conflicting-restatement': 'errConflict',
           'name-kind-clash': 'errNameClash',
           'unknown-reference': 'errUnknownRef',

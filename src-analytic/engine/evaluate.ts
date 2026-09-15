@@ -17,7 +17,7 @@ import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { freeRank, residual, solveLM, type Constraint } from './solve';
-import { inDomain, isFree, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
+import { inDomain, isFree, objectById, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
 
 export interface FigurePoint {
   id: Id;
@@ -100,6 +100,16 @@ function freeCoord(seed: number, id: string, axis: 0 | 1): number {
  * two streams cannot alias.
  */
 const SIGN_STREAM = 100003;
+
+/**
+ * How near zero a residual must be for a given to count as HELD (#1062).
+ *
+ * Named once because it is now read on two paths — the solved figure and the fully determined one —
+ * and a figure whose honesty depended on which path measured it would be worse than no check at all.
+ * Residuals are scale-normalised by construction (`solve.ts`), so one absolute threshold is the right
+ * shape here.
+ */
+const SATISFIED_EPS = 1e-6;
 
 function jitter(seed: number, salt: number): number {
   const x = Math.sin(seed * 127.1 + salt * 311.7) * 43758.5453;
@@ -209,6 +219,27 @@ function place(c: Construction, env: Env, free: Map<Id, Pt>): Map<Id, Pt> {
 
 /** Carrier freedom left after the constraints — `carriers − rank(J)`, so dependent givens do not
  *  over-count (see `freeRank`). */
+/**
+ * A named line's DIRECTION, for the relation vocabulary (#1052).
+ *
+ * «הישר l1 מקביל לישר l2» relates two objects the constraint layer cannot see: `solve.ts` resolves
+ * points by id and knows nothing about curves. Rather than teach it curves — which would drag the
+ * whole classifier into the solver — the caller passes this resolver, and a `curve` operand that
+ * cannot be resolved simply reports "cannot be judged", exactly as an absent point does.
+ *
+ * For `ax + by + c = 0` the direction is `(−b, a)`: the normal is `(a, b)`, and a line runs
+ * perpendicular to its own normal.
+ */
+function lineDirOf(c: Construction, env: Env): (id: Id) => Pt | null {
+  return (id) => {
+    const o = objectById(c, id);
+    if (!o || o.kind !== 'curve') return null;
+    const r = resolveCurve(o.curve, env);
+    if (!r.ok || r.curve.kind !== 'line') return null;
+    return { x: -r.curve.b, y: r.curve.a };
+  };
+}
+
 function carrierDofOf(c: Construction, env: Env, free: Map<Id, Pt>, ids: Id[]): number {
   if (ids.length === 0) return 0;
   if (c.constraints.length === 0) return 2 * ids.length;
@@ -217,7 +248,7 @@ function carrierDofOf(c: Construction, env: Env, free: Map<Id, Pt>, ids: Id[]): 
     new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
   return freeRank(vec, (x) => {
     const pos = place(c, env, asMap(x));
-    return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env) ?? [0]);
+    return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, lineDirOf(c, env)) ?? [0]);
   });
 }
 
@@ -282,17 +313,36 @@ export function evaluate(c: Construction, seed = 0): Figure {
       new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
     const res = solveLM(vec, (x) => {
       const pos = place(c, env, asMap(x));
-      return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env) ?? [0]);
+      return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, lineDirOf(c, env)) ?? [0]);
     });
     free = asMap(res.values);
-    if (!res.ok) {
-      // HONEST FAILURE: the figure is not quietly shown as if it satisfied its givens. Which
-      // constraints failed is recorded so the caller can name the statement, not internal state.
-      const pos = place(c, env, free);
-      for (const k of c.constraints) {
-        const r = residual(k, (id) => pos.get(id) ?? null, env);
-        if (r === null || r.some((v) => Math.abs(v) > 1e-6)) unsatisfied.push(k);
-      }
+  }
+
+  /**
+   * THE CHECK IS NOT PART OF THE SOLVE (#1062).
+   *
+   * This ran only inside `if (ids.length > 0 …)` and only on `!res.ok`, so two false assumptions were
+   * baked into the shape:
+   *
+   *  - **"no carriers means nothing to check"** — no carriers means nothing to *move*. Whether the
+   *    givens HOLD is a different question, and it is exactly the one a student asks when they state a
+   *    given about points they have already placed. `A(0,0) B(4,0) C(0,3)` with «שטח המשולש ABC הוא
+   *    999» was accepted in silence, and so was «B נמצא על ציר ה-x» for a `B` at `y = 5`.
+   *  - **"convergence means satisfied"** — `res.ok` is the minimiser's verdict on its own progress.
+   *    The figure's honesty is judged by the residuals.
+   *
+   * So: whether or not a solve ran, every constraint is measured against the configuration that was
+   * actually reached. The solve is an attempt to *find* a figure; this is the report on the one found.
+   */
+  if (c.constraints.length > 0) {
+    const pos = place(c, env, free);
+    for (const k of c.constraints) {
+      const r = residual(k, (id) => pos.get(id) ?? null, env, lineDirOf(c, env));
+      // `null` is "cannot be judged", not "false": a constraint naming a point that vanished at this
+      // parameter value must not be reported as a given the student got wrong — that would blame the
+      // wrong statement, and vacancy is not a fault ([ADR-AG-008]).
+      if (r === null) continue;
+      if (r.some((v) => Math.abs(v) > SATISFIED_EPS)) unsatisfied.push(k);
     }
   }
   const placed = new Map<Id, Pt>(free);
