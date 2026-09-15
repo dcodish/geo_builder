@@ -150,6 +150,54 @@ export function App() {
       setDraft('');
       return;
     }
+    /**
+     * A given the figure ALREADY ENTAILS (#1063) — the operator’s B11/B12.
+     *
+     * #1045 catches a RESTATEMENT: the same fact twice, decided structurally in `applyFact`. This
+     * is the larger notion — «שטח המשולש ABC הוא 6» on a determined triangle was never stated
+     * before, it is simply *true and already settled*, and structural absorption cannot see that.
+     *
+     * **Two conditions, and neither alone is enough:**
+     *
+     *  - the given HOLDS (`unsatisfied` is empty), and
+     *  - the figure’s reported freedom DID NOT DROP.
+     *
+     * The second is what separates *"true here"* from *"true necessarily"*. On a free triangle,
+     * «AB מקביל לציר x» is satisfied at seed 0 only because the sampler put it there — the
+     * constraint is real and removes a degree of freedom, and calling it "already known" would
+     * silently discard a stated given, which is the defect this whole product exists to avoid.
+     *
+     * **And nothing new may have APPEARED.** The test is on the construction, not on the fact kinds:
+     * a line that mints an object, a parameter or a selector has contributed something whatever the
+     * numbers say. Comparing what the figure GAINED rather than what the sentence emitted is what
+     * makes «B נמצא על ציר ה-x» work for an already-placed `B` — that sentence declares `B`, the
+     * declaration is absorbed because `B` exists, and the line really does add nothing. A test on
+     * fact kinds called it new, which is how it read before #1069 taught that rule to declare.
+     *
+     * A new SELECTOR counts as contributing even when it happens to hold, because a selector consumes
+     * no freedom by design (D7 kind 2) and a DOF comparison alone cannot see it. That is the
+     * conservative direction: it records a line that arguably added nothing, rather than discarding
+     * one that did.
+     *
+     * It costs nothing extra: both derivations already exist — `d` is the current figure and `trial`
+     * is the dry run the submit path has always done.
+     */
+    const gained =
+      trial.construction.objects.length - d.construction.objects.length +
+      (trial.construction.params.length - d.construction.params.length) +
+      (trial.construction.selectors.length - d.construction.selectors.length);
+    const freedomBefore = reportedDof(d.construction, d.figure.carrierDof);
+    const freedomAfter = reportedDof(trial.construction, trial.figure.carrierDof);
+    if (
+      parsed.facts.length > 0 &&
+      gained === 0 &&
+      trial.figure.unsatisfied.length === 0 &&
+      freedomAfter === freedomBefore
+    ) {
+      setNotice(t('noticeAlreadyFollows', { detail: line }));
+      setDraft('');
+      return;
+    }
     recordLine(line);
     setDraft('');
   };
@@ -176,6 +224,7 @@ export function App() {
           'conflicting-restatement': 'errConflict',
           'name-kind-clash': 'errNameClash',
           'unknown-reference': 'errUnknownRef',
+          'does-not-exist': 'errDoesNotExist',
           'unsatisfiable': 'errUnsatisfiable',
         }[error.key],
         { detail: error.detail, existing: t(existingKey(error)) },

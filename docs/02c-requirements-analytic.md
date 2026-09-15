@@ -764,3 +764,17 @@ and consumes no freedom. The object may be a side, a segment, a named line, a li
 equation, or an axis, and all of them are one sentence with one resolver. A point already placed off the
 object is refused, naming the statement; a bound that can never be met on a determined figure is
 reported rather than drawn around.
+
+**R54 — a given the figure already ENTAILS is said, not recorded**
+([ADR-AG-030](06c-decisions-analytic.md#adr-ag-030)). Stating something a determined figure already
+satisfies adds no row and is answered «זה כבר נובע מהנתונים שכתבתם» — a different sentence from R45's
+«כבר ידוע», because the student did not repeat themselves. **A given that holds only at the current
+sample is NOT this case**: it must remove no freedom as well as hold, or a real given would be silently
+discarded.
+
+**R55 — an object that cannot exist is REPORTED once the figure has no freedom left**
+([ADR-AG-031](06c-decisions-analytic.md#adr-ag-031)). A degenerate configuration is silent while another
+configuration may yet have the object — that is R-level ADR-AG-008 and it stands. When every point is
+fixed there is no other configuration, so «מפגש האלכסונים» of a concave quadrilateral, the circumcentre
+of three collinear points and an empty circle are each named as not existing, rather than left absent
+with nothing said.

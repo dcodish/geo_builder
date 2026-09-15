@@ -108,12 +108,29 @@ describe('the closed forms, against properties rather than against themselves', 
 });
 
 describe('a degenerate configuration is VACANT, never a fault and never a NaN point', () => {
-  it('reports the point as absent at this configuration, and raises nothing', () => {
+  it('reports the point as absent, and never as a NaN', () => {
+    /**
+     * The vacancy half is unchanged and is what this case is really for: `P` is ABSENT rather than a
+     * NaN point, and the honest lines around it still land.
+     *
+     * The «raises nothing» half FLIPPED in #1058, and this figure is that issue's own second example.
+     * `A(0,0) B(1,1) C(2,2)` are pinned and collinear, so there is no configuration in which they have
+     * a circumcentre — ADR-AG-008's "not at THIS value" presupposes other values, and here there are
+     * none. Silence told the student nothing about a point they had named.
+     */
     const d = derive(['A(0,0)', 'B(1,1)', 'C(2,2)', 'P מפגש האנכים האמצעיים במשולש ABC']);
-    expect(d.faults).toEqual([]); // "not at this configuration" is not an error (ADR-AG-008)
     expect(d.figure.vacant.map((v) => v.id)).toEqual(['P']);
     expect(d.figure.points.map((p) => p.id)).toEqual(['A', 'B', 'C']);
     expect(d.figure.points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))).toBe(true);
+    expect(d.faults.map((f) => f.code)).toEqual(['does-not-exist']);
+  });
+
+  it('…but stays SILENT while the figure can still move — ADR-AG-008, in its own scope', () => {
+    // Three FREE vertices: at this seed they may be near-collinear, and another configuration will
+    // have a circumcentre. That is the case the rule was written for, and it must not be reported.
+    const d = derive(['משולש ABC', 'P מפגש האנכים האמצעיים במשולש ABC']);
+    expect(d.figure.carrierDof).toBeGreaterThan(0);
+    expect(d.faults).toEqual([]);
   });
 });
 
@@ -319,5 +336,48 @@ describe('#1043 — the diagonal meet lies ON both diagonals', () => {
     const pts = { A: { x: 0, y: 0 }, B: { x: 4, y: 0 }, C: { x: 1, y: 1 }, D: { x: 0, y: 4 } };
     const out = evalRule({ t: 'diagonals', v: ['A', 'B', 'C', 'D'] }, at(pts));
     expect(out).toBeNull();
+  });
+});
+
+/**
+ * #1058 — a point that CANNOT exist says why, instead of being silently absent.
+ *
+ * The operator, playing round #1056's T12: *"we should not accept this input as is since it doesnt
+ * exist. we should put a message to user about why its not drawn and not accept the input."*
+ *
+ * Measured then: `dof = 0` at every seed on the reported figure, so "not at this configuration" was
+ * vacuously "never". ADR-AG-008 is AMENDED, not overturned — its silence is right wherever the figure
+ * still has freedom, and the amendment is that the distinction needs a predicate.
+ */
+describe('#1058 — vacancy needs a predicate', () => {
+  const codes = (lines: string[]) => derive(lines, 0).faults.map((f) => f.code);
+
+  it('reports the concave diagonal meet — the operator’s reported figure', () => {
+    expect(codes(['A(0,0)', 'B(4,0)', 'C(1,1)', 'D(0,4)', 'G מפגש האלכסונים במרובע ABCD'])).toEqual([
+      'does-not-exist',
+    ]);
+  });
+
+  it('reports the wider class the issue named — a collinear circumcentre', () => {
+    expect(codes(['A(0,0)', 'B(1,1)', 'C(2,2)', 'P מפגש האנכים האמצעיים במשולש ABC'])).toEqual([
+      'does-not-exist',
+    ]);
+  });
+
+  it('names WHAT does not exist, so the message can say it', () => {
+    // The same `existing` token #1046 introduced for a name clash, reused rather than re-invented —
+    // the locale renders «מפגש האלכסונים», never `derived:diagonals`.
+    const d = derive(['A(0,0)', 'B(4,0)', 'C(1,1)', 'D(0,4)', 'G מפגש האלכסונים במרובע ABCD'], 0);
+    expect(d.faults[0].existing).toBe('derived:diagonals');
+  });
+
+  it('stays SILENT while the figure can still move — ADR-AG-008 intact', () => {
+    // The amendment's whole point: this figure has freedom, so another configuration may have the
+    // point, and «הציגו תצורה אחרת» can reach it. Reporting here would be the opposite defect.
+    expect(codes(['מרובע ABCD', 'G מפגש האלכסונים במרובע ABCD'])).toEqual([]);
+  });
+
+  it('a convex quadrilateral is unaffected', () => {
+    expect(codes(['A(0,0)', 'B(4,0)', 'C(4,4)', 'D(0,4)', 'G מפגש האלכסונים במרובע ABCD'])).toEqual([]);
   });
 });

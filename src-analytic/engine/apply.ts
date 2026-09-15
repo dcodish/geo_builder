@@ -47,6 +47,14 @@ export type ApplyErrorCode =
    * needs no topological sort (`carriers.ts` `depsPrecedeDependents`).
    */
   | 'unknown-reference'
+  /**
+   * A named object that cannot exist in this figure at all (#1058).
+   *
+   * Distinct from `unsatisfiable`, which is a given the solve could not MEET. This one is a construct
+   * whose definition has no answer here — a concave quadrilateral's diagonal meet, three collinear
+   * points' circumcentre — in a figure with no freedom left to try elsewhere.
+   */
+  | 'does-not-exist'
   /** A stated given the solve could not satisfy — reported, never drawn as if it held. */
   | 'unsatisfiable';
 

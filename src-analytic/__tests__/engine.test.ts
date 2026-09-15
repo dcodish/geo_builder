@@ -11,6 +11,7 @@ import { evaluate, isKnowledge, sampleParam, viewBox } from '../engine/evaluate'
 import { constValue, evalExpr, parseExpr, symbolsOf } from '../engine/expr';
 import { applyFact, fold } from '../engine/apply';
 import { derive } from '../engine/derive';
+import { reportedDof } from '../engine/carriers';
 import { inDomain, pointsOf, type Construction, type Fact } from '../engine/types';
 import { equationExpr, parseLine } from '../parser/parseAnalytic';
 
@@ -354,13 +355,31 @@ describe('#896 — a non-canonical conic is refused by name, not dropped', () =>
   });
 
   it('a genuinely VACANT curve is NOT a fault — an empty circle at this parameter value', () => {
-    // r² = −1 has no circle at this sample. The type calls that "not an error", the domain filter
-    // needs to observe it, and reporting it as a refusal would be the opposite defect.
+    /**
+     * ADR-AG-008's rule, tested **within its own scope** (#1058).
+     *
+     * The rule is about a figure that still has freedom: an empty circle *at this parameter value*,
+     * where another value gives a real one. This case used a circle with NO parameter (`x²+y²+1=0`),
+     * where "at this value" is vacuous — the same conflation #1058 identified, and the version below
+     * is what the rule actually says. The evaluation-level assertions are unchanged; only the
+     * `derive` one needed a figure the rule applies to.
+     */
     const c = fold(lines(['משוואת המעגל x^2+y^2+1=0'])).construction;
     const f = evaluate(c, 0);
     expect(f.curves).toHaveLength(0);
     expect(f.vacant.map((v) => v.reason)).toEqual(['vacant']);
-    expect(derive(['משוואת המעגל x^2+y^2+1=0']).faults).toEqual([]);
+
+    // A circle that is empty for a<0 and real for a>0: the figure can move, so silence is right and
+    // «הציגו תצורה אחרת» can reach a configuration where it exists.
+    const free = derive(['a הוא פרמטר', 'משוואת המעגל x^2+y^2-a=0']);
+    expect(free.figure.carrierDof + free.construction.params.length).toBeGreaterThan(0);
+    expect(free.faults).toEqual([]);
+  });
+
+  it('but a curve that can NEVER exist is reported — the predicate (#1058)', () => {
+    // `x²+y²+1=0` carries no parameter, so there is no other configuration to reach. Staying silent
+    // tells the student nothing about a curve they wrote.
+    expect(derive(['משוואת המעגל x^2+y^2+1=0']).faults.map((f) => f.code)).toEqual(['does-not-exist']);
   });
 });
 
@@ -563,5 +582,82 @@ describe('#1065 — a stated length labels the segment; a derived one does not',
   it('every drawn segment knows whose endpoints it has', () => {
     const d = derive(['משולש ABC'], 0);
     expect(d.figure.segments.map((s) => s.ends.join('')).sort()).toEqual(['AB', 'BC', 'CA']);
+  });
+});
+
+/**
+ * #1063 — a given the figure ALREADY ENTAILS says so, and adds no row.
+ *
+ * The operator, playing #1062's own fix: *"B11 says area is 6 but that is already known at this point
+ * so we should say this is known. B on x-axis should also fall into the already known category."*
+ *
+ * #1045 catches a RESTATEMENT — the same fact twice, decided structurally in `applyFact`. This is the
+ * larger notion: «שטח המשולש ABC הוא 6» on a determined triangle was never stated before, it is simply
+ * true and already settled. B11 and B12 were written as the GUARDS proving #1062 had not overreached,
+ * and they showed the opposite gap: #1062 makes the tool notice a given is false, this is it noticing
+ * a given is redundant.
+ *
+ * The decision lives in the submit path because it needs the figure BEFORE and AFTER, which
+ * `applyFact` cannot see — it judges one fact against one construction. These cases reproduce that
+ * decision exactly.
+ */
+describe('#1063 — a given that adds nothing is said, not recorded', () => {
+  const verdict = (before: string[], line: string): string => {
+    const parsed = parseLine(line);
+    if (!parsed.ok) return `refused:${parsed.code}`;
+    const d = derive(before, 0);
+    const trial = derive([...before, line], 0);
+    const fault = trial.faults.find((f) => f.index === before.length);
+    if (fault) return `refused:${fault.code}`;
+    if (trial.outcomes[before.length] === 'known') return 'restated';
+    const gained =
+      trial.construction.objects.length - d.construction.objects.length +
+      (trial.construction.params.length - d.construction.params.length) +
+      (trial.construction.selectors.length - d.construction.selectors.length);
+    const same =
+      reportedDof(trial.construction, trial.figure.carrierDof) ===
+      reportedDof(d.construction, d.figure.carrierDof);
+    return parsed.facts.length > 0 && gained === 0 && trial.figure.unsatisfied.length === 0 && same
+      ? 'entailed'
+      : 'recorded';
+  };
+
+  const PINNED = ['A(0,0)', 'B(4,0)', 'C(0,3)'];
+
+  it('says so for a given the determined figure already satisfies', () => {
+    expect(verdict(PINNED, 'שטח המשולש ABC הוא 6')).toBe('entailed'); // the operator's B11
+    expect(verdict(PINNED, 'B נמצא על ציר ה-x')).toBe('entailed'); // the operator's B12
+    expect(verdict(PINNED, 'AB מאונך ל-AC')).toBe('entailed');
+    expect(verdict(PINNED, 'AB מקביל לציר ה-x')).toBe('entailed');
+  });
+
+  it('still REFUSES the same sentences when they are false', () => {
+    expect(verdict(PINNED, 'שטח המשולש ABC הוא 999')).toBe('refused:unsatisfiable');
+    expect(verdict(PINNED, 'C נמצא על ציר ה-x')).toBe('refused:unsatisfiable');
+  });
+
+  it('records a given that is true HERE but not NECESSARILY — the counter-case', () => {
+    /**
+     * The reason "the residual is zero" is not enough. On a free triangle «AB מקביל לציר x» is
+     * satisfied at seed 0 only because the sampler put it there; the constraint is real and removes a
+     * degree of freedom. Calling it "already known" would silently discard a stated given, which is
+     * the defect this product exists to avoid.
+     */
+    expect(verdict(['משולש ABC'], 'AB מקביל לציר ה-x')).toBe('recorded');
+    expect(verdict(['משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('recorded');
+    expect(verdict(['A(0,0)', 'משולש ABC'], 'B נמצא על ציר ה-x')).toBe('recorded');
+  });
+
+  it('never swallows a line that brings something NEW', () => {
+    // The test is on what the construction GAINED, not on the sentence's fact kinds — which is what
+    // makes the absorbed `declare` in «B נמצא על ציר ה-x» above come out right.
+    expect(verdict(PINNED, 'D(9,9)')).toBe('recorded');
+    expect(verdict(PINNED, 'הקטע AB')).toBe('recorded');
+    expect(verdict(PINNED, 'k הוא פרמטר')).toBe('recorded');
+    expect(verdict([...PINNED, 'משולש ABC'], 'D על הצלע BC')).toBe('recorded');
+  });
+
+  it('leaves #1045 alone: a structural restatement is still "restated"', () => {
+    expect(verdict([...PINNED, 'שטח המשולש ABC הוא 6'], 'שטח המשולש ABC הוא 6')).toBe('restated');
   });
 });

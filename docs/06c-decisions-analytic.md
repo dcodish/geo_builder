@@ -1874,3 +1874,97 @@ keeps the three lines that are still genuinely prose and asserts the three that 
 **Consequences.** `src-analytic` 318 → 325 tests. The `on-curve` carrier family finally has members, and
 [#1046](https://github.com/dcodish/geo_builder/issues/1046)'s `P(t,t)` — a student improvising around
 this gap — is now a notation question rather than the only way to say the thing.
+
+## ADR-AG-030 — A given the figure already ENTAILS is said, not recorded (#1063)
+
+**Status:** accepted, 2026-09-15 · **Extends:** [ADR-AG-020](#adr-ag-020) (#1045) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R54. **Design:**
+[04c](04c-design-analytic.md) "The submit path's three answers" — now four.
+
+**Context.** The operator, playing [#1062](https://github.com/dcodish/geo_builder/issues/1062)'s own
+fix: *"B11 says area is 6 but that is already known at this point so we should say this is known. B on
+x-axis should also fall into the already known category."*
+
+B11 and B12 were written as the GUARDS proving #1062 had not overreached — that a TRUE given on a
+determined figure stays silent — and they exposed the opposite gap. **#1062 made the tool notice a
+given is false; this is it noticing a given is redundant.** The same question asked in both directions.
+
+**Why [ADR-AG-020](#adr-ag-020) could not see it.** #1045's `known` is decided in `applyFact` by
+STRUCTURAL comparison: is this fact already in the list? «שטח המשולש ABC הוא 6» on a determined triangle
+was never stated before. It is simply *true and already settled*, which is a property of the whole
+figure and invisible to a function that judges one fact against one construction.
+
+**The predicate, measured.** Two conditions, and neither alone is enough:
+
+| case | dof before → after | holds | verdict |
+| --- | --- | --- | --- |
+| area is 6, determined figure | 0 → 0 | yes | **entailed** |
+| `B` on the x-axis, and it is | 0 → 0 | yes | **entailed** |
+| area is 999 | 0 → 0 | **no** | refused |
+| free triangle, `AB ∥ ציר x` | 6 → **5** | yes | **recorded** |
+| free triangle, area is 6 | 6 → **5** | yes | **recorded** |
+
+**The counter-case is why "the residual is zero" is not enough.** On a free triangle «AB מקביל לציר x»
+is satisfied at seed 0 only because the sampler put it there; the constraint is real and removes a
+degree of freedom. Calling it "already known" would **silently discard a stated given**, which is the
+defect this product exists to avoid. The freedom test is what separates *"true here"* from *"true
+necessarily"*.
+
+**The test is on what the figure GAINED, not on the sentence's fact kinds.** The first draft asked
+whether the line lowered to constraints only — and that answer changed under it when
+[ADR-AG-029](#adr-ag-029) taught the axis rule to declare its point. «B נמצא על ציר ה-x» then emitted a
+`declare` that is absorbed because `B` exists, and a fact-kind test called the line new. Comparing the
+construction's objects, params and selectors before and after asks the question that actually matters
+and cannot go stale when a rule changes what it emits.
+
+A NEW SELECTOR counts as contributing even when it happens to hold, because a selector consumes no
+freedom by design and the DOF comparison cannot see it. That is the conservative direction: it records
+a line that arguably added nothing, rather than discarding one that did.
+
+**It costs nothing.** Both derivations already exist in `App.submit` — the current figure and the dry
+run the submit path has always done.
+
+**Consequences.** The message is its own — «זה כבר נובע…» rather than «כבר ידוע…» — because the student
+did not repeat themselves; they stated something the figure had already settled, which is worth telling
+them differently. `src-analytic` 325 → 330 tests.
+
+## ADR-AG-031 — Vacancy needs a PREDICATE, and ADR-AG-008 is amended rather than overturned (#1058)
+
+**Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-008](#adr-ag-008) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R55. **Design:** none (internal to `derive`).
+
+**Context.** The operator, playing round #1056's T12: *"we should not accept this input as is since it
+doesnt exist. we should put a message to user about why its not drawn and not accept the input."*
+
+[ADR-AG-021](#adr-ag-021) had just fixed the half that INVENTED a diagonal meet on a concave
+quadrilateral. The absence was then correct — and silent.
+
+**ADR-AG-008's rule is right, and it is a statement about a figure that still has freedom.** *"Not at
+this parameter value"* presupposes there are other values. Measured on the reported figure: **`dof = 0`
+at every seed.** There is no other configuration; «הציגו תצורה אחרת» can never help; the student named a
+point and the tool declined to have one without saying so.
+
+**Decision: silent while the figure can still move, reported once it cannot.** The rule keeps its scope
+and gains its predicate. A new refusal code, `does-not-exist`, distinct from `unsatisfiable` — that is a
+given the solve could not MEET, this is a construct whose definition has no answer here.
+
+**The class is wider than the diagonals**, which is why it is a predicate and not a special case: three
+collinear points have no circumcentre, for ever, and behaved the same way. So does a circle written
+`x²+y²+1=0`.
+
+**Two of ADR-AG-008's own locks flipped, and reading them was the interesting part.** Both asserted that
+vacancy raises nothing — one on three pinned collinear points, one on `x²+y²+1=0`. **Neither figure has
+a parameter**, so both were testing the rule *outside its own stated scope*: "at this parameter value"
+is vacuous when there is no parameter. They now assert the reported behaviour, and each gained a sibling
+that exercises the rule where it does apply — a free triangle, and a circle whose radius depends on a
+free `a`. The amendment is locked from both sides.
+
+**It reuses [ADR-AG-017](#adr-ag-017)'s `existing` token**, so the message names «מפגש האלכסונים» rather
+than `derived:diagonals` — the engine stays language-free and the locale renders the construct's own
+corpus noun.
+
+**Consequences.** `src-analytic` 330 → 337 tests.

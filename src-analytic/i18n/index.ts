@@ -64,6 +64,9 @@ const he = {
     'אפשר לבחור אות אחרת, או למחוק את ההגדרה הקודמת ולכתוב אותה מחדש.',
   errUnknownRef: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
+  errDoesNotExist:
+    'בשרטוט הזה {{existing}} לא קיים — הנתונים כבר קובעים את כל הנקודות, ואין תצורה אחרת שבה הוא ' +
+    'היה קיים. המשפט "{{detail}}" לא נוסף.',
   errReservedCoordinate:
     'האותיות x ו-y שמורות לצירי מערכת הצירים, ולכן אי אפשר להשתמש בהן כנעלם בשיעורי נקודה: "{{detail}}". ' +
     'אפשר להשתמש באות אחרת, למשל M(3,t).',
@@ -92,6 +95,10 @@ const he = {
   // Informational, NOT a refusal (#1045): the student restated something the figure already holds,
   // so the message confirms they were right and explains why no row appeared.
   noticeAlreadyKnown: 'זה כבר ידוע מהנתונים שכתבתם, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
+  // A different sentence from «כבר ידוע» on purpose (#1063): the student did NOT repeat themselves —
+  // they stated something the figure had already settled, which is a thing worth telling them.
+  noticeAlreadyFollows:
+    'זה כבר נובע מהנתונים שכתבתם — השרטוט מקיים את זה ממילא, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
 };
 
 const en: typeof he = {
@@ -139,6 +146,9 @@ const en: typeof he = {
     'restate it.',
   errUnknownRef: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
+  errDoesNotExist:
+    'In this figure {{existing}} does not exist — the givens already fix every point, and there is ' +
+    'no other configuration where it would. "{{detail}}" was not added.',
   errReservedCoordinate:
     'The letters x and y name the axes, so they cannot be a point\'s unknown: "{{detail}}". ' +
     'Use another letter — for example M(3,t).',
@@ -167,6 +177,8 @@ const en: typeof he = {
   kindCircumcentre: 'the circumcentre',
   kindDiagonalMeet: 'the intersection of the diagonals',
   noticeAlreadyKnown: 'That is already known from what you have written, so I did not add another row: "{{detail}}"',
+  noticeAlreadyFollows:
+    'That already follows from what you have written — the figure satisfies it anyway, so I did not add another row: "{{detail}}"',
 };
 
 export const analyticI18n = createProductI18n({

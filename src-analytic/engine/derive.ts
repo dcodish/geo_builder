@@ -6,12 +6,12 @@
  * that fails is reported with its own index and its own words — never dropped, and never blamed on
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
-import { fold, type ApplyError } from './apply';
+import { fold, existingKindOf, type ApplyError } from './apply';
 import { reportedDof } from './carriers';
 import { evaluate, viewBox, type Figure } from './evaluate';
 import type { Box } from './curves';
 import { parseLine, type ParseFailure } from '../parser/parseAnalytic';
-import { EMPTY_CONSTRUCTION, type Construction, type Fact } from './types';
+import { EMPTY_CONSTRUCTION, objectById, type Construction, type Fact } from './types';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
 export interface LineFault {
@@ -139,11 +139,39 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   facts.forEach((f, i) => {
     if (f.t !== 'param' && f.t !== 'constraint' && f.t !== 'selector' && f.t !== 'declare' && !lineOf.has(f.id)) lineOf.set(f.id, owner[i]);
   });
+  /**
+   * VACANCY NEEDS A PREDICATE (#1058).
+   *
+   * [ADR-AG-008](../../docs/06c-decisions-analytic.md#adr-ag-008) rules that a degenerate
+   * configuration is vacant and **never a fault**: an empty circle at this parameter value is "not at
+   * this value", and reporting it as a refusal would be the opposite defect. That is right — and it is
+   * a statement about a figure that still has FREEDOM LEFT. "Not at this value" presupposes there are
+   * other values.
+   *
+   * A fully determined figure has none. «מפגש האלכסונים» on a concave quadrilateral is absent at every
+   * seed, because there is only one configuration and the diagonals do not cross in it. Staying silent
+   * there tells the student nothing about a point they named, and «הציגו תצורה אחרת» can never help.
+   *
+   * So the distinction keeps its rule and gains its predicate: **silent while the figure can still
+   * move, reported once it cannot.** The class is wider than the diagonals — three collinear points
+   * have no circumcentre, for ever, and behaved the same way.
+   */
+  const freedom = reportedDof(construction, figure.carrierDof);
   for (const v of figure.vacant) {
-    if (v.reason === 'vacant') continue;
     const index = lineOf.get(v.id);
     if (index === undefined) continue; // no line owns it — nothing honest to say about it
-    faults.push({ index, code: 'out-of-scope', detail: lines[index] });
+    if (v.reason !== 'vacant') {
+      faults.push({ index, code: 'out-of-scope', detail: lines[index] });
+      continue;
+    }
+    if (freedom > 0) continue; // another configuration may yet have it
+    const o = objectById(construction, v.id);
+    faults.push({
+      index,
+      code: 'does-not-exist',
+      detail: lines[index],
+      existing: o ? existingKindOf(o) : undefined,
+    });
   }
 
   /**
