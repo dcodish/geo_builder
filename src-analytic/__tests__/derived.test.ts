@@ -190,6 +190,43 @@ describe('M1 — restating a construction is absorbed, contradicting it is refus
     const d = derive(['A(8,1)', 'B(-2,-5)', 'C(0,0)', 'M אמצע AB', 'M אמצע AC']);
     expect(d.faults.map((f) => f.code)).toEqual(['conflicting-restatement']);
   });
+
+  /**
+   * Operator-reported, 2026-09-15: a figure with **two points called M**.
+   *
+   * `M מפגש התיכונים במשולש ABC` then `M(3,c)` created a `derived` M *and* a `point` M, both drawn,
+   * with no refusal at all — so the canvas showed one name twice and every later reference to `M`
+   * bound to whichever came first.
+   *
+   * The cause was that each case asked only about the kinds it happened to know: the point case
+   * checked for a curve and stopped. B4 added three kinds and none of them was visible to it. The
+   * gate now compares `prior.kind` to `f.t` and enumerates nothing, so it cannot go stale again —
+   * which is why the reverse order is tested too: a per-kind check tends to be fixed in one
+   * direction only.
+   */
+  it.each([
+    ['derived first, then a coordinate', ['A(8,-2)', 'B(1,1)', 'C(0,4)', 'M מפגש התיכונים במשולש ABC', 'M(3,5)']],
+    ['coordinate first, then derived', ['A(8,-2)', 'B(1,1)', 'C(0,4)', 'M(3,5)', 'M מפגש התיכונים במשולש ABC']],
+  ])('one name cannot be two kinds — %s', (_name, lines) => {
+    const d = derive(lines);
+    expect(d.faults.map((f) => f.code)).toEqual(['name-kind-clash']);
+    const ids = d.construction.objects.map((o) => o.id);
+    expect(ids.filter((x) => x === 'M')).toHaveLength(1);
+    expect(d.figure.points.filter((p) => p.id === 'M')).toHaveLength(1);
+  });
+
+  it('no id is ever held by two objects, whatever the kinds', () => {
+    // The invariant the bug violated, asserted directly rather than case by case — a fifth object
+    // kind that forgot the gate would fail here rather than shipping a duplicate.
+    const d = derive([
+      'A(8,-2)', 'B(1,1)', 'C(0,4)',
+      'משולש ABC', 'הקטע AB',
+      'M מפגש התיכונים במשולש ABC',
+      'P מפגש האנכים האמצעיים במשולש ABC',
+    ]);
+    const ids = d.construction.objects.map((o) => o.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
 });
 
 describe('the honesty gate reaches derived points too', () => {
