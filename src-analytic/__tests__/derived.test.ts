@@ -12,7 +12,7 @@ import { fold } from '../engine/apply';
 import { depsPrecedeDependents, dofCount, objectDeps } from '../engine/carriers';
 import { derive } from '../engine/derive';
 import { evaluate, isKnowledge } from '../engine/evaluate';
-import { circumcentre, incentre, orthocentre } from '../engine/derived';
+import { circumcentre, diagonalMeet, evalRule, incentre, orthocentre } from '../engine/derived';
 import { parseLine } from '../parser/parseAnalytic';
 import type { Fact } from '../engine/types';
 
@@ -246,5 +246,78 @@ describe('the honesty gate reaches derived points too', () => {
     // Counting the midpoint's own freedom would report 2 DOF for the one unknown `a`.
     expect(dofCount(build(['A(-9a,0)', 'B(3,4)', 'M אמצע AB']))).toBe(1);
     expect(dofCount(build(['A(8,1)', 'B(-2,-5)', 'M אמצע AB']))).toBe(0);
+  });
+});
+
+/**
+ * #1043 — «מפגש האלכסונים» is the meet of two SEGMENTS, not of their supporting lines.
+ *
+ * From a Codex review, and confirmed by measurement before the fix: a concave quadrilateral got a
+ * point at `t = 2` along a diagonal that ends at `t = 1` — committed with no fault, drawn, and
+ * printed in the data panel as a coordinate the student can read off the figure. An invented point
+ * is the same class of defect as a dropped given: the figure says something the sentence does not.
+ */
+describe('#1043 — the diagonal meet lies ON both diagonals', () => {
+  const at = (pts: Record<string, { x: number; y: number }>) => (id: string) => pts[id] ?? null;
+
+  it('is absent for a concave quadrilateral whose diagonals do not cross', () => {
+    // The reported figure. Before the fix this returned (2,2): AC runs (0,0)→(1,1), so t = 2 is
+    // twice past its own endpoint.
+    expect(diagonalMeet({ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 4 })).toBeNull();
+  });
+
+  it('is absent for the reviewer’s own figure too', () => {
+    expect(
+      diagonalMeet({ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 0.5, y: 0.5 }, { x: 0, y: 2 }),
+    ).toBeNull();
+  });
+
+  it('still meets for a convex quadrilateral, where the diagonals really do cross', () => {
+    const m = diagonalMeet({ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 4 }, { x: 0, y: 4 });
+    expect(m?.x).toBeCloseTo(2, 9);
+    expect(m?.y).toBeCloseTo(2, 9);
+  });
+
+  it('still meets for a non-square convex quadrilateral', () => {
+    // The catalog's own figure, whose expected meet was checked by hand in ADR-AG-013: (1.5, 1.5).
+    const m = diagonalMeet({ x: -2, y: 1 }, { x: 4, y: 5 }, { x: 5, y: 2 }, { x: -1, y: -2 });
+    expect(m).not.toBeNull();
+  });
+
+  it('accepts a crossing exactly ON a vertex — the interval is CLOSED', () => {
+    // A(0,0) B(4,0) C(2,2) D(0,4): BD runs (4,0)→(0,4) and passes exactly through C, so the meet
+    // sits at t = 1 — the far ENDPOINT of diagonal AC. The diagonals genuinely touch there, so it is
+    // a meet rather than an absence. Ruled explicitly rather than left to whichever way the
+    // tolerance happened to fall.
+    const m = diagonalMeet({ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 2, y: 2 }, { x: 0, y: 4 });
+    expect(m).not.toBeNull();
+    expect(m?.x).toBeCloseTo(2, 9);
+    expect(m?.y).toBeCloseTo(2, 9);
+  });
+
+  it('is absent when the diagonals are parallel — unchanged', () => {
+    expect(diagonalMeet({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 2 }, { x: 3, y: 2 })).toBeNull();
+  });
+
+  it('scales: a large thin quadrilateral is judged the same way as a small one', () => {
+    // Relative tolerance, not absolute — the corpus has figures spanning 3 units and 3000.
+    const small = diagonalMeet({ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 4 }, { x: 0, y: 4 });
+    const big = diagonalMeet(
+      { x: 0, y: 0 },
+      { x: 4000, y: 0 },
+      { x: 4000, y: 4000 },
+      { x: 0, y: 4000 },
+    );
+    expect(small).not.toBeNull();
+    expect(big).not.toBeNull();
+    expect(big?.x).toBeCloseTo(2000, 6);
+  });
+
+  it('reports the point ABSENT through the rule evaluator, never NaN', () => {
+    // The vacancy path: `evalRule` propagates null and the figure reports the point absent at this
+    // configuration — ADR-AG-008's distinction, applied here.
+    const pts = { A: { x: 0, y: 0 }, B: { x: 4, y: 0 }, C: { x: 1, y: 1 }, D: { x: 0, y: 4 } };
+    const out = evalRule({ t: 'diagonals', v: ['A', 'B', 'C', 'D'] }, at(pts));
+    expect(out).toBeNull();
   });
 });
