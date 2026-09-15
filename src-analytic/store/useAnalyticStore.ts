@@ -24,6 +24,8 @@ export type InputError =
   | { key: 'bad-arity'; detail: string }
   /** One label used for two vertices of the same figure (#1042). */
   | { key: 'repeated-vertex'; detail: string }
+  /** A relation whose verb was understood and whose operand was not (#1052). */
+  | { key: 'bad-operand'; detail: string }
   /** The statement contradicts what an earlier statement already fixed. */
   | { key: 'conflicting-restatement'; detail: string }
   /**

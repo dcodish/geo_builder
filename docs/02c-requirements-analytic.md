@@ -710,3 +710,18 @@ the familiar one, so seed 0 may draw the right-opening parabola; every later con
 to reach the other sign, and «הציגו תצורה אחרת» must get there in a few presses rather than by luck.
 Sampling must still stay away from a degenerate value (`a = 0` collapses `y²=2ax` to a doubled axis),
 which is vacancy rather than a configuration worth showing.
+
+**R47 — a relation is between two DIRECTIONS, and one definition serves them all**
+([ADR-AG-024](06c-decisions-analytic.md#adr-ag-024)). «מקביל» and «מאונך»/«ניצב» hold between any two
+things that have a direction: a segment, a polygon side, a named line, an axis. The student may write
+any of them on either side, and the tool must accept the full synonym run and the optional particles.
+**A stated slope is the same algebra** — parallel is equal slope — so the two share one definition; a
+tool that could state a parallelism one way and measure it another would disagree with itself about
+the same figure. A vertical segment has no slope, and a stated slope over one is refused rather than
+satisfied.
+
+**R48 — a given is checked whether or not the figure had freedom to spare**
+([ADR-AG-024](06c-decisions-analytic.md#adr-ag-024), [#1062](https://github.com/dcodish/geo_builder/issues/1062)).
+A student who places four points and then states what the question told them is exactly the student
+who most wants to know their reading was right. Whether any carrier was free to move is a fact about
+the SOLVER, not about whether the given holds, and it may not decide whether the student is told.

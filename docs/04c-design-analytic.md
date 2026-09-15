@@ -163,6 +163,43 @@ counter and the notice agree: they read one answer rather than each re-deriving 
 the existing declaration — absorbed — but adds information, so it is a real given and belongs in the
 list. Collapsing it into "already known" would silently drop a stated given.
 
+## Relations, and the direction resolver ([ADR-AG-024](06c-decisions-analytic.md#adr-ag-024))
+
+Four things in this grammar have a direction:
+
+| operand | written | resolves to |
+| --- | --- | --- |
+| a segment / a polygon side | `DE`, `הצלע AB` | `B − A`, from the placed points |
+| a named line | `ℓ1`, `הישר l1` | `(−b, a)` from its resolved `ax + by + c = 0` |
+| an axis | `ציר ה-x` | a fixed unit vector — needs no figure at all |
+
+`direction(phrase)` produces one of these in the parser; a `relation` constraint carries two of them;
+the residual relates them. **Sixteen operand pairs, one implementation** — and the relation never
+learns what kind of phrase produced its operands.
+
+**The vectors are normalised.** A relation between a 3-unit segment and a 3000-unit one must converge
+alike; an un-normalised cross product lets the longer operand dominate the minimisation for no
+geometric reason.
+
+**A slope is `dy = m·dx`.** The quotient form has a pole at a vertical segment, and a residual that
+blows up is a residual the minimiser cannot cross — the solution path would be unreachable through it.
+This way a vertical segment simply fails the given.
+
+**A named line is resolved by the CALLER.** `solve.ts` resolves points by id and knows nothing about
+curves; `evaluate` hands it `lineDirOf(c, env)`. That keeps the classifier out of the solver, and an
+operand that cannot be resolved reports "cannot be judged" exactly as an absent point does.
+
+**The check is not the solve** ([#1062](https://github.com/dcodish/geo_builder/issues/1062)). Residuals
+are measured against the configuration that was reached, whether or not a solve ran — a figure with no
+free carriers has nothing to *move* and still has givens that must *hold*. The solve is an attempt to
+reach a configuration; the check is the report on the one reached.
+
+**A noun gate declines a tail that is not an equation** ([#1059](https://github.com/dcodish/geo_builder/issues/1059)).
+Every `matchCurve` branch ends in `(.+)`, which is right for «נתון הישר ℓ1: 4y-3x-20=0» and wrong for
+«הישר DE מקביל לישר BF». The discriminator is that the tail contains **no Hebrew** — not that it
+contains an `=`, because a truncated equation has no `=` either and that student needs the opposite
+answer.
+
 ## Born after the chassis
 
 This is the **first builder created after `shell/` existed**, and the difference shows in what it did

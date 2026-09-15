@@ -19,7 +19,8 @@ export type CatalogCategory =
   | 'circles'
   | 'conics'
   | 'shapes'
-  | 'derived';
+  | 'derived'
+  | 'relations';
 
 export interface CatalogEntryAnalytic {
   category: CatalogCategory;
@@ -30,7 +31,7 @@ export interface CatalogEntryAnalytic {
    * families, read from the 572 conic corpus; F16/F17 come from the «lines and points» corpus
    * (02c §8) and are the first entries whose source is a different exam topic.
    */
-  family: 'F1' | 'F3' | 'F5' | 'F6' | 'F11' | 'F16' | 'F17';
+  family: 'F1' | 'F3' | 'F5' | 'F6' | 'F11' | 'F16' | 'F17' | 'F18' | 'F19';
   /**
    * Lines that must be typed BEFORE this one for it to mean anything — «M אמצע AB» needs A and B.
    *
@@ -113,6 +114,50 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'מרובע ABCD',
     en: 'quadrilateral ABCD',
     needs: ['A(-2,1)', 'B(4,5)', 'C(5,2)', 'D(-1,-2)'],
+  },
+
+  // --- F18 · relations between DIRECTIONS (#1052) ---
+  // One relation over four kinds of operand — a segment, a polygon side, a named line, an axis.
+  // The entries below walk the OPERANDS deliberately, because that is what the resolver has to get
+  // right; a catalog that listed four phrasings of the same operand would prove nothing.
+  {
+    category: 'relations',
+    family: 'F18',
+    he: 'AB מקביל ל-DC',
+    en: 'AB is parallel to DC',
+    needs: ['מרובע ABCD'],
+  },
+  {
+    category: 'relations',
+    family: 'F18',
+    he: 'הצלע AB מאונכת לצלע BC',
+    en: 'side AB is perpendicular to side BC',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F18',
+    he: 'AB מקביל לציר ה-x',
+    en: 'AB is parallel to the x-axis',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F18',
+    he: 'AB מאונך לישר l1',
+    en: 'AB is perpendicular to line l1',
+    needs: ['נתון הישר l1: y=x', 'משולש ABC'],
+  },
+
+  // --- F19 · slope as a GIVEN (#1051) ---
+  // The same direction algebra as F18 — parallel IS equal slope — so the two share one definition
+  // and the tool cannot state a slope one way and a parallelism another.
+  {
+    category: 'relations',
+    family: 'F19',
+    he: 'שיפוע AB הוא 2',
+    en: 'the slope of AB is 2',
+    needs: ['משולש ABC'],
   },
 
   // --- F16 · derived points over stated vertices (02c §8) ---

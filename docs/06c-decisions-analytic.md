@@ -1474,3 +1474,78 @@ their conflict may be semantic and produce no merge conflict at all.** Git merge
 **Consequences.** Locked by four cases in `engine.test.ts` asserting the property of the pair — the
 noun and bare forms of a parabola and of an ellipse are each one object, two different conics are still
 two, and every unnamed curve of all four families shares the namespace while the named ones do not.
+
+## ADR-AG-024 — A relation is between two DIRECTIONS, and the resolver is the design (#1052 #1051)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1061](https://github.com/dcodish/geo_builder/issues/1061)
+(analytic batch B, the relation vocabulary)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R47. **Design:**
+[04c](04c-design-analytic.md) "Relations, and the direction resolver".
+
+**Context.** Measured before building: **0 of 14 parallel/perpendicular phrasings and 0 of 5 slope
+phrasings** were understood. «מקביל» did not exist in the parser at all; `perpendicular` existed in
+`solve.ts` (built for «AD גובה») and no sentence could reach it.
+
+**The decision that matters is not "add two constraints".** It is that a relation is between two
+**directions**, and four different things have one: a segment named by two points (`DE`), a polygon
+side («הצלע AB»), a named line (`ℓ1`), and an **axis** («ציר ה-x»). Any of the four against any of the
+four, under either relation, is sixteen sentences — and it is **one constraint kind with a resolver in
+front of it**, not sixteen rules.
+
+**Why the resolver had to come first, not later.** [#1049](https://github.com/dcodish/geo_builder/issues/1049)'s
+«מקבילית ABCD» *is* `AB ∥ DC, AD ∥ BC`, and [#1051](https://github.com/dcodish/geo_builder/issues/1051)'s
+«שיפוע AB הוא 2» is the same direction algebra (parallel is equal slope). Built separately, the tool
+could state a parallelism one way and measure it another and **disagree with itself**. One definition
+is the only way that cannot happen, and it is why these two issues were bundled rather than sequenced.
+
+**Decision.**
+
+1. **`Direction`** — a three-member union (`points` / `axis` / `curve`) resolved once in the parser,
+   consumed by every rule that relates directions. The relation never learns what kind of phrase
+   produced it.
+2. **One constraint kind, `relation`**, carrying `rel: 'parallel' | 'perpendicular'` and two
+   directions. The residual differs only in which product is driven to zero — **cross** for parallel,
+   **dot** for perpendicular — and every other property is identical.
+3. **Directions are UNIT vectors.** A relation between a 3-unit segment and a 3000-unit one must
+   converge the same way; an un-normalised cross product would let the long operand dominate the
+   minimisation for no geometric reason.
+4. **A slope is `dy = m·dx`, never `dy/dx = m`.** The quotient has a pole at a vertical segment, and a
+   residual that blows up is one the minimiser cannot cross — a figure whose solution path passed near
+   vertical would be unreachable. Written this way a vertical segment simply fails the given, which is
+   #1051's explicit requirement.
+5. **A named line resolves through a resolver the CALLER supplies.** `solve.ts` knows points and
+   nothing else; teaching it curves would drag the classifier into the solver. `evaluate` passes
+   `lineDirOf(c, env)` instead, and a `curve` operand that cannot be resolved reports "cannot be
+   judged" exactly as an absent point does.
+6. **`bad-operand` is its own refusal.** The student who writes «DE מקביל לפיל» got the sentence shape
+   right; telling them "I did not understand" would send them to rewrite the half that was correct
+   ([ADR-AG-017](#adr-ag-017)).
+
+**Two things this round had to fix to get here, both filed separately.**
+
+**#1059, in part.** «הישר DE מקביל לישר BF» was refused as a **bad equation** — the line noun gate ends
+in `(.+)` and called the rest an equation. A noun gate may not claim the rest of the line, so it now
+declines when the tail contains Hebrew. *The obvious discriminator — "contains an `=`" — is wrong, and
+this tree's own existing lock caught it:* «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2» is a **truncated
+equation with no `=`**, and that student must be told their equation is unreadable rather than that the
+sentence was not understood. The two failures look alike and want opposite answers. **The «מעגל O»
+centre reading is deliberately NOT done here** — it belongs with the circle-by-centre object #1060
+needs.
+
+**#1062, entirely**, because #1051's vertical-slope lock could not be written without it. The
+constraint check lived **inside the solve** (`if (ids.length > 0 …)`, and then only on
+non-convergence), so a **fully determined figure never checked a single given**. `A(0,0) B(4,0) C(0,3)`
+with «שטח המשולש ABC הוא 999» was accepted in silence — and that is `area`, which shipped in PR #1055
+this morning, along with `on-line`. The check is now separate from the solve: the solve *finds* a
+configuration, the check *reports* on the one reached. `null` stays "cannot be judged" rather than
+"false", so a constraint naming a vacant point is still not blamed on the student.
+
+**Deliberately NOT built:** «שיפוע הישר הוא 2» with no operand named. That is a contextual reference —
+"the line", when there is exactly one — and this tree has no mechanism for one. It answers
+`bad-operand`, which is honest: the relation was understood and the operand was not.
+
+**Consequences.** 14 of 14 relation phrasings and 4 of 5 slope phrasings now build, over all four
+operand kinds. Five catalog entries carry the new forms, chosen to walk the **operands** rather than
+the phrasings — a catalog listing four spellings of one operand would prove nothing about the resolver.
+`src-analytic` 240 → 278 tests.

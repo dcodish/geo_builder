@@ -18,7 +18,7 @@
  * Unmatched input returns `not-handled`, which is the seam where the LLM fallback escalates.
  */
 import type { DerivedRule } from '../engine/derived';
-import type { Constraint } from '../engine/solve';
+import type { Constraint, Direction } from '../engine/solve';
 import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS } from '../engine/carriers';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id } from '../engine/types';
@@ -56,7 +56,14 @@ export type ParseFailure =
    */
   | { code: 'bad-arity'; detail: string }
   /** One label used for two vertices of the same figure — «משולש ABA» (#1042). */
-  | { code: 'repeated-vertex'; detail: string };
+  | { code: 'repeated-vertex'; detail: string }
+  /**
+   * A relation whose VERB was understood and whose operand was not — «DE מקביל לפיל» (#1052).
+   *
+   * Its own code because the student got the sentence shape right: telling them "I did not
+   * understand" would send them to rewrite the relation, when the thing to fix is the operand.
+   */
+  | { code: 'bad-operand'; detail: string };
 
 export type ParseResult = { ok: true; facts: Fact[] } | ({ ok: false } & ParseFailure);
 
@@ -574,7 +581,108 @@ const ON_AXIS_EN = new RegExp(
   'i',
 );
 
+// ---------------------------------------------------------------------------
+// The relation vocabulary (#1052, #1051) — one resolver, one relation
+// ---------------------------------------------------------------------------
+
+/**
+ * A DIRECTION phrase → a {@link Direction}, or `null` if the phrase does not name one.
+ *
+ * This is the whole design (#1052). «DE», «הצלע AB», «הקטע AB», «ציר ה-x» and «הישר l1» are five
+ * spellings of "a thing with a direction", so they are resolved ONCE here and every rule that relates
+ * directions — parallel, perpendicular, slope, and the shape nouns that lower to them — consumes the
+ * result without learning what kind of phrase produced it. Sixteen operand pairs, one implementation.
+ *
+ * The noun and the definite article are optional throughout, as everywhere else in this grammar.
+ */
+const AXIS_HE = /^ציר\s+ה?-?\s*([xy])$/;
+const AXIS_EN = /^(?:the\s+)?([xy])[- ]axis$/i;
+/** «הישר l1» / «ישר ℓ2» / «l1» — a line the student NAMED, whose direction comes from its equation. */
+const NAMED_LINE = new RegExp(`^(?:ה?ישר\\s+|[Ll]ine\\s+)?([ℓl][0-9]?)$`);
+/** «הצלע AB» / «הקטע AB» / «הישר AB» / «AB» — two named points, whichever noun fronts them. */
+/**
+ * The noun in front of a point pair is optional and may be Hebrew or English. Spelled out rather than
+ * flagged `i`, because `NAME` is deliberately uppercase-only and a case-insensitive whole-pattern
+ * would quietly start accepting `ab` as two vertices.
+ */
+const TWO_POINTS = new RegExp(
+  `^(?:ה?(?:צלע|קטע|ישר)\\s+|[Ss]ide\\s+|[Ss]egment\\s+|[Ll]ine\\s+)?(${NAME})(${NAME})$`,
+);
+
+function direction(phrase: string): Direction | null {
+  const p = trim(phrase).replace(/^ה(?=ישר|צלע|קטע)/, 'ה'); // keep the article; normalise spacing only
+  const axis = AXIS_HE.exec(p) ?? AXIS_EN.exec(p);
+  if (axis) return { k: 'axis', axis: axis[1].toLowerCase() === 'x' ? 'x' : 'y' };
+  const named = NAMED_LINE.exec(p);
+  if (named) return { k: 'curve', id: `line-${named[1]}` };
+  const pts = TWO_POINTS.exec(p);
+  // A two-letter run reads as its two POINTS even when fronted by «הישר», and that is deliberate:
+  // «הישר AC» relates the direction A→C whether or not a `line-AC` object was ever stated, so the
+  // sentence means the same thing before and after the line is given a name.
+  if (pts && pts[1] !== pts[2]) return { k: 'points', a: pts[1], b: pts[2] };
+  return null;
+}
+
+/**
+ * «DE מקביל ל-BF» · «הצלע AB מאונכת לצלע BC» · «AB מקביל לציר ה-x» · «DE is parallel to BF».
+ *
+ * The synonym sets are written out rather than stemmed — this tree's recurring trap is a Hebrew gate
+ * that admits one spelling and silently drops the rest (`src-analytic/CLAUDE.md`). Both relations take
+ * the full gender/number run, the definite article is optional, and so is the hyphen after «ל».
+ */
+const PARALLEL_WORDS = 'מקביל(?:ה|ים|ות)?';
+const PERP_WORDS = '(?:מאונכ(?:ת|ים|ות)?|מאונך|ניצב(?:ת|ים|ות)?)';
+const RELATION_HE = new RegExp(
+  `^${HE_GIVEN}(.+?)\\s+(${PARALLEL_WORDS}|${PERP_WORDS})\\s+ל-?\\s*(.+)$`,
+);
+const RELATION_EN = /^(.+?)\s+(?:is\s+)?(parallel|perpendicular)\s+to\s+(.+)$/i;
+
+/** «שיפוע AB הוא 2» · «שיפוע הישר l1 הוא 2» · «השיפוע של הצלע AB הוא ½» · «the slope of AB is 2». */
+/**
+ * The copula is REQUIRED here, unlike almost everywhere else in this grammar.
+ *
+ * With it optional, the lazy operand group takes the shortest thing that lets the rest match — «שיפוע
+ * AB הוא 2» resolved its operand to `A` and its value to `B הוא 2`, and the refusal then complained
+ * about an operand the student had written perfectly. A separator that can be omitted is fine when
+ * what follows is unmistakable; here both sides are free text, so something has to divide them.
+ */
+const SLOPE_HE = new RegExp(
+  `^${HE_GIVEN}ה?שיפוע\\s+(?:של\\s+)?(.+?)\\s+(?:הוא|היא|שווה(?:\\s+ל-?)?)\\s*(-?\\S.*)$`,
+);
+const SLOPE_EN = /^(?:the\s+)?slope\s+of\s+(.+?)\s+is\s+(.+)$/i;
+
 function parseConstraint(line: string): RuleOutcome {
+  /**
+   * The relation rules run FIRST among the constraints (#1052).
+   *
+   * «הצלע AB מקבילה לצלע DC» would otherwise be read by whichever noun rule matched «הצלע AB» and
+   * the rest handed away — the same swallowing defect #1059 records for the circle and line gates.
+   * A relation is recognisable from its verb, which no other rule uses, so matching it early costs
+   * nothing and removes the ambiguity entirely.
+   */
+  const rel = RELATION_HE.exec(line) ?? RELATION_EN.exec(line);
+  if (rel) {
+    const [, left, word, right] = rel;
+    const u = direction(left);
+    const v = direction(right);
+    // The verb was understood; if an operand was not, that is an OWNED refusal about this sentence
+    // rather than a fall-through to "I did not understand you" (ADR-AG-017).
+    if (!u || !v) return refuse('bad-operand', line);
+    const parallel = /^מקביל|^parallel/i.test(word);
+    return made([
+      { t: 'constraint', k: { t: 'relation', rel: parallel ? 'parallel' : 'perpendicular', u, v }, src: line },
+    ]);
+  }
+
+  const slope = SLOPE_HE.exec(line) ?? SLOPE_EN.exec(line);
+  if (slope) {
+    const u = direction(slope[1]);
+    if (!u) return refuse('bad-operand', line);
+    const value = parseExpr(normalizeMath(slope[2]));
+    if (!value) return refuse('bad-equation', trim(slope[2]));
+    return made([{ t: 'constraint', k: { t: 'slope', u, value }, src: line }]);
+  }
+
   const area = AREA_HE.exec(line) ?? AREA_EN.exec(line);
   if (area) {
     const ids = splitNames(area[1]);
@@ -636,7 +744,30 @@ export function parseLine(raw: string): ParseResult {
   if (param) return { ok: true, facts: [param] };
 
   const curve = matchCurve(line);
-  if (curve) {
+  /**
+   * A noun gate may not claim the rest of the line unconditionally (#1059).
+   *
+   * Every branch of `matchCurve` ends in `(.+)` and calls it the equation. That is right for
+   * «נתון הישר ℓ1: 4y-3x-20=0» and wrong for «הישר DE מקביל לישר BF», where the rule recognised only
+   * the NOUN and then reported «לא הצלחתי לקרוא את המשוואה» about a sentence containing no equation —
+   * sending the student to hunt for a typo in an equation they never wrote.
+   *
+   * **The discriminator is that the tail contains no HEBREW.** An equation in this grammar is written
+   * in Latin variables, digits and operators; a Hebrew word in the tail means the sentence continued
+   * in prose and the noun rule has no claim on it.
+   *
+   * "Contains an `=`" was the obvious test and it is wrong — caught by this tree's own existing lock.
+   * «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2» is a TRUNCATED equation with no `=` in it, and that student
+   * must be told their equation is unreadable, not that the sentence was not understood. The two
+   * failures look alike and want opposite answers, and only the Hebrew test separates them.
+   *
+   * NOTE: this is the swallowing half of #1059. The other half — that «מעגל O» names a CENTRE, per
+   * the operator's 2026-09-15 ruling — belongs with the circle-by-centre object #1060 needs, and is
+   * deliberately not done here.
+   */
+  if (curve && /[֐-׿]/.test(curve.eqSrc)) {
+    // fall through: the noun matched, the tail is not an equation, so this rule has no claim
+  } else if (curve) {
     const eq = equationExpr(curve.eqSrc);
     if (!eq) return { ok: false, code: 'bad-equation', detail: trim(curve.eqSrc) };
     return {
