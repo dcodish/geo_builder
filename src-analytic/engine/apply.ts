@@ -380,10 +380,19 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
        * תצורה אחרת», counted in the DOF cue. Refusing here would make the student place three points
        * before they could name the triangle, which inverts how every exam sentence is written.
        *
-       * Segments sit with the references: «הקטע AB» reads as being about points under discussion,
-       * and a student who means to introduce them has a shape noun for it.
+       * **Segments moved to the declaration side** (#1074). They sat with the references on the
+       * reading that «הקטע AB» is about points under discussion — and the operator's ruling on
+       * «הישר AB» (2026-09-15: *"introduce them with dof"*) settles the general question the other
+       * way: NAMING a thing introduces its points, REFERRING to one does not. «הקטע EF» names a
+       * segment; «M אמצע AB» refers to two points while naming a third. #1028's refusal is
+       * untouched, and the tests that lock it are all midpoint tests, which is the distinction
+       * showing through.
+       *
+       * Refusing here forced a student to place both endpoints before they could name the segment,
+       * which inverts how every exam sentence is written — the same argument that made a shape noun
+       * introduce its vertices.
        */
-      const declares = f.t === 'polygon';
+      const declares = f.t === 'polygon' || f.t === 'segment';
       let base = c;
       for (const id of refs) {
         const o = objectById(base, id);

@@ -1968,3 +1968,44 @@ than `derived:diagonals` — the engine stays language-free and the locale rende
 corpus noun.
 
 **Consequences.** `src-analytic` 330 → 337 tests.
+
+## ADR-AG-033 — The segment NOUN is optional, and naming a segment INTRODUCES its endpoints (#1074)
+
+**Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-013](#adr-ag-013) (declaration vs reference) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R57. **Design:** none (a rule's matcher).
+
+**Context.** Operator, 2026-09-15: *"when there are 2 points like E and F defined, and I write EF,
+i want the segment drawn"*. Measured: «הקטע EF» built `seg-EF`; «EF» was `not-handled`.
+
+**Root cause: the matcher was written around the fullest phrasing the corpus shows.** That is now
+the THIRD time — #1069 (the point-on-object nouns), #1072 («משוואת AB» without «הישר»), and here —
+so the finding is not about segments. **A rule that requires its noun does not refuse the shorter
+spelling; it declines it, and the sentence falls off the end of the chain into `not-handled`,
+which reads to a student as "this tool does not know what a segment is".** The exam writes «EF»
+constantly — "חשבו את EF", "העבירו את EF" — and a student transcribing givens writes what the page
+writes.
+
+**Why the position is safe without a discriminator.** A bare pair of names cannot be a coordinate
+(no parentheses), an equation (no `=`) or a relation (no verb), and `parseShape` already sits second
+to last. The one collision that matters — «AB = 5», where `AB` is a LENGTH — is decided by rule
+order alone: every `=`-bearing rule lives in `parseConstraint`, which runs first. It is locked from
+both sides.
+
+**The second half is a ruling, extended.** A segment whose endpoints did not exist refused with
+`unknown-reference`, and ADR-AG-013 argued for that explicitly: *"segments sit with the references…
+a student who means to introduce them has a shape noun for it."* The operator's «הישר AB» ruling
+(*"introduce them with dof"*) settles the general question the other way, and the principle it
+states is sharper than the noun it was given about:
+
+> **NAMING a thing introduces its points; REFERRING to one does not.**
+
+«הקטע EF» names a segment. «M אמצע AB» names `M` while *referring* to `A` and `B`, and still
+refuses — inventing them would place positions the question never gave (ADR-052). The evidence
+that ADR-AG-013 had already drawn this line correctly and filed segments on the wrong side of it:
+**every existing lock on that refusal is a midpoint test.** Not one flipped.
+
+**Consequences.** «EF» on an empty figure introduces two 2-DOF vertices and draws the segment —
+dof 4, the figure movable under «הציגו תצורה אחרת», exactly as «משולש ABC» behaves. `src-analytic`
+343 → 349 tests.

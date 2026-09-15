@@ -778,3 +778,10 @@ configuration may yet have the object — that is R-level ADR-AG-008 and it stan
 fixed there is no other configuration, so «מפגש האלכסונים» of a concave quadrilateral, the circumcentre
 of three collinear points and an empty circle are each named as not existing, rather than left absent
 with nothing said.
+
+**R57 — the segment noun is optional, and naming a segment introduces its endpoints**
+([ADR-AG-033](06c-decisions-analytic.md#adr-ag-033)). «EF» is «הקטע EF»: one object, one id, either
+spelling. Endpoints that do not exist yet are introduced as free vertices with their two degrees of
+freedom, as a shape noun's vertices are — because the sentence NAMES the segment. Referring to a
+point one does not have («M אמצע AB») still refuses (R-level #1028); the difference is naming
+versus mentioning, not which noun was used.
