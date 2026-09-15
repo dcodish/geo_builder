@@ -1079,6 +1079,35 @@ const COMPONENT_EN = new RegExp(
   `^(?:the\\s+)?([xy])[- ](?:value|coordinate|coord)\\s+of\\s+(?:point\\s+)?(${NAME})\\s+is\\s+(.+)$`,
   'i',
 );
+/**
+ * A point on a curve named only by its KIND — «הנקודה A נמצאת על האליפסה» (#1057).
+ *
+ * The corpus writes this constantly (docs/19 §4a, F2) and the tool could not read it: every
+ * on-object form until now needed the curve`s equation or its name in the same sentence.
+ *
+ * The reference is unambiguous because the CORPUS is: *"no exam in twenty carries two parabolas
+ * or two ellipses; at most one of each per figure"* (docs/19 §4a). Where a student does put two
+ * on the canvas, M1 refuses rather than picking — and no ordinal is invented, because a phrase
+ * the exam never uses is a phrase the student has never seen (ADR-AG-005 D8).
+ */
+const ON_KIND_HE = new RegExp(
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+ה(מעגל|פרבולה|אליפסה)$`
+);
+const ON_KIND_EN = new RegExp(
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+the\\s+(circle|parabola|ellipse)$`
+,  'i',
+);
+
+/** The registry of kind nouns, in both languages, onto the classifier’s own names. */
+const KIND_NOUNS: Record<string, CurveKind> = {
+  מעגל: 'circle',
+  פרבולה: 'parabola',
+  אליפסה: 'ellipse',
+  circle: 'circle',
+  parabola: 'parabola',
+  ellipse: 'ellipse',
+};
+
 const ON_AXIS_HE = new RegExp(
   `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת)?\\s+)?על\\s+(?:ה?חלק\\s+(ה?חיובי|ה?שלילי)\\s+של\\s+)?ציר\\s+ה?-?\\s*([xy])$`,
 );
@@ -1430,6 +1459,17 @@ function parseConstraint(raw: string): RuleOutcome {
         src: line,
       },
     ]);
+  }
+
+  const onKind = ON_KIND_HE.exec(line) ?? ON_KIND_EN.exec(line);
+  if (onKind) {
+    const kind = KIND_NOUNS[onKind[2].toLowerCase()];
+    if (kind) {
+      return made([
+        { t: 'declare', id: onKind[1], src: line },
+        { t: 'on-kind', id: onKind[1], kind, src: line },
+      ]);
+    }
   }
 
   const ax = ON_AXIS_HE.exec(line) ?? ON_AXIS_EN.exec(line);

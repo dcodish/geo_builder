@@ -887,3 +887,9 @@ alone, and never a dash. A point with continuous freedom is not an option set an
 «P נקודת החיתוך של המעגל I עם ציר ה-x» places `P` on both, and where there are two crossings the panel
 lists both (R72) while «הציגו תצורה אחרת» moves between them. Two lines, a line and an axis, and a
 curve and an axis all read the same way; an operand the tool cannot read is refused by name.
+
+**R74 — a conic is named by its KIND** ([ADR-AG-049](06c-decisions-analytic.md#adr-ag-049)).
+«הנקודה A נמצאת על האליפסה», «נקודה B על המעגל» and «P על הפרבולה» place the point on the one curve of
+that kind — including a circle given by its centre, and a conic whose kind comes from the fit rather
+than from a noun. A figure holding two of a kind refuses the reference rather than picking or
+inventing an ordinal, because no exam in the corpus ever needs one.

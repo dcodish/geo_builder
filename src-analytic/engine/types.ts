@@ -206,7 +206,15 @@ export type Fact =
    * it means is a question about the construction, so M1 answers it and refuses when the answer
    * is not exactly one.
    */
-  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'> });
+  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'> })
+  /**
+   * «הנקודה A נמצאת על האליפסה» — a point on a curve named only by its KIND (#1057).
+   *
+   * F2 corpus vocabulary (docs/19 §4a), and the fourth contextual reference: which curve it
+   * means is a question about the construction, so M1 answers it, and refuses where the figure
+   * holds none or several of that kind.
+   */
+  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind });
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list

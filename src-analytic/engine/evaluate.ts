@@ -234,7 +234,7 @@ function place(c: Construction, env: Env, free: Map<Id, Pt>): Map<Id, Pt> {
       case 'derived': {
         // The curve resolver is handed in for the one rule whose parent is a curve (#1059); every
         // other rule ignores it, exactly as `residual` does with the same argument.
-        const v = evalRule(o.rule, (id) => at.get(id) ?? null, curveAtOf(c, env));
+        const v = evalRule(o.rule, (id) => at.get(id) ?? null, curveAtOf(c, env, (id) => at.get(id) ?? null));
         if (v && Number.isFinite(v.x) && Number.isFinite(v.y)) at.set(o.id, v);
         break;
       }
@@ -260,12 +260,29 @@ function place(c: Construction, env: Env, free: Map<Id, Pt>): Map<Id, Pt> {
  * own residual and a direction is only meaningful for a line. Deriving the direction is the caller’s
  * job, in `solve.ts`, where the distinction between the two already lives.
  */
-function curveAtOf(c: Construction, env: Env): (id: Id) => NumCurve | null {
+/**
+ * The resolver every constraint about a CURVE is measured through.
+ *
+ * It must know both ways a curve can exist, or a point told to lie on a circle given by its
+ * CENTRE (#1060) is simply not judged: the residual answers "cannot be told", the solve has
+ * nothing to pull on, and the point is drawn off the circle in silence.
+ *
+ * A `circle-at` needs the PLACED centre, which is why this takes the placement and not only the
+ * environment.
+ */
+function curveAtOf(c: Construction, env: Env, at?: (id: Id) => Pt | null): (id: Id) => NumCurve | null {
   return (id) => {
     const o = objectById(c, id);
-    if (!o || o.kind !== 'curve') return null;
-    const r = resolveCurve(o.curve, env);
-    return r.ok ? r.curve : null;
+    if (!o) return null;
+    if (o.kind === 'circle-at') {
+      const centre = at?.(o.centre);
+      const r = evalExpr(o.r, env);
+      if (!centre || !Number.isFinite(r) || r <= 0) return null;
+      return { kind: 'circle', cx: centre.x, cy: centre.y, r };
+    }
+    if (o.kind !== 'curve') return null;
+    const res = resolveCurve(o.curve, env);
+    return res.ok ? res.curve : null;
   };
 }
 
@@ -295,7 +312,7 @@ function carrierDofOf(c: Construction, env: Env, free: Map<Id, Pt>, ids: Id[]): 
     new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
   return freeRank(vec, (x) => {
     const pos = place(c, env, asMap(x));
-    return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env)) ?? [0]);
+    return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null)) ?? [0]);
   });
 }
 
@@ -447,7 +464,7 @@ export function evaluate(raw: Construction, seed = 0): Figure {
       new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
     const res = solveLM(vec, (x) => {
       const pos = place(c, env, asMap(x));
-      return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env)) ?? [0]);
+      return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null)) ?? [0]);
     });
     free = asMap(res.values);
   }
@@ -471,7 +488,7 @@ export function evaluate(raw: Construction, seed = 0): Figure {
   if (c.constraints.length > 0) {
     const pos = place(c, env, free);
     for (const k of c.constraints) {
-      const r = residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env));
+      const r = residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null));
       // `null` is "cannot be judged", not "false": a constraint naming a point that vanished at this
       // parameter value must not be reported as a given the student got wrong — that would blame the
       // wrong statement, and vacancy is not a fault ([ADR-AG-008]).
@@ -514,7 +531,7 @@ export function evaluate(raw: Construction, seed = 0): Figure {
         // `null` means a parent was vacant at this parameter value, or the configuration is
         // degenerate (three collinear points have no circumcentre). Both are honest vacancies —
         // "not at this value" — never a point drawn at NaN and never a fallback position.
-        const p = evalRule(o.rule, at, curveAtOf(c, env));
+        const p = evalRule(o.rule, at, curveAtOf(c, env, at));
         if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
           points.push({ id: o.id, x: p.x, y: p.y });
           placed.set(o.id, p);

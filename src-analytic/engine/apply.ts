@@ -16,6 +16,7 @@
  * lands, and nowhere else.
  */
 import { fitConic } from './conic';
+import { resolveCurve } from './curves';
 import { curveParentOf, parentsOf, type DerivedRule } from './derived';
 import { constraintRefs } from './solve';
 import { isGenericNoun, namesOption, rightAngleAt, shapeRow } from './shapes';
@@ -550,6 +551,41 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
      * The same contextual resolution as `area-of` and `meet-of`: one circle makes it unambiguous,
      * none or several makes it a refusal rather than a pick.
      */
+    /**
+     * «הנקודה A נמצאת על האליפסה» — the curve resolved by its KIND (#1057).
+     *
+     * The fourth contextual reference, and the same discipline as the other three: one curve of
+     * that kind makes it unambiguous, none or several makes it a refusal. The corpus never puts
+     * two conics of a kind in one figure, so refusing costs nothing a real question asks for.
+     *
+     * A `circle-at` counts as a circle: it IS one, however it was stated.
+     */
+    case 'on-kind': {
+      const point = objectById(c, f.id);
+      if (!point || !isPositional(point)) {
+        return { ok: false, error: { code: 'unknown-reference', detail: f.id } };
+      }
+      /**
+       * The kind of an ANONYMOUS conic is not declared — it comes from the FIT (02c R6: the noun is
+       * optional "because the fit already knows the kind"). So «x²/9 + y²/4 = 1» carries no
+       * `curve.kind` at all, and matching on the declaration alone would find no ellipse in a figure
+       * that plainly has one.
+       *
+       * Resolved against a PROBE environment, the same device `sameNumbers` uses here: a conic's KIND
+       * does not turn on the value of its parameters in any form the corpus writes.
+       */
+      const kindOf = (o: GeoObject): string | null => {
+        if (o.kind === 'circle-at') return 'circle';
+        if (o.kind !== 'curve') return null;
+        if (o.curve.kind) return o.curve.kind;
+        const probe = resolveCurve(o.curve, PROBE_ENVS[0]);
+        return probe.ok ? probe.curve.kind : null;
+      };
+      const matches = c.objects.filter((o) => kindOf(o) === f.kind);
+      if (matches.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+      return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: matches[0].id }, src: f.src });
+    }
+
     case 'tangent-of': {
       const circles = c.objects.filter((o) => o.kind === 'circle-at');
       if (circles.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };

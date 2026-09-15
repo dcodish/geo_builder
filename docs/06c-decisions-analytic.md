@@ -2781,3 +2781,44 @@ formats that work.
 own; they are a different interaction and want the selection mechanism #1048 needs too.
 
 **Consequences.** `src-analytic` +7 tests.
+
+## ADR-AG-049 — A conic is referred to by its KIND, and the corpus is why (#1057)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R74. **Design:** none (a rule and an M1 branch).
+
+**Context.** [ADR-AG-018](#adr-ag-018) removed the one-conic-per-kind limit and deliberately did NOT
+decide how a student refers to one of two anonymous conics. #1057 held the question open and listed
+the candidates — a display ordinal, letting the student name them, ordering by entry — and said the
+corpus was the only real evidence.
+
+**The corpus answers it, and the answer was already written down.** [docs/19](19-analytic-geometry-tool.md)
+§4a, from the survey of twenty exams: *"**No exam in twenty carries two parabolas or two ellipses; at
+most one of each per figure**"*. So there is no convention to find and none to invent. Inventing
+«האליפסה הראשונה» would put the student in front of a phrase the exam never uses, which is exactly
+what [ADR-AG-005](#adr-ag-005) D8 exists to prevent.
+
+**Decision: the reference is by KIND — «האליפסה», «המעגל», «הפרבולה» — resolved at M1 against the
+figure**, unambiguous when it holds one curve of that kind and refused when it holds none or several.
+The refusal is per kind, so a circle and an ellipse together are two unambiguous references.
+
+**The same survey showed the real gap was elsewhere.** «הנקודה A נמצאת על האליפסה» is listed as F2
+vocabulary and the tool could not read it **at all** — every on-object form until now needed the
+curve's equation or its name in the same sentence. The ambiguity #1057 worried about had never
+arisen, because the sentence that would raise it did not parse. That is the fourth contextual
+reference in a day and reuses the resolution the other three share.
+
+**Two defects surfaced by measuring the new sentence, both older than it:**
+
+- **An anonymous conic has no declared kind.** 02c R6 makes the noun optional *"because the fit
+  already knows the kind"*, so «x²/9 + y²/4 = 1» carries none, and matching on the declaration alone
+  found no ellipse in a figure that plainly had one. The kind is resolved from the FIT, against the
+  probe environment `sameNumbers` already uses.
+- **`on-curve` could not see a `circle-at`** ([ADR-AG-045](#adr-ag-045)). A point told to lie on a
+  circle given by its CENTRE was not judged at all: the residual answered "cannot be told", the solve
+  had nothing to pull on, and the point was drawn off the circle **in silence**. The resolver now
+  knows both ways a curve can exist — and it needed the PLACED centre, which is why it takes the
+  placement and not only the environment.
+
+**Consequences.** `src-analytic` +7 tests.
