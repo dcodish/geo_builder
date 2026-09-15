@@ -659,7 +659,6 @@ nothing.
 right angle probably wants a mark rather than text, and the others may want nothing at all.
 See [ADR-AG-014](06c-decisions-analytic.md#adr-ag-014).
 
-<<<<<<< HEAD
 ## 9 — What a REFUSAL owes the student ([ADR-AG-017](06c-decisions-analytic.md#adr-ag-017))
 
 The honesty invariants already say a stated given may never vanish and that a message names the
@@ -687,11 +686,18 @@ the letter already holds, in the construct's own corpus noun («M is already the
 internal terms. «השם כבר משמש עצם מסוג אחר» told the student they had picked a bad name; they had not,
 and it sent them to fix the letter instead of showing them the collision. A refusal that misdescribes
 the problem is worse than one that is merely narrow, because the student acts on it.
-=======
+
 **R44 — an anonymous curve's identity is its EQUATION** ([ADR-AG-019](06c-decisions-analytic.md#adr-ag-019)).
 «הישר x-y+2=0» and the bare «x-y+2=0» are one line stated two ways, and the figure must hold one object,
 not two. All unnamed curves therefore share a single content-derived namespace; a NAMED curve (`ℓ1`,
 `מעגל I`) is identified by its name, because a name is an identity. A corollary the tool got wrong the
 moment the noun became optional: **a statement that claims no family does not contradict one that
 claimed a family** — only two different *claims* conflict.
->>>>>>> fix/1037-bare-equation
+
+**R45 — a statement that adds nothing is SAID, not silently swallowed or silently duplicated**
+([ADR-AG-020](06c-decisions-analytic.md#adr-ag-020)). Restating something the figure already holds is
+a legitimate thing for a student to do — it is how a question's later section refers back — so the
+tool confirms it («זה כבר ידוע…») and does not add a second row. Informational, never an error: the
+student was right. **A restatement that NARROWS is not this case** — «a הוא פרמטר» then «a<13» adds
+information and is recorded like any other given; calling it "already known" would drop a stated given,
+which is the one thing that may never happen.

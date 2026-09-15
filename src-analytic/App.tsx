@@ -78,7 +78,7 @@ function existingKey(error: InputError): string {
 
 export function App() {
   const { t } = useTranslation();
-  const { lines, seed, error, recordLine, removeLine, replaceLine, clearAll, nextConfiguration, setError } =
+  const { lines, seed, error, recordLine, removeLine, replaceLine, clearAll, nextConfiguration, setError, notice, setNotice } =
     useAnalyticStore();
   const [draft, setDraft] = useState('');
   const [zoom, setZoom] = useState(1);
@@ -133,6 +133,21 @@ export function App() {
     const fault = trial.faults.find((f) => f.index === lines.length);
     if (fault) {
       setError({ key: fault.code, detail: fault.detail, existing: fault.existing } as InputError);
+      return;
+    }
+    /**
+     * The THIRD outcome (#1045): the statement is true, and the figure already held it.
+     *
+     * `applyFact` has answered this since V0 and nothing read the answer, so the line was recorded
+     * anyway — the student saw their sentence listed twice, the counter said «4 נתונים» for three
+     * givens, and the tool said nothing at all. Silence reads as failure, so they type it again.
+     *
+     * A `narrowed` line is deliberately NOT here: «a הוא פרמטר» then «a<13» is also absorbed, but it
+     * added information and belongs in the list like any other given.
+     */
+    if (trial.outcomes[lines.length] === 'known') {
+      setNotice(t('noticeAlreadyKnown', { detail: line }));
+      setDraft('');
       return;
     }
     recordLine(line);
@@ -219,6 +234,17 @@ export function App() {
               {errorText && (
                 <p role="alert" style={{ color: color.danger, fontSize: fs.small, margin: '8px 0 0' }}>
                   {errorText}
+                </p>
+              )}
+              {/*
+                An informational answer, never the danger colour and never `role="alert"` (#1045):
+                the student restated something true, and styling that as an error would teach them
+                that a correct restatement is a mistake. `role="status"` is the polite live region,
+                which is also the right announcement for a screen reader.
+              */}
+              {notice && (
+                <p role="status" style={{ color: color.muted, fontSize: fs.small, margin: '8px 0 0' }}>
+                  {notice}
                 </p>
               )}
             </InputArea>

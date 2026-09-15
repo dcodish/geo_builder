@@ -80,7 +80,6 @@ place. A kind that can forward-reference is what would earn one.
   renderer draws. **Pure**, so the renderer stays a consumer rather than a second geometry implementation
   — the same split every sibling uses.
 
-<<<<<<< HEAD
 ## The parser's rule contract ([ADR-AG-017](06c-decisions-analytic.md#adr-ag-017))
 
 A rule in `parseAnalytic.ts` answers one of **three** ways, and the third is the one round #1056 added:
@@ -111,7 +110,7 @@ same wrong input answered the same way whichever rule caught it.
 `curve:ellipse`) minted by `existingKindOf` in the engine and rendered into the student's language in
 `App.tsx`. The engine stays language-free and the message can still say *what* the name already holds
 — the split that lets a refusal name a construct without the engine knowing any Hebrew.
-=======
+
 ## The parser's last branch: a bare equation ([ADR-AG-019](06c-decisions-analytic.md#adr-ag-019))
 
 `parseLine` ends with a branch that accepts an equation carrying no noun at all — `x-y+2=0`,
@@ -140,7 +139,29 @@ and this is a hyperbola" — R7). Two consequences follow, and the second is the
   require *two* claimed kinds before they disagree. Comparing `undefined` with `'line'` reported a
   student's own restatement as a contradiction while drawing the figure correctly, which is the shape
   of defect that ships silently.
->>>>>>> fix/1037-bare-equation
+
+## The submit path's three answers ([ADR-AG-020](06c-decisions-analytic.md#adr-ag-020))
+
+`App.submit` dry-runs the whole line list with the new line appended, and the result is one of
+**three** things, not two:
+
+| outcome | recorded? | shown |
+| --- | --- | --- |
+| `faulted` | no | the refusal, naming the student's own statement |
+| `created` / `narrowed` | yes | the figure updates |
+| `known` | **no** | an informational notice — «זה כבר ידוע…» |
+
+The third row is the one that was missing. `applyFact` had answered it since V0 as a boolean
+`absorbed`, `derive` did not carry it, and the submit path therefore asked only *"is there a fault?"*
+and recorded the line on every `no`. The student saw their sentence listed twice and was told nothing.
+
+**The effect is decided once, at the apply boundary**, and carried out through `fold` (per fact,
+positionally beside `errors`) and `derive` (rolled up per line). That is what makes the fact list, the
+counter and the notice agree: they read one answer rather than each re-deriving one.
+
+**`narrowed` exists because `absorbed` was hiding two events.** «a הוא פרמטר» then «a<13» merges into
+the existing declaration — absorbed — but adds information, so it is a real given and belongs in the
+list. Collapsing it into "already known" would silently drop a stated given.
 
 ## Born after the chassis
 

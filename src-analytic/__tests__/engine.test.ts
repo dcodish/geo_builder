@@ -186,7 +186,7 @@ describe('apply — the M1 boundary, on day one (ADR-AG-003)', () => {
     const again = parseLine('נתונה הנקודה A(2,6)');
     if (!again.ok) throw new Error('should parse');
     const out = applyFact(first, again.facts[0]);
-    expect(out.ok && out.absorbed).toBe(true);
+    expect(out.ok && out.effect).toBe('known');
     expect(out.ok && pointsOf(out.next)).toHaveLength(1);
   });
 
@@ -249,7 +249,7 @@ describe('apply — the M1 boundary, on day one (ADR-AG-003)', () => {
     const out = applyFact(c, again.facts[0]);
     expect(out.ok).toBe(true);
     if (out.ok) {
-      expect(out.absorbed).toBe(true);
+      expect(out.effect).toBe('known');
       expect(out.next.objects).toHaveLength(1);
     }
   });
@@ -421,5 +421,76 @@ describe('anonymous curves share ONE namespace, whichever phrasing minted them',
     expect(ids.filter((i) => i.startsWith('curve-'))).toHaveLength(4);
     expect(ids).toContain('line-l1');
     expect(ids).toContain('circle-I');
+  });
+});
+
+/**
+ * The THIRD outcome — #1045, from the operator's T21: *"the second time should say this is already
+ * known and not enter it twice."*
+ *
+ * The engine was always right: `applyFact` answered "absorbed" and produced no duplicate object.
+ * Nothing READ the answer, so the UI recorded the line anyway — the student's statement appeared
+ * twice, the counter said «4 נתונים» for three givens, and the tool said nothing. Same shape as
+ * #1020: a mechanism that exists, correct, with one of its callers never asking.
+ *
+ * These assert the per-LINE outcome, because that is the thing the submit path reads.
+ */
+describe('#1045 — a line that added nothing says so, and is not recorded', () => {
+  const outcomes = (lines: string[]) => derive(lines, 0).outcomes;
+
+  it('marks an exact restatement KNOWN rather than created', () => {
+    expect(outcomes(['A(8,1)', 'B(-2,-5)', 'M אמצע AB', 'M אמצע AB'])).toEqual([
+      'created',
+      'created',
+      'created',
+      'known',
+    ]);
+  });
+
+  it('marks a restated point, curve and constraint known too — the rule is not per-kind', () => {
+    expect(outcomes(['A(3,4)', 'A(3,4)'])).toEqual(['created', 'known']);
+    expect(outcomes(['הישר l1: y=x', 'הישר l1: y=x'])).toEqual(['created', 'known']);
+    expect(outcomes(['משולש ABC', 'שטח המשולש ABC הוא 7', 'שטח המשולש ABC הוא 7'])).toEqual([
+      'created',
+      'created',
+      'known',
+    ]);
+  });
+
+  it('a restatement in DIFFERENT words is still known — identity is the value, not the spelling', () => {
+    // `sameNumbers` probes numerically, so `2` and `1+1` are one given written two ways.
+    expect(outcomes(['A(2,6)', 'נתונה הנקודה A(2,6)'])).toEqual(['created', 'known']);
+  });
+
+  it('NARROWING is not "already known" — it added information and belongs in the list', () => {
+    // The distinction the issue asked for. «a הוא פרמטר» then «a<13» is absorbed into the existing
+    // declaration, but the domain is strictly tighter afterwards; calling it "already known" would
+    // be false about the student's own statement.
+    expect(outcomes(['a הוא פרמטר', 'a < 13'])).toEqual(['created', 'narrowed']);
+    expect(outcomes(['a הוא פרמטר', 'a הוא פרמטר חיובי'])).toEqual(['created', 'narrowed']);
+  });
+
+  it('but re-declaring the SAME domain is known', () => {
+    expect(outcomes(['a הוא פרמטר חיובי', 'a הוא פרמטר חיובי'])).toEqual(['created', 'known']);
+  });
+
+  it('a multi-fact line is never called known on the strength of one repeated fact', () => {
+    // «AD תיכון לצלע BC» lowers to four facts; declaring A and D again is absorbed, but the
+    // constraint and the segment are new, so the LINE contributed.
+    const o = outcomes(['A(0,0)', 'B(6,0)', 'C(0,6)', 'AD תיכון לצלע BC']);
+    expect(o[3]).toBe('created');
+  });
+
+  it('a faulted line is faulted, whatever else it did', () => {
+    expect(outcomes(['A(3,4)', 'A(9,9)'])).toEqual(['created', 'faulted']);
+    expect(outcomes(['גללי בללי'])).toEqual(['faulted']);
+  });
+
+  it('every line gets exactly one outcome, positionally', () => {
+    const lines = ['A(0,0)', 'B(6,0)', 'C(0,6)', 'משולש ABC', 'משולש ABC', 'גללי'];
+    const o = outcomes(lines);
+    expect(o).toHaveLength(lines.length);
+    expect(o[4]).toBe('known');
+    expect(o[5]).toBe('faulted');
   });
 });

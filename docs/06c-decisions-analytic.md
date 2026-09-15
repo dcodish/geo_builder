@@ -1106,8 +1106,6 @@ already were ([ADR-AG-014](#adr-ag-014)): `B(x_B, 0)` lands on the x-axis and `D
 segment, and both were muddy without it. [ADR-AG-010](#adr-ag-010) R34 makes that a design condition
 rather than a polish item.
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 ## ADR-AG-017 — A rule that MATCHED owes an answer about what it matched (#1039 #1042 #1046)
 
 **Status:** accepted, 2026-09-15 · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056)
@@ -1181,7 +1179,7 @@ signal the LLM fallback escalates on, so its precision is a cost control as well
 The three codes are additions to `ParseFailure`, the store's `InputError` union and `App.tsx`'s code→key
 map — the registry that a new refusal must be added to in all three places, which is itself the thing
 that makes a missing entry a type error rather than a blank message.
-=======
+
 ## ADR-AG-018 — The conic "slot" was an ID COLLISION, not a policy (#1026)
 
 **Status:** accepted, 2026-09-15 · **Supersedes:** [ADR-AG-005](#adr-ag-005) D6, second bullet (the
@@ -1238,8 +1236,7 @@ means only what it says — a NAMED curve restated with a different equation —
 can no longer reach it. `src-analytic` 194 → 197 tests, including the inverted lock: the test that
 asserted the old policy now asserts that two ellipses coexist, with the absorb tested alongside it so
 the content id cannot silently stop deduplicating.
->>>>>>> fix/1026-two-conics
-=======
+
 ## ADR-AG-019 — The shape noun is optional for an equation, and the discriminator is MEASURED (#1037)
 
 **Status:** accepted, 2026-09-15 · **Implements:** [02c](02c-requirements-analytic.md) R6 (operator
@@ -1304,8 +1301,55 @@ ships silently: the figure was right, only the refusal was invented.
 sentences reach the LLM, which is a cost control as much as an honesty property. Five catalog entries
 teach the short form, so the reference card and the model's allowed vocabulary both carry it.
 `src-analytic` 194 → 212 tests.
->>>>>>> fix/1037-bare-equation
 
+
+## ADR-AG-020 — "Already known" is a THIRD outcome, and narrowing is not it (#1045)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R45. **Design:**
+[04c](04c-design-analytic.md) "The submit path's three answers".
+
+**Context.** Operator, play-testing T21: *"the second time should say **this is already known** and
+**not enter it twice**."* Measured: «M אמצע AB» typed twice produced two rows mentioning אמצע and a
+counter reading «4 נתונים» for three givens — with no error, no notice, and nothing said.
+
+**The engine was right the whole time.** `applyFact` has answered `absorbed: true | false` since V0,
+and it produced one `M`, no duplicate object. The signal simply had no reader: `derive` reported
+`faults` and dropped everything else, so `App.submit` could only ask *"is there a fault?"* and called
+`recordLine` on every `no`. An absorbed line is neither a fault nor a creation, and the submit path
+had no third branch. This is [#1020](https://github.com/dcodish/geo_builder/issues/1020)'s shape
+exactly: **a mechanism that exists, is correct, and has a caller that never asks.**
+
+Why it is more than tidiness: silence reads as failure, so a student who sees nothing happen types the
+line again, or differently. The fact list is the source of truth *and the save file*, so a row that
+contributed nothing is noise in the artifact a teacher exports. And absorption is a teaching moment —
+[ADR-AG-003](#adr-ag-003) makes M1 the reason a later section of a question may restate an earlier
+one, so "already known" is the tool confirming the restatement was consistent.
+
+**Decision.**
+
+1. **`applyFact` reports an EFFECT, not a boolean** — `created` | `known` | `narrowed`. The boolean
+   was hiding a real distinction (below). `fold` carries the effects out positionally beside `errors`,
+   and `derive` rolls them up to one **per-line** outcome, adding `faulted`.
+2. **`App.submit` gains its third branch**: a `known` line is not recorded and shows a notice —
+   `role="status"`, muted, never the danger colour. It is not a refusal; the student was right.
+3. **The rollup is deliberately generous.** A line can lower to several facts («AD תיכון לצלע BC» is
+   four), and it counts as contributing if *any* of them created or narrowed something. Only a line
+   whose every fact was already known is `known`, because that is the only case where dropping the row
+   is honest.
+
+**`narrowed` is the part that would have shipped as a lie.** «a הוא פרמטר» then «a<13» is also
+absorbed — it merges into the existing declaration rather than creating a second one — but it **did
+add information**, and the corpus writes parameter domains in exactly that two-step. Telling the
+student "already known" there, and silently dropping the row, would delete a given they had stated:
+the honesty invariant this whole round is about. The two are told apart by asking whether the merge
+changed the domain at all, compared through a normalized form rather than by reference identity —
+`next !== c` happens to work today and would break the first time a no-op branch rebuilt its object.
+
+**Consequences.** The counter and the fact list now agree with the figure, because all three read one
+answer computed at the apply boundary instead of each deriving their own. `absorbed` is gone from the
+public shape; the one test that read it now asserts the effect. `src-analytic` 194 → 202 tests.
 
 ## ADR-AG-023 — One namespace for every anonymous curve (round #1056 reconciliation)
 

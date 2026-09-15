@@ -85,6 +85,9 @@ const he = {
   kindOrthocentre: 'מפגש הגבהים',
   kindCircumcentre: 'מפגש האנכים האמצעיים',
   kindDiagonalMeet: 'מפגש האלכסונים',
+  // Informational, NOT a refusal (#1045): the student restated something the figure already holds,
+  // so the message confirms they were right and explains why no row appeared.
+  noticeAlreadyKnown: 'זה כבר ידוע מהנתונים שכתבתם, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
 };
 
 const en: typeof he = {
@@ -155,6 +158,7 @@ const en: typeof he = {
   kindOrthocentre: 'the orthocentre',
   kindCircumcentre: 'the circumcentre',
   kindDiagonalMeet: 'the intersection of the diagonals',
+  noticeAlreadyKnown: 'That is already known from what you have written, so I did not add another row: "{{detail}}"',
 };
 
 export const analyticI18n = createProductI18n({
