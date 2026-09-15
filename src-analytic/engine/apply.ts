@@ -477,7 +477,9 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       const [a, b] = f.principal ? [p, q] : ring.vertices.filter((x) => x !== p && x !== q);
       const id = `line-${a}${b}`;
       return applyAll(c, [
-        { t: 'curve', id, label: { name: `${a}${b}`, kind: 'line' }, curve: { kind: 'line', eq: f.eq }, src: f.src },
+        // STATED (#1076): the student asked for this diagonal by giving its equation, so it is part
+        // of the figure they are drawing, not a carrier minted to hold something else.
+        { t: 'curve', id, label: { name: `${a}${b}`, kind: 'line' }, curve: { kind: 'line', eq: f.eq }, stated: true, src: f.src },
         { t: 'declare', id: a, src: f.src },
         { t: 'declare', id: b, src: f.src },
         { t: 'constraint', k: { t: 'on-curve', id: a, curve: id }, src: f.src },
