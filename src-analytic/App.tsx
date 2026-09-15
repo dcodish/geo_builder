@@ -25,7 +25,7 @@ import { color, fs } from '../shell/theme';
 import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
 import { domainText, positionalOf, type NumCurve } from './engine/types';
-import { isKnowledge, knownCurve } from './engine/evaluate';
+import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
 import { exprText } from './engine/expr';
 import { ellipseFoci, parabolaFocus } from './engine/curves';
 import { analyticBidi } from './i18n';
@@ -688,6 +688,30 @@ function pointText(
   ky: { known: boolean; value?: number },
 ): string {
   if (kx.known && ky.known) return `(${fmt(kx.value as number)}, ${fmt(ky.value as number)})`;
+
+  /**
+   * A DISCRETE SET of positions (#1036) — «הבחן בין שני מקרים», which the corpus asks about six
+   * times in the forty «lines and points» exercises.
+   *
+   * Asked SECOND, after the determined case and before the dependency: neither member is
+   * knowledge, but the set is, and printing one member alone would be the cardinal sin while
+   * printing nothing throws away the shape of the answer the exam is asking for.
+   */
+  const options = knownOptions(d.construction, (f) => {
+    const q = f.points.find((r) => r.id === id);
+    return q ? [q.x, q.y] : null;
+  });
+  if (options) {
+    // The DRAWN one is marked, which is what connects this row to «הציגו תצורה אחרת».
+    const here = d.figure.points.find((q) => q.id === id);
+    return options
+      .map((v) => {
+        const text = `(${fmt(v[0])}, ${fmt(v[1])})`;
+        const drawn = here && Math.hypot(here.x - v[0], here.y - v[1]) < 1e-6;
+        return drawn ? `[${text}]` : text;
+      })
+      .join(' או ');
+  }
 
   const on = d.construction.constraints.find(
     (k) => k.t === 'on-curve' && k.id === id,

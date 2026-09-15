@@ -2704,3 +2704,46 @@ printing, re-parsing and printing again must give the same text.
 
 **Consequences.** `src-analytic` +7 tests. The other half of #1023 — a symbolic CENTRE label
 `(a, 4)` on the canvas — still needs symbolic conic-coefficient extraction and is still not built.
+
+## ADR-AG-047 — When a pin has TWO roots, the panel lists both (#1036)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R72. **Design:** none (a row and a gate).
+
+**Context.** Operator, 2026-09-15: *"if the area is given, **the options for point C** (on the data
+panel) should be shown"*. «הבחן בין שני מקרים» appears about six times in the forty «lines and
+points» exercises: **the exam is not asking for an answer, it is asking the student to notice there
+are two.**
+
+**Why it is not a weakening of [ADR-AG-003](#adr-ag-003) §2.** Neither member of the set is
+knowledge — cycle the configuration and `C` moves, so printing one alone would be the cardinal sin.
+**The SET is knowledge**: it is the same set at every seed, and cycling permutes which member is
+drawn and changes the set not at all. The lock asserts that invariance directly, because it is the
+whole justification.
+
+**A correction to the issue's own design note, found by measuring.** It says *"the pin's root-find
+already produces every root"*. It does not: the joint solve is a least-squares descent that finds ONE
+root from one starting point. Measured on that very figure, `(3,3)` comes up at 19 seeds of 24 and
+`(1,-5)` at 5 — **both roots are reached by different SEEDS**, not enumerated by one call. So the set
+is collected the way `isKnowledge` collects its verdict, by evaluating the figure at several
+configurations. The feature is what the operator asked for; the mechanism is not what the issue
+assumed, and nothing new is solved.
+
+That measurement also set the sample size: **24 configurations**, because the rarer root appears in
+5 of them and a smaller sample can miss it — reporting one answer where there are two, which is worse
+than reporting none.
+
+**The value is read as a VECTOR, and that is load-bearing.** Asked per component the same figure
+answers `x ∈ {1,3}` and `y ∈ {-5,3}` — four options for a point that is only ever `(1,-5)` or
+`(3,3)`, two of them false. The point is the unit of the answer.
+
+**A cap of four separates a set from a family.** A point free to slide takes a new value at almost
+every seed; listing four of them would be a lie about the shape of the answer. Over the cap, the row
+falls through to the dependency text ([ADR-AG-046](#adr-ag-046)) or the dash.
+
+**The drawn member is marked**, which is what connects the row to «הציגו תצורה אחרת»: the panel states
+the shape of the answer and the canvas shows which one is in front of you.
+
+**Consequences.** `src-analytic` +6 tests. The point row now has four answers, in order of how much
+the figure knows: the numbers · the option set · the dependency · the dash.

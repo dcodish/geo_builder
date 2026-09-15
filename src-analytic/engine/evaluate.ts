@@ -660,6 +660,77 @@ export function isKnowledge(
   return spread <= SATISFIED_EPS * scale ? { known: true, value: vals[0] } : { known: false };
 }
 
+
+/**
+ * How many configurations the OPTION SET is looked for across, and the most it may hold.
+ *
+ * Both measured rather than chosen. On the operator’s own figure — «A(4,0)», «B(0,-2)», «C on
+ * 4x-y-9=0», «area 7» — the two roots appear 19 and 5 times in 24 seeds, so a smaller sample can
+ * miss the rarer one entirely and report a single answer where there are two, which is worse than
+ * reporting none. The CAP is what separates a discrete set from a continuous family: a point free
+ * to slide produces a new value at almost every seed, and is not an option set at any size.
+ */
+const OPTION_SEEDS = 24;
+const OPTION_CAP = 4;
+
+/**
+ * The DISCRETE POSITIONS a value takes — «הבחן בין שני מקרים» made visible (#1036).
+ *
+ * Operator, 2026-09-15: *"if the area is given, the options for point C should be shown"*.
+ *
+ * ## Why this is not a weakening of the honesty gate
+ *
+ * Neither member of the set is knowledge — cycle the configuration and the point moves — and
+ * printing one alone would be the cardinal sin. **The SET is knowledge**: it is the same set at
+ * every seed, and cycling permutes which member is drawn and changes the set not at all. So this
+ * is a fourth answer beside {@link isKnowledge}, not a loosening of it.
+ *
+ * ## Discovered by SAMPLING, which is a correction to how #1036 described it
+ *
+ * That issue says the pin’s root-find "already produces every root". Measured, it does not: the
+ * joint solve is a least-squares descent that finds ONE root from one starting point, and the two
+ * roots of the operator’s own figure are reached by different SEEDS. So the set is collected the
+ * way `isKnowledge` collects its verdict — by evaluating the figure at several configurations —
+ * and the feature is the same while the mechanism is not. Nothing new is solved.
+ *
+ * `null` means "not an option set", which covers both the continuous case (too many distinct
+ * values) and the determined one (exactly one — that is `isKnowledge`’s answer, and it should be
+ * asked first).
+ */
+export function knownOptions(
+  c: Construction,
+  /**
+   * Read the whole VALUE, as a vector. A point reads `[x, y]` and not two scalars, and that is
+   * load-bearing: asking per component would answer `x ∈ {1, 3}` and `y ∈ {-5, 3}` for a point that
+   * is only ever `(1,-5)` or `(3,3)` — four options where there are two, and two of them false.
+   */
+  read: (f: Figure) => number[] | null,
+  seeds = OPTION_SEEDS,
+): number[][] | null {
+  const samples: number[][] = [];
+  for (let seed = 0; seed < seeds; seed += 1) {
+    const v = read(evaluate(c, seed));
+    // A value absent at ANY configuration is not a member of a stable set.
+    if (v === null || v.some((n) => !Number.isFinite(n))) return null;
+    samples.push(v);
+  }
+  const scale = Math.max(1, ...samples.flat().map(Math.abs));
+  const near = (a: number[], b: number[]) => a.every((n, i) => Math.abs(n - b[i]) <= SATISFIED_EPS * scale);
+  const distinct: number[][] = [];
+  for (const v of samples) {
+    if (!distinct.some((d) => near(d, v))) distinct.push(v);
+    // More than the cap is a continuous family wearing a set’s clothes — answer NOT a set, early.
+    if (distinct.length > OPTION_CAP) return null;
+  }
+  if (distinct.length < 2) return null;
+  // A STABLE order, so the options do not permute as the student cycles and look like new answers.
+  return distinct.sort((a, b) => {
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return a[i] - b[i];
+    }
+    return 0;
+  });
+}
 /**
  * Is this curve's SHAPE knowledge — every coefficient invariant across the free DOFs — or is the
  * equation on screen one sample's accident?

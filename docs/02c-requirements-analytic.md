@@ -877,3 +877,8 @@ sits on is not asserted, because the student did not say.
 `y^2 - 2·p·x = 0` in the data panel rather than `—`, and a circle stated by its centre reads that
 centre and radius. No value is printed — the row names what the figure depends on, which is what
 being open actually means.
+
+**R72 — a value with two roots is listed as BOTH**
+([ADR-AG-047](06c-decisions-analytic.md#adr-ag-047)). «C נמצאת על הישר 4x-y-9=0» with «שטח המשולש ABC
+הוא 7» reads `(1, -5) או [(3, 3)]` in the data panel, with the drawn one marked — never one of them
+alone, and never a dash. A point with continuous freedom is not an option set and keeps its open row.
