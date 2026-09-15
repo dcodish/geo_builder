@@ -19,12 +19,24 @@ export interface LineFault {
   detail: string;
 }
 
+/**
+ * What one LINE did — the per-line rollup of `applyFact`'s per-fact effect (#1045).
+ *
+ * A line can lower to several facts («AD תיכון לצלע BC» is four), so the rollup is deliberately
+ * generous: the line COUNTS as contributing if any one of its facts created or narrowed something.
+ * Only a line whose every fact was already known is `known`, which is the only case where dropping
+ * the row is honest.
+ */
+export type LineOutcome = 'created' | 'known' | 'narrowed' | 'faulted';
+
 export interface Derivation {
   construction: Construction;
   figure: Figure;
   box: Box;
   /** One entry per failing line. An empty array means every line landed. */
   faults: LineFault[];
+  /** One entry per input line, positionally — what that line actually did. */
+  outcomes: LineOutcome[];
 }
 
 export function derive(lines: readonly string[], seed = 0): Derivation {
@@ -54,7 +66,7 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
     }
   });
 
-  const { construction, errors } = fold(facts);
+  const { construction, errors, effects } = fold(facts);
   errors.forEach((e, i) => {
     if (e) faults.push({ index: owner[i], code: e.code, detail: e.detail });
   });
@@ -105,7 +117,26 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
     faults.push({ index, code: 'out-of-scope', detail: lines[index] });
   }
 
-  return { construction, figure, box: viewBox(figure), faults };
+  /**
+   * Roll the per-FACT effects up to per-LINE outcomes (#1045).
+   *
+   * A faulted line is faulted whatever else it did. Otherwise the line counts as contributing if
+   * any of its facts created or narrowed something, so a multi-fact line («AD תיכון לצלע BC») is
+   * never called "already known" on the strength of one of its four facts being a repeat.
+   */
+  const outcomes: LineOutcome[] = lines.map(() => "known");
+  facts.forEach((_, i) => {
+    const line = owner[i];
+    const e = effects[i];
+    if (e === "created" || outcomes[line] === "created") outcomes[line] = "created";
+    else if (e === "narrowed") outcomes[line] = "narrowed";
+  });
+  lines.forEach((_, i) => {
+    if (!facts.some((_f, j) => owner[j] === i)) outcomes[i] = "faulted";
+  });
+  for (const f of faults) outcomes[f.index] = "faulted";
+
+  return { construction, figure, box: viewBox(figure), faults, outcomes };
 }
 
 export const EMPTY_DERIVATION: Derivation = {
@@ -113,4 +144,5 @@ export const EMPTY_DERIVATION: Derivation = {
   figure: { env: {}, points: [], curves: [], segments: [], construction: [], vacant: [], unsatisfied: [], selectorsOk: true, carrierDof: 0, provenance: {} },
   box: { minX: -10, minY: -10, maxX: 10, maxY: 10 },
   faults: [],
+  outcomes: [],
 };

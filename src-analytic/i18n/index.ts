@@ -62,6 +62,9 @@ const he = {
   errNameClash: 'השם כבר משמש עצם מסוג אחר: "{{detail}}"',
   errUnknownRef: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
+  // Informational, NOT a refusal (#1045): the student restated something the figure already holds,
+  // so the message confirms they were right and explains why no row appeared.
+  noticeAlreadyKnown: 'זה כבר ידוע מהנתונים שכתבתם, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
 };
 
 const en: typeof he = {
@@ -106,6 +109,7 @@ const en: typeof he = {
   errNameClash: 'That name already belongs to a different kind of object: "{{detail}}"',
   errUnknownRef: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
+  noticeAlreadyKnown: 'That is already known from what you have written, so I did not add another row: "{{detail}}"',
 };
 
 export const analyticI18n = createProductI18n({

@@ -655,3 +655,11 @@ nothing.
 **Still open:** labels for the other constructions. Only the centroid's 2:1 is ruled; an altitude's
 right angle probably wants a mark rather than text, and the others may want nothing at all.
 See [ADR-AG-014](06c-decisions-analytic.md#adr-ag-014).
+
+**R45 — a statement that adds nothing is SAID, not silently swallowed or silently duplicated**
+([ADR-AG-020](06c-decisions-analytic.md#adr-ag-020)). Restating something the figure already holds is
+a legitimate thing for a student to do — it is how a question's later section refers back — so the
+tool confirms it («זה כבר ידוע…») and does not add a second row. Informational, never an error: the
+student was right. **A restatement that NARROWS is not this case** — «a הוא פרמטר» then «a<13» adds
+information and is recorded like any other given; calling it "already known" would drop a stated given,
+which is the one thing that may never happen.

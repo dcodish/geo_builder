@@ -35,6 +35,13 @@ interface AnalyticState {
   /** Which sampled configuration is drawn — «הציגו תצורה אחרת» advances it (ADR-052). */
   seed: number;
   error: InputError | null;
+  /**
+   * An informational answer, not a refusal (#1045) — the student restated something the figure
+   * already holds. They were RIGHT; the line simply adds nothing, so it is not recorded and this
+   * says so. Kept separate from `error` because rendering it in the error slot would teach a
+   * student that a correct restatement is a mistake.
+   */
+  notice: string | null;
 
   recordLine: (line: string) => void;
   removeLine: (index: number) => void;
@@ -42,18 +49,21 @@ interface AnalyticState {
   clearAll: () => void;
   nextConfiguration: () => void;
   setError: (e: InputError | null) => void;
+  setNotice: (n: string | null) => void;
 }
 
 export const useAnalyticStore = create<AnalyticState>((set) => ({
   lines: [],
   seed: 0,
   error: null,
+  notice: null,
 
-  recordLine: (line) => set((s) => ({ lines: [...s.lines, line], error: null })),
-  removeLine: (index) => set((s) => ({ lines: s.lines.filter((_, i) => i !== index), error: null })),
+  recordLine: (line) => set((s) => ({ lines: [...s.lines, line], error: null, notice: null })),
+  removeLine: (index) => set((s) => ({ lines: s.lines.filter((_, i) => i !== index), error: null, notice: null })),
   replaceLine: (index, next) =>
-    set((s) => ({ lines: s.lines.map((l, i) => (i === index ? next : l)), error: null })),
-  clearAll: () => set({ lines: [], error: null, seed: 0 }),
+    set((s) => ({ lines: s.lines.map((l, i) => (i === index ? next : l)), error: null, notice: null })),
+  clearAll: () => set({ lines: [], error: null, notice: null, seed: 0 }),
   nextConfiguration: () => set((s) => ({ seed: s.seed + 1 })),
-  setError: (error) => set({ error }),
+  setError: (error) => set({ error, notice: null }),
+  setNotice: (notice) => set({ notice, error: null }),
 }));

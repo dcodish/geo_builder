@@ -27,6 +27,7 @@ import {
   type Construction,
   type Curve,
   type CurveObject,
+  type Domain,
   type Fact,
   type GeoObject,
   type PointObject,
@@ -58,8 +59,26 @@ export interface ApplyError {
   detail: string;
 }
 
+/**
+ * What a statement DID — the third answer the submit path was missing (#1045).
+ *
+ * `applyFact` has distinguished "created something" from "said something about what exists" since
+ * V0, but as a boolean `absorbed`, and the `true` side covered two genuinely different events:
+ *
+ *  - **`known`** — the figure already held exactly this. Nothing changed. The student is right and
+ *    should be told so, and the line must NOT be recorded: a row that contributed nothing is noise
+ *    in the fact list, which is also the save file and the counter's source.
+ *  - **`narrowed`** — «a הוא פרמטר» then «a<13». Absorbed into the existing declaration, but it DID
+ *    add information, so it is a real given and belongs in the list. Calling this "already known"
+ *    would be a lie about the student's own statement.
+ *
+ * Told apart explicitly rather than by comparing `next` with `c` for reference identity, which
+ * happens to work today and would break the first time a no-op branch rebuilt its object.
+ */
+export type LineEffect = 'created' | 'known' | 'narrowed';
+
 export type ApplyOutcome =
-  | { ok: true; next: Construction; absorbed: boolean }
+  | { ok: true; next: Construction; effect: LineEffect }
   | { ok: false; error: ApplyError };
 
 /** The probe environment for restatement comparison — see `sameNumbers`. */
@@ -127,13 +146,22 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
             exclude: [...(prior.domain.exclude ?? []), ...(f.domain.exclude ?? [])],
           },
         };
+        /**
+         * The one absorption that can still ADD something (#1045).
+         *
+         * «a הוא פרמטר» then «a<13» is absorbed into the existing declaration and the domain is
+         * strictly tighter afterwards — that is a real given, it belongs in the fact list, and
+         * telling the student "already known" would be false. «a הוא פרמטר חיובי» twice is not.
+         * The two are told apart by asking whether the merge changed the domain at all.
+         */
+        const changed = JSON.stringify(normalizeDomain(merged.domain)) !== JSON.stringify(normalizeDomain(prior.domain));
         return {
           ok: true,
-          absorbed: true,
+          effect: changed ? 'narrowed' : 'known',
           next: { ...c, params: c.params.map((p) => (p.sym === f.sym ? merged : p)) },
         };
       }
-      return { ok: true, absorbed: false, next: { ...c, params: [...c.params, { sym: f.sym, domain: f.domain }] } };
+      return { ok: true, effect: 'created', next: { ...c, params: [...c.params, { sym: f.sym, domain: f.domain }] } };
     }
 
     case 'point': {
@@ -154,7 +182,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       if (standing && standing.kind === 'free') {
         return {
           ok: true,
-          absorbed: false,
+          effect: 'created',
           next: {
             ...c,
             objects: c.objects.map((o) =>
@@ -172,13 +200,13 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       if (prior) {
         // M1: a statement about an EXISTING point.
         if (sameNumbers(prior.x, f.x) && sameNumbers(prior.y, f.y)) {
-          return { ok: true, absorbed: true, next: c }; // agrees — absorbed, no duplicate row
+          return { ok: true, effect: 'known', next: c }; // agrees — absorbed, no duplicate row
         }
         return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
       }
       return {
         ok: true,
-        absorbed: false,
+        effect: 'created',
         next: { ...c, objects: [...c.objects, { kind: 'point', id: f.id, x: f.x, y: f.y }] },
       };
     }
@@ -193,7 +221,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         if (prior.curve.kind !== f.curve.kind) {
           return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
         }
-        if (sameCurve(prior.curve, f.curve)) return { ok: true, absorbed: true, next: c };
+        if (sameCurve(prior.curve, f.curve)) return { ok: true, effect: 'known', next: c };
         // The anonymous conics share one id by design (D6), so a DIFFERENT equation under the same
         // id is not a contradiction about one object — it is a second parabola/ellipse, and it is
         // told so. Reporting "conflicting restatement" here would name the wrong problem.
@@ -207,7 +235,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       }
       return {
         ok: true,
-        absorbed: false,
+        effect: 'created',
         next: {
           ...c,
           objects: [...c.objects, { kind: 'curve', id: f.id, label: f.label, curve: f.curve }],
@@ -234,18 +262,18 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       // Restating the same constraint adds nothing — M1's absorb, so a later section of a question
       // may repeat a given without it counting twice against the figure's freedom.
       const dup = c.constraints.some((k) => JSON.stringify(k) === JSON.stringify(f.k));
-      if (dup) return { ok: true, absorbed: true, next: c };
-      return { ok: true, absorbed: false, next: { ...c, constraints: [...c.constraints, f.k] } };
+      if (dup) return { ok: true, effect: 'known', next: c };
+      return { ok: true, effect: 'created', next: { ...c, constraints: [...c.constraints, f.k] } };
     }
 
     /** Introduce a named but unplaced point; harmless and absorbed if it already exists. */
     case 'declare': {
       const o = objectById(c, f.id);
       if (o) {
-        if (isPositional(o)) return { ok: true, absorbed: true, next: c };
+        if (isPositional(o)) return { ok: true, effect: 'known', next: c };
         return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
       }
-      return { ok: true, absorbed: false, next: { ...c, objects: [...c.objects, { kind: 'free', id: f.id }] } };
+      return { ok: true, effect: 'created', next: { ...c, objects: [...c.objects, { kind: 'free', id: f.id }] } };
     }
 
     /** A selector names a point and constrains nothing — it filters configurations after the solve. */
@@ -257,10 +285,10 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       const dup = c.selectors.some(
         (s) => s.id === f.id && s.axis === f.axis && s.positive === f.positive,
       );
-      if (dup) return { ok: true, absorbed: true, next: c };
+      if (dup) return { ok: true, effect: 'known', next: c };
       return {
         ok: true,
-        absorbed: false,
+        effect: 'created',
         next: { ...c, selectors: [...c.selectors, { id: f.id, axis: f.axis, positive: f.positive }] },
       };
     }
@@ -309,7 +337,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       if (prior) {
         // M1: restating the same construction is absorbed — no duplicate row, no re-creation. This
         // is what lets a later section of a question name what an earlier one established.
-        if (sameReference(prior, f)) return { ok: true, absorbed: true, next: c };
+        if (sameReference(prior, f)) return { ok: true, effect: 'known', next: c };
         return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
       }
 
@@ -319,7 +347,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
           : f.t === 'segment'
             ? { kind: 'segment', id: f.id, a: f.a, b: f.b }
             : { kind: 'polygon', id: f.id, vertices: f.vertices };
-      return { ok: true, absorbed: false, next: { ...c, objects: [...c.objects, made] } };
+      return { ok: true, effect: 'created', next: { ...c, objects: [...c.objects, made] } };
     }
   }
 }
@@ -382,20 +410,48 @@ export interface FoldResult {
   construction: Construction;
   /** Per-fact outcome, positionally — the fact list renders refusals in place. */
   errors: Array<ApplyError | null>;
+  /**
+   * Per-fact EFFECT, positionally — what each statement actually did (#1045).
+   *
+   * Parallel to  and  wherever that is non-null, so a caller reads exactly one of
+   * the two for any fact. Carried out of the fold because the decision belongs to  and
+   * every surface that reports it — the fact list, the counter, the notice — must read the same
+   * answer rather than each re-deriving one.
+   */
+  effects: Array<LineEffect | null>;
 }
 
 /** The replay fold: facts in, figure-defining construction out. Pure over the ordered list. */
 export function fold(facts: readonly Fact[]): FoldResult {
   let c = EMPTY_CONSTRUCTION;
   const errors: Array<ApplyError | null> = [];
+  const effects: Array<LineEffect | null> = [];
   for (const f of facts) {
     const out = applyFact(c, f);
     if (out.ok) {
       c = out.next;
       errors.push(null);
+      effects.push(out.effect);
     } else {
       errors.push(out.error);
+      effects.push(null);
     }
   }
-  return { construction: c, errors };
+  return { construction: c, errors, effects };
+}
+
+/**
+ * A domain in comparable form — see the `narrowed` vs `known` decision in `applyFact`.
+ *
+ * Spelled out rather than comparing the objects directly because the merge builds a fresh object
+ * with the same keys in a different order, and `exclude` accumulates duplicates that mean nothing.
+ */
+function normalizeDomain(d: Domain): Record<string, unknown> {
+  return {
+    min: d.min ?? null,
+    max: d.max ?? null,
+    minOpen: d.minOpen ?? false,
+    maxOpen: d.maxOpen ?? false,
+    exclude: [...new Set(d.exclude ?? [])].sort((a: number, b: number) => a - b),
+  };
 }

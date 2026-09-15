@@ -80,6 +80,29 @@ place. A kind that can forward-reference is what would earn one.
   renderer draws. **Pure**, so the renderer stays a consumer rather than a second geometry implementation
   — the same split every sibling uses.
 
+## The submit path's three answers ([ADR-AG-020](06c-decisions-analytic.md#adr-ag-020))
+
+`App.submit` dry-runs the whole line list with the new line appended, and the result is one of
+**three** things, not two:
+
+| outcome | recorded? | shown |
+| --- | --- | --- |
+| `faulted` | no | the refusal, naming the student's own statement |
+| `created` / `narrowed` | yes | the figure updates |
+| `known` | **no** | an informational notice — «זה כבר ידוע…» |
+
+The third row is the one that was missing. `applyFact` had answered it since V0 as a boolean
+`absorbed`, `derive` did not carry it, and the submit path therefore asked only *"is there a fault?"*
+and recorded the line on every `no`. The student saw their sentence listed twice and was told nothing.
+
+**The effect is decided once, at the apply boundary**, and carried out through `fold` (per fact,
+positionally beside `errors`) and `derive` (rolled up per line). That is what makes the fact list, the
+counter and the notice agree: they read one answer rather than each re-deriving one.
+
+**`narrowed` exists because `absorbed` was hiding two events.** «a הוא פרמטר» then «a<13» merges into
+the existing declaration — absorbed — but adds information, so it is a real given and belongs in the
+list. Collapsing it into "already known" would silently drop a stated given.
+
 ## Born after the chassis
 
 This is the **first builder created after `shell/` existed**, and the difference shows in what it did
