@@ -24,6 +24,12 @@
  */
 import { evalExpr, type Env } from './expr';
 import type { Id } from './types';
+import {
+  describeLengthExpr,
+  evalLengthExpr,
+  lengthRefs,
+  type LengthExpr,
+} from './lengths';
 import type { Pt } from './derived';
 import type { Expr } from './expr';
 
@@ -76,7 +82,15 @@ export type Constraint =
    */
   | { t: 'relation'; rel: 'parallel' | 'perpendicular'; u: Direction; v: Direction }
   /** `שיפוע AB הוא 2` — the same direction algebra as a relation, with a stated value (#1051). */
-  | { t: 'slope'; u: Direction; value: Expr };
+  | { t: 'slope'; u: Direction; value: Expr }
+  /**
+   * `AB + BC = DE` — an equation between two expressions over LENGTHS (#1050).
+   *
+   * The only member of this union whose operands are TREES rather than a fixed tuple, which is
+   * the whole reason it exists: `AB = 10`, `AB = AC`, `AB + BC = 10` and `2·AB = 3·CD` are one
+   * kind with different trees rather than four kinds with one form each.
+   */
+  | { t: 'length-eq'; left: LengthExpr; right: LengthExpr };
 
 /** Which points a constraint references — the solver's map from constraints to movable carriers. */
 export function constraintRefs(k: Constraint): Id[] {
@@ -95,6 +109,8 @@ export function constraintRefs(k: Constraint): Id[] {
       return [...dirRefs(k.u), ...dirRefs(k.v)];
     case 'slope':
       return dirRefs(k.u);
+    case 'length-eq':
+      return [...lengthRefs(k.left), ...lengthRefs(k.right)];
     default: {
       const unreferenced: never = k;
       throw new Error(`constraint declares no refs: ${JSON.stringify(unreferenced)}`);
@@ -119,6 +135,8 @@ export function describeConstraint(k: Constraint): string {
       return `${describeDir(k.u)} ${k.rel === 'parallel' ? '∥' : '⊥'} ${describeDir(k.v)}`;
     case 'slope':
       return `שיפוע ${describeDir(k.u)}`;
+    case 'length-eq':
+      return `${describeLengthExpr(k.left)} = ${describeLengthExpr(k.right)}`;
     default: {
       const undescribed: never = k;
       throw new Error(`constraint has no description: ${JSON.stringify(undescribed)}`);
@@ -293,6 +311,17 @@ export function residual(
        * Normalised by the unit direction, so a stated slope reads the same on any scale of figure.
        */
       return [u.y - m * u.x];
+    }
+    case 'length-eq': {
+      const l = evalLengthExpr(k.left, at, env);
+      const r = evalLengthExpr(k.right, at, env);
+      if (l === null || r === null) return null;
+      /**
+       * Scale-normalised, like the area residual and for the same reason: a figure measured in
+       * thousands and one measured in units must converge alike, and a raw difference would let
+       * the larger figure dominate a joint solve purely because its numbers are bigger.
+       */
+      return [(l - r) / Math.max(1, Math.abs(l), Math.abs(r))];
     }
     default: {
       const unmeasured: never = k;

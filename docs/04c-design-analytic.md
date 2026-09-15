@@ -200,6 +200,36 @@ Every `matchCurve` branch ends in `(.+)`, which is right for «נתון הישר
 contains an `=`, because a truncated equation has no `=` either and that student needs the opposite
 answer.
 
+## Lengths as values ([ADR-AG-025](06c-decisions-analytic.md#adr-ag-025))
+
+`engine/lengths.ts` is a **thin adapter, not a second expression language**. `AB + BC = DE` needs
+precedence, juxtaposition, `√` and powers — all of which `expr.ts` already has and is tested for. The
+one thing it lacks is a token for `AB`: its symbols are single Latin letters, so `AB` reads as `A·B`.
+
+So each `|PQ|` is rewritten to a single **private-use character** before parsing, and bound to the
+measured distance at evaluation:
+
+```
+AB + BC = DE     →      +   =  
+                       {A,B}   {B,C}       {D,E}
+```
+
+Private-use precisely because no student can type one and no corpus phrasing contains one — an
+encoding that could collide with real input would repeat ADR-AG-006's `[IVX]` defect, where an internal
+token class swallowed an equation. `SYMBOL_RE` widens by that range and nothing else.
+
+**Three rules, three disjoint conditions, one ordering.** `AB` is a length, a line's name, and part of
+a bare equation, depending on the sentence:
+
+| sentence | claimed by | because |
+| --- | --- | --- |
+| «משוואת הישר AB היא y=2x» | `matchCurve` | it carries a curve NOUN, and runs first |
+| `AB + BC = 10` | `parseConstraint` | a length token on at least one side |
+| `x-y+2=0` | the bare-equation branch | symbols are the PLANE's, and it runs last |
+
+The guard is position, not tokens — and it is asserted in the suite, because the ordering is the whole
+of it.
+
 ## Born after the chassis
 
 This is the **first builder created after `shell/` existed**, and the difference shows in what it did

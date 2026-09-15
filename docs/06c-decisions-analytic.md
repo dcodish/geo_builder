@@ -1549,3 +1549,62 @@ configuration, the check *reports* on the one reached. `null` stays "cannot be j
 operand kinds. Five catalog entries carry the new forms, chosen to walk the **operands** rather than
 the phrasings — a catalog listing four spellings of one operand would prove nothing about the resolver.
 `src-analytic` 240 → 278 tests.
+
+## ADR-AG-025 — Lengths are VALUES, and that needs an expression layer (#1050)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1061](https://github.com/dcodish/geo_builder/issues/1061)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R49. **Design:**
+[04c](04c-design-analytic.md) "Lengths as values".
+
+**Context.** Operator: *"I want to support things like `AB+BC=10` or `AB+BC=DE`"*. Measured: both
+`not-handled`, and so were `AB = AC` and `AB = 10` — **the tool had no notion of a segment's length as
+a value at all.**
+
+**Why this is a different SHAPE from every constraint built so far.** [ADR-AG-015](#adr-ag-015) built a
+constraint layer whose every member is a **fixed-arity relation**: an area equals a number, a point is
+the midpoint of two others, two directions are parallel. `AB + BC = DE` is not that. It is an equation
+between two **expressions**, and neither side has an arity the grammar fixes. One kind per form would
+be four kinds for `AB = 10`, `AB = AC`, `AB + BC = 10` and `2·AB = 3·CD`; as an expression it is **one
+kind with different trees**, which is what makes the ratios and squares the corpus also writes fall out
+rather than each needing another rule.
+
+**Decision.**
+
+1. **A `length-eq` constraint over two `LengthExpr` trees.** The residual is `eval(left) − eval(right)`,
+   scale-normalised like the area residual and for the same reason: a figure measured in thousands and
+   one measured in units must converge alike.
+2. **It REUSES `expr.ts` rather than growing a second parser.** Operator precedence, juxtaposition
+   (`2AB`), `√`, powers and the typeset/keyboard normalisation are already written, tested and
+   load-bearing; a parallel implementation would be a second place for `4√5` to be read differently.
+3. **Length terms are encoded as PRIVATE-USE placeholder characters.** The one thing `expr.ts` cannot
+   do is see `AB` as a single symbol — its tokenizer reads single Latin letters, so `AB` is the product
+   `A·B`. Each `|PQ|` is rewritten to one character from the Unicode private-use area before parsing
+   and bound to the measured distance at evaluation. **Private-use precisely because no student can
+   type one and no corpus phrasing contains one**: an encoding that could collide with real input would
+   be the `[IVX]` defect again ([ADR-AG-006](#adr-ag-006)), where an internal token class ate an
+   equation. `SYMBOL_RE` widens by exactly that range and by nothing else.
+4. **The powers and quotients the corpus writes come free**, which is the return on (2): `AC² + BC² =
+   1250` is Pythagoras stated as a given, and it parses because `expr.ts` already had `^`.
+
+**THE COLLISION, and why the guard is position rather than tokens.** `AB` is a length here and a LINE
+NAME elsewhere — «משוואת הישר AB היא y=2x» is corpus vocabulary too. The length rule lives in
+`parseConstraint`, which `parseLine` reaches **only after `matchCurve`**, so any sentence carrying a
+curve noun is already spoken for, and a bare equation in the plane's variables is claimed by
+[ADR-AG-019](#adr-ag-019)'s branch, which runs later still and tests for `x`/`y` rather than for
+lengths. Three rules, three disjoint conditions, one ordering — and it is **asserted** rather than
+assumed, because this tree has twice been bitten by a token class eating real input.
+
+**A length is ≥ 0**, so `AB = 12` with `AB + BC = 10` is reported `unsatisfiable` naming the statement,
+rather than solved with a negative length. On a figure with no free carriers it is checked too, via
+[#1062](https://github.com/dcodish/geo_builder/issues/1062)'s separation of the check from the solve —
+which landed in this same round and is what makes `A(0,0) B(4,3)` with `AB = 10` a refusal.
+
+**Measured after:** `AB = 10` → 10.0000 · `AB = 4√5` → 8.9443 · `AC² + BC² = 1250` → 1250.00 ·
+`AB = AC` equal to 4 decimal places · `AB + BC = DE` equal to 3. Every one verified from the placed
+points, independently of the solver's own verdict.
+
+**Consequences.** `src-analytic` 278 → 295 tests. Three catalog entries walk the tree SHAPES rather
+than the phrasings. The equal-length kind is the one [#1049](https://github.com/dcodish/geo_builder/issues/1049)
+needs for «ריבוע ABCD» (a rectangle plus `AB = BC`), so the shape-noun round consumes this rather than
+defining its own — the same reason #1052 and #1051 were bundled.

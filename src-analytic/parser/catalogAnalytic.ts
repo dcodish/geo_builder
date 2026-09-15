@@ -31,7 +31,7 @@ export interface CatalogEntryAnalytic {
    * families, read from the 572 conic corpus; F16/F17 come from the «lines and points» corpus
    * (02c §8) and are the first entries whose source is a different exam topic.
    */
-  family: 'F1' | 'F3' | 'F5' | 'F6' | 'F11' | 'F16' | 'F17' | 'F18' | 'F19';
+  family: 'F1' | 'F3' | 'F5' | 'F6' | 'F11' | 'F16' | 'F17' | 'F18' | 'F19' | 'F20';
   /**
    * Lines that must be typed BEFORE this one for it to mean anything — «M אמצע AB» needs A and B.
    *
@@ -157,6 +157,31 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     family: 'F19',
     he: 'שיפוע AB הוא 2',
     en: 'the slope of AB is 2',
+    needs: ['משולש ABC'],
+  },
+
+  // --- F20 · lengths as VALUES (#1050) ---
+  // One constraint kind with different TREES, so the entries walk the tree shapes rather than the
+  // phrasings: a length against a number, a length against a length, and a sum.
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'AB = 10',
+    en: 'AB = 10',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'AB = AC',
+    en: 'AB = AC',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'AB + BC = 10',
+    en: 'AB + BC = 10',
     needs: ['משולש ABC'],
   },
 

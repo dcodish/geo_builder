@@ -21,6 +21,7 @@ import type { DerivedRule } from '../engine/derived';
 import type { Constraint, Direction } from '../engine/solve';
 import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS } from '../engine/carriers';
+import { constantLengthExpr, parseLengthExpr } from '../engine/lengths';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id } from '../engine/types';
 
 /**
@@ -651,6 +652,23 @@ const SLOPE_HE = new RegExp(
 );
 const SLOPE_EN = /^(?:the\s+)?slope\s+of\s+(.+?)\s+is\s+(.+)$/i;
 
+/**
+ * `AB = 10` · `AB = AC` · `AB + BC = 10` · `AB + BC = DE` · `AB = 4√5` · `2·AB = 3·CD` (#1050).
+ *
+ * An equation between two expressions over LENGTHS, which is a shape no other constraint has: every
+ * other kind is a fixed-arity relation, and neither side of this one has an arity the grammar fixes.
+ *
+ * **The collision this has to survive.** `AB` is a length here and a LINE NAME elsewhere —
+ * «משוואת הישר AB היא y=2x» is corpus vocabulary too. The disambiguation is position, not tokens:
+ * this rule runs inside `parseConstraint`, which `parseLine` reaches only AFTER `matchCurve`, so any
+ * sentence carrying a curve noun is already spoken for. That ordering is the whole guard, and it is
+ * asserted rather than assumed — this tree has twice been bitten by a token class eating real input
+ * ([ADR-AG-006](../../docs/06c-decisions-analytic.md#adr-ag-006)).
+ *
+ * A side with no length token at all is a plain number (`10`, `4√5`); a sentence with NO length on
+ * either side is not this rule’s business and falls through untouched.
+ */
+const LENGTH_EQ = /^(?:נתון\s+כי\s+|נתון\s+)?(.+?)\s*=\s*(.+)$/;
 function parseConstraint(line: string): RuleOutcome {
   /**
    * The relation rules run FIRST among the constraints (#1052).
@@ -683,6 +701,17 @@ function parseConstraint(line: string): RuleOutcome {
     return made([{ t: 'constraint', k: { t: 'slope', u, value }, src: line }]);
   }
 
+
+  const lengthEq = LENGTH_EQ.exec(line);
+  if (lengthEq) {
+    const left = parseLengthExpr(lengthEq[1]);
+    const right = parseLengthExpr(lengthEq[2]) ?? constantLengthExpr(lengthEq[2]);
+    // At least ONE side must mention a length, or this is an ordinary equation (`y=2x`) that the
+    // bare-equation branch reads far better than we would.
+    if (left && right) {
+      return made([{ t: 'constraint', k: { t: 'length-eq', left, right }, src: line }]);
+    }
+  }
   const area = AREA_HE.exec(line) ?? AREA_EN.exec(line);
   if (area) {
     const ids = splitNames(area[1]);

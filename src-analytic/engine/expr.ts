@@ -73,7 +73,15 @@ type Tok =
   | { t: 'sqrt' };
 
 /** Symbols are SINGLE latin letters — the corpus's whole parameter alphabet (a b t k p m n r R). */
-const SYMBOL_RE = /[A-Za-z]/;
+/**
+ * A parameter symbol is ONE Latin letter — plus the private-use range, which is how `lengths.ts`
+ * encodes a length term (`AB`) as a single symbol so this parser's precedence, juxtaposition, `√` and
+ * powers all apply to length arithmetic without a second implementation (#1050).
+ *
+ * Private-use characters cannot appear in student input or in any corpus phrasing, so widening the
+ * class here cannot change how a real expression is read.
+ */
+const SYMBOL_RE = /[A-Za-z-]/;
 
 function tokenize(src: string): Tok[] | null {
   const out: Tok[] = [];

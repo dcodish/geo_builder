@@ -300,13 +300,23 @@ describe('#1037 — a bare equation builds, and eats nothing', () => {
   });
 
   it('does NOT swallow a metric given or the component form — the failure mode', () => {
-    // `AB = 4√5` parses as an equation whose symbols are `A` and `B`; they are not the plane's, so
-    // the branch declines. `x_A = 5` does not parse as an equation at all. Both stay unhandled,
-    // which is the correct answer TODAY — they are #1050's and #1040's work, not this branch's.
+    /**
+     * The invariant is that the bare-equation branch never reads these as CURVES. `AB = 4√5` parses
+     * as an equation whose symbols are `A` and `B`, which are not the plane's, so the branch declines.
+     *
+     * **What "declining" leads to has changed, and that is the point of asserting the kind rather
+     * than the code.** When #1037 shipped, nothing else could read a metric given either, so they all
+     * answered `not-handled` — and this test said so, noting it was #1050's work. #1050 landed in
+     * round #1061, so `AB = 4√5` is now a LENGTH constraint: on `A(0,0) B(4,3)` it is `unsatisfiable`,
+     * because that distance is 5 and not 4√5. The bare-equation branch is still not the rule that
+     * claimed it, which is what this case exists to prove.
+     */
     const pts = ['A(0,0)', 'B(4,3)', 'C(1,1)'];
-    for (const line of ['AB = 4√5', 'AB=10', 'x_A = 5', 'AB+BC=10', 'AB = AC']) {
-      expect(outcome(line, pts), line).toBe('not-handled');
+    for (const line of ['AB = 4√5', 'AB=10', 'AB+BC=10', 'AB = AC']) {
+      expect(outcome(line, pts), line).not.toMatch(/^built:/);
     }
+    // `x_A = 5` still parses as nothing at all — the component form (#1040) remains unbuilt.
+    expect(outcome('x_A = 5', pts)).toBe('not-handled');
   });
 
   it('does not swallow a parameter pin either', () => {

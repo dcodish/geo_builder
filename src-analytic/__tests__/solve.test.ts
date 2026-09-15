@@ -357,3 +357,102 @@ describe('#1062 — the check is not part of the solve', () => {
     expect(codes(['A(0,0)', 'B(0,5)', 'משולש ABC', 'שיפוע AB הוא 2'])).toEqual(['unsatisfiable']);
   });
 });
+
+/**
+ * #1050 — lengths as VALUES, and the expression layer over them.
+ *
+ * Every other constraint kind is a fixed-arity relation. `AB + BC = DE` is an equation between two
+ * EXPRESSIONS, and neither side has an arity the grammar fixes — which is why it is one kind with two
+ * trees rather than one kind per form. The cases below walk the TREE SHAPES for that reason: a sum, a
+ * length against a length, a scaled length, a power, an irrational constant.
+ *
+ * Measured before building: all of `AB = 10`, `AB = AC`, `AB + BC = 10`, `AB + BC = DE` were
+ * `not-handled` — the tool had no notion of a segment's length as a value at all.
+ */
+describe('#1050 — length arithmetic', () => {
+  const len = (d: ReturnType<typeof derive>, a: string, b: string) => {
+    const p = d.figure.points.find((q) => q.id === a)!;
+    const q = d.figure.points.find((r) => r.id === b)!;
+    return Math.hypot(q.x - p.x, q.y - p.y);
+  };
+
+  it('pins a length against a number', () => {
+    const d = derive(['משולש ABC', 'AB = 10'], 0);
+    expect(d.faults).toEqual([]);
+    expect(len(d, 'A', 'B')).toBeCloseTo(10, 4);
+  });
+
+  it('pins a length against ANOTHER length — the isosceles given', () => {
+    const d = derive(['משולש ABC', 'AB = AC'], 0);
+    expect(d.faults).toEqual([]);
+    expect(len(d, 'A', 'B')).toBeCloseTo(len(d, 'A', 'C'), 4);
+  });
+
+  it('adds lengths — the operator’s own example', () => {
+    const d = derive(['משולש ABC', 'AB + BC = 10'], 0);
+    expect(d.faults).toEqual([]);
+    expect(len(d, 'A', 'B') + len(d, 'B', 'C')).toBeCloseTo(10, 4);
+  });
+
+  it('adds lengths against another length — the other example', () => {
+    const d = derive(['מרובע ABCD', 'נקודה E(9,9)', 'AB + BC = DE'], 0);
+    expect(d.faults).toEqual([]);
+    expect(len(d, 'A', 'B') + len(d, 'B', 'C')).toBeCloseTo(len(d, 'D', 'E'), 3);
+  });
+
+  it('takes an irrational constant, because the corpus writes one', () => {
+    // `AB = 4√5` is 02c's own F10 example. It works because the expression layer is `expr.ts` —
+    // `√`, juxtaposition and precedence were already written and tested there.
+    const d = derive(['משולש ABC', 'AB = 4√5'], 0);
+    expect(d.faults).toEqual([]);
+    expect(len(d, 'A', 'B')).toBeCloseTo(4 * Math.sqrt(5), 4);
+  });
+
+  it('scales a length', () => {
+    const d = derive(['מרובע ABCD', '2·AB = 3·CD'], 0);
+    expect(d.faults).toEqual([]);
+    expect(2 * len(d, 'A', 'B')).toBeCloseTo(3 * len(d, 'C', 'D'), 3);
+  });
+
+  it('squares lengths — Pythagoras stated as a GIVEN, which the corpus does', () => {
+    const d = derive(['משולש ABC', 'AC^2 + BC^2 = 1250'], 0);
+    expect(d.faults).toEqual([]);
+    expect(len(d, 'A', 'C') ** 2 + len(d, 'B', 'C') ** 2).toBeCloseTo(1250, 2);
+  });
+
+  it('reports an impossible combination rather than solving it with a negative length', () => {
+    // A length is ≥ 0, so `AB = 12` and `AB + BC = 10` cannot both hold.
+    const d = derive(['משולש ABC', 'AB = 12', 'AB + BC = 10'], 0);
+    expect(d.faults.map((f) => f.code)).toContain('unsatisfiable');
+  });
+
+  it('reports a false length on points that are already placed', () => {
+    // #1062's path: no carrier is free, and the given is still checked.
+    const d = derive(['A(0,0)', 'B(4,3)', 'AB = 10'], 0);
+    expect(d.faults.map((f) => f.code)).toEqual(['unsatisfiable']);
+  });
+
+  it('THE COLLISION: `AB` is a length here and a LINE NAME elsewhere', () => {
+    /**
+     * «משוואת הישר AB היא y=2x» is corpus vocabulary too, and this tree has twice been bitten by a
+     * token class eating real input (ADR-AG-006's `[IVX]`). The disambiguation is POSITION, not
+     * tokens: the length rule lives in `parseConstraint`, which `parseLine` reaches only after
+     * `matchCurve`, so any sentence carrying a curve noun is already spoken for. Asserted here
+     * because the ordering is the entire guard.
+     */
+    for (const line of ['משוואת הישר AB היא y=2x', 'נתון הישר AB: y=2x']) {
+      const r = parseLine(line);
+      expect(r.ok, line).toBe(true);
+      if (r.ok) expect(r.facts[0].t, line).toBe('curve');
+    }
+    // And a bare equation in the plane's variables is still a curve, not a length (#1037).
+    const bare = parseLine('y=2x');
+    expect(bare.ok && bare.facts[0].t).toBe('curve');
+  });
+
+  it('leaves a sentence with no length on either side alone', () => {
+    // `x-y+2=0` has an `=` and no length token; the bare-equation branch reads it far better.
+    const r = parseLine('x-y+2=0');
+    expect(r.ok && r.facts[0].t).toBe('curve');
+  });
+});

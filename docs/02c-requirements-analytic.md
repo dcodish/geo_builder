@@ -725,3 +725,11 @@ satisfied.
 A student who places four points and then states what the question told them is exactly the student
 who most wants to know their reading was right. Whether any carrier was free to move is a fact about
 the SOLVER, not about whether the given holds, and it may not decide whether the student is told.
+
+**R49 — a length is a VALUE the student can do arithmetic with**
+([ADR-AG-025](06c-decisions-analytic.md#adr-ag-025)). «AB = 10», «AB = AC», «AB + BC = 10»,
+«AB + BC = DE», «AB = 4√5», «2·AB = 3·CD» and «AC² + BC² = 1250» are one capability, not seven: an
+equation between two expressions over lengths. A length is never negative, so a combination that would
+require one is reported as unsatisfiable, naming the student's own statement. **`AB` remains a line's
+name where the sentence says so** — «משוואת הישר AB היא y=2x» is corpus vocabulary too, and the two
+readings are separated by which rule the sentence reaches first, not by the token.
