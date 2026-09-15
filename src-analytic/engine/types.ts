@@ -131,7 +131,7 @@ export interface FactBase {
 export type Fact =
   | (FactBase & { t: 'param'; sym: string; domain: Domain })
   | (FactBase & { t: 'point'; id: Id; x: Expr; y: Expr })
-  | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve })
+  | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve; stated: boolean })
   | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule })
   | (FactBase & { t: 'segment'; id: Id; a: Id; b: Id })
   | (FactBase & { t: 'polygon'; id: Id; vertices: Id[] })
@@ -189,8 +189,8 @@ export interface ParamDecl {
 export type GeoObject =
   /** Stated by coordinates — `A(2,6)`. Its expressions may carry parameters. */
   | { kind: 'point'; id: Id; x: Expr; y: Expr }
-  /** Stated by equation — the four-member curve family. */
-  | { kind: 'curve'; id: Id; label: CurveLabel; curve: Curve }
+  /** Stated by equation — the four-member curve family. `stated` is #1076's carrier flag. */
+  | { kind: 'curve'; id: Id; label: CurveLabel; curve: Curve; stated: boolean }
   /**
    * DERIVED from points already stated — a midpoint, a centroid, an incentre (#1028). 0-DOF and
    * solver-free: given its parents there is exactly one answer, in closed form. This is the kind

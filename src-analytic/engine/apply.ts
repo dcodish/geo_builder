@@ -280,7 +280,31 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
             error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) },
           };
         }
-        if (sameCurve(prior.curve, f.curve)) return { ok: true, effect: 'known', next: c };
+        if (sameCurve(prior.curve, f.curve)) {
+          /**
+           * PROMOTION (#1076) — the same curve, now stated.
+           *
+           * «נקודה B על הישר y=x» minted `y=x` as a carrier; «y=x» on its own line is the student
+           * asking for the line itself. Because ids are content-derived (ADR-AG-023) these are ONE
+           * object, so the second sentence is not a new curve — it is a change of what the first one
+           * IS, and the figure visibly gains a line. Answering «כבר ידוע» here would be the #1045
+           * mechanism firing on a line that really did something.
+           *
+           * The promotion is one-way. A stated curve is never demoted by a later carrier mention,
+           * because the student already asked to see it and nothing they said withdraws that.
+           */
+          if (f.stated && !prior.stated) {
+            return {
+              ok: true,
+              effect: 'created',
+              next: {
+                ...c,
+                objects: c.objects.map((o) => (o.id === f.id ? { ...prior, stated: true } : o)),
+              },
+            };
+          }
+          return { ok: true, effect: 'known', next: c };
+        }
         /**
          * Same id, different equation, and now that ids are content-derived (#1026) that can only
          * mean one thing: a NAMED curve being restated inconsistently — «הישר AC» given twice with
@@ -294,7 +318,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         effect: 'created',
         next: {
           ...c,
-          objects: [...c.objects, { kind: 'curve', id: f.id, label: f.label, curve: f.curve }],
+          objects: [...c.objects, { kind: 'curve', id: f.id, label: f.label, curve: f.curve, stated: f.stated }],
         },
       };
     }

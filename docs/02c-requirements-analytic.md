@@ -778,3 +778,10 @@ configuration may yet have the object — that is R-level ADR-AG-008 and it stan
 fixed there is no other configuration, so «מפגש האלכסונים» of a concave quadrilateral, the circumcentre
 of three collinear points and an empty circle are each named as not existing, rather than left absent
 with nothing said.
+
+**R56 — a curve minted to CARRY a point is not drawn**
+([ADR-AG-032](06c-decisions-analytic.md#adr-ag-032)). «נקודה B על הישר y=x» means *B is (t,t)*: the
+point appears, the line does not. Stating «y=x» on its own line draws it — and when the carrier was
+already there, that line PROMOTES it and is recorded as a change, never answered «כבר ידוע» or «כבר
+נובע». The carrier remains in the data panel throughout, because it is the honest answer to *where
+does B live*.

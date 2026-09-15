@@ -230,6 +230,29 @@ a bare equation, depending on the sentence:
 The guard is position, not tokens — and it is asserted in the suite, because the ordering is the whole
 of it.
 
+## A point on an object, and the carrier that holds it ([ADR-AG-029](06c-decisions-analytic.md#adr-ag-029), [ADR-AG-032](06c-decisions-analytic.md#adr-ag-032))
+
+«נקודה D על הצלע BC» is the product's defining sentence: the point is neither free (2 DOF) nor
+derived (0), it rides a **carrier** with exactly one. The rule lowers to three pieces, and which
+pieces it emits is decided by the NOUN:
+
+| the student writes | incidence | selector |
+| --- | --- | --- |
+| `D על הצלע BC` / `על הקטע BC` | `on-line-2pt` | `between D B C` |
+| `D על הישר BC` | `on-line-2pt` | — |
+| `B על הישר y=x` | `on-curve` against a minted curve | — |
+
+The operator's ruling is that **the noun decides boundedness**, so `bounded` tests for
+`צלע|קטע|side|segment` by name. It does not test "has a noun" — the alternation also carries
+`ישר|מעגל|פרבולה|אליפסה`, and a circle bounds nothing.
+
+**Where the curve comes from matters as much as the curve.** A line the student named is part of
+their figure; a line minted so a point has something to sit on is not. The object carries `stated`
+to tell them apart, set at the M1 boundary; `evaluate` keeps both, because the solve measures
+`on-curve` against the carrier and the data panel names it as the point's provenance; the RENDERER
+draws only the stated ones. Restating a carrier's equation on its own line **promotes** it — one
+object, now drawn, reported as a change rather than as a restatement.
+
 ## Born after the chassis
 
 This is the **first builder created after `shell/` existed**, and the difference shows in what it did
@@ -268,3 +291,4 @@ applied to the fourth.
   moves.
 - **Not deployed** (above). The readmission path is mechanical: flip `enabled` to `true` and drop
   `devOnly` in [`products.json`](../products.json), and add its RUNBOOK row.
+

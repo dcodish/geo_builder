@@ -30,6 +30,12 @@ export interface FigureCurve {
   id: Id;
   label: CurveLabel;
   curve: NumCurve;
+  /**
+   * #1076 — a curve minted to CARRY a point is knowledge, not figure. It stays here, because the
+   * solve needs it (it is what `on-curve` is measured against) and the data panel names it as the
+   * provenance of the point that rides it. The RENDERER is what leaves it undrawn.
+   */
+  stated: boolean;
 }
 
 /**
@@ -430,7 +436,7 @@ export function evaluate(c: Construction, seed = 0): Figure {
       }
       case 'curve': {
         const res = resolveCurve(o.curve, env);
-        if (res.ok) curves.push({ id: o.id, label: o.label, curve: res.curve });
+        if (res.ok) curves.push({ id: o.id, label: o.label, curve: res.curve, stated: o.stated });
         else vacant.push({ id: o.id, reason: res.reason });
         break;
       }

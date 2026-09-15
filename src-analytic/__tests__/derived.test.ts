@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { fold } from '../engine/apply';
 import { depsPrecedeDependents, dofCount, objectDeps } from '../engine/carriers';
 import { derive } from '../engine/derive';
+import { buildScene } from '../render/scene';
 import { evaluate, isKnowledge } from '../engine/evaluate';
 import { circumcentre, diagonalMeet, evalRule, incentre, orthocentre } from '../engine/derived';
 import { parseLine } from '../parser/parseAnalytic';
@@ -379,5 +380,74 @@ describe('#1058 — vacancy needs a predicate', () => {
 
   it('a convex quadrilateral is unaffected', () => {
     expect(codes(['A(0,0)', 'B(4,0)', 'C(4,4)', 'D(0,4)', 'G מפגש האלכסונים במרובע ABCD'])).toEqual([]);
+  });
+});
+
+describe('#1076 — a CARRIER is not a stated object', () => {
+  /**
+   * Operator ruling, 2026-09-15: *"when I say that נקודה B על הישר y=x - what i really mean is
+   * that B is (t,t). so I dont want the line itself drawn. if i want the line itself, I will say
+   * y=x"*.
+   *
+   * These assert the SCENE, not the construction. #1066's lesson was that a mechanism verified at
+   * the engine layer says nothing about what the student sees, and this defect lives entirely in
+   * what is shown.
+   */
+  const drawn = (lines: string[]) => {
+    const d = derive(lines, 0);
+    const s = buildScene(d.figure, d.box, 600, 600);
+    return { curves: s.curves.length, points: s.points.length, faults: d.faults, d };
+  };
+
+  it('does not draw the line a point was merely placed ON', () => {
+    const r = drawn(['נקודה B על הישר y=x']);
+    expect(r.faults).toEqual([]);
+    expect(r.curves).toBe(0);
+    // The carrier is REAL — B rides it, and the panel still names it.
+    expect(r.points).toBe(1);
+    expect(r.d.figure.curves).toHaveLength(1);
+    const b = r.d.figure.points[0];
+    expect(b.y).toBeCloseTo(b.x, 6);
+  });
+
+  it('draws the same line when the student asks for the line itself', () => {
+    expect(drawn(['y=x']).curves).toBe(1);
+  });
+
+  it('PROMOTES the carrier when the line is later stated — and calls it a change', () => {
+    // Content-derived ids (ADR-AG-023) make these ONE object, so the second line adds no row and
+    // would read as «כבר ידוע» to #1045's mechanism — while the canvas visibly gains a line.
+    const r = drawn(['נקודה B על הישר y=x', 'y=x']);
+    expect(r.curves).toBe(1);
+    expect(r.d.figure.curves).toHaveLength(1);
+    expect(r.d.outcomes[1]).toBe('created');
+  });
+
+  it('never DEMOTES a stated line to a carrier', () => {
+    expect(drawn(['y=x', 'נקודה B על הישר y=x']).curves).toBe(1);
+  });
+
+  it('leaves an object the student built alone — «D על הצלע BC»', () => {
+    // The flag belongs to the MINTING, not to the noun: BC is the student's own segment.
+    const r = drawn(['A(0,0)', 'B(4,0)', 'C(0,4)', 'משולש ABC', 'D על הצלע BC']);
+    expect(r.faults).toEqual([]);
+    expect(r.d.figure.segments).toHaveLength(3);
+  });
+
+  it('carries the CURVE families, which fell through to not-handled', () => {
+    // Not a parabola: «y=x^2» is a translated conic and out of scope by ADR-AG-005. The circle and
+    // the ellipse are the corpus's own, and «שמשוואתו» is how the corpus writes them.
+    for (const line of [
+      'נקודה P על המעגל שמשוואתו x^2+y^2=25',
+      'P על האליפסה x^2/9+y^2/4=1',
+      'P is on the circle x^2+y^2=25',
+    ]) {
+      const r = drawn([line]);
+      expect(r.faults).toEqual([]);
+      expect(r.curves).toBe(0);
+      expect(r.points).toBe(1);
+    }
+    const p = derive(['נקודה P על המעגל שמשוואתו x^2+y^2=25'], 0).figure.points[0];
+    expect(Math.hypot(p.x, p.y)).toBeCloseTo(5, 6);
   });
 });

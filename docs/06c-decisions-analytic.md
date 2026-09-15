@@ -1968,3 +1968,66 @@ than `derived:diagonals` — the engine stays language-free and the locale rende
 corpus noun.
 
 **Consequences.** `src-analytic` 330 → 337 tests.
+
+## ADR-AG-032 — A CARRIER is not a stated object (#1076)
+
+**Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-029](#adr-ag-029) (#1073) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R56. **Design:**
+[04c](04c-design-analytic.md) "A point on an object".
+
+**Context — an operator RULING**, given while playing ADR-AG-029's own fix:
+
+> when I say that נקודה B על הישר y=x - what i really mean is that B is (t,t). so I dont want the
+> line itself drawn. if i want the line itself, I will say y=x
+
+**What was measured.** The line was drawn, and — the detail that decided the shape of the fix —
+both spellings mint the SAME id:
+
+```
+נקודה B על הישר y=x   → objects: curve-anon2j9w, B      scene: crv=1
+y=x                    → objects: curve-anon2j9w         scene: crv=1
+```
+
+**Root cause: "the student stated this" was never recorded.** #1073 has to create the curve — a
+point on a line needs a line to be on, and that 1-DOF carrier is the product's defining mechanism.
+What it could not do is say *why* the curve exists. Every object in the construction reached
+`figure.curves` and then the scene, so the two provenances were indistinguishable.
+
+**Decision: `stated: boolean` on the curve object, set at the M1 boundary** (`apply.ts`) — the one
+place that already decides new-object versus statement-about-existing, so this adds no decision
+point. Required rather than optional, so a future rule that mints a curve without answering the
+question is a **compile error** rather than an over-drawn canvas.
+
+**Where each layer draws the line.** The carrier stays in `figure.curves`: the solve measures
+`on-curve` against it, and the data panel names it as the provenance of the point that rides it —
+ADR-AG-025's rule, that a value's home is where it came from. The RENDERER filters it. Undrawn is a
+statement about the figure the student asked for, not about what the engine knows.
+
+**Promotion is the branch that was most likely to be got wrong, and it was.** Because ids are
+content-derived (ADR-AG-023), «y=x» after «נקודה B על הישר y=x» is not a new curve — it changes what
+the existing one IS. Both of the surrounding mechanisms would have mishandled it:
+
+- ADR-AG-020's structural absorption sees the same curve twice and answers «כבר ידוע»;
+- ADR-AG-030's entailment test sees no new object, no new parameter and no freedom consumed, and
+  answers «זה כבר נובע» — while the canvas visibly gains a line.
+
+`applyFact` already had the vocabulary: promotion reports `created`, and the submit path reads that
+answer before either test runs. **That is the same move #1045 made** — the answer existed and
+nothing read it, for a third time in this tree. Promotion is one-way: a stated curve is never
+demoted by a later carrier mention, because nothing the student said withdraws the request.
+
+**The noun list gained the curve families in the same change**, and that was not scope creep — it
+was this ADR's own claim failing measurement. The fix direction asserted the over-drawing happens
+«for every carrier the on-object rule mints: «נקודה P על הפרבולה y=x²»», and measuring it showed
+that sentence never reached the rule at all: the noun alternation held only `צלע|קטע|ישר`. A noun
+missing from an alternation does not refuse — it falls through to `not-handled`, which reads to a
+student as *"this tool does not do circles"*. `HE_EQ_OF` joined it too, since «המעגל שמשוואתו …» is
+how the corpus writes a circle. None of the curve nouns is BOUNDED; `bounded` tests for
+`צלע|קטע|side|segment` by name rather than for "has a noun", which is what kept the operator's
+boundedness ruling intact through the widening.
+
+**Consequences.** `src-analytic` 337 → 343 tests. «y=x²» is still refused `out-of-scope` — a
+translated conic, outside ADR-AG-005's four-family scope, and an honest refusal rather than
+anything this changed.

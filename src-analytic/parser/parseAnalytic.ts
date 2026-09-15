@@ -641,12 +641,18 @@ const CEVIAN_EN = new RegExp(
  * number, and a gate admitting one spelling is a silent drop, which is this tree's most productive bug
  * class. The NOUN is captured because the operator's ruling makes it load-bearing: it decides whether
  * the carrier is bounded.
+ *
+ * The noun list carries the CURVE families too (#1076). A point on a parabola is the same sentence
+ * as a point on a line — one carrier, one degree of freedom — and leaving «פרבולה» out of the
+ * alternation would not have refused it: the sentence fell through to `not-handled`, which reads to
+ * a student as "this tool does not do parabolas". None of the curve nouns is BOUNDED; only a side
+ * and a segment are, which is why `bounded` tests for those two by name rather than for "has a noun".
  */
 const ON_OBJECT_HE = new RegExp(
-  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+(ה?(?:צלע|קטע|ישר))?\\s*(.+)$`,
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+(ה?(?:צלע|קטע|ישר|מעגל|פרבולה|אליפסה))?\\s*(?:${HE_EQ_OF}\\s+)?(.+)$`,
 );
 const ON_OBJECT_EN = new RegExp(
-  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+)?(side|segment|line)?\\s*(.+)$`,
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+)?(side|segment|line|circle|parabola|ellipse)?\\s*(.+)$`,
   'i',
 );
 
@@ -880,7 +886,8 @@ function parseConstraint(line: string): RuleOutcome {
     if (eq && symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
       const cid = `curve-${anonIndex(operand)}`;
       return made([
-        { t: 'curve', id: cid, label: { name: '' }, curve: { eq }, src: line },
+        // NOT stated (#1076): this line exists to put a point on a line, not to draw the line.
+        { t: 'curve', id: cid, label: { name: '' }, curve: { eq }, stated: false, src: line },
         { t: 'declare', id, src: line },
         { t: 'constraint', k: { t: 'on-curve', id, curve: cid }, src: line },
       ]);
@@ -995,6 +1002,8 @@ export function parseLine(raw: string): ParseResult {
           id: curve.id,
           label: { name: curve.name, kind: curve.kind },
           curve: { kind: curve.kind, eq },
+          // The student named the curve and gave its equation — this sentence IS the curve.
+          stated: true,
           src: line,
         },
         ...through,
@@ -1081,6 +1090,8 @@ export function parseLine(raw: string): ParseResult {
           id: `curve-${anonIndex(line)}`,
           label: { name: '' },
           curve: { eq: bare },
+          // A bare equation on a line of its own is the student asking for that curve.
+          stated: true,
           src: line,
         },
       ],
