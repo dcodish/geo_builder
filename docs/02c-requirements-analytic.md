@@ -899,3 +899,9 @@ inventing an ordinal, because no exam in the corpus ever needs one.
 givens that noun carries — the same object «משולש ABC» would have built, absorbed if it is already
 there. «שטח ABC הוא 6» names no shape and draws none; a noun whose arity disagrees with its vertices
 is refused.
+
+**R76 — a crossing can be clicked, and it adds the SENTENCE**
+([ADR-AG-054](06c-decisions-analytic.md#adr-ag-054)). Where two drawn straight pieces cross and both
+can be named, a dashed ring marks the spot; clicking it adds «P נקודת החיתוך של הישר AB עם הישר CD»
+to the givens — the same line typing it would add, editable and removable like any other. No ring is
+offered where a point already stands, or where either object has no name the grammar can use.

@@ -2987,3 +2987,41 @@ prevent. The only adjustment is at the display boundary, where `x_B` becomes `x_
 engine's symbol names are what its expressions are built from and must not change to suit a renderer.
 
 **Consequences.** Both of the operator's reported figures now answer as the exam does.
+
+## ADR-AG-054 — A crossing offers a SENTENCE (#1025), and a point owns its label (#1086)
+
+**Status:** accepted, 2026-09-15 · **Completes** [ADR-AG-048](#adr-ag-048) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R76. **Design:**
+[04c](04c-design-analytic.md) "The ask lane" — the same split, a third surface.
+
+**Context.** Operator, 2026-09-15: *"when a line we draw crosses another line, we need to see the
+dashed circle allowing us to create that point"*. ADR-AG-048 built the SENTENCE for a crossing and
+left the clicking open; this is the clicking.
+
+**Decision: the dot does not mint a point — it writes the sentence.** Clicking adds
+«P נקודת החיתוך של הישר AB עם הישר CD», exactly what typing it produces. The student sees what was
+added, can rename it, and can delete it like any other given. That is [ADR-AG-044](#adr-ag-044)'s
+rule on a third surface: **two surfaces, one grammar**, now three.
+
+**The constraint that falls out of it is the interesting part.** A dot can only be offered where both
+objects have a name the GRAMMAR can use — a segment by its endpoints, a named line, a named circle.
+An ANONYMOUS conic has none ([ADR-AG-049](#adr-ag-049) closed that question by finding the corpus
+never needs one), so its crossings get **no dot** rather than a dot whose click has nothing to say.
+A limit worth having in the engine, where it is visible, rather than discovered in a click handler.
+
+**Two more things a dot must not do**, both asserted: offer a crossing where a point already stands —
+that is the tool suggesting the student repeat themselves — and offer the same crossing twice when two
+sides of one figure meet there.
+
+**And a collision, from two features that landed hours apart** (#1086). [ADR-AG-036](#adr-ag-036)
+marks every circle's centre and labels it; [ADR-AG-038](#adr-ag-038) makes «מעגל O» name that centre
+as a POINT, which draws its own label. Both drew at one position: «O, 5)», with the `(3` behind the
+letter. **The point owns the label** — not by draw order, but because a point the student named
+carries its own under [#1032](https://github.com/dcodish/geo_builder/issues/1032)'s
+canvas-is-the-question rule, and a second label for one place could only repeat it or contradict it.
+
+**Consequences.** `src-analytic` +8 tests. Straight-to-straight crossings only: a line meets a circle
+twice and the sentence handles that (ADR-AG-047 lists both), but the DOT would have to say which of
+the two it is — a second question, not needed for this to be useful.

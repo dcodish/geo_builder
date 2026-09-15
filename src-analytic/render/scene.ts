@@ -124,6 +124,22 @@ export interface Scene {
   segments: SceneSegment[];
   construction: SceneConstruction[];
   points: ScenePoint[];
+  /**
+   * The crossings the student could PROMOTE to a point (#1025).
+   *
+   * Operator, 2026-09-15: *"when a line we draw crosses another line, we need to see the dashed
+   * circle allowing us to create that point"*. Each carries the SENTENCE its click would add, so the
+   * renderer draws a marker and knows nothing about the grammar.
+   */
+  crossings: SceneCrossing[];
+}
+
+export interface SceneCrossing {
+  id: string;
+  cx: number;
+  cy: number;
+  /** What clicking it means, in the student's own words. */
+  sentence: string;
 }
 
 /**
@@ -163,7 +179,19 @@ function ticks(min: number, max: number, project: (v: number) => number): AxisTi
 export interface SceneKnowledge {
   /** Is this curve`s shape — and so its centre — the same in every configuration? */
   curveKnown?: (id: string) => boolean;
+  /**
+   * The crossings to offer, in WORLD coordinates, each with the sentence it would add (#1025).
+   *
+   * Handed in rather than computed here, for the same reason the knowledge gate is: deciding which
+   * crossings can be NAMED is a question about the construction, and the renderer has only the
+   * figure. It projects them and draws them.
+   */
+  crossings?: Array<{ id: string; x: number; y: number; sentence: string }>;
 }
+
+/** Does a drawn point stand here? The centre mark's label defers to it (#1086). */
+const hasPointAt = (fig: Figure, x: number, y: number): boolean =>
+  fig.points.some((p) => Math.hypot(p.x - x, p.y - y) < 1e-6);
 
 export function buildScene(
   fig: Figure,
@@ -198,9 +226,22 @@ export function buildScene(
       ? {
           cx: t.sx(c.curve.cx),
           cy: t.sy(c.curve.cy),
-          label: knows.curveKnown?.(c.id)
-            ? `(${fmtNum(c.curve.cx)}, ${fmtNum(c.curve.cy)})`
-            : undefined,
+          /**
+           * The label is the mark's only when NO point stands there (#1086).
+           *
+           * Operator, 2026-09-15: *"the label O hides the x value"*. A circle given by its centre
+           * (ADR-AG-038) has BOTH — the mark's coordinates from #1024 and the student's own point
+           * `O` from #1059 — drawn at one place, overlapping into «O, 5)».
+           *
+           * The POINT wins, and not by luck of ordering: a point the student named carries its own
+           * label under the canvas-is-the-question rule (#1032), and a second label for the same
+           * place could only ever repeat it or contradict it.
+           */
+          label:
+            knows.curveKnown?.(c.id) &&
+            !hasPointAt(fig, c.curve.cx, c.curve.cy)
+              ? `(${fmtNum(c.curve.cx)}, ${fmtNum(c.curve.cy)})`
+              : undefined,
         }
       : undefined,
   }));
@@ -256,6 +297,13 @@ export function buildScene(
     };
   });
 
+  const crossings: SceneCrossing[] = (knows.crossings ?? []).map((k) => ({
+    id: k.id,
+    cx: t.sx(k.x),
+    cy: t.sy(k.y),
+    sentence: k.sentence,
+  }));
+
   return {
     width,
     height,
@@ -269,5 +317,6 @@ export function buildScene(
     segments,
     construction,
     points,
+    crossings,
   };
 }

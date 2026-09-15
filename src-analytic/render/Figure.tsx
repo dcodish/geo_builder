@@ -20,8 +20,20 @@ const SCAFFOLD = '#94a3b8';
  *  this surface. */
 const SCAFFOLD_TEXT = '#475569';
 
-export function Figure({ scene, showConstruction = false }: { scene: Scene; showConstruction?: boolean }) {
-  const { width, height, axes, curves, segments, construction, points } = scene;
+export function Figure({
+  scene,
+  showConstruction = false,
+  onCrossing,
+}: {
+  scene: Scene;
+  showConstruction?: boolean;
+  /**
+   * A crossing was clicked (#1025). The caller decides what that MEANS — this component knows only
+   * that the student pointed at one, and hands back the sentence it was carrying.
+   */
+  onCrossing?: (sentence: string) => void;
+}) {
+  const { width, height, axes, curves, segments, construction, points, crossings } = scene;
   return (
     <svg
       width="100%"
@@ -181,6 +193,34 @@ export function Figure({ scene, showConstruction = false }: { scene: Scene; show
             </g>
           ) : null,
         )}
+      </g>
+
+      {/*
+        CROSSINGS the student may promote (#1025) — operator: "we need to see the dashed circle
+        allowing us to create that point".
+
+        A dashed ring, deliberately unlike the filled dot of a real point: it is an OFFER, not part of
+        the figure. Drawn before the points so a real point always covers an offer at the same place.
+      */}
+      <g>
+        {crossings.map((k) => (
+          <g key={k.id} data-crossing={k.id}>
+            <title>{k.sentence}</title>
+            <circle
+              cx={k.cx}
+              cy={k.cy}
+              r={6}
+              fill="#fff"
+              fillOpacity={0.01}
+              stroke={INK}
+              strokeOpacity={0.55}
+              strokeWidth={1.25}
+              strokeDasharray="3 2"
+              style={{ cursor: onCrossing ? 'pointer' : 'default' }}
+              onClick={onCrossing ? () => onCrossing(k.sentence) : undefined}
+            />
+          </g>
+        ))}
       </g>
 
       {/* points */}

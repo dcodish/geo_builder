@@ -35,6 +35,7 @@ import { buildScene } from './render/scene';
 import { AskLane } from '../shell/frame/AskLane';
 import { ask, figureIsOpen, type Answer } from './app/ask';
 import { anotherConfiguration } from './app/another';
+import { crossingSentence, crossingsOf, freeLetter } from './engine/crossings';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
 import { parseLine } from './parser/parseAnalytic';
 
@@ -244,6 +245,20 @@ export function App() {
      */
     return buildScene(d.figure, zoomed, CANVAS_W, CANVAS_H, {
       curveKnown: (id) => knownCurve(d.construction, id) !== null,
+      /**
+       * The crossings a student may promote (#1025) — operator: *"when a line we draw crosses another
+       * line, we need to see the dashed circle allowing us to create that point"*.
+       *
+       * Computed here because deciding which crossings can be NAMED is a question about the
+       * construction, and each dot carries the SENTENCE its click would add rather than a point: two
+       * surfaces, one grammar.
+       */
+      crossings: crossingsOf(d.figure, d.construction).map((k) => ({
+        id: k.id,
+        x: k.x,
+        y: k.y,
+        sentence: crossingSentence(k, freeLetter(d.construction)),
+      })),
     });
   }, [d, zoom]);
 
@@ -369,7 +384,12 @@ export function App() {
         }
         canvasZone={
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-            <Figure scene={scene} showConstruction={showConstruction} />
+            <Figure
+              scene={scene}
+              showConstruction={showConstruction}
+              /* A click on a crossing ADDS ITS SENTENCE — the same line typing it would add. */
+              onCrossing={(sentence) => submit(sentence)}
+            />
             <div style={canvasClusterStyle}>
               <button type="button" style={canvasCtrlStyle} onClick={() => setZoom(1)} aria-label="reset">
                 ↺
