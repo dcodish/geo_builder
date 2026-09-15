@@ -231,7 +231,6 @@ describe('M1 — restating a construction is absorbed, contradicting it is refus
    * direction only.
    */
   it.each([
-    ['derived first, then a coordinate', ['A(8,-2)', 'B(1,1)', 'C(0,4)', 'M מפגש התיכונים במשולש ABC', 'M(3,5)']],
     ['coordinate first, then derived', ['A(8,-2)', 'B(1,1)', 'C(0,4)', 'M(3,5)', 'M מפגש התיכונים במשולש ABC']],
   ])('one name cannot be two kinds — %s', (_name, lines) => {
     const d = derive(lines);
@@ -239,6 +238,34 @@ describe('M1 — restating a construction is absorbed, contradicting it is refus
     const ids = d.construction.objects.map((o) => o.id);
     expect(ids.filter((x) => x === 'M')).toHaveLength(1);
     expect(d.figure.points.filter((p) => p.id === 'M')).toHaveLength(1);
+  });
+
+  it('DERIVED first, then a coordinate, is a STATEMENT about it (#1046 — was a clash)', () => {
+    /**
+     * THIS LOCK IS DELIBERATELY FLIPPED, and the invariant it protected is intact.
+     *
+     * What it was protecting is that one name never holds two objects, and that still holds — it
+     * is asserted below, unchanged. What it got wrong is the DISPOSITION: the operator does not
+     * mean "here is a second M", they mean "the M you have is at (3,5)", which is what M1 is for.
+     * Operator, 2026-09-15: *"it should know I am referring to the existing M"*.
+     *
+     * The other direction — a coordinate first, then a derived rule — stays a clash, and that is
+     * not an inconsistency: naming a point `M` and then saying M is the centroid is a second
+     * DEFINITION of M, while giving the centroid a coordinate is a statement about the first one.
+     */
+    const lines = ['A(8,-2)', 'B(1,1)', 'C(0,4)', 'M מפגש התיכונים במשולש ABC', 'M(3,5)'];
+    const d = derive(lines);
+    // The centroid of THIS triangle is (3,1), so «M(3,5)» is false and the figure says so.
+    expect(d.faults.map((f) => f.code)).toEqual(['unsatisfiable']);
+    // The invariant the original test existed for, untouched.
+    expect(d.construction.objects.filter((o) => o.id === 'M')).toHaveLength(1);
+    expect(d.figure.points.filter((p) => p.id === 'M')).toHaveLength(1);
+  });
+
+  it('and the TRUE version of that statement is simply accepted', () => {
+    const d = derive(['A(0,0)', 'B(6,0)', 'C(3,6)', 'M מפגש התיכונים במשולש ABC', 'M(3,2)']);
+    expect(d.faults).toEqual([]);
+    expect(d.construction.objects.filter((o) => o.id === 'M')).toHaveLength(1);
   });
 
   it('no id is ever held by two objects, whatever the kinds', () => {

@@ -2507,3 +2507,77 @@ free DOF moves by orders of magnitude more; the lock asserts both directions.
 
 **Consequences.** `src-analytic` +13 tests. This affects every gated row, not only slopes — lengths
 and coordinates determined through the joint solve were being under-reported the same way.
+
+## ADR-AG-042 — A coordinate about an existing point is a STATEMENT about it (#1046, #1040)
+
+**Status:** accepted, 2026-09-15 · **Corrects the disposition of** [ADR-AG-018](#adr-ag-018) (#1038) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R68. **Design:** none (the M1 boundary).
+
+**Context.** Operator, 2026-09-15: *"how would i be able to say that **the x value of M is 3** if it
+refuses to draw M again. **it should know i'm referring to the existing M**"*.
+
+**#1038 was right about the duplicate and wrong about the meaning.** Two objects with one name was
+the bug, and stopping it was correct. But `name-kind-clash` misdescribes what the student said: they
+did not name a different object, they made a statement about this one — which is exactly what M1 is
+for. `apply.ts`'s own docblock had reserved the slot: *"richer lowerings — a restatement becoming a
+constraint that drives a free figure — attach to this same function when the constraint layer lands,
+and nowhere else."* It has landed.
+
+**ONE disposition, not two.** The issue proposed splitting on determinacy — a CLAIM to verify when
+the point is determined, a CONSTRAINT to solve when it is not. The constraint kind covers both: on a
+determined figure the solve has nothing left to move, the residual stays non-zero, and
+[ADR-AG-028](#adr-ag-028) reports it as unsatisfiable, naming the statement. The verify half comes
+free, with no second mechanism to keep in step with the first.
+
+**The asymmetry is deliberate and is the interesting part.** «M מפגש התיכונים» then «M(3,5)» is a
+statement; «M(3,5)» then «M מפגש התיכונים» is still a CLASH. Giving a derived point a coordinate says
+where it is; naming a point and then saying it is the centroid defines it twice. A free VERTEX being
+placed stays the substitution it always was, because two coordinates consume its two degrees exactly.
+
+**[#1040](https://github.com/dcodish/geo_builder/issues/1040) came with it**, because it is the same
+given with one component left open: «שיעור ה-x של M הוא 3» is «M(3, y)». `coord` has carried optional
+components since V0 and 02c R31 ruled the form — it was ruled and never implemented, which is this
+tree's most productive bug class for the fourth time.
+
+**Consequences.** Two locks flipped, both asserting `name-kind-clash` for the statement direction,
+and the invariant they protected — one name never holds two objects — is asserted unchanged beside
+them. `src-analytic` +15 tests (with ADR-AG-043).
+
+## ADR-AG-043 — A constraint is blamed where it is APPLIED, not where it was parsed (#1079)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** none (an honesty invariant already required). **Design:** none (internal to `fold`).
+
+**Context.** Found by testing the FALSE version of ADR-AG-042's new sentence — and it turned out to
+reach four sentence kinds that had already shipped today.
+
+```
+משולש ABC + זווית B ישרה      on an impossible figure → ACCEPTED, 0 faults, unsatisfied = 1
+משולש ABC + זווית ABC ישרה     the same given, spelled out → REFUSED unsatisfiable
+```
+
+**Root cause.** `derive` blamed an unsatisfiable constraint through a map built from the PARSER's
+facts, so a constraint synthesised inside `applyFact` was not in it and the fault was dropped by a
+`continue`. The engine detected it every single time; only the reporting was lost.
+
+**This is the cost of the resolved-reference pattern, which is a day old.** «זווית B ישרה»,
+«שטח הדלתון הוא 24», «אלכסוני המרובע נפגשים בנקודה O» and «משוואת האלכסון הראשי» all build their
+constraints at M1 because only M1 knows what they refer to. The pattern is right; the bookkeeping did
+not follow it, and the result was **a figure shown as though it satisfied a given it does not** — the
+one thing this product may never do.
+
+**Decision: `fold` records which FACT added each constraint**, by comparing the construction before
+and after each one. That covers a nested `applyFact` without knowing anything about it, so the next
+resolved reference is attributed with nothing to remember — which is the property that matters, since
+forgetting is exactly what happened here.
+
+Two details it handles: a constraint can be REPLACED rather than appended (ADR-AG-035's choice
+collapse), and the replacement belongs to the line that named the seat; and the constraint reported
+for a choice is the OPTION, which is not itself in the list, so the choice holding it carries the
+blame.
+
+**The lock that matters most** asserts the two spellings of one given produce the SAME answer. They
+diverged for a day without any test noticing, because every test was written for one spelling.

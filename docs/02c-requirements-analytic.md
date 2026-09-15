@@ -851,3 +851,9 @@ curve row cannot say whose carrier it is. A point on a circle keeps its open row
 ([ADR-AG-041](06c-decisions-analytic.md#adr-ag-041)), under the same honesty gate as every other row:
 a number when the givens fix it, «אנכי» for a vertical segment — which is an answer, not an absence —
 and an open row when the figure is still free to change it.
+
+**R68 — stating where an existing point is, is a given about it**
+([ADR-AG-042](06c-decisions-analytic.md#adr-ag-042)). «M(3,2)» after «M מפגש התיכונים במשולש ABC»
+says the centroid is there: true, and it is accepted; false, and it is refused naming the statement;
+and on a figure that can still move, the figure moves until it holds. «שיעור ה-x של M הוא 3» is the
+same given with the y left open. Naming a point and THEN defining it a second way is still refused.

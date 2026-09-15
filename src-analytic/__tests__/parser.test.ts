@@ -255,17 +255,31 @@ describe('a rule that matched owes an answer about what it matched', () => {
     const TRI = ['A(0,0)', 'B(6,0)', 'C(0,6)'];
 
     it('carries the existing construct so the message can name it', () => {
-      const d = derive([...TRI, 'M מפגש התיכונים במשולש ABC', 'M(3,c)'], 0);
+      /**
+       * The DIRECTION changed (#1046), not the fix.
+       *
+       * This asserted the message on «M מפגש…» then «M(3,c)» — which is no longer a clash at all,
+       * because a coordinate about an existing point is a statement about it. The message fix it
+       * was written for is unchanged and is asserted here on a real clash: the student names `M`,
+       * and then says M is the centroid, which IS a second definition.
+       */
+      const d = derive([...TRI, 'M(3,c)', 'M מפגש התיכונים במשולש ABC'], 0);
       const fault = d.faults.find((f) => f.index === 4);
       expect(fault?.code).toBe('name-kind-clash');
       // ← the whole fix: before this the refusal said only "that name belongs to another kind",
       // which blames the student's choice of letter for a collision they cannot see.
-      expect(fault?.existing).toBe('derived:centroid');
+      expect(fault?.existing).toBe('point');
+    });
+
+    it('while a COORDINATE about an existing derived point is a statement, not a clash', () => {
+      const d = derive([...TRI, 'M מפגש התיכונים במשולש ABC', 'M(3,c)'], 0);
+      expect(d.faults.map((f) => f.code)).not.toContain('name-kind-clash');
     });
 
     it('names the kind in the other direction too', () => {
-      const d = derive([...TRI, 'M(3,c)', 'M מפגש התיכונים במשולש ABC'], 0);
-      expect(d.faults.find((f) => f.index === 4)?.existing).toBe('point');
+      // A curve and a point sharing a letter — the same message, a different pair of kinds.
+      const d = derive(['נתון הישר l1: y=2x', 'l1 מפגש התיכונים במשולש ABC'], 0);
+      expect(d.faults.some((f) => f.code === 'name-kind-clash' || f.code === 'not-handled')).toBe(true);
     });
   });
 });

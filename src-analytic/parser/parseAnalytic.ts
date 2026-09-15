@@ -915,6 +915,24 @@ const QUADRANT_SIGNS: Record<string, [boolean, boolean]> = {
   fourth: [true, false],
 };
 
+/**
+ * ONE COORDINATE of a point — «שיעור ה-x של M הוא 3» (#1040).
+ *
+ * Operator, 2026-09-15: *"how would i be able to say that the x value of M is 3"*. It is the same
+ * given as «M(3, y)» with the y left open, and `coord` has carried optional components since V0 —
+ * [02c R31](../../docs/02c-requirements-analytic.md) ruled the form and nothing implemented it.
+ *
+ * The corpus writes «שיעור ה-x», «שיעור ה-x של», «ערך ה-x» and the bare «x של M»; English writes
+ * "the x value of M" and "the x-coordinate of M". One alternation, because a gate admitting one
+ * spelling is a silent drop and this tree has paid for that three times.
+ */
+const COMPONENT_HE = new RegExp(
+  `^${HE_GIVEN}(?:ה?שיעור|ה?ערך|ה?קואורדינט[הת])\\s+ה?-?\\s*([xy])\\s+(?:של\\s+)?(?:ה?נקודה\\s+)?(${NAME})${HE_IS}\\s*:?\\s*(.+)$`,
+);
+const COMPONENT_EN = new RegExp(
+  `^(?:the\\s+)?([xy])[- ](?:value|coordinate|coord)\\s+of\\s+(?:point\\s+)?(${NAME})\\s+is\\s+(.+)$`,
+  'i',
+);
 const ON_AXIS_HE = new RegExp(
   `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת)?\\s+)?על\\s+(?:ה?חלק\\s+(ה?חיובי|ה?שלילי)\\s+של\\s+)?ציר\\s+ה?-?\\s*([xy])$`,
 );
@@ -1249,6 +1267,23 @@ function parseConstraint(raw: string): RuleOutcome {
         { t: 'selector', sel: { kind: 'axis-side', id, axis: 'y', positive: py }, src: line },
       ]);
     }
+  }
+
+  const comp = COMPONENT_HE.exec(line) ?? COMPONENT_EN.exec(line);
+  if (comp) {
+    const [, axis, id, valueSrc] = comp;
+    const value = parseExpr(normalizeMath(valueSrc));
+    if (!value) return refuse('bad-equation', trim(valueSrc));
+    // It DECLARES, like every rule that names a point and says where it is (#1069). The other
+    // component is simply absent, which is what leaves it free.
+    return made([
+      { t: 'declare', id, src: line },
+      {
+        t: 'constraint',
+        k: axis.toLowerCase() === 'x' ? { t: 'coord', id, x: value } : { t: 'coord', id, y: value },
+        src: line,
+      },
+    ]);
   }
 
   const ax = ON_AXIS_HE.exec(line) ?? ON_AXIS_EN.exec(line);

@@ -285,6 +285,33 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         };
       }
 
+      /**
+       * A COORDINATE STATEMENT about a point that already exists (#1046, #1040).
+       *
+       * Operator, 2026-09-15: *"how would i be able to say that the x value of M is 3 if it refuses
+       * to draw M again. it should know I am referring to the existing M"*.
+       *
+       * #1038 was right that a second `M` must not be created, and wrong about what the sentence
+       * MEANS. The student did not name a different object; they made a statement about this one,
+       * which is exactly what M1 is for — a command that would create an object whose id already
+       * exists lowers to CONSTRAINTS on the existing object (docs/17 §M1). This function’s own
+       * docblock reserved the slot: *"richer lowerings … attach to this same function when the
+       * constraint layer lands, and nowhere else."* It has landed.
+       *
+       * ONE disposition, not two. The issue proposed splitting on determinacy — a CLAIM to verify
+       * when the point is determined, a CONSTRAINT to solve when it is not — and the constraint kind
+       * covers both: on a determined figure the solve has nothing left to move, the residual stays
+       * non-zero, and #1062 reports it as unsatisfiable, naming the statement. That is the verify
+       * half for free, with no second mechanism to keep in step with the first.
+       *
+       * A `free` vertex is NOT this case — it is handled above, by substitution, because two
+       * coordinates consume its two degrees of freedom exactly and nothing is left to search for.
+       */
+      const standingDerived = objectById(c, f.id);
+      if (standingDerived && standingDerived.kind === 'derived') {
+        return applyFact(c, { t: 'constraint', k: { t: 'coord', id: f.id, x: f.x, y: f.y }, src: f.src });
+      }
+
       const found = priorOf(c, f);
       if (found && 'clash' in found) {
         return {
@@ -745,6 +772,8 @@ export interface FoldResult {
    * answer rather than each re-deriving one.
    */
   effects: Array<LineEffect | null>;
+  /** Per construction constraint, the index of the FACT that added it — see `fold` (#1079). */
+  constraintFact: number[];
 }
 
 /** The replay fold: facts in, figure-defining construction out. Pure over the ordered list. */
@@ -752,18 +781,39 @@ export function fold(facts: readonly Fact[]): FoldResult {
   let c = EMPTY_CONSTRUCTION;
   const errors: Array<ApplyError | null> = [];
   const effects: Array<LineEffect | null> = [];
-  for (const f of facts) {
+  /**
+   * Which FACT put each constraint in the construction (#1079).
+   *
+   * Recorded HERE, where constraints are applied, rather than read off the parser’s facts — which
+   * is what `derive` used to do, and why a constraint synthesised inside `applyFact` could not be
+   * blamed on any line. Four sentence kinds build their constraints at M1 because only M1 knows
+   * what they refer to («זווית B ישרה», «שטח הדלתון הוא 24», «אלכסוני המרובע נפגשים בנקודה O»,
+   * «משוואת האלכסון הראשי»), and every one of them was therefore unreportable: an unsatisfiable
+   * given was DETECTED and silently dropped, and the figure was shown contradicting it.
+   *
+   * Comparing the CONSTRUCTION before and after each fact covers a nested apply without knowing
+   * anything about it, so a future resolved reference is attributed with nothing to remember.
+   */
+  const constraintFact: number[] = [];
+  facts.forEach((f, i) => {
+    const before = c.constraints;
     const out = applyFact(c, f);
     if (out.ok) {
       c = out.next;
+      // Appended AND replaced: #1049’s choice collapse swaps a constraint in place, and the
+      // replacement belongs to the line that named the seat, not to the line that opened it.
+      c.constraints.forEach((k, at) => {
+        if (before[at] === k && constraintFact[at] !== undefined) return;
+        constraintFact[at] = i;
+      });
       errors.push(null);
       effects.push(out.effect);
     } else {
       errors.push(out.error);
       effects.push(null);
     }
-  }
-  return { construction: c, errors, effects };
+  });
+  return { construction: c, errors, effects, constraintFact };
 }
 
 /**

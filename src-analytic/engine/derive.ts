@@ -60,16 +60,7 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
     }
   });
 
-  /** Which line stated each constraint, so an unsatisfiable one is blamed on the right words. */
-  const constraintLine = new Map<string, number>();
-  facts.forEach((f, i) => {
-    if (f.t === 'constraint') {
-      const key = JSON.stringify(f.k);
-      if (!constraintLine.has(key)) constraintLine.set(key, owner[i]);
-    }
-  });
-
-  const { construction, errors, effects } = fold(facts);
+  const { construction, errors, effects, constraintFact } = fold(facts);
   errors.forEach((e, i) => {
     if (e) faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing });
   });
@@ -118,9 +109,24 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
    * ([02c](../../docs/02c-requirements-analytic.md) honesty invariants).
    */
   for (const k of figure.unsatisfied) {
-    const owner = constraintLine.get(JSON.stringify(k));
-    if (owner === undefined) continue;
-    faults.push({ index: owner, code: 'unsatisfiable', detail: lines[owner] });
+    /**
+     * Which constraint IS this, in the construction (#1079)?
+     *
+     * By identity, because `evaluate` reports the very objects it measured. A CHOICE is the one
+     * exception: what it measures is the OPTION the seed selected, which is not itself in the
+     * list, so the choice holding it is what carries the blame — and that is right, because the
+     * line the student wrote is the one that opened the choice.
+     */
+    let at = construction.constraints.indexOf(k);
+    if (at < 0) {
+      at = construction.constraints.findIndex(
+        (c) => c.t === 'choice' && c.options.includes(k),
+      );
+    }
+    const fact = at >= 0 ? constraintFact[at] : undefined;
+    const line = fact === undefined ? undefined : owner[fact];
+    if (line === undefined) continue;
+    faults.push({ index: line, code: 'unsatisfiable', detail: lines[line] });
   }
 
   /**
