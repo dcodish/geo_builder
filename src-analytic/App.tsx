@@ -22,7 +22,7 @@ import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, clampZoom, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
 import { fmtNum } from '../shell/format';
 import { color, fs } from '../shell/theme';
-import { dofCount, paramRegister } from './engine/carriers';
+import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
 import { domainText, positionalOf, type NumCurve } from './engine/types';
 import { isKnowledge, knownCurve } from './engine/evaluate';
@@ -128,6 +128,7 @@ export function App() {
           'conic-slot-taken': 'errConicTaken',
           'name-kind-clash': 'errNameClash',
           'unknown-reference': 'errUnknownRef',
+          'unsatisfiable': 'errUnsatisfiable',
         }[error.key],
         { detail: error.detail },
       )
@@ -137,7 +138,7 @@ export function App() {
   // Counted from the register, not from the declarations, so an undeclared parameter is reported
   // as the freedom it is rather than silently absent (#1014).
   const register = paramRegister(d.construction);
-  const freeCount = dofCount(d.construction);
+  const freeCount = reportedDof(d.construction, d.figure.carrierDof);
 
   // NO `suiteActions`: AppFrame renders the language toggle AND the About button itself, using this
   // product's own `language` key. Passing a toggle here put two «English» buttons on the suite bar.

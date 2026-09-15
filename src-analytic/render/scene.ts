@@ -9,6 +9,7 @@
  */
 import { polylines, type Box } from '../engine/curves';
 import { markPoint } from '../engine/derived';
+import { fmtNum } from '../../shell/format';
 import type { Figure } from '../engine/evaluate';
 import type { CurveKind } from '../engine/types';
 
@@ -54,11 +55,25 @@ export interface SceneCurve {
   d: string;
 }
 
+/**
+ * One coordinate as the canvas should draw it: a number the givens fixed, or the component's own
+ * SYMBOL when they did not (#1032). `sub` is drawn as a real subscript.
+ */
+export type ScenePart = { text: string; sub?: string };
+
 export interface ScenePoint {
   id: string;
   cx: number;
   cy: number;
   label: string;
+  /**
+   * The point's stated coordinates — `A(6,4)`, or `B(x_B, 0)` where only the `y` was given.
+   *
+   * Absent when the givens say nothing about this point: the canvas carries the QUESTION and the
+   * data panel carries the ANSWER, so a point the solve determined but the student never described
+   * shows its name alone (operator ruling, 2026-09-15).
+   */
+  coords?: [ScenePart, ScenePart];
 }
 
 /** A drawn straight piece — a stated segment or one side of a polygon (#1028), in SCREEN space. */
@@ -150,12 +165,21 @@ export function buildScene(fig: Figure, box: Box, width: number, height: number)
     feet: c.feet.map((f) => ({ cx: t.sx(f.x), cy: t.sy(f.y) })),
   }));
 
-  const points: ScenePoint[] = fig.points.map((p) => ({
-    id: p.id,
-    cx: t.sx(p.x),
-    cy: t.sy(p.y),
-    label: p.id,
-  }));
+  const points: ScenePoint[] = fig.points.map((p) => {
+    const prov = fig.provenance[p.id];
+    const part = (comp: { known: boolean; value?: number } | undefined, axis: 'x' | 'y'): ScenePart =>
+      comp && comp.known ? { text: fmtNum(comp.value as number) } : { text: axis, sub: p.id };
+    // Shown only when the givens said SOMETHING about this point; a point described by nothing —
+    // or only by a constraint shared with others — carries its name alone.
+    const any = prov && (prov.x.known || prov.y.known);
+    return {
+      id: p.id,
+      cx: t.sx(p.x),
+      cy: t.sy(p.y),
+      label: p.id,
+      coords: any ? ([part(prov.x, 'x'), part(prov.y, 'y')] as [ScenePart, ScenePart]) : undefined,
+    };
+  });
 
   return {
     width,

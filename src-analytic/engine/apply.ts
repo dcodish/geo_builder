@@ -17,6 +17,7 @@
  */
 import { fitConic } from './conic';
 import { parentsOf } from './derived';
+import { constraintRefs } from './solve';
 import { evalExpr, type Env } from './expr';
 import {
   conicSlotTaken,
@@ -47,7 +48,9 @@ export type ApplyErrorCode =
    * here is also what guarantees a parent always precedes its dependent, which is why evaluation
    * needs no topological sort (`carriers.ts` `depsPrecedeDependents`).
    */
-  | 'unknown-reference';
+  | 'unknown-reference'
+  /** A stated given the solve could not satisfy — reported, never drawn as if it held. */
+  | 'unsatisfiable';
 
 export interface ApplyError {
   code: ApplyErrorCode;
@@ -99,7 +102,7 @@ function sameNumbers(a: unknown, b: unknown): boolean {
  * not an exhaustive switch.
  */
 function priorOf(c: Construction, f: Fact): { same: GeoObject } | { clash: true } | null {
-  if (f.t === 'param') return null;
+  if (f.t === 'param' || f.t === 'constraint' || f.t === 'selector' || f.t === 'declare') return null;
   const prior = objectById(c, f.id);
   if (!prior) return null;
   return prior.kind === f.t ? { same: prior } : { clash: true };
@@ -134,6 +137,33 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'point': {
+      /**
+       * ANCHORING a free vertex — M1 lowering, and what makes ENTRY ORDER not matter
+       * ([02c R19](../../docs/02c-requirements-analytic.md), the 2-D tool's M2).
+       *
+       * «משולש ABC» then «A(6,4)» is not a student re-creating `A`; it is them *placing* the `A`
+       * they already named. So the coordinates CONSUME the vertex's two degrees of freedom, exactly
+       * as if they had been given first — the figure ends the same whichever order the sentences
+       * arrive in, which is how every exam paragraph is actually written.
+       *
+       * It is an exact substitution, not a solve: two coordinates consume two DOF and nothing is
+       * left to search for. The object is replaced IN PLACE so it keeps its position in the list,
+       * which is what keeps `depsPrecedeDependents` true for anything already referring to it.
+       */
+      const standing = objectById(c, f.id);
+      if (standing && standing.kind === 'free') {
+        return {
+          ok: true,
+          absorbed: false,
+          next: {
+            ...c,
+            objects: c.objects.map((o) =>
+              o.id === f.id ? { kind: 'point', id: f.id, x: f.x, y: f.y } : o,
+            ),
+          },
+        };
+      }
+
       const found = priorOf(c, f);
       if (found && 'clash' in found) {
         return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
@@ -189,19 +219,87 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
      * The three REFERENCE kinds (#1028). They share one shape: every id they name must already be a
      * positional object, and the statement is idempotent under M1 when it says the same thing again.
      */
+    /**
+     * A CONSTRAINT names points and creates none. Like a reference it may not invent one — «שטח
+     * המשולש ABC הוא 20» before ABC exists is a statement about nothing.
+     */
+    case 'constraint': {
+      const missing = constraintRefs(f.k).find((id) => {
+        const o = objectById(c, id);
+        return !o || !isPositional(o);
+      });
+      if (missing !== undefined) {
+        return { ok: false, error: { code: 'unknown-reference', detail: missing } };
+      }
+      // Restating the same constraint adds nothing — M1's absorb, so a later section of a question
+      // may repeat a given without it counting twice against the figure's freedom.
+      const dup = c.constraints.some((k) => JSON.stringify(k) === JSON.stringify(f.k));
+      if (dup) return { ok: true, absorbed: true, next: c };
+      return { ok: true, absorbed: false, next: { ...c, constraints: [...c.constraints, f.k] } };
+    }
+
+    /** Introduce a named but unplaced point; harmless and absorbed if it already exists. */
+    case 'declare': {
+      const o = objectById(c, f.id);
+      if (o) {
+        if (isPositional(o)) return { ok: true, absorbed: true, next: c };
+        return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
+      }
+      return { ok: true, absorbed: false, next: { ...c, objects: [...c.objects, { kind: 'free', id: f.id }] } };
+    }
+
+    /** A selector names a point and constrains nothing — it filters configurations after the solve. */
+    case 'selector': {
+      const o = objectById(c, f.id);
+      if (!o || !isPositional(o)) {
+        return { ok: false, error: { code: 'unknown-reference', detail: f.id } };
+      }
+      const dup = c.selectors.some(
+        (s) => s.id === f.id && s.axis === f.axis && s.positive === f.positive,
+      );
+      if (dup) return { ok: true, absorbed: true, next: c };
+      return {
+        ok: true,
+        absorbed: false,
+        next: { ...c, selectors: [...c.selectors, { id: f.id, axis: f.axis, positive: f.positive }] },
+      };
+    }
+
     case 'derived':
     case 'segment':
     case 'polygon': {
       const refs =
         f.t === 'derived' ? parentsOf(f.rule) : f.t === 'segment' ? [f.a, f.b] : f.vertices;
-      const missing = refs.find((id) => {
-        const o = objectById(c, id);
-        return !o || !isPositional(o);
-      });
-      if (missing !== undefined) {
-        // Named in the student's own words, never as internal state: the message says WHICH point.
-        return { ok: false, error: { code: 'unknown-reference', detail: missing } };
+
+      /**
+       * DECLARATION vs REFERENCE — the distinction #1017 turns on, and it is not a softening of
+       * #1028's `unknown-reference` refusal.
+       *
+       * «M אמצע AB» REFERS to `A` and `B`: inventing them would place positions the question never
+       * gave ([ADR-052](../../docs/06-decisions.md#adr-052)) and spend letters the student is about
+       * to use ([ADR-297](../../docs/06-decisions.md#adr-297)). It still refuses.
+       *
+       * «משולש ABC» **introduces** `A`, `B` and `C` — that is what a shape noun is for. The honest
+       * answer is a vertex with two free degrees of freedom: drawn somewhere, moving under «הציגו
+       * תצורה אחרת», counted in the DOF cue. Refusing here would make the student place three points
+       * before they could name the triangle, which inverts how every exam sentence is written.
+       *
+       * Segments sit with the references: «הקטע AB» reads as being about points under discussion,
+       * and a student who means to introduce them has a shape noun for it.
+       */
+      const declares = f.t === 'polygon';
+      let base = c;
+      for (const id of refs) {
+        const o = objectById(base, id);
+        if (o && isPositional(o)) continue;
+        if (o) return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
+        if (!declares) {
+          // Named in the student's own words, never as internal state: the message says WHICH point.
+          return { ok: false, error: { code: 'unknown-reference', detail: id } };
+        }
+        base = { ...base, objects: [...base.objects, { kind: 'free', id }] };
       }
+      c = base;
 
       const found = priorOf(c, f);
       if (found && 'clash' in found) {

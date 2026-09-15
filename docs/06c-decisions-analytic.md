@@ -982,3 +982,122 @@ the toggle appears, produces 3 dashed lines, 3 feet and three `2:1` labels, and 
 entirely when switched off. **Not in the shared visual smoke** — that harness types lines and captures,
 it does not click controls; this feature's evidence is the dedicated browser run and its screenshots,
 and that limit is stated rather than papered over.
+
+---
+
+## ADR-AG-015 — B2/B3 BUILT: free vertices, the joint solve, and entry order stops mattering (#1016 #1017 #1033 #1034 #1047)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R19 (entry-order independence), R5 (tier 3,
+ratified by [ADR-AG-009](#adr-ag-009)), P4/R22 (the DOF cue as the determinacy signal), §8 F16/F17.
+**Design:** [04c](04c-design-analytic.md) "The model" — the constraint layer and the solve.
+
+**What landed.** The operator's own worked example, in the operator's own order:
+
+```
+משולש ABC · AD תיכון לצלע BC · שטח המשולש ABC הוא 20 · A(6,4) · D(0,3) · B על החלק החיובי של ציר x
+```
+
+builds and yields **B(2,0), C(−2,6)** — image 7 #6's published answer, which is the independent
+oracle the tests check against rather than this engine's own output.
+
+**Five decisions worth recording.**
+
+1. **A shape noun DECLARES; a reference still may not invent.** [ADR-AG-013](#adr-ag-013) made
+   «משולש ABC» refuse when a vertex was missing, and that reasoning was right for «M אמצע AB» —
+   inventing a point places a position the question never gave ([ADR-052](06-decisions.md#adr-052))
+   and spends a letter the student is about to use ([ADR-297](06-decisions.md#adr-297)). It was wrong
+   for a **declaration**: «משולש ABC» is the student *introducing* A, B and C, and the honest answer
+   is a vertex with two free degrees of freedom. The refusal stays for references and goes for
+   declarations, and `apply` is the one place that tells them apart. A sentence that NAMES a new
+   point emits an explicit `declare` fact, so the distinction is stated rather than inferred.
+
+2. **Entry order stops mattering, and it is an exact substitution rather than a solve.** «A(6,4)»
+   after «משולש ABC» is M1 lowering: the coordinates **consume** the vertex's two DOF, replacing the
+   free object in place. Both orders end at the identical figure — [02c R19](02c-requirements-analytic.md),
+   the sibling's M2 — which matters because every exam paragraph names the shape first and places it
+   later.
+
+3. **Levenberg–Marquardt, not Gauss–Newton.** An area constraint is quadratic in the vertices, so a
+   Gauss–Newton step from a far-off seed overshoots and diverges on the corpus's own figures. The
+   damping is the smallest addition that makes the method survive a bad start; measured, the gate
+   converges to the same answer from three very different ones.
+
+4. **A residual is a VECTOR, one entry per equation — never a norm.** The first build returned the
+   *distance* for a midpoint condition. It converged, and the DOF cue then read **1** on a figure that
+   was fully determined: a norm's Jacobian has rank 1 at the solution, so the figure reported freedom
+   it did not have. Per component, the cue counts 6 → 6 → 5 → 3 → 1 → **0**, reaching zero exactly as
+   the last given lands. That is [R22](02c-requirements-analytic.md) — *"the moment the equation
+   appears is the moment the student learns their givens were sufficient"* — and a cue that never
+   reaches zero teaches its opposite. **Caught by reading the number, not by a failing test.**
+
+5. **The DOF cue reports `carriers − rank(J)`, so a dependent given removes no extra freedom.**
+   Stating the same area twice must not make a figure look over-determined. Counting constraints
+   would; the Jacobian's rank does not.
+
+**Honesty.** A constraint the solve cannot meet is a **fault blamed on the line that stated it** — the
+figure is never drawn as though it satisfied a given it does not. And a **selector** is D7 kind 2, not
+a constraint: «החלק החיובי» consumes no freedom and filters configurations *after* the solve, so a
+draw that fails it advances the seed ([ADR-098](06-decisions.md#adr-098)'s pattern) rather than
+reporting a contradiction. Conflating the two is the bug D7 exists to prevent.
+
+**Also fixed on the way:** `evaluate`'s object switch had no exhaustiveness guard, so the new kind
+compiled clean and would have evaluated to **nothing** — the [#1038](https://github.com/dcodish/geo_builder/issues/1038)
+class again, in a second place. It now ends in a `never` check like every switch in `carriers.ts`.
+
+**Not claimed.** The area *measurement* (#1027), the option list for a two-root pin (#1036), the
+component form `x_M` (#1040), and the bare-equation gap (#1037) are untouched. Only the sentences
+named above parse.
+
+---
+
+## ADR-AG-016 — The canvas shows the QUESTION; the data panel shows the ANSWER (#1032)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R20 (equations/coordinates on the canvas, now
+ruled more precisely), R21/R22. **Design:** [04c](04c-design-analytic.md) — `provenanceOf` and the
+scene's label parts.
+
+**Context.** Operator, 2026-09-15, on a figure the tool had just solved: *"the canvas itself shows the
+inputs on the canvas itself. So point A and D were defined so I want to see them, and point B was
+partially defined so I also want to see that. **Anything that is derived from the figure should stay
+in the data panel**."* Asked what a partially-defined point should read: *"for B, we should show
+`B(x_B, 0)`."*
+
+**The rule, and it is PROVENANCE rather than determinacy.** The obvious implementation gates the label
+on `isKnowledge` — and it is wrong. In image 7 #6 the joint solve determines `B = (2,0)` exactly, so
+the honesty gate calls both coordinates knowledge and a gate-driven label prints `B(2,0)`. The ruling
+says that is the **answer**, and the answer belongs in the panel. The canvas carries what the
+student's own givens pin about that point:
+
+| point | its own givens | canvas | panel |
+| --- | --- | --- | --- |
+| `A(6,4)` | both coordinates | `A(6, 4)` | `A(6, 4)` |
+| `D(0,3)` | both coordinates | `D(0, 3)` | `D(0, 3)` |
+| `B` | «על החלק החיובי של ציר x» — pins `y` only | **`B(x_B, 0)`** | `B(2, 0)` |
+| `C` | nothing about `C` alone | `C` | `C(-2, 6)` |
+
+So **the canvas and the panel deliberately disagree about `B`**, and that disagreement is the feature:
+the figure becomes the question, printable as a worksheet with the givens marked the way a textbook
+marks them, and the solution is somewhere the student can choose not to look. It also keeps the canvas
+legible — a solved figure otherwise carries a coordinate pair on every vertex.
+
+**What "its own givens" means, precisely.** Only constraints whose references are exactly that one
+point. «שטח המשולש ABC הוא 20» names three, so it is provenance for none of them — which is why `C`
+shows its name alone even though the figure fixes it. An axis-parallel `on-line` pins one coordinate;
+a slanted line pins neither on its own.
+
+**The honesty invariant still binds, separately.** A stated coordinate carrying a free parameter —
+`A(-9a, 0)` — is **not** known here either, so the canvas never prints a sampled number. Provenance
+decides *whether the givens say anything*; the honesty gate decides *whether what they say is a
+number*. Both must pass.
+
+**Not MathML, and the reason is recorded so it does not read as an omission.** The operator asked for
+`B(x_B, 0)` "in mathml". Subscripts are drawn with an SVG `<tspan>` at reduced size and a baseline
+offset: MathML inside SVG requires `<foreignObject>`, is unevenly supported across browsers, and would
+not survive the PNG export this product already ships. The rendered subscript is identical. The
+letters match the ruled component notation (02c R31c), so what the canvas *shows* is what the student
+may *type* (#1040) — the same word in both directions.
+
+**Legibility.** Point labels are painted stroke-then-fill with a white halo, as the construction ratios
+already were ([ADR-AG-014](#adr-ag-014)): `B(x_B, 0)` lands on the x-axis and `D(0, 3)` on its own
+segment, and both were muddy without it. [ADR-AG-010](#adr-ag-010) R34 makes that a design condition
+rather than a polish item.

@@ -15,7 +15,9 @@ import { constructionOf, evalRule, type Construction as RuleConstruction, type P
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
-import { inDomain, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
+import { provenanceOf, type PointProvenance } from './carriers';
+import { freeRank, residual, solveLM, type Constraint } from './solve';
+import { inDomain, isFree, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
 
 export interface FigurePoint {
   id: Id;
@@ -66,11 +68,30 @@ export interface Figure {
   construction: FigureConstruction[];
   /** Objects that do not exist at this parameter value — named, never silently dropped. */
   vacant: Vacancy[];
+  /** Constraints the solve could NOT meet. Non-empty means the figure must not be shown as if it
+   *  satisfied its givens — the caller reports instead. */
+  unsatisfied: Constraint[];
+  /** Do the D7 branch selectors hold in this configuration? `false` asks for a different one. */
+  selectorsOk: boolean;
+  /** Freedom the OBJECT carriers still have after the constraints — what the DOF cue reports. */
+  carrierDof: number;
+  /** Per point: what the student's OWN givens fix about it — the canvas label (#1032). */
+  provenance: Record<Id, PointProvenance>;
 }
 
 // ---------------------------------------------------------------------------
 // Sampling a parameter inside its domain
 // ---------------------------------------------------------------------------
+
+/**
+ * A free vertex's coordinate — deterministic in the seed and the point's own NAME, so two unplaced
+ * vertices never coincide and each keeps its identity across a reseed.
+ */
+function freeCoord(seed: number, id: string, axis: 0 | 1): number {
+  let h = axis * 7919 + 13;
+  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) % 100003;
+  return Math.round((-6 + 12 * jitter(seed, h)) * 1e6) / 1e6;
+}
 
 /** A tiny deterministic hash → [0,1). Same seed, same figure; different seed, different figure. */
 function jitter(seed: number, salt: number): number {
@@ -121,6 +142,79 @@ export function sampleEnv(c: Construction, seed = 0): Env {
 // Evaluation
 // ---------------------------------------------------------------------------
 
+/**
+ * Place every object, given the environment and an assignment for the FREE vertices.
+ *
+ * Split out of `evaluate` because the solve needs to run it many times: the residual of a
+ * constraint is a function of where the points land, and where they land is a function of the free
+ * vertices being searched over. One placement routine, used by both the search and the final
+ * answer, so the figure the student sees is the figure the solver judged.
+ */
+function place(c: Construction, env: Env, free: Map<Id, Pt>): Map<Id, Pt> {
+  const at = new Map<Id, Pt>();
+  for (const o of c.objects) {
+    switch (o.kind) {
+      case 'point': {
+        const x = evalExpr(o.x, env);
+        const y = evalExpr(o.y, env);
+        if (Number.isFinite(x) && Number.isFinite(y)) at.set(o.id, { x, y });
+        break;
+      }
+      case 'free': {
+        const v = free.get(o.id);
+        if (v) at.set(o.id, v);
+        break;
+      }
+      case 'derived': {
+        const v = evalRule(o.rule, (id) => at.get(id) ?? null);
+        if (v && Number.isFinite(v.x) && Number.isFinite(v.y)) at.set(o.id, v);
+        break;
+      }
+      default:
+        break; // curves, segments and polygons hold no position of their own
+    }
+  }
+  return at;
+}
+
+/** Carrier freedom left after the constraints — `carriers − rank(J)`, so dependent givens do not
+ *  over-count (see `freeRank`). */
+function carrierDofOf(c: Construction, env: Env, free: Map<Id, Pt>, ids: Id[]): number {
+  if (ids.length === 0) return 0;
+  if (c.constraints.length === 0) return 2 * ids.length;
+  const vec = ids.flatMap((id) => [free.get(id)!.x, free.get(id)!.y]);
+  const asMap = (x: number[]) =>
+    new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
+  return freeRank(vec, (x) => {
+    const pos = place(c, env, asMap(x));
+    return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env) ?? [0]);
+  });
+}
+
+/**
+ * Do the branch selectors hold here?
+ *
+ * They consume no freedom, so they cannot be solved FOR — they are a filter over configurations the
+ * solve already produced, and a configuration that fails them asks for a different seed rather than
+ * reporting a contradiction (D7 kind 2).
+ */
+function selectorsHold(c: Construction, at: Map<Id, Pt>): boolean {
+  return c.selectors.every((s) => {
+    const p = at.get(s.id);
+    if (!p) return true; // a selector about an absent point judges nothing
+    const v = s.axis === 'x' ? p.x : p.y;
+    return s.positive ? v > 0 : v < 0;
+  });
+}
+
+/** The free vertices, in a stable order — the solver's unknown vector is two entries each. */
+const freeIds = (c: Construction): Id[] => c.objects.filter(isFree).map((o) => o.id);
+
+export interface SolveReport {
+  /** A constraint that could not be met, named for the student. */
+  unsatisfied: Constraint[];
+}
+
 export function evaluate(c: Construction, seed = 0): Figure {
   const env = sampleEnv(c, seed);
   const points: FigurePoint[] = [];
@@ -136,7 +230,42 @@ export function evaluate(c: Construction, seed = 0): Figure {
   //   - a parent always PRECEDES its dependent, because `apply` refuses a statement naming an
   //     object that does not exist yet — so declaration order is a valid topological order and a
   //     cycle is unreachable (`carriers.ts` `depsPrecedeDependents`, asserted in the suite).
-  const placed = new Map<Id, Pt>();
+  /**
+   * THE SOLVE (#1016). The free vertices start where the sampler puts them and are then moved, all
+   * together, until every constraint holds — which is what makes «שטח המשולש ABC הוא 20» a statement
+   * that shapes the figure rather than a sentence the tool merely accepts.
+   *
+   * With no constraints this is the sampler alone, so an unconstrained figure keeps drawing exactly
+   * as it did and «הציגו תצורה אחרת» still moves it: the seed remains the starting point, and among
+   * several valid configurations it is what chooses between them.
+   */
+  const ids = freeIds(c);
+  const seeded = new Map<Id, Pt>(
+    ids.map((id) => [id, { x: freeCoord(seed, id, 0), y: freeCoord(seed, id, 1) }]),
+  );
+  const unsatisfied: Constraint[] = [];
+  let free = seeded;
+
+  if (ids.length > 0 && c.constraints.length > 0) {
+    const vec = ids.flatMap((id) => [seeded.get(id)!.x, seeded.get(id)!.y]);
+    const asMap = (x: number[]) =>
+      new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
+    const res = solveLM(vec, (x) => {
+      const pos = place(c, env, asMap(x));
+      return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env) ?? [0]);
+    });
+    free = asMap(res.values);
+    if (!res.ok) {
+      // HONEST FAILURE: the figure is not quietly shown as if it satisfied its givens. Which
+      // constraints failed is recorded so the caller can name the statement, not internal state.
+      const pos = place(c, env, free);
+      for (const k of c.constraints) {
+        const r = residual(k, (id) => pos.get(id) ?? null, env);
+        if (r === null || r.some((v) => Math.abs(v) > 1e-6)) unsatisfied.push(k);
+      }
+    }
+  }
+  const placed = new Map<Id, Pt>(free);
   const at = (id: Id): Pt | null => placed.get(id) ?? null;
 
   for (const o of c.objects) {
@@ -174,6 +303,20 @@ export function evaluate(c: Construction, seed = 0): Figure {
         } else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
+      /**
+       * A named but unplaced point (#1017) — 2 DOF, sampled like any other free magnitude.
+       *
+       * Sampled about the ORIGIN rather than at it: the coordinate plane is the subject here, so a
+       * vertex that defaulted to (0,0) would assert a position the question never gave and would
+       * make every unplaced triangle degenerate. The spread is deliberately wide enough that three
+       * unplaced vertices are not near-collinear at the first seed.
+       */
+      case 'free': {
+        const v = placed.get(o.id);
+        if (v) points.push({ id: o.id, x: v.x, y: v.y });
+        else vacant.push({ id: o.id, reason: 'vacant' });
+        break;
+      }
       case 'segment': {
         const a = at(o.a);
         const b = at(o.b);
@@ -192,9 +335,29 @@ export function evaluate(c: Construction, seed = 0): Figure {
         } else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
+      default: {
+        // EXHAUSTIVE, like every switch in carriers.ts. Without this a new object kind compiles
+        // clean and evaluates to NOTHING — silently absent from the figure, which is the #1038
+        // class: a switch that enumerates kinds and is not forced to stay complete.
+        const unevaluated: never = o;
+        throw new Error(`object kind has no evaluation: ${JSON.stringify(unevaluated)}`);
+      }
     }
   }
-  return { env, points, curves, segments, construction, vacant };
+  return {
+    env,
+    points,
+    curves,
+    segments,
+    construction,
+    vacant,
+    unsatisfied,
+    selectorsOk: selectorsHold(c, placed),
+    carrierDof: carrierDofOf(c, env, free, ids),
+    provenance: Object.fromEntries(
+      points.map((p) => [p.id, provenanceOf(c, p.id, env) ?? { x: { known: false }, y: { known: false } }]),
+    ),
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -27,6 +27,7 @@
  * representation, not two.
  */
 import type { DerivedRule } from './derived';
+import type { Constraint } from './solve';
 import type { Expr } from './expr';
 
 export type Id = string;
@@ -123,7 +124,30 @@ export type Fact =
   | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve })
   | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule })
   | (FactBase & { t: 'segment'; id: Id; a: Id; b: Id })
-  | (FactBase & { t: 'polygon'; id: Id; vertices: Id[] });
+  | (FactBase & { t: 'polygon'; id: Id; vertices: Id[] })
+  /**
+   * A statement that must HOLD rather than an object that exists (#1016) — «שטח המשולש ABC הוא 20».
+   *
+   * It carries no id because it creates nothing: it consumes the freedom of points that already do.
+   */
+  | (FactBase & { t: 'constraint'; k: Constraint })
+  /**
+   * D7 KIND 2 — a BRANCH SELECTOR, not a constraint ([ADR-AG-005](../../docs/06c-decisions-analytic.md#adr-ag-005)).
+   *
+   * «על החלק החיובי של ציר x» carries both: being *on* the axis is an incidence that consumes a
+   * degree of freedom, while *which part* of it chooses among configurations that already satisfy
+   * every given. A selector consumes NO freedom — treating it as an equation would report "no valid
+   * configuration" on a perfectly good figure, which is the bug D7 exists to prevent.
+   */
+  | (FactBase & { t: 'selector'; id: Id; axis: 'x' | 'y'; positive: boolean })
+  /**
+   * INTRODUCE a point without placing it — the declaration half of the distinction #1017 draws.
+   *
+   * «AD תיכון לצלע BC» names `D` for the first time, so the sentence introduces it; the constraint
+   * that follows then says where it is. Emitted by any rule whose sentence NAMES a new point, so
+   * that the reference kinds can keep refusing to invent one.
+   */
+  | (FactBase & { t: 'declare'; id: Id });
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list
@@ -163,6 +187,16 @@ export type GeoObject =
    * that makes the object→object dependency relation non-empty for the first time.
    */
   | { kind: 'derived'; id: Id; rule: DerivedRule }
+  /**
+   * A point the student NAMED but did not place — «משולש ABC» introduces three of them (#1017).
+   *
+   * 2 DOF, sampled like any other free magnitude, so the figure is drawable before the coordinates
+   * arrive and the vertex MOVES under «הציגו תצורה אחרת» ([ADR-052](../../docs/06-decisions.md#adr-052)).
+   * It is the counterpart of the `unknown-reference` refusal, not a contradiction of it: naming a
+   * vertex in a DECLARATION introduces it, while naming one in a REFERENCE («M אמצע AB») may not
+   * invent it.
+   */
+  | { kind: 'free'; id: Id }
   /** `הקטע AB` — drawn between two points, and what gives «אמצע הצלע BC» a referent. */
   | { kind: 'segment'; id: Id; a: Id; b: Id }
   /** `משולש ABC` over vertices that are ALREADY stated — its sides. Free vertices are B3's job. */
@@ -177,6 +211,7 @@ export type PolygonObject = Extract<GeoObject, { kind: 'polygon' }>;
 export const isPoint = (o: GeoObject): o is PointObject => o.kind === 'point';
 export const isCurve = (o: GeoObject): o is CurveObject => o.kind === 'curve';
 export const isDerived = (o: GeoObject): o is DerivedObject => o.kind === 'derived';
+export const isFree = (o: GeoObject): o is Extract<GeoObject, { kind: 'free' }> => o.kind === 'free';
 
 /**
  * Anything that resolves to a single position — a stated point or a derived one.
@@ -185,8 +220,10 @@ export const isDerived = (o: GeoObject): o is DerivedObject => o.kind === 'deriv
  * or a derived point silently stops being a point: absent from the panel, absent from the view box,
  * and unavailable as another rule's parent.
  */
-export const isPositional = (o: GeoObject): o is PointObject | DerivedObject =>
-  o.kind === 'point' || o.kind === 'derived';
+export const isPositional = (
+  o: GeoObject,
+): o is PointObject | DerivedObject | Extract<GeoObject, { kind: 'free' }> =>
+  o.kind === 'point' || o.kind === 'derived' || o.kind === 'free';
 
 /**
  * The fold of the fact list: the objects, in the order the student stated them, plus the parameter
@@ -195,9 +232,24 @@ export const isPositional = (o: GeoObject): o is PointObject | DerivedObject =>
 export interface Construction {
   params: ParamDecl[];
   objects: GeoObject[];
+  /** Statements that must hold — solved jointly over the free carriers ([solve.ts](solve.ts)). */
+  constraints: Constraint[];
+  /** Post-solve choices among valid configurations (D7 kind 2) — they consume no freedom. */
+  selectors: Selector[];
 }
 
-export const EMPTY_CONSTRUCTION: Construction = { params: [], objects: [] };
+export interface Selector {
+  id: Id;
+  axis: 'x' | 'y';
+  positive: boolean;
+}
+
+export const EMPTY_CONSTRUCTION: Construction = {
+  params: [],
+  objects: [],
+  constraints: [],
+  selectors: [],
+};
 
 export const pointsOf = (c: Construction): PointObject[] => c.objects.filter(isPoint);
 export const positionalOf = (c: Construction) => c.objects.filter(isPositional);

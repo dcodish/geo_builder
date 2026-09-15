@@ -25,7 +25,9 @@ export type InputError =
   /** One name used for two kinds of object. */
   | { key: 'name-kind-clash'; detail: string }
   /** A construction that refers to a point the figure does not have yet (#1028). */
-  | { key: 'unknown-reference'; detail: string };
+  | { key: 'unknown-reference'; detail: string }
+  /** A given the figure cannot satisfy (#1016). */
+  | { key: 'unsatisfiable'; detail: string };
 
 interface AnalyticState {
   /** The student's lines, in order. The one source of truth. */
