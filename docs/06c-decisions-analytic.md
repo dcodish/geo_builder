@@ -1101,3 +1101,68 @@ may *type* (#1040) — the same word in both directions.
 already were ([ADR-AG-014](#adr-ag-014)): `B(x_B, 0)` lands on the x-axis and `D(0, 3)` on its own
 segment, and both were muddy without it. [ADR-AG-010](#adr-ag-010) R34 makes that a design condition
 rather than a polish item.
+
+## ADR-AG-019 — The shape noun is optional for an equation, and the discriminator is MEASURED (#1037)
+
+**Status:** accepted, 2026-09-15 · **Implements:** [02c](02c-requirements-analytic.md) R6 (operator
+ruling, 2026-09-04) · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R6 — ruled 2026-09-04, unimplemented until now;
+R44 added for the identity rule below. **Design:** [04c](04c-design-analytic.md) "The parser's rule
+contract" — the bare-equation branch and its discriminator.
+
+**Context.** Operator, 2026-09-15: *"why is `x-y+2=0` not recognized by the tool at input?"* It was
+not, and neither was `y^2=54x` — **which is R6's own example.** R6 had ruled the shape noun *optional
+for an equation and load-bearing for a shape*, "because the fit already knows the kind". This is a
+ruled requirement that was never built, not a missing capability: `conic.ts` has fitted six
+coefficients from seven lattice probes and named the family since slice A. Every `matchCurve` branch
+was simply gated on a noun or a name, so a bare equation fell through every rule to `not-handled` —
+and `not-handled` is the **LLM escalation seam**, so the shortest thing a student can type was being
+sent to the paid model as though we had not understood a sentence we understand perfectly.
+
+The corpus writes figures this way. Image 6 gives a triangle as `4x+3y=0`, `12x-5y=0`, `x=15`; image 7
+#10 opens «משוואת אחת ממצלעות משולש היא x-y+2=0».
+
+**Decision.**
+
+1. **A bare equation builds, and the branch runs LAST** — after every named form, parameter
+   declaration, inequality, shape, derived point and coordinate has had first refusal. The issue
+   placed it "last in `matchCurve`", but `matchCurve` runs *before* the point and shape rules, and
+   the protection this branch needs is precisely that those answer first. Implemented as a late
+   branch in `parseLine` instead; the deviation is the plan's own stated intent ("every named form,
+   parameter declaration, inequality and point rule gets first refusal") over its stated location.
+2. **The discriminator is that the equation is in the PLANE's variables, read off the PARSED
+   expression's symbol set** — not by looking for an `x` in the text. This is the whole defence, and
+   it is the `[IVX]` Roman-numeral trap ([ADR-AG-006](#adr-ag-006)) on a new letter: a branch matching
+   anything containing `=` eats `AB = 4√5` and `x_A = 5`.
+3. **It was MEASURED against the corpus before it was written**, as the issue demanded. Every line
+   that must build resolves to symbols containing `x` or `y`; every line that must not — `AB = 4√5`,
+   `AB=10`, `AB+BC=10`, `AB = AC`, `a = 5`, `k=3` — resolves to symbols that are not the plane's, and
+   `x_A = 5` does not parse as an equation at all. Two different mechanisms, both verified rather than
+   assumed.
+4. **No kind is claimed.** `Curve.kind` becomes OPTIONAL — an *expectation* the statement made, not
+   the answer. `classify` remains the authority; the expectation only makes a refusal specific
+   ("you wrote «אליפסה» and this is a hyperbola"). A bare hyperbola or rotated conic is still refused
+   **by name** at evaluation ([ADR-AG-008](#adr-ag-008)), which is why this branch needed no new
+   refusal of its own.
+
+**R44 — an anonymous curve's identity is its EQUATION**, recorded here because this change forced it.
+Anonymous lines and circles were minted `line-<hash>` / `circle-<hash>`, so the bare form of a line the
+student had already given with its noun produced a SECOND object: `line-anon8q5bxa` beside
+`curve-anon8q5bxa`, two panel rows for one line. That duplication did not exist before — without a
+bare form there was only ever one spelling of an anonymous curve — so this change introduced it, and
+fixing it here rather than filing it is the never-patch rule applied to one's own work. All anonymous
+curves now share the `curve-<hash>` namespace; named ones (`line-l1`, `circle-I`) are unaffected,
+because a name IS an identity.
+
+**A consequence worth stating: absence of a claim is not a conflicting claim.** With the namespace
+shared, «הישר x-y+2=0» followed by «x-y+2=0» reached the M1 absorb with `kind: 'line'` on one side and
+`undefined` on the other, and both `sameCurve` and the clash test compared them with `!==` — reporting
+the student's own restatement as a contradiction. Both now require **two** claimed kinds before they
+disagree. This is the second-order defect of making a field optional, and it is exactly the kind that
+ships silently: the figure was right, only the refusal was invented.
+
+**Consequences.** `not-handled` narrows again, on top of [ADR-AG-017](#adr-ag-017) — fewer understood
+sentences reach the LLM, which is a cost control as much as an honesty property. Five catalog entries
+teach the short form, so the reference card and the model's allowed vocabulary both carry it.
+`src-analytic` 194 → 212 tests.

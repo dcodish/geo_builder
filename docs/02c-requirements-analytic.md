@@ -125,6 +125,9 @@ Tier 3 is the boundary between "V1" and "a second constructive engine". ~~**Open
 A bare `y^2=54x` builds; «נתונה פרבולה שמשוואתה» is not required, because the fit already knows the
 kind. But «מקבילית ABCD» *is* the given — it carries AB ∥ DC and nothing else states it. Both are true
 and they are not in tension.
+*(Ruled 2026-09-04; **BUILT** 2026-09-15 by [ADR-AG-019](06c-decisions-analytic.md#adr-ag-019), #1037.
+Until then `y^2=54x` — this requirement's own example — answered `not-handled` and escalated to the
+LLM. See also R44 on what identifies an unnamed curve.)*
 
 **R7 — When a noun IS given with an equation, it is checked against the fit and a mismatch is named.**
 «נתונה אליפסה שמשוואתה x²/9−y²/16=1» must still answer "that is a hyperbola, and this tool does not
@@ -655,3 +658,10 @@ nothing.
 **Still open:** labels for the other constructions. Only the centroid's 2:1 is ruled; an altitude's
 right angle probably wants a mark rather than text, and the others may want nothing at all.
 See [ADR-AG-014](06c-decisions-analytic.md#adr-ag-014).
+
+**R44 — an anonymous curve's identity is its EQUATION** ([ADR-AG-019](06c-decisions-analytic.md#adr-ag-019)).
+«הישר x-y+2=0» and the bare «x-y+2=0» are one line stated two ways, and the figure must hold one object,
+not two. All unnamed curves therefore share a single content-derived namespace; a NAMED curve (`ℓ1`,
+`מעגל I`) is identified by its name, because a name is an identity. A corollary the tool got wrong the
+moment the noun became optional: **a statement that claims no family does not contradict one that
+claimed a family** — only two different *claims* conflict.

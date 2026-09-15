@@ -190,7 +190,14 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       }
       const prior = found?.same as CurveObject | undefined;
       if (prior) {
-        if (prior.curve.kind !== f.curve.kind) {
+        /**
+         * A kind CLAIMED twice, differently, is a contradiction. A kind not claimed at all is not
+         * (#1037): «הישר x-y+2=0» and the bare «x-y+2=0» are the same line stated two ways, and the
+         * second one names no family because [02c R6](../../docs/02c-requirements-analytic.md) says
+         * it need not. Comparing `undefined` against `'line'` would turn the absence of a claim into
+         * a conflicting claim, and the student would be told their own restatement contradicts them.
+         */
+        if (prior.curve.kind && f.curve.kind && prior.curve.kind !== f.curve.kind) {
           return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
         }
         if (sameCurve(prior.curve, f.curve)) return { ok: true, absorbed: true, next: c };
@@ -362,7 +369,10 @@ function pickTighter(
  * Compared at parameter probes, like `sameNumbers`, for the same reason.
  */
 function sameCurve(a: Curve, b: Curve): boolean {
-  if (a.kind !== b.kind) return false;
+  // Same rule as the clash above (#1037): two DIFFERENT claimed families are different curves, but
+  // an unclaimed family agrees with whatever the other one claimed. Identity is the equation; the
+  // kind is an expectation the classifier will settle either way.
+  if (a.kind && b.kind && a.kind !== b.kind) return false;
   return PROBE_ENVS.every((env) => {
     const ka = fitConic(a.eq, env);
     const kb = fitConic(b.eq, env);
