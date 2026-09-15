@@ -1101,3 +1101,46 @@ may *type* (#1040) — the same word in both directions.
 already were ([ADR-AG-014](#adr-ag-014)): `B(x_B, 0)` lands on the x-axis and `D(0, 3)` on its own
 segment, and both were muddy without it. [ADR-AG-010](#adr-ag-010) R34 makes that a design condition
 rather than a polish item.
+
+## ADR-AG-021 — A segment–segment question answered with the line–line formula (#1043)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — none changed; this restores what F16 already
+promises. **Design:** none (internal to `engine/derived.ts`).
+
+**Context.** From a Codex review of the tree, verified by hand before filing. «G מפגש האלכסונים במרובע
+ABCD» over a **concave** quadrilateral returned a point that lies on neither diagonal:
+`A(0,0) B(4,0) C(1,1) D(0,4)` gave `G = (2,2)`, at `t = 2` along a diagonal `AC` that ends at `(1,1)`.
+Committed with no fault, drawn, and printed in the data panel as a coordinate the student can read off
+the figure.
+
+**Root cause.** `diagonalMeet` solved for the intersection of the two supporting **lines** and returned
+it unconditionally, guarding only the parallel case. The docblock said `null` "when the diagonals are
+parallel (they do not meet)", which is a true statement about one way they can fail to meet and was
+being read as the complete contract.
+
+**An invented point is the same class of defect as a dropped given.** Both make the figure say
+something the sentence does not, and this one is worse to a student than a refusal would be: the
+coordinate is printed as knowledge, in the panel, beside coordinates that are true.
+
+**Decision.**
+
+1. **Both parameters come from the same determinant** — `t` along `AC` and `u` along `BD` — so they
+   are consistent by construction rather than by two solves that could disagree near-degenerately.
+2. **`null` unless both lie in `[0, 1]`**, under a relative epsilon. An absolute one would mean
+   something different on a figure spanning 3 units than on one spanning 3000, and the corpus contains
+   both.
+3. **The interval is CLOSED**, and that is a decision rather than a tolerance artefact: `t = 0` or
+   `t = 1` puts the crossing exactly on a vertex — a degenerate quadrilateral whose diagonals
+   genuinely do touch there. Tested directly (`A(0,0) B(4,0) C(2,2) D(0,4)`, where `BD` passes through
+   `C`), so the ruling cannot drift with the epsilon.
+4. **The docblock now states the implemented contract**, both halves.
+
+**`null` is VACANCY, not a fault.** `evalRule` already propagates it and the figure reports the point
+absent at this configuration ([ADR-AG-008](#adr-ag-008)) — never `NaN`, never invented. Nothing new was
+needed for that, which is why this fix is eight lines: the honest path existed and the function was not
+taking it.
+
+**Consequences.** `src-analytic` 194 → 202 tests, including the reported figure, the reviewer's own,
+the closed-endpoint ruling and a scale check at 1000×.
