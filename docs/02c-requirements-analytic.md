@@ -631,3 +631,27 @@ lists it as deliberately open. This corpus is what that split is *about*: no con
 heavy on derived points. Whether the two topics are one tool with a profile or simply one tool whose
 catalog covers both is still unanswered — nothing yet forces the question, and
 [ADR-AG-012](06c-decisions-analytic.md#adr-ag-012) explicitly did **not** settle it.
+
+**R40 — a derived point can SHOW THE CONSTRUCTION that defines it.** *(Operator ruling, 2026-09-15.)*
+The medians for a centroid, the altitudes for an orthocentre, the bisectors for an incentre — drawn
+dotted, with the feet as dots, and each median's two **parts** labelled `2x`/`x`, `2y`/`y`, `2z`/`z`.
+Behind a single global «הצג בנייה» toggle, off by default.
+
+**The label names the PARTS, not the ratio** *(operator ruling, 2026-09-15)*. `2:1` states the
+property; `2x` and `x` hand the student the variables to write the equation with, and a different
+letter per median lets all three enter one calculation. That is the difference between being told a
+fact and being given something to compute with, which is the whole point of R40.
+
+The reason is R21's own: *the answer is meaningless without the way*. A derived point drawn as a bare
+dot shows the answer and hides the method, and for this topic the method is the lesson. It is not
+solving — the construction is what the student must build.
+
+**The construction is DECORATION.** No id, no letter, never in the fact list; a construction line
+minted as an object would occupy a name the student is about to use
+([ADR-297](06-decisions.md#adr-297)). And it must be drawn from the REAL geometry — a median that does
+not actually end at the opposite midpoint would teach something false, which is worse than teaching
+nothing.
+
+**Still open:** labels for the other constructions. Only the centroid's 2:1 is ruled; an altitude's
+right angle probably wants a mark rather than text, and the others may want nothing at all.
+See [ADR-AG-014](06c-decisions-analytic.md#adr-ag-014).

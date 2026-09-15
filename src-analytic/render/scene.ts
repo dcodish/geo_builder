@@ -8,6 +8,7 @@
  * both axes, or a circle draws as an ellipse and the whole product lies about its subject.
  */
 import { polylines, type Box } from '../engine/curves';
+import { markPoint } from '../engine/derived';
 import type { Figure } from '../engine/evaluate';
 import type { CurveKind } from '../engine/types';
 
@@ -69,12 +70,23 @@ export interface SceneSegment {
   y2: number;
 }
 
+/** A derived point's construction, projected to screen space (#1030). Drawn dotted, behind the
+ *  «הצג בנייה» toggle — the medians a student would draw to find a centroid, and the 2:1 that makes
+ *  the property legible. */
+export interface SceneConstruction {
+  id: string;
+  lines: Array<{ x1: number; y1: number; x2: number; y2: number }>;
+  labels: Array<{ x: number; y: number; text: string }>;
+  feet: Array<{ cx: number; cy: number }>;
+}
+
 export interface Scene {
   width: number;
   height: number;
   axes: SceneAxes;
   curves: SceneCurve[];
   segments: SceneSegment[];
+  construction: SceneConstruction[];
   points: ScenePoint[];
 }
 
@@ -126,6 +138,18 @@ export function buildScene(fig: Figure, box: Box, width: number, height: number)
     y2: t.sy(s.b.y),
   }));
 
+  const construction: SceneConstruction[] = fig.construction.map((c) => ({
+    id: c.id,
+    lines: c.lines.map((l) => ({ x1: t.sx(l.a.x), y1: t.sy(l.a.y), x2: t.sx(l.b.x), y2: t.sy(l.b.y) })),
+    labels: c.lines.flatMap((l) =>
+      (l.marks ?? []).map((m) => {
+        const at = markPoint(l, m.at);
+        return { x: t.sx(at.x), y: t.sy(at.y), text: m.text };
+      }),
+    ),
+    feet: c.feet.map((f) => ({ cx: t.sx(f.x), cy: t.sy(f.y) })),
+  }));
+
   const points: ScenePoint[] = fig.points.map((p) => ({
     id: p.id,
     cx: t.sx(p.x),
@@ -144,6 +168,7 @@ export function buildScene(fig: Figure, box: Box, width: number, height: number)
     },
     curves,
     segments,
+    construction,
     points,
   };
 }
