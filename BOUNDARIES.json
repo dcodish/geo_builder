@@ -263,10 +263,12 @@
     "src-analytic/parser": "engine",
     "src-analytic/render": "engine",
     "src-analytic/store": "engine",
+    "src-analytic/app": "engine",
     "src-analytic/i18n": "shell"
   },
 
   "classificationNotes": {
+    "src-analytic/app": "The ask lane's engine decides what a QUESTION means against the figure and which answers pass the knowledge gate — the same kind of reasoning as its 2-D twin, and engine for the same reason: it is about what the figure determines, not about chrome.",
     "src/app": "The submit pipeline reasons about parse results, dry-run outcomes and the honesty gates — it decides what a statement MEANS for the figure, so it is engine, not chrome, despite sitting next to the UI.",
     "src/render": "A pure consumer of engine output, but it reasons about geometry (label wedges, arc extents, foreshortening). Copied, not shared.",
     "src/validation": "engine-layer by subject, and additionally forbidden from importing the engine at all — its oracle must stay independent (enforced separately by its own tests).",

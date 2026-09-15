@@ -39,6 +39,14 @@ const he = {
   secCurves: 'עקומים',
   secLengths: 'אורכים',
   secSlopes: 'שיפועים',
+  // The ASK lane (#1027) — the panel's own input: two surfaces, one grammar.
+  askPlaceholder: 'שאלו על גודל: AB, שטח ABC, משוואת הישר AB',
+  askAdd: 'שאל',
+  // Three different answers, because they are three different situations.
+  askOpen: 'עדיין לא נקבע מהנתונים',
+  askNoValue: 'לא ניתן לחשב מהנתונים',
+  askUnreadable: 'לא הבנתי את השאלה',
+  paletteShow: 'סמלים',
   // A vertical segment HAS no slope, and that is an answer rather than an absence (#1078).
   slopeVertical: 'אנכי (אין שיפוע)',
   secParams: 'פרמטרים',
@@ -131,6 +139,12 @@ const en: typeof he = {
   secCurves: 'Curves',
   secLengths: 'Lengths',
   secSlopes: 'Slopes',
+  askPlaceholder: 'Ask for a size: AB, area of ABC, the equation of line AB',
+  askAdd: 'Ask',
+  askOpen: 'not fixed by the givens yet',
+  askNoValue: 'cannot be computed from the givens',
+  askUnreadable: 'I did not understand the question',
+  paletteShow: 'Symbols',
   slopeVertical: 'vertical (no slope)',
   secParams: 'Parameters',
   freeDof: '{{count}} degrees of freedom',

@@ -9,7 +9,7 @@
  * shared chassis existed ([docs/28 §5](../docs/28-product-unification.md) Phase 4), and mounting
  * rather than re-deriving the chrome is the whole return on that work.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import registry from '../products.json';
 import { AppFrame } from '../shell/frame/AppFrame';
@@ -30,6 +30,8 @@ import { ellipseFoci, parabolaFocus } from './engine/curves';
 import { analyticBidi } from './i18n';
 import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
+import { AskLane } from '../shell/frame/AskLane';
+import { ask, figureIsOpen, type Answer } from './app/ask';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
 import { parseLine } from './parser/parseAnalytic';
 
@@ -82,6 +84,17 @@ export function App() {
     useAnalyticStore();
   const [draft, setDraft] = useState('');
   const [zoom, setZoom] = useState(1);
+  /**
+   * The ASK lane (#1027) — the panel’s own input, and the operator’s request: *"data panel should
+   * have a data entry option to query sizes and equations"*.
+   *
+   * The answers are STATE and the figure is not touched: an ask is evaluated against the current
+   * derivation and discarded (02c R23–R27). Kept newest-first, because the question just asked is
+   * the one being read.
+   */
+  const [askText, setAskText] = useState('');
+  const [answers, setAnswers] = useState<Answer[]>([]);
+  const askRef = useRef<HTMLInputElement | null>(null);
   const [dataOpen, setDataOpen] = useState(true);
   /**
    * «הצג בנייה» — the medians, altitudes or bisectors that DEFINE a derived point (#1030).
@@ -532,7 +545,42 @@ export function App() {
                 }),
               },
             ]}
-          />
+          >
+            {/*
+              The ask lane is ALWAYS there — never behind a button, never gated on a computation
+              having run (ADR-W-038, the shell's rule). What is product-shaped is the ANSWER rows,
+              which is why they are this file’s and the box is not.
+            */}
+            <div style={{ marginTop: 10 }}>
+              {answers.map((a, i) => (
+                <div key={`${a.question}-${i}`} style={askRow} dir="ltr">
+                  {a.unreadable
+                    ? `${a.question} — ${t('askUnreadable')}`
+                    : `${a.question} = ${a.value ?? t(figureIsOpen(d) ? 'askOpen' : 'askNoValue')}`}
+                </div>
+              ))}
+              <AskLane
+                value={askText}
+                onChange={setAskText}
+                inputRef={askRef}
+                dir="auto"
+                placeholder={t('askPlaceholder')}
+                addLabel={t('askAdd')}
+                onSubmit={(text) => {
+                  const answer = ask(d, text, fmt, describeCurve);
+                  setAnswers((prev) => [answer, ...prev].slice(0, 8));
+                  return true;
+                }}
+                palette={{
+                  symbols: SYMBOLS,
+                  symbolTitle: (sy) => (sy.titleKey ? t(sy.titleKey) : sy.label),
+                  startCollapsed: true,
+                  compact: true,
+                  toggleTitle: t('paletteShow'),
+                }}
+              />
+            </div>
+          </DataPanel>
         }
       />
     </AppFrame>
@@ -651,6 +699,14 @@ function pointText(
   }
   return '—';
 }
+
+
+/** An answered question, reading like the inventory rows it sits under. */
+const askRow: CSSProperties = {
+  fontSize: 13,
+  padding: '2px 0',
+  opacity: 0.9,
+};
 
 function describeCurve(name: string, c: NumCurve): string {
   const n = name ? `${name}: ` : '';

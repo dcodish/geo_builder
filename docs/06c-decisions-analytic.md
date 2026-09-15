@@ -2581,3 +2581,45 @@ blame.
 
 **The lock that matters most** asserts the two spellings of one given produce the SAME answer. They
 diverged for a day without any test noticing, because every test was written for one spelling.
+
+## ADR-AG-044 — The ask lane: two surfaces, ONE grammar (#1027)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R23–R27, already written — this implements them.
+**Design:** [04c](04c-design-analytic.md) "The ask lane".
+
+**Context.** Operator, 2026-09-15: *"data panel should have a data entry option to query sizes and
+equations"*. 02c R23–R27 specified it before the product was built and V0 skipped it: the panel
+counted objects and measured nothing.
+
+**Decision: an ask is a MEASURE EXPRESSION**, which is the grammar [ADR-AG-040](#adr-ag-040) built
+for «שטח ABC גדול פי 3 משטח CEF». So `AB`, `שטח ABC`, `AB + BC` and `2·AB` are all askable **because
+they were already sayable**, and neither surface grows a vocabulary the other lacks. Two more
+question shapes ride alongside because the panel already had the answers: a point's name asks for its
+coordinates, and «משוואת הישר ℓ1» asks for its equation.
+
+**The alternative was a question grammar of its own**, and it is worth saying why not: the two
+surfaces would have drifted the way the three builders' ask boxes drifted before ADR-W-038 unified
+the box itself. A student who can SAY «שטח המשולש ABC» and cannot ASK it has met an arbitrary wall.
+
+**The honesty gate is the same gate.** An answer is a value, so it passes `isKnowledge`: the same
+number in every configuration, or no number. Asking «AB» on a figure that has not fixed it gets an
+open answer — which is itself worth knowing and is the truthful one.
+
+**Three answers, not two.** *Not fixed by the givens yet* (the figure still has freedom), *cannot be
+computed* (it is pinned and still unanswerable) and *I did not understand the question* are three
+different situations, and a student told the wrong one looks in the wrong place. The wording is
+chosen from the figure's own freedom rather than from the question.
+
+**The lane itself is the SHARED one** (`shell/frame/AskLane`, ADR-W-038): always present, never
+behind a button, never gated on a computation having run. The ANSWERS are this product's, which is
+the split that keeps the shell free of product knowledge.
+
+**`src-analytic/app` is classified `engine`** in BOUNDARIES.json, like its 2-D twin and for the same
+reason: it decides what a question MEANS against the figure and which answers pass the gate. The
+boundary guard caught the unclassified directory on its first run, which is the guard working.
+
+**Consequences.** `src-analytic` +9 tests. The interactive half of R23–R27 now exists; what is still
+missing from [#1027](https://github.com/dcodish/geo_builder/issues/1027) is the ANGLE row and the
+distance-to-a-line ask, neither of which this grammar carries yet.

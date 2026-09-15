@@ -305,6 +305,25 @@ to tell them apart, set at the M1 boundary; `evaluate` keeps both, because the s
 draws only the stated ones. Restating a carrier's equation on its own line **promotes** it — one
 object, now drawn, reported as a change rather than as a restatement.
 
+## The ask lane ([ADR-AG-044](06c-decisions-analytic.md#adr-ag-044))
+
+Two surfaces, one grammar. The main input CONSTRUCTS; the data panel's own box ASKS, and an ask is
+evaluated against the current derivation and discarded — it never becomes a fact.
+
+| the student types | into the input | into the ask lane |
+| --- | --- | --- |
+| `שטח ABC` | (with a value) a GIVEN that shapes the figure | the area, if the givens fix it |
+| `AB` | the segment, drawn | its length |
+| `משוואת הישר ℓ1` | (with an equation) the line | its equation |
+
+That table is the design: **a thing is askable because it was sayable.** `app/ask.ts` runs the
+question through `parseLengthExpr` — the same measure grammar the constraint rules use — so a
+vocabulary added on one surface arrives on the other with nothing to wire.
+
+The answer passes `isKnowledge`, exactly as an inventory row does, and an unanswerable question is
+worded from the FIGURE's freedom: *not fixed yet* when it still has some, *cannot be computed* when
+it does not, and *I did not understand* when the question named nothing the figure has.
+
 ## Born after the chassis
 
 This is the **first builder created after `shell/` existed**, and the difference shows in what it did

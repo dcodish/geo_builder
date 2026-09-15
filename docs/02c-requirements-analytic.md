@@ -857,3 +857,10 @@ and an open row when the figure is still free to change it.
 says the centroid is there: true, and it is accepted; false, and it is refused naming the statement;
 and on a figure that can still move, the figure moves until it holds. «שיעור ה-x של M הוא 3» is the
 same given with the y left open. Naming a point and THEN defining it a second way is still refused.
+
+**R69 — the data panel can be ASKED** ([ADR-AG-044](06c-decisions-analytic.md#adr-ag-044)). Its own
+input box answers questions about the figure without changing it: «AB», «שטח ABC», «AB + BC»,
+«2AB», a point's name for its coordinates, «משוואת הישר ℓ1» for its equation. **A thing is askable
+because it is sayable** — the ask lane reads the same measure grammar the givens do. An answer passes
+the same honesty gate as every row, and an unanswerable question says WHY: not fixed yet, cannot be
+computed, or not understood.
