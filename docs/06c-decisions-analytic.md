@@ -2623,3 +2623,51 @@ boundary guard caught the unclassified directory on its first run, which is the 
 **Consequences.** `src-analytic` +9 tests. The interactive half of R23–R27 now exists; what is still
 missing from [#1027](https://github.com/dcodish/geo_builder/issues/1027) is the ANGLE row and the
 distance-to-a-line ask, neither of which this grammar carries yet.
+
+## ADR-AG-045 — A circle on a CENTRE POINT, and tangency to the axes (#1060)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R70. **Design:**
+[04c](04c-design-analytic.md) "A circle on a point".
+
+**Context.** Operator, 2026-09-15: *"we need to support מעגל O משיק לציר x and all verses of the axis
+tangency"*. Measured: 0 of 11 phrasings, and — as [ADR-AG-038](#adr-ag-038) recorded — the blocker
+was never the vocabulary. **A circle whose centre is a POINT could not be represented at all.**
+
+**Why the existing model could not hold it.** A `Curve` is an equation over the plane's variables
+whose coefficients are expressions in PARAMETERS. That cannot say *"the circle centred at O"*,
+because `O` is an object, not a number — and the corpus pins circles that way constantly
+(«מעגל שמרכזו M», «מעגל המשיק לציר ה-x»). So this is the first curve whose shape depends on the
+figure, and it is an OBJECT KIND rather than another `Curve` member: a `Curve` resolves from the
+environment alone, and this one needs the placed points.
+
+**`evaluate` turns it into an ordinary `NumCurve`** once the centre has a position, so everything
+downstream is unchanged and inherits it for free: it draws, its centre is marked
+([ADR-AG-036](#adr-ag-036)), the panel lists it, and a point can ride it as a carrier.
+
+**The radius is a parameter named after the centre — `r_O`.** Deterministic, so it needs no
+resolution against the figure and cannot collide with a student's own single letters, and legible in
+the panel. It is **declared positive**, because [ADR-AG-009](#adr-ag-009) taught an undeclared
+parameter to sample negative — right for a coefficient, wrong for a length.
+
+**Tangency is one equation: the distance from the centre to the axis IS the radius.** That is the
+whole feature, and the DOF arithmetic is the check on it — measured, not asserted:
+
+| given | dof |
+| --- | --- |
+| «נתון מעגל O» | **3** — a free centre and a free radius |
+| «מעגל O משיק לציר x» | **2** |
+| «המעגל O משיק לשני הצירים» | **1** |
+
+**The residual is UNSIGNED**, and that is a ruling rather than an implementation detail: a circle
+below the x-axis touches it exactly as one above does, and demanding a sign would assert a side the
+question never gave. The lock samples twelve configurations and requires BOTH signs to appear.
+
+**«המעגל משיק לציר ה-x» is the third contextual reference** in a day — after «שטח הדלתון הוא 24» and
+«אלכסוני המרובע נפגשים» — and it reuses their resolution rather than adding one: one circle makes it
+unambiguous, none or several makes it a refusal.
+
+**Consequences.** `src-analytic` +17 tests. What this does NOT yet do is tangency to a stated LINE
+(«המעגל משיק לישר AB»), which is the same equation with a different distance and wants the direction
+resolver; it is left out rather than half-built.

@@ -109,6 +109,8 @@ export type ExistingKind =
   | 'segment'
   | 'polygon'
   | `curve:${string}`
+  /** A circle stated by its CENTRE rather than by an equation (#1060). */
+  | 'circle-at'
   | `derived:${string}`;
 
 export function existingKindOf(o: GeoObject): ExistingKind {
@@ -117,6 +119,8 @@ export function existingKindOf(o: GeoObject): ExistingKind {
       return `curve:${o.label.kind}`;
     case 'derived':
       return `derived:${o.rule.t}`;
+    case 'circle-at':
+      return 'circle-at';
     default:
       return o.kind;
   }
@@ -512,6 +516,52 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         { t: 'constraint', k: { t: 'on-curve', id: a, curve: id }, src: f.src },
         { t: 'constraint', k: { t: 'on-curve', id: b, curve: id }, src: f.src },
       ]);
+    }
+
+    /**
+     * A circle on a CENTRE POINT (#1060).
+     *
+     * The centre must already be a point — the `declare` that precedes this fact makes sure of
+     * it — and the circle is an ordinary object from there on. Restating it is absorbed, like
+     * every other construction, so «נתון מעגל O» twice is one circle.
+     */
+    case 'circle-at': {
+      const centre = objectById(c, f.centre);
+      if (!centre || !isPositional(centre)) {
+        return { ok: false, error: { code: 'unknown-reference', detail: f.centre } };
+      }
+      const prior = objectById(c, f.id);
+      if (prior) {
+        if (prior.kind !== 'circle-at') {
+          return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };
+        }
+        return { ok: true, effect: 'known', next: c };
+      }
+      return {
+        ok: true,
+        effect: 'created',
+        next: { ...c, objects: [...c.objects, { kind: 'circle-at', id: f.id, centre: f.centre, r: f.r }] },
+      };
+    }
+
+    /**
+     * «המעגל משיק לציר ה-x» — the circle resolved from the figure (#1060).
+     *
+     * The same contextual resolution as `area-of` and `meet-of`: one circle makes it unambiguous,
+     * none or several makes it a refusal rather than a pick.
+     */
+    case 'tangent-of': {
+      const circles = c.objects.filter((o) => o.kind === 'circle-at');
+      if (circles.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+      const circle = circles[0] as Extract<GeoObject, { kind: 'circle-at' }>;
+      return applyAll(
+        c,
+        f.axes.map((axis) => ({
+          t: 'constraint' as const,
+          k: { t: 'tangent-axis' as const, centre: circle.centre, r: circle.r, axis },
+          src: f.src,
+        })),
+      );
     }
 
     case 'area-of': {

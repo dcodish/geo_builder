@@ -572,6 +572,29 @@ export function evaluate(raw: Construction, seed = 0): Figure {
         } else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
+      /**
+       * A circle ON A POINT (#1060) — the first curve whose shape depends on the figure.
+       *
+       * Resolved HERE, where the centre has a position, into exactly the `NumCurve` every other
+       * circle becomes. So the renderer, the centre mark (ADR-AG-036), the panel row and the
+       * `on-curve` carrier all work on it without knowing it arrived differently.
+       *
+       * A radius that is not a positive number is a VACANCY, not an error: «r» may still be an
+       * unbound symbol at this point, and an empty circle is a state the figure already reports.
+       */
+      case 'circle-at': {
+        const c0 = at(o.centre);
+        const radius = evalExpr(o.r, env);
+        if (c0 && Number.isFinite(radius) && radius > 0) {
+          curves.push({
+            id: o.id,
+            label: { name: '', kind: 'circle' },
+            curve: { kind: 'circle', cx: c0.x, cy: c0.y, r: radius },
+            stated: true,
+          });
+        } else vacant.push({ id: o.id, reason: 'vacant' });
+        break;
+      }
       default: {
         // EXHAUSTIVE, like every switch in carriers.ts. Without this a new object kind compiles
         // clean and evaluates to NOTHING — silently absent from the figure, which is the #1038

@@ -92,6 +92,10 @@ export function carrierOf(o: GeoObject): Carrier | null {
     case 'segment':
     case 'polygon':
       return null;
+    // A circle ON a point (#1060): its freedom is its centre’s and its radius parameter’s, both
+    // already counted where they live. The object itself adds none.
+    case 'circle-at':
+      return null;
     default: {
       const unclassified: never = o;
       throw new Error(`object kind carries no DOF classification: ${JSON.stringify(unclassified)}`);
@@ -121,6 +125,9 @@ export function symbolDeps(o: GeoObject): string[] {
       case 'polygon':
       case 'free':
         return [];
+      // Its RADIUS is an expression, and that is the one thing it contributes to the register.
+      case 'circle-at':
+        return symbolsOf(o.r);
       default: {
         const unwalked: never = o;
         throw new Error(`object kind declares no symbol dependencies: ${JSON.stringify(unwalked)}`);
@@ -154,6 +161,8 @@ export function objectDeps(o: GeoObject): Id[] {
       return [o.a, o.b];
     case 'polygon':
       return [...o.vertices];
+    case 'circle-at':
+      return [o.centre];
     default: {
       const undeclared: never = o;
       throw new Error(`object kind declares no dependencies: ${JSON.stringify(undeclared)}`);

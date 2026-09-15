@@ -137,6 +137,17 @@ export type Constraint =
    * that option, which is the discrete degree of freedom being consumed exactly as a coordinate
    * consumes a continuous one.
    */
+  /**
+   * A circle TOUCHES an axis — «מעגל O משיק לציר x» (#1060).
+   *
+   * Tangency to an axis is how the corpus pins a circle WITHOUT giving its radius: it says
+   * r = |y_O| for the x-axis, which is exactly one equation and exactly the sentence a student is
+   * handed instead of a number.
+   *
+   * It names the CENTRE and the radius rather than the circle, because that is what the residual
+   * needs and it keeps this kind independent of how the circle was stated.
+   */
+  | { t: 'tangent-axis'; centre: Id; r: Expr; axis: 'x' | 'y' }
   | { t: 'choice'; options: Constraint[] };
 
 /**
@@ -179,6 +190,8 @@ export function constraintRefs(k: Constraint): Id[] {
       return [k.id, k.a, k.b];
     // Every option's points: the choice is about which constraint holds, not about which points
     // are involved, and a carrier any option could move must be searched over.
+    case 'tangent-axis':
+      return [k.centre];
     case 'choice':
       return [...new Set(k.options.flatMap(constraintRefs))];
     default: {
@@ -211,6 +224,8 @@ export function describeConstraint(k: Constraint): string {
       return `${k.id} על ${k.curve}`;
     case 'on-line-2pt':
       return `${k.id} על ${k.a}${k.b}`;
+    case 'tangent-axis':
+      return `${k.centre} משיק לציר ${k.axis}`;
     case 'choice':
       return k.options.map(describeConstraint).join(' או ');
     default: {
@@ -430,6 +445,15 @@ export function residual(
       // the base length. Zero exactly on the line, and a true distance, so it is comparable with
       // every other residual here without further scaling.
       return [((d.x - a.x) * uy - (d.y - a.y) * ux) / n];
+    }
+    case 'tangent-axis': {
+      const radius = evalExpr(k.r, env);
+      if (!Number.isFinite(radius)) return null; // an unbound radius judges nothing
+      // The DISTANCE from the centre to the axis IS the radius. Unsigned on purpose: a circle
+      // below the x-axis touches it exactly as one above does, and demanding a sign would assert
+      // a side the student never gave (ADR-052). Which side is a SELECTOR’s business, not this.
+      const d = k.axis === 'x' ? Math.abs(p[0].y) : Math.abs(p[0].x);
+      return [d - radius];
     }
     /**
      * A discrete choice HAS no residual, by construction (#1049).

@@ -864,3 +864,10 @@ input box answers questions about the figure without changing it: «AB», «שט
 because it is sayable** — the ask lane reads the same measure grammar the givens do. An answer passes
 the same honesty gate as every row, and an unanswerable question says WHY: not fixed yet, cannot be
 computed, or not understood.
+
+**R70 — a circle can be given by its centre, and pinned by TANGENCY**
+([ADR-AG-045](06c-decisions-analytic.md#adr-ag-045)). «נתון מעגל O» draws a circle with a free centre
+and a free radius — three degrees of freedom, and it moves under «הציגו תצורה אחרת». «מעגל O משיק
+לציר x» says the distance from the centre to that axis is the radius, which is how the corpus pins a
+circle without giving a number; «משיק לשני הצירים» says it twice. Which SIDE of the axis the circle
+sits on is not asserted, because the student did not say.

@@ -324,6 +324,26 @@ The answer passes `isKnowledge`, exactly as an inventory row does, and an unansw
 worded from the FIGURE's freedom: *not fixed yet* when it still has some, *cannot be computed* when
 it does not, and *I did not understand* when the question named nothing the figure has.
 
+## A circle on a point ([ADR-AG-045](06c-decisions-analytic.md#adr-ag-045))
+
+Every curve in this product is an equation over `x` and `y` whose coefficients are expressions in
+parameters — resolvable from the environment alone. `circle-at` is the exception and the reason is
+exact: **its shape depends on a point**, so it cannot be resolved until the figure is placed.
+
+```
+נתון מעגל O          →  declare O        (a free vertex, 2 DOF)
+                        param r_O > 0    (the radius, 1 DOF)
+                        circle-at O r_O  (no freedom of its own)
+```
+
+The object carries no freedom itself; counting it would count the centre and the radius twice.
+`evaluate` turns it into the same `NumCurve` every other circle becomes, which is why nothing
+downstream — the renderer, the centre mark, the panel row, the `on-curve` carrier — needed to learn
+about it.
+
+**Tangency is one equation**: the distance from the centre to the axis is the radius. Unsigned, so the
+circle may sit on either side of the axis — the student said which axis, not which side.
+
 ## Born after the chassis
 
 This is the **first builder created after `shell/` existed**, and the difference shows in what it did

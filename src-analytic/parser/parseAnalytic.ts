@@ -747,6 +747,80 @@ function polygonId(vertices: string[]): string {
   return `poly-${best}`;
 }
 
+/**
+ * A CIRCLE GIVEN BY ITS CENTRE, and its tangency to the axes (#1060).
+ *
+ * Operator, 2026-09-15: *"we need to support מעגל O משיק לציר x and all verses of the axis
+ * tangency"*. Measured then: 0 of 11 phrasings, every one refused as a bad equation.
+ *
+ * Tangency to an axis is how the corpus pins a circle WITHOUT giving its radius — «מעגל המשיק
+ * לציר ה-x» says r = |y_O|, which is exactly one equation and exactly the sentence a student is
+ * handed instead of a number. Without it they must do that algebra themselves and type the
+ * finished equation, which is the student doing the part the figure was meant to show.
+ *
+ * The RADIUS is a parameter named after the centre — `r_O` — so it needs no resolution against
+ * the figure and cannot collide with a student’s own single letters. It is declared POSITIVE:
+ * #1019 made an undeclared parameter sample negative, which is right for a coefficient and wrong
+ * for a length.
+ */
+const CIRCLE_AT_HE = new RegExp(
+  `^${HE_GIVEN}ה?מעגל\\s+(?:ש?מרכזו\\s+)?(${NAME})(?:\\s+(?:ה?משיק|ומשיק)\\s+ל(?:ה?ציר\\s+ה?-?\\s*([xy])|שני\\s+ה?צירים|(?:the\\s+)?([xy])[- ]axis|both\\s+axes))?$`
+);
+const CIRCLE_AT_EN = new RegExp(
+  `^(?:the\\s+)?circle\\s+(?:cent(?:re|er)d\\s+at\\s+)?(${NAME})(?:\\s+is\\s+tangent\\s+to\\s+(?:ה?ציר\\s+ה?-?\\s*([xy])|שני\\s+ה?צירים|(?:the\\s+)?([xy])[- ]axis|both\\s+axes))?$`
+,  'i',
+);
+
+/** The CONTEXTUAL form — the one circle the student has drawn: «המעגל משיק לציר ה-x». */
+const CIRCLE_TANGENT_HE = new RegExp(
+  `^${HE_GIVEN}ה?מעגל\\s+(?:ה?משיק|ומשיק)\\s+ל(?:ה?ציר\\s+ה?-?\\s*([xy])|שני\\s+ה?צירים|(?:the\\s+)?([xy])[- ]axis|both\\s+axes)$`
+);
+const CIRCLE_TANGENT_EN = new RegExp(
+  `^(?:the\\s+)?circle\\s+is\\s+tangent\\s+to\\s+(?:ה?ציר\\s+ה?-?\\s*([xy])|שני\\s+ה?צירים|(?:the\\s+)?([xy])[- ]axis|both\\s+axes)$`
+,  'i',
+);
+
+/** Which axes a matched tangency phrase names — one, or both. */
+function axesOf(m: RegExpExecArray, from: number): Array<'x' | 'y'> {
+  const named = (m[from] ?? m[from + 1]) as string | undefined;
+  if (named) return [named.toLowerCase() as 'x' | 'y'];
+  // «שני הצירים» / «both axes» — the phrase matched but named no single axis.
+  return m[0] && /שני|both/i.test(m[0]) ? ['x', 'y'] : [];
+}
+
+/**
+ * The facts a circle-on-a-point lowers to: the centre as a free vertex, a positive radius, and the
+ * circle itself. Shared by the named and the contextual forms so the two cannot drift.
+ */
+function circleAtFacts(centre: Id, axes: Array<'x' | 'y'>, line: string): Fact[] {
+  const sym = `r_${centre}`;
+  const r: Expr = { kind: 'sym', name: sym };
+  return [
+    { t: 'declare', id: centre, src: line },
+    { t: 'param', sym, domain: { ...UNBOUNDED, min: 0, minOpen: true }, src: line },
+    { t: 'circle-at', id: `circle-at-${centre}`, centre, r, src: line },
+    ...axes.map((axis) => ({
+      t: 'constraint' as const,
+      k: { t: 'tangent-axis' as const, centre, r, axis },
+      src: line,
+    })),
+  ];
+}
+
+function parseCircleAt(line: string): RuleOutcome {
+  const named = CIRCLE_AT_HE.exec(line) ?? CIRCLE_AT_EN.exec(line);
+  if (named) {
+    // The tangency phrase is optional: «נתון מעגל O» alone is a circle with a free centre and a
+    // free radius, which is 3 degrees of freedom and an honest figure.
+    return made(circleAtFacts(named[1], axesOf(named, 2), line));
+  }
+  const bare = CIRCLE_TANGENT_HE.exec(line) ?? CIRCLE_TANGENT_EN.exec(line);
+  if (bare) {
+    // No centre named: the sentence is about the one circle in the figure, which only M1 knows.
+    return made([{ t: 'tangent-of', axes: axesOf(bare, 1), src: line }]);
+  }
+  return null;
+}
 function parseShape(line: string): RuleOutcome {
   const seg = SEGMENT_HE.exec(line) ?? SEGMENT_EN.exec(line);
   if (seg) {
@@ -1330,6 +1404,14 @@ export function parseLine(raw: string): ParseResult {
 
   const param = parseParamHe(line) ?? parseParamEn(line) ?? parseInequality(line);
   if (param) return { ok: true, facts: [param] };
+
+  /**
+   * A circle stated by its CENTRE runs before `matchCurve` (#1060), because that rule’s tail is
+   * `(.+)` and it would read the centre letter as an equation — the #1059 shape, which the Hebrew
+   * guard catches only when the tail HAS Hebrew in it. «נתון מעגל O» has none.
+   */
+  const centred = parseCircleAt(line);
+  if (centred) return centred;
 
   const curve = matchCurve(line);
   /**

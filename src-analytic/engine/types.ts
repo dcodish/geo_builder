@@ -196,7 +196,17 @@ export type Fact =
    * refused by name for one that does not. Guessing would assert a distinction the question never
    * made.
    */
-  | (FactBase & { t: 'diagonal-eq'; principal: boolean; eq: Expr });
+  | (FactBase & { t: 'diagonal-eq'; principal: boolean; eq: Expr })
+  /** «נתון מעגל O» — a circle on a centre point, with a radius parameter (#1060). */
+  | (FactBase & { t: 'circle-at'; id: Id; centre: Id; r: Expr })
+  /**
+   * «המעגל משיק לציר ה-x» — tangency stated about the ONE circle in the figure (#1060).
+   *
+   * The contextual sibling of `area-of` and `meet-of`, and the third of its shape: which circle
+   * it means is a question about the construction, so M1 answers it and refuses when the answer
+   * is not exactly one.
+   */
+  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'> });
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list
@@ -257,7 +267,24 @@ export type GeoObject =
    * this ring IS, which the vertex list alone cannot answer. Absent for a polygon that arrived
    * some other way.
    */
-  | { kind: 'polygon'; id: Id; vertices: Id[]; noun?: string };
+  | { kind: 'polygon'; id: Id; vertices: Id[]; noun?: string }
+  /**
+   * A circle given by its CENTRE POINT and a radius — «נתון מעגל O» (#1060).
+   *
+   * Every curve until now was an equation over the plane’s variables, with parameters for
+   * coefficients. That cannot express *"the circle centred at the point O"*, because `O` is an
+   * object and not a number — and the corpus pins a circle that way constantly: «מעגל שמרכזו M»,
+   * and «מעגל המשיק לציר ה-x», which says r = |y_O| about a circle whose centre is free.
+   *
+   * So this is the first curve whose SHAPE depends on a point, which is why it is an object kind
+   * rather than another `Curve` member: `Curve` is resolved from the environment alone, and this
+   * needs the placed figure. `evaluate` turns it into an ordinary `NumCurve` once the centre has
+   * a position, and everything downstream — drawing, the centre mark, the panel — is unchanged.
+   *
+   * It carries NO freedom itself: the centre is a `free` point with its own two degrees, and the
+   * radius is an ordinary parameter in the register. Counting it here would count both twice.
+   */
+  | { kind: 'circle-at'; id: Id; centre: Id; r: Expr };
 
 export type PointObject = Extract<GeoObject, { kind: 'point' }>;
 export type CurveObject = Extract<GeoObject, { kind: 'curve' }>;
