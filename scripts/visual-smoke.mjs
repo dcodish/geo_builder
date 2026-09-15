@@ -89,6 +89,15 @@ export const APPS = {
       'C(-3,8)',
       'משולש ABC',
       'M מפגש התיכונים במשולש ABC',
+      // 2026-09-15: the day's three new SURFACES, each of which is invisible in an engine test.
+      // #1076 — P is drawn and its carrier is NOT, and #1078 puts the dependency on the point row
+      // instead («P = (x_P, x_P)»), so this line is the shot for both.
+      'נקודה P על הישר y=x',
+      // #1060 — a circle whose centre is a point, pinned by tangency, with #1024's centre mark on it.
+      'מעגל O משיק לציר x',
+      // #1049 — a shape noun that carries its givens, and #1078's slope rows have something to say
+      // about its sides.
+      'דלתון EFGH',
     ],
   },
 };
