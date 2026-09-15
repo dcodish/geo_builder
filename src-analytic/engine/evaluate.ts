@@ -10,6 +10,7 @@
  * The domain is honoured HERE, at sampling time, which is D7 kind 1: a value outside it was never
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
+import { paramRegister } from './carriers';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
@@ -79,10 +80,19 @@ export function sampleParam(d: Domain, seed: number, salt: number): number {
   return v;
 }
 
-/** The parameter assignment for a seed — the figure's free DOFs, resampled by "another configuration". */
+/**
+ * The parameter assignment for a seed — the figure's free DOFs, resampled by "another
+ * configuration".
+ *
+ * The register comes from {@link paramRegister}, which reads the OBJECTS and not only the F11
+ * declarations (#1014). Sampling the declarations alone meant `y²=2ax` with no «a הוא פרמטר» — a
+ * catalog entry — left `a` unbound, evaluated to `NaN`, and drew nothing while saying nothing. An
+ * unstated magnitude is a free DOF ([ADR-052](../../docs/06-decisions.md#adr-052)), so it is
+ * sampled; a declaration narrows its domain rather than granting it existence.
+ */
 export function sampleEnv(c: Construction, seed = 0): Env {
   const env: Record<string, number> = {};
-  c.params.forEach((p, i) => {
+  paramRegister(c).forEach((p, i) => {
     env[p.sym] = sampleParam(p.domain, seed, i + 1);
   });
   return env;
@@ -98,18 +108,28 @@ export function evaluate(c: Construction, seed = 0): Figure {
   const curves: FigureCurve[] = [];
   const vacant: Vacancy[] = [];
 
-  for (const p of c.points) {
-    const x = evalExpr(p.x, env);
-    const y = evalExpr(p.y, env);
-    if (Number.isFinite(x) && Number.isFinite(y)) points.push({ id: p.id, x, y });
-    // A point whose coordinates do not evaluate is absent at this parameter value, never a scope
-    // refusal — there is no such thing as an out-of-scope point.
-    else vacant.push({ id: p.id, reason: 'vacant' });
-  }
-  for (const d of c.curves) {
-    const res = resolveCurve(d.curve, env);
-    if (res.ok) curves.push({ id: d.id, label: d.label, curve: res.curve });
-    else vacant.push({ id: d.id, reason: res.reason });
+  // One walk over the OBJECTS, in the order the student stated them. The environment is complete
+  // before it starts — every parameter assigned — which is the object→parameter dependency layer
+  // (carriers.ts `symbolDeps`); the object→object layer is empty until a derived kind lands, which
+  // is why no topological sort is built on it yet.
+  for (const o of c.objects) {
+    switch (o.kind) {
+      case 'point': {
+        const x = evalExpr(o.x, env);
+        const y = evalExpr(o.y, env);
+        if (Number.isFinite(x) && Number.isFinite(y)) points.push({ id: o.id, x, y });
+        // A point whose coordinates do not evaluate is absent at this parameter value, never a
+        // scope refusal — there is no such thing as an out-of-scope point.
+        else vacant.push({ id: o.id, reason: 'vacant' });
+        break;
+      }
+      case 'curve': {
+        const res = resolveCurve(o.curve, env);
+        if (res.ok) curves.push({ id: o.id, label: o.label, curve: res.curve });
+        else vacant.push({ id: o.id, reason: res.reason });
+        break;
+      }
+    }
   }
   return { env, points, curves, vacant };
 }
@@ -139,6 +159,52 @@ export function isKnowledge(
   const scale = Math.max(1, ...vals.map(Math.abs));
   const spread = Math.max(...vals) - Math.min(...vals);
   return spread <= 1e-7 * scale ? { known: true, value: vals[0] } : { known: false };
+}
+
+/**
+ * Is this curve's SHAPE knowledge — every coefficient invariant across the free DOFs — or is the
+ * equation on screen one sample's accident?
+ *
+ * The point rows have been gated by {@link isKnowledge} since V0; the curve rows were not, and read
+ * straight off seed 0. That was survivable only while every drawable curve was fully pinned. It
+ * stopped being survivable with #1014: now that a parameter nobody declared is registered and
+ * sampled, `y² = 2ax` draws — and an ungated panel printed it as `y² = 6.915870381x`, which is the
+ * tool asserting a magnitude the question never gave
+ * ([ADR-052](../../docs/06-decisions.md#adr-052)), on the very row
+ * [ADR-AG-003](../../docs/06c-decisions-analytic.md#adr-ag-003) §2 says carries the whole honesty
+ * boundary.
+ *
+ * Built ON `isKnowledge` rather than beside it — one coefficient at a time, through the one gate —
+ * so there is no second definition of what "invariant" means.
+ *
+ * Returns the curve when every coefficient is knowledge, and `null` when any of them moves; the
+ * caller shows an open row, exactly as it does for an unpinned coordinate.
+ */
+export function knownCurve(
+  c: Construction,
+  id: Id,
+  seeds: readonly number[] = [0, 1, 2],
+): NumCurve | null {
+  const read = (f: Figure) => f.curves.find((q) => q.id === id)?.curve ?? null;
+  const first = read(evaluate(c, seeds[0]));
+  if (!first) return null;
+  for (const field of Object.keys(first) as Array<keyof NumCurve>) {
+    if (typeof first[field] !== 'number') continue; // `kind` — the discriminant, not a coefficient
+    const k = isKnowledge(
+      c,
+      (f) => {
+        const cur = read(f);
+        // A curve that is a DIFFERENT family at another seed is not knowledge either: the shape
+        // itself varies, which is 02c R13's third row and strictly worse than a moving coefficient.
+        if (!cur || cur.kind !== first.kind) return null;
+        const v = (cur as Record<string, unknown>)[field as string];
+        return typeof v === 'number' ? v : null;
+      },
+      seeds,
+    );
+    if (!k.known) return null;
+  }
+  return first;
 }
 
 // ---------------------------------------------------------------------------

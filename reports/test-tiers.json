@@ -6,7 +6,7 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-09-13",
+  "updatedAt": "2026-09-15",
   "slow": [
     "src/__tests__/determined-prints-1.test.ts",
     "src/__tests__/determined-prints-2.test.ts",
@@ -27,6 +27,7 @@
     "src/__tests__/scenarios-props-budget.test.ts",
     "src/__tests__/scenarios-props-resample.test.ts",
     "src/__tests__/scenarios-props-submit-gate.test.ts",
+    "src/app/__tests__/resolve-view.test.ts",
     "src/engine/__tests__/dof-vacuous.test.ts",
     "src/engine/__tests__/inscribe-joint-solve.test.ts",
     "src/engine/__tests__/issue-541.test.ts",

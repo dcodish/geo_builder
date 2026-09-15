@@ -11,7 +11,7 @@ import { evaluate, isKnowledge, sampleParam, viewBox } from '../engine/evaluate'
 import { constValue, evalExpr, parseExpr, symbolsOf } from '../engine/expr';
 import { applyFact, fold } from '../engine/apply';
 import { derive } from '../engine/derive';
-import { inDomain, type Construction, type Fact } from '../engine/types';
+import { inDomain, pointsOf, type Construction, type Fact } from '../engine/types';
 import { equationExpr, parseLine } from '../parser/parseAnalytic';
 
 const eq = (s: string) => {
@@ -187,7 +187,7 @@ describe('apply — the M1 boundary, on day one (ADR-AG-003)', () => {
     if (!again.ok) throw new Error('should parse');
     const out = applyFact(first, again.facts[0]);
     expect(out.ok && out.absorbed).toBe(true);
-    expect(out.ok && out.next.points).toHaveLength(1);
+    expect(out.ok && pointsOf(out.next)).toHaveLength(1);
   });
 
   it('absorbs a restatement written differently but meaning the same', () => {

@@ -11,6 +11,7 @@ import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
 import { parseLine } from '../parser/parseAnalytic';
 import { fold } from '../engine/apply';
 import { evaluate } from '../engine/evaluate';
+import { derive } from '../engine/derive';
 
 describe('catalog — every entry parses, in BOTH languages', () => {
   for (const entry of COMMAND_CATALOG_ANALYTIC) {
@@ -24,6 +25,39 @@ describe('catalog — every entry parses, in BOTH languages', () => {
         // different things is a drift the panel would advertise as one command.
         expect(he.facts.map((f) => f.t)).toEqual(en.facts.map((f) => f.t));
       }
+    });
+  }
+});
+
+/**
+ * The catalog's SECOND half, added by #1014.
+ *
+ * Parsing was the only thing asserted above, and that is exactly how `נתונה פרבולה שמשוואתה y^2=2ax`
+ * shipped on the reference card while producing an empty figure: it parsed perfectly, the undeclared
+ * `a` was never registered, and the curve drew nothing and said nothing. A catalog entry is a promise
+ * to the student — it is what the commands panel offers and the only vocabulary the LLM may emit — so
+ * "it parses" is not enough. Every entry must reach the canvas or name a refusal.
+ */
+describe('catalog — every entry PRODUCES something, or says why not', () => {
+  for (const entry of COMMAND_CATALOG_ANALYTIC) {
+    it(`${entry.family} · ${entry.he}`, () => {
+      const d = derive([entry.he]);
+      // A declaration legitimately draws nothing: «a הוא פרמטר חיובי» states a domain, not an
+      // object. It is the one category exempt, and it is exempt by its own field rather than by a
+      // list of sentences that would drift.
+      if (entry.category === 'parameters') {
+        expect(d.faults, `a declaration must not fault: ${entry.he}`).toEqual([]);
+        return;
+      }
+      const drawn = d.figure.points.length + d.figure.curves.length;
+      expect(
+        drawn > 0 || d.faults.length > 0,
+        `drew nothing and said nothing: ${entry.he}`,
+      ).toBe(true);
+      // And for a catalog entry specifically, drawing is the expected outcome — a reference card
+      // that offers the student a line which only ever refuses is a different defect.
+      expect(d.faults, `a catalog entry must not fault: ${entry.he}`).toEqual([]);
+      expect(drawn, `a catalog entry must draw: ${entry.he}`).toBeGreaterThan(0);
     });
   }
 });
