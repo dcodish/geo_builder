@@ -893,3 +893,9 @@ curve and an axis all read the same way; an operand the tool cannot read is refu
 that kind — including a circle given by its centre, and a conic whose kind comes from the fit rather
 than from a noun. A figure holding two of a kind refuses the reference rather than picking or
 inventing an ordinal, because no exam in the corpus ever needs one.
+
+**R75 — naming a shape draws it** ([ADR-AG-050](06c-decisions-analytic.md#adr-ag-050)).
+«שטח המשולש ABC הוא 7» and «M מפגש התיכונים במשולש ABC» each draw the triangle they name, with the
+givens that noun carries — the same object «משולש ABC» would have built, absorbed if it is already
+there. «שטח ABC הוא 6» names no shape and draws none; a noun whose arity disagrees with its vertices
+is refused.

@@ -741,7 +741,11 @@ function parseDerived(line: string): RuleOutcome {
       role.t === 'diagonals'
         ? { t: 'diagonals', v: [v[0], v[1], v[2], v[3]] }
         : { t: role.t, v: [v[0], v[1], v[2]] } as DerivedRule;
-    return made([{ t: 'derived', id, rule, src: line }]);
+    // The shape the sentence named is drawn too (#1080) — «במשולש ABC» is the student telling us
+    // there is a triangle, not only which points the centroid is of.
+    const shape = namedShapeFacts(noun, v, line);
+    if (shape === 'bad-arity') return refuse('bad-arity', line);
+    return made([...shape, { t: 'derived', id, rule, src: line }]);
   }
 
   return null;
@@ -892,6 +896,35 @@ function parseCircleAt(line: string): RuleOutcome {
     return made([{ t: 'tangent-of', axes: axesOf(bare, 1), src: line }]);
   }
   return null;
+}
+/**
+ * The SHAPE a sentence named, as a fact, so that naming it draws it (#1080).
+ *
+ * Operator, 2026-09-15, looking at «שטח המשולש ABC הוא 7» over three points and no triangle:
+ * *"in such a case, the triangle should be drawn as the user mentions and refers to it"*.
+ *
+ * The ruling generalises past the area sentence: **naming a shape in a given makes the shape part
+ * of the figure.** «שטח המשולש ABC», «M מפגש התיכונים במשולש ABC» — each names a triangle the
+ * student is plainly thinking about, and drawing only the ones typed on a line of their own left
+ * the figure showing three loose dots for a question about a triangle.
+ *
+ * It is the SAME fact «משולש ABC» produces, so the ring is identical however it arrived, the id is
+ * canonical, and stating it twice is absorbed by M1 rather than drawn twice.
+ *
+ * Returns nothing when the noun is absent (there is no shape to name) or unknown to the registry.
+ * A noun whose arity disagrees with the vertex count is a REFUSAL, which is #1042 applied to a
+ * sentence that had never been checked for it.
+ */
+function namedShapeFacts(noun: string | undefined, ids: Id[], line: string): Fact[] | 'bad-arity' {
+  if (!noun) return [];
+  const key = EN_SHAPE[normalizeShapeNoun(noun).toLowerCase()] ?? normalizeShapeNoun(noun);
+  const row = shapeRow(key);
+  if (!row) return [];
+  if (ids.length !== row.arity) return 'bad-arity';
+  return [
+    { t: 'polygon', id: polygonId(ids), vertices: ids, noun: key, src: line },
+    ...row.givens(ids).map((k: Constraint) => ({ t: 'constraint' as const, k, src: line })),
+  ];
 }
 function parseShape(line: string): RuleOutcome {
   const seg = SEGMENT_HE.exec(line) ?? SEGMENT_EN.exec(line);
@@ -1315,7 +1348,11 @@ function parseConstraint(raw: string): RuleOutcome {
       // sentence were unintelligible.
       if (ids.length < 3) return refuse('bad-arity', line);
       if (hasRepeat(ids)) return refuse('repeated-vertex', line);
-      return made([{ t: 'constraint', k: { t: 'area', ids, value }, src: line }]);
+      // The shape FIRST: it introduces the vertices, and a constraint may not name a point the
+      // figure does not have yet.
+      const shape = namedShapeFacts(noun, ids, line);
+      if (shape === 'bad-arity') return refuse('bad-arity', line);
+      return made([...shape, { t: 'constraint', k: { t: 'area', ids, value }, src: line }]);
     }
     // The noun alone — which figure it names is a question about the CONSTRUCTION, so M1 answers it.
     if (noun) return made([{ t: 'area-of', noun, value, src: line }]);

@@ -229,7 +229,10 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     category: 'derived',
     family: 'F16',
     he: 'G מפגש האלכסונים במרובע ABCD',
-    en: 'G is the intersection of the diagonals of ABCD',
+    // The NOUN on both halves (#1080): the Hebrew says «במרובע», so the English must say which
+    // shape too, or the two halves of one catalog row mean different things — the Hebrew draws a
+    // quadrilateral and the English draws none.
+    en: 'G is the intersection of the diagonals of quadrilateral ABCD',
     needs: ['A(-2,1)', 'B(4,5)', 'C(5,2)', 'D(-1,-2)'],
   },
 ];

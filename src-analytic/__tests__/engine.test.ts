@@ -625,10 +625,27 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
   const PINNED = ['A(0,0)', 'B(4,0)', 'C(0,3)'];
 
   it('says so for a given the determined figure already satisfies', () => {
-    expect(verdict(PINNED, 'שטח המשולש ABC הוא 6')).toBe('entailed'); // the operator's B11
     expect(verdict(PINNED, 'B נמצא על ציר ה-x')).toBe('entailed'); // the operator's B12
     expect(verdict(PINNED, 'AB מאונך ל-AC')).toBe('entailed');
     expect(verdict(PINNED, 'AB מקביל לציר ה-x')).toBe('entailed');
+  });
+
+  it('and for the AREA once the shape it names is already there (#1080 narrowed this)', () => {
+    /**
+     * The operator's B11, with one line added — and the addition is the point.
+     *
+     * «שטח המשולש ABC הוא 6» over three pinned points used to add nothing, and said so. Since #1080
+     * it also DRAWS the triangle it names (the operator: *"the triangle should be drawn as the user
+     * mentions and refers to it"*), so the line changes the figure and is recorded — correctly, and
+     * it is the entailment test doing its job rather than failing it: what it asks is whether the
+     * figure GAINED anything, and now it did.
+     *
+     * Where the shape is already stated, nothing is gained and the answer is unchanged.
+     */
+    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('entailed');
+    expect(verdict(PINNED, 'שטח המשולש ABC הוא 6')).toBe('recorded');
+    // …and the figure it recorded really is the triangle.
+    expect(derive([...PINNED, 'שטח המשולש ABC הוא 6'], 0).figure.segments).toHaveLength(3);
   });
 
   it('still REFUSES the same sentences when they are false', () => {

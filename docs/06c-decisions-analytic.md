@@ -2822,3 +2822,43 @@ reference in a day and reuses the resolution the other three share.
   placement and not only the environment.
 
 **Consequences.** `src-analytic` +7 tests.
+
+## ADR-AG-050 — A shape NAMED in a given is drawn (#1080)
+
+**Status:** accepted, 2026-09-15 · **Narrows** [ADR-AG-030](#adr-ag-030) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R75. **Design:** none (a parser helper).
+
+**Context — an operator ruling.** Looking at three points, an area given, and no triangle:
+
+> in such a case, **the triangle should be drawn as the user mentions and refers to it**
+
+**Root cause: the shape noun was read for its ARITY and then discarded.** «שטח המשולש ABC» lowers to
+an `area` constraint over three ids and «במשולש ABC» to a `centroid` rule over three ids; in both, the
+word «משולש» survived only long enough to check the vertex count. The figure was left showing three
+loose dots for a question plainly about a triangle. It is [ADR-AG-019](#adr-ag-019)'s class turned
+around — that was a noun the parser could not SEE, this is one it sees, checks, and throws away.
+
+**Decision, and it generalises past the reported sentence: naming a shape in a given makes the shape
+part of the figure.** One helper, called by every rule that takes a noun plus a vertex run, emitting
+exactly the facts «משולש ABC» emits — so the ring is identical however it arrived, the id is
+canonical, and stating it twice is absorbed by M1 rather than drawn twice. It carries the noun's own
+GIVENS too ([ADR-AG-035](#adr-ag-035)): «שטח הדלתון ABCD הוא 24» is a kite AND an area, because that
+is what the sentence says.
+
+**It narrows ADR-AG-030, and the narrowing is correct rather than a regression.** «שטח המשולש ABC הוא
+6» over three pinned points used to answer «זה כבר נובע»; it now DRAWS the triangle, so the line
+changes the figure and is recorded. That is the entailment test working, not failing: what it asks is
+whether the figure gained anything, and now it does. Where the shape is already stated, nothing is
+gained and the answer is unchanged — asserted both ways. **The operator validated the old behaviour
+and has been told.**
+
+**A catalog row was found to be lying**, by the lock that compares a row's two halves: the Hebrew
+«G מפגש האלכסונים במרובע ABCD» names a quadrilateral and the English *"the intersection of the
+diagonals of ABCD"* named none, so one half drew a shape and the other did not. The English entry
+gained its noun. The drift was there before and only became observable now.
+
+**Consequences.** `src-analytic` +8 tests. A noun whose arity disagrees with its vertex run is now
+refused in these sentences too, which is [ADR-AG-019](#adr-ag-019)'s rule reaching the rules it had
+never been applied to.
