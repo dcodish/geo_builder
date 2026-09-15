@@ -202,8 +202,17 @@ describe('#1049 — adding a noun is adding a ROW', () => {
       if (!r.ok) continue;
       const kinds = new Set(r.facts.map((f) => f.t));
       expect(kinds.has('polygon'), noun).toBe(true);
-      // The givens the row declares, and no other fact kind — a row may not smuggle in a mechanism.
-      expect([...kinds].every((k) => k === 'polygon' || k === 'constraint'), noun).toBe(true);
+      /**
+       * The givens the row declares, and nothing else — a ROW may not smuggle in a mechanism.
+       *
+       * The `selector` is the RULE`s, not the row`s: every shape gets exactly one, asserting its
+       * vertices are distinct (#1077), and it is listed here rather than admitted loosely so that a
+       * row which started emitting selectors of its own would still fail this.
+       */
+      expect([...kinds].every((k) => k === 'polygon' || k === 'constraint' || k === 'selector'), noun).toBe(true);
+      const selectors = r.facts.filter((f) => f.t === 'selector');
+      expect(selectors, noun).toHaveLength(1);
+      expect(selectors[0].t === 'selector' && selectors[0].sel.kind, noun).toBe('distinct');
       expect(r.facts.filter((f) => f.t === 'constraint').length, noun).toBe(
         row.givens([...names]).length,
       );
