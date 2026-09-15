@@ -26,6 +26,7 @@ import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
 import { domainText, positionalOf, type NumCurve } from './engine/types';
 import { isKnowledge, knownCurve } from './engine/evaluate';
+import { exprText } from './engine/expr';
 import { ellipseFoci, parabolaFocus } from './engine/curves';
 import { analyticBidi } from './i18n';
 import { Figure } from './render/Figure';
@@ -471,8 +472,19 @@ export function App() {
                    * anonymous parabolas apart — and it is the student's own equation, not ours.
                    */
                   const name = c.label.name;
+                  /**
+                   * A curve the givens have not FIXED still has an equation, and the student wrote it
+                   * (#1023). Printing a dash threw it away: «נתונה פרבולה שמשוואתה y²=2px» read as `—`
+                   * on a row that could have said `y^2 - 2·p·x = 0`.
+                   *
+                   * It states no VALUE, so ADR-AG-003 §2 is untouched — it names the dependency, which
+                   * is more than the dash said and less than a number.
+                   */
+                  const lead = name ? `${name}: ` : '';
                   return (
-                    <span key={c.id}>{known ? describeCurve(name, known) : `${name ? `${name}: ` : ''}—`}</span>
+                    <span key={c.id}>
+                      {known ? describeCurve(name, known) : `${lead}${openCurveText(d, c.id)}`}
+                    </span>
                   );
                 }),
               },
@@ -707,6 +719,21 @@ const askRow: CSSProperties = {
   padding: '2px 0',
   opacity: 0.9,
 };
+
+/**
+ * What an UNFIXED curve row says (#1023).
+ *
+ * Its own equation, symbolically, when it has one — and for a circle given by its CENTRE (#1060),
+ * the centre and radius it was stated with, because that IS how the student wrote it.
+ *
+ * Falls back to the dash only when there is nothing truthful to say, which after this is rare.
+ */
+function openCurveText(d: ReturnType<typeof derive>, id: string): string {
+  const o = d.construction.objects.find((q) => q.id === id);
+  if (o?.kind === 'curve') return `${exprText(o.curve.eq)} = 0`;
+  if (o?.kind === 'circle-at') return `O(${o.centre}), r = ${exprText(o.r)}`;
+  return '—';
+}
 
 function describeCurve(name: string, c: NumCurve): string {
   const n = name ? `${name}: ` : '';

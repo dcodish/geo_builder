@@ -22,6 +22,8 @@
  * `25k²` and `2ax` are all products in the exam's notation, and a student typing `2a` means the
  * same thing. Two atoms in a row multiply.
  */
+import { fmtNum } from '../../shell/format';
+
 
 export type Expr =
   | { kind: 'num'; value: number }
@@ -285,6 +287,77 @@ export function symbolsOf(e: Expr, out: string[] = []): string[] {
   return out;
 }
 
+
+/**
+ * An expression back to TEXT — the inverse of the parser, and the thing this tree deliberately did
+ * not build until something needed it (#1023).
+ *
+ * It was specified in #1023 as the enabling primitive behind the circle centre and the intersection
+ * dots, and left unbuilt twice on purpose ([ADR-AG-036](../../docs/06c-decisions-analytic.md#adr-ag-036)):
+ * a mechanism with no caller is this tree`s most repeated defect (#1020, #1045, #1065). Its caller is
+ * the CURVE ROW: a curve whose coefficients carry a free parameter is not knowledge and cannot print
+ * a number, and printing nothing threw away the student`s own equation.
+ *
+ * ## It prints no VALUE, so the honesty gate is untouched
+ *
+ * `y² − 2px = 0` states no magnitude. It names the dependency, which is strictly more than the dash
+ * said and strictly less than a number — exactly the line [ADR-AG-003](../../docs/06c-decisions-analytic.md#adr-ag-003) §2 draws.
+ *
+ * ## Parentheses only where they change the reading
+ *
+ * Driven by PRECEDENCE rather than by wrapping everything: `a*b + c` reads as it was written, while
+ * `(a + b)*c` keeps the parentheses it needs. A printer that brackets defensively produces
+ * `((a)*(b))+((c))`, which is correct and unreadable, and a student comparing it with their notebook
+ * would not recognise their own equation.
+ */
+export function exprText(e: Expr): string {
+  return print(e, 0);
+}
+
+/** Binding power, matching the parser's own levels: add/sub < mul/div < pow < atom. */
+const POW: Record<Expr['kind'], number> = {
+  num: 9,
+  sym: 9,
+  sqrt: 9,
+  pow: 4,
+  neg: 3,
+  mul: 2,
+  div: 2,
+  add: 1,
+  sub: 1,
+};
+
+function print(e: Expr, need: number): string {
+  const body = ((): string => {
+    switch (e.kind) {
+      case 'num':
+        // The SHARED formatter, never a local rounder — the #723 chokepoint.
+        return fmtNum(e.value);
+      case 'sym':
+        return e.name;
+      case 'neg':
+        return `-${print(e.a, POW.neg)}`;
+      case 'sqrt':
+        return `√${print(e.a, 9)}`;
+      case 'add':
+        return `${print(e.a, POW.add)} + ${print(e.b, POW.add)}`;
+      case 'sub':
+        // The right operand binds tighter: `a - (b - c)` must keep its parentheses.
+        return `${print(e.a, POW.sub)} - ${print(e.b, POW.sub + 1)}`;
+      case 'mul':
+        return `${print(e.a, POW.mul)}·${print(e.b, POW.mul)}`;
+      case 'div':
+        return `${print(e.a, POW.div)}/${print(e.b, POW.div + 1)}`;
+      case 'pow':
+        return `${print(e.a, POW.pow + 1)}^${print(e.b, POW.pow)}`;
+      default: {
+        const unprinted: never = e;
+        throw new Error(`expression kind has no text: ${JSON.stringify(unprinted)}`);
+      }
+    }
+  })();
+  return POW[e.kind] < need ? `(${body})` : body;
+}
 /** A constant expression — no parameters — which is the common case and worth asking about. */
 export function isConstant(e: Expr): boolean {
   return symbolsOf(e).length === 0;

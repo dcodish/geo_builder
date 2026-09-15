@@ -871,3 +871,9 @@ and a free radius — three degrees of freedom, and it moves under «הציגו 
 לציר x» says the distance from the centre to that axis is the radius, which is how the corpus pins a
 circle without giving a number; «משיק לשני הצירים» says it twice. Which SIDE of the axis the circle
 sits on is not asserted, because the student did not say.
+
+**R71 — a curve the givens have not fixed shows its equation**
+([ADR-AG-046](06c-decisions-analytic.md#adr-ag-046)). «נתונה פרבולה שמשוואתה y²=2px» reads
+`y^2 - 2·p·x = 0` in the data panel rather than `—`, and a circle stated by its centre reads that
+centre and radius. No value is printed — the row names what the figure depends on, which is what
+being open actually means.

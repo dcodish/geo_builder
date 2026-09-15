@@ -2671,3 +2671,36 @@ unambiguous, none or several makes it a refusal.
 **Consequences.** `src-analytic` +17 tests. What this does NOT yet do is tangency to a stated LINE
 («המעגל משיק לישר AB»), which is the same equation with a different distance and wants the direction
 resolver; it is left out rather than half-built.
+
+## ADR-AG-046 — An unfixed curve says its EQUATION, not a dash (#1023)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R71. **Design:** none (a printer and a row).
+
+**Context.** #1023 specified `exprText` as *"the enabling primitive behind two operator requests"* and
+it was deliberately left unbuilt **twice** — [ADR-AG-036](#adr-ag-036) records the reason: a mechanism
+with no caller is this tree's most repeated defect (#1020, #1045, #1065, and #1065's own docblock
+warning about it). This is the caller arriving.
+
+**Seen in a screenshot, not in a test.** The visual smoke of the day's work showed the panel's curve
+list with two rows reading `—`: a parabola whose `p` is free, and a circle whose centre rides a
+parameter. Both are curves **the student wrote down**, and the row threw the equation away.
+
+**Decision: an unfixed curve row prints its own equation symbolically** — `y^2 - 2·p·x = 0` — and a
+circle given by its CENTRE ([ADR-AG-045](#adr-ag-045)) prints the centre and radius it was stated
+with, because that is how the student said it.
+
+**It does not weaken the honesty gate, and the distinction is exact.** `y² − 2px = 0` states no
+magnitude; it names the dependency. That is strictly more than the dash said — which claimed
+*"unknown"* about something perfectly known in form — and strictly less than a number. It is
+[02c](02c-requirements-analytic.md) P4's *"an under-determined figure is drawn, and its openness is
+VISIBLE"* made legible instead of merely signalled.
+
+**Parentheses by PRECEDENCE, not defensively.** `a·b + c` reads as written and `(a + b)·c` keeps what
+it needs. A printer that brackets everything yields `((a)*(b))+((c))` — correct, unreadable, and not
+what a student has in their notebook, which is the whole point of showing it. The lock round-trips:
+printing, re-parsing and printing again must give the same text.
+
+**Consequences.** `src-analytic` +7 tests. The other half of #1023 — a symbolic CENTRE label
+`(a, 4)` on the canvas — still needs symbolic conic-coefficient extraction and is still not built.
