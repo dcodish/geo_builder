@@ -2451,3 +2451,59 @@ A comparison is a given like any other.
 **Consequences.** `src-analytic` +9 tests. «שטח הדלתון גדול פי 2 משטח המשולש ABC» works because the
 noun resolution ([ADR-AG-035](#adr-ag-035)) and the comparison meet without either knowing about the
 other.
+
+## ADR-AG-041 — A carrier's information belongs on the POINT, and the panel shows SLOPES (#1078)
+
+**Status:** accepted, 2026-09-15 · **Reverses the panel half of** [ADR-AG-032](#adr-ag-032) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R66, R67. **Design:** none (the panel).
+
+**Context.** Three operator reports on one screenshot, 2026-09-15, of the figure «משולש ABC» / «AB
+מקביל לציר ה-x» / «BC מקביל לציר ה-y» / «B על הישר y=x»:
+
+> **B should be something like (t,t)** showing we collapsed the y based on the x
+> the part where it shows **-x+y=0 is meaningless** since the line is not really drawn and in any
+> case **there is no way to know what it belongs to**
+> in this case, **the data panel should show the slope of AB and BC**
+
+**1 — A decision reversed, and the reversal is right.** ADR-AG-032 kept a carrier in the data panel
+*"because it is the honest provenance of where B lives"*. Played, that reasoning does not survive:
+**a curve row cannot say whose carrier it is.** «-x + y = 0» sat unlabelled in a list of curves, next
+to no point, for a line the student never asked to see. It was not provenance, it was an orphan. The
+information is real and the row was the wrong home; the flag now means one thing in both places —
+undrawn on the canvas, unlisted in the panel.
+
+**2 — The right home is the POINT.** `B = (x_B, x_B)` for `y = x`, `B = (x_B, 2·x_B + 3)` for
+`y = 2x + 3`: the dependency made visible, which is what the operator asked for. It prints no VALUE,
+so [ADR-AG-003](#adr-ag-003) §2 is untouched — it names a dependency, and it is strictly more honest
+than the dash, which said *"unknown"* where the truth was *"unknown in one coordinate and determined
+by it in the other"*. A point on a CIRCLE has no such closed form and keeps the dash; none is
+invented. A point with one coordinate pinned reads the same way, which is «B נמצא על ציר ה-x» getting
+`(x_B, 0)` for free.
+
+**The letter is `x_B`, not `t`.** The operator wrote `(t,t)`; this product's convention for an
+unpinned component is the point's own symbol ([#1032](https://github.com/dcodish/geo_builder/issues/1032)),
+which the canvas already prints — and a shared `t` would say two different points on one line were
+the same point. **Flagged for the operator**, since they named the other form.
+**`exprText` was still not needed**: `knownCurve` hands back resolved numeric coefficients, so the
+text is built from those. The printer keeps waiting for a caller that genuinely has an `Expr`.
+
+**3 — The panel shows slopes**, and the operator's figure is the sharpest possible argument for it:
+every length and every coordinate there is open, and the two SLOPES are the only things the givens
+fix. A panel showing only lengths told the student *"nothing is known"* about a figure that knew two
+things. A VERTICAL segment prints «אנכי» rather than nothing, because that is an answer and it is
+exactly what «BC מקביל לציר ה-y» tells them. A square's slopes stay open — it may be rotated — which
+is the guard that the row is gated and not computed.
+
+**4 — A gate calibrated tighter than the solve, found on the way.** The slopes came out empty even
+after the section existed. `isKnowledge` used `1e-7`, **finer than `SATISFIED_EPS`, the accuracy the
+solve itself promises**, so a value produced BY the solve carried more wobble than the test allowed:
+«AB מקביל לציר ה-x» gives slopes of `1.3e-8`, `-3.2e-7`, `-7.8e-9` across three configurations —
+invariantly zero by any reading — and the spread of `3.2e-7` failed. The rule that fixes it is worth
+stating: **a knowledge test cannot be tighter than the solve that produced the value, or it reports
+the solver's own noise as freedom.** It remains relative, and a quantity that really moves with a
+free DOF moves by orders of magnitude more; the lock asserts both directions.
+
+**Consequences.** `src-analytic` +13 tests. This affects every gated row, not only slopes — lengths
+and coordinates determined through the joint solve were being under-reported the same way.

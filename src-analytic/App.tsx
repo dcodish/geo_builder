@@ -418,7 +418,7 @@ export function App() {
                   return (
                     <span key={p.id}>
                       {p.id} ={' '}
-                      {kx.known && ky.known ? `(${fmt(kx.value)}, ${fmt(ky.value)})` : '—'}
+                      {pointText(d, p.id, kx, ky)}
                     </span>
                   );
                 }),
@@ -427,7 +427,21 @@ export function App() {
                 key: 'curves',
                 title: t('secCurves'),
                 dir: 'ltr',
-                rows: d.figure.curves.map((c) => {
+                /**
+                 * A CARRIER gets no row (#1078) — an operator ruling that reverses the panel half of
+                 * ADR-AG-032.
+                 *
+                 * That ADR kept a carrier here, reasoning it was "the honest provenance of where B
+                 * lives". Played, the reasoning does not survive: *"the part where it shows -x+y=0 is
+                 * meaningless since the line is not really drawn and in any case there is no way to
+                 * know what it belongs to"*. A curve row cannot say WHOSE carrier it is — it sits
+                 * unlabelled, next to no point, for a line the student never asked to see.
+                 *
+                 * The information is real and this was the wrong home for it: it belongs on the POINT,
+                 * which is what the coordinate rows below now say. The flag means one thing in both
+                 * places — undrawn on the canvas, unlisted here.
+                 */
+                rows: d.figure.curves.filter((c) => c.stated).map((c) => {
                   // The SAME honesty gate the point rows use: an equation prints only when every
                   // coefficient is invariant across the free DOFs. A parabola whose `a` is still
                   // free is drawn, and its row is open — never a sampled coefficient as fact.
@@ -447,6 +461,47 @@ export function App() {
                   return (
                     <span key={c.id}>{known ? describeCurve(name, known) : `${name ? `${name}: ` : ''}—`}</span>
                   );
+                }),
+              },
+              {
+                key: 'slopes',
+                title: t('secSlopes'),
+                dir: 'ltr',
+                /**
+                 * Every drawn segment’s SLOPE (#1078).
+                 *
+                 * Operator, 2026-09-15, on a figure with «AB מקביל לציר ה-x» and «BC מקביל לציר ה-y»:
+                 * *"in this case, the data panel should show the slope of AB and BC"*. He is right,
+                 * and it is the sharpest possible case for it: in that figure the lengths and the
+                 * coordinates are all open, and the two SLOPES are the only things the givens fix.
+                 * A panel that showed only lengths said "nothing is known" about a figure that knows
+                 * two things.
+                 *
+                 * Gated exactly as every other row. A VERTICAL segment has no slope, and saying so is
+                 * knowledge too — «אנכי» is an answer, not an absence, and it is what «BC מקביל לציר
+                 * ה-y» tells the student.
+                 */
+                rows: uniqueSegments(d.figure.segments).map((seg) => {
+                  const [a, b] = seg.ends;
+                  const read = (f: typeof d.figure) => {
+                    const p1 = f.points.find((q) => q.id === a);
+                    const p2 = f.points.find((q) => q.id === b);
+                    return p1 && p2 ? { dx: p2.x - p1.x, dy: p2.y - p1.y } : null;
+                  };
+                  // Vertical is judged on the DIRECTION, not on the quotient: dy/dx is Infinity there
+                  // and `isKnowledge` would call an infinity "not finite" and print nothing.
+                  const vertical = isKnowledge(d.construction, (f) => {
+                    const v = read(f);
+                    return v === null ? null : Math.abs(v.dx) / Math.max(1e-12, Math.hypot(v.dx, v.dy));
+                  });
+                  if (vertical.known && vertical.value < 1e-6) {
+                    return <span key={seg.id}>{`${a}${b}: ${t('slopeVertical')}`}</span>;
+                  }
+                  const k = isKnowledge(d.construction, (f) => {
+                    const v = read(f);
+                    return v === null || Math.abs(v.dx) < 1e-12 ? null : v.dy / v.dx;
+                  });
+                  return <span key={seg.id}>{`${a}${b}: ${k.known ? fmt(k.value) : '—'}`}</span>;
                 }),
               },
               {
@@ -547,6 +602,56 @@ function fmt(v: number): string {
  * known, and the memorised triple (`y²=2px` → focus, directrix) is exactly what the formula sheet
  * withholds.
  */
+/**
+ * What the givens SAY about a point, as the panel should read it (#1078).
+ *
+ * Operator, 2026-09-15: *"B should be something like (t,t) showing we collapsed the y based on the
+ * x"*. Three answers, in order of how much the figure knows:
+ *
+ *  - both coordinates are knowledge → the numbers;
+ *  - the point rides a LINE → the free coordinate as a symbol, and the other as the expression the
+ *    line makes of it: `B = (x_B, x_B)` for `y = x`;
+ *  - otherwise → the open row this always showed.
+ *
+ * The middle answer prints no VALUE, so it does not weaken ADR-AG-003 §2 — it names a dependency,
+ * and it is strictly more honest than the dash, which said "unknown" where the truth was "unknown
+ * in one coordinate and determined by it in the other".
+ *
+ * The component symbol is the point’s own (`x_B`), which is the convention #1032 set and the canvas
+ * already prints. The operator wrote `(t,t)`; a shared `t` would say two different points on one
+ * line were the same point, which is why this keeps the established form.
+ */
+function pointText(
+  d: ReturnType<typeof derive>,
+  id: string,
+  kx: { known: boolean; value?: number },
+  ky: { known: boolean; value?: number },
+): string {
+  if (kx.known && ky.known) return `(${fmt(kx.value as number)}, ${fmt(ky.value as number)})`;
+
+  const on = d.construction.constraints.find(
+    (k) => k.t === 'on-curve' && k.id === id,
+  );
+  if (on && on.t === 'on-curve') {
+    // The SAME gate the curve rows use: a carrier whose coefficients still move says nothing here.
+    const line = knownCurve(d.construction, on.curve);
+    if (line && line.kind === 'line' && Math.abs(line.b) > 1e-12 && Math.abs(line.a) > 1e-12) {
+      const slope = -line.a / line.b;
+      const intercept = -line.c / line.b;
+      const sx = `x_${id}`;
+      const term = Math.abs(slope - 1) < 1e-12 ? sx : Math.abs(slope + 1) < 1e-12 ? `-${sx}` : `${fmt(slope)}·${sx}`;
+      const tail = Math.abs(intercept) < 1e-12 ? '' : intercept > 0 ? ` + ${fmt(intercept)}` : ` - ${fmt(-intercept)}`;
+      return `(${sx}, ${term}${tail})`;
+    }
+  }
+
+  // One coordinate pinned and the other open — «B על ציר ה-x» — reads the same way.
+  if (kx.known !== ky.known) {
+    return kx.known ? `(${fmt(kx.value as number)}, y_${id})` : `(x_${id}, ${fmt(ky.value as number)})`;
+  }
+  return '—';
+}
+
 function describeCurve(name: string, c: NumCurve): string {
   const n = name ? `${name}: ` : '';
   switch (c.kind) {

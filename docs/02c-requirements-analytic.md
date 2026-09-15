@@ -841,3 +841,13 @@ is filtered.
 מ-BC», «AB גדול ב-2 מ-BC» and «שטח ABC = שטח CEF + 4» are all givens the figure honours, and areas
 and lengths mix freely in one expression. A comparison a determined figure does not satisfy is
 refused, naming the statement.
+
+**R66 — a point on a line shows what the line makes of it**
+([ADR-AG-041](06c-decisions-analytic.md#adr-ag-041)). «B על הישר y=x» reads `B = (x_B, x_B)` in the
+data panel — the dependency, not a value — and the carrier itself gets no row of its own, because a
+curve row cannot say whose carrier it is. A point on a circle keeps its open row.
+
+**R67 — the panel shows every drawn segment's SLOPE**
+([ADR-AG-041](06c-decisions-analytic.md#adr-ag-041)), under the same honesty gate as every other row:
+a number when the givens fix it, «אנכי» for a vertical segment — which is an answer, not an absence —
+and an open row when the figure is still free to change it.

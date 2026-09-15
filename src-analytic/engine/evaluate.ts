@@ -621,7 +621,20 @@ export function isKnowledge(
   }
   const scale = Math.max(1, ...vals.map(Math.abs));
   const spread = Math.max(...vals) - Math.min(...vals);
-  return spread <= 1e-7 * scale ? { known: true, value: vals[0] } : { known: false };
+  /**
+   * The tolerance is the SOLVE's, not a tighter one (#1078).
+   *
+   * It was `1e-7`, which is finer than `SATISFIED_EPS` — the accuracy the solve itself promises. A
+   * value that comes out of the joint solve therefore carries more wobble than this test allowed,
+   * and quantities the givens genuinely FIX were reported as unknown. Measured on the operator's own
+   * figure: «AB מקביל לציר ה-x» gives slopes of 1.3e-8, -3.2e-7 and -7.8e-9 across three
+   * configurations — invariantly zero by any reading — and a spread of 3.2e-7 failed the gate.
+   *
+   * **A knowledge test cannot be tighter than the solve that produced the value**, or it reports the
+   * solver's own noise as freedom. It stays RELATIVE, so nothing about the honesty rule changes:
+   * a quantity that really moves with a free DOF moves by orders of magnitude more than this.
+   */
+  return spread <= SATISFIED_EPS * scale ? { known: true, value: vals[0] } : { known: false };
 }
 
 /**

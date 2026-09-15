@@ -38,6 +38,9 @@ const he = {
   secPoints: 'נקודות',
   secCurves: 'עקומים',
   secLengths: 'אורכים',
+  secSlopes: 'שיפועים',
+  // A vertical segment HAS no slope, and that is an answer rather than an absence (#1078).
+  slopeVertical: 'אנכי (אין שיפוע)',
   secParams: 'פרמטרים',
   freeDof: '{{count}} דרגות חופש',
   pinned: 'הכול נקבע על-ידי הנתונים',
@@ -127,6 +130,8 @@ const en: typeof he = {
   secPoints: 'Points',
   secCurves: 'Curves',
   secLengths: 'Lengths',
+  secSlopes: 'Slopes',
+  slopeVertical: 'vertical (no slope)',
   secParams: 'Parameters',
   freeDof: '{{count}} degrees of freedom',
   pinned: 'Everything is fixed by the givens',
