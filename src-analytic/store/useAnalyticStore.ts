@@ -64,7 +64,14 @@ interface AnalyticState {
   removeLine: (index: number) => void;
   replaceLine: (index: number, next: string) => void;
   clearAll: () => void;
-  nextConfiguration: () => void;
+  /**
+   * Move to a configuration the caller has CHOSEN (#1084).
+   *
+   * It used to increment the seed here, which is the store deciding what "another configuration"
+   * means — and it does not have the figure to decide it with. Finding a seed whose figure actually
+   * differs needs the derivation, so the submit layer picks and this records.
+   */
+  goToSeed: (seed: number) => void;
   setError: (e: InputError | null) => void;
   setNotice: (n: string | null) => void;
 }
@@ -80,7 +87,7 @@ export const useAnalyticStore = create<AnalyticState>((set) => ({
   replaceLine: (index, next) =>
     set((s) => ({ lines: s.lines.map((l, i) => (i === index ? next : l)), error: null, notice: null })),
   clearAll: () => set({ lines: [], error: null, notice: null, seed: 0 }),
-  nextConfiguration: () => set((s) => ({ seed: s.seed + 1 })),
+  goToSeed: (seed) => set({ seed, error: null, notice: null }),
   setError: (error) => set({ error, notice: null }),
   setNotice: (notice) => set({ notice, error: null }),
 }));

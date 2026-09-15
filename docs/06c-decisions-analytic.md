@@ -2946,3 +2946,44 @@ this figure is meant to have two cases the search budget is the thing to raise.
 
 **Consequences.** `src-analytic` +7 tests. Twenty-four drawable samples of that figure cost ~380 ms,
 once per construction.
+
+## ADR-AG-053 — The search starts where the FIGURE lives (#1085, #1084, #1082)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** covered by [02c](02c-requirements-analytic.md) R14 and R72. **Design:** none.
+
+**Context.** Operator, 2026-09-15, on an exam question whose part א reads *"find the coordinates of
+vertex A (**two possibilities**)"*: the panel said something wrong about `A`, and «הציגו תצורה אחרת»
+was disabled. Three defects, and the deepest one decides what the tool can answer at all.
+
+**1 — The search started in a fixed box, and that box chose the answers.** `freeCoord` placed every
+free vertex in `[-6, +6]` before the solve, whatever the figure. The two answers are `(1,3)` and
+`(11,13)`; the first is inside that box and the second is not. A least-squares descent goes to the
+basin it starts in, so **the second answer was not rare, it was unreachable** — forty configurations,
+forty times `(1,3)`.
+
+The box was written when every test figure sat near the origin. It is a magnitude the product never
+stated ([ADR-052](06-decisions.md#adr-052)) and, worse, one that **decides which answers exist**. The
+search now starts in the box of everything the student has PLACED, grown by half its own size so it
+can reach past the given points, and never smaller than the old default; a figure with nothing placed
+has no scale of its own and keeps that default.
+
+**Measured after: twenty configurations each.** The option row reads `(1, 3) | (11, 13)` — the exam's
+«שתי אפשרויות», in the panel. It is also the quieter half of [ADR-AG-052](#adr-ag-052), where a second
+configuration was reachable about once in thirteen tries: same cause, milder symptom.
+
+**2 — «הציגו תצורה אחרת» was disabled at DOF 0.** The cue counts CONTINUOUS freedom, and a figure with
+none can still have several configurations — which is what a discrete branch IS, and what this product
+has had since the branch index existed. The exam asks for both answers and the control that would show
+the second was greyed out. It is never disabled now: when another configuration exists it shows it,
+and when none does it says so, which is more than a disabled button ever said.
+
+**3 — The panel's mathematics is MathML**, through the SHARED renderer (`shell/math`, ADR-W-040) that
+2-D and 3-D already use — not through an emitter of this product's own. One was written and then
+**deleted**: measuring the shared component against the panel's real strings showed it handled every
+one of them, and a second implementation beside a shared component is the fork the shell exists to
+prevent. The only adjustment is at the display boundary, where `x_B` becomes `x_{B}`, because the
+engine's symbol names are what its expressions are built from and must not change to suit a renderer.
+
+**Consequences.** Both of the operator's reported figures now answer as the exam does.

@@ -27,12 +27,14 @@ import { derive } from './engine/derive';
 import { domainText, positionalOf, type NumCurve } from './engine/types';
 import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
 import { exprText } from './engine/expr';
+import { MathText } from '../shell/math';
 import { ellipseFoci, parabolaFocus } from './engine/curves';
 import { analyticBidi } from './i18n';
 import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
 import { AskLane } from '../shell/frame/AskLane';
 import { ask, figureIsOpen, type Answer } from './app/ask';
+import { anotherConfiguration } from './app/another';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
 import { parseLine } from './parser/parseAnalytic';
 
@@ -81,7 +83,7 @@ function existingKey(error: InputError): string {
 
 export function App() {
   const { t } = useTranslation();
-  const { lines, seed, error, recordLine, removeLine, replaceLine, clearAll, nextConfiguration, setError, notice, setNotice } =
+  const { lines, seed, error, recordLine, removeLine, replaceLine, clearAll, goToSeed, setError, notice, setNotice } =
     useAnalyticStore();
   const [draft, setDraft] = useState('');
   const [zoom, setZoom] = useState(1);
@@ -390,7 +392,30 @@ export function App() {
               </button>
             </div>
             <div style={{ position: 'absolute', insetInlineStart: 12, bottom: 12, display: 'flex', gap: 8 }}>
-              <ToolButton onClick={nextConfiguration} disabled={freeCount === 0}>
+              <ToolButton
+                onClick={() => {
+                  /**
+                   * The button asks for what it PROMISES — a figure that differs (#1084).
+                   *
+                   * Incrementing the seed redrew the same picture for the first few presses on the
+                   * operator's own figure, while the DOF cue beside it said the figure still had
+                   * freedom. When nothing differs, saying so beats redrawing in silence.
+                   */
+                  const next = anotherConfiguration(lines, seed);
+                  if (next.found) goToSeed(next.seed);
+                  else setNotice(t('noticeOnlyConfiguration'));
+                }}
+                /**
+                 * NEVER disabled (#1084). It was gated on the DOF cue, which counts CONTINUOUS
+                 * freedom — and a figure with none can still have several configurations: the
+                 * operator's own question asks for «שתי אפשרויות» for a point in a figure the cue
+                 * calls fully determined, and the button that would have shown him the second was
+                 * greyed out.
+                 *
+                 * When there really is only one, pressing it says so, which is more than a disabled
+                 * button ever said.
+                 */
+              >
                 {t('another')}
               </ToolButton>
               {/* Offered only when there IS a construction to show, so the control never promises
@@ -417,7 +442,7 @@ export function App() {
                 title: t('secParams'),
                 dir: 'ltr',
                 rows: register.map((p) => (
-                  <span key={p.sym}>{domainText(p.sym, p.domain)}</span>
+                  <span key={p.sym}><ValueRow text={domainText(p.sym, p.domain)} /></span>
                 )),
               },
               {
@@ -431,8 +456,7 @@ export function App() {
                   const ky = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === p.id)?.y ?? null);
                   return (
                     <span key={p.id}>
-                      {p.id} ={' '}
-                      {pointText(d, p.id, kx, ky)}
+                      <ValueRow text={`${p.id} = ${pointText(d, p.id, kx, ky)}`} />
                     </span>
                   );
                 }),
@@ -483,7 +507,7 @@ export function App() {
                   const lead = name ? `${name}: ` : '';
                   return (
                     <span key={c.id}>
-                      {known ? describeCurve(name, known) : `${lead}${openCurveText(d, c.id)}`}
+                      <ValueRow text={known ? describeCurve(name, known) : `${lead}${openCurveText(d, c.id)}`} />
                     </span>
                   );
                 }),
@@ -520,13 +544,13 @@ export function App() {
                     return v === null ? null : Math.abs(v.dx) / Math.max(1e-12, Math.hypot(v.dx, v.dy));
                   });
                   if (vertical.known && vertical.value < 1e-6) {
-                    return <span key={seg.id}>{`${a}${b}: ${t('slopeVertical')}`}</span>;
+                    return <span key={seg.id}><ValueRow text={`${a}${b}: ${t('slopeVertical')}`} /></span>;
                   }
                   const k = isKnowledge(d.construction, (f) => {
                     const v = read(f);
                     return v === null || Math.abs(v.dx) < 1e-12 ? null : v.dy / v.dx;
                   });
-                  return <span key={seg.id}>{`${a}${b}: ${k.known ? fmt(k.value) : '—'}`}</span>;
+                  return <span key={seg.id}><ValueRow text={`${a}${b}: ${k.known ? fmt(k.value) : '—'}`} /></span>;
                 }),
               },
               {
@@ -552,7 +576,7 @@ export function App() {
                     return p1 && p2 ? Math.hypot(p2.x - p1.x, p2.y - p1.y) : null;
                   });
                   return (
-                    <span key={s.id}>{`${a}${b} = ${k.known ? fmt(k.value) : '—'}`}</span>
+                    <span key={s.id}><ValueRow text={`${a}${b} = ${k.known ? fmt(k.value) : '—'}`} /></span>
                   );
                 }),
               },
@@ -736,6 +760,24 @@ function pointText(
   return '—';
 }
 
+
+/**
+ * A value row, rendered as MATHEMATICS (#1082).
+ *
+ * Operator, 2026-09-15: *"data panel should be in mathml"*, looking at `B = (x_B, -x_B + 2)` — a
+ * subscript printed as an underscore and a power as a caret.
+ *
+ * It goes through the SHARED renderer (`shell/math`, ADR-W-040), which 2-D and 3-D already use, and
+ * not through an emitter of this product's own: a second implementation beside a shared component is
+ * the fork the shell exists to prevent, and this panel needs nothing the shared one lacks.
+ *
+ * The one adjustment is at the DISPLAY boundary: that renderer reads `x_{B}`, while the engine's
+ * symbols are `x_B` and `r_O` — names they must keep, because they are what the expressions are
+ * built from. The braces are added here, where the string stops being data and becomes type.
+ */
+const braced = (text: string): string => text.replace(/([A-Za-z])_([A-Za-z0-9]+)/g, '$1_{$2}');
+
+const ValueRow = ({ text }: { text: string }) => <MathText text={braced(text)} />;
 
 /** An answered question, reading like the inventory rows it sits under. */
 const askRow: CSSProperties = {

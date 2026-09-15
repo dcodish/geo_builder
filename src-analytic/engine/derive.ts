@@ -8,7 +8,7 @@
  */
 import { fold, existingKindOf, type ApplyError } from './apply';
 import { reportedDof } from './carriers';
-import { evaluate, viewBox, type Figure } from './evaluate';
+import { drawableAt, viewBox, type Figure } from './evaluate';
 import type { Box } from './curves';
 import { parseLine, type ParseFailure } from '../parser/parseAnalytic';
 import { EMPTY_CONSTRUCTION, namesObject, objectById, type Construction, type Fact } from './types';
@@ -71,11 +71,17 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
    * `firstSatisfyingSeed` does ([ADR-098](../../docs/06-decisions.md#adr-098)), and give up after a
    * bounded search rather than spinning: if «החלק החיובי» can never hold, that IS worth reporting.
    */
-  let figure = evaluate(construction, seed);
-  for (let extra = 1; extra <= 24 && !figure.selectorsOk; extra += 1) {
-    const candidate = evaluate(construction, seed + extra);
-    if (candidate.selectorsOk) figure = candidate;
-  }
+  /**
+   * The figure SHOWN is the one the gates judge (#1083).
+   *
+   * This loop and `isKnowledge` used to advance the seed by different rules, so the panel could
+   * report on a configuration the canvas never drew. One sampler now answers both — and it also
+   * prefers a configuration in which every object the student NAMED exists, which is the half the
+   * operator found: «אלכסוני המרובע נפגשים בנקודה O» has no `O` when the diagonals cross only when
+   * extended, and drawing that figure while another has the point is a poor choice rather than an
+   * honest one.
+   */
+  let figure = drawableAt(construction, seed);
 
   /**
    * A selector that can NEVER hold is reported — the docblock above has always said so, and nothing

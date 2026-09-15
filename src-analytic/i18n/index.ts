@@ -112,6 +112,8 @@ const he = {
   kindDiagonalMeet: 'מפגש האלכסונים',
   // Informational, NOT a refusal (#1045): the student restated something the figure already holds,
   // so the message confirms they were right and explains why no row appeared.
+  // «הציגו תצורה אחרת» found none — an answer about the figure, not a failure (#1084).
+  noticeOnlyConfiguration: 'זו התצורה היחידה שמצאתי — הנתונים שכתבתם קובעים את השרטוט.',
   noticeAlreadyKnown: 'זה כבר ידוע מהנתונים שכתבתם, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
   // A different sentence from «כבר ידוע» on purpose (#1063): the student did NOT repeat themselves —
   // they stated something the figure had already settled, which is a thing worth telling them.
@@ -211,6 +213,7 @@ const en: typeof he = {
   kindOrthocentre: 'the orthocentre',
   kindCircumcentre: 'the circumcentre',
   kindDiagonalMeet: 'the intersection of the diagonals',
+  noticeOnlyConfiguration: 'This is the only configuration I found — your givens fix the figure.',
   noticeAlreadyKnown: 'That is already known from what you have written, so I did not add another row: "{{detail}}"',
   noticeAlreadyFollows:
     'That already follows from what you have written — the figure satisfies it anyway, so I did not add another row: "{{detail}}"',

@@ -113,10 +113,56 @@ export interface Figure {
  * A free vertex's coordinate — deterministic in the seed and the point's own NAME, so two unplaced
  * vertices never coincide and each keeps its identity across a reseed.
  */
-function freeCoord(seed: number, id: string, axis: 0 | 1): number {
+function freeCoord(seed: number, id: string, axis: 0 | 1, span: Span = DEFAULT_SPAN): number {
   let h = axis * 7919 + 13;
   for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) % 100003;
-  return Math.round((-6 + 12 * jitter(seed, h)) * 1e6) / 1e6;
+  const { lo, hi } = axis === 0 ? span.x : span.y;
+  return Math.round((lo + (hi - lo) * jitter(seed, h)) * 1e6) / 1e6;
+}
+
+/** Where the search starts, per axis. */
+interface Span {
+  x: { lo: number; hi: number };
+  y: { lo: number; hi: number };
+}
+
+/** With nothing placed, the figure has no scale of its own and this is as good as any. */
+const DEFAULT_SPAN: Span = { x: { lo: -6, hi: 6 }, y: { lo: -6, hi: 6 } };
+
+/**
+ * The region the solve STARTS its search in — the figure's own, not a fixed box (#1085).
+ *
+ * Operator, 2026-09-15, on an exam question whose part א says *"find A (two possibilities)"*: the
+ * tool found one of them, at every one of forty configurations. The two answers are `(1,3)` and
+ * `(11,13)`, and the search started every time inside `[-6, 6]²` — a box that contains the first and
+ * not the second. A least-squares descent goes to the basin it starts in, so the second answer was
+ * not merely rare, it was **unreachable**.
+ *
+ * The box was written when every test figure sat near the origin. It is a magnitude the product never
+ * stated (ADR-052) and, worse, one that decides which ANSWERS exist. So the search now starts where
+ * the figure lives: the box of everything the student has PLACED, grown by half its own size in each
+ * direction so the search can reach past the given points, and never smaller than the default.
+ */
+function searchSpan(c: Construction, env: Env): Span {
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (const o of c.objects) {
+    if (o.kind !== 'point') continue;
+    const x = evalExpr(o.x, env);
+    const y = evalExpr(o.y, env);
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      xs.push(x);
+      ys.push(y);
+    }
+  }
+  if (xs.length === 0) return DEFAULT_SPAN;
+  const axis = (vs: number[]) => {
+    const lo = Math.min(...vs);
+    const hi = Math.max(...vs);
+    const grow = Math.max((hi - lo) / 2, 6);
+    return { lo: lo - grow, hi: hi + grow };
+  };
+  return { x: axis(xs), y: axis(ys) };
 }
 
 /** A tiny deterministic hash → [0,1). Same seed, same figure; different seed, different figure. */
@@ -425,8 +471,9 @@ export function evaluate(raw: Construction, seed = 0): Figure {
    * several valid configurations it is what chooses between them.
    */
   const ids = freeIds(c);
+  const span = searchSpan(c, env);
   const seeded = new Map<Id, Pt>(
-    ids.map((id) => [id, { x: freeCoord(seed, id, 0), y: freeCoord(seed, id, 1) }]),
+    ids.map((id) => [id, { x: freeCoord(seed, id, 0, span), y: freeCoord(seed, id, 1, span) }]),
   );
   /**
    * A REGION selector SEEDS the point it names, instead of only filtering the result (#1071).
@@ -687,16 +734,36 @@ export function drawableAt(c: Construction, seed: number): Figure {
   const hit = perSeed.get(seed);
   if (hit) return hit;
 
+  /**
+   * A figure is drawable when its selectors hold AND every object the student NAMED is in it.
+   *
+   * The second half was found by the operator asking why a figure of his had a second answer
+   * (#1083). It did not: in that configuration the point `O` — «אלכסוני המרובע נפגשים בנקודה O» —
+   * was VACANT, because `A` and `C` had landed on the same side of `BD` and the diagonals crossed
+   * only when extended. ADR-AG-021 is right to leave `O` out of such a figure; what is wrong is
+   * SHOWING that figure while another one has every point the student asked for.
+   *
+   * A vacancy is still not an error (ADR-AG-008) — it is a preference, applied only when a better
+   * configuration exists inside the budget.
+   */
+  const whole = (f: Figure) => f.selectorsOk && f.vacant.length === 0;
+
   const first = evaluate(c, seed);
   let chosen = first;
-  if (!first.selectorsOk) {
+  let fallback: Figure | null = first.selectorsOk ? first : null;
+  if (!whole(first)) {
     for (let extra = 1; extra <= DRAWABLE_TRIES; extra += 1) {
       const candidate = evaluate(c, seed + extra);
-      if (candidate.selectorsOk) {
+      if (whole(candidate)) {
         chosen = candidate;
+        fallback = candidate;
         break;
       }
+      // Second best: the selectors hold and something the student named is missing. Remembered, so a
+      // figure with a vacancy still beats one that fails a selector outright.
+      if (!fallback && candidate.selectorsOk) fallback = candidate;
     }
+    if (!whole(chosen) && fallback) chosen = fallback;
   }
   perSeed.set(seed, chosen);
   return chosen;
