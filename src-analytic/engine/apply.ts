@@ -16,7 +16,7 @@
  * lands, and nowhere else.
  */
 import { fitConic } from './conic';
-import { parentsOf, type DerivedRule } from './derived';
+import { curveParentOf, parentsOf, type DerivedRule } from './derived';
 import { constraintRefs } from './solve';
 import { isGenericNoun, namesOption, rightAngleAt, shapeRow } from './shapes';
 import { evalExpr, type Env } from './expr';
@@ -533,6 +533,19 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'polygon': {
       const refs =
         f.t === 'derived' ? parentsOf(f.rule) : f.t === 'segment' ? [f.a, f.b] : f.vertices;
+
+      /**
+       * A rule may name a CURVE as its parent (#1059), and that reference is checked here for the
+       * same reason the point references are: «מעגל O שמשוואתו …» minting a centre of a circle the
+       * figure does not have would be a point defined in terms of nothing.
+       */
+      const curveRef = f.t === 'derived' ? curveParentOf(f.rule) : null;
+      if (curveRef !== null) {
+        const o = objectById(c, curveRef);
+        if (!o || o.kind !== 'curve') {
+          return { ok: false, error: { code: 'unknown-reference', detail: curveRef } };
+        }
+      }
 
       /**
        * DECLARATION vs REFERENCE — the distinction #1017 turns on, and it is not a softening of

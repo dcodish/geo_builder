@@ -2110,3 +2110,51 @@ guard #1042 added was silently inapplicable to every noun #1049 shipped. It read
 Five lists, one table.
 
 **Consequences.** `src-analytic` +12 tests.
+
+## ADR-AG-038 — «מעגל O» names the CENTRE, and the circle stays anonymous (#1059)
+
+**Status:** accepted, 2026-09-15 · **Settles an ambiguity in** [ADR-AG-005](#adr-ag-005) D6 ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R63. **Design:** none (a rule and a rule kind).
+
+**Context — an operator ruling.** #1059 measured that «נתון מעגל O שמשוואתו (x-3)^2+(y-5)^2=25» — an
+ordinary circle given by its equation — could not be stated at all, and raised the question it turns
+on: is `O` the circle's NAME or its CENTRE? D6 says circles are named with the corpus's Roman-numeral
+device or «המעגל שמרכזו M», and a bare letter is ambiguous between them. The operator, 2026-09-15:
+
+> «מעגל O» means the center letter is O
+
+**Decision: a Roman numeral NAMES the circle; any other letter is its CENTRE.** The two readings of
+one sentence shape are told apart by which letter it is, which is what the corpus itself does. The
+numeral branch runs first and the centre branch sees only what it declined, with an explicit
+lookahead so `I` can never be read as a centre.
+
+**The circle stays ANONYMOUS, and that is the load-bearing half.** It keeps the content-derived id a
+bare equation would give it, so `O` is free to be the point. Naming the curve `O` as well would put
+one student letter on two objects in the M1 id space — and the whole value of the ruling is that `O`
+means one thing.
+
+**The centre is a derived point whose parent is a CURVE**, which is new: every rule until now was
+defined over points. So `parentsOf` reports none for it and `curveParentOf` reports the curve —
+two questions kept apart rather than one list meaning two things, because the callers check
+different properties (a point must be positional, a curve must be a curve).
+
+**It does not contradict [ADR-AG-036](#adr-ag-036), it completes it.** #1024 draws EVERY circle's
+centre and mints nothing, precisely so an unnamed centre spends no letter. Here the letter is the
+student's own: they can then write «AO = 5», and the point appears in the data panel like any other
+point they introduced. Named and unnamed centres are different things and get different treatment.
+
+**Two things this did NOT need.** The misreporting #1059 was filed for — «מעגל O משיק לציר x» told
+the student «לא הצלחתי לקרוא את המשוואה» about a sentence containing no equation — **was already
+fixed**, by [ADR-AG-027](#adr-ag-027)'s Hebrew-tail discriminator (#1068), and re-measuring said so
+before any code was written. And a curve that turns out to have no centre («מעגל M שמשוואתו y=2x»
+fits a line) is reported by [ADR-AG-031](#adr-ag-031)'s vacancy predicate with no new message,
+because that mechanism was already right.
+
+**Still not supported, and stated rather than skipped:** «מעגל O» with no equation at all. That is a
+circle with a free centre and a free radius — a 3-DOF free OBJECT — and it needs curve carriers,
+which is a mechanism rather than a rule. [#1060](https://github.com/dcodish/geo_builder/issues/1060)
+(axis tangency) depends on the same thing.
+
+**Consequences.** `src-analytic` +7 tests.

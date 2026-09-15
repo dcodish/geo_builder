@@ -294,6 +294,14 @@ interface CurveHit {
   name: string;
   kind: CurveKind;
   eqSrc: string;
+  /**
+   * The letter the student gave as this circle`s CENTRE — «מעגל O שמשוואתו …» (#1059).
+   *
+   * Operator ruling, 2026-09-15: *"«מעגל O» means the center letter is O"*. So the letter names a
+   * POINT, not the curve, and the curve keeps the anonymous content-derived id a bare equation
+   * would have given it — which is also what stops `O` colliding with the circle in the id space.
+   */
+  centre?: Id;
 }
 
 /**
@@ -302,6 +310,8 @@ interface CurveHit {
  * `[IVX]{1,3}` reads the `x` of «the circle x²+y²−2ax−2x=0» as a Roman numeral and swallows it, and a
  * class that admits `X` while the validator does not silently turns a numeral into an anonymous id.
  */
+/** The numerals themselves, for the lookahead that keeps a NAME from eating one (#1059). */
+const ROMAN_LETTERS = '(?:I|II|III|IV|V)';
 const ROMAN_RUN = '(?:(I|II|III|IV|V)(?=[\\s:]))?';
 
 function matchCurve(line: string): CurveHit | null {
@@ -375,6 +385,31 @@ function matchCurve(line: string): CurveHit | null {
     };
   }
 
+  /**
+   * «נתון מעגל O שמשוואתו (x-3)^2+(y-5)^2=25» — the letter is the CENTRE (#1059).
+   *
+   * Operator ruling, 2026-09-15: *"«מעגל O» means the center letter is O"*. The corpus uses Roman
+   * numerals to NAME circles (ADR-AG-005 D6) and any other letter for the centre, so the two
+   * readings of one sentence shape are told apart by which letter it is — which is why the branch
+   * above runs first and this one only sees what it declined.
+   *
+   * The circle itself stays anonymous, with the content-derived id a bare equation would give it.
+   * That is not a detail: it keeps `O` free to be the point, so the student`s letter means one
+   * thing and the M1 id space has no collision in it.
+   */
+  const heCircleCentre = line.match(
+    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s+(?!${ROMAN_LETTERS}(?=[\\s:]))(${NAME})\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
+  );
+  if (heCircleCentre) {
+    return {
+      id: `curve-${anonIndex(heCircleCentre[2])}`,
+      name: '',
+      kind: 'circle',
+      eqSrc: heCircleCentre[2],
+      centre: heCircleCentre[1],
+    };
+  }
+
   // --- circle: «נתון מעגל I שמשוואתו …» · «משוואת המעגל …» ---
   const heCircle = line.match(
     new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s*${ROMAN_RUN}\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
@@ -388,6 +423,21 @@ function matchCurve(line: string): CurveHit | null {
       eqSrc: heCircle[2],
     };
   }
+
+  // The English centre form, for the same reason and with the same numeral exclusion (#1059).
+  const enCircleCentre = line.match(
+    new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s+(?!${ROMAN_LETTERS}(?=[\\s:]))(${NAME})\\s*:?\\s*(?:is\\s+|whose equation is\\s+)?(.+)$`),
+  );
+  if (enCircleCentre) {
+    return {
+      id: `curve-${anonIndex(enCircleCentre[2])}`,
+      name: '',
+      kind: 'circle',
+      eqSrc: enCircleCentre[2],
+      centre: enCircleCentre[1],
+    };
+  }
+
   const enCircle = line.match(new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s*${ROMAN_RUN}\\s*:?\\s*(?:is\\s+)?(.+)$`));
   if (enCircle) {
     const roman = enCircle[1] ?? '';
@@ -1169,6 +1219,18 @@ export function parseLine(raw: string): ParseResult {
      * Every piece of this already existed: `declare` (the cevian rule), the `free` kind (#1017) and
      * the incidence. The defect was never missing geometry — it was a name nothing was checking.
      */
+    /**
+     * The CENTRE the student named, as a derived point on the curve they just gave (#1059).
+     *
+     * It is a real object because the student named it: they can then say «AO = 5» about it, and it
+     * appears in the data panel with its coordinates like any other point they introduced. That is
+     * the difference from #1024, which marks EVERY circle`s centre and mints nothing — an unnamed
+     * centre must spend no letter.
+     */
+    const centre: Fact[] = curve.centre
+      ? [{ t: 'derived', id: curve.centre, rule: { t: 'circle-centre', curve: curve.id }, src: line }]
+      : [];
+
     const named = curve.kind === 'line' ? TWO_POINT_NAME.exec(curve.name) : null;
     const through: Fact[] = named
       ? [
@@ -1189,6 +1251,7 @@ export function parseLine(raw: string): ParseResult {
           src: line,
         },
         ...through,
+        ...centre,
       ],
     };
   }

@@ -226,7 +226,9 @@ function place(c: Construction, env: Env, free: Map<Id, Pt>): Map<Id, Pt> {
         break;
       }
       case 'derived': {
-        const v = evalRule(o.rule, (id) => at.get(id) ?? null);
+        // The curve resolver is handed in for the one rule whose parent is a curve (#1059); every
+        // other rule ignores it, exactly as `residual` does with the same argument.
+        const v = evalRule(o.rule, (id) => at.get(id) ?? null, curveAtOf(c, env));
         if (v && Number.isFinite(v.x) && Number.isFinite(v.y)) at.set(o.id, v);
         break;
       }
@@ -448,7 +450,7 @@ export function evaluate(raw: Construction, seed = 0): Figure {
         // `null` means a parent was vacant at this parameter value, or the configuration is
         // degenerate (three collinear points have no circumcentre). Both are honest vacancies —
         // "not at this value" — never a point drawn at NaN and never a fallback position.
-        const p = evalRule(o.rule, at);
+        const p = evalRule(o.rule, at, curveAtOf(c, env));
         if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
           points.push({ id: o.id, x: p.x, y: p.y });
           placed.set(o.id, p);

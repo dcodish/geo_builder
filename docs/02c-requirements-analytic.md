@@ -801,3 +801,8 @@ uses, and with the vertices optional when the figure has one shape to mean. «מ
 y=2x» is «משוואת הישר AC היא y=2x». **«האלכסון הראשי» and «האלכסון המשני» resolve only where the
 shape noun distinguishes them** — a kite does, a parallelogram and a rhombus do not — and elsewhere
 are refused by name rather than guessed.
+
+**R63 — a letter after «מעגל» is the centre** ([ADR-AG-038](06c-decisions-analytic.md#adr-ag-038)).
+«נתון מעגל O שמשוואתו (x-3)²+(y-5)²=25» draws the circle and places `O` at its centre, as a point
+the student can then talk about. A ROMAN NUMERAL still names the circle itself («מעגל I»), and the
+circle named by a centre letter stays anonymous, so one letter never means two objects.
