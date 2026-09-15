@@ -142,7 +142,13 @@ function ticks(min: number, max: number, project: (v: number) => number): AxisTi
 export function buildScene(fig: Figure, box: Box, width: number, height: number): Scene {
   const t = makeTransform(box, width, height);
 
-  const curves: SceneCurve[] = fig.curves.map((c) => ({
+  /**
+   * A CARRIER is not drawn (#1076). The engine keeps it — it is what `on-curve` is solved
+   * against, and the panel names it as the provenance of the point that rides it — and the figure
+   * the student sees shows what the student asked for. This is the renderer's own decision, which
+   * is why it lives here and not in `evaluate`.
+   */
+  const curves: SceneCurve[] = fig.curves.filter((c) => c.stated).map((c) => ({
     id: c.id,
     kind: c.curve.kind,
     name: c.label.name,

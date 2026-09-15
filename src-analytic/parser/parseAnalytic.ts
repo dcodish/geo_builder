@@ -701,8 +701,25 @@ function parseDerived(line: string): RuleOutcome {
 const SHAPE_HE = new RegExp(`^${HE_GIVEN}(ה?[א-ת]+(?:[- ][א-ת]+){0,2})\\s+(${NAME_RUN})$`);
 const SHAPE_EN = new RegExp(`^(?:the\\s+)?([a-z]+(?:[- ][a-z]+){0,2})\\s+(${NAME_RUN})$`, 'i');
 
-const SEGMENT_HE = new RegExp(`^${HE_GIVEN}ה?(?:קטע|צלע)\\s+(${NAME})(${NAME})$`);
-const SEGMENT_EN = new RegExp(`^(?:segment|side)\\s+(${NAME})(${NAME})$`, 'i');
+/**
+ * The NOUN IS OPTIONAL — «EF» is «הקטע EF» (#1074).
+ *
+ * Operator, 2026-09-15: *"when there are 2 points like E and F defined, and I write EF, i want the
+ * segment drawn"*. The exam writes it that way constantly — "חשבו את EF", "העבירו את EF" — and a
+ * student transcribing givens writes what the page writes.
+ *
+ * This is the same class as #1072 and #1069: a matcher written around the FULLEST phrasing the
+ * corpus shows, so every shorter spelling of the same statement falls off the end of the chain into
+ * `not-handled`. It is the third time, which is why the answer is "the noun is optional" as a rule
+ * rather than as a patch.
+ *
+ * Safe in the LAST-but-one position it already occupies: a bare pair of names cannot be a
+ * coordinate (no parentheses), an equation (no `=`) or a relation (no verb), so nothing else has a
+ * claim on it. An `=`-bearing line reaches `parseConstraint` first, which is what keeps «AB = 5» a
+ * LENGTH rather than a segment.
+ */
+const SEGMENT_HE = new RegExp(`^${HE_GIVEN}(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})$`);
+const SEGMENT_EN = new RegExp(`^(?:(?:segment|side)\\s+)?(${NAME})(${NAME})$`, 'i');
 
 /**
  * A segment's id is CANONICAL — «הקטע AB» and «הקטע BA» are one object, so they must be one id.
@@ -822,12 +839,18 @@ const CEVIAN_EN = new RegExp(
  * number, and a gate admitting one spelling is a silent drop, which is this tree's most productive bug
  * class. The NOUN is captured because the operator's ruling makes it load-bearing: it decides whether
  * the carrier is bounded.
+ *
+ * The noun list carries the CURVE families too (#1076). A point on a parabola is the same sentence
+ * as a point on a line — one carrier, one degree of freedom — and leaving «פרבולה» out of the
+ * alternation would not have refused it: the sentence fell through to `not-handled`, which reads to
+ * a student as "this tool does not do parabolas". None of the curve nouns is BOUNDED; only a side
+ * and a segment are, which is why `bounded` tests for those two by name rather than for "has a noun".
  */
 const ON_OBJECT_HE = new RegExp(
-  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+(ה?(?:צלע|קטע|ישר))?\\s*(.+)$`,
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+(ה?(?:צלע|קטע|ישר|מעגל|פרבולה|אליפסה))?\\s*(?:${HE_EQ_OF}\\s+)?(.+)$`,
 );
 const ON_OBJECT_EN = new RegExp(
-  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+)?(side|segment|line)?\\s*(.+)$`,
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+)?(side|segment|line|circle|parabola|ellipse)?\\s*(.+)$`,
   'i',
 );
 
@@ -854,6 +877,38 @@ const ANGLE_EN = new RegExp(
   `^(?:the\\s+)?angle\\s+(${NAME})(${NAME})?(${NAME})?\\s+(?:is\\s+)?(?:right|=\\s*90°?|90°?)$`,
   'i',
 );
+/**
+ * «C ברביע השלישי» — a point placed in a REGION (#1071).
+ *
+ * A quadrant is not a curve and not a value: it is a pair of inequalities. That makes it D7's SECOND
+ * kind — a branch selector, a filter over configurations the solve already produced — and not the
+ * third, a constraint that removes freedom. A point in the third quadrant is still a 2-DOF point; it
+ * is simply not drawn anywhere else. Lowering it to constraints would make the DOF cue lie, which is
+ * the one thing D7 exists to prevent.
+ *
+ * So it needs no new mechanism: it is two `axis-side` selectors, the ones #1033 built for
+ * «B על החלק החיובי של ציר x», stated at once.
+ */
+const QUADRANT_HE = new RegExp(
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת)?\\s+)?ב-?ה?רביע\\s+(ה?ראשון|ה?שני|ה?שלישי|ה?רביעי)$`,
+);
+const QUADRANT_EN = new RegExp(
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?in\\s+(?:the\\s+)?(first|second|third|fourth)\\s+quadrant$`,
+  'i',
+);
+
+/** Which way each axis points in each quadrant — the only thing the rule has to know. */
+const QUADRANT_SIGNS: Record<string, [boolean, boolean]> = {
+  ראשון: [true, true],
+  שני: [false, true],
+  שלישי: [false, false],
+  רביעי: [true, false],
+  first: [true, true],
+  second: [false, true],
+  third: [false, false],
+  fourth: [true, false],
+};
+
 const ON_AXIS_HE = new RegExp(
   `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת)?\\s+)?על\\s+(?:ה?חלק\\s+(ה?חיובי|ה?שלילי)\\s+של\\s+)?ציר\\s+ה?-?\\s*([xy])$`,
 );
@@ -1106,7 +1161,8 @@ function parseConstraint(line: string): RuleOutcome {
     if (eq && symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
       const cid = `curve-${anonIndex(operand)}`;
       return made([
-        { t: 'curve', id: cid, label: { name: '' }, curve: { eq }, src: line },
+        // NOT stated (#1076): this line exists to put a point on a line, not to draw the line.
+        { t: 'curve', id: cid, label: { name: '' }, curve: { eq }, stated: false, src: line },
         { t: 'declare', id, src: line },
         { t: 'constraint', k: { t: 'on-curve', id, curve: cid }, src: line },
       ]);
@@ -1129,6 +1185,23 @@ function parseConstraint(line: string): RuleOutcome {
     if (!b && !c) return made([{ t: 'right-angle', id: a, src: line }]);
     // Two letters name no angle at all; saying so beats guessing which one was meant.
     return refuse('bad-operand', line);
+  }
+
+  const quad = QUADRANT_HE.exec(line) ?? QUADRANT_EN.exec(line);
+  if (quad) {
+    const [, id, ordSrc] = quad;
+    const ord = ordSrc.toLowerCase().replace(/^ה/, '');
+    const signs = QUADRANT_SIGNS[ord];
+    if (signs) {
+      const [px, py] = signs;
+      return made([
+        // It DECLARES, like every other rule that names a point on something (#1069) — a student
+        // saying where a point is has introduced it.
+        { t: 'declare', id, src: line },
+        { t: 'selector', sel: { kind: 'axis-side', id, axis: 'x', positive: px }, src: line },
+        { t: 'selector', sel: { kind: 'axis-side', id, axis: 'y', positive: py }, src: line },
+      ]);
+    }
   }
 
   const ax = ON_AXIS_HE.exec(line) ?? ON_AXIS_EN.exec(line);
@@ -1248,6 +1321,8 @@ export function parseLine(raw: string): ParseResult {
           id: curve.id,
           label: { name: curve.name, kind: curve.kind },
           curve: { kind: curve.kind, eq },
+          // The student named the curve and gave its equation — this sentence IS the curve.
+          stated: true,
           src: line,
         },
         ...through,
@@ -1335,6 +1410,8 @@ export function parseLine(raw: string): ParseResult {
           id: `curve-${anonIndex(line)}`,
           label: { name: '' },
           curve: { eq: bare },
+          // A bare equation on a line of its own is the student asking for that curve.
+          stated: true,
           src: line,
         },
       ],

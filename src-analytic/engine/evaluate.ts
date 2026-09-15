@@ -30,6 +30,12 @@ export interface FigureCurve {
   id: Id;
   label: CurveLabel;
   curve: NumCurve;
+  /**
+   * #1076 — a curve minted to CARRY a point is knowledge, not figure. It stays here, because the
+   * solve needs it (it is what `on-curve` is measured against) and the data panel names it as the
+   * provenance of the point that rides it. The RENDERER is what leaves it undrawn.
+   */
+  stated: boolean;
 }
 
 /**
@@ -374,6 +380,33 @@ export function evaluate(raw: Construction, seed = 0): Figure {
   const seeded = new Map<Id, Pt>(
     ids.map((id) => [id, { x: freeCoord(seed, id, 0), y: freeCoord(seed, id, 1) }]),
   );
+  /**
+   * A REGION selector SEEDS the point it names, instead of only filtering the result (#1071).
+   *
+   * «C ברביע השלישי» lowers to two `axis-side` selectors, and `derive` looks for a configuration
+   * where every selector holds by advancing the seed. Measured on the operator's own figure, that is
+   * not adequate: one sign holds about half the time, a quadrant a quarter, and **four quadrant
+   * points about one seed in 256** — against 24 tries. The figure was then drawn with the selectors
+   * FALSE and nothing said, which is a figure contradicting its own givens.
+   *
+   * Sample-and-reject was the right mechanism for a BRANCH (#1033: which of two intersections), where
+   * the candidates are enumerable. It is the wrong one for a region, where the answer is a half-plane
+   * and the sampler can simply be told which half. Folding the sign costs nothing, keeps the
+   * magnitude the seed chose — so «הציגו תצורה אחרת» still moves the point, inside its region — and
+   * leaves the solve free to move it afterwards if a constraint says so; the post-hoc check is
+   * unchanged and still has the last word.
+   */
+  for (const sel of c.selectors) {
+    if (sel.kind !== 'axis-side') continue;
+    const at0 = seeded.get(sel.id);
+    if (!at0) continue;
+    const v = sel.axis === 'x' ? at0.x : at0.y;
+    // A coordinate that sampled to zero is in NEITHER half-plane; the selector is strict, so nudge.
+    const mag = Math.abs(v) < 1e-6 ? 1 : Math.abs(v);
+    const want = sel.positive ? mag : -mag;
+    seeded.set(sel.id, sel.axis === 'x' ? { x: want, y: at0.y } : { x: at0.x, y: want });
+  }
+
   const unsatisfied: Constraint[] = [];
   let free = seeded;
 
@@ -442,7 +475,7 @@ export function evaluate(raw: Construction, seed = 0): Figure {
       }
       case 'curve': {
         const res = resolveCurve(o.curve, env);
-        if (res.ok) curves.push({ id: o.id, label: o.label, curve: res.curve });
+        if (res.ok) curves.push({ id: o.id, label: o.label, curve: res.curve, stated: o.stated });
         else vacant.push({ id: o.id, reason: res.reason });
         break;
       }

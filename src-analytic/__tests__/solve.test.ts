@@ -613,3 +613,86 @@ describe('#1069/#1073 — a point on an object, bounded or not by its noun', () 
     expect(Math.abs(d.figure.points.find((p) => p.id === 'B')!.y)).toBeLessThan(1e-6);
   });
 });
+
+describe('#1071 — a point placed in a QUADRANT', () => {
+  /**
+   * Operator, 2026-09-15: *"I want to be able to place a point in a quartile: C ברביע השלישי"*.
+   *
+   * A quadrant is a REGION, so it is D7's second kind — a branch selector — and not the third. The
+   * DOF assertions below are the part that matters: a region consumes no freedom, and a figure that
+   * reported otherwise would be lying about how determined it is.
+   */
+  const SIGNS: Record<string, [number, number]> = {
+    הראשון: [1, 1],
+    השני: [-1, 1],
+    השלישי: [-1, -1],
+    הרביעי: [1, -1],
+  };
+
+  it('places the point in each of the four quadrants, and keeps its two degrees of freedom', () => {
+    for (const [ord, [sx, sy]] of Object.entries(SIGNS)) {
+      const d = derive([`C ברביע ${ord}`], 0);
+      expect(d.faults).toEqual([]);
+      const c = d.figure.points.find((q) => q.id === 'C')!;
+      expect([Math.sign(c.x), Math.sign(c.y)]).toEqual([sx, sy]);
+      expect(reportedDof(d.construction, d.figure.carrierDof)).toBe(2);
+    }
+  });
+
+  it('accepts every phrasing the operator tried, including English', () => {
+    for (const line of [
+      'C ברביע השלישי',
+      'C נמצאת ברביע השלישי',
+      'הנקודה C ברביע השלישי',
+      'נתון C ברביע השלישי',
+      'C is in the third quadrant',
+    ]) {
+      const d = derive([line], 0);
+      expect(d.faults).toEqual([]);
+      const c = d.figure.points.find((q) => q.id === 'C')!;
+      expect([Math.sign(c.x), Math.sign(c.y)]).toEqual([-1, -1]);
+    }
+  });
+
+  it('SEEDS into the region rather than sampling and rejecting — four points, ten seeds', () => {
+    /**
+     * The measurement that changed the design. Sample-and-reject holds one sign about half the time,
+     * a quadrant a quarter, and four quadrant points about one seed in 256 — against 24 tries. The
+     * figure was drawn with the selectors false and NOTHING said, which is the defect this product
+     * exists to prevent. Forty placements, none wrong, is the lock on the answer.
+     */
+    const want: Record<string, [number, number]> = { A: [1, 1], B: [-1, 1], C: [-1, -1], D: [1, -1] };
+    for (let seed = 0; seed < 10; seed += 1) {
+      const d = derive(
+        ['A ברביע הראשון', 'B ברביע השני', 'C ברביע השלישי', 'D ברביע הרביעי'],
+        seed,
+      );
+      expect(d.figure.selectorsOk).toBe(true);
+      for (const [id, signs] of Object.entries(want)) {
+        const q = d.figure.points.find((r) => r.id === id)!;
+        expect([Math.sign(q.x), Math.sign(q.y)]).toEqual(signs);
+      }
+    }
+  });
+
+  it('still MOVES the point between configurations, inside its region (ADR-052)', () => {
+    const a = derive(['C ברביע הראשון'], 0).figure.points[0];
+    const b = derive(['C ברביע הראשון'], 1).figure.points[0];
+    expect([a.x, a.y]).not.toEqual([b.x, b.y]);
+  });
+
+  it('refuses a point already placed somewhere else, in either order', () => {
+    expect(derive(['C(-3,4)', 'C ברביע הראשון'], 0).faults.map((f) => f.code)).toEqual(['unsatisfiable']);
+    expect(derive(['C ברביע הראשון', 'C(-3,4)'], 0).faults.map((f) => f.code)).toEqual(['unsatisfiable']);
+  });
+
+  it('leaves #1033 working — the half-axis it generalises', () => {
+    for (let seed = 0; seed < 5; seed += 1) {
+      const d = derive(['B על החלק החיובי של ציר x'], seed);
+      expect(d.faults).toEqual([]);
+      const b = d.figure.points.find((q) => q.id === 'B')!;
+      expect(b.x).toBeGreaterThan(0);
+      expect(Math.abs(b.y)).toBeLessThan(1e-6);
+    }
+  });
+});

@@ -182,6 +182,18 @@ export function App() {
      * It costs nothing extra: both derivations already exist — `d` is the current figure and `trial`
      * is the dry run the submit path has always done.
      */
+    /**
+     * A line that PROMOTED a carrier to a stated curve (#1076) changes no count — the object was
+     * already there — and consumes no freedom, so the count test alone would call «y=x» after
+     * «נקודה B על הישר y=x» a given that already follows, while the canvas visibly gained a line.
+     * `applyFact` already answered this: promotion reports `created`. Reading its answer is the
+     * same move #1045 made, and the reason both tests live here rather than duplicating each other.
+     */
+    if (trial.outcomes[lines.length] === 'created') {
+      recordLine(line);
+      setDraft('');
+      return;
+    }
     const gained =
       trial.construction.objects.length - d.construction.objects.length +
       (trial.construction.params.length - d.construction.params.length) +
