@@ -655,3 +655,12 @@ nothing.
 **Still open:** labels for the other constructions. Only the centroid's 2:1 is ruled; an altitude's
 right angle probably wants a mark rather than text, and the others may want nothing at all.
 See [ADR-AG-014](06c-decisions-analytic.md#adr-ag-014).
+
+**R46 — a free magnitude is sampled across everything the student left open, SIGN INCLUDED**
+([ADR-AG-022](06c-decisions-analytic.md#adr-ag-022)). An unbounded parameter that only ever draws
+positive asserts `a > 0`, which the question never gave — the same cardinal sin as drawing a figure
+that violates a given, one step removed ([ADR-052](06-decisions.md#adr-052)). A *starting* value may be
+the familiar one, so seed 0 may draw the right-opening parabola; every later configuration must be able
+to reach the other sign, and «הציגו תצורה אחרת» must get there in a few presses rather than by luck.
+Sampling must still stay away from a degenerate value (`a = 0` collapses `y²=2ax` to a doubled axis),
+which is vacancy rather than a configuration worth showing.

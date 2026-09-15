@@ -94,6 +94,13 @@ function freeCoord(seed: number, id: string, axis: 0 | 1): number {
 }
 
 /** A tiny deterministic hash → [0,1). Same seed, same figure; different seed, different figure. */
+/**
+ * Offsets the seed onto a second, disjoint jitter stream so an unbounded parameter's SIGN is drawn
+ * independently of its magnitude (#1019). Large enough that no real seed count can reach it, so the
+ * two streams cannot alias.
+ */
+const SIGN_STREAM = 100003;
+
 function jitter(seed: number, salt: number): number {
   const x = Math.sin(seed * 127.1 + salt * 311.7) * 43758.5453;
   return x - Math.floor(x);
@@ -114,7 +121,30 @@ export function sampleParam(d: Domain, seed: number, salt: number): number {
   } else if (d.max !== undefined) {
     v = d.max - 1 - 3 * u;
   } else {
-    v = 1 + 3 * u;
+    /**
+     * UNBOUNDED — the only branch that was inventing a bound (#1019).
+     *
+     * `1 + 3 * u` is always in `[1, 4)`, so a parameter nobody bounded was asserted positive at every
+     * seed: `y² = 2ax` drew a right-opening parabola in every configuration and nothing had said it
+     * opens right. That is [ADR-052](../../docs/06-decisions.md#adr-052)'s cardinal sin — a default
+     * value masquerading as a given. The bounded and half-bounded branches above are correct; they
+     * respect what was stated, and this one did not.
+     *
+     * **Seed 0 stays positive.** ADR-052 permits a default as a *starting* point so the figure can be
+     * drawn, and the familiar right-opening parabola is the better first draw for a student. What it
+     * forbids is a default that never moves — so every later configuration may take either sign, and
+     * «הציגו תצורה אחרת» reaches the other one.
+     *
+     * The sign is drawn independently per parameter (the salt rides along), so two unbounded symbols
+     * do not march in lockstep and a figure with both can reach all four sign combinations.
+     *
+     * The magnitude stays in `[1, 4)`, which keeps every configuration away from the degenerate `0`
+     * where `y²=2px` collapses to a doubled axis — the documented `vacant`, and the one value that
+     * would be reported as "not at this value" rather than drawn.
+     */
+    const magnitude = 1 + 3 * u;
+    const negative = seed !== 0 && jitter(seed + SIGN_STREAM, salt) < 0.5;
+    v = negative ? -magnitude : magnitude;
   }
   for (let guard = 0; guard < 8 && !inDomain(d, v); guard += 1) v += 0.37;
   return v;

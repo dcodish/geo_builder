@@ -1101,3 +1101,50 @@ may *type* (#1040) — the same word in both directions.
 already were ([ADR-AG-014](#adr-ag-014)): `B(x_B, 0)` lands on the x-axis and `D(0, 3)` on its own
 segment, and both were muddy without it. [ADR-AG-010](#adr-ag-010) R34 makes that a design condition
 rather than a polish item.
+
+## ADR-AG-022 — An unbounded parameter varies in SIGN; seed 0 may still be the familiar draw (#1019)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R46. **Design:** none (internal to
+`engine/evaluate.ts`'s sampler).
+
+**Context.** `sampleParam`'s unbounded branch was `v = 1 + 3 * u` — always in `[1, 4)`. Measured over
+seeds 0–39: **min 1.115, max 3.965, not one negative value.** So `y² = 2ax` drew a right-opening
+parabola at every configuration, and nothing in the question had said it opens right. The bounded and
+half-bounded branches were correct; they respect what was stated. Only the unbounded branch invented a
+bound, which is [ADR-052](06-decisions.md#adr-052)'s cardinal sin — a **default masquerading as a
+given** — and the conformance smell that ADR names exactly: a value counted as free and never actually
+sampled across its range.
+
+It is pre-existing, and [ADR-AG-011](#adr-ag-011) (B1) widened its blast radius rather than causing it:
+with the register fed by the objects' own expressions, every undeclared symbol in every equation now
+reaches this branch, where before it was left unbound and the object silently drew nothing (#1014).
+
+**Decision.**
+
+1. **The magnitude stays in `[1, 4)` and the SIGN varies.** Keeping `|v| ≥ 1` is what holds every
+   configuration away from the degenerate `0`, where `y²=2px` collapses to a doubled axis — the
+   documented `vacant`, which is "not at this value" rather than an error.
+2. **Seed 0 stays positive.** ADR-052 permits a default as a *starting* point so the figure can be
+   drawn at all, and the right-opening parabola is the better first draw for a student. What ADR-052
+   forbids is a default that never moves — so every later configuration may take either sign, and
+   «הציגו תצורה אחרת» reaches the other one within a few presses (measured: seed 2).
+3. **The sign is drawn per parameter, on a disjoint jitter stream.** Two unbounded symbols must not
+   march in lockstep, or a figure with both could never reach two of its four sign combinations.
+   Measured: two parameters agree in sign on 10 of 20 seeds.
+
+**A correction to the issue's own framing, found by measuring.** #1019 expected this fix to "change
+what every existing figure looks like at seed 0", and deferred it out of B1 on that basis. It does not:
+seed 0's value is byte-identical before and after (`3.4579351904…`), because the sign decision is
+skipped at seed 0 entirely. The play-visible change is confined to the *later* configurations, which is
+where it was missing. The deferral was still right — this deserved its own decision — but the cost it
+was priced at was not the cost.
+
+**R46 is the general statement**, because this branch will not be the last sampler: **a free magnitude
+must be sampled across everything the student left open, sign included.** Bounding it to what looks
+familiar is the same defect as drawing a figure that violates a given, one step removed.
+
+**Consequences.** `src-analytic` 194 → 201 tests, including the seed-0 lock (the familiar draw is
+allowed to be first), the both-signs-within-six-seeds lock, the away-from-zero lock, the independence
+lock, and controls asserting the three bounded branches are untouched.
