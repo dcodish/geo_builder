@@ -517,3 +517,99 @@ describe('#1066 — «משוואת הישר AB היא y=2x» constrains A and B'
     expect(d.figure.points).toEqual([]);
   });
 });
+
+/**
+ * #1069 + #1073 — a point ON AN OBJECT, the product's defining 1-DOF carrier.
+ *
+ * The root CLAUDE.md describes Geo Builder as the tool where a student says *"point G on AD"* and G
+ * slides along AD. `carriers.ts` has named the `on-curve` family since slice A and left it empty; the
+ * operator hit the gap three times in one session before it was built.
+ *
+ * **Operator ruling, 2026-09-15: the NOUN decides whether the carrier is bounded.** «צלע» and «קטע»
+ * carry the bound, «ישר» does not — and the DOF is 1 either way, because a bound is a REGION and
+ * consumes no freedom. That split is what these cases are really testing.
+ */
+describe('#1069/#1073 — a point on an object, bounded or not by its noun', () => {
+  // B(10,0) C(4,8): |BC| = 10, so |BD| = 18 puts D well beyond C on the same line.
+  const TRI = ['A(0,0)', 'B(10,0)', 'C(4,8)', 'משולש ABC'];
+  const along = (d: ReturnType<typeof derive>) => {
+    const D = d.figure.points.find((p) => p.id === 'D')!;
+    const ux = 4 - 10;
+    const uy = 8 - 0;
+    return ((D.x - 10) * ux + (D.y - 0) * uy) / (ux * ux + uy * uy);
+  };
+
+  it('accepts every phrasing the operator wrote', () => {
+    for (const line of [
+      'נקודה D נמצאת על הצלע BC',
+      'D נמצאת על הצלע BC',
+      'D על הצלע BC',
+      'הנקודה D נמצאת על צלע BC',
+      'D נמצא על הצלע BC',
+      'point D is on side BC',
+      'D נמצאת על הקטע BC',
+      'D על הקטע BC',
+      'point D is on segment BC',
+      'D נמצאת על הישר BC',
+    ]) {
+      expect(parseLine(line).ok, line).toBe(true);
+    }
+  });
+
+  it('places the point ON the object, with exactly ONE degree of freedom', () => {
+    // 1, not 0 and not 2: the carrier the product is named after.
+    const d = derive([...TRI, 'D על הצלע BC'], 0);
+    expect(d.faults).toEqual([]);
+    expect(d.figure.carrierDof).toBe(1);
+    const t = along(d);
+    expect(t).toBeGreaterThanOrEqual(0);
+    expect(t).toBeLessThanOrEqual(1);
+  });
+
+  it('THE RULING: «הישר» permits a position beyond the endpoints, «הצלע» does not', () => {
+    // The one observable difference between the two sentences, and the case most likely to be lost
+    // if the bounded version is built first and the unbounded one inherits its selector.
+    const onLine = derive([...TRI, 'D על הישר BC', 'BD = 18'], 0);
+    expect(onLine.faults).toEqual([]);
+    expect(along(onLine)).toBeGreaterThan(1); // past C, and allowed
+
+    const onSide = derive([...TRI, 'D על הצלע BC', 'BD = 18'], 0);
+    expect(onSide.faults.map((f) => f.code)).toContain('unsatisfiable');
+  });
+
+  it('and both accept a position that IS between them', () => {
+    for (const noun of ['הישר', 'הצלע']) {
+      const d = derive([...TRI, `D על ${noun} BC`, 'BD = 5'], 0);
+      expect(d.faults, noun).toEqual([]);
+      expect(along(d), noun).toBeCloseTo(0.5, 6);
+    }
+  });
+
+  it('takes a line given INLINE by its equation, and one given by name', () => {
+    const inline = derive(['נקודה B על הישר y=x'], 0);
+    expect(inline.faults).toEqual([]);
+    const b = inline.figure.points.find((p) => p.id === 'B')!;
+    expect(Math.abs(b.y - b.x)).toBeLessThan(1e-6);
+    expect(inline.figure.carrierDof).toBe(1);
+
+    const named = derive(['נתון הישר l1: y=x', 'P נמצאת על הישר l1'], 0);
+    expect(named.faults).toEqual([]);
+    const p = named.figure.points.find((q) => q.id === 'P')!;
+    expect(Math.abs(p.y - p.x)).toBeLessThan(1e-6);
+  });
+
+  it('refuses a point already placed off the object', () => {
+    const d = derive([...TRI, 'D(99,99)', 'D על הצלע BC'], 0);
+    expect(d.faults.map((f) => f.code)).toContain('unsatisfiable');
+  });
+
+  it('the AXIS sentence introduces its point too — one sentence shape, one behaviour', () => {
+    // It did not, so «B נמצא על ציר ה-x» answered unknown-reference while «B נמצא על הישר y=x»
+    // introduced B. Two rules for one sentence shape is how a tool comes to answer one of them
+    // differently.
+    const d = derive(['B נמצא על ציר ה-x'], 0);
+    expect(d.faults).toEqual([]);
+    expect(d.figure.carrierDof).toBe(1);
+    expect(Math.abs(d.figure.points.find((p) => p.id === 'B')!.y)).toBeLessThan(1e-6);
+  });
+});

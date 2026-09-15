@@ -7,6 +7,7 @@
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
 import { fold, type ApplyError } from './apply';
+import { reportedDof } from './carriers';
 import { evaluate, viewBox, type Figure } from './evaluate';
 import type { Box } from './curves';
 import { parseLine, type ParseFailure } from '../parser/parseAnalytic';
@@ -83,6 +84,32 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   for (let extra = 1; extra <= 24 && !figure.selectorsOk; extra += 1) {
     const candidate = evaluate(construction, seed + extra);
     if (candidate.selectorsOk) figure = candidate;
+  }
+
+  /**
+   * A selector that can NEVER hold is reported — the docblock above has always said so, and nothing
+   * did it (#1069).
+   *
+   * «D על הצלע BC» with «BD = 18» on a 10-unit side is impossible: `D` lands beyond `C`, the
+   * betweenness selector is false, and the figure was drawn anyway with `D` outside the side the
+   * student named. That is a figure contradicting its own givens, which is the one thing this product
+   * may not do.
+   *
+   * The predicate is #1058's: **a figure with no freedom left has no other configuration to try**, so
+   * a failing selector there is a permanent fact rather than an unlucky seed. When the figure still
+   * has freedom, 24 exhausted seeds are evidence and not proof — reporting then could refuse a
+   * satisfiable figure, which is the opposite defect. That half is
+   * [#1071](https://github.com/dcodish/geo_builder/issues/1071)'s measurement question and is
+   * deliberately left alone here.
+   */
+  if (!figure.selectorsOk && reportedDof(construction, figure.carrierDof) === 0) {
+    const blamed = new Set<number>();
+    facts.forEach((f, i) => {
+      if (f.t === 'selector') blamed.add(owner[i]);
+    });
+    for (const index of blamed) {
+      faults.push({ index, code: 'unsatisfiable', detail: lines[index] });
+    }
   }
 
   /**

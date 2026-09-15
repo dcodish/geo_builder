@@ -149,7 +149,7 @@ export type Fact =
    * every given. A selector consumes NO freedom — treating it as an equation would report "no valid
    * configuration" on a perfectly good figure, which is the bug D7 exists to prevent.
    */
-  | (FactBase & { t: 'selector'; id: Id; axis: 'x' | 'y'; positive: boolean })
+  | (FactBase & { t: 'selector'; sel: Selector })
   /**
    * INTRODUCE a point without placing it — the declaration half of the distinction #1017 draws.
    *
@@ -248,11 +248,26 @@ export interface Construction {
   selectors: Selector[];
 }
 
-export interface Selector {
-  id: Id;
-  axis: 'x' | 'y';
-  positive: boolean;
-}
+/**
+ * A post-solve FILTER over configurations — D7 kind 2.
+ *
+ * A selector consumes no freedom: it does not pin a point, it rules out draws the student did not
+ * mean. That is why it is not a constraint — treating one as a constraint would drop the DOF cue by
+ * one and report a figure as more determined than it is.
+ *
+ * Two members, and both are REGIONS: a half-plane, and the span between two points (#1073).
+ */
+export type Selector =
+  /** `B על החלק החיובי של ציר x` — the point is on one side of an axis. */
+  | { kind: 'axis-side'; id: Id; axis: 'x' | 'y'; positive: boolean }
+  /**
+   * `D על הצלע BC` — the point lies BETWEEN `a` and `b`, not merely on their line.
+   *
+   * Operator ruling, 2026-09-15: «צלע» and «קטע» carry this bound and «ישר» does not. **The noun
+   * decides**, and the DOF is 1 either way — only the range differs, which is why this is a selector
+   * and the collinearity beside it is the constraint.
+   */
+  | { kind: 'between'; id: Id; a: Id; b: Id };
 
 export const EMPTY_CONSTRUCTION: Construction = {
   params: [],

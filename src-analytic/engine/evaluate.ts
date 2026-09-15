@@ -302,8 +302,27 @@ function selectorsHold(c: Construction, at: Map<Id, Pt>): boolean {
   return c.selectors.every((s) => {
     const p = at.get(s.id);
     if (!p) return true; // a selector about an absent point judges nothing
-    const v = s.axis === 'x' ? p.x : p.y;
-    return s.positive ? v > 0 : v < 0;
+    if (s.kind === 'axis-side') {
+      const v = s.axis === 'x' ? p.x : p.y;
+      return s.positive ? v > 0 : v < 0;
+    }
+    const a = at.get(s.a);
+    const b = at.get(s.b);
+    if (!a || !b) return true;
+    /**
+     * BETWEEN, as the projection parameter along `ab` (#1073).
+     *
+     * The interval is CLOSED, for the same reason [ADR-AG-021] closed the diagonal meet: an endpoint
+     * is a legitimate position on a side, and leaving that to a tolerance would make the ruling
+     * depend on an epsilon. Collinearity is the CONSTRAINT's job — this judges only the range, so a
+     * point off the line is caught by the residual rather than silently filtered here.
+     */
+    const ux = b.x - a.x;
+    const uy = b.y - a.y;
+    const nn = ux * ux + uy * uy;
+    if (nn < 1e-24) return true;
+    const t = ((p.x - a.x) * ux + (p.y - a.y) * uy) / nn;
+    return t >= -1e-9 && t <= 1 + 1e-9;
   });
 }
 

@@ -451,16 +451,21 @@ describe('#1068 — English prose containing = is not an equation', () => {
   };
 
   it('declines prose rather than drawing it', () => {
-    for (const line of [
-      'P is on the line y=x',
-      'the point P is on the line y=x',
-      'P lies on y=x',
-      'my answer = x',
-      'the answer is y = 2x',
-    ]) {
-      // `not-handled` on purpose: a sentence with words is not a MALFORMED equation, it is a sentence
-      // this rule has no claim on, and the LLM seam is what it should reach.
+    /**
+     * **Three of this case's original five lines have since become legitimate sentences**, and that is
+     * the right outcome rather than a regression. «P is on the line y=x» was prose only because
+     * nothing could read it; #1069 built the point-on-object rule, so it now says what it means.
+     *
+     * What #1068 protects is narrower and still holds: the BARE-EQUATION branch must never turn an
+     * English sentence into a curve. The lines below have no rule that claims them, and they must stay
+     * unclaimed — `not-handled` reaches the LLM seam, which is what that seam is for.
+     */
+    for (const line of ['my answer = x', 'the answer is y = 2x', 'x and y are equal']) {
       expect(kindOf(line), line).toBe('not-handled');
+    }
+    // And the three that flipped are now a POINT ON A LINE, not a curve minted out of prose.
+    for (const line of ['P is on the line y=x', 'the point P is on the line y=x', 'P lies on y=x']) {
+      expect(kindOf(line), line).toBe('ok:curve'); // the line object, followed by the incidence
     }
   });
 

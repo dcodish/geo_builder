@@ -634,6 +634,22 @@ const CEVIAN_EN = new RegExp(
 );
 
 /** `B נמצא על ציר ה-x` / `B על החלק החיובי של ציר x` — incidence, optionally with a side selector. */
+/**
+ * `D על הצלע BC` · `נקודה D נמצאת על הקטע BC` · `B על הישר y=x` · `P נמצאת על הישר l1`.
+ *
+ * The morphology is written out rather than stemmed — «נמצא» ends differently for each gender and
+ * number, and a gate admitting one spelling is a silent drop, which is this tree's most productive bug
+ * class. The NOUN is captured because the operator's ruling makes it load-bearing: it decides whether
+ * the carrier is bounded.
+ */
+const ON_OBJECT_HE = new RegExp(
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+(ה?(?:צלע|קטע|ישר))?\\s*(.+)$`,
+);
+const ON_OBJECT_EN = new RegExp(
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+)?(side|segment|line)?\\s*(.+)$`,
+  'i',
+);
+
 const ON_AXIS_HE = new RegExp(
   `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת)?\\s+)?על\\s+(?:ה?חלק\\s+(ה?חיובי|ה?שלילי)\\s+של\\s+)?ציר\\s+ה?-?\\s*([xy])$`,
 );
@@ -804,6 +820,76 @@ function parseConstraint(line: string): RuleOutcome {
     ]);
   }
 
+  /**
+   * A point ON AN OBJECT — «נקודה D נמצאת על הצלע BC», «B על הישר y=x» (#1069, #1073).
+   *
+   * **The product's defining 1-DOF carrier**, and this tree never had it. The root CLAUDE.md describes
+   * Geo Builder as the tool where a student says *"point G on AD"* and G slides along AD;
+   * `carriers.ts` has named the `on-curve` family since slice A and left it empty.
+   *
+   * **Operator ruling, 2026-09-15: the NOUN decides whether the carrier is bounded.**
+   *
+   *  - «על הצלע BC» / «על הקטע BC» — between `B` and `C`;
+   *  - «על הישר BC» — anywhere on the infinite line, including beyond either end.
+   *
+   * Either way the point has ONE degree of freedom: the bound is a REGION and consumes none, so it
+   * rides as a `between` selector beside the collinearity constraint rather than inside it. A bounded
+   * reading that dropped the DOF to 0 would be wrong in a way the cue would advertise.
+   *
+   * The operand vocabulary is `direction()`'s, not a second list of ways to name a segment — the same
+   * resolver the relations use ([ADR-AG-024](../../docs/06c-decisions-analytic.md#adr-ag-024)), so
+   * «הצלע AB» cannot come to mean one thing here and another there.
+   */
+  const on = ON_OBJECT_HE.exec(line) ?? ON_OBJECT_EN.exec(line);
+  if (on) {
+    const [, id, noun, operandRaw] = on;
+    const operand = trim(operandRaw);
+    const bounded = /צלע|קטע|side|segment/i.test(noun ?? '');
+    const dir = direction(`${noun ?? ''} ${operand}`.trim()) ?? direction(operand);
+
+    if (dir?.k === 'points') {
+      const facts: Fact[] = [
+        { t: 'declare', id, src: line },
+        { t: 'constraint', k: { t: 'on-line-2pt', id, a: dir.a, b: dir.b }, src: line },
+      ];
+      // The bound, and ONLY when the noun carried one — the operator's ruling.
+      if (bounded) {
+        facts.push({ t: 'selector', sel: { kind: 'between', id, a: dir.a, b: dir.b }, src: line });
+      }
+      return made(facts);
+    }
+
+    if (dir?.k === 'curve') {
+      return made([
+        { t: 'declare', id, src: line },
+        { t: 'constraint', k: { t: 'on-curve', id, curve: dir.id }, src: line },
+      ]);
+    }
+
+    /**
+     * The object given INLINE by its equation — «B על הישר y=x».
+     *
+     * The line is minted as an object so it draws and the panel carries it, exactly as #1066 chose for
+     * «משוואת הישר AB היא y=2x». Its id is content-derived, so stating the same line twice — here and
+     * in a sentence of its own — is ONE object (ADR-AG-023).
+     *
+     * The same plane-variables test the bare-equation branch uses, for the same reason: without it
+     * «P is on the line to nowhere» would mint a curve out of prose (#1068).
+     */
+    const eq = operand.includes('=') ? equationExpr(operand) : null;
+    if (eq && symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
+      const cid = `curve-${anonIndex(operand)}`;
+      return made([
+        { t: 'curve', id: cid, label: { name: '' }, curve: { eq }, src: line },
+        { t: 'declare', id, src: line },
+        { t: 'constraint', k: { t: 'on-curve', id, curve: cid }, src: line },
+      ]);
+    }
+    // An AXIS operand belongs to the rule below, which already owns that sentence; anything else is
+    // not a thing a point can be on. Fall through rather than returning — a `return null` here would
+    // exit `parseConstraint` entirely and skip the area, cevian and axis rules that follow.
+  }
+
   const ax = ON_AXIS_HE.exec(line) ?? ON_AXIS_EN.exec(line);
   if (ax) {
     const [, id, sideSrc, axis] = ax;
@@ -814,10 +900,27 @@ function parseConstraint(line: string): RuleOutcome {
     const k: Constraint = onX
       ? { t: 'on-line', id, a: 0, b: 1, c: 0 }
       : { t: 'on-line', id, a: 1, b: 0, c: 0 };
-    const facts: Fact[] = [{ t: 'constraint', k, src: line }];
+    /**
+     * The axis rule DECLARES its point too, as the general on-object rule above does (#1069).
+     *
+     * It did not, so «B נמצא על ציר ה-x» with no `B` yet answered `unknown-reference` while
+     * «B נמצא על הישר y=x» introduced it — the same sentence shape behaving two ways, which is exactly
+     * the drift #1069 warned about in keeping two rules for one sentence. The operator's #1066 ruling
+     * settles which way: a sentence that NAMES a point on an object introduces it, with the freedom the
+     * object leaves it. A `declare` for a point that already exists is absorbed, so nothing that worked
+     * before changes.
+     */
+    const facts: Fact[] = [
+      { t: 'declare', id, src: line },
+      { t: 'constraint', k, src: line },
+    ];
     if (sideSrc) {
       const positive = /חיובי|positive/i.test(sideSrc);
-      facts.push({ t: 'selector', id, axis: onX ? 'x' : 'y', positive, src: line });
+      facts.push({
+        t: 'selector',
+        sel: { kind: 'axis-side', id, axis: onX ? 'x' : 'y', positive },
+        src: line,
+      });
     }
     return made(facts);
   }

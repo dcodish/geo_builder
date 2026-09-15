@@ -755,3 +755,12 @@ panel when it is knowledge, and `—` when it still moves. A length the student'
 additionally drawn **on the segment**, because it is part of their question; a length the tool derived
 is not, because it is an answer. A length stated in terms of a free parameter is a given and is **not a
 number**, so it labels nothing — printing one sample of it would assert a value the question never gave.
+
+**R53 — a point can be placed ON an object, and the NOUN says whether that is bounded**
+([ADR-AG-029](06c-decisions-analytic.md#adr-ag-029)). «D על הצלע BC» and «D על הקטע BC» put `D` between
+`B` and `C`; «D על הישר BC» puts it anywhere on their line, including beyond either end. Either way `D`
+has **one degree of freedom** and moves along the object under «הציגו תצורה אחרת» — a bound is a region
+and consumes no freedom. The object may be a side, a segment, a named line, a line given inline by its
+equation, or an axis, and all of them are one sentence with one resolver. A point already placed off the
+object is refused, naming the statement; a bound that can never be met on a determined figure is
+reported rather than drawn around.

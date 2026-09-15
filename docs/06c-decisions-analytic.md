@@ -1795,3 +1795,82 @@ exists somewhere. The panel's lengths section shares `isKnowledge` with the coor
 rows, so all three answer the same question the same way — and when the measuring lane
 ([#1027](https://github.com/dcodish/geo_builder/issues/1027)) lands, «מה אורך AB» must read this same
 value or the tool could report a length two ways.
+
+## ADR-AG-029 — The point-on-object carrier, and the NOUN that bounds it (#1069 #1073)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R53. **Design:**
+[04c](04c-design-analytic.md) "A point on an object".
+
+**Context.** The root [CLAUDE.md](../CLAUDE.md) describes what this product IS:
+
+> a student adds information incrementally — "square ABCD" → **"point G on AD"** … classified by degrees
+> of freedom — free point (2), **point-on-object (1, the parameter that makes "G on AD"
+> representable)**, derived point (0)
+
+`carriers.ts` named the family in slice A and left it empty: *"a point free on a curve (1), an
+unanchored vertex (2)"*. The unanchored vertex arrived in #1017. **The point on an object never did**,
+and the operator hit the gap three times in one session — «P על הישר y=x», «D על הצלע BC», «נקודה B על
+הישר y=x» — before it was built. Measured: 0 of 12 phrasings.
+
+**The ruling that shapes it.** Operator, 2026-09-15:
+
+> for D - we need to separate the cases. D על הצלע BC or D על הקטע BC means is between B and C.
+> D על הישר BC means anywhere on the line
+
+**The noun decides whether the carrier is bounded**, and the consequence is the design:
+
+| sentence | lowers to | DOF |
+| --- | --- | --- |
+| «D על הישר BC» | `on-line-2pt(D, B, C)` | **1** |
+| «D על הצלע BC» / «על הקטע BC» | the same, **plus** a `between` selector | **1** |
+| «B על הישר y=x» | the line minted from its equation, + `on-curve` | **1** |
+| «P על הישר ℓ1» | `on-curve(P, line-ℓ1)` | **1** |
+
+**One degree of freedom in every row, and that is the point.** A bound is a REGION — D7 kind 2 — and
+consumes no freedom. Folding it into the constraint would drop the cue to 0 and report a figure as more
+determined than it is, which is the defect D7 exists to prevent. So `Selector` becomes a union: the
+existing half-plane, and the span between two points.
+
+**Decisions.**
+
+1. **`on-line-2pt` gets its own residual** rather than reusing the `parallel` relation on `BD ∥ BC`,
+   which is the same algebra. The relation normalises both operands to unit vectors, so a `D` sitting
+   exactly on `B` has no direction and the relation answers *"cannot be judged"* — while an incidence
+   must still HOLD there, and an endpoint is a legitimate position on a side. Same cross product,
+   different degenerate behaviour.
+2. **The betweenness interval is CLOSED**, for the reason [ADR-AG-021](#adr-ag-021) closed the diagonal
+   meet: an endpoint is a real position, and leaving that to a tolerance makes the ruling depend on an
+   epsilon.
+3. **The operand vocabulary is `direction()`'s**, not a second list of ways to name a segment. That
+   resolver exists ([ADR-AG-024](#adr-ag-024)) precisely so «הצלע AB» cannot come to mean one thing in a
+   relation and another in an incidence.
+4. **An inline equation mints the line as an object**, content-addressed, so it draws, the panel carries
+   it, and stating the same line again is one object ([ADR-AG-023](#adr-ag-023)).
+
+**Two defects found by measuring rather than by the plan.**
+
+**A selector that can NEVER hold was silent.** «D על הצלע BC» with «BD = 18» on a 10-unit side places
+`D` beyond `C`; the selector goes false, the seed search finds nothing, and the figure was drawn anyway
+with `D` outside the side the student named — **a figure contradicting its own givens**. `derive`'s own
+docblock had said since slice A that *"if «החלק החיובי» can never hold, that IS worth reporting"*, and
+nothing reported it. Now it does, under #1058's predicate: **a figure with no freedom has no other
+configuration to try**, so a failing selector there is permanent. The under-determined case — 24
+exhausted seeds as evidence rather than proof — is deliberately left to
+[#1071](https://github.com/dcodish/geo_builder/issues/1071)'s measurement question, because refusing a
+satisfiable figure is the opposite defect.
+
+**The axis rule did not introduce its point, and the new rule did.** «B נמצא על ציר ה-x» with no `B`
+answered `unknown-reference` while «B נמצא על הישר y=x» introduced it — the same sentence shape behaving
+two ways. The operator's #1066 ruling settles it: a sentence that NAMES a point on an object introduces
+it with the freedom the object leaves. Folded in, so there is one behaviour rather than two rules
+drifting apart — which is exactly what #1069's plan warned about in keeping the axis rule separate.
+
+**One lock flipped, correctly.** [ADR-AG-027](#adr-ag-027)'s prose case asserted «P is on the line y=x»
+was `not-handled`. It was prose only because nothing could read it; now it says what it means. The case
+keeps the three lines that are still genuinely prose and asserts the three that flipped.
+
+**Consequences.** `src-analytic` 318 → 325 tests. The `on-curve` carrier family finally has members, and
+[#1046](https://github.com/dcodish/geo_builder/issues/1046)'s `P(t,t)` — a student improvising around
+this gap — is now a notation question rather than the only way to say the thing.

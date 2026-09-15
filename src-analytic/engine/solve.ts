@@ -103,7 +103,22 @@ export type Constraint =
    * It is the first member of the `on-curve` carrier family `carriers.ts` named in slice A and
    * left empty.
    */
-  | { t: 'on-curve'; id: Id; curve: Id };
+  | { t: 'on-curve'; id: Id; curve: Id }
+  /**
+   * `D` is collinear with `a` and `b` — «D על הישר BC», «D על הצלע BC» (#1069, #1073).
+   *
+   * The BOUNDED reading («צלע», «קטע») is this constraint **plus a `between` selector**: the
+   * collinearity is what consumes the degree of freedom, and the bound is a region that consumes
+   * none. Splitting them that way is what keeps the DOF cue honest — a point on a side has ONE
+   * degree of freedom whether or not it is bounded.
+   *
+   * Its own residual rather than the `parallel` relation on `aD ∥ ab`, which is the same algebra:
+   * the relation normalises both operands to unit vectors, so a `D` sitting exactly on `a` has no
+   * direction and the relation answers "cannot be judged" — while an incidence must still HOLD
+   * there. Same cross product, different degenerate behaviour, and the endpoint is a legitimate
+   * position on a side.
+   */
+  | { t: 'on-line-2pt'; id: Id; a: Id; b: Id };
 
 /** Which points a constraint references — the solver's map from constraints to movable carriers. */
 export function constraintRefs(k: Constraint): Id[] {
@@ -126,6 +141,8 @@ export function constraintRefs(k: Constraint): Id[] {
       return [...lengthRefs(k.left), ...lengthRefs(k.right)];
     case 'on-curve':
       return [k.id];
+    case 'on-line-2pt':
+      return [k.id, k.a, k.b];
     default: {
       const unreferenced: never = k;
       throw new Error(`constraint declares no refs: ${JSON.stringify(unreferenced)}`);
@@ -154,6 +171,8 @@ export function describeConstraint(k: Constraint): string {
       return `${describeLengthExpr(k.left)} = ${describeLengthExpr(k.right)}`;
     case 'on-curve':
       return `${k.id} על ${k.curve}`;
+    case 'on-line-2pt':
+      return `${k.id} על ${k.a}${k.b}`;
     default: {
       const undescribed: never = k;
       throw new Error(`constraint has no description: ${JSON.stringify(undescribed)}`);
@@ -360,6 +379,17 @@ export function residual(
        * line" and "does this line pass through this point" one answer rather than two.
        */
       return [curveResidual(c, p[0].x, p[0].y)];
+    }
+    case 'on-line-2pt': {
+      const [d, a, b] = p;
+      const ux = b.x - a.x;
+      const uy = b.y - a.y;
+      const n = Math.hypot(ux, uy);
+      if (n < 1e-12) return null; // the two points coincide: they name no line to be on
+      // The perpendicular distance from `d` to the line through `a` and `b` — the cross product over
+      // the base length. Zero exactly on the line, and a true distance, so it is comparable with
+      // every other residual here without further scaling.
+      return [((d.x - a.x) * uy - (d.y - a.y) * ux) / n];
     }
     default: {
       const unmeasured: never = k;

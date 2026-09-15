@@ -329,18 +329,27 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
 
     /** A selector names a point and constrains nothing — it filters configurations after the solve. */
     case 'selector': {
-      const o = objectById(c, f.id);
-      if (!o || !isPositional(o)) {
-        return { ok: false, error: { code: 'unknown-reference', detail: f.id } };
+      /**
+       * Every point the selector names must exist — the subject, and for a `between` selector the two
+       * endpoints it is measured against (#1073). A selector that silently judged nothing because one
+       * of its points was missing would be a given that vanished.
+       */
+      const refs =
+        f.sel.kind === 'axis-side' ? [f.sel.id] : [f.sel.id, f.sel.a, f.sel.b];
+      for (const id of refs) {
+        const o = objectById(c, id);
+        if (!o || !isPositional(o)) {
+          return { ok: false, error: { code: 'unknown-reference', detail: id } };
+        }
       }
-      const dup = c.selectors.some(
-        (s) => s.id === f.id && s.axis === f.axis && s.positive === f.positive,
-      );
+      // Compared structurally: the union's members have different shapes, and a field-by-field test
+      // would have to be extended by hand for each new kind — the drift ADR-043 names.
+      const dup = c.selectors.some((s) => JSON.stringify(s) === JSON.stringify(f.sel));
       if (dup) return { ok: true, effect: 'known', next: c };
       return {
         ok: true,
         effect: 'created',
-        next: { ...c, selectors: [...c.selectors, { id: f.id, axis: f.axis, positive: f.positive }] },
+        next: { ...c, selectors: [...c.selectors, f.sel] },
       };
     }
 
