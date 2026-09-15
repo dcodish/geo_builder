@@ -21,8 +21,6 @@ import { evalExpr, type Env } from './expr';
 import {
   conicSlotTaken,
   EMPTY_CONSTRUCTION,
-  isCurve,
-  isPoint,
   isPositional,
   objectById,
   type Construction,
@@ -30,7 +28,6 @@ import {
   type CurveObject,
   type Fact,
   type GeoObject,
-  type Id,
   type PointObject,
 } from './types';
 
@@ -86,16 +83,26 @@ function sameNumbers(a: unknown, b: unknown): boolean {
 }
 
 /**
- * Lookup is by ID across the WHOLE object list, not per array, so a name used for two different
- * kinds is caught by one rule rather than by each kind remembering to ask about the others.
+ * THE ID GATE — one rule for every object kind, enumerating none of them.
+ *
+ * For every fact that names an object, `f.t` **is** the kind that fact would create: the `Fact`
+ * discriminants minus `param` are exactly the {@link GeoObject} kinds. So "does this name already
+ * belong to something else?" is one comparison, and it cannot go stale when a kind is added.
+ *
+ * It is written this way because the previous version did go stale. Each case asked only about the
+ * kinds it happened to know — the point case checked for a curve and nothing else — so when #1028
+ * added `derived`, `segment` and `polygon`, a `derived` object was invisible to it. Stating
+ * «M מפגש התיכונים במשולש ABC» and then «M(3,c)» produced **two objects called M**, both drawn, with
+ * no refusal: the figure had two points with one name, and every later reference to `M` bound to
+ * whichever came first. That is [ADR-043](../../docs/06-decisions.md#adr-043)'s hand-listed-kind-sets
+ * defect, which `carriers.ts` was built to prevent and which slipped in here because a predicate is
+ * not an exhaustive switch.
  */
-function findPoint(c: Construction, id: Id): PointObject | undefined {
-  const o = objectById(c, id);
-  return o && isPoint(o) ? o : undefined;
-}
-function findCurve(c: Construction, id: Id): CurveObject | undefined {
-  const o = objectById(c, id);
-  return o && isCurve(o) ? o : undefined;
+function priorOf(c: Construction, f: Fact): { same: GeoObject } | { clash: true } | null {
+  if (f.t === 'param') return null;
+  const prior = objectById(c, f.id);
+  if (!prior) return null;
+  return prior.kind === f.t ? { same: prior } : { clash: true };
 }
 
 export function applyFact(c: Construction, f: Fact): ApplyOutcome {
@@ -127,10 +134,11 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'point': {
-      if (findCurve(c, f.id)) {
+      const found = priorOf(c, f);
+      if (found && 'clash' in found) {
         return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
       }
-      const prior = findPoint(c, f.id);
+      const prior = found?.same as PointObject | undefined;
       if (prior) {
         // M1: a statement about an EXISTING point.
         if (sameNumbers(prior.x, f.x) && sameNumbers(prior.y, f.y)) {
@@ -146,10 +154,11 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'curve': {
-      if (findPoint(c, f.id)) {
+      const found = priorOf(c, f);
+      if (found && 'clash' in found) {
         return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
       }
-      const prior = findCurve(c, f.id);
+      const prior = found?.same as CurveObject | undefined;
       if (prior) {
         if (prior.curve.kind !== f.curve.kind) {
           return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
@@ -194,11 +203,12 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         return { ok: false, error: { code: 'unknown-reference', detail: missing } };
       }
 
-      const prior = objectById(c, f.id);
+      const found = priorOf(c, f);
+      if (found && 'clash' in found) {
+        return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
+      }
+      const prior = found?.same;
       if (prior) {
-        if (prior.kind !== f.t) {
-          return { ok: false, error: { code: 'name-kind-clash', detail: f.src } };
-        }
         // M1: restating the same construction is absorbed — no duplicate row, no re-creation. This
         // is what lets a later section of a question name what an earlier one established.
         if (sameReference(prior, f)) return { ok: true, absorbed: true, next: c };
