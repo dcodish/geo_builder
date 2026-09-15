@@ -27,6 +27,8 @@ import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 import registry from '../products.json';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, unstatedChoices, VARIANT_COUNT } from '@/engine';
+import { viewDeltaOf } from '@/store/geoStore';
+import type { ViewDelta, ViewDeltaItem } from '@/store/geoStore';
 import { unstatedChoiceText } from '@/ui/unstatedChoice';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, stepLabel } from '@/parser';
 import { Figure } from '@/render';
@@ -898,6 +900,30 @@ export default function App() {
   // "Show another configuration" — lifted out of the JSX (B6-2d moves the button under the canvas,
   // D7). #41 (ADR-290): the seed search runs in the geometry WORKER; ADR-340 (#175): the search
   // returns the whole COMPOSITE view, applied as ONE undo-tracked transition.
+  /**
+   * The varied/kept note, in one line (#65, [ADR-517](docs/06-decisions.md#adr-517)).
+   *
+   * Capped at TWO named items a side plus a count, per the FR-TH-6 flood discipline: the cue teaches which
+   * choices the question left open, and a list long enough to scan is no longer a cue. An empty `changed`
+   * means there is nothing honest to say — the note is then omitted rather than padded.
+   */
+  const deltaNote = (d: ViewDelta | null): string => {
+    if (!d || d.changed.length === 0) return '';
+    const name = (it: ViewDeltaItem) =>
+      t(
+        it.kind === 'point' ? 'actions.deltaPoint' : it.kind === 'radius' ? 'actions.deltaRadius' : it.kind === 'branch' ? 'actions.deltaBranch' : 'actions.deltaVariant',
+        { id: it.id },
+      );
+    const phrase = (items: ViewDeltaItem[]) => {
+      const shown = items.slice(0, 2).map(name);
+      const rest = items.length - shown.length;
+      return rest > 0 ? [...shown, t('actions.deltaMore', { count: rest })].join(', ') : shown.join(', ');
+    };
+    return d.kept.length > 0
+      ? t('actions.viewChangedKept', { changed: phrase(d.changed), kept: phrase(d.kept) })
+      : t('actions.viewChanged', { changed: phrase(d.changed) });
+  };
+
   const runResample = async () => {
     if (resampling) return;
     setResampling(true);
@@ -907,7 +933,13 @@ export default function App() {
       const changed = found !== null;
       if (changed) useGeoStore.getState().applyView(found!);
       logDebug({ kind: 'action', action: 'show-another', detail: `seed=${changed ? found!.seed : st.seed}`, result: changed ? 'changed' : 'only-config' }); // #84
-      if (changed) setAltNote('');
+      if (changed) {
+        // #65 (ADR-517): say WHICH unstated choice moved and which the press kept — the ADR-052 principle
+        // made visible at the moment it applies («what varied is exactly what the question did not pin»).
+        const note = deltaNote(viewDeltaOf(useGeoStore.getState()));
+        setAltNote(note);
+        if (note) window.setTimeout(() => setAltNote(''), 6000);
+      }
       else {
         // searched and found nothing different — tell the student something DID happen (the
         // figure is determined), so "show another" doesn't look like a dead button (operator).

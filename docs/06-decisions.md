@@ -11648,3 +11648,55 @@ deliberately loose so a slow box cannot flake.
 
 **Deviations from plan:** the commit says `Refs #259`, not a closing keyword — (A) is landed, (B) is not,
 and closing the issue would misreport the work.
+## ADR-517 — «SHOW ANOTHER CONFIGURATION» SAYS WHAT IT CHANGED AND WHAT IT KEPT (#65)
+
+**Status:** accepted, 2026-09-14 · **Issue:** #65 (feature, P3 — external architecture review, operator-commissioned 2026-07-11) · round #1006 · feature route (PR) · makes [ADR-052](#adr-052) visible; the cue sibling of [ADR-101](#adr-101)/[ADR-112](#adr-112); rests on the invariance of [ADR-065](#adr-065)/[ADR-514](#adr-514)
+**Requirements:** [02](02-requirements.md) — FR-TH-6a: the press accounts for the choice it moved · **Design:** [04](04-design.md) — the view delta
+
+**What the student saw.** The figure jumped, with no account of which unstated choice moved. The mechanism
+side has been deliberate for a long time — the press resamples free DOFs, cycles branches, walks reflections
+and variants, and every view it shows meets the figure's requirements — but nothing ever told the student
+WHICH freedom it used. The review put it exactly: *"deliberately change one discrete branch / move one free
+parameter / preserve unrelated choices — and explain what changed and what remained invariant."*
+
+**Why it is worth saying.** The cue *"what varied is exactly what the question did NOT pin"* is ADR-052
+made visible. It teaches which parts of the figure are givens and which are the drawer's freedom — the same
+thing the DOF cue exists for, said at the moment it applies.
+
+**Decision. No engine or solver change.** Both views exist in the store at the moment a view is applied, so
+the account is a **comparison**, never a second search. `viewDelta(beforeFacts, before, afterFacts, after)`
+(`src/replay/viewDelta.ts`, pure) returns `{ changed, kept }` over the figure's own freedoms, and the store
+records it in `resample` and in `applyView` — the worker path (ADR-290) — so the two cannot drift.
+
+**It is judged on SIMILARITY-INVARIANT quantities, and it has to be.** Two seeds of one figure may differ by
+a whole-figure rotation, translation and scale, under which every raw coordinate changes and nothing about
+the drawing does. Comparing positions would report that everything moved, every time. So each freedom is
+characterised by quantities the gauge cannot touch — a point by its distances to the other named points,
+each over the drawing's mean extent; a circle by its radius over that same mean — with the 3% bar
+`shapeDiffers` already uses for the very similar question *"is this a different drawing?"*. The discrete
+choices (branch, variant) need no measurement at all: they are explicit in the facts.
+
+**`kept` can only name a real freedom.** Both lists are drawn from the SAME set — the figure's own freedoms
+(`freeDofs` plus the facts' discrete choices) — so "kept" is never a claim about something that could not
+have moved. A freedom the comparison cannot judge (a point absent from one view) appears in **neither**
+list: silence is the honest answer, never a guess.
+
+**The note retires itself.** The stored value carries the view it DESCRIBES (`facts`, `seed`), and
+`viewDeltaOf` returns it only while that view is still on screen. A later statement, an edit, an undo or a
+load moves the facts reference and the note is gone — with no clearing call at any of those sites. A list of
+sites to clear at is exactly the kind that goes stale the next time one is added, and a note describing a
+view the student has already left is worse than no note.
+
+**Display.** One transient line on the existing `altNote` surface — the same place «אין תצורה אחרת» already
+speaks from — capped at **two named items a side plus a count** (the FR-TH-6 flood discipline: a list long
+enough to scan is no longer a cue). An empty `changed` prints nothing rather than padding.
+
+**Not in scope, deliberately:** the review's full `Solution { values, branches, freeParameters }` record.
+The delta is computable from what the store already tracks, and the issue says so.
+
+**Locks.** `issue-65-view-delta.test.ts` (5): a resample names a freedom that moved and names ONLY freedoms
+of that figure; a view compared with itself reports nothing changed and all freedoms kept (the invariance
+the note rests on, at its exact degenerate case); a free RADIUS is nameable; the note **retires itself** on
+the next statement, with no clearing call at the submit site; a determined figure leaves no note at all.
+
+**Deviations from plan:** none.
