@@ -5,7 +5,8 @@
  *
  * **The register is derived from the OBJECTS.** #1014: a curve whose parameter was never declared
  * drew nothing and said nothing, because `sampleEnv` read the F11 declarations alone. The entry
- * `נתונה פרבולה שמשוואתה y^2=2ax` is in the tool's own catalog, so its reference card contained a
+ * `נתונה פרבולה שמשוואתה y^2=2ax` was in the tool's own catalog (it teaches `2px` since #1022, and
+ * both spellings parse identically), so its reference card contained a
  * line that produced an empty figure. Each row of that issue's table is a test below, with the
  * controls that must keep working beside them.
  *
@@ -20,6 +21,7 @@ import { fold } from '../engine/apply';
 import { derive } from '../engine/derive';
 import { evaluate, knownCurve, sampleParam } from '../engine/evaluate';
 import { parseLine } from '../parser/parseAnalytic';
+import { COMMAND_CATALOG_ANALYTIC, type CatalogEntryAnalytic } from '../parser/catalogAnalytic';
 import { curvesOf, objectById, pointsOf, UNBOUNDED, type Fact } from '../engine/types';
 
 const lines = (src: string[]): Fact[] =>
@@ -308,5 +310,28 @@ describe('#1019 — an unbounded parameter reaches both signs', () => {
     );
     expect(signs.has(1)).toBe(true);
     expect(signs.has(-1)).toBe(true);
+  });
+});
+
+describe('#1022 — the catalog teaches the parabola with the letter the student has', () => {
+  /**
+   * Operator, 2026-09-15: *"while its perfectly fine to have a parabola y^2=2ax, the common is
+   * y^2=2px"*.
+   *
+   * Not cosmetic. The 5-unit formula sheet does NOT carry the parabola (docs/19 §3), so «y² = 2px,
+   * focus (p/2,0), directrix x = -p/2» is recited from memory as a TRIPLE. A card offering `2ax`
+   * teaches a student to rename the one letter whose meaning they already know.
+   *
+   * Both spellings parse and draw identically — asserted here, because that is what makes this a
+   * teaching choice rather than a capability.
+   */
+  it('offers 2px, and both letters still build the same figure', () => {
+    expect(COMMAND_CATALOG_ANALYTIC.some((e: CatalogEntryAnalytic) => e.he.includes('y^2=2px'))).toBe(true);
+    expect(COMMAND_CATALOG_ANALYTIC.some((e: CatalogEntryAnalytic) => e.he.includes('y^2=2ax'))).toBe(false);
+
+    const withP = build(['נתונה פרבולה שמשוואתה y^2=2px']);
+    const withA = build(['נתונה פרבולה שמשוואתה y^2=2ax']);
+    expect(dofCount(withP)).toBe(dofCount(withA));
+    expect(paramRegister(withP).map((r) => r.sym)).toEqual(['p']);
   });
 });

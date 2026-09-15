@@ -85,7 +85,11 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
 
   // --- F6 · conics by equation (canonical only — D6/§2a) ---
   { category: 'conics', family: 'F6', he: 'נתונה פרבולה קנונית שמשוואתה y^2=54x', en: 'canonical parabola y^2=54x' },
-  { category: 'conics', family: 'F6', he: 'נתונה פרבולה שמשוואתה y^2=2ax', en: 'parabola y^2=2ax' },
+  // `p`, not `a` (#1022). It is not an arbitrary parameter name in this topic: the 5-unit formula
+  // sheet does NOT carry the parabola, so «y² = 2px, focus (p/2,0), directrix x = -p/2» is recited
+  // from memory as a triple (docs/19 §3). A card offering `2ax` teaches a student to rename the one
+  // letter whose meaning they already know. Both spellings parse identically; only the teaching differs.
+  { category: 'conics', family: 'F6', he: 'נתונה פרבולה שמשוואתה y^2=2px', en: 'parabola y^2=2px' },
   {
     category: 'conics',
     family: 'F6',
