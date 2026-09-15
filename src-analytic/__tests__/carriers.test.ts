@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
 import { carrierOf, dofCount, objectDeps, paramRegister, symbolDeps } from '../engine/carriers';
 import { fold } from '../engine/apply';
 import { derive } from '../engine/derive';
-import { evaluate, knownCurve } from '../engine/evaluate';
+import { evaluate, knownCurve, sampleParam } from '../engine/evaluate';
 import { parseLine } from '../parser/parseAnalytic';
 import { curvesOf, objectById, pointsOf, UNBOUNDED, type Fact } from '../engine/types';
 
@@ -229,5 +229,71 @@ describe('the object graph — one list, addressed by id across kinds', () => {
   it('keeps ids in disjoint spaces, which is WHY the clash is unreachable here', () => {
     const c = build(['A(2,6)', 'משוואת הישר AC היא y=-2x+8', 'נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9']);
     expect(c.objects.map((o) => o.id)).toEqual(['A', 'line-AC', 'circle-I']);
+  });
+});
+
+/**
+ * #1019 — an UNBOUNDED parameter varies in SIGN, not only in magnitude.
+ *
+ * `1 + 3 * u` asserted `a > 0` for a parameter nobody bounded: `y² = 2ax` drew a right-opening
+ * parabola at every configuration and nothing had said it opens right. That is ADR-052's cardinal
+ * sin — a default value masquerading as a given, which the conformance smell names exactly (a value
+ * counted by `rawMovableDof` but never actually sampled across its range).
+ *
+ * The seed-0 case is a lock in its own right: ADR-052 permits a default as a STARTING point, so the
+ * familiar draw is allowed to be first. What it forbids is a default that never moves.
+ */
+describe('#1019 — an unbounded parameter reaches both signs', () => {
+  const over = (n: number, d: Parameters<typeof sampleParam>[0] = {}) =>
+    Array.from({ length: n }, (_, s) => sampleParam(d, s, 1));
+
+  it('is positive at seed 0 — the familiar first draw is still allowed', () => {
+    expect(sampleParam({}, 0, 1)).toBeGreaterThan(0);
+  });
+
+  it('reaches NEGATIVE values across configurations', () => {
+    const vals = over(40);
+    expect(vals.some((v) => v < 0)).toBe(true); // ← was false at every one of 40 seeds
+  });
+
+  it('reaches both signs within the first handful of configurations', () => {
+    // «הציגו תצורה אחרת» has to get there in a few presses, not in forty.
+    const vals = over(6);
+    expect(vals.some((v) => v > 0)).toBe(true);
+    expect(vals.some((v) => v < 0)).toBe(true);
+  });
+
+  it('never lands near the degenerate 0, where y²=2px collapses to a doubled axis', () => {
+    for (const v of over(60)) expect(Math.abs(v)).toBeGreaterThanOrEqual(1);
+  });
+
+  it('draws two unbounded parameters INDEPENDENTLY — they must not march in lockstep', () => {
+    // A figure with two free symbols has to be able to reach all four sign combinations.
+    const a = over(20);
+    const b = Array.from({ length: 20 }, (_, s) => sampleParam({}, s, 2));
+    const agree = a.filter((v, i) => Math.sign(v) === Math.sign(b[i])).length;
+    expect(agree).toBeGreaterThan(0);
+    expect(agree).toBeLessThan(20);
+  });
+
+  it('leaves every BOUNDED branch exactly as it was — they respect what was stated', () => {
+    // These were never wrong, and a sign change here would invent the opposite given.
+    for (const v of over(20, { min: 0, minOpen: true })) expect(v).toBeGreaterThan(0);
+    for (const v of over(20, { max: 0, maxOpen: true })) expect(v).toBeLessThan(0);
+    for (const v of over(20, { min: 0, max: 6 })) {
+      expect(v).toBeGreaterThan(0);
+      expect(v).toBeLessThan(6);
+    }
+  });
+
+  it('end to end: the parabola opens both ways as configurations advance', () => {
+    const signs = new Set(
+      [0, 1, 2, 3, 4, 5].map((s) => {
+        const d = derive(['a הוא פרמטר', 'נתונה פרבולה שמשוואתה y^2=2ax'], s);
+        return Math.sign(d.figure.env.a as number);
+      }),
+    );
+    expect(signs.has(1)).toBe(true);
+    expect(signs.has(-1)).toBe(true);
   });
 });

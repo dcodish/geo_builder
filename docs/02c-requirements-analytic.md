@@ -701,3 +701,12 @@ tool confirms it («זה כבר ידוע…») and does not add a second row. In
 student was right. **A restatement that NARROWS is not this case** — «a הוא פרמטר» then «a<13» adds
 information and is recorded like any other given; calling it "already known" would drop a stated given,
 which is the one thing that may never happen.
+
+**R46 — a free magnitude is sampled across everything the student left open, SIGN INCLUDED**
+([ADR-AG-022](06c-decisions-analytic.md#adr-ag-022)). An unbounded parameter that only ever draws
+positive asserts `a > 0`, which the question never gave — the same cardinal sin as drawing a figure
+that violates a given, one step removed ([ADR-052](06-decisions.md#adr-052)). A *starting* value may be
+the familiar one, so seed 0 may draw the right-opening parabola; every later configuration must be able
+to reach the other sign, and «הציגו תצורה אחרת» must get there in a few presses rather than by luck.
+Sampling must still stay away from a degenerate value (`a = 0` collapses `y²=2ax` to a doubled axis),
+which is vacancy rather than a configuration worth showing.
