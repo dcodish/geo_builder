@@ -53,6 +53,18 @@ export interface SceneCurve {
   name: string;
   /** SVG path data — one `M…L…` run per polyline. */
   d: string;
+  /**
+   * A circle`s CENTRE, in screen space (#1024).
+   *
+   * Operator, 2026-09-15: *"we need to draw the center. in analytical geo the center is always
+   * important."* Every corpus question that names a circle names its centre («ומרכזו בנקודה K»),
+   * and it is the one point of a circle a student always draws by hand.
+   *
+   * It is a FEATURE OF THE CURVE, never a point object. Minting a `GeoObject` for it would spend a
+   * letter the student is about to use and put it in the M1 id space — the defect
+   * [ADR-297](../../docs/06-decisions.md#adr-297) fixed in the 2-D tree.
+   */
+  centre?: { cx: number; cy: number; label?: string };
 }
 
 /**
@@ -139,16 +151,58 @@ function ticks(min: number, max: number, project: (v: number) => number): AxisTi
   return out;
 }
 
-export function buildScene(fig: Figure, box: Box, width: number, height: number): Scene {
+/**
+ * What the caller knows that the FIGURE cannot know (#1024).
+ *
+ * Whether a value is knowledge is a question about the construction across several
+ * configurations (`isKnowledge`), and a `Figure` is one configuration. So the renderer cannot ask it
+ * and must not guess: without this the centre is marked and left UNLABELLED, which is the honest
+ * answer rather than one sample`s coordinates printed as if they were given
+ * ([ADR-AG-003](../../docs/06c-decisions-analytic.md#adr-ag-003) §2).
+ */
+export interface SceneKnowledge {
+  /** Is this curve`s shape — and so its centre — the same in every configuration? */
+  curveKnown?: (id: string) => boolean;
+}
+
+export function buildScene(
+  fig: Figure,
+  box: Box,
+  width: number,
+  height: number,
+  knows: SceneKnowledge = {},
+): Scene {
   const t = makeTransform(box, width, height);
 
-  const curves: SceneCurve[] = fig.curves.map((c) => ({
+  /**
+   * A CARRIER is not drawn (#1076). The engine keeps it — it is what `on-curve` is solved
+   * against, and the panel names it as the provenance of the point that rides it — and the figure
+   * the student sees shows what the student asked for. This is the renderer's own decision, which
+   * is why it lives here and not in `evaluate`.
+   */
+  const curves: SceneCurve[] = fig.curves.filter((c) => c.stated).map((c) => ({
     id: c.id,
     kind: c.curve.kind,
     name: c.label.name,
     d: polylines(c.curve, box)
       .map((pl) => pl.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${t.sx(x).toFixed(2)},${t.sy(y).toFixed(2)}`).join(''))
       .join(' '),
+    /**
+     * The centre is marked whenever there IS one, and labelled only when it is knowledge (#1024).
+     *
+     * Those are two different questions and they get two different answers: the mark says "this
+     * circle has a centre, here", which is true at every configuration; the label states a value,
+     * which may be said only when the givens fix it.
+     */
+    centre: c.curve.kind === 'circle'
+      ? {
+          cx: t.sx(c.curve.cx),
+          cy: t.sy(c.curve.cy),
+          label: knows.curveKnown?.(c.id)
+            ? `(${fmtNum(c.curve.cx)}, ${fmtNum(c.curve.cy)})`
+            : undefined,
+        }
+      : undefined,
   }));
 
   // A segment is already resolved to endpoints by `evaluate`, so this is a pure projection — the

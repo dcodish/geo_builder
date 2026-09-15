@@ -2111,6 +2111,257 @@ Five lists, one table.
 
 **Consequences.** `src-analytic` +12 tests.
 
+## ADR-AG-038 — «מעגל O» names the CENTRE, and the circle stays anonymous (#1059)
+
+**Status:** accepted, 2026-09-15 · **Settles an ambiguity in** [ADR-AG-005](#adr-ag-005) D6 ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R63. **Design:** none (a rule and a rule kind).
+
+**Context — an operator ruling.** #1059 measured that «נתון מעגל O שמשוואתו (x-3)^2+(y-5)^2=25» — an
+ordinary circle given by its equation — could not be stated at all, and raised the question it turns
+on: is `O` the circle's NAME or its CENTRE? D6 says circles are named with the corpus's Roman-numeral
+device or «המעגל שמרכזו M», and a bare letter is ambiguous between them. The operator, 2026-09-15:
+
+> «מעגל O» means the center letter is O
+
+**Decision: a Roman numeral NAMES the circle; any other letter is its CENTRE.** The two readings of
+one sentence shape are told apart by which letter it is, which is what the corpus itself does. The
+numeral branch runs first and the centre branch sees only what it declined, with an explicit
+lookahead so `I` can never be read as a centre.
+
+**The circle stays ANONYMOUS, and that is the load-bearing half.** It keeps the content-derived id a
+bare equation would give it, so `O` is free to be the point. Naming the curve `O` as well would put
+one student letter on two objects in the M1 id space — and the whole value of the ruling is that `O`
+means one thing.
+
+**The centre is a derived point whose parent is a CURVE**, which is new: every rule until now was
+defined over points. So `parentsOf` reports none for it and `curveParentOf` reports the curve —
+two questions kept apart rather than one list meaning two things, because the callers check
+different properties (a point must be positional, a curve must be a curve).
+
+**It does not contradict [ADR-AG-036](#adr-ag-036), it completes it.** #1024 draws EVERY circle's
+centre and mints nothing, precisely so an unnamed centre spends no letter. Here the letter is the
+student's own: they can then write «AO = 5», and the point appears in the data panel like any other
+point they introduced. Named and unnamed centres are different things and get different treatment.
+
+**Two things this did NOT need.** The misreporting #1059 was filed for — «מעגל O משיק לציר x» told
+the student «לא הצלחתי לקרוא את המשוואה» about a sentence containing no equation — **was already
+fixed**, by [ADR-AG-027](#adr-ag-027)'s Hebrew-tail discriminator (#1068), and re-measuring said so
+before any code was written. And a curve that turns out to have no centre («מעגל M שמשוואתו y=2x»
+fits a line) is reported by [ADR-AG-031](#adr-ag-031)'s vacancy predicate with no new message,
+because that mechanism was already right.
+
+**Still not supported, and stated rather than skipped:** «מעגל O» with no equation at all. That is a
+circle with a free centre and a free radius — a 3-DOF free OBJECT — and it needs curve carriers,
+which is a mechanism rather than a rule. [#1060](https://github.com/dcodish/geo_builder/issues/1060)
+(axis tangency) depends on the same thing.
+
+**Consequences.** `src-analytic` +7 tests.
+## ADR-AG-032 — A CARRIER is not a stated object (#1076)
+
+**Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-029](#adr-ag-029) (#1073) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R56. **Design:**
+[04c](04c-design-analytic.md) "A point on an object".
+
+**Context — an operator RULING**, given while playing ADR-AG-029's own fix:
+
+> when I say that נקודה B על הישר y=x - what i really mean is that B is (t,t). so I dont want the
+> line itself drawn. if i want the line itself, I will say y=x
+
+**What was measured.** The line was drawn, and — the detail that decided the shape of the fix —
+both spellings mint the SAME id:
+
+```
+נקודה B על הישר y=x   → objects: curve-anon2j9w, B      scene: crv=1
+y=x                    → objects: curve-anon2j9w         scene: crv=1
+```
+
+**Root cause: "the student stated this" was never recorded.** #1073 has to create the curve — a
+point on a line needs a line to be on, and that 1-DOF carrier is the product's defining mechanism.
+What it could not do is say *why* the curve exists. Every object in the construction reached
+`figure.curves` and then the scene, so the two provenances were indistinguishable.
+
+**Decision: `stated: boolean` on the curve object, set at the M1 boundary** (`apply.ts`) — the one
+place that already decides new-object versus statement-about-existing, so this adds no decision
+point. Required rather than optional, so a future rule that mints a curve without answering the
+question is a **compile error** rather than an over-drawn canvas.
+
+**Where each layer draws the line.** The carrier stays in `figure.curves`: the solve measures
+`on-curve` against it, and the data panel names it as the provenance of the point that rides it —
+ADR-AG-025's rule, that a value's home is where it came from. The RENDERER filters it. Undrawn is a
+statement about the figure the student asked for, not about what the engine knows.
+
+**Promotion is the branch that was most likely to be got wrong, and it was.** Because ids are
+content-derived (ADR-AG-023), «y=x» after «נקודה B על הישר y=x» is not a new curve — it changes what
+the existing one IS. Both of the surrounding mechanisms would have mishandled it:
+
+- ADR-AG-020's structural absorption sees the same curve twice and answers «כבר ידוע»;
+- ADR-AG-030's entailment test sees no new object, no new parameter and no freedom consumed, and
+  answers «זה כבר נובע» — while the canvas visibly gains a line.
+
+`applyFact` already had the vocabulary: promotion reports `created`, and the submit path reads that
+answer before either test runs. **That is the same move #1045 made** — the answer existed and
+nothing read it, for a third time in this tree. Promotion is one-way: a stated curve is never
+demoted by a later carrier mention, because nothing the student said withdraws the request.
+
+**The noun list gained the curve families in the same change**, and that was not scope creep — it
+was this ADR's own claim failing measurement. The fix direction asserted the over-drawing happens
+«for every carrier the on-object rule mints: «נקודה P על הפרבולה y=x²»», and measuring it showed
+that sentence never reached the rule at all: the noun alternation held only `צלע|קטע|ישר`. A noun
+missing from an alternation does not refuse — it falls through to `not-handled`, which reads to a
+student as *"this tool does not do circles"*. `HE_EQ_OF` joined it too, since «המעגל שמשוואתו …» is
+how the corpus writes a circle. None of the curve nouns is BOUNDED; `bounded` tests for
+`צלע|קטע|side|segment` by name rather than for "has a noun", which is what kept the operator's
+boundedness ruling intact through the widening.
+
+**Consequences.** `src-analytic` 337 → 343 tests. «y=x²» is still refused `out-of-scope` — a
+translated conic, outside ADR-AG-005's four-family scope, and an honest refusal rather than
+anything this changed.
+## ADR-AG-033 — The segment NOUN is optional, and naming a segment INTRODUCES its endpoints (#1074)
+
+**Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-013](#adr-ag-013) (declaration vs reference) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R57. **Design:** none (a rule's matcher).
+
+**Context.** Operator, 2026-09-15: *"when there are 2 points like E and F defined, and I write EF,
+i want the segment drawn"*. Measured: «הקטע EF» built `seg-EF`; «EF» was `not-handled`.
+
+**Root cause: the matcher was written around the fullest phrasing the corpus shows.** That is now
+the THIRD time — #1069 (the point-on-object nouns), #1072 («משוואת AB» without «הישר»), and here —
+so the finding is not about segments. **A rule that requires its noun does not refuse the shorter
+spelling; it declines it, and the sentence falls off the end of the chain into `not-handled`,
+which reads to a student as "this tool does not know what a segment is".** The exam writes «EF»
+constantly — "חשבו את EF", "העבירו את EF" — and a student transcribing givens writes what the page
+writes.
+
+**Why the position is safe without a discriminator.** A bare pair of names cannot be a coordinate
+(no parentheses), an equation (no `=`) or a relation (no verb), and `parseShape` already sits second
+to last. The one collision that matters — «AB = 5», where `AB` is a LENGTH — is decided by rule
+order alone: every `=`-bearing rule lives in `parseConstraint`, which runs first. It is locked from
+both sides.
+
+**The second half is a ruling, extended.** A segment whose endpoints did not exist refused with
+`unknown-reference`, and ADR-AG-013 argued for that explicitly: *"segments sit with the references…
+a student who means to introduce them has a shape noun for it."* The operator's «הישר AB» ruling
+(*"introduce them with dof"*) settles the general question the other way, and the principle it
+states is sharper than the noun it was given about:
+
+> **NAMING a thing introduces its points; REFERRING to one does not.**
+
+«הקטע EF» names a segment. «M אמצע AB» names `M` while *referring* to `A` and `B`, and still
+refuses — inventing them would place positions the question never gave (ADR-052). The evidence
+that ADR-AG-013 had already drawn this line correctly and filed segments on the wrong side of it:
+**every existing lock on that refusal is a midpoint test.** Not one flipped.
+
+**Consequences.** «EF» on an empty figure introduces two 2-DOF vertices and draws the segment —
+dof 4, the figure movable under «הציגו תצורה אחרת», exactly as «משולש ABC» behaves. `src-analytic`
+343 → 349 tests.
+## ADR-AG-034 — A QUADRANT is a region, and a region SEEDS rather than filters (#1071)
+
+**Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-011](#adr-ag-011) (#1033, the half-axis) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R58. **Design:**
+[04c](04c-design-analytic.md) "A point on an object, and the carrier that holds it".
+
+**Context.** Operator, 2026-09-15: *"I want to be able to place a point in a quartile: C ברביע
+השלישי"*. Measured 0 of 5 phrasings.
+
+**The easy half.** A quadrant is a pair of inequalities, so it is D7's SECOND kind — a branch
+selector over configurations the solve produced — and not the third, a constraint that removes
+freedom. **A point in the third quadrant is still a 2-DOF point**; it is simply not drawn anywhere
+else. Lowering it to constraints would make the DOF cue lie, which is what D7 exists to prevent. It
+needs no new mechanism: two `axis-side` selectors, the ones ADR-AG-011 built for «B על החלק החיובי
+של ציר x», stated at once.
+
+**The half that mattered was step 2 of the plan: *measure whether the seed search is adequate*.** It
+is not, and the figure was dishonest about it:
+
+```
+A ברביע הראשון / B ברביע השני / C ברביע השלישי / D ברביע הרביעי
+  selectorsOk : false        ← and NO fault reported
+  A           : (5.76, -2.13)   ← the fourth quadrant, after the student said the first
+```
+
+`derive` advances the seed up to 24 times looking for a configuration where every selector holds.
+One sign holds about half the time, a quadrant a quarter, **four quadrant points about one seed in
+256**. The search exhausted, the figure was drawn anyway, and ADR-AG-008's "another configuration
+may have it" kept it silent — correctly, by its own rule, because the figure still had freedom.
+
+**Decision: a region selector SEEDS the point it names.** The sampled magnitude is kept and only the
+sign is folded, so «הציגו תצורה אחרת» still moves the point *within* its region; the solve may still
+move it afterwards if a constraint says so; and the post-hoc check is untouched and still has the
+last word, so a contradiction («C(-3,4)» with «C ברביע הראשון») is still refused in either order.
+
+**Why that is the right shape and sample-and-reject was not.** Rejection sampling is correct for a
+BRANCH — which of two intersection points, ADR-AG-011's own case — where the candidates are
+enumerable and the selector picks among them. It is the wrong tool for a REGION, where the answer is
+a half-plane and the sampler can simply be *told which half*. The two had been conflated because the
+first region selector to arrive (the positive half-axis) had only one of them, where a coin flip and
+24 tries is plenty.
+
+**Measured after:** 40 placements over ten seeds, none misplaced. And it improved ADR-AG-011's own
+case, which is the sign that the generalisation was already implied.
+
+**Consequences.** `src-analytic` 349 → 355 tests. The deferred half of #1069's note in `derive` —
+whether an exhausted seed search on a figure WITH freedom should be reported — stays deferred and is
+now much rarer, because the common case no longer exhausts anything.
+
+## ADR-AG-036 — A circle MARKS its centre, and the mark is not the label (#1024)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R61. **Design:** none (the renderer).
+
+**Context — an operator ruling**, 2026-09-15:
+
+> T15 - we need to draw the center. **in analytical geo the center is always important.**
+
+and, filing the request:
+
+> when drawing a circle, always mark the center and if center is known, put its values.
+
+**The state it found.** The centre was computed, resolved into every `NumCurve`, and already printed
+in the data panel as «מעגל I: O(3, 4), r = 3». The canvas drew the outline alone. So this was never
+missing geometry — it was a value the tool had and did not show, on the one point of a circle every
+student draws by hand and every corpus question names («ומרכזו בנקודה K»).
+
+**Decision 1: the centre is a FEATURE OF THE CURVE, never a point object.** Minting a `GeoObject` for
+it would spend a letter the student is about to use and put it in the M1 id space — the defect
+[ADR-297](06-decisions.md#adr-297) fixed in the 2-D tree ("a decomposition never spends a student's
+letter"). `SceneCurve` carries the mark; `buildScene` reads it off the resolved curve. It is drawn as
+a small cross rather than a filled dot, so it cannot be mistaken for one of the student's own points.
+
+**Decision 2: the MARK and the LABEL answer two different questions.** The mark says *"this circle
+has a centre, here"*, which is true in every configuration. The label states a VALUE, which
+[ADR-AG-003](#adr-ag-003) §2 permits only when the givens fix it. So `(x-3)²+(y-4)²=9` is marked and
+labelled `(3, 4)`, while `(x-a)²+(y-4)²=9` is **marked and left unlabelled** — the same restraint the
+panel already shows on the same figure, and the reason the two are separate fields rather than one.
+
+**The gate is SUPPLIED, not re-decided.** Whether a value is knowledge is a question about the
+construction across several configurations, and a `Figure` is one configuration — the renderer
+cannot ask it. So `buildScene` takes an optional `SceneKnowledge`, and `App` passes the same
+`knownCurve` the data panel uses. Two consequences, both deliberate: the canvas and the panel cannot
+drift, and a caller that supplies no gate gets the mark WITHOUT a label rather than one sample's
+coordinates printed as if they were given.
+
+**Deliberately NOT here**, and stated rather than quietly skipped:
+
+- the SYMBOLIC label `(a, 4)` the operator also asked for. It needs an `Expr` for the centre, and the
+  centre is derived from NUMERIC conic coefficients — so it needs symbolic coefficient extraction,
+  which is a mechanism, not a display change. Filed; the unlabelled mark is the honest interim, not a
+  silent omission. **`exprText` ([#1023](https://github.com/dcodish/geo_builder/issues/1023)) was
+  deliberately not built here either**: it would have had no caller, which is the pattern this tree
+  has already produced three times (#1020, #1045, #1065).
+- «נתון מעגל» with no equation, which is a 3-DOF free object and belongs to the carrier work.
+
+**Consequences.** `src-analytic` 714 → 720 tests. The mark appears for every drawn circle, including
+one the student stated bare; a CARRIER circle (ADR-AG-032) has no mark because it has no outline
+either.
 ## ADR-AG-039 — A shape's vertices are DISTINCT, and that is a region rather than a given (#1077)
 
 **Status:** accepted, 2026-09-15 · **Fixes a defect in** [ADR-AG-035](#adr-ag-035) ·

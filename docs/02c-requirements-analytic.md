@@ -802,6 +802,34 @@ y=2x» is «משוואת הישר AC היא y=2x». **«האלכסון הראש�
 shape noun distinguishes them** — a kite does, a parallelogram and a rhombus do not — and elsewhere
 are refused by name rather than guessed.
 
+**R63 — a letter after «מעגל» is the centre** ([ADR-AG-038](06c-decisions-analytic.md#adr-ag-038)).
+«נתון מעגל O שמשוואתו (x-3)²+(y-5)²=25» draws the circle and places `O` at its centre, as a point
+the student can then talk about. A ROMAN NUMERAL still names the circle itself («מעגל I»), and the
+circle named by a centre letter stays anonymous, so one letter never means two objects.
+**R56 — a curve minted to CARRY a point is not drawn**
+([ADR-AG-032](06c-decisions-analytic.md#adr-ag-032)). «נקודה B על הישר y=x» means *B is (t,t)*: the
+point appears, the line does not. Stating «y=x» on its own line draws it — and when the carrier was
+already there, that line PROMOTES it and is recorded as a change, never answered «כבר ידוע» or «כבר
+נובע». The carrier remains in the data panel throughout, because it is the honest answer to *where
+does B live*.
+**R57 — the segment noun is optional, and naming a segment introduces its endpoints**
+([ADR-AG-033](06c-decisions-analytic.md#adr-ag-033)). «EF» is «הקטע EF»: one object, one id, either
+spelling. Endpoints that do not exist yet are introduced as free vertices with their two degrees of
+freedom, as a shape noun's vertices are — because the sentence NAMES the segment. Referring to a
+point one does not have («M אמצע AB») still refuses (R-level #1028); the difference is naming
+versus mentioning, not which noun was used.
+**R58 — a point can be placed in a QUADRANT** ([ADR-AG-034](06c-decisions-analytic.md#adr-ag-034)).
+«C ברביע השלישי» — and «נמצאת», «הנקודה C», «נתון», and the English «C is in the third quadrant» —
+draws `C` in that quadrant. It is a REGION: the point keeps both degrees of freedom, moves under
+«הציגו תצורה אחרת» inside its quadrant, and a point already placed elsewhere is refused rather than
+quietly redrawn.
+
+**R61 — a circle marks its centre** ([ADR-AG-036](06c-decisions-analytic.md#adr-ag-036)). Every drawn
+circle shows its centre, because in analytic geometry the centre is always part of the figure. The
+mark appears whenever the circle does; the VALUE beside it appears only when the givens fix it, so a
+circle whose centre rides a parameter is marked and left unlabelled rather than labelled with one
+sample's coordinates. The centre owns no letter — it is part of the circle, not a point the student
+named.
 **R64 — a shape is never drawn collapsed** ([ADR-AG-039](06c-decisions-analytic.md#adr-ag-039)). The
 vertices of a shape are distinct points, and a configuration that puts two of them in the same place
 is not shown — «דלתון ABCD» never draws `B` and `D` together, however well that would satisfy its

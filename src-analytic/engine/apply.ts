@@ -16,7 +16,7 @@
  * lands, and nowhere else.
  */
 import { fitConic } from './conic';
-import { parentsOf, type DerivedRule } from './derived';
+import { curveParentOf, parentsOf, type DerivedRule } from './derived';
 import { constraintRefs } from './solve';
 import { isGenericNoun, namesOption, rightAngleAt, shapeRow } from './shapes';
 import { evalExpr, type Env } from './expr';
@@ -332,7 +332,31 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
             error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) },
           };
         }
-        if (sameCurve(prior.curve, f.curve)) return { ok: true, effect: 'known', next: c };
+        if (sameCurve(prior.curve, f.curve)) {
+          /**
+           * PROMOTION (#1076) — the same curve, now stated.
+           *
+           * «נקודה B על הישר y=x» minted `y=x` as a carrier; «y=x» on its own line is the student
+           * asking for the line itself. Because ids are content-derived (ADR-AG-023) these are ONE
+           * object, so the second sentence is not a new curve — it is a change of what the first one
+           * IS, and the figure visibly gains a line. Answering «כבר ידוע» here would be the #1045
+           * mechanism firing on a line that really did something.
+           *
+           * The promotion is one-way. A stated curve is never demoted by a later carrier mention,
+           * because the student already asked to see it and nothing they said withdraws that.
+           */
+          if (f.stated && !prior.stated) {
+            return {
+              ok: true,
+              effect: 'created',
+              next: {
+                ...c,
+                objects: c.objects.map((o) => (o.id === f.id ? { ...prior, stated: true } : o)),
+              },
+            };
+          }
+          return { ok: true, effect: 'known', next: c };
+        }
         /**
          * Same id, different equation, and now that ids are content-derived (#1026) that can only
          * mean one thing: a NAMED curve being restated inconsistently — «הישר AC» given twice with
@@ -346,7 +370,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         effect: 'created',
         next: {
           ...c,
-          objects: [...c.objects, { kind: 'curve', id: f.id, label: f.label, curve: f.curve }],
+          objects: [...c.objects, { kind: 'curve', id: f.id, label: f.label, curve: f.curve, stated: f.stated }],
         },
       };
     }
@@ -453,7 +477,9 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       const [a, b] = f.principal ? [p, q] : ring.vertices.filter((x) => x !== p && x !== q);
       const id = `line-${a}${b}`;
       return applyAll(c, [
-        { t: 'curve', id, label: { name: `${a}${b}`, kind: 'line' }, curve: { kind: 'line', eq: f.eq }, src: f.src },
+        // STATED (#1076): the student asked for this diagonal by giving its equation, so it is part
+        // of the figure they are drawing, not a carrier minted to hold something else.
+        { t: 'curve', id, label: { name: `${a}${b}`, kind: 'line' }, curve: { kind: 'line', eq: f.eq }, stated: true, src: f.src },
         { t: 'declare', id: a, src: f.src },
         { t: 'declare', id: b, src: f.src },
         { t: 'constraint', k: { t: 'on-curve', id: a, curve: id }, src: f.src },
@@ -539,6 +565,19 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         f.t === 'derived' ? parentsOf(f.rule) : f.t === 'segment' ? [f.a, f.b] : f.vertices;
 
       /**
+       * A rule may name a CURVE as its parent (#1059), and that reference is checked here for the
+       * same reason the point references are: «מעגל O שמשוואתו …» minting a centre of a circle the
+       * figure does not have would be a point defined in terms of nothing.
+       */
+      const curveRef = f.t === 'derived' ? curveParentOf(f.rule) : null;
+      if (curveRef !== null) {
+        const o = objectById(c, curveRef);
+        if (!o || o.kind !== 'curve') {
+          return { ok: false, error: { code: 'unknown-reference', detail: curveRef } };
+        }
+      }
+
+      /**
        * DECLARATION vs REFERENCE — the distinction #1017 turns on, and it is not a softening of
        * #1028's `unknown-reference` refusal.
        *
@@ -551,10 +590,19 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
        * תצורה אחרת», counted in the DOF cue. Refusing here would make the student place three points
        * before they could name the triangle, which inverts how every exam sentence is written.
        *
-       * Segments sit with the references: «הקטע AB» reads as being about points under discussion,
-       * and a student who means to introduce them has a shape noun for it.
+       * **Segments moved to the declaration side** (#1074). They sat with the references on the
+       * reading that «הקטע AB» is about points under discussion — and the operator's ruling on
+       * «הישר AB» (2026-09-15: *"introduce them with dof"*) settles the general question the other
+       * way: NAMING a thing introduces its points, REFERRING to one does not. «הקטע EF» names a
+       * segment; «M אמצע AB» refers to two points while naming a third. #1028's refusal is
+       * untouched, and the tests that lock it are all midpoint tests, which is the distinction
+       * showing through.
+       *
+       * Refusing here forced a student to place both endpoints before they could name the segment,
+       * which inverts how every exam sentence is written — the same argument that made a shape noun
+       * introduce its vertices.
        */
-      const declares = f.t === 'polygon';
+      const declares = f.t === 'polygon' || f.t === 'segment';
       let base = c;
       for (const id of refs) {
         const o = objectById(base, id);

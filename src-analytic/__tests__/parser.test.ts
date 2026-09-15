@@ -12,6 +12,8 @@ import { parseLine } from '../parser/parseAnalytic';
 import { fold } from '../engine/apply';
 import { evaluate } from '../engine/evaluate';
 import { derive } from '../engine/derive';
+import { buildScene } from '../render/scene';
+import { reportedDof } from '../engine/carriers';
 
 describe('catalog — every entry parses, in BOTH languages', () => {
   for (const entry of COMMAND_CATALOG_ANALYTIC) {
@@ -495,5 +497,60 @@ describe('#1068 — English prose containing = is not an equation', () => {
     // It becomes `√` before the guard ever sees it. This is the one legitimate multi-letter token in
     // the grammar, and the reason the guard is applied to the NORMALIZED text.
     expect(kindOf('y=sqrt 4x')).toBe('ok:curve');
+  });
+});
+
+describe('#1074 — the segment NOUN is optional', () => {
+  /**
+   * Operator, 2026-09-15: *"when there are 2 points like E and F defined, and I write EF, i want
+   * the segment drawn"*. The third rule in this tree to be written around the fullest phrasing the
+   * corpus shows (#1069, #1072), which is why the answer is a rule and not a spelling.
+   */
+  const build = (lines: string[]) => {
+    const d = derive(lines, 0);
+    return { d, scene: buildScene(d.figure, d.box, 600, 600) };
+  };
+
+  it('draws the segment between two points that already exist', () => {
+    const r = build(['E(1,1)', 'F(4,5)', 'EF']);
+    expect(r.d.faults).toEqual([]);
+    // Asserted in the SCENE: the student's report is about what they see (#1066).
+    expect(r.scene.segments).toHaveLength(1);
+  });
+
+  it('mints the SAME object as the noun-carrying spelling', () => {
+    const withNoun = derive(['E(1,1)', 'F(4,5)', 'הקטע EF'], 0);
+    const without = derive(['E(1,1)', 'F(4,5)', 'EF'], 0);
+    expect(without.construction.objects.map((o) => o.id)).toEqual(
+      withNoun.construction.objects.map((o) => o.id),
+    );
+    // And so stating both is one segment, the second absorbed (ADR-AG-020).
+    expect(derive(['E(1,1)', 'F(4,5)', 'הקטע EF', 'EF'], 0).outcomes[3]).toBe('known');
+  });
+
+  it('INTRODUCES endpoints that do not exist yet, with their freedom', () => {
+    // The operator's «הישר AB» ruling, applied to the noun that names a segment.
+    const r = build(['EF']);
+    expect(r.d.faults).toEqual([]);
+    expect(reportedDof(r.d.construction, r.d.figure.carrierDof)).toBe(4);
+    expect(r.scene.segments).toHaveLength(1);
+    expect(r.scene.points).toHaveLength(2);
+  });
+
+  it('leaves «M אמצע AB» refusing — naming is not referring', () => {
+    // #1028 is not softened by this. The distinction is which of the two the sentence does.
+    expect(derive(['M אמצע AB'], 0).faults.map((f) => f.code)).toEqual(['unknown-reference']);
+  });
+
+  it('keeps «AB = 5» a LENGTH, not a segment', () => {
+    // The =-bearing rules run first, which is the whole guard.
+    const d = derive(['A(0,0)', 'B(3,4)', 'AB = 5'], 0);
+    expect(d.faults).toEqual([]);
+    expect(d.construction.objects.filter((o) => o.kind === 'segment')).toHaveLength(0);
+  });
+
+  it('still refuses «EE», and still canonicalises FE to EF', () => {
+    expect(derive(['E(0,0)', 'F(3,4)', 'EE'], 0).faults.map((f) => f.code)).toEqual(['repeated-vertex']);
+    expect(derive(['EF', 'FE'], 0).outcomes[1]).toBe('known');
   });
 });

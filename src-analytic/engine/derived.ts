@@ -41,7 +41,20 @@ export type DerivedRule =
   /** `P מפגש האנכים האמצעיים במשולש ABC` — the circumcircle's centre. */
   | { t: 'circumcentre'; v: [Id, Id, Id] }
   /** `G מפגש האלכסונים במרובע ABCD` — AC ∩ BD. */
-  | { t: 'diagonals'; v: [Id, Id, Id, Id] };
+  | { t: 'diagonals'; v: [Id, Id, Id, Id] }
+  /**
+   * `מעגל O שמשוואתו …` — the point the student named as the circle`s CENTRE (#1059).
+   *
+   * Operator ruling, 2026-09-15: *"«מעגל O» means the center letter is O"*. So this is the one
+   * derived point whose parent is a CURVE rather than a set of points, which is why `parentsOf`
+   * reports none for it and {@link curveParentOf} reports the curve instead — two questions kept
+   * apart rather than one list that means two things.
+   *
+   * It exists only because the STUDENT named it. #1024 draws every circle`s centre without minting
+   * an object, precisely so an unnamed centre spends no letter; here the letter is the student`s
+   * own and belongs in the id space like any other point they introduced.
+   */
+  | { t: 'circle-centre'; curve: Id };
 
 /** The ids a rule is defined in terms of. EXHAUSTIVE — see the union's docblock. */
 export function parentsOf(r: DerivedRule): Id[] {
@@ -55,6 +68,10 @@ export function parentsOf(r: DerivedRule): Id[] {
       return [...r.v];
     case 'diagonals':
       return [...r.v];
+    // Its parent is a CURVE, not a point — see `curveParentOf`. Returning the curve id here would
+    // send it through every check that assumes a parent is positional.
+    case 'circle-centre':
+      return [];
     default: {
       const unparented: never = r;
       throw new Error(`derived rule declares no parents: ${JSON.stringify(unparented)}`);
@@ -77,6 +94,8 @@ export function ruleLabel(r: DerivedRule): string {
       return `מפגש האנכים האמצעיים ${r.v.join('')}`;
     case 'diagonals':
       return `מפגש האלכסונים ${r.v.join('')}`;
+    case 'circle-centre':
+      return 'מרכז המעגל';
     default: {
       const unlabelled: never = r;
       throw new Error(`derived rule has no label: ${JSON.stringify(unlabelled)}`);
@@ -197,11 +216,35 @@ export function diagonalMeet(a: Pt, b: Pt, c: Pt, d: Pt): Pt | null {
  * `null` when a parent is missing (it was vacant at this parameter value) or the configuration is
  * degenerate. EXHAUSTIVE over the rule union.
  */
-export function evalRule(r: DerivedRule, at: (id: Id) => Pt | null): Pt | null {
+/**
+ * The CURVE a rule is defined in terms of, where it has one (#1059).
+ *
+ * Separate from {@link parentsOf} because the two answers are used for different things: the
+ * points must exist and be positional, the curve must exist and be a curve. One list carrying both
+ * would have to be re-split by every caller, and the first caller to forget would refuse a valid
+ * sentence or admit an invalid one.
+ */
+export function curveParentOf(r: DerivedRule): Id | null {
+  return r.t === 'circle-centre' ? r.curve : null;
+}
+
+export function evalRule(
+  r: DerivedRule,
+  at: (id: Id) => Pt | null,
+  /** The resolved curves, for the one rule that needs them. Absent means "no curve is available". */
+  curveAt?: (id: Id) => { kind?: string; cx?: number; cy?: number } | null,
+): Pt | null {
   const ps = parentsOf(r).map(at);
   if (ps.some((p) => p === null)) return null;
   const p = ps as Pt[];
   switch (r.t) {
+    case 'circle-centre': {
+      const c = curveAt?.(r.curve);
+      // Not a circle, or not resolvable at this parameter value: the point is VACANT, which is a
+      // state the figure already knows how to report. Never a fallback position.
+      if (!c || c.kind !== 'circle' || c.cx === undefined || c.cy === undefined) return null;
+      return { x: c.cx, y: c.cy };
+    }
     case 'midpoint':
       return midpoint(p[0], p[1]);
     case 'centroid':
@@ -391,6 +434,11 @@ export function constructionOf(
     // The two diagonals whose crossing this is.
     case 'diagonals':
       return { lines: [{ a: p[0], b: p[2] }, { a: p[1], b: p[3] }], feet: [] };
+
+    // A centre has no SCAFFOLDING: there are no auxiliary lines a student would draw to find it,
+    // because reading it off the equation is the whole method. Its own mark is the answer.
+    case 'circle-centre':
+      return null;
 
     default: {
       const undrawn: never = r;
