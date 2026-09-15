@@ -648,6 +648,73 @@ export function evaluate(raw: Construction, seed = 0): Figure {
  * panel, this gate carries the whole honesty boundary, so it is the one function in the tree that
  * most deserves its tests).
  */
+/**
+ * How far the DRAWABLE search looks — the same budget `derive` gives the figure it shows.
+ */
+const DRAWABLE_TRIES = 24;
+
+/**
+ * Per construction, the drawable figure at each seed. The panel asks per coordinate per point, and
+ * each answer may now cost several evaluations, so the work is done once.
+ */
+const drawableCache = new WeakMap<Construction, Map<number, Figure>>();
+
+/**
+ * The figure the tool would SHOW at this seed (#1083).
+ *
+ * Operator, 2026-09-15: *"on this shape, point C should be able to be positioned"* — on a figure
+ * whose `C` was identical at every configuration he could reach, and which the panel called open.
+ *
+ * The gate was asking a different question from the one the student sees. `derive` advances the
+ * seed until the SELECTORS hold, because a configuration that fails them is not a figure this tool
+ * draws; `isKnowledge` and `knownOptions` called `evaluate` directly and judged "does this value
+ * vary?" across configurations that had been rejected before they ever reached the canvas. Of
+ * course it varied there. Measured on his figure: three raw seeds put `C` at three different places
+ * and NONE of them satisfied the selectors.
+ *
+ * **The honesty gate must be measured over the configurations the tool would draw**, or it reports
+ * as freedom something the student can never see.
+ *
+ * Falls back to the raw figure when nothing in the budget holds — the same thing `derive` shows,
+ * for the same reason: a figure is still drawn, and the gate must judge THAT one.
+ */
+export function drawableAt(c: Construction, seed: number): Figure {
+  let perSeed = drawableCache.get(c);
+  if (!perSeed) {
+    perSeed = new Map();
+    drawableCache.set(c, perSeed);
+  }
+  const hit = perSeed.get(seed);
+  if (hit) return hit;
+
+  const first = evaluate(c, seed);
+  let chosen = first;
+  if (!first.selectorsOk) {
+    for (let extra = 1; extra <= DRAWABLE_TRIES; extra += 1) {
+      const candidate = evaluate(c, seed + extra);
+      if (candidate.selectorsOk) {
+        chosen = candidate;
+        break;
+      }
+    }
+  }
+  perSeed.set(seed, chosen);
+  return chosen;
+}
+/**
+ * When two INDEPENDENT solves have found the same answer (#1083).
+ *
+ * Not `SATISFIED_EPS`, and the difference is the point: that is how small a RESIDUAL must be for one
+ * configuration to satisfy its givens. This is how far apart two configurations may land and still be
+ * the same solution — and two least-squares descents from different starting points agree to rather
+ * less than they each satisfy.
+ *
+ * Measured on the operator's own figure (#1083): twenty-four drawable configurations all found
+ * `C = (-5, -5)`, spread over `1.1e-5`. At the residual tolerance that reads as FIVE distinct
+ * answers, and the panel offered the student five identical-looking options.
+ */
+const SAME_VALUE_EPS = 1e-4;
+
 export function isKnowledge(
   c: Construction,
   read: (f: Figure) => number | null,
@@ -655,7 +722,7 @@ export function isKnowledge(
 ): { known: true; value: number } | { known: false } {
   const vals: number[] = [];
   for (const s of seeds) {
-    const v = read(evaluate(c, s));
+    const v = read(drawableAt(c, s));
     if (v === null || !Number.isFinite(v)) return { known: false };
     vals.push(v);
   }
@@ -674,7 +741,7 @@ export function isKnowledge(
    * solver's own noise as freedom. It stays RELATIVE, so nothing about the honesty rule changes:
    * a quantity that really moves with a free DOF moves by orders of magnitude more than this.
    */
-  return spread <= SATISFIED_EPS * scale ? { known: true, value: vals[0] } : { known: false };
+  return spread <= SAME_VALUE_EPS * scale ? { known: true, value: vals[0] } : { known: false };
 }
 
 
@@ -726,13 +793,13 @@ export function knownOptions(
 ): number[][] | null {
   const samples: number[][] = [];
   for (let seed = 0; seed < seeds; seed += 1) {
-    const v = read(evaluate(c, seed));
+    const v = read(drawableAt(c, seed));
     // A value absent at ANY configuration is not a member of a stable set.
     if (v === null || v.some((n) => !Number.isFinite(n))) return null;
     samples.push(v);
   }
   const scale = Math.max(1, ...samples.flat().map(Math.abs));
-  const near = (a: number[], b: number[]) => a.every((n, i) => Math.abs(n - b[i]) <= SATISFIED_EPS * scale);
+  const near = (a: number[], b: number[]) => a.every((n, i) => Math.abs(n - b[i]) <= SAME_VALUE_EPS * scale);
   const distinct: number[][] = [];
   for (const v of samples) {
     if (!distinct.some((d) => near(d, v))) distinct.push(v);

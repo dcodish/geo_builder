@@ -2895,3 +2895,54 @@ because what must agree is the figure. A sixth spelling now has a place to be ad
 will notice if it is not.
 
 **Consequences.** `src-analytic` +18 tests.
+
+## ADR-AG-052 — The honesty gate measures what the tool would DRAW (#1083)
+
+**Status:** accepted, 2026-09-15 · **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** covered by [ADR-AG-003](#adr-ag-003) §2 — this makes it true. **Design:** none (internal).
+
+**Context.** Operator, 2026-09-15: *"on this shape, point C should be able to be positioned"*, on a
+full kite figure whose `C` the panel showed as a dependency.
+
+**Measured, and the figure was not the problem.** `derive` returned the identical figure at every
+seed — `C = (-4.9999998506756826, -5.0000000829500193)`, to seventeen digits — while `isKnowledge`
+answered `false`. The reason:
+
+```
+raw evaluate(c, 0) → C = (-3.841,  -2.681)   selectorsOk = FALSE
+raw evaluate(c, 1) → C = (-4.267,  -3.535)   selectorsOk = FALSE
+raw evaluate(c, 2) → C = (-8.233, -11.467)   selectorsOk = FALSE
+```
+
+**Root cause: the gate and the canvas were looking at different figures.** `derive` advances the seed
+until the SELECTORS hold, because a configuration that fails them is not a figure this tool shows.
+`isKnowledge` and `knownOptions` called `evaluate` directly, and judged *"does this value vary?"*
+across configurations that had been rejected before they ever reached the canvas. Of course it varied
+there.
+
+**Every gated row was affected** — coordinates, lengths, slopes, equations, ask answers — on any
+figure whose configuration is chosen by a selector: a quadrant ([ADR-AG-034](#adr-ag-034)), a
+half-axis, a betweenness ([ADR-AG-029](#adr-ag-029)), and the distinctness every shape now carries
+([ADR-AG-039](#adr-ag-039)). The last of those made it far commoner than it had been.
+
+**Decision: one sampler, `drawableAt`, shared by both gates** — the same seed advance `derive`
+performs, memoised per construction because the panel asks per coordinate per point.
+
+**A second defect, found in the fix.** With drawable sampling the option set answered `(-5,-5)` and
+`(-5,-5)` — twice. Twenty-four drawable configurations had all found the same answer, spread over
+`1.1e-5`, and the clustering used `SATISFIED_EPS`. That constant is **how small a RESIDUAL must be
+for one configuration to satisfy its givens**; how far apart two independent least-squares descents
+may land and still be the same solution is a different question with a larger answer. Hence
+`SAME_VALUE_EPS`, measured from that spread rather than chosen.
+
+**A limit worth stating rather than hiding.** Scanning two hundred configurations found a SECOND
+drawable solution for the operator's figure — `C = (-9, -13)` — reachable about once in thirteen
+drawable configurations and not at all within the twenty-four the gates sample. The tool therefore
+reports `(-5, -5)` as knowledge, and there exists a configuration it did not find. **Sampling cannot
+prove uniqueness**; it never could, and this ADR does not change that. What it changes is that the
+sampling now looks at figures the student could actually see. The operator has been told, because if
+this figure is meant to have two cases the search budget is the thing to raise.
+
+**Consequences.** `src-analytic` +7 tests. Twenty-four drawable samples of that figure cost ~380 ms,
+once per construction.
