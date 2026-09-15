@@ -48,6 +48,16 @@ export interface InputAreaProps {
   /** Per-chip direction for quick commands — needed when the commands are SENTENCES (2-D's Hebrew
    *  examples), not math tokens. Absent = the strip stays LTR. */
   quickDir?: (command: string) => 'rtl' | 'ltr';
+  /**
+   * PRESENTATION for a quick command — the same seam `QuickChips` has carried since it was written,
+   * and the one this strip was missing (#1088).
+   *
+   * A direction alone is not enough for a mixed line: «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9» laid
+   * out RTL with no LTR isolation reorders the equation's own characters into «2+(y-4)^2=9^(x-3)».
+   * `onQuickCommand` still receives the RAW command — what the student would have typed — so what is
+   * displayed and what is submitted can never drift apart.
+   */
+  quickDisplay?: (command: string) => string;
   /** Extra product content under the palette (errors, hints) — rendered inside the card. */
   children?: ReactNode;
 }
@@ -68,6 +78,7 @@ export function InputArea({
   quickCommands,
   onQuickCommand,
   quickDir,
+  quickDisplay,
   children,
 }: InputAreaProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -86,7 +97,7 @@ export function InputArea({
               dir={quickDir?.(cmd)}
               onClick={() => onQuickCommand(cmd)}
             >
-              {cmd}
+              {quickDisplay ? quickDisplay(cmd) : cmd}
             </button>
           ))}
         </div>

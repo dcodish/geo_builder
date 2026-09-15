@@ -383,3 +383,39 @@ applied to the fourth.
 - **Not deployed** (above). The readmission path is mechanical: flip `enabled` to `true` and drop
   `devOnly` in [`products.json`](../products.json), and add its RUNBOOK row.
 
+
+## The session, and the panel that shows it ([ADR-AG-055](06c-decisions-analytic.md#adr-ag-055))
+
+**A save holds the LINES.** No position, no parameter value, no seed-dependent number — the session
+is the ordered list of sentences the student typed, and `restore` hands them back to `derive`. Three
+things fall out of that one choice, and they are the reason it is worth stating as design rather than
+as a serialization detail:
+
+- a load is a **replay through the real parser**, so a saved figure doubles as a parser-drift net;
+- a load can be **audited by line** — the failure the audit reports is a sentence the student wrote,
+  which is the only kind of failure worth showing them ([ADR-242](06-decisions.md)'s rule, made
+  answerable);
+- nothing in the file can contradict the engine, because the file holds no engine output.
+
+`shell/save` supplies the envelope, the naming and the `LoadAudit` shape; this product supplies the
+lines. Envelope REFUSALS are not audit entries — they are errors, and they name which of the three
+reasons applies (another builder's file, a newer format, not a save file at all), because those send
+the student to three different places.
+
+**The bidi seams.** `shell/bidi` decides where an LTR run begins and ends; this product's job is to
+pass that decision to every surface that shows a line. There are five — the input box, its live
+preview, the example chips on the empty canvas, the quick strip above the box, and the fact list with
+its editor — and the strip is the one that had no seam to pass to, because `InputArea` rendered the
+raw command where its sibling `QuickChips` had carried a `display` hook since #751. That gap is fixed
+in the shared component, not here: a second consumer would have hit it too.
+
+**Provenance and the curve-parented point.** `provenanceOf` answers "what do the givens that name
+this point ALONE say about it?" — deliberately a different question from `isKnowledge`, which asks
+whether the solve pins a value. A derived point normally inherits nothing, because its parents are
+points that the solve places. `circle-centre` is the exception the model already knew about
+(`parentsOf` returns none for it; `curveParentOf` answers instead): its parent is a CURVE, and a curve
+written out in full is read rather than solved. The test is syntactic — do the equation's symbols
+reduce to the reserved ones? — and it must stay syntactic, because `knownCurve` runs `evaluate` over
+three seeds and `provenanceOf` is called from inside `evaluate`. It is conservative on a parametric
+circle (both components open, where `y` is really given): under-claiming is safe, and attributing a
+free symbol to one coordinate of a FITTED centre needs algebra the fit discards.
