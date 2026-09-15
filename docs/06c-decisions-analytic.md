@@ -1351,40 +1351,6 @@ changed the domain at all, compared through a normalized form rather than by ref
 answer computed at the apply boundary instead of each deriving their own. `absorbed` is gone from the
 public shape; the one test that read it now asserts the effect. `src-analytic` 194 → 202 tests.
 
-## ADR-AG-023 — One namespace for every anonymous curve (round #1056 reconciliation)
-
-**Status:** accepted, 2026-09-15 · **Completes:** [ADR-AG-018](#adr-ag-018) (#1026) and
-[ADR-AG-019](#adr-ag-019) (#1037) · **Round:**
-[#1056](https://github.com/dcodish/geo_builder/issues/1056)
-
-**Requirements:** [02c](02c-requirements-analytic.md) R44 — unchanged; this is R44 applied to the one
-family that had been left out. **Design:** [04c](04c-design-analytic.md) "The parser's last branch".
-
-**Context.** Two fixes in the same round met at the same line. ADR-AG-018 gave anonymous conics a
-content-derived id, `parabola-<hash>`. ADR-AG-019 ruled that an anonymous curve is identified by its
-**equation** and put unnamed lines and circles in a single `curve-<hash>` namespace. Each was right on
-its own branch and each suite was green.
-
-**Together they were wrong**, and neither branch could see it: with conics keeping a kind prefix,
-«נתונה פרבולה שמשוואתה y^2=54x» and the bare «y^2=54x» land in different namespaces, so one parabola
-becomes two objects and two data-panel rows — precisely the duplication ADR-AG-019 had just removed for
-lines and circles.
-
-**Decision.** Every unnamed curve — line, circle, parabola, ellipse — takes `curve-<hash of its
-normalized equation>`. A NAMED curve keeps its name (`line-l1`, `circle-I`), because a name is an
-identity. ADR-AG-018's property is untouched: two different equations still hash differently and remain
-two objects, and the same equation restated is still absorbed.
-
-**Why this is its own ADR rather than a quiet fix-up.** The defect existed in neither branch and in
-both — it is a property of the pair, invisible to each item's own gate, and the kind that a round
-landing items independently would ship. It is the case the staging tip exists for, and recording it is
-how the next round learns to look for it: **when two items in one batch touch the same identity rule,
-their conflict may be semantic and produce no merge conflict at all.** Git merged these files cleanly.
-
-**Consequences.** Locked by four cases in `engine.test.ts` asserting the property of the pair — the
-noun and bare forms of a parabola and of an ellipse are each one object, two different conics are still
-two, and every unnamed curve of all four families shares the namespace while the named ones do not.
-
 ## ADR-AG-021 — A segment–segment question answered with the line–line formula (#1043)
 
 **Status:** accepted, 2026-09-15 · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056)
@@ -1474,3 +1440,37 @@ familiar is the same defect as drawing a figure that violates a given, one step 
 **Consequences.** `src-analytic` 194 → 201 tests, including the seed-0 lock (the familiar draw is
 allowed to be first), the both-signs-within-six-seeds lock, the away-from-zero lock, the independence
 lock, and controls asserting the three bounded branches are untouched.
+
+## ADR-AG-023 — One namespace for every anonymous curve (round #1056 reconciliation)
+
+**Status:** accepted, 2026-09-15 · **Completes:** [ADR-AG-018](#adr-ag-018) (#1026) and
+[ADR-AG-019](#adr-ag-019) (#1037) · **Round:**
+[#1056](https://github.com/dcodish/geo_builder/issues/1056)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R44 — unchanged; this is R44 applied to the one
+family that had been left out. **Design:** [04c](04c-design-analytic.md) "The parser's last branch".
+
+**Context.** Two fixes in the same round met at the same line. ADR-AG-018 gave anonymous conics a
+content-derived id, `parabola-<hash>`. ADR-AG-019 ruled that an anonymous curve is identified by its
+**equation** and put unnamed lines and circles in a single `curve-<hash>` namespace. Each was right on
+its own branch and each suite was green.
+
+**Together they were wrong**, and neither branch could see it: with conics keeping a kind prefix,
+«נתונה פרבולה שמשוואתה y^2=54x» and the bare «y^2=54x» land in different namespaces, so one parabola
+becomes two objects and two data-panel rows — precisely the duplication ADR-AG-019 had just removed for
+lines and circles.
+
+**Decision.** Every unnamed curve — line, circle, parabola, ellipse — takes `curve-<hash of its
+normalized equation>`. A NAMED curve keeps its name (`line-l1`, `circle-I`), because a name is an
+identity. ADR-AG-018's property is untouched: two different equations still hash differently and remain
+two objects, and the same equation restated is still absorbed.
+
+**Why this is its own ADR rather than a quiet fix-up.** The defect existed in neither branch and in
+both — it is a property of the pair, invisible to each item's own gate, and the kind that a round
+landing items independently would ship. It is the case the staging tip exists for, and recording it is
+how the next round learns to look for it: **when two items in one batch touch the same identity rule,
+their conflict may be semantic and produce no merge conflict at all.** Git merged these files cleanly.
+
+**Consequences.** Locked by four cases in `engine.test.ts` asserting the property of the pair — the
+noun and bare forms of a parabola and of an ellipse are each one object, two different conics are still
+two, and every unnamed curve of all four families shares the namespace while the named ones do not.
