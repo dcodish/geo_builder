@@ -64,6 +64,8 @@ const he = {
     'אפשר לבחור אות אחרת, או למחוק את ההגדרה הקודמת ולכתוב אותה מחדש.',
   errUnknownRef: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
+  errNoPrincipalDiagonal:
+    'בצורה הזאת אין אלכסון ראשי ואלכסון משני — ההבחנה הזאת קיימת רק בצורות כמו דלתון: "{{detail}}". אפשר לציין את האלכסון לפי הקודקודים, למשל «משוואת האלכסון AC היא y=2x».',
   errAmbiguousShape:
     'בשרטוט הזה אין צורה אחת שאפשר לקרוא לה כך: "{{detail}}". אפשר לציין את הקודקודים, למשל «שטח הדלתון ABCD הוא 24».',
   errAmbiguousAngle:
@@ -150,6 +152,10 @@ const en: typeof he = {
     'restate it.',
   errUnknownRef: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
+  errNoPrincipalDiagonal:
+    'This shape has no principal and secondary diagonal — that distinction exists only for shapes ' +
+    'like a kite: "{{detail}}". Name the diagonal by its vertices instead, for example "the ' +
+    'equation of diagonal AC is y=2x".',
   errAmbiguousShape:
     'No single shape in this figure answers to that: "{{detail}}". Name its vertices — for example "the area of kite ABCD is 24".',
   errAmbiguousAngle:

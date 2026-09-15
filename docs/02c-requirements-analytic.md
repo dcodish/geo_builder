@@ -793,3 +793,11 @@ is right, so «הציגו תצורה אחרת» walks all three — R14's discre
 «זווית B ישרה» (also «הזווית B היא 90», «∡B = 90») settles it, and the figure keeps that seat at
 every configuration. A vertex that names no single angle — no shape through it, or several — is
 refused with the format that would work, never resolved by guessing which two rays were meant.
+
+**R62 — a diagonal is an object, and a concurrency point has a verb**
+([ADR-AG-037](06c-decisions-analytic.md#adr-ag-037)). «אלכסוני המרובע ABCD נפגשים בנקודה O» builds
+the same figure as «O מפגש האלכסונים במרובע ABCD», in the construct state the sentence form actually
+uses, and with the vertices optional when the figure has one shape to mean. «משוואת האלכסון AC היא
+y=2x» is «משוואת הישר AC היא y=2x». **«האלכסון הראשי» and «האלכסון המשני» resolve only where the
+shape noun distinguishes them** — a kite does, a parallelogram and a rhombus do not — and elsewhere
+are refused by name rather than guessed.

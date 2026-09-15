@@ -41,6 +41,8 @@ export type InputError =
   | { key: 'ambiguous-angle'; detail: string }
   /** A shape named by its noun alone, where the figure has no such shape or several (#1049). */
   | { key: 'ambiguous-shape'; detail: string }
+  /** «האלכסון הראשי» where the shape distinguishes no principal diagonal (#1070). */
+  | { key: 'undistinguished-diagonal'; detail: string }
   /** A given the figure cannot satisfy (#1016). */
   | { key: 'unsatisfiable'; detail: string };
 

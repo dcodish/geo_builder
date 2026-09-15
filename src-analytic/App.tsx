@@ -227,6 +227,7 @@ export function App() {
           'does-not-exist': 'errDoesNotExist',
           'ambiguous-angle': 'errAmbiguousAngle',
           'ambiguous-shape': 'errAmbiguousShape',
+          'undistinguished-diagonal': 'errNoPrincipalDiagonal',
           'unsatisfiable': 'errUnsatisfiable',
         }[error.key],
         { detail: error.detail, existing: t(existingKey(error)) },

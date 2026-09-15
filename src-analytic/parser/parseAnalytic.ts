@@ -93,7 +93,15 @@ const HE_GIVEN = '(?:נתו(?:ן|נה|נים|נות)\\s+)?';
 /** «הנקודה» / «נקודה» / «הנקודות» / «נקודות», optional — the subject noun. */
 const HE_POINT = '(?:ה?נקוד(?:ה|ות)\\s+)?';
 /** «הישר» / «ישר». */
-const HE_LINE = 'ה?ישר';
+/**
+ * The line NOUNS — «הישר AC», and «האלכסון AC», which is the same object (#1070).
+ *
+ * «משוואת האלכסון AC היא y=2x» failed while «משוואת הישר AC היא y=2x» worked, and the two say the
+ * identical thing: a diagonal of a quadrilateral IS the line through those two vertices. So this is
+ * a noun the line rule did not accept, not a new construct — and adding it here means the diagonal
+ * inherits ADR-AG-026 (the name is a claim: A and C are ON that line) rather than re-deriving it.
+ */
+const HE_LINE = 'ה?(?:ישר|אלכסון)';
 /** «המעגל» / «מעגל». */
 const HE_CIRCLE = 'ה?מעגל';
 /** «שמשוואתו» / «שמשוואתה» / «משוואת» / «שמשוואת» — the "whose equation is" connector. */
@@ -449,12 +457,61 @@ const splitNames = (run: string): string[] => run.match(/[A-Z][0-9]?/g) ?? [];
  * («מפגש התיכונים במרובע ABCD») is refused rather than quietly reading the first three.
  */
 const ROLES: Array<{ he: RegExp; en: RegExp; t: DerivedRule['t']; n: number }> = [
-  { he: /ה?תיכונים/, en: /centroid|medians/i, t: 'centroid', n: 3 },
+  { he: /ה?תיכונ(?:ים|י)/, en: /centroid|medians/i, t: 'centroid', n: 3 },
   { he: /חוצי\s+ה?זוויות/, en: /incent(?:re|er)|angle\s+bisectors/i, t: 'incentre', n: 3 },
-  { he: /ה?גבהים/, en: /orthocent(?:re|er)|altitudes/i, t: 'orthocentre', n: 3 },
-  { he: /ה?אנכים\s+ה?אמצעיים/, en: /circumcent(?:re|er)|perpendicular\s+bisectors/i, t: 'circumcentre', n: 3 },
-  { he: /ה?אלכסונים/, en: /diagonals/i, t: 'diagonals', n: 4 },
+  { he: /ה?גבה(?:ים|י)/, en: /orthocent(?:re|er)|altitudes/i, t: 'orthocentre', n: 3 },
+  { he: /ה?אנכ(?:ים|י)\s+ה?אמצעיים/, en: /circumcent(?:re|er)|perpendicular\s+bisectors/i, t: 'circumcentre', n: 3 },
+  { he: /ה?אלכסונ(?:ים|י)/, en: /diagonals/i, t: 'diagonals', n: 4 },
 ];
+
+/**
+ * The CONSTRUCT state is part of the noun (#1070).
+ *
+ * Hebrew inflects a plural noun when it governs another: «האלכסונים» standing alone becomes
+ * «אלכסוני המרובע» in front of the shape. The noun-phrase form («מפגש האלכסונים במרובע») only ever
+ * sees the free state, so the table was written with it — and the VERB form, which is the one the
+ * corpus writes as a sentence, only ever sees the construct state. Both spellings are one noun.
+ */
+
+/**
+ * The VERB phrasing of a concurrency point (#1070).
+ *
+ * «אלכסוני המרובע ABCD נפגשים בנקודה O» and «O מפגש האלכסונים במרובע ABCD» say the identical
+ * thing: the first is a SENTENCE, the second a NOUN PHRASE naming the point. The corpus writes
+ * both, and D8 is that the student types the exam`s own sentence.
+ *
+ * One alternation over the SAME `ROLES` table, so «התיכונים נפגשים בנקודה M» and «הגבהים נפגשים
+ * בנקודה H» arrive with it rather than as three more rules.
+ *
+ * The vertices are OPTIONAL: «אלכסוני המרובע נפגשים בנקודה O» is a contextual reference to the
+ * one quadrilateral the student has drawn, resolved at M1 like «שטח הדלתון הוא 24» (#1049).
+ */
+/**
+ * «משוואת האלכסון הראשי היא y=2x» — the diagonal named by its ROLE (#1070).
+ *
+ * Operator, 2026-09-15: *"for a דלתון - i want to be able to say משוואת האלכסון הראשי or האלכסון
+ * המשני and give the equation"*, and *"what i said about a kite should be true for other quads"*.
+ *
+ * The generalisation holds in one direction only, and that is the whole modelling decision:
+ * **every quadrilateral has two diagonals; only some have a PRINCIPAL one.** Which diagonal is
+ * principal is a fact about the figure — a kite's axis of symmetry — so it is meaningful only for
+ * a noun whose registry row distinguishes them, and M1 is where the figure is known.
+ */
+const DIAGONAL_EQ_HE = new RegExp(
+  `^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?ה?אלכסון\\s+ה?(ראשי|משני)${HE_IS}\\s*:?\\s*(.+)$`,
+);
+const DIAGONAL_EQ_EN = new RegExp(
+  `^(?:the\\s+)?(main|principal|major|secondary|minor)\\s+diagonal\\s+(?:is\\s+|=\\s*)(.+)$`,
+  'i',
+);
+
+const MEET_HE = new RegExp(
+  `^${HE_GIVEN}(.+?)\\s+נפגשים\\s+ב-?\\s*(?:ה?נקוד(?:ה|ת))?\\s*(${NAME})$`,
+);
+const MEET_EN = new RegExp(
+  `^(?:the\\s+)?(.+?)\\s+meet\\s+(?:at\\s+)?(?:the\\s+)?(?:point\\s+)?(${NAME})$`,
+  'i',
+);
 
 /** `M אמצע AB` · `M הוא אמצע הצלע AB` · `M is the midpoint of AB`. The corpus's commonest construct. */
 const MIDPOINT_HE = new RegExp(
@@ -467,7 +524,7 @@ const MIDPOINT_EN = new RegExp(
 
 /** `M מפגש התיכונים במשולש ABC` · `G מפגש האלכסונים במרובע ABCD`. */
 const CONCURRENCY_HE = new RegExp(
-  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מפגש\\s+(.+?)\\s+ב-?\\s*(?:ה?(משולש|מרובע)\\s+)?(${NAME_RUN})$`,
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מפגש\\s+(.+?)\\s+ב-?\\s*(?:ה?([א-ת]+(?:[- ][א-ת]+){0,2})\\s+)?(${NAME_RUN})$`,
 );
 const CONCURRENCY_EN = new RegExp(
   `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+(?:intersection\\s+of\\s+the\\s+)?(.+?)\\s+of\\s+(?:(triangle|quadrilateral)\\s+)?(${NAME_RUN})$`,
@@ -479,14 +536,15 @@ const CONCURRENCY_EN = new RegExp(
  * because a noun the parser cannot see is a noun it cannot check: «משולש ABCD» built a four-sided
  * "triangle" and «מפגש התיכונים במרובע ABC» built a centroid from a "quadrilateral" of three
  * points — the student's own word contradicted the figure and nothing said so.
+ * Read from the REGISTRY (#1070). This was the FIFTH hand-written list of shape nouns in this
+ * file, and it knew only two of them — so «מפגש האלכסונים בדלתון ABCD» could not be checked at
+ * all. One table, asked five ways.
  */
-const SHAPE_ARITY: ReadonlyArray<{ re: RegExp; n: number }> = [
-  { re: /^(?:משולש|triangle)$/i, n: 3 },
-  { re: /^(?:מרובע|quadrilateral)$/i, n: 4 },
-];
-
-const arityOf = (noun: string | undefined): number | null =>
-  noun ? (SHAPE_ARITY.find((s) => s.re.test(noun))?.n ?? null) : null;
+const arityOf = (noun: string | undefined): number | null => {
+  if (!noun) return null;
+  const key = EN_SHAPE[normalizeShapeNoun(noun).toLowerCase()] ?? noun;
+  return shapeRow(key)?.arity ?? null;
+};
 
 /** A label naming two different vertices of one figure is not a figure — «משולש ABA» (#1042). */
 const hasRepeat = (v: readonly string[]): boolean => new Set(v).size !== v.length;
@@ -497,6 +555,40 @@ function parseDerived(line: string): RuleOutcome {
     const [, id, a, b] = mid;
     if (a === b) return refuse('repeated-vertex', line); // «M אמצע AA» is a point, not a segment
     return made([{ t: 'derived', id, rule: { t: 'midpoint', a, b }, src: line }]);
+  }
+
+  const diag = DIAGONAL_EQ_HE.exec(line) ?? DIAGONAL_EQ_EN.exec(line);
+  if (diag) {
+    const [, which, eqSrc] = diag;
+    const eq = equationExpr(eqSrc);
+    if (!eq) return refuse('bad-equation', trim(eqSrc));
+    const principal = /ראשי|main|principal|major/i.test(which);
+    return made([{ t: 'diagonal-eq', principal, eq, src: line }]);
+  }
+
+  const meet = MEET_HE.exec(line) ?? MEET_EN.exec(line);
+  if (meet) {
+    const [, subject, id] = meet;
+    const role = ROLES.find((r) => r.he.test(subject) || r.en.test(subject));
+    // Not a concurrency subject — «הישרים נפגשים בנקודה O» is a different sentence and this rule
+    // has no claim on it. Declining leaves it to the rules after this one.
+    if (role) {
+      // The shape may be named with its vertices or only by its noun; the trailing run of names is
+      // the figure when it is there, and the NOUN carries it otherwise.
+      const shape = /([A-Z][0-9]?){3,}$/.exec(trim(subject));
+      if (shape) {
+        const v = splitNames(shape[0]);
+        if (v.length !== role.n) return refuse('bad-arity', line);
+        if (hasRepeat(v)) return refuse('repeated-vertex', line);
+        const rule: DerivedRule =
+          role.t === 'diagonals'
+            ? { t: 'diagonals', v: [v[0], v[1], v[2], v[3]] }
+            : ({ t: role.t, v: [v[0], v[1], v[2]] } as DerivedRule);
+        return made([{ t: 'derived', id, rule, src: line }]);
+      }
+      // No vertices: the shape is whichever one the figure has, which only M1 can say.
+      return made([{ t: 'meet-of', role: role.t, arity: role.n, id, src: line }]);
+    }
   }
 
   const con = CONCURRENCY_HE.exec(line) ?? CONCURRENCY_EN.exec(line);

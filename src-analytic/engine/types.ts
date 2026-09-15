@@ -179,7 +179,24 @@ export type Fact =
    * The corpus is full of these («שיפוע הישר הוא 2», «האלכסונים נפגשים בנקודה O»), and this is the
    * first of them. Each one still needs its own rule; what they share is this resolution step.
    */
-  | (FactBase & { t: 'area-of'; noun: string; value: Expr });
+  | (FactBase & { t: 'area-of'; noun: string; value: Expr })
+  /**
+   * «אלכסוני המרובע נפגשים בנקודה O» — a concurrency point whose SHAPE was not named (#1070).
+   *
+   * The contextual sibling of `area-of`: the shape is whichever one in the figure has the right
+   * number of vertices, resolved at M1 and refused when that is not exactly one.
+   */
+  | (FactBase & { t: 'meet-of'; role: DerivedRule['t']; arity: number; id: Id })
+  /**
+   * «משוואת האלכסון הראשי היא y=2x» — a diagonal named by its ROLE rather than its endpoints.
+   *
+   * In a kite the principal diagonal is the axis of symmetry — the one joining the two vertices
+   * where the equal sides meet. That is a geometric FACT about the figure, not a naming
+   * convention, so it is meaningful only for a noun whose row distinguishes the two, and must be
+   * refused by name for one that does not. Guessing would assert a distinction the question never
+   * made.
+   */
+  | (FactBase & { t: 'diagonal-eq'; principal: boolean; eq: Expr });
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list

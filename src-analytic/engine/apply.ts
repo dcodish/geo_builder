@@ -16,9 +16,9 @@
  * lands, and nowhere else.
  */
 import { fitConic } from './conic';
-import { parentsOf } from './derived';
+import { parentsOf, type DerivedRule } from './derived';
 import { constraintRefs } from './solve';
-import { isGenericNoun, namesOption, rightAngleAt } from './shapes';
+import { isGenericNoun, namesOption, rightAngleAt, shapeRow } from './shapes';
 import { evalExpr, type Env } from './expr';
 import {
   EMPTY_CONSTRUCTION,
@@ -74,6 +74,14 @@ export type ApplyErrorCode =
    * single object is answered by saying so, never by picking one.
    */
   | 'ambiguous-shape'
+  /**
+   * «האלכסון הראשי» in a shape whose noun distinguishes no principal diagonal (#1070).
+   *
+   * A kite has one — its axis of symmetry is a fact about the figure. A plain quadrilateral, a
+   * parallelogram and a rhombus do not, and picking one would assert a distinction the question
+   * never made. The message names the endpoints form instead.
+   */
+  | 'undistinguished-diagonal'
   /** A stated given the solve could not satisfy — reported, never drawn as if it held. */
   | 'unsatisfiable';
 
@@ -185,6 +193,31 @@ function priorOf(
   // The clash carries the object it collided with, so the refusal can say what the name holds
   // rather than only that the name is taken (#1046).
   return prior.kind === f.t ? { same: prior } : { clash: true, prior };
+}
+
+/**
+ * Apply several facts as ONE statement (#1070).
+ *
+ * The resolved-reference kinds — «זווית B ישרה», «שטח הדלתון הוא 24», «משוואת האלכסון הראשי» —
+ * all work the same way: M1 works out what the sentence names, and then the sentence means
+ * exactly what the spelled-out form would have meant. Applying the spelled-out FACTS, rather than
+ * duplicating what they do, is what guarantees the two phrasings cannot drift apart.
+ *
+ * The effect is the same rollup `derive` does per line, and for the same reason: a statement that
+ * created anything counted, one that only narrowed narrowed, and one whose every part was already
+ * known is the only case where dropping the row is honest.
+ */
+function applyAll(c: Construction, facts: readonly Fact[]): ApplyOutcome {
+  let next = c;
+  let effect: LineEffect = 'known';
+  for (const f of facts) {
+    const out = applyFact(next, f);
+    if (!out.ok) return out;
+    next = out.next;
+    if (out.effect === 'created') effect = 'created';
+    else if (out.effect === 'narrowed' && effect !== 'created') effect = 'narrowed';
+  }
+  return { ok: true, next, effect };
 }
 
 export function applyFact(c: Construction, f: Fact): ApplyOutcome {
@@ -376,6 +409,58 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
      * ONE shape of that noun, and a guess otherwise. Refusing the ambiguous case is what makes the
      * unambiguous one safe.
      */
+    /**
+     * «אלכסוני המרובע נפגשים בנקודה O» — the shape resolved from the figure (#1070).
+     *
+     * The same contextual resolution as `area-of`, keyed on ARITY rather than on a noun, because
+     * the sentence names the construct («האלכסונים») and not the shape. One quadrilateral in the
+     * figure makes it unambiguous; none or several makes it a refusal, never a pick.
+     */
+    case 'meet-of': {
+      const rings = c.objects.filter(
+        (o) => o.kind === 'polygon' && o.vertices.length === f.arity,
+      ) as PolygonObject[];
+      if (rings.length !== 1) return { ok: false, error: { code: 'ambiguous-shape', detail: f.src } };
+      const v = rings[0].vertices;
+      const rule: DerivedRule =
+        f.role === 'diagonals'
+          ? { t: 'diagonals', v: [v[0], v[1], v[2], v[3]] }
+          : ({ t: f.role, v: [v[0], v[1], v[2]] } as DerivedRule);
+      return applyFact(c, { t: 'derived', id: f.id, rule, src: f.src });
+    }
+
+    /**
+     * «משוואת האלכסון הראשי היא y=2x» — the diagonal the NOUN distinguishes (#1070).
+     *
+     * Only some quadrilaterals have a principal diagonal: a kite does, because its axis of
+     * symmetry is a geometric fact about the figure. A plain «מרובע», a parallelogram and a rhombus
+     * do not, and there the phrase has no referent — refused by name, because choosing one would
+     * assert a distinction the question never made (ADR-052 in vocabulary form).
+     *
+     * Once resolved it is the ORDINARY line-by-name statement, applied as the facts the spelled-out
+     * «משוואת האלכסון AC היא y=2x» would have produced, so ADR-AG-026`s incidences come with it.
+     */
+    case 'diagonal-eq': {
+      const rings = c.objects.filter(
+        (o) => o.kind === 'polygon' && !!o.noun && !!shapeRow(o.noun)?.principalDiagonal,
+      ) as PolygonObject[];
+      if (rings.length !== 1) {
+        return { ok: false, error: { code: 'undistinguished-diagonal', detail: f.src } };
+      }
+      const ring = rings[0];
+      const [p, q] = shapeRow(ring.noun!)!.principalDiagonal!(ring.vertices);
+      // The SECONDARY diagonal is the other one: the two vertices the principal does not join.
+      const [a, b] = f.principal ? [p, q] : ring.vertices.filter((x) => x !== p && x !== q);
+      const id = `line-${a}${b}`;
+      return applyAll(c, [
+        { t: 'curve', id, label: { name: `${a}${b}`, kind: 'line' }, curve: { kind: 'line', eq: f.eq }, src: f.src },
+        { t: 'declare', id: a, src: f.src },
+        { t: 'declare', id: b, src: f.src },
+        { t: 'constraint', k: { t: 'on-curve', id: a, curve: id }, src: f.src },
+        { t: 'constraint', k: { t: 'on-curve', id: b, curve: id }, src: f.src },
+      ]);
+    }
+
     case 'area-of': {
       const rings = c.objects.filter(
         (o) => o.kind === 'polygon' && o.noun === f.noun,

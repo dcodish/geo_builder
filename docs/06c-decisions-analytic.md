@@ -2047,3 +2047,66 @@ a stated value that is not 90 falls through rather than being quietly treated as
 **Consequences.** `src-analytic` 682 → 714 tests. Ten nouns ship: משולש · משולש ישר-זווית · משולש
 שווה שוקיים · משולש שווה צלעות · מרובע · מקבילית · מלבן · ריבוע · מעוין · טרפז · טרפז שווה שוקיים ·
 טרפז ישר-זווית · דלתון, with the English aliases pointing at the same rows.
+
+## ADR-AG-037 — A diagonal is an OBJECT, and only some shapes have a PRINCIPAL one (#1070)
+
+**Status:** accepted, 2026-09-15 · **Builds on** [ADR-AG-035](#adr-ag-035) (the registry) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R62. **Design:**
+[04c](04c-design-analytic.md) "The shape registry" (contextual references).
+
+**Context.** Operator, 2026-09-15:
+
+> trying to say אלכסוני המרובע נפגשים בנקודה O - not supported
+> for a דלתון - i want to be able to say משוואת האלכסון הראשי or האלכסון המשני and give the equation
+> **what i said about a kite should be true for other quads**
+
+**Three gaps, and they are three different kinds of thing.**
+
+**1 — One phrasing admitted where the corpus writes two.** «O מפגש האלכסונים במרובע ABCD» built;
+«אלכסוני המרובע נפגשים בנקודה O» did not. They say the identical thing — the first is a NOUN
+PHRASE naming the point, the second a SENTENCE with a verb — and D8's whole principle is that the
+student types the exam's own sentence. One alternation over the existing `ROLES` table, so the
+medians, the altitudes and the angle bisectors arrive with the diagonals rather than as three more
+rules.
+
+**The interesting part was Hebrew grammar.** «האלכסונים» standing alone becomes «אלכסוני המרובע» in
+front of the shape — the construct state. The noun-phrase form only ever sees the free state, so the
+table was written with it, and the verb form only ever sees the construct state. Both spellings are
+one noun, and the table now says so. Measured: the same fix carries «תיכוני המשולש» and «גבהי
+המשולש».
+
+**2 — «האלכסון AC» is the LINE AC**, and the whole sentence already worked with a different noun.
+So this is a noun the line rule did not accept, not a new construct — and adding it to `HE_LINE`
+means the diagonal INHERITS [ADR-AG-026](#adr-ag-026) (the name is a geometric claim: `A` and `C`
+are on that line) rather than re-deriving it. The lock compares the two constructions and requires
+them identical.
+
+**3 — The modelling decision: «האלכסון הראשי» is a fact about the FIGURE, not a naming convention.**
+In a kite the principal diagonal is the axis of symmetry — the one joining the two vertices where
+the equal sides meet. So the operator's generalisation holds **in one direction only**, and stating
+that direction is the decision:
+
+> **Every quadrilateral has two diagonals as objects; only some have a PRINCIPAL one.**
+
+The registry row carries `principalDiagonal` where the noun distinguishes them, and a shape whose
+noun does not — a plain «מרובע», a parallelogram, and notably a **rhombus**, whose diagonals are
+unequal but whose NOUN says nothing about which is which — is refused by name
+(`undistinguished-diagonal`), with the message naming the endpoint form that does work. Picking one
+would assert a distinction the question never made, which is [ADR-052](06-decisions.md#adr-052)'s
+cardinal sin in vocabulary form.
+
+**Both new forms are CONTEXTUAL references, and they reuse #1049's resolution rather than inventing
+one.** «אלכסוני המרובע נפגשים בנקודה O» names no vertices and «האלכסון הראשי» names no shape; both
+are questions about the construction, so both are resolved at M1 and refused when the answer is not
+exactly one object. That is now the third pair of this shape in the tree (`right-angle`, `area-of`,
+and these), which is why `applyAll` exists: a resolved reference applies **the facts the spelled-out
+sentence would have produced**, so the two phrasings cannot drift apart.
+
+**A fifth hand-written list of shape nouns was found and removed.** `SHAPE_ARITY` in the parser knew
+`משולש` and `מרובע` only, so «מפגש האלכסונים בדלתון ABC» could not be checked at all — the arity
+guard #1042 added was silently inapplicable to every noun #1049 shipped. It reads the registry now.
+Five lists, one table.
+
+**Consequences.** `src-analytic` +12 tests.
