@@ -128,14 +128,48 @@ export function Figure({ scene, showConstruction = false }: { scene: Scene; show
         {points.map((p) => (
           <g key={p.id}>
             <circle cx={p.cx} cy={p.cy} r={3.5} fill={INK} />
+            {/*
+              The label carries the point's STATED givens — `A(6,4)`, or `B(x_B, 0)` where only the
+              `y` was given (#1032). What the solve derived stays in the data panel: the canvas is
+              the question, the panel is the answer.
+
+              Subscripts are <tspan> with a reduced size and a baseline offset, not MathML: MathML
+              inside SVG needs <foreignObject>, is unevenly supported, and would not survive the
+              image export this product already has. The rendered result is the same subscript.
+            */}
             <text
               x={p.cx + 7}
               y={p.cy - 7}
               fontSize={13}
               fontFamily="system-ui, sans-serif"
               fill={INK}
+              // A coordinate label lands ON the ink it describes — B sits on the axis, D on its own
+              // segment. The halo is what keeps it readable at projection size (ADR-AG-010 R34),
+              // the same treatment the construction ratios needed.
+              stroke="#fff"
+              strokeWidth={3}
+              strokeLinejoin="round"
+              paintOrder="stroke"
             >
               {p.label}
+              {p.coords && (
+                <>
+                  <tspan>(</tspan>
+                  {p.coords.map((part, i) => (
+                    <tspan key={i}>
+                      {i > 0 && <tspan>, </tspan>}
+                      <tspan fontStyle={part.sub ? 'italic' : undefined}>{part.text}</tspan>
+                      {part.sub && (
+                        <tspan fontSize={9} dy={3}>
+                          {part.sub}
+                        </tspan>
+                      )}
+                      {part.sub && <tspan dy={-3} />}
+                    </tspan>
+                  ))}
+                  <tspan>)</tspan>
+                </>
+              )}
             </text>
           </g>
         ))}
