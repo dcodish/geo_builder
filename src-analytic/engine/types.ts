@@ -327,7 +327,23 @@ export type Selector =
    * decides**, and the DOF is 1 either way — only the range differs, which is why this is a selector
    * and the collinearity beside it is the constraint.
    */
-  | { kind: 'between'; id: Id; a: Id; b: Id };
+  | { kind: 'between'; id: Id; a: Id; b: Id }
+  /**
+   * The vertices of a shape are DISTINCT POINTS (#1077).
+   *
+   * Every shape noun asserts this and none of them encoded it, so the solve was free to satisfy
+   * «דלתון ABCD» by putting `B` and `D` in the same place — |AB|=|AD| and |CB|=|CD| hold trivially
+   * there. Measured: the kite collapsed in 25 of 60 configurations on its own, and in 51 of 60
+   * once a diagonal was given. A figure drawn that way contradicts the noun the student wrote.
+   *
+   * It is a SELECTOR and not a constraint because it consumes no freedom — a quadrilateral has
+   * eight degrees either way — and because "not equal" is not an equation a least-squares solve
+   * can drive to zero. It is a region: the configurations minus the degenerate ones.
+   *
+   * The test is RELATIVE to the figure`s own size, so it states no magnitude (ADR-052): two points
+   * a thousandth of the figure`s span apart are the same point for every purpose a student has.
+   */
+  | { kind: 'distinct'; ids: Id[] };
 
 export const EMPTY_CONSTRUCTION: Construction = {
   params: [],

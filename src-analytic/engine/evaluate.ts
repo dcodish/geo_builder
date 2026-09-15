@@ -299,7 +299,38 @@ function carrierDofOf(c: Construction, env: Env, free: Map<Id, Pt>, ids: Id[]): 
  * reporting a contradiction (D7 kind 2).
  */
 function selectorsHold(c: Construction, at: Map<Id, Pt>): boolean {
+  /**
+   * The scale the DISTINCT test is measured against (#1077).
+   *
+   * Relative, because an absolute epsilon would be a magnitude this product never stated
+   * (ADR-052) and would mean something different on a figure spanning 3 units and one spanning
+   * 300.
+   *
+   * A HUNDREDTH of the span, measured rather than guessed: a thousandth was tried first and let
+   * through a parallelogram whose `A` and `B` were 0.009 apart on a figure spanning 5 — about one
+   * pixel, which is a collapsed figure to the student even though the numbers differ. The threshold
+   * is about what a reader can SEE, so it is set where seeing stops.
+   */
+  const xs = [...at.values()];
+  const span = xs.length < 2 ? 1 : Math.max(
+    1e-9,
+    Math.max(...xs.map((p) => p.x)) - Math.min(...xs.map((p) => p.x)),
+    Math.max(...xs.map((p) => p.y)) - Math.min(...xs.map((p) => p.y)),
+  );
+  const apart = span * 1e-2;
+
   return c.selectors.every((s) => {
+    if (s.kind === 'distinct') {
+      const ps = s.ids.map((id) => at.get(id));
+      // A selector about an absent point judges nothing, as below.
+      if (ps.some((p) => !p)) return true;
+      for (let i = 0; i < ps.length; i += 1) {
+        for (let j = i + 1; j < ps.length; j += 1) {
+          if (Math.hypot(ps[i]!.x - ps[j]!.x, ps[i]!.y - ps[j]!.y) < apart) return false;
+        }
+      }
+      return true;
+    }
     const p = at.get(s.id);
     if (!p) return true; // a selector about an absent point judges nothing
     if (s.kind === 'axis-side') {

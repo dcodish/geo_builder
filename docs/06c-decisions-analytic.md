@@ -2110,3 +2110,55 @@ guard #1042 added was silently inapplicable to every noun #1049 shipped. It read
 Five lists, one table.
 
 **Consequences.** `src-analytic` +12 tests.
+
+## ADR-AG-039 — A shape's vertices are DISTINCT, and that is a region rather than a given (#1077)
+
+**Status:** accepted, 2026-09-15 · **Fixes a defect in** [ADR-AG-035](#adr-ag-035) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R64. **Design:**
+[04c](04c-design-analytic.md) "The shape registry".
+
+**Context.** The operator reported «משוואת האלכסון המשני היא y=-x+2» as unsupported. It parses — that
+half is [ADR-AG-037](#adr-ag-037) — and checking it showed the kite it was about had COLLAPSED, `B`
+and `D` drawn at one point. Measured, and the diagonal turned out not to be the cause:
+
+| figure | configurations that collapse |
+| --- | --- |
+| `דלתון ABCD` | **25 / 60** |
+| `דלתון ABCD` + a diagonal's equation | **51 / 60** |
+| `מקבילית ABCD` | 2 / 60 |
+| every other noun | 0–1 / 60 |
+
+**Root cause: the given every shape noun carries and none of them wrote down.** «דלתון ABCD» lowers
+to `|AB| = |AD|` and `|CB| = |CD|`, and **both hold trivially when `B` and `D` are the same point**.
+That is a genuine solution of the stated constraints and a smooth minimum, so the solver finds it.
+The kite is the worst case because its givens are equalities between ADJACENT sides; a
+parallelogram's are parallel relations, which a collapsed side cannot satisfy because a zero-length
+segment has no direction — which is why it was nearly immune and why the defect hid.
+
+A figure drawn that way contradicts the noun the student wrote, and said nothing.
+
+**Decision: a `distinct` SELECTOR over the shape's vertices.** Not a constraint, for two independent
+reasons: it consumes no freedom (a quadrilateral has eight degrees either way, and a DOF cue that
+dropped here would be lying), and "not equal" is not an equation a least-squares solve can drive to
+zero. It is a REGION — the configurations minus the degenerate ones — which is exactly D7's second
+kind, and `derive` already re-seeds until the selectors hold.
+
+**The threshold is relative to the figure's own span, and it was MEASURED rather than guessed.** An
+absolute epsilon would be a magnitude this product never stated ([ADR-052](06-decisions.md#adr-052))
+and would mean different things at different scales. A thousandth of the span was tried first and
+still let through a parallelogram whose `A` and `B` were 0.009 apart on a figure spanning 5 — about
+one pixel, which is a collapsed figure to a student however different the numbers are. **The
+threshold is about what a reader can see, so it is set where seeing stops:** a hundredth.
+
+**Measured after: every noun, sixty configurations each, zero collapses** — including the operator's
+reported pair of lines.
+
+**Why this was not caught by #1049's own locks.** They verified each noun's givens from the placed
+points at four seeds, which is the right shape of test and found nothing: the kite's givens HELD in
+the collapsed figure. What no test asked was whether the figure was a figure. The lesson is narrow
+and worth keeping: **a constraint check cannot catch a degenerate solution, because the degenerate
+solution satisfies the constraints.**
+
+**Consequences.** `src-analytic` +6 tests.

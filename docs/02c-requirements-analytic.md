@@ -801,3 +801,9 @@ uses, and with the vertices optional when the figure has one shape to mean. «מ
 y=2x» is «משוואת הישר AC היא y=2x». **«האלכסון הראשי» and «האלכסון המשני» resolve only where the
 shape noun distinguishes them** — a kite does, a parallelogram and a rhombus do not — and elsewhere
 are refused by name rather than guessed.
+
+**R64 — a shape is never drawn collapsed** ([ADR-AG-039](06c-decisions-analytic.md#adr-ag-039)). The
+vertices of a shape are distinct points, and a configuration that puts two of them in the same place
+is not shown — «דלתון ABCD» never draws `B` and `D` together, however well that would satisfy its
+equal sides. It costs no freedom: the figure is as open as the givens leave it, and only the drawing
+is filtered.
