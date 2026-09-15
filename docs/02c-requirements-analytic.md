@@ -778,3 +778,9 @@ configuration may yet have the object — that is R-level ADR-AG-008 and it stan
 fixed there is no other configuration, so «מפגש האלכסונים» of a concave quadrilateral, the circumcentre
 of three collinear points and an empty circle are each named as not existing, rather than left absent
 with nothing said.
+
+**R58 — a point can be placed in a QUADRANT** ([ADR-AG-034](06c-decisions-analytic.md#adr-ag-034)).
+«C ברביע השלישי» — and «נמצאת», «הנקודה C», «נתון», and the English «C is in the third quadrant» —
+draws `C` in that quadrant. It is a REGION: the point keeps both degrees of freedom, moves under
+«הציגו תצורה אחרת» inside its quadrant, and a point already placed elsewhere is refused rather than
+quietly redrawn.

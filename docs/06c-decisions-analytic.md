@@ -1968,3 +1968,54 @@ than `derived:diagonals` — the engine stays language-free and the locale rende
 corpus noun.
 
 **Consequences.** `src-analytic` 330 → 337 tests.
+
+## ADR-AG-034 — A QUADRANT is a region, and a region SEEDS rather than filters (#1071)
+
+**Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-011](#adr-ag-011) (#1033, the half-axis) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R58. **Design:**
+[04c](04c-design-analytic.md) "A point on an object, and the carrier that holds it".
+
+**Context.** Operator, 2026-09-15: *"I want to be able to place a point in a quartile: C ברביע
+השלישי"*. Measured 0 of 5 phrasings.
+
+**The easy half.** A quadrant is a pair of inequalities, so it is D7's SECOND kind — a branch
+selector over configurations the solve produced — and not the third, a constraint that removes
+freedom. **A point in the third quadrant is still a 2-DOF point**; it is simply not drawn anywhere
+else. Lowering it to constraints would make the DOF cue lie, which is what D7 exists to prevent. It
+needs no new mechanism: two `axis-side` selectors, the ones ADR-AG-011 built for «B על החלק החיובי
+של ציר x», stated at once.
+
+**The half that mattered was step 2 of the plan: *measure whether the seed search is adequate*.** It
+is not, and the figure was dishonest about it:
+
+```
+A ברביע הראשון / B ברביע השני / C ברביע השלישי / D ברביע הרביעי
+  selectorsOk : false        ← and NO fault reported
+  A           : (5.76, -2.13)   ← the fourth quadrant, after the student said the first
+```
+
+`derive` advances the seed up to 24 times looking for a configuration where every selector holds.
+One sign holds about half the time, a quadrant a quarter, **four quadrant points about one seed in
+256**. The search exhausted, the figure was drawn anyway, and ADR-AG-008's "another configuration
+may have it" kept it silent — correctly, by its own rule, because the figure still had freedom.
+
+**Decision: a region selector SEEDS the point it names.** The sampled magnitude is kept and only the
+sign is folded, so «הציגו תצורה אחרת» still moves the point *within* its region; the solve may still
+move it afterwards if a constraint says so; and the post-hoc check is untouched and still has the
+last word, so a contradiction («C(-3,4)» with «C ברביע הראשון») is still refused in either order.
+
+**Why that is the right shape and sample-and-reject was not.** Rejection sampling is correct for a
+BRANCH — which of two intersection points, ADR-AG-011's own case — where the candidates are
+enumerable and the selector picks among them. It is the wrong tool for a REGION, where the answer is
+a half-plane and the sampler can simply be *told which half*. The two had been conflated because the
+first region selector to arrive (the positive half-axis) had only one of them, where a coin flip and
+24 tries is plenty.
+
+**Measured after:** 40 placements over ten seeds, none misplaced. And it improved ADR-AG-011's own
+case, which is the sign that the generalisation was already implied.
+
+**Consequences.** `src-analytic` 349 → 355 tests. The deferred half of #1069's note in `derive` —
+whether an exhausted seed search on a figure WITH freedom should be reported — stays deferred and is
+now much rarer, because the common case no longer exhausts anything.
