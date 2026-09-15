@@ -429,3 +429,66 @@ describe('#1072 — «משוואת AB היא y=2x» is the same object as «מש
     }
   });
 });
+
+/**
+ * #1068 — maths has no words.
+ *
+ * A REGRESSION from ADR-AG-019 (#1037, round #1056), found by the operator two rounds later. The
+ * bare-equation branch accepted a line when the parsed equation's symbols included `x` or `y`. That
+ * discriminator is right about every input it was measured against — and it was measured against the
+ * corpus of GIVENS, where every line is maths.
+ *
+ * `expr.ts` multiplies by juxtaposition, so every letter of an English sentence becomes a symbol.
+ * «my answer = x» has symbols [a,e,m,n,r,s,w,x,y], contains `x`, passed, and **drew a line**.
+ *
+ * The lesson is sharper than "measure it": a discriminator measured only against the inputs it was
+ * designed for has not been measured.
+ */
+describe('#1068 — English prose containing = is not an equation', () => {
+  const kindOf = (line: string): string => {
+    const r = parseLine(line);
+    return r.ok ? `ok:${r.facts[0].t}` : r.code;
+  };
+
+  it('declines prose rather than drawing it', () => {
+    for (const line of [
+      'P is on the line y=x',
+      'the point P is on the line y=x',
+      'P lies on y=x',
+      'my answer = x',
+      'the answer is y = 2x',
+    ]) {
+      // `not-handled` on purpose: a sentence with words is not a MALFORMED equation, it is a sentence
+      // this rule has no claim on, and the LLM seam is what it should reach.
+      expect(kindOf(line), line).toBe('not-handled');
+    }
+  });
+
+  it('still builds every bare equation — including spaced ones and juxtaposed parameters', () => {
+    for (const line of [
+      'x-y+2=0',
+      'y^2=54x',
+      '(x-3)^2+(y-4)^2=9',
+      'x^2/9+y^2/16=1',
+      'x=15',
+      '4x+3y=0',
+      'y=-2x+8',
+      'x - y + 2 = 0',
+      'x^2+y^2-2ax-2x=0',
+    ]) {
+      expect(kindOf(line), line).toBe('ok:curve');
+    }
+  });
+
+  it('the word test is SPACE-DELIMITED, so juxtaposed parameters stay legal', () => {
+    // `2abc` is three parameters multiplied, not a word — it is not space-delimited. A test on any
+    // 3-letter run would have refused it, which is why the boundary matters.
+    expect(kindOf('x^2+y^2-2abc=0')).toBe('ok:curve');
+  });
+
+  it('`sqrt` cannot be mistaken for a word — normalizeMath runs first', () => {
+    // It becomes `√` before the guard ever sees it. This is the one legitimate multi-letter token in
+    // the grammar, and the reason the guard is applied to the NORMALIZED text.
+    expect(kindOf('y=sqrt 4x')).toBe('ok:curve');
+  });
+});

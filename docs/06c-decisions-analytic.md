@@ -1674,3 +1674,60 @@ about **names**, not about lines.
 sees `C` introduced. It asserts the **invariant** it is named after — a point id is a bare letter, a
 curve id is namespaced, and the two cannot collide — instead of a population that this ADR was entitled
 to change.
+
+## ADR-AG-027 — Maths has no words; a discriminator measured only against its own inputs is unmeasured (#1068)
+
+**Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-019](#adr-ag-019) (#1037) ·
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R6 — unchanged; this repairs its implementation.
+**Design:** [04c](04c-design-analytic.md) "The parser's last branch".
+
+**Context.** [ADR-AG-019](#adr-ag-019) built the bare-equation branch and chose its discriminator with
+care: *"the discriminator must be that the equation is in the PLANE's variables … and it must be
+measured against the corpus, not reasoned about."* It was measured — against `AB = 4√5`, `x_A = 5`,
+`a = 5`, `AB+BC=10` — and it is right about every one of them.
+
+**It was never measured against prose.** `expr.ts` multiplies by juxtaposition, so every letter of an
+English sentence becomes a symbol:
+
+```
+"P is on the line y=x"  →  symbols [P,e,h,i,l,n,o,s,t,x,y]
+"my answer = x"         →  symbols [a,e,m,n,r,s,w,x,y]
+```
+
+Both contain `x`. Both passed. **Both were drawn.** «my answer = x» produced a line on the canvas, from
+a sentence that is not about geometry at all, with nothing said.
+
+Found by the operator two rounds later, while typing an ordinary English sentence in the course of
+asking for something else entirely.
+
+**Decision.** The branch asks first whether the text is an equation **at all**: a **space-delimited run
+of three or more letters is a word**, and no equation in this grammar contains one.
+
+- `normalizeMath` runs first, so `sqrt` is already `√` — the one legitimate multi-letter token cannot be
+  mistaken for a word, and this is why the guard is applied to the normalized text rather than the raw.
+- Every parameter is a single letter, so juxtaposed products (`2abc`) are **not space-delimited** and
+  stay legal. A test on any three-letter run would have refused them; the boundary is what makes the
+  guard safe rather than merely strict.
+- It **declines** rather than refusing. A sentence with words is not a malformed equation — it is a
+  sentence this rule has no claim on, and `not-handled` reaches the LLM seam, which is what that seam is
+  for.
+
+Measured after: six prose lines decline, nine bare equations build, **zero catalog entries affected**.
+
+**The lesson, which is the reason this is an ADR and not a one-line fix.** This is the `[IVX]` trap
+([ADR-AG-006](#adr-ag-006)) for the third time in this tree, and each time the fix has been "measure the
+discriminator against the corpus". That instruction was followed here and the defect shipped anyway,
+because the corpus consulted was **the corpus of givens** — the inputs the rule was designed for.
+
+> **A discriminator measured only against the inputs it was designed for has not been measured.**
+> The question is not "does it accept what it should" but "what else does it accept" — and the second
+> needs inputs from outside the rule's own world: prose, another rule's vocabulary, a student's typo,
+> a sentence in the other language.
+
+`src-analytic/CLAUDE.md` carries the `[IVX]` trap already; this adds the sharper form.
+
+**Consequences.** `src-analytic` 307 → 311 tests, four of them prose cases that no previous round would
+have thought to write. The branch is otherwise unchanged, and R6 is implemented as it was always meant
+to be.

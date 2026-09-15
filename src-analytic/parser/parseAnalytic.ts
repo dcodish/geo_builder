@@ -940,8 +940,36 @@ export function parseLine(raw: string): ParseResult {
    * hyperbola or rotated conic is still refused BY NAME at evaluation
    * ([ADR-AG-008](../../docs/06c-decisions-analytic.md#adr-ag-008)).
    */
+  /**
+   * **Maths has no words** (#1068).
+   *
+   * The symbol test below asks whether the plane’s variables are PRESENT. It was measured against
+   * the corpus of GIVENS, where every line is maths, and it is right about all of them. It was never
+   * measured against prose — and `expr.ts` multiplies by juxtaposition, so every letter of an English
+   * sentence becomes a symbol:
+   *
+   *     "P is on the line y=x"  →  symbols [P,e,h,i,l,n,o,s,t,x,y]
+   *     "my answer = x"         →  symbols [a,e,m,n,r,s,w,x,y]
+   *
+   * Both contain `x`, both passed, and both were DRAWN. «my answer = x» produced a line.
+   *
+   * So the branch must first ask whether the text is an equation at all. A space-delimited run of
+   * three or more letters is a word, and no equation in this grammar contains one: `normalizeMath`
+   * has already turned `sqrt` into `√` by the time this runs, and every parameter is a single letter.
+   * Juxtaposed parameters (`2abc`) are NOT space-delimited and stay legal.
+   *
+   * Declining rather than refusing is deliberate: a sentence with words is not a malformed equation,
+   * it is a sentence this rule has no claim on. It falls through to `not-handled` and the LLM seam,
+   * which is what that seam is for.
+   *
+   * This is the `[IVX]` trap a third time ([ADR-AG-006](../../docs/06c-decisions-analytic.md#adr-ag-006)),
+   * and the lesson is sharper than "measure it": **a discriminator measured only against the inputs it
+   * was designed for has not been measured.**
+   */
+  const HAS_A_WORD = /(?:^|\s)[A-Za-z]{3,}(?=\s|$)/;
+
   const bare = equationExpr(line);
-  if (bare && symbolsOf(bare).some((s) => RESERVED_SYMBOLS.has(s))) {
+  if (bare && !HAS_A_WORD.test(normalizeMath(line)) && symbolsOf(bare).some((s) => RESERVED_SYMBOLS.has(s))) {
     return {
       ok: true,
       facts: [
