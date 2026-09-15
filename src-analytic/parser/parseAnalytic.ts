@@ -778,6 +778,12 @@ function parseShape(line: string): RuleOutcome {
      */
     return made([
       { t: 'polygon', id: polygonId(vertices), vertices, noun: normalizeShapeNoun(noun), src: line },
+      /**
+       * The given every shape noun carries and none of them wrote down (#1077): these are DIFFERENT
+       * POINTS. Without it the solve may satisfy «דלתון ABCD» by putting `B` and `D` in one place,
+       * where both equal-side givens hold trivially — measured in 25 of 60 configurations.
+       */
+      { t: 'selector' as const, sel: { kind: 'distinct' as const, ids: vertices }, src: line },
       ...row.givens(vertices).map((k: Constraint) => ({ t: 'constraint' as const, k, src: line })),
     ]);
   }

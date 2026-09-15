@@ -536,7 +536,11 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
        * of its points was missing would be a given that vanished.
        */
       const refs =
-        f.sel.kind === 'axis-side' ? [f.sel.id] : [f.sel.id, f.sel.a, f.sel.b];
+        f.sel.kind === 'axis-side'
+          ? [f.sel.id]
+          : f.sel.kind === 'distinct'
+            ? f.sel.ids
+            : [f.sel.id, f.sel.a, f.sel.b];
       for (const id of refs) {
         const o = objectById(c, id);
         if (!o || !isPositional(o)) {
