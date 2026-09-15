@@ -2596,3 +2596,62 @@ painted and tagged; the stripped ink equals the plain render, no dashed offer, n
 than tagging anything. The ruling's requirements lines went to 02w rather than 02b/02d, because both
 product documents state that export is a shared surface owned by 02w. The conformance check is a lock
 per product over a shared markup helper rather than a row in a harness that does not exist yet (#664).
+
+## ADR-W-052 — The CONTINUOUS LOOP: the operator tests while the session keeps fixing (2026-09-15)
+
+**Status:** accepted, 2026-09-15 · **Amends:** [CLAUDE.md](../CLAUDE.md) standing rule 3
+(triage-first) for sessions the operator explicitly puts into this mode · **Scope:** any product; born
+in the analytic tree's 2026-09-15 session
+
+**Requirements:** none (internal workflow). **Design:** none (internal).
+
+**Context.** Standing rule 3 says a session in which the operator reports issues does the FULL triage
+and **then stops**. Its stated reason is real: *"the operator raises several issues per testing pass;
+immediate fixes force one-at-a-time reporting and overwrite each other."*
+
+On 2026-09-15 the analytic tree ran three rounds back to back, and the operator was testing throughout.
+The rule's failure mode showed up in a form it did not anticipate: **the session kept stopping to hand
+over a new port.** Each fix sat on its own branch with its own dev server — 5311, 5312, 5313 — so every
+item cost the operator a context switch, and twice they tested the right sentence on a build that did
+not contain the fix. The rule was protecting them from clobbered fixes and charging them a tax in
+interruptions instead.
+
+Operator, 2026-09-15: *"we need to define a loop process here. you never stop fixing issues until we
+have cleared the list … when there are things to test, you tell me and i test (you continue working) so
+we have a continuous work and parallel testing and more issues will come in."*
+
+**Decision.** In **loop mode**, entered only when the operator asks for it by name:
+
+1. **The session does not stop after triage.** It files each report as an issue with a measured
+   diagnosis — that half of rule 3 is untouched and is what keeps root-cause discipline — and then
+   **keeps fixing**.
+2. **ONE long-lived server, on `main`.** A dedicated worktree (`loop/serve`) is kept fast-forwarded to
+   `origin/main`; each push pulls into it and Vite hot-reloads. **The operator's URL never changes**,
+   and they are always looking at the newest green code. This is the change that makes the loop work —
+   the interruptions were never about the fixing, they were about the ports.
+3. **Gate per PUSH, not per item.** Each item pays `tsc` + build + the product lane; a push of one to
+   three items pays `npm run test:full`, read from `reports/suite-verdict.json`
+   ([ADR-W-033](#adr-w-033)). The full bar is not lowered; it is paid at the point where work becomes
+   visible to the operator.
+4. **Reports arriving mid-flight are triaged without losing the place** — measured, filed, and the
+   current item continues.
+
+**What still stops the session**, and the operator should want all three:
+
+- **a decision only they can make** — the session asks and moves to another item rather than guessing;
+- **two escalations in a row** ([ADR-W-028](#adr-w-028)) — two plans failing contact with the code says
+  the QUEUE is going stale, and grinding through more is the loop pressure the escalation exit exists
+  to relieve;
+- **anything that would need a patch instead of a root fix.** Throughput pressure is exactly when that
+  temptation appears, and it is the one thing the loop may not trade.
+
+**Why this is not a weakening of rule 3.** The rule's purpose is that the operator's reports are not
+lost and not overwritten. The loop serves that purpose *better*: every report becomes a filed issue
+with a measurement before anything is built, and a stable server means the operator can keep testing
+rather than waiting for a session to finish triaging. What it drops is the STOP, and the stop was
+protecting against a problem — clobbered work-in-progress — that per-item branches and a merge-to-main
+cadence already prevent.
+
+**Recorded because a future session would do the opposite.** CLAUDE.md loads every session and says
+"STOP". Without this ADR, a session reading it during a loop the operator had asked for would halt
+mid-flight and the operator would have to re-establish the mode by hand.
