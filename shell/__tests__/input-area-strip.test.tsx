@@ -10,7 +10,7 @@
  * Locked at the component, in the shape #751 chose, so the contract cannot hold on one path only again.
  */
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { InputArea } from '../frame/InputArea';
 import { makeBidi, stripFormatControls } from '../bidi';
 

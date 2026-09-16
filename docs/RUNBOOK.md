@@ -9,6 +9,7 @@ The single ops entry point. Deep 2-D proxy detail (one-time setup, env file, sec
 | 2-D static app (`dist/`) | `npm run build` | `/var/www/vhosts/themathbible.com/httpdocs/geo-builder/` | `https://themathbible.com/geo-builder/` (Apache static) |
 | 3-D static app (`dist-3d/`) | `npm run build:3d` | `…/httpdocs/3d-builder/` (**rename `3d.html` → `index.html`**) | `https://themathbible.com/3d-builder/` (Apache static) |
 | Complex-numbers app (`dist-complex/`) | `npm run build:complex` | `…/httpdocs/complex-builder/` (**rename `complex.html` → `index.html`**) | `https://themathbible.com/complex-builder/` (Apache static) |
+| Analytic-geometry app (`dist-analytic/`) | `npm run build:analytic` | `…/httpdocs/analytic-builder/` (**rename `analytic.html` → `index.html`**) | `https://themathbible.com/analytic-builder/` (Apache static) |
 | Shared Node proxy (`dist-server/proxy.mjs`) | `npm run build:proxy` | `/var/www/geo-proxy/proxy.mjs` | `geo-proxy.service` on loopback **:8788**, reverse-proxied by Apache |
 | **Site homepage** (tool links) | — hand-edited; **canonical copy: [`deploy/homepage/index.html`](../deploy/homepage/index.html)** | `…/httpdocs/index.html` | `https://themathbible.com/` (Apache static) |
 | Proxy env (key, admin creds, log paths) | — (hand-edited) | `/var/www/geo-proxy/geo-proxy.env` (mode 600) | read by the service |
@@ -16,7 +17,7 @@ The single ops entry point. Deep 2-D proxy detail (one-time setup, env file, sec
 - **Server:** `ssh root@themathbible.com` (74.208.61.39). Plesk on Ubuntu 22.04. **Apache serves everything; nginx is OFF** — never touch `vhost_nginx.conf`.
 - **One proxy serves both apps** (`server/parseHandler.ts` binds them): LLM fallback (`/api/parse`, body `tool:'3d'` selects the 3-D prompt), usage-event sinks (`events.jsonl` + `events-3d.jsonl` via `EVENTS_3D_LOG_PATH`), and the two admin dashboards.
 - **Admin dashboards:** `https://themathbible.com/geo-builder/admin` and `…/3d-builder/admin` (→ proxy path `/admin3`, `ADMIN_3D_BASE`). Same credentials (in the env file).
-- **Apache directives** (reverse-proxy lines): sources in [deploy/apache-geo-builder.conf](../deploy/apache-geo-builder.conf) + [deploy/apache-3d-builder.conf](../deploy/apache-3d-builder.conf) + [deploy/apache-complex-builder.conf](../deploy/apache-complex-builder.conf). **Store them in Plesk's GUI field** (*Domains → themathbible.com → Apache & nginx Settings → Additional directives for HTTPS*) so a Plesk regeneration doesn't drop them; direct edits to `vhost_ssl.conf` do NOT survive regeneration.
+- **Apache directives** (reverse-proxy lines): sources in [deploy/apache-geo-builder.conf](../deploy/apache-geo-builder.conf) + [deploy/apache-3d-builder.conf](../deploy/apache-3d-builder.conf) + [deploy/apache-complex-builder.conf](../deploy/apache-complex-builder.conf) + [deploy/apache-analytic-builder.conf](../deploy/apache-analytic-builder.conf). **Store them in Plesk's GUI field** (*Domains → themathbible.com → Apache & nginx Settings → Additional directives for HTTPS*) so a Plesk regeneration doesn't drop them; direct edits to `vhost_ssl.conf` do NOT survive regeneration.
 
   **There is no CLI for this — it needs the operator's hands** (verified 2026-09-06 on Plesk Obsidian 18.0.80.6): `plesk bin site --help` exposes only *PHP* directives, and `/usr/local/psa/bin/apache` covers only modules and MPM. The GUI field is **DB-backed and authoritative** — its contents were confirmed byte-identical to the live `vhost_ssl.conf` — which is why hand-editing that file is the one thing never to do: it works instantly and reverts silently at the next regeneration, the exact failure [#903](https://github.com/dcodish/geo_builder/issues/903) exists to prevent. A session needing a directive **prepares the exact block and escalates**; it does not improvise. Before pasting, confirm the field already holds the existing proxies (`/hw/`, `/akinator`, `/bagrut`, `/akinator2`, the builder lanes) and **append** — replacing it takes four live apps down with it.
 
@@ -39,7 +40,7 @@ carrying, at minimum, the tails its app fetches**, and the static app alone is n
 **Verify after pasting** — `405`/`200` mean routed, `404` means not:
 
 ```sh
-for p in geo-builder 3d-builder complex-builder; do
+for p in geo-builder 3d-builder complex-builder analytic-builder; do
   printf '%s api/config -> ' "$p"
   curl -s -o /dev/null -w '%{http_code}\n' "https://themathbible.com/$p/api/config?tool=x"
 done
@@ -60,6 +61,7 @@ npx vitest run           # full suite green
 npm run build            # 2-D (tsc -b + vite)   — skip if 2-D unchanged
 npm run build:3d         # 3-D                    — skip if 3-D unchanged
 npm run build:complex    # complex                — skip if src-complex/ unchanged
+npm run build:analytic   # analytic               — skip if src-analytic/ unchanged
 npm run build:proxy      # only if server/ changed
 
 # 1. 2-D static
@@ -74,13 +76,18 @@ ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/3d-build
 scp -r dist-complex/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/complex-builder/
 ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/complex-builder && mv -f complex.html index.html'
 
+# 2c. analytic static (same rename pattern). The directory was created at the prod/2026-09-16
+#     deploy — its FIRST: mkdir + chown root:root + chmod 755, matching its siblings.
+scp -r dist-analytic/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/analytic-builder/
+ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/analytic-builder && mv -f analytic.html index.html'
+
 # 2b. homepage — ONLY when the tool links / landing page changed. EDIT THE TRACKED COPY
 #     (deploy/homepage/index.html), commit, then upload it — never hand-edit on the server,
 #     or the repo copy silently stops being canonical (adopted 2026-08-15, complex-card link):
 scp deploy/homepage/index.html root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/index.html
 
 # 3. perms (static files should be 644 root:root — scp usually preserves this; verify)
-ssh root@themathbible.com 'chmod -R a+rX /var/www/vhosts/themathbible.com/httpdocs/geo-builder /var/www/vhosts/themathbible.com/httpdocs/3d-builder /var/www/vhosts/themathbible.com/httpdocs/complex-builder'
+ssh root@themathbible.com 'chmod -R a+rX /var/www/vhosts/themathbible.com/httpdocs/geo-builder /var/www/vhosts/themathbible.com/httpdocs/3d-builder /var/www/vhosts/themathbible.com/httpdocs/complex-builder /var/www/vhosts/themathbible.com/httpdocs/analytic-builder'
 
 # 4. proxy — ONLY when server/ changed
 scp dist-server/proxy.mjs root@themathbible.com:/var/www/geo-proxy/
