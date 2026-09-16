@@ -16,7 +16,7 @@
  * acted on. A real limit, and the honest place for it is here rather than in the click handler.
  */
 import type { Figure } from './evaluate';
-import type { Construction, Id, NumCurve } from './types';
+import type { Construction, CurveKind, Id, NumCurve } from './types';
 import { objectById } from './types';
 
 export interface Crossing {
@@ -42,14 +42,37 @@ interface Straight {
 
 const EPS = 1e-9;
 
-/** How the grammar refers to an object — `null` when it has no name a sentence can use. */
-function words(c: Construction, id: Id): string | null {
+/**
+ * How the grammar refers to an object — `null` when it has no name a sentence can use.
+ *
+ * `classified` is the kind the FIGURE fitted, which the caller already holds. A bare «y=9» names no
+ * family, so the construction object carries none; only the fit knows it is a line, and a caller
+ * that has already tested for one should not make this function guess again.
+ */
+function words(c: Construction, id: Id, classified?: CurveKind): string | null {
   const o = objectById(c, id);
   if (!o) return null;
   if (o.kind === 'segment') return `הישר ${o.a}${o.b}`;
   if (o.kind === 'curve') {
     const name = o.label.name;
-    if (!name) return null; // an ANONYMOUS conic — #1057's open question, so no dot
+    /**
+     * A LINE GIVEN BY ITS EQUATION names itself (#1092).
+     *
+     * Operator, 2026-09-15 (T34): a bare «נתון הישר y=9» drawn across a triangle offered no
+     * ring where it visibly crossed two sides. ADR-AG-054's limit — a ring only where the GRAMMAR
+     * can name both objects — was right, and this case was on the wrong side of it: #1057's open
+     * question is that the NOUN «הפרבולה» is ambiguous between two anonymous conics, and an
+     * EQUATION is not ambiguous. It identifies exactly one curve, and `incidenceOn` now reads it
+     * back to the same content-derived id, so the offered sentence round-trips.
+     *
+     * Lines only, deliberately. A conic would need a noun for the sentence («הפרבולה y^2=54x»?),
+     * which is #1057's question and not settled by the corpus; lines are the reported case and the
+     * corpus's constant one.
+     */
+    if (!name) {
+      const kind = classified ?? o.label.kind ?? o.curve.kind;
+      return kind === 'line' && o.label.eqSrc ? `הישר ${o.label.eqSrc}` : null;
+    }
     if (o.curve.kind === 'circle' || /^(I|II|III|IV|V)$/.test(name)) return `המעגל ${name}`;
     return `הישר ${name}`;
   }
@@ -77,7 +100,9 @@ function straightOfSegment(s: Figure['segments'][number], c: Construction): Stra
 /** A stated straight line, which is drawn across the whole view. */
 function straightOfCurve(id: Id, curve: NumCurve, c: Construction): Straight | null {
   if (curve.kind !== 'line') return null;
-  const w = words(c, id);
+  // The fit has just said it IS a line; pass that on rather than have `words` re-derive it from a
+  // construction object that a bare equation leaves kind-less.
+  const w = words(c, id, 'line');
   if (!w) return null;
   return { a: curve.a, b: curve.b, c: curve.c, within: null, words: w };
 }

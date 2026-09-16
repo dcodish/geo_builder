@@ -656,6 +656,33 @@ function incidenceOn(operand: string, id: Id): Constraint | null {
   const dir = direction(trim(operand));
   if (dir?.k === 'curve') return { t: 'on-curve', id, curve: dir.id };
   if (dir?.k === 'points') return { t: 'on-line-2pt', id, a: dir.a, b: dir.b };
+
+  /**
+   * A CURVE NAMED BY ITS EQUATION — «הישר y=9», or the bare «y=9» (#1092).
+   *
+   * Operator, 2026-09-15 (T34): a bare «נתון הישר y=9» crossing a triangle offered no ring, because
+   * the canvas may only offer a crossing it can put into a SENTENCE (ADR-AG-054) and this rule
+   * could not read one back.
+   *
+   * The resolver itself already existed and was already right — the on-curve rule mints
+   * `curve-${anonIndex(...)}` for exactly this operand — and this caller simply never reached it.
+   * The docblock above states the contract it was missing: *the naming forms `matchCurve` mints are
+   * mapped here to the same ids it mints.* An equation is one of those forms.
+   *
+   * Written kind-agnostically because `anonIndex` is: the id is derived from the equation text, and
+   * a parabola's equation names its parabola exactly as a line's names its line.
+   *
+   * The reserved-symbol guard is the on-curve rule's, for the on-curve rule's reason (#1068): without
+   * it «עם הערך x=5» — prose that happens to contain an `=` — would mint a curve. An operand with
+   * no plane variable in it is still `bad-operand`, which is the honest answer.
+   */
+  const bare = trim(operand).replace(/^(?:ה?ישר|ה?עקום|(?:the\s+)?(?:line|curve))\s+/i, '');
+  if (bare.includes('=')) {
+    const eq = equationExpr(bare);
+    if (eq && symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
+      return { t: 'on-curve', id, curve: `curve-${anonIndex(bare)}` };
+    }
+  }
   return null;
 }
 
@@ -1638,7 +1665,11 @@ export function parseLine(raw: string): ParseResult {
         {
           t: 'curve',
           id: curve.id,
-          label: { name: curve.name, kind: curve.kind },
+          /**
+           * An UNNAMED curve carries its equation as its label (#1092), so the canvas can offer a
+           * sentence about it. A named one does not: its name is how the student refers to it.
+           */
+          label: { name: curve.name, kind: curve.kind, ...(curve.name ? {} : { eqSrc: trim(curve.eqSrc) }) },
           curve: { kind: curve.kind, eq },
           // The student named the curve and gave its equation — this sentence IS the curve.
           stated: true,
@@ -1727,7 +1758,9 @@ export function parseLine(raw: string): ParseResult {
         {
           t: 'curve',
           id: `curve-${anonIndex(line)}`,
-          label: { name: '' },
+          // Its equation is its name (#1092) — the same string `anonIndex` just hashed, so a
+          // sentence the canvas offers about it re-parses to THIS object.
+          label: { name: '', eqSrc: trim(line) },
           curve: { eq: bare },
           // A bare equation on a line of its own is the student asking for that curve.
           stated: true,

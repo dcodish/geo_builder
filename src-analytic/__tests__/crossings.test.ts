@@ -97,3 +97,72 @@ describe('#1086 — the centre mark does not label what a POINT already labels',
     expect(centreLabel(['(x-3)^2+(y-4)^2=9'])).toBe('(3, 4)');
   });
 });
+
+/**
+ * #1092 — A LINE GIVEN BY ITS EQUATION NAMES ITSELF.
+ *
+ * Operator, 2026-09-15 (T34): *"attached image where a line crosses BC and there is no clickable"*.
+ * A bare «נתון הישר y=9» drawn across a triangle offered no ring where it visibly crossed two sides,
+ * while the same line written «נתון הישר l1: y=9» offered two.
+ *
+ * ADR-AG-054's limit was right — a ring only where the GRAMMAR can name both objects — and this case
+ * was on the wrong side of it. #1057's open question is that the NOUN «הפרבולה» is ambiguous between
+ * two anonymous conics; an EQUATION is not ambiguous, it identifies exactly one curve.
+ *
+ * The resolver was already written and already correct (the on-curve rule mints
+ * `curve-${anonIndex(...)}` for this very operand) — `incidenceOn`, which the crossing rule uses,
+ * simply never reached it. The tree's most repeated defect: a mechanism with a caller that misses it.
+ */
+describe('#1092 — an equation is a name the grammar can use', () => {
+  const T = ['A(0,0)', 'B(4,12)', 'C(10,2)', 'משולש ABC'];
+
+  /** Every spelling of "this line, by its equation" the grammar accepts. */
+  const SPELLINGS = [
+    'נתון הישר y=9',
+    'y=9',
+    'נתון הישר y = 9', // spaced — `anonIndex` strips whitespace before hashing
+    'the line y=9',
+  ];
+
+  for (const spelling of SPELLINGS) {
+    it(`offers both rings for ${JSON.stringify(spelling)}`, () => {
+      const { crossings } = at([...T, spelling]);
+      expect(crossings).toHaveLength(2);
+      // Both rings name the SAME line, by the equation the student actually typed.
+      const expected = `הישר ${spelling.replace(/^(?:נתון הישר |the line )/, '')}`;
+      expect(crossings.map((k) => k.second)).toEqual([expected, expected]);
+      // ...and the other side is the triangle's own sides, not the line again.
+      expect(crossings.map((k) => k.first).sort()).toEqual(['הישר AB', 'הישר BC']);
+    });
+
+    it(`and its sentence ROUND-TRIPS without minting a second curve — ${JSON.stringify(spelling)}`, () => {
+      // The assertion that makes "two surfaces, one grammar" true rather than merely asserted: the
+      // words the dot offers re-parse to the SAME content-derived id (ADR-AG-023), so the figure
+      // gains a point and NOT a duplicate line.
+      const lines = [...T, spelling];
+      const { d, crossings } = at(lines);
+      const sentence = crossingSentence(crossings[0], freeLetter(d.construction));
+      const after = derive([...lines, sentence], 0);
+      expect(after.faults).toEqual([]);
+      expect(after.figure.curves).toHaveLength(d.figure.curves.length);
+      const p = after.figure.points.find((q) => q.id === 'P')!;
+      expect([p.x, p.y].map((n) => Number(n.toFixed(4)))).toEqual([3, 9]);
+    });
+  }
+
+  it('a NAMED line still names itself by its name, not its equation', () => {
+    const { crossings } = at([...T, 'נתון הישר l1: y=9']);
+    expect(crossings.map((k) => k.second)).toEqual(['הישר l1', 'הישר l1']);
+  });
+
+  it('an anonymous CONIC still gets no ring — #1057 stays open, deliberately', () => {
+    // The grammar half accepts an equation operand for any curve, but a RING needs a noun for the
+    // sentence, and which noun a student would use for one of two anonymous conics is unsettled.
+    expect(at(['x^2/9+y^2/4=1', 'נתון הישר l1: y=x']).crossings).toHaveLength(0);
+  });
+
+  it('and prose containing an «=» is still refused, not minted into a curve (#1068)', () => {
+    const d = derive([...T, 'נתון הישר y=9', 'P נקודת החיתוך של הישר AB עם עם הערך x'], 0);
+    expect(d.faults.map((f) => f.code)).toEqual(['bad-operand']);
+  });
+});

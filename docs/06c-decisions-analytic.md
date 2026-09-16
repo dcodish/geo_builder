@@ -3087,3 +3087,56 @@ only about which of them carries the value.
 this one exists — filed as debt rather than widened here, because widening it means auditing every
 assertion in it against a fourth product, which is its own piece of work. The parametric-circle centre
 is conservative (both components open where `y` is really given) and the design doc says why.
+
+## ADR-AG-056 — An equation is a name the grammar can use (#1092)
+
+**Status:** accepted, 2026-09-16 · **Narrows** [ADR-AG-054](#adr-ag-054) · **Does NOT settle**
+[ADR-AG-049](#adr-ag-049)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R76 (amended). **Design:**
+[04c](04c-design-analytic.md) "The session, and the panel that shows it" — the round-trip rule.
+
+**Context.** Operator, 2026-09-15 (T34): *"attached image where a line crosses BC and there is no
+clickable"*. Measured: with a triangle drawn, «נתון הישר l1: y=9» offers two rings and «נתון הישר y=9»
+offers none, though both draw the same line across the same two sides.
+
+**What ADR-AG-054 got right, and where its line sat wrong.** That ADR made the limit deliberate: a
+ring may be offered only where the grammar can name both objects, because a click with nothing to say
+is worse than no click. That reasoning stands. What it inherited was the assumption that an unnamed
+curve has no referent — which came from [ADR-AG-049](#adr-ag-049), where the open question is that the
+NOUN «הפרבולה» is **ambiguous between two** anonymous conics. **An equation is not ambiguous.** It
+identifies exactly one curve, and a student writing «הישר y=9» is using the ordinary way to refer to
+one. So the limit was drawn around *namelessness* when the thing that actually blocks a sentence is
+*ambiguity*.
+
+**The second half is the recurring defect.** Measured before writing anything:
+
+```
+'הנקודה P נמצאת על הישר y=9'             → builds, P = (-5.08, 9.00)   ✔
+'P נקודת החיתוך של הישר AB עם הישר y=9'   → bad-operand                 ✘
+```
+
+The resolver from an equation to the anonymous curve **already existed and was already correct** — the
+on-curve rule mints `curve-${anonIndex(...)}` for exactly this operand, guarded by the reserved-symbol
+test that stops prose becoming a curve (#1068). `incidenceOn`, which the crossing rule uses, handled
+axes, circles-by-numeral and `direction()`, and never reached it — while its own docblock stated the
+contract it was failing: *"the naming forms `matchCurve` mints are mapped here to the same ids it
+mints."* **This tree's most repeated defect, now for the eighth time** (#1020, #1045, #1065, #1023,
+#1088): a mechanism that exists, is correct, and has a caller that does not reach it.
+
+**Decision.** `CurveLabel` gains `eqSrc` — the equation as the student wrote it. It belongs on the
+LABEL because for a curve with no other name **the equation is its name**, and it is the same string
+`anonIndex` hashed into the id. That is what makes the offered sentence round-trip: it re-parses to
+the SAME object rather than minting a second one for one curve (the ADR-AG-023 defect). Asserted
+directly — the lock re-derives with the dot's own sentence and requires `figure.curves` to be
+unchanged in length.
+
+`incidenceOn` reads an equation operand, written kind-agnostically because `anonIndex` is: a parabola's
+equation names its parabola exactly as a line's names its line. `words()` writes one for **lines only**
+— a ring on an anonymous conic would need a noun for the sentence, which is ADR-AG-049's question and
+is deliberately left open. Lines are the reported case and the corpus's constant one.
+
+**Consequences.** `src-analytic` +10 tests, covering four spellings («נתון הישר y=9», the bare «y=9»,
+the spaced «y = 9» that exercises `anonIndex`'s normalisation, and the English «the line y=9»), each
+with its round trip. The two guards are locked with them: a named line still names itself by its NAME,
+and prose containing an `=` is still `bad-operand` rather than a curve minted out of a sentence.

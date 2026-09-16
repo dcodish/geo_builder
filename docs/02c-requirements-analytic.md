@@ -905,6 +905,10 @@ is refused.
 can be named, a dashed ring marks the spot; clicking it adds «P נקודת החיתוך של הישר AB עם הישר CD»
 to the givens — the same line typing it would add, editable and removable like any other. No ring is
 offered where a point already stands, or where either object has no name the grammar can use.
+**Amended by [ADR-AG-056](06c-decisions-analytic.md#adr-ag-056) (#1092):** a curve's EQUATION is such
+a name. «נתון הישר y=9» and the bare «y=9» offer rings reading «...עם הישר y=9», and that sentence
+re-parses to the same curve rather than a second one. The limit that remains is AMBIGUITY, not
+namelessness: an anonymous conic still gets no ring, because which noun names one of two is open.
 
 **R77 — the session can be SAVED, and a load says what it restored**
 ([ADR-AG-055](06c-decisions-analytic.md#adr-ag-055)). The figure has a name, the session downloads as

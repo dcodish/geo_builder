@@ -117,6 +117,17 @@ export interface CurveLabel {
   name: string;
   /** The family the statement named, if it named one — see {@link Curve.kind}. */
   kind?: CurveKind;
+  /**
+   * The equation AS THE STUDENT WROTE IT, for a curve they gave no other name (#1092).
+   *
+   * It lives on the LABEL because for such a curve the equation *is* its name: «הישר y=9» is how
+   * a student refers to it, and `anonIndex` derives the object's id from this same string. That is
+   * what lets a generated sentence round-trip — it re-parses to the SAME content-derived id rather
+   * than minting a second object for one curve (the ADR-AG-023 defect).
+   *
+   * Absent on a curve that HAS a name, where the name is the way to refer to it.
+   */
+  eqSrc?: string;
 }
 
 // ---------------------------------------------------------------------------
