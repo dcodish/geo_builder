@@ -68,8 +68,28 @@ const QUICK_COMMANDS = [
  */
 const DRAG_SLOP = 4;
 
-const CANVAS_W = 720;
-const CANVAS_H = 720;
+/**
+ * The size the scene is built at BEFORE the viewport has been measured (#1103).
+ *
+ * It is a first-paint fallback and nothing else. The real size comes from a `ResizeObserver` on the
+ * drawing viewport, because a fixed nominal canvas cannot be right: `Figure` renders
+ * `viewBox="0 0 W H"` at `width/height: 100%` under the default `xMidYMid meet`, so a square
+ * projection meeting a 1094×674 card letterboxes to 674×674 and leaves 420px dead — by construction,
+ * at every window size.
+ *
+ * It is not only cosmetic. `view.ts` maps pointer travel through the viewport's RENDERED rect on the
+ * promise that *"the world point under the cursor stays under the cursor"*; with the world drawn into
+ * a letterboxed 674 of a 1094 rect, every pixel of drag was worth 0.82 of what the arithmetic thought
+ * and the wheel anchor was mis-registered by the same factor. Measuring the element the drag already
+ * measures is what makes the promise true, which is why the observer watches `viewportRef` itself and
+ * not some other box.
+ *
+ * 2-D and 3-D have always done this (`src/App.tsx`, `src3d/App3.tsx`); the D1 Workbench contract locks
+ * the CARD and stopped at its edge, so what the surface did inside it drifted unmeasured.
+ */
+const CANVAS_FALLBACK = { w: 720, h: 720 };
+/** Never build a scene smaller than this — below it the tick labels collide. Mirrors 2-D's floor. */
+const CANVAS_MIN = 320;
 
 /**
  * The locale key describing WHAT a clashing name already holds (#1046).
@@ -252,6 +272,28 @@ export function App() {
   const [view, setView] = useState<CanvasView>(INITIAL_VIEW);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   /**
+   * THE MEASURED DRAWING SURFACE (#1103) — the scene is built at the size the viewport really is.
+   *
+   * Observing `viewportRef` and not a wrapper is deliberate: it is the same element `view.ts` reads
+   * for pointer arithmetic, so the projected size and the tracked rect cannot disagree. See
+   * `CANVAS_FALLBACK` for why a nominal size was wrong in both dimensions at once.
+   */
+  const [canvasSize, setCanvasSize] = useState(CANVAS_FALLBACK);
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (!r) return;
+      setCanvasSize({
+        w: Math.max(CANVAS_MIN, Math.floor(r.width)),
+        h: Math.max(CANVAS_MIN, Math.floor(r.height)),
+      });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  /**
    * `moved` is what separates a CLICK from a DRAG (#1101).
    *
    * #1094 captured the pointer on PRESS. Capture retargets the whole gesture to the capturing
@@ -278,6 +320,26 @@ export function App() {
   const canvasCard = useRef<HTMLDivElement | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const askRef = useRef<HTMLInputElement | null>(null);
+
+  /**
+   * CLEAR-ALL CLEARS THE SESSION, not just the store (#1107) — #146's class, third occurrence.
+   *
+   * The button was wired straight to the store action, which resets store state only; the drafts are
+   * local React state the store has never heard of, so an unsent line and an unsent question survived
+   * a clear and misrepresented a cleared session. 2-D carries the original scar (#146) and 3-D copied
+   * its shape by hand — the fix has lived as a hand-written list inside each product, which is why a
+   * third and fourth product reintroduced it.
+   *
+   * The ANSWERS go too: a length measured on a figure that no longer exists is a stale reading shown
+   * as current fact. That is only the clear-all corner of #1110 — deleting a single given, loading a
+   * file and undo still strand answers, and #1110 stays open for the general fix.
+   */
+  const clearSession = () => {
+    clearAll();
+    setDraft('');
+    setAskText('');
+    setAnswers([]);
+  };
   const [dataOpen, setDataOpen] = useState(true);
   /**
    * «הצג בנייה» — the medians, altitudes or bisectors that DEFINE a derived point (#1030).
@@ -452,7 +514,7 @@ export function App() {
      * is supplied here, from the same `knownCurve` the data panel uses, rather than re-decided in
      * the renderer where it would drift from the panel it must agree with.
      */
-    return buildScene(d.figure, zoomed, CANVAS_W, CANVAS_H, {
+    return buildScene(d.figure, zoomed, canvasSize.w, canvasSize.h, {
       curveKnown: (id) => knownCurve(d.construction, id) !== null,
       /**
        * The crossings a student may promote (#1025) — operator: *"when a line we draw crosses another
@@ -469,7 +531,7 @@ export function App() {
         sentence: crossingSentence(k, freeLetter(d.construction)),
       })),
     });
-  }, [d, view]);
+  }, [d, view, canvasSize]);
 
   const errorText = error
     ? t(
@@ -590,9 +652,18 @@ export function App() {
               placeholder={t('inputPlaceholder')}
               submitLabel={t('add')}
               symbols={SYMBOLS}
-              quickCommands={lines.length > 0 ? QUICK_COMMANDS : undefined}
-              onQuickCommand={submit}
-              quickDir={() => 'rtl'}
+              /*
+                NO compact chip strip above the input (#1105).
+
+                Operator, 2026-09-16: *"on the input panel, I dont want to see the chips. behavior
+                should be like 2d and 3d tools"*. `QUICK_COMMANDS` still feeds the empty-canvas
+                `QuickChips` overlay below — the examples are there for the first click and in the
+                manual, which is what the siblings do and all three of them have always done.
+
+                This WITHDRAWS docs/28 §D9b's second half ("shrinking to a one-line strip above the
+                input once a figure exists"). Analytic was not the deviation — it was the only product
+                that ever implemented it, so the ruling is reversed rather than the code corrected.
+              */
               /**
                * THE BIDI SEAMS, all four, as the siblings pass them (#1088).
                *
@@ -680,7 +751,18 @@ export function App() {
             <FigureName value={name} onChange={setName} placeholder={t('namePlaceholder')} />
           <div
             ref={viewportRef}
-            style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}
+            /**
+             * `flex: 1` + `minHeight: 0`, NOT `height: 100%` (#1106).
+             *
+             * The canvas card is a fixed-height flex column holding three children: the figure name,
+             * this viewport, and the ADR-W-023 action row (undo · redo · clear-all). `height: 100%`
+             * resolves against the CARD, so this child alone was as tall as all three and the row was
+             * pushed 51px past a page that cannot scroll — present in the markup, unreachable on
+             * screen. `flex: 1` means "take what is left after my siblings", which is the shape both
+             * 2-D and 3-D use. `minHeight: 0` is not optional: without it a flex item refuses to
+             * shrink below its content and the overflow returns.
+             */
+            style={{ position: 'relative', width: '100%', flex: 1, minHeight: 0, touchAction: 'none' }}
             /**
              * DRAG TO MOVE (#1094). Pointer capture so a drag that leaves the canvas keeps tracking;
              * without it the view sticks the moment the cursor crosses the edge.
@@ -830,7 +912,7 @@ export function App() {
               type="button"
               style={lines.length > 0 ? { ...rowSubtleStyle, color: rowDangerInk } : rowSubtleOffStyle}
               disabled={lines.length === 0}
-              onClick={clearAll}
+              onClick={clearSession}
             >
               {t('clearAll')}
             </button>

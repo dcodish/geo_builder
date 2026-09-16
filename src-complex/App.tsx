@@ -199,6 +199,24 @@ export function App() {
   const askRows = useMemo(() => askRowsOf(queries, derived2.knowledge), [queries, derived2]);
   const [askText, setAskText] = useState('');
   const askRef = useRef<HTMLInputElement | null>(null);
+
+  /**
+   * CLEAR-ALL CLEARS THE SESSION, not just the store (#1107) — #146's class, fourth occurrence.
+   *
+   * The button was wired straight to the store action, which resets store state only; these two
+   * drafts are local React state the store has never heard of, so an unsent line and an unsent
+   * question survived a clear. 2-D carries the original scar (#146), 3-D copied its shape by hand,
+   * and analytic and complex each reintroduced it — because the fix has lived as a per-product
+   * hand-written list with nothing checking the outcome.
+   *
+   * The ask ANSWERS need nothing here: `askRows` is derived from `queries` in the store, so the store
+   * action already retires them. That is the shape analytic lacks, and the reason #1110 is its alone.
+   */
+  const clearSession = () => {
+    clearAll();
+    setInput('');
+    setAskText('');
+  };
   /**
    * THE `n` STEPPER — display state, and nowhere else (ADR-CX-001 D3).
    *
@@ -581,7 +599,7 @@ export function App() {
               <span style={rowSpacerStyle} />
               {/* #739: the row carries clear-all in every tool (undo/redo await store temporal —
                   the named feature gap on the issue) */}
-              <button style={lines.length > 0 ? { ...rowSubtleStyle, color: rowDangerInk } : rowSubtleOffStyle} disabled={lines.length === 0} onClick={clearAll}>{t('clearAll')}</button>
+              <button style={lines.length > 0 ? { ...rowSubtleStyle, color: rowDangerInk } : rowSubtleOffStyle} disabled={lines.length === 0} onClick={clearSession}>{t('clearAll')}</button>
               {/* the LAUNCHER — narrow screens only (CSS): opens the data overlay when the
                   always-visible column has no room to exist */}
               <button

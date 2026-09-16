@@ -973,3 +973,11 @@ doing the student's homework. The formulas are AUTHORED in the subject's own wor
 rendering derived from the engine would be correct and unlike anything in a notebook. A row with no
 technique behind it — a coordinate read off the givens, a line the student wrote down, a sum they
 assembled — shows none, and an answer the figure does not determine shows none either.
+
+**R85 — an intersection sentence can say WHICH crossing it means**
+([ADR-AG-065](06c-decisions-analytic.md#adr-ag-065)). A straight meets a conic twice, and both
+crossings are offered, so the student must be able to name either: «נקודת החיתוך **הראשונה**/**השנייה**
+של הישר AB עם המעגל I». Two sentences naming crossings of the same pair name **two different points** —
+the tool may never put two letters on one location — and the ring a student clicks commits the sentence
+for the crossing under it, so what is written down re-reads as the point that was clicked. Where a pair
+has only one crossing the sentence carries no ordinal, because there is nothing to disambiguate.

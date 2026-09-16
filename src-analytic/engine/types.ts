@@ -405,7 +405,28 @@ export type Selector =
    * The test is RELATIVE to the figure`s own size, so it states no magnitude (ADR-052): two points
    * a thousandth of the figure`s span apart are the same point for every purpose a student has.
    */
-  | { kind: 'distinct'; ids: Id[] };
+  | { kind: 'distinct'; ids: Id[] }
+  /**
+   * TWO CROSSINGS OF THE SAME PAIR ARE TWO POINTS (#1113).
+   *
+   * An intersection is not a derived point — it is a `declare` plus two incidences, and the joint
+   * solve finds *a* crossing. A line meets a conic twice, so two sentences naming the crossings of
+   * the SAME pair have identical constraints, and the solve settled both on the same root: four ring
+   * clicks put four letters on one location while the far crossing was never reachable at all. The
+   * operator, 2026-09-16: *"2 points with different names on the same location which should never
+   * happen"*.
+   *
+   * The ruling (his, 2026-09-16) was that **the sentence names the root** rather than a branch index
+   * being stored behind the student's back, so «נקודת החיתוך הראשונה/השנייה» is the wording and this
+   * selector is what makes the two words mean different points. It names only its own subject: the
+   * siblings are found from the construction by their incidence signature, because the parser is pure
+   * over one line and cannot know what the figure already holds.
+   *
+   * A SELECTOR, for `distinct`'s reasons exactly — it consumes no freedom (the crossing is already
+   * pinned by its two incidences) and "not the other root" is a region, not an equation a
+   * least-squares solve can drive to zero.
+   */
+  | { kind: 'crossing-distinct'; id: Id };
 
 export const EMPTY_CONSTRUCTION: Construction = {
   params: [],

@@ -3501,3 +3501,90 @@ no jsdom and the property at stake is a discipline about WHEN capture is taken �
 in the source and is exactly what a future edit would undo. One of those assertions initially read
 past its own subject (a fixed-width slice spilling into the next handler) and judged the wrong code;
 the helper now bounds each handler at the next prop.
+
+## ADR-AG-064 — The drawing surface is MEASURED, and the chrome is the suite's (#1103, #1106, #1105, #1107)
+
+**Status:** accepted, 2026-09-16 · **Withdraws** [docs/28 §D9b](28-product-unification.md)'s compact-strip half
+
+**Requirements:** none (conformance — 02c already promises the suite chrome). **Design:**
+[28 §D9b](28-product-unification.md) amended; the D1 Workbench contract gains an inside-the-card rule.
+
+**Context.** Four reports from one side-by-side comparison with 2-D, all of them *"make it look like
+the other tools"*. They are one decision because they are one cause: **the D1 contract locks the CARD
+and stops at its edge**, so everything the surface does inside the card drifted per-product and nothing
+measured it.
+
+| # | symptom | measured |
+| --- | --- | --- |
+| 1103 | the canvas letterboxes | 420px of a 1094px card dead, drag tracking the cursor at **0.82×** |
+| 1106 | no clear-all button | the ADR-W-023 row rendered **51px past a page that cannot scroll** |
+| 1105 | example chips never leave | analytic is the **only** product that passes `quickCommands` |
+| 1107 | clear-all leaves the draft | #146's defect, reintroduced once per new product (now 4) |
+
+**Decision.**
+
+1. **The scene is built at the MEASURED viewport**, via a `ResizeObserver` on `viewportRef` — the same
+   element `view.ts` reads for pointer arithmetic, so the projection and the tracked rect cannot
+   disagree. A nominal 720×720 `viewBox` under `xMidYMid meet` letterboxes **by construction** at every
+   window size, and the 0.82× drag was that same ratio: the promise *"the world point under the cursor
+   stays under the cursor"* was arithmetically unreachable. 2-D and 3-D have always measured.
+2. **`flex: 1` + `minHeight: 0` on the viewport**, never `height: 100%` — in a fixed-height flex column
+   `100%` resolves against the CARD, so one child claimed all three children's space. `minHeight: 0` is
+   load-bearing: without it a flex item will not shrink below its content.
+3. **No compact chip strip.** D9b's second half is withdrawn rather than the code corrected, because
+   analytic was the only product that ever built it.
+4. **Clear-all clears the SESSION**, not just the store — drafts and the ask lane with it. The fix has
+   lived as a per-product hand-written list since #146 and has now been reintroduced twice; the list is
+   the defect, and a conformance probe is what stops a fifth product repeating it.
+
+**A contracted control that is invisible is not satisfied.** #1106 is the sharpest of the four: the row
+was *present in the markup* and unreachable on screen, so every structural test passed. "Rendered" is
+not "reachable", and only a positional assertion can tell them apart.
+
+**Consequences.** The analytic canvas fills its card and the drag tracks 1:1. #1110's general
+stale-answer fix stays open — only the clear-all corner is taken here.
+
+## ADR-AG-065 — Two crossings of one pair are two points, and the SENTENCE says which (#1113)
+
+**Status:** accepted, 2026-09-16 · **P1, was live in production** · **Extends** [ADR-AG-047](#adr-ag-047), [ADR-AG-056](#adr-ag-056)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 — an intersection sentence may name WHICH
+crossing. **Design:** none (internal to `engine/crossings.ts` + the selector family).
+
+**Context.** Operator, playing T16: *"somehow i got 2 points with different names on the same location
+which should never happen"*. Measured: four ring clicks put **four letters on (0.9194, 1.8388)** while
+the second crossing at (3.4806, 6.9612) never received a point at all. Shipped in `prod/2026-09-16-3`.
+
+**Root cause.** An intersection is not a derived point — it is a `declare` plus two incidences, and the
+joint solve finds *a* crossing ([ADR-AG-047](#adr-ag-047), and that modelling is still right). Two
+sentences naming crossings of the same pair therefore carried **identical constraints**, so nothing
+distinguished them and every one settled on the same root. #1096's *"the ring you click is the point
+you get"* held between distinct crossings and failed between the two roots of one pair — the case it
+was built for — because the click's choice was settled only for the click and discarded at commit.
+
+Second, independent: the ring dedupe used an **absolute** `1e-6`, so a crossing that drifted to the
+fourth decimal was offered again although a point sat on it. [ADR-AG-021](#adr-ag-021) had already ruled
+against absolute epsilons; this dedupe never inherited it.
+
+**Decision — the operator's, put to him as three options.**
+
+1. **The sentence names the root.** «נקודת החיתוך הראשונה / השנייה», accepted by the grammar and
+   emitted by the ring, so a clicked line re-parses to the point that was clicked
+   ([ADR-AG-048](#adr-ag-048)). A **stored branch index was offered and refused**: it would put state
+   behind the student's back and a save would have to carry it or silently collapse the pair on reload.
+2. **`crossing-distinct`, a SELECTOR** — `distinct`'s reasons exactly: it consumes no freedom (the
+   crossing is already pinned by its two incidences) and *"not the other root"* is a region, not an
+   equation a least-squares solve can drive to zero. It names only its own subject and finds its
+   siblings by **incidence signature**, because the parser is pure over one line.
+3. **Emitted for every intersection**, ordinal or not — the defect is a property of the construct, not
+   of the wording.
+4. **Relative epsilon in the dedupe**, inheriting ADR-AG-021 rather than restating it.
+
+**A bounded residue, filed rather than hidden: [#1114](https://github.com/dcodish/geo_builder/issues/1114).**
+A *third* sentence on a two-root pair is **detected** (`selectorsOk` false) and **not reported**, because
+`derive` reports a failing selector only at zero freedom — [#1071](https://github.com/dcodish/geo_builder/issues/1071)'s
+open question, which stays open. #1114 carries the argument that settles this case without it: at most
+two crossings is **counting**, not sampling, so no satisfiable figure can be wrongly refused.
+
+**Consequences.** Both roots are reachable and two letters no longer share a point. `src-analytic`
+gains `issue-1113-crossing-roots.test.ts` (7), which asserts the residue as well as the fix.
