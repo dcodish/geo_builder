@@ -992,3 +992,10 @@ the point, the right angle at its foot, and the value on it — never the number
 construction is what the student has to perform. It is decoration and never an object, an ask never
 changes the figure (R24), and the height appears only when the distance is knowledge (R25) — on a
 figure that does not fix it, the answer is open and nothing is drawn.
+
+The answer **stays in the panel** once asked ([ADR-AG-067](06c-decisions-analytic.md#adr-ag-067)): the
+panel is a record of what the student asked and what the figure answered. What the canvas shows is a
+**view** of it — clicking the same menu entry again clears the dotted line and **keeps the row**, and
+clicking once more draws it again. Only the ✕ on the row discards the record, and its drawing goes with
+it. **Typing** the same question again is a different gesture and must neither duplicate nor hide: it
+re-answers, replaces its row, and shows.

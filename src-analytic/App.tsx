@@ -44,6 +44,7 @@ import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
 import { AskLane } from '../shell/frame/AskLane';
 import { ask, figureIsOpen, type Answer } from './app/ask';
+import { askOnceAnswer, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
 import { anotherConfiguration, seedShowing } from './app/another';
 import { crossingSentence, crossingsOf, freeLetter } from './engine/crossings';
@@ -328,6 +329,24 @@ export function App() {
    * readability at low zoom.
    */
   const [pick, setPick] = useState<{ items: Measurable[]; x: number; y: number } | null>(null);
+
+  /**
+   * ASK IT, OR TAKE IT BACK (#1118) — one writer, so a measurement can always be retired.
+   *
+   * Operator, playing #1048: *"it's one thing to see it, but then I want to remove it and continue
+   * on."* #1048 tied the drawn height's lifetime to its ANSWER precisely so that dropping the answer
+   * would drop the height; this is the half that was designed and not built.
+   *
+   * The QUESTION is the key. It is the sentence the student asked, it is unique to the measurement,
+   * and it is what the menu offers — so clicking the same entry twice toggles, which is exactly the
+   * route he described (*"maybe I click on the dot again and I can remove the line"*), and asking the
+   * same thing twice stops producing a second identical row.
+   */
+  const make = (sentence: string) => () => ask(d, sentence, fmt, describeCurve);
+  const toggleAsk = (sentence: string) =>
+    setAnswers((prev) => toggleDrawn(prev, sentence, make(sentence)));
+  const askOnce = (sentence: string) =>
+    setAnswers((prev) => askOnceAnswer(prev, sentence, make(sentence)));
   const askRef = useRef<HTMLInputElement | null>(null);
 
   /**
@@ -532,9 +551,7 @@ export function App() {
        * The label is the answer's own value, so the canvas and the panel cannot disagree. Only
        * answers that HAVE a mark contribute, which `ask` grants only when the distance is knowledge.
        */
-      marks: answers
-        .filter((a) => a.mark)
-        .map((a) => ({ from: a.mark!.from, foot: a.mark!.foot, label: a.value ?? undefined })),
+      marks: drawnMarks(answers),
       /**
        * The crossings a student may promote (#1025) — operator: *"when a line we draw crosses another
        * line, we need to see the dashed circle allowing us to create that point"*.
@@ -1111,6 +1128,19 @@ export function App() {
             <div style={{ marginTop: 10 }}>
               {answers.map((a, i) => (
                 <div key={`${a.question}-${i}`} style={askRow} dir="ltr">
+                  {/*
+                    RETIRE THIS MEASUREMENT (#1118) — the same affordance the fact rows carry, and the
+                    one that also removes the height it drew, because the drawing lives on the answer.
+                  */}
+                  <button
+                    type="button"
+                    style={askDismiss}
+                    aria-label={t('askRemove')}
+                    title={t('askRemove')}
+                    onClick={() => setAnswers((prev) => removeAnswerAt(prev, i))}
+                  >
+                    ✕
+                  </button>
                   <div>
                     {a.unreadable
                       ? `${a.question} — ${t('askUnreadable')}`
@@ -1139,8 +1169,8 @@ export function App() {
                 placeholder={t('askPlaceholder')}
                 addLabel={t('askAdd')}
                 onSubmit={(text) => {
-                  const answer = ask(d, text, fmt, describeCurve);
-                  setAnswers((prev) => [answer, ...prev].slice(0, 8));
+                  // Idempotent, not a toggle (#1118) — see `askOnce`.
+                  askOnce(text);
                   return true;
                 }}
                 palette={{
@@ -1178,10 +1208,18 @@ export function App() {
                 style={measureItem}
                 onClick={() => {
                   // The SAME path the typed lane takes — one grammar, one answer (ADR-AG-044).
-                  setAnswers((prev) => [ask(d, m.sentence, fmt, describeCurve), ...prev].slice(0, 8));
+                  toggleAsk(m.sentence);
                   setPick(null);
                 }}
               >
+                {/*
+                  An entry whose DRAWING is on the canvas offers to clear it, and says so (#1118).
+                  The row stays either way — the operator's ruling: the panel is a record, the canvas
+                  is a view of it.
+                */}
+                {isDrawn(answers, m.sentence) && (
+                  <span aria-hidden="true" style={{ opacity: 0.6, marginInlineEnd: 6 }}>✕</span>
+                )}
                 <MathText text={analyticBidi.isolateLtrRuns(m.sentence)} />
               </button>
             ))}
@@ -1434,6 +1472,21 @@ const askRow: CSSProperties = {
   fontSize: 13,
   padding: '2px 0',
   opacity: 0.9,
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 6,
+};
+
+/** The ✕ that retires a measurement (#1118) — quiet, and never louder than the answer it removes. */
+const askDismiss: CSSProperties = {
+  border: 'none',
+  background: 'none',
+  cursor: 'pointer',
+  color: color.muted,
+  fontSize: 12,
+  lineHeight: 1,
+  padding: 0,
+  flex: 'none',
 };
 
 /**

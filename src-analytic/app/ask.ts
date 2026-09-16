@@ -87,6 +87,17 @@ export interface Answer {
    * (ADR-052) — the one thing this product may not do.
    */
   mark?: { from: { x: number; y: number }; foot: { x: number; y: number } };
+  /**
+   * Is the mark currently DRAWN? (#1118, operator ruling 2026-09-16.)
+   *
+   * The row and the drawing have separate lifetimes, and that is his ruling: *"once the distance …
+   * is asked for and appears in the data panel, it should stay there. just remove the dotted line if
+   * asked on the canvas."* The panel is a RECORD of what was asked and answered; the canvas is a
+   * VIEW, and a student clearing the figure to see it is not withdrawing the question.
+   *
+   * Absent means drawn — a freshly asked measurement shows itself.
+   */
+  shown?: boolean;
 }
 
 /**
