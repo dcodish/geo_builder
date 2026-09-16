@@ -59,6 +59,15 @@ const QUICK_COMMANDS = [
   'נתונה הנקודה A(2,6)',
 ];
 
+/**
+ * How far the pointer may travel before a press becomes a PAN rather than a click (#1101).
+ *
+ * A few pixels of tremor is a click. Without this threshold every press was a pan, and — because
+ * pointer capture retargets the whole gesture — the `click` never reached the canvas objects
+ * underneath.
+ */
+const DRAG_SLOP = 4;
+
 const CANVAS_W = 720;
 const CANVAS_H = 720;
 
@@ -242,7 +251,18 @@ export function App() {
    */
   const [view, setView] = useState<CanvasView>(INITIAL_VIEW);
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const dragRef = useRef<{ x: number; y: number; view: CanvasView } | null>(null);
+  /**
+   * `moved` is what separates a CLICK from a DRAG (#1101).
+   *
+   * #1094 captured the pointer on PRESS. Capture retargets the whole gesture to the capturing
+   * element, so `click` never reached the child — and the crossing rings (#1025), which the operator
+   * had validated in T46–T48, stopped responding in production while still being drawn. **A ring
+   * that looks clickable and is not is worse than no ring at all.**
+   *
+   * So capture is deferred until the pointer has actually travelled: below the threshold the gesture
+   * stays a click and passes through to whatever was under it.
+   */
+  const dragRef = useRef<{ x: number; y: number; view: CanvasView; moved: boolean } | null>(null);
   /**
    * The ASK lane (#1027) — the panel’s own input, and the operator’s request: *"data panel should
    * have a data entry option to query sizes and equations"*.
@@ -671,14 +691,21 @@ export function App() {
              */
             onPointerDown={(e) => {
               if (e.button !== 0) return;
-              dragRef.current = { x: e.clientX, y: e.clientY, view: viewRef.current };
-              e.currentTarget.setPointerCapture(e.pointerId);
+              // NO capture here (#1101) — see `dragRef`. A press is not yet a drag.
+              dragRef.current = { x: e.clientX, y: e.clientY, view: viewRef.current, moved: false };
             }}
             onPointerMove={(e) => {
               const start = dragRef.current;
               if (!start) return;
+              const dx = e.clientX - start.x;
+              const dy = e.clientY - start.y;
+              if (!start.moved) {
+                if (Math.hypot(dx, dy) < DRAG_SLOP) return;
+                start.moved = true;
+                e.currentTarget.setPointerCapture(e.pointerId);
+              }
               const rect = e.currentTarget.getBoundingClientRect();
-              setView(panned(figureBoxRef.current, start.view, e.clientX - start.x, e.clientY - start.y, rect));
+              setView(panned(figureBoxRef.current, start.view, dx, dy, rect));
             }}
             onPointerUp={(e) => {
               dragRef.current = null;

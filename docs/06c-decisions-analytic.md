@@ -3459,3 +3459,45 @@ about the level holding. Rendered through the same MathML path as everything els
 styled quieter than the answer, because it is the method and not the result. Verified in a browser:
 «AB» shows `d = √((4 - 1)² + (5 - 1)²)` under `AB = 5`, and «משוואת הישר AB» shows the two-point
 form under its equation.
+
+## ADR-AG-063 — A press is not yet a drag (#1101)
+
+**Status:** accepted, 2026-09-16 · **Corrects** [ADR-AG-060](#adr-ag-060) · **P1, live in production**
+
+**Requirements:** none (behaviour restored). **Design:** none (a correction to ADR-AG-060).
+
+**Context.** Found while building #1048, by clicking canvas objects that ought to have responded.
+Measured on `main`:
+
+```
+MAIN (has #1094 pan): rings=2  sentenceAdded=false
+```
+
+The dashed crossing rings (#1025, #1092) still DREW and no longer RESPONDED. The operator had
+validated them in T46–T48; ADR-AG-060 landed afterwards and broke them, and the break shipped in
+`prod/2026-09-16-2`.
+
+**Root cause.** ADR-AG-060's pan handler took `setPointerCapture` on **press**. Capture retargets the
+whole gesture to the capturing element, so the `click` that follows never reaches the child carrying
+the handler. Every press became a pan, including presses that never moved.
+
+**A ring that looks clickable and is not is worse than no ring at all** — the tool invites an action
+and then ignores it, which is the same dishonesty as printing a number it does not know.
+
+**Decision.** Capture is deferred until the pointer has actually travelled (`DRAG_SLOP = 4px`). Below
+the threshold the gesture stays a click and passes through to whatever is under it; above it, the pan
+begins exactly as before. Nothing about panning changes for anyone who was panning.
+
+**Why ADR-AG-060's own verification missed it, which is the part worth keeping.** That work drove a
+pan and a wheel zoom in a real browser and asserted the view moved — and it did. **Nothing asserted
+that a click still reached the objects underneath**, because those objects belonged to a feature that
+already worked and was not being changed. The lesson is narrow and practical: *when a new
+interaction layer is added over an existing one, the thing to test is not the new behaviour but
+whether the old one survived.* The lock therefore asserts both together, because either alone passes
+while the other is broken.
+
+**Consequences.** `src-analytic` +5 tests. Source-scan rather than rendered-DOM, since this tree has
+no jsdom and the property at stake is a discipline about WHEN capture is taken — which reads clearly
+in the source and is exactly what a future edit would undo. One of those assertions initially read
+past its own subject (a fixed-width slice spilling into the next handler) and judged the wrong code;
+the helper now bounds each handler at the next prop.
