@@ -51,24 +51,23 @@ describe('#1113 — two letters never share one crossing', () => {
     expect(pts.some((p) => near(p, NEAR))).toBe(true);
   });
 
-  it('a THIRD sentence on a two-root pair still stacks — the bounded residue, asserted not hidden', () => {
+  it('a THIRD sentence on a two-root pair is REFUSED — the residue this file recorded, now closed', () => {
     /**
-     * Two crossings exist and a third sentence names one of them again. `crossing-distinct` DETECTS
-     * it — `selectorsOk` is false — but `derive` only reports a failing selector when the figure has
-     * no freedom left, and here `A` and `B` are free on the line. That gate is deliberate and is
-     * [#1071](https://github.com/dcodish/geo_builder/issues/1071)'s open measurement question: with
-     * freedom left, 24 exhausted seeds are evidence and not proof, and reporting on them could refuse
-     * a satisfiable figure.
+     * This case asserted the opposite until #1114, and that is why it is worth keeping rather than
+     * deleting. It recorded the bounded residue honestly — detection live (`selectorsOk` false),
+     * refusal absent — so that the day the refusal arrived, it would FAIL and be revisited. It did.
      *
-     * So this asserts the CURRENT state rather than pretending it is fixed: the detection is live and
-     * the refusal is not. #1114 carries the counting argument that settles it without #1071 — a pair
-     * with two roots cannot host three named crossings, whatever the freedom, which is provable
-     * rather than sampled.
+     * The refusal is a COUNTING argument, not a sampling one, which is why it did not have to wait for
+     * [#1071](https://github.com/dcodish/geo_builder/issues/1071): a straight meets a conic in at most
+     * two points at ANY configuration, so a third such sentence cannot hold under any seed. `derive`'s
+     * `reportedDof === 0` freedom gate is untouched and #1071's general question stays open.
      */
     const lines = [...BASE, CROSS('P', 'first'), CROSS('Q', 'second'), CROSS('R')];
     const d = derive(lines, 0);
-    expect(d.figure.selectorsOk).toBe(false); // detected
-    expect(d.faults).toHaveLength(0); // and not yet reported — #1114
+    expect(d.faults).toHaveLength(1);
+    expect(d.faults[0].code).toBe('unsatisfiable');
+    // The refusal names the student's own sentence, never internal state.
+    expect(d.faults[0].detail).toBe(CROSS('R'));
   });
 
   it('the ordinal PARSES, in both spellings and in English — the sentence names its root', () => {

@@ -228,6 +228,53 @@ function applyAll(c: Construction, facts: readonly Fact[]): ApplyOutcome {
   return { ok: true, next, effect };
 }
 
+/**
+ * Which CARRIERS is this point already constrained to lie on?
+ *
+ * Two constraint kinds put a point on a curve, and both must count (#1114). A line named by two points
+ * lowers to `on-line-2pt`, not to `on-curve` — measured on the reported figure, where every crossing
+ * carried `on-line-2pt(P, A, B)` beside `on-curve(P, circle-I)`. A first version of this check looked at
+ * `on-curve` alone, saw one carrier per point instead of two, and never fired.
+ *
+ * The `line2pt:` key is synthetic and order-independent, so «the line AB» and «the line BA» are one
+ * carrier rather than two.
+ */
+function carriersOfPoint(c: Construction, id: string): string[] {
+  const out: string[] = [];
+  for (const k of c.constraints) {
+    if (k.t === 'on-curve' && (k as { id: string }).id === id) out.push((k as { curve: string }).curve);
+    else if (k.t === 'on-line-2pt' && (k as { id: string }).id === id) {
+      const pair = k as { a: string; b: string };
+      out.push(`line2pt:${[pair.a, pair.b].sort().join(',')}`);
+    }
+  }
+  return out;
+}
+
+/** A carrier's kind — `null` when it is not one this bound knows about. */
+function carrierKind(c: Construction, carrier: string): string | null {
+  if (carrier.startsWith('line2pt:')) return 'line';
+  const o = c.objects.find((x) => x.id === carrier);
+  if (!o || o.kind !== 'curve') return null;
+  const cu = (o as { curve?: { kind?: string } }).curve;
+  return cu?.kind ?? null;
+}
+
+/**
+ * How many points two curves of these kinds can share — Bézout, capped at what this product draws.
+ *
+ * `null` means "no useful bound", and then nothing is refused: a bound that is not certain must never
+ * turn into a refusal, because refusing a satisfiable figure is the worse defect of the two.
+ */
+function maxCrossings(a: string | null, b: string | null): number | null {
+  if (!a || !b) return null;
+  const isConic = (k: string) => k === 'circle' || k === 'ellipse' || k === 'parabola';
+  if (a === 'line' && b === 'line') return 1;
+  if ((a === 'line' && isConic(b)) || (isConic(a) && b === 'line')) return 2;
+  if (isConic(a) && isConic(b)) return 4;
+  return null;
+}
+
 export function applyFact(c: Construction, f: Fact): ApplyOutcome {
   switch (f.t) {
     case 'param': {
@@ -430,6 +477,47 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       // may repeat a given without it counting twice against the figure's freedom.
       const dup = c.constraints.some((k) => JSON.stringify(k) === JSON.stringify(f.k));
       if (dup) return { ok: true, effect: 'known', next: c };
+
+      /**
+       * A PAIR OF CURVES HAS ONLY SO MANY CROSSINGS (#1114).
+       *
+       * «נקודת החיתוך» lowers to two `on-curve` constraints, so naming a third crossing of one
+       * line×conic pair is representable — and it used to build. Measured on the reported figure, the
+       * damage is worse than a stacked point: naming `R` did not merely put it on top of `P`, it
+       * dragged `Q` there too, collapsing three distinct names onto one location.
+       *
+       *   P(0.92, 1.84)  Q(3.48, 6.96)          ← two crossings, correct
+       *   P(0.92, 1.84)  Q(0.92, 1.84)  R(0.92, 1.84)   ← after naming a third
+       *
+       * **This is a COUNTING argument, not a sampling one**, which is why it is refused here rather
+       * than left to the freedom gate in `derive`. A straight meets a conic in at most two points at
+       * ANY configuration, with any amount of freedom, so a third such sentence cannot hold under any
+       * seed — the "vacuously never" reasoning ADR-AG-008 / #1058 used. No seed search is involved and
+       * no satisfiable figure can be wrongly refused, so #1071's general question stays open and
+       * `derive`'s `reportedDof === 0` gate is deliberately untouched.
+       *
+       * The cap comes from the curve KINDS alone, never from their parameters — which is what lets
+       * this live at apply time, before anything is evaluated.
+       */
+      if (f.k.t === 'on-curve' || f.k.t === 'on-line-2pt') {
+        const subject = (f.k as { id: string }).id;
+        const arriving = f.k.t === 'on-curve'
+          ? (f.k as { curve: string }).curve
+          : `line2pt:${[(f.k as { a: string }).a, (f.k as { b: string }).b].sort().join(',')}`;
+        for (const other of carriersOfPoint(c, subject)) {
+          if (other === arriving) continue;
+          const cap = maxCrossings(carrierKind(c, other), carrierKind(c, arriving));
+          if (cap === null) continue;
+          const named = c.objects.filter((o) => {
+            if (o.id === subject) return false;
+            const on = carriersOfPoint(c, o.id);
+            return on.includes(other) && on.includes(arriving);
+          }).length;
+          if (named >= cap) {
+            return { ok: false, error: { code: 'unsatisfiable', detail: f.src } };
+          }
+        }
+      }
       /**
        * The student CONSUMING a discrete degree of freedom (#1049).
        *

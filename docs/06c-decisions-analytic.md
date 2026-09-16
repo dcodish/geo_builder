@@ -4196,3 +4196,50 @@ honest, and the seam #1124's ratio grammar plugs into.
 **Consequences.** `issue-1123-colon-claim.test.ts` (6), including a **generic** honesty case: a
 `not-handled` refusal reports the input verbatim. Asserted as a property rather than per-case, because
 this is the fourth escape of one class. Analytic lane 1147.
+
+---
+
+## ADR-AG-075 — A pair of curves has only so many crossings, and the bound is structural (#1114)
+
+**Requirements:** none (internal). **Design:** none (internal).
+
+Split out of #1113 while fixing it. That issue made the two crossings of one line × conic pair land on
+the two different roots; a **third** sentence on the same pair still built.
+
+**Measured, and worse than the issue recorded.** Naming `R` did not merely stack it on `P` — it dragged
+`Q` there too:
+
+```
+P(0.92, 1.84)  Q(3.48, 6.96)                    ← two crossings, correct
+P(0.92, 1.84)  Q(0.92, 1.84)  R(0.92, 1.84)     ← after naming a third
+```
+
+**Why this did not have to wait for #1071.** `crossing-distinct` DETECTED it — `selectorsOk` was false —
+but `derive` reports a failing selector only when the figure has no freedom left, and here `A` and `B`
+are free on the line. That gate is deliberate: with freedom left, 24 exhausted seeds are evidence and not
+proof, and reporting on them could refuse a satisfiable figure. **This case is a counting argument, not a
+sampling one** — a straight meets a conic in at most two points at ANY configuration, so three such
+sentences cannot all hold under any seed (ADR-AG-008 / #1058's "vacuously never"). So the refusal lives
+beside the construct in `applyFact`, `derive`'s freedom gate is untouched, and #1071 stays open.
+
+**The bound comes from the curve KINDS alone**, never their parameters — which is what lets it run at
+apply time, before anything is evaluated. `maxCrossings` returns `null` where it has no certain bound, and
+then nothing is refused: **a bound that is not certain must never become a refusal**, because refusing a
+satisfiable figure is the worse defect of the two.
+
+**A first version of the check never fired, and the reason is worth recording.** It counted `on-curve`
+constraints only. A line named by two points lowers to **`on-line-2pt`**, so each crossing carried
+`on-line-2pt(P, A, B)` beside `on-curve(P, circle-I)` and the check saw one carrier per point instead of
+two. `carriersOfPoint` now counts both kinds, with a synthetic order-independent `line2pt:` key so
+«the line AB» and «the line BA» are one carrier. Measured, not assumed — the plan said this sentence
+lowers to two `on-curve` constraints, and it does not.
+
+**#1113's recorded residue fired exactly as designed.** That file carried a case asserting the CURRENT
+state — detection live, refusal absent — so that the day the refusal arrived it would fail and be
+revisited. It failed in this round. It is kept and inverted rather than deleted, and now asserts the
+refusal names the student's own sentence.
+
+**Consequences.** `issue-1114-crossing-cap.test.ts` (5), including the control that two crossings still
+land on two different roots — a cap that broke #1113 would be a worse defect than the one fixed — and the
+same bound at a different arity (two straights meet once, so a second name is refused). Analytic lane
+76 files / 1152 tests.
