@@ -18,6 +18,7 @@
  * `<math>` natively (MathML Core — Chromium ≥109, Firefox, Safari).
  */
 import { useMemo } from 'react';
+import { exprML } from './mathExpr';
 
 const NUM = String.raw`\d+(?:\.\d+)?`;
 // a radicand: a parenthesised number/fraction (the √() grouping) OR a bare number
@@ -45,9 +46,41 @@ const SUP = String.raw`(?:\([^()]+\)|[A-Za-z0-9])(?:²|\^\d+)`;
 // requires the pair RIGHT AFTER it, so «הקשת הקטנה AB» (a qualified arc reference, not a measure) stays
 // plain text.
 const ARC = String.raw`(?:⌢|⏜|ה?קשת|(?<![A-Za-z])arc)\s*(?:\{\s*([A-Z]\d*[A-Z]\d*)\s*\}|([A-Z]\d*[A-Z]\d*)(?![A-Za-z\d]))`;
-// One tokenizer over the line: an arc, a subscript, a superscript, or a value expression (post-filtered
-// to those that actually carry a √ or a `/`, so a lone number stays plain text).
-const TOKEN = new RegExp(`(${ARC})|(${SUB})|(${SUP})|(${VALUE})`, 'gu');
+/**
+ * An EXPRESSION span (#1125) — a maximal run of mathematical characters.
+ *
+ * `VALUE` above matches only spans whose operands are literal NUMBERS, which is what stated magnitudes
+ * are. The #1053 formula traces are arithmetic over sub-expressions, so `VALUE` never matched them and
+ * their `√` and `/` survived as glyphs. This span is deliberately WIDER — identifiers, brackets, the
+ * absolute-value bar, unary signs — and is post-filtered exactly as `VALUE` is: a run carrying neither
+ * a `√` nor a `/` is not worth typesetting and stays plain text, so «AB = 10» and «∠ABC = 37» are
+ * untouched.
+ *
+ * It stops at `=` and at any non-Latin letter, which is what keeps the boundaries the corpus pins:
+ * «BC = 35/√32» still renders `BC = ` as text, and Hebrew never enters a formula.
+ */
+const MATHCH = String.raw`0-9A-Za-z√(){}|_^²·*×+\-\/.`;
+/**
+ * The span must CONTAIN a radical or a fraction bar, asserted up front.
+ *
+ * Without the lookahead this run swallowed neighbouring spans it could not improve: «(x-3)^2+(y-4)^2=9»
+ * matched from the `+`, carried no radical, and fell through to plain text -- dropping a superscript
+ * the corpus had always typeset. Matching only where it will actually render leaves every other token
+ * to the rule that already handled it.
+ *
+ * It also may not begin or end on whitespace (that ate the space in «BC = 35/√32»), and a comma
+ * ends it -- `m = (4 - 0) / (3 - 0),  y - 0 = ...` is two statements, not one expression.
+ */
+const EXPR = String.raw`(?=[${MATHCH}\s]*[√\/])[${MATHCH}](?:[${MATHCH}\s]*[${MATHCH}])?`;
+
+/**
+ * One tokenizer over the line: an arc, a subscript, a superscript, a value, or an expression.
+ *
+ * ORDER IS LOAD-BEARING. `SUP` precedes `EXPR` so `(x-3)^2` keeps rendering as the superscript island
+ * the corpus asserts, and `VALUE` precedes it so every stated magnitude takes the byte-identical path it
+ * always did. `EXPR` is the fallback that catches what the value grammar cannot express.
+ */
+const TOKEN = new RegExp(`(${ARC})|(${SUB})|(${SUP})|(${VALUE})|(${EXPR})`, 'gu');
 
 const esc = (s: string): string => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] ?? c);
 const mn = (s: string): string => `<mn>${esc(s.trim())}</mn>`;
@@ -115,9 +148,16 @@ function arcML(pair: string): string {
   return `<math><mover accent="true">${mi(pair)}<mo stretchy="true">⏜</mo></mover></math>`;
 }
 
-/** True when the text carries math notation worth formatting (a radical, a fraction, a subscript, a power, an arc). */
+/**
+ * True when the text carries math notation worth formatting (a radical, a fraction, a subscript, a
+ * power, an arc).
+ *
+ * The `/` clause used to require a DIGIT either side, which is why «משוואת הישר AB»'s trace —
+ * `m = (4 - 0) / (3 - 0)` — reported `hasMath: false` and was never typeset at all (#1125). A fraction
+ * bar between two bracketed sub-expressions is exactly as much a fraction as one between two numbers.
+ */
 export function hasMath(text: string): boolean {
-  return /√|_\{|²|\^\d|\d\s*\/\s*[\d√]|⌢|⏜|(?:ה?קשת|(?<![A-Za-z])arc)\s*\{?[A-Z]\d*[A-Z]/u.test(text);
+  return /√|_\{|²|\^\d|[\d)|]\s*\/\s*[\d√(|]|⌢|⏜|(?:ה?קשת|(?<![A-Za-z])arc)\s*\{?[A-Z]\d*[A-Z]/u.test(text);
 }
 
 /** Render `text` to an HTML string: MathML for the math tokens, escaped verbatim text for the rest. */
@@ -131,7 +171,16 @@ export function mathHtml(text: string): string {
     else if (m[4]) out += subML(m[4]);
     else if (m[5]) out += supML(m[5]);
     else if (m[6] && /√|\//.test(m[6])) out += valueML(m[6]);
-    else out += esc(m[0]); // a lone number matched by VALUE — keep as plain text
+    else if (m[7] && /√|\//.test(m[7])) {
+      /**
+       * An expression the value grammar could not express (#1125). `exprML` returns null when the span
+       * is not a well-formed expression, and then the span stays verbatim — a renderer that half-parses
+       * a formula would show the student a formula that is not the one they were given.
+       */
+      const ml = exprML(m[7]);
+      out += ml ?? esc(m[0]);
+    }
+    else out += esc(m[0]); // a lone number, or a run with no √ and no / — keep as plain text
     last = i + m[0].length;
   }
   out += esc(text.slice(last));

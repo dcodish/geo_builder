@@ -2803,3 +2803,68 @@ nobody looked at. With the deploy boundary in place, the worst an unattended nig
 gated, unplayed code on `main`, which is precisely what an attended round does, and `main` is not what
 students use. The gates that protect `main` do not need a human; the judgement that protects
 **production** does, and it keeps him.
+
+---
+
+## ADR-W-055 — The shared math renderer gains an EXPRESSION level under its value level (#1125)
+
+**Requirements:** none (internal) — what changes is that a formula the tool already shows is legible as
+mathematics. **Design:** [04-design](04-design.md) — `shell/mathExpr.ts` joins `shell/math.tsx`.
+
+**Operator, playing PR #1116 T8/T9:** *"the equations are not full mathml (the sqrt is not on the whole
+line and ratios are not shown nicely)"*. Two defects named, a third found by measuring.
+
+**Root cause — a lane that emits EXPRESSIONS was pointed at a renderer whose grammar stops at VALUES.**
+`shell/math.tsx` was built for stated magnitudes ([ADR-298](06-decisions.md#adr-298) / #77 / #40, the
+`BC = 35/√32` case), and its grammar bottoms out at a literal number:
+
+```
+RADICAND := ( NUM [/ NUM] ) | NUM      RTERM := [NUM] √ RADICAND | NUM      VALUE := RTERM [/ RTERM]
+```
+
+The #1053 formula traces are arithmetic over sub-expressions — `3² + (-4)²`, `(3 - 0)² + (4 - 0)²`. None
+is a `NUM`, so nothing matched, the `√` and `/` survived as glyphs, and the tokenizer fell through to its
+innermost atoms, emitting **one `<math>` island per superscript** with plain text between. Measured:
+
+| trace | `<math>` roots | `msqrt` | `mfrac` |
+| --- | --- | --- | --- |
+| `d(A, l1) = \|3·2 - 4·5 + 1\| / √(3² + (-4)²)` | 2 | 0 | 0 |
+| `d = √((3 - 0)² + (4 - 0)²)` | 2 | 0 | 0 |
+| `m = (4 - 0) / (3 - 0), …` | **`hasMath: false`** | 0 | 0 |
+
+**Widening `NUM` is the patch, and was rejected:** it would still island, and still bottom out one level
+down. The fix is the missing level — a recursive-descent parser whose operands are themselves
+expressions, emitting one `<math>` per span, with `|…|` as `<mo>` fences.
+
+**The SPAN boundaries are kept, and that is the load-bearing constraint.** `math.tsx` decides which parts
+of a line are mathematical, and those boundaries are asserted: «BC = 35/√32» keeps `BC = ` as text,
+«קשת AC + קשת BE» stays two arc islands, a lone number is never wrapped. Whole-line runs would be a
+simpler story and would break every one of them, so `mathExpr.ts` is handed an already-identified span
+and answers only *what MathML is it*.
+
+Two guards make the new span safe, and both were added because measurement caught them failing:
+
+- **It must CONTAIN a `√` or `/`.** Without that it swallowed neighbours it could not improve:
+  «(x-3)^2+(y-4)^2=9» matched from the `+`, carried no radical, fell through to text and **dropped a
+  superscript the corpus had always typeset**.
+- **It may not begin or end on whitespace**, which had eaten the space in «BC = 35/√32».
+
+`hasMath`'s `/` clause required a DIGIT either side, which is why the slope trace was never typeset at
+all. A fraction bar between two bracketed sub-expressions is exactly as much a fraction as one between
+two numbers.
+
+**The subtlest bug, worth recording.** `|` is the one bracket whose opening and closing forms are the same
+character, so the juxtaposition rule read the CLOSING bar of `|3·2 - 4·5 + 1|` as the start of another
+factor and the whole parse failed — on the headline case. An `absDepth` counter settles it.
+
+**A malformed span is kept verbatim.** Every level returns `null` on a shape it does not recognise. Four
+products render through this file; a parse that silently dropped an operand would show a student a
+formula that is not the one they were given.
+
+**Verified across the blast radius**, as the issue required rather than assumed: the stated-magnitude
+corpus is **byte-identical** before and after (diffed, not trusted), and the 2-D math corpus (22) plus the
+analytic (1129), complex (1152) and 3-D (4632) lanes are green.
+
+**Consequences.** New `shell/mathExpr.ts` and `shell/__tests__/issue-1125-expression-math.test.ts` (15).
+This also corrects a claim in **#1117**, which says the trace is *"MathML, correct"* — it was plain glyphs
+with islands. #1117's fix is still wanted, and could not have improved anything until this landed.
