@@ -632,11 +632,21 @@ const hasRepeat = (v: readonly string[]): boolean => new Set(v).size !== v.lengt
  * Modelling it as a DERIVED point would have been the wrong shape: a derived point is one answer in
  * closed form, and a line meets a circle twice.
  */
+/**
+ * The ORDINAL that names WHICH crossing (#1113), non-capturing on purpose.
+ *
+ * A line meets a conic twice and both crossings are offered, so the sentence must be able to say
+ * which one it means — the operator's ruling, 2026-09-16, over storing a branch index behind the
+ * student's back. The word is accepted and carried in the student's own line; what makes the two
+ * words denote different points is the `crossing-distinct` selector below, which every intersection
+ * gets. It is non-capturing so the operand groups keep their indices.
+ */
+const NTH_HE = '(?:ה?ראשונה|ה?שניי?ה|ה?אחרת)?';
 const INTERSECT_HE = new RegExp(
-  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה?נקודת|ה?נקודות)?\\s*ה?חיתוך\\s+(?:של\\s+)?(.+?)\\s+(?:עם|ו-?)\\s+(.+)$`
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה?נקודת|ה?נקודות)?\\s*ה?חיתוך\\s*${NTH_HE}\\s*(?:של\\s+)?(.+?)\\s+(?:עם|ו-?)\\s+(.+)$`
 );
 const INTERSECT_EN = new RegExp(
-  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+intersection\\s+(?:point\\s+)?of\\s+(.+?)\\s+(?:and|with)\\s+(.+)$`
+  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+(?:first\\s+|second\\s+|other\\s+)?intersection\\s+(?:point\\s+)?of\\s+(.+?)\\s+(?:and|with)\\s+(.+)$`
 ,  'i',
 );
 
@@ -714,6 +724,16 @@ function parseIntersection(line: string): RuleOutcome {
     { t: 'declare', id, src: line },
     { t: 'constraint', k: left, src: line },
     { t: 'constraint', k: right, src: line },
+    /**
+     * AND IT IS NOT ITS SIBLING (#1113).
+     *
+     * Emitted for EVERY intersection, not only for one that says «השנייה» — the defect is a property
+     * of the construct, not of the wording. Two crossings of the same pair carry identical
+     * incidences, so without this the solve settles both on the same root and the student gets two
+     * letters on one point. With one crossing named there is no sibling and the selector judges
+     * nothing, which costs nothing.
+     */
+    { t: 'selector', sel: { kind: 'crossing-distinct', id }, src: line },
   ]);
 }
 function parseDerived(line: string): RuleOutcome {

@@ -404,6 +404,35 @@ function selectorsHold(c: Construction, at: Map<Id, Pt>): boolean {
     }
     const p = at.get(s.id);
     if (!p) return true; // a selector about an absent point judges nothing
+    /**
+     * A CROSSING IS NOT ITS SIBLING (#1113).
+     *
+     * Two sentences naming crossings of the same pair carry identical incidences, so nothing in the
+     * solve distinguished them and both settled on the same root. The siblings are found here, from
+     * the construction, because the parser is pure over one line: any other point whose incidence
+     * SIGNATURE matches this one is a crossing of the same pair, and must be somewhere else.
+     *
+     * `apart` is the same relative threshold `distinct` uses, for the same reason — an absolute one
+     * would state a magnitude the student never gave (ADR-052), and this is the exact epsilon defect
+     * that made the ring dedupe re-offer a taken crossing.
+     */
+    if (s.kind === 'crossing-distinct') {
+      const sig = (id: Id) =>
+        JSON.stringify(
+          c.constraints
+            .filter((k) => 'id' in k && (k as { id?: Id }).id === id)
+            .map((k) => JSON.stringify({ ...k, id: '' }))
+            .sort(),
+        );
+      const mine = sig(s.id);
+      for (const other of at.keys()) {
+        if (other === s.id) continue;
+        if (sig(other) !== mine) continue;
+        const q = at.get(other)!;
+        if (Math.hypot(p.x - q.x, p.y - q.y) < apart) return false;
+      }
+      return true;
+    }
     if (s.kind === 'axis-side') {
       const v = s.axis === 'x' ? p.x : p.y;
       return s.positive ? v > 0 : v < 0;

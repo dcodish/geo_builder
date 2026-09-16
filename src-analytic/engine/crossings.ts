@@ -28,6 +28,11 @@ export interface Crossing {
   second: string;
   /** A stable identity, so React keeps the dots still while the figure moves. */
   id: string;
+  /**
+   * WHICH root of this pair (#1113) — 0 or 1 for a straight meeting a conic, `undefined` when the
+   * pair has only one crossing and there is nothing to disambiguate.
+   */
+  nth?: number;
 }
 
 /** A tiny line, as `a·x + b·y + c = 0` plus the span it is drawn over. */
@@ -41,6 +46,26 @@ interface Straight {
 }
 
 const EPS = 1e-9;
+
+/**
+ * How close two points must be to count as the SAME crossing (#1113).
+ *
+ * Relative to the figure's own span, never absolute: an absolute 1e-6 states a magnitude the student
+ * never gave (ADR-052) and means something different on a figure spanning 3 units than on one
+ * spanning 3000 — ADR-AG-021's ruling, which this dedupe had not inherited. Measured symptom: a
+ * solved crossing drifted to the fourth decimal and its ring was offered AGAIN although a point was
+ * already sitting on it, which is how a third and fourth letter reached one location.
+ */
+function apart(figure: Figure): number {
+  const ps = figure.points;
+  if (ps.length < 2) return 1e-9;
+  const span = Math.max(
+    1e-9,
+    Math.max(...ps.map((p) => p.x)) - Math.min(...ps.map((p) => p.x)),
+    Math.max(...ps.map((p) => p.y)) - Math.min(...ps.map((p) => p.y)),
+  );
+  return span * 1e-6;
+}
 
 /**
  * The Hebrew noun for each curve family, for a curve with only its equation to go by (#1096).
@@ -280,12 +305,19 @@ export function crossingsOf(figure: Figure, c: Construction): Crossing[] {
    */
   for (const st of straights) {
     for (const cn of conics) {
-      for (const at of meetConic(st, cn.curve)) {
-        if (figure.points.some((p) => Math.hypot(p.x - at.x, p.y - at.y) < 1e-6)) continue;
+      const roots = meetConic(st, cn.curve);
+      /**
+       * `nth` is the ROOT'S ORDER in this pair, taken before any filtering (#1113) — which is why
+       * this is `forEach` over the full root list and not a loop over the survivors. It is what lets
+       * the offered sentence say «הראשונה» or «השנייה»; drop a taken crossing first and the
+       * remaining one would call itself "the first" and collide with the point already there.
+       */
+      roots.forEach((at, n) => {
+        if (figure.points.some((p) => Math.hypot(p.x - at.x, p.y - at.y) < apart(figure))) return;
         const id = `${at.x.toFixed(6)},${at.y.toFixed(6)}`;
-        if (out.some((o) => o.id === id)) continue;
-        out.push({ ...at, first: st.words, second: cn.words, id });
-      }
+        if (out.some((o) => o.id === id)) return;
+        out.push({ ...at, first: st.words, second: cn.words, id, nth: roots.length > 1 ? n : undefined });
+      });
     }
   }
   return out;
@@ -304,5 +336,16 @@ export function freeLetter(c: Construction): string {
 }
 
 /** The sentence a dot would add. */
+/**
+ * The line a click writes down — and it NAMES ITS ROOT (#1113).
+ *
+ * The operator's ruling, 2026-09-16: the sentence says which crossing it means rather than a branch
+ * index being stored behind the student's back. Without the ordinal both rings of one line×conic pair
+ * produced the identical sentence, so the solve settled every one of them on the same root and four
+ * clicks put four letters on one point.
+ *
+ * The words are the grammar's own (`NTH_HE` in the parser accepts them), so a clicked line re-parses
+ * to the point that was clicked — ADR-AG-048's «two surfaces, one grammar».
+ */
 export const crossingSentence = (x: Crossing, name: string): string =>
-  `${name} נקודת החיתוך של ${x.first} עם ${x.second}`;
+  `${name} נקודת החיתוך${x.nth === undefined ? '' : x.nth === 0 ? ' הראשונה' : ' השנייה'} של ${x.first} עם ${x.second}`;

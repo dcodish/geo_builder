@@ -507,6 +507,16 @@ strip and the whole surface in 3-D and complex are new.
 
 *Cost accepted:* one more line in the column D1 was chosen to unclutter.
 
+> **WITHDRAWN, 2026-09-16 (#1105, [ADR-AG-064](06c-decisions-analytic.md#adr-ag-064)).** The second
+> half — *"shrinking to a one-line strip above the input once a figure exists"* — is reversed. The
+> operator, seeing it built for the first time: *"on the input panel, I dont want to see the chips.
+> behavior should be like 2d and 3d tools"*. The *cost accepted* above is no longer accepted.
+>
+> **Analytic was never the deviation — it was the only product that ever implemented this half.**
+> 2-D, 3-D and complex pass no `quickCommands` at all, so for them the examples have always lived only
+> on the empty canvas and in the manual, and that is now the ruling for every product. The empty-state
+> half of D9b stands unchanged.
+
 ### D10 — Tablet: **the data panel becomes an overlay in portrait; canvas and input stay side by side**
 
 Bounded by an existing ruling: **NFR-US-4** — tablets in scope (touch, pinch-zoom, +/− buttons),

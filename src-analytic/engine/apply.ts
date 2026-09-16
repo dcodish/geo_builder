@@ -687,7 +687,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
        * of its points was missing would be a given that vanished.
        */
       const refs =
-        f.sel.kind === 'axis-side'
+        f.sel.kind === 'axis-side' || f.sel.kind === 'crossing-distinct'
           ? [f.sel.id]
           : f.sel.kind === 'distinct'
             ? f.sel.ids
