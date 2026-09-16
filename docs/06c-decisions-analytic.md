@@ -4071,7 +4071,14 @@ locus lane". Nothing in `src-analytic/` changes in this commit — the three iss
 
 ---
 
-## ADR-AG-072 — The answer row is typeset, and punctuated as a sentence (#1117 + #1112)
+## ADR-AG-076 — The answer row is typeset, and punctuated as a sentence (#1117 + #1112)
+
+> **Renumbered from ADR-AG-072.** Another session landed its own ADR-AG-072 (the locus lane) while
+> round #1135 was executing, and both claimed the number. Theirs landed first, so this one moved. The
+> commit that introduced this decision (`fe52156b`) says ADR-AG-072 in its message and cannot be
+> rewritten — it is already pushed — so the pointer is recorded here instead. **`test:docs` does not
+> check ADR ids for uniqueness**, which is why neither session was told; filed as the guard that should
+> have caught it.
 
 **Requirements:** none (internal) — R26's promise is unchanged; the row now keeps it legibly.
 **Design:** none (internal).
