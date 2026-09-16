@@ -10,6 +10,7 @@
  * (`app/submit.ts`), because deciding needs the fold; this holds the state that path writes.
  */
 import { create } from 'zustand';
+import { temporal } from 'zundo';
 import type { LoadAudit } from '../../shell/save';
 
 /**
@@ -108,6 +109,20 @@ interface AnalyticState {
    * differs needs the derivation, so the submit layer picks and this records.
    */
   goToSeed: (seed: number) => void;
+  /**
+   * UNDO / REDO (#1098) — the row member this builder was missing.
+   *
+   * Cheaper here than anywhere else in the suite, and for the reason that also makes the save file a
+   * drift net (ADR-AG-055): **the session IS the ordered line list and the figure is derived from
+   * it.** There is no position, parameter value or solver state to roll back, so a history entry is
+   * a list of strings plus the seed, and an undone figure is re-derived rather than restored.
+   *
+   * The seed rides along because it is what the student SAW — «הציגו תצורה אחרת» then undo must put
+   * back the configuration they were looking at, not merely the facts (the E5/STO-5 lesson 2-D
+   * records).
+   */
+  undo: () => void;
+  redo: () => void;
   setError: (e: InputError | null) => void;
   setName: (name: string) => void;
   setLoadAudit: (audit: LoadAudit | null) => void;
@@ -125,7 +140,9 @@ interface AnalyticState {
   setNotice: (n: string | null) => void;
 }
 
-export const useAnalyticStore = create<AnalyticState>((set, get) => ({
+export const useAnalyticStore = create<AnalyticState>()(
+  temporal(
+    (set, get) => ({
   lines: [],
   seed: 0,
   name: '',
@@ -139,6 +156,19 @@ export const useAnalyticStore = create<AnalyticState>((set, get) => ({
     set((s) => ({ lines: s.lines.map((l, i) => (i === index ? next : l)), error: null, notice: null })),
   clearAll: () => set({ lines: [], error: null, notice: null, seed: 0, name: '', loadAudit: null }),
   goToSeed: (seed) => set({ seed, error: null, notice: null }),
+
+  /**
+   * The temporal wrappers. They clear the transient surfaces too: an error or notice is about the
+   * line the student just typed, and stepping away from that line must not leave its message behind.
+   */
+  undo: () => {
+    useAnalyticStore.temporal.getState().undo();
+    set({ error: null, notice: null });
+  },
+  redo: () => {
+    useAnalyticStore.temporal.getState().redo();
+    set({ error: null, notice: null });
+  },
   setError: (error) => set({ error, notice: null }),
   setNotice: (notice) => set({ notice, error: null }),
   setName: (name) => set({ name }),
@@ -157,4 +187,22 @@ export const useAnalyticStore = create<AnalyticState>((set, get) => ({
 
   restore: ({ lines, seed, name }) =>
     set({ lines: [...lines], seed: seed ?? 0, name: name ?? '', error: null, notice: null }),
-}));
+    }),
+    {
+      /**
+       * The history slice is the SESSION and nothing else (#1098).
+       *
+       * `lines` is the source of truth and `seed` is the configuration the student was looking at;
+       * everything else here is transient UI — an error, a notice, a load audit — and rolling those
+       * back would make undo restore a message about a line that no longer exists.
+       *
+       * `name` is deliberately OUT: naming a drawing is not a construction step, which is the same
+       * call 2-D made for `figureName`.
+       */
+      partialize: (s) => ({ lines: s.lines, seed: s.seed }) as AnalyticState,
+      // Without this, setting an error would push a history entry and undo would appear to do nothing.
+      equality: (a, b) => a.lines === b.lines && a.seed === b.seed,
+      limit: 100,
+    },
+  ),
+);

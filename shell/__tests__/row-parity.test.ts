@@ -23,6 +23,18 @@ const ROOT = path.resolve(__dirname, '..', '..');
 /** BOM-tolerant read — a Windows editor's BOM must not turn into a JSON.parse crash here. */
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/^﻿/, '');
 
+/**
+ * EVERY BUILDER IN THE SUITE, in one place (#1090, fixed with #1098).
+ *
+ * This file used to hand-list three products in each assertion, and the analytic builder — the most
+ * recent to join — was in none of them. So the tool the parity lock did not check was the tool that
+ * drifted: its figure name sat in the wrong zone, its clear-all on the fact-list footer, and it had
+ * no undo/redo at all. That is the very shape this file exists to prevent.
+ *
+ * Adding builder five means adding one line HERE, and every assertion below picks it up.
+ */
+const APPS = ['src/App.tsx', 'src3d/App3.tsx', 'src-complex/App.tsx', 'src-analytic/App.tsx'] as const;
+
 /** The one wording (he) and its en mirror. */
 const WORDING = 'הציגו תצורה אחרת';
 const WORDING_EN = 'Show another configuration';
@@ -149,7 +161,7 @@ describe('#742 / ADR-W-024 — the canvas chrome is contracted', () => {
   });
 
   it('every canvas renders the SHARED corner cluster (imports the shell contract)', () => {
-    for (const rel of ['src/render/Figure.tsx', 'src3d/render/Figure3.tsx', 'src-complex/App.tsx']) {
+    for (const rel of ['src/render/Figure.tsx', 'src3d/render/Figure3.tsx', 'src-complex/App.tsx', 'src-analytic/App.tsx']) {
       const src = read(rel);
       expect(src.includes('canvasClusterStyle') && src.includes('canvasCtrlStyle'), `${rel} carries the cluster`).toBe(true);
     }
@@ -186,8 +198,8 @@ describe('#743 — the row is ONE look: every builder consumes the shell style c
     }
   });
 
-  it('all three rows import it — no product paints its own row buttons', () => {
-    for (const rel of ['src/App.tsx', 'src3d/App3.tsx', 'src-complex/App.tsx']) {
+  it('every row imports it — no product paints its own row buttons', () => {
+    for (const rel of APPS) {
       const src = read(rel);
       expect(src.includes("shell/frame/figureRow'"), `${rel} consumes the contract`).toBe(true);
       expect(src.includes('rowAccentStyle') || src.includes('= rowAccentStyle'), `${rel} uses the accent`).toBe(true);
@@ -223,5 +235,82 @@ describe('#739 — the complex clear-all sits on the row, not the fact-list foot
     expect(clear, 'after the row opens').toBeGreaterThan(actions);
     expect(clear, 'before the dataZone').toBeLessThan(data);
     expect(src.slice(footer, canvas).includes('clearAll'), 'the footer must not carry it').toBe(false);
+  });
+});
+
+/**
+ * #1098 — THE PARITY THE OPERATOR ASKED FOR, held for all FOUR builders.
+ *
+ * Operator, 2026-09-16, with three screenshots side by side: *"I wanted the analytics to look like
+ * the other tools with all aspects"*.
+ *
+ * These are the differences those screenshots showed, each turned into an assertion that names the
+ * product it fails for. They are written over `APPS`, so builder five is checked the day it is
+ * added rather than the day someone notices.
+ */
+describe('#1098 — the figure name and the session ops, in every builder', () => {
+  it('the NAME is the first thing in the CANVAS zone — never the input zone', () => {
+    /**
+     * `shell/frame/FigureName`'s own docblock carries the operator's B3 ruling — *"the name is
+     * CENTERED ABOVE THE CANVAS, because it names the drawing"* — and predicts that a field
+     * standardized in two products "drifts a third time". #1087 drifted it a fourth, into the input
+     * zone, in the change whose purpose was parity. Asserted here so it cannot drift a fifth.
+     */
+    for (const rel of APPS) {
+      const src = read(rel);
+      const name = src.indexOf('<FigureName');
+      expect(name, `${rel} mounts FigureName`).toBeGreaterThan(-1);
+      const canvas = src.indexOf('canvasZone=');
+      const input = src.indexOf('inputZone=');
+      expect(canvas, `${rel} has a canvasZone`).toBeGreaterThan(-1);
+      // It must sit after the canvas zone opens, and before the next zone does.
+      const after = [input, src.indexOf('dataZone='), src.indexOf('listZone=')].filter((i) => i > canvas);
+      const nextZone = after.length ? Math.min(...after) : src.length;
+      expect(name > canvas && name < nextZone, `${rel}: FigureName belongs in canvasZone`).toBe(true);
+    }
+  });
+
+  /**
+   * COMPLEX HAS NO UNDO/REDO EITHER — found by this assertion the day it was written (#1099).
+   *
+   * Listed as a NAMED exception rather than quietly dropped from the loop: the assertion stays
+   * strict, the gap stays visible, and the line below is what a fix deletes. Weakening the check to
+   * make the suite green would have hidden a real defect in a shipped product — the whole reason
+   * this file exists.
+   */
+  const NO_HISTORY_YET = ['src-complex/App.tsx'];
+
+  it('undo and redo exist in every builder, read from the TEMPORAL store', () => {
+    for (const rel of APPS) {
+      if (NO_HISTORY_YET.includes(rel)) continue;
+      const src = read(rel);
+      expect(/canUndo/.test(src), `${rel} offers undo`).toBe(true);
+      expect(/canRedo/.test(src), `${rel} offers redo`).toBe(true);
+      // Availability comes from the history, not from a count of facts — clearing is itself
+      // undoable, and a count-based test greys out the press that recovers it.
+      expect(src.includes('pastStates'), `${rel} reads undo availability from the history`).toBe(true);
+      expect(src.includes('futureStates'), `${rel} reads redo availability from the history`).toBe(true);
+    }
+  });
+
+  it('clear-all sits on the ROW, never on the fact-list footer', () => {
+    // #739 made this correction for complex; #1098 makes it for analytic, which had it in the
+    // footer exactly as complex once did.
+    for (const rel of APPS) {
+      const src = read(rel);
+      const footer = src.indexOf('footer={');
+      if (footer < 0) continue; // a product with no fact-list footer cannot fail this way
+      const slice = src.slice(footer, footer + 500);
+      expect(/onClick=\{clearAll\}|onClick=\{\(\) => clearAll/.test(slice), `${rel}: clear-all must not live in the footer`).toBe(false);
+    }
+  });
+});
+
+describe('#1099 — the gap this file found while being widened', () => {
+  it('complex is the ONLY builder without a history, and that is recorded', () => {
+    // When complex gains undo/redo, this test fails and the exception above is deleted with it.
+    // An exception with no expiry is how a known gap becomes a permanent one.
+    const missing = APPS.filter((rel) => !read(rel).includes('pastStates'));
+    expect(missing).toEqual(['src-complex/App.tsx']);
   });
 });

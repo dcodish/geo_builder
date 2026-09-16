@@ -938,3 +938,11 @@ adds no degrees of freedom: the anchor's are the anchor's and the direction is c
 asserts nothing the question did not give (ADR-052). An anchor that does not yet exist is introduced
 with DOF, as «הישר AB» introduces A and B; the direction operand is a reference and introduces
 nothing.
+
+
+**R81 — the chrome is the suite's** ([ADR-AG-058](06c-decisions-analytic.md#adr-ag-058)). The figure's
+name sits centred above the canvas, the canvas controls in its inline-end corner, and the under-canvas
+row carries «הציגו תצורה אחרת» as its one accent with «בטל · בצע שוב · נקה הכל» opposite — the
+same row, in the same order, as every other builder. **A step can always be taken back:** undo and
+redo cover adding, editing, deleting and clearing, and because the session is the line list, an undone
+figure is re-derived rather than restored.

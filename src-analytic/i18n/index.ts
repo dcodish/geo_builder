@@ -148,6 +148,10 @@ const he = {
   errLoadForeign: 'הקובץ "{{detail}}" שייך לכלי אחר בסדרה — פתחו אותו שם.',
   errLoadNewer: 'הקובץ "{{detail}}" נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב.',
   errLoadUnreadable: 'הקובץ "{{detail}}" אינו קובץ שרטוט שמור.',
+  // The under-canvas row's session ops (#1098) — the suite's words, so «בטל» means here what it
+  // means in הנדסת המישור.
+  undo: 'בטל',
+  redo: 'בצע שוב',
   noticeAlreadyFollows:
     'זה כבר נובע מהנתונים שכתבתם — השרטוט מקיים את זה ממילא, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
 };
@@ -272,6 +276,8 @@ const en: typeof he = {
   errLoadForeign: 'The file "{{detail}}" belongs to another builder in the suite — open it there.',
   errLoadNewer: 'The file "{{detail}}" was saved by a newer version of the tool — refresh and try again.',
   errLoadUnreadable: 'The file "{{detail}}" is not a saved figure.',
+  undo: 'Undo',
+  redo: 'Redo',
   noticeAlreadyFollows:
     'That already follows from what you have written — the figure satisfies it anyway, so I did not add another row: "{{detail}}"',
 };

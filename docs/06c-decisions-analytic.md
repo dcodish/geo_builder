@@ -3203,3 +3203,60 @@ catalog entries, deliberately axis-based so each builds standing alone as the ca
 a ring. It has no equation to name itself with ([ADR-AG-056](#adr-ag-056)) and no letter. «הישר דרך
 P» is the obvious candidate and the corpus has not been checked for it, so the honest default holds:
 no name the grammar can use means no ring.
+
+## ADR-AG-058 — The chrome is the SUITE's, not this product's (#1098, #1090)
+
+**Status:** accepted, 2026-09-16 · **Completes** [ADR-AG-055](#adr-ag-055) · **Closes**
+[#1090](https://github.com/dcodish/geo_builder/issues/1090)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R81. **Design:**
+[04c](04c-design-analytic.md) "The session, and the panel that shows it".
+
+**Context.** Operator, 2026-09-16, with 2-D, 3-D and analytic screenshots side by side: *"I wanted the
+analytics to look like the other tools with all aspects"*. ADR-AG-055 delivered the SESSION actions
+in the suite's order and stopped there; seven differences remained, measured against the source.
+
+**The first one was ours, and the component had predicted it.** `shell/frame/FigureName`'s docblock
+carries the operator's B3 ruling — *"the name is CENTERED ABOVE THE CANVAS"* — and warns that a field
+standardized in two products *"drifts a third time"* otherwise. ADR-AG-055 mounted it in the INPUT
+zone, **drifting it a fourth, in the change whose whole purpose was parity.** A one-line move; the
+lesson is that reading a shared component's contract is part of mounting it, and the lock now asserts
+the zone rather than trusting the next author to read.
+
+**Three more were one omission.** `shell/frame/figureRow` states the row contract in its own docblock
+— `[accent alternatives] … extras … [spacer] … [subtle undo/redo/clear]` — and exists because *"Same
+members, three implementations."* This builder never imported it, so it was the fourth: its actions
+floated over the canvas corner, clear-all sat on the fact-list footer (the correction #739 had
+already made for complex), and the alternatives button wore no accent.
+
+**One was NOT a shared-style bug, and measuring is what showed it.** The canvas cluster sat left here
+and right in the siblings. `canvasClusterStyle` uses `insetInlineEnd`, which under this product's RTL
+page resolves LEFT — and 2-D wraps its cluster in `dir="ltr"`. So the fix is one attribute here, not
+an edit to `canvasControls.ts`, **which would have moved the cluster in all four products.** The
+temptation to fix a shared style from one product's symptom is the drift this file keeps recording.
+
+**Decision — undo/redo, and why it is cheap here.** The session IS the ordered line list and the
+figure is derived from it (ADR-AG-055), so there is no position, parameter value or solver state to
+roll back: a history entry is a list of strings plus the seed, and an undone figure is **re-derived**
+rather than restored. `zundo`'s `temporal` wraps the store with a partialize slice of `lines + seed`
+— the seed because it is the configuration the student SAW (2-D's E5/STO-5 lesson), and nothing else,
+so an error, a notice or a figure name never becomes a step to undo. Availability is read from
+`pastStates`/`futureStates`, not from the line count: **clearing the canvas is itself undoable, and a
+count-based test would grey out the one press that recovers it.**
+
+**And the lock found a defect in a sibling.** Widening `row-parity.test.ts` from three products to
+four — which is #1090's fix, done here rather than left as the hole that let this drift happen —
+immediately failed for **complex, which has no undo/redo either** ([#1099](https://github.com/dcodish/geo_builder/issues/1099)).
+It is recorded as a NAMED, self-expiring exception plus a companion assertion that complex is the only
+one, so the day it gains a history that test fails and the exception is deleted with it. Weakening the
+check to make the suite green would have hidden a real defect in a shipped product — the whole reason
+the file exists. Fixing complex here would have meant a sibling edit inside an analytic chrome change.
+
+**Left for a ruling:** the empty state. «מה בונים היום?» is the siblings' wording; this product says
+«התחילו לשרטט — הבחינה לא מדפיסה שרטוט», which is a thing only this tool needs to say. Changing a
+voice is not a parity defect, so it waits.
+
+**Consequences.** `src-analytic` +10 tests (the history, and what it deliberately does not record);
+`shell` +4 (the widened parity lock and the sibling gap it found). Verified in a real browser, not
+only in tests: the name centres above the canvas, the cluster sits right, undo takes a row away and
+redo brings it back, zero console errors.

@@ -10,6 +10,7 @@
  * rather than re-deriving the chrome is the whole return on that work.
  */
 import { useMemo, useState, useRef, type ChangeEvent, type CSSProperties } from 'react';
+import { useStore } from 'zustand';
 import { useTranslation } from 'react-i18next';
 import registry from '../products.json';
 import { AppFrame } from '../shell/frame/AppFrame';
@@ -20,6 +21,7 @@ import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, clampZoom, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
+import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { fmtNum } from '../shell/format';
 import { color, fs } from '../shell/theme';
 import { paramRegister, reportedDof } from './engine/carriers';
@@ -109,7 +111,16 @@ export function App() {
     setLoadAudit,
     serialize,
     restore,
+    undo,
+    redo,
   } = useAnalyticStore();
+  /**
+   * Can we step back or forward? Read from the TEMPORAL store, as both siblings do, so a disabled
+   * button means "there is nothing there" rather than a guess from the line count — clearing the
+   * canvas is itself undoable, and a count-based test would grey out the one press that recovers it.
+   */
+  const canUndo = useStore(useAnalyticStore.temporal, (t) => t.pastStates.length > 0);
+  const canRedo = useStore(useAnalyticStore.temporal, (t) => t.futureStates.length > 0);
   const [draft, setDraft] = useState('');
 
   /**
@@ -510,8 +521,6 @@ export function App() {
         }
         inputZone={
           <>
-            {/* The figure's NAME — what a save is called (#1087), in the sibling's position. */}
-            <FigureName value={name} onChange={setName} placeholder={t('namePlaceholder')} />
             <InputArea
               value={draft}
               onChange={setDraft}
@@ -570,20 +579,28 @@ export function App() {
               }}
               onDelete={(id) => removeLine(Number(id))}
               footer={
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <ToolButton onClick={clearAll} disabled={lines.length === 0}>
-                    {t('clearAll')}
-                  </ToolButton>
-                  <span style={{ fontSize: fs.small, color: color.muted }}>
-                    {t('factCount', { count: lines.length })}
-                  </span>
-                </div>
+                /* CLEAR-ALL MOVED to the under-canvas row (#1098) — it acts on the figure, like
+                   undo/redo, and #739 made that call for complex for the same reason. What stays
+                   here is the COUNT, which is about this list. */
+                <span style={{ fontSize: fs.small, color: color.muted }}>
+                  {t('factCount', { count: lines.length })}
+                </span>
               }
               testId="analytic-facts"
             />
           </>
         }
         canvasZone={
+          <>
+            {/*
+              THE FIGURE'S NAME, CENTRED ABOVE THE CANVAS (#1098).
+              `FigureName`'s own docblock carries the operator's B3 ruling — *"the name is CENTERED
+              ABOVE THE CANVAS, because it names the drawing"* — and warns that a field standardized
+              in two products "drifts a third time" otherwise. #1087 mounted it in the INPUT zone and
+              drifted it a fourth, in the change whose purpose was parity. Both siblings mount it as
+              the first child of `canvasZone`; so does this now.
+            */}
+            <FigureName value={name} onChange={setName} placeholder={t('namePlaceholder')} />
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
             <Figure
               scene={scene}
@@ -591,7 +608,15 @@ export function App() {
               /* A click on a crossing ADDS ITS SENTENCE — the same line typing it would add. */
               onCrossing={(sentence) => submit(sentence)}
             />
-            <div style={canvasClusterStyle}>
+            {/*
+              `dir="ltr"` (#1098) — NOT a change to the shared style, which was right all along.
+              `canvasClusterStyle` uses `insetInlineEnd`, and under this product's RTL page that
+              resolves to the LEFT while the siblings' clusters sit right. 2-D wraps its cluster the
+              same way (`src/render/Figure.tsx`), which is what made the difference measurable rather
+              than a matter of taste — and why the fix is here and not in `canvasControls.ts`, where
+              it would have moved the cluster in all four products.
+            */}
+            <div style={canvasClusterStyle} dir="ltr">
               <button type="button" style={canvasCtrlStyle} onClick={() => setZoom(1)} aria-label="reset">
                 ↺
               </button>
@@ -612,42 +637,72 @@ export function App() {
                 +
               </button>
             </div>
-            <div style={{ position: 'absolute', insetInlineStart: 12, bottom: 12, display: 'flex', gap: 8 }}>
-              <ToolButton
-                onClick={() => {
-                  /**
-                   * The button asks for what it PROMISES — a figure that differs (#1084).
-                   *
-                   * Incrementing the seed redrew the same picture for the first few presses on the
-                   * operator's own figure, while the DOF cue beside it said the figure still had
-                   * freedom. When nothing differs, saying so beats redrawing in silence.
-                   */
-                  const next = anotherConfiguration(lines, seed);
-                  if (next.found) goToSeed(next.seed);
-                  else setNotice(t('noticeOnlyConfiguration'));
-                }}
-                /**
-                 * NEVER disabled (#1084). It was gated on the DOF cue, which counts CONTINUOUS
-                 * freedom — and a figure with none can still have several configurations: the
-                 * operator's own question asks for «שתי אפשרויות» for a point in a figure the cue
-                 * calls fully determined, and the button that would have shown him the second was
-                 * greyed out.
-                 *
-                 * When there really is only one, pressing it says so, which is more than a disabled
-                 * button ever said.
-                 */
-              >
-                {t('another')}
-              </ToolButton>
-              {/* Offered only when there IS a construction to show, so the control never promises
-                  something the figure cannot deliver. */}
-              {d.figure.construction.length > 0 && (
-                <ToolButton onClick={() => setShowConstruction((v) => !v)}>
-                  {t(showConstruction ? 'hideConstruction' : 'showConstruction')}
-                </ToolButton>
-              )}
-            </div>
           </div>
+
+          {/*
+            THE UNDER-CANVAS ROW (#1098) — the suite's row, from the suite's styles.
+
+            `shell/frame/figureRow` states the contract in its own docblock:
+
+              [accent alternatives-button] … product extras … [spacer] … [subtle undo/redo/clear]
+
+            ...and exists because "Same members, three implementations — the #734 class." This
+            builder never imported it, so it was the FOURTH implementation: its actions floated over
+            the canvas corner, clear-all sat in the fact-list footer, and undo/redo did not exist.
+            `row-parity.test.ts` asserts exactly this shape for complex and does not know this
+            product exists (#1090) — widened in this change, so builder five fails there instead of
+            in front of a student.
+          */}
+          <div style={figureRowStyle}>
+            <button
+              type="button"
+              style={lines.length === 0 ? rowAccentOffStyle : rowAccentStyle}
+              disabled={lines.length === 0}
+              onClick={() => {
+                /**
+                 * The button asks for what it PROMISES — a figure that differs (#1084).
+                 *
+                 * Incrementing the seed redrew the same picture for the first few presses on the
+                 * operator's own figure, while the DOF cue beside it said the figure still had
+                 * freedom. When nothing differs, saying so beats redrawing in silence.
+                 */
+                const next = anotherConfiguration(lines, seed);
+                if (next.found) goToSeed(next.seed);
+                else setNotice(t('noticeOnlyConfiguration'));
+              }}
+            >
+              {t('another')}
+            </button>
+
+            {/* A product EXTRA, which the contract allows between the accent and the spacer. Offered
+                only when there IS a construction to show, so the control never promises something
+                the figure cannot deliver. */}
+            {d.figure.construction.length > 0 && (
+              <button type="button" style={rowSubtleStyle} onClick={() => setShowConstruction((v) => !v)}>
+                {t(showConstruction ? 'hideConstruction' : 'showConstruction')}
+              </button>
+            )}
+
+            <span style={rowSpacerStyle} />
+
+            <button type="button" style={canUndo ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canUndo} onClick={undo}>
+              {t('undo')}
+            </button>
+            <button type="button" style={canRedo ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canRedo} onClick={redo}>
+              {t('redo')}
+            </button>
+            {/* Clear-all wears the danger tone over the subtle shape, and sits HERE rather than on
+                the fact list's footer — the same correction #739 made for complex. */}
+            <button
+              type="button"
+              style={lines.length > 0 ? { ...rowSubtleStyle, color: rowDangerInk } : rowSubtleOffStyle}
+              disabled={lines.length === 0}
+              onClick={clearAll}
+            >
+              {t('clearAll')}
+            </button>
+          </div>
+        </>
         }
         dataZone={
           <DataPanel
