@@ -46,10 +46,17 @@ describe('#1025 — a crossing is offered where the student could NAME it', () =
     expect(crossings[0].second).toBe('הישר l1');
   });
 
-  it('offers NOTHING where a name does not exist — an anonymous conic', () => {
-    // #1057 left how a student refers to one of two anonymous conics open, so a dot here would be a
-    // click with no sentence behind it.
-    expect(at(['x^2/9+y^2/4=1', 'נתון הישר l1: y=x']).crossings).toHaveLength(0);
+  it('OVERTURNED by the operator (#1096): an anonymous conic DOES offer its rings', () => {
+    /**
+     * This assertion used to expect zero, on ADR-AG-054's reasoning that a conic has no name a
+     * sentence can use. Operator ruling, 2026-09-16 on T49: *"i dont agree. I think we need to offer
+     * the rings in this case too"*.
+     *
+     * Rewritten rather than deleted, so the record shows the rule CHANGED and why — the boundary was
+     * drawn around namelessness when the thing that actually blocks a sentence is ambiguity
+     * (ADR-AG-056), and an equation is not ambiguous.
+     */
+    expect(at(['x^2/9+y^2/4=1', 'נתון הישר l1: y=x']).crossings).toHaveLength(2);
   });
 
   it('and nothing where a point already stands', () => {
@@ -155,10 +162,12 @@ describe('#1092 — an equation is a name the grammar can use', () => {
     expect(crossings.map((k) => k.second)).toEqual(['הישר l1', 'הישר l1']);
   });
 
-  it('an anonymous CONIC still gets no ring — #1057 stays open, deliberately', () => {
-    // The grammar half accepts an equation operand for any curve, but a RING needs a noun for the
-    // sentence, and which noun a student would use for one of two anonymous conics is unsettled.
-    expect(at(['x^2/9+y^2/4=1', 'נתון הישר l1: y=x']).crossings).toHaveLength(0);
+  it('and the conic limit #1092 left in place was lifted by the operator (#1096)', () => {
+    // #1092 deliberately stopped at lines, leaving the conic noun to ADR-AG-049's open question.
+    // The operator settled it: «האליפסה x^2/9+y^2/4=1» is the noun, and it is unambiguous.
+    const { crossings } = at(['x^2/9+y^2/4=1', 'נתון הישר l1: y=x']);
+    expect(crossings).toHaveLength(2);
+    expect(crossings[0].second).toBe('האליפסה x^2/9+y^2/4=1');
   });
 
   it('and prose containing an «=» is still refused, not minted into a curve (#1068)', () => {

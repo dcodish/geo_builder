@@ -686,7 +686,12 @@ function incidenceOn(operand: string, id: Id): Constraint | null {
    * it «עם הערך x=5» — prose that happens to contain an `=` — would mint a curve. An operand with
    * no plane variable in it is still `bad-operand`, which is the honest answer.
    */
-  const bare = trim(operand).replace(/^(?:ה?ישר|ה?עקום|(?:the\s+)?(?:line|curve))\s+/i, '');
+  // Any curve NOUN may front an equation (#1096): «הפרבולה y^2=54x» is how a student refers to a
+  // conic that has only its equation to go by, and it is the phrasing the canvas's own rings offer.
+  const bare = trim(operand).replace(
+    /^(?:ה?ישר|ה?עקום|ה?מעגל|ה?פרבולה|ה?אליפסה|(?:the\s+)?(?:line|curve|circle|parabola|ellipse))\s+/i,
+    '',
+  );
   if (bare.includes('=')) {
     const eq = equationExpr(bare);
     if (eq && symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) {

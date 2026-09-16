@@ -31,7 +31,8 @@ export function Figure({
    * A crossing was clicked (#1025). The caller decides what that MEANS — this component knows only
    * that the student pointed at one, and hands back the sentence it was carrying.
    */
-  onCrossing?: (sentence: string) => void;
+  /** The sentence this ring adds, and WHERE it is in the world (#1096). */
+  onCrossing?: (sentence: string, at: { x: number; y: number }) => void;
 }) {
   const { width, height, axes, curves, segments, construction, points, crossings } = scene;
   return (
@@ -217,7 +218,7 @@ export function Figure({
               strokeWidth={1.25}
               strokeDasharray="3 2"
               style={{ cursor: onCrossing ? 'pointer' : 'default' }}
-              onClick={onCrossing ? () => onCrossing(k.sentence) : undefined}
+              onClick={onCrossing ? () => onCrossing(k.sentence, { x: k.wx, y: k.wy }) : undefined}
             />
           </g>
         ))}

@@ -135,6 +135,9 @@ export interface Scene {
 }
 
 export interface SceneCrossing {
+  /** WHERE in the world — so a click can say which of a conic's two crossings it meant (#1096). */
+  wx: number;
+  wy: number;
   id: string;
   cx: number;
   cy: number;
@@ -299,6 +302,8 @@ export function buildScene(
 
   const crossings: SceneCrossing[] = (knows.crossings ?? []).map((k) => ({
     id: k.id,
+    wx: k.x,
+    wy: k.y,
     cx: t.sx(k.x),
     cy: t.sy(k.y),
     sentence: k.sentence,

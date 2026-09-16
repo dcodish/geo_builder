@@ -54,3 +54,42 @@ export function anotherConfiguration(
   }
   return { seed, found: false };
 }
+
+
+/**
+ * WHICH SOLUTION DID THEY CLICK? (#1096)
+ *
+ * A line meets a conic TWICE, so two rings offer the SAME sentence — «P נקודת החיתוך של הישר l1 עם
+ * האליפסה …» names both crossings, and [ADR-AG-047](../../docs/06c-decisions-analytic.md#adr-ag-047)
+ * lists both in the panel with «הציגו תצורה אחרת» moving between them.
+ *
+ * **Clicking the left ring and landing on the right point would break the contract the rings exist
+ * for.** So the click carries WHERE it was, and the seed that puts the new point nearest there is
+ * the one shown first.
+ *
+ * This invents no given. Both roots are genuinely valid and the student can still cycle to the other;
+ * choosing which to show FIRST is exactly what the branch mechanism is for, and ADR-052 permits a
+ * starting choice so long as it can change. The operator was away and asked not to be consulted, so
+ * this is recorded as the session's call rather than his ruling (ADR-AG-061).
+ */
+export function seedShowing(
+  lines: readonly string[],
+  id: string,
+  target: { x: number; y: number },
+  tries = TRIES,
+): number {
+  let best = 0;
+  let bestD = Infinity;
+  for (let seed = 0; seed < tries; seed += 1) {
+    const p = derive([...lines], seed).figure.points.find((q) => q.id === id);
+    if (!p) continue;
+    const dist = Math.hypot(p.x - target.x, p.y - target.y);
+    if (dist < bestD) {
+      bestD = dist;
+      best = seed;
+      // Close enough that no other seed could be meaningfully nearer the click.
+      if (dist < 1e-6) break;
+    }
+  }
+  return best;
+}

@@ -3355,3 +3355,54 @@ works on a desktop.
 across repeated steps, the auto-centre arming, the rendered-size measurement, and the shared clamp.
 The `+`/`−` buttons keep their old behaviour exactly — they zoom about the current centre — so
 nothing the operator already had changed.
+
+## ADR-AG-061 — A conic's crossings are offered too, and the ring you click is the point you get (#1096)
+
+**Status:** accepted, 2026-09-16 · **Overturns** [ADR-AG-054](#adr-ag-054)'s conic limit ·
+**Closes** [ADR-AG-049](#adr-ag-049)'s open question · **Extends** [ADR-AG-056](#adr-ag-056)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R76 (amended again). **Design:**
+[04c](04c-design-analytic.md) — `engine/crossings.ts`.
+
+**Context.** Operator ruling, 2026-09-16, on play case T49: *"i dont agree. I think we need to offer
+the rings in this case too"*. T49 had been written to assert the OPPOSITE — that an anonymous conic
+gets no ring — and he overruled it.
+
+**It extends a principle rather than contradicting one.** ADR-AG-056 had already found the right
+boundary for lines: **what blocks a sentence is AMBIGUITY, not namelessness.** ADR-AG-049's open
+question is that the NOUN «הפרבולה» is ambiguous between two anonymous parabolas — but «הפרבולה
+y^2=54x» names exactly one curve. ADR-AG-054 drew its limit around the wrong property, twice; this
+finishes moving it.
+
+**Two halves, and the second is what makes the rings honest.**
+
+*The geometry.* `crossingsOf` did straight × straight only. It now also does straight × conic, in
+closed form: the line is parametrised as `P0 + t·d`, which removes every vertical/horizontal special
+case, and substituting into each canonical form (`NumCurve` admits only three) leaves a quadratic in
+`t`. A near-zero leading coefficient is the genuinely linear case — a line parallel to a parabola's
+axis meets it once — and is solved as such rather than divided through, which is where a naive
+quadratic draws a ring at the edge of the world.
+
+*Which solution did they click?* A line meets a conic TWICE, so both rings carry the SAME sentence,
+and [ADR-AG-047](#adr-ag-047) already lists both solutions with «הציגו תצורה אחרת» moving between
+them. **Clicking the left ring and landing on the right point would break the contract rings exist
+for.** So the click carries WHERE it was, and `seedShowing` picks the configuration that puts the new
+point nearest there. This invents no given: both roots are valid, the student can still cycle, and
+choosing which to show FIRST is exactly what the branch mechanism is for (ADR-052 permits a starting
+choice so long as it can change). **The operator was away and had asked not to be consulted, so this
+is recorded as the session's call, not his ruling.**
+
+**A latent bug it surfaced.** A named circle's stored label is «מעגל I», not «I», so `words()`
+prepending the noun produced «המעגל מעגל I» — which the grammar refuses. It could not surface while
+circles were excluded from the crossing search, and did the moment they were let in.
+
+**And one case deliberately left refusing.** A TANGENCY offers no ring. Measured, the sentence a ring
+would add there returns `unsatisfiable` while landing on exactly the right point — the two incidences
+are degenerate at a touch. **A ring whose click fails is worse than no ring**, which is ADR-AG-054's
+principle and outranks the ruling to offer more rings; that ruling was about anonymous conics, not
+about tangency. Filed as [#1100](https://github.com/dcodish/geo_builder/issues/1100) rather than
+papered over, with the note that the refusal itself looks wrong and is worth fixing on its own.
+
+**Consequences.** `src-analytic` +14 tests. **Two existing assertions were REWRITTEN, not deleted** —
+the one ADR-AG-054 wrote and the one #1092 left in place — each now recording that the rule changed
+and why, so the log reads as a decision reversed rather than a test quietly dropped.

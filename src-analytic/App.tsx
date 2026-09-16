@@ -44,7 +44,7 @@ import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
 import { AskLane } from '../shell/frame/AskLane';
 import { ask, figureIsOpen, type Answer } from './app/ask';
-import { anotherConfiguration } from './app/another';
+import { anotherConfiguration, seedShowing } from './app/another';
 import { crossingSentence, crossingsOf, freeLetter } from './engine/crossings';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
 import { parseLine } from './parser/parseAnalytic';
@@ -692,7 +692,26 @@ export function App() {
               scene={scene}
               showConstruction={showConstruction}
               /* A click on a crossing ADDS ITS SENTENCE — the same line typing it would add. */
-              onCrossing={(sentence) => submit(sentence)}
+              /**
+               * A click on a ring ADDS ITS SENTENCE — the same line typing it would add — and then
+               * shows the solution the student actually clicked (#1096).
+               *
+               * A line meets a conic twice, so both rings carry the same words; without the second
+               * half, clicking the right-hand crossing could land the point on the left one. The
+               * seed search costs nothing here because it runs once, on a click.
+               */
+              onCrossing={(sentence, at) => {
+                const next = [...lines, sentence];
+                // A GUARD, not a second decision: `submit` still owns whether the line is accepted
+                // and what the student is told. This only asks whether jumping the configuration
+                // afterwards would be meaningful, because moving the figure for a refused line
+                // would be a change the student did not ask for.
+                const clean = !derive(next, seed).faults.some((f) => f.index === lines.length);
+                submit(sentence);
+                if (!clean) return;
+                const best = seedShowing(next, freeLetter(d.construction), at);
+                if (best !== seed) goToSeed(best);
+              }}
             />
             {/*
               `dir="ltr"` (#1098) — NOT a change to the shared style, which was right all along.

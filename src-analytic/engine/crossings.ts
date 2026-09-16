@@ -43,6 +43,19 @@ interface Straight {
 const EPS = 1e-9;
 
 /**
+ * The Hebrew noun for each curve family, for a curve with only its equation to go by (#1096).
+ *
+ * These are the words the grammar's operand reader accepts, so a sentence built from them parses
+ * back to the SAME object — «two surfaces, one grammar» (ADR-AG-048), now over conics too.
+ */
+const CONIC_NOUN: Record<string, string> = {
+  line: 'הישר',
+  circle: 'המעגל',
+  parabola: 'הפרבולה',
+  ellipse: 'האליפסה',
+};
+
+/**
  * How the grammar refers to an object — `null` when it has no name a sentence can use.
  *
  * `classified` is the kind the FIGURE fitted, which the caller already holds. A bare «y=9» names no
@@ -70,10 +83,30 @@ function words(c: Construction, id: Id, classified?: CurveKind): string | null {
      * corpus's constant one.
      */
     if (!name) {
-      const kind = classified ?? o.label.kind ?? o.curve.kind;
-      return kind === 'line' && o.label.eqSrc ? `הישר ${o.label.eqSrc}` : null;
+      /**
+       * AN EQUATION NAMES ITS CURVE, whatever kind it is (#1096).
+       *
+       * Operator ruling, 2026-09-16 on T49: *"i dont agree. I think we need to offer the rings in
+       * this case too"* — overriding ADR-AG-054's limit for the conics ADR-AG-049 left out.
+       *
+       * ADR-AG-056 already established the principle for lines and drew the boundary in the right
+       * place: what blocks a sentence is AMBIGUITY, not namelessness. The noun «הפרבולה» is
+       * ambiguous between two anonymous parabolas; «הפרבולה y^2=54x» is not. The kind comes
+       * from the FIT, because a bare equation declares none (02c R6).
+       */
+      if (!o.label.eqSrc) return null;
+      const noun = CONIC_NOUN[classified ?? o.label.kind ?? o.curve.kind ?? ''];
+      return noun ? `${noun} ${o.label.eqSrc}` : null;
     }
-    if (o.curve.kind === 'circle' || /^(I|II|III|IV|V)$/.test(name)) return `המעגל ${name}`;
+    /**
+     * A NAMED CIRCLE ALREADY CARRIES ITS NOUN (#1096): the label stored for «נתון מעגל I שמשוואתו …»
+     * is «מעגל I», not «I». Prepending the noun again produced «המעגל מעגל I», which the grammar
+     * refuses — a latent bug that could not surface while circles were excluded from the crossing
+     * search altogether, and did the moment they were let in.
+     */
+    if (o.curve.kind === 'circle' || /^(I|II|III|IV|V)$/.test(name)) {
+      return name.startsWith('מעגל') ? `ה${name}` : `המעגל ${name}`;
+    }
     return `הישר ${name}`;
   }
   return null;
@@ -107,6 +140,83 @@ function straightOfCurve(id: Id, curve: NumCurve, c: Construction): Straight | n
   return { a: curve.a, b: curve.b, c: curve.c, within: null, words: w };
 }
 
+/**
+ * WHERE A STRAIGHT MEETS A CONIC (#1096) — up to two points, in closed form.
+ *
+ * The line is parametrised as `P0 + t·d` (`P0` its point nearest the origin, `d = (−b, a)`), which
+ * removes every vertical/horizontal special case: substituting into each canonical conic leaves a
+ * QUADRATIC in `t`, and the three canonical forms are the only shapes `NumCurve` admits.
+ *
+ * A near-zero leading coefficient is the genuinely linear case — a line parallel to a parabola's
+ * axis meets it exactly once — and is solved as such rather than divided through, which is where a
+ * naive quadratic produces an infinity and draws a ring at the edge of the world.
+ */
+function meetConic(l: Straight, conic: NumCurve): Array<{ x: number; y: number }> {
+  const n2 = l.a * l.a + l.b * l.b;
+  if (n2 < EPS) return [];
+  const p0 = { x: (-l.a * l.c) / n2, y: (-l.b * l.c) / n2 };
+  const d = { x: -l.b, y: l.a };
+
+  let A = 0;
+  let B = 0;
+  let C = 0;
+  if (conic.kind === 'circle') {
+    const q = { x: p0.x - conic.cx, y: p0.y - conic.cy };
+    A = d.x * d.x + d.y * d.y;
+    B = 2 * (d.x * q.x + d.y * q.y);
+    C = q.x * q.x + q.y * q.y - conic.r * conic.r;
+  } else if (conic.kind === 'ellipse') {
+    const ia = 1 / (conic.a * conic.a);
+    const ib = 1 / (conic.b * conic.b);
+    A = d.x * d.x * ia + d.y * d.y * ib;
+    B = 2 * (p0.x * d.x * ia + p0.y * d.y * ib);
+    C = p0.x * p0.x * ia + p0.y * p0.y * ib - 1;
+  } else if (conic.kind === 'parabola') {
+    // y² = 2p·x
+    const two = 2 * conic.p;
+    A = d.y * d.y;
+    B = 2 * p0.y * d.y - two * d.x;
+    C = p0.y * p0.y - two * p0.x;
+  } else {
+    return [];
+  }
+
+  const ts: number[] = [];
+  if (Math.abs(A) < 1e-12) {
+    if (Math.abs(B) > 1e-12) ts.push(-C / B); // the honestly linear case
+  } else {
+    const disc = B * B - 4 * A * C;
+    if (disc < -1e-9) return []; // misses it
+    const root = Math.sqrt(Math.max(disc, 0));
+    /**
+     * A TANGENCY OFFERS NO RING, deliberately (#1096).
+     *
+     * It is a real meeting point and a student may well want to name it, but measured, the sentence
+     * a ring would offer there does not build: the two incidences are degenerate at a touch and the
+     * solve returns `unsatisfiable` even though it lands on the right point. **A ring whose click
+     * fails is worse than no ring** — that is ADR-AG-054's whole principle, and it outranks the
+     * ruling to offer more rings, which was about anonymous conics and not about tangency.
+     *
+     * Filed separately rather than papered over here.
+     */
+    if (root <= 1e-6) return [];
+    ts.push((-B + root) / (2 * A));
+    ts.push((-B - root) / (2 * A));
+  }
+
+  return ts
+    .map((t) => ({ x: p0.x + t * d.x, y: p0.y + t * d.y }))
+    .filter((q) => Number.isFinite(q.x) && Number.isFinite(q.y))
+    // A SEGMENT is bounded; a stated line is not. The same `within` the straight-to-straight path uses.
+    .filter((q) => !l.within || l.within(q.x, q.y));
+}
+
+/** A drawn conic the student can NAME — the other half of a crossing (#1096). */
+interface Conic {
+  curve: NumCurve;
+  words: string;
+}
+
 /** Where two straights meet — `null` when they are parallel, or meet outside what is drawn. */
 function meet(p: Straight, q: Straight): { x: number; y: number } | null {
   const det = p.a * q.b - q.a * p.b;
@@ -135,10 +245,17 @@ export function crossingsOf(figure: Figure, c: Construction): Crossing[] {
     const st = straightOfSegment(s, c);
     if (st) straights.push(st);
   }
+  const conics: Conic[] = [];
   for (const cu of figure.curves) {
     if (!cu.stated) continue;
     const st = straightOfCurve(cu.id, cu.curve, c);
-    if (st) straights.push(st);
+    if (st) {
+      straights.push(st);
+      continue;
+    }
+    // Not a line — a circle, parabola or ellipse. It joins the search if it can be NAMED (#1096).
+    const w = words(c, cu.id, cu.curve.kind);
+    if (w) conics.push({ curve: cu.curve, words: w });
   }
 
   const out: Crossing[] = [];
@@ -152,6 +269,23 @@ export function crossingsOf(figure: Figure, c: Construction): Crossing[] {
       const id = `${at.x.toFixed(6)},${at.y.toFixed(6)}`;
       if (out.some((o) => o.id === id)) continue;
       out.push({ ...at, first: straights[i].words, second: straights[j].words, id });
+    }
+  }
+
+  /**
+   * STRAIGHT × CONIC (#1096). A line meets a conic twice, and BOTH are offered: the student can name
+   * either, and ADR-AG-047 already lists both solutions with «הציגו תצורה אחרת» moving between them.
+   * Which one a click lands on is settled at the click (see `App.tsx`), not here — this module knows
+   * where the crossings are, not what a mouse did.
+   */
+  for (const st of straights) {
+    for (const cn of conics) {
+      for (const at of meetConic(st, cn.curve)) {
+        if (figure.points.some((p) => Math.hypot(p.x - at.x, p.y - at.y) < 1e-6)) continue;
+        const id = `${at.x.toFixed(6)},${at.y.toFixed(6)}`;
+        if (out.some((o) => o.id === id)) continue;
+        out.push({ ...at, first: st.words, second: cn.words, id });
+      }
     }
   }
   return out;
