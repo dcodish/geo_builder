@@ -124,14 +124,18 @@ closed at `{line, circle, parabola, ellipse}` and should be hard-coded as such.
 
 ## 4. Product definition — what the student does, per ask type
 
-Charter unchanged from the three shipped siblings: **reproduce and verify, never solve**
-([ADR-AG-001](06c-decisions-analytic.md#adr-ag-001) D1).
+Charter: **reproduce and answer, never solve**
+([ADR-AG-001](06c-decisions-analytic.md#adr-ag-001) D1, **amended by
+[ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)** — the verify half is withdrawn; operator,
+2026-09-16: *"I dont want a validation tool"*). "Never solve" still means no CAS and is untouched.
+The student never types a claimed answer to be graded; the tool shows what it can determine, and
+shows the shape alone when it cannot.
 
 | Exam ask | Tool behaviour |
 |---|---|
-| `מצאו את משוואת המעגל` | The student types their claimed equation; the tool checks it against the built figure and marks ✓ / refuses. The data panel *also* carries the equation once it is knowledge, behind the student's own checkbox — the 3-D contract ([ADR-AG-003](06c-decisions-analytic.md#adr-ag-003) §2, §4b). |
-| `הביעו באמצעות k את משוואת המעגל` | Same, **verified across sampled values of `k`** — a wrong coefficient fails some sample. This is `src3d`'s `AM→ = u + ½v − w` claim mechanism, and it is why no CAS is needed. |
-| `מצאו את משוואת המקום הגיאומטרי` | The tool sweeps the moving point's free DOF and **paints the trace** (the student watches the curve get drawn); the claimed equation is verified as a residual over the swept points. |
+| `מצאו את משוואת המעגל` | The data panel carries the equation once it is **knowledge**, behind the student's own checkbox — the 3-D contract ([ADR-AG-003](06c-decisions-analytic.md#adr-ag-003) §2, §4b). Nothing is typed to be graded ([ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)). |
+| `הביעו באמצעות k את משוואת המעגל` | **Not answered.** A coefficient that moves with `k` is not knowledge, and recognising the symbolic dependence across samples is the CAS boundary. The figure is drawn for the sampled `k` and cycles with it. |
+| `מצאו את משוואת המקום הגיאומטרי` | The tool sweeps the point's residual DOF and **paints the trace**, **names the kind**, and **prints the equation when it can determine it** — the two-seed set test of [ADR-AG-072](06c-decisions-analytic.md#adr-ag-072) §4. When the set moves with a parameter, the shape is shown and no equation is. |
 | `שרטטו את שתי האפשרויות` | Both roots of the parameter pin are real configurations; `show another configuration` cycles them — the existing branch index. |
 | `מצאו את הערך של a` | The student states the pinning relation; the tool root-finds, and a two-root pin surfaces as two branches, never as a silently-chosen one. |
 | `האם קיימת נקודה שבעבורה…?` | A refusal is a first-class answer. `no-roots` is an honest contradiction, never a fabricated point. |
@@ -210,10 +214,12 @@ corpus's most common `הוכיחו` item) stays deferred separately (D5, R2).
 **Resolved** ([ADR-AG-001](06c-decisions-analytic.md#adr-ag-001) and
 [ADR-AG-002](06c-decisions-analytic.md#adr-ag-002), operator 2026-09-03):
 
-- **D1 — draw-and-verify, NO CAS.** The §6 deadlock of the July draft. It dissolved once the corpus
-  showed that even `הביעו באמצעות k` asks verify by sampling the parameter. The `src3d` NO-CAS
-  boundary ([src3d/CLAUDE.md](../src3d/CLAUDE.md) rule 3) is adopted verbatim, escalation route
-  included.
+- **D1 — draw-and-verify, NO CAS.** The §6 deadlock of the July draft. The `src3d` NO-CAS boundary
+  ([src3d/CLAUDE.md](../src3d/CLAUDE.md) rule 3) is adopted verbatim, escalation route included.
+  ~~The verify half~~ — **withdrawn by [ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)** (operator,
+  2026-09-16: *"I dont want a validation tool"*). The charter is **draw-and-answer, NO CAS**: the tool
+  shows what it can determine and shows the shape alone when it cannot. The NO-CAS half stands
+  unchanged and is what keeps the parameterised asks honest.
 - **D2 — V0 is the equation + tangency substrate, not the locus.** See §7.
 - ~~**D3** — the route lane splits by currency~~ · ~~**D4** — the tool never chains~~ —
   **both amended the same day by [ADR-AG-003](06c-decisions-analytic.md#adr-ag-003)**, below.
@@ -259,11 +265,14 @@ coefficient form, an evaluator, a plotter, a point-membership residual, and a ta
 against each of the other three. A parameter may occupy any coefficient slot. **This is a fixed
 table of ~10 curve-pair relations, not an algebra system.**
 
-**New core #3 — the locus sweep.** A moving point with a defining property, its free DOF sampled and
-its trace painted, plus a residual check of the student's claimed equation against the trace. This
-sits *directly* on the existing free-DOF sampler: a locus **is** a swept free DOF, and `שתי
-האפשרויות` **is** the branch index. That observation from the July draft survives the re-reading
-intact and is still the plan's best piece of leverage.
+**~~New core #3~~ — the locus sweep is NOT a new core** ([ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)).
+The July draft's observation — *a locus **is** a swept free DOF, and `שתי האפשרויות` **is** the branch
+index* — understated itself. Measured against the built engine, the freedom is not merely analogous to
+the DOF cue's number, it **is** that number: `carrierDofOf` + `freeRank` + `solveLM` already detect the
+locus and already sample points on it, one per seed. What the lane adds is an **ordered** sweep
+(continuation along the Jacobian's null space, because seeds scatter), a polyline, a kind, and an
+equation gated by a two-seed set comparison. The claimed-equation check the draft named here is
+withdrawn with D1's verify half.
 
 **Transplanted whole (not re-derived):** the one-parameter pin by numeric root-find, roots as
 branches, `no-roots` as an honest contradiction — `src3d`'s algebraic lane
@@ -280,7 +289,7 @@ fact).
 | SVG renderer + `transform.ts` (world→screen, isotropic fit, Y-flip) | **copied**, + axes/grid and curve plotting |
 | Parser front-end, rule pipeline, `catalog` as coverage map, LLM fallback via the `tool:`-parameterised proxy | **copied**, new grammar |
 | Store: Zustand + zundo, ordered fact list as source of truth, derive-on-demand, save/load, image export | **copied** |
-| Free-DOF sampler + branch index | **copied — and it is the locus generator** |
+| Free-DOF sampler + branch index | **copied — and it is the locus generator**, literally: a locus is a point whose residual `carrierDof` is 1, and the sampler already walks it one seed at a time ([ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)) |
 | Engine geometry, constraint solve | **new** (product trees never share; [BOUNDARIES.json](../BOUNDARIES.json)) |
 
 ## 7. Phased build plan (gates in the doc-20 style; each gate = tests green + `tsc`/build clean + the operator can PLAY it)
@@ -310,9 +319,18 @@ fact).
   `plannedTrees` with a total classification, and the `shell/__tests__` parity locks enumerating the
   fourth tree. [docs/28 §5](28-product-unification.md) Phase 4 is the whole return on the
   unification work: this is the first product that never re-derives the chrome.
-- **V1 — the locus lane.** Moving point, swept trace, claimed-equation verification, `שרטטו את שתי
-  האפשרויות`. **Gate: חורף 2024** (locus parabola with a parameter, both branches drawn) **and
-  קיץ א' 2024** (locus line from `MA=MB` between two circles).
+- **V1 — the locus lane** ([ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)), split in two. **A
+  locus is a named point whose residual `carrierDof` is 1** — measured, not assumed: `MA=MB` already
+  lands M on `x=4` at every seed and `∠APB=90°` already lands P on the circle of diameter AB, so the
+  detector and the sampler are the shipped solve. The lane sweeps that DOF by **continuation**, paints
+  the trace in the **ask lane** («המקום הגיאומטרי של P»), names the kind, and prints the equation when
+  a **two-seed set comparison** says the set is determinate. No claimed-equation verification — that
+  half of the charter is withdrawn.
+  - **V1a — the property locus** (#1137, blocked on #1136's free-point sentence). **Gate: קיץ א' 2024**
+    (locus line from `MA=MB` between two circles), plus the determinacy pair: the bisector prints its
+    equation, חורף 25 prints none and says «מעגל».
+  - **V1b — the construction locus** (#1138): a swept driver, a **derived** traced point, and the
+    third D7 inequality kind (a sweep range) as its consumer. **Gate: קיץ ב' 2024 and חורף 2024.**
 - **V2 — conic roles and metric asks.** `מוקד`/`מדריך`/`הציר הראשי` as first-class given forms;
   triangle area/perimeter over named points; area ratios; the affine `#כיווץ מעגל` edit.
   **Gate: חורף 2023 and קיץ א' 2023.**

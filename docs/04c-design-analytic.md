@@ -501,3 +501,71 @@ and the dashed drop is still drawn.
 is offered only when `asPair` finds its name really is two points the construction holds. The lock
 asserts the stronger property — every sentence the menu offers is one `ask` understands — so the menu
 cannot drift away from the grammar as either side grows.
+
+## The locus lane ([ADR-AG-072](06c-decisions-analytic.md#adr-ag-072))
+
+**Planned — #1136 → #1137 → #1138. Nothing below is built yet.** It is written here because the
+design's whole claim is that the mechanism already exists, and a reader who does not know that will
+build a second one.
+
+### The definition is a number the engine already prints
+
+> A locus is a named point whose residual `carrierDof` is **1**.
+
+`carrierDofOf` computes it as `carriers − rank(J)` (see "The model — objects, and the register that
+makes them free"), and it is already right on locus figures: `משולש ABM` + `MA = MB` reports 1 and
+puts M on `x=4` at every seed; adding `MA = 5` reports 0 and pins it. So the detector is `carrierDof`,
+the point sampler is `solveLM` under `sampleEnv`, and «הציגו תצורה אחרת» is already walking the locus
+one point at a time. **Do not write a locus solver.**
+
+### What is genuinely new: an ORDERED sweep
+
+Seeds are a sampler, not a sweep — two seeds of the bisector gave `y = 317` and `y = 1.23`, so seed
+order is not trace order and no sort fixes it in general (angle about a centroid works for the circle
+and fails for the line and the parabola). The tracer is **continuation**: solve once, take a fixed
+arclength step along the null space of the residual Jacobian, re-correct with `solveLM`, repeat until
+the view box or closure. Two properties earn it:
+
+- it is **ordered by construction**, so the output is a polyline rather than a cloud;
+- it works when the traced point is **downstream** of the free one (#1138's `G = midpoint(E,K)` with E
+  sweeping), which is why a marching-squares contour of a residual field was rejected — G has no
+  residual in its own `(x,y)`.
+
+### The honesty gate is at the level of the SET
+
+`isKnowledge` asks whether a **value** is invariant across every admissible parameter. A locus point is
+never invariant — that is what makes it a locus — so the value-level gate answers "no" on every locus
+and would suppress the feature. The locus's gate asks the same question one level up:
+
+| swept at two seeds | kind | equation |
+| --- | --- | --- |
+| same set | shown | **shown** |
+| same kind, different set | shown | **not shown** |
+| different kind | not shown | not shown |
+
+`A(−9a,0)`, `B(41a,0)`, `∠APB = 90°` is row 2: a circle for every `a`, r=25 at `a=1` and r=50 at
+`a=2`. The student gets the drawn circle and the word «מעגל» and no equation — no `hasParameter` test
+anywhere, which is the point. A rule written as "if the figure has a free parameter" would be a patch
+wearing a rule's clothes, and would also be wrong on a parameter the locus happens not to depend on.
+
+### The fit is a claim, so it is checked — against the trace, not against a student
+
+`sweep → least-squares fit over the four kinds → snap to rationals → RE-VERIFY the snapped equation
+against the traced points → print, or print nothing`. The re-verify step is **not** the student-side
+validation ADR-AG-072 §6 withdrew; it is the tool refusing to print arithmetic it cannot confirm, and
+it is the only thing standing between an over-eager rational snap and a confident wrong equation. Note
+also that this fit is **not** `conic.ts`'s exact six-coefficient solve, which takes seven lattice
+probes of a *known* equation; a cloud needs least squares plus a canonicity check, and a traced ray
+will fit happily as a full line.
+
+### It rides the ask lane, and widens one field
+
+«המקום הגיאומטרי של P» is an ask sentence, so the lane of "The ask lane" and the record/view
+lifetimes of "Measuring by clicking" carry it unchanged — row added on ask, drawing toggled by the
+menu entry, ✕ discards both. The one change below the surface: `Answer.mark` is shaped for a distance
+(`{from, foot}`) and `drawnMarks` filters on it, so it must also be able to carry a **polyline**.
+
+Its drawing gate inverts the one beside it, and this is the trap to expect: a height is drawn only
+when the distance is **knowledge**, because on an open figure it would assert a magnitude nobody gave;
+a trace is drawn only when the figure is **open**, because it shows every position the givens allow
+rather than one. Same module, opposite precondition — a second arm, never a bypass.

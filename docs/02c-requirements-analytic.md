@@ -513,6 +513,13 @@ a **named result that crosses parts**, where a quantity *derived* in part א bec
 7. **R28** — what bounds "all computable" in the data panel: pairwise, named-only, or grouped?
 8. The conic-slot removal needs its own ADR superseding the slot decision.
 
+**Two of these are now partly answered elsewhere and are left open deliberately, not by oversight.**
+[ADR-AG-072](06c-decisions-analytic.md#adr-ag-072) §5 rules that a **kind** is shown whenever the kind
+is invariant across the parameter, which is R13's question asked about a locus rather than about a
+stated parametric equation; and its whole lane is triggered by a point having exactly one free degree
+of freedom, which is R18's "may DOF reporting prompt?" answered *yes, for this one case*. Whether
+either generalises is the operator's to say.
+
 ---
 
 ## 7 — The teacher lane ([ADR-AG-010](06c-decisions-analytic.md#adr-ag-010))
@@ -999,3 +1006,36 @@ panel is a record of what the student asked and what the figure answered. What t
 clicking once more draws it again. Only the ✕ on the row discards the record, and its drawing goes with
 it. **Typing** the same question again is a different gesture and must neither duplicate nor hide: it
 re-answers, replaces its row, and shows.
+
+**R87 — a point the givens leave one degree of freedom has a מקום גיאומטרי, and the tool draws it,
+names it and prints its equation when it can determine it**
+([ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)). Locus is the most-asked construct in the
+corpus — 13 of 20 — and the exam prints no figure for it (P1).
+
+**It is asked, not stated.** The student describes the point with ordinary givens, leaving it free:
+«נקודה P» and «PA מאונך ל-PB» is a P with one degree of freedom left, and the DOF cue already says so
+(R18, P4). Then the ask lane is asked — «המקום הגיאומטרי של P» — and the answer is a row plus a
+drawing, under R86's lifetimes: clicking the entry again clears the drawing and keeps the row, ✕
+discards both. **There is no locus sentence to learn**; the set-former phrasing is sugar over the same
+figure, and a locus that needs a quantifier over *objects* rather than points («מרכזי המעגלים
+שהקטע AB הוא מיתר שלהם») is refused by name rather than approximated (R-refusal, §9).
+
+**What the answer contains, and what gates each part.** The **trace** is drawn whenever the point has
+exactly one free degree of freedom — and this is the one drawn answer that is honest *because* the
+figure is under-determined, since it shows every position the givens allow rather than one sample.
+R25's "shown only when it is knowledge" therefore gains a second arm here rather than an exception: a
+locus is knowledge **as a set**. The **kind** (ישר · מעגל · פרבולה · אליפסה — the corpus has no
+others) is named whenever the kind is the same for every admissible parameter value. The **equation**
+is printed only when the *set itself* is the same for every admissible parameter value — swept at two
+seeds it must come back the same curve. Where a parameter moves the set, as in חורף 25's
+`A(−9a,0)`, `B(41a,0)`, the student sees the circle, sees that it is a circle, sees it grow as
+«הציגו תצורה אחרת» changes `a` (P6), and sees **no equation** — because naming one would mean either
+asserting one sample's `a` as a given (P3, [ADR-052](06-decisions.md#adr-052)) or deriving a symbolic
+form, which is the NO-CAS boundary.
+
+**The tool never grades.** The student does not type a claimed equation to be marked ✓ or ✗ (operator,
+2026-09-16: *"I dont want a validation tool"* — ADR-AG-072 §6, amending
+[ADR-AG-001](06c-decisions-analytic.md#adr-ag-001) D1). The tool's own arithmetic is still checked
+against itself: an equation it cannot re-verify against the trace it drew is **not printed at all**,
+and the shape stands alone. A printed equation is a claim the tool makes, and the honesty invariant
+binds it exactly as it binds every other row that prints a number.

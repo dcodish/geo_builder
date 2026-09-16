@@ -357,9 +357,10 @@ symbol the palette offers must parse — the shared `shell/symbols.ts` test cont
 `/analytic.html`, `build:analytic` → `dist-analytic/`, matching the three siblings exactly. The
 operator may override before the first build; nothing else depends on it.
 
-**Still open after this ADR:** the 471 ↔ 572 profile split (V4) · whether an answer is ever revealed
-after a wrong claim (largely moot under [ADR-AG-003](#adr-ag-003) D3′, since values already show
-behind the student's checkbox).
+**Still open after this ADR:** the 471 ↔ 572 profile split (V4) · ~~whether an answer is ever revealed
+after a wrong claim~~ — **closed by [ADR-AG-072](#adr-ag-072) §6**: there are no claims, so there is
+nothing to reveal after one. (It was already largely moot under [ADR-AG-003](#adr-ag-003) D3′, since
+values show behind the student's checkbox.)
 
 ---
 
@@ -3919,3 +3920,151 @@ rules wrong. It now asserts the named answer, with the reason in the case.
 
 **Consequences.** `issue-1111-missing-object.test.ts` (9), each branch asserted separately so a future
 merge of the copy cannot re-collapse them. Analytic lane 70 files / 1110 tests.
+
+---
+
+## ADR-AG-072 — A locus is a point with one degree of freedom, and the tool DRAWS it, NAMES it and SOLVES it (#1136, #1137, #1138)
+
+**Status:** accepted, 2026-09-16 · **Amends [ADR-AG-001](#adr-ag-001) D1** (the verify half of the
+charter is withdrawn) · **closes** the [ADR-AG-005](#adr-ag-005) open item *"whether an answer is
+ever revealed after a wrong claim"* — there are no claims
+
+**Requirements:** [02c](02c-requirements-analytic.md) R87. **Design:**
+[04c](04c-design-analytic.md) — "The locus lane".
+
+**Context.** מקומות גיאומטריים is the most-asked construct in the corpus — **13 of 20** sampled 572
+Q1s — and the shape is always one of four: ישר ×4 · פרבולה ×5 · מעגל ×3 · אליפסה ×1. It is the V1
+lane of [docs/19 §7](19-analytic-geometry-tool.md) and had never been designed past a sentence.
+Operator, opening the session: *"we need to discuss the part of מקומות גיאומטריים of the analytical
+tool. how would you address this?"*
+
+### The finding the design rests on: the engine already solves the locus
+
+Measured through the real `parse → fold → evaluate` path before anything was designed, six seeds
+each:
+
+| figure | result |
+| --- | --- |
+| `A(0,0)` `B(8,0)` `משולש ABM` `MA = MB` | M at **x=4.00 every seed**, y different each time — the perpendicular bisector, sampled. `carrierDof = 1` |
+| `A(-9,0)` `B(41,0)` `משולש ABP` `PA מאונך ל-PB` | P at (12.65,−24.77), (−3.13,−16.09), (37.77,−12.29)… **all at distance 25.00 from (16,0)** — the circle on diameter AB, which is חורף 25's locus. `carrierDof = 1` |
+| …plus `MA = 5` | `carrierDof = 0`, M pinned |
+
+`carrierDofOf` + `freeRank` + `solveLM` already give the locus as a **detector and a point sampler**.
+[docs/19 §6](19-analytic-geometry-tool.md) called this *"new core #3 — the locus sweep"*; it is not a
+new core, and the plan's own best guess ("a locus **is** a swept free DOF") turns out to understate
+it — the freedom is not merely analogous, it is the same number the DOF cue already prints.
+
+> **A locus is a named point whose residual `carrierDof` is 1.** «הציגו תצורה אחרת» is already
+> walking it, one point at a time. The lane is that button shown all at once.
+
+**No new constraint kinds are needed for the corpus's four shapes.** `length-eq` covers `MA=MB`
+(ישר) and `PF₁+PF₂=2a` (אליפסה); `relation perpendicular` covers ∠APB=90° (מעגל); `lengths.ts`
+already carries a `point-line` measure term, which is the parabola.
+
+**Decisions (operator, 2026-09-16).**
+
+1. **Input is ORDINARY GIVENS; there is no locus grammar in V1.** Operator: *"maybe the user defines
+   the point like it says point M is this and that and so on so it kind of gives the information with
+   all of the degrees of freedom."* That is exactly the model the measurement found. The student
+   states the point and its property in sentences the tool already has, and the locus falls out of the
+   DOF. The set-former phrasing («המקום הגיאומטרי של כל הנקודות M המקיימות…») becomes **sugar over the
+   same thing** later, never a prerequisite — which deletes the hardest parser family from V1.
+
+2. **The surface is the ASK LANE, not a new panel.** Operator: *"maybe we have a separate area where
+   a user can enter a point he wants to see the locus for and we do it."* That area exists:
+   [ADR-AG-044](#adr-ag-044)'s lane, with [ADR-AG-067](#adr-ag-067)'s row/drawing lifetimes finished
+   the same week — ask → row + drawing · click the entry again → drawing hidden, **row stays** · ✕ →
+   both go. «המקום הגיאומטרי של P» is one more ask sentence. **One field widens:** `Answer.mark` is
+   distance-shaped (`{from, foot}`) and `drawnMarks` filters on it; it must also carry a polyline.
+
+3. **The tracer is CONTINUATION, not seed scatter.** Solve once, step along the null space of the
+   Jacobian by a fixed arclength, re-solve, repeat to the view box or to closure. Seeds are not a
+   sweep: seed 2 of the bisector put M at y=**317** and seed 3 at y=**1.23**, so joining them in seed
+   order paints confetti. Sorting has no honest key in 2-D — angle works for the circle and fails for
+   the bisector and the parabola. Marching squares over a residual field would serve this ADR's first
+   half and **cannot** serve the second (in the construction locus the traced point is *downstream* of
+   the free one and has no residual in its own `(x,y)`). Continuation is the only mechanism that covers
+   both, and it sits **on** `solveLM`/`freeRank` rather than beside them.
+
+4. **The tool SHOWS the equation, and determinacy is a TWO-SEED SET COMPARISON.** Operator: *"I don't
+   want a guessing game. we either show or not. I think we need to show the equation if we can
+   determine it"*, and *"only if we are positive about the equation we show it. otherwise, we stick to
+   showing the shape."* Its mechanical form:
+
+   > Sweep the trace at two different seeds. **Same set** → determinate: fit and print the equation.
+   > **Different set** → shape only.
+
+   This is the **set-level sibling of `isKnowledge`**, and naming it that way is the whole of the
+   decision. `isKnowledge` asks *is this value invariant across every admissible parameter* — a locus
+   point is by definition **not** invariant, so a value-level gate answers "no" on every locus and
+   would suppress the feature entirely. The set is invariant where the point is not.
+
+   It falls out correctly with **no special-casing for parameters**, which is why it is preferred to
+   an `if (hasParameter)` test that would be a patch in the shape of a rule:
+
+   - bisector, no parameter → seed 0 and seed 5 both trace `x=4` → same set → print `x = 4`;
+   - חורף 25, `A(−9a,0)` `B(41a,0)` `∠APB=90°` → at `a=1` the circle is r=25 at (16,0), at `a=2` it is
+     r=50 at (32,0) → **different set → shape only**. Reaching `(x−16a)²+y²=625a²` would mean
+     recognising a symbolic dependence across samples, which is the NO-CAS boundary
+     ([src-analytic/CLAUDE.md](../src-analytic/CLAUDE.md) rule 2) and stays refused.
+
+   Side effect, and a good one: «הציגו תצורה אחרת» then makes the circle **grow with `a`** on screen,
+   which is [02c P6](02c-requirements-analytic.md)'s "a parametric equation is a FAMILY" made visible.
+
+5. **The KIND is shown whenever the KIND is invariant, even if the coefficients are not** (operator:
+   *"1 - yes"*). In חורף 25 the coefficients move with `a` but it is a circle for every `a`, and
+   *"show that the locus of P is a circle"* is precisely what that exam asks. Determinable ⇒ shown,
+   which is decision 4's rule applied one level up.
+
+6. **No student-side validation. This is the amendment to [ADR-AG-001](#adr-ag-001) D1.** Operator:
+   *"2 - no. I dont want a validation tool."* D1's charter read *"the student types the claimed
+   equation or coordinates and the tool verifies it, marking ✓ or refusing it honestly… **reproduce and
+   verify, never solve**"*, and verification was half of it. It is withdrawn. **The charter is now
+   `reproduce and ANSWER, never solve`** — "never solve" still means no CAS and is untouched.
+
+   Three notes on blast radius, checked rather than assumed. (a) [ADR-AG-003](#adr-ag-003) had already
+   withdrawn D3's currency split on 2026-09-03 — *"we show the values and equations once they are
+   defined by the input"* — so showing a locus equation needed **no** amendment; it is D3′'s knowledge
+   contract with decision 4 supplying the knowledge predicate. (b) [02c](02c-requirements-analytic.md)
+   contains no occurrence of "verify" and was therefore already consistent with this ruling; the stale
+   charter lived only in this ADR and in [docs/19](19-analytic-geometry-tool.md) §4 and §5. (c) The
+   [ADR-AG-005](#adr-ag-005) open item *"whether an answer is ever revealed after a wrong claim"*
+   closes: there is no claim.
+
+7. **The SELF-CHECK is not validation and must survive.** The pipeline is `sweep → least-squares fit
+   → snap to rationals → re-verify the snapped equation against the trace → print, or print nothing`.
+   The last step is the tool checking **itself**, not grading a student. With decision 6 removing the
+   student-side check, nothing else stands between a slightly over-eager rational snap and the tool
+   printing a confident wrong equation — the one thing this product may not do. `x² + y² − 32.0000001x
+   − 224.9998 = 0` is not an answer: if it will not snap, print nothing and keep the shape.
+   **A later session must not delete this as "the validation we ruled out."**
+
+   Fitting a point cloud is **not** `conic.ts`'s exact six-coefficient fit from seven lattice probes of
+   a known equation. It is least squares plus a canonicity check, and a traced **ray** will fit happily
+   as a full line.
+
+8. **The "draw only when it is knowledge" gate gains a SECOND ARM, never a bypass.** `Answer.mark` is
+   documented as *"present only when the distance is KNOWLEDGE — on an under-determined figure, drawing
+   it would assert a magnitude the student never gave"*. A locus inverts that: it is honest **because**
+   the figure is under-determined, since it draws every position rather than one. The existing gate
+   would silently suppress the trace on exactly the figures it exists for, and *"every surface that
+   prints a number is gated, and remembering only one is the recurring failure"* is this tree's own
+   documented trap.
+
+9. **The trace paints to the VIEW BOX**, and the box stays driven by the stated objects, so an infinite
+   locus never inflates the frame ([ADR-AG-069](#adr-ag-069)).
+
+10. **Out of scope, refused BY NAME.** «המקום הגיאומטרי של מרכזי המעגלים שהקטע AB הוא מיתר שלהם»
+    quantifies over *circles*, not points, and needs a free circle object. The «מקבילית» precedent
+    applies: a given we understand but cannot honour is refused by name, never flattened and never
+    escalated to the LLM.
+
+**Staging.** #1136 (the free-point sentence — `נקודה M` does not parse today, and the `free` carrier
+it needs has existed since slice A) blocks #1137 (V1a, the property locus: tracer, ask-lane row,
+determinacy gate, fit pipeline). #1138 (V1b, the construction locus) follows and reuses all of it,
+adding a walkable `on-curve` driver and a trace that follows a **derived** point. docs/19 §7's V1 gate
+splits accordingly: **קיץ א' 2024** for V1a, **קיץ ב' 2024 + חורף 2024** for V1b.
+
+**Consequences.** docs/19 §4 and §5 lose the "verify" charter; §7's V1 entry is rewritten and split.
+02c gains R87 and its §6 open-rulings list loses the reveal-after-a-wrong-claim item. 04c gains "The
+locus lane". Nothing in `src-analytic/` changes in this commit — the three issues carry the build.
