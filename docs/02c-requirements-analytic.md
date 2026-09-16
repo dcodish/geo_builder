@@ -929,3 +929,12 @@ runs and takes its direction from the content.
 `O(3, 5)`: the equation is read, not solved, so the centre is as given as writing `O(3,5)` would be.
 A parametric circle's centre stays open — no sampled number reaches the canvas (ADR-052) — and only
 ONE label is drawn at the place, so nothing can hide anything.
+
+
+**R80 — a line can be CONSTRUCTED through a point** ([ADR-AG-057](06c-decisions-analytic.md#adr-ag-057)).
+«דרך P עובר ישר מקביל ל AB» and its perpendicular sibling draw the line through P whose direction is
+copied from AB — from a named line, or from an axis, whichever the student names. The construction
+adds no degrees of freedom: the anchor's are the anchor's and the direction is copied, so the tool
+asserts nothing the question did not give (ADR-052). An anchor that does not yet exist is introduced
+with DOF, as «הישר AB» introduces A and B; the direction operand is a reference and introduces
+nothing.

@@ -17,7 +17,7 @@ import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
 import { pairKey, pinnedLengths } from './lengths';
 import { provenanceOf, type PointProvenance } from './carriers';
-import { freeRank, residual, resolveChoices, solveLM, type Constraint } from './solve';
+import { dirVector, freeRank, residual, resolveChoices, solveLM, type Constraint } from './solve';
 import { inDomain, isFree, objectById, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
 
 export interface FigurePoint {
@@ -659,6 +659,43 @@ export function evaluate(raw: Construction, seed = 0): Figure {
         } else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
+
+      /**
+       * «דרך P עובר ישר מקביל ל AB» — the line through a placed point, in closed form (#1093).
+       *
+       * Like `circle-at` above, this reads the PLACED anchor rather than the stated one: the point
+       * may be free, or riding a carrier, and where it ended up this configuration is what the line
+       * passes through.
+       *
+       * `dirVector` is the solver's own resolver, exported rather than re-implemented — it already
+       * knows all three ways a direction can be named (two points, an axis, a named line) and
+       * already returns `null` for a degenerate one. A second copy here would be the drift the
+       * `direction()`/relation split exists to prevent.
+       *
+       * A direction that cannot be resolved is a VACANCY, not an error, for `circle-at`'s reason: the
+       * objects it is read from may simply not be placed yet, and an empty line is a state the figure
+       * already reports honestly.
+       */
+      case 'line-at': {
+        const p0 = at(o.through);
+        const along = p0 ? dirVector(o.dir, at, curveAtOf(c, env, at)) : null;
+        // The perpendicular reading is the same construction a quarter turn on. Rotating the
+        // RESOLVED vector keeps `Direction` a pure reference to something in the figure — it names
+        // an object, and "that object turned 90°" is not an object.
+        const v = along && (o.perp ? { x: -along.y, y: along.x } : along);
+        if (p0 && v) {
+          // Through `(px, py)` with direction `(vx, vy)`: the normal is `(vy, -vx)`, so the line is
+          // `vy·x − vx·y + (vx·py − vy·px) = 0`.
+          curves.push({
+            id: o.id,
+            label: { name: '', kind: 'line' },
+            curve: { kind: 'line', a: v.y, b: -v.x, c: v.x * p0.y - v.y * p0.x },
+            stated: true,
+          });
+        } else vacant.push({ id: o.id, reason: 'vacant' });
+        break;
+      }
+
       default: {
         // EXHAUSTIVE, like every switch in carriers.ts. Without this a new object kind compiles
         // clean and evaluates to NOTHING — silently absent from the figure, which is the #1038

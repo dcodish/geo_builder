@@ -365,7 +365,17 @@ function matchCurve(line: string): CurveHit | null {
   if (heLineBare) {
     return { id: `curve-${anonIndex(heLineBare[1])}`, name: '', kind: 'line', eqSrc: heLineBare[1] };
   }
-  const enLine = line.match(new RegExp(`^(?:the\\s+)?line\\s+(${LINE_NAME})\\s*:?\\s*(?:is\\s+)?(.+)$`, 'i'));
+  /**
+   * NOT flagged `i`, and the English words carry their own case alternatives instead (#1093).
+   *
+   * `LINE_NAME` contains `[A-Z][0-9]?[A-Z][0-9]?`, so a whole-pattern `i` made it match any two
+   * lowercase letters — «the line **th**rough P is perpendicular to AB» was claimed by this rule
+   * with `th` as the line's NAME, and the student was told their equation («rough P is …») was
+   * unreadable. This is exactly the trap `TWO_POINTS` spells out a few lines above and avoids the
+   * same way: *"a case-insensitive whole-pattern would quietly start accepting `ab` as two
+   * vertices."* Found while adding the «through a point» construction, which the bug swallowed.
+   */
+  const enLine = line.match(new RegExp(`^(?:[Tt]he\\s+)?[Ll]ine\\s+(${LINE_NAME})\\s*:?\\s*(?:is\\s+)?(.+)$`));
   if (enLine) return { id: `line-${enLine[1]}`, name: enLine[1], kind: 'line', eqSrc: enLine[2] };
   const enLineBare = line.match(/^(?:the\s+)?line\s+(.+=.+)$/i);
   if (enLineBare) {
@@ -1238,6 +1248,71 @@ const RELATION_HE = new RegExp(
 );
 const RELATION_EN = /^(.+?)\s+(?:is\s+)?(parallel|perpendicular)\s+to\s+(.+)$/i;
 
+/**
+ * A LINE CONSTRUCTED THROUGH A POINT — «דרך P עובר ישר מקביל ל AB» (#1093).
+ *
+ * Operator, 2026-09-15: *"דרך P עובר ישר מקביל ל AB - not supported"*. It was not: the grammar had no
+ * «דרך» rule at all, so this is a missing capability rather than a broken gate.
+ *
+ * **It is a CONSTRUCTION, not a statement about something that exists.** The line does not exist until
+ * this sentence creates it, and its equation is never given — it is fixed by a point it passes through
+ * and a direction it copies. That is why it lowers to an OBJECT (`line-at`) and not to constraints on
+ * a curve with free coefficients: the closed form is immediate, and putting two DOF into the solve
+ * only to take them straight back out would be the long way round to the same line.
+ *
+ * The direction operand goes through `direction()` — the same resolver the relation and slope rules
+ * use — so «AB», «הצלע AB», «הישר l1» and «ציר ה-x» mean here exactly what they mean there.
+ *
+ * The verb is optional and takes its full inflection run, and «מקביל»/«מאונך» take theirs, because
+ * this tree's recurring trap is a Hebrew gate that admits one spelling and silently drops the rest
+ * (five times by #1081's count, and #1088 made it six).
+ */
+const THROUGH_HE = new RegExp(
+  `^${HE_GIVEN}דרך\\s+${HE_POINT}(${NAME})\\s+(?:עובר(?:ת)?\\s+)?ה?(?:ישר|קו)\\s+(${PARALLEL_WORDS}|${PERP_WORDS})\\s+ל-?\\s*(.+)$`,
+);
+const THROUGH_EN = new RegExp(
+  `^(?:a\\s+|the\\s+)?line\\s+(?:passes\\s+)?through\\s+(?:point\\s+)?(${NAME})\\s+(?:and\\s+is\\s+|is\\s+)?(parallel|perpendicular)\\s+to\\s+(.+)$`,
+  'i',
+);
+
+function parseThroughLine(line: string): RuleOutcome {
+  const m = THROUGH_HE.exec(line) ?? THROUGH_EN.exec(line);
+  if (!m) return null;
+  const [, through, word, dirSrc] = m;
+  const dir = direction(trim(dirSrc));
+  // The verb was understood and the operand was not — an OWNED refusal about this sentence, naming
+  // what a direction may be, rather than a fall-through to "I did not understand you" (ADR-AG-017).
+  if (!dir) return refuse('bad-operand', line);
+  const perp = new RegExp(`^(?:${PERP_WORDS})$|^perpendicular$`, 'i').test(word);
+  /**
+   * The id is content-derived, so stating the same construction twice is ONE object (ADR-AG-023) —
+   * the same discipline the anonymous curves follow, keyed on what actually identifies this line:
+   * the point, the direction and which of the two readings it is.
+   */
+  const id = `curve-${anonIndex(`through:${through}:${perp ? 'perp' : 'par'}:${describeDirId(dir)}`)}`;
+  /**
+   * The ANCHOR is introduced if it does not exist, with DOF — the operator's 2026-09-15 ruling for
+   * «הישר AB» (#1066), applied here because it is the same act: «דרך P» NAMES P and asserts a line
+   * passes through it, exactly as «הישר AB» names A and B and asserts the line passes through both.
+   *
+   * The DIRECTION operand is not declared, and that asymmetry is deliberate: it is a REFERENCE to
+   * something whose direction is being copied, which is what a relation's operands are, and relations
+   * do not introduce their operands either. Naming the thing a construction is ABOUT differs from
+   * mentioning the thing it is measured against.
+   */
+  return made([
+    { t: 'declare', id: through, src: line },
+    { t: 'line-at', id, through, dir, perp, src: line },
+  ]);
+}
+
+/** A direction as a STABLE string, for the content-derived id above. */
+function describeDirId(d: Direction): string {
+  if (d.k === 'axis') return `axis-${d.axis}`;
+  if (d.k === 'curve') return `curve-${d.id}`;
+  return `pts-${d.a}${d.b}`;
+}
+
 /** «שיפוע AB הוא 2» · «שיפוע הישר l1 הוא 2» · «השיפוע של הצלע AB הוא ½» · «the slope of AB is 2». */
 /**
  * The copula is REQUIRED here, unlike almost everywhere else in this grammar.
@@ -1687,7 +1762,12 @@ export function parseLine(raw: string): ParseResult {
    * gets the last word, rather than having its refusal overwritten by `not-handled` downstream.
    */
   const matched =
-    parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
+    // `parseThroughLine` FIRST (#1093). «דרך P עובר ישר מקביל ל AB» ends in a relation phrase, so
+    // RELATION_HE matches it with «דרך P עובר ישר» as its left operand and then refuses an operand
+    // the student wrote perfectly — the swallowing defect #1059 records, and the relation rule's own
+    // docblock gives the cure: a construction recognisable from a keyword no other rule uses costs
+    // nothing to match early and removes the ambiguity entirely.
+    parseThroughLine(line) ?? parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
   if (matched) return matched;
 
   // NO constrained-shape refusal here any more (#1049). It existed because those nouns carried

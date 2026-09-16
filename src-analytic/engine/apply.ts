@@ -112,6 +112,7 @@ export type ExistingKind =
   | `curve:${string}`
   /** A circle stated by its CENTRE rather than by an equation (#1060). */
   | 'circle-at'
+  | 'line-at'
   | `derived:${string}`;
 
 export function existingKindOf(o: GeoObject): ExistingKind {
@@ -122,6 +123,8 @@ export function existingKindOf(o: GeoObject): ExistingKind {
       return `derived:${o.rule.t}`;
     case 'circle-at':
       return 'circle-at';
+    case 'line-at':
+      return 'line-at';
     default:
       return o.kind;
   }
@@ -542,6 +545,41 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         ok: true,
         effect: 'created',
         next: { ...c, objects: [...c.objects, { kind: 'circle-at', id: f.id, centre: f.centre, r: f.r }] },
+      };
+    }
+
+    /**
+     * «דרך P עובר ישר מקביל ל AB» — a line CONSTRUCTED through a point (#1093).
+     *
+     * Written as the exact parallel of `circle-at` above, because it is one: a positional anchor the
+     * figure must already hold, a name-clash check, and an idempotent restatement. What it is NOT is
+     * a statement about an existing line — the sentence creates the line, which is why this is an
+     * object kind rather than a constraint.
+     *
+     * The direction's own referents are NOT resolved here. `dirRefs` feeds the dependency walk in
+     * `carriers.ts`, and a direction naming something absent surfaces there as the vacancy it is —
+     * the same division `circle-at` keeps between its centre (checked here, because the object
+     * cannot exist without it) and its radius symbol (resolved at evaluate time).
+     */
+    case 'line-at': {
+      const through = objectById(c, f.through);
+      if (!through || !isPositional(through)) {
+        return { ok: false, error: { code: 'unknown-reference', detail: f.through } };
+      }
+      const prior = objectById(c, f.id);
+      if (prior) {
+        if (prior.kind !== 'line-at') {
+          return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };
+        }
+        return { ok: true, effect: 'known', next: c };
+      }
+      return {
+        ok: true,
+        effect: 'created',
+        next: {
+          ...c,
+          objects: [...c.objects, { kind: 'line-at', id: f.id, through: f.through, dir: f.dir, perp: f.perp }],
+        },
       };
     }
 

@@ -68,6 +68,11 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'lines', family: 'F3', he: 'x-y+2=0', en: 'x-y+2=0' },
   { category: 'lines', family: 'F3', he: '4x+3y=0', en: '4x+3y=0' },
 
+  // A line CONSTRUCTED through a point, copying a direction (#1093, ADR-AG-057). Not an equation
+  // given but a construction: the line does not exist until the sentence creates it.
+  { category: 'lines', family: 'F3', he: 'דרך P עובר ישר מקביל לציר ה-x', en: 'a line through P is parallel to the x-axis' },
+  { category: 'lines', family: 'F3', he: 'דרך P עובר ישר מאונך לציר ה-x', en: 'a line through P is perpendicular to the x-axis' },
+
   // --- F5 · circles by equation ---
   {
     category: 'circles',
