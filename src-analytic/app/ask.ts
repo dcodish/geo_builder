@@ -24,7 +24,34 @@ import { derive, type Derivation } from '../engine/derive';
 import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
 import { isKnowledge, knownCurve } from '../engine/evaluate';
 import { objectById, type Id } from '../engine/types';
-import { traceDistance2pt, traceLine2pt } from '../engine/techniques';
+import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
+
+/**
+ * The line a NAME refers to, as this configuration drew it (#1048).
+ *
+ * Two spellings mean two different things and both are legal: «l1» is a curve the student named, and
+ * «AB» is the line through two points they placed — which need not have been stated as a line at all.
+ * Resolving both here keeps `lengths.ts` free of any knowledge about objects.
+ */
+function lineNamed(f: Derivation['figure'], name: string): { a: number; b: number; c: number } | null {
+  const curve = f.curves.find((c) => c.label.name === name || c.id === `line-${name}` || c.id === `circle-${name}`);
+  if (curve && curve.curve.kind === 'line') return { a: curve.curve.a, b: curve.curve.b, c: curve.curve.c };
+  const pair = /^([A-Z][0-9]?)([A-Z][0-9]?)$/.exec(name);
+  if (pair) {
+    const p = f.points.find((q) => q.id === pair[1]);
+    const q2 = f.points.find((q) => q.id === pair[2]);
+    if (p && q2) {
+      // Through two points: the line whose normal is perpendicular to P→Q.
+      const a = q2.y - p.y;
+      const b = -(q2.x - p.x);
+      if (Math.hypot(a, b) > 1e-12) return { a, b, c: -(a * p.x + b * p.y) };
+    }
+  }
+  return null;
+}
+
+/** The question is EXACTLY one point-to-line distance, for the same reason `BARE_LENGTH` exists. */
+const POINT_LINE_ONLY = /^(?:ה?מרחק|[Dd]istance)\s+\S.*$/;
 
 /** What the panel shows for one asked question. */
 export interface Answer {
@@ -56,6 +83,15 @@ const BARE_LENGTH = /^(?:ה?(?:קטע|צלע|אורך)\s+)?[A-Z][0-9]?[A-Z][0-9]
 /** A single point's name, which is a question about its coordinates. */
 const POINT_ONLY = /^[A-Z][0-9]?$/;
 
+/**
+ * «שיפוע הישר l1» — the third thing the operator named for a line (#1048).
+ *
+ * A slope is shown in the data panel already, but could not be ASKED for, so the click menu had
+ * nothing to put behind the option he described. One grammar, two surfaces — the rule the crossings
+ * and the ask lane already follow.
+ */
+const SLOPE_OF = /^(?:ה?שיפוע|[Tt]he\s+slope\s+of)\s+(?:של\s+)?(?:ה?(?:ישר|קטע|צלע)\s+)?(.+)$/;
+
 /** «משוואת …» / «the equation of …» — a question about a curve rather than a value. */
 const EQUATION_OF = /^(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+(?:ה?(?:ישר|מעגל|פרבולה|אליפסה|אלכסון)\s+)?(.+)$/;
 
@@ -85,6 +121,26 @@ export function ask(
       question,
       value: kx.known && ky.known ? `(${fmt(kx.value)}, ${fmt(ky.value)})` : null,
     };
+  }
+
+  /**
+   * --- a line, by name: its SLOPE (#1048) ---
+   *
+   * Before the equation rule, because «שיפוע הישר l1» and «משוואת הישר l1» are different
+   * questions about the same object and only the leading noun separates them.
+   */
+  const sl = SLOPE_OF.exec(text);
+  if (sl) {
+    const name = sl[1].trim();
+    const line = lineNamed(d.figure, name);
+    if (!line) return { question, value: null, unreadable: true };
+    // A vertical line HAS no slope, and that is an answer about the figure rather than a failure.
+    if (Math.abs(line.b) < 1e-12) return { question, value: null };
+    const k = isKnowledge(d.construction, (f) => {
+      const l = lineNamed(f, name);
+      return l && Math.abs(l.b) > 1e-12 ? -l.a / l.b : null;
+    });
+    return { question, value: k.known ? fmt(k.value) : null };
   }
 
   // --- a curve, by name: its equation ---
@@ -123,12 +179,18 @@ export function ask(
   if (!measure) return { question, value: null, unreadable: true };
   // Every point it names must exist, or the question is about a figure the student has not drawn.
   const missing = measure.terms
-    .flatMap((t) => (t.kind === 'area' ? t.ids : [t.a, t.b]))
+    .flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : [t.a, t.b]))
     .find((id: Id) => !objectById(d.construction, id));
   if (missing !== undefined) return { question, value: null, unreadable: true };
 
   const k = isKnowledge(d.construction, (f) =>
-    evalLengthExpr(measure, (id) => f.points.find((q) => q.id === id) ?? null, f.env),
+    evalLengthExpr(
+      measure,
+      (id) => f.points.find((q) => q.id === id) ?? null,
+      f.env,
+      // The NAMED line this configuration drew (#1048) — see `lineNamed`.
+      (nm) => lineNamed(f, nm),
+    ),
   );
   /**
    * A PLAIN DISTANCE gets its formula (#1053).
@@ -138,8 +200,17 @@ export function ask(
    * it. The trace explains a row; it does not narrate a calculation.
    */
   const one = measure.terms.length === 1 ? measure.terms[0] : null;
-  const plain = one && one.kind !== 'area' ? one : null;
+  const plain = one && one.kind !== 'area' && one.kind !== 'point-line' ? one : null;
   let trace: string | undefined;
+  /**
+   * THE POINT-TO-LINE DISTANCE now has a surface, so it gets its technique entry (#1048 completing
+   * #1053's third move). ADR-AG-062 deliberately left it unauthored while nothing could ask for it.
+   */
+  if (one?.kind === 'point-line' && k.known && POINT_LINE_ONLY.test(text)) {
+    const pt = d.figure.points.find((q) => q.id === one.p);
+    const l = lineNamed(d.figure, one.line);
+    if (pt && l) trace = tracePointLine(pt, l, one.line, fmt);
+  }
   // BARE_LENGTH, not "one term": «AB + AB» also folds to one term but is 2·AB, and a formula for the
   // distance would then be explaining something the student did not ask for.
   if (plain && k.known && BARE_LENGTH.test(text)) {

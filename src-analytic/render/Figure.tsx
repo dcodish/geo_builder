@@ -24,6 +24,7 @@ export function Figure({
   scene,
   showConstruction = false,
   onCrossing,
+  onPick,
 }: {
   scene: Scene;
   showConstruction?: boolean;
@@ -33,6 +34,15 @@ export function Figure({
    */
   /** The sentence this ring adds, and WHERE it is in the world (#1096). */
   onCrossing?: (sentence: string, at: { x: number; y: number }) => void;
+  /**
+   * CLICK AN OBJECT TO MEASURE IT (#1048) — the operator's *"clicking on a line itself should allow
+   * us to either show the equation of the line or the distance between the two nodes"*.
+   *
+   * The renderer reports WHAT was clicked and WHERE on screen; which questions that object admits is
+   * a matter for the construction, and belongs where the ask lane lives. A renderer that knew the
+   * menu would be a second place deciding what is measurable.
+   */
+  onPick?: (what: { kind: 'point' | 'curve'; id: string }, screen: { x: number; y: number }) => void;
 }) {
   const { width, height, axes, curves, segments, construction, points, crossings } = scene;
   return (
@@ -153,6 +163,26 @@ export function Figure({
           <path key={c.id} d={c.d} data-kind={c.kind} data-id={c.id} />
         ))}
       </g>
+      {/*
+        THE HIT LAYER for clicking a curve (#1048). A 2px stroke is not a target anyone can hit, so
+        each path is repeated transparent and fat. Separate from the drawn layer on purpose — the
+        drawing keeps its exact width, and the hit area can grow without the figure getting heavier.
+
+        `pointer-events: stroke` so only the line itself responds, not the area a closed conic
+        encloses: clicking inside a circle is not clicking the circle.
+      */}
+      {onPick && (
+        <g fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: 'stroke' }}>
+          {curves.map((c) => (
+            <path
+              key={`hit-${c.id}`}
+              d={c.d}
+              style={{ cursor: 'pointer' }}
+              onClick={(e) => onPick({ kind: 'curve', id: c.id }, { x: e.clientX, y: e.clientY })}
+            />
+          ))}
+        </g>
+      )}
 
       {/*
         A circle's CENTRE (#1024) — operator: "in analytical geo the center is always important".
@@ -229,6 +259,18 @@ export function Figure({
         {points.map((p) => (
           <g key={p.id}>
             <circle cx={p.cx} cy={p.cy} r={3.5} fill={INK} />
+            {/* The point's own hit ring — bigger than the dot, invisible, and only when a caller
+                wants picks (#1048). */}
+            {onPick && (
+              <circle
+                cx={p.cx}
+                cy={p.cy}
+                r={10}
+                fill="transparent"
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => onPick({ kind: 'point', id: p.id }, { x: e.clientX, y: e.clientY })}
+              />
+            )}
             {/*
               The label carries the point's STATED givens — `A(6,4)`, or `B(x_B, 0)` where only the
               `y` was given (#1032). What the solve derived stays in the data panel: the canvas is

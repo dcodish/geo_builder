@@ -44,6 +44,7 @@ import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
 import { AskLane } from '../shell/frame/AskLane';
 import { ask, figureIsOpen, type Answer } from './app/ask';
+import { measurablesOf, type Measurable } from './app/measurable';
 import { anotherConfiguration, seedShowing } from './app/another';
 import { crossingSentence, crossingsOf, freeLetter } from './engine/crossings';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
@@ -58,6 +59,9 @@ const QUICK_COMMANDS = [
   'נתונה פרבולה קנונית שמשוואתה y^2=54x',
   'נתונה הנקודה A(2,6)',
 ];
+
+/** How far the pointer may travel before a press becomes a pan rather than a click (#1101). */
+const DRAG_SLOP = 4;
 
 const CANVAS_W = 720;
 const CANVAS_H = 720;
@@ -242,7 +246,18 @@ export function App() {
    */
   const [view, setView] = useState<CanvasView>(INITIAL_VIEW);
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const dragRef = useRef<{ x: number; y: number; view: CanvasView } | null>(null);
+  /**
+   * `moved` is what separates a CLICK from a DRAG (#1101).
+   *
+   * #1094 captured the pointer on press. Pointer capture retargets the whole gesture to the
+   * capturing element, so `click` never reached the child — and the crossing rings (#1025), which
+   * the operator had validated, stopped responding in production while still being drawn. A ring
+   * that looks clickable and is not is worse than no ring at all.
+   *
+   * So capture is deferred until the pointer has actually travelled: below the threshold the gesture
+   * stays a click and passes through to whatever was under it.
+   */
+  const dragRef = useRef<{ x: number; y: number; view: CanvasView; moved: boolean } | null>(null);
   /**
    * The ASK lane (#1027) — the panel’s own input, and the operator’s request: *"data panel should
    * have a data entry option to query sizes and equations"*.
@@ -257,6 +272,14 @@ export function App() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const canvasCard = useRef<HTMLDivElement | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
+  /**
+   * THE MEASURE MENU (#1048) — what was clicked, and where to put the list.
+   *
+   * `screen` is viewport coordinates from the click, because the menu is positioned over the whole
+   * page rather than inside the SVG: an SVG-space menu would scale with the canvas and shrink out of
+   * readability at low zoom.
+   */
+  const [pick, setPick] = useState<{ items: Measurable[]; x: number; y: number } | null>(null);
   const askRef = useRef<HTMLInputElement | null>(null);
   const [dataOpen, setDataOpen] = useState(true);
   /**
@@ -671,14 +694,23 @@ export function App() {
              */
             onPointerDown={(e) => {
               if (e.button !== 0) return;
-              dragRef.current = { x: e.clientX, y: e.clientY, view: viewRef.current };
-              e.currentTarget.setPointerCapture(e.pointerId);
+              // NO capture here (#1101) — see `dragRef`. A press is not yet a drag.
+              dragRef.current = { x: e.clientX, y: e.clientY, view: viewRef.current, moved: false };
             }}
             onPointerMove={(e) => {
               const start = dragRef.current;
               if (!start) return;
+              const dx = e.clientX - start.x;
+              const dy = e.clientY - start.y;
+              if (!start.moved) {
+                // A few pixels of tremor is a click, not a pan — the threshold is what makes a dot
+                // on the canvas clickable with a real hand.
+                if (Math.hypot(dx, dy) < DRAG_SLOP) return;
+                start.moved = true;
+                e.currentTarget.setPointerCapture(e.pointerId);
+              }
               const rect = e.currentTarget.getBoundingClientRect();
-              setView(panned(figureBoxRef.current, start.view, e.clientX - start.x, e.clientY - start.y, rect));
+              setView(panned(figureBoxRef.current, start.view, dx, dy, rect));
             }}
             onPointerUp={(e) => {
               dragRef.current = null;
@@ -700,6 +732,15 @@ export function App() {
                * half, clicking the right-hand crossing could land the point on the left one. The
                * seed search costs nothing here because it runs once, on a click.
                */
+              /**
+               * Clicking an object offers what can be MEASURED about it (#1048), as sentences the
+               * student could have typed. Nothing is measured here: choosing one asks the ask lane,
+               * which is the single path to an answer.
+               */
+              onPick={(what, screen) => {
+                const items = measurablesOf(d.construction, what);
+                setPick(items.length ? { items, x: screen.x, y: screen.y } : null);
+              }}
               onCrossing={(sentence, at) => {
                 const next = [...lines, sentence];
                 // A GUARD, not a second decision: `submit` still owns whether the line is accepted
@@ -1017,6 +1058,40 @@ export function App() {
         }
       />
       {/*
+        THE MEASURE MENU (#1048).
+
+        Rendered at PAGE level rather than inside the canvas so it never scales with the zoom and
+        never clips at the canvas edge. A click anywhere else closes it — a menu that needs its own
+        dismiss button is one the student has to learn.
+      */}
+      {pick && (
+        <>
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+            onClick={() => setPick(null)}
+            aria-hidden="true"
+          />
+          <div style={{ ...measureMenu, left: pick.x + 6, top: pick.y + 6 }} role="menu">
+            {pick.items.map((m) => (
+              <button
+                key={m.sentence}
+                type="button"
+                role="menuitem"
+                style={measureItem}
+                onClick={() => {
+                  // The SAME path the typed lane takes — one grammar, one answer (ADR-AG-044).
+                  setAnswers((prev) => [ask(d, m.sentence, fmt, describeCurve), ...prev].slice(0, 8));
+                  setPick(null);
+                }}
+              >
+                <MathText text={analyticBidi.isolateLtrRuns(m.sentence)} />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/*
         THE MANUAL (#1087) — this product has a command catalog and had no screen showing it, so the
         only way to learn the grammar was to guess. Every entry is one the parse lock already proves
         builds, so the guide cannot advertise a sentence the tool cannot read.
@@ -1230,6 +1305,31 @@ const askTrace: CSSProperties = {
   marginTop: 2,
   fontSize: fs.small,
   color: color.muted,
+};
+
+/** The measure menu (#1048) — a small list at the click, over everything. */
+const measureMenu: CSSProperties = {
+  position: 'fixed',
+  zIndex: 41,
+  background: '#fff',
+  border: `1px solid ${color.borderStrong}`,
+  borderRadius: 10,
+  boxShadow: '0 8px 24px rgba(15,23,42,0.14)',
+  padding: 4,
+  display: 'flex',
+  flexDirection: 'column',
+  minWidth: 180,
+};
+
+const measureItem: CSSProperties = {
+  textAlign: 'start',
+  padding: '7px 10px',
+  border: 'none',
+  background: 'none',
+  borderRadius: 7,
+  cursor: 'pointer',
+  fontSize: fs.small,
+  color: color.ink,
 };
 
 const askRow: CSSProperties = {

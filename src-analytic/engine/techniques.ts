@@ -51,7 +51,7 @@ export interface Technique {
   /** Stable id, for the integrity test and for a future catalog. */
   id: string;
   /** What kind of row this explains. */
-  target: 'distance-2pt' | 'line-2pt';
+  target: 'distance-2pt' | 'line-2pt' | 'point-line';
   /** The Hebrew name a teacher would use for the move. */
   he: string;
   /**
@@ -82,6 +82,12 @@ export const TECHNIQUES: readonly Technique[] = [
     target: 'line-2pt',
     he: 'משוואת הישר העובר דרך שתי נקודות',
     formula: 'y - y₁ = m(x - x₁),  m = (y₂-y₁)/(x₂-x₁)',
+  },
+  {
+    id: 'point-line',
+    target: 'point-line',
+    he: 'המרחק מנקודה לישר',
+    formula: 'd = |Ax₀ + By₀ + C| / √(A² + B²)',
   },
 ];
 
@@ -123,4 +129,28 @@ export function traceLine2pt(a: TracePoint, b: TracePoint, fmt: (v: number) => s
   const slope = `m = (${minus(b.y, a.y, fmt)}) / (${minus(b.x, a.x, fmt)})`;
   const point = `y - ${b.y < 0 ? `(${fmt(a.y)})` : fmt(a.y)} = m(x - ${a.x < 0 ? `(${fmt(a.x)})` : fmt(a.x)})`;
   return `${slope},  ${point}`;
+}
+
+/**
+ * The distance from a point to a line, with this figure's numbers in the general form (#1048).
+ *
+ * ADR-AG-062 deliberately left this entry unauthored while nothing could ask for it; #1048 gives it
+ * a surface, so it joins the table now rather than as a guess made earlier.
+ *
+ * The line's coefficients are shown AS THE FIGURE HOLDS THEM. A student reading
+ * `|3·2 + (-4)·5 + 1| / √(3² + (-4)²)` can check every symbol against the equation on their page,
+ * which is the whole point of substituting rather than stating.
+ */
+export function tracePointLine(
+  p: TracePoint,
+  line: { a: number; b: number; c: number },
+  name: string,
+  fmt: (v: number) => string,
+): string {
+  const co = (v: number) => (v < 0 ? `(${fmt(v)})` : fmt(v));
+  const plus = (v: number) => `${v < 0 ? '- ' : '+ '}${fmt(Math.abs(v))}`;
+  return (
+    `d(${p.id}, ${name}) = |${co(line.a)}·${co(p.x)} ${line.b < 0 ? '-' : '+'} ` +
+    `${fmt(Math.abs(line.b))}·${co(p.y)} ${plus(line.c)}| / √(${co(line.a)}² + ${co(line.b)}²)`
+  );
 }
