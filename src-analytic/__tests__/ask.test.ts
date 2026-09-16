@@ -66,10 +66,22 @@ describe('#1027 — an answer passes the same honesty gate as a row', () => {
     expect(figureIsOpen(derive(SQUARE_ISH, 0))).toBe(false);
   });
 
-  it('a question about something the figure does not have is UNREADABLE, not unanswered', () => {
-    expect(answer(SQUARE_ISH, 'XY').unreadable).toBe(true);
-    expect(answer(SQUARE_ISH, 'Z').unreadable).toBe(true);
+  it('a question about something the figure does not have is NAMED, not called incomprehensible (#1111)', () => {
+    /**
+     * This case asserted the opposite until #1111, and the operator is why it changed: «מרחק של C
+     * מ-AB» on a figure with no C answered *I did not understand the question*, when the sentence was
+     * understood perfectly and it was the FIGURE that had no C. A student told their sentence is
+     * unreadable rewrites the sentence for ever.
+     *
+     * So "the figure does not have it" and "I could not read it" are now two answers, and the first
+     * one carries the letter. What remains UNREADABLE is what genuinely is.
+     */
+    expect(answer(SQUARE_ISH, 'XY').missing).toEqual({ name: 'X', kind: 'point' });
+    expect(answer(SQUARE_ISH, 'Z').missing).toEqual({ name: 'Z', kind: 'point' });
+    expect(answer(SQUARE_ISH, 'XY').unreadable).toBeFalsy();
+
     expect(answer(SQUARE_ISH, 'שלום').unreadable).toBe(true);
     expect(answer(SQUARE_ISH, '').unreadable).toBe(true);
+    expect(answer(SQUARE_ISH, 'שלום').missing).toBeUndefined();
   });
 });

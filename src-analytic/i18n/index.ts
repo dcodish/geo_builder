@@ -49,6 +49,9 @@ const he = {
   askOpen: 'עדיין לא נקבע מהנתונים',
   askNoValue: 'לא ניתן לחשב מהנתונים',
   askUnreadable: 'לא הבנתי את השאלה',
+  /** #1111 — the sentence was understood; the figure has no such object. The LETTER is the point. */
+  askMissingPoint: 'אין בשרטוט נקודה בשם {{name}}',
+  askMissingCurve: 'אין בשרטוט ישר או מעגל בשם {{name}}',
   paletteShow: 'סמלים',
   // A vertical segment HAS no slope, and that is an answer rather than an absence (#1078).
   slopeVertical: 'אנכי (אין שיפוע)',
@@ -185,6 +188,8 @@ const en: typeof he = {
   askOpen: 'not fixed by the givens yet',
   askNoValue: 'cannot be computed from the givens',
   askUnreadable: 'I did not understand the question',
+  askMissingPoint: 'there is no point {{name}} in your figure',
+  askMissingCurve: 'there is no line or circle named {{name}} in your figure',
   paletteShow: 'Symbols',
   slopeVertical: 'vertical (no slope)',
   secParams: 'Parameters',

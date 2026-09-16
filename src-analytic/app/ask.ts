@@ -62,6 +62,19 @@ export interface Answer {
   /** The question was not understood at all, which is different from having no answer. */
   unreadable?: boolean;
   /**
+   * THE FIGURE HAS NO SUCH OBJECT (#1111) — a third failure, and not the same as either neighbour.
+   *
+   * «מרחק של C מ-AB» on a figure with no `C` used to answer «לא הבנתי את השאלה» — *I did not
+   * understand the question*. The student's Hebrew was understood perfectly; the tool simply has no
+   * `C`, and it KNEW that: the code found which id was missing and then collapsed it into
+   * `unreadable`. A student told their sentence was not understood will rewrite the sentence for
+   * ever, because the sentence was never the problem.
+   *
+   * CLAUDE.md's standing rule: error messages name the conflicting STATEMENT, never internal state.
+   * Here the conflicting statement is in hand, so it is carried rather than discarded.
+   */
+  missing?: { name: string; kind: 'point' | 'curve' };
+  /**
    * HOW THE ANSWER WAS REACHED (#1053) — the formula with this figure's values substituted.
    *
    * Operator: *"we don't just show the result — we show what to use to get to this result"*, at the
@@ -142,7 +155,8 @@ export function ask(
   // --- a point, by name: its coordinates ---
   if (POINT_ONLY.test(text)) {
     const o = objectById(d.construction, text);
-    if (!o) return { question, value: null, unreadable: true };
+    // Understood perfectly; the figure simply has no such point (#1111).
+    if (!o) return { question, value: null, missing: { name: text, kind: 'point' } };
     const kx = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === text)?.x ?? null);
     const ky = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === text)?.y ?? null);
     return {
@@ -161,7 +175,7 @@ export function ask(
   if (sl) {
     const name = sl[1].trim();
     const line = lineNamed(d.figure, name);
-    if (!line) return { question, value: null, unreadable: true };
+    if (!line) return { question, value: null, missing: { name, kind: 'curve' } };
     // A vertical line HAS no slope, and that is an answer about the figure rather than a failure.
     if (Math.abs(line.b) < 1e-12) return { question, value: null };
     const k = isKnowledge(d.construction, (f) => {
@@ -178,7 +192,7 @@ export function ask(
     const curve = d.construction.objects.find(
       (o) => o.kind === 'curve' && (o.label.name === name || o.id === `line-${name}` || o.id === `circle-${name}`),
     );
-    if (!curve) return { question, value: null, unreadable: true };
+    if (!curve) return { question, value: null, missing: { name, kind: 'curve' } };
     const known = knownCurve(d.construction, curve.id);
     /**
      * A LINE NAMED BY TWO POINTS gets the move that produces it (#1053) — the operator's second
@@ -209,7 +223,7 @@ export function ask(
   const missing = measure.terms
     .flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : [t.a, t.b]))
     .find((id: Id) => !objectById(d.construction, id));
-  if (missing !== undefined) return { question, value: null, unreadable: true };
+  if (missing !== undefined) return { question, value: null, missing: { name: missing, kind: 'point' } };
 
   const k = isKnowledge(d.construction, (f) =>
     evalLengthExpr(

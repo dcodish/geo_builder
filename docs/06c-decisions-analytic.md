@@ -3871,3 +3871,51 @@ decided in `app/answers.ts` (the store decides nothing, per its own docblock) an
 rather than a list of computed answers. New `issue-1110-answers-follow.test.ts` (7);
 `issue-1118-retire-measurement.test.ts` rewritten for the record shape (13). Analytic lane 69 files /
 1101 tests.
+
+---
+
+## ADR-AG-071 — "Your figure has no C" is a different answer from "I did not understand you" (#1111)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R26 extended — an unanswerable question says WHY,
+and "the figure has no such object" is one of the reasons. **Design:** none (internal).
+
+**Operator, playing T15:** *"i asked for AB in different ways and got some wierd answers"*. The weird one:
+«מרחק של C מ-AB» on a figure with no `C` answered **«לא הבנתי את השאלה»** — *I did not understand the
+question*. The Hebrew was understood perfectly; the tool simply had no `C`.
+
+**And it knew.** `ask.ts` computed which id was missing and the very next line discarded it:
+
+```ts
+const missing = measure.terms…find((id) => !objectById(d.construction, id));
+if (missing !== undefined) return { question, value: null, unreadable: true };
+```
+
+The comment above it stated the distinction correctly. A student told their sentence was not understood
+will rewrite the sentence for ever, because the sentence was never the problem. This is CLAUDE.md's
+standing rule — *error messages name the conflicting statement, never internal state* — with the
+conflicting statement already in hand.
+
+**The sweep is the fix.** `Answer` gains `missing?: { name, kind }`, and **four** of `ask.ts`'s six
+`unreadable` returns become it: a point by name, a line in a slope question, a curve in an equation
+question, and a point inside a measure expression. The plan counted three; there are four, and fixing
+only the reported branch would have been patching the input that errored. The two that stay are genuinely
+unreadable — empty input, and a sentence the measure grammar cannot parse at all.
+
+Copy names the letter, in both languages — «אין בשרטוט נקודה בשם C» / *there is no point C in your
+figure*. A generic "one of the points does not exist" would repeat today's defect more politely.
+
+**What this fix does NOT do, and it is the operator's own sentence.** Driving his exact wording rather
+than a neighbouring spelling shows «מרחק של D מ-AB» is **`unreadable` still** — the «של» word order is not
+in the measure grammar at all, so it never reaches the missing-object check. Five neighbouring spellings
+do reach it («המרחק מ-D לישר AB», «המרחק מ-D ל-AB», «DA», «D», «שטח DBC», «AB + DC»). That is a missing
+CAPABILITY, relabelled a feature per CLAUDE.md and filed as
+[#1134](https://github.com/dcodish/geo_builder/issues/1134) rather than widened in under a bug's banner.
+It is recorded as a named case in the lock, asserting today's behaviour, so the gap is visible from the
+test rather than rediscovered by the next person who types it.
+
+**A pre-existing assertion INVERTED, and is worth flagging.** `ask.test.ts` carried *"a question about
+something the figure does not have is UNREADABLE, not unanswered"* — precisely the behaviour this issue
+rules wrong. It now asserts the named answer, with the reason in the case.
+
+**Consequences.** `issue-1111-missing-object.test.ts` (9), each branch asserted separately so a future
+merge of the copy cannot re-collapse them. Analytic lane 70 files / 1110 tests.

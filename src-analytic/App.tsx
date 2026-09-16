@@ -1093,9 +1093,11 @@ export function App() {
                     ✕
                   </button>
                   <div>
-                    {a.unreadable
-                      ? `${a.question} — ${t('askUnreadable')}`
-                      : `${a.question} = ${a.value ?? t(figureIsOpen(d) ? 'askOpen' : 'askNoValue')}`}
+                    {a.missing
+                      ? `${a.question} — ${t(a.missing.kind === 'point' ? 'askMissingPoint' : 'askMissingCurve', { name: a.missing.name })}`
+                      : a.unreadable
+                        ? `${a.question} — ${t('askUnreadable')}`
+                        : `${a.question} = ${a.value ?? t(figureIsOpen(d) ? 'askOpen' : 'askNoValue')}`}
                   </div>
                   {/*
                     HOW IT WAS REACHED (#1053) — the formula with this figure's numbers in it.
