@@ -3304,3 +3304,54 @@ Held by a source-scan, because that is the property a refactor breaks silently.
 **Consequences.** `shell/math` gains one token form, which every builder inherits: 2-D and 3-D write
 `(a+b)^2` too. `src-analytic` +10 tests. Verified in a browser: two `<math>` elements in the givens
 list, no literal `^2` left, no console errors.
+
+## ADR-AG-060 — The canvas is a CAMERA over the plane (#1094)
+
+**Status:** accepted, 2026-09-16 · **Extends** [ADR-W-024](06w-decisions-workspace.md#adr-w-024)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R83. **Design:**
+[04c](04c-design-analytic.md) — `src-analytic/render/view.ts` carries the reasoning.
+
+**Context.** Operator, 2026-09-16: *"the canvas has no zoom and move features"*. Measured: the shared
+`+ − ↺` cluster and nothing else — **no pan at all**, and zoom only in 1.25× steps about the
+figure's centre, recomputed on every derive, so a student could not look at a corner of their own
+drawing and the view jumped whenever the extent changed.
+
+**Decision — box arithmetic, NOT a `<g transform>`.** 2-D pans and zooms with a transform layer over
+a fixed projection, which is right there: the drawing is the content and there is no background.
+
+**This canvas is a COORDINATE SYSTEM.** Its axes, grid and tick labels are content. Under a transform
+they would scale with the drawing — the grid coarsening, the labels growing, «10» ceasing to mean
+ten. So the view moves the WORLD BOX and re-projects. The capability is 2-D's; the implementation
+deliberately is not, and **a naive port would have shipped a coordinate plane whose numbers lie.**
+
+`render/view.ts` is pure arithmetic over a box — no React, no DOM — so the two properties that make a
+canvas a camera are asserted directly rather than through a rendered page: a drag keeps the world
+point under the cursor under the cursor, and so does a wheel zoom. `centre: null` means "follow the
+figure", which is the load-bearing part: a drawing that grows stays framed until the student moves the
+view, and is theirs afterwards — a view that re-centred on every derive would be unusable while
+typing.
+
+The wheel listener is registered NATIVELY and non-passively: React 18 attaches `onWheel` as passive,
+so `preventDefault` is a no-op and the page scrolls behind the canvas (2-D's F5/REN-2 lesson).
+
+**A correction worth recording.** This work was held back for half a day as "NOT READY" because
+screenshots after a pan showed stray blue marks beside the y-axis. Root-causing it properly found
+**nothing wrong with the product**: the DOM carries correct `<text>` labels with correct characters,
+widths and computed fills on this branch AND on `main`; and asking the browser to rasterise its own
+SVG and reading the pixels around the label returns **0 blue pixels and 24 ordinary dark ones**. The
+artifact lives in Playwright's element-screenshot capture path, not in anything a student sees.
+
+Two lessons, and the second is the useful one: a screenshot is evidence of what the *capture* did, not
+only of what the page renders — and **"I cannot explain it" was the right reason to hold, even though
+the defect turned out not to exist.** Shipping on the guess that it was harmless would have been
+right by luck; the measurement is what made it right on purpose.
+
+**Out of scope, deliberately:** touch pinch-zoom. It is a separate gesture with its own
+pointer-tracking hazards (2-D's comment records a second finger corrupting the pan), and the operator
+works on a desktop.
+
+**Consequences.** `src-analytic` +15 tests on the pure arithmetic, including both camera invariants
+across repeated steps, the auto-centre arming, the rendered-size measurement, and the shared clamp.
+The `+`/`−` buttons keep their old behaviour exactly — they zoom about the current centre — so
+nothing the operator already had changed.

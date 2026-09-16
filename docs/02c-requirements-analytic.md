@@ -953,3 +953,10 @@ figure is re-derived rather than restored.
 formula rendered — `(x-3)²+(y-5)²=25`, not `(x-3)^2+…` — in the panel they read to check what they
 told the tool, and the Hebrew around it stays Hebrew. Editing a line still shows the characters they
 typed: what is displayed is derived, never stored.
+
+
+**R83 — the canvas can be moved and aimed** ([ADR-AG-060](06c-decisions-analytic.md#adr-ag-060)).
+Dragging moves the view; the wheel zooms about the cursor, so the point being read stays where it is.
+The grid and the tick labels stay crisp and true at every zoom, because the view re-projects the world
+box rather than scaling the drawing. ↺ restores the framing and re-arms the automatic centring; until
+the student moves the view, a figure that grows stays framed.

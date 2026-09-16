@@ -9,7 +9,7 @@
  * shared chassis existed ([docs/28 §5](../docs/28-product-unification.md) Phase 4), and mounting
  * rather than re-deriving the chrome is the whole return on that work.
  */
-import { useMemo, useState, useRef, type ChangeEvent, type CSSProperties } from 'react';
+import { useMemo, useState, useRef, useEffect, type ChangeEvent, type CSSProperties } from 'react';
 import { useStore } from 'zustand';
 import { useTranslation } from 'react-i18next';
 import registry from '../products.json';
@@ -20,7 +20,8 @@ import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 import { Workbench } from '../shell/frame/Workbench';
-import { canvasClusterStyle, canvasCtrlStyle, clampZoom, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
+import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
+import { INITIAL_VIEW, centreOf, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { fmtNum } from '../shell/format';
 import { color, fs } from '../shell/theme';
@@ -230,7 +231,18 @@ export function App() {
     }
   };
 
-  const [zoom, setZoom] = useState(1);
+  /**
+   * WHAT THE CANVAS IS LOOKING AT (#1094) — zoom AND centre, because the operator had neither move
+   * nor a zoom they could aim: *"the canvas has no zoom and move features"*.
+   *
+   * `centre: null` means "follow the figure": while the student has not moved the view, a drawing
+   * that grows stays framed; the moment they pan, the view is theirs and a later given must not yank
+   * it away. The arithmetic lives in `render/view.ts` so the invariants are testable without a
+   * rendered canvas.
+   */
+  const [view, setView] = useState<CanvasView>(INITIAL_VIEW);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{ x: number; y: number; view: CanvasView } | null>(null);
   /**
    * The ASK lane (#1027) — the panel’s own input, and the operator’s request: *"data panel should
    * have a data entry option to query sizes and equations"*.
@@ -258,6 +270,37 @@ export function App() {
   const [showConstruction, setShowConstruction] = useState(false);
 
   const d = useMemo(() => derive(lines, seed), [lines, seed]);
+
+  /**
+   * The box and the view in REFS as well as in state (#1094): the wheel listener below is registered
+   * once and would otherwise close over the first render's values forever.
+   */
+  const figureBoxRef = useRef(d.box);
+  figureBoxRef.current = d.box;
+  const viewRef = useRef(view);
+  viewRef.current = view;
+
+  /**
+   * WHEEL TO ZOOM, about the cursor (#1094).
+   *
+   * Registered NATIVELY and non-passively. React 18 attaches `onWheel` as a PASSIVE listener, so
+   * `preventDefault()` inside it is a no-op and the page scrolls behind the canvas — the lesson 2-D
+   * records at F5/REN-2, and the reason this is an effect rather than a JSX prop.
+   */
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const box = figureBoxRef.current;
+      const v = viewRef.current;
+      const anchor = toWorld(box, v, e.clientX - rect.left, e.clientY - rect.top, rect);
+      setView(zoomedAt(box, v, e.deltaY < 0 ? CANVAS_ZOOM_STEP : 1 / CANVAS_ZOOM_STEP, anchor));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   /**
    * The builder roster, as DATA from `products.json` — `shell/` may never import a product, so the
@@ -379,11 +422,10 @@ export function App() {
   };
 
   const scene = useMemo(() => {
-    const box = d.box;
-    const cx = (box.minX + box.maxX) / 2;
-    const cy = (box.minY + box.maxY) / 2;
-    const half = ((box.maxX - box.minX) / 2) / zoom;
-    const zoomed = { minX: cx - half, maxX: cx + half, minY: cy - half, maxY: cy + half };
+    // The box the VIEW is looking at (#1094) — the figure's own box moved and scaled by what the
+    // student has done to it. Re-projecting rather than transforming is what keeps the grid crisp
+    // and the tick labels true at every zoom; see `render/view.ts`.
+    const zoomed = viewBox(d.box, view);
     /**
      * The renderer cannot ask whether a value is KNOWLEDGE — that is a question about the
      * construction across configurations, and a `Figure` is one configuration (#1024). So the gate
@@ -407,7 +449,7 @@ export function App() {
         sentence: crossingSentence(k, freeLetter(d.construction)),
       })),
     });
-  }, [d, zoom]);
+  }, [d, view]);
 
   const errorText = error
     ? t(
@@ -616,7 +658,36 @@ export function App() {
               the first child of `canvasZone`; so does this now.
             */}
             <FigureName value={name} onChange={setName} placeholder={t('namePlaceholder')} />
-          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+          <div
+            ref={viewportRef}
+            style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}
+            /**
+             * DRAG TO MOVE (#1094). Pointer capture so a drag that leaves the canvas keeps tracking;
+             * without it the view sticks the moment the cursor crosses the edge.
+             *
+             * The drag's ORIGIN view is captured once and every move measured from it, rather than
+             * accumulating deltas — accumulation drifts, and drift here means the drawing slides out
+             * from under the cursor.
+             */
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              dragRef.current = { x: e.clientX, y: e.clientY, view: viewRef.current };
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+              const start = dragRef.current;
+              if (!start) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              setView(panned(figureBoxRef.current, start.view, e.clientX - start.x, e.clientY - start.y, rect));
+            }}
+            onPointerUp={(e) => {
+              dragRef.current = null;
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+            }}
+            onPointerCancel={() => {
+              dragRef.current = null;
+            }}
+          >
             <Figure
               scene={scene}
               showConstruction={showConstruction}
@@ -632,13 +703,14 @@ export function App() {
               it would have moved the cluster in all four products.
             */}
             <div style={canvasClusterStyle} dir="ltr">
-              <button type="button" style={canvasCtrlStyle} onClick={() => setZoom(1)} aria-label="reset">
+              {/* ↺ restores BOTH zoom and centre, and re-arms the auto-centre (#1094). */}
+              <button type="button" style={canvasCtrlStyle} onClick={() => setView(INITIAL_VIEW)} aria-label="reset">
                 ↺
               </button>
               <button
                 type="button"
                 style={canvasCtrlStyle}
-                onClick={() => setZoom((z) => clampZoom(z / CANVAS_ZOOM_STEP))}
+                onClick={() => setView((v) => zoomedAt(figureBoxRef.current, v, 1 / CANVAS_ZOOM_STEP, v.centre ?? centreOf(figureBoxRef.current)))}
                 aria-label="zoom out"
               >
                 −
@@ -646,7 +718,7 @@ export function App() {
               <button
                 type="button"
                 style={canvasCtrlStyle}
-                onClick={() => setZoom((z) => clampZoom(z * CANVAS_ZOOM_STEP))}
+                onClick={() => setView((v) => zoomedAt(figureBoxRef.current, v, CANVAS_ZOOM_STEP, v.centre ?? centreOf(figureBoxRef.current)))}
                 aria-label="zoom in"
               >
                 +
