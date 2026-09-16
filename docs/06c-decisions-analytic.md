@@ -4146,3 +4146,53 @@ branches format their own numbers and never call this helper, so they were never
 **Consequences.** `issue-1119-constant-term.test.ts` (6), verified **red without the fix** (3 failed),
 and carrying the opposite direction too — a ±1 *coefficient* still drops its `1`, so this is a scoping
 fix and not a deletion.
+
+---
+
+## ADR-AG-074 — A rule that recognises a PREFIX must decline, not refuse on the student's behalf (#1123)
+
+**Requirements:** none (internal) — the honesty invariants it restores are already stated in CLAUDE.md.
+**Design:** none (internal).
+
+**Operator:** *"the analytics tool doesnt support the ratio AC:CB=3:2"*. The ratio grammar really is
+missing — that is #1124 — but the sentence never reached the seam where that could be said:
+
+```
+AC:CB = 3:2   →   bad-equation · detail «CB = 3:2»
+```
+
+**`CB = 3:2` appears nowhere in what the student typed.** The colon rule manufactured it by cutting the
+sentence at the first colon, and `parseLine` stops at a refusal, so no later rule ever saw the line.
+Measured through `derive`, the figure then drew `C` wherever the sampler put it — `AC:CB` was 3:8 there —
+while the stated ratio vanished.
+
+That breaks **both** honesty invariants at once: *"error messages name the conflicting statement, never
+internal state"*, and *"no stated magnitude is ever silently dropped"*.
+
+**Root cause.** `LINE_NAME`'s second alternative is a two-point run, so `AC:` matches as a line name and
+the branch claimed everything after the colon as that line's equation. The existing `matchCurve` guard —
+*"the tail contains no Hebrew"* (#1059) — cannot help, because `CB = 3:2` is pure Latin and digits.
+
+**The class, and why the fix is a discriminator.** This is the **fourth instance**, three documented in
+`parseAnalytic.ts` itself: `[IVX]{1,3}` with an `i` flag eating a circle equation's `x`
+([ADR-AG-006](#adr-ag-006)); a case-insensitive `LINE_NAME` reading the `th` of *"the line through P"*
+(#1093 — the same alternative as here); `HAS_A_WORD` drawing «my answer = x» as a line (#1068). **A rule
+recognises a PREFIX, claims the remainder unconditionally, and then refuses on the student's behalf.**
+Each prior fix narrowed one discriminator; this branch never had one.
+
+**The discriminator is the one the file already uses** at the bottom of `matchCurve` for the bare-equation
+branch: the tail must parse as an equation AND mention the plane's own variables. Special-casing a `p:q`
+tail would have left the class alive for every other `XY:<not-an-equation>` sentence — the patch tripwire
+docs/17 names.
+
+**Declining is right HERE SPECIFICALLY because the bare-colon form carries no noun.** «נתון הישר AB: …»
+has evidence the student meant an equation and must keep refusing loudly — that is the #1059 ruling, and
+the truncated-equation lock («נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2») rides on it. Both are asserted in the
+new lock, so the distinction is kept rather than flattened.
+
+With that in place `AC:CB = 3:2` reaches **`not-handled` with the student's whole line as the detail** —
+honest, and the seam #1124's ratio grammar plugs into.
+
+**Consequences.** `issue-1123-colon-claim.test.ts` (6), including a **generic** honesty case: a
+`not-handled` refusal reports the input verbatim. Asserted as a property rather than per-case, because
+this is the fourth escape of one class. Analytic lane 1147.

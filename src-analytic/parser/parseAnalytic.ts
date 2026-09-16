@@ -350,15 +350,49 @@ function matchCurve(line: string): CurveHit | null {
       eqSrc: heNamedNoNoun[2],
     };
   }
-  /** The same omission in the colon form — «AB: y=2x», «l1: y=2x». */
+  /**
+   * The same omission in the colon form — «AB: y=2x», «l1: y=2x».
+   *
+   * IT MUST DECLINE, NOT REFUSE, WHEN THE TAIL IS NOT AN EQUATION (#1123).
+   *
+   * `LINE_NAME`'s second alternative is a two-point run, so «AC:» matches as a line name and this rule
+   * claimed everything after the colon as that line's equation. «AC:CB = 3:2» was therefore answered
+   * `bad-equation` quoting **`CB = 3:2`** — a string that appears nowhere in what the student typed,
+   * manufactured by cutting their sentence at the first colon. `parseLine` stops there, so no later rule
+   * ever saw it, and the figure drew `C` wherever the sampler put it while the given vanished.
+   *
+   * That breaks both honesty invariants at once: an error names the conflicting STATEMENT, never
+   * internal state; and no stated magnitude is ever dropped.
+   *
+   * **This is the fourth instance of one class**, three of them documented in this same file:
+   * `[IVX]{1,3}` with an `i` flag eating a circle equation's `x` (ADR-AG-006); a case-insensitive
+   * `LINE_NAME` reading the `th` of *"the line through P"* (#1093 — the same alternative as here); and
+   * `HAS_A_WORD` drawing «my answer = x» as a line (#1068). **A rule recognises a PREFIX, claims the
+   * remainder unconditionally, then refuses on the student's behalf.** Each prior fix narrowed one
+   * discriminator; this branch never had one.
+   *
+   * The discriminator is the one the bare-equation branch already uses at the bottom of this file: the
+   * tail must parse as an equation AND mention the PLANE's own variables. Declining is right *here
+   * specifically* because the bare-colon form carries **no noun** — «נתון הישר AB: …» has evidence the
+   * student meant an equation and must keep refusing loudly (the #1059 ruling, which the
+   * truncated-equation lock rides on). This form has no such evidence.
+   *
+   * Special-casing a `p:q` tail would leave the class alive for every other `XY:<not-an-equation>`
+   * sentence — the patch tripwire docs/17 names.
+   */
   const heNamedColon = line.match(new RegExp(`^${HE_GIVEN}(${LINE_NAME}):\\s*(.+)$`));
   if (heNamedColon) {
-    return {
-      id: `line-${heNamedColon[1]}`,
-      name: heNamedColon[1],
-      kind: 'line',
-      eqSrc: heNamedColon[2],
-    };
+    const tail = heNamedColon[2];
+    const colonEq = tail.includes('=') ? equationExpr(tail) : null;
+    if (colonEq && symbolsOf(colonEq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
+      return {
+        id: `line-${heNamedColon[1]}`,
+        name: heNamedColon[1],
+        kind: 'line',
+        eqSrc: tail,
+      };
+    }
+    // Not an equation in the plane's variables — this rule has no claim on the sentence. Fall through.
   }
 
   const heLineBare = line.match(new RegExp(`^${HE_GIVEN}${HE_LINE}\\s+(.+=.+)$`));
