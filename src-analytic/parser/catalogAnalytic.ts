@@ -194,6 +194,37 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['משולש ABC'],
   },
 
+  /**
+   * --- spellings the tool WRITES and would not READ (#1127, #1134) ---
+   *
+   * Each is listed in its own right, per the #347 lesson: the coverage guard builds every entry, so a
+   * spelling that is not here is never exercised and can rot back out in silence. That is exactly how
+   * `x_A` came to be printed by the panel and refused by the parser.
+   */
+  {
+    category: 'points',
+    family: 'F1',
+    he: 'x_A = 5',
+    en: 'x_A = 5',
+  },
+  {
+    category: 'points',
+    family: 'F1',
+    he: 'x של A הוא 5',
+    en: 'the x-coordinate of A is 5',
+  },
+  {
+    category: 'points',
+    family: 'F1',
+    he: 'קדקוד A(1,2)',
+    /**
+     * English has no `vertex` NOUN, and deliberately does not gain one here. `point` is spelled inline
+     * at six call sites rather than in a shared token, so adding `vertex` beside each would be the
+     * re-spelled-inline drift this issue's own plan warns about. The Hebrew spelling is what #1127 is
+     * about; an English equivalent is its own issue if the corpus ever wants one.
+     */
+    en: 'point A(1,2)',
+  },
   // --- F16 · derived points over stated vertices (02c §8) ---
   {
     category: 'derived',
