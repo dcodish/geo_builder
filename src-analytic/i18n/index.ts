@@ -43,6 +43,8 @@ const he = {
   // Short enough to READ in the panel's column — a placeholder clipped at its start teaches nothing.
   askPlaceholder: 'שאלו: AB, שטח ABC',
   askAdd: 'שאל',
+  /** The ✕ that retires a measurement and the height it drew (#1118). */
+  askRemove: 'הסירו את המדידה',
   // Three different answers, because they are three different situations.
   askOpen: 'עדיין לא נקבע מהנתונים',
   askNoValue: 'לא ניתן לחשב מהנתונים',
@@ -179,6 +181,7 @@ const en: typeof he = {
   secSlopes: 'Slopes',
   askPlaceholder: 'Ask: AB, area of ABC',
   askAdd: 'Ask',
+  askRemove: 'Remove this measurement',
   askOpen: 'not fixed by the givens yet',
   askNoValue: 'cannot be computed from the givens',
   askUnreadable: 'I did not understand the question',

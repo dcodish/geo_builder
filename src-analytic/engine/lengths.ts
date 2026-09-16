@@ -32,7 +32,22 @@ import type { Id } from './types';
  * a length is. Encoding both the same way means «AB = 2CD» and «שטח ABC = 3·שטח CEF» are ONE
  * constraint kind with different trees, which is the property `length-eq` was built for.
  */
-export type MeasureTerm = { kind?: 'length'; a: Id; b: Id } | { kind: 'area'; ids: Id[] };
+export type MeasureTerm =
+  | { kind?: 'length'; a: Id; b: Id }
+  | { kind: 'area'; ids: Id[] }
+  /**
+   * «המרחק מ-A לישר l1» — the distance from a POINT to a LINE (#1048).
+   *
+   * The operator named it as one of the three things this topic teaches. It is a measure exactly as
+   * the other two are, so it joins the union rather than becoming a second grammar — which is what
+   * lets «המרחק מ-A לישר l1 = 5» be the same constraint kind as «AB = 5» without new solver code.
+   *
+   * `line` is the name AS WRITTEN, not an id: «l1» and «AB» are both legal and mean different things
+   * (a named curve, and the line through two points), and only the caller holding the figure can
+   * tell them apart. Resolving it here would mean this module knowing about objects, which is the
+   * layering the rest of the file is careful to avoid.
+   */
+  | { kind: 'point-line'; p: Id; line: string };
 
 /** @deprecated the name the union grew out of — kept so existing callers read unchanged. */
 export type LengthTerm = MeasureTerm;
@@ -79,12 +94,30 @@ const LENGTH_TOKEN = /([A-Z][0-9]?)([A-Z][0-9]?)/g;
  * read as the length `AB` followed by a stray `C`. An optional Hebrew noun sits between the word
  * and the vertices because the corpus writes «שטח המשולש ABC» as often as «שטח ABC».
  */
+/**
+ * «המרחק מ-A לישר l1» · «המרחק בין A לבין הישר AB» · «distance from A to line l1» (#1048).
+ *
+ * Matched BEFORE the length token, for the reason areas are: «…ל AB» would otherwise be eaten as the
+ * length `AB`, and the sentence would silently become a different measurement. The noun and the
+ * definite article are optional throughout, as everywhere else in this grammar, and both «ל» and
+ * «אל» front the target because both are written.
+ */
+const POINT_LINE_TOKEN =
+  /(?:ה?מרחק|[Dd]istance)\s+(?:מ-?|בין\s+|from\s+)([A-Z][0-9]?)\s+(?:לבין\s+|א?ל-?|to\s+)\s*(?:ה?(?:ישר|קטע|צלע)\s+|(?:the\s+)?line\s+)?([A-Za-zℓ][0-9]?[A-Z]?[0-9]?)/g;
+
 const AREA_TOKEN = /(?:שטח|[Aa]rea\s+of)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9]?){3,})/g;
 
 export function parseLengthExpr(src: string): LengthExpr | null {
   const terms: MeasureTerm[] = [];
   // Areas first — see AREA_TOKEN. Each becomes a placeholder before any length token is looked for.
-  const withAreas = normalizeMath(src).replace(AREA_TOKEN, (_m, run: string) => {
+  // Point-to-line first: its tail contains a name that LENGTH_TOKEN would otherwise claim (#1048).
+  const withPL = normalizeMath(src).replace(POINT_LINE_TOKEN, (_m, p: string, line: string) => {
+    const key = `${p}|${line}`;
+    const at = terms.findIndex((t) => t.kind === 'point-line' && `${t.p}|${t.line}` === key);
+    const i = at >= 0 ? at : terms.push({ kind: 'point-line', p, line }) - 1;
+    return String.fromCharCode(PLACEHOLDER_BASE + i);
+  });
+  const withAreas = withPL.replace(AREA_TOKEN, (_m, run: string) => {
     const ids = run.match(/[A-Z][0-9]?/g) ?? [];
     const key = ids.join();
     const at = terms.findIndex((t) => t.kind === 'area' && t.ids.join() === key);
@@ -95,7 +128,7 @@ export function parseLengthExpr(src: string): LengthExpr | null {
     // Identical endpoints have zero length always; they are a degenerate statement rather than a
     // term, and admitting them would let `AA = 5` look satisfiable-but-failing instead of wrong.
     if (a === b) return `${a}${b}`;
-    const at = terms.findIndex((t) => t.kind !== 'area' && t.a === a && t.b === b);
+    const at = terms.findIndex((t) => t.kind !== 'area' && t.kind !== 'point-line' && t.a === a && t.b === b);
     const i = at >= 0 ? at : terms.push({ a, b }) - 1;
     return String.fromCharCode(PLACEHOLDER_BASE + i);
   });
@@ -121,6 +154,14 @@ export function evalLengthExpr(
   le: LengthExpr,
   at: (id: Id) => Pt | null,
   env: Env,
+  /**
+   * Resolve a line NAMED in the text to `ax + by + c = 0` (#1048).
+   *
+   * Optional, so every existing caller reads unchanged: a caller that supplies none simply cannot
+   * evaluate a point-to-line term, which is the honest outcome for one that has no figure to resolve
+   * against.
+   */
+  lineAt?: (name: string) => { a: number; b: number; c: number } | null,
 ): number | null {
   const bound: Record<string, number> = { ...env };
   for (let i = 0; i < le.terms.length; i += 1) {
@@ -130,6 +171,14 @@ export function evalLengthExpr(
       const ps = term.ids.map(at);
       if (ps.some((p) => p === null)) return null;
       value = polygonArea(ps as Pt[]);
+    } else if (term.kind === 'point-line') {
+      const p = at(term.p);
+      const l = lineAt?.(term.line) ?? null;
+      if (!p || !l) return null;
+      const n = Math.hypot(l.a, l.b);
+      if (n < 1e-12) return null; // not a line at all
+      // The textbook form: |a·x₀ + b·y₀ + c| / √(a² + b²). UNSIGNED, because a distance is.
+      value = Math.abs(l.a * p.x + l.b * p.y + l.c) / n;
     } else {
       const p = at(term.a);
       const q = at(term.b);
@@ -144,13 +193,23 @@ export function evalLengthExpr(
 
 /** Every point a length expression references, so the solver knows which carriers may move. */
 export function lengthRefs(le: LengthExpr): Id[] {
-  return le.terms.flatMap((t) => (t.kind === 'area' ? t.ids : [t.a, t.b]));
+  // A point-to-line term references the POINT only: the line is named, and whether that name is a
+  // curve or a pair of vertices is the caller's question, not the solver's.
+  return le.terms.flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : [t.a, t.b]));
 }
 
 /** The student's own words are carried on the fact; this is the internal shorthand for a refusal. */
 export function describeLengthExpr(le: LengthExpr): string {
   if (le.terms.length === 0) return 'ערך';
-  return le.terms.map((t) => (t.kind === 'area' ? `שטח ${t.ids.join('')}` : `${t.a}${t.b}`)).join('+');
+  return le.terms
+    .map((t) =>
+      t.kind === 'area'
+        ? `שטח ${t.ids.join('')}`
+        : t.kind === 'point-line'
+          ? `מרחק ${t.p}-${t.line}`
+          : `${t.a}${t.b}`,
+    )
+    .join('+');
 }
 
 /**
@@ -200,7 +259,9 @@ export function pinnedLengths(
     // A pinned LENGTH only: an area term pins no segment, and the `lengthy` filter above already
     // required exactly one term — this says which kind it must be (#1075).
     const only = lengthy[0].terms[0];
-    if (only.kind === 'area') continue;
+    // A pinned SEGMENT only. An area pins none, and a point-to-line distance pins a point against a
+    // line rather than a pair of vertices — a different thing, and not what this map is for (#1048).
+    if (only.kind === 'area' || only.kind === 'point-line') continue;
     out.set(pairKey(only.a, only.b), v);
   }
   return out;

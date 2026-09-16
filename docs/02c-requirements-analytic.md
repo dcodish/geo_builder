@@ -981,3 +981,21 @@ crossings are offered, so the student must be able to name either: «נקודת 
 the tool may never put two letters on one location — and the ring a student clicks commits the sentence
 for the crossing under it, so what is written down re-reads as the point that was clicked. Where a pair
 has only one crossing the sentence carries no ordinal, because there is nothing to disambiguate.
+
+**R86 — a measurement can be reached by CLICKING, and a distance is shown as a construction**
+([ADR-AG-066](06c-decisions-analytic.md#adr-ag-066)). Clicking a point or a line offers the questions
+that object admits — a point's coordinates and its distance to each named line; a line's equation, its
+slope, and the length between its two nodes when its name really is two points. Each option is the
+**sentence the student could have typed**, and choosing it asks that sentence, so the click teaches the
+wording rather than hiding it. The distance from a point to a line is **drawn**: the perpendicular from
+the point, the right angle at its foot, and the value on it — never the number alone, because the
+construction is what the student has to perform. It is decoration and never an object, an ask never
+changes the figure (R24), and the height appears only when the distance is knowledge (R25) — on a
+figure that does not fix it, the answer is open and nothing is drawn.
+
+The answer **stays in the panel** once asked ([ADR-AG-067](06c-decisions-analytic.md#adr-ag-067)): the
+panel is a record of what the student asked and what the figure answered. What the canvas shows is a
+**view** of it — clicking the same menu entry again clears the dotted line and **keeps the row**, and
+clicking once more draws it again. Only the ✕ on the row discards the record, and its drawing goes with
+it. **Typing** the same question again is a different gesture and must neither duplicate nor hide: it
+re-answers, replaces its row, and shows.

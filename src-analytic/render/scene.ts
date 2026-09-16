@@ -116,6 +116,20 @@ export interface SceneConstruction {
   feet: Array<{ cx: number; cy: number }>;
 }
 
+/** One answered point-to-line distance, drawn (#1048). */
+export interface SceneMeasure {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  /** The right-angle tick at the foot, or `null` when the point is too close to the line to show one. */
+  tick: string | null;
+  label: { text: string; x: number; y: number } | null;
+}
+
+/** Screen-space leg length of the right-angle tick at the foot of a perpendicular. */
+const RIGHT_ANGLE = 9;
+
 export interface Scene {
   width: number;
   height: number;
@@ -132,6 +146,11 @@ export interface Scene {
    * renderer draws a marker and knows nothing about the grammar.
    */
   crossings: SceneCrossing[];
+  /**
+   * The perpendiculars an ANSWER is about (#1048), already projected — «the canvas should show the
+   * height from the point to the line». Decoration: no id, nothing the student named.
+   */
+  measures: SceneMeasure[];
 }
 
 export interface SceneCrossing {
@@ -190,6 +209,12 @@ export interface SceneKnowledge {
    * figure. It projects them and draws them.
    */
   crossings?: Array<{ id: string; x: number; y: number; sentence: string }>;
+  /**
+   * The point-to-line perpendiculars to DRAW, in world coordinates (#1048) — one per answered
+   * distance. The caller owns them because they belong to the ask lane, which the renderer cannot
+   * see; drawing them is all this module does with them.
+   */
+  marks?: Array<{ from: { x: number; y: number }; foot: { x: number; y: number }; label?: string }>;
 }
 
 /** Does a drawn point stand here? The centre mark's label defers to it (#1086). */
@@ -300,6 +325,35 @@ export function buildScene(
     };
   });
 
+  /**
+   * The perpendicular, projected (#1048). The RIGHT-ANGLE tick is built here rather than in the
+   * renderer because it is geometry — two short legs of equal screen length along the foot's own two
+   * directions — and building it from screen vectors keeps it square at every zoom, which a
+   * world-space square would not be.
+   */
+  const measures: SceneMeasure[] = (knows.marks ?? []).map((m) => {
+    const x1 = t.sx(m.from.x);
+    const y1 = t.sy(m.from.y);
+    const x2 = t.sx(m.foot.x);
+    const y2 = t.sy(m.foot.y);
+    const dx = x1 - x2;
+    const dy = y1 - y2;
+    const len = Math.hypot(dx, dy) || 1;
+    // Along the perpendicular, and along the line itself — the two edges of the right angle.
+    const ux = (dx / len) * RIGHT_ANGLE;
+    const uy = (dy / len) * RIGHT_ANGLE;
+    const vx = -uy;
+    const vy = ux;
+    return {
+      x1, y1, x2, y2,
+      // Drawn only when the foot is far enough from the point for a tick to read at all.
+      tick: len > RIGHT_ANGLE * 2
+        ? `M${(x2 + ux).toFixed(2)},${(y2 + uy).toFixed(2)}L${(x2 + ux + vx).toFixed(2)},${(y2 + uy + vy).toFixed(2)}L${(x2 + vx).toFixed(2)},${(y2 + vy).toFixed(2)}`
+        : null,
+      label: m.label ? { text: m.label, x: (x1 + x2) / 2, y: (y1 + y2) / 2 } : null,
+    };
+  });
+
   const crossings: SceneCrossing[] = (knows.crossings ?? []).map((k) => ({
     id: k.id,
     wx: k.x,
@@ -323,5 +377,6 @@ export function buildScene(
     construction,
     points,
     crossings,
+    measures,
   };
 }

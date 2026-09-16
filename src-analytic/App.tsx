@@ -44,6 +44,8 @@ import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
 import { AskLane } from '../shell/frame/AskLane';
 import { ask, figureIsOpen, type Answer } from './app/ask';
+import { askOnceAnswer, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
+import { measurablesOf, type Measurable } from './app/measurable';
 import { anotherConfiguration, seedShowing } from './app/another';
 import { crossingSentence, crossingsOf, freeLetter } from './engine/crossings';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
@@ -319,6 +321,32 @@ export function App() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const canvasCard = useRef<HTMLDivElement | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
+  /**
+   * THE MEASURE MENU (#1048) — what was clicked, and where to put the list.
+   *
+   * `screen` is viewport coordinates from the click, because the menu is positioned over the whole
+   * page rather than inside the SVG: an SVG-space menu would scale with the canvas and shrink out of
+   * readability at low zoom.
+   */
+  const [pick, setPick] = useState<{ items: Measurable[]; x: number; y: number } | null>(null);
+
+  /**
+   * ASK IT, OR TAKE IT BACK (#1118) — one writer, so a measurement can always be retired.
+   *
+   * Operator, playing #1048: *"it's one thing to see it, but then I want to remove it and continue
+   * on."* #1048 tied the drawn height's lifetime to its ANSWER precisely so that dropping the answer
+   * would drop the height; this is the half that was designed and not built.
+   *
+   * The QUESTION is the key. It is the sentence the student asked, it is unique to the measurement,
+   * and it is what the menu offers — so clicking the same entry twice toggles, which is exactly the
+   * route he described (*"maybe I click on the dot again and I can remove the line"*), and asking the
+   * same thing twice stops producing a second identical row.
+   */
+  const make = (sentence: string) => () => ask(d, sentence, fmt, describeCurve);
+  const toggleAsk = (sentence: string) =>
+    setAnswers((prev) => toggleDrawn(prev, sentence, make(sentence)));
+  const askOnce = (sentence: string) =>
+    setAnswers((prev) => askOnceAnswer(prev, sentence, make(sentence)));
   const askRef = useRef<HTMLInputElement | null>(null);
 
   /**
@@ -517,6 +545,14 @@ export function App() {
     return buildScene(d.figure, zoomed, canvasSize.w, canvasSize.h, {
       curveKnown: (id) => knownCurve(d.construction, id) !== null,
       /**
+       * THE HEIGHTS TO DRAW (#1048) — one per answered point-to-line distance, carried on the answer
+       * that produced it so the drawing and the number come from the same measurement.
+       *
+       * The label is the answer's own value, so the canvas and the panel cannot disagree. Only
+       * answers that HAVE a mark contribute, which `ask` grants only when the distance is knowledge.
+       */
+      marks: drawnMarks(answers),
+      /**
        * The crossings a student may promote (#1025) — operator: *"when a line we draw crosses another
        * line, we need to see the dashed circle allowing us to create that point"*.
        *
@@ -531,7 +567,7 @@ export function App() {
         sentence: crossingSentence(k, freeLetter(d.construction)),
       })),
     });
-  }, [d, view, canvasSize]);
+  }, [d, view, canvasSize, answers]);
 
   const errorText = error
     ? t(
@@ -782,6 +818,8 @@ export function App() {
               const dx = e.clientX - start.x;
               const dy = e.clientY - start.y;
               if (!start.moved) {
+                // A few pixels of tremor is a click, not a pan — the threshold is what makes a dot
+                // on the canvas clickable with a real hand.
                 if (Math.hypot(dx, dy) < DRAG_SLOP) return;
                 start.moved = true;
                 e.currentTarget.setPointerCapture(e.pointerId);
@@ -809,6 +847,15 @@ export function App() {
                * half, clicking the right-hand crossing could land the point on the left one. The
                * seed search costs nothing here because it runs once, on a click.
                */
+              /**
+               * Clicking an object offers what can be MEASURED about it (#1048), as sentences the
+               * student could have typed. Nothing is measured here: choosing one asks the ask lane,
+               * which is the single path to an answer.
+               */
+              onPick={(what, screen) => {
+                const items = measurablesOf(d.construction, what);
+                setPick(items.length ? { items, x: screen.x, y: screen.y } : null);
+              }}
               onCrossing={(sentence, at) => {
                 const next = [...lines, sentence];
                 // A GUARD, not a second decision: `submit` still owns whether the line is accepted
@@ -1081,6 +1128,19 @@ export function App() {
             <div style={{ marginTop: 10 }}>
               {answers.map((a, i) => (
                 <div key={`${a.question}-${i}`} style={askRow} dir="ltr">
+                  {/*
+                    RETIRE THIS MEASUREMENT (#1118) — the same affordance the fact rows carry, and the
+                    one that also removes the height it drew, because the drawing lives on the answer.
+                  */}
+                  <button
+                    type="button"
+                    style={askDismiss}
+                    aria-label={t('askRemove')}
+                    title={t('askRemove')}
+                    onClick={() => setAnswers((prev) => removeAnswerAt(prev, i))}
+                  >
+                    ✕
+                  </button>
                   <div>
                     {a.unreadable
                       ? `${a.question} — ${t('askUnreadable')}`
@@ -1109,8 +1169,8 @@ export function App() {
                 placeholder={t('askPlaceholder')}
                 addLabel={t('askAdd')}
                 onSubmit={(text) => {
-                  const answer = ask(d, text, fmt, describeCurve);
-                  setAnswers((prev) => [answer, ...prev].slice(0, 8));
+                  // Idempotent, not a toggle (#1118) — see `askOnce`.
+                  askOnce(text);
                   return true;
                 }}
                 palette={{
@@ -1125,6 +1185,48 @@ export function App() {
           </DataPanel>
         }
       />
+      {/*
+        THE MEASURE MENU (#1048).
+
+        Rendered at PAGE level rather than inside the canvas so it never scales with the zoom and
+        never clips at the canvas edge. A click anywhere else closes it — a menu that needs its own
+        dismiss button is one the student has to learn.
+      */}
+      {pick && (
+        <>
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+            onClick={() => setPick(null)}
+            aria-hidden="true"
+          />
+          <div style={{ ...measureMenu, left: pick.x + 6, top: pick.y + 6 }} role="menu">
+            {pick.items.map((m) => (
+              <button
+                key={m.sentence}
+                type="button"
+                role="menuitem"
+                style={measureItem}
+                onClick={() => {
+                  // The SAME path the typed lane takes — one grammar, one answer (ADR-AG-044).
+                  toggleAsk(m.sentence);
+                  setPick(null);
+                }}
+              >
+                {/*
+                  An entry whose DRAWING is on the canvas offers to clear it, and says so (#1118).
+                  The row stays either way — the operator's ruling: the panel is a record, the canvas
+                  is a view of it.
+                */}
+                {isDrawn(answers, m.sentence) && (
+                  <span aria-hidden="true" style={{ opacity: 0.6, marginInlineEnd: 6 }}>✕</span>
+                )}
+                <MathText text={analyticBidi.isolateLtrRuns(m.sentence)} />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
       {/*
         THE MANUAL (#1087) — this product has a command catalog and had no screen showing it, so the
         only way to learn the grammar was to guess. Every entry is one the parse lock already proves
@@ -1341,10 +1443,50 @@ const askTrace: CSSProperties = {
   color: color.muted,
 };
 
+/** The measure menu (#1048) — a small list at the click, over everything. */
+const measureMenu: CSSProperties = {
+  position: 'fixed',
+  zIndex: 41,
+  background: '#fff',
+  border: `1px solid ${color.borderStrong}`,
+  borderRadius: 10,
+  boxShadow: '0 8px 24px rgba(15,23,42,0.14)',
+  padding: 4,
+  display: 'flex',
+  flexDirection: 'column',
+  minWidth: 180,
+};
+
+const measureItem: CSSProperties = {
+  textAlign: 'start',
+  padding: '7px 10px',
+  border: 'none',
+  background: 'none',
+  borderRadius: 7,
+  cursor: 'pointer',
+  fontSize: fs.small,
+  color: color.ink,
+};
+
 const askRow: CSSProperties = {
   fontSize: 13,
   padding: '2px 0',
   opacity: 0.9,
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 6,
+};
+
+/** The ✕ that retires a measurement (#1118) — quiet, and never louder than the answer it removes. */
+const askDismiss: CSSProperties = {
+  border: 'none',
+  background: 'none',
+  cursor: 'pointer',
+  color: color.muted,
+  fontSize: 12,
+  lineHeight: 1,
+  padding: 0,
+  flex: 'none',
 };
 
 /**

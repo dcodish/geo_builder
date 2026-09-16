@@ -3588,3 +3588,113 @@ two crossings is **counting**, not sampling, so no satisfiable figure can be wro
 
 **Consequences.** Both roots are reachable and two letters no longer share a point. `src-analytic`
 gains `issue-1113-crossing-roots.test.ts` (7), which asserts the residue as well as the fix.
+
+## ADR-AG-066 — Clicking an object asks a SENTENCE, and a distance is DRAWN (#1048)
+
+**Status:** accepted, 2026-09-16 · **Extends** [ADR-AG-048](#adr-ag-048), [ADR-AG-053](#adr-ag-053), [ADR-AG-062](#adr-ag-062)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R86. **Design:**
+[04c](04c-design-analytic.md) — "Measuring by clicking".
+
+**Context.** Operator, 2026-09-15: *"one of the purposes here is to teach how to find the equation of a
+line, how to find the distance between a line and a point and between two points … a user can say I
+want to see the distance between this point and a specific line, and **the canvas should show the
+height from the point to the line** … clicking on a line itself should allow us to either show the
+equation of the line or the distance between the two nodes … maybe also the slope as a third option."*
+
+**Decision.**
+
+1. **A click opens a menu of SENTENCES, not a menu of results.** Every option is spelled exactly as a
+   student would type it — «המרחק מ-A לישר l1», «שיפוע הישר l1» — and choosing one asks it through the
+   ask lane. That is the reason to prefer this to a toolbar: a button teaches nothing, while a click
+   that *names* the thing teaches the vocabulary the exam uses (ADR-W-030's argument, and ADR-AG-048's
+   «two surfaces, one grammar»). It also means **one measurement engine**, reachable by clicking and by
+   typing, rather than two that can disagree.
+2. **The menu offers only what the figure can answer.** «אורך» is offered for a line whose name really
+   is two points the figure holds, and not for «ℓ1», which has no nodes — offering it would promise a
+   number that cannot exist. A test asserts that *every* offered sentence is one the ask lane
+   understands, so the menu cannot drift away from the grammar.
+3. **A point-to-line distance is a `MeasureTerm`**, joining `length` and `area` in the one union rather
+   than becoming a second grammar. That is what makes «המרחק מ-A לישר l1 = 5» the same constraint kind
+   as «AB = 5» with no new solver code, and the union addition forced every consumer to handle it —
+   exhaustiveness working as designed.
+4. **THE PERPENDICULAR IS DRAWN.** A distance reported as `2.6` teaches nothing; the height dropped
+   from the point, with its right angle at the foot, is the construction the student must actually
+   perform, and the distance is *defined* by it ([ADR-AG-014](#adr-ag-014)'s principle). It is
+   **decoration**: no id, no letter, never in the fact list, and an ask never mutates the figure
+   (02c R24). It is carried on the ANSWER, because it exists for exactly as long as the question does.
+5. **Not behind «הצג בנייה».** That toggle exists because three medians per derived point bury a
+   figure; this is one segment that appears only while its question is on the panel, and hiding the
+   answer to what was just asked would invert the operator's request.
+6. **Drawn only when the distance is KNOWLEDGE.** On an under-determined figure the point sits where
+   the sampler put it, and a height drawn there asserts a magnitude nobody stated (ADR-052) — the
+   cardinal sin. The value is open and no height appears.
+7. **The right-angle tick is built in SCREEN space**, from the foot's own two directions, so it stays
+   square at every zoom; a world-space square would shear under the camera (#1094).
+
+**Known gap, filed not hidden: [#1115](https://github.com/dcodish/geo_builder/issues/1115).** The menu
+offers distances to NAMED lines only. An anonymous «נתון הישר y=9» is nameable by its equation since
+[ADR-AG-056](#adr-ag-056) and should be offered too; that needs `POINT_LINE_TOKEN` widened to accept an
+equation operand, which is a grammar change with real ambiguity risk against the surrounding expression
+and deserves its own slice rather than being rushed in beside this.
+
+**Consequences.** `src-analytic` gains `issue-1048-click-measure.test.ts` (13). The point-to-line
+technique entry ADR-AG-062 deliberately left unauthored is now written, because something can finally
+ask for it.
+
+## ADR-AG-067 — The row is a RECORD, the drawing is a VIEW (#1118)
+
+**Status:** accepted, 2026-09-16 · **Completes** [ADR-AG-066](#adr-ag-066)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R86 (extended). **Design:**
+[04c](04c-design-analytic.md) — "Measuring by clicking".
+
+**Context.** Operator, playing #1048 the hour it was built: *"I want to be able to also remove the
+distance — maybe I click on the dot again and I can remove the line … it's one thing to see it, but
+then I want to remove it and continue on."*
+
+ADR-AG-066 tied the drawn height's lifetime to its ANSWER **precisely so that dropping the answer would
+drop the height** — and then shipped no way to drop an answer. `setAnswers` had one writer that only
+ever prepended.
+
+**The first build removed both, and he corrected it on sight:**
+
+> *"once the distance between a point and line (or anything else) is asked for and appears in the data
+> panel, it should stay there. just remove the dotted line if asked on the canvas."*
+
+**Decision — and the correction is the decision.**
+
+1. **The panel is a RECORD; the canvas is a VIEW of one entry in it.** What the student asked and what
+   the figure answered is history, and clearing a dotted line to see the figure underneath **is not
+   withdrawing the question**. ADR-AG-066's "the drawing belongs to the answer" was right about
+   ownership and wrong about lifetime: the answer owns the mark, and `shown` says whether it is on.
+2. **Three gestures, not two:**
+
+   | gesture | row | drawing |
+   | --- | --- | --- |
+   | ask it (menu or typing) | added, or refreshed in place | drawn |
+   | click the same menu entry again | **stays** | hidden |
+   | the ✕ on the row | removed | goes with it |
+
+3. **A menu entry whose drawing is on SAYS so** — it carries a ✕ and reads as a switch. An entry that
+   silently did the opposite of what it did last time would be worse than no toggle at all.
+4. **TYPING the same question again is NOT the toggle gesture, and this is the subtlest part.** Clicking
+   an entry that is visibly lit means *take it back*. Typing a sentence means *tell me this*, and
+   answering that by hiding the answer would be the opposite of what was asked. So the typed lane is
+   **idempotent**: the question is re-evaluated (the figure may have moved), it replaces its row rather
+   than stacking a duplicate, and it always shows. The first draft routed both through one toggle; it
+   was wrong for the same reason a search box that clears on re-search is wrong.
+5. **Hiding evaluates nothing.** `make` is a thunk the toggle calls only when the question is new —
+   asserted, so a future refactor cannot make clearing a line cost a solve.
+6. **The QUESTION is the key.** It is the sentence the student asked, unique to the measurement, and
+   exactly what the menu offers — so the menu and the panel cannot disagree about what is showing.
+
+**The decisions live in `app/answers.ts`, not in the component — and that is [#1102](https://github.com/dcodish/geo_builder/issues/1102)'s
+lesson applied the same day it was learned.** That issue's submit decision sat inline in `App.tsx`, its
+test reproduced the logic instead of calling it, and a change fifteen minutes later shadowed the real
+one while the lock stayed green. These functions are what the component calls and what the locks call —
+which is also why the operator's correction cost a rewritten test file and nothing else.
+
+**Consequences.** `src-analytic` gains `issue-1118-retire-measurement.test.ts` (14). Asking the same
+question twice no longer produces two identical rows with the drawing stacked on itself — the state the
+operator hit within a minute of first use.
