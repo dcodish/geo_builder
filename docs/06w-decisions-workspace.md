@@ -2655,3 +2655,94 @@ cadence already prevent.
 **Recorded because a future session would do the opposite.** CLAUDE.md loads every session and says
 "STOP". Without this ADR, a session reading it during a loop the operator had asked for would halt
 mid-flight and the operator would have to re-establish the mode by hand.
+
+---
+
+## ADR-W-053 — The component and the locks call the SAME decision; the seam list is an assertion (#1132)
+
+**Requirements:** none (internal). **Design:** [04-design](04-design.md) (the 2-D commit-seam table),
+[04c](04c-design-analytic.md) (the analytic app layer).
+
+**Operator, 2026-09-16, mid-round:** *"we should always address root cause and not symptoms"* — raised
+when two items of round #1131 turned out to share one root.
+
+### The rule
+
+> **A decision with no exported seam gets REPRODUCED by its test, and the reproduction drifts from
+> production silently.** So every commit seam names a decision module, and the component and the locks
+> call the same function. A test that re-implements its subject can only agree with itself.
+
+### The evidence it is drawn from
+
+Two shipped, green features were dead in production, and no gate could see either:
+
+- **#1102** — analytic's submit decision lived inline in `App.tsx`. `useAnalyticStore.ts` had NAMED
+  `app/submit.ts` since V0 and the file did not exist, so #1063's lock reproduced the decision. The copy
+  had no `created` arm; #1076 added one to the real path fifteen minutes later and the branch went dead
+  for its entire class. Green throughout.
+- **#1041** — ADR-510 moved the post-commit configuration search out of the commit seams into their
+  callers and re-armed only the submit one. The ✎ edit seam kept a comment describing the connection.
+  Its lock hand-rolls a test-local copy of the App closure **and** uses a sequence valid at seed 0, so it
+  passes with or without the fix.
+
+**The shared root is not a wrong line — it is that nothing enumerates the seams**, so a forgotten one and
+a deliberately exempt one are indistinguishable. `replaceGroup`'s docblock had *already* recorded that it
+is the seam that drifts (`PARITY CAVEAT`, `geoStore.ts:560`). The note was there and the move still missed
+it. **Prose is not a mechanism.**
+
+### The mechanism
+
+`shell/__tests__/seam-registry.test.ts`, cross-product like `row-parity.test.ts`:
+
+1. **Seed-resetting actions are EXTRACTED from each store and compared to a declared list.** A new seam,
+   or an existing one that starts resetting the seed, fails the suite until someone decides in writing
+   whether it needs the post-commit search. Each entry carries a status — `wired`, `exempt`, `gap`,
+   `not-a-seam` — and everything but `wired` must carry a reason.
+2. **A `gap` must name its open issue.** Gaps are allowed to exist; pretending otherwise only pressures
+   people to mislabel one as exempt. What is forbidden is a gap with nowhere to read about it.
+3. **Every `*/app/` decision module must be imported by at least one test.**
+
+### What the mechanism does NOT do, stated so nobody over-trusts it
+
+- **It cannot detect a test that reproduces its subject.** That is a judgement, not a pattern. What it
+  removes are the conditions that make reproduction tempting: a decision that has a callable seam tends
+  to get called.
+- **Check 3 would not have caught #1102** — that module did not exist, and a file that is not there
+  cannot be untested. Check 1 is what forces the module to exist; check 3 guards the next state, where a
+  module exists and quietly grows a branch nothing calls. Recorded rather than oversold.
+- **A first draft of the extractor missed `replaceGroup`**, which writes `patch.seed = 0` rather than
+  `seed: 0` — it would have missed the very seam the file exists for. Both spellings are matched, and a
+  case guards the extractor itself. A guard that misses its motivating case is worse than no guard,
+  because it grants confidence it has not earned.
+
+### What the inventory found on its first run
+
+The registry's first pass discovered that **2-D has six seed-resetting actions, not the three #1041
+documented** — and two of them are a real, previously unknown defect:
+
+| action | status |
+| --- | --- |
+| `replaceGroup` (✎ edit) | wired — ADR-518 |
+| `removeGroup` | exempt, measured |
+| `remove` | exempt, same shape; own measurement owed (#1133) |
+| **`toggle`** | **GAP — #1133** |
+| **`setGroupEnabled`** | **GAP — #1133** |
+| `clear`, initial state | not a seam |
+
+**Re-enabling a disabled given ADDS a requirement back** — the same direction as a submit, and submits
+have always searched — while deletion only ever relaxes. Measured stranded on «משולש ABC» · «גובה AD
+במשולש ABC» · «AB = 10» · «AD = 7»: seed 0 invalid, seed 1 valid, nothing searches. That asymmetry is
+exactly what an un-enumerated inventory hides: the two read as one "toggling" concern and behave as
+opposites.
+
+Filed as **#1133** rather than fixed, because the round's contract is its contract. **The registry ships
+with those rows red-flagged rather than silently green** — a mechanism that surfaces a gap on its first
+run and then names it is the mechanism working.
+
+### Consequences
+
+`shell/__tests__/seam-registry.test.ts` (19). `src3d/` still has **no `app/` layer at all** — 0 decision
+modules behind an 1121-line component — which is the tree most exposed to this class; it is its own slice
+and is NOT folded in here. The registry currently declares 2-D's store only; extending it to the sibling
+stores is the natural next step, and each product's row set should be added with its measurements rather
+than copied.

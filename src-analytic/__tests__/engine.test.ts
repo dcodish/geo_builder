@@ -12,7 +12,6 @@ import { constValue, evalExpr, parseExpr, symbolsOf } from '../engine/expr';
 import { applyFact, fold } from '../engine/apply';
 import { derive } from '../engine/derive';
 import { decideSubmit } from '../app/submit';
-import { reportedDof } from '../engine/carriers';
 import { inDomain, pointsOf, type Construction, type Fact } from '../engine/types';
 import { equationExpr, parseLine } from '../parser/parseAnalytic';
 

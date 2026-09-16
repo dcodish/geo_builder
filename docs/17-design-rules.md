@@ -101,6 +101,8 @@ The list itself is the smell: each is a point where a general decision is being 
 | Sampling loops (any new `for (seed…) replay/evaluate`) | M3 one sampler, budgeted |
 | Hard-coded defaults in shape macros (apex choice, right-angle vertex, equal pair) | M4 defaults yield to statements |
 | Inline lexical fragments in parser rules (label token, number grammar, keyword morphology) | `src/parser/lexicon.ts` atoms + the `lexical-ratchet.test.ts` ceilings (S2.1 of docs/24 — counts may only go DOWN; compose new rules from the atoms) |
+| Commit seams that reset the seed (any store action writing `seed: 0` / `patch.seed = 0`) | the seam registry — `shell/__tests__/seam-registry.test.ts` ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)). Each seam is `wired` / `exempt` / `gap`, a non-wired one carries a reason and a `gap` names its issue. Adding a seam without a status fails the suite |
+| A decision reachable from no test (an `app/`-layer module a lock reproduces instead of calling) | same registry, second half — every `*/app/` module must be imported by a test. The root of #1102 and #1041 |
 
 ## 3b. ParseContext — the deictic/semantic fence (S2.4 of docs/24)
 
