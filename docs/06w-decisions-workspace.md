@@ -2868,3 +2868,51 @@ analytic (1129), complex (1152) and 3-D (4632) lanes are green.
 **Consequences.** New `shell/mathExpr.ts` and `shell/__tests__/issue-1125-expression-math.test.ts` (15).
 This also corrects a claim in **#1117**, which says the trace is *"MathML, correct"* — it was plain glyphs
 with islands. #1117's fix is still wanted, and could not have improved anything until this landed.
+
+---
+
+## ADR-W-056 — An ADR id is a reference, so no two decisions may claim one (#1140)
+
+**Requirements:** none (internal). **Design:** none (internal) — a case in `docs-hygiene.test.ts`.
+
+**Found by colliding.** On 2026-09-17 two sessions landed an `ADR-AG-072` within minutes of each other —
+one for the locus lane (`5faa5e4d`, the other PC), one for the answer row (`fe52156b`, overnight round
+#1135). **Both passed `test:docs` and both were pushed.** The duplicate surfaced only because the landing
+session happened to `grep` the log's headers while reconciling external movement on `main`. That is luck,
+not a gate.
+
+**Why it matters more than tidiness.** An ADR id is a **reference**: commit messages, code comments,
+`Requirements:`/`Design:` lines and the orientation files all cite them. Two decisions sharing one id
+makes every citation ambiguous — and silently, because the prose around each citation still reads
+correctly.
+
+The numbering convention is *"take the next number after the tail"*. That is right, and **two concurrent
+sessions cannot both obey it**. Exactly the class [ADR-W-053](#adr-w-053) names: a convention held up by
+everyone remembering, with no mechanism. It stopped being hypothetical when [ADR-W-054](#adr-w-054)
+authorised unattended overnight rounds — every round writes ADRs, another PC is active, and nobody is
+awake to spot the next one.
+
+**A DECLARATION is what may not repeat, and that distinction is measured, not assumed.** Matching every
+`^#+ ADR-N` heading reports **31 duplicates, of which 28 are legitimate**: an amendment
+(«ADR-050 Amendment 1 — …», «ADR-115 Am. — …») shares its parent's id *by design* — that is what an
+amendment is — and a bare «## ADR-265» with no title is a section wrapper around the real heading
+beneath it. A guard that fired on 28 correct entries would be switched off within a day. So a declaration
+is an id followed **directly by its em-dash title**, and only those are counted.
+
+**Three real collisions predate the guard** — `ADR-244`, `ADR-245`, `ADR-500`, all in the 2-D log and all
+from long before it existed. They are **grandfathered, not renumbered**: these ids are cited from commits,
+comments and other ADRs, and rewriting months-old decision history to satisfy a new test would break more
+citations than it fixes. A companion case asserts the list **neither grows nor rots** — if one is ever
+renumbered by hand, that case fails and the entry is deleted with it. A named, bounded, self-expiring
+exception, the shape #1099 proved works.
+
+**A numbering GAP is information, never a failure.** A skipped number is usually a withdrawn decision and
+entirely legitimate; a repeated one never is. The gap case asserts only that gaps are computable, and says
+in its own docblock that it exists to stop a future reader tightening it into a contiguity check — which
+would make a withdrawn ADR unrenumberable.
+
+**The collision rule needs no coordination:** whichever declaration landed **second** renumbers, and
+records its old number in its body, because the commit that introduced it is already pushed.
+
+**Verified by firing.** A deliberately duplicated id turns both new cases red; removed, `test:docs` is
+green at 678.

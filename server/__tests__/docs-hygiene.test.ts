@@ -112,6 +112,107 @@ describe('orientation files stay orientation files (ADR-W-002)', () => {
     }
     expect(dangling, 'referenced ADR ids with no entry in any log').toEqual([]);
   });
+
+  /**
+   * NO ADR ID IS CLAIMED TWICE (#1140).
+   *
+   * Two sessions landed an `ADR-AG-072` within minutes of each other on 2026-09-17 — one for the locus
+   * lane, one for the answer row. **Both passed this file's 675 tests and both were pushed.** The
+   * duplicate surfaced only because the landing session happened to `grep` the log's headers while
+   * reconciling external movement on `main`; that is luck, not a gate.
+   *
+   * An ADR id is a REFERENCE — commit messages, code comments, `Requirements:`/`Design:` lines and the
+   * orientation files all cite them — so two decisions sharing one id makes every citation ambiguous,
+   * and silently, because the prose around each citation still reads correctly.
+   *
+   * The numbering convention is *"take the next number after the tail"*, which is right and which two
+   * concurrent sessions **cannot both obey**. That is the class
+   * [ADR-W-053](../../docs/06w-decisions-workspace.md#adr-w-053) names: a convention held up by everyone
+   * remembering, with no mechanism. It stopped being hypothetical when
+   * [ADR-W-054](../../docs/06w-decisions-workspace.md#adr-w-054) authorised unattended overnight rounds —
+   * every round writes ADRs, and nobody is awake to spot the next collision.
+   */
+  /**
+   * Three collisions predate this guard, all in the 2-D log and all from long before it existed.
+   *
+   * They are GRANDFATHERED rather than renumbered: an ADR id is a reference, these are cited from
+   * commits, comments and other ADRs, and rewriting months-old decision history to satisfy a new test
+   * would break more citations than it fixes. The companion case below forbids the list growing, which
+   * is the property that matters — a known, bounded, named exception, the shape #1099 proved works.
+   */
+  const KNOWN_DUPLICATE_ADRS = ['ADR-244', 'ADR-245', 'ADR-500'];
+
+  /** Every heading that INTRODUCES a decision, by log. */
+  const declarations = (): Map<string, string[]> => {
+    const seen = new Map<string, string[]>();
+    for (const [log] of ADR_LOGS) {
+      /**
+       * A DECLARATION is an id followed directly by its em-dash title.
+       *
+       * An AMENDMENT («ADR-050 Amendment 1 — …», «ADR-115 Am. — …») shares its parent's id BY DESIGN —
+       * that is what an amendment is — and a bare «## ADR-265» with no title is a section wrapper
+       * around the real heading beneath it. Measured: matching every `^#+ ADR-N` heading reports 31
+       * duplicates, of which 28 are those two legitimate shapes. A guard that fires on 28 correct
+       * entries would be turned off within a day.
+       */
+      for (const heading of read(log).match(new RegExp(String.raw`^#+\s*${ADR_ID}\s+—`, 'gm')) ?? []) {
+        const id = heading.replace(/^#+\s*/, '').replace(/\s+—$/, '');
+        seen.set(id, [...(seen.get(id) ?? []), log]);
+      }
+    }
+    return seen;
+  };
+
+  it('no ADR id is claimed twice, in any log', () => {
+    const seen = declarations();
+    expect(seen.size, 'no ADR declarations parsed — the log format changed').toBeGreaterThan(100);
+
+    const duplicates = [...seen.entries()]
+      .filter(([id, where]) => where.length > 1 && !KNOWN_DUPLICATE_ADRS.includes(id))
+      .map(([id, where]) => `${id} claimed ${where.length}x (${[...new Set(where)].join(', ')})`);
+
+    expect(
+      duplicates,
+      'an ADR id introduces more than one decision. Two decisions cannot share a reference: renumber ' +
+        'the one that landed SECOND (the only rule that needs no coordination between concurrent ' +
+        'sessions) and record the old number in its body, since the commit that introduced it is ' +
+        'already pushed and cannot be rewritten.',
+    ).toEqual([]);
+  });
+
+  it('the grandfathered list does not grow, and each entry is still real', () => {
+    /**
+     * Both directions, so the exception cannot quietly become a dumping ground and cannot quietly rot.
+     * If one of these is ever renumbered by hand, this fails and the entry is deleted with it — the
+     * self-expiring shape, not an exception with no expiry.
+     */
+    const seen = declarations();
+    const actual = [...seen.entries()].filter(([, where]) => where.length > 1).map(([id]) => id).sort();
+    expect(actual, 'the set of duplicate ADR ids changed').toEqual([...KNOWN_DUPLICATE_ADRS].sort());
+  });
+
+  /**
+   * A GAP is reported, never failed.
+   *
+   * A skipped number is usually a WITHDRAWN decision and entirely legitimate; a repeated one never is.
+   * Turning a gap into a gate would make a withdrawn ADR unrenumberable, so this case asserts only that
+   * the gap list can be computed — it exists to stop a future reader from "helpfully" tightening the
+   * duplicate check above into a contiguity check.
+   */
+  it('a numbering GAP is information, not a failure', () => {
+    for (const [log, meta] of ADR_LOGS) {
+      const prefix = meta.idPrefix ?? '';
+      const nums = (read(log).match(new RegExp(String.raw`^#+\s*${ADR_ID}`, 'gm')) ?? [])
+        .map((h) => Number(h.replace(/^#+\s*/, '').replace(new RegExp(`^ADR-${escapeRe(prefix)}`), '')))
+        .filter((n) => Number.isFinite(n))
+        .sort((a, b) => a - b);
+      if (nums.length === 0) continue;
+      const gaps = [];
+      for (let i = 1; i < nums.length; i += 1) if (nums[i] - nums[i - 1] > 1) gaps.push(nums[i - 1]);
+      // Asserted as computable, deliberately not as empty — see the docblock.
+      expect(Array.isArray(gaps), log).toBe(true);
+    }
+  });
 });
 
 describe('the documentation registry is total (ADR-W-041)', () => {
