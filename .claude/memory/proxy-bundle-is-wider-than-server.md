@@ -43,7 +43,19 @@ Differ ⇒ scp + `systemctl restart geo-proxy`, whatever the `server/` diff said
 (~25 ms) and cannot go stale the way a directory list can. Verify after: `systemctl is-active`,
 `curl healthz` → `ok`, and the deployed sha matches local.
 
-Recorded on [#903](https://github.com/dcodish/geo_builder/issues/903) as part of its deploy-recipe
-scope; delete this memory once the RUNBOOK itself carries the check.
+**SECOND OCCURRENCE, 2026-09-16 (prod/2026-09-16-4).** The note worked — the diff was run and the
+stale proxy was caught — but only because a session happened to read it. Live copy dated Sep 13 with 21
+commits since touching its inputs; the whole delta was `products.json`'s analytic roster entry still
+reading `enabled: false`. Effect was **admin blindness**: `server/admin.ts:1098` filters the reachability
+probe to enabled products, so the analytic page — live to students all morning — was never probed. Note
+also that the input set is wider than this note first said: `products.json` too, not just the catalogs.
+
+Now filed as **[#1130](https://github.com/dcodish/geo_builder/issues/1130)** (P2, armed): replace the
+directory rule with a `scripts/deploy-preflight.mjs` that builds, diffs built-vs-live, and exits non-zero
+on DIFFERS. **Delete this memory when #1130 lands** — a convention that depends on remembering is not a
+check, which is the same lesson #1107 taught about per-product hand-written lists.
+
+Superseded the earlier pointer to [#903](https://github.com/dcodish/geo_builder/issues/903), which closed
+without carrying the check.
 
 Related: [[deploys-are-mine-to-run]], [[gate-lines-are-read-not-matched]].
