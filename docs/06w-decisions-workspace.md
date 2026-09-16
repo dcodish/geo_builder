@@ -2746,3 +2746,60 @@ modules behind an 1121-line component — which is the tree most exposed to this
 and is NOT folded in here. The registry currently declares 2-D's store only; extending it to the sibling
 stores is the natural next step, and each product's row set should be added with its measurements rather
 than copied.
+
+---
+
+## ADR-W-054 — Unattended overnight rounds: ADR-W-012's Phase 2, opened with a hard boundary at the deploy
+
+**Requirements:** none (internal). **Design:** none (internal) — the mechanism is the existing
+`/fix-round` skill plus `/loop`; what is new is the authority to run it with nobody watching.
+
+**Operator, 2026-09-16, late:** *"i want a loop to run over night forever and fix all issues with the
+alaytical tool so i can test them in the morning. prepare a live document with a list of tests the i can
+keep open and test. i will provide results in a separate session not to interfere with the code fixing
+session."*
+
+[ADR-W-012](#adr-w-012) deliberately deferred *scheduled, unattended* rounds and their landing policy,
+and [ADR-W-028](#adr-w-028) restated that it *"remains open … unattended running is a separate risk
+argument, since every round measured here had a human at the keyboard."* This ADR closes that question in
+the affirmative, with the boundary the risk argument actually needs.
+
+### What is now permitted without a human at the keyboard
+
+- **Rounds run back to back, indefinitely**, each composed from the `auto-ok` queue by priority.
+- **Bugs and debt land on `main`**, under the unchanged full gates: per-item ADR, lock, `tsc`, build, the
+  product lane, and the batch `test:full` on the staging tip before a single push.
+- **Features become PRs**, never merged.
+
+### What an unattended round may NEVER do — the boundary that makes the rest safe
+
+1. **It does not deploy.** A night's worth of unplayed changes is exactly what the play-and-approve gate
+   exists to prevent, and a bad deploy is the one outcome nobody is awake to notice. `main` is the
+   finish line until the operator has played.
+2. **It does not merge a PR.** Unchanged from ADR-W-012.
+3. **It does not invent a plan.** The escalation exit is what stands in for the missing human: a plan
+   that fails contact with the code goes to `needs-operator` and the round moves on. The
+   two-escalations-finalize rule ([ADR-W-028](#adr-w-028)) still ends a round, and the loop then opens
+   the next one rather than grinding.
+4. **It does not widen its own contract.** Work discovered mid-round is filed, never folded in — three
+   times in round #1131 alone (#1133, #1134, and the #1108 escalation).
+
+### The live document is part of the mechanism, not a nicety
+
+The operator will read the results **in a different session**, so the handover cannot be this session's
+chat. Each round republishes a single Artifact play sheet — numbered cases, the Hebrew lines, *look for*
+and *before* per standing rule 5 — and the sheet stores the operator's per-case verdict in the artifact
+database. A later session reads those verdicts directly with `read_db` instead of asking him to retype
+them.
+
+That closes the loop ADR-W-012's Phase 1 left open: rounds could run, but their output still needed a
+human to transcribe. The round issue remains the durable ledger; the sheet is the operator's surface onto
+it.
+
+### Why the risk argument is answered rather than waved away
+
+The thing that made unattended running frightening was never the fixing — it was landing something
+nobody looked at. With the deploy boundary in place, the worst an unattended night can do is put green,
+gated, unplayed code on `main`, which is precisely what an attended round does, and `main` is not what
+students use. The gates that protect `main` do not need a human; the judgement that protects
+**production** does, and it keeps him.
