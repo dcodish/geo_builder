@@ -564,7 +564,22 @@ export function App() {
             <FactList
               rows={lines.map((line, i) => ({
                 id: String(i),
-                content: analyticBidi.isolateLtrRuns(line),
+                /**
+                 * THE GIVEN ROWS ARE MATHML TOO (#1097).
+                 *
+                 * Operator, 2026-09-16: *"input panel is not mathml"*. The #1082 ruling was applied
+                 * to the DATA panel and not to this one, so a student typed `(x-3)^2` and read `^2`
+                 * back in the one place they go to check what they told the tool.
+                 *
+                 * ISOLATE FIRST, then typeset: the bidi runs are decided by `shell/bidi` (the seam
+                 * #1088 vindicated), and `mathHtml` escapes everything that is not a maths token, so
+                 * the isolate characters ride through untouched and the Hebrew stays Hebrew.
+                 *
+                 * PRESENTATION ONLY. `editValueOf` below still returns the raw typed line, so ✎
+                 * shows what the student wrote rather than a re-serialisation — the same rule
+                 * `QuickChips`' `display` follows.
+                 */
+                content: <MathText text={analyticBidi.isolateLtrRuns(line)} />,
                 error: d.faults.find((f) => f.index === i)?.detail,
               }))}
               emptyHint={t('factsEmpty')}

@@ -946,3 +946,10 @@ row carries «הציגו תצורה אחרת» as its one accent with «בטל �
 same row, in the same order, as every other builder. **A step can always be taken back:** undo and
 redo cover adding, editing, deleting and clearing, and because the session is the line list, an undone
 figure is re-derived rather than restored.
+
+
+**R82 — the givens list is typeset, like the data panel**
+([ADR-AG-059](06c-decisions-analytic.md#adr-ag-059)). A line the student typed is shown with its
+formula rendered — `(x-3)²+(y-5)²=25`, not `(x-3)^2+…` — in the panel they read to check what they
+told the tool, and the Hebrew around it stays Hebrew. Editing a line still shows the characters they
+typed: what is displayed is derived, never stored.

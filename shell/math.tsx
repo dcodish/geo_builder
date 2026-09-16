@@ -27,7 +27,18 @@ const RTERM = String.raw`(?:${NUM}\s*[*·]?\s*)?√\s*(?:${RADICAND})|${NUM}`;
 // a value: TERM optionally over TERM
 const VALUE = String.raw`(?:${RTERM})(?:\s*\/\s*(?:${RTERM}))?`;
 const SUB = String.raw`[A-Za-z]_\{[A-Za-z0-9]+\}`;
-const SUP = String.raw`[A-Za-z0-9](?:²|\^\d+)`;
+/**
+ * A POWER, over a single symbol OR a parenthesised group (#1097).
+ *
+ * `y^2` was always handled; `(x-3)^2` was not — and that is the commonest form the analytic builder
+ * sees, because every circle equation is written `(x-a)^2+(y-b)^2=r^2`. A student typing one read
+ * `^2` back as literal text in the panel that exists to show them what they told the tool.
+ *
+ * Non-nested on purpose: `[^()]+` matches one flat group, which covers the corpus (`(x-3)`, `(y+5)`,
+ * `(2x-1)`). Nesting would need a parser, and inventing one to typeset a form nothing writes is how
+ * a renderer acquires bugs nobody can reproduce.
+ */
+const SUP = String.raw`(?:\([^()]+\)|[A-Za-z0-9])(?:²|\^\d+)`;
 // An ARC measure — the ⌢/⏜ glyph or the word (קשת/arc) followed immediately by a 2-letter point pair,
 // bare or in the ⌢{} toolbar template's braces («⌢{AC}», the √()/S_{} discipline) — rendered as the
 // textbook over-arc (⌢ OVER the letters, like the exam's ⌢AC + ⌢BE notation; issue #155). The word form
@@ -78,9 +89,26 @@ function subML(t: string): string {
   return `<math><msub>${mi(m[1])}${mi(m[2])}</msub></math>`;
 }
 function supML(t: string): string {
-  const m = t.match(/^([A-Za-z0-9])(²|\^(\d+))$/)!;
+  const m = t.match(/^(\([^()]+\)|[A-Za-z0-9])(²|\^(\d+))$/)!;
   const exp = m[2] === '²' ? '2' : m[3];
-  return `<math><msup>${/\d/.test(m[1]) ? mn(m[1]) : mi(m[1])}${mn(exp)}</msup></math>`;
+  return `<math><msup>${baseML(m[1])}${mn(exp)}</msup></math>`;
+}
+
+/**
+ * The BASE of a power: a lone symbol, or a parenthesised expression rendered as a row.
+ *
+ * The group's contents are split into identifiers, numbers and operators rather than escaped as one
+ * blob, so `(x-3)` renders as maths and not as a quoted string sitting inside a formula. The
+ * parentheses are `<mo>` because that is what they are — operators, not decoration.
+ */
+function baseML(base: string): string {
+  if (!base.startsWith('(')) return /\d/.test(base) ? mn(base) : mi(base);
+  const inner = base.slice(1, -1);
+  const parts = inner.match(/\d+(?:\.\d+)?|[A-Za-z]+|[^\sA-Za-z\d]/gu) ?? [inner];
+  const body = parts
+    .map((tok) => (/^\d/.test(tok) ? mn(tok) : /^[A-Za-z]+$/.test(tok) ? mi(tok) : `<mo>${esc(tok)}</mo>`))
+    .join('');
+  return `<mrow><mo>(</mo>${body}<mo>)</mo></mrow>`;
 }
 /** MathML for an arc measure: the point pair under a stretched over-arc (⏜ accent), the textbook ⌢AC. */
 function arcML(pair: string): string {

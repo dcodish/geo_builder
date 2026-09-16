@@ -3260,3 +3260,47 @@ voice is not a parity defect, so it waits.
 `shell` +4 (the widened parity lock and the sibling gap it found). Verified in a real browser, not
 only in tests: the name centres above the canvas, the cluster sits right, undo takes a row away and
 redo brings it back, zero console errors.
+
+## ADR-AG-059 — A parenthesised power is maths too (#1097)
+
+**Status:** accepted, 2026-09-16 · **Completes** [ADR-AG-053](#adr-ag-053)'s MathML ruling ·
+**Changes** `shell/math`
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R82. **Design:** none (shared renderer).
+
+**Context.** Operator, 2026-09-16: *"input panel is not mathml"*, with a screenshot of the givens
+list showing «נתון מעגל O שמשוואתו (x-3)^2+(y-5)^2=25» as raw typed text. The earlier ruling
+(*"data panel should be in mathml"*) had been applied to one panel and not the other.
+
+**The measurement that changed the fix.** The obvious change — render the rows through `MathText`,
+as the data panel does — **would have shipped something that did nothing for the reported line.**
+Measured before writing any code:
+
+```
+mathHtml('… y^2=54x')          → <math><msup><mi>y</mi><mn>2</mn></msup></math>=54x   ✓
+mathHtml('… (x-3)^2+(y-5)^2=25') → (x-3)^2+(y-5)^2=25   — untouched                     ✗
+```
+
+`SUP` was `[A-Za-z0-9](?:²|\^\d+)`: **a single-character base only.** A parenthesised base is the
+commonest form this product sees — every circle equation is `(x-a)^2+(y-b)^2=r^2` — so the panel
+would have gained a renderer that still printed `^2` for the exact sentence the operator sent.
+
+**Decision.** The defect is in the SHARED renderer and is fixed there: `SUP` accepts a flat
+parenthesised group, and `baseML` renders its contents as real maths (identifiers, numbers and
+operators, parentheses as `<mo>`) rather than escaping the group as one blob. Flat on purpose —
+`[^()]+` covers the corpus, and inventing a parser to typeset nesting nothing writes is how a
+renderer acquires bugs nobody can reproduce; a nested group is left alone rather than half-rendered,
+and that is asserted.
+
+**Isolate first, then typeset.** The bidi runs are decided by `shell/bidi` (the seam #1088
+vindicated) and `mathHtml` escapes everything that is not a maths token, so the isolate characters
+ride through untouched and the two mechanisms compose rather than fight. Asserted directly: the
+output still carries LRI/PDI, and stripping tags and isolates round-trips to what the student typed.
+
+**Presentation only.** `editValueOf` still returns the raw line, so ✎ shows what was typed rather
+than a re-serialisation — the rule `QuickChips`' `display` follows and #1088 extended to the strip.
+Held by a source-scan, because that is the property a refactor breaks silently.
+
+**Consequences.** `shell/math` gains one token form, which every builder inherits: 2-D and 3-D write
+`(a+b)^2` too. `src-analytic` +10 tests. Verified in a browser: two `<math>` elements in the givens
+list, no literal `^2` left, no console errors.
