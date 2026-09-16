@@ -43,16 +43,50 @@ export const centreOf = (box: Box) => ({
   y: (box.minY + box.maxY) / 2,
 });
 
+/** The canvas's rendered size in pixels. Its ASPECT is what the world box must match. */
+export interface Surface {
+  width: number;
+  height: number;
+}
+
 /**
- * The world box this view is looking at.
+ * The world box this view is looking at, FITTED TO THE CANVAS (#1122).
  *
- * The half-extents are taken from the figure's own box, so the aspect the renderer was given is
- * preserved — zoom scales what is visible, it does not reshape it.
+ * #1103 fixed the measurement half of the letterbox — the scene is built at the `ResizeObserver`'s
+ * size, so the `<svg>`'s `viewBox` equals its own box and `preserveAspectRatio` letterboxes nothing.
+ * Its second half was never implemented, and there is a second letterbox one layer down: the world
+ * box's aspect was the FIGURE's, so `makeTransform` fitted it with `Math.min(w/…, h/…)` and centred
+ * the remainder in `ox`/`oy`. The letterbox had moved from outside the svg to inside it.
+ *
+ * What the student saw: a line stopping dead in open gridded canvas, with 33–51% of the width dead at
+ * common window sizes. `lineSegmentIn` clips to the world box, which is correct — the box was the
+ * wrong box. Zoom could not help, because both half-extents are divided by `view.zoom`, leaving the
+ * aspect and the dead band invariant.
+ *
+ * **Growing the SHORT axis is the whole fix.** It shows more plane; it never stretches it, so the
+ * scale stays one isotropic number. Done here, at the single place every consumer reads — the scene,
+ * `panned`, `toWorld` and the wheel anchor — there is no second opinion about what the canvas shows,
+ * which is what let the drag and the projection disagree.
+ *
+ * Consequence worth stating, because it is the invariant the locks assert: `makeTransform` now returns
+ * `ox === 0 && oy === 0` by construction, for a rect of any aspect and a figure of any aspect.
+ *
+ * Without a measured surface (first paint, before the observer fires) the figure's own aspect stands —
+ * a fallback, never a silent default: one frame later the real size arrives and the box is refitted.
  */
-export function viewBox(figure: Box, view: CanvasView): Box {
+export function viewBox(figure: Box, view: CanvasView, surface?: Surface): Box {
   const c = view.centre ?? centreOf(figure);
-  const halfX = (figure.maxX - figure.minX) / 2 / view.zoom;
-  const halfY = (figure.maxY - figure.minY) / 2 / view.zoom;
+  let halfX = (figure.maxX - figure.minX) / 2 / view.zoom;
+  let halfY = (figure.maxY - figure.minY) / 2 / view.zoom;
+
+  if (surface && surface.width > 0 && surface.height > 0 && halfX > 0 && halfY > 0) {
+    const want = surface.width / surface.height;
+    const have = halfX / halfY;
+    // Grow the axis that is too short for the canvas; never shrink, or the figure would be cropped.
+    if (have < want) halfX = halfY * want;
+    else if (have > want) halfY = halfX / want;
+  }
+
   return { minX: c.x - halfX, maxX: c.x + halfX, minY: c.y - halfY, maxY: c.y + halfY };
 }
 
@@ -72,7 +106,7 @@ export function panned(
   dyPx: number,
   rect: { width: number; height: number },
 ): CanvasView {
-  const box = viewBox(figure, view);
+  const box = viewBox(figure, view, rect);
   if (rect.width <= 0 || rect.height <= 0) return view;
   const worldPerPxX = (box.maxX - box.minX) / rect.width;
   const worldPerPxY = (box.maxY - box.minY) / rect.height;
@@ -114,7 +148,7 @@ export function toWorld(
   py: number,
   rect: { width: number; height: number },
 ): { x: number; y: number } {
-  const box = viewBox(figure, view);
+  const box = viewBox(figure, view, rect);
   const fx = rect.width > 0 ? px / rect.width : 0.5;
   const fy = rect.height > 0 ? py / rect.height : 0.5;
   return {

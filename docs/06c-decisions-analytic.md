@@ -3772,3 +3772,51 @@ instead of reproducing it and gains two cases (the three reported sentences; the
 65 tests green in that file. The same signature defect — an internal decision reachable from no test —
 is what [ADR-AG-067](#adr-ag-067) had already applied to `app/answers.ts` on the strength of this issue's
 diagnosis, before this fix was built.
+
+---
+
+## ADR-AG-069 — The world box is fitted to the CANVAS, at one place (#1122)
+
+**Requirements:** none (internal) — 02c R20's promise (coordinates and equations belong on the figure) is
+restored where it had stopped holding. **Design:** [04c](04c-design-analytic.md) — `viewBox` takes the
+surface.
+
+**The second letterbox.** [ADR-AG-062](#adr-ag-062) / #1103 fixed the MEASUREMENT half: the scene is built
+at the `ResizeObserver`'s size, so the `<svg>`'s `viewBox` equals its own box and `preserveAspectRatio`
+letterboxes nothing. That holds. Its second step — *"pad the world box to the surface's aspect, at ONE
+place"* — was never implemented, and there is a second letterbox one layer down: `viewBox` took its
+half-extents from the FIGURE's box, so `makeTransform` fitted it with `Math.min(width / w, height / h)`
+and centred the remainder in `ox`/`oy`. **The letterbox moved from outside the svg to inside it.**
+
+Operator, on the shipped build: *"note the canvas doesnt draw the lines nicely when i zoom and play with
+the canvas"* — lines stopping dead in empty gridded canvas. Measured: 33% of the width dead at 1920×1080,
+**51% at 1920×860**. `lineSegmentIn` clips to the world box, which is correct; the box was the wrong box.
+Zoom could not help — both half-extents are divided by `view.zoom`, so the aspect and the dead band are
+invariant under it.
+
+**And the drag sheared.** Pointer travel maps through the rendered rect while the drawing filled only the
+rect's height, so tracking was x=0.735 / y=1.000 at 1920×1080 and x=0.530 / y=1.000 at 1920×860. Before
+#1103 both axes lagged uniformly at 0.82 — the figure kept its shape under the hand. Afterwards one axis
+was exact and one was not, which is worse: a diagonal drag no longer moves along the cursor's line.
+
+**The fix is the step that was skipped, done at one place.** `viewBox(figure, view, surface)` grows the
+SHORT axis to the canvas's aspect. Every consumer reads that one box — the scene, `panned`, `toWorld`, the
+wheel anchor — so there is no second opinion about what the canvas is showing, which is exactly what let
+the projection and the drag disagree. `makeTransform` then returns `ox === 0 && oy === 0` by construction.
+Growing shows **more plane**; the scale stays a single isotropic number, never a stretched one. Without a
+measured surface the figure's aspect stands as a first-paint fallback, refitted one frame later.
+
+**Locks — the ones #1103 should have carried** (`issue-1122-world-box.test.ts`, 8): `ox`/`oy` are zero
+across 5 surfaces × 4 figure aspects × 3 zooms; the box carries the canvas aspect; the short axis GROWS
+(fitting by shrinking would satisfy the aspect while cropping the drawing); a line's clipped span touches
+both canvas edges; the wheel anchor holds.
+
+**The drag case had to be rewritten, and that is worth recording.** Its first draft compared `toWorld`
+before and after `panned` — both of which share one box, so it was self-consistent at any aspect and
+stayed **green with the fix removed**. The skew lives BETWEEN the world box and the drawing, so the case
+now goes through `makeTransform`: take a world point, find where it is really painted, drag, and require
+it to be painted exactly `(dx, dy)` away. Verified red without the fix — x moves 91.9px for a 200px drag.
+
+A lock that passes for the wrong reason is the failure mode
+[ADR-W-053](06w-decisions-workspace.md#adr-w-053) exists to name, and #1103's own locks are the example:
+they assert the svg box, and none asserts that the world box agrees with it.

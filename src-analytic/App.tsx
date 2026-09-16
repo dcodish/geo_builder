@@ -472,7 +472,7 @@ export function App() {
     // The box the VIEW is looking at (#1094) — the figure's own box moved and scaled by what the
     // student has done to it. Re-projecting rather than transforming is what keeps the grid crisp
     // and the tick labels true at every zoom; see `render/view.ts`.
-    const zoomed = viewBox(d.box, view);
+    const zoomed = viewBox(d.box, view, { width: canvasSize.w, height: canvasSize.h });
     /**
      * The renderer cannot ask whether a value is KNOWLEDGE — that is a question about the
      * construction across configurations, and a `Figure` is one configuration (#1024). So the gate
