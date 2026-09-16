@@ -11,6 +11,7 @@ import { evaluate, isKnowledge, sampleParam, viewBox } from '../engine/evaluate'
 import { constValue, evalExpr, parseExpr, symbolsOf } from '../engine/expr';
 import { applyFact, fold } from '../engine/apply';
 import { derive } from '../engine/derive';
+import { decideSubmit } from '../app/submit';
 import { reportedDof } from '../engine/carriers';
 import { inDomain, pointsOf, type Construction, type Fact } from '../engine/types';
 import { equationExpr, parseLine } from '../parser/parseAnalytic';
@@ -598,28 +599,30 @@ describe('#1065 — a stated length labels the segment; a derived one does not',
  * a given is redundant.
  *
  * The decision lives in the submit path because it needs the figure BEFORE and AFTER, which
- * `applyFact` cannot see — it judges one fact against one construction. These cases reproduce that
- * decision exactly.
+ * `applyFact` cannot see — it judges one fact against one construction.
+ *
+ * **These cases CALL that decision; they used to reproduce it (#1102).** The reproduction is why this
+ * lock stayed green while the feature was dead in the app for a day: #1076 added an earlier-returning
+ * arm to the real submit path, the copy here never grew one, and so it went on testing a submit path
+ * that no longer existed. A test that re-implements its subject can only ever agree with itself.
  */
 describe('#1063 — a given that adds nothing is said, not recorded', () => {
+  /**
+   * The REAL submit decision, named in this test's own vocabulary.
+   *
+   * Every branch below is `decideSubmit`'s; nothing here re-derives a verdict. If the app's submit
+   * path changes shape, these names stop resolving and this file fails to compile — which is the
+   * point, and the opposite of what the previous reproduction did.
+   */
   const verdict = (before: string[], line: string): string => {
-    const parsed = parseLine(line);
-    if (!parsed.ok) return `refused:${parsed.code}`;
-    const d = derive(before, 0);
-    const trial = derive([...before, line], 0);
-    const fault = trial.faults.find((f) => f.index === before.length);
-    if (fault) return `refused:${fault.code}`;
-    if (trial.outcomes[before.length] === 'known') return 'restated';
-    const gained =
-      trial.construction.objects.length - d.construction.objects.length +
-      (trial.construction.params.length - d.construction.params.length) +
-      (trial.construction.selectors.length - d.construction.selectors.length);
-    const same =
-      reportedDof(trial.construction, trial.figure.carrierDof) ===
-      reportedDof(d.construction, d.figure.carrierDof);
-    return parsed.facts.length > 0 && gained === 0 && trial.figure.unsatisfied.length === 0 && same
-      ? 'entailed'
-      : 'recorded';
+    const v = decideSubmit(line, before, 0);
+    switch (v.kind) {
+      case 'refused': return `refused:${v.error.key}`;
+      case 'already-known': return 'restated';
+      case 'already-follows': return 'entailed';
+      case 'record': return 'recorded';
+      case 'ignored': return 'ignored';
+    }
   };
 
   const PINNED = ['A(0,0)', 'B(4,0)', 'C(0,3)'];
@@ -676,5 +679,32 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
 
   it('leaves #1045 alone: a structural restatement is still "restated"', () => {
     expect(verdict([...PINNED, 'שטח המשולש ABC הוא 6'], 'שטח המשולש ABC הוא 6')).toBe('restated');
+  });
+
+  /**
+   * #1102 — the three sentences the operator reported, which this feature was BUILT for and which
+   * were silently recorded for a day because #1076's arm returned first.
+   *
+   * They are here rather than in a new file because the bug was never in the entailment test itself:
+   * it was that something else answered before it. Only a case driven through the whole decision can
+   * see that, which is exactly what the reproduced helper above could not do.
+   */
+  it('#1102 — the reported sentences reach the entailment test at all', () => {
+    expect(verdict(['A(0,0)', 'B(4,0)'], 'AB = 4')).toBe('entailed');
+    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('entailed');
+    expect(verdict([...PINNED, 'משולש ABC'], 'B נמצא על ציר ה-x')).toBe('entailed');
+  });
+
+  /**
+   * The guard in the other direction — #1076 must not regress.
+   *
+   * A PROMOTION («y=x» when a point was already declared on that carrier) states no constraint and
+   * genuinely changes the canvas, so it is recorded with no notice. This pair is what forbids
+   * "fixing" #1102 by simply deleting the promotion arm: both classes report the line outcome
+   * `created` and both leave `gained` at zero, so only the constraint count separates them.
+   */
+  it('#1076 does not regress — a promotion is recorded, never called entailed', () => {
+    expect(verdict(['נקודה B על הישר y=x'], 'נתון הישר l1: y=x')).toBe('recorded');
+    expect(verdict(['נקודה B על הישר y=x'], 'y=x')).toBe('recorded');
   });
 });

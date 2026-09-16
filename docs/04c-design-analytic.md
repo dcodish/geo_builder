@@ -447,6 +447,45 @@ measurablesOf(construction, what)        app/measurable.ts   ← composes SENTEN
                     scene.measures  →  <g data-testid="analytic-measures">   render/Figure.tsx
 ```
 
+### The app layer decides; the component dispatches (ADR-AG-068)
+
+`src-analytic/app/` holds the decisions the component used to carry inline. Three modules, one rule:
+
+| module | answers |
+| --- | --- |
+| `app/submit.ts` | what a newly typed line DOES — refuse, notice, or record |
+| `app/ask.ts` | what a question's answer IS — value, trace, mark |
+| `app/answers.ts` | what the ask lane's row list BECOMES — ask, show, hide, retire |
+
+**The rule is that the component and the locks call the same function.** It is written down because
+violating it produced a defect that no gate could see: #1063's entailment notice was live, green and
+unreachable for a day, because the submit decision sat in `App.tsx` and its test *reproduced* that
+decision rather than calling it. The copy had no `created` arm, so it went on testing a submit path that
+no longer existed — a test that re-implements its subject can only agree with itself.
+
+```
+        the student types a line
+                  │
+                  ▼
+   decideSubmit(raw, lines, seed, current)      app/submit.ts   ← pure; no store, no t(), no render
+                  │
+   ┌──────────────┼───────────────┬────────────────────┬──────────────┐
+   ▼              ▼               ▼                    ▼              ▼
+'ignored'     'refused'    'already-known'      'already-follows'  'record'
+  (blank)     setError      notice #1045          notice #1063     recordLine
+```
+
+`current` is the caller's already-memoized derivation of `lines`, so the submit path still folds exactly
+once more than it must; a test passes `derive(lines, seed)` and needs nothing else.
+
+**The ordering inside it is load-bearing.** The promotion arm (#1076) must precede the entailment test
+(#1063) — a promoted carrier changes the canvas while changing no count — but it must be stated as
+*created AND no constraint appended*, because `applyFact` also reports `created` for a bare constraint
+append. Measured: an entailed given adds a constraint and gains nothing; a promotion gains nothing and
+adds no constraint. That single number is what keeps the two classes apart, and it is a property of the
+construction rather than of any particular sentence.
+
+
 **Why the mark rides on the answer.** A perpendicular exists for exactly as long as its question does.
 Putting it in the figure would make it an object — something with an id that survives, that undo must
 account for, that a save must carry — and 02c R24 says an ask never mutates the figure. Carrying it on

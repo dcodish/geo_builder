@@ -27,6 +27,7 @@ import { fmtNum } from '../shell/format';
 import { color, fs } from '../shell/theme';
 import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
+import { decideSubmit } from './app/submit';
 import { domainText, positionalOf, type NumCurve } from './engine/types';
 import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
 import { exprText } from './engine/expr';
@@ -49,7 +50,6 @@ import { measurablesOf, type Measurable } from './app/measurable';
 import { anotherConfiguration, seedShowing } from './app/another';
 import { crossingSentence, crossingsOf, freeLetter } from './engine/crossings';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
-import { parseLine } from './parser/parseAnalytic';
 
 declare const __BUILD__: string;
 
@@ -436,99 +436,36 @@ export function App() {
     [t],
   );
 
+  /**
+   * The submit path DISPATCHES; it does not decide (#1102).
+   *
+   * The decision — parse, dry-run fold, and the three "this line adds nothing" outcomes — lives in
+   * `app/submit.ts`, which is what the locks call too. It used to live here, and that is precisely
+   * how #1063's entailment notice went dead: #1076 added an earlier-returning arm, and the test that
+   * should have caught it REPRODUCED this function instead of calling it, so it modelled a submit
+   * path that no longer existed.
+   */
   const submit = (raw: string) => {
-    const line = raw.trim();
-    if (!line) return;
-    const parsed = parseLine(line);
-    if (!parsed.ok) {
-      setError({ key: parsed.code, detail: parsed.detail });
-      return;
+    const verdict = decideSubmit(raw, lines, seed, d);
+    switch (verdict.kind) {
+      case 'ignored':
+        return;
+      case 'refused':
+        setError(verdict.error);
+        return;
+      case 'already-known':
+        setNotice(t('noticeAlreadyKnown', { detail: verdict.line }));
+        setDraft('');
+        return;
+      case 'already-follows':
+        setNotice(t('noticeAlreadyFollows', { detail: verdict.line }));
+        setDraft('');
+        return;
+      case 'record':
+        recordLine(verdict.line);
+        setDraft('');
+        return;
     }
-    // Dry-run the WHOLE list with the new line appended: a statement is acceptable only if the
-    // figure still folds. A refusal keeps the prior figure and names the student's own words.
-    const trial = derive([...lines, line], seed);
-    const fault = trial.faults.find((f) => f.index === lines.length);
-    if (fault) {
-      setError({ key: fault.code, detail: fault.detail, existing: fault.existing } as InputError);
-      return;
-    }
-    /**
-     * The THIRD outcome (#1045): the statement is true, and the figure already held it.
-     *
-     * `applyFact` has answered this since V0 and nothing read the answer, so the line was recorded
-     * anyway — the student saw their sentence listed twice, the counter said «4 נתונים» for three
-     * givens, and the tool said nothing at all. Silence reads as failure, so they type it again.
-     *
-     * A `narrowed` line is deliberately NOT here: «a הוא פרמטר» then «a<13» is also absorbed, but it
-     * added information and belongs in the list like any other given.
-     */
-    if (trial.outcomes[lines.length] === 'known') {
-      setNotice(t('noticeAlreadyKnown', { detail: line }));
-      setDraft('');
-      return;
-    }
-    /**
-     * A given the figure ALREADY ENTAILS (#1063) — the operator’s B11/B12.
-     *
-     * #1045 catches a RESTATEMENT: the same fact twice, decided structurally in `applyFact`. This
-     * is the larger notion — «שטח המשולש ABC הוא 6» on a determined triangle was never stated
-     * before, it is simply *true and already settled*, and structural absorption cannot see that.
-     *
-     * **Two conditions, and neither alone is enough:**
-     *
-     *  - the given HOLDS (`unsatisfied` is empty), and
-     *  - the figure’s reported freedom DID NOT DROP.
-     *
-     * The second is what separates *"true here"* from *"true necessarily"*. On a free triangle,
-     * «AB מקביל לציר x» is satisfied at seed 0 only because the sampler put it there — the
-     * constraint is real and removes a degree of freedom, and calling it "already known" would
-     * silently discard a stated given, which is the defect this whole product exists to avoid.
-     *
-     * **And nothing new may have APPEARED.** The test is on the construction, not on the fact kinds:
-     * a line that mints an object, a parameter or a selector has contributed something whatever the
-     * numbers say. Comparing what the figure GAINED rather than what the sentence emitted is what
-     * makes «B נמצא על ציר ה-x» work for an already-placed `B` — that sentence declares `B`, the
-     * declaration is absorbed because `B` exists, and the line really does add nothing. A test on
-     * fact kinds called it new, which is how it read before #1069 taught that rule to declare.
-     *
-     * A new SELECTOR counts as contributing even when it happens to hold, because a selector consumes
-     * no freedom by design (D7 kind 2) and a DOF comparison alone cannot see it. That is the
-     * conservative direction: it records a line that arguably added nothing, rather than discarding
-     * one that did.
-     *
-     * It costs nothing extra: both derivations already exist — `d` is the current figure and `trial`
-     * is the dry run the submit path has always done.
-     */
-    /**
-     * A line that PROMOTED a carrier to a stated curve (#1076) changes no count — the object was
-     * already there — and consumes no freedom, so the count test alone would call «y=x» after
-     * «נקודה B על הישר y=x» a given that already follows, while the canvas visibly gained a line.
-     * `applyFact` already answered this: promotion reports `created`. Reading its answer is the
-     * same move #1045 made, and the reason both tests live here rather than duplicating each other.
-     */
-    if (trial.outcomes[lines.length] === 'created') {
-      recordLine(line);
-      setDraft('');
-      return;
-    }
-    const gained =
-      trial.construction.objects.length - d.construction.objects.length +
-      (trial.construction.params.length - d.construction.params.length) +
-      (trial.construction.selectors.length - d.construction.selectors.length);
-    const freedomBefore = reportedDof(d.construction, d.figure.carrierDof);
-    const freedomAfter = reportedDof(trial.construction, trial.figure.carrierDof);
-    if (
-      parsed.facts.length > 0 &&
-      gained === 0 &&
-      trial.figure.unsatisfied.length === 0 &&
-      freedomAfter === freedomBefore
-    ) {
-      setNotice(t('noticeAlreadyFollows', { detail: line }));
-      setDraft('');
-      return;
-    }
-    recordLine(line);
-    setDraft('');
   };
 
   const scene = useMemo(() => {

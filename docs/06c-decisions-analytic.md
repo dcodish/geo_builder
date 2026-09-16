@@ -3698,3 +3698,77 @@ which is also why the operator's correction cost a rewritten test file and nothi
 **Consequences.** `src-analytic` gains `issue-1118-retire-measurement.test.ts` (14). Asking the same
 question twice no longer produces two identical rows with the drawing stacked on itself — the state the
 operator hit within a minute of first use.
+
+---
+
+## ADR-AG-068 — The submit decision is a FUNCTION the app and the locks both call (#1102)
+
+**Requirements:** none (internal) — no promise to the student changes; #1063's promise is restored.
+**Design:** [04c](04c-design-analytic.md) — `app/submit.ts` joins `app/ask.ts` and `app/answers.ts` as
+the app layer's decision modules.
+
+**The defect this fixes is not a wrong branch — it is an unreachable one.** #1063 built the notice for
+*a given the figure already entails*, shipped it green, and it never fired in the app for any of the
+three sentences the operator reported. Measured on `main` in a real browser: «AB = 4» after `A(0,0)`
+`B(4,0)` added a third row and said nothing.
+
+**Why the branch was dead.** `App.tsx` submit ran, in order:
+
+```js
+if (trial.outcomes[lines.length] === 'created') { recordLine(line); return; }   // e22377d3, #1076
+…
+if (parsed.facts.length > 0 && gained === 0 && …) { setNotice(…); return; }     // e4774a7f, #1063
+```
+
+`e22377d3` landed **fifteen minutes after** `e4774a7f`, in the same round. The promotion arm is right in
+itself — a line that promotes a carrier to a stated curve really does change the figure — but it was
+stated as `outcomes === 'created'`, which is far wider than promotion.
+
+**What separates the two classes — measured, not reasoned.** The obvious discriminators do not work:
+both classes report `created`, and both can leave `gained` at zero.
+
+| line | outcome | gained | **constraints added** |
+| --- | --- | --- | --- |
+| «AB = 4» on a determined `A`,`B` — entailed | `created` | 0 | **1** |
+| «שטח המשולש ABC הוא 6» on a determined triangle — entailed | `created` | 0 | **1** |
+| «y=x» after «נקודה B על הישר y=x» — promotion | `created` | 0 | **0** |
+
+`applyFact` reports `created` when it appends a constraint (`engine/apply.ts`), which is the whole
+reason an entailed given reached the promotion arm at all. **A promotion states no constraint; an
+entailed given is nothing but a constraint.** So the arm narrows to *created, and appended no
+constraint* — a property of the construction, not a property of the one input that was reported.
+
+A line that both gains an object and states a constraint is unaffected: it fails the entailment test on
+`gained === 0` and records through the same path it always did.
+
+**The structural half, which is the actual root cause.** `store/useAnalyticStore.ts` has named
+`app/submit.ts` since V0 — *"Whether a line is acceptable is the submit path's question"* — **and the
+file did not exist.** The decision lived inline in the component, reachable from no test, so the lock
+for #1063 REPRODUCED it:
+
+```js
+const verdict = (before, line) => {
+  …
+  if (trial.outcomes[before.length] === 'known') return 'restated';   // no `created` arm, ever
+  …
+};
+```
+
+That copy modelled a submit path which no longer existed, and would have stayed green through any
+further change to the real one. **Narrowing the `created` arm without extracting the decision would have
+left the next regression exactly as invisible** — which is why this ADR is about the seam and not about
+the condition.
+
+`decideSubmit(raw, lines, seed, current)` is now pure over its inputs and returns one of five verdicts;
+`App.tsx` dispatches on it and stores nothing of its own, and the lock calls the same function. The
+component's `parseLine` import is gone with the logic.
+
+**Verified both directions.** Restoring the old condition turns the new cases red (3 failed) and the
+#1076 guard is what forbids the lazy fix of deleting the promotion arm — so the lock fails for the right
+reason in each direction, rather than passing by checking nothing.
+
+**Consequences.** `src-analytic/app/submit.ts` is new. `engine.test.ts`'s #1063 block calls the decision
+instead of reproducing it and gains two cases (the three reported sentences; the #1076 promotion guard),
+65 tests green in that file. The same signature defect — an internal decision reachable from no test —
+is what [ADR-AG-067](#adr-ag-067) had already applied to `app/answers.ts` on the strength of this issue's
+diagnosis, before this fix was built.
