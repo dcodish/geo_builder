@@ -4068,3 +4068,45 @@ splits accordingly: **קיץ א' 2024** for V1a, **קיץ ב' 2024 + חורף 20
 **Consequences.** docs/19 §4 and §5 lose the "verify" charter; §7's V1 entry is rewritten and split.
 02c gains R87 and its §6 open-rulings list loses the reveal-after-a-wrong-claim item. 04c gains "The
 locus lane". Nothing in `src-analytic/` changes in this commit — the three issues carry the build.
+
+---
+
+## ADR-AG-072 — The answer row is typeset, and punctuated as a sentence (#1117 + #1112)
+
+**Requirements:** none (internal) — R26's promise is unchanged; the row now keeps it legibly.
+**Design:** none (internal).
+
+Two operator reports against **one template string**, which is why they are one item.
+
+**#1117**, playing PR #1116 T28: *"we don't have MathML in the input in the data panel"*. The row read
+
+```
+המרחק מ-A לישר l1 = 2.6                      ← plain text
+d(A, l1) = |3·2 - 4·5 + 1| / √(3² + (-4)²)   ← typeset, directly beneath it
+```
+
+so one line contradicted the next.
+
+**#1112**, playing T15: *"the last one משוואת AB = -2x + y = 0 should be משוואת AB: -2x + y = 0"*. The row
+is built as `question SEP value`, and for an equation question the value is **itself an equation** — so
+the row carried two `=` and read as a broken statement. Nothing is wrong with the mathematics; the row was
+punctuated as if «משוואת AB» were a quantity.
+
+**The separator is chosen from the VALUE, not from the question kind.** A value that is already an
+equation cannot be joined to its question with another `=`. Deciding on content gives one rule covering
+every question kind that exists now and every one added later; a list of "the rules that return equations"
+would need editing each time a rule learned to, and the row would read as broken until someone remembered.
+
+**Ordering, and why this is item 2 and not item 1.** Routing the row through `MathText` could not have
+improved anything before [ADR-W-055](06w-decisions-workspace.md#adr-w-055) / #1125: the renderer's grammar
+stopped at literal values, so the row would have become *wrongly* typeset rather than plain — not
+obviously better than what the operator reported. That dependency was flagged on PR #1116 rather than
+discovered here, and #1125 is item 1 of this round for exactly this reason.
+
+#1125 also **corrected #1117's own premise**: it says the trace is *"MathML, correct"*, and it was not —
+it was plain glyphs with `<math>` islands embedded. Both halves of the contradiction were broken; the row
+is the half this ADR fixes.
+
+**Consequences.** `issue-1117-answer-row.test.ts` (6). Its `describeCurve` is the app's real line shape
+rather than a stub returning `''` — a stub hides the whole defect, because the row then has nothing
+containing an `=` to collide with. Analytic lane 1135.

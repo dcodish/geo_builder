@@ -1093,11 +1093,32 @@ export function App() {
                     ✕
                   </button>
                   <div>
-                    {a.missing
-                      ? `${a.question} — ${t(a.missing.kind === 'point' ? 'askMissingPoint' : 'askMissingCurve', { name: a.missing.name })}`
-                      : a.unreadable
-                        ? `${a.question} — ${t('askUnreadable')}`
-                        : `${a.question} = ${a.value ?? t(figureIsOpen(d) ? 'askOpen' : 'askNoValue')}`}
+                    {/*
+                      THE ANSWER ROW IS TYPESET, AND PUNCTUATED (#1117 + #1112).
+
+                      Operator: *"we don't have MathML in the input in the data panel"* — the row said
+                      `המרחק מ-A לישר l1 = 2.6` in plain glyphs while the formula directly beneath it was
+                      typeset, so one line contradicted the next.
+
+                      And *"the last one משוואת AB = -2x + y = 0 should be משוואת AB: -2x + y = 0"*. The
+                      row is built as `question SEP value`, and when the VALUE is itself an equation the
+                      row carries two `=` and reads as a broken statement. The separator is therefore
+                      chosen from the value's CONTENT rather than from which rule answered: a value that
+                      is already an equation cannot be joined to its question with another `=`. That is
+                      one rule for every present and future question kind, instead of a list of the ones
+                      that happen to return equations.
+                    */}
+                    {a.missing ? (
+                      `${a.question} — ${t(a.missing.kind === 'point' ? 'askMissingPoint' : 'askMissingCurve', { name: a.missing.name })}`
+                    ) : a.unreadable ? (
+                      `${a.question} — ${t('askUnreadable')}`
+                    ) : (
+                      <MathText
+                        text={analyticBidi.isolateLtrRuns(
+                          `${a.question}${a.value && a.value.includes('=') ? ':' : ' ='} ${a.value ?? t(figureIsOpen(d) ? 'askOpen' : 'askNoValue')}`,
+                        )}
+                      />
+                    )}
                   </div>
                   {/*
                     HOW IT WAS REACHED (#1053) — the formula with this figure's numbers in it.
