@@ -26,6 +26,21 @@ export interface EditDeps {
   t: (key: string, opts?: Record<string, unknown>) => string;
   /** The aria-live note under the input — how a refusal reaches the student. */
   setInputNote(msg: string): void;
+  /**
+   * The POST-COMMIT configuration search (#1041), mirroring `SubmitDeps`.
+   *
+   * ADR-510 moved the synchronous `firstSatisfyingSeed` search out of both commit seams and into the
+   * callers. `commitCommands`' caller — the submit pipeline — was re-armed; this one was not, and the
+   * comment left behind in `replaceGroup` asserted a connection that did not exist. So an edit that
+   * left the figure violating a requirement stayed broken silently and indefinitely, while
+   * `replaceGroup` ALSO reset the seed to 0 (ADR-484) — discarding the student's working configuration
+   * and then not searching for another.
+   *
+   * The class: **when work moves out of a shared callee into its callers, every caller is a seam that
+   * must be re-armed**, and the inventory must be taken from the callee's call sites rather than from
+   * the path being worked on. See #1132 for the mechanism that makes that inventory checkable.
+   */
+  resolveAfterCommit(): void;
 }
 
 /**
@@ -107,5 +122,19 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   const after = replay(store().facts, store().seed).status;
   const orphaned = store().facts.filter((f) => wasOk[f.id] === 'ok' && after[f.id] !== 'ok' && after[f.id] !== 'disabled');
   setInputNote(orphaned.length > 0 ? t('steps.editBrokeDependents', { items: orphaned.map((f) => `«${f.utterance ?? f.cmd.type}»`).join(', ') }) : '');
+  /**
+   * The edit is committed — now search for a configuration that honours it (#1041).
+   *
+   * ONLY on the success return: every refusal above (unreadable edit, lowercase-label nudge, honesty
+   * gate, unknown circle) returns false without launching anything.
+   *
+   * No condition is tested here on purpose. `runViewResolve` already early-returns when
+   * `meetsRequirements` holds, so a clean edit costs nothing; repeating that test at the call site
+   * would be a second copy of the trigger — the very shape that let this seam drift.
+   *
+   * `void`, not `await`: the boolean contract `FactList` depends on stays synchronous, and the search
+   * runs off-thread exactly as it does after a submit.
+   */
+  void deps.resolveAfterCommit();
   return true;
 }

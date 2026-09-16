@@ -315,7 +315,9 @@ export default function App() {
   // B5-2d/#782: the seam itself lives in `@/app/editPipeline` (CLAUDE.md: submit-path behaviour goes
   // in `src/app/`, never inline in the component). This is the adapter — the two UI concerns it has.
   function commitEdit(key: string, editText: string): boolean {
-    return runEditCommit(key, editText, { t, setInputNote });
+    // #1041: the edit seam launches the post-commit search too — the SAME closure `runSubmit` is given
+    // below, so the two commit paths cannot drift again.
+    return runEditCommit(key, editText, { t, setInputNote, resolveAfterCommit });
   }
 
   // The text → command[] path: the deterministic parser runs first; anything it

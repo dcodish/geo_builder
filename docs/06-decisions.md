@@ -11700,3 +11700,77 @@ the note rests on, at its exact degenerate case); a free RADIUS is nameable; the
 the next statement, with no clearing call at the submit site; a determined figure leaves no note at all.
 
 **Deviations from plan:** none.
+
+---
+
+## ADR-518 — The ✎ edit seam launches the post-commit search; the seam inventory becomes an assertion (#1041)
+
+**Requirements:** none (internal) — R-level behaviour is unchanged; the promise that *everything the
+student stated is honoured on the figure* is restored at a seam where it had stopped holding.
+**Design:** [04-design](04-design.md) — `EditDeps` gains `resolveAfterCommit`, mirroring `SubmitDeps`.
+
+**In prod since `prod/2026-09-14`.** An edit (✎) that left the figure violating a requirement stayed
+broken **silently and indefinitely**: no configuration search ran, no seed moved, and the "could not
+honour everything at once" note ([ADR-445](#adr-445)) never fired.
+
+**Root cause — a transaction moved off-thread, with the inventory taken from one seam only.**
+`58b53efe` ([ADR-510](#adr-510)) deleted the synchronous `firstSatisfyingSeed` search from *both* commit
+seams and moved it into the callers. `commitCommands`' caller — the submit pipeline — was re-armed;
+`replaceGroup`'s was not, and the comment left in its place asserted the connection that did not exist:
+
+```ts
+// #364 (ADR-510): the search itself moved off-thread to the post-commit `autoResolve` — the ✎
+// path commits at seed 0 and the worker sweeps from there (the same shape as the submit path).
+patch.seed = 0;
+```
+
+Compounding it, `replaceGroup` **also resets the seed to 0** ([ADR-484](#adr-484)), so the edit path did
+not merely fail to improve a bad seed — it discarded the student's working configuration and then did
+not search.
+
+**The class:** *when work moves out of a shared callee into its callers, every caller is a seam that must
+be re-armed* — and the inventory must be taken from the callee's own call sites rather than from the path
+being worked on. `replaceGroup`'s docblock had **already** recorded that this is the seam that drifts
+(`PARITY CAVEAT`, `geoStore.ts:560`): the note was there and the move still missed it, which is the proof
+that prose is not a mechanism. The general form is [#1132](https://github.com/dcodish/geo_builder/issues/1132).
+
+**The fix.** `EditDeps` gains `resolveAfterCommit(): void`; `App.commitEdit` binds the same closure it
+already binds into `runSubmit`, so the two commit paths cannot drift again. It fires only on the success
+return — every refusal (unreadable edit, lowercase nudge, honesty gate, unknown circle) launches nothing —
+and no condition is tested at the call site, because `runViewResolve` already early-returns when
+`meetsRequirements` holds and a second copy of the trigger is the shape that caused this.
+
+Making the dep **required** rather than optional is deliberate: `tsc` then named every existing call site
+(two test helpers), which is the compile-time half of the inventory.
+
+**The measurement, including the part I got wrong.** The lock needs a sequence invalid at seed 0 *and*
+satisfiable elsewhere; anything else passes with or without the fix, which is precisely how the old lock
+survived (its `SEQ` is valid at seed 0).
+
+- The plan's suggested candidate — a right triangle inscribed in a circle, edited to «קשת AB = קשת BC» —
+  is **unusable**: no seed in 0..199 satisfies it, so the search cannot rescue it either.
+- A first sweep then produced a two-tangent candidate that was an **artefact**: it parsed each line with
+  a bare fact list instead of a `ParseContext`, building a figure the app never builds. Through
+  `buildParseCtx`, as submit does, that case is valid at seed 0 and strands nobody.
+- **One candidate in roughly fifty survives the correct context:** «משולש ABC» · «גובה AD במשולש ABC» ·
+  «AB = 10» · «AD = 6», editing the last step to «AD = 7» — invalid at seed 0, satisfied at seed 1.
+
+That the trigger is narrow is recorded rather than hidden: the defect is real and shipped, and it bites
+only where seed 0 happens to be one of the few unsatisfiable configurations. The lock therefore asserts
+its **own fixture still strands**, so it fails loudly if the solver ever makes seed 0 valid there instead
+of passing for the wrong reason.
+
+**`removeGroup` is exempt, and the exemption is measured, not assumed.** It is the third seam that resets
+the seed and it is deliberately not wired: over 12 deletions across three figures, a remainder that stays
+satisfiable was valid at seed 0 every time (the search would be a no-op), and one that breaks had no valid
+seed in 0..79 (the search could not help). No case was found where the search would rescue a recoverable
+figure. The exemption is written down as a case, because a forgotten seam and an exempt one are otherwise
+indistinguishable — which is the whole lesson of this ADR.
+
+**Siblings, answered rather than assumed** (the issue's scope note): **3-D** wires its edit seam already —
+`replaceFact` calls `seedForRequirements` synchronously inside the store action, a different shape but not
+broken. **Complex** has no configuration search at all, so there is nothing to wire there.
+
+**Consequences.** New `src/app/__tests__/issue-1041-edit-resolve.test.ts` (5). Verified both directions:
+removing the call turns it red (2 failed). `issue-364-accept-the-flash.test.ts` is untouched and still
+green — it proves the store contract, which is real; what it never proved is the connection.
