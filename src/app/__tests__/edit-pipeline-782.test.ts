@@ -22,11 +22,14 @@ import { replay } from '@/store/geoStore';
 
 function makeDeps() {
   const notes: string[] = [];
+  /** #1041: the post-commit search is now a required dep — counted, so a refusal can assert zero. */
+  const resolves = { n: 0 };
   const deps: EditDeps = {
     t: (key, opts) => (opts ? `${key}:${JSON.stringify(opts)}` : key),
     setInputNote: (m) => notes.push(m),
+    resolveAfterCommit: () => { resolves.n += 1; },
   };
-  return { deps, notes };
+  return { deps, notes, resolves };
 }
 
 /** Type an utterance the way submit does, and hand back the group key of the step it created. */

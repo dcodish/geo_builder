@@ -95,11 +95,14 @@ describe('#926 — the fold: a set-var whose letter nothing binds is a fact in e
 describe('#926 — the ✎ edit seam is not a bare success when it orphans a row', () => {
   function makeDeps() {
     const notes: string[] = [];
+    /** #1041: the post-commit search is now a required dep — counted, so a refusal can assert zero. */
+    const resolves = { n: 0 };
     const deps: EditDeps = {
       t: (key, opts) => (opts ? `${key}:${JSON.stringify(opts)}` : key),
       setInputNote: (m) => notes.push(m),
+      resolveAfterCommit: () => { resolves.n += 1; },
     };
-    return { deps, notes };
+    return { deps, notes, resolves };
   }
   function submitStep(utterance: string): string {
     const st = useGeoStore.getState();

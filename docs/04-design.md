@@ -144,6 +144,26 @@ src/
                    ADR-264 Am. 1 split rescues (deriving it was tried in round #961 and refuted)
   app/           submitPipeline.ts — the text→command orchestration, extracted from App.tsx and
                  directly tested (S0.4)
+                 - THE COMMIT SEAMS AND THE POST-COMMIT SEARCH (ADR-518, #1041). Three store actions
+                   change the fact list; the configuration search is a property of the SEAM, and the
+                   list below is an assertion in `app/__tests__/issue-1041-edit-resolve.test.ts`,
+                   not a comment:
+
+                     commitCommands (submit)  → resolveAfterCommit, via submitPipeline
+                     replaceGroup   (✎ edit)  → resolveAfterCommit, via editPipeline   ← was missing
+                     removeGroup    (delete)  → EXEMPT, measured (see below)
+
+                   ADR-510 moved the search off-thread into the callers and re-armed only the submit
+                   one; `replaceGroup` kept a comment describing a connection that did not exist, and
+                   also resets the seed to 0 (ADR-484), so an edit discarded the student's working
+                   configuration and then did not search. `EditDeps.resolveAfterCommit` is REQUIRED,
+                   so `tsc` names every call site — the compile-time half of the inventory.
+                   `removeGroup` is exempt on measurement, not on taste: across 12 deletions, a
+                   satisfiable remainder was valid at seed 0 every time and a broken one had no valid
+                   seed at all, so no case exists where the search would rescue a recoverable figure.
+                   Siblings: 3-D wires its edit seam synchronously inside `replaceFact`
+                   (`seedForRequirements`); complex has no configuration search to wire. The general
+                   mechanism — a decision reachable from no test gets reproduced — is #1132
                  - errorSubject.ts (ADR-487, #943): `utteranceForError(facts, status, raw)` — WHICH
                    sentence a refusal is about. Pure over its three inputs; it exists because
                    `humanizeError` is deliberately figure-free (ADR-228 Am.6), so the student's own
