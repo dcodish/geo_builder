@@ -1266,10 +1266,24 @@ const SYMBOLS = [
  * `a x + b y + c = 0`, written the way a textbook writes it: no `1x`, no `+ 0`, no `+ -3`. The raw
  * coefficients are arithmetic; this is notation, and the panel is read by a student.
  */
-function lineText(a: number, b: number, c: number): string {
+/**
+ * Exported so its lock CALLS it (#1119, per [ADR-W-053](../docs/06w-decisions-workspace.md#adr-w-053)).
+ *
+ * It was module-private, which left a test only able to reproduce it -- and a reproduction of this
+ * function would have carried the same bug in the same shape and agreed with it.
+ */
+export function lineText(a: number, b: number, c: number): string {
   const term = (k: number, sym: string): string => {
     if (Math.abs(k) < 1e-12) return '';
-    const mag = Math.abs(k) === 1 ? '' : fmt(Math.abs(k));
+    /**
+     * THE MAGNITUDE RULE BELONGS TO THE SYMBOL, NOT TO THE TERM (#1119).
+     *
+     * Suppressing `1` is correct notation for a COEFFICIENT -- `1x` must print as `x`. The constant
+     * term is formatted by this same helper with `sym = ''`, so the rule erased the number itself and
+     * «3x - 4y + 1 = 0» printed as «3x - 4y + = 0». It fired for any line whose constant is +/-1, not
+     * only the #1093-built ones the DEPLOY-LOG entry described.
+     */
+    const mag = Math.abs(k) === 1 && sym !== '' ? '' : fmt(Math.abs(k));
     return `${k < 0 ? '-' : '+'} ${mag}${sym} `;
   };
   const parts = `${term(a, 'x')}${term(b, 'y')}${term(c, '')}`.trim();

@@ -4110,3 +4110,39 @@ is the half this ADR fixes.
 **Consequences.** `issue-1117-answer-row.test.ts` (6). Its `describeCurve` is the app's real line shape
 rather than a stub returning `''` — a stub hides the whole defect, because the row then has nothing
 containing an `=` to collide with. Analytic lane 1135.
+
+---
+
+## ADR-AG-073 — The magnitude rule belongs to the SYMBOL, not to the term (#1119)
+
+**Requirements:** none (internal). **Design:** none (internal).
+
+```
+נתון הישר l1: 3x-4y+1=0
+```
+printed **`l1: 3x - 4y + = 0`** — the constant simply gone, and the equation malformed.
+
+**Root cause: a coefficient rule applied to a term that has no symbol.** `lineText` suppresses the
+magnitude when `|k| = 1`, which is correct notation *for a coefficient* — `1x` must print as `x`. The
+**constant** term is formatted by the same helper with `sym = ''`, so the rule erased the number itself.
+One condition, scoped to the symbol it was always about.
+
+It fired for **any** line whose constant is ±1 — `-y + 1 = 0`, `x + y + 1 = 0`, `3x - 4y - 1 = 0` — not
+only the #1093-built lines that the `prod/2026-09-16-2` DEPLOY-LOG entry described.
+
+**A bookkeeping failure is the reason this survived, and it is the part worth remembering.** That
+DEPLOY-LOG entry says of this defect: *"Cosmetic, the figure itself is correct; **filed** and fixed
+next."* **No issue was ever filed** — a search across every issue, open and closed, found nothing. It
+shipped and stayed live through three deploys. **A claimed filing that did not happen is worse than an
+unfiled defect, because it stops anyone looking.**
+
+**`lineText` is now exported**, per [ADR-W-053](06w-decisions-workspace.md#adr-w-053): it was
+module-private, so a lock could only have REPRODUCED it — and a reproduction would have carried this bug
+in the same shape and agreed with itself.
+
+**Neighbours confirmed rather than assumed** (the plan's step 2): `describeCurve`'s parabola and ellipse
+branches format their own numbers and never call this helper, so they were never affected.
+
+**Consequences.** `issue-1119-constant-term.test.ts` (6), verified **red without the fix** (3 failed),
+and carrying the opposite direction too — a ±1 *coefficient* still drops its `1`, so this is a scoping
+fix and not a deletion.
