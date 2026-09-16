@@ -7,6 +7,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
+import { knownCurve } from '../engine/evaluate';
+import { buildScene } from '../render/scene';
 
 const at = (lines: string[]) => {
   const d = derive(lines, 0);
@@ -67,5 +69,55 @@ describe('#1059 — a letter after «מעגל» is the CENTRE', () => {
     expect(derive(['נתון מעגל M שמשוואתו y=2x'], 0).faults.map((f) => f.code)).toEqual([
       'does-not-exist',
     ]);
+  });
+});
+
+/**
+ * #1089 — the centre the student NAMED carries its value, not just its letter.
+ *
+ * Operator, 2026-09-16 (T36): *"the O should show the values. now it only shows O"*, on the figure
+ * #1086 had just changed. #1086 was right that two labels must not overlap at one place and wrong
+ * about which of them carries the value: the mark went quiet and the number went with it.
+ *
+ * The root cause was one blanket line in `provenanceOf` — *"a derived point's position comes from
+ * its parents, never from givens about itself"* — written when every derived rule had POINT parents.
+ * `circle-centre` is the one whose parent is a CURVE, and a curve written out in full is READ, not
+ * solved.
+ */
+describe('#1089 — a curve-parented derived point inherits the curve’s provenance', () => {
+  it('a literal circle fixes its named centre, and the figure says so', () => {
+    const d = derive(['נתון מעגל O שמשוואתו (x-3)^2+(y-5)^2=25'], 0);
+    expect(d.faults).toEqual([]);
+    expect(d.figure.provenance.O).toEqual({ x: { known: true, value: 3 }, y: { known: true, value: 5 } });
+  });
+
+  it('a PARAMETRIC circle does not — an unstated magnitude prints no number (ADR-052)', () => {
+    const d = derive(['נתון מעגל O שמשוואתו (x-a)^2+(y-5)^2=25'], 0);
+    expect(d.faults).toEqual([]);
+    /**
+     * BOTH components stay open, and that is deliberately conservative rather than exact: `a` moves
+     * only the x, so a per-component answer would say «O(x_O, 5)». Attributing a free symbol to one
+     * coordinate of a FITTED centre needs the algebra the fit throws away, and the honesty invariant
+     * forbids printing a value that is not known — it does not require printing every value that is.
+     * Under-claiming here is safe; over-claiming would put a sampled number on the canvas.
+     */
+    expect(d.figure.provenance.O).toEqual({ x: { known: false }, y: { known: false } });
+  });
+
+  it('a derived point over FREE VERTICES stays open — the rule the blanket line was written for', () => {
+    const d = derive(['משולש ABC', 'G מפגש התיכונים במשולש ABC'], 0);
+    expect(d.figure.provenance.G).toEqual({ x: { known: false }, y: { known: false } });
+  });
+
+  it('and at the RENDER layer: ONE label, carrying both pieces', () => {
+    // The #1086 lesson — verify where the operator looks. The point prints its coordinates and the
+    // centre mark prints nothing, so nothing can overlap and nothing is withheld.
+    const d = derive(['נתון מעגל O שמשוואתו (x-3)^2+(y-5)^2=25'], 0);
+    const scene = buildScene(d.figure, d.box, 600, 600, {
+      curveKnown: (id) => knownCurve(d.construction, id) !== null,
+    });
+    expect(scene.curves[0].centre?.label).toBeUndefined();
+    const o = scene.points.find((p) => p.id === 'O')!;
+    expect(o.coords?.map((c) => c.text)).toEqual(['3', '5']);
   });
 });

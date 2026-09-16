@@ -31,10 +31,10 @@
  * find anything out of place. If a future kind can forward-reference, that is the moment a real sort
  * is earned — and this function is what will fail first and say so.
  */
-import { parentsOf } from './derived';
+import { curveParentOf, parentsOf } from './derived';
 import { evalExpr, symbolsOf, type Env } from './expr';
 import { constraintRefs } from './solve';
-import { UNBOUNDED, type Construction, type GeoObject, type Id, type ParamDecl } from './types';
+import { UNBOUNDED, type Construction, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
 
 /**
  * The plane's own coordinates. A curve is the zero set of `f(x, y; params)`, so `x` and `y` occur
@@ -279,7 +279,17 @@ export interface PointProvenance {
  * is NOT known here, which keeps the canvas from printing a sampled number — the honesty invariant
  * still binds, separately from provenance.
  */
-export function provenanceOf(c: Construction, id: Id, env: Env): PointProvenance | null {
+export function provenanceOf(
+  c: Construction,
+  id: Id,
+  env: Env,
+  /**
+   * The curves as this configuration DREW them — needed only for the one derived rule whose parent
+   * is a curve (see below). Absent = that rule reports its coordinates open, which is what every
+   * caller without a figure in hand should see.
+   */
+  curves: ReadonlyArray<{ id: Id; curve: NumCurve }> = [],
+): PointProvenance | null {
   const o = c.objects.find((q) => q.id === id);
   if (!o) return null;
 
@@ -296,8 +306,36 @@ export function provenanceOf(c: Construction, id: Id, env: Env): PointProvenance
 
   if (o.kind !== 'free' && o.kind !== 'derived') return null;
 
-  // A derived point's position comes from its parents, never from givens about itself.
-  if (o.kind === 'derived') return { x: { known: false }, y: { known: false } };
+  /**
+   * A derived point's provenance is its PARENTS' provenance (#1089).
+   *
+   * For every rule with POINT parents that means open: a centroid over three free vertices gets its
+   * position from the solve, and printing a number there would assert a given the question never
+   * gave (ADR-052). `circle-centre` is the one rule whose parent is a CURVE — `derived.ts` keeps
+   * that apart already (`parentsOf` reports none for it, {@link curveParentOf} answers instead) —
+   * and a curve the student wrote out in full is READ, not solved: «נתון מעגל O שמשוואתו
+   * (x-3)^2+(y-5)^2=25» fixes O as plainly as «O(3,5)» does.
+   *
+   * Operator, 2026-09-16 (T36): *"the O should show the values"*. Before this, `provenanceOf` said
+   * O was unknown while `knownCurve` printed the same circle's centre — two honesty gates
+   * contradicting each other about one fact, which #1086 exposed by removing the centre mark's
+   * label.
+   *
+   * The test is the same one a stated point's own coordinates take, and it is deliberately
+   * SYNTACTIC: `knownCurve` runs `evaluate` over three seeds, and this function is called FROM
+   * `evaluate`. A parametric circle stays open, so no sampled number reaches the canvas.
+   */
+  if (o.kind === 'derived') {
+    const open: PointProvenance = { x: { known: false }, y: { known: false } };
+    const parent = curveParentOf(o.rule);
+    if (parent === null) return open;
+    const def = c.objects.find((q) => q.id === parent);
+    if (!def || def.kind !== 'curve') return open;
+    if (!symbolsOf(def.curve.eq).every((sym) => RESERVED_SYMBOLS.has(sym))) return open;
+    const drawn = curves.find((q) => q.id === parent)?.curve;
+    if (!drawn || drawn.kind !== 'circle') return open;
+    return { x: { known: true, value: drawn.cx }, y: { known: true, value: drawn.cy } };
+  }
 
   const out: PointProvenance = { x: { known: false }, y: { known: false } };
   for (const k of c.constraints) {

@@ -3025,3 +3025,65 @@ canvas-is-the-question rule, and a second label for one place could only repeat 
 **Consequences.** `src-analytic` +8 tests. Straight-to-straight crossings only: a line meets a circle
 twice and the sentence handles that (ADR-AG-047 lists both), but the DOT would have to say which of
 the two it is — a second question, not needed for this to be useful.
+
+## ADR-AG-055 — The tool joins the suite: a session, a panel that reads right, and the value behind the letter (#1087, #1088, #1089)
+
+**Status:** accepted, 2026-09-16 · **Extends** [ADR-W-016](06w-decisions-workspace.md#adr-w-016) ·
+**Corrects** [ADR-AG-054](#adr-ag-054)
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R77, R78, R79. **Design:**
+[04c](04c-design-analytic.md) "The session, and the panel that shows it".
+
+**Context.** Three operator reports, one week apart in the queue and one afternoon apart in fact, all
+of the same shape: *this tool is not yet one of the four*.
+
+1. *"I want the visualization of the tool to match that of the other tools. currently the buttons are
+   not located in same locations and there is no load and save and stuff we have on other tools"*
+   (#1087).
+2. *"input panel needs to support bidi in the same way we have for the other tools"* (#1088).
+3. *"the O should show the values. now it only shows O"* (#1089) — on a figure ADR-AG-054 had changed
+   that morning.
+
+**Decision 1 — a save holds the LINES, and a load is audited.** The session serializes to the ordered
+sentence list plus the seed and the figure's name, inside `shell/save`'s envelope. There is no
+position and no parameter value in the file, so a load re-parses the student's own words: the format
+is a parser-drift net as much as a document, and a line that no longer builds can be reported **by
+name**. Envelope refusals are kept OUT of the audit and routed to the error surface, where they name
+which of the three reasons applies — another builder's file, a newer format, or not a save file —
+because a generic "could not read" sends a student to fix a file that was read perfectly well.
+
+The utility row is now save · load · copy image · save image · guide, the order the three older
+builders had each grown by hand with nothing holding it. `shell/__tests__/utility-row-parity.test.ts`
+holds it now, across all four — verified to fail on a swapped pair before being kept.
+
+**Decision 2 — every surface that shows a line isolates its runs.** The segmentation was never wrong:
+measured directly, `(x-3)^2+(y-4)^2=9` is ONE run, caret included. What was wrong is that this panel
+passed **none** of the four seams its siblings pass (`boxDir`, `preview`, `previewDir`, `editDir`),
+and that `InputArea`'s quick strip had no seam to pass anything to — it rendered `{cmd}` raw, where
+its sibling component `QuickChips` has carried a `display` hook since [#751](06w-decisions-workspace.md#adr-w-029)
+closed exactly this defect. 2-D and 3-D pass no `quickCommands` at all, so the half-closed class sat
+unexercised until the first product whose every command is a Hebrew sentence carrying an equation.
+**The fix is in the shared component**, with the lock written in #751's own shape beside #751's own
+test — a class closed on one of its two paths is not closed.
+
+**Decision 3 — a derived point's provenance is its PARENT's provenance.** ADR-AG-054 resolved the
+overlapping labels at a circle's named centre by silencing the centre mark, and the operator's reply
+identified what that cost: *"the issue last time was the O was located over the values so it hid
+them"*. The mark going quiet took the number with it. Measured, the figure was contradicting itself —
+`provenanceOf` reported O unknown while `knownCurve` printed the same circle's centre as `(3, 5)`.
+
+The cause was one blanket line — *"a derived point's position comes from its parents, never from
+givens about itself"* — written when every derived rule had POINT parents, where it is right: a
+centroid over three free vertices IS placed by the solve, and a number there would assert a given the
+question never gave (ADR-052). `circle-centre` is the one rule whose parent is a curve, a distinction
+`derived.ts` already drew and provenance never learned. **This tree's most repeated defect, for the
+seventh time: the model grew a case and a switch that enumerates cases did not.**
+
+ADR-AG-054's rule is unchanged and was right — two labels must not overlap at one place. It was wrong
+only about which of them carries the value.
+
+**Consequences.** `shell` +8 tests (a new component seam, a new cross-product parity lock);
+`src-analytic` +19. `row-parity.test.ts` still enumerates three products by hand and does not know
+this one exists — filed as debt rather than widened here, because widening it means auditing every
+assertion in it against a fourth product, which is its own piece of work. The parametric-circle centre
+is conservative (both components open where `y` is really given) and the design doc says why.

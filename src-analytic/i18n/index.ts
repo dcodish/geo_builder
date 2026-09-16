@@ -117,6 +117,37 @@ const he = {
   noticeAlreadyKnown: 'זה כבר ידוע מהנתונים שכתבתם, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
   // A different sentence from «כבר ידוע» on purpose (#1063): the student did NOT repeat themselves —
   // they stated something the figure had already settled, which is a thing worth telling them.
+  // ── The session chrome (#1087): one vocabulary across the suite, so a student who learned
+  // «שמור»/«טען» in הנדסת המישור reads the same words here.
+  save: 'שמור',
+  load: 'טען',
+  namePlaceholder: 'שם השרטוט (לא חובה)',
+  copyImage: 'העתיקו תמונה',
+  saveImage: 'הורידו תמונה',
+  copied: 'הועתק',
+  manualButton: 'מדריך',
+  manualTitle: 'המדריך — גאומטריה אנליטית',
+  manualIntro:
+    'זהו מדריך חלקי — מוצגות דוגמאות מייצגות בלבד, כדי להראות אילו מיני משפטים אפשר להקליד. ' +
+    'לחצו על דוגמה כדי לנסות אותה על השרטוט.',
+  manualTry: 'לחצו כדי לנסות — הדוגמה תיבנה על השרטוט',
+  manualMore: '…ואלו רק דוגמאות — הכלי מבין ניסוחים נוספים מהסוג הזה',
+  manualPoints: 'נקודות',
+  manualLines: 'ישרים',
+  manualCircles: 'מעגלים',
+  manualConics: 'פרבולות ואליפסות',
+  manualShapes: 'צורות',
+  manualRelations: 'קשרים בין עצמים',
+  manualDerived: 'נקודות נגזרות',
+  manualParameters: 'פרמטרים ואי-שוויונים',
+  // A load says what it RESTORED and, separately, what it could not — a line that no longer builds
+  // is named, never dropped in silence (ADR-242, and the reason a save holds lines and not points).
+  loadRestored: 'טענתי את השרטוט — {{total}} נתונים.',
+  loadPartial:
+    'טענתי {{restored}} נתונים מתוך {{total}}. את אלה לא הצלחתי לקרוא מחדש: {{lines}}',
+  errLoadForeign: 'הקובץ "{{detail}}" שייך לכלי אחר בסדרה — פתחו אותו שם.',
+  errLoadNewer: 'הקובץ "{{detail}}" נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב.',
+  errLoadUnreadable: 'הקובץ "{{detail}}" אינו קובץ שרטוט שמור.',
   noticeAlreadyFollows:
     'זה כבר נובע מהנתונים שכתבתם — השרטוט מקיים את זה ממילא, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
 };
@@ -215,6 +246,32 @@ const en: typeof he = {
   kindDiagonalMeet: 'the intersection of the diagonals',
   noticeOnlyConfiguration: 'This is the only configuration I found — your givens fix the figure.',
   noticeAlreadyKnown: 'That is already known from what you have written, so I did not add another row: "{{detail}}"',
+  save: 'Save',
+  load: 'Load',
+  namePlaceholder: 'Figure name (optional)',
+  copyImage: 'Copy image',
+  saveImage: 'Download image',
+  copied: 'Copied',
+  manualButton: 'Guide',
+  manualTitle: 'The guide — analytic geometry',
+  manualIntro:
+    'A partial guide — representative examples only, to show what kinds of sentence you can type. ' +
+    'Click an example to try it on the figure.',
+  manualTry: 'Click to try — the example will be built on the figure',
+  manualMore: '…and these are only examples — the tool reads further phrasings of the same kind',
+  manualPoints: 'Points',
+  manualLines: 'Lines',
+  manualCircles: 'Circles',
+  manualConics: 'Parabolas and ellipses',
+  manualShapes: 'Shapes',
+  manualRelations: 'Relations between objects',
+  manualDerived: 'Derived points',
+  manualParameters: 'Parameters and inequalities',
+  loadRestored: 'Figure loaded — {{total}} givens.',
+  loadPartial: 'Loaded {{restored}} of {{total}} givens. These could not be read again: {{lines}}',
+  errLoadForeign: 'The file "{{detail}}" belongs to another builder in the suite — open it there.',
+  errLoadNewer: 'The file "{{detail}}" was saved by a newer version of the tool — refresh and try again.',
+  errLoadUnreadable: 'The file "{{detail}}" is not a saved figure.',
   noticeAlreadyFollows:
     'That already follows from what you have written — the figure satisfies it anyway, so I did not add another row: "{{detail}}"',
 };
