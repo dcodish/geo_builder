@@ -972,9 +972,24 @@ export function App() {
             <div style={{ marginTop: 10 }}>
               {answers.map((a, i) => (
                 <div key={`${a.question}-${i}`} style={askRow} dir="ltr">
-                  {a.unreadable
-                    ? `${a.question} — ${t('askUnreadable')}`
-                    : `${a.question} = ${a.value ?? t(figureIsOpen(d) ? 'askOpen' : 'askNoValue')}`}
+                  <div>
+                    {a.unreadable
+                      ? `${a.question} — ${t('askUnreadable')}`
+                      : `${a.question} = ${a.value ?? t(figureIsOpen(d) ? 'askOpen' : 'askNoValue')}`}
+                  </div>
+                  {/*
+                    HOW IT WAS REACHED (#1053) — the formula with this figure's numbers in it.
+
+                    Operator: *"we don't just show the result — we show what to use to get to this
+                    result"*, at the level he ruled: substituted, never worked through. Rendered as
+                    MathML like everything else numeric in this tool (#1097), and quieter than the
+                    answer, because it is the method and not the result.
+                  */}
+                  {a.trace && (
+                    <div style={askTrace}>
+                      <MathText text={a.trace} />
+                    </div>
+                  )}
                 </div>
               ))}
               <AskLane
@@ -1210,6 +1225,13 @@ const MANUAL_SECTIONS = [
 ];
 
 /** An answered question, reading like the inventory rows it sits under. */
+/** The method line under an answer (#1053) — present but subordinate to the value it explains. */
+const askTrace: CSSProperties = {
+  marginTop: 2,
+  fontSize: fs.small,
+  color: color.muted,
+};
+
 const askRow: CSSProperties = {
   fontSize: 13,
   padding: '2px 0',

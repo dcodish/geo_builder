@@ -963,3 +963,13 @@ Dragging moves the view; the wheel zooms about the cursor, so the point being re
 The grid and the tick labels stay crisp and true at every zoom, because the view re-projects the world
 box rather than scaling the drawing. ↺ restores the framing and re-arms the automatic centring; until
 the student moves the view, a figure that grows stays framed.
+
+
+**R84 — an answer shows the move that produced it**
+([ADR-AG-062](06c-decisions-analytic.md#adr-ag-062)). Asking for a distance or for a line's equation
+shows the formula **with this figure's values substituted** — `d = √((4-1)² + (5-1)²)` under
+`AB = 5` — never the bare formula and never the arithmetic worked through, which would be the tool
+doing the student's homework. The formulas are AUTHORED in the subject's own words, because a
+rendering derived from the engine would be correct and unlike anything in a notebook. A row with no
+technique behind it — a coordinate read off the givens, a line the student wrote down, a sum they
+assembled — shows none, and an answer the figure does not determine shows none either.

@@ -3406,3 +3406,56 @@ papered over, with the note that the refusal itself looks wrong and is worth fix
 **Consequences.** `src-analytic` +14 tests. **Two existing assertions were REWRITTEN, not deleted** —
 the one ADR-AG-054 wrote and the one #1092 left in place — each now recording that the rule changed
 and why, so the log reads as a decision reversed rather than a test quietly dropped.
+
+## ADR-AG-062 — The formula behind a measurement, with this figure's numbers in it (#1053)
+
+**Status:** accepted, 2026-09-16 · **Delivers** docs/19 §4b's deferred R1 (the derivation trace),
+in its first concrete slice
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R84. **Design:**
+`src-analytic/engine/techniques.ts` carries the reasoning.
+
+**Context.** Operator, 2026-09-15: *"when I select to see a distance or an equation of a line, I want
+the relevant formula to be shown on screen, so we don't just show the result — we show what to use
+to get to this result."*
+
+**The level is the operator's ruling.** The issue offered three and asked; he answered *"1053 - yes -
+b is correct"*:
+
+  1. the formula alone — `d = √((x₂−x₁)² + (y₂−y₁)²)`
+  2. **the formula with THIS figure's values substituted** — `d = √((4−1)² + (5−1)²)`
+  3. the arithmetic worked through — `= √25 = 5`
+
+(3) is the tool doing the student's homework. (2) is where the teaching is: seeing *their* numbers in
+the general form is the step a student actually gets wrong, and it is still not the working that
+earns the marks. **A test guards the boundary** — a substituted trace must contain the figure's own
+numbers and must NOT contain the answer, nor arrive with the subtractions already collapsed. Level
+(3) is one "helpful" line away at all times, and that line is now a failing test.
+
+**Authored, not generated.** docs/19 §4b specified the substrate when it deferred this: *"an authored
+technique table … teacher knowledge, not engine knowledge"*. The engine computes a distance from a
+residual and a solve, not from `√((x₂−x₁)²+(y₂−y₁)²)`; a trace derived from the code would be correct
+and **unlike anything in the student's notebook**, which is the one thing it must not be.
+
+**Only what a surface can ask for.** The table holds TWO entries, and that is deliberate. The issue
+names four moves; `point↔line distance` has no way to be requested until #1048's click-to-measure,
+and `slope` is shown in the panel rather than asked. Authoring entries for rows nobody can request
+would be writing a teacher's words against a guess. The two here are exactly the two the operator
+named and the two the ask lane already accepts.
+
+**What gets NO trace, and why each is right.** A point's coordinates — they are READ off the givens,
+not computed. A compound expression like «AB + CA» — arithmetic the student assembled, not one named
+move. An area — no entry in the table. A line GIVEN by its equation — there is no technique behind a
+given, and printing a derivation for one would be the tool explaining the student to themselves. And
+an answer the figure does not determine: no row, nothing to explain — which is also docs/19 §9's
+boundary, *"it must not answer 'how COULD you reach X'"*, that being a planner.
+
+**A vertical line** says the formula does not apply rather than dividing by zero, and a negative
+coordinate is parenthesised — `5 − (−3)` — because `5 − −3` is the commonest way a substituted
+formula stops looking like the one in the student's notes.
+
+**Consequences.** `src-analytic` +13 tests, six of them about what does NOT get a trace and three
+about the level holding. Rendered through the same MathML path as everything else numeric (#1097) and
+styled quieter than the answer, because it is the method and not the result. Verified in a browser:
+«AB» shows `d = √((4 - 1)² + (5 - 1)²)` under `AB = 5`, and «משוואת הישר AB» shows the two-point
+form under its equation.
