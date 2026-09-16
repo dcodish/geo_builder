@@ -58,11 +58,12 @@ main { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
 .layer-chip.on { border-color: #7c3aed; background: #f5f3ff; color: #6d28d9; }
 
 .gauss-plane {
-  width: 100%; height: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff;
+  /* #1104: the plane fills its CARD. `height: auto` let the intrinsic 680×620 aspect decide the
+     height, and `max-height: 76vh` capped it against the viewport — a pre-Workbench guard from
+     before the card owned the height, which by the end only shrank the drawing. The Workbench's D1
+     contract already stops the card at the right place; this stops the surface at the card. */
+  width: 100%; height: 100%; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); touch-action: none;
-  /* on very wide screens the square plane must not devour the viewport — the figure actions
-     under it (D7) stay reachable without scrolling */
-  max-height: 76vh;
 }
 .input-row { display: flex; gap: 8px; }
 .input-row input {

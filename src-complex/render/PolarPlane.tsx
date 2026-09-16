@@ -14,8 +14,16 @@
 import type { Scene } from '../scene/scene';
 import { RadicalTspans } from './radicalText';
 
-const W = 680;
-const H = 620;
+/**
+ * THE PLANE'S FALLBACK SIZE (#1104) — a first-paint default, never the drawing surface.
+ *
+ * These used to BE the surface: a fixed 680×620 `viewBox` met a much wider card, so
+ * `xMidYMid meet` scaled to the height and centred, leaving dead strips left and right — measured at
+ * **56% of the card's width** at 1920×860. Now they are only what the component draws at before the
+ * `ResizeObserver` reports, which also keeps the headless render tests deterministic.
+ */
+const W0 = 680;
+const H0 = 620;
 
 /** Stated values are solid and dark; sampled ones are dashed and muted — the honesty is visual. */
 const INK = {
@@ -73,6 +81,7 @@ export function PolarPlane({
   labels,
   zoom = 1,
   empty = false,
+  size,
 }: {
   scene: Scene;
   showGrid?: boolean;
@@ -88,7 +97,18 @@ export function PolarPlane({
   /** #742: an EMPTY canvas is blank white like every builder's — the grid/axes appear with the
    *  first point (the empty-state overlay used to sit on a full coordinate plane, colliding). */
   empty?: boolean;
+  /**
+   * THE MEASURED CANVAS (#1104), in CSS px — what 2-D and 3-D have always done.
+   *
+   * The `viewBox` becomes this box, so `preserveAspectRatio` has nothing left to letterbox. The scale
+   * `k` still takes the SHORT axis, so a wider card shows **more of the plane** rather than a stretched
+   * one — the modulus rings stay circles, which is the only reading that does not lie about a Gauss
+   * plane. (`preserveAspectRatio="none"` would fill by stretching and turn them into ellipses.)
+   */
+  size?: { w: number; h: number };
 }) {
+  const W = size && size.w > 0 ? size.w : W0;
+  const H = size && size.h > 0 ? size.h : H0;
   const k = (Math.min(W, H) / 2 / scene.extent) * zoom;
   if (empty) {
     return (

@@ -271,18 +271,16 @@ describe('#1098 — the figure name and the session ops, in every builder', () =
   });
 
   /**
-   * COMPLEX HAS NO UNDO/REDO EITHER — found by this assertion the day it was written (#1099).
+   * The exception is GONE (#1099, ADR-CX-0xx).
    *
-   * Listed as a NAMED exception rather than quietly dropped from the loop: the assertion stays
-   * strict, the gap stays visible, and the line below is what a fix deletes. Weakening the check to
-   * make the suite green would have hidden a real defect in a shipped product — the whole reason
-   * this file exists.
+   * This assertion found, the day it was written, that complex had no history at all —
+   * `canUndo:0 pastStates:0` against 2/3/2 in the siblings — and the gap was recorded as a named,
+   * self-expiring exception (`NO_HISTORY_YET`) rather than by weakening the check. Complex now has
+   * the two buttons and a `temporal` store, so the exception is deleted with the gap, which is what
+   * a self-expiring exception is FOR. All four builders are asserted with no carve-out.
    */
-  const NO_HISTORY_YET = ['src-complex/App.tsx'];
-
   it('undo and redo exist in every builder, read from the TEMPORAL store', () => {
     for (const rel of APPS) {
-      if (NO_HISTORY_YET.includes(rel)) continue;
       const src = read(rel);
       expect(/canUndo/.test(src), `${rel} offers undo`).toBe(true);
       expect(/canRedo/.test(src), `${rel} offers redo`).toBe(true);
@@ -306,11 +304,18 @@ describe('#1098 — the figure name and the session ops, in every builder', () =
   });
 });
 
-describe('#1099 — the gap this file found while being widened', () => {
-  it('complex is the ONLY builder without a history, and that is recorded', () => {
-    // When complex gains undo/redo, this test fails and the exception above is deleted with it.
-    // An exception with no expiry is how a known gap becomes a permanent one.
+describe('#1099 — the gap this file found, and closed', () => {
+  it('EVERY builder has a history now — the expiry fired, as designed', () => {
+    /**
+     * This case used to assert that complex was the ONLY builder without a history, so that the day
+     * complex gained one it would FAIL and take the exception with it. That is exactly what happened
+     * in round #1131: an exception with no expiry is how a known gap becomes a permanent one, and
+     * this is the shape that stops it.
+     *
+     * Kept, inverted, rather than deleted — it is now the assertion that no builder may quietly lose
+     * its history again.
+     */
     const missing = APPS.filter((rel) => !read(rel).includes('pastStates'));
-    expect(missing).toEqual(['src-complex/App.tsx']);
+    expect(missing).toEqual([]);
   });
 });

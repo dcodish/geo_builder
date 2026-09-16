@@ -2297,3 +2297,62 @@ cross-product decision. This entry records the complex-builder side: `src-comple
 the file-load path shares it. `localStorage['complex-proto-session']` is neither read nor written; a
 browser that still holds one from before this deploy is simply ignored. Lock:
 `__tests__/no-session-restore-919.test.ts`.
+
+---
+
+## ADR-CX-039 — The Gauss plane is MEASURED, and the row gains its missing members (#1104, #1099)
+
+**Requirements:** [02d](02d-requirements-complex.md) — the canvas fills its card; a deleted step is
+recoverable. **Design:** [04d](04d-design-complex.md) — the measured surface, and the temporal store.
+
+Two items of round #1131, landed together because they are the same sentence about this product: it
+carries the shared chrome and had stopped short of it in two places.
+
+### The plane letterboxed inside its own card (#1104)
+
+**Operator, comparing the four builders side by side:** *"note that the canvas is not full possible size
+on the analytics and the complex tools but on the 2d and 3d it is. I want it to be like on the 2d"*.
+
+`PolarPlane` rendered `viewBox="0 0 680 620"` at `width: 100%`, so under the default `xMidYMid meet` a
+680×620 projection meeting a 1124px card scaled to the HEIGHT and centred — measured at **56% of the
+card's width at 1920×860**, 77% at 1920×1080. The CSS compounded it: `height: auto` let the intrinsic
+aspect decide the height, and `max-height: 76vh` capped it against the viewport — a pre-Workbench guard
+from before the card owned the height, which by the end only shrank the drawing.
+
+**The class.** The D1 Workbench contract (#734) locks the *zones* — it guarantees the canvas **card** is
+identical across tools and stops at the card's edge. What the drawing surface does INSIDE the card was
+left per-product: two of four filled it, two letterboxed, and nothing measured it.
+
+**The fix is what 2-D and 3-D have always done:** a `ResizeObserver` on the canvas wrapper, the measured
+box as the `viewBox`, and `flex: 1; min-height: 0` so the wrapper fills the card. The scale `k` already
+takes the SHORT axis, so a wider card shows **more of the plane** rather than a stretched one — the
+modulus rings stay circles, which is the only reading that does not lie about a Gauss plane.
+`preserveAspectRatio="none"` would have filled it by stretching and turned them into ellipses; it is
+deliberately not used. The 680×620 constants survive as `W0`/`H0`, a first-paint fallback that also keeps
+the headless render tests deterministic.
+
+### No undo, no redo (#1099)
+
+Found by `row-parity.test.ts` the day it was widened from three products to four: `canUndo:0
+pastStates:0` against 2/3/2 in the siblings. The under-canvas row carried «הציגו תצורה אחרת» and
+«נקה הכל» and no way back, so a student who deleted a step could not recover it.
+
+**Relabelled `feature` before building it**, per CLAUDE.md — undo/redo did not exist in this product, and
+a missing capability is never built under a bug's banner even when the mechanism is settled elsewhere.
+
+Cheap here for the reason that also makes the save file a drift net: **the session IS the ordered line
+list and everything else is derived from it**, so a history entry is a list of strings plus the view
+state, and an undone figure is re-derived rather than restored. `partialize` carries `lines`, `queries`,
+`disabled`, `name`, `seed` and `freePos` — the last two because they are what the student was LOOKING at
+(E5/STO-5: «הציגו תצורה אחרת» then undo must restore the configuration on screen, not merely the facts).
+`lastError`, `loadAudit` and `view` stay out: an error is not a step.
+
+**The self-expiring exception did its job, and that is the part worth keeping.** #1098 recorded the gap
+as a named `NO_HISTORY_YET` list plus a companion assertion that complex was the ONLY product without a
+history — so the day complex gained one, that companion FAILED and took the exception with it. It failed
+in this round exactly as designed. The companion is kept and inverted: no builder may now quietly lose
+its history.
+
+**Consequences.** `useComplexStore` is wrapped in `temporal`; the row gains undo · redo before clear-all,
+matching the sibling order. `row-parity.test.ts` asserts all four builders with no carve-out. Complex
+lane 74 files / 1137 tests.

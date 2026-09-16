@@ -27,6 +27,7 @@ import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, submitQuery, tog
 import { v2Claims, v2Contradiction, v2Formulas, v2Freedom, v2Labels, v2Measures, whyText } from './replay/scene2';
 import { buildScene } from './scene/scene';
 import { PolarPlane } from './render/PolarPlane';
+import { useStore } from 'zustand';
 import { useComplexStore, type InputError } from './store/useComplexStore';
 import { SYMBOLS } from './ui/symbols';
 import { AskText } from './ui/askText';
@@ -66,6 +67,8 @@ export function App() {
     clearAll,
     serialize,
     setLoadAudit,
+    undo,
+    redo,
   } = useComplexStore();
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -229,7 +232,37 @@ export function App() {
   // #742: the corner cluster's zoom — view state, local by design (docs/20 §6.4), never stored.
   const [canvasZoom, setCanvasZoom] = useState(1);
   const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>(''); // top-row copy feedback
+  /**
+   * Can we step back or forward (#1099)? Read from the TEMPORAL store, as all three siblings do, so a
+   * disabled button means "there is no history", never "there are no lines". Clearing the canvas is
+   * itself undoable, and a count-based test would grey out the one press that recovers it.
+   */
+  const canUndo = useStore(useComplexStore.temporal, (t) => t.pastStates.length > 0);
+  const canRedo = useStore(useComplexStore.temporal, (t) => t.futureStates.length > 0);
   const canvasCard = useRef<HTMLDivElement>(null);
+  /**
+   * THE MEASURED CANVAS (#1104) — 2-D and 3-D have always done this.
+   *
+   * A nominal size cannot be right: `PolarPlane` rendered `viewBox="0 0 680 620"` at `width: 100%`
+   * under the default `xMidYMid meet`, so a 680×620 projection meeting a 1124px card scaled to the
+   * HEIGHT and centred — **56% of the card's width** at 1920×860, with dead strips either side. The
+   * D1 Workbench contract (#734) locks the CARD and stops at its edge, so what the surface did inside
+   * it drifted unmeasured; two of four builders filled it and two letterboxed.
+   *
+   * The fallback is a first-paint value only, and it keeps the headless render tests deterministic.
+   */
+  const [canvasSize, setCanvasSize] = useState({ w: 680, h: 620 });
+  useEffect(() => {
+    const el = canvasCard.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (!r) return;
+      setCanvasSize({ w: Math.max(240, Math.floor(r.width)), h: Math.max(240, Math.floor(r.height)) });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   // the canvas is POLAR: a complex number as a length and a direction, not a dot on a grid
   const polarScene = useMemo(() => buildScene(derived2, { n: stepN }), [derived2, stepN]);
   /**
@@ -503,8 +536,9 @@ export function App() {
                 {/* the wrapper is a transparent flex conduit — same column context the svg had as
                     the card's direct child, so .gauss-plane keeps its shrink behaviour and the
                     actions row under the canvas stays above the fold */}
-                <div ref={canvasCard} style={{ position: 'relative', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <div ref={canvasCard} style={{ position: 'relative', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                   <PolarPlane
+                    size={canvasSize}
                     scene={polarScene}
                     showGrid={view === 'polar'}
                     mode={view}
@@ -599,6 +633,13 @@ export function App() {
               <span style={rowSpacerStyle} />
               {/* #739: the row carries clear-all in every tool (undo/redo await store temporal —
                   the named feature gap on the issue) */}
+              {/* #1099: the row's missing members. Order matches the siblings — undo · redo · clear-all. */}
+              <button type="button" style={canUndo ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canUndo} onClick={undo}>
+                {t('undo')}
+              </button>
+              <button type="button" style={canRedo ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canRedo} onClick={redo}>
+                {t('redo')}
+              </button>
               <button style={lines.length > 0 ? { ...rowSubtleStyle, color: rowDangerInk } : rowSubtleOffStyle} disabled={lines.length === 0} onClick={clearSession}>{t('clearAll')}</button>
               {/* the LAUNCHER — narrow screens only (CSS): opens the data overlay when the
                   always-visible column has no room to exist */}

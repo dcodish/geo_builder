@@ -22,6 +22,7 @@
  * cutover is what makes it true rather than merely intended.
  */
 import { create } from 'zustand';
+import { temporal } from 'zundo';
 import type { LoadAudit } from '../../shell/save';
 import type { Cx } from '../value/value';
 import { stripFormatControls } from '../../shell/bidi';
@@ -110,6 +111,17 @@ interface ComplexState {
   // --- what `app/submit.ts` writes: the store records, it does not decide ---
   /** an ACCEPTED v2 line, with the configuration the gate found for it */
   recordLine: (line: string, seed: number) => void;
+  /**
+   * UNDO / REDO (#1099) — the row member this builder was missing.
+   *
+   * The under-canvas row carried «הציגו תצורה אחרת» and «נקה הכל» and no way back, so a student
+   * who deleted a step could not recover it. Cheap here for the same reason it is cheap in the
+   * siblings: **the session IS the ordered line list and everything else is derived from it**, so
+   * a history entry is a list of strings plus the view state, and an undone figure is re-derived
+   * rather than restored.
+   */
+  undo: () => void;
+  redo: () => void;
   setError: (e: InputError) => void;
   setLoadAudit: (a: LoadAudit<InputError> | null) => void;
   resetSession: () => void;
@@ -131,7 +143,7 @@ interface ComplexState {
  */
 const cleanLine = (line: string): string => stripFormatControls(line);
 
-export const useComplexStore = create<ComplexState>((set, get) => ({
+export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
   lines: [],
   queries: [],
   // a repeated question adds nothing — the lane dedupes on the cleaned text (the 3-D posture)
@@ -192,4 +204,44 @@ export const useComplexStore = create<ComplexState>((set, get) => ({
   resetSession: () =>
     set({ lines: [], queries: [], name: '', disabled: [], freePos: {}, seed: 0, lastError: null, loadAudit: null }),
   restoreView: ({ freePos, seed, view, name }) => set({ freePos, seed, view, ...(name !== undefined ? { name } : {}) }),
+
+  /**
+   * The temporal wrappers. They clear the transient surfaces too: an error is about the line the
+   * student just typed, and stepping away from that line must not leave its message behind.
+   */
+  undo: () => {
+    useComplexStore.temporal.getState().undo();
+    set({ lastError: null });
+  },
+  redo: () => {
+    useComplexStore.temporal.getState().redo();
+    set({ lastError: null });
+  },
+}), {
+  /**
+   * WHAT UNDO PUTS BACK (#1099) — the session slice, and nothing transient.
+   *
+   * `lines` is the session; `disabled`, `queries` and `name` are the student's own choices about it;
+   * `seed` and `freePos` are what they were LOOKING at, which is the E5/STO-5 lesson the siblings
+   * record — «הציגו תצורה אחרת» then undo must restore the configuration on screen, not merely the
+   * facts. `lastError`, `loadAudit` and `view` stay out: an error is not a step, and a banner about a
+   * load is not something to step back into.
+   */
+  partialize: (s) => ({
+    lines: s.lines,
+    queries: s.queries,
+    disabled: s.disabled,
+    name: s.name,
+    seed: s.seed,
+    freePos: s.freePos,
+  }) as ComplexState,
+  // Without this, setting an error would push a history entry and undo would appear to do nothing.
+  equality: (a, b) =>
+    a.lines === b.lines &&
+    a.queries === b.queries &&
+    a.disabled === b.disabled &&
+    a.name === b.name &&
+    a.seed === b.seed &&
+    a.freePos === b.freePos,
+  limit: 100,
 }));
