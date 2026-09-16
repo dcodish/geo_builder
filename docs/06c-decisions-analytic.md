@@ -4250,3 +4250,54 @@ refusal names the student's own sentence.
 land on two different roots — a cap that broke #1113 would be a worse defect than the one fixed — and the
 same bound at a different arity (two straights meet once, so a second name is refused). Analytic lane
 76 files / 1152 tests.
+
+---
+
+## ADR-AG-079 — A circle's centre is namable, and the name asserts nothing (#1109)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R90. **Design:** none (internal).
+
+**Operator, playing T10/T12:** *"when a center of a circle is defined by the equation, it should be
+clickable so user can assign the center with a letter"*. The `+` mark has been drawn since #1024 and was
+inert, while a **crossing** in the same figure was clickable and minted a letter — so the affordance
+existed and the most interesting point on a circle did not have it. A student reads that as a bug.
+
+**The ruling (2026-09-16):** *"the click only names what doesn't have a name"*. Two halves, both built
+and both asserted:
+
+- **It NAMES; it never asserts.** No constraint, no degree of freedom — a label is not a given, so on
+  «נתון מעגל O משיק לציר x» the centre keeps its freedom after being named.
+- **Offered only where a name is MISSING**, and gone once one exists.
+
+**The grammar was the whole of the work, and that was measured.** The issue warned the missing sentence
+was *"probably the larger part"*; none of six spellings parsed. But the ENGINE half already existed —
+`circle-centre` has been a `DerivedRule` since [ADR-AG-020](#adr-ag-020) / #1059, the one whose parent is
+a CURVE rather than a set of points. So this is a parser rule emitting an existing fact. Minting a second
+kind of centre-point would have been [ADR-AG-023](#adr-ag-023)'s divergence.
+
+**It travels the crossing's road rather than forking it**, which was the issue's own design constraint:
+the same `Namable` shape, the same `freeLetter`, concatenated into the same offer list — one kind of
+offer, one letter source, one grammar. No second click handler in `App.tsx`.
+
+### The round-trip assertion earned its place immediately
+
+The first build composed the offered sentence from `label.name` — which is the whole **noun phrase**,
+«מעגל I» and not «I» — and offered **«P מרכז המעגל מעגל I»**, which does not parse. The centre coordinates
+were right, the gating was right, and the sentence was unusable. Nothing but the round-trip check would
+have caught it, and that is exactly what [ADR-AG-048](#adr-ag-048)'s «two surfaces, one grammar» rule is
+for: an offered sentence the parser cannot read back is a ring whose click fails, which
+[ADR-AG-054](#adr-ag-054) says is worse than no ring. The student's letter now comes from the **id**
+(`circle-I`), which is what the grammar refers to.
+
+**Siblings, decided out loud** (the issue's step 5): a parabola's FOCUS and an ellipse's CENTRE are the
+same question and are **not** in this slice — neither has a `DerivedRule`, so each is new engine work
+rather than a spelling. Circle-only.
+
+**One honesty wrinkle found and filed, not fixed here:** refusing «O מרכז המעגל Z» reports
+`unknown-reference` with the detail **`circle-Z`** — an internal id, where the student wrote `Z`. That is
+CLAUDE.md's *"error messages name the conflicting statement, never internal state"*, and it is
+pre-existing and general to `unknown-reference` rather than introduced here, so it is filed rather than
+widened into this slice.
+
+**Consequences.** `issue-1109-name-centre.test.ts` (11) and a catalog entry. Analytic lane 77 files /
+1168 tests.

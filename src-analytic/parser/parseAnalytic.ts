@@ -622,6 +622,40 @@ const MIDPOINT_EN = new RegExp(
   'i',
 );
 
+/**
+ * `O מרכז המעגל I` · `O הוא מרכז המעגל I` · `O is the centre of circle I` (#1109).
+ *
+ * Operator, playing T10/T12: *"when a center of a circle is defined by the equation, it should be
+ * clickable so user can assign the center with a letter"*.
+ *
+ * ## It NAMES; it never asserts
+ *
+ * His ruling: *"the click only names what doesn't have a name"*. So this emits the **`circle-centre`
+ * derived rule** — the one #1059/#1060 already shipped, whose parent is a CURVE rather than a set of
+ * points — and nothing else. No constraint, no degree of freedom. On «נתון מעגל O משיק לציר x» the
+ * centre keeps its freedom after the naming, because a label is not a given.
+ *
+ * ## The engine half already existed, and that is why this is a parser rule
+ *
+ * The issue warned that the missing grammar was *"probably the larger part"*, and measured it is the
+ * ONLY part: none of six spellings parsed, while `{ t: 'circle-centre', curve }` has been a
+ * `DerivedRule` since #1059. A rule that minted a second kind of centre-point would be the divergence
+ * ADR-AG-023 names, so this reuses the fact the circle-by-centre form already produces.
+ *
+ * ## Siblings, decided explicitly rather than left implied
+ *
+ * A parabola's FOCUS and an ellipse's CENTRE are the same question and are **not** in this slice: they
+ * have no `DerivedRule`, so each would be new engine work rather than a spelling. Circle-only, said out
+ * loud, per the issue's step 5.
+ */
+const CENTRE_HE = new RegExp(
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מרכז\\s+(?:ה?מעגל\\s+)?(${NAME})$`,
+);
+const CENTRE_EN = new RegExp(
+  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+cent(?:re|er)\\s+of\\s+(?:circle\\s+)?(${NAME})$`,
+  'i',
+);
+
 /** `M מפגש התיכונים במשולש ABC` · `G מפגש האלכסונים במרובע ABCD`. */
 const CONCURRENCY_HE = new RegExp(
   `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מפגש\\s+(.+?)\\s+ב-?\\s*(?:ה?([א-ת]+(?:[- ][א-ת]+){0,2})\\s+)?(${NAME_RUN})$`,
@@ -779,6 +813,19 @@ function parseDerived(line: string): RuleOutcome {
     const [, id, a, b] = mid;
     if (a === b) return refuse('repeated-vertex', line); // «M אמצע AA» is a point, not a segment
     return made([{ t: 'derived', id, rule: { t: 'midpoint', a, b }, src: line }]);
+  }
+
+  /**
+   * Naming a circle`s CENTRE (#1109) — it names, it never asserts.
+   *
+   * The curve is resolved by NAME to the id the rest of the tree uses (`circle-I`), rather than a
+   * second id minted here: two ids for one curve is ADR-AG-023`s defect. An unknown name refuses by
+   * name instead of inventing a circle, which is the same rule every other operand follows.
+   */
+  const centre = CENTRE_HE.exec(line) ?? CENTRE_EN.exec(line);
+  if (centre) {
+    const [, id, circleName] = centre;
+    return made([{ t: 'derived', id, rule: { t: 'circle-centre', curve: `circle-${circleName}` }, src: line }]);
   }
 
   const diag = DIAGONAL_EQ_HE.exec(line) ?? DIAGONAL_EQ_EN.exec(line);
