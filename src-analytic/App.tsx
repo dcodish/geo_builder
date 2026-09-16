@@ -526,6 +526,16 @@ export function App() {
     return buildScene(d.figure, zoomed, canvasSize.w, canvasSize.h, {
       curveKnown: (id) => knownCurve(d.construction, id) !== null,
       /**
+       * THE HEIGHTS TO DRAW (#1048) — one per answered point-to-line distance, carried on the answer
+       * that produced it so the drawing and the number come from the same measurement.
+       *
+       * The label is the answer's own value, so the canvas and the panel cannot disagree. Only
+       * answers that HAVE a mark contribute, which `ask` grants only when the distance is knowledge.
+       */
+      marks: answers
+        .filter((a) => a.mark)
+        .map((a) => ({ from: a.mark!.from, foot: a.mark!.foot, label: a.value ?? undefined })),
+      /**
        * The crossings a student may promote (#1025) — operator: *"when a line we draw crosses another
        * line, we need to see the dashed circle allowing us to create that point"*.
        *
@@ -540,7 +550,7 @@ export function App() {
         sentence: crossingSentence(k, freeLetter(d.construction)),
       })),
     });
-  }, [d, view, canvasSize]);
+  }, [d, view, canvasSize, answers]);
 
   const errorText = error
     ? t(

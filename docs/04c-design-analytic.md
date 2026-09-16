@@ -419,3 +419,46 @@ reduce to the reserved ones? — and it must stay syntactic, because `knownCurve
 three seeds and `provenanceOf` is called from inside `evaluate`. It is conservative on a parametric
 circle (both components open, where `y` is really given): under-claiming is safe, and attributing a
 free symbol to one coordinate of a FITTED centre needs algebra the fit discards.
+
+## Measuring by clicking
+
+The click surface and the typing surface answer through **one** path. `app/measurable.ts` composes
+TEXT and measures nothing — a second route to a number is how two halves of one panel start
+disagreeing — and everything it produces is fed to `app/ask.ts`, the same function the «שאלו» box
+calls.
+
+```
+click a point / a curve
+        │
+        ▼
+measurablesOf(construction, what)        app/measurable.ts   ← composes SENTENCES, never values
+        │   [ «A», «המרחק מ-A לישר l1» ]
+        ▼
+      ask(d, sentence, fmt, describeCurve)          app/ask.ts
+        │
+        ├── value   → the answer row
+        ├── trace   → the substituted formula (#1053)
+        └── mark    → { from, foot }  in WORLD coordinates
+                          │
+                          ▼
+            buildScene(…, { marks })      render/scene.ts     ← projects; builds the right-angle tick
+                          │                                     in SCREEN space so it stays square
+                          ▼
+                    scene.measures  →  <g data-testid="analytic-measures">   render/Figure.tsx
+```
+
+**Why the mark rides on the answer.** A perpendicular exists for exactly as long as its question does.
+Putting it in the figure would make it an object — something with an id that survives, that undo must
+account for, that a save must carry — and 02c R24 says an ask never mutates the figure. Carrying it on
+the `Answer` means it appears when asked, disappears when the row is dropped, and needs no lifecycle of
+its own.
+
+**Two gates on drawing it**, and they are different questions. The distance must be **knowledge**, or a
+height would assert a magnitude the givens never fixed (R25, ADR-052). And the foot must be far enough
+from the point in *screen* space for a right-angle tick to read at all — below that the tick is omitted
+and the dashed drop is still drawn.
+
+**Where a measurable option comes from** is the object's own shape, not a fixed list: a line's length
+is offered only when `asPair` finds its name really is two points the construction holds. The lock
+asserts the stronger property — every sentence the menu offers is one `ask` understands — so the menu
+cannot drift away from the grammar as either side grows.

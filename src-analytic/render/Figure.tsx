@@ -44,7 +44,7 @@ export function Figure({
    */
   onPick?: (what: { kind: 'point' | 'curve'; id: string }, screen: { x: number; y: number }) => void;
 }) {
-  const { width, height, axes, curves, segments, construction, points, crossings } = scene;
+  const { width, height, axes, curves, segments, construction, points, crossings, measures } = scene;
   return (
     <svg
       width="100%"
@@ -233,6 +233,53 @@ export function Figure({
         A dashed ring, deliberately unlike the filled dot of a real point: it is an OFFER, not part of
         the figure. Drawn before the points so a real point always covers an offer at the same place.
       */}
+      {/*
+        THE HEIGHT FROM A POINT TO A LINE (#1048), drawn because it was ASKED for.
+
+        Operator: *"the canvas should show the height from the point to the line"*. A distance
+        reported as a number teaches nothing — the perpendicular, with its right angle at the foot,
+        is the construction the student has to perform, and drawing it is what makes the number mean
+        something (ADR-AG-014's principle).
+
+        NOT behind «הצג בנייה». That toggle exists because three medians per derived point bury a
+        figure; this is one segment that appears only while its question is on the panel, and hiding
+        the answer to what was just asked would be the opposite of the operator's request.
+
+        Drawn before the points, so a point always covers its own end of the perpendicular.
+      */}
+      <g data-testid="analytic-measures">
+        {measures.map((m, i) => (
+          <g key={`m${i}`}>
+            <line
+              x1={m.x1}
+              y1={m.y1}
+              x2={m.x2}
+              y2={m.y2}
+              stroke={SCAFFOLD}
+              strokeWidth={1.5}
+              strokeDasharray="5 4"
+            />
+            {m.tick && <path d={m.tick} fill="none" stroke={SCAFFOLD} strokeWidth={1.5} />}
+            {m.label && (
+              <text
+                x={m.label.x}
+                y={m.label.y}
+                dx={6}
+                dy={-4}
+                fill={SCAFFOLD_TEXT}
+                stroke="#fff"
+                strokeWidth={4}
+                strokeLinejoin="round"
+                paintOrder="stroke"
+                fontSize={14}
+                fontWeight={700}
+              >
+                {m.label.text}
+              </text>
+            )}
+          </g>
+        ))}
+      </g>
       <g>
         {crossings.map((k) => (
           <g key={k.id} data-crossing={k.id}>

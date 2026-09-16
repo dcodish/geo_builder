@@ -3588,3 +3588,56 @@ two crossings is **counting**, not sampling, so no satisfiable figure can be wro
 
 **Consequences.** Both roots are reachable and two letters no longer share a point. `src-analytic`
 gains `issue-1113-crossing-roots.test.ts` (7), which asserts the residue as well as the fix.
+
+## ADR-AG-066 — Clicking an object asks a SENTENCE, and a distance is DRAWN (#1048)
+
+**Status:** accepted, 2026-09-16 · **Extends** [ADR-AG-048](#adr-ag-048), [ADR-AG-053](#adr-ag-053), [ADR-AG-062](#adr-ag-062)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R86. **Design:**
+[04c](04c-design-analytic.md) — "Measuring by clicking".
+
+**Context.** Operator, 2026-09-15: *"one of the purposes here is to teach how to find the equation of a
+line, how to find the distance between a line and a point and between two points … a user can say I
+want to see the distance between this point and a specific line, and **the canvas should show the
+height from the point to the line** … clicking on a line itself should allow us to either show the
+equation of the line or the distance between the two nodes … maybe also the slope as a third option."*
+
+**Decision.**
+
+1. **A click opens a menu of SENTENCES, not a menu of results.** Every option is spelled exactly as a
+   student would type it — «המרחק מ-A לישר l1», «שיפוע הישר l1» — and choosing one asks it through the
+   ask lane. That is the reason to prefer this to a toolbar: a button teaches nothing, while a click
+   that *names* the thing teaches the vocabulary the exam uses (ADR-W-030's argument, and ADR-AG-048's
+   «two surfaces, one grammar»). It also means **one measurement engine**, reachable by clicking and by
+   typing, rather than two that can disagree.
+2. **The menu offers only what the figure can answer.** «אורך» is offered for a line whose name really
+   is two points the figure holds, and not for «ℓ1», which has no nodes — offering it would promise a
+   number that cannot exist. A test asserts that *every* offered sentence is one the ask lane
+   understands, so the menu cannot drift away from the grammar.
+3. **A point-to-line distance is a `MeasureTerm`**, joining `length` and `area` in the one union rather
+   than becoming a second grammar. That is what makes «המרחק מ-A לישר l1 = 5» the same constraint kind
+   as «AB = 5» with no new solver code, and the union addition forced every consumer to handle it —
+   exhaustiveness working as designed.
+4. **THE PERPENDICULAR IS DRAWN.** A distance reported as `2.6` teaches nothing; the height dropped
+   from the point, with its right angle at the foot, is the construction the student must actually
+   perform, and the distance is *defined* by it ([ADR-AG-014](#adr-ag-014)'s principle). It is
+   **decoration**: no id, no letter, never in the fact list, and an ask never mutates the figure
+   (02c R24). It is carried on the ANSWER, because it exists for exactly as long as the question does.
+5. **Not behind «הצג בנייה».** That toggle exists because three medians per derived point bury a
+   figure; this is one segment that appears only while its question is on the panel, and hiding the
+   answer to what was just asked would invert the operator's request.
+6. **Drawn only when the distance is KNOWLEDGE.** On an under-determined figure the point sits where
+   the sampler put it, and a height drawn there asserts a magnitude nobody stated (ADR-052) — the
+   cardinal sin. The value is open and no height appears.
+7. **The right-angle tick is built in SCREEN space**, from the foot's own two directions, so it stays
+   square at every zoom; a world-space square would shear under the camera (#1094).
+
+**Known gap, filed not hidden: [#1115](https://github.com/dcodish/geo_builder/issues/1115).** The menu
+offers distances to NAMED lines only. An anonymous «נתון הישר y=9» is nameable by its equation since
+[ADR-AG-056](#adr-ag-056) and should be offered too; that needs `POINT_LINE_TOKEN` widened to accept an
+equation operand, which is a grammar change with real ambiguity risk against the surrounding expression
+and deserves its own slice rather than being rushed in beside this.
+
+**Consequences.** `src-analytic` gains `issue-1048-click-measure.test.ts` (13). The point-to-line
+technique entry ADR-AG-062 deliberately left unauthored is now written, because something can finally
+ask for it.
