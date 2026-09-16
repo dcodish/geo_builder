@@ -1039,3 +1039,24 @@ form, which is the NO-CAS boundary.
 against itself: an equation it cannot re-verify against the trace it drew is **not printed at all**,
 and the shape stands alone. A printed equation is a claim the tool makes, and the honesty invariant
 binds it exactly as it binds every other row that prints a number.
+
+**R88 — a RATIO between two lengths is a given the student can state**
+([#1124](https://github.com/dcodish/geo_builder/issues/1124)).
+
+The exam writes a division in three ways, and all three are accepted:
+
+| the student types | what it does |
+| --- | --- |
+| «AC:CB = 3:2» | a relation between two lengths over points that **already exist** |
+| «C מחלקת את AB ביחס 3:2» / "C divides AB in ratio 3:2" | **mints** `C` on `AB`, between its ends |
+| «היחס בין AC ל-CB הוא 3:2» | the exam's prose spelling of the same placement |
+
+The split is by FORM, not by preference: the bare colon references endpoints, the keyworded divider
+creates one — which is what lets a student state the whole thing in a single sentence.
+
+A ratio is a **rewrite of a length equation**, not a new kind of given: `AC:CB = p:q` means
+`|AC| = (p/q)·|CB|`, which is the same constraint «AC = 1.5CB» already stated. The two produce the same
+figure, and that is asserted rather than assumed.
+
+**Out of scope, and refused by name:** an n-way chain, «AC:CB:BD = 3:2:4». Reading the first pair out of
+it would silently drop a stated given.
