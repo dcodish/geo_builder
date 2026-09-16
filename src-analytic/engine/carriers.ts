@@ -33,7 +33,7 @@
  */
 import { curveParentOf, parentsOf } from './derived';
 import { evalExpr, symbolsOf, type Env } from './expr';
-import { constraintRefs } from './solve';
+import { constraintRefs, dirRefs } from './solve';
 import { UNBOUNDED, type Construction, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
 
 /**
@@ -95,6 +95,10 @@ export function carrierOf(o: GeoObject): Carrier | null {
     // A circle ON a point (#1060): its freedom is its centre’s and its radius parameter’s, both
     // already counted where they live. The object itself adds none.
     case 'circle-at':
+    // A line through a point with a COPIED direction (#1093), for the same reason and more simply:
+    // the point's freedom is the point's, and the direction is read off an object the figure already
+    // determines. A construction that adds freedom would be asserting something nobody stated.
+    case 'line-at':
       return null;
     default: {
       const unclassified: never = o;
@@ -128,6 +132,9 @@ export function symbolDeps(o: GeoObject): string[] {
       // Its RADIUS is an expression, and that is the one thing it contributes to the register.
       case 'circle-at':
         return symbolsOf(o.r);
+      // A copied direction carries no expression at all — nothing to register (#1093).
+      case 'line-at':
+        return [];
       default: {
         const unwalked: never = o;
         throw new Error(`object kind declares no symbol dependencies: ${JSON.stringify(unwalked)}`);
@@ -163,6 +170,10 @@ export function objectDeps(o: GeoObject): Id[] {
       return [...o.vertices];
     case 'circle-at':
       return [o.centre];
+    // The point it passes through, AND whatever its direction is read from — both must be placed
+    // before this line can be drawn (#1093).
+    case 'line-at':
+      return [o.through, ...dirRefs(o.dir)];
     default: {
       const undeclared: never = o;
       throw new Error(`object kind declares no dependencies: ${JSON.stringify(undeclared)}`);

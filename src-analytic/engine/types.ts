@@ -27,7 +27,7 @@
  * representation, not two.
  */
 import type { DerivedRule } from './derived';
-import type { Constraint } from './solve';
+import type { Constraint, Direction } from './solve';
 import type { Expr } from './expr';
 
 export type Id = string;
@@ -210,6 +210,8 @@ export type Fact =
   | (FactBase & { t: 'diagonal-eq'; principal: boolean; eq: Expr })
   /** «נתון מעגל O» — a circle on a centre point, with a radius parameter (#1060). */
   | (FactBase & { t: 'circle-at'; id: Id; centre: Id; r: Expr })
+  /** «דרך P עובר ישר מקביל ל AB» — a line through a point, with a copied direction (#1093). */
+  | (FactBase & { t: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean })
   /**
    * «המעגל משיק לציר ה-x» — tangency stated about the ONE circle in the figure (#1060).
    *
@@ -303,7 +305,21 @@ export type GeoObject =
    * It carries NO freedom itself: the centre is a `free` point with its own two degrees, and the
    * radius is an ordinary parameter in the register. Counting it here would count both twice.
    */
-  | { kind: 'circle-at'; id: Id; centre: Id; r: Expr };
+  | { kind: 'circle-at'; id: Id; centre: Id; r: Expr }
+  /**
+   * «דרך P עובר ישר מקביל ל AB» — a line CONSTRUCTED through a point, copying a direction (#1093).
+   *
+   * The exact parallel of `circle-at` one dimension over, and it carries freedom for the same
+   * reason: **none of its own.** `through` is a point object whose DOF are counted where the point
+   * lives, and `dir` names an object whose direction is already determined by the figure. So the
+   * line needs no free coefficients and no new residual — `evaluate` reads the placed point and the
+   * resolved direction and emits a concrete line.
+   *
+   * `perp` carries the other half of the corpus phrase («מאונך ל»), which is the same construction
+   * with the direction turned a quarter turn — a flag rather than a second object kind, because
+   * nothing else about it differs.
+   */
+  | { kind: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean };
 
 export type PointObject = Extract<GeoObject, { kind: 'point' }>;
 export type CurveObject = Extract<GeoObject, { kind: 'curve' }>;

@@ -236,7 +236,7 @@ export function describeConstraint(k: Constraint): string {
 }
 
 /** The points a direction depends on — an axis and a named line depend on none. */
-function dirRefs(d: Direction): Id[] {
+export function dirRefs(d: Direction): Id[] {
   switch (d.k) {
     case 'points':
       return [d.a, d.b];
@@ -276,7 +276,7 @@ function describeDir(d: Direction): string {
  * `null` for a degenerate operand (a zero-length segment, a line that did not resolve). The caller
  * treats that as "cannot be judged" rather than "satisfied".
  */
-function dirVector(
+export function dirVector(
   d: Direction,
   at: (id: Id) => Pt | null,
   curveAt?: (id: Id) => NumCurve | null,

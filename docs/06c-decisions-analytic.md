@@ -3140,3 +3140,66 @@ is deliberately left open. Lines are the reported case and the corpus's constant
 the spaced «y = 9» that exercises `anonIndex`'s normalisation, and the English «the line y=9»), each
 with its round trip. The two guards are locked with them: a named line still names itself by its NAME,
 and prose containing an `=` is still `bad-operand` rather than a curve minted out of a sentence.
+
+## ADR-AG-057 — A line CONSTRUCTED through a point (#1093)
+
+**Status:** accepted, 2026-09-16 · **Copies** [ADR-AG-045](#adr-ag-045) (`circle-at`) ·
+**Applies** [ADR-AG-026](#adr-ag-026)'s naming ruling
+
+**Requirements:** [02c](02c-requirements-analytic.md) §9 R80. **Design:**
+[04c](04c-design-analytic.md) "A circle on a point" — the same section, one dimension over.
+
+**Context.** Operator, 2026-09-15: *"דרך P עובר ישר מקביל ל AB - not supported"*. Measured: the
+grammar had no «דרך» rule at all, so this was a missing capability and was built as a feature rather
+than patched in under a bug's banner (docs/22).
+
+**Decision 1 — it is an OBJECT, not constraints on a curve.** The line does not exist until the
+sentence creates it, and its equation is never given: it is fixed by a point it passes through and a
+direction it copies. `line-at` is therefore the exact parallel of `circle-at`, and carries freedom the
+same way — **none of its own**. The anchor's DOF are counted where the point lives; the direction is
+read off an object the figure already determines. `evaluate` reads the placed anchor and the resolved
+direction and emits the line in closed form.
+
+The alternative was a curve with free coefficients plus an incidence and a parallel relation. It is
+worse for the reason `circle-at` exists at all: there is no curve-with-free-coefficients kind, and it
+would put two DOF into the solve only to remove them with two constraints, where the closed form is
+immediate. **No new residual, no new solver code.**
+
+`perp` is a flag rather than a second object kind, because nothing else about the construction
+differs; the vector is rotated after resolution, which keeps `Direction` a pure reference to something
+in the figure — "that object turned 90°" is not an object.
+
+`dirVector` is the solver's own resolver, **exported rather than re-implemented**. It already knows
+all three ways a direction can be named and already returns `null` for a degenerate one; a second copy
+is exactly the drift the single `direction()` resolver exists to prevent.
+
+**Decision 2 — the anchor is INTRODUCED, the direction is not.** The operator ruled (2026-09-15, #1066)
+that «הישר AB» with A and B absent introduces them with DOF, because naming a line by two points is
+naming *them*. «דרך Q» is the same act, so Q is declared and the line rides it. The DIRECTION operand
+is not declared, and the asymmetry is the point: a direction is what a RELATION's operand is, and
+relations do not introduce their operands. **Naming what a construction is about differs from naming
+what it is measured against.**
+
+**A pre-existing bug this uncovered.** `LINE_NAME` contains `[A-Z][0-9]?[A-Z][0-9]?` and the English
+line rule carried `/i`, so **any two lowercase letters matched as a line's NAME**: «the line
+**th**rough P is perpendicular to AB» was claimed by the curve rule, and the student was told their
+equation («rough P is …») was unreadable. The file's own `TWO_POINTS` comment warns about this exact
+trap — *"a case-insensitive whole-pattern would quietly start accepting `ab` as two vertices"* — and
+the fix is the one it already prescribes: spell the English words' case out and drop the flag. It
+would equally have swallowed «the line from A to B» and any other «line <two letters>…» sentence.
+
+**Rule ORDER matters and is asserted.** «…מקביל ל AB» ends in a relation phrase, so `RELATION_HE`
+matched the whole sentence with «דרך P עובר ישר» as its left operand and then refused an operand the
+student had written perfectly — the swallowing defect #1059 records. The cure is the one the relation
+rule's own docblock gives: a construction recognisable from a keyword no other rule uses costs nothing
+to match early and removes the ambiguity entirely.
+
+**Consequences.** `src-analytic` +23 tests, covering twelve spellings (both readings × Hebrew and
+English × the inflection runs), the axis and named-line directions, the DOF conformance assertion, the
+anchor-follows behaviour, idempotent restatement, and both guards on the uncovered `/i` bug. Two
+catalog entries, deliberately axis-based so each builds standing alone as the catalog lock requires.
+
+**Left open:** how a student REFERS to this line afterwards, and therefore whether its crossings offer
+a ring. It has no equation to name itself with ([ADR-AG-056](#adr-ag-056)) and no letter. «הישר דרך
+P» is the obvious candidate and the corpus has not been checked for it, so the honest default holds:
+no name the grammar can use means no ring.
