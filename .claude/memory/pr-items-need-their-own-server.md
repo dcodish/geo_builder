@@ -30,3 +30,17 @@ handle that makes `git worktree remove` / `rm -rf` fail with "Device or resource
 a port or blaming vite: `Get-NetTCPConnection -LocalPort <p> -State Listen` → `Stop-Process` the PID.
 Never pipe the dev server through `| head` in a background command — the closed pipe kills vite at
 startup while npm exits 0, which reads as "server up" when nothing is listening.
+
+**Identity half (2026-09-16, the worst version yet):** with `--strictPort`, a launch onto a port a
+LEFTOVER server already holds dies instantly — and that leftover answers `curl` with **200**. Four
+ports were reported "curl-checked, 200" while all three PR launches had failed with `Port NNNN is
+already in use` in a log nobody read; the operator played a stale tree from a previous session and
+reported T1/T2 as broken. The feature was fine.
+
+- **Kill first.** Before launching a play server, `Get-NetTCPConnection -State Listen` over the whole
+  range and `Stop-Process` anything squatting — old sessions leave servers running for days.
+- **Read the launch log**, not the HTTP status. `already in use` / `error when starting` ⇒ failed.
+- **Verify IDENTITY, never liveness.** Fetch a module from the running server and grep a string that
+  exists ONLY on that branch (a new identifier such as `bareAngleMark`, a new i18n key, a file main
+  does not have), plus a NEGATIVE control on `main` proving the string is absent there. A 200 proves
+  something is listening, not that it is yours — the same class as [[gate-lines-are-read-not-matched]].

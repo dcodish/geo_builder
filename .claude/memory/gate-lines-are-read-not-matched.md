@@ -28,5 +28,9 @@ reading it for truth.
   lines (`sibling-safety: PASS`, the `Tests N passed` line) after actually reading them — if the
   text says FAIL anywhere, the landing stops.
 - Every screenshot taken for verification is READ (the #704 practice) — capturing is not checking.
+- **A verdict is only for the sha it names.** `reports/suite-verdict.json` carries `sha` and `dirty` —
+  compare `sha` against the branch HEAD before quoting it. PR #1116 (2026-09-16) shipped a green block
+  from `929f5e96` while its head was `9a6f56c2`: a second feature commit (#1118) landed after the gate,
+  and its own message said the suite was still running. The green was real and the head was untested.
 
 See [[shared-tree-branch-races]] for the same session's cwd lesson.

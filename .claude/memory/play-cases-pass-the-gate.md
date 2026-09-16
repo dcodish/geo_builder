@@ -25,3 +25,21 @@ sequence the operator did NOT type), drive it through the deterministic half of 
 `src/__tests__/scenarios-props-submit-gate.test.ts`; my scratch `measure-gate.mjs` under vite-node does
 exactly this). A `produced:false` with `reason:'empty'`, or an `error` that is not deferral-worthy, means
 the UI refuses the line and everything after it is unreachable. Issue #960 makes this a harness rule.
+
+**INHERITED cases are not pre-validated (2026-09-16, PR #1008).** The rule above was followed for cases
+I authored and skipped entirely for cases I COPIED from round #1006's sheet — four of them, listed
+verbatim with new port numbers. All four were dead: «זוית ABC» / «זוית B» gate as
+`{produced:false, reason:'empty'}` on any figure whose arms already exist. The operator hit it on his
+second case.
+
+Worse, **the disproof was already in the queue.** #1011 was filed FROM round #1006 — the same round
+whose sheet I was copying — titled *"PR #1008's «זוית ABC» commits nothing"*, with the full
+measurement table. Nobody had to re-derive it; it only had to be read.
+
+- Re-run the gate on every case, including ones a previous sheet already listed. A PR ages; `main`
+  moves 93 commits; a case that passed on Monday is a hypothesis on Wednesday.
+- **Before listing any PR's cases, search the queue for issues filed AGAINST that PR** (`gh issue list
+  --search "<PR number>"` and the issue it closes). A blocking bug found while BUILDING the PR lives
+  there, not in the PR body — the PR body is written by the session that thought it worked.
+- A case can also pass for the WRONG REASON: #1006's T6 chained «זוית ABC» then «זווית BCA = 40» and
+  would have read green on the 40°, while the arc it was actually checking was never drawn.
