@@ -24,3 +24,11 @@ one that produces the effect — the first T2 spelling also tripped an unrelated
 (`intersectionsWithinSegments`, now #944), which would have read as a second bug.
 
 See [[playsheet-is-copy-pasteable-lines]], [[measure-before-diagnosing]], [[locks-and-gates-are-hypotheses]].
+
+**The same hazard runs the other way, when READING his report** (2026-09-16, T32 of the #1116 sheet):
+his screenshot carried a dashed «0.8» distance from the *previous* case, and T32's own claim was that
+no height is drawn. Diagnosed straight from the image it was a P1 honesty bug — a magnitude on the
+canvas that the givens never fixed. A clean run of the three utterances he pasted drew no measurement
+at all, and he confirmed: *"that was from a different test"*. So a screenshot of a sheet run is a
+picture of the WHOLE run, not of the case — re-run the case's own lines on a cleared canvas before
+believing anything in the frame that the case did not ask for.
