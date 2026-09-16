@@ -3820,3 +3820,54 @@ it to be painted exactly `(dx, dy)` away. Verified red without the fix — x mov
 A lock that passes for the wrong reason is the failure mode
 [ADR-W-053](06w-decisions-workspace.md#adr-w-053) exists to name, and #1103's own locks are the example:
 they assert the svg box, and none asserts that the world box agrees with it.
+
+---
+
+## ADR-AG-070 — An answer is DERIVED from the figure, never stored beside it (#1110)
+
+**Requirements:** none (internal) — 02c R23–R27 stand; what changes is that the panel can no longer
+state a reading the figure has stopped supporting. **Design:** [04c](04c-design-analytic.md) — the ask
+lane's record moves into the store.
+
+**Operator, playing T15:** *"it still carries the PQ from data i deleted"* — a distance between two
+crossing points he had removed, still stated as fact. A stale measurement presented as current is the
+honesty class this product exists to avoid.
+
+**Root cause.** The answers were component state with exactly one writer. `setAnswers` was never called
+on `clearAll`, `removeLine`, `replaceLine`, a load, or undo/redo — so an answer survived every one of
+them. The store is the source of truth for the figure; the answers were not in it, so the thing that
+invalidates them could not reach them.
+
+**The fix is the issue's option 1, and its fallback is deliberately NOT shipped.** The cheap shape —
+drop every answer whenever `lines` or `seed` changes — is honest but empties the lane on any edit, and
+the issue says not to ship it as the answer without saying so. An answer is a **reading of a particular
+`(facts, seed)`**: the moment either changes it is stale or must be recomputed, and keeping it verbatim
+is the one option that is never right. So the **question** is stored and the **reading is derived** by
+the same fold as everything else.
+
+This is the shape complex already had — its `askRows` come from `queries` in the store — which is why
+#1110 was analytic's alone, and is a plain instance of
+[ADR-W-053](06w-decisions-workspace.md#adr-w-053)'s lesson: the tree that kept the decision and the data
+in the component is the tree that drifted.
+
+**What falls out of it, rather than being added:**
+
+- **«נקה הכל» retires the answers**, because `clearAll` clears `queries`.
+- **Editing a given moves the answer with it** — «AB» reading `6` becomes `10` when `B(6,0)` is edited to
+  `B(10,0)` — where the fallback shape would have emptied the lane.
+- **Undo restores what the student was READING**, not merely the figure: `queries` ride in the temporal
+  partialize for the same reason `seed` does (E5/STO-5).
+- **A stale value is unrepresentable rather than unlikely** — there is no stored reading to go stale.
+- **Hiding a drawing evaluates nothing**, which [ADR-AG-067](#adr-ag-067) had to assert with a counted
+  thunk. With the record separated from the reading it is structural, and the thunk is gone.
+
+**Consequence for the #1118 lock, worth stating because a case INVERTED.** It asserted *"the row keeps
+its VALUE across a hide and a show — it was never recomputed"*. That is now false on purpose: keeping a
+reading verbatim across a figure change is the defect. The case is replaced by one asserting that a
+stored question carries no value at all.
+
+**Consequences.** `useAnalyticStore` gains `queries: AskedQuestion[]` and `setQueries`; the gestures stay
+decided in `app/answers.ts` (the store decides nothing, per its own docblock) and now fold the record
+rather than a list of computed answers. New `issue-1110-answers-follow.test.ts` (7);
+`issue-1118-retire-measurement.test.ts` rewritten for the record shape (13). Analytic lane 69 files /
+1101 tests.

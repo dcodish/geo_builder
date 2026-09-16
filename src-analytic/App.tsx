@@ -129,6 +129,8 @@ export function App() {
     lines,
     seed,
     error,
+    queries,
+    setQueries,
     recordLine,
     removeLine,
     replaceLine,
@@ -320,7 +322,6 @@ export function App() {
   const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>('');
   const fileRef = useRef<HTMLInputElement | null>(null);
   const canvasCard = useRef<HTMLDivElement | null>(null);
-  const [answers, setAnswers] = useState<Answer[]>([]);
   /**
    * THE MEASURE MENU (#1048) — what was clicked, and where to put the list.
    *
@@ -342,11 +343,8 @@ export function App() {
    * route he described (*"maybe I click on the dot again and I can remove the line"*), and asking the
    * same thing twice stops producing a second identical row.
    */
-  const make = (sentence: string) => () => ask(d, sentence, fmt, describeCurve);
-  const toggleAsk = (sentence: string) =>
-    setAnswers((prev) => toggleDrawn(prev, sentence, make(sentence)));
-  const askOnce = (sentence: string) =>
-    setAnswers((prev) => askOnceAnswer(prev, sentence, make(sentence)));
+  const toggleAsk = (sentence: string) => setQueries(toggleDrawn(queries, sentence));
+  const askOnce = (sentence: string) => setQueries(askOnceAnswer(queries, sentence));
   const askRef = useRef<HTMLInputElement | null>(null);
 
   /**
@@ -358,15 +356,14 @@ export function App() {
    * its shape by hand — the fix has lived as a hand-written list inside each product, which is why a
    * third and fourth product reintroduced it.
    *
-   * The ANSWERS go too: a length measured on a figure that no longer exists is a stale reading shown
-   * as current fact. That is only the clear-all corner of #1110 — deleting a single given, loading a
-   * file and undo still strand answers, and #1110 stays open for the general fix.
+   * The ANSWERS need nothing here any more (#1110): they are DERIVED from `queries`, so `clearAll`
+   * retires them with the lines. That is the general fix this comment used to say was still owed —
+   * a reading of a figure that no longer exists cannot be rendered, because no reading is stored.
    */
   const clearSession = () => {
     clearAll();
     setDraft('');
     setAskText('');
-    setAnswers([]);
   };
   const [dataOpen, setDataOpen] = useState(true);
   /**
@@ -380,6 +377,23 @@ export function App() {
   const [showConstruction, setShowConstruction] = useState(false);
 
   const d = useMemo(() => derive(lines, seed), [lines, seed]);
+
+  /**
+   * THE ANSWERS ARE DERIVED (#1110), never stored.
+   *
+   * They used to be component state with exactly one writer, so nothing invalidated them: a length
+   * and an area survived deleting every given AND «נקה הכל» — a stale reading presented as current
+   * fact. An answer is a reading of a particular `(facts, seed)`; the moment either changes it is
+   * stale or must be recomputed, and keeping it verbatim is the one option that is never right.
+   *
+   * So the STORE holds the QUESTIONS and this recomputes their answers from the current derivation —
+   * the same shape as everything else derived here, and the shape complex already had (its `askRows`
+   * come from `queries`), which is why this defect was analytic's alone.
+   */
+  const answers = useMemo<Answer[]>(
+    () => queries.map((q) => ({ ...ask(d, q.sentence, fmt, describeCurve), shown: q.shown })),
+    [queries, d, fmt, describeCurve],
+  );
 
   /**
    * The box and the view in REFS as well as in state (#1094): the wheel listener below is registered
@@ -1074,7 +1088,7 @@ export function App() {
                     style={askDismiss}
                     aria-label={t('askRemove')}
                     title={t('askRemove')}
-                    onClick={() => setAnswers((prev) => removeAnswerAt(prev, i))}
+                    onClick={() => setQueries(removeAnswerAt(queries, i))}
                   >
                     ✕
                   </button>
@@ -1154,7 +1168,7 @@ export function App() {
                   The row stays either way — the operator's ruling: the panel is a record, the canvas
                   is a view of it.
                 */}
-                {isDrawn(answers, m.sentence) && (
+                {isDrawn(queries, m.sentence) && (
                   <span aria-hidden="true" style={{ opacity: 0.6, marginInlineEnd: 6 }}>✕</span>
                 )}
                 <MathText text={analyticBidi.isolateLtrRuns(m.sentence)} />

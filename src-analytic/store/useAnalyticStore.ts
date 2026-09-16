@@ -32,6 +32,30 @@ export interface SavedAnalyticSession {
   name?: string;
 }
 
+/**
+ * A QUESTION THE STUDENT ASKED (#1110) — the record, not the reading.
+ *
+ * The ask lane used to hold `Answer` objects in component state: a value computed once against one
+ * `(facts, seed)` and then kept verbatim. Nothing invalidated them, so a length and an area survived
+ * deleting every given AND «נקה הכל» — a stale measurement presented as current fact, which is the
+ * honesty class this product exists to avoid.
+ *
+ * **An answer is a READING of a particular figure.** The moment the figure changes, the reading is
+ * either stale or must be recomputed, and keeping it verbatim is the one option that is never right.
+ * So what persists is the QUESTION; the answer is derived by the same fold as everything else, which
+ * is the sibling invariant the rest of this store already obeys (complex does exactly this — its
+ * `askRows` come from `queries`, which is why #1110 was analytic's alone).
+ *
+ * `shown` is the canvas half of ADR-AG-067's three gestures: the row is a record, the drawing is a
+ * view of it, and hiding the drawing does not withdraw the question.
+ */
+export interface AskedQuestion {
+  /** The student's own words — the key throughout, and what the measure menu offers. */
+  sentence: string;
+  /** Is this measurement's drawing on the canvas right now? */
+  shown: boolean;
+}
+
 export type InputError =
   /** No rule matched — the LLM-escalation seam. */
   | { key: 'not-handled'; detail: string }
@@ -96,11 +120,21 @@ interface AnalyticState {
    * student that a correct restatement is a mistake.
    */
   notice: string | null;
+  /**
+   * THE ASK LANE'S RECORD (#1110) — the questions, newest first. The ANSWERS are derived from these
+   * and the current derivation, never stored, so they cannot outlive the figure they describe.
+   */
+  queries: AskedQuestion[];
 
   recordLine: (line: string) => void;
   removeLine: (index: number) => void;
   replaceLine: (index: number, next: string) => void;
   clearAll: () => void;
+  /**
+   * Replace the question list. The GESTURES are decided in `app/answers.ts` and this records the
+   * result — the store decides nothing, which is the invariant its own docblock opens with.
+   */
+  setQueries: (next: AskedQuestion[]) => void;
   /**
    * Move to a configuration the caller has CHOSEN (#1084).
    *
@@ -150,11 +184,26 @@ export const useAnalyticStore = create<AnalyticState>()(
   error: null,
   notice: null,
 
+  queries: [],
+
   recordLine: (line) => set((s) => ({ lines: [...s.lines, line], error: null, notice: null })),
   removeLine: (index) => set((s) => ({ lines: s.lines.filter((_, i) => i !== index), error: null, notice: null })),
   replaceLine: (index, next) =>
     set((s) => ({ lines: s.lines.map((l, i) => (i === index ? next : l)), error: null, notice: null })),
-  clearAll: () => set({ lines: [], error: null, notice: null, seed: 0, name: '', loadAudit: null }),
+  clearAll: () =>
+    // The QUERIES go with the lines (#1110): a reading of a figure that no longer exists is a lie,
+    // and «נקה הכל» is the clearest case of the figure no longer existing.
+    set({ lines: [], error: null, notice: null, seed: 0, name: '', loadAudit: null, queries: [] }),
+
+  /**
+   * The three gestures, as store actions (ADR-AG-067's decisions, now over the stored record).
+   *
+   * Asking is IDEMPOTENT and always shows: typing a sentence means *tell me this*, and answering that
+   * by hiding the answer would be the opposite of what was asked. Only clicking a lit menu entry is
+   * the toggle. Neither one evaluates anything here — the value is derived — so hiding a drawing
+   * cannot cost a solve, which ADR-AG-067 had to assert and this shape makes structural.
+   */
+  setQueries: (next) => set({ queries: next }),
   goToSeed: (seed) => set({ seed, error: null, notice: null }),
 
   /**
@@ -199,9 +248,11 @@ export const useAnalyticStore = create<AnalyticState>()(
        * `name` is deliberately OUT: naming a drawing is not a construction step, which is the same
        * call 2-D made for `figureName`.
        */
-      partialize: (s) => ({ lines: s.lines, seed: s.seed }) as AnalyticState,
+      // The QUERIES ride along (#1110): undo must put back what the student was reading, not only the
+      // figure — the same argument that puts `seed` here (E5/STO-5).
+      partialize: (s) => ({ lines: s.lines, seed: s.seed, queries: s.queries }) as AnalyticState,
       // Without this, setting an error would push a history entry and undo would appear to do nothing.
-      equality: (a, b) => a.lines === b.lines && a.seed === b.seed,
+      equality: (a, b) => a.lines === b.lines && a.seed === b.seed && a.queries === b.queries,
       limit: 100,
     },
   ),

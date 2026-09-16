@@ -33,48 +33,65 @@
  * and exactly what the menu offers — so the menu and the panel cannot disagree about what is showing.
  */
 import type { Answer } from './ask';
+import type { AskedQuestion } from '../store/useAnalyticStore';
 
-/** How many rows the lane holds. Older answers fall off the end rather than growing without bound. */
+/**
+ * ## The record is the QUESTION, not the reading (#1110)
+ *
+ * These functions used to fold a list of `Answer` — values already computed against one
+ * `(facts, seed)`. Nothing invalidated them, so a length and an area survived deleting every given and
+ * «נקה הכל». They now fold the stored `AskedQuestion` list instead, and the answer is DERIVED, which
+ * makes a stale reading unrepresentable rather than merely unlikely.
+ *
+ * A consequence worth naming: none of these evaluates anything any more. ADR-AG-067 had to assert that
+ * hiding a drawing costs no solve (via a `make` thunk); with the record separated from the reading it is
+ * structural, and the thunk is gone.
+ */
+
+/** How many rows the lane holds. Older questions fall off the end rather than growing without bound. */
 export const ASK_LIMIT = 8;
 
-/** Is this measurement's drawing on the canvas right now? `shown` absent means yes. */
-export const isDrawn = (rows: Answer[], sentence: string): boolean =>
-  rows.some((a) => a.question === sentence && a.shown !== false);
+/** Is this measurement's drawing on the canvas right now? */
+export const isDrawn = (qs: readonly AskedQuestion[], sentence: string): boolean =>
+  qs.some((q) => q.sentence === sentence && q.shown);
 
 /** Is the lane holding this question at all, drawn or not? */
-export const isAsked = (rows: Answer[], sentence: string): boolean =>
-  rows.some((a) => a.question === sentence);
+export const isAsked = (qs: readonly AskedQuestion[], sentence: string): boolean =>
+  qs.some((q) => q.sentence === sentence);
 
 /**
  * A menu entry's gesture: ask it if it has not been asked, otherwise flip whether it is DRAWN.
  *
- * The row is never removed here — that is the operator's ruling. `make` is a thunk so that hiding a
- * drawing costs no evaluation.
+ * The row is never removed here — that is the operator's ruling (ADR-AG-067).
  */
-export function toggleDrawn(rows: Answer[], sentence: string, make: () => Answer): Answer[] {
-  if (!isAsked(rows, sentence)) return [make(), ...rows].slice(0, ASK_LIMIT);
-  return rows.map((a) => (a.question === sentence ? { ...a, shown: a.shown === false } : a));
+export function toggleDrawn(qs: readonly AskedQuestion[], sentence: string): AskedQuestion[] {
+  if (!isAsked(qs, sentence)) return [{ sentence, shown: true }, ...qs].slice(0, ASK_LIMIT);
+  return qs.map((q) => (q.sentence === sentence ? { ...q, shown: !q.shown } : q));
 }
 
 /**
- * The typed lane's gesture: answer it, once, and show it.
+ * The typed lane's gesture: ask it, once, and show it.
  *
- * Re-asking replaces the existing row rather than adding a second identical one — the figure may have
- * changed, so the answer is recomputed — and it does NOT toggle. Clicking an entry you can see is lit
- * means *take it back*; typing a sentence means *tell me this*, and answering that by hiding the answer
- * would be the opposite of what was asked.
+ * Re-asking replaces the existing entry rather than adding a second identical one, and it does NOT
+ * toggle. Clicking an entry you can see is lit means *take it back*; typing a sentence means *tell me
+ * this*, and answering that by hiding the answer would be the opposite of what was asked.
  */
-export function askOnceAnswer(rows: Answer[], sentence: string, make: () => Answer): Answer[] {
-  return [make(), ...rows.filter((a) => a.question !== sentence)].slice(0, ASK_LIMIT);
+export function askOnceAnswer(qs: readonly AskedQuestion[], sentence: string): AskedQuestion[] {
+  return [{ sentence, shown: true }, ...qs.filter((q) => q.sentence !== sentence)].slice(0, ASK_LIMIT);
 }
 
-/** Retire the row at `index` — the ✕ on the row. Its drawing goes with it. Out-of-range is a no-op. */
-export function removeAnswerAt(rows: Answer[], index: number): Answer[] {
-  return index < 0 || index >= rows.length ? rows : rows.filter((_, i) => i !== index);
+/** Retire the entry at `index` — the ✕ on the row. Its drawing goes with it. Out-of-range is a no-op. */
+export function removeAnswerAt(qs: readonly AskedQuestion[], index: number): AskedQuestion[] {
+  return index < 0 || index >= qs.length ? [...qs] : qs.filter((_, i) => i !== index);
 }
 
-/** The marks the canvas should draw: every answer that HAS one and is not hidden. */
-export const drawnMarks = (rows: Answer[]): Array<{ from: { x: number; y: number }; foot: { x: number; y: number }; label?: string }> =>
+/**
+ * The marks the canvas should draw: every DERIVED answer that has one and is not hidden.
+ *
+ * This one still takes `Answer`, because a mark is part of the reading rather than the record — it is
+ * in world coordinates and moves with the figure, which is precisely why it must not be stored.
+ */
+export const drawnMarks = (rows: readonly Answer[]): Array<{ from: { x: number; y: number }; foot: { x: number; y: number }; label?: string }> =>
   rows
     .filter((a) => a.mark && a.shown !== false)
     .map((a) => ({ from: a.mark!.from, foot: a.mark!.foot, label: a.value ?? undefined }));
