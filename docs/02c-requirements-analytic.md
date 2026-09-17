@@ -1061,6 +1061,23 @@ figure, and that is asserted rather than assumed.
 **Out of scope, and refused by name:** an n-way chain, «AC:CB:BD = 3:2:4». Reading the first pair out of
 it would silently drop a stated given.
 
+**R89 — a notation the tool WRITES is a notation it READS**
+([#1127](https://github.com/dcodish/geo_builder/issues/1127),
+[#1134](https://github.com/dcodish/geo_builder/issues/1134)).
+
+| the student types | why it must be read |
+| --- | --- |
+| `x_A = 5`, `y_A = 3`, `x_{A} = 7` | the data panel PRINTS coordinates this way, and R31c calls it canonical |
+| «x של A הוא 5» | the bare form, beside the noun forms «שיעור ה-x של A…» / «ערך ה-x…» |
+| «קדקוד A(1,2)» | the exam's own Hebrew word for a vertex, wherever «הנקודה» is admitted |
+| «מרחק של C מ-AB» | the same distance question as «המרחק מ-C ל-AB», in the other word order |
+
+A product that writes a notation and then refuses it back teaches the student that their own correct
+transcription is wrong, and sends them hunting for a mistake they did not make.
+
+**A component states ONE coordinate.** `x_A = 5` leaves `y` free, as every component form does — pinning
+both would invent a given the student never stated (ADR-052).
+
 **R90 — a circle's CENTRE can be given a letter, by clicking it or by saying so**
 ([#1109](https://github.com/dcodish/geo_builder/issues/1109)).
 

@@ -102,8 +102,22 @@ const LENGTH_TOKEN = /([A-Z][0-9]?)([A-Z][0-9]?)/g;
  * definite article are optional throughout, as everywhere else in this grammar, and both «ל» and
  * «אל» front the target because both are written.
  */
+/**
+ * The point-to-line distance, in BOTH word orders (#1134).
+ *
+ * «המרחק מ-A לישר l1» names the point after a `מ-` and the line after a `ל-`. The operator wrote
+ * «מרחק של C מ-AB», which inverts which preposition introduces which operand: `של` puts the POINT
+ * first and `מ-` then introduces the LINE. Measured, five neighbouring spellings reached the grammar
+ * and his did not — and #1111's missing-object message, built for exactly his sentence, could never
+ * fire on it because the sentence never parsed.
+ *
+ * One token with two alternations, not two tokens: the operand classes are identical and only the
+ * prepositions differ, so a second token would be the same rule written twice and free to drift.
+ * Deliberately NOT the widening #1115 was disarmed over — no `=`, digits or operators enter the
+ * operand, so the «AB + 2·CD» ambiguity does not arise.
+ */
 const POINT_LINE_TOKEN =
-  /(?:ה?מרחק|[Dd]istance)\s+(?:מ-?|בין\s+|from\s+)([A-Z][0-9]?)\s+(?:לבין\s+|א?ל-?|to\s+)\s*(?:ה?(?:ישר|קטע|צלע)\s+|(?:the\s+)?line\s+)?([A-Za-zℓ][0-9]?[A-Z]?[0-9]?)/g;
+  /(?:ה?מרחק|[Dd]istance)\s+(?:מ-?|בין\s+|from\s+)([A-Z][0-9]?)\s+(?:לבין\s+|א?ל-?|to\s+)\s*(?:ה?(?:ישר|קטע|צלע)\s+|(?:the\s+)?line\s+)?([A-Za-zℓ][0-9]?[A-Z]?[0-9]?)|(?:ה?מרחק|[Dd]istance)\s+(?:של|of)\s+([A-Z][0-9]?)\s+(?:מ-?|from\s+)\s*(?:ה?(?:ישר|קטע|צלע)\s+|(?:the\s+)?line\s+)?([A-Za-zℓ][0-9]?[A-Z]?[0-9]?)/g;
 
 const AREA_TOKEN = /(?:שטח|[Aa]rea\s+of)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9]?){3,})/g;
 
@@ -111,12 +125,25 @@ export function parseLengthExpr(src: string): LengthExpr | null {
   const terms: MeasureTerm[] = [];
   // Areas first — see AREA_TOKEN. Each becomes a placeholder before any length token is looked for.
   // Point-to-line first: its tail contains a name that LENGTH_TOKEN would otherwise claim (#1048).
-  const withPL = normalizeMath(src).replace(POINT_LINE_TOKEN, (_m, p: string, line: string) => {
-    const key = `${p}|${line}`;
-    const at = terms.findIndex((t) => t.kind === 'point-line' && `${t.p}|${t.line}` === key);
-    const i = at >= 0 ? at : terms.push({ kind: 'point-line', p, line }) - 1;
-    return String.fromCharCode(PLACEHOLDER_BASE + i);
-  });
+  const withPL = normalizeMath(src).replace(
+    POINT_LINE_TOKEN,
+    /**
+     * FOUR groups, because the token carries two word orders (#1134).
+     *
+     * `מהמרחק מ-A לישר l1` fills 1 and 2; `מרחק של A מ-l1` fills 3 and 4. Reading only the first
+     * pair is how the second order parsed and then answered nothing at all -- the token matched, the
+     * operands came back undefined, and the measure resolved to null with no error anywhere.
+     */
+    (_m, pA: string | undefined, lineA: string | undefined, pB: string | undefined, lineB: string | undefined) => {
+      const p = pA ?? pB;
+      const line = lineA ?? lineB;
+      if (!p || !line) return _m;
+      const key = `${p}|${line}`;
+      const at = terms.findIndex((t) => t.kind === 'point-line' && `${t.p}|${t.line}` === key);
+      const i = at >= 0 ? at : terms.push({ kind: 'point-line', p, line }) - 1;
+      return String.fromCharCode(PLACEHOLDER_BASE + i);
+    },
+  );
   const withAreas = withPL.replace(AREA_TOKEN, (_m, run: string) => {
     const ids = run.match(/[A-Z][0-9]?/g) ?? [];
     const key = ids.join();

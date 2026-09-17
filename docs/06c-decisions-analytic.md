@@ -4311,6 +4311,58 @@ with «AC = 1.5CB», the n-way refusal by name, and the named-line ordering regr
 
 ---
 
+## ADR-AG-078 — A notation the tool writes is a notation it reads (#1127 + #1134)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R89. **Design:** none (internal).
+
+Four spellings, bundled because they are **one sentence about the grammar**: in each case the product
+itself produces a notation and then refuses it back.
+
+| spelling | who writes it | was |
+| --- | --- | --- |
+| `x_A = 5` | the data panel prints coordinates this way; R31c calls it canonical | `not-handled` |
+| «x של A הוא 5» | **this parser's own docblock**, which claimed the bare form was supported | `not-handled` |
+| «קדקוד A(1,2)» | the exam, constantly | `not-handled` |
+| «מרחק של C מ-AB» | **the operator**, in his own T15 report | `unreadable` |
+
+**`קדקוד` joins `HE_POINT`, the shared token**, never inline at a call site — the tree's stated rule is
+that a noun gate re-spelled inline drifts, and it has paid for that three times. The lock asserts the
+spelling across two unrelated constructs, which is what would fail if it had been added at one site.
+
+**The «של» order is a word order, not a wider operand.** «המרחק מ-A לישר l1» names the point after `מ-`
+and the line after `ל-`; the operator's wording inverts which preposition introduces which. One token
+with two alternations rather than two tokens, because the operand classes are identical and only the
+prepositions differ — two tokens would be the same rule written twice and free to drift. Deliberately
+**not** the widening #1115 was disarmed over: no `=`, digits or operators enter the operand.
+
+**It unblocks #1111.** That issue built «אין בשרטוט נקודה בשם D» for exactly this sentence, and it could
+never fire because the sentence never parsed. The two halves are asserted together, because neither is
+worth anything alone.
+
+### Two corrections to the issues' own framing, both measured
+
+- **«xA = 5» is not the component form and never was.** It parses as a CURVE — the equation `x·A = 5`.
+  A lock comparing the new spelling against it would have compared two unrelated things; the real
+  equivalence is the noun form, and that is what is asserted.
+- **The bare «x של A» form was already documented as supported and was not.** The noun was required, so
+  «x של A הוא 5» was refused while «שיעור ה-x של A הוא 5» worked. A comment claiming a capability is how
+  a gap survives being looked at — the same shape as #1119's DEPLOY-LOG entry claiming an issue had been
+  filed when none was.
+
+**English gains no `vertex` noun**, deliberately: `point` is spelled inline at six call sites rather than
+in a shared token, so adding one beside each would be precisely the drift this ADR is about. Its own
+issue if the corpus ever wants it.
+
+**Four recorded gaps fired closing this**, all self-expiring records doing their job: #1111's KNOWN GAP
+case, `parser.test.ts`'s *"the component form remains unbuilt"* line, and (in the same round) #1113's
+crossing residue and the `NO_HISTORY_YET` parity exception. Each is kept and inverted rather than
+deleted.
+
+**Consequences.** `issue-1127-1134-spellings.test.ts` (13). Catalog entries for all three new spellings
+(#347's lesson). Analytic lane 76 files / 1161 tests.
+
+---
+
 ## ADR-AG-079 — A circle's centre is namable, and the name asserts nothing (#1109)
 
 **Requirements:** [02c](02c-requirements-analytic.md) R90. **Design:** none (internal).

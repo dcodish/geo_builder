@@ -91,7 +91,14 @@ const refuse = (code: ParseFailure['code'], detail: string): ParseResult =>
  */
 const HE_GIVEN = '(?:נתו(?:ן|נה|נים|נות)\\s+)?';
 /** «הנקודה» / «נקודה» / «הנקודות» / «נקודות», optional — the subject noun. */
-const HE_POINT = '(?:ה?נקוד(?:ה|ות)\\s+)?';
+/**
+ * The optional subject noun before a point's name.
+ *
+ * `קדקוד` is the EXAM's own word for a vertex (#1127), and it belongs here rather than inline at
+ * any call site: this tree's stated rule is that a noun gate re-spelled inline drifts, and it has paid
+ * for that three times. One alternation, and every construct that admits a point gains the spelling.
+ */
+const HE_POINT = '(?:ה?(?:נקוד(?:ה|ות)|קדקוד)\\s+)?';
 /** «הישר» / «ישר». */
 /**
  * The line NOUNS — «הישר AC», and «האלכסון AC», which is the same object (#1070).
@@ -1257,6 +1264,29 @@ const QUADRANT_SIGNS: Record<string, [boolean, boolean]> = {
 const COMPONENT_HE = new RegExp(
   `^${HE_GIVEN}(?:ה?שיעור|ה?ערך|ה?קואורדינט[הת])\\s+ה?-?\\s*([xy])\\s+(?:של\\s+)?(?:ה?נקודה\\s+)?(${NAME})${HE_IS}\\s*:?\\s*(.+)$`,
 );
+/**
+ * THE SUBSCRIPTED SPELLING (#1127) — `x_A = 5`.
+ *
+ * The panel PRINTS coordinates this way and 02c R31c calls it canonical, and the parser would not read
+ * it back: `xA = 5` worked, `x_A = 5` was `not-handled`. A tool that writes a notation and refuses to
+ * read it is teaching the student that their own transcription is wrong.
+ *
+ * Language-neutral on purpose — a subscript is symbolic, not Hebrew or English.
+ */
+const COMPONENT_SUB = new RegExp(
+  `^${HE_GIVEN}([xy])\\s*_\\s*\\{?\\s*(${NAME})\\s*\\}?${HE_IS}\\s*=\\s*(.+)$`,
+);
+/**
+ * The BARE «x של A» form, which this file's own docblock already claimed to support (#1127).
+ *
+ * Measured: it did not. The noun (`שיעור`/`ערך`/`קואורדינטה`) was required, so «x של A הוא 5» was refused
+ * while «שיעור ה-x של A הוא 5» worked. The `של` is what makes the bare form unambiguous, so it is
+ * required here rather than making the noun optional in the pattern above — a lone `x` at the start of a
+ * line is too weak a claim.
+ */
+const COMPONENT_OF = new RegExp(
+  `^${HE_GIVEN}([xy])\\s+של\\s+${HE_POINT}(${NAME})${HE_IS}\\s*:?\\s*(.+)$`,
+);
 const COMPONENT_EN = new RegExp(
   `^(?:the\\s+)?([xy])[- ](?:value|coordinate|coord)\\s+of\\s+(?:point\\s+)?(${NAME})\\s+is\\s+(.+)$`,
   'i',
@@ -1695,7 +1725,11 @@ function parseConstraint(raw: string): RuleOutcome {
     }
   }
 
-  const comp = COMPONENT_HE.exec(line) ?? COMPONENT_EN.exec(line);
+  const comp =
+    COMPONENT_HE.exec(line) ??
+    COMPONENT_EN.exec(line) ??
+    COMPONENT_OF.exec(line) ??
+    COMPONENT_SUB.exec(line);
   if (comp) {
     const [, axis, id, valueSrc] = comp;
     const value = parseExpr(normalizeMath(valueSrc));

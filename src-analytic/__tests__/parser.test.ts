@@ -331,8 +331,16 @@ describe('#1037 — a bare equation builds, and eats nothing', () => {
     for (const line of ['AB = 4√5', 'AB=10', 'AB+BC=10', 'AB = AC']) {
       expect(outcome(line, pts), line).not.toMatch(/^built:/);
     }
-    // `x_A = 5` still parses as nothing at all — the component form (#1040) remains unbuilt.
-    expect(outcome('x_A = 5', pts)).toBe('not-handled');
+    /**
+     * `x_A = 5` is READ now (#1127), where this line used to record it as unbuilt.
+     *
+     * On these points `A` is pinned at `(0,0)`, so stating its x as 5 contradicts a given the student
+     * already made — `unsatisfiable` is the honest answer, and the bare-equation branch is still not the
+     * rule that claimed it, which is what this case exists to prove.
+     */
+    expect(outcome('x_A = 5', pts)).toBe('unsatisfiable');
+    // …and on a point that is NOT pinned, it simply builds.
+    expect(outcome('x_A = 5', ['נקודה A'])).toMatch(/^built:/);
   });
 
   it('does not swallow a parameter pin either', () => {

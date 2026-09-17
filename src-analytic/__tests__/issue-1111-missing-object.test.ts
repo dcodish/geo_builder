@@ -42,20 +42,21 @@ describe('#1111 — a missing object is named, not called incomprehensible', () 
     expect(a.missing).toEqual({ name: 'D', kind: 'point' });
   });
 
-  it('KNOWN GAP — his exact wording «מרחק של D מ-AB» does not parse at all (#1134)', () => {
+  it('his exact wording «מרחק של D מ-AB» now reaches the missing-object answer (#1134)', () => {
     /**
      * Measured, and recorded rather than hidden. The operator reported «מרחק של C מ-AB», and this fix
      * does NOT make that sentence work: the «של» word order — *distance OF D FROM AB* — is not in the
      * measure grammar, so it never reaches the missing-object check this issue is about.
      *
-     * That is a missing CAPABILITY, which CLAUDE.md says is relabelled a feature and never built under
-     * a bug's banner, so it is filed as #1134 instead of widened in here. This case exists so the gap
-     * is visible from the lock: when #1134 lands it flips to a missing-object answer, and whoever
-     * lands it will see exactly what to change.
+     * That is a missing CAPABILITY, so it was filed as #1134 and built as a feature rather than widened
+     * in here under a bug's banner. **This case is the record flipping.** It asserted `unreadable` so
+     * that the day the spelling was read, it would fail and be revisited — which is what happened, one
+     * round later. Kept and inverted rather than deleted, so the two halves stay locked together: the
+     * sentence parses AND it gets the named answer #1111 built.
      */
     const a = answer(FIG, 'מרחק של D מ-AB');
-    expect(a.unreadable).toBe(true);
-    expect(a.missing).toBeUndefined();
+    expect(a.unreadable).toBeFalsy();
+    expect(a.missing).toEqual({ name: 'D', kind: 'point' });
   });
 
   it('a point asked for by name alone', () => {
