@@ -569,3 +569,38 @@ Its drawing gate inverts the one beside it, and this is the trap to expect: a he
 when the distance is **knowledge**, because on an open figure it would assert a magnitude nobody gave;
 a trace is drawn only when the figure is **open**, because it shows every position the givens allow
 rather than one. Same module, opposite precondition — a second arm, never a bypass.
+
+## The apply boundary's reference check, both halves ([ADR-AG-083](06c-decisions-analytic.md#adr-ag-083))
+
+A constraint names things, and creates none of them. «שטח המשולש ABC הוא 20» before `ABC` exists is a
+statement about nothing, so the apply boundary refuses it — that half has been there since #1028.
+
+**A constraint can also name a CURVE**, and that half was missing. `constraintRefs` answers *which
+points does this touch*, which is what its two callers want: `carriers.ts` needs the carriers a
+constraint can move, and the apply boundary needs the points a statement presumes. So `on-curve`
+returns only its point, and a `curve` direction returns nothing at all.
+
+The result was a given that vanished between two layers. «נקודה D היא חיתוך של l7 ו- l8» parsed
+correctly into two `on-curve` constraints, passed the apply boundary because its *points* were fine,
+and then could not be measured at evaluation because the curves were not there — so `D` became an
+ordinary free point at a sampled position, drawn on a canvas while the panel called it undetermined.
+
+`constraintCurveRefs` is the sibling, and the boundary now checks both lists:
+
+| ref kind | must resolve to | asked by |
+| --- | --- | --- |
+| point | something positional | `constraintRefs` |
+| curve | something with a shape — `curve`, `circle-at`, `line-at` | `constraintCurveRefs` |
+
+They stay **separate functions**. Merging them would have made the point check reject every curve
+reference as "not a point" — the opposite defect, and a worse one.
+
+### Naming what the student wrote
+
+A curve's id carries a prefix so a circle and a point may both be called `I` (`circle-I`, `line-l7`).
+`statedName` strips it, and is applied at **every** `unknown-reference` site rather than at the ones
+that were reported: it is the identity on an unprefixed id, so a uniform call cannot be wrong, and the
+next site handed a curve id inherits the fix instead of repeating the defect.
+
+An anonymous curve (`curve-<hash>`) is left whole — there is no student name to recover, and the
+hash's tail would be a different wrong word rather than the right one.

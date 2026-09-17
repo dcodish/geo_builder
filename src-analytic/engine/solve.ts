@@ -236,6 +236,46 @@ export function describeConstraint(k: Constraint): string {
 }
 
 /** The points a direction depends on — an axis and a named line depend on none. */
+/**
+ * THE CURVES A CONSTRAINT NAMES — the other half of {@link constraintRefs} (#1150).
+ *
+ * `constraintRefs` answers *which POINTS does this touch*, and both of its callers want exactly that:
+ * `carriers.ts` to find the carriers a constraint can move, and the apply boundary to refuse a
+ * statement about a point the figure does not have. So `on-curve` returns only its point, and
+ * `dirRefs` returns `[]` for a curve direction — correct for those questions, and it left a hole.
+ *
+ * **Nothing checked that the CURVE exists.** «נקודה D היא חיתוך של l7 ו- l8» on a figure with no `l7`
+ * lowered to two `on-curve` constraints naming curves that were never there, passed the apply
+ * boundary in silence, and then could not be measured at evaluation — so `D` was drawn as an ordinary
+ * free point at a sampled position while the panel one column over read `D = –`. The defining clause
+ * of a point vanished and the point was drawn anyway, which is CLAUDE.md's honesty invariant: *no
+ * stated magnitude is ever silently dropped — a given parses to a constraint, escalates, or errors,
+ * but never vanishes.*
+ *
+ * Kept SEPARATE from `constraintRefs` rather than merged into it, because the two answers have
+ * different truth conditions: a point ref must resolve to something positional, and a curve ref must
+ * resolve to something with a shape. Merging them would have made the apply check reject every curve
+ * reference as "not a point", which is the opposite defect.
+ */
+export function constraintCurveRefs(k: Constraint): Id[] {
+  const ofDir = (d: Direction): Id[] => (d.k === 'curve' ? [d.id] : []);
+  switch (k.t) {
+    case 'on-curve':
+      return [k.curve];
+    case 'relation':
+      return [...ofDir(k.u), ...ofDir(k.v)];
+    case 'slope':
+      return ofDir(k.u);
+    case 'choice':
+      return [...new Set(k.options.flatMap(constraintCurveRefs))];
+    default:
+      // EXHAUSTIVE BY DEFAULT, deliberately — unlike `constraintRefs`, whose `never` arm forces every
+      // new kind to declare its points. A constraint kind that names no curve is the common case, and
+      // a kind that does will be caught by its own test rather than by a compile error here.
+      return [];
+  }
+}
+
 export function dirRefs(d: Direction): Id[] {
   switch (d.k) {
     case 'points':

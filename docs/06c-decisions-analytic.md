@@ -4463,3 +4463,41 @@ Both obvious gates are already argued against in this tree: `reportedDof === 0` 
 His second sentence was *"we need to give the user different options and not similar options"*. #1166's comment measured that and refuted the obvious diagnosis — analytic's distinctness test was already fine (0 of 12 offers under the 3% bar), and the offers were numerically far apart. What made them useless is that six of the first seven were *another straight line*: numerically distant, perceptually identical. So the lock walks the real **offer list** through `anotherConfiguration` and asserts successive offers differ as **shapes**, on a similarity-invariant fingerprint — not that raw seeds differ, which would measure a list no student is shown.
 
 **Consequences.** `engine/rings.ts` (new), `Figure.ringFaults`, one term in `whole()`. `issue-1158-1166-polygon-noun-validity.test.ts` (24 tests, sweeping `SHAPES` so a noun added later inherits the lock). Analytic lane 80 files / 1235 tests.
+
+## ADR-AG-083 — A constraint's CURVE references are checked like its point references (#1150 + #1145)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — none added; this restores an existing promise (the honesty invariant: a given parses to a constraint, escalates, or errors, but never vanishes). **Design:** [04c](04c-design-analytic.md) — *the apply boundary's reference check*. **LADDER stage:** the apply boundary, beside the point-reference refusal it completes.
+
+**Operator, on his saved figure «עבודת סוכות 1»:** *"the last input referred to l1 and l2 which don't exist and yet point D was positioned"*.
+
+### The diagnosis in the issue was wrong, and the issue said to check it
+
+#1150 proposed that the point rule's optional tail *"fails to match, so the rule succeeds with the tail dropped"* — the ADR-AG-017/#1042 class — and flagged it **measured but not yet complete**. Measured at HEAD, the sentence parses **fully**:
+
+```
+«נקודה D היא חיתוך של l7 ו- l8»  →  declare · on-curve · on-curve · selector
+```
+
+Both constraints faithfully name `l7` and `l8`. Nothing was dropped by the parser.
+
+**The hole is one seam later.** `constraintRefs` answers *which POINTS does this constraint touch* — which is exactly right for both of its callers (`carriers.ts`, to find the carriers a constraint can move; the apply boundary, to refuse a statement about a point the figure lacks), so `on-curve` returns only its point and `dirRefs` returns `[]` for a curve direction. **Nothing ever asked whether the curve existed.** The constraints passed the apply boundary in silence, could not be measured at evaluation, and `D` was drawn as an ordinary free point at a sampled position — while the data panel one column over read `D = –`. The canvas asserted a position the panel admitted was undetermined.
+
+Same class as the issue named; different mechanism. The lesson is the one docs/17 keeps making: a root cause read off the code is a hypothesis.
+
+### The decision
+
+**`constraintCurveRefs` is the other half of `constraintRefs`, and the apply boundary checks both.** Kept separate rather than merged, because the two have different truth conditions — a point ref must resolve to something positional, a curve ref to something with a shape (`curve`, `circle-at`, `line-at`). Merging them would have made the check reject every curve reference as "not a point", which is the opposite defect.
+
+Its `default` arm returns `[]` rather than throwing on an unhandled kind, deliberately unlike `constraintRefs`'s exhaustive `never`: naming no curve is the common case, and a kind that does name one will be caught by its own test rather than by a compile error that every future kind has to answer.
+
+### #1145 rides along, because this fix would otherwise have created a new instance of it
+
+A curve's id is prefixed so that a circle and a point may both be called `I` — «מעגל I» is `circle-I`, «הישר l7» is `line-l7`. That prefix is internal, and it was reaching the student: «O מרכז המעגל Z» reported the detail **`circle-Z`**, a word they never typed. The new check above would have reported `line-l7` the same way, on a message that did not exist before.
+
+`statedName(id)` strips the prefixes the parser minted and is applied at **every** `unknown-reference` site, not the two that were reported — it is the identity on an unprefixed id (a point is just `A`), so a uniform call cannot be wrong and the next site handed a curve id inherits the fix. An anonymous curve (`curve-<hash>`) is left whole: there is no student name to recover, and printing the hash's tail would be a different wrong word rather than the right one.
+
+CLAUDE.md, *Honesty invariants*: **error messages name the conflicting statement, never internal state.**
+
+**Counter-direction, asserted:** the same sentence with both lines PRESENT still records. A reference check that refused a legitimate statement would be far worse than the silence it replaces.
+
+**Consequences.** `constraintCurveRefs` (`solve.ts`), `statedName` + `CURVE_BEARING` + one arm (`apply.ts`), nine `unknown-reference` sites routed through `statedName`. `issue-1150-1145-refs.test.ts` (10). Analytic lane 82 files / 1237 tests.
