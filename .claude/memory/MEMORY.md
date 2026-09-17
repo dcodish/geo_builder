@@ -45,3 +45,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Predicate vs its own case](predicate-vs-its-own-case.md) — run a plan's predicate against the plan's OWN reported case before building; a predicate its own figure fails is a no-op and an escalation (#999, round #1006)
 - [Locks must call, not reproduce](locks-must-call-not-reproduce.md) — a test that re-implements the decision it guards stays green through the change that kills the feature; extract the decision first (#1102/#1118, 2026-09-16)
 - [⇗ would-escalate can be a gate bug](would-escalate-can-be-a-gate-bug.md) — the parse may be perfect and the HONESTY GATE wrong; measure parse and gates separately before classifying (#1161, 2026-09-17)
+- [PR may ship mid-pass](pr-may-ship-mid-pass.md) — re-check merge state and the newest `prod/*` tag in the SAME compound as handing over a play sheet; a parallel session merged AND deployed PR #1143 while its sheet was being built (2026-09-17)
