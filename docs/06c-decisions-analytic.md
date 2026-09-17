@@ -4463,3 +4463,48 @@ Both obvious gates are already argued against in this tree: `reportedDof === 0` 
 His second sentence was *"we need to give the user different options and not similar options"*. #1166's comment measured that and refuted the obvious diagnosis — analytic's distinctness test was already fine (0 of 12 offers under the 3% bar), and the offers were numerically far apart. What made them useless is that six of the first seven were *another straight line*: numerically distant, perceptually identical. So the lock walks the real **offer list** through `anotherConfiguration` and asserts successive offers differ as **shapes**, on a similarity-invariant fingerprint — not that raw seeds differ, which would measure a list no student is shown.
 
 **Consequences.** `engine/rings.ts` (new), `Figure.ringFaults`, one term in `whole()`. `issue-1158-1166-polygon-noun-validity.test.ts` (24 tests, sweeping `SHAPES` so a noun added later inherits the lock). Analytic lane 80 files / 1235 tests.
+
+## ADR-AG-082 — A shape noun's UNSTATED choice is the tool's assumption, and a statement pins it (#1159)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R93. **Design:** [04c](04c-design-analytic.md) — *a noun's unstated choice is the tool's*. **LADDER stage:** the apply boundary — the noun lowers as before, and what changes is what a later statement may do to it.
+
+**Operator, playing the analytic tool:** *"I write «טרפז ABCD» and the tool assumed AB is parallel to CD. I then write «AB parallel to CD» and the tool says this is already known — which it should not be, because that was **assumed, not given**."*
+
+He is right, and the 2-D tool already agreed with him: [ADR-506](06-decisions.md#adr-506) (#989) settled exactly this, from the same complaint. This tree never received the ruling. **Ported, not copied** — the trees share rulings and never code (`src-analytic/CLAUDE.md` boundary 1), and 2-D expresses it as `trapezoidRingInForce` over its own model.
+
+### One gap, three symptoms, all measured
+
+| # | sequence | before | after |
+|---|---|---|---|
+| 1 | «טרפז ABCD» · «BC מקביל ל-AD» | **both** pairs held ⇒ a PARALLELOGRAM at every seed | one pair — the student's |
+| 2 | «טרפז ABCD» · «AB מקביל ל-CD» | `already-follows` | `record` |
+| 3 | «AB מקביל ל-**CD**» vs «AB מקביל ל-**DC**» | `already-follows` vs `already-known` | identical |
+
+Symptom 1 is the serious one: the tool kept its own guess **and** added the student's, and drew something that is not a trapezoid, silently, at every configuration.
+
+### The decision
+
+**A shape noun that leaves a choice unstated records that choice as the TOOL'S, not the student's.** `engine/shapes.ts`'s three `טרפז*` rows emit their parallel pair through `assumedParallel`, which carries `assumed: true` on the constraint. Two things may then happen at the apply boundary, and **neither is a restatement**:
+
+- the student names **that** pair — the constraint stops being a guess and becomes their given (`narrowed`);
+- the student names the **other** pair — the assumption **yields** to them (`created`).
+
+Stating both is a parallelogram they asked for, and is left alone: the second statement finds no assumption to displace because the first already pinned it.
+
+**Not a `choice` constraint**, deliberately. A `choice` is walked by «הציגו תצורה אחרת», which would flip which pair is parallel *under the student* — and the exam's lettering does not invite that. The pair defaults by ring order and is pinned or displaced by a statement; nothing cycles.
+
+**`displacedAssumption` reads the RING**, not the letters: the stated pair must be an opposite-side pair of the same declared polygon as the assumed one. So it cannot fire on two segments that merely share names with a ring's sides, and a quadrilateral noun added later inherits it.
+
+### The entailment gate needed its own arm, and measurement said so
+
+The plan expected symptom 2 to fall out of symptom 1's fix. **It does not**, and the plan said to verify rather than assume: pinning an assumption changes neither the constraint count nor the figure's freedom, so all three of the entailment gate's conditions still hold and it still answered *«זה כבר נובע מהנתונים שכתבתם»*. The signal is that **an assumption stopped being one**, so `decideSubmit` counts assumed relations before and after and records when the count drops.
+
+### `canonicalConstraint` — the identity of a constraint as a STATEMENT
+
+Symptom 3 came from comparing constraints with `JSON.stringify`. `shapes.ts` justifies that compare in its own docblock — *"honest here precisely because both sides are built by the functions in this file; there is no second way to spell a right angle at B"* — and that argument is sound for a seat the table builds. It is **false** for a constraint the PARSER built from a student's sentence, where the spelling is theirs.
+
+So one key, used by every comparison site (`namesOption`, the duplicate absorb, the assumption match): each point pair sorted, then the two operands of a symmetric relation sorted. **Not a spelling-equivalence table** — the analytic mirror of #999's ruling: normalise the one thing that is genuinely a spelling and never enumerate which kinds mean the same as which others. `assumed` is deliberately outside the key, which is exactly what lets a stated pair recognise the assumed one.
+
+**Counter-direction, asserted:** a parallelogram's pair is a real given, so restating it is still absorbed as «כבר ידוע» — a fix that made every parallel record would have swapped one dishonest message for another.
+
+**Consequences.** `assumed?: true` on the `relation` constraint, `canonicalConstraint`/`sameConstraint` (`solve.ts`), `assumedParallel` + `displacedAssumption` (`shapes.ts`), one arm in `apply.ts`, one in `decideSubmit`. `issue-1159-trapezoid-pair.test.ts` (12). Analytic lane 81 files / 1237 tests — none of `options`, `named-shape`, `shapes`, `lowering`, `panel` moved, which was this issue's stated escalation trigger.

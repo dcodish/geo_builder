@@ -569,3 +569,57 @@ Its drawing gate inverts the one beside it, and this is the trap to expect: a he
 when the distance is **knowledge**, because on an open figure it would assert a magnitude nobody gave;
 a trace is drawn only when the figure is **open**, because it shows every position the givens allow
 rather than one. Same module, opposite precondition — a second arm, never a bypass.
+
+## A noun's unstated choice is the TOOL's ([ADR-AG-082](06c-decisions-analytic.md#adr-ag-082))
+
+A shape noun lowers to constraints, and some of what it lowers to was never in the sentence. «טרפז
+ABCD» promises that *one* pair of opposite sides is parallel; it does not say which. The registry picks
+one by ring order so the figure can be drawn at all — and that pick belongs to the tool.
+
+Constraints that the noun **gives** and constraints the tool **assumed** were indistinguishable once
+emitted, and three defects followed from the one gap: the tool kept its guess alongside a student's
+contradicting statement (drawing a parallelogram on a declared trapezoid), it declined their statement
+as *"already follows from what you wrote"*, and the same statement got two answers depending on letter
+order.
+
+### The mark
+
+`assumedParallel` in `engine/shapes.ts` sets `assumed: true` on the constraint. `evaluate` ignores it
+entirely — an assumed constraint solves exactly like any other, which is what makes the figure drawable
+before the student has chosen. Only the **apply boundary** and the **submit verdict** read it:
+
+| the student states | what happens | effect |
+| --- | --- | --- |
+| the assumed pair | the mark is dropped; the constraint becomes theirs | `narrowed` |
+| the other opposite-side pair of the same ring | the assumption is removed, theirs is added | `created` |
+| both | the first pins, the second records — a parallelogram they asked for | — |
+| a pair of a noun that GAVE it («מקבילית») | ordinary restatement | `known` |
+
+`displacedAssumption` reads the **ring**, not the letters: the stated pair must be an opposite-side pair
+of the same declared polygon as the assumed one, so it cannot fire on two segments that merely share
+names with a polygon's sides, and a quadrilateral noun added later inherits the behaviour.
+
+**It is not a `choice`.** A `choice` constraint is walked by «הציגו תצורה אחרת», which would flip the
+parallel pair under the student between one press and the next. The default is stable and moves only
+when a statement moves it.
+
+### Why the submit verdict needed its own arm
+
+Pinning an assumption changes neither the constraint count nor the figure's freedom, so every condition
+of the entailment gate still holds and it still answered «זה כבר נובע מהנתונים שכתבתם». The honest
+signal is not in the figure — it is that **an assumption stopped being one**, so `decideSubmit` counts
+assumed relations before and after and records when the count drops.
+
+### One key for "the same statement"
+
+Every comparison site — the choice collapse, the duplicate absorb, the assumption match — calls
+`canonicalConstraint` (`engine/solve.ts`): each point pair sorted, then the two operands of a symmetric
+relation sorted. A segment is undirected and so are ∥ and ⊥.
+
+The `JSON.stringify` compare it replaces was justified, in `shapes.ts`'s own words, by *"there is no
+second way to spell a right angle at B"* — true of a seat that file builds, and false of a constraint
+the parser built from a student's sentence. The lesson generalises: **a structural compare is only as
+honest as the set of writers that can produce the structure.**
+
+`assumed` is outside the key on purpose — an assumed `AB ∥ DC` and a stated one are the same statement,
+which is precisely what lets the stated one recognise and pin the assumed one.
