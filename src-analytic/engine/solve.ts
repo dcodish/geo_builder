@@ -81,7 +81,26 @@ export type Constraint =
    * which carriers may move) is identical. `perpendicular` above is kept for the cevian that already
    * ships; it is the point-pair special case this generalises.
    */
-  | { t: 'relation'; rel: 'parallel' | 'perpendicular'; u: Direction; v: Direction }
+  | {
+      t: 'relation';
+      rel: 'parallel' | 'perpendicular';
+      u: Direction;
+      v: Direction;
+      /**
+       * THE TOOL PICKED THIS, THE STUDENT DID NOT (#1159).
+       *
+       * «טרפז ABCD» promises one pair of parallel sides and the lettering suggests which — but the
+       * student stated a trapezoid, not a pair. So the pair the noun lowers to is the tool's
+       * ASSUMPTION, and it must be distinguishable from an identical constraint the student typed:
+       * an assumption yields when they name a pair, and it may never be quoted back at them as
+       * something that "already follows from the givens".
+       *
+       * Carried on the constraint rather than beside it so it cannot be lost by the copies the fold
+       * makes. Deliberately absent from {@link canonicalConstraint} — an assumed `AB ∥ DC` and a
+       * stated one are the SAME statement, which is exactly what lets the stated one pin it.
+       */
+      assumed?: true;
+    }
   /** `שיפוע AB הוא 2` — the same direction algebra as a relation, with a stated value (#1051). */
   | { t: 'slope'; u: Direction; value: Expr }
   /**
@@ -166,6 +185,47 @@ export function resolveChoices(ks: readonly Constraint[], seed: number): Constra
 }
 
 /** Which points a constraint references — the solver's map from constraints to movable carriers. */
+/**
+ * THE IDENTITY OF A CONSTRAINT AS A STATEMENT — one key, used by every comparison site (#1159).
+ *
+ * Two sentences that say the same thing must compare equal, and the comparison used to be
+ * `JSON.stringify`. That is honest for a constraint built by `shapes.ts`'s own helpers — its docblock
+ * says so, and *"there is no second way to spell a right angle at B"* is true of a seat the table
+ * builds. It is **false** for a constraint the PARSER built from a student's sentence, where the
+ * spelling is theirs:
+ *
+ * | «AB מקביל ל-**CD**» | `already-follows` |
+ * | «AB מקביל ל-**DC**» | `already-known`   |
+ *
+ * One statement, two answers, decided by which letter the student happened to write first. A segment
+ * is UNDIRECTED and so is parallelism, so the key sorts each point pair and then the two operands.
+ *
+ * **Not a spelling-equivalence table.** This is the analytic mirror of #999's ruling: normalise the
+ * one thing that is genuinely a spelling — operand order in a symmetric relation — and never
+ * enumerate which kinds mean the same as which others. Everything else keeps its exact form, so a
+ * constraint kind added later is compared strictly until someone decides otherwise.
+ *
+ * `assumed` is deliberately NOT part of the key — see its docblock.
+ */
+export function canonicalConstraint(k: Constraint): string {
+  const dir = (d: Direction): string =>
+    d.k === 'points' ? `p:${[d.a, d.b].sort().join(',')}` : d.k === 'axis' ? `a:${d.axis}` : `c:${d.id}`;
+  if (k.t === 'relation') {
+    // Both relations are symmetric in their operands: `u ∥ v` is `v ∥ u`, and likewise for ⊥.
+    const [u, v] = [dir(k.u), dir(k.v)].sort();
+    return `relation|${k.rel}|${u}|${v}`;
+  }
+  if (k.t === 'perpendicular') {
+    const [p, q] = [[k.a, k.b].sort().join(','), [k.c, k.d].sort().join(',')].sort();
+    return `perpendicular|${p}|${q}`;
+  }
+  return JSON.stringify(k);
+}
+
+/** Do these two constraints say the SAME thing? See {@link canonicalConstraint}. */
+export const sameConstraint = (a: Constraint, b: Constraint): boolean =>
+  canonicalConstraint(a) === canonicalConstraint(b);
+
 export function constraintRefs(k: Constraint): Id[] {
   switch (k.t) {
     case 'coord':

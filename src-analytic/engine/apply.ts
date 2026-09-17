@@ -18,8 +18,8 @@
 import { fitConic } from './conic';
 import { resolveCurve } from './curves';
 import { curveParentOf, parentsOf, type DerivedRule } from './derived';
-import { constraintRefs } from './solve';
-import { isGenericNoun, namesOption, rightAngleAt, shapeRow } from './shapes';
+import { constraintRefs, sameConstraint } from './solve';
+import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, shapeRow } from './shapes';
 import { evalExpr, type Env } from './expr';
 import {
   EMPTY_CONSTRUCTION,
@@ -473,9 +473,44 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       if (missing !== undefined) {
         return { ok: false, error: { code: 'unknown-reference', detail: missing } };
       }
+      /**
+       * A STATEMENT MEETS THE TOOL'S OWN ASSUMPTION (#1159) — decided before the duplicate absorb,
+       * because to the absorb the two look identical, and that is the whole defect.
+       *
+       * «טרפז ABCD» lowers to an ASSUMED parallel pair. Two things can then happen, and neither is a
+       * restatement:
+       *
+       *  - the student names THAT pair — «AB מקביל ל-CD». The constraint stops being the tool's guess
+       *    and becomes their given. Nothing about the figure changes and the freedom does not drop,
+       *    which is precisely why the entailment gate called it «already follows» — a sentence that
+       *    is false, because it followed from a pair the TOOL picked. It is `narrowed`: the figure is
+       *    unchanged and its commitment is not.
+       *  - the student names the OTHER pair — «BC מקביל ל-AD». The assumption yields to them. Keeping
+       *    both drew a PARALLELOGRAM at every seed, silently, on a figure the student called a
+       *    trapezoid.
+       *
+       * Both pairs STATED is a parallelogram the student asked for, and is left alone: the second
+       * statement finds no assumption to displace (the first already pinned it) and records normally.
+       */
+      if (f.k.t === 'relation' && !f.k.assumed) {
+        const pins = c.constraints.findIndex((k) => k.t === 'relation' && k.assumed && sameConstraint(k, f.k));
+        if (pins >= 0) {
+          const pinned = [...c.constraints];
+          pinned[pins] = f.k; // the student's own constraint, with no `assumed` mark
+          return { ok: true, effect: 'narrowed', next: { ...c, constraints: pinned } };
+        }
+        const yields = displacedAssumption(c, f.k);
+        if (yields >= 0) {
+          const moved = c.constraints.filter((_, i) => i !== yields);
+          return { ok: true, effect: 'created', next: { ...c, constraints: [...moved, f.k] } };
+        }
+      }
+
       // Restating the same constraint adds nothing — M1's absorb, so a later section of a question
-      // may repeat a given without it counting twice against the figure's freedom.
-      const dup = c.constraints.some((k) => JSON.stringify(k) === JSON.stringify(f.k));
+      // may repeat a given without it counting twice against the figure's freedom. Compared by what
+      // the constraint SAYS (#1159): «AB ∥ CD» and «AB ∥ DC» are one statement, and used to get two
+      // different answers depending on which letter the student wrote first.
+      const dup = c.constraints.some((k) => sameConstraint(k, f.k));
       if (dup) return { ok: true, effect: 'known', next: c };
 
       /**

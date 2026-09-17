@@ -152,6 +152,25 @@ export function decideSubmit(
    * an already-placed `B` — that sentence declares `B`, the declaration is absorbed because `B`
    * exists, and the line really does add nothing.
    */
+  /**
+   * A LINE THAT PINNED THE TOOL'S OWN ASSUMPTION RECORDS (#1159) — checked before the entailment gate,
+   * because the entailment gate is exactly what gets it wrong.
+   *
+   * «טרפז ABCD» then «AB מקביל ל-CD» satisfies all three of that gate's conditions: the given holds,
+   * nothing appeared, and the freedom did not drop. So it answered *«זה כבר נובע מהנתונים שכתבתם»* —
+   * **it already follows from what you wrote**. The sentence is false. It follows from a pair the
+   * TOOL picked by lettering, and the student has just turned that guess into a given. Telling them
+   * their own statement is redundant, when the redundancy is the tool's assumption, is ADR-052's
+   * cardinal sin wearing an honesty notice — and it is what the operator objected to.
+   *
+   * Measured rather than assumed, as the plan required: displacing the assumption (arm 1) does NOT
+   * deliver this on its own, because pinning changes neither the count nor the freedom. The signal is
+   * that an assumption stopped being one.
+   */
+  const assumptions = (d: Derivation) =>
+    d.construction.constraints.filter((k) => k.t === 'relation' && k.assumed).length;
+  if (assumptions(trial) < assumptions(current)) return { kind: 'record', line };
+
   const freedomBefore = reportedDof(current.construction, current.figure.carrierDof);
   const freedomAfter = reportedDof(trial.construction, trial.figure.carrierDof);
   if (

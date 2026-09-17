@@ -26,7 +26,7 @@
  * diagonals. Every row reads its vertices that way and none of them has to say so.
  */
 import { parseLengthExpr } from './lengths';
-import type { Constraint } from './solve';
+import { sameConstraint, type Constraint } from './solve';
 import type { Id } from './types';
 
 /** `ab ∥ cd` / `ab ⊥ cd`, over the point pairs the ring gives. */
@@ -38,6 +38,26 @@ const rel = (kind: 'parallel' | 'perpendicular', a: Id, b: Id, c: Id, d: Id): Co
 });
 
 const parallel = (a: Id, b: Id, c: Id, d: Id) => rel('parallel', a, b, c, d);
+
+/**
+ * The parallel pair a TRAPEZOID noun carries — marked as the tool's own assumption (#1159).
+ *
+ * «טרפז ABCD» promises *a* pair of parallel sides, and the ring order suggests which. The student
+ * stated a trapezoid; they did not state a pair. So this seat defaults by lettering and YIELDS the
+ * moment they name one — and until they do, it may never be quoted back at them as something that
+ * already follows from their own givens.
+ *
+ * This is [ADR-506](../../docs/06-decisions.md#adr-506)'s decision, ported rather than copied: the
+ * 2-D tree reached it from the same operator complaint and expresses it as `trapezoidRingInForce`
+ * over its own model. Trees do not share code here; they share rulings.
+ */
+const assumedParallel = (a: Id, b: Id, c: Id, d: Id): Constraint => ({
+  t: 'relation',
+  rel: 'parallel',
+  u: { k: 'points', a, b },
+  v: { k: 'points', a: c, b: d },
+  assumed: true,
+});
 
 /**
  * A right angle AT `v`, between the rays to `p` and `q`.
@@ -129,17 +149,18 @@ export const SHAPES: Record<string, ShapeRow> = {
   },
   טרפז: {
     arity: 4,
-    // Which pair is parallel IS stated by the vertex order: `AB ∥ DC` are the bases of `ABCD`.
-    givens: ([a, b, c, d]) => [parallel(a, b, d, c)],
+    // Which pair is parallel is the TOOL'S ASSUMPTION, defaulted by ring order and then pinned or
+    // displaced the moment the student names a pair (#1159) — see `assumedParallel`.
+    givens: ([a, b, c, d]) => [assumedParallel(a, b, d, c)],
   },
   'טרפז שווה שוקיים': {
     arity: 4,
-    givens: ([a, b, c, d]) => [parallel(a, b, d, c), equal(a, d, b, c)],
+    givens: ([a, b, c, d]) => [assumedParallel(a, b, d, c), equal(a, d, b, c)],
   },
   'טרפז ישר זווית': {
     // Both right angles sit on the same leg, so this is determined and needs no choice.
     arity: 4,
-    givens: ([a, b, c, d]) => [parallel(a, b, d, c), rightAngleAt(a, b, d)],
+    givens: ([a, b, c, d]) => [assumedParallel(a, b, d, c), rightAngleAt(a, b, d)],
   },
   דלתון: {
     // A kite: two pairs of ADJACENT equal sides, meeting at `A` and at `C`. That makes `AC` the axis
@@ -176,7 +197,58 @@ export const isGenericNoun = (noun: string): boolean => {
  * by the functions in this file — there is no second way to spell a right angle at `B`.
  */
 export const namesOption = (option: Constraint, stated: Constraint): boolean =>
-  JSON.stringify(option) === JSON.stringify(stated);
+  sameConstraint(option, stated);
+
+/** The two pairs of OPPOSITE sides of a ring, as unordered point-pair keys — `ABCD` ⇒ AB|DC, BC|AD. */
+const oppositePairs = (v: readonly Id[]): Array<[string, string]> => {
+  const key = (a: Id, b: Id) => [a, b].sort().join(',');
+  const out: Array<[string, string]> = [];
+  const n = v.length;
+  for (let i = 0; i < n / 2; i += 1) {
+    out.push([key(v[i], v[(i + 1) % n]), key(v[(i + 2) % n], v[(i + 3) % n])]);
+  }
+  return out;
+};
+
+/** The point-pair key of a relation operand, or null when it is not two points. */
+const operandKey = (d: { k: string; a?: Id; b?: Id }): string | null =>
+  d.k === 'points' && d.a && d.b ? [d.a, d.b].sort().join(',') : null;
+
+/**
+ * WHICH ASSUMPTION DOES THIS STATEMENT DISPLACE, if any — the index in `c.constraints`, or −1 (#1159).
+ *
+ * The student has named a pair of parallel sides. It displaces the tool's assumed pair when both
+ * belong to the SAME declared ring and they are its two different pairs of opposite sides — «טרפז
+ * ABCD» assumes `AB ∥ DC`, and «BC מקביל ל-AD» is the other pair of the same quadrilateral.
+ *
+ * Read from the RING rather than from the letters, so it cannot fire on two segments that merely
+ * happen to share names with a polygon's sides, and so a noun added later inherits it. A statement
+ * about a pair that is not an opposite-side pair of that ring — a diagonal, a side against something
+ * outside the figure — displaces nothing and records as the ordinary constraint it is.
+ */
+export function displacedAssumption(
+  c: { objects: ReadonlyArray<{ kind: string; vertices?: Id[] }>; constraints: readonly Constraint[] },
+  stated: Constraint,
+): number {
+  if (stated.t !== 'relation' || stated.rel !== 'parallel') return -1;
+  const su = operandKey(stated.u);
+  const sv = operandKey(stated.v);
+  if (!su || !sv) return -1;
+
+  return c.constraints.findIndex((k) => {
+    if (!(k.t === 'relation' && k.rel === 'parallel' && k.assumed)) return false;
+    const au = operandKey(k.u);
+    const av = operandKey(k.v);
+    if (!au || !av) return false;
+    return c.objects.some((o) => {
+      if (o.kind !== 'polygon' || !o.vertices || o.vertices.length < 4) return false;
+      const pairs = oppositePairs(o.vertices).map((p) => p.slice().sort().join('|'));
+      const assumedPair = [au, av].sort().join('|');
+      const statedPair = [su, sv].sort().join('|');
+      return statedPair !== assumedPair && pairs.includes(assumedPair) && pairs.includes(statedPair);
+    });
+  });
+}
 
 /**
  * The English nouns, as aliases onto the Hebrew rows — never a second table.

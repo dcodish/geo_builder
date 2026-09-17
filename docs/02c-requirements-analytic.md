@@ -1119,3 +1119,28 @@ the same cardinal sin as drawing a figure that violates its givens ([ADR-052](06
 **Where the student's own coordinates force a bad ring** — four pinned points written in an order
 that crosses — the figure is determined and there is no configuration to choose. That case is
 [#1170](https://github.com/dcodish/geo_builder/issues/1170) and is not yet answered.
+
+**R93 — what a shape noun leaves UNSTATED is the tool's assumption, and stating it is new information**
+([#1159](https://github.com/dcodish/geo_builder/issues/1159)).
+
+«טרפז ABCD» promises that **one** pair of opposite sides is parallel. It does not say which — the
+student wrote a noun, not a pair — so the tool picks one by the ring's lettering in order to draw
+anything at all, and that pick is **its own**, never a given.
+
+Two consequences, and both are promises to the student:
+
+- **Naming a pair settles it.** «AB מקביל ל-CD» pins the pair the tool had merely guessed; «BC מקביל
+  ל-AD» replaces the guess with the other pair and the figure ROTATES. The tool never keeps its
+  assumption *and* the student's statement — that draws a parallelogram on a figure they called a
+  trapezoid.
+- **An assumption is never quoted back as their own given.** «זה כבר נובע מהנתונים שכתבתם» — *it
+  already follows from what you wrote* — may only be said about things they actually wrote. A
+  statement that pins an assumption is recorded like any other given, because it narrowed the figure's
+  commitment even though it moved nothing.
+
+**A noun that genuinely states a choice is different.** «מקבילית ABCD» gives BOTH pairs — the noun says
+so — so restating one really is a restatement, and «כבר ידוע» is the honest answer there. The
+distinction is whether the *noun* settled it or the *tool* did.
+
+**One statement gets one answer.** A segment is undirected and so are ∥ and ⊥, so «AB מקביל ל-CD» and
+«AB מקביל ל-DC» are the same sentence and must never receive different replies.
