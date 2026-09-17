@@ -18,6 +18,7 @@ import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
+import { DISPLAY_ONLY } from '@/engine';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isSymbolBound, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, firstCyclableBranch, cyclableBranch, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -2366,9 +2367,22 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
     commands.every(
       (c) => c.type === 'set-var' || (REQUIREMENT_DATA.has(c.type) && !enabledCmdList.some((e) => deepEqual(e, c))),
     );
-  // `name-center` REVEALS an existing circle's hidden centre — a visible change that adds no object/point
-  // and moves nothing, so the geometry checks above miss it. It still "produced" (the centre now shows).
-  const reveals = commands.some((c) => c.type === 'name-center' || c.type === 'show-circle');
+  /**
+   * A DISPLAY-ONLY command produced something the geometry checks above cannot see (#1011).
+   *
+   * It reveals a hidden centre, resolves a hidden circle, or draws a valueless angle arc — a visible
+   * change that adds no object and moves nothing. The membership is DECLARED beside the command union
+   * (`DISPLAY_ONLY`, `engine/types.ts`) rather than listed here, because this was an enumeration that
+   * each new display feature was discovered to be missing from, one play session at a time.
+   *
+   * An EXACT re-statement is excluded, exactly as `dataOnly` excludes one: saying «זוית מרכזית AOB»
+   * twice has genuinely already been done, and the friendly «כבר קיים» is the honest answer. The
+   * difference from `dataOnly` is only that a display command needs no other condition — showing the
+   * thing IS the whole of what it does.
+   */
+  const reveals = commands.some(
+    (c) => DISPLAY_ONLY.has(c.type) && !enabledCmdList.some((e) => deepEqual(e, c)),
+  );
   // A step that REDUCES the figure's free-DOF count took effect even with ZERO coordinate delta (#156 —
   // the ADR-234/272/273 honesty class, driven-parametric edition): «∠EOF=90» on square-side midpoints
   // seeded at t=0.5 already held at the seed (nothing moved) and drives via the carriers' `solve`

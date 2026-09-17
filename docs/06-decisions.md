@@ -11774,3 +11774,39 @@ broken. **Complex** has no configuration search at all, so there is nothing to w
 **Consequences.** New `src/app/__tests__/issue-1041-edit-resolve.test.ts` (5). Verified both directions:
 removing the call turns it red (2 failed). `issue-364-accept-the-flash.test.ts` is untouched and still
 green — it proves the store contract, which is real; what it never proved is the connection.
+
+## ADR-519 — A DISPLAY-ONLY COMMAND DECLARES ITSELF; the submit gate stops enumerating them (#1011)
+
+**Requirements:** none (internal) — the R-level promise is unchanged: a statement the student makes reaches the figure or is refused, never vanishes. This restores it for one class of statement. **Design:** [04](04-design.md) — the submit gate's "produced" test.
+
+**The class.** `dryRunOutcome` decides whether a line produced anything by asking the FIGURE: did the construction grow, did a degree of freedom go, did the scale become fixed, did anything move. A **display-only** command — one that changes what the student SEES while adding no object, no constraint, no label, moving no point, removing no DOF and pinning no scale — answers *no* to every one of those, and has still done precisely what was asked.
+
+The gate already knew the class existed and handled it by **enumeration**:
+
+```ts
+const reveals = commands.some((c) => c.type === 'name-center' || c.type === 'show-circle');
+```
+
+Each of those two was added to that line **when its own feature was found broken in play**. That is the signature of a defect that repeats rather than one that was fixed: the next display command is not in the list, so it is discovered by a student.
+
+**`mark-angle` was the third member and was never added.** Measured on `main`:
+
+| figure | line | before | after |
+|---|---|---|---|
+| circle O, A and B on it, **radii OA and OB already drawn** | «זוית מרכזית AOB» | `{produced: false, reason: 'empty'}` | **`produced`** |
+| the same, radii **not** drawn | «זוית מרכזית AOB» | `produced` | `produced` |
+| the same, **with a value** | «זוית מרכזית AOB = 80» | `produced` | `produced` |
+
+So a student whose radii were already on the canvas typed a valueless central angle, was told «זה כבר קיים באיור», and got no arc — while the identical sentence on a figure one step less complete worked. The boundary was exact and invisible: the mark committed iff one of its arms happened to be new.
+
+**Decision — membership is a DECLARED PROPERTY, beside the command union.** `DISPLAY_ONLY` lives in `engine/types.ts` where commands are written, typed `ReadonlySet<AnyCommand['type']>` so a member that is not a real command kind is a compile error. `dryRunOutcome` consults it. A new display command is then added by the person writing it rather than found by a student, which is the whole of the fix — the `mark-angle` symptom is one line of it.
+
+**This was not a `|| c.type === 'mark-angle'` patch, and the reason is on the queue.** Two display features are planned and hit the same gate *by construction*: **#216** (`shade-region`, whose issue says outright *"no constraints, no DOF impact"* — it would register `empty` on every region whose boundary points already exist, which is every region a student would shade) and **#155** (the arc ⌢ render). Both now inherit the answer.
+
+**An exact re-statement stays a friendly no-op.** The duplicate exclusion `dataOnly` has always had is applied here too, so saying the same mark twice is «כבר קיים» rather than a second arc drawn over the first. Without it a display command would produce unconditionally, which is the opposite defect.
+
+### A note on the witness, because the original one is gone
+
+#1011 was filed against **PR #1008's branch**, and that PR was **closed without merging** — so «זוית ABC», its headline utterance, does not parse on `main` at all. The issue could have been read as stale. It is not: the valueless **central** angle lowers to the same `mark-angle` and was swallowed identically, which is the witness above and the one the lock uses. The class was always the point; the PR was only where it was first seen.
+
+**Consequences.** `DISPLAY_ONLY` (new, `engine/types.ts`), one line in `replay/core.ts`. `issue-1011-display-only.test.ts` (7) — driven through `parse → dryRunOutcome`, the REAL gate, because the defect reached play precisely by being locked below it. 2-D lane 391 files / 6752 tests.

@@ -1258,6 +1258,44 @@ export interface Consumed {
 /** What the parser produces and a `Fact` stores: engine commands plus the symbolic layer. */
 export type AnyCommand = (Command | SymbolicCommand) & { consumed?: Consumed };
 
+/**
+ * DISPLAY-ONLY COMMANDS — a command that changes what the student SEES while adding no object, no
+ * constraint and no label, moving no point, removing no DOF and pinning no scale (#1011).
+ *
+ * The submit gate decides "did this produce anything?" from the figure: did the construction grow, did
+ * a DOF go, did the scale become fixed, did a coordinate move. A display-only command answers **no** to
+ * every one of those and has still done exactly what the student asked. So the gate has to be TOLD, and
+ * this is where a command says so.
+ *
+ * ## Why it is a declared property and not a list in the gate
+ *
+ * It WAS a list in the gate — `name-center || show-circle`, written inline in `dryRunOutcome`. Each of
+ * those two was added to it when its own feature was found broken in play, which is the shape of a
+ * defect that repeats: the gate enumerates, and a new display command is not in the enumeration, so it
+ * is discovered by a student rather than by the compiler.
+ *
+ * `mark-angle` was the third member and was never added. Measured on `main`: «זוית מרכזית AOB» on a
+ * figure whose two radii are already drawn returns `{produced: false, reason: 'empty'}`, so the student
+ * is told «זה כבר קיים באיור» and no arc appears — while the SAME utterance on a figure where the radii
+ * are new commits fine, because the segments are what grew.
+ *
+ * Two more are queued and hit it by construction: **#216** `shade-region`, whose issue says outright
+ * *"no constraints, no DOF impact"*, and **#155**'s arc notation. Declaring the property here means they
+ * inherit the answer instead of each being found broken in play.
+ *
+ * Typed against `AnyCommand['type']`, so a member that is not a real command kind — or one renamed — is
+ * a compile error rather than a silently inert string.
+ */
+export const DISPLAY_ONLY: ReadonlySet<AnyCommand['type']> = new Set<AnyCommand['type']>([
+  // Reveals an EXISTING circle's auto-hidden centre. Adds no object; the centre simply shows.
+  'name-center',
+  // Reveals an EXISTING hidden circle (ADR-291) — a circumscription resolved, never a duplicate.
+  'show-circle',
+  // A VALUELESS angle arc (FR-RN-7): a highlightable marker that asserts nothing. Its arms are drawn as
+  // their own `segment`s, so on a figure where they already exist it is the whole of what this line did.
+  'mark-angle',
+]);
+
 /** Tolerances. */
 export const LEN_EPS = 1e-6; // coordinate closeness (units)
 export const ANGLE_EPS = 0.5; // degrees

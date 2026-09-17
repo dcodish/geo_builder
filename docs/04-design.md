@@ -670,3 +670,34 @@ knowledge gates ask "is this the same in every configuration?", and the pool is 
   is the responsible one. Runs only when a degeneracy exists, one replay per prefix, and never nests (a
   prefix replay inside the scan reports the predicate alone). The engine carries fact ids and a number;
   the wording is the chrome's, in the student's own words (`figure.degenerate`, He + En).
+
+## What counts as "produced": a display-only command declares itself (#1011, [ADR-519](06-decisions.md#adr-519))
+
+`dryRunOutcome` answers one question — *did this line do anything?* — and it answers it by looking at the
+FIGURE: did the construction grow, did a degree of freedom go, did the scale become fixed, did a point
+move. When the answer is no everywhere, the student is told «זה כבר קיים באיור» and the line is not
+committed. That is right for a genuine restatement and it is how a stated given can never be silently
+swallowed.
+
+**A display-only command breaks the assumption behind it.** Revealing a hidden centre, resolving a
+hidden circle, drawing a valueless angle arc — each changes what the student sees and touches none of
+the four signals. There is nothing in the figure for the gate to notice, so the gate has to be told.
+
+It used to be told by a list written inside the gate, and the list grew one entry at a time as each
+display feature was found broken in play. Membership is now a **declared property** —
+`DISPLAY_ONLY` in `engine/types.ts`, beside the command union, typed against `AnyCommand['type']` so a
+non-existent kind is a compile error — and `dryRunOutcome` consults it. A new display command therefore
+inherits the answer at the moment it is written.
+
+Two rules keep it honest:
+
+- **An exact re-statement is excluded**, the same way `dataOnly` excludes one. Saying the same mark
+  twice genuinely has already been done, and a second arc drawn over the first would be the opposite
+  defect.
+- **It asserts nothing.** A display command must leave `freeDofCount` and the constraint list
+  unchanged; a command that removes freedom is a GIVEN and belongs in the ordinary lane, where the
+  geometry signals already see it. The lock asserts this, because the moment a "display" command starts
+  constraining, the gate is being told something false.
+
+The membership is tested at the gate the app calls, never below it: #1011 reached a play session at all
+because the feature's own lock drove the store directly and never crossed `dryRunOutcome`.
