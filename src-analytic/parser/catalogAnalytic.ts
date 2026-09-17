@@ -194,6 +194,35 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['משולש ABC'],
   },
 
+  /**
+   * --- the COLON-RATIO family (#1124), F20: it lowers to the same length-eq as «AB = 10» ---
+   *
+   * Listed in full rather than by one representative, and that is the direct lesson of #347: the
+   * coverage guard builds every entry, so a spelling that is not here is never exercised and can rot
+   * back out in silence. Three forms, because the exam writes all three.
+   */
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'AC:CB = 3:2',
+    en: 'AC:CB = 3:2',
+    needs: ['A(0,0)', 'B(10,0)', 'C על הקטע AB'],
+  },
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'C מחלקת את AB ביחס 3:2',
+    en: 'C divides AB in ratio 3:2',
+    needs: ['A(0,0)', 'B(10,0)'],
+  },
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'היחס בין AC ל-CB הוא 3:2',
+    en: 'the ratio between AC and CB is 3:2',
+    needs: ['A(0,0)', 'B(10,0)'],
+  },
+
   /** Naming a circle's CENTRE (#1109) — the same click-to-name family as a crossing. */
   {
     category: 'derived',

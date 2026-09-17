@@ -4253,6 +4253,64 @@ same bound at a different arity (two straights meet once, so a second name is re
 
 ---
 
+## ADR-AG-077 — A ratio is a REWRITE of a length equation, and the form decides whether it places or relates (#1124)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R88. **Design:** none (internal) — no new engine
+kind; the rules are `parseRatioColon` / `parseDividesInRatio` in the parser.
+
+**Operator:** *"the analytics tool doesnt support the ratio AC:CB=3:2"*. The **mechanism was already
+here** — `length-eq` carries `AB = 10`, `AB = AC` and `2·AB = 3·CD` as one kind with different trees —
+and only the notation was missing. 2-D has had all three forms since #519.
+
+**The split is 2-D's, ported rather than reinvented.** The bare colon is a RELATION over points that
+already exist; the keyworded divider is a PLACEMENT that mints one. Deciding by **form** is what makes
+«C מחלקת את AB ביחס 3:2» a single sentence a student can type, and it is why the issue recommended
+porting the split instead of picking one lowering.
+
+`AC:CB = p:q` ⇒ `|AC| = (p/q)·|CB|` — exactly what «AC = 1.5CB» already lowers to. **No new engine
+kind**, and the divider reuses precisely what «C על הקטע AB» emits (`declare` + `on-line-2pt` +
+`between`) plus that constraint.
+
+### The first build parsed perfectly and drew the wrong figure
+
+Worth recording in full, because everything about it looked right.
+
+It hand-wrote the `LengthExpr` tree. Every spelling parsed; the fact tree printed **byte-identical** to
+the one «AC = 1.5CB» produces; the derived construction printed byte-identical too — same objects, same
+params, same selectors, same constraints, same outcomes. And `C` landed at **3.75 instead of 6.00**, with
+`unsatisfied` **empty**.
+
+The cause: `LengthExpr.terms[i]` is bound to a **private-use code point** (`PLACEHOLDER_BASE`, U+E000),
+so the placeholder symbol's name is an invisible character. `JSON.stringify` renders it as an invisible
+glyph between the quotes, which means **`name: ""` and `name: ""` are indistinguishable in every
+console, diff and test dump.** The constraint was never evaluated, and nothing anywhere said so.
+
+The fix is to **call `parseLengthExpr`** and wrap its expr, rather than reproduce its encoding — the rule
+[ADR-W-053](06w-decisions-workspace.md#adr-w-053) states, arriving here from a direction nobody predicted:
+not a test reproducing a decision, but a *rule* reproducing a data encoding, with the same result of
+agreeing with itself while being wrong.
+
+It is also why this ADR's lock asserts **geometry** rather than parsing. A test that checked "it parsed"
+would have passed on that build.
+
+### Ordering
+
+The rules run **before `matchCurve`**, whose bare-colon branch would otherwise claim «AC:CB = 3:2» as a
+line named `AC` with the equation `CB = 3:2` — the reported bug, fixed in
+[ADR-AG-074](#adr-ag-074) / #1123 by making that branch decline a tail that is not an equation in the
+plane's variables. That fix is what turned this sentence into an honest `not-handled`, and this ADR is
+what plugs into that seam; #1123's lock is updated to say so rather than left asserting a refusal that is
+now a build.
+
+**Catalog entries for all three forms** are listed individually — the direct lesson of #347: the coverage
+guard builds every entry, so a spelling that is not there is never exercised and can rot back out in
+silence.
+
+**Consequences.** `issue-1124-ratio-family.test.ts` (12), asserting geometry per spelling, the identity
+with «AC = 1.5CB», the n-way refusal by name, and the named-line ordering regression. Analytic lane 1161.
+
+---
+
 ## ADR-AG-079 — A circle's centre is namable, and the name asserts nothing (#1109)
 
 **Requirements:** [02c](02c-requirements-analytic.md) R90. **Design:** none (internal).
