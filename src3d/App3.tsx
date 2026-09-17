@@ -59,7 +59,19 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
     case 'incircle-needs-triangle': // #442 — only a tangential polygon has an incircle
       return t('err.incircleNeedsTriangle');
     case 'ambiguous-vector-length':
-      return t('err.ambiguousVectorLength');
+      /**
+       * #1156 — the apply-level refusal carries the student's OWN pairs, so the two spellings that
+       * work are shown in their letters rather than as `AB`/`CD` placeholders. A bare "which did you
+       * mean?" leaves a student who has just been told their true given is false no way forward,
+       * which is #778's *non-canonical input is TAUGHT, never silently accepted*.
+       *
+       * The parser's `c = 1` refusal carries no pairs and keeps the generic wording.
+       */
+      return 'a1' in err
+        ? t('err.ambiguousVectorLengthRatio', {
+            a1: err.a1, b1: err.b1, a2: err.a2, b2: err.b2, c: err.c,
+          })
+        : t('err.ambiguousVectorLength');
     case 'param-roles-conflated':
       return t('err.paramRolesConflated', { letter: err.letter });
     // #836: name the candidates — a bare "which diagonal?" leaves a student who does not know the prime

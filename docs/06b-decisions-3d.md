@@ -9891,3 +9891,46 @@ rectangle / rhombus 1, square 0, trapezoid 3 then 2, «מרובע» 4, the trian
 floor); ARM 1 unchanged (2 / 1 / 0); the #292 drives still consume (4, 2); `numericRank` unit-locked
 (empty, zero, identity, dependent columns, all-noise, a real column beside a noise column, a dependent
 third). `fixtures3/` sweep unchanged. No fixture, for the reason ADR-3D-247 gives.
+
+### ADR-3D-249 — «AA'=3BC» is ASKED about, never called false; and a length ratio DRIVES (#1156)
+
+**Requirements:** [02b](02b-requirements-3d.md) — none added; this restores the honesty invariant (a true given is never refuted). **Design:** the apply boundary's public entry. **LADDER stage:** apply, at the outermost call — before any internal lowering.
+
+**Live in production, and reported by the log rather than by a person.** Session `i8gw52ej`: one student, 7 submits, 4 spellings, every one `claim-refuted`. They then cleared the canvas and rebuilt the figure without the relation.
+
+```
+תיבה
+AA'=3BC        ⚠ claim-refuted   ← the tool says a true statement is false
+|AA'|=3|BC|    ✓ builds, ratio exactly 3
+```
+
+Nothing in the figure refuted anything: the box is bare, its edges are free, and `AB=4` on it resizes happily. The tool was refuting a given against proportions **it had sampled itself** — [ADR-052](06-decisions.md#adr-052)'s cardinal sin.
+
+### The ruling, and why the obvious fix was rejected first
+
+Round #1169 attempted the issue's proposed *routing* rule — read the sentence as a length relation — and **took four locks red across three files**. That was the plan failing contact with the code, and it was escalated rather than forced:
+
+- **[#748](https://github.com/dcodish/geo_builder/issues/748)** ruled that where the vector and length readings disagree the tool **refuses rather than picks** — *"believing either would be a guess"*;
+- **[ADR-3D-010](#adr-3d-010)**'s own correction note ruled that **a coefficient commits to the vector reading** at PARSE time.
+
+**Operator ruling, 2026-09-17: refuse and TEACH the bar form.** Both prior rulings stand untouched; the sentence is asked about exactly as the parser already asks about the `c = 1` form. This is the option that contradicts nothing already decided.
+
+### Why the question is asked at APPLY, and at the OUTERMOST call
+
+It cannot be asked at parse time, and ADR-3D-010 records what happens when you try: widening the parser's guard to the coefficient form **broke twelve tests**, because with an unknown point the identical sentence *defines* that point (the affine lane, the 2018 gate's «A'K = 4/5 DN»). The parser is context-free by design and cannot tell the two apart.
+
+So the question needs the figure. Five conditions, each protecting a lane: a single pair term with a numeric coefficient (a named-vector relation stays v7-t1's verified claim) · `k ≠ 1` (the parser already asks) · every point known (otherwise it is a definition) · **neither pair rides a segment** (the rider family is #748's, chain form and non-chain alike) · the pairs are distinct.
+
+**And at the outermost call only** — found by a failing test, not by reasoning. `point-on-segment3` on an existing id lowers to ADR-3D-047's *"vec-rel dual"*, producing exactly the shape being asked about; asking it of the engine's own rewrite refused a statement nobody wrote that way. A depth guard makes the intent explicit: this is a question about **the sentence the student submitted**.
+
+### The second half needed no ruling
+
+`length-ratio` («AB:BC = 3:1») was *checked but never solved*, so it refuted against the sampled box in the same way. But `A:B = p:q` has **no vector reading at all** — there is nothing ambiguous to ask — so it simply drives, reaching the `length-rel` pin that has existed since T2. It is similarity-invariant like the rest of the M1 scalar family, and the claim is still recorded, so the final verification stays the arbiter and a contradictory ratio still refuses.
+
+**Both halves ship together deliberately.** Refusing `AA'=3BC` while `AB:BC = 3:1` still answered "your statement is false" would leave the student one keystroke from the same wrong message.
+
+### The teaching is the point, not the refusal
+
+[#778](https://github.com/dcodish/geo_builder/issues/778)'s direction — *non-canonical input is TAUGHT, never silently accepted*. The refusal carries the student's **own** pairs and coefficient, so the message names the two spellings that work in their letters rather than as `AB`/`CD` placeholders. A bare «לא הבנתי» would be a worse outcome than the bug, because the student would have no way to get what they want.
+
+**Consequences.** `ambiguous-vector-length` joins `EngineError3` with its pairs; `ambiguousPairRatio` + a depth guard at `applyCommand3`; a `length-ratio` arm beside `length-eq`'s in the claim fork; `err.ambiguousVectorLengthRatio` in both locales. `issue-1156-ratio-taught.test.ts` (15), including every case the four tripwire locks defend. 3-D lane 245 files / 4717 tests, none moved.

@@ -1523,6 +1523,20 @@ export type EngineError3 =
   // «ABCD מלבן» on a base the figure knows is a square. Operator ruling: a naming error, not a
   // redundancy. Carries both shapes so the message can name them.
   | { code: 'shape-less-specific'; stated: QuadBase; actual: QuadBase }
+  /**
+   * «AA'=3BC» — a bare-label ratio between two pairs that are NOT a rider and its host (#1156).
+   *
+   * The same reason the PARSER refuses the `c = 1` form: the sentence has two readings — a vector
+   * equality and a length relation — and where they disagree the tool asks rather than picks (#748).
+   * It cannot be decided at parse time, because with an unknown point the identical sentence DEFINES
+   * that point (ADR-3D-010's affine lane, the 2018 gate's «A'K = 4/5 DN»), so the decision needs to
+   * know which points exist and lives here.
+   *
+   * Carries the pairs so the message can teach the two spellings that work, in the student's own
+   * letters — this is #778's *non-canonical input is TAUGHT, never silently accepted*, and a bare
+   * refusal would be worse than the bug it replaces.
+   */
+  | { code: 'ambiguous-vector-length'; a1: Id; b1: Id; a2: Id; b2: Id; c: number }
   | { code: 'unknown-point'; id: Id }
   | { code: 'unknown-vector'; id: string }
   | { code: 'unknown-plane'; id: string }
