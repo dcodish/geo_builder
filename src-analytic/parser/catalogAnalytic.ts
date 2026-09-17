@@ -194,6 +194,15 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['משולש ABC'],
   },
 
+  /** Naming a circle's CENTRE (#1109) — the same click-to-name family as a crossing. */
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'O מרכז המעגל I',
+    en: 'O is the centre of circle I',
+    needs: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9'],
+  },
+
   // --- F16 · derived points over stated vertices (02c §8) ---
   {
     category: 'derived',
