@@ -407,3 +407,48 @@ describe('the doc gate covers every doc-reading test (ADR-W-041)', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * A COMMITTED CONFLICT MARKER IS A CORRUPTED DOCUMENT (2026-09-17).
+ *
+ * `docs/02c-requirements-analytic.md` shipped to production at `prod/2026-09-17-2` carrying three
+ * live `<<<<<<<` / `=======` / `>>>>>>>` lines: a fix round's staging merge resolved two doc tails by
+ * script and the third file's markers were never removed. **Every other gate stayed green** — the
+ * size ceilings, the registry, the FR resolution, the ADR contract — because none of them reads a
+ * document as prose, and a docs-only push runs no CI lane at all.
+ *
+ * Cheap, total, and it cannot be argued with: a tracked text file may not contain a merge marker.
+ * Anchored to the LINE START, because `=======` is also a legitimate Markdown setext rule and
+ * `>>>>>>>` can open a blockquote — only the seven-character marker at column zero is the defect.
+ */
+describe('no committed merge conflict markers', () => {
+  const MARKER = /^(?:<{7} |={7}$|>{7} )/m;
+  const scan = ['docs', 'deploy'].flatMap((dir) => {
+    const base = path.join(ROOT, dir);
+    if (!fs.existsSync(base)) return [];
+    const walk = (d: string): string[] =>
+      fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => {
+        const full = path.join(d, e.name);
+        if (e.isDirectory()) return walk(full);
+        return /\.(md|json|ya?ml|conf|html)$/.test(e.name) ? [full] : [];
+      });
+    return walk(base);
+  });
+  const roots = ['CLAUDE.md', 'DOCS.json', 'BOUNDARIES.json', 'products.json']
+    .map((f) => path.join(ROOT, f))
+    .filter((f) => fs.existsSync(f));
+
+  it('the scan is not vacuous', () => {
+    expect(scan.length + roots.length).toBeGreaterThan(20);
+  });
+
+  it.each([...scan, ...roots])('%s', (file) => {
+    const text = fs.readFileSync(file, 'utf8');
+    const line = text.split(/\r?\n/).findIndex((l) => MARKER.test(l));
+    expect(
+      line,
+      `${path.relative(ROOT, file)} carries a merge conflict marker at line ${line + 1}. ` +
+        `A resolved merge leaves none; this file was committed mid-conflict.`,
+    ).toBe(-1);
+  });
+});

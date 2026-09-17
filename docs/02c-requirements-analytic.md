@@ -1120,7 +1120,6 @@ the same cardinal sin as drawing a figure that violates its givens ([ADR-052](06
 that crosses — the figure is determined and there is no configuration to choose. That case is
 [#1170](https://github.com/dcodish/geo_builder/issues/1170) and is not yet answered.
 
-<<<<<<< HEAD
 **R93 — what a shape noun leaves UNSTATED is the tool's assumption, and stating it is new information**
 ([#1159](https://github.com/dcodish/geo_builder/issues/1159)).
 
@@ -1145,7 +1144,6 @@ distinction is whether the *noun* settled it or the *tool* did.
 
 **One statement gets one answer.** A segment is undirected and so are ∥ and ⊥, so «AB מקביל ל-CD» and
 «AB מקביל ל-DC» are the same sentence and must never receive different replies.
-=======
 **R94 — a value the student stated exactly is DISPLAYED exactly**
 ([#1120](https://github.com/dcodish/geo_builder/issues/1120)).
 
@@ -1161,4 +1159,3 @@ ruling is untouched, and this sits ABOVE it). **A decimal the student typed is t
 
 There is no √ or π form in this tool yet — those values show as decimals until the corpus asks for
 them.
->>>>>>> fix/1150-silent-clause
