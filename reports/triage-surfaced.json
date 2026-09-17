@@ -2,8 +2,8 @@
   "version": 1,
   "_comment": "Git-tracked so the log-triage NEW-vs-carried split survives a machine switch (#502). Keys are sha256('geo-builder/log-triage/surfaced/v1' + app + utterance), truncated — NO utterance text is stored here, which is why this file may be committed while logs/triage-state-*.json may not. Values are the date the row was first put in front of the operator. Written by .claude/skills/log-triage/triage.mjs on every run.",
   "lastRun": {
-    "3d": "2026-09-09T07:44:07.075Z",
-    "2d": "2026-09-09T07:44:06.767Z"
+    "3d": "2026-09-17T06:46:18.810Z",
+    "2d": "2026-09-17T06:46:18.705Z"
   },
   "surfaced": {
     "044372aaddb95f3c": "2026-07-28",
@@ -50,6 +50,7 @@
     "a5ff1f32be6f8ae3": "2026-08-10",
     "a853e949bd0624c4": "2026-08-10",
     "ac295d56a85d522c": "2026-07-17",
+    "ac2aa4707f0b2e84": "2026-09-17",
     "ad5c3ff28647573f": "2026-07-17",
     "af85daa75464e129": "2026-07-17",
     "b36fccb6c09e15c3": "2026-07-28",
@@ -66,6 +67,7 @@
     "e08fed71a4b3695f": "2026-07-17",
     "ee7159afcba55a6d": "2026-07-17",
     "eeb82eb6fff99584": "2026-07-25",
+    "f35445be502a94d4": "2026-09-17",
     "f9ec311c9bb11ec8": "2026-08-30",
     "fc0ae79c1702bd74": "2026-07-17",
     "fc99cd27aa4a1280": "2026-07-17"
