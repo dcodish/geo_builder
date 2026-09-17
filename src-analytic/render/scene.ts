@@ -151,6 +151,20 @@ export interface Scene {
    * height from the point to the line». Decoration: no id, nothing the student named.
    */
   measures: SceneMeasure[];
+  /**
+   * The מקומות גיאומטריים an answer is about (#1137), already projected — the curve a point traces
+   * when the figure's remaining freedom is walked. Decoration, exactly like `measures`: no id,
+   * nothing the student named, and it lives as long as the question does.
+   */
+  loci: SceneLocus[];
+}
+
+export interface SceneLocus {
+  /** The polyline in SCREEN coordinates, ready for an SVG `path`. */
+  d: string;
+  /** A closed trace (circle, ellipse) is stroked as a loop; an open one stops where it stops. */
+  closed: boolean;
+  label: { text: string; x: number; y: number } | null;
 }
 
 export interface SceneCrossing {
@@ -215,6 +229,11 @@ export interface SceneKnowledge {
    * see; drawing them is all this module does with them.
    */
   marks?: Array<{ from: { x: number; y: number }; foot: { x: number; y: number }; label?: string }>;
+  /**
+   * The traced loci to draw, in WORLD coordinates (#1137) — the caller owns them for the same reason
+   * it owns `marks`: they belong to the ask lane, which the renderer cannot see.
+   */
+  loci?: Array<{ points: Array<{ x: number; y: number }>; closed: boolean; label?: string }>;
 }
 
 /** Does a drawn point stand here? The centre mark's label defers to it (#1086). */
@@ -354,6 +373,27 @@ export function buildScene(
     };
   });
 
+  /**
+   * The traced loci, projected (#1137).
+   *
+   * Nothing is decided here — which points, and whether the curve closed, were both settled by the
+   * tracer against the CONSTRUCTION, which this module cannot see. Projecting them is all it does,
+   * exactly as with `measures` and `crossings`.
+   *
+   * The label sits at the trace's midpoint rather than its end: an open locus runs off the view, and
+   * a label pinned to a point that is off-screen is a label nobody reads.
+   */
+  const loci: SceneLocus[] = (knows.loci ?? [])
+    .filter((l) => l.points.length >= 2)
+    .map((l) => {
+      const pts = l.points.map((p) => [t.sx(p.x), t.sy(p.y)] as const);
+      const d =
+        pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join('') +
+        (l.closed ? 'Z' : '');
+      const mid = pts[Math.floor(pts.length / 2)];
+      return { d, closed: l.closed, label: l.label ? { text: l.label, x: mid[0], y: mid[1] } : null };
+    });
+
   const crossings: SceneCrossing[] = (knows.crossings ?? []).map((k) => ({
     id: k.id,
     wx: k.x,
@@ -378,5 +418,6 @@ export function buildScene(
     points,
     crossings,
     measures,
+    loci,
   };
 }

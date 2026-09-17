@@ -23,6 +23,8 @@ import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
 import { isKnowledge, knownCurve } from '../engine/evaluate';
+import { locusOf } from '../engine/locus';
+import { locusEquation } from '../engine/locusFit';
 import { objectById, type Id } from '../engine/types';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 
@@ -101,6 +103,21 @@ export interface Answer {
    */
   mark?: { from: { x: number; y: number }; foot: { x: number; y: number } };
   /**
+   * THE מקום גיאומטרי — the traced curve, in WORLD coordinates, for the canvas (#1137).
+   *
+   * The SECOND ARM of the "draw only when it is knowledge" gate, and it is the inverse of `mark`
+   * above, not an exception to it. That gate exists because drawing a distance on an under-determined
+   * figure would assert a magnitude the student never gave. A locus is honest **precisely because**
+   * the figure is under-determined: it draws every position the point can take rather than one. The
+   * gate as written would have suppressed the trace on exactly the figures it exists for, and *"every
+   * surface that prints a number is gated, and remembering only one is the recurring failure"* is this
+   * tree's own documented trap — so it gets a second arm rather than a bypass (ADR-AG-072 §8).
+   *
+   * Decoration, like `mark`: no id, no letter, never in the fact list, and an ask never mutates the
+   * figure (02c R24).
+   */
+  locus?: { points: Array<{ x: number; y: number }>; closed: boolean };
+  /**
    * Is the mark currently DRAWN? (#1118, operator ruling 2026-09-16.)
    *
    * The row and the drawing have separate lifetimes, and that is his ruling: *"once the distance …
@@ -137,6 +154,15 @@ const SLOPE_OF = /^(?:ה?שיפוע|[Tt]he\s+slope\s+of)\s+(?:של\s+)?(?:ה?(?:
 const EQUATION_OF = /^(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+(?:ה?(?:ישר|מעגל|פרבולה|אליפסה|אלכסון)\s+)?(.+)$/;
 
 /**
+ * «המקום הגיאומטרי של P» · «locus of P» — the question this whole lane exists for (#1137).
+ *
+ * The set-former phrasing («המקום הגיאומטרי של כל הנקודות M המקיימות…») is deliberately NOT here:
+ * ADR-AG-072 §1 rules it sugar over the same thing, to be added later, not a prerequisite. What this
+ * must read is the question a student asks ABOUT a point they have already stated.
+ */
+const LOCUS_OF = /^(?:ה?מקום\s+ה?גיאומטרי|[Tt]he\s+locus|[Ll]ocus)\s+(?:של\s+|of\s+)?(?:ה?נקודה\s+)?(.+)$/;
+
+/**
  * Answer one question against the figure the student has built.
  *
  * `fmt` and `describeCurve` are injected rather than imported: they are the CALLER's formatting, and
@@ -148,9 +174,49 @@ export function ask(
   question: string,
   fmt: (v: number) => string,
   describeCurve: (name: string, c: NonNullable<ReturnType<typeof knownCurve>>) => string,
+  /**
+   * The family's name in the student's language — «מעגל», «ישר» (#1137).
+   *
+   * Injected for the reason the two formatters above are: it is the CALLER's wording, and this module
+   * is the lane's engine and holds no locale. Defaulting to the internal kind means a caller that
+   * forgets shows `circle` rather than `מעגל` — visibly wrong rather than silently absent, which is
+   * the direction this tree prefers to fail in.
+   */
+  kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind']) => string = (k) => k,
 ): Answer {
   const text = question.trim();
   if (!text) return { question, value: null, unreadable: true };
+
+  /**
+   * --- «המקום הגיאומטרי של P» — the locus lane (#1137) ---
+   *
+   * BEFORE the point rule, because «P» and «המקום הגיאומטרי של P» are different questions about the
+   * same point and only the leading phrase separates them — the same ordering `SLOPE_OF` needs against
+   * `EQUATION_OF`, for the same reason.
+   *
+   * There is NO locus grammar in the construction lane, and that is ADR-AG-072 §1: the student states
+   * the point and its property with sentences the tool already has, and the locus falls out of the
+   * DOF. This phrase is a QUESTION, which is why it lives here.
+   */
+  const loc = LOCUS_OF.exec(text);
+  if (loc) {
+    const name = loc[1].trim();
+    const o = objectById(d.construction, name);
+    if (!o) return { question, value: null, missing: { name, kind: 'point' } };
+    const res = locusOf(d.construction, name, [0, 1], d.box);
+    // No locus is a TRUE answer about the figure, not a failure to understand: the point is
+    // determined, or its freedom is not a curve. `value: null` is the lane's own way of saying
+    // «the figure does not determine this», and it is the honest one here too.
+    if (!res || !res.shape) return { question, value: null };
+    const eq = locusEquation(res.shape, fmt);
+    return {
+      question,
+      // The KIND always; the EQUATION only when the two configurations agreed on it (ADR-AG-072 §4,
+      // §5). «מעגל» on its own is a complete, true answer — and it is what חורף 25 actually asks for.
+      value: eq ? `${kindWord(res.shape.curve.kind)} · ${eq}` : kindWord(res.shape.curve.kind),
+      locus: { points: res.trace.points, closed: res.trace.closed },
+    };
+  }
 
   // --- a point, by name: its coordinates ---
   if (POINT_ONLY.test(text)) {

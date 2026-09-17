@@ -4464,6 +4464,72 @@ His second sentence was *"we need to give the user different options and not sim
 
 **Consequences.** `engine/rings.ts` (new), `Figure.ringFaults`, one term in `whole()`. `issue-1158-1166-polygon-noun-validity.test.ts` (24 tests, sweeping `SHAPES` so a noun added later inherits the lock). Analytic lane 80 files / 1235 tests.
 
+## ADR-AG-081 — The locus lane, V1a: the button shown all at once (#1136 + #1137)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R87 (specified), R92 (the free point). **Design:** [`src-analytic/CLAUDE.md`](../src-analytic/CLAUDE.md). **LADDER stage:** a reader over the solved figure — it walks the carrier system `evaluate` already builds and mutates nothing.
+
+Implements [ADR-AG-072](#adr-ag-072), scoped with the operator 2026-09-16. Locus is **13 of 20** sampled 572 Q1s — the most-asked construct in the corpus.
+
+**What a student can now do:**
+
+```
+A(-9,0)
+B(41,0)
+נקודה P
+PA מאונך ל-PB
+```
+
+then ask **«המקום הגיאומטרי של P»** and get the circle **drawn**, the row reading **«מעגל»**, and its equation **`(x − 16)² + y² = 625`**.
+
+### The engine already solved it — confirmed before anything was built
+
+Measured through the real `parse → fold → evaluate` path: `MA = MB` puts `M` at **x = 4.00 at every seed** with a different `y` each time; `∠APB = 90°` puts `P` at **distance 25.00 from (16, 0)** at every seed. `carrierDof = 1` in both. docs/19 §6 called the tracer "new core #3"; **it is not a new core**, and no constraint kind was added.
+
+> A locus is a named point whose residual `carrierDof` is 1. «הציגו תצורה אחרת» is already walking it, one point at a time. This lane is that button shown all at once.
+
+### #1136 first, because the workaround was itself the cardinal sin
+
+Every measurement in #1137 had to smuggle a 2-DOF point in as `משולש ABM` — asserting a triangle the student never mentioned, which is [ADR-052](06-decisions.md#adr-052) through the front door. The `free` carrier family has existed since slice A; **only the sentence was missing**, so «נקודה M» emits the `declare` fact the cevian and polygon rules already emit.
+
+**The class was measured, not assumed** (#1136's plan asked for it): «מעגל O» could already be declared unplaced; **«ישר k» still cannot**, for the same reason the point could not. That half is NOT fixed here — a free line has no object kind and no `carrierOf` row, so it is engine work rather than a sentence, and it is [#1171](https://github.com/dcodish/geo_builder/issues/1171). The lock asserts the split so it cannot be quietly forgotten.
+
+### CONTINUATION, and the two alternatives are refuted by measurement
+
+Solve once, step along the null space of the Jacobian by a fixed arclength, re-solve; outward both ways, to closure or to a bound.
+
+- **Seed scatter is not a trace.** Seed 2 puts `M` at `y = 317.54`, seed 3 at `y = 1.23`. Joined in seed order that is confetti, and sorting has no honest key in 2-D — angle works for the circle and fails for the bisector and the parabola.
+- **Marching squares cannot reach V1b.** #1138's traced point is DOWNSTREAM of the free one, so it has no scalar residual in its own `(x,y)` and there is nothing to contour. Continuation walks the FIGURE's freedom, so the same tracer covers both halves — `positionsAt` re-evaluates the whole dependent chain per step and traces whichever point was asked about.
+
+`carrierSystem` was extracted from `evaluate` so the solve and the tracer read **the same residuals**; a second construction of "what the constraints say" would be two definitions of the figure drifting apart.
+
+### The determinacy gate, and it is the honesty gate
+
+> *"only if we are positive about the equation we show it. otherwise, we stick to showing the shape."*
+
+Trace at two configurations, compare the **sets**. Same ⇒ print the equation; different ⇒ the kind alone. It is the set-level sibling of `isKnowledge` — that predicate asks whether a VALUE is invariant, and a locus point is by definition not, which is exactly why the *set* needs its own predicate.
+
+It falls out with no special-casing: the bisector prints `x = 4`; **חורף 25 with `A(−9a,0)` `B(41a,0)` prints «מעגל» and no equation**, because reaching `(x − 16a)² + y² = 625a²` means recognising a symbolic dependence across samples — the CAS boundary. And the KIND still shows, because the kind IS invariant and *"show that the locus of P is a circle"* is precisely what that exam asks.
+
+### The self-check earned its place three times over
+
+`fit → snap to rationals → RE-VERIFY the snapped equation against the trace → print, or print nothing`. With no student-side validation anywhere in this product, nothing else stands between an over-eager snap and a confident wrong equation. Three defects were found by measuring it rather than reasoning about it, and each was a class:
+
+1. **A line is not a well-posed conic fit.** Infinitely many conics contain a straight line, so the least-squares eigenspace is degenerate and the most elementary locus in the corpus classified as `rotated`. Cured by fitting the **lowest-degree curve first**, which is also what a student writes.
+2. **Snapping must be RELATIVE.** חורף 25's `F` fits to `−368.99998759` against `−369` — absolute error `1.2e−5`, relative `3.4e−8`. Held to an absolute `1e−6` a perfectly determinate locus printed nothing.
+3. **Normalisation must be MONIC.** Dividing by the largest coefficient makes that same circle's `A = −1/225`, which is not a rational with a denominator under 64. Monic gives `1, 1, −32, −225` — integers, which is what exam loci have.
+
+A fourth was a scope question rather than a bug: the view box is driven by the STATED objects, so «A(0,0)» + «MA = 5» gives a box about five across for a curve ten across, and tracing only inside it produced a **23° arc** — too little to identify (the gate then reported "shape only" about a determinate locus) and too little to show the student their answer. The walk now goes wider than the frame and the RENDERER clips, which leaves ADR-AG-072 §9 intact: the frame is still driven by the stated objects and an infinite locus still does not inflate it.
+
+### The knowledge gate needed a SECOND ARM, not a bypass
+
+`Answer.mark` is present *only* when a distance is knowledge, because drawing it on an under-determined figure would assert a magnitude nobody gave. A locus is the **inverse**: it is honest *because* the figure is under-determined, since it draws every position rather than one. The gate as written would have suppressed the trace on exactly the figures it exists for — and *"every surface that prints a number is gated, and remembering only one is the recurring failure"* is this tree's own documented trap.
+
+The trace rides ADR-AG-067's existing `shown` lifetime rather than inventing a fourth rule, so «click the entry again» hides a locus exactly as it hides a height and the row stays.
+
+**Consequences.** `engine/locus.ts` and `engine/locusFit.ts` (new), `carrierSystem` extracted from `evaluate`, `Answer.locus`, `drawnLoci`, `SceneLocus`, four `locus.*` locale keys, one catalog entry. `issue-1136-1137-locus.test.ts` (24). Analytic lane 88 files / 1236 tests.
+
+**Not in this slice:** #1138 (V1b, the construction locus) — it inherits the tracer, the surface, the gate and the fit pipeline whole. The set-former phrasing «המקום הגיאומטרי של כל הנקודות M המקיימות…» stays sugar for later (ADR-AG-072 §1). «המקום הגיאומטרי של מרכזי המעגלים…» quantifies over *circles* and is still refused by name.
+
 ## ADR-AG-082 — A shape noun's UNSTATED choice is the tool's assumption, and a statement pins it (#1159)
 
 **Requirements:** [02c](02c-requirements-analytic.md) R93. **Design:** [04c](04c-design-analytic.md) — *a noun's unstated choice is the tool's*. **LADDER stage:** the apply boundary — the noun lowers as before, and what changes is what a later statement may do to it.

@@ -298,6 +298,50 @@ function place(c: Construction, env: Env, free: Map<Id, Pt>): Map<Id, Pt> {
   return at;
 }
 
+/**
+ * THE CARRIER SYSTEM — the free vertices as a vector, and what the constraints say about it.
+ *
+ * Extracted (#1137) so the SOLVE and the LOCUS TRACER read the same residuals. The tracer walks the
+ * null space of this exact Jacobian and re-solves at every step, and a second construction of "what
+ * the constraints say" would be two definitions of the figure that drift apart — the failure this
+ * codebase names repeatedly. `evaluate`'s own solve is the first caller and
+ * [`locus.ts`](./locus.ts) is the second; there is no third way to ask.
+ *
+ * Pure over `(c, env)`: no seed, no starting point. WHERE the walk starts is the caller's business —
+ * `evaluate` samples it, the tracer inherits the solved figure — and keeping that out of here is what
+ * makes the system reusable at all.
+ */
+export interface CarrierSystem {
+  /** The free vertices, in the order their coordinates occupy the vector (two entries each). */
+  ids: Id[];
+  /** Positions → vector, and back. */
+  toVec: (free: Map<Id, Pt>) => number[];
+  asMap: (x: number[]) => Map<Id, Pt>;
+  /** Every object's position at these carrier values — derived points included. */
+  positionsAt: (x: number[]) => Map<Id, Pt>;
+  /** The constraint residuals there. Empty when the figure states none. */
+  residualsAt: (x: number[]) => number[];
+}
+
+export function carrierSystem(c: Construction, env: Env): CarrierSystem {
+  const ids = freeIds(c);
+  const asMap = (x: number[]) =>
+    new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
+  const positionsAt = (x: number[]) => place(c, env, asMap(x));
+  return {
+    ids,
+    asMap,
+    toVec: (free) => ids.flatMap((id) => [free.get(id)!.x, free.get(id)!.y]),
+    positionsAt,
+    residualsAt: (x) => {
+      const pos = positionsAt(x);
+      return c.constraints.flatMap(
+        (k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null)) ?? [0],
+      );
+    },
+  };
+}
+
 /** Carrier freedom left after the constraints — `carriers − rank(J)`, so dependent givens do not
  *  over-count (see `freeRank`). */
 /**
@@ -542,14 +586,10 @@ export function evaluate(raw: Construction, seed = 0): Figure {
   let free = seeded;
 
   if (ids.length > 0 && c.constraints.length > 0) {
-    const vec = ids.flatMap((id) => [seeded.get(id)!.x, seeded.get(id)!.y]);
-    const asMap = (x: number[]) =>
-      new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
-    const res = solveLM(vec, (x) => {
-      const pos = place(c, env, asMap(x));
-      return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null)) ?? [0]);
-    });
-    free = asMap(res.values);
+    // Through `carrierSystem` (#1137) so the locus tracer walks the SAME residuals this solves.
+    const sys = carrierSystem(c, env);
+    const res = solveLM(sys.toVec(seeded), sys.residualsAt);
+    free = sys.asMap(res.values);
   }
 
   /**

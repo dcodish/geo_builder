@@ -1120,6 +1120,26 @@ the same cardinal sin as drawing a figure that violates its givens ([ADR-052](06
 that crosses — the figure is determined and there is no configuration to choose. That case is
 [#1170](https://github.com/dcodish/geo_builder/issues/1170) and is not yet answered.
 
+**R92 — a point may be NAMED before it is PLACED**
+([#1136](https://github.com/dcodish/geo_builder/issues/1136)).
+
+«נקודה M» · «נתונה נקודה M» · «M היא נקודה» · «point M» introduces `M` as a point with **two degrees
+of freedom** — drawn at a sampled position, moving when «הציגו תצורה אחרת» advances the
+configuration, counted by the DOF cue (R18, P4), and pinned by any later given that determines it.
+
+**It is a free point, not a default.** A point that exists but never moves would be a magnitude the
+tool asserted and the student never gave, which is R14's rule and
+[ADR-052](06-decisions.md#adr-052)'s cardinal sin wearing a different hat. Two configurations must
+place it in two different places.
+
+**This is what R87 stands on.** A locus is a point described by its property, so the property has to
+have something to attach to. Before it, the only way to obtain a 2-DOF point was to name it as the
+vertex of a polygon — «משולש ABM» — which asserts a triangle the question never mentioned.
+
+**A LINE still cannot be named before it is determined** («ישר k»), and a circle already could
+(«מעגל O»). That asymmetry is known and filed
+([#1171](https://github.com/dcodish/geo_builder/issues/1171)), not intended.
+
 **R93 — what a shape noun leaves UNSTATED is the tool's assumption, and stating it is new information**
 ([#1159](https://github.com/dcodish/geo_builder/issues/1159)).
 

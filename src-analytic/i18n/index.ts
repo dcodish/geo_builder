@@ -87,6 +87,12 @@ const he = {
   errUnknownRefLine: 'הישר {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
   errUnknownRefCircle: 'המעגל {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
+  // The locus families (#1137) — keyed by the engine's own kind, so a family added later shows its
+  // internal name rather than nothing at all.
+  'locus.line': 'ישר',
+  'locus.circle': 'מעגל',
+  'locus.parabola': 'פרבולה',
+  'locus.ellipse': 'אליפסה',
   errNoPrincipalDiagonal:
     'בצורה הזאת אין אלכסון ראשי ואלכסון משני — ההבחנה הזאת קיימת רק בצורות כמו דלתון: "{{detail}}". אפשר לציין את האלכסון לפי הקודקודים, למשל «משוואת האלכסון AC היא y=2x».',
   errAmbiguousShape:
@@ -226,6 +232,10 @@ const en: typeof he = {
   errUnknownRefLine: 'The line {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefCircle: 'The circle {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
+  'locus.line': 'line',
+  'locus.circle': 'circle',
+  'locus.parabola': 'parabola',
+  'locus.ellipse': 'ellipse',
   errNoPrincipalDiagonal:
     'This shape has no principal and secondary diagonal — that distinction exists only for shapes ' +
     'like a kite: "{{detail}}". Name the diagonal by its vertices instead, for example "the ' +
