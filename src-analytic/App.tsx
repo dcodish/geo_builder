@@ -23,7 +23,7 @@ import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
 import { INITIAL_VIEW, centreOf, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
-import { fmtNum } from '../shell/format';
+import { fmtAnalytic } from './format';
 import { color, fs } from '../shell/theme';
 import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
@@ -1314,7 +1314,10 @@ export function lineText(a: number, b: number, c: number): string {
  * rounded to `-0`.
  */
 function fmt(v: number): string {
-  return fmtNum(Math.abs(v) < 1e-12 ? 0 : v);
+  // #1120 — EXACT FORMS FIRST. The slope of `y=(4/3)x` is 4/3, and printing `1.33` states a different
+  // number. The clamp and the decimal fallback live inside `fmtAnalytic`, which is this tree's one
+  // display formatter so the panel and the canvas cannot disagree.
+  return fmtAnalytic(v);
 }
 
 /**

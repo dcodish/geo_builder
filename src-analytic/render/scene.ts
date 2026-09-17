@@ -9,7 +9,7 @@
  */
 import { polylines, type Box } from '../engine/curves';
 import { markPoint } from '../engine/derived';
-import { fmtNum } from '../../shell/format';
+import { fmtAnalytic } from '../format';
 import type { Figure } from '../engine/evaluate';
 import type { CurveKind } from '../engine/types';
 
@@ -268,7 +268,7 @@ export function buildScene(
           label:
             knows.curveKnown?.(c.id) &&
             !hasPointAt(fig, c.curve.cx, c.curve.cy)
-              ? `(${fmtNum(c.curve.cx)}, ${fmtNum(c.curve.cy)})`
+              ? `(${fmtAnalytic(c.curve.cx)}, ${fmtAnalytic(c.curve.cy)})`
               : undefined,
         }
       : undefined,
@@ -293,7 +293,7 @@ export function buildScene(
       label:
         s.pinnedLength === undefined
           ? undefined
-          : { text: fmtNum(s.pinnedLength), x: (x1 + x2) / 2, y: (y1 + y2) / 2 },
+          : { text: fmtAnalytic(s.pinnedLength), x: (x1 + x2) / 2, y: (y1 + y2) / 2 },
     };
   });
 
@@ -312,7 +312,7 @@ export function buildScene(
   const points: ScenePoint[] = fig.points.map((p) => {
     const prov = fig.provenance[p.id];
     const part = (comp: { known: boolean; value?: number } | undefined, axis: 'x' | 'y'): ScenePart =>
-      comp && comp.known ? { text: fmtNum(comp.value as number) } : { text: axis, sub: p.id };
+      comp && comp.known ? { text: fmtAnalytic(comp.value as number) } : { text: axis, sub: p.id };
     // Shown only when the givens said SOMETHING about this point; a point described by nothing —
     // or only by a constraint shared with others — carries its name alone.
     const any = prov && (prov.x.known || prov.y.known);

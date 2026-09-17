@@ -4501,3 +4501,42 @@ CLAUDE.md, *Honesty invariants*: **error messages name the conflicting statement
 **Counter-direction, asserted:** the same sentence with both lines PRESENT still records. A reference check that refused a legitimate statement would be far worse than the silence it replaces.
 
 **Consequences.** `constraintCurveRefs` (`solve.ts`), `statedName` + `CURVE_BEARING` + one arm (`apply.ts`), nine `unknown-reference` sites routed through `statedName`. `issue-1150-1145-refs.test.ts` (10). Analytic lane 82 files / 1237 tests.
+
+## ADR-AG-084 — Exact forms: the analytic tree gets the display tier its three siblings already had (#1120)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R94. **Design:** [04c](04c-design-analytic.md) — *the tree's display formatter*. **LADDER stage:** display only — no value, gate or comparison anywhere in the product is affected.
+
+**Operator, playing PR #1116 T29, and again unprompted the next day:** *"in the data panel, the slope of 4/3 is written as 1.33 which is wrong"*. **Ruling, 2026-09-16, verbatim: "exact forms".**
+
+He is right that *wrong* is the word rather than *imprecise*: in analytic geometry the slope of that line **is** 4/3, and `1.33` is a different number the panel was stating as the value. It also sat badly beside this product's own promise — #1053 shows the FORMULA behind an answer so a student sees the method, and the method here yields 4/3. Showing the working and then rounding the result teaches them to write `1.33` on an exam that wants `4/3`.
+
+### Two corrections to the issue's framing, both measured
+
+**1 — This is NOT a workspace change.** The ruling's transcription says *"`fmtNum` is the workspace's single display chokepoint, so this is a workspace ADR and not a per-product one. Every number in every tool is in its scope."* Measured, that is not the shape of the code. [`shell/format.ts`](../shell/format.ts)'s own docblock already describes the architecture — *"Exact symbolic forms (5, 1/2, √2, cis120°) never pass through here … Each keeps its own product-specific tiers ABOVE the decimal fallback"* — and three of the four trees have built theirs:
+
+| tree | exact tier |
+| --- | --- |
+| 2-D | `exactFormOf` — rational · √ · π ([ADR-410](06-decisions.md), #217) |
+| 3-D | `cleanNum` — integer · `p/q` (q ≤ 24) · surd |
+| complex | exactness carried structurally in the value model (`ExactValue`) |
+| **analytic** | **none — `fmtNum` called directly** |
+
+So the shared formatter was never the defect. **Analytic is the one tree that never built the tier above it**, and a cross-product disparity of that shape is a wiring smell rather than a workspace redesign. The fix is scoped to this tree and this ADR is `ADR-AG`, not `ADR-W`.
+
+**2 — Recognition, not carriage — a DEVIATION from the transcribed mechanism, stated plainly.** The operator's words were *"exact forms"*, which names an outcome. The transcription went further and selected the body's **option (2), carry the stated value** — *"the parser already holds `4/3` as text, so it is kept alongside the float"*. This builds **option (1), recognition**, and the reasons are:
+
+- it is what **both** sibling trees that print exact forms already do, so it satisfies the ruling with the mechanism the workspace has settled on twice;
+- the value reaching display is a `number`, and the exactness of `4/3` lives in the equation several layers up. Carrying it would mean threading an exact representation through `isKnowledge` and every value path — a new value-carrying layer, which is a new mechanism rather than a tier;
+- the issue's stated objection to option (1) — *"it will occasionally print a fraction for a number that only looks like one"* — is answered by discipline rather than by architecture, and the discipline is the siblings': a **relative** tolerance of `1e-6`, a denominator capped at **12**, and a caller that has already gated on invariance (`isKnowledge` — the same number in every admissible configuration). **`1.3333` typed by a student stays `1.33`**, and that is asserted first-class.
+
+**If the operator meant the stated-text mechanism specifically, this is the line to revisit** — it is recorded here rather than folded in silently.
+
+### What was built
+
+`src-analytic/format.ts`: `fractionText` (the tier) and `fmtAnalytic` (tier, then the shared decimal fallback, with the sub-epsilon clamp the old `fmt` carried). The tree's **one** display formatter, so the panel and the canvas cannot print one value two ways — `fmtNum`'s own *"never per-call-site"* rule applied one level up. `App.tsx`'s `fmt` and `render/scene.ts`'s three labels route through it.
+
+**Copied, not imported**: `src-analytic/CLAUDE.md` boundary 1 — 2-D's lives in `src/`, which this tree may not import. A third recogniser in the workspace is the architecture `shell/format.ts` describes, not a new sin.
+
+**No surd tier**, deliberately: no witness in this tree's corpus yet, and a tier with no witness has no test that could fail. √2 falls to the decimal, honestly.
+
+**Consequences.** `src-analytic/format.ts` (new), one line in `App.tsx`, three labels in `scene.ts`. `issue-1120-exact-forms.test.ts` (7), whose load-bearing case is the counter-direction. Analytic lane 82 files / 1246 tests — **no display assertion moved.**

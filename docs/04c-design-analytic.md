@@ -604,3 +604,39 @@ next site handed a curve id inherits the fix instead of repeating the defect.
 
 An anonymous curve (`curve-<hash>`) is left whole — there is no student name to recover, and the
 hash's tail would be a different wrong word rather than the right one.
+
+## The tree's display formatter ([ADR-AG-084](06c-decisions-analytic.md#adr-ag-084))
+
+`shell/format.ts` owns decimal EXPANSIONS for every product — two places after the point, one
+chokepoint, no private rounders. Its docblock is equally explicit about what it does *not* own:
+*"Exact symbolic forms (5, 1/2, √2, cis120°) never pass through here … Each keeps its own
+product-specific tiers ABOVE the decimal fallback."*
+
+This tree had no tier, and called `fmtNum` directly — so the slope of «y=(4/3)x» read `1.33`. 2-D has
+`exactFormOf` (rational · √ · π), 3-D has `cleanNum` (integer · `p/q` · surd), and the complex tree
+carries exactness structurally. Analytic was the gap, not the shared formatter.
+
+`src-analytic/format.ts` is now the tree's **one** display formatter — panel and canvas both — with a
+single tier above the fallback:
+
+```
+fmtAnalytic(v) = fractionText(v) ?? fmtNum(v)
+```
+
+### Recognition is honest only while it stays recognition
+
+The number reaching display is a `number`; the exactness of `4/3` lives in the equation the student
+typed, layers above. So the form is RECOGNISED, exactly as both siblings do, and two limits keep that
+from becoming invention:
+
+- **a relative tolerance (`1e-6`) and a denominator capped at 12.** With a loose bar or a large
+  denominator, every float is "rational" and the tier always succeeds — which in a tool about
+  exactness is its own kind of lie. `1.3333` typed by a student stays `1.33`; π is not printed as 22/7.
+- **the caller has already gated on invariance.** A value is displayed at all only where it passed
+  `isKnowledge` — the same number in every admissible configuration — so a sampled coincidence never
+  reaches the formatter.
+
+The counter-direction is the load-bearing test, not the reported case.
+
+**No surd tier**: no witness in this tree's corpus, and a tier with no witness has no test that could
+fail. It is added when an exam asks for it.

@@ -1119,3 +1119,19 @@ the same cardinal sin as drawing a figure that violates its givens ([ADR-052](06
 **Where the student's own coordinates force a bad ring** — four pinned points written in an order
 that crosses — the figure is determined and there is no configuration to choose. That case is
 [#1170](https://github.com/dcodish/geo_builder/issues/1170) and is not yet answered.
+
+**R94 — a value the student stated exactly is DISPLAYED exactly**
+([#1120](https://github.com/dcodish/geo_builder/issues/1120)).
+
+The slope of «y=(4/3)x» is **4/3**, and the panel says `4/3`. It does not say `1.33`, which is a
+different number — this tool is about exactness, and rounding a stated value into a wrong one teaches
+the student to write the wrong one on an exam.
+
+**Small rationals only, and only where the value is already knowledge.** A number is shown as a
+fraction when it is one to within a tight relative tolerance and its denominator is small; anything
+else keeps the house two-decimal display (R-level: [#723](https://github.com/dcodish/geo_builder/issues/723)'s
+ruling is untouched, and this sits ABOVE it). **A decimal the student typed is their number**:
+`1.3333` is displayed as `1.33` and never dressed up as `4/3`.
+
+There is no √ or π form in this tool yet — those values show as decimals until the corpus asks for
+them.
