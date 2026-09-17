@@ -10,7 +10,7 @@
  * edit it exists to catch. So the near-misses are asserted, not the happy path.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 // @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
 const tooling = (await import('../../scripts/check-sibling-safety.mjs')) as any;
-const { classifyChange, productOf, PRODUCTS, firstReason, SIBLING_TRAILER } = tooling;
+const { classifyChange, productOf, PRODUCTS, firstReason, SIBLING_TRAILER, treesTouched, crossProductGroups } = tooling;
 
 type Buckets = { own: string[]; sibling: string[]; shared: string[]; inert: string[] };
 /** Default viewpoint stays `complex` — the one the guard shipped with (#846 made it a parameter). */
@@ -229,5 +229,78 @@ describe('#895 — the cross-product reason rides a commit trailer', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('#1155 — the refusal is a property of the CHANGE, so every lane reads it the same', () => {
+  /**
+   * The defect this locks: `--product` is filled in by the CI LANE, and the guard used it as the
+   * viewpoint of the diff check. So for any change touching exactly one tree P, the P lane passed
+   * and the other three refused the change's OWN files as sibling edits — at most one lane could be
+   * right, and three were wrong by construction. `main` shipped red that way at 8525c378 with every
+   * test green, and PRs #1142/#1143 could not be merged.
+   *
+   * These assert the PROPERTY rather than the four instances, so product N+1 is covered the day it
+   * is added to PRODUCTS — the same reason `treesTouched` takes no product argument.
+   */
+
+  it('THE PROPERTY: a single-tree change gets the same verdict from every lane', () => {
+    for (const id of Object.keys(PRODUCTS)) {
+      const prefix = (PRODUCTS as Record<string, { prefixes: string[] }>)[id].prefixes[0];
+      const files = [`${prefix}feature.ts`, 'server/__tests__/docs-hygiene.test.ts', 'docs/06w-decisions-workspace.md'];
+      expect(crossProductGroups(files), `a change scoped to ${id} is refusable by NO lane`).toBeNull();
+    }
+  });
+
+  it('the reported case: PR #1142 is analytic-only, and no lane may refuse it', () => {
+    // verbatim from `gh pr view 1142 --json files`; the three non-analytic lanes refused this.
+    expect(
+      crossProductGroups([
+        'docs/02c-requirements-analytic.md',
+        'docs/06c-decisions-analytic.md',
+        'docs/06w-decisions-workspace.md',
+        'server/__tests__/docs-hygiene.test.ts',
+        'src-analytic/__tests__/issue-1123-colon-claim.test.ts',
+        'src-analytic/__tests__/issue-1124-ratio-family.test.ts',
+        'src-analytic/parser/catalogAnalytic.ts',
+        'src-analytic/parser/parseAnalytic.ts',
+      ]),
+    ).toBeNull();
+  });
+
+  it('the guarantee is NOT weakened: a genuine two-tree edit is refused, and by every lane alike', () => {
+    const files = ['src/engine/solve.ts', 'src-complex/value/angle.ts', 'shell/math.tsx'];
+    const groups = crossProductGroups(files) as [string, string[]][];
+    expect(groups).not.toBeNull();
+    expect(groups.map(([t]) => t)).toEqual(['2d', 'complex']);
+    // the offending files are named by the tree they belong to, not "sibling of whoever asked"
+    expect(Object.fromEntries(groups)).toEqual({
+      '2d': ['src/engine/solve.ts'],
+      complex: ['src-complex/value/angle.ts'],
+    });
+    // shell/ is shared surface, so it is not part of the refusal — the BUILDS are its check
+    expect(groups.flatMap(([, g]) => g)).not.toContain('shell/math.tsx');
+  });
+
+  it('a shared-or-inert-only change touches no tree and is refusable by nobody', () => {
+    expect(crossProductGroups(['server/proxy.mjs', 'docs/22-workflow.md', 'package.json'])).toBeNull();
+  });
+
+  it('STRUCTURAL: the decision takes no product, so a lane cannot re-enter it', () => {
+    // The fix expressed in the signature. If someone reintroduces a viewpoint parameter here, the
+    // lane-relative verdict comes back and every assertion above turns into a coincidence.
+    expect(treesTouched).toHaveLength(1);
+    expect(crossProductGroups).toHaveLength(1);
+  });
+
+  it('SEAM: main() asks crossProductGroups, it does not re-derive the condition (ADR-W-053)', () => {
+    // A test that recomputed "two or more trees" would keep passing after main() went back to
+    // asking classifyChange().sibling — which is exactly the drift ADR-W-053 is about. So assert
+    // that the CLI's refusal branch is the exported decision and nothing else.
+    const src = readFileSync(new URL('../../scripts/check-sibling-safety.mjs', import.meta.url), 'utf8');
+    const body = src.slice(src.indexOf('function main()'));
+    expect(body).toContain('const byTree = crossProductGroups(files);');
+    expect(body).toContain('if (byTree) {');
+    expect(body, 'main() must not branch on a lane-relative bucket').not.toMatch(/sibling\.length/);
   });
 });
