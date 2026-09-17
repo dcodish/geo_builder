@@ -92,8 +92,67 @@ export function fractionText(v: number): string | null {
  *
  * ONE function, so the panel and the canvas cannot print the same value two ways — `fmtNum`'s own
  * rule («never per-call-site rounding sweeps») applied one level up. Exact first, decimals after.
+ *
+ * For a number sitting INSIDE an equation, see {@link fractionClearingFactor} — a bare `4/3` is right
+ * as a standalone value and ambiguous as a coefficient.
  */
 export function fmtAnalytic(v: number): string {
   const z = Math.abs(v) < 1e-12 ? 0 : v;
   return fractionText(z) ?? fmtNum(z);
+}
+
+/** `v` as a small rational in lowest terms, or null. The integer case returns denominator 1. */
+function asRational(v: number): { num: number; den: number } | null {
+  if (!Number.isFinite(v)) return null;
+  if (Math.abs(v) < 1e-12) return { num: 0, den: 1 };
+  const sign = v < 0 ? -1 : 1;
+  const a = Math.abs(v);
+  const bar = EXACT_TOL * Math.max(a, 1);
+  for (let q = 1; q <= MAX_DENOM; q += 1) {
+    const p = Math.round(a * q);
+    if (p < 1) continue;
+    if (Math.abs(a - p / q) <= bar) {
+      const d = gcd(p, q);
+      return { num: (sign * p) / d, den: q / d };
+    }
+  }
+  return null;
+}
+
+const lcm = (a: number, b: number): number => (a * b) / gcd(a, b);
+
+/**
+ * WHAT TO MULTIPLY AN EQUATION BY SO NO COEFFICIENT IS A FRACTION (#1180). `1` when none is; `null`
+ * when some coefficient is not a small rational at all and scaling would achieve nothing.
+ *
+ * **Operator ruling, 2026-09-17:** an exact fraction is right as a standalone value — the slope row
+ * reads `4/3` — and wrong as a **coefficient**, for two reasons that compound:
+ *
+ *  - **`4/3x` is ambiguous.** It reads as `4/(3x)` at least as naturally as `(4/3)x`, so the panel was
+ *    printing an equation a student can misread. A misreadable correct equation is indistinguishable
+ *    from a wrong one, which is worse than the rounding #1120 was filed to fix.
+ *  - **the panel typesets its rows**, so the fraction stacked vertically mid-equation — cramped between
+ *    the sign and the `x`, which is what he actually saw.
+ *
+ * Asked to choose between bracketing it (`-(4/3)x + y = 0`) and clearing it, he chose **clearing**:
+ * `-4x + 3y = 0`, the form a textbook prints.
+ *
+ * **It rewrites the row, and that is already what the row does.** Measured before building: a line the
+ * student states as «משוואת הישר AB היא y=(4/3)x» carries `eqSrc = null` and is rendered from its
+ * CLASSIFIED coefficients into `ax + by + c = 0` — the panel has never echoed the student's own form
+ * here. So clearing fractions is the same kind of act as the normalisation already happening, applied
+ * to every equation row alike, and no stated-vs-derived distinction is needed.
+ *
+ * The sign is left alone: `-4/3x + y = 0` becomes `-4x + 3y = 0`, exactly as the ruling wrote it. A
+ * convention that also flipped signs would be a second decision nobody has made.
+ */
+export function fractionClearingFactor(values: readonly number[]): number | null {
+  let factor = 1;
+  for (const v of values) {
+    const r = asRational(v);
+    if (!r) return null; // a surd, an irrational — scaling cannot clear it
+    factor = lcm(factor, r.den);
+    if (factor > MAX_DENOM * MAX_DENOM) return null; // runaway; leave the equation as it is
+  }
+  return factor;
 }

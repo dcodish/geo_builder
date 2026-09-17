@@ -79,7 +79,7 @@ export type InputError =
    */
   | { key: 'name-kind-clash'; detail: string; existing?: string }
   /** A construction that refers to a point the figure does not have yet (#1028). */
-  | { key: 'unknown-reference'; detail: string }
+  | { key: 'unknown-reference'; detail: string; expected?: 'point' | 'line' | 'circle' | 'curve' }
   /** A construct that cannot exist in this figure, which has no freedom left to try (#1058). */
   | { key: 'does-not-exist'; detail: string; existing?: string }
   /** A vertex that does not name an angle on its own — no shape through it, or several (#1049). */

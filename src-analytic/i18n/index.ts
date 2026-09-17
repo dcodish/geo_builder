@@ -79,7 +79,13 @@ const he = {
   errNameClash:
     'השם הזה כבר תפוס בשרטוט — הוא {{existing}}. אי אפשר לתת לו משמעות שנייה במשפט "{{detail}}". ' +
     'אפשר לבחור אות אחרת, או למחוק את ההגדרה הקודמת ולכתוב אותה מחדש.',
-  errUnknownRef: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
+  // #1179 — one sentence per KIND, written out rather than templated: Hebrew gender carries through
+  // the whole clause («הנקודה … הוגדרה» vs «הישר … הוגדר»), so a noun slotted into one sentence would
+  // be wrong in three of four cases. `errUnknownRef` stays as the kind-free fallback.
+  errUnknownRef: 'אין בשרטוט עצם בשם {{detail}}. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
+  errUnknownRefPoint: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
+  errUnknownRefLine: 'הישר {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
+  errUnknownRefCircle: 'המעגל {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
   errNoPrincipalDiagonal:
     'בצורה הזאת אין אלכסון ראשי ואלכסון משני — ההבחנה הזאת קיימת רק בצורות כמו דלתון: "{{detail}}". אפשר לציין את האלכסון לפי הקודקודים, למשל «משוואת האלכסון AC היא y=2x».',
@@ -215,7 +221,10 @@ const en: typeof he = {
     'That name is already taken in this figure — it is {{existing}}. It cannot take a second ' +
     'meaning in "{{detail}}". Either choose another letter, or delete the earlier definition and ' +
     'restate it.',
-  errUnknownRef: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errUnknownRef: 'There is no object called {{detail}} in the figure. Define it first, then you can refer to it.',
+  errUnknownRefPoint: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errUnknownRefLine: 'The line {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errUnknownRefCircle: 'The circle {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
   errNoPrincipalDiagonal:
     'This shape has no principal and secondary diagonal — that distinction exists only for shapes ' +

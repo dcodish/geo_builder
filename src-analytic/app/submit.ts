@@ -92,7 +92,7 @@ export function decideSubmit(
   if (fault) {
     return {
       kind: 'refused',
-      error: { key: fault.code, detail: fault.detail, existing: fault.existing } as InputError,
+      error: { key: fault.code, detail: fault.detail, existing: fault.existing, expected: fault.expected } as InputError,
     };
   }
 

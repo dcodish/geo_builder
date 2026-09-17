@@ -693,3 +693,35 @@ The counter-direction is the load-bearing test, not the reported case.
 
 **No surd tier**: no witness in this tree's corpus, and a tier with no witness has no test that could
 fail. It is added when an exam asks for it.
+
+## Position decides notation ([ADR-AG-085](06c-decisions-analytic.md#adr-ag-085))
+
+`fmtAnalytic` answers *how is this number written* and is the tree's one formatter, so the panel and the
+canvas cannot disagree ([ADR-AG-084](06c-decisions-analytic.md#adr-ag-084)). It is not the whole
+question. **The same number is written differently depending on where it sits:**
+
+| position | `4/3` | why |
+| --- | --- | --- |
+| a standalone value — a slope row, a length, a coordinate | `4/3` | exact, and nothing follows it |
+| a COEFFICIENT inside an equation | never | `4/3x` reads as `4/(3x)` |
+
+For an equation the fractions are cleared from the whole row instead —
+`fractionClearingFactor` returns the LCM of the denominators and `lineText` scales every term by it, so
+`-4/3x + y = 0` prints as `-4x + 3y = 0`. A surd coefficient cannot be cleared and the row stays in
+decimals; integers are untouched.
+
+This does **not** rewrite the student: measured before building, a line stated by equation carries
+`eqSrc = null` and the row is already rendered from its classified coefficients into `ax + by + c = 0`.
+The row has never been an echo, so clearing fractions is the same act it was already performing.
+
+## A refusal names the KIND it expected ([ADR-AG-085](06c-decisions-analytic.md#adr-ag-085))
+
+`unknown-reference` carries `expected: RefKind` beside its detail — a token, like `existing` (#1046), so
+the engine holds no language. The kind is read from the id the parser minted: curves are prefixed
+(`line-l7`, `circle-Z`) and points are bare, so `refKindOf` answers it at every refusal site and **no
+call site has to declare it**. That is the property that matters: the next site handed a curve id
+inherits the right noun instead of repeating the defect.
+
+The locale holds four whole sentences, not one with a noun slotted in — Hebrew gender runs through the
+clause («הנקודה … הוגדרה» vs «הישר … הוגדר»). An anonymous curve has no name the student wrote, so it
+gets the kind-free wording rather than a guessed noun.

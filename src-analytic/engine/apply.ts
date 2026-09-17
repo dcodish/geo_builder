@@ -102,6 +102,44 @@ export interface ApplyError {
    * A TOKEN, never a sentence: the engine stays language-free, and He/En render it in `App.tsx`.
    */
   existing?: ExistingKind;
+  /**
+   * WHAT KIND of object the statement expected to find (#1179).
+   *
+   * #1145 fixed which WORD a refusal quotes (`l7`, not `line-l7`); this is the sentence around it.
+   * One point-shaped string served every missing reference, so a student who wrote «הישר l7» was told
+   * «הנקודה l7 עדיין לא הוגדרה» — the right word in the wrong sentence, which sends them off to define
+   * a POINT called `l7`. #1150's new curve check made that path far easier to reach, which is why it
+   * surfaced on the first play.
+   *
+   * A TOKEN, never a sentence — the same contract `existing` already has (#1046): the engine stays
+   * language-free and the locale picks the noun, which matters more in Hebrew than in English because
+   * the gender carries through the whole sentence («הנקודה … הוגדרה» vs «הישר … הוגדר»).
+   */
+  expected?: RefKind;
+}
+
+/**
+ * The kind of object an id names, read from the prefix the PARSER minted (#1179).
+ *
+ * Curves are prefixed so that a circle and a point may both be called `I`; points are bare. So the id
+ * alone answers this at every refusal site, and no call site has to remember to say — which is what
+ * keeps the next site that is handed a curve id from repeating the defect.
+ *
+ * An ANONYMOUS curve (`curve-<hash>`) gets the kind-free wording: it has no name the student wrote, so
+ * there is no noun that would be true.
+ */
+export type RefKind = 'point' | 'line' | 'circle' | 'curve';
+
+export function refKindOf(id: Id): RefKind {
+  if (id.startsWith('line-')) return 'line';
+  if (id.startsWith('circle-')) return 'circle';
+  if (id.startsWith('curve-')) return 'curve';
+  return 'point';
+}
+
+/** The one refusal for "the figure has no such thing", naming it the student's way and by its kind. */
+function unknownRef(id: Id): ApplyError {
+  return { code: 'unknown-reference', detail: statedName(id), expected: refKindOf(id) };
 }
 
 /** What a name already holds, in terms the student can recognise — see `ApplyError.existing`. */
@@ -504,7 +542,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         return !o || !isPositional(o);
       });
       if (missing !== undefined) {
-        return { ok: false, error: { code: 'unknown-reference', detail: statedName(missing) } };
+        return { ok: false, error: unknownRef(missing) };
       }
       /**
        * …AND THE CURVES IT NAMES (#1150). Same rule, the half that was missing.
@@ -526,7 +564,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         return !o || !CURVE_BEARING.has(o.kind);
       });
       if (missingCurve !== undefined) {
-        return { ok: false, error: { code: 'unknown-reference', detail: statedName(missingCurve) } };
+        return { ok: false, error: unknownRef(missingCurve) };
       }
       /**
        * A STATEMENT MEETS THE TOOL'S OWN ASSUMPTION (#1159) — decided before the duplicate absorb,
@@ -710,7 +748,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'circle-at': {
       const centre = objectById(c, f.centre);
       if (!centre || !isPositional(centre)) {
-        return { ok: false, error: { code: 'unknown-reference', detail: statedName(f.centre) } };
+        return { ok: false, error: unknownRef(f.centre) };
       }
       const prior = objectById(c, f.id);
       if (prior) {
@@ -742,7 +780,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'line-at': {
       const through = objectById(c, f.through);
       if (!through || !isPositional(through)) {
-        return { ok: false, error: { code: 'unknown-reference', detail: statedName(f.through) } };
+        return { ok: false, error: unknownRef(f.through) };
       }
       const prior = objectById(c, f.id);
       if (prior) {
@@ -779,7 +817,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'on-kind': {
       const point = objectById(c, f.id);
       if (!point || !isPositional(point)) {
-        return { ok: false, error: { code: 'unknown-reference', detail: statedName(f.id) } };
+        return { ok: false, error: unknownRef(f.id) };
       }
       /**
        * The kind of an ANONYMOUS conic is not declared — it comes from the FIT (02c R6: the noun is
@@ -829,7 +867,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'right-angle': {
       const host = objectById(c, f.id);
       if (!host || !isPositional(host)) {
-        return { ok: false, error: { code: 'unknown-reference', detail: statedName(f.id) } };
+        return { ok: false, error: unknownRef(f.id) };
       }
       const rings = c.objects.filter((g) => g.kind === 'polygon' && g.vertices.includes(f.id));
       if (rings.length !== 1) {
@@ -873,7 +911,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       for (const id of refs) {
         const o = objectById(c, id);
         if (!o || !isPositional(o)) {
-          return { ok: false, error: { code: 'unknown-reference', detail: statedName(id) } };
+          return { ok: false, error: unknownRef(id) };
         }
       }
       // Compared structurally: the union's members have different shapes, and a field-by-field test
@@ -902,7 +940,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       if (curveRef !== null) {
         const o = objectById(c, curveRef);
         if (!o || o.kind !== 'curve') {
-          return { ok: false, error: { code: 'unknown-reference', detail: statedName(curveRef) } };
+          return { ok: false, error: unknownRef(curveRef) };
         }
       }
 
@@ -944,7 +982,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         }
         if (!declares) {
           // Named in the student's own words, never as internal state: the message says WHICH point.
-          return { ok: false, error: { code: 'unknown-reference', detail: statedName(id) } };
+          return { ok: false, error: unknownRef(id) };
         }
         base = { ...base, objects: [...base.objects, { kind: 'free', id }] };
       }

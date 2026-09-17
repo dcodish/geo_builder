@@ -23,7 +23,7 @@ import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
 import { INITIAL_VIEW, centreOf, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
-import { fmtAnalytic } from './format';
+import { fmtAnalytic, fractionClearingFactor } from './format';
 import { color, fs } from '../shell/theme';
 import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
@@ -543,7 +543,18 @@ export function App() {
           'bad-operand': 'errBadOperand',
           'conflicting-restatement': 'errConflict',
           'name-kind-clash': 'errNameClash',
-          'unknown-reference': 'errUnknownRef',
+          // #1179 — the noun follows the KIND the statement expected, not a single point-shaped
+          // sentence. `expected` is the token the engine carries; an id with no prefix (and so no
+          // kind) falls to the kind-free wording rather than guessing.
+          'unknown-reference':
+            error.key === 'unknown-reference' && error.expected
+              ? {
+                  point: 'errUnknownRefPoint',
+                  line: 'errUnknownRefLine',
+                  circle: 'errUnknownRefCircle',
+                  curve: 'errUnknownRef',
+                }[error.expected]
+              : 'errUnknownRef',
           'does-not-exist': 'errDoesNotExist',
           'ambiguous-angle': 'errAmbiguousAngle',
           'ambiguous-shape': 'errAmbiguousShape',
@@ -1283,7 +1294,16 @@ const SYMBOLS = [
  * It was module-private, which left a test only able to reproduce it -- and a reproduction of this
  * function would have carried the same bug in the same shape and agreed with it.
  */
-export function lineText(a: number, b: number, c: number): string {
+export function lineText(a0: number, b0: number, c0: number): string {
+  /**
+   * NO FRACTION IS LEFT AS A COEFFICIENT (#1180) — the whole equation is scaled instead.
+   *
+   * `-4/3x + y = 0` is ambiguous (`4/(3x)`?) and typesets badly; `-4x + 3y = 0` is what a textbook
+   * prints. The scaling is decided in `format.ts`, which is where this tree's number presentation
+   * lives; when nothing can be cleared — a surd coefficient — the factor is 1 and this is a no-op.
+   */
+  const k = fractionClearingFactor([a0, b0, c0]) ?? 1;
+  const [a, b, c] = [a0 * k, b0 * k, c0 * k];
   const term = (k: number, sym: string): string => {
     if (Math.abs(k) < 1e-12) return '';
     /**

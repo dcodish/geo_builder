@@ -4584,3 +4584,37 @@ So the shared formatter was never the defect. **Analytic is the one tree that ne
 **No surd tier**, deliberately: no witness in this tree's corpus yet, and a tier with no witness has no test that could fail. √2 falls to the decimal, honestly.
 
 **Consequences.** `src-analytic/format.ts` (new), one line in `App.tsx`, three labels in `scene.ts`. `issue-1120-exact-forms.test.ts` (7), whose load-bearing case is the counter-direction. Analytic lane 82 files / 1246 tests — **no display assertion moved.**
+
+## ADR-AG-085 — A number's notation depends on its POSITION; a refusal's noun depends on the KIND (#1180 + #1179)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R94 (amended). **Design:** [04c](04c-design-analytic.md) — *the tree's display formatter*. **LADDER stage:** display and refusal wording; no value, gate or comparison changes.
+
+Both found by the operator playing round #1173, and both are that round repairing its own output.
+
+### #1180 — `4/3` is right as a VALUE and wrong as a COEFFICIENT
+
+*"the data panel has something weird in the 4/3 display"*. The curve row read `-4/3x + y = 0`, and that is wrong twice over: **`4/3x` is ambiguous** — it reads as `4/(3x)` at least as naturally as `(4/3)x` — and the panel typesets its rows, so the fraction stacked vertically mid-equation.
+
+A misreadable correct equation is indistinguishable from a wrong one, which is a worse failure than the rounding [#1120](https://github.com/dcodish/geo_builder/issues/1120) was filed to fix.
+
+**Ruling, 2026-09-17: clear the fractions** — `-4x + 3y = 0`, the form a textbook prints. Offered brackets (`-(4/3)x + y = 0`) as the smaller change and he chose this instead; recorded as given.
+
+**What ADR-AG-084 got right and what it missed.** Its chokepoint rule — *one display formatter, so the panel and the canvas cannot print one value two ways* — is correct and unchanged. What it missed is that **a number's notation depends on its position in an expression**, which is a different axis from which surface shows it. `fmtAnalytic` is untouched; `fractionClearingFactor` is the new question, asked where a number is placed INTO an equation.
+
+**The sub-question resolved itself by measurement.** The ruling did not say whether a STATED equation should be rewritten, and echoing the student's own form would have been defensible. Measured first: a line stated as «משוואת הישר AB היא y=(4/3)x» carries `eqSrc = null` and is rendered from its CLASSIFIED coefficients into `ax + by + c = 0`. **The row has never echoed the student's form.** So clearing fractions is the same kind of act as the normalisation already happening, applied uniformly, and no stated-vs-derived split is needed — which is the opposite of what I recommended before measuring.
+
+Sign is not normalised: `-4x + 3y = 0`, exactly as the ruling wrote it. A convention that also flipped signs would be a second decision nobody has made. A coefficient with no small rational form (a surd) cannot be cleared, and the equation is left in decimals rather than scaled by something meaningless.
+
+**Known sibling, not in this tree yet:** `locusFit.ts`'s `y = <slope>x + c` has the identical ambiguity and lives on PR #1172's branch. Recorded on [#1176](https://github.com/dcodish/geo_builder/issues/1176) so it is fixed when that branch is repaired, rather than discovered again in play.
+
+### #1179 — the refusal named the right object with the wrong noun
+
+*"the message is wrong — הנקודה l7 … it should be **the line** l7"*.
+
+[#1145](https://github.com/dcodish/geo_builder/issues/1145) fixed which WORD a refusal quotes; this is the sentence around it. One point-shaped string served every missing reference, so two of the three refusals named the right object with the wrong kind — and **#1150's new curve check made those two far more reachable**, which is why it surfaced on the first play.
+
+`ApplyError` gains `expected?: RefKind`, a TOKEN the locale renders — the same contract `existing` has carried since #1046, so the engine stays language-free. The kind is read from the id the parser minted (`refKindOf`): curves are prefixed so a circle and a point may both be called `I`, points are bare, so **the id alone answers it at every site** and no call site has to remember to say. That is what stops the next site handed a curve id from repeating the defect.
+
+**Four sentences, written out, not one templated noun.** Hebrew gender carries through the whole clause — «הנקודה … הוגדרה» against «הישר … הוגדר» — so slotting a noun into one sentence would be wrong in three cases of four. An anonymous curve (`curve-<hash>`) gets the **kind-free** wording: it has no name the student wrote, so no noun would be true.
+
+**Consequences.** `fractionClearingFactor` (`format.ts`), one scaling in `lineText`; `RefKind`/`refKindOf`/`unknownRef` (`apply.ts`), `expected` threaded through `derive` → `submit` → the store, four locale strings per language. `issue-1180-1179-equation-and-noun.test.ts` (14) — asserting the **rendered** sentence through the real locale, because a key that exists proves nothing about what a student reads. Analytic lane 84 files / 1278 tests.
