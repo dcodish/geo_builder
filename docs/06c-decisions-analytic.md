@@ -4411,3 +4411,55 @@ widened into this slice.
 
 **Consequences.** `issue-1109-name-centre.test.ts` (11) and a catalog entry. Analytic lane 77 files /
 1168 tests.
+
+## ADR-AG-080 — A shape noun promises a RING, and the configuration drawn must honour it (#1158 + #1166)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R91. **Design:** [`src-analytic/CLAUDE.md`](../src-analytic/CLAUDE.md) (the drawability predicate). **LADDER stage:** configuration choice — inside `drawableAt`'s seed sweep, after the solve and before anything downstream reads the figure.
+
+**Two operator reports on 2026-09-17, one sentence.**
+
+- *"i later ask for another shape and get this — which should never happen on any quad"*, with «טרפז ABCD» drawn as a crossed butterfly (#1158).
+- *"on same diagram, i now have a collapsed triangle on several show next steps"*, with «משולש ABC» drawn as a straight line (#1166).
+
+Measured at `deef0103`: his trapezoid crossed at **16 of 24** configurations, his triangle exactly flat at **13 of 24**, and `faults = []` at every single one. The tool believed both figures satisfied their givens — and they did satisfy the **constraints**. What they did not satisfy is **the noun**.
+
+**The ruling: a polygon noun asserts more than the relations it lowers to.** «טרפז» promises a simple ring and «משולש» promises three non-collinear points, and neither promise is expressible in the vocabulary a noun lowers through. [`shapes.ts`](../src-analytic/engine/shapes.ts) is explicit that *"`parallel(a,b,c,d)` and `equal(a,b,c,d)` are the whole vocabulary"*, and both are **direction-insensitive**: a cross-product residual cannot tell `A→B→C→D` from the traversal that folds the ring over itself, and a length equation cannot either. So the promise has to be kept somewhere else, and that somewhere is where the configuration is chosen.
+
+### Why it is ONE seam and not two predicates
+
+#1166 ruled this before either was built:
+
+> #1158 (simplicity) and this (degeneracy) are the same sentence: *the configuration drawn must honour the polygon noun that was declared*. Fixed independently they will grow two parallel predicate lists that drift — the failure this codebase has paid for repeatedly.
+
+So there is one module, [`engine/rings.ts`](../src-analytic/engine/rings.ts), one verdict type (`'crossed' | 'degenerate'`), and one consumer. «מרובע» is the row that proves it was never about the parallel relation: it lowers to **no constraint at all** and still crossed 11 times in 24.
+
+### The chokepoint is where the configuration is CHOSEN
+
+`whole()` inside `drawableAt` gains a third term beside "the selectors hold" and "every named object exists". That single insert fixes the canvas, the data panel, `isKnowledge`, `knownOptions` and «הציגו תצורה אחרת» together, because all of them route through it — and the operator met the defect *through* the configuration walk, which is downstream of this function. Adding «דלתון» stays one row in `shapes.ts` and inherits this with no edit.
+
+It is consulted as a **preference inside the existing budget**, like its two neighbours. Measured: a valid ring was reachable within 7 extra seeds from every start across seven figures, with zero unreachable inside `DRAWABLE_TRIES = 24`. The budget did not need raising.
+
+**Result, same seeds:** crossed **0/24** on all six quadrilateral figures (from 11–16), exactly flat **0/24** on all four triangle figures (from 13–17). Near-degeneracy fell as a side effect — the operator's own figure went from 17/24 under 5° to 6/24 — without being targeted.
+
+### Simplicity, not convexity. Exact degeneracy, not narrowness.
+
+Both bounds are [ADR-052](06-decisions.md#adr-052) and both are asserted:
+
+- **A concave quadrilateral is a legitimate «מרובע»** and the exam draws them. Rejecting concavity would assert a given the question never gave — the cardinal sin from the other side. This is where the 2-D sibling's `declaredPolygonsConvex` is deliberately **not** the template: 2-D *prefers* convexity under [ADR-018](06-decisions.md#adr-018)/ADR-097, a different decision for a different product.
+- **A thin triangle is ugly but TRUE.** #1166 ruled exact degeneracy invalid and near-degeneracy a seed preference, so the tolerance is `|sin θ| < 1e-3` — **0.057°**, two orders of magnitude below the 3–5° band it must not touch, and two above the collapsed configurations it must catch. The bands were measured, which is why the value is not delicate.
+
+Read per **vertex** rather than by area: an n-gon with a straight corner is really an (n−1)-gon whatever its area says, and area would mean something different at every zoom. The 2-D sibling learned the same thing (`hasStraightVertex`).
+
+### The second arm was built, measured, and WITHDRAWN
+
+The plan's arm 2 reported on the declaring line when the search found nothing valid. Built, it moved three `derived.test.ts` locks — and every figure it fired on had **`reportedDof = 0`**. With the choice in place, the only figures reaching that state are ones where the student **pinned** the coordinates themselves, which is #1166's own *"out of scope here"* residual. On such a figure there is one configuration, never a search, so «לא נמצאה תצורה שבה מתקיים» is not even a true sentence.
+
+Both obvious gates are already argued against in this tree: `reportedDof === 0` is exactly the three locks, which encode [ADR-AG-008](#adr-ag-008)'s `does-not-exist` answer for a collinear circumcentre; `reportedDof > 0` is what the selector arm refuses to do, for #1071's reason — with freedom left, 24 exhausted seeds are evidence and not proof. An arm with no uncontested domain is a ruling, not a gate, so it is [#1170](https://github.com/dcodish/geo_builder/issues/1170) and `derive.ts` carries a comment saying why there is nothing there.
+
+**Residual risk, stated:** a figure that *has* freedom and whose 24 seeds all produce a bad ring is still drawn silently. Measured zero occurrences across the twelve figures of both issues.
+
+### The lock asserts the operator's complaint, not just the mechanism
+
+His second sentence was *"we need to give the user different options and not similar options"*. #1166's comment measured that and refuted the obvious diagnosis — analytic's distinctness test was already fine (0 of 12 offers under the 3% bar), and the offers were numerically far apart. What made them useless is that six of the first seven were *another straight line*: numerically distant, perceptually identical. So the lock walks the real **offer list** through `anotherConfiguration` and asserts successive offers differ as **shapes**, on a similarity-invariant fingerprint — not that raw seeds differ, which would measure a list no student is shown.
+
+**Consequences.** `engine/rings.ts` (new), `Figure.ringFaults`, one term in `whole()`. `issue-1158-1166-polygon-noun-validity.test.ts` (24 tests, sweeping `SHAPES` so a noun added later inherits the lock). Analytic lane 80 files / 1235 tests.

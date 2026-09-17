@@ -1094,3 +1094,28 @@ either — there is no «המעגל ‹name›» to write, and a sentence the pa
 offered (R-level statement of ADR-AG-048's «two surfaces, one grammar»).
 
 **Circle-only.** A parabola's focus and an ellipse's centre are the same question and are not covered.
+
+**R91 — a shape noun promises a RING, and every configuration drawn honours it**
+([#1158](https://github.com/dcodish/geo_builder/issues/1158) ·
+[#1166](https://github.com/dcodish/geo_builder/issues/1166)).
+
+«טרפז ABCD» promises a trapezoid, and a trapezoid is a **simple** quadrilateral — its sides do not
+cross. «משולש ABC» promises a triangle, and three points on one line are not one. Neither promise is
+carried by the relations the noun lowers to, so both are kept where the tool chooses which
+configuration to show: a crossed or collapsed ring is never drawn, and never offered by
+«הציגו תצורה אחרת».
+
+**This is a promise about the NOUN, not about beauty**, and it stops exactly where the noun stops:
+
+- **Simple, not convex.** A concave «מרובע» is a legitimate quadrilateral and the exam draws them.
+  Only a ring that crosses *itself* is rejected.
+- **Collapsed, not narrow.** A thin triangle is honest — R14's unstated magnitudes are free, and a
+  figure whose givens force a tight wedge must still be drawable. Only an exactly-flat ring is
+  rejected.
+
+Rejecting either of the two right-hand cases would assert a given the student never gave, which is
+the same cardinal sin as drawing a figure that violates its givens ([ADR-052](06-decisions.md#adr-052)).
+
+**Where the student's own coordinates force a bad ring** — four pinned points written in an order
+that crosses — the figure is determined and there is no configuration to choose. That case is
+[#1170](https://github.com/dcodish/geo_builder/issues/1170) and is not yet answered.

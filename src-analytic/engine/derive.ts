@@ -110,6 +110,24 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   }
 
   /**
+   * THERE IS DELIBERATELY NO RING-FAULT ARM HERE — see [#1170](https://github.com/dcodish/geo_builder/issues/1170).
+   *
+   * `figure.ringFaults` says a declared polygon is drawn as a ring its noun does not promise
+   * (#1158, #1166). `drawableAt` uses it to CHOOSE a configuration, which is what fixed both reported
+   * bugs. Reporting the leftovers here was the plan's second arm, and it was built, measured and
+   * withdrawn: with the choice in place, every figure it fires on has **`reportedDof = 0`** — the
+   * student pinned the coordinates, and those coordinates are what make the ring crossed or
+   * collapsed. There is no configuration search to have failed, so
+   * «לא נמצאה תצורה שבה מתקיים» would not even be a true sentence about such a figure.
+   *
+   * Both obvious gates are argued against in this file already: gating on `reportedDof === 0` is
+   * exactly the three `derived.test.ts` locks that encode ADR-AG-008's `does-not-exist` answer, and
+   * gating on `reportedDof > 0` is what the selector arm above refuses to do, for #1071's reason —
+   * with freedom left, 24 exhausted seeds are evidence and not proof. #1166 foresaw this case and
+   * ruled it *"out of scope here"*; #1170 carries the ruling it needs.
+   */
+
+  /**
    * A constraint the solve could not meet is a FAULT, blamed on the line that stated it — the
    * figure is never shown as though it satisfied a given it does not
    * ([02c](../../docs/02c-requirements-analytic.md) honesty invariants).
@@ -211,7 +229,7 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
 
 export const EMPTY_DERIVATION: Derivation = {
   construction: EMPTY_CONSTRUCTION,
-  figure: { env: {}, points: [], curves: [], segments: [], construction: [], vacant: [], unsatisfied: [], selectorsOk: true, carrierDof: 0, provenance: {} },
+  figure: { env: {}, points: [], curves: [], segments: [], construction: [], vacant: [], unsatisfied: [], selectorsOk: true, ringFaults: [], carrierDof: 0, provenance: {} },
   box: { minX: -10, minY: -10, maxX: 10, maxY: 10 },
   faults: [],
   outcomes: [],

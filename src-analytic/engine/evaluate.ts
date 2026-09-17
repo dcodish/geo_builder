@@ -17,6 +17,7 @@ import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
 import { pairKey, pinnedLengths } from './lengths';
 import { provenanceOf, type PointProvenance } from './carriers';
+import { ringFaultsOf, type RingFault } from './rings';
 import { dirVector, freeRank, residual, resolveChoices, solveLM, type Constraint } from './solve';
 import { inDomain, isFree, objectById, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
 
@@ -99,6 +100,12 @@ export interface Figure {
   unsatisfied: Constraint[];
   /** Do the D7 branch selectors hold in this configuration? `false` asks for a different one. */
   selectorsOk: boolean;
+  /**
+   * Declared polygons whose drawn ring CONTRADICTS the noun that declared it — crossed, or collapsed
+   * (#1158, #1166). Non-empty is the same kind of statement as `unsatisfied`: this configuration must
+   * not be shown as though it satisfied its givens. See {@link ringFaultsOf}.
+   */
+  ringFaults: RingFault[];
   /** Freedom the OBJECT carriers still have after the constraints — what the DOF cue reports. */
   carrierDof: number;
   /** Per point: what the student's OWN givens fix about it — the canvas label (#1032). */
@@ -743,6 +750,18 @@ export function evaluate(raw: Construction, seed = 0): Figure {
     vacant,
     unsatisfied,
     selectorsOk: selectorsHold(c, placed),
+    /**
+     * Read from the POINTS this evaluation just produced, so the ring judged is the ring drawn
+     * (#1158, #1166). A vertex that did not resolve leaves its polygon unjudged — that is a vacancy
+     * and belongs to ADR-AG-008.
+     */
+    ringFaults: ringFaultsOf(
+      c,
+      (id) => {
+        const p = points.find((q) => q.id === id);
+        return p ? { x: p.x, y: p.y } : undefined;
+      },
+    ),
     carrierDof: carrierDofOf(c, env, free, ids),
     provenance: Object.fromEntries(
       points.map((p) => [p.id, provenanceOf(c, p.id, env, curves) ?? { x: { known: false }, y: { known: false } }]),
@@ -812,7 +831,23 @@ export function drawableAt(c: Construction, seed: number): Figure {
    * A vacancy is still not an error (ADR-AG-008) — it is a preference, applied only when a better
    * configuration exists inside the budget.
    */
-  const whole = (f: Figure) => f.selectorsOk && f.vacant.length === 0;
+  /**
+   * …and the third term: every polygon the student DECLARED is drawn as the ring its noun promises
+   * (#1158, #1166).
+   *
+   * It belongs exactly here, beside the other two, because this is the one place that chooses which
+   * configuration the tool shows — so canvas, data panel, `isKnowledge`, `knownOptions` and
+   * «הציגו תצורה אחרת» are all corrected together and no noun has to be taught about it. The
+   * operator met the defect through the configuration walk («i later ask for another shape and get
+   * this»), and the walk is downstream of this function.
+   *
+   * Consulted as a PREFERENCE inside the existing budget, like its neighbours: a figure whose givens
+   * genuinely force a bad ring still gets drawn rather than vanishing — and `derive` reports it on
+   * the line that named the polygon, which is the honest half. Measured across seven quadrilateral
+   * figures (#1158), a valid ring was reachable within 7 extra seeds from every start and there were
+   * ZERO starts with none inside `DRAWABLE_TRIES`, so the budget did not need raising.
+   */
+  const whole = (f: Figure) => f.selectorsOk && f.vacant.length === 0 && f.ringFaults.length === 0;
 
   const first = evaluate(c, seed);
   let chosen = first;
