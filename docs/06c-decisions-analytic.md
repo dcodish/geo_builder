@@ -4684,3 +4684,44 @@ Sign is not normalised: `-4x + 3y = 0`, exactly as the ruling wrote it. A conven
 **Four sentences, written out, not one templated noun.** Hebrew gender carries through the whole clause — «הנקודה … הוגדרה» against «הישר … הוגדר» — so slotting a noun into one sentence would be wrong in three cases of four. An anonymous curve (`curve-<hash>`) gets the **kind-free** wording: it has no name the student wrote, so no noun would be true.
 
 **Consequences.** `fractionClearingFactor` (`format.ts`), one scaling in `lineText`; `RefKind`/`refKindOf`/`unknownRef` (`apply.ts`), `expected` threaded through `derive` → `submit` → the store, four locale strings per language. `issue-1180-1179-equation-and-noun.test.ts` (14) — asserting the **rendered** sentence through the real locale, because a key that exists proves nothing about what a student reads. Analytic lane 84 files / 1278 tests.
+## ADR-AG-086 — A locus is traced at the configuration being SHOWN, and a neighbour it cannot measure is skipped (#1176)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R87 — unchanged in what it promises; this is the implementation failing to keep it. **Design:** [04c](04c-design-analytic.md) — *the locus lane*. **LADDER stage:** the ask lane's read of the figure.
+
+**Operator, playing PR #1172's T10:** *"when pressing show another option, the shape breaks"* — with `P` well off the circle drawn as its own locus.
+
+### The canvas drew a curve that did not contain the point it named
+
+`ask.ts` called `locusOf(…, [0, 1], …)` with the seed pair **hardcoded**, while the figure sits at the session's seed. From the first press of «הציגו תצורה אחרת» the drawn locus therefore belonged to a different value of the figure's free parameter:
+
+| seed | `a` | P | traced circle | on it? |
+|--:|--:|---|---|---|
+| 0 | 3.458 | (108.0, −68.6) | centre (54.6, 0) r 86.4 | yes |
+| 1 | 1.314 | (−4.5, −20.7) | centre (55.3, 0) r 86.4 | **no** |
+| 2 | −3.400 | (21.9, −37.5) | centre (55.4, −0.2) r 86.4 | **no** — the screenshot |
+
+The traced circle was **identical at every seed** while `P` moved. It also broke ADR-AG-072 §4's own stated side effect — *"«הציגו תצורה אחרת» then makes the circle GROW with `a` on screen"* — because it was never re-traced.
+
+**A `Derivation` now carries its `seed`.** Not carrying it is what made the defect possible: `ask` had no way to know which configuration it was answering about. Carried rather than re-derived, so a consumer cannot disagree with its own figure by construction.
+
+### The lock is the deliverable, not the one-line fix
+
+All 24 locks in `issue-1136-1137-locus.test.ts` passed throughout. They assert the trace's SHAPE and the gate's VERDICT — both true — and neither asked the question that matters on a figure that moves:
+
+> the traced point lies **on its own trace**, at the configuration shown, at every seed.
+
+It is invisible without a parameter, because there the locus really is the same set at every seed. So the parameterised figure is not an edge case for this feature; it is the only case that can fail.
+
+### The comparison sample must be MEASURABLE, not merely different
+
+Exposed by the fix and owned with it. The determinacy gate answers "kind only" when the two traced sets differ — but it was also answering that when it simply **could not measure one of them**, which is not evidence about the set at all.
+
+Measured: the plain bisector traces `x = 4` exactly at almost every configuration, but at seed 2 the free point solves out at `y ≈ 317`, so the figure is drawn fifty times larger than the points defining it and `MA = MB` pins `x` to only ~1e−4 out there. That trace legitimately fails the self-check — and as the *neighbour* of seed 1 it was suppressing the equation on a configuration that measured perfectly well. The comparison now advances past a configuration it cannot measure, bounded by `COMPARE_TRIES = 3`. It never widens what counts as agreement: two traces that both measure and disagree still print the kind alone.
+
+**Investigated and rejected before settling there.** A finer step does not help — measured, the drift is `1.9e-3` at step 14.6, 7.3 and 3.65 alike, because it is ill-conditioning and not accumulation. Trimming the fit to the view box does not help either (`2.6e-4`, still short of the snap bar). At an ill-conditioned configuration the tool genuinely cannot verify `x = 4`, and ADR-AG-072 §7 already says what to do: **if it will not snap, print nothing.** That case is now asserted deliberately rather than worked around, so a future change which starts printing an equation there has to say why.
+
+### Riding along: #1180's ruling reaches this surface too
+
+`locusEquation`'s slope arm built `y = <slope>x + c`, so a fractional slope printed `y = 4/3x + 2` — the ambiguity (`4/(3x)`?) the operator reported against the panel's curve row. Same ruling, same treatment: the equation clears its fractions, `3y = 4x + 6`, using the `fractionClearingFactor` that landed with round #1173. The two axis-parallel arms keep their exact value (`x = 4/3`): nothing follows them, so there is nothing to misread.
+
+**Consequences.** `Derivation.seed`, one call site in `ask.ts`, `COMPARE_TRIES` in `locus.ts`, the slope arm in `locusFit.ts`. `issue-1176-locus-configuration.test.ts` (11). Analytic lane 86 files / 1388 tests.

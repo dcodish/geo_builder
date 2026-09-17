@@ -31,6 +31,7 @@
  * answer. **If it will not snap, print nothing** — the kind still shows, and that is the honest half.
  */
 import { classify, type Conic } from './conic';
+import { fractionClearingFactor } from '../format';
 import type { NumCurve } from './types';
 
 export interface LocusPt {
@@ -366,9 +367,27 @@ export function locusEquation(shape: LocusShape, fmt: (v: number) => string): st
   switch (c.kind) {
     case 'line': {
       const { D, E, F } = shape.conic;
+      // `x = 4/3` and `y = 4/3` are STANDALONE values — nothing follows them, nothing to misread.
       if (Math.abs(E) < 1e-12) return `x = ${fmt(-F / D)}`;
       if (Math.abs(D) < 1e-12) return `y = ${fmt(-F / E)}`;
-      return `y = ${fmt(-D / E)}x ${-F / E >= 0 ? '+' : '−'} ${fmt(Math.abs(-F / E))}`;
+      /**
+       * …but a SLOPE is a COEFFICIENT, and `y = 4/3x + 2` carries #1180's ambiguity exactly: it reads
+       * as `4/(3x)` at least as naturally as `(4/3)x`. Reported against the panel's curve row and
+       * ruled there — *clear the fractions from the whole equation* — so the same treatment applies
+       * here rather than leaving one surface ambiguous because nobody happened to look at it.
+       *
+       * `fractionClearingFactor` is the helper that ruling produced, and it returns 1 when there is
+       * nothing to clear, so an integer slope is untouched.
+       */
+      const k = fractionClearingFactor([D, E, F]) ?? 1;
+      const [d, e, f] = [D * k, E * k, F * k];
+      const yPart = Math.abs(e) === 1 ? 'y' : `${fmt(Math.abs(e))}y`;
+      const lhs = e < 0 ? `−${yPart}` : yPart;
+      // `dx + ey + f = 0` → `ey = −dx − f`, signs folded as they are written.
+      const xMag = Math.abs(d) === 1 ? '' : fmt(Math.abs(d));
+      const rhs = `${d > 0 ? '−' : ''}${xMag}x`;
+      const konst = Math.abs(f) < 1e-12 ? '' : ` ${f > 0 ? '−' : '+'} ${fmt(Math.abs(f))}`;
+      return `${lhs} = ${rhs}${konst}`;
     }
     case 'circle':
       return `${shift('x', c.cx)}² + ${shift('y', c.cy)}² = ${fmt(c.r * c.r)}`;

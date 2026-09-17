@@ -68,6 +68,15 @@ const DEFAULTS = { step: 0.35, maxSteps: 220 };
  */
 const WALK_ROOM = 4;
 
+/**
+ * How many configurations the determinacy gate may skip past looking for a measurable neighbour.
+ *
+ * Small on purpose. The gate needs ONE other configuration, not a survey, and a figure whose
+ * neighbours are all unmeasurable is one the tool should be quiet about — that is the self-check
+ * doing its job rather than a budget to raise.
+ */
+const COMPARE_TRIES = 3;
+
 function dot(a: number[], b: number[]): number {
   return a.reduce((s, v, i) => s + v * b[i], 0);
 }
@@ -362,10 +371,34 @@ export function locusOf(
 
   const first = traceAt(seeds[0]);
   if (!first || first.points.length < 2) return null;
-  const second = traceAt(seeds[1]);
-  const shape = second && second.points.length >= 2
-    ? agreeingShape(first.points, second.points)
-    : shapeOfTrace(first.points);
+
+  /**
+   * THE COMPARISON SAMPLE MUST BE MEASURABLE, not merely different (#1176).
+   *
+   * The gate asks *is the SET the same in another configuration* and answers "kind only" when it is
+   * not. That conflates two different things, and the distinction only became reachable once the
+   * primary seed stopped being hardcoded: **"the two sets differ"** (the parameterised case — correct,
+   * and what the gate exists for) and **"I could not measure one of them"**, which is not evidence
+   * about the set at all.
+   *
+   * Measured: the plain bisector «A(0,0)» «B(8,0)» «MA = MB» traces `x = 4` exactly at almost every
+   * configuration, but at seed 2 the free point solves out at `y ≈ 317`, so the figure is drawn fifty
+   * times larger than the points defining it and `MA = MB` pins `x` to only ~1e−4 out there. That
+   * trace legitimately fails the self-check — and as the NEIGHBOUR of seed 1 it was suppressing the
+   * equation on a configuration that measured perfectly well.
+   *
+   * So the comparison advances past a configuration it cannot measure, bounded. It never widens what
+   * counts as agreement: two traces that both measure and DISAGREE still print the kind alone.
+   */
+  let shape = shapeOfTrace(first.points);
+  for (let step = 1; step <= COMPARE_TRIES; step += 1) {
+    const other = traceAt(seeds[1] + step - 1);
+    if (!other || other.points.length < 2) continue;
+    // A neighbour with no measurable shape is skipped, not counted as a disagreement.
+    if (!shapeOfTrace(other.points)) continue;
+    shape = agreeingShape(first.points, other.points);
+    break;
+  }
   return { trace: first, shape };
 }
 

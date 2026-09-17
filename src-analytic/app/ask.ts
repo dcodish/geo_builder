@@ -203,7 +203,21 @@ export function ask(
     const name = loc[1].trim();
     const o = objectById(d.construction, name);
     if (!o) return { question, value: null, missing: { name, kind: 'point' } };
-    const res = locusOf(d.construction, name, [0, 1], d.box);
+    /**
+     * TRACED AT THE CONFIGURATION BEING SHOWN (#1176), not at a fixed pair.
+     *
+     * This read `[0, 1]`, hardcoded, while the figure sits at the session's seed — so from the first
+     * press of «הציגו תצורה אחרת» the drawn locus belonged to a different configuration. On a
+     * parameterised figure that means **the canvas drawing a curve that does not contain the point it
+     * claims to be the locus of**, which is the one thing this product may not do. Measured on
+     * «A(-9a,0)» «B(41a,0)»: the traced circle was identical at every seed (centre ≈ (55, 0), r ≈ 86.4)
+     * while `P` moved with `a`, ending 36 units off it.
+     *
+     * The SECOND seed is what the determinacy gate compares sets against, so it stays a second
+     * *different* configuration — `seed + 1` rather than a constant, or the comparison would drift
+     * back to describing a figure nobody is looking at.
+     */
+    const res = locusOf(d.construction, name, [d.seed, d.seed + 1], d.box);
     // No locus is a TRUE answer about the figure, not a failure to understand: the point is
     // determined, or its freedom is not a curve. `value: null` is the lane's own way of saying
     // «the figure does not determine this», and it is the honest one here too.
