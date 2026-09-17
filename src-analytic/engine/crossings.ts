@@ -349,3 +349,67 @@ export function freeLetter(c: Construction): string {
  */
 export const crossingSentence = (x: Crossing, name: string): string =>
   `${name} נקודת החיתוך${x.nth === undefined ? '' : x.nth === 0 ? ' הראשונה' : ' השנייה'} של ${x.first} עם ${x.second}`;
+/** A point the student may NAME by clicking it — a crossing, or a circle's centre (#1109). */
+export interface Namable {
+  id: string;
+  x: number;
+  y: number;
+  /** The whole sentence the click would commit, letter included. */
+  sentence: string;
+}
+
+/**
+ * THE CENTRES A STUDENT MAY NAME (#1109).
+ *
+ * Operator, playing T10/T12: *"when a center of a circle is defined by the equation, it should be
+ * clickable so user can assign the center with a letter"*. The `+` mark has been drawn since #1024 and
+ * was inert; a crossing in the same figure was clickable and minted a letter, so the affordance existed
+ * and the most interesting point on a circle did not have it.
+ *
+ * **Offered only where there is no name**, which is his ruling: *"the click only names what doesn't have
+ * a name"*. Three ways a centre can already be named, all excluded:
+ *
+ *  - a point already sits there (the student named it earlier, by this route or another);
+ *  - the circle was stated BY its centre letter («מעגל O שמשוואתו …», #1059), so the letter IS the name;
+ *  - the circle is anonymous, so there is no «המעגל ‹name›» to write — a sentence that cannot round-trip
+ *    must not be offered (ADR-AG-048's «two surfaces, one grammar», and ADR-AG-054's rule that a ring
+ *    whose click fails is worse than no ring).
+ *
+ * It travels the crossing's road rather than forking it: the same `Namable` shape, the same `freeLetter`,
+ * and the sentence is what the parser reads back — never a point minted behind the grammar's back.
+ */
+export function centresOf(figure: Figure, letter: string): Namable[] {
+  const out: Namable[] = [];
+  for (const cu of figure.curves) {
+    if (!cu.stated) continue;
+    const circle = cu.curve as { kind: string; cx?: number; cy?: number };
+    if (circle.kind !== 'circle' || circle.cx === undefined || circle.cy === undefined) continue;
+
+    /**
+     * The student's own letter comes from the ID, not from `label.name`.
+     *
+     * `label.name` is the whole noun phrase — «מעגל I», not «I» — so composing the sentence from it
+     * produced «P מרכז המעגל מעגל I», which does not parse. The round-trip assertion caught it, which is
+     * exactly what ADR-AG-048's «two surfaces, one grammar» rule is for: an offered sentence the parser
+     * cannot read back is a ring whose click fails, and ADR-AG-054 says that is worse than no ring.
+     */
+    const PREFIX = 'circle-';
+    if (!cu.id.startsWith(PREFIX)) continue; // not named the way the grammar refers to a circle
+    const name = cu.id.slice(PREFIX.length);
+    if (!name) continue;
+
+    // Already named: a point sits on the centre, whatever route put it there.
+    const taken = figure.points.some(
+      (p) => Math.hypot(p.x - circle.cx!, p.y - circle.cy!) < apart(figure),
+    );
+    if (taken) continue;
+
+    out.push({
+      id: `centre-${cu.id}`,
+      x: circle.cx,
+      y: circle.cy,
+      sentence: `${letter} מרכז המעגל ${name}`,
+    });
+  }
+  return out;
+}

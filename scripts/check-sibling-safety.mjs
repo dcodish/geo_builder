@@ -26,9 +26,11 @@
  *
  *   Allow-sibling-edit: a fourth product's switcher label must exist in every sibling's resources
  *
- * `--product` (2d | 3d | complex | analytic, default complex) is the VIEWPOINT: which tree this change is allowed
- * to touch. Everything belonging to another product is a sibling, and the siblings' builds are the ones
- * that run. Before #846 the viewpoint was hard-coded, so only the complex lane could run this at all.
+ * `--product` (2d | 3d | complex | analytic, default complex) names the LANE — which build is the one
+ * already covered, so the OTHER three are the sibling builds that run here. It is deliberately not the
+ * viewpoint of the diff check: "which product is this change scoped to" is a property of the change,
+ * answered once by `treesTouched`, and it must read the same in every lane (#1155). Before #846 even
+ * the lane was hard-coded, so only the complex job could run this at all.
  *
  * Exit 0 = the siblings are provably untouched and still build. Exit 1 = look before you commit.
  *
@@ -107,6 +109,48 @@ export function productOf(file) {
     }
   }
   return best;
+}
+
+/**
+ * WHICH product trees does this change actually touch? (#1155)
+ *
+ * This is the question the refusal has always been about, and it is a property of the CHANGE: it has
+ * ONE answer, and that answer is the same no matter who asks. The guard used to ask a different
+ * question — "is this change scoped to <viewpoint>?" — with the viewpoint supplied by `--product`,
+ * which `ci.yml` fills in FROM THE LANE. A lane is not a claim about the change, so a one-answer
+ * question got four answers: for any change touching exactly one tree P, the P lane passed while the
+ * other three refused the change's OWN files as "sibling" edits. At most one lane could be right, and
+ * three were wrong by construction — `main` shipped red that way at 8525c378, with every test green.
+ *
+ * The refusal is computed from this set now. **0 or 1 tree is not a cross-product edit** and no lane
+ * may refuse it; **2 or more** is one, and every lane refuses it alike unless the trailer says why.
+ * Nothing in ADR-W-017's guarantee moves: a change that touched one tree did not edit a sibling, and
+ * harm reaching a sibling through a SHARED surface was never this half's to catch — the builds below
+ * and `npm run test:full` are. Only the lane-relativity is gone.
+ */
+export function treesTouched(files) {
+  const trees = new Set();
+  for (const f of files) {
+    const owner = productOf(String(f).replace(/\\/g, '/'));
+    if (owner) trees.add(owner);
+  }
+  return [...trees].sort();
+}
+
+/**
+ * THE REFUSAL DECISION ITSELF, exported so the lock asserts it rather than reproducing it (ADR-W-053).
+ *
+ * Returns `null` when there is nothing any lane may refuse, or the offending files grouped by the
+ * tree they belong to. Keeping the decision here — rather than as an `if` inside `main()` beside a
+ * re-derived condition in the test — is what stops the two from drifting apart; a test that recomputes
+ * "two or more trees" would keep passing after `main()` went back to asking about the lane.
+ *
+ * Note what it does NOT take: a product. That is the fix, expressed in the signature (#1155).
+ */
+export function crossProductGroups(files) {
+  const trees = treesTouched(files);
+  if (trees.length < 2) return null; // one tree is a scoped change — no lane may refuse it
+  return trees.map((t) => [t, files.filter((f) => productOf(String(f).replace(/\\/g, '/')) === t)]);
 }
 
 /**
@@ -271,30 +315,35 @@ function main() {
   }
 
   const files = changedFiles(base);
-  const { own, sibling, shared, inert } = classifyChange(files, product);
+  const { shared, inert } = classifyChange(files, product);
+  const trees = treesTouched(files);
+  const byTree = crossProductGroups(files);
 
-  console.log(`sibling-safety [${product}] — ${files.length} changed file(s) vs ${base}`);
-  console.log(`  own ${own.length} · shared ${shared.length} · inert ${inert.length} · sibling ${sibling.length}`);
+  console.log(`sibling-safety [lane ${product}] — ${files.length} changed file(s) vs ${base}`);
+  console.log(
+    `  product tree(s) touched: ${trees.length ? trees.join(', ') : 'none'} · shared ${shared.length} · inert ${inert.length}`,
+  );
 
   let ok = true;
 
-  if (sibling.length > 0) {
+  // THE REFUSAL IS COMPUTED FROM THE CHANGE, NEVER FROM THIS LANE (#1155). One tree is a scoped
+  // change and no lane may refuse it; two or more is a cross-product edit and every lane refuses
+  // it alike unless somebody said why. That the verdict no longer depends on WHO ASKED is the
+  // whole point — it is one question about the change, so it gets one answer.
+  if (byTree) {
     if (reason) {
-      console.log(`\n  cross-product edit PERMITTED by ${reasonSource}, and recorded:\n    "${reason}"`);
-      for (const f of sibling) console.log(`      ${f}`);
+      console.log(
+        `\n  cross-product edit PERMITTED by ${reasonSource}, and recorded:\n    "${reason}"`,
+      );
+      for (const [t, group] of byTree) for (const f of group) console.log(`      [${t}] ${f}`);
     } else {
       ok = false;
       console.error(
-        `\n  REFUSED: ${sibling.length} file(s) belonging to a shipped sibling product were changed:`,
+        `\n  REFUSED: one change edits ${trees.length} product trees — ${trees.join(', ')}:`,
       );
-      for (const f of sibling) console.error(`      ${f}`);
+      for (const [t, group] of byTree) for (const f of group) console.error(`      [${t}] ${f}`);
       console.error(
-        `\n  A slice scoped to ${product} must not edit another product's tree. If this change really\n` +
-          `  is cross-product, say why IN THE COMMIT — a trailer on any commit in ${base}..HEAD:\n` +
-          `      ${SIBLING_TRAILER}: why this legitimately edits a sibling\n` +
-          `\n  That is the form CI can read; an env var lives only in your shell (#895). While you are\n` +
-          `  still writing the change and the reason is not yet committed, the local loop also takes:\n` +
-          `      ALLOW_SIBLING_EDIT="the reason" node scripts/check-sibling-safety.mjs --product ${product}\n`,
+        `\n  Products never import each other and ship separately, so one change spanning two of\n  their trees is either two changes or a deliberate workspace-wide one. If it really is the\n  latter, say why IN THE COMMIT — a trailer on any commit in ${base}..HEAD:\n      ${SIBLING_TRAILER}: why this legitimately spans products\n\n  That is the form CI can read; an env var lives only in your shell (#895). While you are\n  still writing the change and the reason is not yet committed, the local loop also takes:\n      ALLOW_SIBLING_EDIT="the reason" node scripts/check-sibling-safety.mjs\n`,
       );
     }
   }

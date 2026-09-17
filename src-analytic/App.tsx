@@ -48,7 +48,7 @@ import { ask, figureIsOpen, type Answer } from './app/ask';
 import { askOnceAnswer, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
 import { anotherConfiguration, seedShowing } from './app/another';
-import { crossingSentence, crossingsOf, freeLetter } from './engine/crossings';
+import { centresOf, crossingSentence, crossingsOf, freeLetter } from './engine/crossings';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
 
 declare const __BUILD__: string;
@@ -511,12 +511,23 @@ export function App() {
        * construction, and each dot carries the SENTENCE its click would add rather than a point: two
        * surfaces, one grammar.
        */
-      crossings: crossingsOf(d.figure, d.construction).map((k) => ({
-        id: k.id,
-        x: k.x,
-        y: k.y,
-        sentence: crossingSentence(k, freeLetter(d.construction)),
-      })),
+      crossings: [
+        ...crossingsOf(d.figure, d.construction).map((k) => ({
+          id: k.id,
+          x: k.x,
+          y: k.y,
+          sentence: crossingSentence(k, freeLetter(d.construction)),
+        })),
+        /**
+         * A circle's CENTRE is namable the same way a crossing is (#1109) — the operator's
+         * *"it should be clickable so user can assign the center with a letter"*.
+         *
+         * Concatenated into the same list rather than given its own handler, which is the issue's own
+         * design constraint: one kind of offer, one letter source, one grammar. Each entry carries the
+         * SENTENCE its click would add, so the click surface and the typing surface cannot disagree.
+         */
+        ...centresOf(d.figure, freeLetter(d.construction)),
+      ],
     });
   }, [d, view, canvasSize, answers]);
 

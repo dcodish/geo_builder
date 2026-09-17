@@ -1060,3 +1060,20 @@ figure, and that is asserted rather than assumed.
 
 **Out of scope, and refused by name:** an n-way chain, «AC:CB:BD = 3:2:4». Reading the first pair out of
 it would silently drop a stated given.
+
+**R90 — a circle's CENTRE can be given a letter, by clicking it or by saying so**
+([#1109](https://github.com/dcodish/geo_builder/issues/1109)).
+
+«O מרכז המעגל I» · «O is the centre of circle I», and the same sentence offered by clicking the centre
+mark that R31 already draws.
+
+**It names; it never asserts.** The letter attaches to the point the circle already determines and
+commits no constraint and no degree of freedom — so on «נתון מעגל O משיק לציר x» the centre keeps its
+freedom after being named. A label is not a given.
+
+**The offer appears only where a name is missing**, and disappears once one exists: a centre that already
+carries a letter, or has a point sitting on it, is not offered again. An ANONYMOUS circle is not offered
+either — there is no «המעגל ‹name›» to write, and a sentence the parser cannot read back must never be
+offered (R-level statement of ADR-AG-048's «two surfaces, one grammar»).
+
+**Circle-only.** A parabola's focus and an ellipse's centre are the same question and are not covered.
