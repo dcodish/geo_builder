@@ -18,7 +18,7 @@
 import { fitConic } from './conic';
 import { resolveCurve } from './curves';
 import { curveParentOf, parentsOf, type DerivedRule } from './derived';
-import { constraintRefs, sameConstraint } from './solve';
+import { constraintCurveRefs, constraintRefs, sameConstraint } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, shapeRow } from './shapes';
 import { evalExpr, type Env } from './expr';
 import {
@@ -32,6 +32,7 @@ import {
   type Domain,
   type Fact,
   type GeoObject,
+  type Id,
   type PointObject,
   type PolygonObject,
 } from './types';
@@ -151,6 +152,38 @@ export type LineEffect = 'created' | 'known' | 'narrowed';
 export type ApplyOutcome =
   | { ok: true; next: Construction; effect: LineEffect }
   | { ok: false; error: ApplyError };
+
+/**
+ * THE NAME THE STUDENT WROTE, from the id the parser minted (#1145, #1150).
+ *
+ * Curves get a prefixed id — «מעגל I» becomes `circle-I`, «הישר l7» becomes `line-l7` — so that a
+ * circle and a point may both be called `I` without colliding. That prefix is internal, and it was
+ * reaching the student: refusing «O מרכז המעגל Z» reported the detail **`circle-Z`**, a word they
+ * never typed, and #1150's new curve check would have reported `line-l7` the same way.
+ *
+ * CLAUDE.md, *Honesty invariants*: **error messages name the conflicting statement, never internal
+ * state.** A student told their sentence mentions `circle-Z` will look for `circle-Z` in it.
+ *
+ * Applied at EVERY `unknown-reference` site rather than at the two that were reported: it is the
+ * identity function on an id that carries no prefix — a point is just `A` — so a uniform call cannot
+ * be wrong, and the next site to be given a curve id inherits the fix.
+ *
+ * An ANONYMOUS curve (`curve-<hash>`) is deliberately left alone: there is no student name to
+ * recover, and printing the hash's tail would be a different wrong word rather than the right one.
+ */
+export function statedName(id: Id): string {
+  const m = /^(?:line|circle)-(.+)$/.exec(id);
+  return m ? m[1] : id;
+}
+
+/**
+ * The object kinds that HAVE a shape — what an `on-curve` or a curve direction may name (#1150).
+ *
+ * A stated equation, a circle given by its centre, a line built through a point: each resolves to a
+ * curve at evaluation, and each is a legitimate carrier. A POINT is not, and neither is a polygon —
+ * naming one where a curve belongs is the same mistake as naming a curve that does not exist.
+ */
+const CURVE_BEARING: ReadonlySet<string> = new Set(['curve', 'circle-at', 'line-at']);
 
 /** The probe environment for restatement comparison — see `sameNumbers`. */
 const PROBE_ENVS: Env[] = [
@@ -471,7 +504,29 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         return !o || !isPositional(o);
       });
       if (missing !== undefined) {
-        return { ok: false, error: { code: 'unknown-reference', detail: missing } };
+        return { ok: false, error: { code: 'unknown-reference', detail: statedName(missing) } };
+      }
+      /**
+       * …AND THE CURVES IT NAMES (#1150). Same rule, the half that was missing.
+       *
+       * «נקודה D היא חיתוך של l7 ו- l8» on a figure with no `l7` lowered to two `on-curve`
+       * constraints, passed this boundary in silence because `constraintRefs` answers only about
+       * POINTS, and could not be measured at evaluation — so `D` was drawn as an ordinary free point
+       * at a sampled position while the data panel one column over read `D = –`. The canvas asserted
+       * a position the panel admitted was undetermined, and the student's defining clause had
+       * vanished without a word.
+       *
+       * The tool already knew how to say this: an ASK naming an object the figure does not have
+       * answers «אין בשרטוט …» (#1111). This is the FACT lane finally getting the same check.
+       *
+       * The detail is the student's own name for the curve — `l7`, never an internal id.
+       */
+      const missingCurve = constraintCurveRefs(f.k).find((id) => {
+        const o = objectById(c, id);
+        return !o || !CURVE_BEARING.has(o.kind);
+      });
+      if (missingCurve !== undefined) {
+        return { ok: false, error: { code: 'unknown-reference', detail: statedName(missingCurve) } };
       }
       /**
        * A STATEMENT MEETS THE TOOL'S OWN ASSUMPTION (#1159) — decided before the duplicate absorb,
@@ -655,7 +710,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'circle-at': {
       const centre = objectById(c, f.centre);
       if (!centre || !isPositional(centre)) {
-        return { ok: false, error: { code: 'unknown-reference', detail: f.centre } };
+        return { ok: false, error: { code: 'unknown-reference', detail: statedName(f.centre) } };
       }
       const prior = objectById(c, f.id);
       if (prior) {
@@ -687,7 +742,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'line-at': {
       const through = objectById(c, f.through);
       if (!through || !isPositional(through)) {
-        return { ok: false, error: { code: 'unknown-reference', detail: f.through } };
+        return { ok: false, error: { code: 'unknown-reference', detail: statedName(f.through) } };
       }
       const prior = objectById(c, f.id);
       if (prior) {
@@ -724,7 +779,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'on-kind': {
       const point = objectById(c, f.id);
       if (!point || !isPositional(point)) {
-        return { ok: false, error: { code: 'unknown-reference', detail: f.id } };
+        return { ok: false, error: { code: 'unknown-reference', detail: statedName(f.id) } };
       }
       /**
        * The kind of an ANONYMOUS conic is not declared — it comes from the FIT (02c R6: the noun is
@@ -774,7 +829,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'right-angle': {
       const host = objectById(c, f.id);
       if (!host || !isPositional(host)) {
-        return { ok: false, error: { code: 'unknown-reference', detail: f.id } };
+        return { ok: false, error: { code: 'unknown-reference', detail: statedName(f.id) } };
       }
       const rings = c.objects.filter((g) => g.kind === 'polygon' && g.vertices.includes(f.id));
       if (rings.length !== 1) {
@@ -818,7 +873,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       for (const id of refs) {
         const o = objectById(c, id);
         if (!o || !isPositional(o)) {
-          return { ok: false, error: { code: 'unknown-reference', detail: id } };
+          return { ok: false, error: { code: 'unknown-reference', detail: statedName(id) } };
         }
       }
       // Compared structurally: the union's members have different shapes, and a field-by-field test
@@ -847,7 +902,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
       if (curveRef !== null) {
         const o = objectById(c, curveRef);
         if (!o || o.kind !== 'curve') {
-          return { ok: false, error: { code: 'unknown-reference', detail: curveRef } };
+          return { ok: false, error: { code: 'unknown-reference', detail: statedName(curveRef) } };
         }
       }
 
@@ -889,7 +944,7 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         }
         if (!declares) {
           // Named in the student's own words, never as internal state: the message says WHICH point.
-          return { ok: false, error: { code: 'unknown-reference', detail: id } };
+          return { ok: false, error: { code: 'unknown-reference', detail: statedName(id) } };
         }
         base = { ...base, objects: [...base.objects, { kind: 'free', id }] };
       }

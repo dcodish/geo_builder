@@ -623,3 +623,73 @@ honest as the set of writers that can produce the structure.**
 
 `assumed` is outside the key on purpose — an assumed `AB ∥ DC` and a stated one are the same statement,
 which is precisely what lets the stated one recognise and pin the assumed one.
+## The apply boundary's reference check, both halves ([ADR-AG-083](06c-decisions-analytic.md#adr-ag-083))
+
+A constraint names things, and creates none of them. «שטח המשולש ABC הוא 20» before `ABC` exists is a
+statement about nothing, so the apply boundary refuses it — that half has been there since #1028.
+
+**A constraint can also name a CURVE**, and that half was missing. `constraintRefs` answers *which
+points does this touch*, which is what its two callers want: `carriers.ts` needs the carriers a
+constraint can move, and the apply boundary needs the points a statement presumes. So `on-curve`
+returns only its point, and a `curve` direction returns nothing at all.
+
+The result was a given that vanished between two layers. «נקודה D היא חיתוך של l7 ו- l8» parsed
+correctly into two `on-curve` constraints, passed the apply boundary because its *points* were fine,
+and then could not be measured at evaluation because the curves were not there — so `D` became an
+ordinary free point at a sampled position, drawn on a canvas while the panel called it undetermined.
+
+`constraintCurveRefs` is the sibling, and the boundary now checks both lists:
+
+| ref kind | must resolve to | asked by |
+| --- | --- | --- |
+| point | something positional | `constraintRefs` |
+| curve | something with a shape — `curve`, `circle-at`, `line-at` | `constraintCurveRefs` |
+
+They stay **separate functions**. Merging them would have made the point check reject every curve
+reference as "not a point" — the opposite defect, and a worse one.
+
+### Naming what the student wrote
+
+A curve's id carries a prefix so a circle and a point may both be called `I` (`circle-I`, `line-l7`).
+`statedName` strips it, and is applied at **every** `unknown-reference` site rather than at the ones
+that were reported: it is the identity on an unprefixed id, so a uniform call cannot be wrong, and the
+next site handed a curve id inherits the fix instead of repeating the defect.
+
+An anonymous curve (`curve-<hash>`) is left whole — there is no student name to recover, and the
+hash's tail would be a different wrong word rather than the right one.
+
+## The tree's display formatter ([ADR-AG-084](06c-decisions-analytic.md#adr-ag-084))
+
+`shell/format.ts` owns decimal EXPANSIONS for every product — two places after the point, one
+chokepoint, no private rounders. Its docblock is equally explicit about what it does *not* own:
+*"Exact symbolic forms (5, 1/2, √2, cis120°) never pass through here … Each keeps its own
+product-specific tiers ABOVE the decimal fallback."*
+
+This tree had no tier, and called `fmtNum` directly — so the slope of «y=(4/3)x» read `1.33`. 2-D has
+`exactFormOf` (rational · √ · π), 3-D has `cleanNum` (integer · `p/q` · surd), and the complex tree
+carries exactness structurally. Analytic was the gap, not the shared formatter.
+
+`src-analytic/format.ts` is now the tree's **one** display formatter — panel and canvas both — with a
+single tier above the fallback:
+
+```
+fmtAnalytic(v) = fractionText(v) ?? fmtNum(v)
+```
+
+### Recognition is honest only while it stays recognition
+
+The number reaching display is a `number`; the exactness of `4/3` lives in the equation the student
+typed, layers above. So the form is RECOGNISED, exactly as both siblings do, and two limits keep that
+from becoming invention:
+
+- **a relative tolerance (`1e-6`) and a denominator capped at 12.** With a loose bar or a large
+  denominator, every float is "rational" and the tier always succeeds — which in a tool about
+  exactness is its own kind of lie. `1.3333` typed by a student stays `1.33`; π is not printed as 22/7.
+- **the caller has already gated on invariance.** A value is displayed at all only where it passed
+  `isKnowledge` — the same number in every admissible configuration — so a sampled coincidence never
+  reaches the formatter.
+
+The counter-direction is the load-bearing test, not the reported case.
+
+**No surd tier**: no witness in this tree's corpus, and a tier with no witness has no test that could
+fail. It is added when an exam asks for it.

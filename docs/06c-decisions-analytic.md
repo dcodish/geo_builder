@@ -4508,3 +4508,79 @@ So one key, used by every comparison site (`namesOption`, the duplicate absorb, 
 **Counter-direction, asserted:** a parallelogram's pair is a real given, so restating it is still absorbed as «כבר ידוע» — a fix that made every parallel record would have swapped one dishonest message for another.
 
 **Consequences.** `assumed?: true` on the `relation` constraint, `canonicalConstraint`/`sameConstraint` (`solve.ts`), `assumedParallel` + `displacedAssumption` (`shapes.ts`), one arm in `apply.ts`, one in `decideSubmit`. `issue-1159-trapezoid-pair.test.ts` (12). Analytic lane 81 files / 1237 tests — none of `options`, `named-shape`, `shapes`, `lowering`, `panel` moved, which was this issue's stated escalation trigger.
+## ADR-AG-083 — A constraint's CURVE references are checked like its point references (#1150 + #1145)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — none added; this restores an existing promise (the honesty invariant: a given parses to a constraint, escalates, or errors, but never vanishes). **Design:** [04c](04c-design-analytic.md) — *the apply boundary's reference check*. **LADDER stage:** the apply boundary, beside the point-reference refusal it completes.
+
+**Operator, on his saved figure «עבודת סוכות 1»:** *"the last input referred to l1 and l2 which don't exist and yet point D was positioned"*.
+
+### The diagnosis in the issue was wrong, and the issue said to check it
+
+#1150 proposed that the point rule's optional tail *"fails to match, so the rule succeeds with the tail dropped"* — the ADR-AG-017/#1042 class — and flagged it **measured but not yet complete**. Measured at HEAD, the sentence parses **fully**:
+
+```
+«נקודה D היא חיתוך של l7 ו- l8»  →  declare · on-curve · on-curve · selector
+```
+
+Both constraints faithfully name `l7` and `l8`. Nothing was dropped by the parser.
+
+**The hole is one seam later.** `constraintRefs` answers *which POINTS does this constraint touch* — which is exactly right for both of its callers (`carriers.ts`, to find the carriers a constraint can move; the apply boundary, to refuse a statement about a point the figure lacks), so `on-curve` returns only its point and `dirRefs` returns `[]` for a curve direction. **Nothing ever asked whether the curve existed.** The constraints passed the apply boundary in silence, could not be measured at evaluation, and `D` was drawn as an ordinary free point at a sampled position — while the data panel one column over read `D = –`. The canvas asserted a position the panel admitted was undetermined.
+
+Same class as the issue named; different mechanism. The lesson is the one docs/17 keeps making: a root cause read off the code is a hypothesis.
+
+### The decision
+
+**`constraintCurveRefs` is the other half of `constraintRefs`, and the apply boundary checks both.** Kept separate rather than merged, because the two have different truth conditions — a point ref must resolve to something positional, a curve ref to something with a shape (`curve`, `circle-at`, `line-at`). Merging them would have made the check reject every curve reference as "not a point", which is the opposite defect.
+
+Its `default` arm returns `[]` rather than throwing on an unhandled kind, deliberately unlike `constraintRefs`'s exhaustive `never`: naming no curve is the common case, and a kind that does name one will be caught by its own test rather than by a compile error that every future kind has to answer.
+
+### #1145 rides along, because this fix would otherwise have created a new instance of it
+
+A curve's id is prefixed so that a circle and a point may both be called `I` — «מעגל I» is `circle-I`, «הישר l7» is `line-l7`. That prefix is internal, and it was reaching the student: «O מרכז המעגל Z» reported the detail **`circle-Z`**, a word they never typed. The new check above would have reported `line-l7` the same way, on a message that did not exist before.
+
+`statedName(id)` strips the prefixes the parser minted and is applied at **every** `unknown-reference` site, not the two that were reported — it is the identity on an unprefixed id (a point is just `A`), so a uniform call cannot be wrong and the next site handed a curve id inherits the fix. An anonymous curve (`curve-<hash>`) is left whole: there is no student name to recover, and printing the hash's tail would be a different wrong word rather than the right one.
+
+CLAUDE.md, *Honesty invariants*: **error messages name the conflicting statement, never internal state.**
+
+**Counter-direction, asserted:** the same sentence with both lines PRESENT still records. A reference check that refused a legitimate statement would be far worse than the silence it replaces.
+
+**Consequences.** `constraintCurveRefs` (`solve.ts`), `statedName` + `CURVE_BEARING` + one arm (`apply.ts`), nine `unknown-reference` sites routed through `statedName`. `issue-1150-1145-refs.test.ts` (10). Analytic lane 82 files / 1237 tests.
+
+## ADR-AG-084 — Exact forms: the analytic tree gets the display tier its three siblings already had (#1120)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R94. **Design:** [04c](04c-design-analytic.md) — *the tree's display formatter*. **LADDER stage:** display only — no value, gate or comparison anywhere in the product is affected.
+
+**Operator, playing PR #1116 T29, and again unprompted the next day:** *"in the data panel, the slope of 4/3 is written as 1.33 which is wrong"*. **Ruling, 2026-09-16, verbatim: "exact forms".**
+
+He is right that *wrong* is the word rather than *imprecise*: in analytic geometry the slope of that line **is** 4/3, and `1.33` is a different number the panel was stating as the value. It also sat badly beside this product's own promise — #1053 shows the FORMULA behind an answer so a student sees the method, and the method here yields 4/3. Showing the working and then rounding the result teaches them to write `1.33` on an exam that wants `4/3`.
+
+### Two corrections to the issue's framing, both measured
+
+**1 — This is NOT a workspace change.** The ruling's transcription says *"`fmtNum` is the workspace's single display chokepoint, so this is a workspace ADR and not a per-product one. Every number in every tool is in its scope."* Measured, that is not the shape of the code. [`shell/format.ts`](../shell/format.ts)'s own docblock already describes the architecture — *"Exact symbolic forms (5, 1/2, √2, cis120°) never pass through here … Each keeps its own product-specific tiers ABOVE the decimal fallback"* — and three of the four trees have built theirs:
+
+| tree | exact tier |
+| --- | --- |
+| 2-D | `exactFormOf` — rational · √ · π ([ADR-410](06-decisions.md), #217) |
+| 3-D | `cleanNum` — integer · `p/q` (q ≤ 24) · surd |
+| complex | exactness carried structurally in the value model (`ExactValue`) |
+| **analytic** | **none — `fmtNum` called directly** |
+
+So the shared formatter was never the defect. **Analytic is the one tree that never built the tier above it**, and a cross-product disparity of that shape is a wiring smell rather than a workspace redesign. The fix is scoped to this tree and this ADR is `ADR-AG`, not `ADR-W`.
+
+**2 — Recognition, not carriage — a DEVIATION from the transcribed mechanism, stated plainly.** The operator's words were *"exact forms"*, which names an outcome. The transcription went further and selected the body's **option (2), carry the stated value** — *"the parser already holds `4/3` as text, so it is kept alongside the float"*. This builds **option (1), recognition**, and the reasons are:
+
+- it is what **both** sibling trees that print exact forms already do, so it satisfies the ruling with the mechanism the workspace has settled on twice;
+- the value reaching display is a `number`, and the exactness of `4/3` lives in the equation several layers up. Carrying it would mean threading an exact representation through `isKnowledge` and every value path — a new value-carrying layer, which is a new mechanism rather than a tier;
+- the issue's stated objection to option (1) — *"it will occasionally print a fraction for a number that only looks like one"* — is answered by discipline rather than by architecture, and the discipline is the siblings': a **relative** tolerance of `1e-6`, a denominator capped at **12**, and a caller that has already gated on invariance (`isKnowledge` — the same number in every admissible configuration). **`1.3333` typed by a student stays `1.33`**, and that is asserted first-class.
+
+**If the operator meant the stated-text mechanism specifically, this is the line to revisit** — it is recorded here rather than folded in silently.
+
+### What was built
+
+`src-analytic/format.ts`: `fractionText` (the tier) and `fmtAnalytic` (tier, then the shared decimal fallback, with the sub-epsilon clamp the old `fmt` carried). The tree's **one** display formatter, so the panel and the canvas cannot print one value two ways — `fmtNum`'s own *"never per-call-site"* rule applied one level up. `App.tsx`'s `fmt` and `render/scene.ts`'s three labels route through it.
+
+**Copied, not imported**: `src-analytic/CLAUDE.md` boundary 1 — 2-D's lives in `src/`, which this tree may not import. A third recogniser in the workspace is the architecture `shell/format.ts` describes, not a new sin.
+
+**No surd tier**, deliberately: no witness in this tree's corpus yet, and a tier with no witness has no test that could fail. √2 falls to the decimal, honestly.
+
+**Consequences.** `src-analytic/format.ts` (new), one line in `App.tsx`, three labels in `scene.ts`. `issue-1120-exact-forms.test.ts` (7), whose load-bearing case is the counter-direction. Analytic lane 82 files / 1246 tests — **no display assertion moved.**
