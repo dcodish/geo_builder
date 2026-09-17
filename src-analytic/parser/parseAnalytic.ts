@@ -21,7 +21,7 @@ import type { DerivedRule } from '../engine/derived';
 import type { Constraint, Direction } from '../engine/solve';
 import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { RESERVED_SYMBOLS } from '../engine/carriers';
-import { constantLengthExpr, parseLengthExpr } from '../engine/lengths';
+import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id } from '../engine/types';
 import { EN_SHAPE, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
 
@@ -629,6 +629,40 @@ const MIDPOINT_EN = new RegExp(
   'i',
 );
 
+/**
+ * `O מרכז המעגל I` · `O הוא מרכז המעגל I` · `O is the centre of circle I` (#1109).
+ *
+ * Operator, playing T10/T12: *"when a center of a circle is defined by the equation, it should be
+ * clickable so user can assign the center with a letter"*.
+ *
+ * ## It NAMES; it never asserts
+ *
+ * His ruling: *"the click only names what doesn't have a name"*. So this emits the **`circle-centre`
+ * derived rule** — the one #1059/#1060 already shipped, whose parent is a CURVE rather than a set of
+ * points — and nothing else. No constraint, no degree of freedom. On «נתון מעגל O משיק לציר x» the
+ * centre keeps its freedom after the naming, because a label is not a given.
+ *
+ * ## The engine half already existed, and that is why this is a parser rule
+ *
+ * The issue warned that the missing grammar was *"probably the larger part"*, and measured it is the
+ * ONLY part: none of six spellings parsed, while `{ t: 'circle-centre', curve }` has been a
+ * `DerivedRule` since #1059. A rule that minted a second kind of centre-point would be the divergence
+ * ADR-AG-023 names, so this reuses the fact the circle-by-centre form already produces.
+ *
+ * ## Siblings, decided explicitly rather than left implied
+ *
+ * A parabola's FOCUS and an ellipse's CENTRE are the same question and are **not** in this slice: they
+ * have no `DerivedRule`, so each would be new engine work rather than a spelling. Circle-only, said out
+ * loud, per the issue's step 5.
+ */
+const CENTRE_HE = new RegExp(
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מרכז\\s+(?:ה?מעגל\\s+)?(${NAME})$`,
+);
+const CENTRE_EN = new RegExp(
+  `^(?:point\\s+)?(${NAME})\\s+is\\s+the\\s+cent(?:re|er)\\s+of\\s+(?:circle\\s+)?(${NAME})$`,
+  'i',
+);
+
 /** `M מפגש התיכונים במשולש ABC` · `G מפגש האלכסונים במרובע ABCD`. */
 const CONCURRENCY_HE = new RegExp(
   `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מפגש\\s+(.+?)\\s+ב-?\\s*(?:ה?([א-ת]+(?:[- ][א-ת]+){0,2})\\s+)?(${NAME_RUN})$`,
@@ -786,6 +820,19 @@ function parseDerived(line: string): RuleOutcome {
     const [, id, a, b] = mid;
     if (a === b) return refuse('repeated-vertex', line); // «M אמצע AA» is a point, not a segment
     return made([{ t: 'derived', id, rule: { t: 'midpoint', a, b }, src: line }]);
+  }
+
+  /**
+   * Naming a circle`s CENTRE (#1109) — it names, it never asserts.
+   *
+   * The curve is resolved by NAME to the id the rest of the tree uses (`circle-I`), rather than a
+   * second id minted here: two ids for one curve is ADR-AG-023`s defect. An unknown name refuses by
+   * name instead of inventing a circle, which is the same rule every other operand follows.
+   */
+  const centre = CENTRE_HE.exec(line) ?? CENTRE_EN.exec(line);
+  if (centre) {
+    const [, id, circleName] = centre;
+    return made([{ t: 'derived', id, rule: { t: 'circle-centre', curve: `circle-${circleName}` }, src: line }]);
   }
 
   const diag = DIAGONAL_EQ_HE.exec(line) ?? DIAGONAL_EQ_EN.exec(line);
@@ -1748,6 +1795,158 @@ function parseConstraint(raw: string): RuleOutcome {
   return null;
 }
 
+/**
+ * THE COLON-RATIO FAMILY (#1124) — «AC:CB = 3:2» and its two spoken spellings.
+ *
+ * Operator: *"the analytics tool doesnt support the ratio AC:CB=3:2"*. The MECHANISM was already here —
+ * `length-eq` carries `AB = 10`, `AB = AC` and `2·AB = 3·CD` as one kind with different trees — and only
+ * the notation was missing. 2-D has had all three forms since #519.
+ *
+ * ## The split is 2-D's, ported rather than reinvented
+ *
+ * | form | what it is | lowering |
+ * | --- | --- | --- |
+ * | «AC:CB = 3:2» | a RELATION between two lengths over points that already exist | one `length-eq` |
+ * | «C מחלקת את AB ביחס 3:2» | a PLACEMENT that mints the divider | `declare` + `on-line-2pt` + `between` + the same `length-eq` |
+ * | «היחס בין AC ל-CB הוא 3:2» | the exam's prose spelling of the placement | the same as the divider |
+ *
+ * Deciding by FORM rather than picking one lowering is what makes «C מחלקת את AB ביחס 3:2» a single
+ * sentence: the bare colon references endpoints, the keyworded divider creates one.
+ *
+ * ## Why the constraint is `AC = (p/q)·CB` and not a new kind
+ *
+ * `AC:CB = p:q` means `|AC|/|CB| = p/q`, so `|AC| = (p/q)·|CB|` — which is exactly what «AC = 1.5CB»
+ * already lowers to. The identity lock asserts the two produce the **same construction**, because a
+ * second mechanism for one meaning is how two surfaces of a tool start disagreeing.
+ *
+ * ## Ordering is the whole risk, and it is why #1123 came first
+ *
+ * These run BEFORE `matchCurve`, whose bare-colon branch would otherwise claim «AC:CB = 3:2» as a line
+ * named `AC` with the equation `CB = 3:2` — the reported bug, fixed in #1123 by making that branch
+ * decline a tail that is not an equation in the plane's variables. Ordering here as well is belt and
+ * braces; 2-D learned the same lesson the same way and says so in `dividesInRatio`'s own comment.
+ *
+ * No CAS is needed: `p` and `q` are literal digits and `p/q` is arithmetic, well inside ADR-AG-001 D1.
+ */
+const RATIO_PQ = String.raw`(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)`;
+const RATIO_END = String.raw`\s*` + '$';
+
+/**
+ * The relation itself: |first| = (p/q)·|second|. Shared by all three spellings.
+ *
+ * **Built by CALLING `parseLengthExpr`, never by hand.** A hand-written tree looked right, printed
+ * identically to the one «AC = 1.5CB» produces, and silently did nothing: `LengthExpr.terms[i]` is bound
+ * to a PRIVATE-USE code point (`PLACEHOLDER_BASE`, U+E000), so the placeholder symbol's name is an
+ * invisible character — and `JSON.stringify` renders it as an invisible glyph between the quotes, making
+ * `name: ""` and `name: ""` look like the same string in every diff and every console.
+ *
+ * Measured: with the hand-built tree the constraint was simply not evaluated. `C` floated to wherever the
+ * sampler put it (3.75 instead of 6.00 on `A(0,0) B(10,0)`), `unsatisfied` stayed **empty**, and the
+ * construction printed byte-identical to the working one. Exactly the class
+ * [ADR-W-053](../../docs/06w-decisions-workspace.md#adr-w-053) names: reproducing a decision instead of
+ * calling it, agreeing with itself, and being wrong.
+ *
+ * Scaling wraps the REAL parsed expr rather than rebuilding it, so the result is identical to the
+ * multiplication spelling by construction — which is what the identity lock asserts.
+ */
+const ratioFact = (
+  first: [string, string],
+  second: [string, string],
+  p: number,
+  q: number,
+  src: string,
+): Fact | null => {
+  const left = parseLengthExpr(first[0] + first[1]);
+  const right = parseLengthExpr(second[0] + second[1]);
+  if (!left || !right) return null;
+  const scaled: LengthExpr = {
+    expr: { kind: 'mul', a: { kind: 'num', value: p / q }, b: right.expr },
+    terms: right.terms,
+  };
+  return { t: 'constraint', k: { t: 'length-eq', left, right: scaled }, src };
+};
+
+/**
+ * «AC:CB = 3:2» — a bare ratio between two named segments, no keyword.
+ *
+ * Anchored on the FULL `seg:seg = p:q` shape, so it never claims a lone segment, an equality, or a
+ * `p:q` that lacks two named segments on the left.
+ */
+function parseRatioColon(line: string): Fact[] | null {
+  const m = line.match(
+    new RegExp(
+      String.raw`^\s*([A-Z]\d?)\s*([A-Z]\d?)\s*:\s*([A-Z]\d?)\s*([A-Z]\d?)\s*=\s*` + RATIO_PQ + RATIO_END,
+    ),
+  );
+  if (!m) return null;
+  const p = Number(m[5]);
+  const q = Number(m[6]);
+  if (!(p > 0) || !(q > 0)) return null;
+  const fact = ratioFact([m[1], m[2]], [m[3], m[4]], p, q, line);
+  return fact ? [fact] : null;
+}
+
+/** The placement shared by the divider and prose spellings: `C` sits on `AB`, between its ends. */
+function ratioDividerFacts(id: string, a: string, b: string, p: number, q: number, src: string): Fact[] | null {
+  const ratio = ratioFact([a, id], [id, b], p, q, src);
+  if (!ratio) return null;
+  return [
+    { t: 'declare', id, src },
+    { t: 'constraint', k: { t: 'on-line-2pt', id, a, b }, src },
+    { t: 'selector', sel: { kind: 'between', id, a, b }, src },
+    ratio,
+  ];
+}
+
+/**
+ * «C מחלקת את AB ביחס 3:2» / "C divides AB in ratio 3:2", and the prose «היחס בין AC ל-CB הוא 3:2».
+ *
+ * Keyword-anchored on `מחלק`/`divides` or `יחס`/`ratio` PLUS a literal `p:q`, so neither spelling can
+ * claim a plain segment or a bare equality.
+ */
+function parseDividesInRatio(line: string): Fact[] | null {
+  // (a) divider-first — the one-liner that makes this worth having.
+  const div = line.match(
+    new RegExp(
+      String.raw`([A-Z]\d?)\s+(?:מחלק[הת]?|divides?)\s+(?:את\s+)?(?:ה?(?:קטע|צלע)\s+)?([A-Z]\d?)\s*([A-Z]\d?)[\s\S]*?(?:ביחס|יחס|ratio)\D*?` +
+        RATIO_PQ,
+      'i',
+    ),
+  );
+  if (div) {
+    const p = Number(div[4]);
+    const q = Number(div[5]);
+    if (p > 0 && q > 0) return ratioDividerFacts(div[1], div[2], div[3], p, q, line);
+  }
+
+  /**
+   * (b) sub-segments named — «היחס בין AC ל-CB הוא 3:2».
+   *
+   * The two segments SHARE the divider, and the host runs from the first's free end to the second's.
+   * Refusing when they share no letter is deliberate: «היחס בין AB ל-CD הוא 3:2» is a relation between
+   * two unrelated segments, not a division, and guessing which point to mint would be inventing a given.
+   */
+  const two = line.match(
+    new RegExp(
+      String.raw`(?:ה?יחס|ratio)[\s\S]*?([A-Z]\d?)([A-Z]\d?)\s*(?::|\/|ל-?|to|and|ו-?|,)\s*([A-Z]\d?)([A-Z]\d?)[\s\S]*?` +
+        RATIO_PQ,
+      'i',
+    ),
+  );
+  if (two) {
+    const [a1, b1, a2, b2] = [two[1], two[2], two[3], two[4]];
+    const shared = [a1, b1].find((x) => x === a2 || x === b2);
+    if (shared) {
+      const start = a1 === shared ? b1 : a1;
+      const end = a2 === shared ? b2 : a2;
+      const p = Number(two[5]);
+      const q = Number(two[6]);
+      if (p > 0 && q > 0 && start !== end) return ratioDividerFacts(shared, start, end, p, q, line);
+    }
+  }
+  return null;
+}
+
 export function parseLine(raw: string): ParseResult {
   const line = trim(raw);
   if (!line) return { ok: false, code: 'not-handled', detail: raw };
@@ -1762,6 +1961,17 @@ export function parseLine(raw: string): ParseResult {
    */
   const centred = parseCircleAt(line);
   if (centred) return centred;
+
+  /**
+   * THE RATIO FAMILY RUNS BEFORE `matchCurve` (#1124).
+   *
+   * Its bare-colon branch would otherwise claim «AC:CB = 3:2» as a line named `AC` with the equation
+   * `CB = 3:2` — the reported bug, fixed in #1123 by making that branch decline a tail that is not an
+   * equation in the plane's variables. Ordering here as well is belt and braces, and it is what 2-D
+   * does for the same reason.
+   */
+  const ratio = parseRatioColon(line) ?? parseDividesInRatio(line);
+  if (ratio) return { ok: true, facts: ratio };
 
   const curve = matchCurve(line);
   /**

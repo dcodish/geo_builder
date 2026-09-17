@@ -37,17 +37,19 @@ const outcome = (line: string) => {
 };
 
 describe('#1123 — the colon rule declines what it cannot read', () => {
-  it('every row of the operator’s measured table now refuses HONESTLY', () => {
+  it('every row of the operator’s measured table now BUILDS — #1124 plugged into the seam', () => {
     /**
-     * The detail must be the student's whole line, byte for byte — never a fragment the parser made by
-     * cutting at a colon. That is the invariant the reported defect violated.
+     * This case asserted a `not-handled` REFUSAL until #1124, and the change is the point rather than a
+     * regression. #1123's job was to stop the colon rule claiming these sentences and refusing on the
+     * student's behalf with words he never typed; reaching an honest `not-handled` was the *seam*, and
+     * #1124's ratio grammar is what plugs into it. Both landed the same night, in that order, for
+     * exactly this reason.
+     *
+     * The honesty property this issue is really about has not moved — it is asserted below, on sentences
+     * that genuinely have no rule.
      */
     for (const line of ['AC:CB = 3:2', 'AC:CB=3:2', 'AB:BC = 1:1', 'AD:DB = 2:3', 'AB:CD = 5:4']) {
-      const r = outcome(line);
-      expect(r.ok, line).toBe(false);
-      if (r.ok) continue;
-      expect(r.code, line).toBe('not-handled');
-      expect(r.detail, line).toBe(line);
+      expect(outcome(line).ok, line).toBe(true);
     }
   });
 
@@ -90,7 +92,7 @@ describe('#1123 — the honesty invariant, asserted generically', () => {
      * Worth asserting as a property rather than per-case, since this is the FOURTH escape of the same
      * class. Any future rule that claims a prefix and hands back a fragment fails here.
      */
-    for (const line of ['AC:CB = 3:2', 'QQ:ZZ = 9:9', 'זה משפט שאין לו כלל', 'AB:CD']) {
+    for (const line of ['זה משפט שאין לו כלל', 'AB:CD', 'QQ:ZZ:RR = 1:2:3', 'XY:ZW = abc']) {
       const r = outcome(line);
       if (r.ok || r.code !== 'not-handled') continue;
       expect(r.detail, line).toBe(line);

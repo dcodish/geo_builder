@@ -1040,6 +1040,27 @@ against itself: an equation it cannot re-verify against the trace it drew is **n
 and the shape stands alone. A printed equation is a claim the tool makes, and the honesty invariant
 binds it exactly as it binds every other row that prints a number.
 
+**R88 — a RATIO between two lengths is a given the student can state**
+([#1124](https://github.com/dcodish/geo_builder/issues/1124)).
+
+The exam writes a division in three ways, and all three are accepted:
+
+| the student types | what it does |
+| --- | --- |
+| «AC:CB = 3:2» | a relation between two lengths over points that **already exist** |
+| «C מחלקת את AB ביחס 3:2» / "C divides AB in ratio 3:2" | **mints** `C` on `AB`, between its ends |
+| «היחס בין AC ל-CB הוא 3:2» | the exam's prose spelling of the same placement |
+
+The split is by FORM, not by preference: the bare colon references endpoints, the keyworded divider
+creates one — which is what lets a student state the whole thing in a single sentence.
+
+A ratio is a **rewrite of a length equation**, not a new kind of given: `AC:CB = p:q` means
+`|AC| = (p/q)·|CB|`, which is the same constraint «AC = 1.5CB» already stated. The two produce the same
+figure, and that is asserted rather than assumed.
+
+**Out of scope, and refused by name:** an n-way chain, «AC:CB:BD = 3:2:4». Reading the first pair out of
+it would silently drop a stated given.
+
 **R89 — a notation the tool WRITES is a notation it READS**
 ([#1127](https://github.com/dcodish/geo_builder/issues/1127),
 [#1134](https://github.com/dcodish/geo_builder/issues/1134)).
@@ -1056,3 +1077,20 @@ transcription is wrong, and sends them hunting for a mistake they did not make.
 
 **A component states ONE coordinate.** `x_A = 5` leaves `y` free, as every component form does — pinning
 both would invent a given the student never stated (ADR-052).
+
+**R90 — a circle's CENTRE can be given a letter, by clicking it or by saying so**
+([#1109](https://github.com/dcodish/geo_builder/issues/1109)).
+
+«O מרכז המעגל I» · «O is the centre of circle I», and the same sentence offered by clicking the centre
+mark that R31 already draws.
+
+**It names; it never asserts.** The letter attaches to the point the circle already determines and
+commits no constraint and no degree of freedom — so on «נתון מעגל O משיק לציר x» the centre keeps its
+freedom after being named. A label is not a given.
+
+**The offer appears only where a name is missing**, and disappears once one exists: a centre that already
+carries a letter, or has a point sitting on it, is not offered again. An ANONYMOUS circle is not offered
+either — there is no «המעגל ‹name›» to write, and a sentence the parser cannot read back must never be
+offered (R-level statement of ADR-AG-048's «two surfaces, one grammar»).
+
+**Circle-only.** A parabola's focus and an ellipse's centre are the same question and are not covered.

@@ -4253,6 +4253,64 @@ same bound at a different arity (two straights meet once, so a second name is re
 
 ---
 
+## ADR-AG-077 — A ratio is a REWRITE of a length equation, and the form decides whether it places or relates (#1124)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R88. **Design:** none (internal) — no new engine
+kind; the rules are `parseRatioColon` / `parseDividesInRatio` in the parser.
+
+**Operator:** *"the analytics tool doesnt support the ratio AC:CB=3:2"*. The **mechanism was already
+here** — `length-eq` carries `AB = 10`, `AB = AC` and `2·AB = 3·CD` as one kind with different trees —
+and only the notation was missing. 2-D has had all three forms since #519.
+
+**The split is 2-D's, ported rather than reinvented.** The bare colon is a RELATION over points that
+already exist; the keyworded divider is a PLACEMENT that mints one. Deciding by **form** is what makes
+«C מחלקת את AB ביחס 3:2» a single sentence a student can type, and it is why the issue recommended
+porting the split instead of picking one lowering.
+
+`AC:CB = p:q` ⇒ `|AC| = (p/q)·|CB|` — exactly what «AC = 1.5CB» already lowers to. **No new engine
+kind**, and the divider reuses precisely what «C על הקטע AB» emits (`declare` + `on-line-2pt` +
+`between`) plus that constraint.
+
+### The first build parsed perfectly and drew the wrong figure
+
+Worth recording in full, because everything about it looked right.
+
+It hand-wrote the `LengthExpr` tree. Every spelling parsed; the fact tree printed **byte-identical** to
+the one «AC = 1.5CB» produces; the derived construction printed byte-identical too — same objects, same
+params, same selectors, same constraints, same outcomes. And `C` landed at **3.75 instead of 6.00**, with
+`unsatisfied` **empty**.
+
+The cause: `LengthExpr.terms[i]` is bound to a **private-use code point** (`PLACEHOLDER_BASE`, U+E000),
+so the placeholder symbol's name is an invisible character. `JSON.stringify` renders it as an invisible
+glyph between the quotes, which means **`name: ""` and `name: ""` are indistinguishable in every
+console, diff and test dump.** The constraint was never evaluated, and nothing anywhere said so.
+
+The fix is to **call `parseLengthExpr`** and wrap its expr, rather than reproduce its encoding — the rule
+[ADR-W-053](06w-decisions-workspace.md#adr-w-053) states, arriving here from a direction nobody predicted:
+not a test reproducing a decision, but a *rule* reproducing a data encoding, with the same result of
+agreeing with itself while being wrong.
+
+It is also why this ADR's lock asserts **geometry** rather than parsing. A test that checked "it parsed"
+would have passed on that build.
+
+### Ordering
+
+The rules run **before `matchCurve`**, whose bare-colon branch would otherwise claim «AC:CB = 3:2» as a
+line named `AC` with the equation `CB = 3:2` — the reported bug, fixed in
+[ADR-AG-074](#adr-ag-074) / #1123 by making that branch decline a tail that is not an equation in the
+plane's variables. That fix is what turned this sentence into an honest `not-handled`, and this ADR is
+what plugs into that seam; #1123's lock is updated to say so rather than left asserting a refusal that is
+now a build.
+
+**Catalog entries for all three forms** are listed individually — the direct lesson of #347: the coverage
+guard builds every entry, so a spelling that is not there is never exercised and can rot back out in
+silence.
+
+**Consequences.** `issue-1124-ratio-family.test.ts` (12), asserting geometry per spelling, the identity
+with «AC = 1.5CB», the n-way refusal by name, and the named-line ordering regression. Analytic lane 1161.
+
+---
+
 ## ADR-AG-078 — A notation the tool writes is a notation it reads (#1127 + #1134)
 
 **Requirements:** [02c](02c-requirements-analytic.md) R89. **Design:** none (internal).
@@ -4302,3 +4360,54 @@ deleted.
 
 **Consequences.** `issue-1127-1134-spellings.test.ts` (13). Catalog entries for all three new spellings
 (#347's lesson). Analytic lane 76 files / 1161 tests.
+
+---
+
+## ADR-AG-079 — A circle's centre is namable, and the name asserts nothing (#1109)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R90. **Design:** none (internal).
+
+**Operator, playing T10/T12:** *"when a center of a circle is defined by the equation, it should be
+clickable so user can assign the center with a letter"*. The `+` mark has been drawn since #1024 and was
+inert, while a **crossing** in the same figure was clickable and minted a letter — so the affordance
+existed and the most interesting point on a circle did not have it. A student reads that as a bug.
+
+**The ruling (2026-09-16):** *"the click only names what doesn't have a name"*. Two halves, both built
+and both asserted:
+
+- **It NAMES; it never asserts.** No constraint, no degree of freedom — a label is not a given, so on
+  «נתון מעגל O משיק לציר x» the centre keeps its freedom after being named.
+- **Offered only where a name is MISSING**, and gone once one exists.
+
+**The grammar was the whole of the work, and that was measured.** The issue warned the missing sentence
+was *"probably the larger part"*; none of six spellings parsed. But the ENGINE half already existed —
+`circle-centre` has been a `DerivedRule` since [ADR-AG-020](#adr-ag-020) / #1059, the one whose parent is
+a CURVE rather than a set of points. So this is a parser rule emitting an existing fact. Minting a second
+kind of centre-point would have been [ADR-AG-023](#adr-ag-023)'s divergence.
+
+**It travels the crossing's road rather than forking it**, which was the issue's own design constraint:
+the same `Namable` shape, the same `freeLetter`, concatenated into the same offer list — one kind of
+offer, one letter source, one grammar. No second click handler in `App.tsx`.
+
+### The round-trip assertion earned its place immediately
+
+The first build composed the offered sentence from `label.name` — which is the whole **noun phrase**,
+«מעגל I» and not «I» — and offered **«P מרכז המעגל מעגל I»**, which does not parse. The centre coordinates
+were right, the gating was right, and the sentence was unusable. Nothing but the round-trip check would
+have caught it, and that is exactly what [ADR-AG-048](#adr-ag-048)'s «two surfaces, one grammar» rule is
+for: an offered sentence the parser cannot read back is a ring whose click fails, which
+[ADR-AG-054](#adr-ag-054) says is worse than no ring. The student's letter now comes from the **id**
+(`circle-I`), which is what the grammar refers to.
+
+**Siblings, decided out loud** (the issue's step 5): a parabola's FOCUS and an ellipse's CENTRE are the
+same question and are **not** in this slice — neither has a `DerivedRule`, so each is new engine work
+rather than a spelling. Circle-only.
+
+**One honesty wrinkle found and filed, not fixed here:** refusing «O מרכז המעגל Z» reports
+`unknown-reference` with the detail **`circle-Z`** — an internal id, where the student wrote `Z`. That is
+CLAUDE.md's *"error messages name the conflicting statement, never internal state"*, and it is
+pre-existing and general to `unknown-reference` rather than introduced here, so it is filed rather than
+widened into this slice.
+
+**Consequences.** `issue-1109-name-centre.test.ts` (11) and a catalog entry. Analytic lane 77 files /
+1168 tests.
