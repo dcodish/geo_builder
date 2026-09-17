@@ -2916,3 +2916,84 @@ records its old number in its body, because the commit that introduced it is alr
 
 **Verified by firing.** A deliberately duplicated id turns both new cases red; removed, `test:docs` is
 green at 678.
+
+## ADR-W-057 — Which product a change is scoped to is a property of the CHANGE, not of the lane that asks (#1155)
+
+**Requirements:** none (internal). **Design:** none (internal) — `scripts/check-sibling-safety.mjs`.
+
+**Amends [ADR-W-036](#adr-w-036)**, which made the viewpoint a parameter so every lane could run the
+guard. That was right about the lanes and wrong about the parameter: it let the LANE supply the
+viewpoint, and a lane has no opinion about what a change is scoped to.
+
+**Found by trying to merge green work.** PRs #1142 and #1143 were green on the analytic lane and red on
+the 2-D, 3-D and complex lanes, with **every test in those lanes passing**. So was `main` itself at
+`8525c378` (run 35151806213) — a batch push that landed and left three lanes red, and nobody noticed,
+because the round read the analytic lane it had run locally.
+
+The refusal in all three:
+
+```
+  REFUSED: 4 file(s) belonging to a shipped sibling product were changed:
+      src-analytic/parser/parseAnalytic.ts
+      ...
+```
+
+`src-analytic/` is not a sibling of an analytic change. It is the tree the change is **for**.
+
+**The root cause is a question asked of the wrong thing.** The guard took its *viewpoint* — which tree
+this change may touch — from `--product`, and [ci.yml](../.github/workflows/ci.yml) fills `--product` in
+**from the lane**: the 2-D job passes `2d`, the 3-D job `3d`, and so on. A lane is not a claim about the
+change. "Which product is this change scoped to" has **one** answer; the guard asked it four times and
+got four. For any change touching exactly one tree P, the P lane passed and the other three refused —
+so at most one lane could be right, and three were wrong *by construction*.
+
+**Why it stayed hidden for sixteen days** ([ADR-W-036](#adr-w-036) made the viewpoint a parameter on 2026-09-01).
+A lane runs only when the `changes` filter selects it, and a single-product change with **no shared
+file** never wakes the other three, so the wrong answers were never computed. The trigger is the very
+ordinary shape *one product tree + any shared surface*:
+
+| PR | files | lanes woken | result |
+| --- | --- | --- | --- |
+| #1146 | `src-analytic/` + docs | analytic only | CLEAN |
+| #1142, #1143 | `src-analytic/` + `server/__tests__/docs-hygiene.test.ts` | all four | three refuse |
+
+It is not analytic-specific: a 2-D fix touching `src/` + `shell/` fails the 3-D and complex lanes
+identically. The guard has been wrong for every product since the day it became per-lane.
+
+**The decision.** The diff refusal is computed from the change alone and reads the same in every lane:
+
+- `treesTouched(files)` — the set of product trees the change edits. **It takes no product argument**,
+  which is the fix expressed in a signature rather than in a comment.
+- **0 or 1 tree is not a cross-product edit**, and no lane may refuse it.
+- **2 or more is one**, and every lane refuses it alike unless an `Allow-sibling-edit:` trailer says why
+  ([ADR-W-039](#adr-w-039) / #895) — and the refusal now names the trees, instead of calling files
+  "sibling" relative to whoever happened to ask.
+- `--product` keeps its *other* job, which was always legitimate: naming the lane, so the three builds
+  that run are the ones this job has not already proved. The header comment says that now.
+
+**Nothing in [ADR-W-017](#adr-w-017)'s guarantee moves, and that was checked rather than asserted.** The
+operator's requirement is *"we never, never, never harm the other tools that are running."* A change
+that touches one tree did not harm a sibling by editing it — it did not edit one. Harm reaching a
+sibling through a **shared** surface was never the diff check's half to catch; the sibling builds (which
+still run in every lane, unchanged) and `npm run test:full` are. What the refusal has always really
+meant is *"two trees in one change with no stated reason"*, and that is preserved exactly. Only the
+lane-relativity is gone.
+
+**The lock is the property, not the four instances.** `crossProductGroups` returns `null` for a
+single-tree change for **every** id in `PRODUCTS`, so product N+1 is covered the day it is registered —
+the same reason the function takes no viewpoint. PR #1142's file list is pinned verbatim as the reported
+case, and a genuine two-tree edit is asserted still refused, with `shell/` correctly *excluded* from the
+refusal because shared surface is the builds' business.
+
+**The decision is an exported seam, not an `if` in `main()`** ([ADR-W-053](#adr-w-053)). A test that
+recomputed "two or more trees" would keep passing after `main()` drifted back to asking
+`classifyChange().sibling`; that is precisely the drift ADR-W-053 names. So `crossProductGroups` holds
+the decision, `main()` calls it, and a case asserts that `main()` branches on the seam and never on a
+lane-relative bucket.
+
+**What must NOT be done, recorded because it was the tempting exit.** Adding `Allow-sibling-edit:` to
+#1142/#1143 would have turned both green in minutes. The hatch exists to record *why a change
+legitimately edits a sibling*; those changes edit no sibling at all. It would have written a false
+sentence into the permanent record and left the gate broken for everyone after — and a gate people learn
+to wave through is worse than no gate. Same for an admin merge. The gate was wrong, so the gate was
+fixed.
