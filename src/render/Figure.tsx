@@ -27,7 +27,7 @@ import type { Transform } from './transform';
 export interface FigureLetterHolder {
   factId: string;
   utterance: string;
-  reclaimable: boolean;
+  swappable: boolean;
 }
 
 export interface FigureProps {
@@ -97,9 +97,8 @@ export interface FigureProps {
   /** Hide/show a point's label + dot (clicked on the canvas) — the host wires the store's `toggleHidden`. */
   onToggleHidden?: (id: Id) => void;
   /** Localised strings for the on-canvas point-edit menu (rename / hide / show / the no-op reasons). */
-  pointMenuText?: { rename: string; hide: string; show: string; apply: string; taken: string; bad: string; takenBy?: string; reclaim?: string };
+  pointMenuText?: { rename: string; hide: string; show: string; apply: string; taken: string; bad: string; takenBy?: string; swapLetters?: string };
   /** #238: take the letter back from an orphaned construction, then rename onto it. */
-  onReclaim?: (id: string, to: string) => { ok: boolean; reason?: string };
   /** #238: highlight the statement that holds a letter, so the refusal points at something visible. */
   onHighlightFact?: (factId: string) => void;
   /** Per-segment display style (keyed by seg id) — hidden and/or dashed (FR-RN-10). */
@@ -200,7 +199,6 @@ export function Figure({
   onRename,
   onToggleHidden,
   pointMenuText,
-  onReclaim,
   onHighlightFact,
   segStyle,
   onToggleSegHidden,
@@ -294,10 +292,22 @@ export function Figure({
     if (res.holder && onHighlightFact) onHighlightFact(res.holder.factId);
   }
 
-  /** #238: drop the orphaned holder and rename onto the freed letter — one undoable action. */
-  function reclaimLetter(id: string) {
-    if (!takenBy || !onReclaim) return;
-    const res = onReclaim(id, takenBy.to);
+/**
+   * #1013 — THE OFFER EXCHANGES TWO LETTERS. IT NEVER DELETES A STATEMENT.
+   *
+   * It used to drop the holder and rename onto the freed letter, so «משולש ABC» · «נקודה D» ·
+   * «נקודה E» then D → E left FOUR points and no «נקודה D» — the student asked to re-letter one point
+   * and lost another. Operator ruling 2026-09-18: *"deleting a phase is a capability I do not want to
+   * have automatically done as users will not expect the consequences."*
+   *
+   * A swap destroys nothing, so the whole safety apparatus the delete needed stops being load-bearing.
+   * The offer is still shown only where the destructive one was (a plain point statement, never a
+   * shape) — deliberately NOT widened, because whether a shape-held letter should become swappable is
+   * an open ruling.
+   */
+  function swapLetters(id: string) {
+    if (!takenBy || !onSwap) return;
+    const res = onSwap(id, takenBy.to);
     if (res.ok) {
       setMenu(null);
       setTakenBy(null);
@@ -1141,9 +1151,11 @@ export function Figure({
                   <div style={{ fontSize: 11, color: '#64748b', display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {/* #238: the holder, in the student's OWN wording — a step row they can recognise. */}
                     <span>{(pointMenuText?.takenBy ?? '{{what}}').replace('{{what}}', takenBy.holder.utterance)}</span>
-                    {takenBy.holder.reclaimable && onReclaim && (
-                      <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => reclaimLetter(menu.id)}>
-                        {pointMenuText?.reclaim ?? 'reclaim'}
+                    {takenBy.holder.swappable && onSwap && (
+                      <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => swapLetters(menu.id)}>
+                        {(pointMenuText?.swapLetters ?? 'swap {{a}} and {{b}}')
+                          .replace('{{a}}', menu.id)
+                          .replace('{{b}}', takenBy.to)}
                       </button>
                     )}
                   </div>

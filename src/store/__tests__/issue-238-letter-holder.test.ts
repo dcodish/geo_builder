@@ -12,9 +12,22 @@ import { useGeoStore, replay, letterHolder } from '@/store/geoStore';
  * a flat «האות כבר בשימוש» with no way, from the canvas, to see WHO held the letter or to take it back.
  *
  * ADR-379 closed the common road into that dead end (a clicked crossing can no longer orphan its letter).
- * What is locked here is the rarer class that survives it — and, above all, that **reclaiming can never
- * become a quiet delete**: the letter comes back only when dropping its holder removes the letter and
- * nothing else.
+ * What is locked here is the rarer class that survives it.
+ *
+ * ## #1013 (ADR-520 Am. 1) — the offer SWAPS; it never deletes
+ *
+ * The feature shipped with a destructive offer: *"take the letter and remove that step"*. On «משולש ABC»
+ * · «נקודה D» · «נקודה E», asking D → E left **four** points and no «נקודה D» — the student asked to
+ * re-letter one point and lost another, plus the statement that created it.
+ *
+ * Operator ruling, 2026-09-18, playing the PR: *"deleting a phase is a capability I do not want to have
+ * automatically done as users will not expect the consequences."* So the destructive path is **retired,
+ * not merely guarded** — keeping it behind a stricter gate would still be a delete nobody asked for.
+ *
+ * What this file now locks is therefore the opposite property: **no path from the letter box drops a
+ * fact**. `swappable` keeps the offer's SCOPE exactly where it was (a plain point statement, never a
+ * shape) — deliberately not widened, since whether a shape-held letter should become swappable is an
+ * open ruling.
  */
 
 function ctxOf() {
@@ -44,52 +57,66 @@ describe('#238 — the refusal names who holds the letter', () => {
     expect(res.holder!.utterance, 'the holder is quoted as the student wrote it').toBe('משולש ABC');
   });
 
-  it('a letter held by a SHAPE is NOT reclaimable — dropping it would take the other vertices too', () => {
+  /**
+   * T7's refusal, unchanged. A swap would be mechanically safe here — the triangle's vertex A and the
+   * loose point D could simply exchange names — but the operator approved this refusal as it stands, so
+   * #1013 does NOT widen the offer to it. That is a separate ruling.
+   */
+  it('a letter held by a SHAPE is not offered — the refusal stands, unwidened', () => {
     build(['משולש ABC', 'נקודה D']);
     const h = letterHolder(useGeoStore.getState().facts, 'A')!;
-    expect(h.reclaimable, 'dropping «משולש ABC» would silently remove B and C as well').toBe(false);
-
-    // …and `reclaim` REFUSES it, so the offer can never become a quiet delete.
-    const before = useGeoStore.getState().facts.length;
-    const res = useGeoStore.getState().reclaim('D', 'A');
-    expect(res.ok).toBe(false);
-    expect(useGeoStore.getState().facts.length, 'nothing was dropped').toBe(before);
+    expect(h.swappable, '«משולש ABC» holds A, so no offer appears beside the refusal').toBe(false);
+    expect(h.utterance, 'and the refusal still names the holder in the student’s wording').toBe('משולש ABC');
   });
 
-  it('a letter held by a statement that introduces ONLY it IS reclaimable, in one undoable action', () => {
-    // «נקודה E» introduces E and nothing else, and nothing is built on E — so E can come back.
+  /**
+   * THE OPERATOR'S OWN SEQUENCE (#1013). Before the fix this left FOUR points and no «נקודה D».
+   * Every assertion here is about what SURVIVES, because the defect was a silent loss.
+   */
+  it('the offer SWAPS the two letters — five points stay five, and both statements survive', () => {
     build(['משולש ABC', 'נקודה D', 'נקודה E']);
     const h = letterHolder(useGeoStore.getState().facts, 'E')!;
-    expect(h.reclaimable).toBe(true);
+    expect(h.swappable, '«נקודה E» introduces E and nothing else').toBe(true);
 
     const countBefore = useGeoStore.getState().facts.length;
-    const res = useGeoStore.getState().reclaim('D', 'E');
+    const res = useGeoStore.getState().swap('D', 'E');
     expect(res.ok, JSON.stringify(res)).toBe(true);
 
     const after = useGeoStore.getState();
-    // Asserted on the fact ID, not the wording: a rename legitimately REWRITES «נקודה D» to read
-    // «נקודה E», so the text alone cannot tell the dropped holder from the renamed row.
-    expect(after.facts.some((f) => f.id === h.factId), 'the orphaned holder is gone').toBe(false);
-    expect(after.facts.length, 'exactly one statement was dropped').toBe(countBefore - 1);
+    expect(after.facts.length, 'NO fact was dropped — this is the whole point').toBe(countBefore);
+    expect(after.facts.some((f) => f.id === h.factId), 'the holder statement is still there').toBe(true);
+
     const d = replay(after.facts, after.seed);
-    expect(d.positions.has('E'), 'the letter is now the renamed point').toBe(true);
-    expect(d.positions.has('D'), 'the old letter is released').toBe(false);
+    expect([...d.positions.keys()].sort(), 'five points, not four').toEqual(['A', 'B', 'C', 'D', 'E']);
     expect(d.lastError).toBeNull();
+    // Both «נקודה» rows survive; the two letters have exchanged places, so the list still reads D and E.
+    expect(after.facts.map((f) => f.utterance).filter((u) => u?.startsWith('נקודה')).sort()).toEqual([
+      'נקודה D',
+      'נקודה E',
+    ]);
   });
 
-  it('a letter something else DEPENDS on is not reclaimable', () => {
-    // F is used by a second statement, so dropping the one that introduced it would break that one.
-    build(['משולש ABC', 'נקודה D', 'נקודה F', 'AF']);
-    expect(letterHolder(useGeoStore.getState().facts, 'F')!.reclaimable, 'segment AF still needs F').toBe(false);
-    expect(useGeoStore.getState().reclaim('D', 'F').ok).toBe(false);
-  });
-
-  it('the reclaim is ONE undo entry — the statement and the old letter come back together', () => {
+  it('the swap is ONE undo entry — both letters go back together', () => {
     build(['משולש ABC', 'נקודה D', 'נקודה E']);
     const before = useGeoStore.getState().facts;
-    expect(useGeoStore.getState().reclaim('D', 'E').ok).toBe(true);
+    expect(useGeoStore.getState().swap('D', 'E').ok).toBe(true);
     useGeoStore.temporal.getState().undo();
     expect(useGeoStore.getState().facts, 'a single undo restores the session exactly').toEqual(before);
+  });
+
+  it('a letter something else DEPENDS on is not offered', () => {
+    // F is used by a second statement. The offer's SCOPE is unchanged by #1013, deliberately.
+    build(['משולש ABC', 'נקודה D', 'נקודה F', 'AF']);
+    expect(letterHolder(useGeoStore.getState().facts, 'F')!.swappable, 'segment AF still mentions F').toBe(false);
+  });
+
+  /**
+   * THE RETIREMENT, asserted rather than assumed. The ruling is that the destructive capability is gone,
+   * not merely gated — so the action itself must not be reachable. A test that only checked the button's
+   * wording would pass with the delete still sitting in the store for the next caller to find.
+   */
+  it('there is NO destructive reclaim left on the store', () => {
+    expect('reclaim' in useGeoStore.getState(), 'the delete-then-rename path is retired, not re-gated').toBe(false);
   });
 
   it('a letter nobody holds has no holder — the refusal path is not reached', () => {

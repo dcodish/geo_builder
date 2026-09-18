@@ -136,21 +136,29 @@ export interface LetterHolder {
   /** The student's own wording of that statement, to quote back. */
   utterance: string;
   /** Safe to take the letter back: dropping this statement removes the letter AND NOTHING ELSE. */
-  reclaimable: boolean;
+  swappable: boolean;
 }
 
 export type RenameResult = { ok: true } | { ok: false; reason: 'same' | 'no-source' } | { ok: false; reason: 'target-taken'; holder: LetterHolder | null };
 
 /**
- * The statement that introduced `letter`, and whether taking the letter back is safe (#238).
+ * The statement that introduced `letter`, and whether the two letters may be OFFERED as a swap (#238).
  *
- * "No dependents" is asked as a question about the FIGURE, not about a command kind: dropping the holder
- * statement must remove the letter **and nothing else**. So it is reclaimable exactly when
+ * #1013 (ADR-520 Am. 1) — this predicate was written to answer *"is deleting the holder safe?"*, because
+ * the offer used to delete. It no longer does: the offer swaps, and a swap destroys nothing, so nothing
+ * here is load-bearing for safety any more.
+ *
+ * It is kept, unchanged, as the SCOPE of the offer. The operator approved the shape-held refusal as it
+ * stands, so the swap appears exactly where the destructive offer appeared and nowhere new; whether a
+ * letter held by «משולש ABC» should also become swappable is a separate ruling, called out rather than
+ * assumed. Renamed `reclaimable` → `swappable` so the name says what it now gates.
+ *
+ * "No dependents" is asked as a question about the FIGURE, not about a command kind. So it is swappable
+ * exactly when
  *
  *  - no OTHER enabled statement mentions the letter (nothing is built on it), and
  *  - every point this statement introduces that did not exist BEFORE it is the letter itself — which is
- *    what stops «משולש ABC» from being offered as a way to reclaim C, since dropping it would silently
- *    take A and B with it.
+ *    what keeps «משולש ABC» out of the offer.
  *
  * Stated that way it covers the whole class the issue names — an undone/redone step, a deleted-then-
  * recreated construction, a derived point whose carrier was disabled (the ADR-010 auto-drop) — without
@@ -167,7 +175,7 @@ export function letterHolder(facts: Fact[], letter: Id): LetterHolder | null {
   const introduces = commandPointIds(holder.cmd).filter((id) => !earlier.has(id));
   // Dropping the holder must remove the letter AND NOTHING ELSE — so it may introduce nothing but it.
   const onlyTheLetter = introduces.length === 1 && introduces[0] === L;
-  return { factId: holder.id, utterance: holder.utterance ?? '', reclaimable: !usedElsewhere && onlyTheLetter };
+  return { factId: holder.id, utterance: holder.utterance ?? '', swappable: !usedElsewhere && onlyTheLetter };
 }
 
 /**
@@ -453,16 +461,14 @@ export interface GeoState {
    *  named point: assign the next free capital letter and rewrite the `@`-id → that letter everywhere. One
    *  undo entry. Returns the assigned letter, or null if the id isn't a promotable anon point / A–Z is full. */
   promote: (auxId: Id) => Id | null;
-  /** Exchange two existing labels (A ↔ B) everywhere — what rename can't do (taken target). One undo entry. */
   /**
-   * RECLAIM a letter from an orphaned construction and rename onto it (#238,
-   * [ADR-520](docs/06-decisions.md#adr-520)): drop the statement that holds `to` and rename `from` onto
-   * it, as ONE undoable action (the ADR-232 load precedent - one `set`, one undo entry).
+   * Exchange two existing labels (A ↔ B) everywhere — what `rename` cannot do, since it refuses a taken
+   * target to avoid an accidental merge. One undo entry.
    *
-   * Refuses unless {@link letterHolder} says the holder is reclaimable, so this can never be the quiet
-   * way to delete a statement the figure still needs: it is the honest refusal's ACTION, not a bypass.
+   * #1013 (ADR-520 Am. 1): this is ALSO what the taken-letter offer calls. It replaced a `reclaim` that
+   * dropped the holder's statement and renamed onto the freed letter — a delete the student never asked
+   * for. A swap destroys nothing, so it needs none of that action's safety apparatus.
    */
-  reclaim: (from: Id, to: Id) => RenameResult;
   swap: (a: Id, b: Id) => SwapResult;
   /** Fold one point into another (e.g. F → E, both already present) — drops F's definition,
    *  rewrites F→E everywhere, drops facts that collapsed; one undo entry. */
@@ -913,37 +919,6 @@ export const useGeoStore = create<GeoState>()(
           hidden: get().hidden.map((h) => (h === F ? T : h)), // a hidden point keeps its hidden state under the new letter
           segStyle: renameSegStyle(get().segStyle, F, T), // a styled segment keeps its style under the renamed endpoint
           hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)), // a hidden circle tracks its renamed centre
-          selectedId: null,
-        });
-        return { ok: true };
-      },
-
-      /**
-       * #238 ([ADR-520](docs/06-decisions.md#adr-520)) - take a letter back from an orphaned construction.
-       *
-       * The reported dead end (prod session ne810woo): the student picked O for a crossing, changed the
-       * configuration, and O was «כבר בשימוש» - held by something no longer on the drawing, with no way
-       * from the canvas to see who held it or to take it back.
-       *
-       * The safety is {@link letterHolder}'s, not this action's: it proceeds only when dropping the holder
-       * removes the letter AND NOTHING ELSE. One `set` means one undo entry, so a student who did not mean
-       * it gets both the statement and the old letter back with a single undo.
-       */
-      reclaim: (from, to) => {
-        const F = from.toUpperCase();
-        const T = to.toUpperCase();
-        if (F === T) return { ok: false, reason: 'same' };
-        const facts = get().facts;
-        const holder = letterHolder(facts, T);
-        if (!holder || !holder.reclaimable) return { ok: false, reason: 'target-taken', holder };
-        const freed = facts.filter((f) => f.id !== holder.factId);
-        const r = renameFacts(freed, F, T);
-        if (!r.ok) return r;
-        set({
-          facts: r.facts,
-          hidden: get().hidden.map((h) => (h === F ? T : h)),
-          segStyle: renameSegStyle(get().segStyle, F, T),
-          hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)),
           selectedId: null,
         });
         return { ok: true };

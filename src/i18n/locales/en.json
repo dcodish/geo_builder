@@ -380,7 +380,7 @@
     "taken": "Letter already used",
     "bad": "Invalid letter",
     "takenBy": "Held by: «{{what}}»",
-    "reclaim": "Take the letter and remove that step"
+    "swapLetters": "Swap {{a}} and {{b}}"
   },
   "segMenu": {
     "hide": "Hide segment",

@@ -11862,3 +11862,39 @@ own wording; a letter held by a SHAPE is **not** reclaimable and `reclaim` refus
 a letter held by a statement introducing only it is reclaimable, drops exactly one statement, and leaves
 the figure clean; a letter another statement DEPENDS on is not reclaimable; the reclaim is **one undo
 entry** (a single undo restores the session exactly); a letter nobody holds has no holder.
+
+### ADR-520 Amendment 1 — the taken-letter offer SWAPS, and the destructive path is retired (#1013, supersedes #1190)
+
+**Requirements:** [02](02-requirements.md) — **FR-RN-14 revised** (one row, not a second). **Design:** [04](04-design.md) — the letter box's offer. **LADDER stage:** store action + the point menu; nothing in replay or the engine.
+
+**A change request against PR #1010, found by the operator playing it.** The feature is right; its offer was wrong.
+
+```
+משולש ABC · נקודה D · נקודה E        then the letter box: D → E
+  before:  points A,B,C,E            ← five became FOUR
+           facts «משולש ABC» «נקודה E»   ← «נקודה D» is GONE
+```
+
+A student asked to re-letter one point and lost another, plus the statement that created it.
+
+### The ruling is about the OFFER, not about the safety analysis
+
+The issue originally argued the swap on the grounds that it is **safer** — an exchange destroys nothing, so it needs no `reclaimable` guard. The operator's 2026-09-18 ruling, restating the request while playing T34, is stronger:
+
+> *"deleting a phase is a capability I do not want to have automatically done as users will not expect the consequences."*
+
+A student pressing a button next to a letter box does not expect a statement to be deleted, and the tool must not do it for them — **however well guarded**. So the destructive `reclaim` is **retired, not re-gated**: keeping it behind a stricter predicate would still be a delete nobody asked for.
+
+`swap(a, b)` already existed in the store (the three-way rename through a `\0` sentinel, token-aware, one `set` ⇒ one undo). The work was wiring the offer to it and rewording the button — not building a capability.
+
+**This supersedes [#1190](https://github.com/dcodish/geo_builder/issues/1190)** (the circle-centre collateral delete). That defect exists *only* because the offer deletes; once it swaps there is nothing to delete, and the reclaimability predicate that mis-measured "and nothing else" stops being load-bearing. A future session must not harden the destructive path to close #1190 — that would build exactly what this ruling forbids.
+
+### What did NOT change, deliberately
+
+`letterHolder`'s predicate is kept exactly as it was, and renamed `reclaimable` → `swappable` so its name says what it now gates: the **scope of the offer**, no longer the safety of a delete.
+
+A swap *would* be mechanically safe where a reclaim was refused — «משולש ABC»'s vertex `A` and a loose point `D` could simply exchange names. The operator approved that refusal as it stands in an earlier pass, so the swap appears exactly where the destructive offer appeared and nowhere new. Whether a shape-held letter should become swappable is a **separate ruling**, called out here rather than assumed.
+
+The copy follows the mechanism: «קחו את האות והסירו את השלב הזה» becomes «החליפו בין D ל-E», naming the student's own two letters. It needs no warning, because there is nothing to warn about.
+
+**Consequences.** The `reclaim` store action and its `onReclaim` prop are deleted; the point menu calls the existing `onSwap`; `LetterHolder.reclaimable` → `swappable`; `pointMenu.reclaim` → `pointMenu.swapLetters` in both locales, interpolating both letters. `issue-238-letter-holder.test.ts` is **revised, not extended** (7): the operator's own sequence now asserts what SURVIVES — five points stay five, no fact is dropped, both «נקודה» rows are still in the list — the shape-held refusal is locked as *unwidened*, and the retirement is asserted directly (`'reclaim' in store` is false), because a lock that only checked the button's wording would pass with the delete still sitting in the store for the next caller to find.
