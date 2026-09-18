@@ -1380,9 +1380,32 @@ function direction(phrase: string): Direction | null {
 const PARALLEL_WORDS = 'מקביל(?:ה|ים|ות)?';
 const PERP_WORDS = '(?:מאונכ(?:ת|ים|ות)?|מאונך|ניצב(?:ת|ים|ות)?)';
 const RELATION_HE = new RegExp(
-  `^${HE_GIVEN}(.+?)\\s+(${PARALLEL_WORDS}|${PERP_WORDS})\\s+ל-?\\s*(.+)$`,
+  // The connector is OPTIONAL (#1160): «AB מקביל DC» is written as often as «AB מקביל ל-DC», and the
+  // verb alone already identifies the sentence — nothing else in the grammar uses it.
+  `^${HE_GIVEN}(.+?)\\s+(${PARALLEL_WORDS}|${PERP_WORDS})\\s+(?:ל-?\\s*)?(.+)$`,
 );
-const RELATION_EN = /^(.+?)\s+(?:is\s+)?(parallel|perpendicular)\s+to\s+(.+)$/i;
+const RELATION_EN = /^(.+?)\s+(?:is\s+)?(parallel|perpendicular)(?:\s+to)?\s+(.+)$/i;
+
+/**
+ * THE EXAM'S OWN NOTATION — «AB ∥ DC», «AB || DC», «AB ⊥ DC» (#1160).
+ *
+ * The relation itself was fully built and well tested; only its SYMBOLS were unreadable, so a student
+ * writing what the exam prints got «לא הבנתי» for a capability that already existed. That is this
+ * tree's recurring one-spelling gate — #1081 counted five, and #1128 and #1151 are the same shape.
+ *
+ * A separate pattern rather than more alternatives inside `PARALLEL_WORDS`, because a symbol needs no
+ * connector and no surrounding spaces: «AB∥DC» is one token to a student. It feeds the SAME handler,
+ * so this is a second spelling of one rule and not a second rule.
+ *
+ * **`//` is deliberately NOT admitted.** It is the one candidate symbol that collides with real
+ * mathematics, and this rule runs BEFORE the equation parser — so a line it claimed wrongly would be
+ * refused as a bad operand instead of falling through to be read as the equation it is. A narrower
+ * symbol set is fine; a mis-parsed equation is not. Both ⊥ (U+22A5) and ⟂ (U+27C2) are admitted,
+ * because both are typed and they are indistinguishable on screen.
+ */
+const REL_PARALLEL_SYM = String.raw`∥|\|\|`;
+const REL_PERP_SYM = String.raw`⊥|⟂`;
+const RELATION_SYM = new RegExp(`^${HE_GIVEN}(.+?)\\s*(${REL_PARALLEL_SYM}|${REL_PERP_SYM})\\s*(.+)$`);
 
 /**
  * A LINE CONSTRUCTED THROUGH A POINT — «דרך P עובר ישר מקביל ל AB» (#1093).
@@ -1530,7 +1553,7 @@ function parseConstraint(raw: string): RuleOutcome {
    * A relation is recognisable from its verb, which no other rule uses, so matching it early costs
    * nothing and removes the ambiguity entirely.
    */
-  const rel = RELATION_HE.exec(line) ?? RELATION_EN.exec(line);
+  const rel = RELATION_HE.exec(line) ?? RELATION_EN.exec(line) ?? RELATION_SYM.exec(line);
   if (rel) {
     const [, left, word, right] = rel;
     const u = direction(left);
@@ -1538,7 +1561,7 @@ function parseConstraint(raw: string): RuleOutcome {
     // The verb was understood; if an operand was not, that is an OWNED refusal about this sentence
     // rather than a fall-through to "I did not understand you" (ADR-AG-017).
     if (!u || !v) return refuse('bad-operand', line);
-    const parallel = /^מקביל|^parallel/i.test(word);
+    const parallel = new RegExp(`^(?:מקביל|parallel|${REL_PARALLEL_SYM})`, 'i').test(word);
     return made([
       { t: 'constraint', k: { t: 'relation', rel: parallel ? 'parallel' : 'perpendicular', u, v }, src: line },
     ]);

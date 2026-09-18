@@ -417,6 +417,27 @@ question rather than inherit "never the same".
 Structural scoping is also what keeps the check inside what was ruled: two independently stated points
 that merely coincide are a different sentence, and are deliberately untouched.
 
+### The relation rule's notations ([ADR-AG-093](06c-decisions-analytic.md#adr-ag-093))
+
+One relation, three ways to write it, one handler:
+
+| pattern | admits | connector |
+| --- | --- | --- |
+| `RELATION_HE` | «AB מקביל DC», «הצלע AB מאונכת לצלע BC» — the full inflection run | optional |
+| `RELATION_EN` | «AB is parallel to DC», «AB perpendicular DC» | optional |
+| `RELATION_SYM` | «AB ∥ DC», «AB||DC», «AB ⊥ DC», «AB ⟂ DC» | none — and no spaces required |
+
+All three resolve their operands through the same `direction()` and emit the same `relation`
+constraint, so a segment, a polygon side, a named line and an axis mean the same thing in every
+notation. A symbol is a second SPELLING of one rule, never a second rule.
+
+**`//` is excluded on purpose.** The relation rule runs before the equation parser, so a symbol that
+also appears in real mathematics would let it claim a division and refuse it as a bad operand instead
+of letting it fall through. The narrower symbol set is the deliberate trade.
+
+The catalog carries the symbol rows, which is what keeps them alive: the guard re-parses every row in
+both languages, so a notation that stops parsing fails the suite rather than becoming documentation.
+
 ## A circle on a point ([ADR-AG-045](06c-decisions-analytic.md#adr-ag-045))
 
 Every curve in this product is an equation over `x` and `y` whose coefficients are expressions in

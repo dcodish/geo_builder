@@ -4894,3 +4894,50 @@ The ruling sketches `[ שנה את השם ל-O ]` beside the refusal. **Analytic
 `engine/sameDerivation.ts` (new), one guard in `applyFact`'s derived-mint, a new `already-named` error code carrying `holder` (a NAME, never a sentence — the engine stays language-free) threaded through `LineFault` → `decideSubmit` → the locale, and one He/En string pair.
 
 `issue-1153-one-position-one-name.test.ts` (9) — **proven to fail without the fix**: disabling the guard turns 4 of the 9 red. Analytic lane 90 files / 1406 tests green.
+
+## ADR-AG-093 — The relation's SYMBOLS are the exam's notation, and the connector is optional (#1160)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — R95's "every spelling of one question" widened to the relation family; no new numbered row. **Design:** [04c](04c-design-analytic.md) — *the relation rule's notations*. **LADDER stage:** parse; no engine, solve, gate or display change.
+
+Not reported by the operator — surfaced by probing the neighbouring spellings of the sentence he typed for #1159.
+
+### The capability existed; only its notation was unreadable
+
+```
+AB מקביל ל-DC        ✅        AB ∥ DC      ❌ not-handled
+AB מקבילה ל-DC       ✅        AB || DC     ❌ not-handled
+הצלע AB מאונכת לצלע BC ✅      AB ⊥ DC      ❌ not-handled
+AB is parallel to DC ✅        AB מקביל DC  ❌ not-handled  (no connector)
+```
+
+The word forms are in good shape — the full inflection run, the `ל` variants, the `הצלע…לצלע` frame and the English all land. The gap is exactly the **symbol** row plus the connector-less word form. A student who writes what the exam prints is told the tool does not understand them, for a relation it implements and tests thoroughly.
+
+This is the tree's recurring **one-spelling gate**: #1081 counted five, and #1128 and #1151 are the same shape. It also unblocks [#1129](https://github.com/dcodish/geo_builder/issues/1129), which may not offer a `∥` or `⊥` palette chip while the glyph does not parse.
+
+### Deviation from the plan, and why — the chokepoint it named does not carry these lines
+
+The issue's plan put the symbol normalisation in `engine/expr.ts`, *"the single existing normalisation chokepoint"*, reasoning that `²`≡`^2` and `√`≡`sqrt` are the same kind of fact.
+
+**Measured, the line never goes through it.** `normalizeMath` is applied to *equation fragments* — four call sites, each on a sub-string that is already known to be an expression — and never to the whole utterance. A symbol rewritten there would never be seen by the relation rule, which matches raw text. It is also not the same kind of fact: `∥` is a relation VERB, and teaching a math-expression normaliser to rewrite Hebrew verbs would be the second normaliser the plan was trying to avoid.
+
+So the change is at the other chokepoint the plan names — the relation rule itself.
+
+### A second SPELLING of one rule, not a second rule
+
+`RELATION_SYM` is its own pattern because a symbol needs no connector and no surrounding spaces («AB∥DC» is one token to a student), while the word forms require `ל`. It feeds the **same handler**, resolves both operands through the **same `direction()`**, and produces the same `relation` constraint — so every operand kind (segment, polygon side, named line, axis) arrives with nothing to wire.
+
+The connector became optional in the same edit, which is what fixes «AB מקביל DC» and «AB parallel DC» — one change rather than two, as the plan asked.
+
+### The counter-direction, and one symbol deliberately refused
+
+`//` is **not** admitted. It is the one candidate that collides with real mathematics, and this rule runs BEFORE the equation parser — so a line it claimed wrongly would be refused as a *bad operand* rather than falling through to be read as the equation it is. The issue's own plan authorises this: a narrower symbol set is fine, a mis-parsed equation is not. Asserted in the lock so the exclusion is a decision on the record rather than an oversight someone later "fixes".
+
+Both `⊥` (U+22A5) and `⟂` (U+27C2) are admitted: they are indistinguishable on screen and both get typed.
+
+Measured unchanged: `y=2x+1`, `y = 1/2`, `(x-3)^2+(y-4)^2=9`, `נתון הישר l1: y=x`, `A(3,4)`, `משולש ABC`. An operand the figure cannot read is still the owned `bad-operand` refusal (ADR-AG-017), not a fall-through.
+
+### Consequences
+
+`parseAnalytic.ts`: `RELATION_SYM`, an optional connector in `RELATION_HE`/`RELATION_EN`, and the parallel test widened to the symbols. `catalogAnalytic.ts` gains the two symbol rows — the catalog is the coverage map, so the guard re-parses them in both languages and a symbol that stops parsing fails the suite instead of becoming documentation.
+
+`issue-1160-relation-symbols.test.ts` (12) — **proven to fail without the fix**: removing the symbol pattern turns 9 of the 12 red. Analytic lane 90 files / 1410 tests green.

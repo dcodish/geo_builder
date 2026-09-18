@@ -143,6 +143,24 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'side AB is perpendicular to side BC',
     needs: ['משולש ABC'],
   },
+  // The exam's own NOTATION (#1160). The relation was built and well tested; only its symbols were
+  // unreadable, so the student who wrote what the page prints was told it was not understood. Listed
+  // because the catalog is the coverage map: the guard re-parses every row, so a symbol that stops
+  // parsing fails the suite instead of quietly becoming documentation.
+  {
+    category: 'relations',
+    family: 'F18',
+    he: 'AB ∥ DC',
+    en: 'AB ∥ DC',
+    needs: ['מרובע ABCD'],
+  },
+  {
+    category: 'relations',
+    family: 'F18',
+    he: 'AB ⊥ BC',
+    en: 'AB ⊥ BC',
+    needs: ['משולש ABC'],
+  },
   {
     category: 'relations',
     family: 'F18',
