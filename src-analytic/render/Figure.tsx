@@ -42,7 +42,7 @@ export function Figure({
    * a matter for the construction, and belongs where the ask lane lives. A renderer that knew the
    * menu would be a second place deciding what is measurable.
    */
-  onPick?: (what: { kind: 'point' | 'curve'; id: string }, screen: { x: number; y: number }) => void;
+  onPick?: (what: { kind: 'point' | 'curve' | 'segment'; id: string }, screen: { x: number; y: number }) => void;
 }) {
   const { width, height, axes, curves, segments, construction, points, crossings, measures } = scene;
   return (
@@ -179,6 +179,23 @@ export function Figure({
               d={c.d}
               style={{ cursor: 'pointer' }}
               onClick={(e) => onPick({ kind: 'curve', id: c.id }, { x: e.clientX, y: e.clientY })}
+            />
+          ))}
+          {/*
+            A DRAWN SEGMENT IS CLICKABLE TOO (#1139) — a triangle's side is a line the student can
+            see, and before this it was a line to nobody: the pick reported only points and curves.
+            The same transparent-stroke technique as the curves above; `measurablesOf` turns the id
+            back into the side's name.
+          */}
+          {segments.map((sg) => (
+            <line
+              key={`hit-${sg.id}`}
+              x1={sg.x1}
+              y1={sg.y1}
+              x2={sg.x2}
+              y2={sg.y2}
+              style={{ cursor: 'pointer' }}
+              onClick={(e) => onPick({ kind: 'segment', id: sg.id }, { x: e.clientX, y: e.clientY })}
             />
           ))}
         </g>

@@ -4618,3 +4618,56 @@ Sign is not normalised: `-4x + 3y = 0`, exactly as the ruling wrote it. A conven
 **Four sentences, written out, not one templated noun.** Hebrew gender carries through the whole clause — «הנקודה … הוגדרה» against «הישר … הוגדר» — so slotting a noun into one sentence would be wrong in three cases of four. An anonymous curve (`curve-<hash>`) gets the **kind-free** wording: it has no name the student wrote, so no noun would be true.
 
 **Consequences.** `fractionClearingFactor` (`format.ts`), one scaling in `lineText`; `RefKind`/`refKindOf`/`unknownRef` (`apply.ts`), `expected` threaded through `derive` → `submit` → the store, four locale strings per language. `issue-1180-1179-equation-and-noun.test.ts` (14) — asserting the **rendered** sentence through the real locale, because a key that exists proves nothing about what a student reads. Analytic lane 84 files / 1278 tests.
+
+## ADR-AG-088 — A name that denotes a line denotes it to EVERY surface (#1148 + #1139)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R95** (new). **Design:** [04c](04c-design-analytic.md) — *the ask lane*, the resolver seam. **LADDER stage:** operand resolution, ahead of evaluation; no value, solve or gate semantics change.
+
+Both reported by the operator on 2026-09-16, on the same figure, minutes apart: *"now the line is drawn but data panel still refuses"*, and *"the line itself is not clickable in this state and it should be — allowing to show distance, equation, slope."*
+
+### The defect was not a branch; it was FIVE resolvers
+
+Measured on `A(0,0)` `B(6,0)` `C(3,5)` + «משולש ABC» before the fix:
+
+```
+AB                  -> 6          the measure grammar resolves a two-point line
+שיפוע AB            -> 0          the slope branch resolves a two-point line
+משוואת AB           -> MISSING    the equation branch does not
+המרחק מ-C לישר AB   -> 5          the ask lane answers it
+menu(C)             -> ["C"]      ...and the click menu never offers it
+```
+
+`AB` is one line. It existed to three resolvers, not to the fourth, and the fifth — the click menu's own enumeration of "what is there to ask about" — could not see it at all. Fixing the equation branch would have answered the operator and **guaranteed the next question kind repeats it**, which is the class and not the input (standing rule 1). #1139 was already the third sighting; the menu's copy was the fourth.
+
+### One question, asked in two directions
+
+There are exactly two questions here, and `app/lines.ts` is now the only place either is answered:
+
+- **resolution** — `lineNamed(figure, name)`: which line is this, in the configuration drawn?
+- **enumeration** — `lineNamesOf(construction)`: which names denote a line at all?
+
+They are tied by an invariant the suite asserts by **calling both surfaces** rather than by listing what either should say: *every name the enumeration offers resolves, and every sentence the menu composes is one the ask lane answers.* A menu entry whose answer would be «לא הבנתי» is the menu lying about the figure, and that is now a test failure instead of a bug report.
+
+The enumeration's three sources are the named line curves it always had, plus **every stated segment and every side of every polygon** — the half #1139 was filed about. A triangle's sides are lines the student can see, and before this they were lines to nobody.
+
+### Why the coefficients are normalized, and why NOT by `hypot`
+
+A line through two points is built as `a = Δy`, `b = −Δx`, so its coefficients scale with how far apart the points happen to sit. That scale is not part of the line, and it breaks two things at once: `A(0,0)`–`B(6,0)` printed «-6y = 0» instead of «y = 0», and `isKnowledge` over raw coefficients would call a perfectly determined line *unknown* merely because its points slid along it between configurations.
+
+The obvious normal form — divide by `hypot(a, b)` — was measured and **rejected**: it makes `A(0,0)`–`C(3,5)` print «0.86x - 0.51y = 0», because 5/√34 is a surd and ADR-AG-085's `fractionClearingFactor` cannot clear what is not rational. Dividing by the **leading coefficient** keeps a rational line rational — `(5, −3, 0)` → `(1, −0.6, 0)` → cleared back to «5x - 3y = 0» — and fixes the sign for free.
+
+Every existing consumer is unaffected by construction: the slope is `-a/b` and the point-line distance divides by `hypot(a, b)`, so both are scale-invariant.
+
+**The property this buys, and the reason it is not cosmetic.** On «A(0,0)» + «B על הישר y=x», the *line* `AB` is `x - y = 0` in every configuration while `B`'s *position* is open. The tool now answers the equation and still refuses the length — the honesty gate at the right granularity, which raw coefficients could not express.
+
+### One addition the fix forced, at the display chokepoint
+
+`lineText`'s magnitude rule (ADR-AG-085 / #1119) tested `Math.abs(k) === 1` — exact equality on a float. A line through two SOLVED points carries the solve's tolerance: «B על הישר y=x» lands at `y − x ≈ 3e-8`, so `AB` has `b = -1.0000000124` and the rule printed «x - 1y = 0» for a coefficient `fmt` was about to round to `1` anyway. The rule is about the number the STUDENT sees, so it now asks `fmt`. This was unreachable before — a two-point line had no equation to print — and it is a latent defect for any solver-derived curve row, not only this one.
+
+### Consequences
+
+`app/lines.ts` (new — the seam); `ask.ts` loses its private `lineNamed` and its equation branch resolves through the shared path with the `isKnowledge` gate the slope branch already used; `measurable.ts` enumerates through `lineNamesOf` and grows `measurablesOfSegment`, with the three line questions extracted to ONE list both the curve and the segment paths call; `Figure.tsx` reports a third pick kind (`segment`) over a transparent-stroke hit layer, so a drawn side is clickable at all; one line in `App.tsx`'s `lineText`.
+
+**The opposite side is offered first** on a vertex click: on a triangle, the distance from `C` to `AB` is the height — the question the student came to ask. The two sides through `C` are legitimate questions with legitimate answers (zero) and are still offered, just not ahead of it.
+
+`issue-1148-1139-one-resolver.test.ts` (12) — **proven to fail without the fix**: making the two seams the identity turns 7 of the 12 red. Analytic lane 85 files / 1364 tests green; `smoke:visual --app analytic` passed and the screenshots were read.

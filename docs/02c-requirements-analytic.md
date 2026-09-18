@@ -1159,3 +1159,21 @@ ruling is untouched, and this sits ABOVE it). **A decimal the student typed is t
 
 There is no √ or π form in this tool yet — those values show as decimals until the corpus asks for
 them.
+
+**R95 — a name that denotes a line denotes it to every question, and to every surface**
+([#1148](https://github.com/dcodish/geo_builder/issues/1148), [#1139](https://github.com/dcodish/geo_builder/issues/1139)).
+
+`AB` is a line whenever `A` and `B` are points the figure holds — whether the student drew it as a
+line, stated it as a segment, or got it as a side of «משולש ABC». Every question that can be asked
+about a line can be asked about it: its **equation**, its **slope**, and the **distance** from a point
+to it. A question the tool answers in one spelling and refuses in another is the tool disagreeing with
+itself about what the figure contains.
+
+**The menu offers exactly what the lane answers.** An option the click menu composes must be a
+sentence the ask lane answers; the two are one enumeration, not two lists that happen to agree. A
+drawn side is an object the student can see, so it is an object they can click.
+
+**The honesty gate is unchanged and applies per question.** A line whose coefficients are the same in
+every configuration has an equation; one that moves does not, and says so. A line can be knowledge
+while the points naming it are not — «A(0,0)» with «B על הישר y=x» has the equation `x - y = 0` and no
+length — and each question is answered on its own terms.
