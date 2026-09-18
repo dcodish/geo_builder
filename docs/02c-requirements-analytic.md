@@ -1199,3 +1199,19 @@ than about the question.
 a point and then stated on its own is the SAME line as one stated outright, and behaves identically —
 same crossing rings, same name. How an object came to exist is the tool's bookkeeping, not something
 the student should be able to feel.
+
+**R97 — a given the tool accepted is DRIVEN, or it is refused; it is never quietly ignored**
+([#1201](https://github.com/dcodish/geo_builder/issues/1201)).
+
+«המרחק מ-A לישר l1 = 5» is a statement about the figure, exactly as «AB = 5» is. Once accepted it must
+shape the drawing — and when no configuration can satisfy it, the tool says so and names the student's
+own sentence. What it may never do is draw a figure that contradicts a given while listing that given
+as one it holds.
+
+**This is the honesty invariant at the level of the SOLVE, not the parser.** A statement can survive
+parsing, become the right constraint, and still be dropped on the way to the drawing — and that is the
+worst of the three failures, because nothing on screen says anything is wrong.
+
+**A magnitude that cannot be measured is not a magnitude that is satisfied.** Where the tool cannot
+evaluate a stated quantity at all, it must treat that as a fault to report rather than as a residual of
+zero — which is what "no opinion" silently becomes inside a least-squares solve.

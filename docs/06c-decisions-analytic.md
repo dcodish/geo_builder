@@ -4771,3 +4771,66 @@ That is the OTHER half of the issue's point 3 — synthesising an identity for a
 ### Consequences
 
 `parseAnalytic.ts` (the carrier mint gains `eqSrc`), `apply.ts` (the promotion merges labels). `issue-1149-promotion-identity.test.ts` (6) — **proven to fail without the fix**: all six go red when both edits are reverted. Analytic lane 87 files / 1386 tests green.
+
+## ADR-AG-091 — A measure term the solver cannot resolve is a FALSE GREEN, not a missing opinion (#1201)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R97** (new). **Design:** [04c](04c-design-analytic.md) — *the resolver seam*, extended one layer down. **LADDER stage:** residual evaluation; no parse, gate or display change. **P1 — prod honesty.**
+
+### The symptom
+
+```
+נתון הישר l1: y=0
+A על הישר x=0
+המרחק מ-A לישר l1 = 5
+```
+
+`A` rides `x = 0`, so it is `(0, t)` and its distance to `l1` is `|t|`. The statement asks for `|t| = 5` and is satisfiable twice over. Measured:
+
+```
+faults              []                 -- nothing refused
+figure.unsatisfied  []                 -- the engine reported it SATISFIED
+A                   (0, -2.130393)     -- distance 2.13, not 5
+```
+
+The tool accepted the given, built the right constraint for it, reported nothing wrong, and drew a figure contradicting it. A student reading `2.13` off that canvas was told something false, while the panel still listed the given as one that held.
+
+### One cause, and it explains BOTH halves
+
+`residual()` computed a `length-eq` as `evalLengthExpr(k.left, at, env)` — **three arguments**. The fourth is `lineAt`, which resolves a `point-line` term's line. Without it the term evaluated to `null`, so the whole residual came back `null`. And `null` is read two different ways, each correct on its own:
+
+| reader | what it does with `null` | consequence here |
+| --- | --- | --- |
+| the SOLVE (`residual(...) ?? [0]`) | treats it as **zero — satisfied** | the constraint is never driven |
+| the REPORT (`if (r === null) continue`) | treats it as **cannot be judged** | it never reaches `unsatisfied` |
+
+`?? [0]` is not itself a bug: the least-squares residual vector must keep a constant dimension across iterates, so a term that vanishes at one parameter value has to contribute something. The defect is that a **permanent wiring gap produced the same `null` as transient vacancy**, and transient vacancy is the only thing that reading is safe for. That is why the failure was silent rather than merely wrong, and it is the class this ADR is really about.
+
+### The fix, and why the resolver MOVED rather than being written again
+
+`residual` gains `lineAt?: (name) => {a,b,c} | null`, supplied by `evaluate.ts` beside the `curveAt` it already builds, and threaded into both `evalLengthExpr` calls.
+
+The tempting shortcut was to give `solve.ts` a small line resolver of its own. **That is precisely the defect ADR-AG-088 retired three commits earlier** — one object resolved several ways, so a capability added to one reader goes missing from the others in silence. So the resolution moved DOWN into `engine/lines.ts`, and `app/lines.ts` (the ask lane and the click menu) now builds on it rather than beside it. One object, one answer, now across three layers.
+
+It resolves against a CONFIGURATION rather than a `Figure`, because the solver asks at every iterate where no figure exists yet — taking a `Figure` would have forced one to be built per iteration.
+
+### Measured after
+
+```
+seeds 0,1,2    A = (0, ±5.000)         the given is honoured, and BOTH signs occur across seeds
+A(0,0) pinned  faults: unsatisfiable   the impossible case is refused, naming the student's sentence
+C on x=3, «המרחק מ-C לישר AB = 4»      C lands at |y| = 4.000 — a two-point line drives identically
+```
+
+The sign result matters as much as the magnitude: a fix that drove `|t| = 5` by pinning `t = -5` would satisfy the given and quietly delete a configuration the student is entitled to cycle to (ADR-052). The lock asserts both signs occur.
+
+### A narrow false refusal, stated rather than hidden
+
+Where the LINE's own endpoint is the only carrier — `A(0,0)`, `B` on `x=10`, `C(3,4)`, «המרחק מ-C לישר AB = 2» — the solve now has a live residual and **6 of 8 seeds reach it exactly** (`B = (10, 5.7)`, distance 2.000). Seeds 0 and 5 diverge (`B` runs to `y ≈ -97775`) and the step is REFUSED.
+
+That is a false refusal on a satisfiable statement, and it is a **regression in convenience traded for a fix in honesty**: before, this case was accepted in silence with a wrong figure. A refusal keeps the prior figure (`decideSubmit` discards a faulting line), so the runaway position is never drawn. The divergence is a solve-convergence question of the same family as [#1182](https://github.com/dcodish/geo_builder/issues/1182) — whose re-seed ruling would cover exactly this — and it is not a wiring question, so it is not fixed here. Noted on that issue.
+
+### Consequences
+
+`engine/lines.ts` (new — the resolution, moved down from `app/`), `app/lines.ts` builds on it, `solve.ts` takes and threads `lineAt`, `evaluate.ts` gains `lineAtOf` and supplies it at all three `residual` call sites (and exports both builders, so the lock calls them instead of copying them).
+
+`issue-1201-point-line-residual.test.ts` (6) — **proven to fail without the fix**: restoring the three-argument call turns 5 of the 6 red. Analytic lane 89 files / 1397 tests green.

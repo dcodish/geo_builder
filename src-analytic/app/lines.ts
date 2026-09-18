@@ -31,72 +31,31 @@
  * `lineNamed`.** A menu entry the ask lane would refuse is the menu lying about the figure, and that
  * is now a test failure rather than a report.
  *
- * ## Why the coefficients are NORMALIZED
+ * ## Where the pieces live
  *
- * A line through two points is built as `a = Δy`, `b = −Δx`, so its coefficients scale with how far
- * apart the two points happen to sit. That scale is not part of the line: `A(0,0)`–`B(6,0)` would
- * print «-6y = 0» instead of «y = 0», and — worse — `isKnowledge` over raw coefficients would call a
- * perfectly determined line unknown merely because the points slid along it between configurations.
- *
- * A line's identity is its coefficient RATIO, so the triple is divided by its LEADING coefficient.
- * Dividing by `hypot(a, b)` would be the textbook normal form and is the wrong choice here: it makes
- * `A(0,0)`–`C(3,5)` print «0.86x - 0.51y = 0», because 5/√34 is a surd and `fractionClearingFactor`
- * cannot clear what is not rational. Dividing by the leading coefficient keeps a rational line
- * rational — `(5, -3, 0)` → `(1, -0.6, 0)` → cleared back to «5x - 3y = 0» — and fixes the sign for
- * free, since the leading coefficient becomes exactly `1`.
- *
- * Every existing consumer is unaffected by construction: the slope is `-a/b` and the point-line
- * distance divides by `hypot(a, b)`, so both are scale-invariant.
+ * The RESOLUTION (and the normalization it needs) sits in `engine/lines.ts`, because #1201 found a
+ * third caller below this layer — the solver, computing the residual of «המרחק מ-A לישר l1 = 5».
+ * This module keeps what only the surfaces need: the figure-shaped lookups, and the ENUMERATION.
  */
 import type { Construction, Id } from '../engine/types';
 import type { Figure } from '../engine/evaluate';
+import { asPair, lineByName, type NamedLine } from '../engine/lines';
 
-/** A line as `ax + by + c = 0`, normalized so that one line is always one triple. */
-export interface NamedLine {
-  a: number;
-  b: number;
-  c: number;
-}
-
-/** A name spells a segment when it is two DIFFERENT letters — «AB», never «AA». */
-const PAIR = /^([A-Z][0-9]?)([A-Z][0-9]?)$/;
-
-/** The two point ids a name spells, or `null` when the name is not a pair of letters. */
-export function asPair(name: string): [Id, Id] | null {
-  const m = PAIR.exec(name);
-  if (!m || m[1] === m[2]) return null;
-  return [m[1], m[2]];
-}
-
-/**
- * One line, one triple: divided by its leading coefficient, which is then exactly `1`.
- *
- * `null` when the "line" is degenerate — two coincident points name no line, and saying so here is
- * what keeps every caller from dividing by zero in its own way.
- */
-function normalized(a: number, b: number, c: number): NamedLine | null {
-  if (!(Math.hypot(a, b) > 1e-12)) return null;
-  const k = Math.abs(a) > 1e-12 ? a : b;
-  return { a: a / k, b: b / k, c: c / k };
-}
+export { asPair, type NamedLine };
 
 /**
  * The line a NAME refers to, as this configuration drew it (#1048, #1148).
  *
- * Two spellings mean two different things and both are legal: «l1» is a curve the student named, and
- * «AB» is the line through two points they placed — which need not have been stated as a line at all.
- * Resolving both here keeps `lengths.ts` free of any knowledge about objects.
+ * The resolution itself lives in `engine/lines.ts` (#1201): the SOLVER needs the same answer at every
+ * iterate, one layer below this one, and a second copy here would be the very defect #1148 retired.
+ * What this adds is only the two lookups a `Figure` can answer.
  */
 export function lineNamed(f: Figure, name: string): NamedLine | null {
-  const curve = f.curves.find((c) => c.label.name === name || c.id === `line-${name}` || c.id === `circle-${name}`);
-  if (curve && curve.curve.kind === 'line') return normalized(curve.curve.a, curve.curve.b, curve.curve.c);
-  const pair = asPair(name);
-  if (!pair) return null;
-  const p = f.points.find((q) => q.id === pair[0]);
-  const q = f.points.find((r) => r.id === pair[1]);
-  if (!p || !q) return null;
-  // Through two points: the line whose normal is perpendicular to P->Q.
-  return normalized(q.y - p.y, -(q.x - p.x), (q.x - p.x) * p.y - (q.y - p.y) * p.x);
+  return lineByName(
+    name,
+    (n) => f.curves.find((c) => c.label.name === n || c.id === `line-${n}` || c.id === `circle-${n}`)?.curve ?? null,
+    (id) => f.points.find((q) => q.id === id) ?? null,
+  );
 }
 
 /**

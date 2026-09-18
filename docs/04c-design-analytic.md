@@ -378,6 +378,21 @@ outright are the same object.**
 A curve the tool DERIVES has no text to carry, and naming it from its computed coefficients is a
 separate question with an honesty gate of its own (#1202).
 
+### The resolver reaches the SOLVER too ([ADR-AG-091](06c-decisions-analytic.md#adr-ag-091))
+
+`app/lines.ts` was the first home of "what line does this name denote", because the ask lane and the
+click menu were the callers. #1201 found a third, one layer below: the **residual** of
+«המרחק מ-A לישר l1 = 5» cannot be computed without that same answer.
+
+So the resolution lives in `engine/lines.ts` and everything builds on it — the surfaces through
+`app/lines.ts`, the solver through `lineAtOf`, which `evaluate.ts` constructs beside `curveAtOf` and
+hands to `residual`. It resolves against a CONFIGURATION (a point-by-id lookup plus a curve-by-name
+lookup) rather than a `Figure`, because the solver asks at every iterate.
+
+**`null` from a residual means "cannot be judged at this iterate", and the solve turns it into `0`** so
+the residual vector keeps its dimension. That is safe only while `null` is transient. A term that can
+never be resolved returns `null` forever and is then a permanent false green — which is what #1201 was.
+
 ## A circle on a point ([ADR-AG-045](06c-decisions-analytic.md#adr-ag-045))
 
 Every curve in this product is an equation over `x` and `y` whose coefficients are expressions in

@@ -454,6 +454,19 @@ export function residual(
    * points by id, and everything else arrives already resolved.
    */
   curveAt?: (id: Id) => NumCurve | null,
+  /**
+   * The line a NAME denotes, for the measure terms that reference one (#1201).
+   *
+   * «המרחק מ-A לישר l1 = 5» is a `length-eq` whose left side holds a point-to-line term, and
+   * its distance cannot be computed without knowing which line `l1` is. Without this the term
+   * evaluated to `null`, the whole residual came back `null`, and the solve read that as ZERO -- so
+   * the constraint was never driven and the figure was reported satisfied while violating it.
+   *
+   * By NAME rather than by id, and separate from `curveAt`, because «AB» denotes the line through two
+   * points and is not an object at all. Optional for the same reason `curveAt` is: a caller that
+   * cannot resolve names hands nothing, and those operands report "cannot be judged".
+   */
+  lineAt?: (name: string) => { a: number; b: number; c: number } | null,
 ): number[] | null {
   const pts = constraintRefs(k).map(at);
   if (pts.some((p) => p === null)) return null;
@@ -515,8 +528,10 @@ export function residual(
       return [u.y - m * u.x];
     }
     case 'length-eq': {
-      const l = evalLengthExpr(k.left, at, env);
-      const r = evalLengthExpr(k.right, at, env);
+      // `lineAt` threaded through (#1201): a point-to-line term is unresolvable without it, and an
+      // unresolvable term makes this whole residual `null` -- which the solve reads as satisfied.
+      const l = evalLengthExpr(k.left, at, env, lineAt);
+      const r = evalLengthExpr(k.right, at, env, lineAt);
       if (l === null || r === null) return null;
       /**
        * Scale-normalised, like the area residual and for the same reason: a figure measured in
