@@ -11810,3 +11810,91 @@ So a student whose radii were already on the canvas typed a valueless central an
 #1011 was filed against **PR #1008's branch**, and that PR was **closed without merging** — so «זוית ABC», its headline utterance, does not parse on `main` at all. The issue could have been read as stale. It is not: the valueless **central** angle lowers to the same `mark-angle` and was swallowed identically, which is the witness above and the one the lock uses. The class was always the point; the PR was only where it was first seen.
 
 **Consequences.** `DISPLAY_ONLY` (new, `engine/types.ts`), one line in `replay/core.ts`. `issue-1011-display-only.test.ts` (7) — driven through `parse → dryRunOutcome`, the REAL gate, because the defect reached play precisely by being locked below it. 2-D lane 391 files / 6752 tests.
+## ADR-520 — A TAKEN LETTER NAMES ITS HOLDER, AND CAN BE TAKEN BACK WHEN THE HOLDER IS ORPHANED (#238)
+
+**Status:** accepted, 2026-09-14 · **Issue:** #238 (feature, P3 — split out of #234 at the operator's request, 2026-07-21) · round #1006 · feature route (PR) · the remaining half of #234 after [ADR-379](#adr-379) fixed its root · one-`set` undo per the [ADR-232](#adr-232) load precedent · the target-taken guard of [ADR-122](#adr-122)
+**Requirements:** [02](02-requirements.md) — FR-RN-14: a refused letter names its holder · **Design:** [04](04-design.md) — the letter-holder question
+**Deviations from plan:** the plan's third bullet (*"the same flat refusal exists on the merge path and the swap path — audit all three call sites"*) is **measured false**; see the audit below.
+
+**What the student saw.** Prod session `ne810woo` (2026-07-20): *"I selected the letter O as intersection
+between segments but then I did a different config which moved the intersection to different segments.
+When I tried to assign O now, it is taken. This would be wrong since O is not on the diagram anymore."*
+The refusal was a flat «האות כבר בשימוש». The student is on the canvas; the holder is a row in the step
+list they have no reason to connect to that message — and there was no way to see who held the letter, nor
+to take it back.
+
+**What ADR-379 already fixed, and what it left.** ADR-379 stops a *clicked crossing* from leaving the
+figure, which is how the operator reached the dead end — the common road is closed. A letter can still be
+held by something the student cannot see or reach from the canvas: an undone/redone or edited step whose
+object is gone from the drawing but present in the fact list, a deleted-then-recreated construction, or a
+derived point whose carrier was disabled (the ADR-010 dependent auto-drop).
+
+**Decision, part 1 — the refusal carries its holder.** `letterHolder(facts, letter)` returns the statement
+that introduced the letter, **quoted in the student's own wording**, plus whether the letter can be taken
+back; both `renameFacts` and `nameCentreFacts` return it with `target-taken`. The popup names the holder
+and **highlights that step row**, through the selection machinery that already lights up a fact's objects.
+
+**Decision, part 2 — reclaiming, when it is safe.** `reclaim(from, to)` drops the holding statement and
+renames onto the freed letter as **one `set` ⇒ one undo entry** (the ADR-232 precedent), so a student who
+did not mean it gets both the statement and the old letter back with a single undo.
+
+**"No dependents" is a question about the FIGURE, not about a command kind.** Dropping the holder must
+remove the letter **and nothing else**, so the letter is reclaimable exactly when
+
+1. no OTHER enabled statement mentions it — nothing is built on it; and
+2. every point the holder introduces that did not exist *before* it is the letter itself — which is what
+   stops «משולש ABC» being offered as a way to reclaim C, since dropping it would silently take A and B.
+
+Stated that way it covers the whole class the issue names — the undone step, the deleted-then-recreated
+construction, the auto-dropped dependent — without enumerating any of them, because all of them reduce to
+*"who still needs this letter?"*. **`reclaim` re-asks it and refuses**, so the offer can never become a
+quiet way to delete a statement the figure still needs: it is the honest refusal's ACTION, not a bypass.
+
+**Sibling audit (the plan's third bullet), measured.** The plan said the same flat refusal lives on the
+merge and swap paths and asked for all three call sites. It does not: `SwapResult` is
+`'same' | 'no-source'` and `MergeResult` is `'same' | 'no-source' | 'no-target' | 'source-in-shape'` —
+**neither has a `target-taken` reason at all**, because both *require* their target to exist (swapping and
+merging are what you do *with* a taken letter). The real call sites are exactly two — `renameFacts` and
+`nameCentreFacts` — and both are covered. Recorded so the audit is not re-run looking for a third.
+
+**Locks.** `issue-238-letter-holder.test.ts` (6): a refused rename carries the holder with the student's
+own wording; a letter held by a SHAPE is **not** reclaimable and `reclaim` refuses it with nothing dropped;
+a letter held by a statement introducing only it is reclaimable, drops exactly one statement, and leaves
+the figure clean; a letter another statement DEPENDS on is not reclaimable; the reclaim is **one undo
+entry** (a single undo restores the session exactly); a letter nobody holds has no holder.
+
+### ADR-520 Amendment 1 — the taken-letter offer SWAPS, and the destructive path is retired (#1013, supersedes #1190)
+
+**Requirements:** [02](02-requirements.md) — **FR-RN-14 revised** (one row, not a second). **Design:** [04](04-design.md) — the letter box's offer. **LADDER stage:** store action + the point menu; nothing in replay or the engine.
+
+**A change request against PR #1010, found by the operator playing it.** The feature is right; its offer was wrong.
+
+```
+משולש ABC · נקודה D · נקודה E        then the letter box: D → E
+  before:  points A,B,C,E            ← five became FOUR
+           facts «משולש ABC» «נקודה E»   ← «נקודה D» is GONE
+```
+
+A student asked to re-letter one point and lost another, plus the statement that created it.
+
+### The ruling is about the OFFER, not about the safety analysis
+
+The issue originally argued the swap on the grounds that it is **safer** — an exchange destroys nothing, so it needs no `reclaimable` guard. The operator's 2026-09-18 ruling, restating the request while playing T34, is stronger:
+
+> *"deleting a phase is a capability I do not want to have automatically done as users will not expect the consequences."*
+
+A student pressing a button next to a letter box does not expect a statement to be deleted, and the tool must not do it for them — **however well guarded**. So the destructive `reclaim` is **retired, not re-gated**: keeping it behind a stricter predicate would still be a delete nobody asked for.
+
+`swap(a, b)` already existed in the store (the three-way rename through a `\0` sentinel, token-aware, one `set` ⇒ one undo). The work was wiring the offer to it and rewording the button — not building a capability.
+
+**This supersedes [#1190](https://github.com/dcodish/geo_builder/issues/1190)** (the circle-centre collateral delete). That defect exists *only* because the offer deletes; once it swaps there is nothing to delete, and the reclaimability predicate that mis-measured "and nothing else" stops being load-bearing. A future session must not harden the destructive path to close #1190 — that would build exactly what this ruling forbids.
+
+### What did NOT change, deliberately
+
+`letterHolder`'s predicate is kept exactly as it was, and renamed `reclaimable` → `swappable` so its name says what it now gates: the **scope of the offer**, no longer the safety of a delete.
+
+A swap *would* be mechanically safe where a reclaim was refused — «משולש ABC»'s vertex `A` and a loose point `D` could simply exchange names. The operator approved that refusal as it stands in an earlier pass, so the swap appears exactly where the destructive offer appeared and nowhere new. Whether a shape-held letter should become swappable is a **separate ruling**, called out here rather than assumed.
+
+The copy follows the mechanism: «קחו את האות והסירו את השלב הזה» becomes «החליפו בין D ל-E», naming the student's own two letters. It needs no warning, because there is nothing to warn about.
+
+**Consequences.** The `reclaim` store action and its `onReclaim` prop are deleted; the point menu calls the existing `onSwap`; `LetterHolder.reclaimable` → `swappable`; `pointMenu.reclaim` → `pointMenu.swapLetters` in both locales, interpolating both letters. `issue-238-letter-holder.test.ts` is **revised, not extended** (7): the operator's own sequence now asserts what SURVIVES — five points stay five, no fact is dropped, both «נקודה» rows are still in the list — the shape-held refusal is locked as *unwidened*, and the retirement is asserted directly (`'reclaim' in store` is false), because a lock that only checked the button's wording would pass with the delete still sitting in the store for the next caller to find.

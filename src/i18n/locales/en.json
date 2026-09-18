@@ -378,7 +378,9 @@
     "show": "Show label",
     "apply": "Apply",
     "taken": "Letter already used",
-    "bad": "Invalid letter"
+    "bad": "Invalid letter",
+    "takenBy": "Held by: «{{what}}»",
+    "swapLetters": "Swap {{a}} and {{b}}"
   },
   "segMenu": {
     "hide": "Hide segment",

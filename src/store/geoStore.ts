@@ -124,7 +124,59 @@ const relabelUtterance = (utt: string | undefined, from: Id, to: Id): string | u
   utt ? utt.replace(new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\d)', 'g'), to) : utt;
 
 /** Outcome of a relabel request, so the UI can explain a no-op. */
-export type RenameResult = { ok: true } | { ok: false; reason: 'same' | 'no-source' | 'target-taken' };
+/**
+ * WHO holds a letter, and whether it can be taken back (#238, [ADR-520](docs/06-decisions.md#adr-520)).
+ *
+ * The student is on the canvas; the holder is a row in the step list they have no reason to connect to
+ * «האות כבר בשימוש». So the refusal carries the holder with it.
+ */
+export interface LetterHolder {
+  /** The fact that INTRODUCED the letter — its id, so the UI can highlight that row. */
+  factId: string;
+  /** The student's own wording of that statement, to quote back. */
+  utterance: string;
+  /** Safe to take the letter back: dropping this statement removes the letter AND NOTHING ELSE. */
+  swappable: boolean;
+}
+
+export type RenameResult = { ok: true } | { ok: false; reason: 'same' | 'no-source' } | { ok: false; reason: 'target-taken'; holder: LetterHolder | null };
+
+/**
+ * The statement that introduced `letter`, and whether the two letters may be OFFERED as a swap (#238).
+ *
+ * #1013 (ADR-520 Am. 1) — this predicate was written to answer *"is deleting the holder safe?"*, because
+ * the offer used to delete. It no longer does: the offer swaps, and a swap destroys nothing, so nothing
+ * here is load-bearing for safety any more.
+ *
+ * It is kept, unchanged, as the SCOPE of the offer. The operator approved the shape-held refusal as it
+ * stands, so the swap appears exactly where the destructive offer appeared and nowhere new; whether a
+ * letter held by «משולש ABC» should also become swappable is a separate ruling, called out rather than
+ * assumed. Renamed `reclaimable` → `swappable` so the name says what it now gates.
+ *
+ * "No dependents" is asked as a question about the FIGURE, not about a command kind. So it is swappable
+ * exactly when
+ *
+ *  - no OTHER enabled statement mentions the letter (nothing is built on it), and
+ *  - every point this statement introduces that did not exist BEFORE it is the letter itself — which is
+ *    what keeps «משולש ABC» out of the offer.
+ *
+ * Stated that way it covers the whole class the issue names — an undone/redone step, a deleted-then-
+ * recreated construction, a derived point whose carrier was disabled (the ADR-010 auto-drop) — without
+ * enumerating any of them, because all of them reduce to "who still needs this letter?".
+ */
+export function letterHolder(facts: Fact[], letter: Id): LetterHolder | null {
+  const L = letter.toUpperCase();
+  const enabled = facts.filter((f) => f.enabled);
+  const idx = enabled.findIndex((f) => commandPointIds(f.cmd).includes(L));
+  if (idx < 0) return null;
+  const holder = enabled[idx];
+  const usedElsewhere = enabled.some((f, i) => i !== idx && commandPointIds(f.cmd).includes(L));
+  const earlier = new Set(enabled.slice(0, idx).flatMap((f) => commandPointIds(f.cmd)));
+  const introduces = commandPointIds(holder.cmd).filter((id) => !earlier.has(id));
+  // Dropping the holder must remove the letter AND NOTHING ELSE — so it may introduce nothing but it.
+  const onlyTheLetter = introduces.length === 1 && introduces[0] === L;
+  return { factId: holder.id, utterance: holder.utterance ?? '', swappable: !usedElsewhere && onlyTheLetter };
+}
 
 /**
  * The PURE fact-list core of the `rename` store action — the `nameCentreFacts` precedent, point
@@ -132,13 +184,13 @@ export type RenameResult = { ok: true } | { ok: false; reason: 'same' | 'no-sour
  * plain fact arrays in the App's submit loop, the scenario harness, and the log-triage verifier with
  * THE SAME implementation (a re-implementation is the ADR-346 drift class this repo keeps paying for).
  */
-export function renameFacts(facts: Fact[], from: Id, to: Id): { ok: true; facts: Fact[] } | { ok: false; reason: 'same' | 'no-source' | 'target-taken' } {
+export function renameFacts(facts: Fact[], from: Id, to: Id): { ok: true; facts: Fact[] } | { ok: false; reason: 'same' | 'no-source' } | { ok: false; reason: 'target-taken'; holder: LetterHolder | null } {
   const F = from.toUpperCase();
   const T = to.toUpperCase();
   if (F === T) return { ok: false, reason: 'same' };
   const all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
   if (!all.has(F)) return { ok: false, reason: 'no-source' };
-  if (all.has(T)) return { ok: false, reason: 'target-taken' }; // would merge two distinct points
+  if (all.has(T)) return { ok: false, reason: 'target-taken', holder: letterHolder(facts, T) }; // would merge two distinct points
   return {
     ok: true,
     facts: facts.map((f) => ({
@@ -162,7 +214,7 @@ export function nameCentreFacts(
   facts: Fact[],
   from: Id,
   to: Id,
-): { ok: true; facts: Fact[]; source: string; letter: string; anon: boolean } | { ok: false; reason: 'same' | 'no-source' | 'target-taken' } {
+): { ok: true; facts: Fact[]; source: string; letter: string; anon: boolean } | { ok: false; reason: 'same' | 'no-source' } | { ok: false; reason: 'target-taken'; holder: LetterHolder | null } {
   const F = from.startsWith('@') ? from : from.toUpperCase();
   const T = to.toUpperCase();
   let source: string | null = null;
@@ -185,7 +237,7 @@ export function nameCentreFacts(
     letter = F;
   }
   if (source === T) return { ok: false, reason: 'same' }; // promoting a token to its OWN letter ('@ctr-O'→'O') is a real change
-  if (all.has(T)) return { ok: false, reason: 'target-taken' };
+  if (all.has(T)) return { ok: false, reason: 'target-taken', holder: letterHolder(facts, T) };
   const anon = source.startsWith('@');
   // The circle-id follow must match the WHOLE id (or its `-`-suffixed concentric inner), never a
   // substring: `renameInCommand`'s literal fallback turned `circle-O1` into `circle-O21` when the
@@ -409,7 +461,14 @@ export interface GeoState {
    *  named point: assign the next free capital letter and rewrite the `@`-id → that letter everywhere. One
    *  undo entry. Returns the assigned letter, or null if the id isn't a promotable anon point / A–Z is full. */
   promote: (auxId: Id) => Id | null;
-  /** Exchange two existing labels (A ↔ B) everywhere — what rename can't do (taken target). One undo entry. */
+  /**
+   * Exchange two existing labels (A ↔ B) everywhere — what `rename` cannot do, since it refuses a taken
+   * target to avoid an accidental merge. One undo entry.
+   *
+   * #1013 (ADR-520 Am. 1): this is ALSO what the taken-letter offer calls. It replaced a `reclaim` that
+   * dropped the holder's statement and renamed onto the freed letter — a delete the student never asked
+   * for. A swap destroys nothing, so it needs none of that action's safety apparatus.
+   */
   swap: (a: Id, b: Id) => SwapResult;
   /** Fold one point into another (e.g. F → E, both already present) — drops F's definition,
    *  rewrites F→E everywhere, drops facts that collapsed; one undo entry. */
@@ -874,7 +933,8 @@ export const useGeoStore = create<GeoState>()(
        */
       nameCentre: (from, to) => {
         const r = nameCentreFacts(get().facts, from, to);
-        if (!r.ok) return { ok: false, reason: r.reason };
+        // #238: the refusal carries its holder through unflattened — the UI needs WHO, not just "taken".
+        if (!r.ok) return r.reason === 'target-taken' ? { ok: false, reason: r.reason, holder: r.holder } : { ok: false, reason: r.reason };
         const { source, letter } = r;
         const T = to.toUpperCase();
         set({
