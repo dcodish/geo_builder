@@ -197,6 +197,13 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   it, and **again on the final figure** for every solid that holds both letters — a pair no solid holds
   stays unjudged, never refused ([ADR-3D-203](06b-decisions-3d.md#adr-3d-203),
   [ADR-3D-246](06b-decisions-3d.md#adr-3d-246)).
+- **FR-CL-2a (Must)** — **A segment RATIO is one notation with two separators.** «BE/ED = 1:3» and
+  «BE:ED = 1:3» are the same statement and are read identically, in every combination of the two
+  separators and with a bare number on the right («AB/BC = 2»); `/` is how a textbook writes it. A
+  spelling the grammar reads is listed in the catalog, which is the coverage map as well as the panel.
+  Both `p` and `q` are **positive** — «AB:BC = 0:3» states that a segment has zero length and is not
+  read as a ratio. *(Realised — [ADR-3D-251](06b-decisions-3d.md#adr-3d-251), #1163;
+  `issue-1163-ratio-separators.test.ts`. The 2-D sibling this restores parity with is `segmentRatio`.)*
 - **FR-CL-3 (Must)** — **A refusal names the student's statement, not internal state**
   ([FR-SU-5](02w-requirements-workspace.md)).
 

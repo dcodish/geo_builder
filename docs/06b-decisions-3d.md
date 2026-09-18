@@ -10008,3 +10008,32 @@ Before `marked`, both spellings still reached `vec-rel` and the divergence had n
 
 Fixed as a chokepoint rather than a second copy: the two boundary patterns are named (`SCRIPT_BOUNDARY_LATIN_HE`, `SCRIPT_BOUNDARY_HE_LATIN`) and applied by both readers. An arrow needs no boundary — it is its own character — so only the WORD test moves.
 **Consequences.** `marked?: true` on `VecRelCommand`, set at the one `vec-rel` emitter; an early return in `ambiguousPairRatio`; a `vec-eq` arm in the claim fork's free-dims block; `ScalarPin` kind `vec-eq` + its residual + `PIN_FIXES_SCALE: false`; `→` in `symbols3.ts`, in 3-D bidi `CORE`, and in four locale strings. Locks: `issue-1183-vector-marked.test.ts` (22) — every marked spelling parses marked, builds on the operator's own trapezoid, and the drawn figure satisfies `DC = 3·AB` to < 1e-6 at four seeds; the unmarked tripwire and the length half unchanged; a marked-but-impossible statement still refused. `bidi3.test.ts` grows the palette lock from "is CORE" to "has a standalone rendering" (`/^\p{M}+$/u`), the class rather than the button.
+### ADR-3D-251 — a segment ratio reads `/` wherever it reads `:` (#1163)
+
+**Requirements:** [02b](02b-requirements-3d.md) — **FR-CL-2a** added (one notation, two separators). **Design:** one parser rule, no new command and no new engine path. **LADDER stage:** parse only.
+
+**Two independent reports of the same gap.** Prod session `i8gw52ej` — a student stating the ratio in which a point divides a segment:
+
+```
+תיבה
+אלכסון BD
+E על BD
+BE/ED=1:3      ✗ not-handled
+BE:ED=1:3      ✓ builds
+```
+
+and the operator, 2026-09-18, in the spelling a textbook uses: *"in 3d tool - the ratio notion AB/BC = 3/1 isnt recognized"*.
+
+**Nobody was blocked, and saying so is part of the record.** The LLM fallback read the slash correctly and the figure built — `[llm/ok] BE/ED=1:3 ==> ["BE:ED = 1:3"]`. Every occurrence simply spent a paid call rewriting a slash into a colon. So this buys **cost and determinism, not capability**, and it is a P3 for that reason. [ADR-3D-249](#adr-3d-249) then made the colon form genuinely *drive* rather than refute, which makes the missing sibling more visible rather than less.
+
+### One rule, not a second pattern
+
+2-D has had the `/`-form sibling (`segmentRatio`) beside its colon form (`segmentRatioColon`) since the colon form existed; 3-D never grew it. The separator is now a character class at the **existing** rule rather than a new rule beside it: two separators of one notation drift apart the moment they are two rules, and the whole defect here is that one spelling of one statement was reachable and the other was not.
+
+The RHS also takes a **bare number** — «AB/BC = 2», 2-D's own third spelling — with `q` defaulting to 1, and both separators accept it, since the point of the change is that the two cannot differ.
+
+### Owned with the fix: a ratio is POSITIVE
+
+The colon form silently accepted «AB:BC = 0:3» — a statement that a segment has zero length — and the new separator would have made that reachable by a second spelling, which is how a hole doubles instead of closing. 2-D guards `p > 0 && q > 0` in **both** of its ratio rules; that guard arrives here with the spelling it belongs to. It is reachable only by typing it, and no lock depended on the old permissiveness.
+
+**Consequences.** `lengthRatioClaim` takes `[:/]` on both sides plus an optional denominator; a positivity guard; a `BE/ED = 1:3` catalog row, because the catalog is the coverage MAP as well as the panel and a spelling it omits is invisible to every catalog-wide property. Lock: `issue-1163-ratio-separators.test.ts` (12) — every assertion a **parity** comparison between two spellings rather than a spelled-out expectation, so it cannot go green by re-implementing the grammar it guards (ADR-W-053); plus the prod sequence built end-to-end and `BE:ED` measured as 1:3 **on the canvas**, which is the arm that would notice a ratio recorded and never solved.
