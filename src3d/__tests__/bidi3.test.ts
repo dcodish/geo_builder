@@ -221,6 +221,29 @@ describe('#482 — the bidi alphabet cannot drift from the palette the tool offe
     ).toEqual([]);
   });
 
+  /**
+   * #1185 — A BUTTON'S LABEL MUST HAVE A STANDALONE RENDERING.
+   *
+   * The vector button was `['⃗', '⃗', 0]` — U+20D7 COMBINING RIGHT ARROW ABOVE, a lone combining mark
+   * used as both label and insert. A combining mark is DEFINED to render over the preceding base
+   * character; with no base the result is renderer-dependent, and on the operator's Windows machine it
+   * was a stray mark on the button and `DC□=AB□` in the input.
+   *
+   * The lock above passed throughout, because it asks whether a character is bidi-CORE — never whether
+   * it is LEGIBLE. U+20D7 is CORE and always was. This is the missing half, written as the CLASS (any
+   * bare combining mark) rather than as the one button, which is what would have caught it.
+   */
+  it('#1185 — no palette button is labelled with a bare combining mark', () => {
+    const offenders = SYMBOL_PALETTE_3.filter(([label]) => /^\p{M}+$/u.test(label)).map(([label]) => [
+      ...label,
+    ].map((ch) => 'U+' + ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')).join(' '));
+    expect(
+      offenders,
+      'a combining mark renders OVER the preceding character — with none, it is a dotted circle or ' +
+        'tofu. Give the button a character that stands alone (#1185 chose → over ⃗).',
+    ).toEqual([]);
+  });
+
   it('the palette still offers ∥ next to ⊥ (#493 — the parser accepts it, so it must be typeable)', () => {
     const inserts = SYMBOL_PALETTE_3.map(([, insert]) => insert);
     expect(inserts).toContain('∥');

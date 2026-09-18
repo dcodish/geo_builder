@@ -9934,3 +9934,77 @@ So the question needs the figure. Five conditions, each protecting a lane: a sin
 [#778](https://github.com/dcodish/geo_builder/issues/778)'s direction — *non-canonical input is TAUGHT, never silently accepted*. The refusal carries the student's **own** pairs and coefficient, so the message names the two spellings that work in their letters rather than as `AB`/`CD` placeholders. A bare «לא הבנתי» would be a worse outcome than the bug, because the student would have no way to get what they want.
 
 **Consequences.** `ambiguous-vector-length` joins `EngineError3` with its pairs; `ambiguousPairRatio` + a depth guard at `applyCommand3`; a `length-ratio` arm beside `length-eq`'s in the claim fork; `err.ambiguousVectorLengthRatio` in both locales. `issue-1156-ratio-taught.test.ts` (15), including every case the four tripwire locks defend. 3-D lane 245 files / 4717 tests, none moved.
+
+### ADR-3D-250 — an EXPLICITLY MARKED vector statement is honoured, and a vector equation DRIVES (#1183, #1185)
+
+**Requirements:** [02b](02b-requirements-3d.md) — **FR-VC-1a** added (the marked statement is reachable, and a vector equation on a free figure is a given). **Design:** the parser→apply command boundary, plus one `ScalarPin` kind. **LADDER stage:** parse (the marking is recorded) and apply (the guard honours it; the claim fork drives it).
+
+**Reported by the operator quoting the tool back at it**, one day after [ADR-3D-249](#adr-3d-249) shipped and while it was still undeployed:
+
+> לא ברור אם הכוונה לווקטור או לאורך — כתבו |DC| = 3|AB| אם התכוונתם לאורכים, או DC⃗ = 3AB⃗ אם התכוונתם לווקטורים
+>
+> *"how would i write that a vector is really 3 times another vector (not only size)"*
+
+**They could not.** Every vector spelling — including the one that message tells them to type — returned that same message.
+
+```
+תיבה
+|AA'|=3|BC|            ✓ builds                    ← the LENGTH half of the message is true
+AA'=3BC                ⚠ ambiguous-vector-length   ← the ASK, intended
+AA'⃗ = 3BC⃗             ⚠ ambiguous-vector-length   ✗ THE TAUGHT SPELLING
+AA'→ = 3BC→            ⚠ ambiguous-vector-length   ✗
+וקטור AA' = 3 וקטור BC  ⚠ ambiguous-vector-length   ✗
+```
+
+The tool asked a question, offered two answers, and rejected one of them **with the question**. ADR-3D-249's ask is right; it was **unanswerable**, because the answer was indistinguishable from the question.
+
+### Root cause — the marking was used and then discarded
+
+`markVectorContext` set `VEC_MARKED` from the arrow (or the «וקטור»/`vector` word), used it to choose the vector lane over the length lane, and emitted a `vec-rel` carrying **no record of it**. All five spellings lowered to the byte-identical command:
+
+```js
+{ type:'vec-rel', from:'D', to:'C', terms:[{ coeff:{k:3,p:0}, atom:{kind:'pair',from:'A',to:'B'} }] }
+```
+
+So `ambiguousPairRatio` could not tell "the student wrote an arrow" from "the student wrote a bare pair", and fired on the marked spelling it exists to let through. docs/17's *capability bound to a code path rather than to the concept*: a real fact about the utterance living only inside one parse-time variable. It travels on the command now (`marked?: true`), written only when true so an unmarked command — and every saved `.geo3.json` — is byte-identical to before.
+
+**Nothing about the ambiguity ruling changes.** An unmarked `XY = k·ZW` still asks, so [#748](https://github.com/dcodish/geo_builder/issues/748) (refuse rather than pick where the readings disagree) and [ADR-3D-010](#adr-3d-010) (a coefficient commits to the vector lane at parse time) both stand untouched. The guard simply declines to ask a student who has already answered.
+
+### The third arm, without which the fix is not a fix
+
+The student's next move after the arrow was refused traded the loop for a **false accusation**:
+
+```
+טרפז ABCD
+נסמן: AB = u
+DC = 3u        ⚠ claim-refuted
+```
+
+A bare trapezoid has DC ∥ AB and free dims, so `DC = 3AB` is satisfiable — refuting it against proportions the tool sampled itself is [ADR-052](06-decisions.md#adr-052)'s cardinal sin, **the very thing ADR-3D-249 fixed for the pair form, one spelling over**. Shipping arms 1–2 alone would have left the student one keystroke from the message they had just escaped, which is the same reason ADR-3D-249 shipped its two halves together.
+
+**A vector equation is therefore a GIVEN on a figure with free dims**, exactly as a length equation and a length ratio already are. New `ScalarPin` kind `vec-eq`, the vector twin of `length-rel`: three **signed component** residuals over the existing `exprAt`, never a magnitude — `|lhs − rhs|` is non-negative and would touch zero rather than cross it, the ADR-3D-006 stall `concyclic` records. Both sides scale together, so it is similarity-invariant and joins the gauge-frozen dims-only solve.
+
+Placed with its scalar siblings in the claim fork rather than beside the `vec-rel` branch, because the sentence arrives through **three** spellings — the named-vector route, the marked pair, and a `vec-eq` lowered by some other command — and a drive bound to one of them is the same code-path capability this ADR is about. Pin **and** claim (the ADR-3D-030 pattern): the recorded claim stays the final arbiter, so «AA'⃗ = 3BC⃗» between two perpendicular edges of a box still refuses — now because the figure genuinely cannot satisfy it rather than because one sample did not.
+
+### The character the message teaches (#1185)
+
+The palette's vector button was `['⃗', '⃗', 0]` — **U+20D7 COMBINING RIGHT ARROW ABOVE, a lone combining mark**. A combining mark is defined to render over the preceding base character; with none it is renderer-dependent, and on the operator's machine it was a stray mark on the button and `DC□=AB□` in the input. The existing bidi lock passed throughout because it asks whether a character is bidi-CORE — never whether it is **legible**.
+
+**Operator ruling, 2026-09-18, asked what the button should insert: `→` (U+2192).** `parse3` already accepts `[→⃗⟶]` interchangeably, so `AB→` parses identically to `AB⃗` — no grammar change and no font work. The textbook over-letter arrow is knowingly given up for legibility; the trade-off was put to the operator explicitly. U+20D7 **stays** in the grammar and in bidi CORE — a student can still paste it — and `→` joins CORE because the palette now offers it, which is the #482 drift rule applied rather than an exception to it.
+
+`err.ambiguousVectorLength` and `err.ambiguousVectorLengthRatio` move to `→` in **both** locales in this same change. That coupling is the whole point: the message, the palette and the grammar teach one character, or the tool recommends a key that does nothing — which is precisely the failure this ADR is named for.
+
+### Why ADR-3D-249's lock did not catch it
+
+`issue-1156-ratio-taught.test.ts` (15 cases) contains **no `⃗` and no `→` anywhere**. It asserts the ask fires and that `|AA'|=3|BC|` builds — the half that works is locked, the half that is **advertised** is not. So the new lock reads the remedy **out of the locale message** and drives it, rather than hardcoding it alongside: change the message to teach a different key and the lock drives that key instead. A taught remedy is a hypothesis until something types it.
+
+### Owned with the fix: the marking was read UPSTREAM of the boundary that makes it readable
+
+Carrying the bit onto the command made an existing inconsistency visible, and [#773](https://github.com/dcodish/geo_builder/issues/773)’s catalog-wide despacing property failed on «וקטור SE = 3/4 וקטור SD» — that test working exactly as designed.
+
+`markVectorContext` read the RAW utterance. `normalize3` splits a Hebrew↔Latin script transition, and **its own comment already said why this step comes first**: *«וקטורSE» must become «וקטור SE» before the word «וקטור» can be recognised and dropped.* The marking was taken upstream of that split, so the glued spelling silently lost its vector meaning while the spaced one kept it — and a missing space at a script boundary is **invisible to a student in an RTL box**, which is the whole premise of ADR-3D-170.
+
+Before `marked`, both spellings still reached `vec-rel` and the divergence had no observable effect, so nothing could catch it. It would have become a live bug the moment anything downstream read the bit.
+
+Fixed as a chokepoint rather than a second copy: the two boundary patterns are named (`SCRIPT_BOUNDARY_LATIN_HE`, `SCRIPT_BOUNDARY_HE_LATIN`) and applied by both readers. An arrow needs no boundary — it is its own character — so only the WORD test moves.
+**Consequences.** `marked?: true` on `VecRelCommand`, set at the one `vec-rel` emitter; an early return in `ambiguousPairRatio`; a `vec-eq` arm in the claim fork's free-dims block; `ScalarPin` kind `vec-eq` + its residual + `PIN_FIXES_SCALE: false`; `→` in `symbols3.ts`, in 3-D bidi `CORE`, and in four locale strings. Locks: `issue-1183-vector-marked.test.ts` (22) — every marked spelling parses marked, builds on the operator's own trapezoid, and the drawn figure satisfies `DC = 3·AB` to < 1e-6 at four seeds; the unmarked tripwire and the length half unchanged; a marked-but-impossible statement still refused. `bidi3.test.ts` grows the palette lock from "is CORE" to "has a standalone rendering" (`/^\p{M}+$/u`), the class rather than the button.

@@ -142,6 +142,20 @@ export type MutualRel3 = 'coincident' | 'parallel' | 'intersecting' | 'skew';
 /** V7 T2 — a SCALAR given that DRIVES the figure (a residual in the global solve). */
 export type ScalarPin =
   | { kind: 'length-rel'; a1: Id; b1: Id; a2: Id; b2: Id; c: number } // |a1b1| = c·|a2b2| (similarity-INVARIANT)
+  /**
+   * #1183 — a VECTOR EQUATION that DRIVES: `Σ lhs = Σ rhs`, three signed component residuals.
+   *
+   * The vector twin of `length-rel`, and it closes the same ADR-052 hole one spelling over. A
+   * `vec-eq` on a figure with free dims used to fall straight through to the claim lane and be
+   * verified against proportions the tool had SAMPLED ITSELF, so «נסמן: AB = u» + «DC = 3u» on a
+   * bare trapezoid — a perfectly satisfiable given — came back `claim-refuted`. Both sides scale
+   * together, so it is similarity-invariant and joins the gauge-frozen dims-only solve exactly like
+   * `length-rel` and `mag-rel`.
+   *
+   * Component-wise and SIGNED, never a magnitude: `|lhs − rhs|` is non-negative and would TOUCH
+   * zero rather than cross it, which is the ADR-3D-006 stall the `concyclic` note records.
+   */
+  | { kind: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // DC⃗ = 3·AB⃗
   | { kind: 'length'; a: Id; b: Id; value: number } // |DC| = 4
   | { kind: 'vangle'; vertex: Id; p: Id; q: Id; deg: number } // ∠ADC = 120
   // #909 — the angle between two SEGMENTS that need not meet («הזווית בין A'C לבין BC' היא 70»).
@@ -666,6 +680,19 @@ export interface VecRelCommand {
   to: Id;
   terms: SymTerm[];
   symbol?: string;
+  /**
+   * #1183 — the student wrote the VECTOR marking explicitly (`⃗`/`→`/`⟶`, or the «וקטור»/`vector`
+   * word), so this relation is not the two-reading sentence {@link ambiguousPairRatio} asks about.
+   *
+   * The parser used to consume the marking and throw it away: `markVectorContext` set `VEC_MARKED`,
+   * used it to pick the vector lane over the length lane, and emitted a `vec-rel` carrying no record
+   * of it. All five spellings lowered to a byte-identical command, so apply could not tell «the
+   * student wrote an arrow» from «the student wrote a bare pair» — and the ambiguity guard fired on
+   * the very spelling its own clarification tells them to type. A real fact about the utterance that
+   * lived only inside one parse-time variable (docs/17: a capability bound to a code path rather
+   * than to the concept); it travels on the command now.
+   */
+  marked?: true;
 }
 
 /**

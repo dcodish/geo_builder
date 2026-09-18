@@ -104,6 +104,18 @@ function upliftLowercaseLabels(s: string): string {
 /** Normalise an utterance: strip invisible bidi/format controls, unify primes to `'`, strip vector
  *  arrows (AB→ ≡ AB), unify minus/maqaf to `-`, collapse whitespace, uplift anchored lowercase
  *  labels (#181). */
+/**
+ * #773 (ADR-3D-170) — the SCRIPT-TRANSITION boundary, as two named patterns rather than two literals
+ * inline in `normalize3`.
+ *
+ * Named because {@link markVectorContext} must apply the SAME boundary before it looks for the vector
+ * WORD (#1183). `normalize3`’s own comment already says why that matters — «וקטורSE» must become
+ * «וקטור SE» before the word can be recognised — but the marking was read off the RAW utterance,
+ * upstream of this step, so the glued spelling silently lost its vector meaning while the spaced one
+ * kept it. Two readers, one definition; a second copy is how the pair would drift.
+ */
+const SCRIPT_BOUNDARY_LATIN_HE = /([A-Za-z][A-Za-z0-9']*)(?=[א-ת])/g;
+const SCRIPT_BOUNDARY_HE_LATIN = /([א-ת]{2,})(?=[A-Za-z])/g;
 export function normalize3(s: string): string {
   // #751 (ADR-W-029): the control set is the SHARED one (shell/bidi) — it had three copies.
   return upliftLowercaseLabels(
@@ -152,8 +164,8 @@ export function normalize3(s: string): string {
       // instead; «משולש» is spelled entirely from that set (מ‑ש‑ו‑ל‑ש), so the exemption silently
       // swallowed the commonest noun in the corpus. Measured, not reasoned: the catalog-wide property
       // below is what caught it.
-      .replace(/([A-Za-z][A-Za-z0-9']*)(?=[א-ת])/g, '$1 ')
-      .replace(/([א-ת]{2,})(?=[A-Za-z])/g, '$1 ')
+      .replace(SCRIPT_BOUNDARY_LATIN_HE, '$1 ')
+      .replace(SCRIPT_BOUNDARY_HE_LATIN, '$1 ')
       .replace(/(?:^|(?<=[\s:,]))(?:ה?ו?וקטור|vectors?)\s+/gi, '') // the vector WORD marks vector meaning (recorded before normalize), then reads as decoration
       // #494 — a DETACHED clitic re-binds to its operand. Hebrew's ל/ב/מ/ה/ש/כ are prefixes, and every
       // gate in this tree spells them glued (`ל?מישור`, `ב-?`), so «מקביל ל π1» was not-handled while
@@ -1813,7 +1825,11 @@ const vecEqClaim: Rule = (s0) => {
   if (lhsPair) {
     const rhs = parseSymExpr(parts[1]);
     if (!rhs) return null;
-    return [{ type: 'vec-rel', from: lhsPair[1], to: lhsPair[2], terms: rhs.terms, symbol: rhs.symbol }];
+    // #1183: the VECTOR marking travels ON the command. `VEC_MARKED` chose this lane over the length
+    // lane; dropping it here is what made every spelling indistinguishable at apply, so the ambiguity
+    // guard refused the arrow form its own clarification teaches. Recorded only when true, so an
+    // unmarked command is byte-identical to before (and a saved figure's JSON is unchanged).
+    return [{ type: 'vec-rel', from: lhsPair[1], to: lhsPair[2], terms: rhs.terms, symbol: rhs.symbol, ...(VEC_MARKED ? { marked: true as const } : {}) }];
   }
   const lhs = parseVecExpr(parts[0]);
   const rhs = parseVecExpr(parts[1]);
@@ -4416,7 +4432,15 @@ export const RULES: Rule[] = [
  *  `AS = AB` reads as a LENGTH equality, the bagrut default). Extracted from `parse3` and exported
  *  ONLY so the shadow-matrix guard can run rules under the exact pre-state `parse3` gives them. */
 export function markVectorContext(utterance: string): void {
-  VEC_MARKED = /[→⃗⟶]/.test(utterance) || /(?:^|[\s:,])(?:ה?ו?וקטור|vectors?)\s/i.test(utterance);
+  // #1183/#773: the WORD is looked for AFTER the script-transition boundary is applied. An arrow is
+  // its own character and needs no boundary, but «וקטור SE» despaces to «וקטורSE» — invisible to a
+  // student in an RTL box — and reading the raw utterance made the glued spelling mean something
+  // different from the spaced one. `normalize3` applies exactly this split for exactly this reason;
+  // the marking was simply read upstream of it.
+  const bounded = utterance
+    .replace(SCRIPT_BOUNDARY_LATIN_HE, '$1 ')
+    .replace(SCRIPT_BOUNDARY_HE_LATIN, '$1 ');
+  VEC_MARKED = /[→⃗⟶]/.test(utterance) || /(?:^|[\s:,])(?:ה?ו?וקטור|vectors?)\s/i.test(bounded);
 }
 
 
