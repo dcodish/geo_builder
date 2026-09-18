@@ -60,7 +60,7 @@ Deploy **only committed state on `main`** ([docs/22 §5](22-workflow.md)).
 npm run deploy:preflight      # builds the proxy, reads the live artifacts, prints what is stale
 ```
 
-It names each artifact `MATCHES live` or `DIFFERS — push required`, and **exits non-zero whenever
+It names each artifact `MATCHES live`, `DIFFERS — push required` or `STALE BUILD` (built before its own source last changed — rebuild, then re-run; [ADR-W-061](06w-decisions-workspace.md#adr-w-061)), and **exits non-zero whenever
 anything differs** so the verdict cannot be skimmed past on the way to the commands below. Push
 exactly what it names; leave the rest alone.
 

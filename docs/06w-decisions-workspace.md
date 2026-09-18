@@ -3111,3 +3111,47 @@ So an unmatched bracket at either EDGE is peeled off and rendered as the text it
 ### Blast radius
 
 `shell/math.tsx` is shared by 2-D, 3-D, complex and analytic, and every one of them writes ordered pairs. The full suite is the gate, not a product lane. `shell/__tests__/bracketed-fraction.test.ts` (6) — **proven to fail without the fix**: making the peel the identity turns 2 of its 6 red.
+
+## ADR-W-061 — The preflight may not say MATCHES about a build it cannot vouch for (#1213, amends ADR-W-058)
+
+**Requirements:** none (internal — an operating procedure). **Design:** [RUNBOOK](RUNBOOK.md) § *Standard deploy*. **Product:** workspace.
+
+Found by running **T12 of round #1200's own play sheet**, against the preflight shipped that same day.
+
+### It reported MATCHES for four artifacts that did not match
+
+```
+proxy (dist-server/proxy.mjs)    DIFFERS — push required
+2-D bundle (dist)                MATCHES live      ← false
+3-D / complex / analytic         MATCHES live      ← false
+```
+
+`main` carried round #1200's six items and the #1201 P1, none of it deployed. Measured:
+
+```
+dist/index.html built     2026-09-17 22:51        (the day before)
+sources newer than it     src/app/roleReadings.ts, submitPipeline.ts, editPipeline.ts, …
+after `npm run build`     assets/index-Dk2TolO8.js  →  assets/index-B3YiZORf.js
+```
+
+The local bundle matched the live one because **both were stale**. The comparison was true and meaningless.
+
+### Root cause — the word that carried the guarantee was the one the implementation dropped
+
+The proxy is rebuilt on every run, so its answer is always against current source. The static bundles were read off disk as found. #1130's plan said the live hash is compared against the **freshly built** one.
+
+This is ADR-W-058's own class, reintroduced inside the tool written to retire it: **a check whose answer depends on someone having remembered to do something first is not a check.** The RUNBOOK's step 0 builds everything before the preflight is consulted, and the preflight trusted that — which is exactly the trust ADR-W-058 says a deploy may not extend.
+
+### The fix, and why staleness rather than an unconditional rebuild
+
+A product whose `dist` is older than any source it is built from is reported **`STALE BUILD`**, never `MATCHES`, and exits non-zero — the same discipline already applied to NOT BUILT and to an unreachable host: *"nothing measured as stale"* must never be readable as *"everything is current"*.
+
+Not an unconditional rebuild: four builds are real time on a script that should stay cheap enough to run casually, step 0 already builds, and a guard on the **forgotten** build is what was actually missing. A future session may decide to build instead; what may not change is that MATCHES cannot be printed without evidence.
+
+Each product now declares the trees it is built from, and **`shell/` is in all four** — which is why one edit there stales every bundle at once, and why a product that forgot to declare it would go quietly unchecked. That is asserted.
+
+### Tested, which needed a split
+
+`scripts/preflight-targets.mjs` holds the targets and the two decisions, because importing `deploy-preflight.mjs` runs a preflight — including the ssh reads — which a test may not do. `server/__tests__/preflight-staleness.test.ts` (6) calls the real decisions rather than restating them, and covers the boundary that matters: a test file is not a source, and NOT BUILT is not STALE (they send the operator to two different actions).
+
+Demonstrated end to end: a freshly built bundle compares normally; touching one analytic source flips analytic to STALE; touching one `shell/` source flips it too.

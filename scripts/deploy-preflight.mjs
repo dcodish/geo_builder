@@ -30,22 +30,14 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PRODUCTS, isStale, newestSource } from './preflight-targets.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const HOST = process.env.GEO_DEPLOY_HOST ?? 'root@themathbible.com';
-const DOCROOT = '/var/www/vhosts/themathbible.com/httpdocs';
 const PROXY_LIVE = '/var/www/geo-proxy/proxy.mjs';
-
-/** Each product: where its build lands, what the served page is called, and where it lives on prod. */
-const PRODUCTS = [
-  { name: '2-D', dist: 'dist', page: 'index.html', live: `${DOCROOT}/geo-builder/index.html` },
-  { name: '3-D', dist: 'dist-3d', page: '3d.html', live: `${DOCROOT}/3d-builder/index.html` },
-  { name: 'complex', dist: 'dist-complex', page: 'complex.html', live: `${DOCROOT}/complex-builder/index.html` },
-  { name: 'analytic', dist: 'dist-analytic', page: 'analytic.html', live: `${DOCROOT}/analytic-builder/index.html` },
-];
 
 const offline = process.argv.includes('--offline');
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
@@ -89,11 +81,18 @@ try {
 const proxyLiveOut = remote(`sha256sum ${PROXY_LIVE}`);
 add('proxy (dist-server/proxy.mjs)', proxyLocal, proxyLiveOut ? proxyLiveOut.split(/\s+/)[0] : null);
 
-// --- the static bundles, one row per product
+// --- the static bundles, one row per product. The staleness rule and the targets live in
+// `preflight-targets.mjs` so they can be tested without running this script (#1213).
 for (const p of PRODUCTS) {
   const localPath = resolve(root, p.dist, p.page);
-  const localHtml = existsSync(localPath) ? readFileSync(localPath, 'utf8') : null;
-  add(`${p.name} bundle (${p.dist})`, localHtml ? bundleOf(localHtml) : null, bundleOf(remote(`cat ${p.live}`)));
+  const built = existsSync(localPath) ? statSync(localPath).mtimeMs : 0;
+  const what = `${p.name} bundle (${p.dist})`;
+  if (isStale(built, newestSource(root, p.src))) {
+    rows.push({ what, status: 'STALE BUILD — rebuild before trusting this', local: null, live: null });
+    continue;
+  }
+  const localHtml = built ? readFileSync(localPath, 'utf8') : null;
+  add(what, localHtml ? bundleOf(localHtml) : null, bundleOf(remote(`cat ${p.live}`)));
 }
 
 const width = Math.max(...rows.map((r) => r.what.length));
@@ -106,14 +105,16 @@ for (const r of rows) {
 const differs = rows.filter((r) => r.status.startsWith('DIFFERS'));
 const unbuilt = rows.filter((r) => r.status === 'NOT BUILT');
 const unknown = rows.filter((r) => r.status === 'UNKNOWN');
+const stale = rows.filter((r) => r.status.startsWith('STALE'));
 console.log('');
 if (unbuilt.length) console.log(`  ${unbuilt.length} artifact(s) NOT BUILT — build them before reading this verdict.`);
+if (stale.length) console.log(`  ${stale.length} artifact(s) built BEFORE their own source changed — they cannot be compared. Build, then re-run.`);
 if (unknown.length) console.log(`  ${unknown.length} artifact(s) could not be read from ${HOST} — verdict incomplete.`);
 if (differs.length) {
   console.log(`  ${differs.length} artifact(s) DIFFER from live. Push exactly these; leave the rest alone.\n`);
   process.exit(1);
 }
-if (unbuilt.length || unknown.length) {
+if (unbuilt.length || unknown.length || stale.length) {
   console.log('  Nothing measured as stale, but the measurement is incomplete — do not read this as "all current".\n');
   process.exit(1);
 }
