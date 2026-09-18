@@ -1177,3 +1177,19 @@ drawn side is an object the student can see, so it is an object they can click.
 every configuration has an equation; one that moves does not, and says so. A line can be knowledge
 while the points naming it are not — «A(0,0)» with «B על הישר y=x» has the equation `x - y = 0` and no
 length — and each question is answered on its own terms.
+
+**R96 — every spelling of one question gets one answer, and the operands decide the roles**
+([#1151](https://github.com/dcodish/geo_builder/issues/1151)).
+
+«המרחק בין C ל-AB» and «המרחק בין AB ל-C» are the same question. So are «מרחק של C מ-AB»,
+«distance from C to AB» and «distance between AB and C». A grammar that answers one and refuses
+another is teaching the student that the tool has a secret word order, which no exam has.
+
+**Roles come from what each operand IS, never from where it sits.** A one-letter name is a point; a
+two-letter name or a curve name is a line. Two points are a plain distance — «המרחק בין A ל-B» is the
+length `AB` and answers the same number — and a point with a line is the distance to that line,
+written in either order.
+
+**A question naming something absent is told so.** «המרחק בין C ל-QR» on a figure with no `QR` reports
+the missing object; it never answers «לא ניתן לחשב מהנתונים», which is a claim about the figure rather
+than about the question.

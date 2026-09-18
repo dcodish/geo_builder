@@ -228,11 +228,23 @@ export function ask(
   // --- anything else: a measure expression, through the one grammar ---
   const measure = parseLengthExpr(text);
   if (!measure) return { question, value: null, unreadable: true };
-  // Every point it names must exist, or the question is about a figure the student has not drawn.
-  const missing = measure.terms
+  /**
+   * EVERY operand must resolve — including the LINE (#1151).
+   *
+   * Only the points were checked, so «המרחק בין C ל-QR» on a figure with no `QR` answered `null`:
+   * «לא ניתן לחשב מהנתונים» — a statement ABOUT the figure, for a question naming something the
+   * figure has not got. #1111 built the missing-object message for exactly this, and one operand
+   * was walking past it.
+   */
+  const missingPoint = measure.terms
     .flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : [t.a, t.b]))
     .find((id: Id) => !objectById(d.construction, id));
-  if (missing !== undefined) return { question, value: null, missing: { name: missing, kind: 'point' } };
+  if (missingPoint !== undefined)
+    return { question, value: null, missing: { name: missingPoint, kind: 'point' } };
+  const missingLine = measure.terms
+    .flatMap((t) => (t.kind === 'point-line' ? [t.line] : []))
+    .find((name) => !lineNamed(d.figure, name));
+  if (missingLine !== undefined) return { question, value: null, missing: { name: missingLine, kind: 'curve' } };
 
   const k = isKnowledge(d.construction, (f) =>
     evalLengthExpr(

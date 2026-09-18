@@ -346,6 +346,23 @@ because it is named by its equation (ADR-AG-056) and that is a poor menu entry.
 Normalizing is by the LEADING coefficient, not by `hypot(a, b)`: the latter is the textbook normal
 form and makes a rational line irrational, which ADR-AG-085's fraction clearing then cannot undo.
 
+### The measure grammar's operands ([ADR-AG-089](06c-decisions-analytic.md#adr-ag-089))
+
+`parseLengthExpr` reads a distance as a set of **frames** — one small pattern per spelling, each
+handing over exactly two operands — and then decides the roles **once**, from the operand names:
+
+| the name | what it can be |
+| --- | --- |
+| `A`, `A1` | a point, and nothing else |
+| `AB`, `l1`, `ℓ₁` | a line — a pair of vertices, or a named curve |
+
+So `point + point` is a plain distance (the same term `AB` produces), and `point + line` is the
+distance to that line **in either order**. The classification is purely syntactic, which is what lets
+this module keep knowing nothing about objects — the layering the rest of the file maintains.
+
+A pair of LINE operands is left unconsumed: the parallel-lines distance is a capability rather than a
+spelling, and it is not built here.
+
 ## A circle on a point ([ADR-AG-045](06c-decisions-analytic.md#adr-ag-045))
 
 Every curve in this product is an equation over `x` and `y` whose coefficients are expressions in

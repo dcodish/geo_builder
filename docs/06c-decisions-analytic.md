@@ -4671,3 +4671,61 @@ Every existing consumer is unaffected by construction: the slope is `-a/b` and t
 **The opposite side is offered first** on a vertex click: on a triangle, the distance from `C` to `AB` is the height — the question the student came to ask. The two sides through `C` are legitimate questions with legitimate answers (zero) and are still offered, just not ahead of it.
 
 `issue-1148-1139-one-resolver.test.ts` (12) — **proven to fail without the fix**: making the two seams the identity turns 7 of the 12 red. Analytic lane 85 files / 1364 tests green; `smoke:visual --app analytic` passed and the screenshots were read.
+
+## ADR-AG-089 — A measure's operands decide their own roles; word order does not (#1151)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R96** (new). **Design:** [04c](04c-design-analytic.md) — *the measure grammar*. **LADDER stage:** parse-time operand classification, ahead of evaluation; no solve or gate change.
+
+Reported by the operator: «המרחק בין AB ל-C» is unreadable while «המרחק בין C ל-AB» answers, and «המרחק בין A ל-B» — two points he had pinned — comes back «לא ניתן לחשב».
+
+### Measured, and worse than reported
+
+On `A(0,0)` `B(6,0)` `C(3,5)` + «משולש ABC»:
+
+```
+המרחק בין C ל-AB          -> 5            (point, then line)
+המרחק בין AB ל-C          -> «לא הבנתי»   the SAME question, other order
+המרחק בין A ל-B           -> null         two points, read as a line named «B»
+המרחק בין C ל-QR          -> null         a silent statement about a figure with no QR
+distance between C and AB -> null         the token missed -- and LENGTH_TOKEN then ate «AB»
+```
+
+The English row is the one that matters most and the issue did not state it: when the distance token failed, `LENGTH_TOKEN` claimed `AB` out of the same sentence, so the student asking for a **distance to a line** was answered about **a different measurement**. A wrong answer delivered confidently is the class this tool exists to avoid; the other rows are merely refusals.
+
+### The defect: POSITION was doing the operands' job
+
+`POINT_LINE_TOKEN` required the point first and the line second. Every spelling that inverted them fell out of the grammar, and #1134 had already had to repair the same token once for the same reason — the previous fix added a second word order as a second alternation, which widened the symptom without touching the cause.
+
+**Roles now come from the operands, and an operand's own spelling settles it:** one letter is a point and can be nothing else; two letters or a curve name denote a line. That decision needs no figure, so `lengths.ts` keeps the layering the rest of the file is careful about — it still knows nothing about objects.
+
+| operands | the question |
+| --- | --- |
+| `A`, `B` | the plain distance — **the same term «AB» produces**, so one question is one term |
+| `C`, `AB` (either order) | the point-to-line distance |
+| `AB`, `l1` | not read — see below |
+
+### Frames, not one positional mega-regex
+
+Each spelling is a small pattern with the SAME two operand slots, applied in turn, and the roles are decided once for all of them. That is what retires the shape of #1134's own bug — a four-group token where only the first pair was read, so the second word order matched and then resolved to nothing at all.
+
+The frames are ordered most-specific-first, and the English `between … and …` joins as a frame rather than as a parallel rule, so it cannot drift from its Hebrew twin.
+
+### Two lines is a CAPABILITY, and is deliberately NOT built here
+
+The issue's plan lists `line + line → the parallel-lines distance`. The widened token can now reach that pair, and it is left **unconsumed** — «המרחק בין AB ל-l1» still answers «לא הבנתי», exactly as today. Two reasons, and the first is binding: CLAUDE.md forbids building a missing capability under a bug's banner. The second is that the plan's stated fallback — *"an honest refusal otherwise"* — is not obviously right, because two non-parallel lines are at distance **zero**, so refusing would itself be a small dishonesty. That is a product question and it is not this fix's to answer. Filed separately.
+
+### Class check (standing rule 1)
+
+The other multi-operand measures were swept and cannot carry the defect: `AREA_TOKEN` reads ONE run of vertices, and `LENGTH_TOKEN` reads two interchangeable points. Asserted rather than argued, so an edit that later gives either an asymmetric operand pair fails the lock.
+
+The **catalog** obligation in the plan does not apply: `catalogAnalytic.ts` teaches CONSTRUCTION commands and has no ask-lane rows at all. The ask lane's teaching surface is the click menu, which ADR-AG-088 widened in this same round.
+
+### The silent null is closed too
+
+Only the POINT operands were checked for existence, so «המרחק בין C ל-QR» answered `null` — «לא ניתן לחשב מהנתונים», a statement ABOUT the figure, for a question naming something the figure has not got. The line operand now goes through the same check and gets #1111's missing-object message.
+
+### Consequences
+
+`lengths.ts`: `POINT_LINE_TOKEN` → `DISTANCE_FRAMES` + one role decision; `ask.ts`: the line operand joins the existence check. `issue-1151-operand-roles.test.ts` (16) — **proven to fail without the fix**: restoring the old token turns 9 of the 16 red.
+
+**Found while measuring, filed not folded:** [#1201](https://github.com/dcodish/geo_builder/issues/1201) — «המרחק מ-A לישר l1 = 5» is accepted, reported satisfied, and not honoured (the figure draws 2.13). Measured identically on `origin/main`, so it is pre-existing; it is a solve defect, not a grammar one, and outside this round's composition.
