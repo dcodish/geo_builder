@@ -3206,13 +3206,43 @@ const angleSegClaim: Rule = (s0) => {
   return [...draw, { type: 'cos-angle', u, v, cos: Math.cos((deg * Math.PI) / 180) }];
 };
 
-/** `A'K : A'C = 2 : 3` — a length-RATIO claim (draws both segments). */
+/**
+ * `A'K : A'C = 2 : 3` — a length-RATIO claim (draws both segments).
+ *
+ * #1163 — `:` AND `/` ARE ONE NOTATION WITH TWO SEPARATORS, and this rule reads both.
+ *
+ * Prod session `i8gw52ej` typed «BE/ED=1:3» and the operator later typed «AB/BC = 3/1»; both were
+ * `not-handled` while the colon spelling of the same statement built. 2-D has had the `/`-form sibling
+ * (`segmentRatio`) beside its colon form for as long as the colon form has existed — 3-D simply never
+ * grew it, and `/` is the spelling a textbook writes as a fraction.
+ *
+ * No student was blocked: the LLM fallback rewrote the slash into a colon and the figure built
+ * (`[llm/ok] BE/ED=1:3 ==> ["BE:ED = 1:3"]`), so this buys cost and determinism rather than
+ * capability. [ADR-3D-249](../../docs/06b-decisions-3d.md#adr-3d-249) then made the colon form
+ * genuinely DRIVE rather than refute, which makes the missing sibling more visible, not less.
+ *
+ * Taken at THIS rule rather than as a second pattern: two separators of one notation drift apart the
+ * moment they are two rules, and the lock is a PARITY assertion (both spellings ⇒ the same commands)
+ * precisely so it cannot go green by re-implementing the grammar it guards.
+ *
+ * The RHS also takes a BARE number — «AB/BC = 2» is 2-D's own third spelling, and `q` defaults to 1.
+ * Both separators accept it, since the point of this change is that the two cannot differ.
+ *
+ * `p`/`q` must be POSITIVE, which is 2-D's guard (`segmentRatio`, `segmentRatioColon`) arriving with
+ * the spelling it belongs to. A zero or negative ratio states a zero-length or reversed segment and
+ * was silently accepted by the colon form before — reachable only by typing it, and it would have
+ * become reachable by a second spelling here.
+ */
+const RATIO_SEP = String.raw`\s*[:/]\s*`;
 const lengthRatioClaim: Rule = (s) => {
   const m = s.match(
-    new RegExp(`^([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*:\\s*([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(${NUM})\\s*:\\s*(${NUM})$`),
+    new RegExp(
+      `^([A-Z]\\d*'?)([A-Z]\\d*'?)${RATIO_SEP}([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(${UNUM})(?:${RATIO_SEP}(${UNUM}))?$`,
+    ),
   );
   if (!m) return null;
-  const [, a1, b1, a2, b2, p, q] = m;
+  const [, a1, b1, a2, b2, p, q = '1'] = m;
+  if (+p <= 0 || +q <= 0) return null; // a length ratio is positive — zero states a collapsed segment
   return [
     { type: 'segment3', a: a1, b: b1 },
     { type: 'segment3', a: a2, b: b2 },

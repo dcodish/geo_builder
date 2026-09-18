@@ -236,6 +236,10 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'claims', he: 'המישור KBC: x + 2y + 3z - 26 = 0', en: 'plane KBC: x + 2y + 3z - 26 = 0' },
   { category: 'claims', he: "הזווית בין A'C לבין BC' היא 90", en: "the angle between A'C and BC' is 90" },
   { category: 'claims', he: "A'K : A'C = 2 : 3", en: "A'K : A'C = 2 : 3" },
+  // #1163: the `/`-form sibling of the line above — one notation, two separators. Listed because the
+  // catalog is the coverage MAP as well as the panel: a spelling the grammar reads and the catalog
+  // omits is invisible to every catalog-wide property (the despacing sweep, the parse guards).
+  { category: 'claims', he: 'BE/ED = 1:3', en: 'BE/ED = 1:3' },
   { category: 'claims', he: 'ℓ אינו מקביל ל-π1 לכל m', en: 'ℓ is not parallel to plane π1 for every m' },
   { category: 'claims', he: 'נפח החרוט = 100π', en: 'the volume of the cone = 100π' },
   { category: 'claims', he: 'שטח המעטפת של החרוט = 65π', en: 'the lateral area of the cone = 65π' },
