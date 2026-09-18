@@ -4834,3 +4834,63 @@ That is a false refusal on a satisfiable statement, and it is a **regression in 
 `engine/lines.ts` (new — the resolution, moved down from `app/`), `app/lines.ts` builds on it, `solve.ts` takes and threads `lineAt`, `evaluate.ts` gains `lineAtOf` and supplies it at all three `residual` call sites (and exports both builders, so the lock calls them instead of copying them).
 
 `issue-1201-point-line-residual.test.ts` (6) — **proven to fail without the fix**: restoring the three-argument call turns 5 of the 6 red. Analytic lane 89 files / 1397 tests green.
+
+## ADR-AG-092 — One position, one name: the invariant lives at the FIGURE (#1153)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R98** (new). **Design:** [04c](04c-design-analytic.md) — *naming paths and the shared check*. **LADDER stage:** fact application, before the object is minted; no solve, display or gate change.
+
+**Operator ruling, 2026-09-17:** the second naming REFUSES and names the holder. Renaming is an explicit action the student takes — nothing changes silently. (2-D answers the same action by renaming today; the operator ruled that 2-D comes into line, filed as [#1164](https://github.com/dcodish/geo_builder/issues/1164). This issue does not wait for it.)
+
+### Measured
+
+```
+נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9
+P מרכז המעגל I  ->  [P(3,4)]                  faults []
+O מרכז המעגל I  ->  [P(3,4), O(3,4)]          faults []
+T מרכז המעגל I  ->  [P(3,4), O(3,4), T(3,4)]  faults []
+```
+
+Three letters stacked on one position, nothing said, and the data panel then listed three points the student could not tell apart.
+
+### Where the check goes, and why not in the centre rule
+
+This class has now appeared three times — [#1113](https://github.com/dcodish/geo_builder/issues/1113) (crossings), this one (centres), and the duplicate-curve mint measured on [#1126](https://github.com/dcodish/geo_builder/issues/1126). A check inside the centre branch is the patch shape and would guarantee a fourth.
+
+So it sits at the **one place a derived object is minted** in `applyFact`. All seven `DerivedRule` kinds pass through it — midpoint, centroid, incentre, orthocentre, circumcentre, diagonals, circle-centre — so the naming family reaches one check rather than each rule growing its own.
+
+### The test is STRUCTURAL, and that is what keeps it honest
+
+Two rules that define the same point ARE the same point — decidable from the rules alone, with no coordinates and no tolerance. `sameDerivation` answers it per rule, and each answer is a small statement about the geometry:
+
+| rule | same when |
+| --- | --- |
+| `midpoint` | the same unordered pair — the midpoint of `AB` is the midpoint of `BA` |
+| `centroid` · `incentre` · `orthocentre` · `circumcentre` | the same three vertices in any order — a triangle is a set |
+| `diagonals` | the same RING up to rotation and reflection — **not** a set: `ABCD` and `ABDC` are different quadrilaterals whose diagonals meet in different places |
+| `circle-centre` | the same parent curve |
+
+The switch is **exhaustive** (`const undecided: never`): a new `DerivedRule` must decide whether two of its instances are the same point, and a compile error is how that question gets asked — rather than the new rule silently inheriting "never the same" and reopening the class.
+
+### The sub-case that is NOT decided here
+
+Measured in the same pass:
+
+```
+A(3,4) · B(3,4)  ->  two points at one position, faults []
+```
+
+A **positional** check would have caught this too. It is deliberately left alone: the operator ruled on *naming one object twice*, and two independently stated points that happen to coincide is a different sentence. A student may state two points a later constraint separates, and under [ADR-052](06-decisions.md#adr-052) an unstated magnitude is a free DOF — so the coincidence may be incidental rather than asserted. **Escalated on the issue rather than answered**, and locked as unchanged so a future session cannot fold it in by accident.
+
+### The rename OFFER is not in this slice, and that is stated
+
+The ruling sketches `[ שנה את השם ל-O ]` beside the refusal. **Analytic has no rename action at all** — that is [#1154](https://github.com/dcodish/geo_builder/issues/1154), which ports 2-D's rename family — so a button here would call nothing. The refusal therefore tells the student the concrete action available today: delete the line that named the holder and write it again. The offer lands with #1154 and is recorded there.
+
+### A sibling that looks identical and is not
+
+[#1167](https://github.com/dcodish/geo_builder/issues/1167) reads to a student as the same thing — *"two points on the same location"* — and this check will NOT fix it: measured, its `O` is a hardcoded string in a panel description, not an object, so no naming path ran. **#1153/#1126/#1164 are about objects sharing a position; #1167 is about descriptions inventing letters for positions.** Recorded here so the two stay deliberate siblings rather than being closed as duplicates.
+
+### Consequences
+
+`engine/sameDerivation.ts` (new), one guard in `applyFact`'s derived-mint, a new `already-named` error code carrying `holder` (a NAME, never a sentence — the engine stays language-free) threaded through `LineFault` → `decideSubmit` → the locale, and one He/En string pair.
+
+`issue-1153-one-position-one-name.test.ts` (9) — **proven to fail without the fix**: disabling the guard turns 4 of the 9 red. Analytic lane 90 files / 1406 tests green.

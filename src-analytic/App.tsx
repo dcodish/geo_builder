@@ -559,13 +559,14 @@ export function App() {
           'ambiguous-angle': 'errAmbiguousAngle',
           'ambiguous-shape': 'errAmbiguousShape',
           'undistinguished-diagonal': 'errNoPrincipalDiagonal',
+          'already-named': 'errAlreadyNamed',
           'unsatisfiable': 'errUnsatisfiable',
           // A save file this tool will not open, named by WHICH of the three reasons (#1087).
           'load-foreign': 'errLoadForeign',
           'load-newer': 'errLoadNewer',
           'load-unreadable': 'errLoadUnreadable',
         }[error.key],
-        { detail: error.detail, existing: t(existingKey(error)) },
+        { detail: error.detail, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '' },
       )
     : null;
 

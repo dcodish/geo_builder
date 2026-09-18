@@ -22,6 +22,8 @@ export interface LineFault {
   existing?: ApplyError['existing'];
   /** For an unknown reference: what KIND was expected, so the message uses the right noun (#1179). */
   expected?: ApplyError['expected'];
+  /** For a second naming: WHO already holds the position, so the refusal shows it (#1153). */
+  holder?: ApplyError['holder'];
 }
 
 /**
@@ -64,7 +66,7 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
 
   const { construction, errors, effects, constraintFact } = fold(facts);
   errors.forEach((e, i) => {
-    if (e) faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected });
+    if (e) faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder });
   });
 
   /**

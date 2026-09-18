@@ -393,6 +393,30 @@ lookup) rather than a `Figure`, because the solver asks at every iterate.
 the residual vector keeps its dimension. That is safe only while `null` is transient. A term that can
 never be resolved returns `null` forever and is then a permanent false green — which is what #1201 was.
 
+### Naming paths and the shared check ([ADR-AG-092](06c-decisions-analytic.md#adr-ag-092))
+
+A figure has several routes that give something a letter — the centre of a circle (#1109), a crossing
+(#1025), a midpoint or a triangle centre, and the rename family still to come (#1154). Each of them
+ends at the same place: a `derived` object is minted in `applyFact`.
+
+That mint is where "one position, one name" is enforced, and putting it anywhere else is the patch
+shape — the class had already been reported for crossings (#1113) and measured again on curves (#1126)
+before it was reported for centres.
+
+```
+P מרכז המעגל I   →  ● P
+O מרכז המעגל I   →  refused: «כבר יש שם לנקודה הזו: P»
+```
+
+**The test is structural, not positional.** `engine/sameDerivation.ts` asks whether two `DerivedRule`s
+define the same point — the same unordered pair for a midpoint, the same three vertices for a triangle
+centre, the same RING (not set) for a quadrilateral's diagonal meet, the same parent for a circle
+centre. No coordinates, no tolerance, and its switch is exhaustive so a new rule must answer the
+question rather than inherit "never the same".
+
+Structural scoping is also what keeps the check inside what was ruled: two independently stated points
+that merely coincide are a different sentence, and are deliberately untouched.
+
 ## A circle on a point ([ADR-AG-045](06c-decisions-analytic.md#adr-ag-045))
 
 Every curve in this product is an equation over `x` and `y` whose coefficients are expressions in

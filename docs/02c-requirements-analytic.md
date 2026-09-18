@@ -1215,3 +1215,21 @@ worst of the three failures, because nothing on screen says anything is wrong.
 **A magnitude that cannot be measured is not a magnitude that is satisfied.** Where the tool cannot
 evaluate a stated quantity at all, it must treat that as a fault to report rather than as a residual of
 zero — which is what "no opinion" silently becomes inside a least-squares solve.
+
+**R98 — a position carries at most one name, and a second naming is REFUSED, never silent**
+([#1153](https://github.com/dcodish/geo_builder/issues/1153)).
+
+«P מרכז המעגל I» names the centre. A later «O מרכז המעגל I» is not a second point — it is the same
+point, named again — and the tool says so, naming the letter that already holds it. Three letters
+stacked on one position is a figure the student cannot read, and it is drawn from statements that each
+looked accepted.
+
+**Renaming is an action the student takes, never a substitution the tool performs.** The refusal names
+the holder and says what to do about it; nothing is silently re-pointed at a different letter.
+
+**Naming the same thing with the SAME letter stays a no-op.** Repeating «P מרכז המעגל I» is a student
+restating themselves, and restatement has always been absorbed.
+
+This is about **one object named twice**. Two points the student stated independently that happen to
+land on one position is a different question — the tool may not assume a coincidence was asserted when
+an unstated magnitude is a free DOF (ADR-052) — and it is not answered by this requirement.
