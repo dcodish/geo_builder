@@ -10,6 +10,7 @@
     "build:complex": "tsc -b && vite build --config vite.config.complex.ts",
     "build:analytic": "tsc -b && vite build --config vite.config.analytic.ts",
     "build:proxy": "node server/build.mjs",
+    "deploy:preflight": "node scripts/deploy-preflight.mjs",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",

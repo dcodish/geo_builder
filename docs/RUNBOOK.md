@@ -51,9 +51,26 @@ names any builder the config cannot reach.
 
 ## Standard deploy
 
-Deploy **only committed state on `main`** ([docs/22 §5](22-workflow.md)). Decision rule first: **did `server/` change?**
-- **No** → static-only deploy; **do not restart the proxy.**
-- **Yes** → also rebuild + push + restart the proxy (step 4).
+Deploy **only committed state on `main`** ([docs/22 §5](22-workflow.md)).
+
+**Which steps to run is a MEASUREMENT, never a question about which files changed**
+([ADR-W-058](06w-decisions-workspace.md#adr-w-058), [#1130](https://github.com/dcodish/geo_builder/issues/1130)):
+
+```sh
+npm run deploy:preflight      # builds the proxy, reads the live artifacts, prints what is stale
+```
+
+It names each artifact `MATCHES live` or `DIFFERS — push required`, and **exits non-zero whenever
+anything differs** so the verdict cannot be skimmed past on the way to the commands below. Push
+exactly what it names; leave the rest alone.
+
+> **The rule this replaced was *"did `server/` change?"*, and it was not merely fragile — it was
+> unsound.** Measured: 20 of the proxy bundle's 26 first-party modules live OUTSIDE `server/`
+> (`src/parser/catalog.ts`, `src3d/parser/catalog3.ts`, the whole complex and analytic trees …), so
+> editing a catalog row changes the deployed proxy and the old rule answered "no". It shipped stale
+> server code twice, and the failure mode is invisible by construction: the stale artifact keeps
+> working. `server/__tests__/deploy-preflight.test.ts` asserts the old rule is unsound, so it cannot
+> be restored by someone who finds it simpler.
 
 ```sh
 # 0. Gates on the exact tree being deployed
@@ -62,7 +79,7 @@ npm run build            # 2-D (tsc -b + vite)   — skip if 2-D unchanged
 npm run build:3d         # 3-D                    — skip if 3-D unchanged
 npm run build:complex    # complex                — skip if src-complex/ unchanged
 npm run build:analytic   # analytic               — skip if src-analytic/ unchanged
-npm run build:proxy      # only if server/ changed
+npm run build:proxy      # always — it is ~30 ms, and the preflight decides whether to PUSH it
 
 # 1. 2-D static
 scp -r dist/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/geo-builder/
@@ -89,7 +106,7 @@ scp deploy/homepage/index.html root@themathbible.com:/var/www/vhosts/themathbibl
 # 3. perms (static files should be 644 root:root — scp usually preserves this; verify)
 ssh root@themathbible.com 'chmod -R a+rX /var/www/vhosts/themathbible.com/httpdocs/geo-builder /var/www/vhosts/themathbible.com/httpdocs/3d-builder /var/www/vhosts/themathbible.com/httpdocs/complex-builder /var/www/vhosts/themathbible.com/httpdocs/analytic-builder'
 
-# 4. proxy — ONLY when server/ changed
+# 4. proxy — when the preflight says it DIFFERS
 scp dist-server/proxy.mjs root@themathbible.com:/var/www/geo-proxy/
 ssh root@themathbible.com 'systemctl restart geo-proxy'
 ```

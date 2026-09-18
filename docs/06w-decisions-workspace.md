@@ -2997,3 +2997,50 @@ legitimately edits a sibling*; those changes edit no sibling at all. It would ha
 sentence into the permanent record and left the gate broken for everyone after — and a gate people learn
 to wave through is worse than no gate. Same for an admin merge. The gate was wrong, so the gate was
 fixed.
+
+## ADR-W-058 — Which deploy steps to run is a MEASUREMENT, not a question about which files changed (#1130)
+
+**Requirements:** none (internal — an operating procedure, not a product promise). **Design:** [RUNBOOK](RUNBOOK.md) § *Standard deploy*. **Product:** workspace.
+
+### The rule was not fragile; it was UNSOUND
+
+The RUNBOOK decided the proxy step by asking *"did `server/` change?"* — **No** → static-only, do not restart the proxy. It shipped stale server code **twice**, and the second occurrence is what filed this.
+
+The reason it could never work, measured through esbuild's own metafile on the real `build:proxy` options:
+
+```
+26 first-party modules go into dist-server/proxy.mjs
+20 of them live OUTSIDE server/
+   src/parser/catalog.ts        <- the 2-D catalog IS the LLM's vocabulary
+   src3d/parser/catalog3.ts     <- and the 3-D one
+   src-complex/**, src-analytic/**
+```
+
+So editing a catalog row — a change nobody would call a *server* change — makes the deployed proxy stale, and the rule answers "no". The failure mode is invisible by construction: **the stale artifact keeps working**, so nothing surfaces until someone diffs it by hand. A convention that depends on remembering is not a check, which is the same class as the per-product clear-all list #1107 fixed for the fourth time.
+
+This round demonstrated it live: **no `server/` file was touched**, and the preflight measured the built proxy as DIFFERING from production — because items 1–3 edited `src-analytic/`.
+
+### The question becomes a measurement
+
+`scripts/deploy-preflight.mjs` builds the proxy (~30 ms, so it is unconditional) and compares artifacts against the live ones:
+
+| artifact | compared by |
+| --- | --- |
+| `dist-server/proxy.mjs` | `sha256` local vs `sha256sum` over ssh |
+| each product bundle | the **content-hashed filename** Vite emits, read from the local page and from the served `index.html` |
+
+Vite's asset names are content hashes, so comparing the referenced bundle IS a content comparison and needs no hashing of its own.
+
+It **reads only** — no writes, no restart, no deploy — and **exits non-zero whenever anything differs**. Differing is the normal pre-deploy state, so that exit code is not a pass/fail verdict; it is there so the verdict cannot be skimmed past on the way to the scp commands. Evidence produced is not evidence read.
+
+An artifact that is NOT BUILT, or a host that cannot be reached, is reported as such and also exits non-zero: *"nothing measured as stale"* must never be readable as *"everything is current"*.
+
+### The lock asserts the OLD RULE IS UNSOUND
+
+`server/__tests__/deploy-preflight.test.ts` asks esbuild what goes into the bundle, **through the same `proxyBuildOptions` the real build uses** — `server/build.mjs` now exports them, so the preflight, the build and the lock have one definition instead of three descriptions. Describing the import graph a second time is exactly how the RUNBOOK sentence drifted from the build it described.
+
+It asserts that the bundle's inputs outside `server/` are a MAJORITY, not a count, so adding a module does not fail a test about the rule. And it asserts the retired rule is not being INSTRUCTED again — blockquotes and headings exempt, because the RUNBOOK must be free to explain what it replaced and why.
+
+### Consequences
+
+`scripts/deploy-preflight.mjs` (new) · `npm run deploy:preflight` · `server/build.mjs` exports `proxyBuildOptions`/`proxyInputs` and only builds when RUN, not when imported · RUNBOOK § *Standard deploy* rewritten around the preflight, with the old rule recorded as retired rather than deleted. `server/__tests__/deploy-preflight.test.ts` (4).
