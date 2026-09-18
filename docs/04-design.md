@@ -701,3 +701,27 @@ Two rules keep it honest:
 
 The membership is tested at the gate the app calls, never below it: #1011 reached a play session at all
 because the feature's own lock drove the store directly and never crossed `dryRunOutcome`.
+
+## Re-reading a role-assigned letter run ([ADR-521](06-decisions.md#adr-521))
+
+Between the dry run and the refusal, `app/submitPipeline.ts` asks `app/roleReadings.ts` one question:
+*what else could that letter run have meant?*
+
+The answer is produced by **rewriting the utterance** and handing it back to the same parser — so no
+rule grows a second convention, and the alternative is a sentence the student could have typed, which
+is also what is taught back to them. The module keys off the `arc` a construct emits, so it speaks for
+the whole family (`רבע מעגל`, `גזרה`) rather than for one rule.
+
+| step | what it costs |
+| --- | --- |
+| no role run in the utterance | nothing — `roleReadings` returns `null` before any work |
+| ordering the readings | nothing — a probe over the figure the student ALREADY has |
+| a reading that builds | one dry run, because the probe put it first |
+| no reading more promising than the stated one | nothing — the refusal keeps today's cost |
+
+The probe is the construct's PINNED central angle measured across the configurations already sampled;
+a construct that pins no angle (a general sector) leaves it unscored rather than inventing a target.
+
+**`produced` is not the adoption test.** It means something was built, not that the construct's promise
+holds, so an adopted reading is checked against that promise — equal radii, and the pinned angle
+(`honoursConstruct`). Answering a refusal with a wrong figure would be worse than the refusal.

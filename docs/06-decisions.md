@@ -11810,3 +11810,61 @@ So a student whose radii were already on the canvas typed a valueless central an
 #1011 was filed against **PR #1008's branch**, and that PR was **closed without merging** — so «זוית ABC», its headline utterance, does not parse on `main` at all. The issue could have been read as stale. It is not: the valueless **central** angle lowers to the same `mark-angle` and was swallowed identically, which is the witness above and the one the lock uses. The class was always the point; the PR was only where it was first seen.
 
 **Consequences.** `DISPLAY_ONLY` (new, `engine/types.ts`), one line in `replay/core.ts`. `issue-1011-display-only.test.ts` (7) — driven through `parse → dryRunOutcome`, the REAL gate, because the defect reached play precisely by being locked below it. 2-D lane 391 files / 6752 tests.
+
+## ADR-521 — A role-assigned letter run is RE-READ before it is refused (#1012)
+
+**Requirements:** [02](02-requirements.md) — the catalog row now states the reading it assumes. **Design:** [04](04-design.md) — the submit pipeline's re-reading step. **LADDER stage:** submit-time reading selection, after the dry run and before the refusal; no engine, solver or gate semantics change. **Amends** ADR-355/ADR-357 (the role-assignment discipline).
+
+Operator, 2026-09-15 (round #1006 T3): *"ODC is not drawn but CDO is. When drawing a quarter of a circle, it is not clear what order of nodes to enter so I think the tool should not assume one. So user enters ODC and cannot find a config for that, but it can find a config for CDO so it should propose that one."*
+
+### The class
+
+A construct whose letter run encodes a ROLE assignment — «רבע מעגל OAB» means *centre O, ends A and B* — fixed that assignment by POSITION. A student writing the same three letters in another order got an unsatisfiable figure and a refusal that blamed **their** geometry. The convention is real and lived only in a code comment; the catalog row said *"a 90° arc with its two bounding radii"* and never mentioned that the first letter is the centre. The tool asserted a spelling rule it never taught — the ADR-W-030 line.
+
+Measured on the operator's figure — «ABC משולש ישר זוית» · «AC=15» · «BC=10» · «O על AC» · «D על CB» — all six spellings of one drawable quarter:
+
+```
+ODC  centre O   refused   16.6 s        DOC  centre D   refused   19.5 s
+OCD  centre O   refused   11.1 s        CDO  centre C   BUILDS     1.1 s
+DCO  centre D   refused   19.3 s        COD  centre C   BUILDS     0.8 s
+```
+
+Only the CENTRE matters — the arms are interchangeable — so there are **three** readings, not six.
+
+### The mechanism: re-read by REWRITING the sentence
+
+`app/roleReadings.ts` answers one question — *what else could that run have meant?* — by rewriting the utterance and handing it back to the same parser. No rule grows a second convention, and nothing in the module knows how a quarter circle is built. The alternative spelling is a sentence the student could have typed, which is exactly what is then taught through the canonical-hint seam ADR-428 obligation 2 already wired. **Silent adoption would be the #778 violation**; the step commits the reading that builds AND shows its spelling.
+
+The mechanism keys off the `arc` a construct emits, so it is the family's, not the quarter's. Measured: it covers `רבע מעגל` (scored) and `גזרה` (unscored — a general sector pins no central angle, ADR-357, so the probe correctly abstains and the readings keep rotation order). «חצי מעגל ODC» is `not-handled` and cannot benefit, because it never produces a parse to re-read — filed as [#1204](https://github.com/dcodish/geo_builder/issues/1204).
+
+### Cost is part of the fix, and the probe is free
+
+Each WRONG reading is what is expensive (11–19 s of recruiter ladder); the right one costs ~1 s. A naive loop over three centres would turn a 17-second refusal into a 37-second one — #259's burn, multiplied. So readings are ordered by a probe that adds no solve: the central angle the construct PINS, measured on the figure the student **already has**, at the configurations it already samples.
+
+```
+centre O:  angle(C,O,D) = 33.7° / 12.7° / 31.2°   at seeds 0,1,2   -> worst |Δ90| = 77.3
+centre D:  angle(C,D,O) = 56.3° / 77.3° / 58.8°                    -> worst |Δ90| = 33.7
+centre C:  angle(O,C,D) = 90.0° / 90.0° / 90.0°                    -> 0
+```
+
+`C` rides the triangle's right angle, so its arms are perpendicular whatever O and D do. It is tried first and the retry costs one second.
+
+**Only readings the probe rates BETTER than the stated one are tried** — a reading no more promising than what the student wrote has not earned a ladder run. That is what keeps the refusal path near the cost it has today instead of trebling it.
+
+### The guard that keeps this from being worse than the bug
+
+`dryRunOutcome`'s `produced` means *something was built*, not *what you asked for was built*, and for this family the difference is visible: measured, «רבע מעגל CAB» returns `produced: true` with its two radii at **15 and 10**, because both were pinned by the student. A quarter circle cannot have two radii.
+
+So an adopted reading is checked against the construct's own promise — equal radii, and the pinned central angle (`honoursConstruct`). Answering a refusal with a wrong figure is strictly worse than the refusal it replaced. When no reading is honest, nothing is adopted and the step refuses exactly as it does today.
+
+That «רבע מעגל CAB» is drawn at all on the DIRECT path — and that «רבע מעגל ABC» silently moves `B` off the stated «BC=10» — is a **pre-existing** defect of the construct, measured identically on `origin/main` and filed as **[#1203](https://github.com/dcodish/geo_builder/issues/1203)** (P1). It is not this mechanism's to fix; it is precisely what this mechanism must not spread.
+
+### The half already delivered — deliberately not rebuilt
+
+The report's second half (*"the radius to the quarter circle is free, so we should be able to show different configs"*) was measured as already working and is untouched. The lock asserts the arms are equal to EACH OTHER rather than equal to the canonical spelling's arms, because the quarter's radius is an unstated magnitude and therefore a free DOF (ADR-052) the sampler may place differently. Pinning it in a test would lock in a default the student never gave.
+
+### Consequences
+
+`app/roleReadings.ts` (new), one block in `app/submitPipeline.ts` between the dry run and the refusal, and the catalog row now states the centre-first reading — the coverage map is the user-facing reference, and the convention's homelessness was half the bug.
+
+`issue-1012-role-readings.test.ts` (7), driven through the REAL submit pipeline, because a test against `roleReadings` alone would pass while the pipeline forgot to call it. 2-D lane green.
