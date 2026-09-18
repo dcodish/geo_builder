@@ -4992,3 +4992,45 @@ That ADR kept them and merely ordered the height first, reasoning that the menu'
 The exclusion is by the NAME the line is made of (`asPair` contains the clicked id), never by measuring the answer. A named line that merely *happens* to pass through the point today also answers 0, but it is not made OF the point: another configuration may move it off, and the student may genuinely want to ask. A "drop it if the answer is zero" test would have removed it wrongly, and that case is locked.
 
 `issue-1207-no-zero-distances.test.ts` (5), and ADR-AG-088's own case was rewritten to assert the exact list — with the others gone, its `toContain` would have passed for a weaker reason than the one that is true.
+
+## ADR-AG-096 — The view belongs to the figure it was computed for (#1209)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R101** (new). **Design:** [04c](04c-design-analytic.md) — the canvas view's lifetime. **LADDER stage:** view state; no engine, solve or display-format change.
+
+**Operator, 2026-09-18, playing T13:** *"after the 2nd input, the canvas is not centred in a way the points are visible"* — with a screenshot of an **empty canvas** whose banner read «טענתי את השרטוט — 2 נתונים» and whose data panel listed `A = (0, y_A)` and `l1: y = 0` perfectly.
+
+### The engine was innocent
+
+The figure's own box is correct at every step:
+
+```
+«נתון הישר l1: y=0»       box [-10,-10 .. 10,10]
+«A על הישר x=0»           box [-1.4,-2.4 .. 1.4,0.3]    A(0, -2.1)
+«המרחק מ-A לישר l1 = 5»   box [-3.3,-5.7 .. 3.2,0.7]    A(0, -5.0)
+```
+
+### Root cause — a load replaces the figure and keeps the view
+
+Pan and zoom are a transform ON TOP of the figure's box. `onLoadFile` calls `restore(...)`, re-derives for the audit, sets the banner — and **never touches `view`**. Every other `setView` in the file is a user gesture: the wheel, a drag, the ± buttons, the reset button.
+
+So the previous figure's transform is applied to a new figure it was never computed for. `clearSession` had the same gap.
+
+Both now go through one `showWholeFigure()` rather than each remembering — which is the shape `clearAll`'s own comment records as having been reintroduced by a third and fourth product.
+
+### Verified in the real app, because the defect is one of geometry on screen
+
+Driven in a browser, counting the drawn points inside the canvas box:
+
+```
+after building a figure          6/6 points on screen
+after zooming into a corner      0/6            ← the operator's blank canvas, reproduced
+after «נקה הכל» + rebuilding     6/6            ← the fix
+zoomed into a corner             0/4
+after LOADING a save file        2/2            ← the reported path
+```
+
+That is the lock for this one: the panel's JSX and the view state live in `App.tsx` with no extracted component, so a unit test cannot reach them — the same constraint ADR-AG-094 records. Stated rather than left silent.
+
+### Why it matters more than it looks
+
+A loaded figure that appears empty reads as **data loss** — the student's own save looks like it failed to open, and nothing on screen says otherwise.

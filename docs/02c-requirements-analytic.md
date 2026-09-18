@@ -1258,3 +1258,13 @@ they asked to keep.
 **The measure menu offers only questions worth asking.** An option is offered when the ask lane answers
 it AND the answer can be something other than zero — so clicking a vertex does not offer the distance to
 the sides that vertex is an endpoint of.
+
+**R101 — a figure the student opens is visible**
+([#1209](https://github.com/dcodish/geo_builder/issues/1209)).
+
+Pan and zoom belong to the figure they were computed for. Opening a saved figure, or clearing and
+starting a new one, shows that figure whole — the previous view is not carried onto something it was
+never computed for.
+
+A loaded save that appears empty reads as **data loss**: the student's own file looks like it failed to
+open, and nothing on screen contradicts that.

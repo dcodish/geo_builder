@@ -160,6 +160,47 @@ export function hasMath(text: string): boolean {
   return /√|_\{|²|\^\d|[\d)|]\s*\/\s*[\d√(|]|⌢|⏜|(?:ה?קשת|(?<![A-Za-z])arc)\s*\{?[A-Z]\d*[A-Z]/u.test(text);
 }
 
+/**
+ * A MATH SPAN IS BRACKET-BALANCED (#1208).
+ *
+ * `EXPR` stops at a comma, deliberately — «m = (4-0)/(3-0), y - 0 = …» is two statements. But a span
+ * that BEGINS inside a bracket then ends at that comma carries an opener whose partner is outside it:
+ *
+ * ```
+ * P = (14/3, 31/3)   →  span "(14/3"  →  unparseable  →  left as plain text
+ *                       span "31/3"   →  a proper fraction
+ * ```
+ *
+ * which is exactly what the operator saw — a coordinate pair with its y typeset and its x flat. The
+ * bracket is not part of the expression; it belongs to the sentence around it. So an unmatched bracket
+ * at either edge is peeled off and rendered as the text it is, and what remains is offered to `exprML`.
+ *
+ * Peeled one layer at a time from the edges only — an unmatched bracket in the MIDDLE means the span is
+ * genuinely malformed, and `exprML` still refuses it, keeping the "never half-parse a formula" rule.
+ */
+function peelBrackets(span: string): { lead: string; core: string; tail: string } {
+  let lead = '';
+  let tail = '';
+  let core = span;
+  const unmatched = (s: string, open: string, close: string) => {
+    let depth = 0;
+    for (const ch of s) {
+      if (ch === open) depth++;
+      else if (ch === close) depth--;
+    }
+    return depth;
+  };
+  while (core.startsWith('(') && unmatched(core, '(', ')') > 0) {
+    lead += '(';
+    core = core.slice(1);
+  }
+  while (core.endsWith(')') && unmatched(core, '(', ')') < 0) {
+    tail = ')' + tail;
+    core = core.slice(0, -1);
+  }
+  return { lead, core, tail };
+}
+
 /** Render `text` to an HTML string: MathML for the math tokens, escaped verbatim text for the rest. */
 export function mathHtml(text: string): string {
   let out = '';
@@ -177,8 +218,9 @@ export function mathHtml(text: string): string {
        * is not a well-formed expression, and then the span stays verbatim — a renderer that half-parses
        * a formula would show the student a formula that is not the one they were given.
        */
-      const ml = exprML(m[7]);
-      out += ml ?? esc(m[0]);
+      const { lead, core, tail } = peelBrackets(m[7]);
+      const ml = /√|\//.test(core) ? exprML(core) : null;
+      out += ml ? esc(lead) + ml + esc(tail) : esc(m[0]);
     }
     else out += esc(m[0]); // a lone number, or a run with no √ and no / — keep as plain text
     last = i + m[0].length;

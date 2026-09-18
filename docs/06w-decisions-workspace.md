@@ -3082,3 +3082,32 @@ Run against the tree **before** the deletion, it failed naming exactly `_scratch
 ### Consequences
 
 `server/__tests__/suite-hygiene.test.ts` (new, 4 cases — it lives there for the `isolation.test.ts` reason: it runs in EVERY per-product lane and belongs to no product). `_scratch556b.test.ts` and `probe578c.test.ts` deleted. Two named waivers.
+
+## ADR-W-060 — A math span is bracket-balanced; a bracket whose partner is outside it is text (#1208)
+
+**Requirements:** [19](19-…)/[02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown; no new row. **Design:** the shared renderer's span boundaries. **Product:** workspace (`shell/`), reported in analytic. **LADDER stage:** display only.
+
+**Operator, 2026-09-18, playing T8:** *"the x of point P is not shown correctly. the y of point P is the right presentation"* — on a row reading `P = (14/3, 31/3)` with the y stacked and the x flat.
+
+### It was never about x versus y
+
+Measured through the real `mathHtml`, counting `<mfrac>`:
+
+```
+P = (14/3, 31/3)  ->  1     (14/3   ->  0      P = (14/3, 5)  ->  0
+14/3              ->  1     14/3)   ->  1      P = (5, 31/3)  ->  1
+```
+
+**An opening bracket before a fraction kills it**, and in an ordered pair only the first coordinate has one.
+
+### Root cause — a correct refusal, upstream of a wrong span
+
+`EXPR` carries no comma deliberately (#1125: «m = (4-0)/(3-0), y - 0 = …» is two statements, not one expression). But a span that BEGINS at a bracket and ENDS at that comma holds an opener whose partner is outside it, so `exprML` refuses `(14/3` — and refusing is right: *"a renderer that half-parses a formula would show the student a formula that is not the one they were given."*
+
+The defect is that the bracket was in the span at all. It belongs to the sentence, not to the expression.
+
+So an unmatched bracket at either EDGE is peeled off and rendered as the text it is, and what remains is offered to `exprML` unchanged. Peeled one layer at a time and only at the edges: an unmatched bracket in the MIDDLE means the text really is malformed, `exprML` still refuses it, and the never-half-parse guarantee is untouched.
+
+### Blast radius
+
+`shell/math.tsx` is shared by 2-D, 3-D, complex and analytic, and every one of them writes ordered pairs. The full suite is the gate, not a product lane. `shell/__tests__/bracketed-fraction.test.ts` (6) — **proven to fail without the fix**: making the peel the identity turns 2 of its 6 red.

@@ -218,6 +218,8 @@ export function App() {
         seed: typeof saved.seed === 'number' ? saved.seed : 0,
         name: typeof saved.name === 'string' ? saved.name : figureNameFromFileName(file.name, 'analytic'),
       });
+      // A load is a new figure, so the view it is seen through is a new view too (#1209).
+      showWholeFigure();
       /**
        * A LOAD IS AUDITED, not trusted (#1087). The lines are re-parsed on the way in, and a line
        * that no longer builds is reported rather than dropped in silence — which is the whole value
@@ -360,10 +362,26 @@ export function App() {
    * retires them with the lines. That is the general fix this comment used to say was still owed —
    * a reading of a figure that no longer exists cannot be rendered, because no reading is stored.
    */
+  /**
+   * THE VIEW BELONGS TO THE FIGURE IT WAS COMPUTED FOR (#1209).
+   *
+   * Pan and zoom are a transform ON TOP of the figure's own box. Replace the figure wholesale and the
+   * old transform is applied to something it was never computed for — load a small figure while zoomed
+   * into the corner of a large one and it lands entirely off-screen. The operator loaded a two-given
+   * save and got a canvas showing grid and nothing else, while the data panel listed the figure
+   * perfectly: it reads as data loss, on the student's own save.
+   *
+   * So every seam that REPLACES the figure resets the view, and they all come through here rather than
+   * each remembering to — which is the shape `clearAll` itself records as having been reintroduced by a
+   * third and fourth product.
+   */
+  const showWholeFigure = () => setView(INITIAL_VIEW);
+
   const clearSession = () => {
     clearAll();
     setDraft('');
     setAskText('');
+    showWholeFigure();
   };
   const [dataOpen, setDataOpen] = useState(true);
   /**
