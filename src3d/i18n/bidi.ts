@@ -39,7 +39,11 @@ const HEBREW_LETTER = /[א-ת]/;
 // The combining vector arrow is written as `⃗`, never literally: typed as itself it would combine
 // with the preceding character in THIS source file, making the class unreadable and easy to break by
 // accident. `Α-ω` is the Greek letter span (Α…ω) — π, α, β, γ, δ, θ all live in it.
-const CORE = /[A-Za-z0-9'′·<½¾²³ℓ\u20D7Α-ω|∠∡∢⊥∥△▲√⌢°]/;
+// #1185: `→` (U+2192) joins the class because the palette now INSERTS it — the combining arrow
+// U+20D7 has no standalone glyph and rendered as tofu on the button and in the input alike. U+20D7
+// STAYS: a student can still paste it and the parser still reads it, so a run carrying it must not
+// split. Adding the character the palette offers is exactly the #482 drift the lock guards against.
+const CORE = /[A-Za-z0-9'′·<½¾²³ℓ\u20D7→Α-ω|∠∡∢⊥∥△▲√⌢°]/;
 
 /**
  * Delimiters that HUG a run and belong inside the isolate with it — `(1, 2, -3)` is the 3-D case that

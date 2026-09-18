@@ -749,6 +749,21 @@ function ratioStatement(
  */
 function ambiguousPairRatio(c: Construction3, cmd: Command3): EngineError3 | null {
   if (cmd.type !== 'vec-rel' || cmd.symbol) return null;
+  /**
+   * #1183 — AN EXPLICITLY MARKED STATEMENT HAS ALREADY ANSWERED THE QUESTION.
+   *
+   * The clarification below tells the student to write the arrow form if they meant vectors. Until
+   * this line, that form arrived here as the byte-identical command the bare form produces and got
+   * the SAME refusal — the tool asking a question, offering two answers, and rejecting one of them
+   * with the question. The ask is right; it was unanswerable because the answer was indistinguishable
+   * from the question.
+   *
+   * Nothing about the ambiguity ruling changes: an UNMARKED `XY = k·ZW` still asks, so #748 (refuse
+   * rather than pick where the readings disagree) and ADR-3D-249 both stand untouched. This only
+   * declines to ask a student who already said which reading they meant, down the vector lane
+   * ADR-3D-010 says a coefficient commits to at parse time.
+   */
+  if (cmd.marked) return null;
   if (cmd.terms.length !== 1) return null;
   const [term] = cmd.terms;
   if (term.atom.kind !== 'pair' || term.coeff.p !== 0) return null;
@@ -1563,6 +1578,29 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
          * Shipping the ambiguity clarification without this would leave the student one keystroke from
          * the same false accusation they just escaped.
          */
+        /**
+         * A VECTOR EQUATION DRIVES, exactly as a length equation and a length ratio do (#1183).
+         *
+         * «נסמן: AB = u» then «DC = 3u» on a bare `טרפז ABCD` answered `claim-refuted`. A trapezoid
+         * has DC ∥ AB and free dims, so `DC = 3AB` is satisfiable and is a GIVEN — refuting it against
+         * the proportions the tool sampled itself is [ADR-052](../../docs/06-decisions.md#adr-052)'s
+         * cardinal sin, the very thing #1156 fixed for the pair form and this is one spelling over.
+         *
+         * Placed with its scalar siblings rather than beside the `vec-rel` fork, because the sentence
+         * reaches here through THREE spellings — the named-vector route, the marked pair route
+         * (#1183's `marked` bit), and a `vec-eq` claim lowered by some other command — and a drive
+         * bound to one of them is the code-path capability docs/17 warns about.
+         *
+         * Pin AND claim, the ADR-3D-030 pattern: the pin drives the free dims toward the statement,
+         * and the recorded claim stays the FINAL ARBITER — so a vector equation that genuinely cannot
+         * hold («AA'⃗ = 3BC⃗» between two perpendicular edges of a box) still refuses, now because the
+         * figure truly cannot satisfy it rather than because one sample did not.
+         */
+        if (cmd.claim.type === 'vec-eq') {
+          next.scalarPins.push({ kind: 'vec-eq', lhs: cmd.claim.lhs, rhs: cmd.claim.rhs });
+          next.claims.push(cmd.claim);
+          return { ok: true, next };
+        }
         if (cmd.claim.type === 'length-ratio' && cmd.claim.q !== 0) {
           const { a1, b1, a2, b2, p, q } = cmd.claim;
           next.scalarPins.push({ kind: 'length-rel', a1, b1, a2, b2, c: p / q });

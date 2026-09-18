@@ -106,6 +106,20 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
 
 - **FR-VC-1 (Must)** — Accept a **named basis** on a solid and reason affinely over it: sums, scalar
   multiples, and the identities a bagrut question asks a student to verify.
+- **FR-VC-1a (Must)** — **A statement the student MARKS as being about vectors is read as being about
+  vectors, and a vector equation a free figure can satisfy is a GIVEN.** Where `XY = k·ZW` has both a
+  vector and a length reading the tool asks which was meant (FR-VC-1, [ADR-3D-249](06b-decisions-3d.md#adr-3d-249)) —
+  but a student who has already answered is not asked again: an explicit `→`/`⃗`/`⟶`, or the word
+  «וקטור»/`vector`, commits the sentence to the vector lane. **Every spelling of the marking is equal**,
+  and the character the refusal message TEACHES is one the palette offers and the parser accepts — a
+  remedy the tool cannot itself type is a dead end, not a remedy. On a figure with free dimensions the
+  marked statement **drives** («טרפז ABCD» + «DC→ = 3AB→» draws a trapezoid whose DC really is 3·AB,
+  at every configuration), exactly as a length equation and a length ratio do; refusing it against
+  proportions the tool sampled itself would be [ADR-052](06-decisions.md#adr-052)’s cardinal sin. The
+  same holds for the named-vector spelling («נסמן: AB = u» then «DC = 3u»). A marked statement the
+  figure genuinely cannot satisfy — two perpendicular edges of a box — is still **refused**, because
+  reaching the vector lane is not the same as being believed. *(Realised —
+  [ADR-3D-250](06b-decisions-3d.md#adr-3d-250), #1183/#1185; `issue-1183-vector-marked.test.ts`.)*
 - **FR-VC-2 (Must)** — Support **at most one symbolic parameter** in a vector expression, pinned by a
   given through root-finding. *(Two unknowns in one expression is a known boundary — issue #301.)*
 - **FR-VC-2a (Must)** — **A POWER in a coordinate component is supported where the solver can pin it,

@@ -243,6 +243,7 @@ const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
   length: true, // |DC| = 4 — an absolute size
   dot: true, // u·v = 24 scales as s², so it fixes s
   'length-rel': false, // a RATIO of lengths
+  'vec-eq': false, // #1183: both sides scale together — a vector equation pins no size
   vangle: false,
   'seg-angle': false, // #909: an angle is similarity-INVARIANT — it must not fix the scale
   'seg-perp-plane': false,
@@ -766,6 +767,17 @@ export function solvePivot(
         const a2 = at(pin.a2);
         const b2 = at(pin.b2);
         out.push(a1 && b1 && a2 && b2 ? norm3(sub3(b1, a1)) - pin.c * norm3(sub3(b2, a2)) : 10);
+      } else if (pin.kind === 'vec-eq') {
+        // #1183: a VECTOR equation drives — three SIGNED component residuals, so the descent crosses
+        // zero instead of touching it (the ADR-3D-006 lesson `concyclic` records below). `exprAt`
+        // already evaluates a `VecExpr`, so a named vector and a point pair reach this by one path.
+        const l = exprAt(pin.lhs);
+        const r = exprAt(pin.rhs);
+        if (!l || !r) {
+          out.push(10, 10, 10);
+          continue;
+        }
+        out.push(l.x - r.x, l.y - r.y, l.z - r.z);
       } else if (pin.kind === 'mag-rel') {
         // #393/#335 (ADR-3D-107): |e1| − c·|e2| over vector EXPRESSIONS — the expression twin of
         // length-rel, same signed-difference form (a difference of magnitudes crosses zero).
