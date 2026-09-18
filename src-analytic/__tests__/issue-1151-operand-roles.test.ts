@@ -30,7 +30,7 @@ import { fmtNum } from '../../shell/format';
 const fmt = (n: number) => fmtNum(n);
 const FIG = ['A(0,0)', 'B(6,0)', 'C(3,5)', 'משולש ABC', 'נתון הישר l1: y=0'];
 const d = derive(FIG, 0);
-const answer = (q: string) => ask(d, q, fmt, () => 'curve');
+const answer = (q: string) => ask(d, q, fmt);
 
 /** The height from C to AB, which is 5 on this figure, asked every way a student might write it. */
 const POINT_LINE_SPELLINGS = [

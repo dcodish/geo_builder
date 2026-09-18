@@ -29,8 +29,7 @@ import { ask } from '../app/ask';
 import { derive } from '../engine/derive';
 
 const fmt = (v: number) => String(Math.round(v * 100) / 100);
-const describeCurve = () => '';
-const answer = (lines: string[], question: string) => ask(derive(lines, 0), question, fmt, describeCurve);
+const answer = (lines: string[], question: string) => ask(derive(lines, 0), question, fmt);
 
 /** A determined triangle — A, B, C all exist; D, E and `l9` never do. */
 const FIG = ['A(0,0)', 'B(6,0)', 'C(3,5)', 'משולש ABC'];

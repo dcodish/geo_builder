@@ -839,3 +839,26 @@ inherits the right noun instead of repeating the defect.
 The locale holds four whole sentences, not one with a noun slotted in — Hebrew gender runs through the
 clause («הנקודה … הוגדרה» vs «הישר … הוגדר»). An anonymous curve has no name the student wrote, so it
 gets the kind-free wording rather than a guessed noun.
+
+## A curve reads as an equation plus its properties ([ADR-AG-097](06c-decisions-analytic.md#adr-ag-097))
+
+`curveParts(c: NumCurve) → { equation, details? }` is the tree's ONE curve-text decision, in
+`src-analytic/app/curveText.ts` beside `lineText`, which moved there with it.
+
+| kind | `equation` | `details` |
+| --- | --- | --- |
+| line | `ax + by + c = 0` | — (it was already nothing but its equation) |
+| circle | `(x − h)² + (y − k)² = r²` | `O(h, k), r` |
+| parabola | `y² = 2p·x` | `F(p/2, 0)`, directrix `x = −p/2` |
+| ellipse | `x²/a² + y²/b² = 1` | `a`, `b`, `F₁`, `F₂` |
+
+Notation, not arithmetic, so the same rules the line terms follow apply throughout: a zero offset writes
+no bracket (`x²`, not `(x - 0)²`), a negative one flips the sign (`(x + 2)²`, not `(x - -2)²`), and a unit
+coefficient is suppressed (`y² = x`, not `y² = 1x`). Every number goes through `fmtAnalytic`, this tree's
+one display formatter, so the panel, the canvas and the ask lane cannot round differently.
+
+**Two callers, one import.** The panel renders `equation` on the row and `details` inside the same
+`<details>` disclosure the ask lane's working uses (ADR-AG-094) — open by default, because for a circle
+given by its centre those properties ARE the givens. The ask lane answers `«משוואת …»` with `equation`.
+It used to take the formatter as a PARAMETER; it imports it now, which is what makes "one formatting for
+both surfaces" a fact rather than a convention every call site has to keep.

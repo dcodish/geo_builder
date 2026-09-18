@@ -26,6 +26,7 @@ import { isKnowledge, knownCurve } from '../engine/evaluate';
 import { objectById, type Id } from '../engine/types';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { asPair, lineNamed } from './lines';
+import { curveParts } from './curveText';
 
 /** The question is EXACTLY one point-to-line distance, for the same reason `BARE_LENGTH` exists. */
 const POINT_LINE_ONLY = /^(?:ה?מרחק|[Dd]istance)\s+\S.*$/;
@@ -116,16 +117,16 @@ const EQUATION_OF = /^(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+(?:ה?(?:יש
 /**
  * Answer one question against the figure the student has built.
  *
- * `fmt` and `describeCurve` are injected rather than imported: they are the CALLER's formatting, and
- * an answer row must read exactly as the inventory rows above it do — the same rounding, the same
- * equation text. A second formatter here is how two surfaces of one panel start disagreeing.
+ * `fmt` is injected rather than imported: it is the CALLER's precision, and an answer row must read
+ * exactly as the inventory rows above it do. A second formatter here is how two surfaces of one panel
+ * start disagreeing.
+ *
+ * The curve text was injected for the same reason until #1212 moved it INTO this layer. Injection had
+ * a cost the reasoning missed: every test but one passed a stub (`() => ''`), so the equation an
+ * answer gives was never actually asserted through `ask`. Importing it makes the shared formatting a
+ * fact rather than a convention the callers have to keep.
  */
-export function ask(
-  d: Derivation,
-  question: string,
-  fmt: (v: number) => string,
-  describeCurve: (name: string, c: NonNullable<ReturnType<typeof knownCurve>>) => string,
-): Answer {
+export function ask(d: Derivation, question: string, fmt: (v: number) => string): Answer {
   const text = question.trim();
   if (!text) return { question, value: null, unreadable: true };
 
@@ -198,7 +199,7 @@ export function ask(
       }
       return {
         question,
-        value: known ? describeCurve('', { kind: 'line', a: ka.value, b: kb.value, c: kc.value }) : null,
+        value: known ? curveParts({ kind: 'line', a: ka.value, b: kb.value, c: kc.value }).equation : null,
         ...(trace ? { trace } : {}),
       };
     }
@@ -220,7 +221,7 @@ export function ask(
     }
     return {
       question,
-      value: known ? describeCurve('', known) : null,
+      value: known ? curveParts(known).equation : null,
       ...(trace && known ? { trace } : {}),
     };
   }

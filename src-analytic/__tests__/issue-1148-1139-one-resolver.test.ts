@@ -26,13 +26,9 @@ import { derive } from '../engine/derive';
 import { ask } from '../app/ask';
 import { lineNamed, lineNamesOf, segmentName } from '../app/lines';
 import { measurablesOf } from '../app/measurable';
-import { lineText } from '../App';
 import { fmtNum } from '../../shell/format';
 
 const fmt = (n: number) => fmtNum(n);
-/** The caller's curve formatter, as `App.tsx` injects it — the ask lane must not grow its own. */
-const describeCurve = (name: string, c: { kind: string; a?: number; b?: number; c?: number }) =>
-  c.kind === 'line' ? `${name ? `${name}: ` : ''}${lineText(c.a!, c.b!, c.c!)}` : JSON.stringify(c);
 
 const TRI = ['A(0,0)', 'B(6,0)', 'C(3,5)', 'משולש ABC'];
 /** Both points slide along their own carriers, so the line through them is genuinely undetermined. */
@@ -41,8 +37,7 @@ const VARIES = ['A על הישר y=x', 'B על הישר y=2x+1'];
 const SLIDES = ['A(0,0)', 'B על הישר y=x'];
 
 const answer = (lines: string[], q: string, seed = 0) =>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ask(derive(lines, seed), q, fmt, describeCurve as any);
+  ask(derive(lines, seed), q, fmt);
 
 describe('#1148 — the equation branch resolves what every other branch resolves', () => {
   it('a line through two points answers ALL THREE questions, and they agree', () => {

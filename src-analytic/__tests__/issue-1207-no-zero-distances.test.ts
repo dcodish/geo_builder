@@ -47,7 +47,7 @@ describe('#1207 — the sides through the clicked point are not offered', () => 
      */
     const d = derive(TRI, 0);
     for (const sentence of menu(TRI, 'C').slice(1)) {
-      const a = ask(d, sentence, fmt, () => 'curve');
+      const a = ask(d, sentence, fmt);
       expect(a.unreadable, `«${sentence}» was not understood`).toBeUndefined();
       expect(a.missing, `«${sentence}» named something absent`).toBeUndefined();
       expect(a.value, `«${sentence}» has no answer`).not.toBeNull();

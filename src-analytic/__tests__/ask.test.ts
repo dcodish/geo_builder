@@ -10,11 +10,9 @@
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
 import { ask, figureIsOpen } from '../app/ask';
-import type { NumCurve } from '../engine/types';
 
 const fmt = (v: number) => (Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : v.toFixed(2));
-const describeCurve = (_name: string, c: NumCurve) => `kind:${c.kind}`;
-const answer = (lines: string[], question: string) => ask(derive(lines, 0), question, fmt, describeCurve);
+const answer = (lines: string[], question: string) => ask(derive(lines, 0), question, fmt);
 
 const SQUARE_ISH = ['A(0,0)', 'B(4,0)', 'C(0,3)', 'משולש ABC'];
 
@@ -40,14 +38,19 @@ describe('#1027 — the panel answers a question, and changes nothing', () => {
   });
 
   it('a CURVE’s equation', () => {
-    expect(answer(['נתון הישר ℓ1: y=2x'], 'משוואת הישר ℓ1').value).toBe('kind:line');
+    /**
+     * It asserted `kind:line` until #1212 — the output of the STUB this file injected, not an
+     * equation at all. The formatter is imported now, so the case named "a curve's equation"
+     * finally checks one.
+     */
+    expect(answer(['נתון הישר ℓ1: y=2x'], 'משוואת הישר ℓ1').value).toBe('-2x + y = 0');
   });
 
   it('and it never touches the figure', () => {
     // The whole contract of an ask (02c R23): evaluated against the figure and discarded.
     const d = derive(SQUARE_ISH, 0);
     const before = JSON.stringify(d.construction);
-    ask(d, 'AB', fmt, describeCurve);
+    ask(d, 'AB', fmt);
     expect(JSON.stringify(d.construction)).toBe(before);
   });
 });

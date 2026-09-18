@@ -19,8 +19,7 @@ import { ask } from '../app/ask';
 import { derive } from '../engine/derive';
 import { TECHNIQUES, techniqueFor, traceDistance2pt, traceLine2pt } from '../engine/techniques';
 
-const noCurve = () => '';
-const askAt = (lines: string[], q: string) => ask(derive(lines, 0), q, fmtNum, noCurve);
+const askAt = (lines: string[], q: string) => ask(derive(lines, 0), q, fmtNum);
 
 describe('#1053 — a distance shows the move that produces it', () => {
   it('«AB» carries the distance formula with THIS figure’s numbers', () => {

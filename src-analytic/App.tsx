@@ -23,12 +23,13 @@ import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
 import { INITIAL_VIEW, centreOf, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
-import { fmtAnalytic, fractionClearingFactor } from './format';
+import { fmtAnalytic } from './format';
+import { curveParts } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
 import { decideSubmit } from './app/submit';
-import { domainText, positionalOf, type NumCurve } from './engine/types';
+import { domainText, positionalOf } from './engine/types';
 import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
 import { exprText } from './engine/expr';
 import { MathText } from '../shell/math';
@@ -39,7 +40,6 @@ import { svgToPng } from '../shell/export/svgToPng';
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { ANALYTIC_APP, ANALYTIC_SAVE_VERSION } from './store/useAnalyticStore';
 import { COMMAND_CATALOG_ANALYTIC } from './parser/catalogAnalytic';
-import { ellipseFoci, parabolaFocus } from './engine/curves';
 import { analyticBidi } from './i18n';
 import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
@@ -409,8 +409,8 @@ export function App() {
    * come from `queries`), which is why this defect was analytic's alone.
    */
   const answers = useMemo<Answer[]>(
-    () => queries.map((q) => ({ ...ask(d, q.sentence, fmt, describeCurve), shown: q.shown })),
-    [queries, d, fmt, describeCurve],
+    () => queries.map((q) => ({ ...ask(d, q.sentence, fmt), shown: q.shown })),
+    [queries, d, fmt],
   );
 
   /**
@@ -1022,8 +1022,8 @@ export function App() {
                    * invariants forbid and which #1029 had already caught in its other form. It was
                    * invisible while the ids read `parabola` and `ellipse` and would have become
                    * unmissable the moment content-derived ids landed. The row needs no name anyway:
-                   * `describeCurve` prints the equation and the focus, which is what tells two
-                   * anonymous parabolas apart — and it is the student's own equation, not ours.
+                   * `curveParts` prints the equation, which is what tells two anonymous parabolas
+                   * apart — and it is the student's own equation, not ours.
                    */
                   const name = c.label.name;
                   /**
@@ -1035,9 +1035,33 @@ export function App() {
                    * is more than the dash said and less than a number.
                    */
                   const lead = name ? `${name}: ` : '';
+                  /**
+                   * THE ROW LEADS WITH THE EQUATION; THE PROPERTIES FOLD AWAY (#1212).
+                   *
+                   * Operator, playing T18: *"the circle equation is not an equation. under equations
+                   * we should see the equation and then we can have the center and radius. these
+                   * should be collapsable like i requested for the line equations"*.
+                   *
+                   * Same `<details>` as the ask lane's trace (#1206), and shown by the same reasoning:
+                   * the centre and radius ARE what a student was given for a stated circle, so folding
+                   * them shut by default would hide the givens. It is an opt-out, not a demotion.
+                   *
+                   * A line has no `details` and so gets no disclosure at all — its row is untouched.
+                   */
+                  const parts = known ? curveParts(known) : null;
                   return (
                     <span key={c.id}>
-                      <ValueRow text={known ? describeCurve(name, known) : `${lead}${openCurveText(d, c.id)}`} />
+                      <ValueRow text={parts ? `${lead}${parts.equation}` : `${lead}${openCurveText(d, c.id)}`} />
+                      {parts?.details && (
+                        <details style={askTraceBox} open>
+                          <summary style={askTraceToggle} title={t('curveDetailsToggle')}>
+                            {t('curveDetailsLabel')}
+                          </summary>
+                          <div style={askTrace}>
+                            <MathText text={braced(parts.details)} />
+                          </div>
+                        </details>
+                      )}
                     </span>
                   );
                 }),
@@ -1326,51 +1350,6 @@ const SYMBOLS = [
 ] as const;
 
 /**
- * `a x + b y + c = 0`, written the way a textbook writes it: no `1x`, no `+ 0`, no `+ -3`. The raw
- * coefficients are arithmetic; this is notation, and the panel is read by a student.
- */
-/**
- * Exported so its lock CALLS it (#1119, per [ADR-W-053](../docs/06w-decisions-workspace.md#adr-w-053)).
- *
- * It was module-private, which left a test only able to reproduce it -- and a reproduction of this
- * function would have carried the same bug in the same shape and agreed with it.
- */
-export function lineText(a0: number, b0: number, c0: number): string {
-  /**
-   * NO FRACTION IS LEFT AS A COEFFICIENT (#1180) — the whole equation is scaled instead.
-   *
-   * `-4/3x + y = 0` is ambiguous (`4/(3x)`?) and typesets badly; `-4x + 3y = 0` is what a textbook
-   * prints. The scaling is decided in `format.ts`, which is where this tree's number presentation
-   * lives; when nothing can be cleared — a surd coefficient — the factor is 1 and this is a no-op.
-   */
-  const k = fractionClearingFactor([a0, b0, c0]) ?? 1;
-  const [a, b, c] = [a0 * k, b0 * k, c0 * k];
-  const term = (k: number, sym: string): string => {
-    if (Math.abs(k) < 1e-12) return '';
-    /**
-     * THE MAGNITUDE RULE BELONGS TO THE SYMBOL, NOT TO THE TERM (#1119).
-     *
-     * Suppressing `1` is correct notation for a COEFFICIENT -- `1x` must print as `x`. The constant
-     * term is formatted by this same helper with `sym = ''`, so the rule erased the number itself and
-     * «3x - 4y + 1 = 0» printed as «3x - 4y + = 0». It fired for any line whose constant is +/-1, not
-     * only the #1093-built ones the DEPLOY-LOG entry described.
-     *
-     * The test is on the FORMATTED magnitude, not the raw float (#1148). A line through two SOLVED
-     * points carries the solve's tolerance -- «B על הישר y=x» lands at y - x ≈ 3e-8, so `AB` has
-     * `b = -1.0000000124` -- and `=== 1` then printed «x - 1y = 0» for a coefficient `fmt` was about
-     * to round to `1` anyway. The rule is about the number the STUDENT sees, so it asks `fmt`.
-     */
-    const shown = fmt(Math.abs(k));
-    const mag = shown === fmt(1) && sym !== '' ? '' : shown;
-    return `${k < 0 ? '-' : '+'} ${mag}${sym} `;
-  };
-  const parts = `${term(a, 'x')}${term(b, 'y')}${term(c, '')}`.trim();
-  // A leading `+ ` is noise; a leading `- ` is a sign and stays attached.
-  const body = parts.startsWith('+ ') ? parts.slice(2) : parts.replace(/^- /, '-');
-  return `${body} = 0`;
-}
-
-/**
  * Display precision, delegated to the workspace's ONE chokepoint (#1029).
  *
  * This tree kept a private `toPrecision(10)` rounder, which is the thing `shell/format.ts` exists to
@@ -1387,12 +1366,6 @@ function fmt(v: number): string {
   return fmtAnalytic(v);
 }
 
-/**
- * One line of data per curve. Deliberately DESCRIPTIVE (centre, radius, focus) rather than a
- * restatement of the equation the student just typed — the panel's job is to organise what is
- * known, and the memorised triple (`y²=2px` → focus, directrix) is exactly what the formula sheet
- * withholds.
- */
 /**
  * What the givens SAY about a point, as the panel should read it (#1078).
  *
@@ -1600,22 +1573,4 @@ function openCurveText(d: ReturnType<typeof derive>, id: string): string {
   if (o?.kind === 'curve') return `${exprText(o.curve.eq)} = 0`;
   if (o?.kind === 'circle-at') return `O(${o.centre}), r = ${exprText(o.r)}`;
   return '—';
-}
-
-function describeCurve(name: string, c: NumCurve): string {
-  const n = name ? `${name}: ` : '';
-  switch (c.kind) {
-    case 'line':
-      return `${n}${lineText(c.a, c.b, c.c)}`;
-    case 'circle':
-      return `${n}O(${fmt(c.cx)}, ${fmt(c.cy)}), r = ${fmt(c.r)}`;
-    case 'parabola': {
-      const f = parabolaFocus(c);
-      return `${n}y² = ${fmt(2 * c.p)}x, F(${fmt(f.x)}, 0), x = ${fmt(-c.p / 2)}`;
-    }
-    case 'ellipse': {
-      const [f1, f2] = ellipseFoci(c);
-      return `${n}a = ${fmt(c.a)}, b = ${fmt(c.b)}, F₁(${fmt(f1.x)}, ${fmt(f1.y)}), F₂(${fmt(f2.x)}, ${fmt(f2.y)})`;
-    }
-  }
 }

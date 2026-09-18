@@ -5034,3 +5034,81 @@ That is the lock for this one: the panel's JSX and the view state live in `App.t
 ### Why it matters more than it looks
 
 A loaded figure that appears empty reads as **data loss** — the student's own save looks like it failed to open, and nothing on screen says otherwise.
+
+## ADR-AG-097 — A curve row leads with its EQUATION; the properties fold beneath it (#1212)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R102** (new), serving R99. **Design:**
+[04c](04c-design-analytic.md) — *A curve reads as an equation plus its properties*. **LADDER stage:**
+display only — no engine, solve or parse change, and nothing new is computed.
+
+**Operator, 2026-09-18, playing T18:** *"the circle equation is not an equation. under equations we should
+see the equation and then we can have the center and radius. these should be collapsable like i requested
+for the line equations"*.
+
+```
+משוואות
+מעגל I: O(3, 4), r = 3        ← not an equation
+l1: -2x + y - 1 = 0           ← an equation
+```
+
+He is right twice: the row is not an equation, and it sits under a heading ADR-AG-092 renamed to
+«משוואות» hours earlier on his own report. That rename made this visible; it did not cause it.
+
+### Measured — two of four kinds printed no equation at all
+
+| kind | before | leads with an equation? |
+| --- | --- | --- |
+| line | `-2x + y - 1 = 0` | yes |
+| **circle** | `O(3, 4), r = 3` | **no — none at all** |
+| **ellipse** | `a = 4, b = 3, F₁(…), F₂(…)` | **no — none at all** |
+| parabola | `y² = 8x, F(2, 0), x = -2` | yes, properties run on inline |
+
+Every one of those equations was derivable from what the row already held — a circle knows `cx, cy, r`;
+an ellipse knows `a, b`. Nothing had to be computed that was not computed already.
+
+### Root cause — a stated rule that did not survive being played
+
+`describeCurve` carried its reasoning in a comment: *"deliberately DESCRIPTIVE (centre, radius, focus)
+rather than a restatement of the equation the student just typed — the memorised triple (`y²=2px` →
+focus, directrix) is exactly what the formula sheet withholds."*
+
+The instinct is sound and the premise inverts an honesty invariant. Measured against the only way this
+tree lets a circle be stated — by its equation; «רדיוס» appears nowhere in the parser — the student types
+«נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9» and the panel answers `O(3, 4), r = 3`.
+
+That is not declining to restate the given. It is **replacing the given with a derived form**, under a
+heading that promises equations — and *"everything the student stated is visible"* is the invariant it
+trades away. «משוואת המעגל» then answered the centre and radius, which is a different question than the
+one asked. The ellipse is the same trade: its equation was typed too, and the row showed only its axes
+and foci.
+
+Avoiding redundancy is a real instinct, and it was spent against the wrong thing. The derived form is the
+redundant one.
+
+So: the equation leads, and the properties become supporting detail under the same `<details>` disclosure
+ADR-AG-094 gave the ask lane's working. Open by default, deliberately — for a circle given by its centre,
+those properties ARE the givens, and folding them shut by default would hide what the student stated. A
+line has no `details` and gets no disclosure; its row is untouched.
+
+### The move that makes the lock possible
+
+`describeCurve` and `lineText` were module-private component code in `App.tsx`, so the ask lane could
+only reach the formatter by INJECTION — and **every test but one injected a stub** (`() => ''`,
+`() => 'curve'`, `` `kind:${c.kind}` ``). A stub agrees with anything, so "«משוואת I» answers the
+equation" could not have been asserted at all; `issue-1117` had already noticed the hazard and answered it
+by hand-writing a faithful stub, with the comment *"a stub returning '' hides the entire defect"*. That is
+the argument for the import, not for a better stub — [ADR-W-053](06w-decisions-workspace.md#adr-w-053).
+
+`app/curveText.ts` is now the one home; `ask()` imports it and lost the parameter; thirteen test files
+dropped their stubs. The shared formatting is a structural fact rather than a convention every call site
+has to keep.
+
+### Notation is a rule, not a template
+
+The line terms' rules apply to all four kinds — a zero offset writes no bracket (`x²`, not `(x - 0)²`), a
+negative one flips the sign (`(x + 2)²`, not `(x - -2)²`), a unit coefficient is suppressed (`y² = x`).
+Numbers go through `fmtAnalytic` (ADR-AG-084), so fractions and exact forms (#1120) are already right.
+
+`src-analytic/__tests__/issue-1212-curve-equation.test.ts` (8) calls `curveParts` and `ask` directly,
+including the operator's own circle end to end and the #1023 guarantee that an unfixed parabola still
+shows its open form rather than an invented equation.

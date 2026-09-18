@@ -36,12 +36,13 @@ import { hasMath, mathHtml } from '../../shell/math';
 const fmt = (v: number) => String(Math.round(v * 1000) / 1000);
 
 /**
- * A faithful `describeCurve` — the app's own shape for a LINE (`App.tsx`), which is what makes an
- * equation question's answer an equation. A stub returning '' hides the entire defect, because the row
- * then has nothing with an `=` in it to collide with.
+ * The REAL curve formatter reaches this lock now (#1212): the ask lane imports it rather than taking
+ * it as a parameter, so an equation question's answer is an equation by construction. This file used a
+ * faithful hand-written stub for exactly that reason — *'a stub returning '' hides the entire defect,
+ * because the row then has nothing with an = in it to collide with'* — which is the argument for the
+ * import.
  */
-const describeLine = (name: string) => `${name ? name + ': ' : ''}3x - 4y + 1 = 0`;
-const answer = (lines: string[], q: string) => ask(derive(lines, 0), q, fmt, describeLine);
+const answer = (lines: string[], q: string) => ask(derive(lines, 0), q, fmt);
 
 /** The row the component builds, as one string — the thing under test (see `App.tsx`). */
 const rowText = (a: { question: string; value: string | null }) =>

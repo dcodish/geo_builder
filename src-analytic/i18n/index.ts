@@ -46,6 +46,9 @@ const he = {
   /** The ✕ that retires a measurement and the height it drew (#1118). */
   askTraceLabel: 'איך מגיעים לזה',
   askTraceToggle: 'הצגה/הסתרה של דרך החישוב',
+  /** A curve row's derived properties — centre, radius, foci, directrix — folded under its equation (#1212). */
+  curveDetailsLabel: 'נתוני העקום',
+  curveDetailsToggle: 'הצגה/הסתרה של נתוני העקום',
   askRemove: 'הסירו את המדידה',
   // Three different answers, because they are three different situations.
   askOpen: 'עדיין לא נקבע מהנתונים',
@@ -195,6 +198,8 @@ const en: typeof he = {
   askAdd: 'Ask',
   askTraceLabel: 'how this is reached',
   askTraceToggle: 'show or hide the working',
+  curveDetailsLabel: 'what this curve also knows',
+  curveDetailsToggle: 'show or hide the properties',
   askRemove: 'Remove this measurement',
   askOpen: 'not fixed by the givens yet',
   askNoValue: 'cannot be computed from the givens',

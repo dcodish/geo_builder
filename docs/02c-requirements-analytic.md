@@ -1268,3 +1268,19 @@ never computed for.
 
 A loaded save that appears empty reads as **data loss**: the student's own file looks like it failed to
 open, and nothing on screen contradicts that.
+**R102 — a curve row states an EQUATION, and its derived properties fold beneath it**
+([#1212](https://github.com/dcodish/geo_builder/issues/1212)).
+
+Under «משוואות», every curve — line, circle, parabola, ellipse — leads with its own equation. The centre
+and radius, the semi-axes, the foci, the directrix are true and useful and **secondary**: they sit on a
+second row the student can fold away, exactly as R100 folds an answer's working.
+
+**The given is never replaced by something derived from it.** A student who typed
+«(x-3)^2+(y-4)^2=9» and is shown only `O(3, 4), r = 3` has had their own statement taken off the screen
+and a consequence of it put in its place — which is the honesty invariant read backwards. The derived
+properties are the addition; the equation is the given. And «משוואת המעגל» is answered with the
+equation, because that is what was asked.
+
+The exception is a curve the givens have not FIXED, which shows its open form rather than an invented
+equation — no coefficient is ever sampled and printed as fact (R21, [#1023](https://github.com/dcodish/geo_builder/issues/1023)).
+
