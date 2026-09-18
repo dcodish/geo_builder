@@ -1115,7 +1115,7 @@ export function App() {
                   >
                     ✕
                   </button>
-                  <div>
+                  <div style={askAnswerCol}>
                     {/*
                       THE ANSWER ROW IS TYPESET, AND PUNCTUATED (#1117 + #1112).
 
@@ -1142,20 +1142,42 @@ export function App() {
                         )}
                       />
                     )}
-                  </div>
-                  {/*
-                    HOW IT WAS REACHED (#1053) — the formula with this figure's numbers in it.
 
-                    Operator: *"we don't just show the result — we show what to use to get to this
-                    result"*, at the level he ruled: substituted, never worked through. Rendered as
-                    MathML like everything else numeric in this tool (#1097), and quieter than the
-                    answer, because it is the method and not the result.
-                  */}
-                  {a.trace && (
-                    <div style={askTrace}>
-                      <MathText text={a.trace} />
-                    </div>
-                  )}
+                    {/*
+                      HOW IT WAS REACHED (#1053), ON ITS OWN ROW AND FOLDABLE (#1206).
+
+                      The formula with this figure's numbers in it. Operator, on #1053: *"we don't just
+                      show the result — we show what to use to get to this result"*, at the level he
+                      ruled: substituted, never worked through. Typeset as MathML like everything else
+                      numeric here (#1097), and quieter than the answer, because it is the method and
+                      not the result.
+
+                      Operator, playing T1: *"having all the equations in one line doesnt look nice so we
+                      should have each line on a new row. we should be able to collapse the items so if
+                      user doesnt want to see them, only the equation is shown"*.
+
+                      It sat here as a FLEX SIBLING of the answer, so the two shared one baseline however
+                      the trace was styled — its own `marginTop` could never apply. It is now inside the
+                      answer's column, which is what puts it on its own line; the `✕` stays beside the
+                      answer's first line rather than centring against a two-line block.
+
+                      SHOWN by default, deliberately: #1053 is an operator ruling that the method is part
+                      of the answer — *"we don't just show the result — we show what to use to get to this
+                      result"* — so collapsing it by default would quietly reverse that. The request is an
+                      opt-out, and `<details>` gives the student one for free: keyboard-reachable, out of
+                      the accessibility tree when closed, and no state for this component to hold.
+                    */}
+                    {a.trace && (
+                      <details style={askTraceBox} open>
+                        <summary style={askTraceToggle} title={t('askTraceToggle')}>
+                          {t('askTraceLabel')}
+                        </summary>
+                        <div style={askTrace}>
+                          <MathText text={a.trace} />
+                        </div>
+                      </details>
+                    )}
+                  </div>
                 </div>
               ))}
               <AskLane
@@ -1502,8 +1524,37 @@ const askRow: CSSProperties = {
   padding: '2px 0',
   opacity: 0.9,
   display: 'flex',
-  alignItems: 'baseline',
+  // `flex-start`, not `baseline` (#1206): the row's second child is now a COLUMN that may be two
+  // lines tall, and a baseline would centre the dismiss button against the whole block.
+  alignItems: 'flex-start',
   gap: 6,
+};
+
+/** The answer and its derivation, stacked — what actually puts the trace on its own line (#1206). */
+const askAnswerCol: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 1,
+  minWidth: 0, // so a long equation wraps inside the column instead of widening the panel
+};
+
+/** The disclosure around the trace. `<details>` carries the open/closed state, so nothing here does. */
+const askTraceBox: CSSProperties = {
+  marginTop: 1,
+};
+
+/**
+ * The fold control — quiet, because the METHOD is secondary to the answer above it.
+ *
+ * The native disclosure marker is KEPT. Hiding it (`list-style: none`) left the label reading as inert
+ * grey text with nothing to say it could be clicked — caught by looking at the rendered row, which is
+ * the only way a layout change is actually judged.
+ */
+const askTraceToggle: CSSProperties = {
+  cursor: 'pointer',
+  fontSize: fs.small,
+  color: color.muted,
+  userSelect: 'none',
 };
 
 /** The ✕ that retires a measurement (#1118) — quiet, and never louder than the answer it removes. */

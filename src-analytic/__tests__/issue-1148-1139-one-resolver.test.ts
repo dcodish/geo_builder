@@ -87,12 +87,16 @@ describe('#1148 — the equation branch resolves what every other branch resolve
 });
 
 describe('#1139 — the click menu sees what the ask lane sees', () => {
-  it('clicking a vertex offers the height, and the OPPOSITE side comes first', () => {
+  it('clicking a vertex offers the height — and ONLY it', () => {
+    /**
+     * #1139 ordered the height first and kept the sides through `C`; the operator then ruled them out
+     * entirely (#1207), because their answer is 0 by construction. Asserted as the EXACT list rather
+     * than "contains the height": with the others gone, a `toContain` would pass for a weaker reason
+     * than the one that is true.
+     */
     const d = derive(TRI, 0);
     const opts = measurablesOf(d.construction, { kind: 'point', id: 'C' }).map((m) => m.sentence);
-    expect(opts).toContain('המרחק מ-C לישר AB');
-    // The height is the question a student came to ask; the two sides through C answer 0.
-    expect(opts[1]).toBe('המרחק מ-C לישר AB');
+    expect(opts).toEqual(['C', 'המרחק מ-C לישר AB']);
   });
 
   it('EVERY sentence the menu offers is one the ask lane answers', () => {

@@ -4941,3 +4941,54 @@ Measured unchanged: `y=2x+1`, `y = 1/2`, `(x-3)^2+(y-4)^2=9`, `נתון הישר
 `parseAnalytic.ts`: `RELATION_SYM`, an optional connector in `RELATION_HE`/`RELATION_EN`, and the parallel test widened to the symbols. `catalogAnalytic.ts` gains the two symbol rows — the catalog is the coverage map, so the guard re-parses them in both languages and a symbol that stops parsing fails the suite instead of becoming documentation.
 
 `issue-1160-relation-symbols.test.ts` (12) — **proven to fail without the fix**: removing the symbol pattern turns 9 of the 12 red. Analytic lane 90 files / 1410 tests green.
+
+## ADR-AG-094 — An answer and its derivation are two rows, and the derivation folds (#1206)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R100** (new). **Design:** [04c](04c-design-analytic.md) — the ask lane's answer row. **LADDER stage:** display only.
+
+**Operator, 2026-09-18, playing T1:** *"having all the equations in one line doesnt look nice so we should have each line on a new row. we should be able to collapse the items so if user doesnt want to see them, only the equation is shown"*.
+
+### What he saw
+
+```
+✕  משוואת הישר CA: 5x - 3y = 0   m = (0-5)/(0-3),  y - 5 = m(x - 3)
+✕  משוואת AB: y = 0              m = (0-0)/(6-0),  y - 0 = m(x - 0)
+```
+
+### Root cause — a style that could never apply
+
+`askRow` is `display: flex; align-items: baseline`, and the trace was a **flex sibling** of the answer. So the two shared one baseline by construction, and the `marginTop: 2` on `askTrace` was inert — the layout could not have honoured it however the trace was styled.
+
+The trace now lives INSIDE the answer's column (`askAnswerCol`, `flex-direction: column`), which is what puts it on its own line. The row's `align-items` becomes `flex-start` so the `✕` stays beside the answer's first line rather than centring against a two-line block.
+
+### Shown by default, and that is a decision
+
+`<details open>`. [#1053](https://github.com/dcodish/geo_builder/issues/1053) is an operator ruling that the method is part of the answer — *"we don't just show the result — we show what to use to get to this result"* — so collapsing by default would quietly reverse it. The request is an opt-out, and `<details>` provides one for free: keyboard-reachable, and out of the accessibility tree when closed, with no state for the component to hold.
+
+### The native marker is kept, and looking is why
+
+`list-style: none` on the summary was written first and **removed the disclosure triangle**, leaving the label reading as inert grey text with nothing to say it could be clicked. Caught by rendering the row in a real browser and looking at it — which is the only way a layout change is actually judged, and the reason the verification for this one is a screenshot rather than a unit test.
+
+### Why the lock is not a render test
+
+The analytic panel's JSX lives entirely in `App.tsx`; there is no extracted row component, and extracting one to make this assertable would set a structural precedent well beyond a layout fix. So the invariant was verified by driving the real page — `details` present, `open` by default, nested inside the column, and its top edge below the answer's bottom edge — and the locale strings are locked by unit test. Stated here rather than left as a silent gap: **an extracted `AskAnswerRow` is what a unit lock would need**, and it is the right first step whenever this row is next touched.
+
+---
+
+## ADR-AG-095 — A menu entry whose answer can only be zero is not offered (#1207, amends ADR-AG-088)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the measure menu's contract gains its second half. **Design:** [04c](04c-design-analytic.md) — the measure menu. **LADDER stage:** menu enumeration; no evaluation change.
+
+**Operator, 2026-09-18, playing T2:** *"there is no need to show the distance to segments that make up that point since they will be 0 and no one would want to ask that"*.
+
+Clicking `C` offered the distance to `AB` — the height, and the question the student came to ask — and also to `BC` and `CA`, which are distances from a point to a line **through that point**: zero by construction, at every configuration of every figure.
+
+### This overrides a choice ADR-AG-088 made deliberately
+
+That ADR kept them and merely ordered the height first, reasoning that the menu's contract is *«an option is offered iff the ask lane answers it»* and the lane does answer `0`. The contract holds either way, so this is a product judgement rather than a defect — and a session reading only ADR-AG-088 would have had every reason to put them back. **The contract is a floor, not a licence to offer everything that clears it**, and two dead entries buried the one worth asking.
+
+### Structural, not positional — the boundary that matters
+
+The exclusion is by the NAME the line is made of (`asPair` contains the clicked id), never by measuring the answer. A named line that merely *happens* to pass through the point today also answers 0, but it is not made OF the point: another configuration may move it off, and the student may genuinely want to ask. A "drop it if the answer is zero" test would have removed it wrongly, and that case is locked.
+
+`issue-1207-no-zero-distances.test.ts` (5), and ADR-AG-088's own case was rewritten to assert the exact list — with the others gone, its `toContain` would have passed for a weaker reason than the one that is true.

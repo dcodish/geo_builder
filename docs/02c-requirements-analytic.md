@@ -1243,3 +1243,18 @@ is the tool's internal category (`kind: 'curve'`) and a word the exam never uses
 
 **A heading is a promise about its rows.** Naming the implementation's type there teaches the student a
 vocabulary the question paper does not share, and it is the same defect as showing them an internal id.
+
+**R100 — an answer and its working are separate rows, and the working can be folded away**
+([#1206](https://github.com/dcodish/geo_builder/issues/1206), [#1207](https://github.com/dcodish/geo_builder/issues/1207)).
+
+A question the student asked shows its answer on one line and, beneath it, how that answer was reached.
+The two never share a line: a formula running on past the equation it belongs to reads as a second,
+unrelated fragment.
+
+**The working is shown by default and the student may fold it.** It is part of the answer (#1053), so
+it is not hidden until they say so — and folding it leaves the question and its equation, which is what
+they asked to keep.
+
+**The measure menu offers only questions worth asking.** An option is offered when the ask lane answers
+it AND the answer can be something other than zero — so clicking a vertex does not offer the distance to
+the sides that vertex is an endpoint of.

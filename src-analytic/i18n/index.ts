@@ -44,6 +44,8 @@ const he = {
   askPlaceholder: 'שאלו: AB, שטח ABC',
   askAdd: 'שאל',
   /** The ✕ that retires a measurement and the height it drew (#1118). */
+  askTraceLabel: 'איך מגיעים לזה',
+  askTraceToggle: 'הצגה/הסתרה של דרך החישוב',
   askRemove: 'הסירו את המדידה',
   // Three different answers, because they are three different situations.
   askOpen: 'עדיין לא נקבע מהנתונים',
@@ -191,6 +193,8 @@ const en: typeof he = {
   secSlopes: 'Slopes',
   askPlaceholder: 'Ask: AB, area of ABC',
   askAdd: 'Ask',
+  askTraceLabel: 'how this is reached',
+  askTraceToggle: 'show or hide the working',
   askRemove: 'Remove this measurement',
   askOpen: 'not fixed by the givens yet',
   askNoValue: 'cannot be computed from the givens',

@@ -41,18 +41,27 @@ export interface Measurable {
 export function measurablesOfPoint(c: Construction, id: Id): Measurable[] {
   const out: Measurable[] = [{ sentence: id }];
   /**
-   * THE OPPOSITE SIDE FIRST (#1139).
+   * A LINE THE POINT IS AN ENDPOINT OF IS NOT OFFERED (#1139 → #1207).
    *
-   * On a triangle, the distance from `C` to `AB` is the HEIGHT — the question a student actually
-   * came to ask. The two sides through `C` are legitimate questions with legitimate answers (zero),
-   * so the menu still offers them; it simply stops burying the interesting one under them.
+   * On a triangle, the distance from `C` to `AB` is the HEIGHT — the question the student came to
+   * ask. The distance from `C` to `BC` or `CA` is **zero by construction**, at every configuration
+   * and in every figure.
+   *
+   * #1139 ordered the height first and kept the other two, reasoning that the menu's contract is
+   * «offered iff the ask lane answers it» and the lane does answer 0. Operator ruling, 2026-09-18:
+   * *"there is no need to show the distance to segments that make up that point since they will be 0
+   * and no one would want to ask that"*. He is right — that contract is a floor, not a reason to
+   * offer everything clearing it, and two dead entries bury the one worth asking.
+   *
+   * The test is STRUCTURAL, by name, and that matters: a named line `l1` that happens to pass through
+   * the point also answers 0 today, but it is not MADE OF the point — another configuration may move
+   * it off, and the student may well want to ask. Only a line the point is an endpoint of is dropped.
    */
-  const touches = (n: string) => {
+  const madeOf = (n: string) => {
     const p = asPair(n);
     return !!p && (p[0] === id || p[1] === id);
   };
-  const names = lineNamesOf(c);
-  for (const line of [...names.filter((n) => !touches(n)), ...names.filter(touches)])
+  for (const line of lineNamesOf(c).filter((n) => !madeOf(n)))
     out.push({ sentence: `המרחק מ-${id} לישר ${line}` });
   return out;
 }
