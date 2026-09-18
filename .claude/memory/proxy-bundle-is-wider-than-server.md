@@ -1,11 +1,11 @@
 ---
 name: proxy-bundle-is-wider-than-server
-description: "The RUNBOOK's 'did server/ change?' deploy rule under-detects — proxy.mjs also bundles the LLM command catalogs, so diff the BUILT bundle against the live one instead"
+description: "The RUNBOOK's 'did server/ change?' deploy rule mis-detects in BOTH directions — proxy.mjs bundles the LLM command catalogs, so diff the BUILT bundle against the live one instead"
 metadata: 
   node_type: memory
   type: project
   originSessionId: 7d6cf4c9-ed74-4903-8db6-6b892854e932
-  modified: 2026-09-05T20:08:55.286Z
+  modified: 2026-09-18T11:04:30.450Z
 ---
 
 `docs/RUNBOOK.md`'s standard-deploy decision rule is *"did `server/` change? No → static-only, do not
@@ -59,3 +59,24 @@ Superseded the earlier pointer to [#903](https://github.com/dcodish/geo_builder/
 without carrying the check.
 
 Related: [[deploys-are-mine-to-run]], [[gate-lines-are-read-not-matched]].
+
+
+## It OVER-detects too (2026-09-18, prod/2026-09-18)
+
+The rule said *deploy the proxy* because `server/` had changed — but the only changed file was
+`server/__tests__/docs-hygiene.test.ts`, **a test, which is not in the bundle**. Right answer, wrong
+reason; on another day that same reasoning ships a needless proxy restart.
+
+So the sha-diff is not just the safety net for the under-detecting case — it is the **only** check
+worth running, and it answers both directions:
+
+```sh
+npm run build:proxy
+sha256sum dist-server/proxy.mjs
+ssh root@themathbible.com 'sha256sum /var/www/geo-proxy/proxy.mjs'
+npm run build:proxy && sha256sum dist-server/proxy.mjs   # again — prove it is deterministic
+```
+
+The rebuild matters: without it a differing hash could be build nondeterminism rather than staleness.
+It was deterministic, and the sole real delta was a single new 3-D catalog row (#1163) — which is the
+under-detecting half of this same memory, arriving from the other side in the same deploy.

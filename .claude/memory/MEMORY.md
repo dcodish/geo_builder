@@ -49,3 +49,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [--strictPort fails silently](strictport-fails-silently.md) — a stale server keeps the port and answers 200; verify the served build by IDENTIFIER (vite strips comments), and check process CreationDate
 - [Taught remedies are hypotheses](taught-remedies-are-hypotheses.md) — an error message that teaches a spelling must DRIVE that spelling; #1156 shipped a remedy that returned the same refusal (2026-09-18 #1183)
 - [Vectors are 3-D only](vectors-are-3d-only.md) — 2-D has zero vector support BY DESIGN (space-unit topic, operator 2026-09-18 #1184); never port them to `src/` or file a parity issue
+- [Deploy transport](deploy-transport-scp-tar.md) — recursive scp can die mid-upload; check the server before retrying, and tar|ssh carries the LOCAL uid so chown root:root after (prod/2026-09-18)
