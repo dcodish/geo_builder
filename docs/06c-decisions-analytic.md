@@ -4725,3 +4725,55 @@ Measured: the plain bisector traces `x = 4` exactly at almost every configuratio
 `locusEquation`'s slope arm built `y = <slope>x + c`, so a fractional slope printed `y = 4/3x + 2` — the ambiguity (`4/(3x)`?) the operator reported against the panel's curve row. Same ruling, same treatment: the equation clears its fractions, `3y = 4x + 6`, using the `fractionClearingFactor` that landed with round #1173. The two axis-parallel arms keep their exact value (`x = 4/3`): nothing follows them, so there is nothing to misread.
 
 **Consequences.** `Derivation.seed`, one call site in `ask.ts`, `COMPARE_TRIES` in `locus.ts`, the slope arm in `locusFit.ts`. `issue-1176-locus-configuration.test.ts` (11). Analytic lane 86 files / 1388 tests.
+
+## ADR-AG-087 — the CANVAS gets a bidi chokepoint, so a label cannot reorder a number (#1191)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — **R87 unchanged**; this is the implementation failing to keep it, one surface over. **Design:** [04c](04c-design-analytic.md) — the renderer's label seam. **LADDER stage:** render only; nothing in the engine, the tracer or the ask lane moves.
+
+**Operator, playing PR #1172.** A perpendicular bisector of `A(0,0)`–`B(6,8)`, drawn dashed, labelled on the canvas:
+
+```
+4 · ישרy = −3x + 25        ← what the student READ  (captured in a browser, before)
+ישר · 4y = −3x + 25        ← what the tool computed (captured in a browser, after)
+```
+
+`3x + 4y = 25` **is** the perpendicular bisector, and the drawn `M` sits on it. The geometry, the tracer and the determinacy gate are all correct. **This is display only** — and it is the class `Figure.tsx`'s own header comment calls *"the worst class of bug this tool can have"*: the canvas silently lying about a number, reached through a label instead of a tick.
+
+### Root cause — the canvas had no bidi chokepoint at all
+
+The label went onto the canvas as a raw string: `ask.ts` composes `value = \`${kindWord} · ${eq}\``, `App.tsx` hands it to `buildScene` as `loci[].label`, `scene.ts` copies it into `SceneLocus.label.text`, `Figure.tsx` renders it in a plain SVG `<text>`.
+
+The root `<svg>` sets `direction: ltr`, so the paragraph level is LTR. In `ישר · 4y = …` the `·` sits between a Hebrew word and a **European Number**; UBA N1 resolves that neutral to RTL and I1 lifts the digit above the base level, so `4 · ישר` reorders as one unit and the rest of the equation is stranded.
+
+**Only an equation that STARTS with a digit scrambles**, which is why the locus lane's own worked example survived the build:
+
+| locus | equation | first char | renders |
+| --- | --- | --- | --- |
+| circle | `(x − 16)² + y² = 625` | `(` then `x` (strong L) | correct |
+| parabola | `y² = 8x` | `y` | correct |
+| line, unit `y` | `y = −3x + 4`, `x = 4` | `x`/`y` | correct |
+| **line, non-unit `y`** | **`4y = −3x + 25`** | **`4` (EN)** | **scrambled** |
+
+The whole analytic renderer contained **one** bidi call — `unicodeBidi: 'isolate'` on the circle-centre label — which could not have helped: the scramble is *inside* the string, not around it. The **panel** row for the very same value was already correct, because it goes through `analyticBidi.isolateLtrRuns`. The canvas was simply a second display surface that never adopted the kit.
+
+### Where the fix belongs, and where it deliberately does not
+
+**Not** by reordering the label or dropping the `·`. That hides the class and leaves the next Hebrew-carrying canvas label to break: `drawnMarks` feeds `measures[].label` from the same `Answer.value` through the same unisolated `<text>`, and today those values are bare numbers — one Hebrew word away from the identical defect.
+
+The isolation goes in `buildScene`, which already declares (#723/#1029) that *formatting is a DISPLAY concern, so it happens here* and is the single place every canvas label — locus, measure, segment length, centre, construction mark — is produced. No call site can forget, and a label added later is isolated by construction. SVG `<text>` honours U+2066/U+2069 natively; ADR-431 Am. 1's exception is about `.docx`, not the browser.
+
+**`crossings[].sentence` is deliberately NOT isolated.** It is not canvas `<text>` — it is a `<title>` tooltip, and the same string is submitted back as an utterance when the ring is clicked. Format controls belong in display strings, never in something that round-trips into the parser.
+
+### The import question, answered as the issue said it could be
+
+`scene.ts` imported nothing from `i18n/`, and that is *why* the canvas never adopted the kit: reaching one function would have dragged i18next, every locale and the post-processor chain into a pure renderer.
+
+So the kit moves to its own module (`i18n/bidi.ts`) and `i18n/index.ts` re-exports it — every existing caller is untouched, and the renderer imports two lines instead of a bootstrap. The injection alternative (`SceneKnowledge`) was rejected: **an injected isolator is one a caller can forget, and forgetting is the entire defect.** One instance also means `extraCore` cannot drift between the panel and the canvas, which two kits would eventually do.
+
+### Verification
+
+A unit lock over the **composed** label string, calling `ask` and `buildScene` rather than reproducing them, and comparing the canvas label to `isolateLtrRuns` of the panel's own value rather than to a spelled-out expectation (ADR-W-053) — so the assertion is *the canvas and the panel agree*, which is the real invariant. Proven to FAIL without the fix: 5 of its 6 cases go red when `lbl` is made the identity.
+
+And, because a bidi bug is a **visual order** bug that no string assertion can see, driven in a real browser at the operator's own figure, before and after — the two renderings quoted at the top of this entry are screenshots, not reasoning.
+
+**Consequences.** `i18n/bidi.ts` (new, the kit); `i18n/index.ts` re-exports it; `buildScene` gains one `lbl()` seam applied at all five label channels. Lock: `issue-1191-canvas-bidi.test.ts` (6), including the class assertion that every label channel is isolated and that a pure-LTR label is left alone.

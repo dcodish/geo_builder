@@ -725,3 +725,42 @@ inherits the right noun instead of repeating the defect.
 The locale holds four whole sentences, not one with a noun slotted in — Hebrew gender runs through the
 clause («הנקודה … הוגדרה» vs «הישר … הוגדר»). An anonymous curve has no name the student wrote, so it
 gets the kind-free wording rather than a guessed noun.
+
+## The canvas's bidi chokepoint ([ADR-AG-087](06c-decisions-analytic.md#adr-ag-087))
+
+The renderer has **one** place where a label's text is decided: `buildScene`. Every channel that can
+carry text — a locus label, a measure label, a segment's pinned length, a circle's centre, a
+construction mark — is produced there, and every one now passes through a single `lbl()` seam that
+isolates the LTR technical runs inside it.
+
+This is the same argument the module already made for *formatting* (#723/#1029): a value's on-screen
+form is a display concern, so it is decided at the display boundary rather than at each caller. Bidi
+isolation is the same kind of decision and belongs in the same place. The property it buys is the one
+that matters — **a label channel added later is isolated by construction**, because it cannot be added
+anywhere else.
+
+### Why not inject it
+
+`SceneKnowledge` already carries caller-owned data (`marks`, `loci`, `crossings`), so an `isolate`
+callback would have fitted the existing seam. It was rejected: an injected isolator is one a caller can
+forget, and forgetting is precisely the defect — the panel remembered, the canvas did not. A second
+consideration settles it even where the caller is careful: two kit instances can be built with
+different `extraCore` alphabets, and then the panel and the canvas isolate the same string two
+different ways.
+
+So the kit lives in `i18n/bidi.ts`, a module with no i18next in it, and `i18n/index.ts` re-exports it.
+The renderer stays a pure consumer — it imports two lines, not a bootstrap — which is the constraint
+that kept it out of `i18n/` in the first place.
+
+### What is deliberately left raw
+
+`crossings[].sentence` is not a label. It renders as an SVG `<title>` (a tooltip, laid out by the
+browser's own bidi) and the same string is **submitted back as an utterance** when the student clicks
+the ring. Format controls belong in strings that are displayed, never in one that round-trips into the
+parser.
+
+Axis ticks and point names do not pass through it either, and that is a narrower claim than it
+sounds: they are not composed strings. A tick is `String(r)` for a number the axis chose and a point
+carries its own id — single-script by construction, with no Hebrew to mix and nothing to reorder. The
+seam covers every channel whose text is BUILT from parts, which is every channel where the defect can
+occur.

@@ -11,11 +11,12 @@
  * THIS tool; a missing `switcherAnalytic` in a sibling is a blank chip THERE (ADR-AG-004 §2 — the
  * checklist item whose failure surfaces in the wrong product).
  */
-import { makeBidi } from '../../shell/bidi';
 import { createProductI18n } from '../../shell/i18n';
 
-/** The bidi kit — exported for composed (non-`t()`) strings and for the palette drift lock. */
-export const analyticBidi = makeBidi({ extraCore: '_' });
+// #1191: the kit itself lives in ./bidi so the RENDERER can reach it without importing this bootstrap.
+// Re-exported here because every existing caller imports it from './i18n' — one instance, two doors.
+export { analyticBidi } from './bidi';
+import { analyticBidi } from './bidi';
 
 const he = {
   // The suite's display names are the CURRICULUM's subject names (operator ruling 2026-08-17).
