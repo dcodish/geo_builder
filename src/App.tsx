@@ -66,7 +66,7 @@ import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { runSubmit } from '@/app/submitPipeline';
 import { runViewResolve } from '@/app/resolveView';
-import { runEditCommit } from '@/app/editPipeline';
+import { runEditCommit, runSetGroupEnabled } from '@/app/editPipeline';
 import { anonPointDescriptor, visibleCoincidences } from '@/render/pointDescriptions';
 import { humanizeError, translateParams } from '@/i18n/humanizeError';
 import { otherUtteranceForError, utteranceForError } from '@/app/errorSubject';
@@ -104,7 +104,6 @@ export default function App() {
   };
   const facts = useGeoStore((s) => s.facts);
   const selectedId = useGeoStore((s) => s.selectedId);
-  const setGroupEnabled = useGeoStore((s) => s.setGroupEnabled);
   const removeGroup = useGeoStore((s) => s.removeGroup);
   const select = useGeoStore((s) => s.select);
   const figureName = useGeoStore((s) => s.figureName);
@@ -1443,7 +1442,9 @@ export default function App() {
                 emptyHint={t('steps.empty')}
                 onToggle={(id) => {
                   const g = groups.find((x) => x.key === id);
-                  if (g) setGroupEnabled(id, !g.facts.every((f) => f.enabled));
+                  // Routed through `src/app/` (#1133): re-enabling a given ADDS a requirement back, so
+                  // it searches for a configuration that honours it exactly as a submit does.
+                  if (g) runSetGroupEnabled(id, !g.facts.every((f) => f.enabled), { resolveAfterCommit });
                 }}
                 toggleLabel={t('actions.toggle')}
                 editValueOf={(id) => {

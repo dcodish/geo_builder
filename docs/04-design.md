@@ -725,3 +725,21 @@ a construct that pins no angle (a general sector) leaves it unscored rather than
 **`produced` is not the adoption test.** It means something was built, not that the construct's promise
 holds, so an adopted reading is checked against that promise — equal radii, and the pinned angle
 (`honoursConstruct`). Answering a refusal with a wrong figure would be worse than the refusal.
+
+### The commit-seam inventory ([ADR-522](06-decisions.md#adr-522))
+
+Six store actions reset the seed, and every one is a seam that must decide whether to launch the
+post-commit configuration search. The inventory is an assertion, not prose
+(`issue-1041-edit-resolve.test.ts`), because prose is what let #1041 and #1133 happen:
+
+| action | what it does | search |
+| --- | --- | --- |
+| `commitCommands` | a statement is added | yes — `submitPipeline` |
+| `replaceGroup` | a statement is replaced | yes — `runEditCommit` (#1041) |
+| `setGroupEnabled` | a group's tick flips | yes — `runSetGroupEnabled` (#1133) |
+| `toggle` | one fact's tick flips | yes — `runToggleFact` (no UI caller yet) |
+| `remove` | one fact is deleted | yes — `runRemoveFact` (measured: a partial group can strand) |
+| `removeGroup` | a whole statement is deleted | **exempt**, measured (ADR-518) |
+
+The rule the table encodes: **a seam that ADDS a requirement back searches; one that only relaxes need
+not.** Deleting a whole statement only relaxes. Re-enabling, and deleting one fact of a group, do not.

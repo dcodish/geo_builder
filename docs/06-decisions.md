@@ -11868,3 +11868,49 @@ The report's second half (*"the radius to the quarter circle is free, so we shou
 `app/roleReadings.ts` (new), one block in `app/submitPipeline.ts` between the dry run and the refusal, and the catalog row now states the centre-first reading — the coverage map is the user-facing reference, and the convention's homelessness was half the bug.
 
 `issue-1012-role-readings.test.ts` (7), driven through the REAL submit pipeline, because a test against `roleReadings` alone would pass while the pipeline forgot to call it. 2-D lane green.
+
+## ADR-522 — Re-enabling a given SEARCHES; the seam inventory becomes six rows (#1133)
+
+**Requirements:** none (internal) — the promise is unchanged and already written: a given the student stated is honoured by the figure, and everything they stated is visible on it. This restores it at a seam that had lost it. **Design:** [04](04-design.md) — the commit-seam inventory. **LADDER stage:** post-commit configuration search; no parse, engine or solver change. **Extends** ADR-518 / ADR-510.
+
+Not reported by a user — found by the #1132 inventory pass, before the registry existed.
+
+### The symptom, measured
+
+A student unticks a given and ticks it back. The requirement returns, the seed resets to 0 (ADR-484), and nothing searches — so the figure can sit there violating a given the list shows as holding. Measured on «משולש ABC» · «גובה AD במשולש ABC» · «AB = 10» · «AD = 7», through the REAL submit path so the figure starts where the app leaves it:
+
+```
+after the build    seed 3   meetsRequirements: true    <- the submit's own search found seed 3
+disable the given  seed 0   meetsRequirements: true       (fewer requirements to meet)
+re-enable it       seed 0   meetsRequirements: FALSE   <- the defect
+```
+
+The honesty class this product exists to avoid, reached not through a wrong parse but through a checkbox.
+
+### Root cause — the same class as #1041, at seams neither issue enumerated
+
+`58b53efe` (ADR-510) moved the post-commit search out of the commit seams and into their callers. #1041 re-armed the ✎ edit seam. **The inventory was larger than either issue documented.**
+
+**Re-enabling is not like deleting.** `removeGroup` is exempt because deletion only ever relaxes: a satisfiable remainder was valid at seed 0 every time it was measured. Re-enabling does the opposite — it ADDS a requirement back, the same direction as a submit, and submits have always searched. The two look like one "toggling" concern and behave like opposites, which is exactly what an un-enumerated inventory hides.
+
+### `remove` was measured, and the expected exemption did NOT hold
+
+The plan asked for `remove` to be given a status rather than left blank. Measured by deleting each fact of the figure above in turn: **two of six deletions left a figure that fails `meetsRequirements` at its seed and that the search CAN rescue** — one fact of the altitude group, and one of the «AB = 10» group.
+
+That is the case #1041 looked for and did not find, and the reason is instructive: #1041 measured **whole-group** deletion. Removing one fact of a multi-fact group is not a relaxation at all — it leaves a partial group, which is a different figure. So `remove` is armed, not exempt.
+
+`remove` and `toggle` have no UI caller today (the step list deletes and ticks whole groups). They are armed anyway, and the registry records that they have no caller — so the day one is added, the armed path already exists instead of a silent gap being introduced.
+
+### The trigger is narrow, and the lock says so
+
+It bites only where seed 0 happens to be one of the few unsatisfiable configurations. A lock aimed at it must therefore assert **its own fixture still strands**, or it would pass forever on a figure that stopped being a case. The first test does exactly that, and a companion asserts that flipping the store DIRECTLY still leaves the figure broken — so the lock is testing the wiring rather than the store contract, which is the #1041 lesson written down.
+
+### No condition at the call site
+
+Deliberately, and for the reason ADR-518 gives: `runViewResolve` already early-returns when `meetsRequirements` holds, so disabling costs nothing, and a second copy of that test at the call site is the precise shape that produced #1041.
+
+### Consequences
+
+`app/editPipeline.ts` gains `runSetGroupEnabled`, `runToggleFact` and `runRemoveFact`; `App.tsx`'s step-list `onToggle` routes through the first rather than calling the store inline (CLAUDE.md's module table — this behaviour belongs in `src/app/`). The #1132 registry in `issue-1041-edit-resolve.test.ts` grows from three rows to **six**, with the count asserted so a seventh seam cannot be added silently.
+
+`issue-1133-enable-resolve.test.ts` (5). 2-D lane green.

@@ -158,13 +158,19 @@ describe('#1041 — the ✎ edit seam launches the post-commit search', () => {
      * search would rescue a recoverable figure.** If that ever stops being true, this case is where the
      * exemption gets revisited.
      */
-    const SEAMS_REQUIRING_RESOLVE = ['commitCommands', 'replaceGroup'] as const;
+    const SEAMS_REQUIRING_RESOLVE = [
+      'commitCommands', // submit          -> submitPipeline
+      'replaceGroup', //   the edit seam   -> runEditCommit           (#1041)
+      'setGroupEnabled', // a group's tick -> runSetGroupEnabled      (#1133)
+      'toggle', //         one fact's tick -> runToggleFact           (#1133)
+      'remove', //         one fact gone   -> runRemoveFact           (#1133, measured)
+    ] as const;
     const SEAMS_EXEMPT = ['removeGroup'] as const;
 
     expect(SEAMS_REQUIRING_RESOLVE).toContain('replaceGroup');
     expect(SEAMS_EXEMPT).toEqual(['removeGroup']);
-    // The seam under test here is the one that was missing; the submit seam's wiring is covered by
-    // `submitPipeline`'s own suite, and the full registry lands with #1132.
-    expect(SEAMS_REQUIRING_RESOLVE.length + SEAMS_EXEMPT.length).toBe(3);
+    // SIX seams reset the seed, which is what the #1132 inventory pass found. A new one added
+    // without a row here fails this count rather than drifting for a release.
+    expect(SEAMS_REQUIRING_RESOLVE.length + SEAMS_EXEMPT.length).toBe(6);
   });
 });
