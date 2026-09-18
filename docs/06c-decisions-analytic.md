@@ -4729,3 +4729,45 @@ Only the POINT operands were checked for existence, so «המרחק בין C ל-
 `lengths.ts`: `POINT_LINE_TOKEN` → `DISTANCE_FRAMES` + one role decision; `ask.ts`: the line operand joins the existence check. `issue-1151-operand-roles.test.ts` (16) — **proven to fail without the fix**: restoring the old token turns 9 of the 16 red.
 
 **Found while measuring, filed not folded:** [#1201](https://github.com/dcodish/geo_builder/issues/1201) — «המרחק מ-A לישר l1 = 5» is accepted, reported satisfied, and not honoured (the figure draws 2.13). Measured identically on `origin/main`, so it is pre-existing; it is a solve defect, not a grammar one, and outside this round's composition.
+
+## ADR-AG-090 — A curve keeps its identity when its representation changes (#1149)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R95** (extended — a stated curve is nameable however it entered the figure). **Design:** [04c](04c-design-analytic.md) — *curve identity and the promotion path*. **LADDER stage:** object construction; no solve, gate or value change.
+
+A line first used as a CARRIER and then stated is PROMOTED — one object, now drawn (#1076, and ADR-AG-023's content-derived ids are what make the two sentences ONE object). The promotion rebuilt that object from the carrier alone, and `words()` can name an anonymous curve only by its equation (ADR-AG-056).
+
+### Measured — the same two lines, two behaviours
+
+```
+y=2x+1 · y=-x+15                                    -> one crossing offered at (4.667, 10.333)
+«נקודה A על הישר y=-x+15» … then the same two lines -> NO crossing offered
+```
+
+Before the fix the promoted objects carried `label = { name: '' }` — no kind, no `eqSrc`. The student's own text was discarded **twice**, which is why fixing one end would have left the hole open:
+
+1. `parseAnalytic.ts` minted the carrier with an empty label, though the equation text was in its hand one line earlier;
+2. `apply.ts`'s promotion returned `{ ...prior, stated: true }`, preserving that emptiness and dropping the stated sentence's label.
+
+### The fix, and what it is NOT
+
+The carrier now carries `eqSrc`, and the promotion merges the incoming label over the prior — a name the prior already holds is never overwritten, since that is the student's own.
+
+Deliberately **not** a tolerant read at `crossings.ts:122`. Making the consumer accept a missing `eqSrc` would hide a lossy mint behind a defensive branch and leave every other consumer of the label broken in silence; the defect is that the object lost its identity, not that someone noticed.
+
+No `kind` is asserted on the carrier: the noun that reached that branch may be «ישר», but the FIT is what classifies a curve, and claiming a kind we have not established would be a second source of truth for it.
+
+### The property, not the symptom
+
+What is locked is stronger than "a crossing appears": **a promoted carrier is byte-identical to a curve stated outright.** Measured both ways, the curve objects now compare equal, so a future path that rebuilds objects without their labels fails the lock rather than being reported a fourth time.
+
+The carrier-only case is unchanged and now holds for the reason we actually mean: a carrier is not drawn (#1076), so no ring belongs to it — it is excluded because it is not `stated`, rather than as a side effect of a field nobody filled in.
+
+### Class check (standing rule 1) — swept, and one more found
+
+`parseAnalytic.ts:1686` is the ONLY carrier mint, so the reported path is a single site. The sweep of every other transition a curve can undergo found the same symptom at a seam that never HAD text: `evaluate.ts`'s `circle-at` and `line-at` derive `stated` curves with no `eqSrc`, so «דרך P עובר ישר מקביל ל AB» is drawn, its equation is printed in the panel, and it offers no crossing ring. Measured: `y = 5` and `x = 2` genuinely meet at (2, 5) and no ring is offered.
+
+That is the OTHER half of the issue's point 3 — synthesising an identity for a curve whose text was never written — and it is a different mechanism with an honesty gate of its own (a sampled equation must not be printed as a name). Filed as **[#1202](https://github.com/dcodish/geo_builder/issues/1202)** rather than built here.
+
+### Consequences
+
+`parseAnalytic.ts` (the carrier mint gains `eqSrc`), `apply.ts` (the promotion merges labels). `issue-1149-promotion-identity.test.ts` (6) — **proven to fail without the fix**: all six go red when both edits are reverted. Analytic lane 87 files / 1386 tests green.

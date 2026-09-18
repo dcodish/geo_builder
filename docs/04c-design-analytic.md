@@ -363,6 +363,21 @@ this module keep knowing nothing about objects — the layering the rest of the 
 A pair of LINE operands is left unconsumed: the parallel-lines distance is a capability rather than a
 spelling, and it is not built here.
 
+### Curve identity and the promotion path ([ADR-AG-090](06c-decisions-analytic.md#adr-ag-090))
+
+Because ids are content-derived, «נקודה B על הישר y=x» and a later «y=x» are ONE object: the second
+sentence PROMOTES the first from carrier to stated (#1076). The promotion carries the label — an
+anonymous curve's identity is its equation (ADR-AG-056), so an object that loses `eqSrc` becomes one
+nobody can name, and the crossing rings vanish for a line the student can see.
+
+Two rules hold the seam shut: the carrier is minted WITH its `eqSrc` (the parser has the text), and
+the promotion merges the incoming label over the prior, never overwriting a name the student gave.
+The invariant to test against is equality, not appearance — **a promoted carrier and a curve stated
+outright are the same object.**
+
+A curve the tool DERIVES has no text to carry, and naming it from its computed coefficients is a
+separate question with an honesty gate of its own (#1202).
+
 ## A circle on a point ([ADR-AG-045](06c-decisions-analytic.md#adr-ag-045))
 
 Every curve in this product is an equation over `x` and `y` whose coefficients are expressions in

@@ -1193,3 +1193,9 @@ written in either order.
 **A question naming something absent is told so.** «המרחק בין C ל-QR» on a figure with no `QR` reports
 the missing object; it never answers «לא ניתן לחשב מהנתונים», which is a claim about the figure rather
 than about the question.
+
+**A stated curve is nameable however it entered the figure**
+([#1149](https://github.com/dcodish/geo_builder/issues/1149)). A line the student first used to carry
+a point and then stated on its own is the SAME line as one stated outright, and behaves identically —
+same crossing rings, same name. How an object came to exist is the tool's bookkeeping, not something
+the student should be able to feel.
