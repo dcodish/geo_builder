@@ -25,30 +25,7 @@ import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
 import { isKnowledge, knownCurve } from '../engine/evaluate';
 import { objectById, type Id } from '../engine/types';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
-
-/**
- * The line a NAME refers to, as this configuration drew it (#1048).
- *
- * Two spellings mean two different things and both are legal: «l1» is a curve the student named, and
- * «AB» is the line through two points they placed — which need not have been stated as a line at all.
- * Resolving both here keeps `lengths.ts` free of any knowledge about objects.
- */
-function lineNamed(f: Derivation['figure'], name: string): { a: number; b: number; c: number } | null {
-  const curve = f.curves.find((c) => c.label.name === name || c.id === `line-${name}` || c.id === `circle-${name}`);
-  if (curve && curve.curve.kind === 'line') return { a: curve.curve.a, b: curve.curve.b, c: curve.curve.c };
-  const pair = /^([A-Z][0-9]?)([A-Z][0-9]?)$/.exec(name);
-  if (pair) {
-    const p = f.points.find((q) => q.id === pair[1]);
-    const q2 = f.points.find((q) => q.id === pair[2]);
-    if (p && q2) {
-      // Through two points: the line whose normal is perpendicular to P→Q.
-      const a = q2.y - p.y;
-      const b = -(q2.x - p.x);
-      if (Math.hypot(a, b) > 1e-12) return { a, b, c: -(a * p.x + b * p.y) };
-    }
-  }
-  return null;
-}
+import { asPair, lineNamed } from './lines';
 
 /** The question is EXACTLY one point-to-line distance, for the same reason `BARE_LENGTH` exists. */
 const POINT_LINE_ONLY = /^(?:ה?מרחק|[Dd]istance)\s+\S.*$/;
@@ -192,7 +169,39 @@ export function ask(
     const curve = d.construction.objects.find(
       (o) => o.kind === 'curve' && (o.label.name === name || o.id === `line-${name}` || o.id === `circle-${name}`),
     );
-    if (!curve) return { question, value: null, missing: { name, kind: 'curve' } };
+    /**
+     * A LINE THROUGH TWO POINTS IS A LINE TO THIS QUESTION TOO (#1148).
+     *
+     * It was not, and that was the whole defect: on «משולש ABC» the figure holds no curve object for
+     * `AB`, so this branch reported the name MISSING while «שיפוע AB» answered `0` and «AB» answered
+     * `6` — three resolvers, one of which could not see what the other two could.
+     *
+     * It now resolves through `lineNamed`, the same path the slope branch and the measure grammar
+     * use, so the three cannot disagree again. The honesty gate comes with it in the shape that
+     * branch already uses: an equation is printed only when the coefficients are the SAME in every
+     * configuration (ADR-052). An under-determined line stays open — it does not get one sampled
+     * configuration's equation printed as though it were the answer.
+     */
+    if (!curve) {
+      const here = lineNamed(d.figure, name);
+      if (!here) return { question, value: null, missing: { name, kind: 'curve' } };
+      const ka = isKnowledge(d.construction, (f) => lineNamed(f, name)?.a ?? null);
+      const kb = isKnowledge(d.construction, (f) => lineNamed(f, name)?.b ?? null);
+      const kc = isKnowledge(d.construction, (f) => lineNamed(f, name)?.c ?? null);
+      const known = ka.known && kb.known && kc.known;
+      const pair = asPair(name);
+      let trace: string | undefined;
+      if (known && pair) {
+        const a0 = d.figure.points.find((q) => q.id === pair[0]);
+        const b0 = d.figure.points.find((q) => q.id === pair[1]);
+        if (a0 && b0) trace = traceLine2pt(a0, b0, fmt);
+      }
+      return {
+        question,
+        value: known ? describeCurve('', { kind: 'line', a: ka.value, b: kb.value, c: kc.value }) : null,
+        ...(trace ? { trace } : {}),
+      };
+    }
     const known = knownCurve(d.construction, curve.id);
     /**
      * A LINE NAMED BY TWO POINTS gets the move that produces it (#1053) — the operator's second
@@ -203,10 +212,10 @@ export function ask(
      * the tool explaining the student to themselves.
      */
     let trace: string | undefined;
-    const pair = /^([A-Z][0-9]?)([A-Z][0-9]?)$/.exec(name);
+    const pair = asPair(name);
     if (pair && known?.kind === 'line') {
-      const a0 = d.figure.points.find((q) => q.id === pair[1]);
-      const b0 = d.figure.points.find((q) => q.id === pair[2]);
+      const a0 = d.figure.points.find((q) => q.id === pair[0]);
+      const b0 = d.figure.points.find((q) => q.id === pair[1]);
       if (a0 && b0) trace = traceLine2pt(a0, b0, fmt);
     }
     return {
@@ -219,11 +228,23 @@ export function ask(
   // --- anything else: a measure expression, through the one grammar ---
   const measure = parseLengthExpr(text);
   if (!measure) return { question, value: null, unreadable: true };
-  // Every point it names must exist, or the question is about a figure the student has not drawn.
-  const missing = measure.terms
+  /**
+   * EVERY operand must resolve — including the LINE (#1151).
+   *
+   * Only the points were checked, so «המרחק בין C ל-QR» on a figure with no `QR` answered `null`:
+   * «לא ניתן לחשב מהנתונים» — a statement ABOUT the figure, for a question naming something the
+   * figure has not got. #1111 built the missing-object message for exactly this, and one operand
+   * was walking past it.
+   */
+  const missingPoint = measure.terms
     .flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : [t.a, t.b]))
     .find((id: Id) => !objectById(d.construction, id));
-  if (missing !== undefined) return { question, value: null, missing: { name: missing, kind: 'point' } };
+  if (missingPoint !== undefined)
+    return { question, value: null, missing: { name: missingPoint, kind: 'point' } };
+  const missingLine = measure.terms
+    .flatMap((t) => (t.kind === 'point-line' ? [t.line] : []))
+    .find((name) => !lineNamed(d.figure, name));
+  if (missingLine !== undefined) return { question, value: null, missing: { name: missingLine, kind: 'curve' } };
 
   const k = isKnowledge(d.construction, (f) =>
     evalLengthExpr(

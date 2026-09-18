@@ -1682,8 +1682,19 @@ function parseConstraint(raw: string): RuleOutcome {
     if (eq && symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
       const cid = `curve-${anonIndex(operand)}`;
       return made([
-        // NOT stated (#1076): this line exists to put a point on a line, not to draw the line.
-        { t: 'curve', id: cid, label: { name: '' }, curve: { eq }, stated: false, src: line },
+        /**
+         * NOT stated (#1076): this line exists to put a point on a line, not to draw the line.
+         *
+         * It still carries `eqSrc` (#1149). An anonymous curve's identity IS its equation
+         * (ADR-AG-056), and this was the one mint that dropped the text the student had just
+         * written — so a line introduced as a carrier and later stated became a line nobody could
+         * name, offering no crossing ring where the same two lines stated outright offer one.
+         *
+         * No `kind` is asserted: the noun that reached this branch may be «ישר», but the fit is
+         * what classifies the curve, and claiming a kind we have not established would be a second
+         * source of truth for it.
+         */
+        { t: 'curve', id: cid, label: { name: '', eqSrc: operand }, curve: { eq }, stated: false, src: line },
         { t: 'declare', id, src: line },
         { t: 'constraint', k: { t: 'on-curve', id, curve: cid }, src: line },
       ]);

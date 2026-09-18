@@ -499,12 +499,26 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
            * because the student already asked to see it and nothing they said withdraws that.
            */
           if (f.stated && !prior.stated) {
+            /**
+             * THE PROMOTION CARRIES THE LABEL (#1149).
+             *
+             * `{ ...prior, stated: true }` kept the CARRIER's label and threw away the stated
+             * sentence's, so a promoted line lost the `kind` and `eqSrc` the student had just
+             * written — and `words()` can name an anonymous curve only by its equation. The result
+             * was two identical figures behaving differently: lines stated outright offered their
+             * crossing ring, and the same lines reached as carriers first offered none.
+             *
+             * A promoted carrier must be indistinguishable from a curve stated outright, so the
+             * incoming label wins — except for a NAME the prior already holds, which is the
+             * student's own and cannot be erased by an anonymous restatement.
+             */
+            const label = { ...prior.label, ...f.label, name: prior.label.name || f.label.name };
             return {
               ok: true,
               effect: 'created',
               next: {
                 ...c,
-                objects: c.objects.map((o) => (o.id === f.id ? { ...prior, stated: true } : o)),
+                objects: c.objects.map((o) => (o.id === f.id ? { ...prior, label, stated: true } : o)),
               },
             };
           }

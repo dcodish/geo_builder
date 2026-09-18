@@ -1313,8 +1313,14 @@ export function lineText(a0: number, b0: number, c0: number): string {
      * term is formatted by this same helper with `sym = ''`, so the rule erased the number itself and
      * «3x - 4y + 1 = 0» printed as «3x - 4y + = 0». It fired for any line whose constant is +/-1, not
      * only the #1093-built ones the DEPLOY-LOG entry described.
+     *
+     * The test is on the FORMATTED magnitude, not the raw float (#1148). A line through two SOLVED
+     * points carries the solve's tolerance -- «B על הישר y=x» lands at y - x ≈ 3e-8, so `AB` has
+     * `b = -1.0000000124` -- and `=== 1` then printed «x - 1y = 0» for a coefficient `fmt` was about
+     * to round to `1` anyway. The rule is about the number the STUDENT sees, so it asks `fmt`.
      */
-    const mag = Math.abs(k) === 1 && sym !== '' ? '' : fmt(Math.abs(k));
+    const shown = fmt(Math.abs(k));
+    const mag = shown === fmt(1) && sym !== '' ? '' : shown;
     return `${k < 0 ? '-' : '+'} ${mag}${sym} `;
   };
   const parts = `${term(a, 'x')}${term(b, 'y')}${term(c, '')}`.trim();

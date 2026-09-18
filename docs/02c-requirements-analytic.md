@@ -1159,3 +1159,43 @@ ruling is untouched, and this sits ABOVE it). **A decimal the student typed is t
 
 There is no √ or π form in this tool yet — those values show as decimals until the corpus asks for
 them.
+
+**R95 — a name that denotes a line denotes it to every question, and to every surface**
+([#1148](https://github.com/dcodish/geo_builder/issues/1148), [#1139](https://github.com/dcodish/geo_builder/issues/1139)).
+
+`AB` is a line whenever `A` and `B` are points the figure holds — whether the student drew it as a
+line, stated it as a segment, or got it as a side of «משולש ABC». Every question that can be asked
+about a line can be asked about it: its **equation**, its **slope**, and the **distance** from a point
+to it. A question the tool answers in one spelling and refuses in another is the tool disagreeing with
+itself about what the figure contains.
+
+**The menu offers exactly what the lane answers.** An option the click menu composes must be a
+sentence the ask lane answers; the two are one enumeration, not two lists that happen to agree. A
+drawn side is an object the student can see, so it is an object they can click.
+
+**The honesty gate is unchanged and applies per question.** A line whose coefficients are the same in
+every configuration has an equation; one that moves does not, and says so. A line can be knowledge
+while the points naming it are not — «A(0,0)» with «B על הישר y=x» has the equation `x - y = 0` and no
+length — and each question is answered on its own terms.
+
+**R96 — every spelling of one question gets one answer, and the operands decide the roles**
+([#1151](https://github.com/dcodish/geo_builder/issues/1151)).
+
+«המרחק בין C ל-AB» and «המרחק בין AB ל-C» are the same question. So are «מרחק של C מ-AB»,
+«distance from C to AB» and «distance between AB and C». A grammar that answers one and refuses
+another is teaching the student that the tool has a secret word order, which no exam has.
+
+**Roles come from what each operand IS, never from where it sits.** A one-letter name is a point; a
+two-letter name or a curve name is a line. Two points are a plain distance — «המרחק בין A ל-B» is the
+length `AB` and answers the same number — and a point with a line is the distance to that line,
+written in either order.
+
+**A question naming something absent is told so.** «המרחק בין C ל-QR» on a figure with no `QR` reports
+the missing object; it never answers «לא ניתן לחשב מהנתונים», which is a claim about the figure rather
+than about the question.
+
+**A stated curve is nameable however it entered the figure**
+([#1149](https://github.com/dcodish/geo_builder/issues/1149)). A line the student first used to carry
+a point and then stated on its own is the SAME line as one stated outright, and behaves identically —
+same crossing rings, same name. How an object came to exist is the tool's bookkeeping, not something
+the student should be able to feel.

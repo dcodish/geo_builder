@@ -4618,3 +4618,156 @@ Sign is not normalised: `-4x + 3y = 0`, exactly as the ruling wrote it. A conven
 **Four sentences, written out, not one templated noun.** Hebrew gender carries through the whole clause — «הנקודה … הוגדרה» against «הישר … הוגדר» — so slotting a noun into one sentence would be wrong in three cases of four. An anonymous curve (`curve-<hash>`) gets the **kind-free** wording: it has no name the student wrote, so no noun would be true.
 
 **Consequences.** `fractionClearingFactor` (`format.ts`), one scaling in `lineText`; `RefKind`/`refKindOf`/`unknownRef` (`apply.ts`), `expected` threaded through `derive` → `submit` → the store, four locale strings per language. `issue-1180-1179-equation-and-noun.test.ts` (14) — asserting the **rendered** sentence through the real locale, because a key that exists proves nothing about what a student reads. Analytic lane 84 files / 1278 tests.
+
+## ADR-AG-088 — A name that denotes a line denotes it to EVERY surface (#1148 + #1139)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R95** (new). **Design:** [04c](04c-design-analytic.md) — *the ask lane*, the resolver seam. **LADDER stage:** operand resolution, ahead of evaluation; no value, solve or gate semantics change.
+
+Both reported by the operator on 2026-09-16, on the same figure, minutes apart: *"now the line is drawn but data panel still refuses"*, and *"the line itself is not clickable in this state and it should be — allowing to show distance, equation, slope."*
+
+### The defect was not a branch; it was FIVE resolvers
+
+Measured on `A(0,0)` `B(6,0)` `C(3,5)` + «משולש ABC» before the fix:
+
+```
+AB                  -> 6          the measure grammar resolves a two-point line
+שיפוע AB            -> 0          the slope branch resolves a two-point line
+משוואת AB           -> MISSING    the equation branch does not
+המרחק מ-C לישר AB   -> 5          the ask lane answers it
+menu(C)             -> ["C"]      ...and the click menu never offers it
+```
+
+`AB` is one line. It existed to three resolvers, not to the fourth, and the fifth — the click menu's own enumeration of "what is there to ask about" — could not see it at all. Fixing the equation branch would have answered the operator and **guaranteed the next question kind repeats it**, which is the class and not the input (standing rule 1). #1139 was already the third sighting; the menu's copy was the fourth.
+
+### One question, asked in two directions
+
+There are exactly two questions here, and `app/lines.ts` is now the only place either is answered:
+
+- **resolution** — `lineNamed(figure, name)`: which line is this, in the configuration drawn?
+- **enumeration** — `lineNamesOf(construction)`: which names denote a line at all?
+
+They are tied by an invariant the suite asserts by **calling both surfaces** rather than by listing what either should say: *every name the enumeration offers resolves, and every sentence the menu composes is one the ask lane answers.* A menu entry whose answer would be «לא הבנתי» is the menu lying about the figure, and that is now a test failure instead of a bug report.
+
+The enumeration's three sources are the named line curves it always had, plus **every stated segment and every side of every polygon** — the half #1139 was filed about. A triangle's sides are lines the student can see, and before this they were lines to nobody.
+
+### Why the coefficients are normalized, and why NOT by `hypot`
+
+A line through two points is built as `a = Δy`, `b = −Δx`, so its coefficients scale with how far apart the points happen to sit. That scale is not part of the line, and it breaks two things at once: `A(0,0)`–`B(6,0)` printed «-6y = 0» instead of «y = 0», and `isKnowledge` over raw coefficients would call a perfectly determined line *unknown* merely because its points slid along it between configurations.
+
+The obvious normal form — divide by `hypot(a, b)` — was measured and **rejected**: it makes `A(0,0)`–`C(3,5)` print «0.86x - 0.51y = 0», because 5/√34 is a surd and ADR-AG-085's `fractionClearingFactor` cannot clear what is not rational. Dividing by the **leading coefficient** keeps a rational line rational — `(5, −3, 0)` → `(1, −0.6, 0)` → cleared back to «5x - 3y = 0» — and fixes the sign for free.
+
+Every existing consumer is unaffected by construction: the slope is `-a/b` and the point-line distance divides by `hypot(a, b)`, so both are scale-invariant.
+
+**The property this buys, and the reason it is not cosmetic.** On «A(0,0)» + «B על הישר y=x», the *line* `AB` is `x - y = 0` in every configuration while `B`'s *position* is open. The tool now answers the equation and still refuses the length — the honesty gate at the right granularity, which raw coefficients could not express.
+
+### One addition the fix forced, at the display chokepoint
+
+`lineText`'s magnitude rule (ADR-AG-085 / #1119) tested `Math.abs(k) === 1` — exact equality on a float. A line through two SOLVED points carries the solve's tolerance: «B על הישר y=x» lands at `y − x ≈ 3e-8`, so `AB` has `b = -1.0000000124` and the rule printed «x - 1y = 0» for a coefficient `fmt` was about to round to `1` anyway. The rule is about the number the STUDENT sees, so it now asks `fmt`. This was unreachable before — a two-point line had no equation to print — and it is a latent defect for any solver-derived curve row, not only this one.
+
+### Consequences
+
+`app/lines.ts` (new — the seam); `ask.ts` loses its private `lineNamed` and its equation branch resolves through the shared path with the `isKnowledge` gate the slope branch already used; `measurable.ts` enumerates through `lineNamesOf` and grows `measurablesOfSegment`, with the three line questions extracted to ONE list both the curve and the segment paths call; `Figure.tsx` reports a third pick kind (`segment`) over a transparent-stroke hit layer, so a drawn side is clickable at all; one line in `App.tsx`'s `lineText`.
+
+**The opposite side is offered first** on a vertex click: on a triangle, the distance from `C` to `AB` is the height — the question the student came to ask. The two sides through `C` are legitimate questions with legitimate answers (zero) and are still offered, just not ahead of it.
+
+`issue-1148-1139-one-resolver.test.ts` (12) — **proven to fail without the fix**: making the two seams the identity turns 7 of the 12 red. Analytic lane 85 files / 1364 tests green; `smoke:visual --app analytic` passed and the screenshots were read.
+
+## ADR-AG-089 — A measure's operands decide their own roles; word order does not (#1151)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R96** (new). **Design:** [04c](04c-design-analytic.md) — *the measure grammar*. **LADDER stage:** parse-time operand classification, ahead of evaluation; no solve or gate change.
+
+Reported by the operator: «המרחק בין AB ל-C» is unreadable while «המרחק בין C ל-AB» answers, and «המרחק בין A ל-B» — two points he had pinned — comes back «לא ניתן לחשב».
+
+### Measured, and worse than reported
+
+On `A(0,0)` `B(6,0)` `C(3,5)` + «משולש ABC»:
+
+```
+המרחק בין C ל-AB          -> 5            (point, then line)
+המרחק בין AB ל-C          -> «לא הבנתי»   the SAME question, other order
+המרחק בין A ל-B           -> null         two points, read as a line named «B»
+המרחק בין C ל-QR          -> null         a silent statement about a figure with no QR
+distance between C and AB -> null         the token missed -- and LENGTH_TOKEN then ate «AB»
+```
+
+The English row is the one that matters most and the issue did not state it: when the distance token failed, `LENGTH_TOKEN` claimed `AB` out of the same sentence, so the student asking for a **distance to a line** was answered about **a different measurement**. A wrong answer delivered confidently is the class this tool exists to avoid; the other rows are merely refusals.
+
+### The defect: POSITION was doing the operands' job
+
+`POINT_LINE_TOKEN` required the point first and the line second. Every spelling that inverted them fell out of the grammar, and #1134 had already had to repair the same token once for the same reason — the previous fix added a second word order as a second alternation, which widened the symptom without touching the cause.
+
+**Roles now come from the operands, and an operand's own spelling settles it:** one letter is a point and can be nothing else; two letters or a curve name denote a line. That decision needs no figure, so `lengths.ts` keeps the layering the rest of the file is careful about — it still knows nothing about objects.
+
+| operands | the question |
+| --- | --- |
+| `A`, `B` | the plain distance — **the same term «AB» produces**, so one question is one term |
+| `C`, `AB` (either order) | the point-to-line distance |
+| `AB`, `l1` | not read — see below |
+
+### Frames, not one positional mega-regex
+
+Each spelling is a small pattern with the SAME two operand slots, applied in turn, and the roles are decided once for all of them. That is what retires the shape of #1134's own bug — a four-group token where only the first pair was read, so the second word order matched and then resolved to nothing at all.
+
+The frames are ordered most-specific-first, and the English `between … and …` joins as a frame rather than as a parallel rule, so it cannot drift from its Hebrew twin.
+
+### Two lines is a CAPABILITY, and is deliberately NOT built here
+
+The issue's plan lists `line + line → the parallel-lines distance`. The widened token can now reach that pair, and it is left **unconsumed** — «המרחק בין AB ל-l1» still answers «לא הבנתי», exactly as today. Two reasons, and the first is binding: CLAUDE.md forbids building a missing capability under a bug's banner. The second is that the plan's stated fallback — *"an honest refusal otherwise"* — is not obviously right, because two non-parallel lines are at distance **zero**, so refusing would itself be a small dishonesty. That is a product question and it is not this fix's to answer. Filed separately.
+
+### Class check (standing rule 1)
+
+The other multi-operand measures were swept and cannot carry the defect: `AREA_TOKEN` reads ONE run of vertices, and `LENGTH_TOKEN` reads two interchangeable points. Asserted rather than argued, so an edit that later gives either an asymmetric operand pair fails the lock.
+
+The **catalog** obligation in the plan does not apply: `catalogAnalytic.ts` teaches CONSTRUCTION commands and has no ask-lane rows at all. The ask lane's teaching surface is the click menu, which ADR-AG-088 widened in this same round.
+
+### The silent null is closed too
+
+Only the POINT operands were checked for existence, so «המרחק בין C ל-QR» answered `null` — «לא ניתן לחשב מהנתונים», a statement ABOUT the figure, for a question naming something the figure has not got. The line operand now goes through the same check and gets #1111's missing-object message.
+
+### Consequences
+
+`lengths.ts`: `POINT_LINE_TOKEN` → `DISTANCE_FRAMES` + one role decision; `ask.ts`: the line operand joins the existence check. `issue-1151-operand-roles.test.ts` (16) — **proven to fail without the fix**: restoring the old token turns 9 of the 16 red.
+
+**Found while measuring, filed not folded:** [#1201](https://github.com/dcodish/geo_builder/issues/1201) — «המרחק מ-A לישר l1 = 5» is accepted, reported satisfied, and not honoured (the figure draws 2.13). Measured identically on `origin/main`, so it is pre-existing; it is a solve defect, not a grammar one, and outside this round's composition.
+
+## ADR-AG-090 — A curve keeps its identity when its representation changes (#1149)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R95** (extended — a stated curve is nameable however it entered the figure). **Design:** [04c](04c-design-analytic.md) — *curve identity and the promotion path*. **LADDER stage:** object construction; no solve, gate or value change.
+
+A line first used as a CARRIER and then stated is PROMOTED — one object, now drawn (#1076, and ADR-AG-023's content-derived ids are what make the two sentences ONE object). The promotion rebuilt that object from the carrier alone, and `words()` can name an anonymous curve only by its equation (ADR-AG-056).
+
+### Measured — the same two lines, two behaviours
+
+```
+y=2x+1 · y=-x+15                                    -> one crossing offered at (4.667, 10.333)
+«נקודה A על הישר y=-x+15» … then the same two lines -> NO crossing offered
+```
+
+Before the fix the promoted objects carried `label = { name: '' }` — no kind, no `eqSrc`. The student's own text was discarded **twice**, which is why fixing one end would have left the hole open:
+
+1. `parseAnalytic.ts` minted the carrier with an empty label, though the equation text was in its hand one line earlier;
+2. `apply.ts`'s promotion returned `{ ...prior, stated: true }`, preserving that emptiness and dropping the stated sentence's label.
+
+### The fix, and what it is NOT
+
+The carrier now carries `eqSrc`, and the promotion merges the incoming label over the prior — a name the prior already holds is never overwritten, since that is the student's own.
+
+Deliberately **not** a tolerant read at `crossings.ts:122`. Making the consumer accept a missing `eqSrc` would hide a lossy mint behind a defensive branch and leave every other consumer of the label broken in silence; the defect is that the object lost its identity, not that someone noticed.
+
+No `kind` is asserted on the carrier: the noun that reached that branch may be «ישר», but the FIT is what classifies a curve, and claiming a kind we have not established would be a second source of truth for it.
+
+### The property, not the symptom
+
+What is locked is stronger than "a crossing appears": **a promoted carrier is byte-identical to a curve stated outright.** Measured both ways, the curve objects now compare equal, so a future path that rebuilds objects without their labels fails the lock rather than being reported a fourth time.
+
+The carrier-only case is unchanged and now holds for the reason we actually mean: a carrier is not drawn (#1076), so no ring belongs to it — it is excluded because it is not `stated`, rather than as a side effect of a field nobody filled in.
+
+### Class check (standing rule 1) — swept, and one more found
+
+`parseAnalytic.ts:1686` is the ONLY carrier mint, so the reported path is a single site. The sweep of every other transition a curve can undergo found the same symptom at a seam that never HAD text: `evaluate.ts`'s `circle-at` and `line-at` derive `stated` curves with no `eqSrc`, so «דרך P עובר ישר מקביל ל AB» is drawn, its equation is printed in the panel, and it offers no crossing ring. Measured: `y = 5` and `x = 2` genuinely meet at (2, 5) and no ring is offered.
+
+That is the OTHER half of the issue's point 3 — synthesising an identity for a curve whose text was never written — and it is a different mechanism with an honesty gate of its own (a sampled equation must not be printed as a name). Filed as **[#1202](https://github.com/dcodish/geo_builder/issues/1202)** rather than built here.
+
+### Consequences
+
+`parseAnalytic.ts` (the carrier mint gains `eqSrc`), `apply.ts` (the promotion merges labels). `issue-1149-promotion-identity.test.ts` (6) — **proven to fail without the fix**: all six go red when both edits are reverted. Analytic lane 87 files / 1386 tests green.
