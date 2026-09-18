@@ -36,7 +36,7 @@ const he = {
   hideConstruction: 'הסתר בנייה',
   dataHide: 'הסתר נתונים',
   secPoints: 'נקודות',
-  secCurves: 'עקומים',
+  secEquations: 'משוואות',
   secLengths: 'אורכים',
   secSlopes: 'שיפועים',
   // The ASK lane (#1027) — the panel's own input: two surfaces, one grammar.
@@ -186,7 +186,7 @@ const en: typeof he = {
   hideConstruction: 'Hide construction',
   dataHide: 'Hide data',
   secPoints: 'Points',
-  secCurves: 'Curves',
+  secEquations: 'Equations',
   secLengths: 'Lengths',
   secSlopes: 'Slopes',
   askPlaceholder: 'Ask: AB, area of ABC',

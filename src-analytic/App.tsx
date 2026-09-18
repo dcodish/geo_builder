@@ -975,7 +975,7 @@ export function App() {
               },
               {
                 key: 'curves',
-                title: t('secCurves'),
+                title: t('secEquations'),
                 dir: 'ltr',
                 /**
                  * A CARRIER gets no row (#1078) — an operator ruling that reverses the panel half of

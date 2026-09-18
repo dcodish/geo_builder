@@ -1233,3 +1233,13 @@ restating themselves, and restatement has always been absorbed.
 This is about **one object named twice**. Two points the student stated independently that happen to
 land on one position is a different question — the tool may not assume a coincidence was asserted when
 an unstated magnitude is a free DOF (ADR-052) — and it is not answered by this requirement.
+
+**R99 — a panel heading names what the rows ARE, in the student's own word**
+([#1147](https://github.com/dcodish/geo_builder/issues/1147)).
+
+The data panel's equations section lists what the student stated or asked about the curves in their
+figure, and every row in it is an equation. So it is headed «משוואות» / «Equations» — not «עקומים», which
+is the tool's internal category (`kind: 'curve'`) and a word the exam never uses.
+
+**A heading is a promise about its rows.** Naming the implementation's type there teaches the student a
+vocabulary the question paper does not share, and it is the same defect as showing them an internal id.
