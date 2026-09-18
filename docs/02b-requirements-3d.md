@@ -110,7 +110,7 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   vectors, and a vector equation a free figure can satisfy is a GIVEN.** Where `XY = k·ZW` has both a
   vector and a length reading the tool asks which was meant (FR-VC-1, [ADR-3D-249](06b-decisions-3d.md#adr-3d-249)) —
   but a student who has already answered is not asked again: an explicit `→`/`⃗`/`⟶`, or the word
-  «וקטור»/`vector`, commits the sentence to the vector lane. **Every spelling of the marking is equal**,
+  «וקטור»/`vector`, commits the sentence to the vector lane. **Every spelling of the marking is equal** — in the grammar AND on the step row, which renders the four spellings identically, with the arrow typeset over the letters and the marking the student typed consumed rather than shown twice ([ADR-3D-252](06b-decisions-3d.md#adr-3d-252), #1194) —
   and the character the refusal message TEACHES is one the palette offers and the parser accepts — a
   remedy the tool cannot itself type is a dead end, not a remedy. On a figure with free dimensions the
   marked statement **drives** («טרפז ABCD» + «DC→ = 3AB→» draws a trapezoid whose DC really is 3·AB,

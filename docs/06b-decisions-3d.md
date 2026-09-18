@@ -10039,3 +10039,50 @@ The RHS also takes a **bare number** — «AB/BC = 2», 2-D's own third spelling
 The colon form silently accepted «AB:BC = 0:3» — a statement that a segment has zero length — and the new separator would have made that reachable by a second spelling, which is how a hole doubles instead of closing. 2-D guards `p > 0 && q > 0` in **both** of its ratio rules; that guard arrives here with the spelling it belongs to. It is reachable only by typing it, and no lock depended on the old permissiveness.
 
 **Consequences.** `lengthRatioClaim` takes `[:/]` on both sides plus an optional denominator; a positivity guard; a `BE/ED = 1:3` catalog row, because the catalog is the coverage MAP as well as the panel and a spelling it omits is invisible to every catalog-wide property. Lock: `issue-1163-ratio-separators.test.ts` (12) — every assertion a **parity** comparison between two spellings rather than a spelled-out expectation, so it cannot go green by re-implementing the grammar it guards (ADR-W-053); plus the prod sequence built end-to-end and `BE:ED` measured as 1:3 **on the canvas**, which is the arm that would notice a ratio recorded and never solved.
+
+### ADR-3D-252 — the vector MARKING is one vocabulary with one home, and a spacing arrow becomes the combining one (#1194)
+
+**Requirements:** [02b](02b-requirements-3d.md) — **FR-VC-1a extended** (one sentence; the promise is unchanged, its display half is now stated). **Design:** `lexicon/` gains a second leaf. **LADDER stage:** display only; the grammar is byte-identical.
+
+**Found by the operator within an hour of [ADR-3D-250](#adr-3d-250) shipping, playing its own play sheet.** Typing the spelling the tool now recommends:
+
+```
+typed    DC→=3AB→
+row      DC⃗→=3AB⃗→        ← the arrow twice: once typeset over the letters, once left behind
+```
+
+> *"we dont need the forward arrow now since we put the arrow above the vector."*
+
+The figure was right; the row was not.
+
+### Root cause — one vocabulary, three copies, and the fix updated two of them
+
+The grammar accepts four spellings of one marking, and each site spelled out its own list:
+
+| site | knew |
+| --- | --- |
+| `normalize3`'s strip | `→ ⃗ ⟶` |
+| `markVectorContext` | `→ ⃗ ⟶` |
+| `vectorNotation`'s *"already marked"* guard | **`⃗` only** |
+
+So ADR-3D-250 making `→` the character the palette inserts and `err.ambiguousVectorLength*` teaches walked into the one spelling the display had never learned. The pair rule added `⃗` because its guard did not recognise `→` as a marking, and the `→` stayed where the student typed it.
+
+**Latent from the day the parser accepted three arrows** — nothing had ever made one of the unlearned spellings the recommended one. ADR-3D-250 did, and it was reported the same morning.
+
+### Fixed where this class was already named
+
+`lexicon/nouns3.ts` exists because *"the same gates were maintained in two files and drifted three times … each copy was fixed alone and the other silently stayed behind"*, and it records the property that makes the layer work: **it imports nothing**, so `parser/`, `engine/` and `render/` may all depend on it without depending on each other.
+
+`lexicon/marks3.ts` is the second leaf, for the notation vocabulary rather than the shape nouns: the combining arrow, the spacing arrows, the arrow class, and the word. All three sites now read it. A fifth spelling reaches the grammar and the display together, or not at all.
+
+Deliberately **not** folded into `nouns3.ts`: that module is emphatic about being the vocabulary of words that NAME SHAPES, and a notation mark is a different kind of thing.
+
+### A spacing arrow is CONVERTED, not merely tolerated
+
+The narrow repair — widen the guard so `→` counts as "already marked" — would have stopped the doubling and left `DC→=3AB→` rendering with the student's raw arrow while `DC⃗=3AB⃗` rendered typeset. Two spellings of one statement would still have produced two different rows.
+
+`→` and `⟶` are **spacing characters that mean what the combining arrow means** — a student types them because a keyboard can produce them and `U+20D7` cannot stand alone, which is exactly why #1185 retired it from the palette. So display replaces them with the combining arrow, precisely as the «וקטור» word has always been consumed once the typeset arrow carries its meaning. That word-consuming line, four lines above, is the precedent and the model.
+
+**Targeted at a mark that FOLLOWS A PAIR.** A stray arrow elsewhere in a sentence is the student's own character in a position this formatter does not claim to understand, and it is left alone — a blanket strip would be a formatter editing prose.
+
+**Consequences.** `lexicon/marks3.ts` (new, imports nothing); `normalize3`, `markVectorContext` and `vectorNotation` all read it; one conversion added ahead of the pair rule. The grammar is unchanged — every spelling still parses to the same `marked: true` command. Lock: `issue-1194-one-arrow.test.ts` (18) — **parity**, never a spelled-out expected row (ADR-W-053): all five spellings render the same row, each pair carries exactly ONE `U+20D7`, no finished row carries a spacing arrow, the parse is asserted unmoved, and the stray-arrow case is locked as deliberately untouched.

@@ -23,6 +23,7 @@ import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX } from '../lexicon/nouns3';
+import { VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 import { riderPairsT, riderWholeSide, riderWholeT } from '../engine/onSegmentRatio';
 
@@ -139,7 +140,7 @@ export function normalize3(s: string): string {
       .replace(/ /g, ' ')
       .replace(/ {2,}/g, ' ')
       .replace(/[′’‘`]/g, "'")
-      .replace(/[→⃗⟶]/g, '')
+      .replace(new RegExp(`[${VECTOR_ARROW_CLASS}]`, 'g'), '') // #1194: one vocabulary, three readers
       .replace(/[−־]/g, '-')
       // #773 — a SCRIPT TRANSITION is a token boundary, in both directions.
       //
@@ -4470,7 +4471,9 @@ export function markVectorContext(utterance: string): void {
   const bounded = utterance
     .replace(SCRIPT_BOUNDARY_LATIN_HE, '$1 ')
     .replace(SCRIPT_BOUNDARY_HE_LATIN, '$1 ');
-  VEC_MARKED = /[→⃗⟶]/.test(utterance) || /(?:^|[\s:,])(?:ה?ו?וקטור|vectors?)\s/i.test(bounded);
+  VEC_MARKED =
+    VECTOR_ARROW_RE.test(utterance) ||
+    new RegExp(String.raw`(?:^|[\s:,])${VECTOR_WORD_SRC}\s`, 'i').test(bounded);
 }
 
 
