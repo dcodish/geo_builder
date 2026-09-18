@@ -10007,7 +10007,9 @@ Carrying the bit onto the command made an existing inconsistency visible, and [#
 Before `marked`, both spellings still reached `vec-rel` and the divergence had no observable effect, so nothing could catch it. It would have become a live bug the moment anything downstream read the bit.
 
 Fixed as a chokepoint rather than a second copy: the two boundary patterns are named (`SCRIPT_BOUNDARY_LATIN_HE`, `SCRIPT_BOUNDARY_HE_LATIN`) and applied by both readers. An arrow needs no boundary — it is its own character — so only the WORD test moves.
+
 **Consequences.** `marked?: true` on `VecRelCommand`, set at the one `vec-rel` emitter; an early return in `ambiguousPairRatio`; a `vec-eq` arm in the claim fork's free-dims block; `ScalarPin` kind `vec-eq` + its residual + `PIN_FIXES_SCALE: false`; `→` in `symbols3.ts`, in 3-D bidi `CORE`, and in four locale strings. Locks: `issue-1183-vector-marked.test.ts` (22) — every marked spelling parses marked, builds on the operator's own trapezoid, and the drawn figure satisfies `DC = 3·AB` to < 1e-6 at four seeds; the unmarked tripwire and the length half unchanged; a marked-but-impossible statement still refused. `bidi3.test.ts` grows the palette lock from "is CORE" to "has a standalone rendering" (`/^\p{M}+$/u`), the class rather than the button.
+
 ### ADR-3D-251 — a segment ratio reads `/` wherever it reads `:` (#1163)
 
 **Requirements:** [02b](02b-requirements-3d.md) — **FR-CL-2a** added (one notation, two separators). **Design:** one parser rule, no new command and no new engine path. **LADDER stage:** parse only.
