@@ -289,3 +289,23 @@ fact been settled by what was built; the third is settled here with data.
 ## Comparative / experimental testing (method A vs B vs C)
 
 When we evaluate an **alternative method or algorithm** for a pluggable element of the engine (a root finder, a multivariate solver, a global sampler, a decomposition), the comparison is governed by a dedicated **experiment protocol** so results are reproducible and paper-quality: [paper/experiments/PROTOCOL.md](paper/experiments/PROTOCOL.md) (ledger + results schema alongside it). It sits **on top of** the three correctness nets above (invariants campaign, coordinate-validation campaign, givens verifier), **reusing them as ground truth**, and adds the cross-method dimension + cost/robustness metrics + a provenance ledger. The *architecture* of the swap-and-measure harness is the solver-experiment ADR ([draft](paper/adr-draft-solver-experiment-harness.md), to be numbered in [06](06-decisions.md)); this testing layer is **dev/CI only — nothing in it ships**. Key rule: **correctness is a hard GATE (zero regressions vs. a frozen `solver-baseline` tag), not a metric** — a faster-but-wrong method is disqualified before its speed is even considered.
+
+## The suite guards itself ([ADR-W-059](06w-decisions-workspace.md#adr-w-059))
+
+A test file that **cannot fail** is worse than no test: it costs time on every run and on every machine,
+and reports green whatever the code does. Two shipped that way — a 2-D scratch sweep and its 3-D twin,
+both pure `console.log`.
+
+`server/__tests__/suite-hygiene.test.ts` walks every tree that carries tests and fails the suite for any
+`*.test.ts(x)` that contains no assertion, or that is pinned with `.only` — which leaves its siblings
+unrun while the suite still reports green, and is the mechanical half of the readiness gate's promise
+that no skipped or `.only` spec hides a gap.
+
+It **discovers** files rather than carrying a list, because a list goes stale on the next file added.
+Assertion-ness is read from the source, following local imports one hop so a file that asserts through a
+shared harness (`scenarios-harness.ts`) is not flagged; the heuristic is stated in the ADR rather than
+assumed, and its failure direction is a false alarm rather than a false green.
+
+Legitimately assertion-free files — the env-gated triage report tools, whose deliverable is a written
+report — are waived **by name, each with its reason**. A guard with no escape hatch gets disabled the
+first time it is inconvenient, and a waiver with no reason is as good as no guard.

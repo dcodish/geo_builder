@@ -3044,3 +3044,41 @@ It asserts that the bundle's inputs outside `server/` are a MAJORITY, not a coun
 ### Consequences
 
 `scripts/deploy-preflight.mjs` (new) · `npm run deploy:preflight` · `server/build.mjs` exports `proxyBuildOptions`/`proxyInputs` and only builds when RUN, not when imported · RUNBOOK § *Standard deploy* rewritten around the preflight, with the old rule recorded as retired rather than deleted. `server/__tests__/deploy-preflight.test.ts` (4).
+
+## ADR-W-059 — A test file that cannot fail is not a test, and the suite now says so (#1044)
+
+**Requirements:** none (internal — suite hygiene, not a product promise). **Design:** [08](08-testing-strategy.md) — the suite's own guards. **Product:** workspace.
+
+### The reported instance
+
+`src/__tests__/_scratch556b.test.ts` — 14 lines, **zero assertions**, six replay sweeps of `console.log`. It ran on every `test:full`, on every machine, and **could not fail**: it reported green forever whatever the engine did. Left behind as a scratch diagnostic and never removed.
+
+### Deleting it is the patch shape, and the class is live
+
+The `/decisions` pass of 2026-09-17 found two more (`tmp-probe.test.ts`, `tmp-probe2.test.ts`) sitting untracked in `src-analytic/__tests__/` the same morning. So the deletion ships with a guard — and the guard immediately earned its place by finding a **second tracked instance the issue did not know about**: `src3d/__tests__/probe578c.test.ts`, the 3-D twin of the reported file, thirteen lines of `console.log` over five spellings of «גובה».
+
+Both are deleted. Nothing is lost, because neither asserted anything.
+
+### The guard, and the heuristic stated rather than assumed
+
+`server/__tests__/suite-hygiene.test.ts` walks every tree that carries tests and fails the suite for any `*.test.ts(x)` that contains no assertion. It **discovers** files rather than carrying a list, which is the difference between a guard and a snapshot.
+
+"Contains no assertion" is judged from the SOURCE, because vitest exposes no per-file assertion count this can read. A file counts as asserting when it — **or any local module it imports, one hop** — contains one of the listed forms. The import hop is what keeps a file asserting through a shared harness (`scenarios-harness.ts` is this tree's own example) from being flagged.
+
+It is a heuristic and the ADR says so. Its failure direction is a **false alarm** on a file asserting in some form not yet listed, fixed by adding the form or naming a waiver. The expensive direction — a file that cannot fail passing silently — is the one it closes.
+
+### `.only` is the same class from the other end
+
+`.only` leaves a file's siblings unrun while the suite still reports green. CLAUDE.md's readiness gate already forbids *"skipped or `.only` specs hiding gaps"*; this is the mechanical half of a promise that until now depended on someone remembering. Added in the same guard because it is the same question: **can this file still fail?**
+
+### Waivers are NAMED, because a guard with no escape hatch gets disabled
+
+Two files are legitimately assertion-free and are waived with reasons: `triageDump.test.ts` and `triageHtml.test.ts` — env-gated operator TOOLS, skipped in the normal suite, whose deliverable is a written report. Asserting on a report they exist to produce would be asserting on their own input. A fourth case in the guard requires every waiver to carry a reason, so an entry cannot be added as a bare silencer.
+
+### The guard was SEEN to fail
+
+Run against the tree **before** the deletion, it failed naming exactly `_scratch556b.test.ts` and nothing else; after the deletion it failed again naming `probe578c.test.ts` and the two tools. A guard that has never been observed failing is not known to work, and this one was checked in both directions before it was trusted.
+
+### Consequences
+
+`server/__tests__/suite-hygiene.test.ts` (new, 4 cases — it lives there for the `isolation.test.ts` reason: it runs in EVERY per-product lane and belongs to no product). `_scratch556b.test.ts` and `probe578c.test.ts` deleted. Two named waivers.
