@@ -87,10 +87,20 @@ describe('#1212 — every curve kind states an equation', () => {
     expect(curveParts({ kind: 'parabola', p: -2 }).equation).toBe('y² = -4x');
   });
 
-  it('a LINE row is unchanged — it was already an equation, and has nothing to fold', () => {
-    const p = curveParts({ kind: 'line', a: -2, b: 1, c: -1 });
-    expect(p.equation).toBe('-2x + y - 1 = 0');
-    expect(p.details).toBeUndefined();
+  /**
+   * ⚠ «a LINE row is unchanged — it was already an equation, and has nothing to fold» has MOVED to
+   * issue-1219-line-details.test.ts, with the opposite expectation.
+   *
+   * This issue's sentence — *a line was already nothing but its equation* — was right about the
+   * EQUATION and wrong about everything else a line knows. The operator asked for the slope and the
+   * explicit form in that fold (#1219, ADR-AG-121), and the slope was already reachable by asking
+   * all along; it simply had nowhere to be shown.
+   *
+   * Moved rather than deleted: the row below still guards what this issue was actually about — the
+   * line's EQUATION, which is unchanged and must stay so.
+   */
+  it('a LINE row still states its equation, exactly as this issue left it', () => {
+    expect(curveParts({ kind: 'line', a: -2, b: 1, c: -1 }).equation).toBe('-2x + y - 1 = 0');
   });
 
   it("the operator's own circle, end to end: the row now says what he typed", () => {

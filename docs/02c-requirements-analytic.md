@@ -1220,6 +1220,26 @@ about a line can be asked about it: its **equation**, its **slope**, and the **d
 to it. A question the tool answers in one spelling and refuses in another is the tool disagreeing with
 itself about what the figure contains.
 
+**R95a — and what a line can be ASKED, its row SHOWS**
+([ADR-AG-121](06c-decisions-analytic.md#adr-ag-121),
+[#1219](https://github.com/dcodish/geo_builder/issues/1219)). A determined line's fold carries its
+**explicit form** («הצורה המפורשת», `y = mx + b`) beside the general one already in its row, and its
+**slope**. Neither is computed for this: the slope was reachable by asking all along and had nowhere
+to be shown, which is the same tool-disagrees-with-itself failure R95 is about, one surface over.
+
+**A VERTICAL line says «אנכי», not nothing.** It has no explicit form — `x = 4` is already its natural
+one — and no slope, and *saying so is knowledge*: the rule this tree already applied to a vertical
+SEGMENT, which the line row had not inherited. An invented «y = ∞x» and a silently empty row are both
+wrong, and the second is what an unconsidered version of this would have produced.
+
+A fractional slope is written the way a textbook writes it, with the fraction after the variable —
+`y = -x/2 + 7/2`, never `y = -1/2x`. The explicit form cannot clear its fractions the way the general
+form does (its `y` coefficient is fixed at 1), so it obeys #1180's ruling by notation instead of by
+scaling.
+
+An **open** line keeps its open form and gains no slope built from one configuration's numbers
+(#1023, [ADR-052](06-decisions.md#adr-052)).
+
 **The menu offers exactly what the lane answers.** An option the click menu composes must be a
 sentence the ask lane answers; the two are one enumeration, not two lists that happen to agree. A
 drawn side is an object the student can see, so it is an object they can click.

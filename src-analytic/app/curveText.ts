@@ -63,6 +63,60 @@ export function lineText(a0: number, b0: number, c0: number): string {
 }
 
 /**
+ * `y = mx + b` — «הצורה המפורשת», the counterpart of the general form above (#1219).
+ *
+ * **Operator, playing T23:** *"i also want to have the 2nd display option for the line - which is
+ * the y=mx+b format. this and the slope are below the line collapsable"*.
+ *
+ * `null` FOR A VERTICAL LINE, and that is the whole reason this returns a nullable rather than a
+ * string. A vertical line has no explicit form — `x = 4` is already its natural one — so there is
+ * nothing to print, and both alternatives are wrong: «y = ∞x + b» invents a value, and omitting the
+ * row silently would drop an answer the tool has (the line IS vertical, and saying so is knowledge).
+ * The caller prints the vertical word instead.
+ *
+ * THE COEFFICIENT MAY BE A FRACTION HERE, AND THAT NEEDS ITS OWN NOTATION. `lineText` never prints
+ * one: [#1180](https://github.com/dcodish/geo_builder/issues/1180) scales the WHOLE equation by
+ * `fractionClearingFactor` precisely because `-4/3x + y = 0` is ambiguous (`4/(3x)`?) and typesets
+ * badly. The explicit form cannot use that escape — its `y` coefficient is fixed at 1, so a
+ * fractional slope is genuinely fractional — and printing `y = -1/2x + 7/2` would reintroduce the
+ * exact shape that ADR removed.
+ *
+ * So the fraction goes AFTER the variable, which is how a textbook writes it and is unambiguous:
+ * `y = -x/2 + 7/2`. The sign, the `1`-suppression and the zero-suppression are still `term`'s rules,
+ * read off its own output rather than re-decided.
+ */
+export function explicitLineText(a: number, b: number, c: number): string | null {
+  if (Math.abs(b) < 1e-12) return null;
+  // ax + by + c = 0  ->  y = (-a/b)x + (-c/b)
+  const m = -a / b;
+  const k = -c / b;
+  const rhs = `${explicitTerm(m)}${term(k, '')}`.trim();
+  // An all-zero right-hand side is the line `y = 0`, which must print its zero rather than nothing.
+  if (rhs === '') return 'y = 0';
+  const body = rhs.startsWith('+ ') ? rhs.slice(2) : rhs.replace(/^- /, '-');
+  return `y = ${body}`;
+}
+
+/**
+ * The `x` term of an explicit form, with a fractional coefficient written after the variable.
+ *
+ * Derived FROM `term` rather than written beside it: it takes that function's answer and moves the
+ * denominator, so the sign rule, the `1x` rule and the zero rule stay in one place and this cannot
+ * drift from the general form printed directly above it in the panel.
+ */
+function explicitTerm(m: number): string {
+  const base = term(m, 'x');
+  // `+ 3/4x ` -> `+ 3x/4 ` · `- 1/2x ` -> `- x/2 ` (the 1 is already suppressed by `term` only when
+  // the whole magnitude is 1, so a fraction's numerator is still there to suppress here).
+  return base.replace(/(\d+)\/(\d+)x/, (_m, p: string, q: string) => `${p === '1' ? '' : p}x/${q}`);
+}
+
+/** The slope of `ax + by + c = 0`, or `null` when it is vertical — the same question, as a number. */
+export function slopeOf(a: number, b: number): number | null {
+  return Math.abs(b) < 1e-12 ? null : -a / b;
+}
+
+/**
  * One signed term of an equation, or '' when the coefficient is zero.
  *
  * THE MAGNITUDE RULE BELONGS TO THE SYMBOL, NOT TO THE TERM (#1119).
@@ -102,10 +156,30 @@ export interface CurveParts {
 }
 
 /**
+ * The words this module cannot know, supplied by a caller that has `t()` (#1219).
+ *
+ * One member today. It is an OBJECT rather than a bare string so the next locale-bearing detail
+ * joins it instead of adding a fourth positional argument — the shape `Answer.fact` took for the
+ * same reason.
+ */
+export interface CurveWords {
+  /** What a vertical line's details say — «אנכי (אין שיפוע)». */
+  vertical: string;
+}
+
+/**
  * The equation of a resolved curve, plus whatever it also knows about itself.
  *
- * A LINE has no details: it was already nothing but its equation, and #1212 leaves its row exactly
- * as it was. The other three each gain the equation they never printed.
+ * **A LINE NOW HAS DETAILS TOO (#1219).** #1212 said *"a line was already nothing but its
+ * equation"* — right about the equation, wrong about everything else a line knows. Measured, the
+ * slope was already reachable by ASKING («שיפוע l1» → "2") and simply had nowhere to be shown, and
+ * the «שיפועים» section does not cover a stated line at all: it iterates `figure.segments`, and a
+ * line is a curve with no segment.
+ *
+ * The LOCALE arrives as an argument, for the reason `nameAt` does: this module is text rendering and
+ * holds no locale, and a vertical line's answer is a WORD. A caller that supplies none gets no
+ * vertical details rather than an English word in a Hebrew panel — and the one caller that needs it
+ * is the panel, which has `t()` in hand.
  */
 /**
  * A DESCRIBED POSITION IS NAMED BY THE POINT THAT OCCUPIES IT, AND BY NOTHING OTHERWISE (#1167).
@@ -134,10 +208,24 @@ const at = (nameAt: NameAt | undefined, x: number, y: number, coords: string): s
 /** Who sits at a position, if anyone — `pointAt(figure, …)`, supplied by the caller. */
 export type NameAt = (x: number, y: number) => string | null;
 
-export function curveParts(c: NumCurve, nameAt?: NameAt): CurveParts {
+export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): CurveParts {
   switch (c.kind) {
-    case 'line':
-      return { equation: lineText(c.a, c.b, c.c) };
+    case 'line': {
+      const equation = lineText(c.a, c.b, c.c);
+      const explicit = explicitLineText(c.a, c.b, c.c);
+      /**
+       * A VERTICAL LINE SAYS «אנכי», it does not say nothing (#1219).
+       *
+       * «שיפוע l2» on `x = 4` answered `null` — understood, unanswered, blank. This tree already has
+       * the right rule for the identical situation on a SEGMENT: *"a vertical segment has no slope,
+       * and saying so is knowledge too — «אנכי» is an answer, not an absence"*. The line row was the
+       * one surface that had not inherited it, and moving the slope into the row without this would
+       * have rendered an empty detail for every vertical line.
+       */
+      if (explicit === null) return { equation, ...(words ? { details: words.vertical } : {}) };
+      const m = slopeOf(c.a, c.b)!;
+      return { equation, details: `${explicit}, m = ${fmt(m)}` };
+    }
     case 'circle':
       return {
         equation: `${shifted('x', c.cx)} + ${shifted('y', c.cy)} = ${fmt(c.r * c.r)}`,

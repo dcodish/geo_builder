@@ -6477,3 +6477,72 @@ Verified to bite: reverting the composition to the figure's own box turns **5 of
 ### Consequences
 
 `engine/evaluate.ts` (`viewBox` gains its optional extra extent), `app/drawnBox.ts` (new — the composition), `App.tsx` (three `d.box` sites now read the drawn box: the ref, the auto-refit key, and the projection).
+
+## ADR-AG-121 — A line's row carries its slope and its explicit form; a vertical line says «אנכי» (#1219)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — what a line's row states. **Design:** this entry — `curveParts`'s line branch and its locale seam. **LADDER stage:** display. No parser, engine or solver change. **Amends** [ADR-AG-097](#adr-ag-097) (#1212) and one sentence of #1214's.
+
+**Operator, 2026-09-19, playing T23:** *"when showing a line in the data panel, the slope is not shown under the line equation. i also want to have the 2nd display option for the line - which is the y=mx+b format. this and the slope are below the line collapsable"*.
+
+### Nothing needed computing
+
+```
+«נתון הישר l1: y=2x+1»    row: -2x + y - 1 = 0      ASK «שיפוע l1» -> "2"
+«נתון הישר l3: y=3»       row: y - 3 = 0            ASK «שיפוע l3» -> "0"
+«נתון הישר l2: x=4»       row: x - 4 = 0            ASK «שיפוע l2» -> null
+```
+
+The slope was already reachable by ASKING and simply had nowhere to be shown. [ADR-AG-097](#adr-ag-097) had said *"a LINE has no details: it was already nothing but its equation"* — right about the equation, and wrong about everything else a line knows. And the «שיפועים» section does not cover this: it iterates `figure.segments`, and a stated line is a curve with no segment, so it appears there not at all.
+
+### ⚠ The vertical line was the bug hiding inside the request
+
+«שיפוע l2» on `x = 4` answered **null** — understood, unanswered, blank. This tree already had the right rule for the identical situation one object over:
+
+> *"A VERTICAL segment has no slope, and saying so is knowledge too — «אנכי» is an answer, not an absence."*
+
+The line row was the one surface that had not inherited it. **This had to be fixed as part of the same change rather than after it:** moving the slope into the row without it would have rendered an empty detail for every vertical line — the tool having visibly nothing to say about a line whose verticality it knows perfectly well.
+
+| line | equation (unchanged) | details |
+| --- | --- | --- |
+| `y = 2x + 1` | `-2x + y - 1 = 0` | `y = 2x + 1, m = 2` |
+| `y = 3` | `y - 3 = 0` | `y = 3, m = 0` |
+| `x = 4` | `x - 4 = 0` | **אנכי (אין שיפוע)** |
+
+### The fraction, which #1180 already ruled on and this could have broken
+
+`lineText` never prints a fractional coefficient: [#1180](https://github.com/dcodish/geo_builder/issues/1180) scales the whole equation by `fractionClearingFactor`, because `-4/3x + y = 0` is ambiguous (`4/(3x)`?) and typesets badly.
+
+**The explicit form cannot use that escape** — its `y` coefficient is fixed at 1, so a fractional slope is genuinely fractional. Printing `y = -1/2x + 7/2` would have reintroduced the exact shape that ADR removed, in a row sitting directly beneath one that obeys it. So the fraction goes AFTER the variable, which is how a textbook writes it and is unambiguous:
+
+```
+x + 2y = 7   ->   y = -x/2 + 7/2,  m = -1/2
+3x - 4y = 0  ->   y = 3x/4,        m = 3/4
+2x + 3y = 6  ->   y = -2x/3 + 2,   m = -2/3
+```
+
+`explicitTerm` is **derived from `term`** rather than written beside it — it takes that function's output and moves the denominator — so the sign rule, the `1x`-suppression and the zero rule stay in one place and the two forms in the same fold cannot drift apart.
+
+### The locale seam
+
+`curveParts` renders text and holds no locale, and a vertical line's answer is a WORD. It therefore takes the word as an argument, exactly as it takes `nameAt` — as an object (`CurveWords`) rather than a fourth positional string, so the next locale-bearing detail joins it instead of growing the signature again.
+
+A caller supplying none gets **no** vertical details rather than an English word in a Hebrew panel. The ask lane, which reads only `.equation`, is unaffected and passes nothing.
+
+The honesty gate is not new and is not re-decided here: the panel already reads a curve only when `knownCurve` vouches for it, so an open line gains no slope built from one configuration's numbers ([ADR-052](06-decisions.md#adr-052)). Locked anyway, because this change is what first gives a line something to print.
+
+### ⚠ Two rows MOVED, one of them predicted by the issue
+
+- **#1212's** *"a LINE row is unchanged — it was already an equation, and has nothing to fold"*. Replaced in place by a row that still guards what that issue was actually about — the line's EQUATION, unchanged.
+- **#1214's** *"a LINE has no details, so it needs no label — the operator's «נתוני הישר» cannot appear"*. #1219 called this one in advance: *"this reverses the point in #1214 that «נתוני הישר» can never appear; once this lands, it can."* Its replacement is **stronger** than the row it retires: a line now goes through that file's own loop — *every kind that has details has a real label rather than a bare key* — instead of being excused from it.
+
+Moved, not deleted, with a comment in each place, as ADR-527 and ADR-AG-119 did earlier in the same run.
+
+### Lock
+
+`issue-1219-line-details.test.ts` (13), driven through the **real panel path** — derive, `knownCurve`, `curveParts` — rather than against the renderer alone, so a change that left the gate behind would fail. The vertical row asserts the WORD and specifically not an empty string; the fraction rows assert a property (`no digit/digit immediately before x`) over five lines rather than three literals; and the untouched kinds are asserted so a one-branch change is provably one branch.
+
+Verified to bite: reverting the line branch to #1212's turns **7 of 13** red.
+
+### Consequences
+
+`app/curveText.ts` (`explicitLineText`, `slopeOf`, `explicitTerm`, `CurveWords`, and the line branch), `App.tsx` (passes the word), `__tests__/issue-1212-curve-equation.test.ts` and `__tests__/issue-1214-curve-noun.test.ts` (one row each, moved).

@@ -72,8 +72,23 @@ describe('#1214 — the fold label is the student’s noun', () => {
     }
   });
 
-  it('a LINE has no details, so it needs no label — the operator’s «נתוני הישר» cannot appear', () => {
-    expect(curveParts({ kind: 'line', a: 1, b: 1, c: -1 }).details).toBeUndefined();
+  /**
+   * ⚠ «a LINE has no details, so it needs no label» has MOVED to issue-1219-line-details.test.ts.
+   *
+   * #1219 (ADR-AG-121) gave a line details — its explicit form and its slope — so «נתוני הישר»
+   * CAN now appear, and does. That issue predicted this row by name: *"this reverses the point in
+   * #1214 that «נתוני הישר» can never appear; once this lands, it can."*
+   *
+   * What this issue was actually about is untouched and is asserted by the loop above: every kind
+   * that HAS details has a real label rather than a bare key. A line now goes through that loop
+   * instead of being excused from it, which is a stronger guard than the row this replaces.
+   */
+  it('a LINE now has details, and therefore a real label of its own', () => {
+    const parts = curveParts({ kind: 'line', a: 1, b: 1, c: -1 }, undefined, { vertical: 'אנכי' });
+    expect(parts.details).toBeTruthy();
+    const label = analyticI18n.t(curveDetailsKey('line'));
+    expect(label).toBeTruthy();
+    expect(label).not.toBe(curveDetailsKey('line'));
   });
 
   it('NO user-facing string says «עקום» in either form — the hole this closes', () => {

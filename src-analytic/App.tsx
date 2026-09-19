@@ -1219,7 +1219,7 @@ export function App() {
                    */
                   // #1167 — the panel asks WHO occupies a described position instead of inventing a
                   // letter for it. Same function the centre ring uses, so the two cannot disagree.
-                  const parts = known ? curveParts(known, (x, y) => pointAt(d.figure, x, y)) : null;
+                  const parts = known ? curveParts(known, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }) : null;
                   return (
                     <span key={c.id}>
                       <ValueRow text={parts ? `${lead}${parts.equation}` : `${lead}${openCurveText(d, c.id)}`} />
