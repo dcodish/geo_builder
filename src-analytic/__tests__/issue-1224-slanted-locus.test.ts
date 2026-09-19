@@ -77,7 +77,7 @@ describe('#1224 — a locus states its equation whatever its slope or scale', ()
       fmtAnalytic,
       kind,
     ).value;
-    expect(v).toBe('מעגל · (x − 16)² + y² = 625');
+    expect(v).toBe('מעגל · (x − 16)² + y² = 25²'); // right-hand side by #1187; #1224 changed neither side
   });
 
   it('A PARAMETERISED LOCUS STILL PRINTS THE KIND ALONE — the honesty gate', () => {

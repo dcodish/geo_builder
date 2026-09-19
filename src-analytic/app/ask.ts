@@ -155,7 +155,17 @@ const EQUATION_OF = /^(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+(?:ה?(?:יש
  * ADR-AG-072 §1 rules it sugar over the same thing, to be added later, not a prerequisite. What this
  * must read is the question a student asks ABOUT a point they have already stated.
  */
-const LOCUS_OF = /^(?:ה?מקום\s+ה?גיאומטרי|[Tt]he\s+locus|[Ll]ocus)\s+(?:של\s+|of\s+)?(?:ה?נקודה\s+)?(.+)$/;
+/**
+ * BOTH SPELLINGS OF «גיאומטרי», because both are how it is written (#1210).
+ *
+ * Operator: «המקום הגאומטרי של M» returned «לא הבנתי את השאלה» while «המקום הגיאומטרי» worked. The
+ * yud is optional in Hebrew orthography — *ktiv male* «גיאומטרי» and *ktiv haser* «גאומטרי** are the
+ * same word, and a student who omits it has not made a mistake. Refusing one of them teaches a
+ * spelling rather than answering a question, which is the defect #1156/#1183 named.
+ *
+ * `י?` rather than a second alternation: one character, at the one place they differ.
+ */
+const LOCUS_OF = /^(?:ה?מקום\s+ה?גי?אומטרי|[Tt]he\s+locus|[Ll]ocus)\s+(?:של\s+|of\s+)?(?:ה?נקודה\s+)?(.+)$/;
 
 /**
  * Answer one question against the figure the student has built.

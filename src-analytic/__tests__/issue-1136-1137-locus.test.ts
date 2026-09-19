@@ -157,9 +157,11 @@ describe('#1137 — the determinacy gate (ADR-AG-072 §4, §5)', () => {
     expect(a.locus!.points.length).toBeGreaterThan(20);
   });
 
-  it('חורף 25 is determinate: «מעגל» AND (x − 16)² + y² = 625', () => {
+  it('חורף 25 is determinate: «מעגל» AND (x − 16)² + y² = 25² (#1187 — was 625)', () => {
     const a = answer(WINTER25, 'המקום הגיאומטרי של P');
-    expect(a.value).toBe('מעגל · (x − 16)² + y² = 625');
+    // #1187, operator's T31: «the radius in equation should show as 25^2 and not 625» — the row's
+    // job is to say what the circle IS, and 625 makes the student take a square root to find out.
+    expect(a.value).toBe('מעגל · (x − 16)² + y² = 25²');
   });
 
   /**

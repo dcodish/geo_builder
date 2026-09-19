@@ -117,7 +117,7 @@ describe('#1176 — the point lies on its own locus', () => {
       expect(
         ask(derive(['A(-9,0)', 'B(41,0)', 'נקודה P', 'PA מאונך ל-PB'], seed), 'המקום הגיאומטרי של P', fmtAnalytic, kind).value,
         `חורף 25 at seed ${seed}`,
-      ).toBe('מעגל · (x − 16)² + y² = 625');
+      ).toBe('מעגל · (x − 16)² + y² = 25²'); // #1187
     }
   });
 

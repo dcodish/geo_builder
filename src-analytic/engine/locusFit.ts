@@ -426,8 +426,24 @@ export function locusEquation(shape: LocusShape, fmt: (v: number) => string): st
       const konst = Math.abs(f) < 1e-12 ? '' : ` ${f > 0 ? '−' : '+'} ${fmt(Math.abs(f))}`;
       return `${lhs} = ${rhs}${konst}`;
     }
-    case 'circle':
-      return `${shift('x', c.cx)}² + ${shift('y', c.cy)}² = ${fmt(c.r * c.r)}`;
+    case 'circle': {
+      /**
+       * THE RIGHT-HAND SIDE IS `r²`, WRITTEN AS `r²` (#1187).
+       *
+       * Operator, playing T31: *"the radius in equation should show as 25^2 and not 625"*. He is
+       * right, and it is not a formatting preference — `(x − 16)² + y² = 625` makes the student
+       * compute a square root to find the radius the tool already knows, on a row whose whole job is
+       * to tell them what the circle IS. The exam writes `= 25²`.
+       *
+       * Only when the radius is a clean value to square: `fmt(r)` must round-trip, or `= 12.25²`
+       * would be a worse row than the number it replaced. Otherwise the square stands as it did.
+       */
+      const r2 = c.r * c.r;
+      const shown = fmt(c.r);
+      const exact = Number.parseFloat(shown);
+      const clean = Number.isFinite(exact) && Math.abs(exact * exact - r2) < 1e-9;
+      return `${shift('x', c.cx)}² + ${shift('y', c.cy)}² = ${clean ? `${shown}²` : fmt(r2)}`;
+    }
     case 'parabola':
       return `y² = ${fmt(2 * c.p)}x`;
     case 'ellipse':

@@ -5649,3 +5649,29 @@ Saying why: that seed draws its locus over ~974 units while `A` and `B` sit 8 ap
 ### What this unblocks
 
 [#1191](https://github.com/dcodish/geo_builder/issues/1191) is a P1 about `4y = −3x + 25` rendering as `4 · ישר y = −3x + 25` on the canvas. While #1224 stood, that figure printed «ישר» with nothing after it — **so the P1's fix could not be play-verified at all**, and its play case was marked unplayable on the operator's sheet. That figure now produces the label, which is what makes the P1 checkable.
+
+## ADR-AG-107 — The yud is optional, and a circle states its radius squared (#1210, #1187)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the locus lane answers the question the student asked, in the exam's notation; no new row. **Design:** [04c](04c-design-analytic.md) — the locus question's pattern and the circle's equation. **LADDER stage:** parse + display.
+
+The last two of the three things standing between PR #1172 and its merge, and therefore between the P1s (#1191, #1176) and production. The third was ADR-AG-106.
+
+### #1210 — refusing a spelling answers a spelling, not a question
+
+«המקום הגאומטרי של M» returned «לא הבנתי את השאלה» while «המקום הגיאומטרי» worked.
+
+*Ktiv male* «גיאומטרי» and *ktiv haser* «גאומטרי** are the same word. A student who omits the yud has made no mistake, and a tool that refuses one of them is teaching orthography on a geometry question — the class #1156 and #1183 named, where the remedy offered is about the student's typing rather than their figure.
+
+`י?` — one optional character at the one place the two forms differ, rather than a second alternation that could drift. The lock asserts eight neighbouring forms still resolve, and that the pattern did not become a wildcard: «שיפוע AB» is still not a locus question.
+
+### #1187 — the row's job is to say what the circle IS
+
+**Operator, playing T31:** *"the radius in equation should show as 25^2 and not 625"*.
+
+`(x − 16)² + y² = 625` makes the student take a square root to recover a radius the tool already holds, on the one row that exists to tell them. The exam writes `= 25²`.
+
+**Conditional on the radius being worth squaring.** The squared form is shown only when the displayed radius round-trips — `fmt(r)` parsed back and squared must equal the constant. Otherwise `= 12.25²` would be a worse row than the number it replaces, and a tidy-looking square that does not hold would misstate the figure. When it does not round-trip the plain constant stands, exactly as before.
+
+### Three existing locks asserted the old form, and were updated with the reason
+
+`issue-1136-1137-locus`, `issue-1176-locus-configuration` and `issue-1224-slanted-locus` all asserted `= 625` — the last of them written earlier the same day. Each now asserts `= 25²` and carries the operator's ruling inline, so the next session reads *why* the expected value changed rather than finding a bare edit. The `(x − 16)² + y²` half is asserted separately, because #1187 changes one side of the equation and must not be read as licence to restyle the other.
