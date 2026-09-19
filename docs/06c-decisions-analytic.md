@@ -6350,3 +6350,65 @@ Verified to bite: removing the two digit alternatives turns **8 of 20** red.
 ### Consequences
 
 `parser/parseAnalytic.ts` (the token and its four consumers), `parser/catalogAnalytic.ts` (one row — the card's job is to show the digit form exists, and the numeral is the only thing that varies).
+
+## ADR-AG-119 — Every notation for a distance is rewritten into the ONE question it already is (#1128)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the distance spellings, and which nouns may be dropped. **Design:** [04c](04c-design-analytic.md) / this entry — the two normalisations and where they sit. **LADDER stage:** parse. No engine, solver or render change. **Extends** [ADR-AG-…/#1151](#adr-ag-091) (the role decision) and #1048 (point-to-line).
+
+**Operator ruling, 2026-09-16:** *"`d_{AB}` should also work for questions. as well as `|AB|`"* — and, on the spelling list, *"we need to support all of these"*. And, playing the round of 2026-09-19: *"אורך הקטע BC = 10 is not recognized in analytics tool"*.
+
+### Measured first, and the issue's table was stale
+
+```
+AB = 10                      OK          המרחק בין A ל-B = 10       OK    ← already worked
+d_{AB} = 10                  not-handled  המרחק AB = 10              not-handled
+d(A,B) = 10                  not-handled  אורך AB = 10               not-handled
+|AB| = 10                    not-handled  אורך הקטע AB = 10          not-handled
+המרחק מ-A לישר l1 = 3        OK          הקטע AB = 10               not-handled
+```
+
+**Two of the issue's claims had gone out of date and are corrected here rather than inherited.** Its table says no «מרחק» sentence parses at all — three of them do, and have since #1151. And it splits the point-to-LINE distance out as part (b), *"a CAPABILITY, not a spelling"*, to be built after #1048: measured, «המרחק מ-A לישר l1 = 3» **already works**, so (b) landed from the other direction while this issue waited. What was actually missing was narrower and more embarrassing: every plain Hebrew word for a length, and every textbook notation.
+
+### The notations are rewritten into the worded question, not given rules of their own
+
+`d_{AB}`, `d_{A,B}`, `d(A,B)` and `|AB|` become «המרחק בין X ל-Y» *before* the distance frames run. They are then read by the frames that already exist, which means **the role decision happens in the one place #1151 put it** — a spelling cannot disagree with its own synonym, and no second copy of "which operand is a point and which is a line" comes into existence ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)).
+
+That choice pays immediately: **`d_{A,l1}` works for free.** The frame reads `l1` as a line exactly as the worded form does, so the symbolic spelling inherits the point-to-line capability instead of being refused beside its own synonym. Giving the notations their own point-pair patterns would have produced precisely that split — and worse, a pattern restricted to point names would let `d_{A,l1}` fall through to `LENGTH_TOKEN`, which would eat a pair out of the middle of it and answer a **different measurement**. That is the honesty failure #1151 records for the English form, and it is the reason the operands here are deliberately unrestricted.
+
+### A length noun is dropped only where it adds nothing — and the boundary is the point
+
+«אורך AB», «הקטע AB», «צלע AB», «המרחק AB» → the pair speaks for itself. The lookahead is the whole safety: the noun is removed only where a point pair follows it **immediately**, so «הקטע» in any other sentence is untouched, and «המרחק בין A ל-B» — already consumed by the frames — never reaches this step.
+
+**What is NOT in the list is the load-bearing half.** «תיכון», «גובה», «שוק», «בסיס», «יתר» each assert something BESIDES a length — that the segment is a median, a height, a leg, a base, a hypotenuse. Reducing «התיכון BC = 10» to `|BC| = 10` would drop the median claim silently, which is the invariant this repo treats as cardinal. They stay refused until the tool can honour both halves. And «הישר BC = 10» stays refused for its own reason: **a line has no length**, which is ADR-AG-111's extent ruling and must not be overturned sideways from a distance fix.
+
+### ⚠ Three rows of #1246's lock MOVED
+
+`issue-1246-equation-claim.test.ts` asserted «הקטע BC = 10», «הצלע BC = 10» and «אורך הקטע BC = 10» were `not-handled`. That was correct *at the time*: #1246's ruling was «never bad-equation», and `not-handled` was the best answer available to it, not its goal — that file's own header says *"They wrote a LENGTH."*
+
+They are **moved, not deleted**, into this issue's lock with the opposite expectation, and a comment stands in their place explaining why the other five stay. A lock that simply disappears looks like coverage nobody wrote. This is the same discipline ADR-527 used earlier in the same run.
+
+### ⚠ What is NOT built: the copula
+
+«אורך הקטע AB **הוא** 10» is still refused, where «... = 10» is accepted. `LENGTH_EQ` takes a literal `=` and does not admit `HE_IS`, the closed copula token the rest of the file uses.
+
+Filed as **[#1260](https://github.com/dcodish/geo_builder/issues/1260)** rather than folded in, and the reason is specific: **this is the shape of tonight's own P1.** #1248 (ADR-524 Am. 1) was a length connective that was too generous — «אורך הקטע BC > 10» committed `set-distance: 10`, a stated RANGE becoming an EQUALITY at its own bound, invisible to every honesty gate because the number *was* accounted for, by the wrong constraint. Widening a length rule's connective at the end of a long run, in that same file class, is how that P1 comes back. The bound-word guard has to be the first lock, not an afterthought.
+
+Measured while deciding: the obvious collision does **not** fire — «AD הוא תיכון לצלע BC» survives a widened connective, because `parseExpr` rejects the prose tail and the rule falls through to the cevian rule below. Recorded so #1260 starts from a fact rather than re-deriving it, and so it knows to LOCK that property rather than rely on it.
+
+### The chip
+
+The `d_{}` palette button the operator asked for could not exist until `d_{AB}` parsed — a chip whose output the grammar refuses hands the student `not-handled` on their own click. It is **copied from complex** (#791/#525): same label, same wrap, so a student moving between the two tools finds one button rather than two spellings of an idea.
+
+`SYMBOLS` is now **exported**, which it was not. That is what lets a test prove a button's insertion parses, and it is what #1129 (the palette's missing totality guard) needs; this issue proves only the one button it adds.
+
+### Lock
+
+`issue-1128-distance-spellings.test.ts` (65). The claim is **equality, not thirteen geometry assertions**: each spelling is asserted to produce the same term, the same figure and the same answer as `AB` — thirteen independent expectations would pass while two spellings quietly disagreed, and would re-state the grammar inside the test. Both surfaces are asserted rather than inferred from the shared `parseLengthExpr` call, because that shared call is exactly what a later refactor could break silently.
+
+Plus the boundary rows (the five claim-carrying nouns and «הישר» still refused), the moved #1246 rows, the `d_{A,l1}` inheritance, and the chip driven through `applySymbol` rather than assumed.
+
+Verified to bite, both halves independently: disabling the symbolic rewrite turns **19 of 65** red; disabling the noun strip turns **23** red.
+
+### Consequences
+
+`engine/lengths.ts` (the two normalisations), `parser/catalogAnalytic.ts` (three rows — one per family of spelling, since the lock already proves the thirteen equal), `App.tsx` (the chip, and the export), `i18n/index.ts` (both locales), `__tests__/issue-1246-equation-claim.test.ts` (three rows moved out).

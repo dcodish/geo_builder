@@ -1522,14 +1522,27 @@ function uniqueSegments(segments: readonly { id: string; ends: [string, string] 
   });
 }
 
-/** The product's symbol palette — only the glyphs this tool's grammar actually uses (#525). */
-const SYMBOLS = [
+/**
+ * The product's symbol palette — only the glyphs this tool's grammar actually uses (#525).
+ *
+ * EXPORTED (#1128) so a test can prove each button's insertion parses. It was private, and a chip
+ * whose output the grammar refuses is a button that hands the student `not-handled` — which is why
+ * the `d_{}` chip could not be added until `d_{AB}` parsed. The full totality guard over every
+ * glyph is #1129; this export is what that issue needs and what #1128's own lock uses for its chip.
+ */
+export const SYMBOLS = [
   { label: '²', before: '^2' },
   { label: '√', before: '√' },
   { label: 'ℓ', before: 'ℓ' },
   { label: '≤', before: '<=' },
   { label: '≥', before: '>=' },
   { label: '≠', before: '≠' },
+  /**
+   * The distance chip (#1128), asked for by the operator with the analytic palette request and
+   * COPIED FROM COMPLEX (#791/#525) — same label, same wrap — so a student moving between the two
+   * tools finds the same button rather than two spellings of one idea.
+   */
+  { label: 'd_{}', titleKey: 'symDist', before: 'd_{', after: '}' },
 ] as const;
 
 /**

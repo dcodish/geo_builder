@@ -1230,6 +1230,26 @@ written in either order.
 the missing object; it never answers «לא ניתן לחשב מהנתונים», which is a claim about the figure rather
 than about the question.
 
+**Every NOTATION for a distance is the same question** ([ADR-AG-119](06c-decisions-analytic.md#adr-ag-119),
+[#1128](https://github.com/dcodish/geo_builder/issues/1128)). **Operator ruling, 2026-09-16:**
+*"`d_{AB}` should also work for questions. as well as `|AB|`"*, and on the spelling list,
+*"we need to support all of these"*.
+
+`AB` · `d_{AB}` · `d_{A,B}` · `d(A,B)` · `|AB|` · «המרחק בין A ל-B» · «המרחק בין A לבין B» ·
+«המרחק מ-A ל-B» · «המרחק AB» · «אורך AB» · «אורך הקטע AB» · «הקטע AB» · «צלע AB» — one term, on both
+surfaces. Before this a student had exactly one way in, the symbolic `AB = 10`, and every plain
+Hebrew word for a length was refused.
+
+**A length noun is admitted only when it adds NOTHING to the pair it precedes.** «הקטע», «צלע»,
+«אורך» and «מרחק» name the measurement and no more, so «הקטע AB = 10» is `|AB| = 10`. «תיכון»,
+«גובה», «שוק», «בסיס» and «יתר» each assert something BESIDES a length — that the segment is a
+median, a height, a leg, a base, a hypotenuse — and reading those as a bare length would drop the
+student's claim silently, so they stay refused until the tool can honour both halves. «הישר AB» is
+refused for its own reason: a line has no length (R103's extent ruling).
+
+**Still refused, and filed:** the Hebrew copula. «אורך הקטע AB הוא 10» is not accepted where
+«אורך הקטע AB = 10» is — [#1260](https://github.com/dcodish/geo_builder/issues/1260).
+
 **A stated curve is nameable however it entered the figure**
 ([#1149](https://github.com/dcodish/geo_builder/issues/1149)). A line the student first used to carry
 a point and then stated on its own is the SAME line as one stated outright, and behaves identically —
