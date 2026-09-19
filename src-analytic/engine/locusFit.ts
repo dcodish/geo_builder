@@ -31,7 +31,6 @@
  * answer. **If it will not snap, print nothing** — the kind still shows, and that is the honest half.
  */
 import { classify, type Conic } from './conic';
-import { fractionClearingFactor } from '../format';
 import type { NumCurve } from './types';
 
 export interface LocusPt {
@@ -381,75 +380,13 @@ export function shapeOfTrace(pts: readonly LocusPt[]): LocusShape | null {
 }
 
 /**
- * THE LOCUS'S EQUATION, written the way a student writes it — or `null`.
+ * `locusEquation` MOVED to `app/curveText.ts` (#1197).
  *
- * `null` whenever the shape carries no snapped conic, which is the determinacy gate's «shape only»
- * verdict reaching the surface: the row then says «מעגל» and prints no equation, exactly as ruled.
- *
- * The CANONICAL form per family, not the general six-coefficient one: nobody answers
- * «x² + y² − 32x − 369 = 0» when the question asks for a locus — they answer
- * «(x − 16)² + y² = 625». The numbers come from the classified curve, whose values were derived from
- * the snapped coefficients, so they are the exact ones.
- *
- * `fmt` is the CALLER's formatter for the same reason it is everywhere else in this lane: this tree
- * has no private display rounder, and a second one here is how two surfaces of one panel start
- * disagreeing about what `4/3` looks like.
+ * It produces a sentence for a student, not a fact about the figure — and once it had to write a
+ * line the way the panel writes one, it needed `lineText`, which lives in `app/`. An engine module
+ * importing upward would have been the real cost of keeping it here: this layer reasons about
+ * points, lines and constraints, and holds no notation.
  */
-export function locusEquation(shape: LocusShape, fmt: (v: number) => string): string | null {
-  if (!shape.conic) return null;
-  const c = shape.curve;
-  // `x`, `x − 3`, `x + 3` — the bracketed term of a translated conic, with the no-op omitted.
-  const shift = (v: string, k: number) =>
-    Math.abs(k) < 1e-12 ? v : `(${v} ${k > 0 ? '−' : '+'} ${fmt(Math.abs(k))})`;
-  switch (c.kind) {
-    case 'line': {
-      const { D, E, F } = shape.conic;
-      // `x = 4/3` and `y = 4/3` are STANDALONE values — nothing follows them, nothing to misread.
-      if (Math.abs(E) < 1e-12) return `x = ${fmt(-F / D)}`;
-      if (Math.abs(D) < 1e-12) return `y = ${fmt(-F / E)}`;
-      /**
-       * …but a SLOPE is a COEFFICIENT, and `y = 4/3x + 2` carries #1180's ambiguity exactly: it reads
-       * as `4/(3x)` at least as naturally as `(4/3)x`. Reported against the panel's curve row and
-       * ruled there — *clear the fractions from the whole equation* — so the same treatment applies
-       * here rather than leaving one surface ambiguous because nobody happened to look at it.
-       *
-       * `fractionClearingFactor` is the helper that ruling produced, and it returns 1 when there is
-       * nothing to clear, so an integer slope is untouched.
-       */
-      const k = fractionClearingFactor([D, E, F]) ?? 1;
-      const [d, e, f] = [D * k, E * k, F * k];
-      const yPart = Math.abs(e) === 1 ? 'y' : `${fmt(Math.abs(e))}y`;
-      const lhs = e < 0 ? `−${yPart}` : yPart;
-      // `dx + ey + f = 0` → `ey = −dx − f`, signs folded as they are written.
-      const xMag = Math.abs(d) === 1 ? '' : fmt(Math.abs(d));
-      const rhs = `${d > 0 ? '−' : ''}${xMag}x`;
-      const konst = Math.abs(f) < 1e-12 ? '' : ` ${f > 0 ? '−' : '+'} ${fmt(Math.abs(f))}`;
-      return `${lhs} = ${rhs}${konst}`;
-    }
-    case 'circle': {
-      /**
-       * THE RIGHT-HAND SIDE IS `r²`, WRITTEN AS `r²` (#1187).
-       *
-       * Operator, playing T31: *"the radius in equation should show as 25^2 and not 625"*. He is
-       * right, and it is not a formatting preference — `(x − 16)² + y² = 625` makes the student
-       * compute a square root to find the radius the tool already knows, on a row whose whole job is
-       * to tell them what the circle IS. The exam writes `= 25²`.
-       *
-       * Only when the radius is a clean value to square: `fmt(r)` must round-trip, or `= 12.25²`
-       * would be a worse row than the number it replaced. Otherwise the square stands as it did.
-       */
-      const r2 = c.r * c.r;
-      const shown = fmt(c.r);
-      const exact = Number.parseFloat(shown);
-      const clean = Number.isFinite(exact) && Math.abs(exact * exact - r2) < 1e-9;
-      return `${shift('x', c.cx)}² + ${shift('y', c.cy)}² = ${clean ? `${shown}²` : fmt(r2)}`;
-    }
-    case 'parabola':
-      return `y² = ${fmt(2 * c.p)}x`;
-    case 'ellipse':
-      return `x²/${fmt(c.a * c.a)} + y²/${fmt(c.b * c.b)} = 1`;
-  }
-}
 
 /**
  * THE DETERMINACY GATE — a two-seed SET comparison, and it is the honesty gate (ADR-AG-072 §4).

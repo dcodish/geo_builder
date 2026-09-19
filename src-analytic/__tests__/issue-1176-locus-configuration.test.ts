@@ -25,7 +25,8 @@ import { describe, expect, it } from 'vitest';
 import { ask } from '../app/ask';
 import { derive } from '../engine/derive';
 import { locusOf } from '../engine/locus';
-import { locusEquation, snapAndVerify } from '../engine/locusFit';
+import { snapAndVerify } from '../engine/locusFit';
+import { locusEquation } from '../app/curveText';
 import { fmtAnalytic } from '../format';
 
 /** חורף 25 with the exam's own parameter — the locus is a different circle at every `a`. */
@@ -113,7 +114,7 @@ describe('#1176 — the point lies on its own locus', () => {
       expect(
         ask(derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], seed), 'המקום הגיאומטרי של M', fmtAnalytic, kind).value,
         `bisector at seed ${seed}`,
-      ).toBe('ישר · x = 4');
+      ).toBe('ישר · x - 4 = 0');
       expect(
         ask(derive(['A(-9,0)', 'B(41,0)', 'נקודה P', 'PA מאונך ל-PB'], seed), 'המקום הגיאומטרי של P', fmtAnalytic, kind).value,
         `חורף 25 at seed ${seed}`,
@@ -133,7 +134,7 @@ describe('#1176 — the point lies on its own locus', () => {
     const kind = ((k: string) => (k === 'line' ? 'ישר' : k)) as never;
     expect(
       ask(derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 1), 'המקום הגיאומטרי של M', fmtAnalytic, kind).value,
-    ).toBe('ישר · x = 4');
+    ).toBe('ישר · x - 4 = 0');
   });
 
   /**
@@ -159,7 +160,7 @@ describe('#1176 — the point lies on its own locus', () => {
   it('an ill-conditioned configuration still reaches its TRUE equation (#1224)', () => {
     const kind = ((k: string) => (k === 'line' ? 'ישר' : k)) as never;
     const v = ask(derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 2), 'המקום הגיאומטרי של M', fmtAnalytic, kind).value;
-    expect(v).toBe('ישר · x = 4');
+    expect(v).toBe('ישר · x - 4 = 0');
   });
 
   it('AND AN EQUATION THAT FAILS THE TRACE IS STILL REFUSED — the rule #1224 did not touch', () => {
@@ -197,7 +198,7 @@ describe('#1176 — a locus equation carries no fraction as a coefficient', () =
       curve: { kind: 'line' as const, a: -4 / 3, b: 1, c: -2 },
       conic: { A: 0, B: 0, C: 0, D: -4 / 3, E: 1, F: -2 },
     };
-    expect(locusEquation(shape, fmtAnalytic)).toBe('3y = 4x + 6');
+    expect(locusEquation(shape, fmtAnalytic)).toBe('-4x + 3y - 6 = 0');
   });
 
   it('an integer slope is untouched', () => {
@@ -205,7 +206,7 @@ describe('#1176 — a locus equation carries no fraction as a coefficient', () =
       curve: { kind: 'line' as const, a: -2, b: 1, c: 0 },
       conic: { A: 0, B: 0, C: 0, D: -2, E: 1, F: 0 },
     };
-    expect(locusEquation(shape, fmtAnalytic)).toBe('y = 2x');
+    expect(locusEquation(shape, fmtAnalytic)).toBe('-2x + y = 0');
   });
 
   /** The two axis-parallel arms are STANDALONE values — nothing follows them, so they keep a fraction. */
@@ -214,6 +215,6 @@ describe('#1176 — a locus equation carries no fraction as a coefficient', () =
       curve: { kind: 'line' as const, a: 1, b: 0, c: -4 / 3 },
       conic: { A: 0, B: 0, C: 0, D: 1, E: 0, F: -4 / 3 },
     };
-    expect(locusEquation(vert, fmtAnalytic)).toBe('x = 4/3');
+    expect(locusEquation(vert, fmtAnalytic)).toBe('3x - 4 = 0');
   });
 });

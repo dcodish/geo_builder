@@ -37,7 +37,7 @@ describe('#1210 — the question is understood however the student spells it', (
     const without = askOn(BISECTOR, 'המקום הגאומטרי של M');
     expect(without.unreadable, 'ktiv haser was «לא הבנתי את השאלה»').toBeFalsy();
     expect(without.value).toBe(withYud.value);
-    expect(without.value).toBe('ישר · x = 4');
+    expect(without.value).toBe('ישר · x - 4 = 0');
   });
 
   it('the neighbouring forms still work — the fix is one character, not a widening', () => {
@@ -51,7 +51,7 @@ describe('#1210 — the question is understood however the student spells it', (
       'locus of M',
       'the locus of M',
     ]) {
-      expect(askOn(BISECTOR, q).value, q).toBe('ישר · x = 4');
+      expect(askOn(BISECTOR, q).value, q).toBe('ישר · x - 4 = 0');
     }
   });
 

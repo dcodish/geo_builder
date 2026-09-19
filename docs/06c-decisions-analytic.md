@@ -5675,3 +5675,37 @@ The last two of the three things standing between PR #1172 and its merge, and th
 ### Three existing locks asserted the old form, and were updated with the reason
 
 `issue-1136-1137-locus`, `issue-1176-locus-configuration` and `issue-1224-slanted-locus` all asserted `= 625` — the last of them written earlier the same day. Each now asserts `= 25²` and carries the operator's ruling inline, so the next session reads *why* the expected value changed rather than finding a bare edit. The `(x − 16)² + y²` half is asserted separately, because #1187 changes one side of the equation and must not be read as licence to restyle the other.
+
+## ADR-AG-108 — One printer for a line, and it is the panel's (#1197)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — a line is written `Ax + By + C = 0` wherever it is shown; no new row. **Design:** [04c](04c-design-analytic.md) — the locus label's notation, and where `locusEquation` lives. **LADDER stage:** display only.
+
+**Operator, twice.** 2026-09-18, playing round #1193 T10: *"when a line is shown - we always write it as Ax+By+C=0 and not like the image has"*. And again 2026-09-19, playing T54 on the integrated branch: *"the line needs to be in the format of Ax+By+C=0 and not like it is now"*.
+
+### The convention was already written down; the lane had its own
+
+```
+the data panel (lineText)        3x + 4y - 25 = 0     ✅ the convention
+the locus label (locusEquation)  4y = −3x + 25        ❌
+```
+
+Two printers for one object, two inches apart on the same screen. `lineText`'s own docblock is the rule — *"written the way a textbook writes it: no `1x`, no `+ 0`, no `+ -3`"* — and it already carries #1180's fraction clearing and #1119's magnitude rule. The locus lane reimplemented the notation instead of calling it, which is the failure [ADR-W-053](06w-decisions-workspace.md#adr-w-053) names, in the direction that is easiest to miss: not a test reproducing a decision, but a second *implementation* of one.
+
+### The move that made the call possible
+
+`lineText` lives in `app/curveText.ts`; `locusEquation` lived in `engine/locusFit.ts`. An engine module importing upward would have been the real cost of a one-line fix.
+
+So `locusEquation` moved **up** into `app/curveText.ts` — which is the right home on its own terms, and the mirror of what #1201 did when it moved line *resolution* DOWN into the engine. The test is what the thing IS: resolution is geometry and belongs below; notation is a sentence for a student and belongs above. `ask.ts`, in `app/`, was already its only production caller.
+
+The line branch now calls `lineText(D, E, F)` on the **snapped** coefficients — the exact ones the determinacy gate accepted — and `lineText` clears the fractions itself. Circle, parabola and ellipse keep their canonical forms: `Ax + By + C = 0` is the convention for a LINE, and `(x − 16)² + y² = 25²` is how a circle is written.
+
+```
+x = 4               →  x - 4 = 0
+y = 4               →  y - 4 = 0
+4y = −3x + 25       →  3x + 4y - 25 = 0
+y = −x + 4          →  x + y - 4 = 0
+```
+
+### Twenty-three assertions, changed with the reason attached
+
+Four locus test files asserted the retired notation, across 23 places. Each pair was listed explicitly in the migration rather than pattern-matched, so a wrong pair would be visible in review — `y = 2x` and `-2x + y = 0` are the same line, and a script that guessed could quietly have made them different ones. The prose in those files was updated too, so no file describes a notation it no longer asserts.

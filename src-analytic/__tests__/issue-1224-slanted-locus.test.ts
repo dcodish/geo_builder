@@ -6,7 +6,7 @@
  * ordinary one.
  *
  * ```
- * B(8,0)   bisector x = 4         «ישר · x = 4»   ✓
+ * B(8,0)   bisector x = 4         «ישר · x - 4 = 0»   ✓
  * B(0,8)   bisector y = 4         «ישר · y = 4»   ✓
  * B(6,8)   bisector 3x + 4y = 25  «ישר»           ✗  drawn correctly, no equation
  * B(4,4)   bisector at 45°        «ישר»           ✗
@@ -55,19 +55,19 @@ const bisector = (b: string) =>
 describe('#1224 — a locus states its equation whatever its slope or scale', () => {
   it('a SLANTED bisector prints one — the case the feature is for', () => {
     // 3x + 4y = 25, written with the fractions cleared (#1180) as the panel writes lines.
-    expect(bisector('B(6,8)')).toBe('ישר · 4y = −3x + 25');
-    expect(bisector('B(4,4)')).toBe('ישר · y = −x + 4');
+    expect(bisector('B(6,8)')).toBe('ישר · 3x + 4y - 25 = 0');
+    expect(bisector('B(4,4)')).toBe('ישר · x + y - 4 = 0');
   });
 
   it('and so does the SMALL axis-aligned one that also failed', () => {
     // The case that proved it was scale, not orientation.
-    expect(bisector('B(2,0)')).toBe('ישר · x = 1');
+    expect(bisector('B(2,0)')).toBe('ישר · x - 1 = 0');
   });
 
   it('the cases that already worked are unchanged', () => {
-    expect(bisector('B(8,0)')).toBe('ישר · x = 4');
-    expect(bisector('B(0,8)')).toBe('ישר · y = 4');
-    expect(bisector('B(10,0)')).toBe('ישר · x = 5');
+    expect(bisector('B(8,0)')).toBe('ישר · x - 4 = 0');
+    expect(bisector('B(0,8)')).toBe('ישר · y - 4 = 0');
+    expect(bisector('B(10,0)')).toBe('ישר · x - 5 = 0');
   });
 
   it('the חורף 25 circle is unchanged', () => {
@@ -113,10 +113,10 @@ describe('#1224 — a locus states its equation whatever its slope or scale', ()
 
   it('#1191’s own figure now produces the label that issue is about', () => {
     /**
-     * The P1 was filed against `4y = −3x + 25` rendering as `4 · ישר y = −3x + 25` on the canvas. While
+     * The P1 was filed against `3x + 4y - 25 = 0` rendering as `4 · ישר y = −3x + 25` on the canvas. While
      * #1224 stood, that figure printed «ישר» with nothing after it — so the P1's fix could not be
      * play-verified at all. This is what unblocks it.
      */
-    expect(bisector('B(6,8)')).toContain('4y = −3x + 25');
+    expect(bisector('B(6,8)')).toContain('3x + 4y - 25 = 0');
   });
 });

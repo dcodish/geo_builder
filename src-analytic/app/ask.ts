@@ -24,11 +24,11 @@ import { derive, type Derivation } from '../engine/derive';
 import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
 import { isKnowledge, knownCurve } from '../engine/evaluate';
 import { locusOf } from '../engine/locus';
-import { locusEquation } from '../engine/locusFit';
+
 import { objectById, type Id } from '../engine/types';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { asPair, lineNamed } from './lines';
-import { curveParts } from './curveText';
+import { curveParts, locusEquation } from './curveText';
 
 /** The question is EXACTLY one point-to-line distance, for the same reason `BARE_LENGTH` exists. */
 const POINT_LINE_ONLY = /^(?:ה?מרחק|[Dd]istance)\s+\S.*$/;

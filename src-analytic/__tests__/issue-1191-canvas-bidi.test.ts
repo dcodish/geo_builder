@@ -23,7 +23,7 @@
  * | circle | `(x − 16)² + y² = 625` | `(` then `x` | correct |
  * | parabola | `y² = 8x` | `y` | correct |
  * | line, unit `y` | `x = 4` | `x` | correct |
- * | **line, non-unit `y`** | **`4y = −3x + 25`** | **`4`** | **scrambled** |
+ * | **line, non-unit `y`** | **`3x + 4y - 25 = 0`** | **`4`** | **scrambled** |
  *
  * ## What is asserted, and why it is not a reproduction
  *
@@ -68,7 +68,7 @@ const locusLabelOnCanvas = (lines: string[], seed: number, who: string) => {
 describe('#1191 — the reported label', () => {
   it('the locus label on the canvas is ISOLATED, and says what the panel says', () => {
     const { value, label } = locusLabelOnCanvas(OPERATOR, 1, 'M');
-    expect(value, 'the configuration that prints an equation').toBe('ישר · 4y = −3x + 25');
+    expect(value, 'the configuration that prints an equation').toBe('ישר · 3x + 4y - 25 = 0');
     expect(label, 'the canvas must isolate the run the panel already isolates').toBe(
       analyticBidi.isolateLtrRuns(value as string),
     );
@@ -98,7 +98,7 @@ describe('#1191 — the reported label', () => {
    */
   it('the axis-parallel case is isolated too, though it read correctly without it', () => {
     const { value, label } = locusLabelOnCanvas(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 0, 'M');
-    expect(value).toBe('ישר · x = 4');
+    expect(value).toBe('ישר · x - 4 = 0');
     expect(label).toBe(analyticBidi.isolateLtrRuns(value as string));
   });
 });
@@ -149,8 +149,8 @@ describe('#1191 — every canvas label channel goes through the chokepoint', () 
   it('a pure-LTR label is left alone', () => {
     const d = derive(['A(0,0)', 'B(6,8)'], 0);
     const s = buildScene(d.figure, d.box, 600, 400, {
-      loci: [{ points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], closed: false, label: '4y = −3x + 25' }],
+      loci: [{ points: [{ x: 0, y: 0 }, { x: 1, y: 1 }], closed: false, label: '3x + 4y - 25 = 0' }],
     });
-    expect(s.loci[0]?.label?.text).toBe('4y = −3x + 25');
+    expect(s.loci[0]?.label?.text).toBe('3x + 4y - 25 = 0');
   });
 });

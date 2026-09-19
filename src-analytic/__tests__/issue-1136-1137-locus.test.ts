@@ -153,7 +153,7 @@ describe('#1137 — the determinacy gate (ADR-AG-072 §4, §5)', () => {
   it('the bisector is determinate: «ישר» AND its equation', () => {
     const a = answer(BISECTOR, 'המקום הגיאומטרי של M');
     expect(a.unreadable).toBeUndefined();
-    expect(a.value).toBe('ישר · x = 4');
+    expect(a.value).toBe('ישר · x - 4 = 0');
     expect(a.locus!.points.length).toBeGreaterThan(20);
   });
 
@@ -207,7 +207,7 @@ describe('#1137 — the determinacy gate (ADR-AG-072 §4, §5)', () => {
 describe('#1137 — the ask lane', () => {
   it('reads the Hebrew and the English, with and without «של»', () => {
     for (const q of ['המקום הגיאומטרי של M', 'המקום הגיאומטרי M', 'locus of M', 'the locus of M']) {
-      expect(answer(BISECTOR, q).value, q).toBe('ישר · x = 4');
+      expect(answer(BISECTOR, q).value, q).toBe('ישר · x - 4 = 0');
     }
   });
 
@@ -254,6 +254,6 @@ describe('#1137 — the ask lane', () => {
     expect(drawnLoci([a])).toHaveLength(1);
     expect(drawnLoci([{ ...a, shown: false }])).toHaveLength(0);
     // The label the canvas draws is the answer's own value, so the two cannot disagree.
-    expect(drawnLoci([a])[0].label).toBe('ישר · x = 4');
+    expect(drawnLoci([a])[0].label).toBe('ישר · x - 4 = 0');
   });
 });
