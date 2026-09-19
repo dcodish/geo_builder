@@ -27,7 +27,8 @@ import { parseLengthExpr } from '../engine/lengths';
 import { parseLine } from '../parser/parseAnalytic';
 import { derive } from '../engine/derive';
 import { ask } from '../app/ask';
-import { SYMBOLS } from '../App';
+// #1129 moved the palette out of App.tsx into its own module; this import followed it.
+import { SYMBOLS } from '../ui/symbols';
 import { applySymbol } from '../../shell/symbols';
 
 /** Every spelling of «the distance from A to B», which is what they all have to be. */

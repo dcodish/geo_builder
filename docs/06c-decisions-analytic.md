@@ -6546,3 +6546,64 @@ Verified to bite: reverting the line branch to #1212's turns **7 of 13** red.
 ### Consequences
 
 `app/curveText.ts` (`explicitLineText`, `slopeOf`, `explicitTerm`, `CurveWords`, and the line branch), `App.tsx` (passes the word), `__tests__/issue-1212-curve-equation.test.ts` and `__tests__/issue-1214-curve-noun.test.ts` (one row each, moved).
+
+## ADR-AG-122 — The palette becomes a module with a parse lock, and gains the six chips its grammar now supports (#1129)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the palette row. **Design:** none (internal). **LADDER stage:** none — UI declaration plus one tokeniser constant. **Ports** `src-complex/__tests__/symbols-module.test.ts`. **Depends on** #1127 and [ADR-AG-119](#adr-ag-119) (#1128), both landed in this same run.
+
+**Operator, 2026-09-16:** *"another item for analytics is the symbols pallet. we need all relevant ones for analytics and we probably need to add `d_{}`"*. **Ruling, same day:** *"Be INCLUSIVE: π is in (needs a one-line `expr.ts` constant). `|…|`, `d_{}`, `x_A` arrive via #1128/#1127. Only `°`/`∡` are held — they need the unbuilt angle capability, and a chip that cannot parse is worse than no chip."*
+
+### The issue's audit, re-run — and most of it has unblocked itself
+
+#1129 measured its candidates and found *"two chips are free today and the rest is gated on grammar."* Re-measured tonight, after this run's own landings:
+
+```
+·      PARSES      ³      PARSES       ← free then, free now
+|AB|   PARSES      ← was blocked on #1128 (landed tonight)
+d_{}   PARSES      ← was blocked on #1128 (shipped WITH it, as that issue required)
+x_{A}  PARSES      ← was blocked on #1127 (landed earlier)
+π      PARSES      ← after the one-line constant this ADR adds
+°  ∡   no          ← held by the ruling
+```
+
+**Five of the six blocked candidates unblocked themselves while the issue waited**, which is the shape the issue predicted: *"'all relevant ones for analytics' is, measured, mostly a request for notation rather than for buttons."*
+
+### π is a NUMBER, not a symbol
+
+One line in `expr.ts`, and the distinction is the whole of it: a `sym` token is a free parameter the figure may SAMPLE, so «AB = 2π» read as a symbol would make the length free and let the solver choose it. As a `num` token it is its value, and the juxtaposition rule that already reads `2a` and `4√5` reads `2π` for nothing.
+
+### The real defect was the missing LOCK, not the missing chips
+
+`shell/symbols.ts` states the contract — *"a product's tests can require every offered symbol to parse and to sit inside the bidi run alphabet"* — and complex was the only product holding itself to it. Analytic had none, and that is *why* its palette went thin: with no lock, "does this chip work?" had no mechanical answer, so nothing was added. The list also lived **inline in `App.tsx`**, unlike all three siblings.
+
+Both are fixed together, because neither alone is the fix: `ui/symbols.ts` is what a test can import, and the test is what makes the module worth having.
+
+**TOTALITY is the case that matters** — the template map's keys must equal the palette's, so a new button without a proof fails the suite. Without it the per-spec loop passes by checking nothing, which is the exercised-counter lesson this repo has already paid for.
+
+### ⚠ The ported bidi check failed on a chip that has shipped since #525 — and it was the CHECK that was wrong
+
+The ported test asserts each inserted character is in `RUN_CORE ∪ RUN_DELIMS ∪ INTERIOR`. Run here, it failed on **«≠»**.
+
+Measured before changing anything: `≠` is not in `RUN_CORE` — and neither are `=`, `>`, `^`, `*` or the SPACE — yet
+
+```
+«הנקודה A שונה מ-a ≠ 5»   ->   «הנקודה ⁦A⁩ שונה מ-⁦a ≠ 5⁩»
+```
+
+the whole expression sits inside ONE isolate, the operator carried through it exactly as `=` is. **The character list was the wrong question.** Widening `INTERIOR` to silence the failure would have been fitting the test to the answer.
+
+So the bidi half asserts the PROPERTY instead: pressing any chip inside a Hebrew sentence must not change how many runs the line isolates into, driven through the real `inputPreview`. That is strictly stronger than the allowlist — a character that IS in the alphabet but still broke a run would pass the ported check and fail this one — and it is the thing #482 actually cares about.
+
+### What is deliberately NOT here
+
+`°`, `∡` and `∠` are held by the ruling: their capability is unbuilt (02c §5d marks «∡ACB = 90°» ✗), and a chip inserting a character the grammar refuses hands the student `not-handled` on their own click. **Asserted as held, with the reason** — a lock row checks both that they are absent and that they still do not parse, so when the angle capability lands that row goes red and the chips are owed rather than forgotten.
+
+### Lock
+
+`symbols-module.test.ts` (18): totality; every chip driven through `applySymbol` and then the real `derive`, in a context that line actually needs; the bidi property above; the six original entries pinned in label and insert text, because moving a list between files is exactly where a character quietly becomes a different one; and the held glyphs with their reason.
+
+### Consequences
+
+`ui/symbols.ts` (new), `__tests__/symbols-module.test.ts` (new, ported), `engine/expr.ts` (the π token), `App.tsx` (inline list removed, module imported), `i18n/index.ts` (twelve tooltips, both locales), `__tests__/issue-1128-distance-spellings.test.ts` (its `SYMBOLS` import follows the move).
+
+**#725** — the workspace-wide palette reorganisation — is unaffected and still comes after: it cannot factor a base set out of a product whose own set was still missing its members, and this adds entries and a lock, both of which that work then reorganises.

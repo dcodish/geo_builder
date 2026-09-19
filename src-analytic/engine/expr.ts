@@ -128,6 +128,22 @@ function tokenize(src: string): Tok[] | null {
       i += 1;
       continue;
     }
+    /**
+     * π IS A NUMBER, not a symbol (#1129).
+     *
+     * **Operator ruling, 2026-09-16**, asked which glyphs belong in the analytic palette: *"Be
+     * INCLUSIVE: π is in (needs a one-line expr.ts constant)."*
+     *
+     * A `num` token and not a `sym`, and the distinction is the whole of it: a symbol is a free
+     * parameter the figure may SAMPLE, so `AB = 2π` as a symbol would make the length free and let
+     * the solver choose it. π is a constant, so it is tokenised as its value and the juxtaposition
+     * rule that already reads `2a` and `4√5` reads `2π` for free.
+     */
+    if (c === 'π') {
+      out.push({ t: 'num', v: Math.PI });
+      i += 1;
+      continue;
+    }
     return null; // an unknown character is a REFUSAL, never a silently dropped term
   }
   return out;

@@ -150,6 +150,20 @@ understand to the paid LLM so it can guess at an empty clause is the failure
 **R11 — Notation.** Primes (`A'`, `F₁'`) and subscripts (`F₁`, `l1`). Primes already exist in the 3-D
 tree; subscripts are new to this input language.
 
+**R11a — the PALETTE offers only what the grammar reads**
+([ADR-AG-122](06c-decisions-analytic.md#adr-ag-122),
+[#1129](https://github.com/dcodish/geo_builder/issues/1129)). A chip inserting a character the parser
+then refuses hands the student `not-handled` on their own click, which is worse than no chip —
+#511's rule, and the operator's own framing when ruling the analytic set.
+
+The set: `²` `³` `√` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}`. **`°` and `∡` are deliberately absent**
+until the angle capability exists (§5d marks «∡ACB = 90°» ✗); they arrive in that work's own change,
+because a chip is part of shipping a notation rather than a follow-up to it.
+
+Mechanically enforced: every entry is driven through the real grammar, with a totality guard so a
+button cannot be added without a proof — and pressing any chip inside a Hebrew sentence must not
+change how the line isolates, since RTL is the default and a split run is a visibly broken line.
+
 **R31 — A point's COMPONENTS are addressable and comparable: `Ax > Bx`.** *(Operator ruling,
 2026-09-04.)* The typed form of «שיעור ה-x של קדקוד A גדול משיעור ה-x של קדקוד B» (5d). Comparison
 operators `<` `≤` `≥` `≠` are already on the palette.
