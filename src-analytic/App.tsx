@@ -32,7 +32,7 @@ import { decideSubmit } from './app/submit';
 import { domainText, positionalOf } from './engine/types';
 import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
 import { exprText } from './engine/expr';
-import { MathText } from '../shell/math';
+import { MathText, hasMath } from '../shell/math';
 import { Banner } from '../shell/frame/Banner';
 import { FigureName } from '../shell/frame/FigureName';
 import { ManualScreen } from '../shell/frame/ManualScreen';
@@ -701,7 +701,33 @@ export function App() {
                * equation's characters, and the student reads a formula they did not write.
                */
               quickDisplay={(c) => analyticBidi.isolateLtrRuns(c)}
-              preview={(s) => analyticBidi.inputPreview(s)}
+              /**
+               * THE PREVIEW TYPESETS WHAT IT PREVIEWS (#1215).
+               *
+               * Operator, 2026-09-19, on «מעגל (x-3)^2+(y-5)^2=25»: *"note the text below the textbox
+               * isnt mathml"* — the preview printed `^2` while the fact row two lines below printed
+               * `²`. The student saw their own sentence twice, typeset once.
+               *
+               * Nothing needed building. `InputArea`'s `preview` prop takes a **ReactNode**, and its
+               * own comment says *"2-D's maths renderer rides the same prop at its adoption"*. 2-D
+               * adopted it; this tree — where equations are the entire subject — did not, and
+               * `hasMath`/`MathText` have been sitting in `shell/math.tsx` the whole time.
+               *
+               * The bidi previewer stays as the fallback, and it is not a lesser one: it is what
+               * carries the RTL reading order while an equation is still half-typed. `hasMath` is
+               * false until an exponent or a fraction completes, so early keystrokes take that path
+               * exactly as before and no half-formed formula is ever half-typeset (ADR-W-060).
+               *
+               * **ISOLATE FIRST, THEN TYPESET — the order matters and was found by looking.** Handing
+               * the raw string to `MathText` typeset it perfectly and laid it out backwards: the
+               * renderer emits several `<math>` islands with text between them, and in an RTL
+               * paragraph that whole sequence runs right-to-left, so «מעגל (x-3)²+(y-5)²=25» drew
+               * with `=25` at the far LEFT. That is the defect this preview exists to prevent,
+               * reintroduced by its own fix. The answer rows already do it in this order (#1097).
+               */
+              preview={(s) =>
+                hasMath(s) ? <MathText text={analyticBidi.isolateLtrRuns(s, true)} /> : analyticBidi.inputPreview(s)
+              }
               previewDir={(s) => analyticBidi.textDir(s)}
               boxDir={(s) => analyticBidi.textDir(s)}
             >
