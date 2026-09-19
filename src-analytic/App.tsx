@@ -30,6 +30,7 @@ import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
 import { decideSubmit } from './app/submit';
 import { runFallback } from './app/fallback';
+import { panelListsCurve } from './app/panelRows';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
 import { domainText, positionalOf } from './engine/types';
 import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
@@ -1127,7 +1128,27 @@ export function App() {
                  * which is what the coordinate rows below now say. The flag means one thing in both
                  * places — undrawn on the canvas, unlisted here.
                  */
-                rows: d.figure.curves.filter((c) => c.stated).map((c) => {
+                /**
+                 * …AND A MENTIONED ONE DOES (#1250). The ruling above is about an ORPHANED row, not
+                 * an undrawn one — the operator's objection was verbatim *"there is no way to know
+                 * what it belongs to"*.
+                 *
+                 * Those two coincided until [ADR-AG-111] made a mentioned line UNDRAWN for the first
+                 * time: «משוואת הצלע CE היא x-3y=0» draws only the segment, so `stated` is false, and
+                 * the equation the student wrote vanished from the one place they check what the tool
+                 * understood — while «משוואת הישר CE» kept its row. Same equation, same object.
+                 *
+                 * Operator ruling, 2026-09-19: *"if we say that a point is on a line, we dont draw the
+                 * line but if we specifically mention a line, we should have its equation."* So the
+                 * panel asks whether the line was MENTIONED, and the canvas keeps asking `stated`.
+                 *
+                 * `label.name` IS "mentioned", and not by coincidence: a line the student made the
+                 * subject of a sentence is one they referred to by name, while a line minted only to
+                 * hold a point (#1078's «B על הישר y=x») has nothing to call it. No second flag — one
+                 * would have to be set correctly at every mint site, and the name already answers
+                 * truthfully at all of them.
+                 */
+                rows: d.figure.curves.filter(panelListsCurve).map((c) => {
                   // The SAME honesty gate the point rows use: an equation prints only when every
                   // coefficient is invariant across the free DOFs. A parabola whose `a` is still
                   // free is drawn, and its row is open — never a sampled coefficient as fact.

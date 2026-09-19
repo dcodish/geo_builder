@@ -6009,3 +6009,61 @@ Four rules in it encode decisions with their own ADRs, and each is locked:
 New: `parser/llmSharedAnalytic.ts` (prompt + request builder), `parser/llmAnalytic.ts` (transport), `app/fallback.ts` (the decision, pure and injectable). Changed: `server/parseHandler.ts` (registry + validation), `App.tsx` (the seam, the spinner), `store/useAnalyticStore.ts` + `i18n/index.ts` (the `llm-busy` key, both locales).
 
 **Not done here:** the complex Builder, which has the same gap. The operator scoped this to analytic; #1251 keeps the complex arm open, and it is now a smaller job — the registry work is shared and only its prompt and client remain.
+
+## ADR-AG-113 — The panel lists a line the student MENTIONED; the canvas draws one that is STATED (#1250)
+
+**Requirements:** none (internal) — restores the standing promise that everything the student stated is visible. **Design:** [04c](04c-design-analytic.md) — the panel's listing predicate, extracted. **LADDER stage:** presentation. No parse, engine or solver change. **Refines** the #1078 ruling; **follows** ADR-AG-111.
+
+**Operator, 2026-09-19**, playing round #1244:
+
+> T15 — *"משוואת הצלע CE היא x-3y=0 should appear in the data panel under lines"*
+> T16 — *"משוואת הישר CE היא x-3y=0 does add it do the data panel"*
+
+Two sentences stating **the same equation about the same object**, and only one of them put it in the panel.
+
+### Measured
+
+```
+                          stated   label.name    panel row?
+משוואת הצלע CE …  (T15)   false    "CE"          no   <- the defect
+משוואת הישר CE …  (T16)   true     "CE"          yes
+משוואת CE …       (T17)   false    "CE"          no   <- the operator's own reported line
+B על הישר y=x     (#1078) false    ""            no   <- correct
+```
+
+### This ran into the operator's OWN earlier ruling, and refines rather than reverses it
+
+The filter was `curves.filter((c) => c.stated)`, carrying #1078:
+
+> *"the part where it shows -x+y=0 is meaningless since the line is not really drawn and in any case **there is no way to know what it belongs to**"*
+
+**His objection there was not that the line was undrawn — it was that the row was ORPHANED.** An unlabelled equation, next to no point, for a line nobody asked to see. Those two properties coincided until ADR-AG-111 made a *mentioned* line *undrawn* for the first time, and the distinction had never had to be drawn before.
+
+His ruling of the same day states it in the positive:
+
+> *"if we say that a point is on a line, we dont draw the line but if we specifically mention a line, we should have its equation."*
+
+### The decision — two questions, two answers
+
+`stated` was answering both *is it drawn* and *is it listed*. They are now known to be different questions:
+
+| | asks | of «משוואת הצלע CE» |
+| --- | --- | --- |
+| the canvas | `stated` — is it DRAWN? | no (his *"only draws CE"* ruling) |
+| the panel | was it MENTIONED? | **yes** |
+
+**`label.name` is "mentioned", and not by coincidence:** a line the student made the subject of a sentence is one they referred to by name, while a line minted only to hold a point has nothing to call it. So #1078's case stays unlisted for the reason #1078 gave, rather than by exception.
+
+A second flag (`drawn` beside `listed`) was considered and **rejected**: it would have to be set correctly at every mint site, and the name already answers truthfully at all of them.
+
+### The decision is EXTRACTED, and that is not cosmetic
+
+`panelListsCurve` is a named function in `app/panelRows.ts` because the first draft of this fix's lock **re-implemented the filter** and would therefore have passed with or without the change — the exact failure ADR-W-053 records (*"a test that re-implements the decision it guards stays green through the change that kills the feature"*). Caught before it was committed, by asking what the test would do if the predicate were reverted. It is: 3 of the 8 assertions go red.
+
+### Lock
+
+`issue-1250-mentioned-line-row.test.ts` (8), driven through a real `derive` and **calling** `panelListsCurve`: all three mentioned spellings leave exactly one row naming `CE`; the drawn case gets one row and not two; **#1078's anonymous carrier still gets none** (the regression guard for the earlier ruling, and the reason the predicate is the name rather than `!stated`); and the canvas is asserted separately to be unchanged in both directions, since the whole decision rests on the two questions staying different.
+
+### Consequences
+
+`app/panelRows.ts` (new — the decision and its docblock), `App.tsx` (calls it).
