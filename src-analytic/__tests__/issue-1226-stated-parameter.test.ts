@@ -62,7 +62,8 @@ describe('#1226 — a stated parameter reaches the panel', () => {
      */
     const o = derive(['A(-9a,0)'], 0).construction.objects.find((q) => q.id === 'A');
     expect(o?.kind).toBe('point');
-    expect(exprText(o!.kind === 'point' ? o.x : { kind: 'num', value: 0 })).toBe('-9·a');
+    if (o?.kind !== 'point') throw new Error('unreachable — asserted above');
+    expect(exprText(o.x)).toBe('-9·a');
   });
 
   it('a fully numeric point is unchanged — numbers still win', () => {

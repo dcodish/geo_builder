@@ -5404,3 +5404,43 @@ A stated point is `point`; a carrier point is `free`; a derived point is `derive
 **Not the canvas.** The label still reads `A` there, and per #1211's ruling coordinates on the canvas are opt-in — so that half belongs to #1211's mechanism rather than becoming automatic here.
 
 **Not the locus equation.** [#1186](https://github.com/dcodish/geo_builder/issues/1186) asks for `(x − 16a)² + y² = 625a²` and is a harder problem: recognising a symbolic dependence across sampled traces, which ADR-AG-072 §4 called the CAS boundary. This needs no inference at all — it prints what is already stored — so it lands first and independently.
+
+## ADR-AG-105 — The canvas shows the stated expression too (#1230, completes ADR-AG-104)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — honesty: everything the student stated is visible on the figure; no new row. **Design:** [04c](04c-design-analytic.md) — the point label's open form. **LADDER stage:** display only.
+
+**Operator, 2026-09-19, playing T44:** *"the data panel is now correct but canvas is not"*, with both surfaces in one screenshot:
+
+```
+data panel      A = (-9·a, 0)      B = (41·a, 0)      ADR-AG-104, correct
+canvas label    A(x_A, 0)          B(x_B, 0)          the tool's own symbol
+```
+
+### The scoping in ADR-AG-104 was wrong, and on a premise nobody checked
+
+That ADR wrote the canvas out of scope in as many words:
+
+> **Not the canvas.** The label still reads `A` there, and per #1211's ruling coordinates on the canvas are opt-in — so that half belongs to #1211's mechanism rather than becoming automatic here.
+
+**The canvas does not read `A`.** It has printed coordinates since the provenance work, through the same invented-symbol fallback the panel used. #1211's ruling is about showing *computed* coordinates for a point the student never described; it has nothing to say about a coordinate the student wrote down.
+
+So the second surface was in scope all along, and the reasoning that excluded it was a belief about the screen that a single look would have falsified. Recorded plainly because the same habit produced ADR-AG-099's one-letter hole earlier the same day: **a claim about what the UI shows is a measurement, not an inference.**
+
+### Cause — the same fallback, one layer down
+
+`Component` had two cases:
+
+```ts
+| { known: true; value: number }
+| { known: false }
+```
+
+so an open coordinate could only ever render `x_A`. The panel could reach past provenance to the construction and read the expression; the scene builder cannot — it is handed the figure, not the objects. And `provenanceOf` had the expression in hand at the moment it discarded it.
+
+The open case now carries `expr?: string`, set from `exprText(e)` in the `kind === 'point'` branch — the same guard ADR-AG-104 used, measured the same way: a stated point is `point`, a carrier point is `free`, a derived point is `derived`. The scene prefers `expr` over the invented symbol, and the `any` gate that decides whether to show coordinates at all now counts a stated expression as something said.
+
+### What stays exactly as it was
+
+A numeric point still draws its numbers. **A carrier point still draws `x_A`** — «A על הישר y=x» is a `free` object, the student stated no expression for its x, and inventing one there would be the opposite error to the one this fixes. And no sampled number ever reaches a label for an open coordinate: the lock asserts the absence of a decimal, not merely the presence of `-9·a`.
+
+The last lock asserts the two surfaces agree by construction rather than checking two separately-correct strings that could drift apart later.
