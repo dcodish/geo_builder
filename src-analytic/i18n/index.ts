@@ -47,8 +47,18 @@ const he = {
   askTraceLabel: 'איך מגיעים לזה',
   askTraceToggle: 'הצגה/הסתרה של דרך החישוב',
   /** A curve row's derived properties — centre, radius, foci, directrix — folded under its equation (#1212). */
-  curveDetailsLabel: 'נתוני העקום',
-  curveDetailsToggle: 'הצגה/הסתרה של נתוני העקום',
+  /**
+   * ONE LABEL PER KIND, because «עקום» is our word and not the exam's (#1214, and #1147 before it).
+   *
+   * Whole strings rather than «נתוני ה» + a slotted noun: ADR-AG-085 settled that for the refusals
+   * on the same grammar, and the definite article is exactly the kind of joint that breaks when the
+   * fifth noun arrives.
+   */
+  curveDetailsCircle: 'נתוני המעגל',
+  curveDetailsParabola: 'נתוני הפרבולה',
+  curveDetailsEllipse: 'נתוני האליפסה',
+  /** The tooltip names no kind, so it needs no fourth string and cannot reintroduce the old noun. */
+  curveDetailsToggle: 'הצגה/הסתרה של הנתונים',
   askRemove: 'הסירו את המדידה',
   // Three different answers, because they are three different situations.
   askOpen: 'עדיין לא נקבע מהנתונים',
@@ -198,8 +208,10 @@ const en: typeof he = {
   askAdd: 'Ask',
   askTraceLabel: 'how this is reached',
   askTraceToggle: 'show or hide the working',
-  curveDetailsLabel: 'what this curve also knows',
-  curveDetailsToggle: 'show or hide the properties',
+  curveDetailsCircle: "the circle's properties",
+  curveDetailsParabola: "the parabola's properties",
+  curveDetailsEllipse: "the ellipse's properties",
+  curveDetailsToggle: 'show or hide these properties',
   askRemove: 'Remove this measurement',
   askOpen: 'not fixed by the givens yet',
   askNoValue: 'cannot be computed from the givens',

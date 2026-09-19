@@ -24,7 +24,7 @@ import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/
 import { INITIAL_VIEW, centreOf, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { fmtAnalytic } from './format';
-import { curveParts } from './app/curveText';
+import { curveDetailsKey, curveParts } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
@@ -1055,7 +1055,16 @@ export function App() {
                       {parts?.details && (
                         <details style={askTraceBox} open>
                           <summary style={askTraceToggle} title={t('curveDetailsToggle')}>
-                            {t('curveDetailsLabel')}
+                            {/*
+                              THE LABEL NAMES THE KIND, IN THE STUDENT'S WORD (#1214).
+
+                              It said «נתוני העקום» — the internal category (`kind: 'curve'`) reaching
+                              a student, which is the defect #1147 removed from the heading above it
+                              hours earlier, reintroduced by the label #1212 added. `curveDetailsKey`
+                              is total over the kinds that HAVE details, so a fifth conic cannot ship
+                              a blank summary.
+                            */}
+                            {t(curveDetailsKey(known!.kind))}
                           </summary>
                           <div style={askTrace}>
                             <MathText text={braced(parts.details)} />

@@ -5166,3 +5166,41 @@ The component renders it with **`slopeVertical`, the string the «שיפועים
 ### The field exists for the next one
 
 `fact` is a union with one member today. [#1227](https://github.com/dcodish/geo_builder/issues/1227) is already queued behind it: the locus of a DETERMINED point is that point, or a finite set of points, and it currently returns the same `null` with the same false message. It joins this union rather than growing a parallel mechanism.
+## ADR-AG-099 — A sweep that closes a class must match the word's other form (#1214, amends ADR-AG-092)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R99** — a heading names what its rows ARE, in the student's own word; extended from the section heading to the labels inside it. **Design:** [04c](04c-design-analytic.md) — the curve row. **LADDER stage:** display only.
+
+**Operator, 2026-09-19, playing T19:** *"the data panel says נתוני העקום and עקום is mathematically correct but not what a highschool student would expect so we should have נתוני המעגל and then נתוני הישר etc."*
+
+This is **his own #1147 ruling reintroduced three commits later**, by the label ADR-AG-097 added.
+
+### The guard that existed to prevent it had a one-letter hole
+
+ADR-AG-092 did not merely fix the literal — it shipped a sweep over the whole locale, commented *"the class is closed rather than the instance"*:
+
+```js
+.filter((l) => /עקומ/.test(l) && …)
+```
+
+```
+/עקומ/  vs  «עקומים»  (what #1147 removed)  ->  true
+/עקומ/  vs  «העקום»   (what #1212 shipped)  ->  FALSE
+```
+
+The plural carries a medial mem (`מ`, U+05DE). The singular ends in a **final mem** (`ם`, U+05DD) — a different codepoint. The sweep was written against the word in front of it, and silently did not cover the singular of that same word.
+
+**So it read as class-level while being instance-level, which is worse than no guard at all:** it is the kind of test that makes the next session confident. Widened to `/עקו[מם]/`, it went red on both strings this issue is about *before* anything else changed, and that red is the fix's first piece of evidence.
+
+**The hole is the root cause; the wording is the symptom.** A fix that only renamed the label would have left the next singular noun free to walk through.
+
+### The labels themselves
+
+One whole string per kind — «נתוני המעגל», «נתוני הפרבולה», «נתוני האליפסה» — not «נתוני ה» with a noun slotted in. ADR-AG-085 settled that on this same grammar: Hebrew agreement runs through the clause, and the definite article is exactly the joint that breaks when the fifth noun arrives. The English side settles it too, holding `'a circle'` where a prefix repairs nothing.
+
+The tooltip names no kind, so it needs no fourth string and cannot reintroduce the old noun.
+
+`curveDetailsKey` returns a KEY and lives beside `curveParts`, because that module already decides which kinds HAVE details. The lock walks every member of the `NumCurve` union, asks `curveParts` whether it folds, and requires a real label exactly when it does — so a fifth conic cannot ship a labelled row with nothing in it, or a detail row with no label.
+
+### The operator's own example cannot happen yet
+
+«נתוני הישר» will not appear: a line returns no `details` and renders no disclosure (ADR-AG-097, asserted at T23). The three kinds that fold are circle, parabola and ellipse. [#1219](https://github.com/dcodish/geo_builder/issues/1219) would give a line a fold, and the table gains its fourth entry then — which is why the lock is written against `curveParts` rather than a hardcoded three.
