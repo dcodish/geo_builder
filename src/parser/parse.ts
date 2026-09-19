@@ -1975,7 +1975,11 @@ const foot: Rule = (s) => {
     new RegExp(String.raw`([A-Za-z]\d*)\b.*?רגל.*?(?:מהנקודה\s*|מ-?\s*)([A-Za-z]\d*)\b.*?(?:אל\s*|ל-?\s*)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`),
   );
   const m = en ?? he;
-  return m ? [{ type: 'foot', id: up(m[1]), from: up(m[2]), a: up(m[3]), b: up(m[4]) }] : null;
+  if (!m) return null;
+  // #1233 — the same incidence, stated in the third spelling the family owns: «F רגל האנך מ-B ל-AB»
+  // put F exactly on B and reported success.
+  const [id, from, a, b] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
+  return cevianWellFormed(from, id, [a, b]) ? [{ type: 'foot', id, from, a, b }] : null;
 };
 
 /** "M is the midpoint of AB" / "M אמצע AB" / "C is the midpoint of OB". */
@@ -8077,6 +8081,38 @@ const roleSideLine: Rule = (s, ctx) => {
 };
 
 /**
+ * A CEVIAN IS DEFINED BY AN INCIDENCE, AND THE SENTENCE MUST HONOUR IT (#1233).
+ *
+ * «תיכון»/«גובה» does not merely name a segment — it asserts that the segment runs from a vertex to a
+ * point on the OPPOSITE side. A sentence whose letters contradict that is degenerate by its letters
+ * alone, before any geometry is attempted: «BD גובה לצלע AB» asks for the perpendicular from B to a
+ * side B is an endpoint of, whose foot is B itself.
+ *
+ * The check EXISTED — as `opp[0] === apex || opp[1] === apex` inside the median rule — and lived in one
+ * of the several rules that need it. That is the classic docs/17 shape: a gate written where the bug
+ * was reported rather than where the class lives. Measured on «משולש ABC», the same five degenerate
+ * cells behaved five different ways depending on which rule happened to read the sentence:
+ *
+ *   BD תיכון לצלע AB   escalates (the gate)      BD גובה לצלע AB   BUILDS, |BD| = 0, no error
+ *   AD תיכון לצלע AB   escalates (the gate)      AD גובה לצלע AB   BUILDS silently, no coincidence
+ *   AB תיכון לצלע BC   over-constrained          AB גובה לצלע BC   BUILDS a hidden ~B on top of B
+ *                                                F רגל האנך מ-B ל-AB  BUILDS, F coincides with B
+ *
+ * So the predicate is stated once, as the DEFINITION rather than as the observed failures, and every
+ * rule that emits a cevian's foot asks it.
+ *
+ * 2-D's answer is `return null` — the sentence escalates to the LLM — which is what the median gate
+ * has always done and what this hoist keeps. It means a student gets "I did not understand" for a
+ * sentence the tool understood perfectly, and «AB תיכון לצלע BC» trades a solver message for that
+ * escalation. An OWNED refusal that names the statement is the better answer and is a larger change
+ * (2-D has no refusal vocabulary equivalent to the analytic tree's `ParseFailure` codes); it is split
+ * out deliberately rather than smuggled in here. The analytic sibling #1231 answers it the other way
+ * in a tree that HAS that vocabulary.
+ */
+const cevianWellFormed = (apex: Id, foot: Id, side: readonly [Id, Id]): boolean =>
+  apex !== side[0] && apex !== side[1] && apex !== foot && foot !== side[0] && foot !== side[1];
+
+/**
  * "median from A in ABC" / "תיכון מ-A במשולש ABC" — the median from a vertex to the
  * midpoint of the opposite side. Emits the triangle (idempotent if it exists),
  * the opposite-side midpoint, and the segment to it.
@@ -8118,7 +8154,9 @@ const median: Rule = (s, ctx) => {
         opp = edges[0];
       }
     }
-    if (opp[0] === apex || opp[1] === apex) return null;
+    // #1233 — the gate that used to read only `apex ∈ opp` here is now the shared definition, so the
+    // altitude and the foot rule cannot drift from it again.
+    if (!cevianWellFormed(apex, foot, opp)) return null;
     return [
       { type: 'midpoint', id: foot, a: opp[0], b: opp[1] },
       { type: 'segment', a: apex, b: foot },
@@ -8290,6 +8328,9 @@ const altitude: Rule = (s, ctx) => {
     if (apexes.length !== 1) return null;
     const apx = apexes[0];
     const foot2 = existingFootOf(ctx, apx, sd[0], sd[1]) ?? freeLabel([apx, ...sd, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']); // reuse (Am. 2)
+    // #1233 — the apex is derived from the polygon here, so this cannot currently be degenerate; asked
+    // anyway, because "cannot currently be" is what the median's gate said about the altitude.
+    if (!cevianWellFormed(apx, foot2, sd)) return null;
     return [
       { type: 'foot', id: foot2, from: apx, a: sd[0], b: sd[1] },
       { type: 'segment', a: apx, b: foot2 },
@@ -8299,7 +8340,13 @@ const altitude: Rule = (s, ctx) => {
   const sideM = s.match(/(?:\bto\s+(?:the\s+)?(?:side\s+)?|\bon\s+side\s+|אל\s*(?:ה?צלע\s+)?|על\s+ה?צלע\s+|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // explicit opposite side "to BC"
   let p: string, q: string;
   let tri: Id[] | null = null;
-  if (sideM && up(sideM[1]) !== apex) {
+  // #1233 — this used to read `sideM && up(sideM[1]) !== apex`: a HALF gate that checked only the
+  // stated side's FIRST letter, and whose answer to a degenerate statement was to discard it and derive
+  // a different side from the figure. «AD גובה לצלע AB» therefore drew the altitude to **BC** — the
+  // student stated one side and silently got another, with no note, which is the honesty invariant
+  // ("no stated given is ever silently dropped") failing at a seam nobody had looked at. A STATED side
+  // is a given: it is used, and `cevianWellFormed` below decides whether the statement stands.
+  if (sideM) {
     p = up(sideM[1]);
     q = up(sideM[2]);
   } else {
@@ -8353,6 +8400,10 @@ const altitude: Rule = (s, ctx) => {
   // Auto-name the foot avoiding EVERY existing figure point, not just the apex/base — otherwise a second
   // altitude re-picks 'F' and silently REDEFINES the first altitude's foot (a §6-honesty collision).
   const f = namedFoot ?? existingFootOf(ctx, apex, p, q) ?? freeLabel([apex, p, q, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']); // reuse (Am. 2)
+  // #1233 — the altitude had NO counterpart to the median's apex gate, so «BD גובה לצלע AB» built a
+  // zero-length altitude and reported success. Asked HERE, at the single emit point, so every way the
+  // apex and the side are resolved above is covered by one check.
+  if (!cevianWellFormed(apex, f, [p, q])) return null;
   const cmds: Command[] = [];
   if (tri) cmds.push({ type: 'triangle', ids: [tri[0], tri[1], tri[2]] });
   cmds.push({ type: 'foot', id: f, from: apex, a: p, b: q });

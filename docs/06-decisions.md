@@ -11914,3 +11914,73 @@ Deliberately, and for the reason ADR-518 gives: `runViewResolve` already early-r
 `app/editPipeline.ts` gains `runSetGroupEnabled`, `runToggleFact` and `runRemoveFact`; `App.tsx`'s step-list `onToggle` routes through the first rather than calling the store inline (CLAUDE.md's module table — this behaviour belongs in `src/app/`). The #1132 registry in `issue-1041-edit-resolve.test.ts` grows from three rows to **six**, with the count asserted so a seventh seam cannot be added silently.
 
 `issue-1133-enable-resolve.test.ts` (5). 2-D lane green.
+
+## ADR-525 — A cevian's incidence is checked in every rule that emits a foot (#1233)
+
+**Requirements:** none (internal) — the promise is unchanged and already written: a figure never contradicts the word the student used to declare it. This restores it in the rules that had lost it. **Design:** [04](04-design.md) — the cevian family and its shared well-formedness predicate. **LADDER stage:** parse. No engine, solver or render change. **Extends** the median's own gate; sibling of the analytic ADR for #1231.
+
+Found by the sibling audit (docs/17 §1) while triaging the analytic cevian report.
+
+### The symptom
+
+```
+משולש ABC
+BD גובה לצלע AB
+```
+
+`B` is an endpoint of `AB`, so the foot of the perpendicular from `B` to `AB` is `B` itself. Measured: `status {g0.0: ok, g1.1: ok, g1.2: ok}`, `lastError: null`, `violations: []`, `coincidences: [["B","D"]]`, `|BD| = 0` exactly. A zero-length "altitude", a second letter sitting on top of `B`, and the tool reporting success.
+
+The gate that refuses exactly this **already existed** — `if (opp[0] === apex || opp[1] === apex) return null;` — inside the *median* rule, and only there.
+
+### The class, measured rather than reasoned
+
+The predicate a cevian sentence asserts is an incidence: *from a vertex, to a point on the OPPOSITE side*. Measured on «משולש ABC», the five degenerate shapes behaved five different ways depending on which of the three rules happened to read the sentence:
+
+| | median | altitude | the `foot` rule |
+| --- | --- | --- | --- |
+| apex = u | escalates (the gate) | **builds, \|BD\| = 0, no error** | **builds, F on top of B** |
+| apex = v | escalates (the gate) | **builds, and to the WRONG SIDE** (below) | — |
+| apex = foot | falls through to the apex form | over-constrained | unresolved dependency |
+| foot = u / v | over-constrained | **builds a hidden `~B` on top of `B`** | — |
+
+That is the docs/17 shape the design rules name: *a gate written where the bug was reported, not where the class lives.* So the predicate is now stated once, as the definition —
+
+```
+cevianWellFormed(apex, foot, side) — apex ∉ side, apex ≠ foot, foot ∉ side
+```
+
+— and every rule that emits a cevian's foot asks it: the median, the altitude (at its single emit point, so every way the apex and side are resolved above is covered by one check), the altitude's vertex-less side form, and the `foot` rule.
+
+### A second defect, found by measurement and not filed by anyone
+
+`AD גובה לצלע AB` did not merely build — it built the altitude **to `BC`**. The altitude rule's side resolution read
+
+```ts
+if (sideM && up(sideM[1]) !== apex) { p = …; q = …; } else { /* derive a side from the figure */ }
+```
+
+a HALF gate that checked only the stated side's **first** letter, and whose answer to a degenerate statement was to **discard the stated side and silently substitute another**. The student stated one side and got a different one, with no note — the honesty invariant (*no stated given is ever silently dropped*) failing at a seam nobody had looked at, and a strictly worse outcome than the zero-length segment this issue was filed about.
+
+A stated side is a given. It is used, and `cevianWellFormed` decides whether the statement stands.
+
+### What is deliberately NOT refused
+
+`AA תיכון לצלע BC` still builds. 2-D reads a repeated run as naming no segment, so the named form declines and the honest apex form («the median from A») takes over, drawing the correct figure with an auto-named foot. That is a *recovery*, not a lie: the figure is right and only the foot's name was not given by the student. Refusing it would remove a working spelling to satisfy a symmetry argument. The analytic sibling #1231 refuses its own `AA` case because there it silently **moves vertex A** — a different outcome from the same letters, and the reason the two trees answer differently.
+
+### The refusal's SHAPE, and what is split out
+
+2-D answers with `return null` — the sentence escalates to the LLM. That is what the median's gate has always done and what this hoist keeps, but it means a student gets *"I did not understand"* for a sentence the tool understood perfectly, and `AB תיכון לצלע BC` trades a solver message for that escalation.
+
+An **owned refusal that names the statement** is the better answer. It is a larger change — 2-D has no refusal vocabulary equivalent to the analytic tree's `ParseFailure` codes — and it is **split out deliberately rather than smuggled in here**. The analytic sibling answers it the other way precisely because that tree has the vocabulary; #1231's plan says so in as many words, and the split is recorded on both sides so neither is read as the other's precedent.
+
+### The lock
+
+A table over `{median, altitude, foot rule} × {apex=u, apex=v, apex=foot, foot=u, foot=v} × {he, en}` driven through the real `parse` with the app's own context — it CALLS the decision rather than re-implementing it (ADR-W-053). The negative controls are the half that matters most: a well-formed cevian in either role and either locale still builds, the two locales commit the *same* commands, and a well-formed stated side is still the side that is used. Verified to bite: **14 of the 24 assertions fail against pristine `parse.ts`.**
+
+The corpus was the plan's proposed home for this lock and is the wrong one: `factsOf` throws on a step that does not parse, so a scenario cannot express a parse-time refusal at all. Recorded here so the next session does not re-attempt it.
+
+### Consequences
+
+`parser/parse.ts`: `cevianWellFormed` above the median rule, called from four emit sites; the median's inline gate becomes a call; the altitude's half gate on the stated side is removed.
+
+`cevian-well-formed.test.ts` (24). 2-D lane green.
