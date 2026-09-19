@@ -305,6 +305,28 @@ to tell them apart, set at the M1 boundary; `evaluate` keeps both, because the s
 draws only the stated ones. Restating a carrier's equation on its own line **promotes** it — one
 object, now drawn, reported as a change rather than as a restatement.
 
+## A cevian lowers to its WHOLE definition ([ADR-AG-109](06c-decisions-analytic.md#adr-ag-109))
+
+«AD תיכון לצלע BC» and «AD גובה לצלע BC» are conjunctions, and the rule emits every half:
+
+| the student writes | incidence | the role's own condition |
+| --- | --- | --- |
+| `AD תיכון לצלע BC` | `on-line-2pt D B C` | `midpoint D B C` |
+| `AD גובה לצלע BC` | `on-line-2pt D B C` | `perpendicular A D B C` |
+
+The incidence column is the one that was missing (#1232). `perpendicular` is a pure DIRECTION
+residual — two vectors whose dot product is driven to zero — so emitting it alone placed no foot, and
+the tool drew a height that missed `BC` at every seed with no fault reported. `midpoint` implies its
+own incidence, which is why the median leg read correctly while stating one constraint; the incidence
+is stated for both roles anyway, so the conjunction lives in one place and the legs cannot drift.
+
+**Not a compound `foot` kind**, which is what 2-D uses. Here the two halves stay separate constraints
+so a refusal can name WHICH one failed, and so a student who already wrote «AD ⊥ BC» has that half
+recognised as known by `canonicalConstraint`. The redundancy on the median costs no freedom:
+`carrierDofOf` measures `carriers − rank(J)`, and a dependent row adds no rank.
+
+**No `between` selector**, unlike the table above — the foot is on the LINE. See R103.
+
 ## The ask lane ([ADR-AG-044](06c-decisions-analytic.md#adr-ag-044))
 
 Two surfaces, one grammar. The main input CONSTRUCTS; the data panel's own box ASKS, and an ask is

@@ -1639,6 +1639,34 @@ function parseConstraint(raw: string): RuleOutcome {
       { t: 'declare', id: foot, src: line },
       // The cevian's own segment, so «AD» is a thing on the canvas and not only a relation.
       { t: 'segment', id: segmentId(apex, foot), a: apex, b: foot, src: line },
+      /**
+       * EVERY CONDITION THE ROLE MEANS, NOT ONLY THE ONE IT IS NAMED AFTER (#1232).
+       *
+       * Both cevians are a CONJUNCTION: the foot lies on the side, **and** the segment to it has the
+       * role's own property. The median's `midpoint` happens to carry both halves in one kind — a
+       * midpoint is on the side by construction — so its leg read correctly while stating only one
+       * constraint. The altitude's does not: `perpendicular` is a pure direction condition, two
+       * vectors whose dot product is driven to zero, and it says nothing about where `D` sits. Emitting
+       * it alone dropped the incidence half silently, and the tool drew a "height" floating off its own
+       * side with `faults: []` at every seed — a stated given vanishing, which is the honesty
+       * invariant this repo treats as cardinal.
+       *
+       * So the incidence is stated HERE, for both roles, and each role then adds what is left. It is
+       * `on-line-2pt` — the tree's one incidence residual, degenerate-safe at an endpoint — rather
+       * than a new compound kind, for three reasons: a refusal can then name WHICH half failed
+       * («D על BC» or «AD ⊥ BC») instead of a lump; a student who already stated «AD ⊥ BC» has that
+       * half recognised as known by `canonicalConstraint`; and a line lowering to several facts is
+       * this rule's existing shape ([ADR-AG-025](../../docs/06c-decisions-analytic.md#adr-ag-025)
+       * counts the median at four), not a new one.
+       *
+       * The foot is on the **LINE** `uv`, with no `between` selector: an obtuse triangle's altitude
+       * lands beyond an endpoint and is a perfectly honest figure. Bounding it to the segment would
+       * refuse a correct construction, which is the opposite failure and no better.
+       *
+       * For the median the incidence is implied by `midpoint`, so it is redundant rather than wrong —
+       * it is stated anyway so the conjunction lives in ONE place and neither leg can drift from it.
+       */
+      { t: 'constraint', k: { t: 'on-line-2pt', id: foot, a: u, b: v }, src: line },
       median
         ? { t: 'constraint', k: { t: 'midpoint', id: foot, a: u, b: v }, src: line }
         : { t: 'constraint', k: { t: 'perpendicular', a: apex, b: foot, c: u, d: v }, src: line },

@@ -5709,3 +5709,67 @@ y = −x + 4          →  x + y - 4 = 0
 ### Twenty-three assertions, changed with the reason attached
 
 Four locus test files asserted the retired notation, across 23 places. Each pair was listed explicitly in the migration rather than pattern-matched, so a wrong pair would be visible in review — `y = 2x` and `-2x + y = 0` are the same line, and a script that guessed could quietly have made them different ones. The prose in those files was updated too, so no file describes a notation it no longer asserts.
+
+## ADR-AG-109 — A construct means every condition in its definition, not the one it is named after (#1232)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R103 (a named cevian reaches its side, and may reach the extension), R40's *"a median that does not actually end at the opposite midpoint would teach something false"*. **Design:** [04c](04c-design-analytic.md) — "A cevian lowers to its WHOLE definition". **LADDER stage:** parser lowering; no solver change.
+
+**Found in triage, not reported.** The operator's 2026-09-19 report was about a different cevian sentence. This one is well-formed, catalogued, deployed since `prod/2026-09-19-2`, and drew a wrong figure with `faults: []`:
+
+```
+משולש ABC
+AD גובה לצלע BC
+```
+
+### Measured before diagnosing
+
+| seed | cos∠(AD,BC) | dist(D, line BC) / \|BC\| | faults |
+| --- | --- | --- | --- |
+| 0 | −4e−9 | 0.440 | `[]` |
+| 1 | −8e−8 | 0.711 | `[]` |
+| 4 | +7e−8 | 1.061 | `[]` |
+| 5 | +1e−8 | 0.196 | `[]` |
+
+Perpendicularity holds *exactly* at every seed; incidence holds at none. The foot sat up to a whole side-length away from the side it was the foot of, and there is no configuration in which it looks right. With coordinates pinned — `A(0,3)`, `B(5,0)`, `C(7,0)` — the "altitude" foot landed 17.6 units off a side 2 units long, still with no fault.
+
+### The class
+
+*A construct defined by a CONJUNCTION of conditions was lowered to only the condition its keyword is named after, and the incidence half was dropped — so the figure satisfies the word and not the definition.*
+
+«גובה» is two statements: the foot is on the side, **and** the segment to it is perpendicular. The rule emitted only the second. `perpendicular` is a pure direction residual — two vectors whose dot product is driven to zero — and asserts nothing about where `D` sits.
+
+**Why the median leg was right by accident.** `midpoint(D,B,C)` carries both halves in one kind: a midpoint is on the side by construction. So the sibling condition read correctly while stating one constraint, and the shape that worked there was copied to a role where it does not.
+
+**Why it survived.** The cevian rule had no test for the «גובה» leg at all — a search for the word across `src-analytic/__tests__/` returned nothing. The «תיכון» leg is exercised by a real bagrut exercise ([ADR-AG-015](#adr-ag-015), image 7 #6) and is correct; its sibling shipped untested beside it.
+
+### The sibling audit closed the class rather than assuming it
+
+Every emitter of the point-pair `perpendicular` kind: **one**, this rule. `shapes.ts` builds `relation`, not this kind.
+
+- The generic `relation` (#1052, «DE ⊥ BF») is **correctly** incidence-free — two independent directions sharing no point, so there is no foot to place. Confirmed by reading it, as the fix plan asked, rather than assumed.
+- `rightAngleAt(v,p,q)` is likewise safe: both rays start at `v`, so incidence is structural.
+- Every other parser rule that DECLARES a point was swept (intersection, circle-at, line-at, on-object, component, axis-side, ratio-divider). Each lowers its full meaning, or deliberately leaves the DOF the sentence leaves. The altitude was the sole member.
+
+### The fix, and why NOT a compound `foot` kind
+
+2-D lowers the same sentence to a single `foot` command — incidence and perpendicularity as one primitive — and the fix plan proposed porting that shape. **It was not ported, for three measured reasons:**
+
+1. **The foot must stay a CONSTRAINED point, not a derived one.** [ADR-AG-015](#adr-ag-015)'s worked example — the operator's own — states `D(0,3)` *alongside* «AD תיכון לצלע BC» and solves for `B` and `C`. A derived point cannot accept a stated coordinate. This is why the median leg used the `midpoint` constraint rather than the `midpoint` derived rule that already existed, and the altitude must match it.
+2. **Two constraints name which half failed.** `describeConstraint` can say «D על BC» or «AD ⊥ BC»; one compound kind reports a lump. That is [ADR-AG-017](#adr-ag-017)'s rule — a refusal names the statement.
+3. **A student who already wrote «AD ⊥ BC» has that half recognised** by `canonicalConstraint`, which a new kind would not match.
+
+Reusing `on-line-2pt` also avoids reproducing its residual, which is deliberately *not* the `parallel` relation: it stays well-defined when `D` sits exactly on an endpoint, and an endpoint is a legitimate foot.
+
+So the rule states the incidence for **both** roles and each role adds what is left. On the median it is redundant rather than wrong, and redundancy is free here: `carrierDofOf` computes `carriers − rank(J)`, so a dependent row consumes no freedom. A count-based accounting would have reported that figure over-determined — asserted in the test rather than assumed.
+
+### The foot is on the LINE
+
+«לצלע BC» reads as "to the side", and the naive repair is a `between` selector. An obtuse triangle's altitude foot legitimately falls beyond an endpoint, so that bound would refuse a correct figure — the same honesty failure pointing the other way. `A(0,3)`, `B(5,0)`, `C(7,0)` puts the foot at the origin, `t = −2.5`, and it builds there.
+
+This does not contradict [ADR-AG-032](#adr-ag-032)'s "the noun decides boundedness": that ruling is about «נקודה D על הצלע BC», where the student places a point on a side and the noun is their choice of region. Here the noun names which side the cevian drops to, and the foot's position is the geometry's to decide, not the wording's.
+
+### The lock the fix plan proposed would have failed
+
+The plan asked for `dist < 1e-9`. The minimiser converges to ~1.5e-8 relative off-line and ~5.6e-8 in cos over 24 seeds — measured, and a lock at 1e-9 would have gone red on correct output. The tolerance is 1e-6: clear of the noise, and still a millionth of the side.
+
+`issue-1232-altitude-foot.test.ts` locks both halves over 8 seeds, the English sentence, the obtuse case, the median, and — the class — that the RULE emits both constraints. Verified red on the pre-change code: 4 of its 5 cases fail, the median's passes, which is exactly the shape of the defect.

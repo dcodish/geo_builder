@@ -1304,3 +1304,20 @@ equation, because that is what was asked.
 
 The exception is a curve the givens have not FIXED, which shows its open form rather than an invented
 equation — no coefficient is ever sampled and printed as fact (R21, [#1023](https://github.com/dcodish/geo_builder/issues/1023)).
+
+**R103 — a named cevian ACTUALLY REACHES its side, and may reach the side's extension**
+([#1232](https://github.com/dcodish/geo_builder/issues/1232)).
+
+«AD תיכון לצלע BC» and «AD גובה לצלע BC» each state TWO things: `D` lies on `BC`, and `AD` has the
+role's own property — through the midpoint, or perpendicular. Both must hold in every configuration.
+An altitude whose foot floats beside the side is not an altitude, and the number a student measures
+off it means nothing.
+
+This is R40's rule applied to the cevian the student NAMED rather than to the decoration: *"a median
+that does not actually end at the opposite midpoint would teach something false, which is worse than
+teaching nothing."* The same sentence is true of a height, and the student's own named `D` is the case
+where it costs the most.
+
+**The foot is on the LINE, not bounded to the segment.** An obtuse triangle's altitude foot falls
+beyond an endpoint — that is ordinary geometry, not a broken figure. Bounding the foot to the segment
+would refuse a correct construction, which is the same honesty failure pointing the other way.
