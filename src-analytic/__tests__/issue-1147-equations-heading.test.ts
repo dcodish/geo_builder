@@ -42,7 +42,7 @@ describe('#1147 — the equations section says «משוואות»', () => {
     const locale = readFileSync(join(import.meta.dirname, '..', 'i18n', 'index.ts'), 'utf8');
     const offenders = locale
       .split('\n')
-      .filter((l) => /עקומ/.test(l) && !l.trimStart().startsWith('*') && !l.trimStart().startsWith('//'));
+      .filter((l) => /עקו[מם]/.test(l) && !l.trimStart().startsWith('*') && !l.trimStart().startsWith('//'));
     expect(offenders, `these locale strings still say «עקום»:\n${offenders.join('\n')}`).toEqual([]);
   });
 

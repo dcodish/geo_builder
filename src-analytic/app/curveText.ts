@@ -135,6 +135,35 @@ export function curveParts(c: NumCurve): CurveParts {
   }
 }
 
+/**
+ * WHICH LOCALE KEY LABELS A KIND'S FOLDED DETAIL (#1214).
+ *
+ * Operator, 2026-09-19, playing T19: *"the data panel says נתוני העקום and עקום is mathematically
+ * correct but not what a highschool student would expect so we should have נתוני המעגל and then
+ * נתוני הישר etc."*
+ *
+ * It lives here, beside `curveParts`, because this module already decides which kinds HAVE details —
+ * so a test can assert the two agree and a fifth conic cannot ship a labelled row with nothing in it,
+ * or a detail row with no label.
+ *
+ * A KEY, not a string: this layer holds no locale (ADR-AG-085). A LINE is absent on purpose — it
+ * returns no `details`, so it renders no disclosure and needs no label ([#1219](https://github.com/dcodish/geo_builder/issues/1219)
+ * would give it one).
+ */
+export function curveDetailsKey(kind: NumCurve['kind']): string {
+  switch (kind) {
+    case 'circle':
+      return 'curveDetailsCircle';
+    case 'parabola':
+      return 'curveDetailsParabola';
+    case 'ellipse':
+      return 'curveDetailsEllipse';
+    case 'line':
+      // Unreachable while a line has no details; typed exhaustively so adding one cannot be silent.
+      return 'curveDetailsToggle';
+  }
+}
+
 /** The whole row on one line, named — what a caller with nowhere to fold the detail away shows. */
 export function describeCurve(name: string, c: NumCurve): string {
   const { equation, details } = curveParts(c);
