@@ -5112,3 +5112,57 @@ Numbers go through `fmtAnalytic` (ADR-AG-084), so fractions and exact forms (#11
 `src-analytic/__tests__/issue-1212-curve-equation.test.ts` (8) calls `curveParts` and `ask` directly,
 including the operator's own circle end to end and the #1023 guarantee that an unfixed parabola still
 shows its open form rather than an invented equation.
+
+## ADR-AG-098 — An answer can be a FACT about the figure, not only a value or an absence (#1223)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — honesty: an error message never misdescribes the givens; no new row. **Design:** [04c](04c-design-analytic.md) — the `Answer` outcomes. **LADDER stage:** display only. **Extends:** ADR-AG-0xx (#1111's `missing`).
+
+**Operator, 2026-09-19:** *"when i ask for שיפוע PB it says it cannot be claculated which is wrong. its just that the slope is not defined"* — on `A(0,0)`, `B(3,4)`, `C(6,0)`, `P(3,0)`, where `B` and `P` share an x.
+
+### The panel contradicted itself on one screen
+
+```
+הכול נקבע על-ידי הנתונים          "everything is determined by the givens"
+שיפוע BP = לא ניתן לחשב מהנתונים   "cannot be computed from the givens"
+```
+
+Both cannot be true, and the first is the correct one. The slope of `BP` is not uncomputable — it does not **exist**, which is a fact about the geometry and a perfectly good answer.
+
+### Root cause — the rule was written down, and the return value contradicted it
+
+```js
+// A vertical line HAS no slope, and that is an answer about the figure rather than a failure.
+if (Math.abs(line.b) < 1e-12) return { question, value: null };
+```
+
+The comment states the decision exactly. The next line returns `null`, which is the **failure channel**, because `Answer` had no way to say *vertical*. So one `null` carried three situations and the component guessed between two of them:
+
+```js
+a.value ?? t(figureIsOpen(d) ? 'askOpen' : 'askNoValue')
+```
+
+| what is true | what the student was told |
+| --- | --- |
+| the figure is still open | «עדיין לא נקבע מהנתונים» — correct |
+| genuinely not computable | «לא ניתן לחשב מהנתונים» — correct |
+| **vertical: determined, no slope** | «לא ניתן לחשב מהנתונים» — **false** |
+
+The figure is determined, so `figureIsOpen` is false and the third case landed on the "your givens are insufficient" wording. Not cosmetic: it sends a student looking for a missing given on a figure that has none.
+
+### The shape of the fix, which this tree has made before
+
+`Answer` gains `fact?: 'vertical'` — a fourth outcome beside `value`, `unreadable` and `missing`. That is the identical move #1111 made when it split `missing` out of `unreadable`, for the identical reason recorded there: *"a student told their sentence was not understood will rewrite the sentence for ever, because the sentence was never the problem."*
+
+A **token**, not a sentence, per ADR-AG-085 — `ask.ts` is the lane's engine and holds no locale.
+
+The component renders it with **`slopeVertical`, the string the «שיפועים» section already prints** for a vertical segment («אנכי (אין שיפוע)»). Reusing it is the point: two surfaces that computed the same fact would otherwise be free to word it differently, and that drift is what #1102 named.
+
+### What the fix must not swallow
+
+`null` legitimately means *the givens do not fix this*, and that wording is right. The bug was only that a determined-but-undefined answer borrowed it. So the lock leads with the **anti-lock**: two points on two different carriers leave `AB`'s slope genuinely free, and that case must still answer «עדיין לא נקבע מהנתונים» with no `fact` set. A horizontal slope stays `0` — a value, not an absence — for the same reason ADR-AG-0xx gave for segments.
+
+`src-analytic/__tests__/issue-1223-vertical-slope.test.ts` (6) calls `ask` directly, and asserts `figureIsOpen` is false on the operator's figure — because that is what made the old message false rather than merely unhelpful.
+
+### The field exists for the next one
+
+`fact` is a union with one member today. [#1227](https://github.com/dcodish/geo_builder/issues/1227) is already queued behind it: the locus of a DETERMINED point is that point, or a finite set of points, and it currently returns the same `null` with the same false message. It joins this union rather than growing a parallel mechanism.
