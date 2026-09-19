@@ -1321,3 +1321,22 @@ where it costs the most.
 **The foot is on the LINE, not bounded to the segment.** An obtuse triangle's altitude foot falls
 beyond an endpoint — that is ordinary geometry, not a broken figure. Bounding the foot to the segment
 would refuse a correct construction, which is the same honesty failure pointing the other way.
+
+**R103a — the TRIANGLE may identify the side, and the cevian's target may be written with a maqaf**
+([#1165](https://github.com/dcodish/geo_builder/issues/1165), [#1222](https://github.com/dcodish/geo_builder/issues/1222)).
+
+A student who has written «משולש ABC» says «AD תיכון במשולש ABC», not «AD תיכון לצלע BC» — naming the
+side is the tool's phrasing, not theirs. Both are the same statement and the tool accepts both, in
+both languages, for both roles; so is «AD תיכון ל-BC», where the maqaf is the ordinary Hebrew
+connector this product already relies on elsewhere.
+
+The apex is what makes the triangle spelling determinate: it is a vertex of the named triangle, and
+the side is the two vertices that are left. So the apex must BE one of them — «XD תיכון במשולש ABC»
+leaves three candidate sides, and the tool refuses it by name rather than choosing one (ADR-052: it
+never invents what the student did not state). That refusal is its own message, because the two
+neighbouring ones would each say something untrue about a sentence whose triangle is perfectly good.
+
+**Still not accepted, and deliberately:** the spellings that name no target at all — «AD גובה»,
+«תיכון מ-A לצלע BC» with no letter for the foot. Those need the FIGURE to say what the cevian reaches
+or need the tool to mint a name, and this parser reads one sentence with no figure in hand
+([#1240](https://github.com/dcodish/geo_builder/issues/1240), and #1222's apex-fronted arm).

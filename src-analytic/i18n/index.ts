@@ -130,6 +130,11 @@ const he = {
   errDegenerateRole:
     'תיכון וגובה יוצאים מקודקוד אל הצלע שמולו, ובמשפט "{{detail}}" הקודקוד עצמו נמצא על הצלע הזאת ' +
     '(או שהוא גם הקודקוד וגם הרגל). אפשר לכתוב למשל "AD תיכון לצלע BC".',
+  // #1165 — «XD תיכון במשולש ABC». The triangle spelling works by removing the apex from the ring,
+  // so an apex outside it leaves three candidate sides and nothing to choose between them.
+  errApexNotAVertex:
+    'תיכון או גובה יוצאים מקודקוד של המשולש, ובמשפט "{{detail}}" הקודקוד שנכתב אינו אחד מקודקודי ' +
+    'המשולש. אפשר לכתוב את הקודקוד שבמשולש, למשל "AD תיכון במשולש ABC", או לציין את הצלע במפורש.',
   // #1175 — the refusal's job is to tell them WHICH point is already there. It names the holder and
   // the reason, so a student who mis-read their own figure learns the thing they got wrong.
   errCrossingAlreadyNamed:
@@ -298,6 +303,10 @@ const en: typeof he = {
     'A median or an altitude runs from a vertex to the side OPPOSITE it, and in "{{detail}}" that ' +
     'vertex lies on the side itself (or is its own foot). Write it as, for example, ' +
     '"AD is the median to side BC".',
+  errApexNotAVertex:
+    'A median or an altitude starts at a VERTEX of the triangle, and in "{{detail}}" the point ' +
+    'written is not one of that triangle’s vertices. Use a vertex of the triangle — for ' +
+    'example "AD is the median in triangle ABC" — or name the side outright.',
   errCrossingAlreadyNamed:
     'Those lines meet at {{holder}}, and that point already has a name. "{{detail}}" would give it a second one. If you meant a different point, check which two lines cross there.',
   errLlmBusy:

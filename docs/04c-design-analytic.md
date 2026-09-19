@@ -327,6 +327,28 @@ recognised as known by `canonicalConstraint`. The redundancy on the median costs
 
 **No `between` selector**, unlike the table above — the foot is on the LINE. See R103.
 
+### The TARGET is an alternation, and the apex resolves it ([ADR-AG-117](06c-decisions-analytic.md#adr-ag-117))
+
+The side used to be a mandatory run with «במשולש ABC» as an optional trailing decoration *after* it,
+so the triangle was matched as text and could never be the thing that identifies the target.
+`CEVIAN_TARGET_HE` / `CEVIAN_TARGET_EN` make it an alternative instead, and the lowering resolves
+whichever branch matched into the same two letters:
+
+| the student writes | `u`, `v` come from | refusal when it will not resolve |
+| --- | --- | --- |
+| `AD תיכון לצלע BC` | the run, verbatim | — |
+| `AD תיכון ל-BC` | the run, verbatim (maqaf allowed) | — |
+| `AD תיכון במשולש ABC` | the ring minus the apex | `apex-not-a-vertex` · `bad-arity` |
+
+Everything downstream is untouched: the same four facts, the same gates, the same messages — which
+is what the lock asserts, as a PARITY between the two spellings rather than as expectations of its
+own ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)).
+
+Two refusals, not one, because one message cannot be true of both failures: «במשולש ABCD» is a noun
+disagreeing with its own vertex count (`bad-arity`), while «XD … במשולש ABC» is a perfectly good
+triangle the apex is not part of (`apex-not-a-vertex`). Reusing `degenerate-role` there would have
+told the student their apex "lies on the side itself", which it does not.
+
 ## The ask lane ([ADR-AG-044](06c-decisions-analytic.md#adr-ag-044))
 
 Two surfaces, one grammar. The main input CONSTRUCTS; the data panel's own box ASKS, and an ask is

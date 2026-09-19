@@ -6215,3 +6215,81 @@ Verified to bite: 5 of the 8 fail against pristine `parseAnalytic.ts`.
 ### Consequences
 
 `parser/parseAnalytic.ts` (the code and the structural gate), `app/submit.ts` (the refusal now carries its context to the UI by spread, so the next code that carries some arrives intact), `store/useAnalyticStore.ts`, `App.tsx`, `i18n/index.ts` (both locales).
+
+## ADR-AG-117 — The triangle may identify a cevian's side, and the apex is what resolves it (#1165 + #1222)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R103a — which sentences name a cevian, and which deliberately still do not. **Design:** [04c](04c-design-analytic.md) — the target alternation and the two refusals it needs. **LADDER stage:** parse. No engine, solver or render change. **Family of** #1047 / #1231 / #1232 (the cevian rule's earlier halves).
+
+**Operator, 2026-09-17, with a screenshot:** *"we need to support things like `AD תיכון` and `AD חוצה זווית` like we do in the 2d tool."*
+
+### Measured, before anything was changed
+
+```
+AD תיכון במשולש ABC                 not-handled
+AD גובה במשולש ABC                  not-handled
+AD is the median in triangle ABC    not-handled
+AD תיכון ל-BC                       not-handled
+AD תיכון לצלע BC                    OK (5 facts)
+```
+
+The last row is the point. The capability was complete; only the **spellings** were missing — and one of the missing ones is what a student actually writes, because they have already written «משולש ABC» and the side has no name in their head.
+
+**And 2-D answers all of them**, which is the framing that lifts this above tail work: a sibling disparity is read as a bug, and the working sibling is the template ([cross-product-disparity](../.claude/memory/cross-product-disparity-is-a-wiring-smell.md)).
+
+### Why the triangle could never have worked
+
+The rule's target was a **mandatory** side run, with «במשולש ABC» permitted only as an optional trailing decoration *after* it:
+
+```
+(?:ל|אל\s+ה?)?(?:ה?צלע\s+)?(NAME)(NAME)(?:\s+ב?ה?משולש\s+NAME_RUN)?
+```
+
+So the triangle was recognised as **text** and could never be the thing that identifies the target — «AD תיכון במשולש ABC» has no side run to match, and the whole rule missed. This is the shape of defect that reads as "a missing feature" and is really a grammar that admits one operand where it should admit two.
+
+The target is now an **alternation** — the side named outright, *or* the triangle that determines it — and the lowering resolves whichever branch matched into the same `u`, `v`. **Nothing downstream changed**: the same four facts, the same #1231 gate, the same messages.
+
+The maqaf (#1222) rides along: «AD תיכון ל-BC» failed only because the rule had no `-` allowance before a Latin run, while the product relies on that Hebrew connector itself throughout its own catalog.
+
+### The apex is what makes the triangle spelling determinate — so it must be a vertex
+
+Remove the apex from the ring and the two letters left ARE the side. That is the whole mechanism, and it is also why an apex outside the ring is meaningless: «XD תיכון במשולש ABC» leaves three candidate sides and nothing to choose between them, so it is refused rather than guessed at ([ADR-052](06-decisions.md#adr-052) — never invent what the student did not state).
+
+**Determined from the SENTENCE, never from the figure.** This parser is context-free by design — `parseLine(raw)` takes no figure — and both forms here name everything they need. That is exactly what separates them from the arms parked below.
+
+### A THIRD refusal code, because two messages would have lied
+
+| the sentence | code | why not the neighbour |
+| --- | --- | --- |
+| `AD תיכון במשולש ABCD` | `bad-arity` | correct as it stands: a noun disagreeing with its own vertex count |
+| `XD תיכון במשולש ABC` | **`apex-not-a-vertex`** | `bad-arity` says "a triangle has three vertices" about a run that HAS three; `degenerate-role` says the apex "lies on the side itself", and `X` is not in the triangle at all |
+| `AB תיכון במשולש ABC` | `degenerate-role` | unchanged — #1231's gate still applies through the new spelling |
+
+The first draft refused both of the first two rows as `bad-arity`, and the message is what caught it: the honesty invariant is that an error names **the student's statement**, and a message that describes a different mistake sends them to fix a run that is already correct.
+
+### ⚠ What is NOT built, and the finding that decides it
+
+The operator's sentence also named «AD חוצה זווית», and two neighbouring spellings were scoped and **parked**:
+
+| arm | why it is parked |
+| --- | --- |
+| **angle bisector** (#1165 arm 2) | «AD חוצה את זווית A» names neither `B` nor `C`. Only the triangle-naming spelling («AD חוצה את הזווית A במשולש ABC») is determinable here, so the arm is a *lowering* question and not a regex one — it is worth doing, and it is a separate piece of work |
+| **apex-fronted** (#1222 arm 2) | «תיכון מ-A לצלע BC» gives the foot **no letter**, so the tool would have to mint one |
+| **no target at all** (#1240) | «AD גובה» needs the figure to say what it reaches |
+
+The last two share one finding, and it is the reason they are parked together rather than each on its own merits: **`freeLetter` lives in `engine/crossings.ts` and is called from `App.tsx`. `apply.ts` mints no point names at all, and the parser is context-free.** Minting a name for an unnamed foot is therefore not a parser change — it is a new naming seam, and where it belongs is a design decision rather than a fix.
+
+### Catalog
+
+The catalog had **zero** cevian entries — `grep -c "תיכון\|גובה" catalogAnalytic.ts` returned 0 — so a student looking for the command found nothing and the LLM fallback was never taught to emit one (the catalog is simultaneously the reference card, the coverage map and the model's allowed vocabulary, ADR-AG-005 D8). Two rows are added, walking the two axes the rule has to get right — role × how the target is named — rather than four phrasings of one thing. `parser.test.ts`'s own guard then proves each row parses in both languages and draws.
+
+### Lock
+
+`issue-1165-cevian-target.test.ts` (29), written as **PARITY**: each added spelling lowers to the same facts, and derives the same figure at seeds 0–3, as the side-naming spelling that already worked and is already locked by #1231/#1232. The obvious lock — "the triangle form produces a midpoint on BC" — would re-state the grammar rule inside the test and stay green through any change that kept both halves wrong together ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)); a parity assertion cannot.
+
+Verified to bite, both halves independently: removing the triangle alternative turns **15 of 29** red; removing the maqaf allowance turns **5** red.
+
+The negative control is the row that matters — the refusals above are all satisfiable by refusing the whole form, which is precisely the state this fixes.
+
+### Consequences
+
+`parser/parseAnalytic.ts` (the target alternation, the resolution, the new code), `parser/catalogAnalytic.ts`, `store/useAnalyticStore.ts`, `App.tsx`, `i18n/index.ts` (both locales).

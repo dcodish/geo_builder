@@ -71,6 +71,8 @@ export type InputError =
   | { key: 'repeated-vertex'; detail: string }
   /** A cevian whose apex lies on the side it is drawn to, or is its own foot (#1231). */
   | { key: 'degenerate-role'; detail: string }
+  /** A cevian named by its triangle whose apex is not a vertex of that triangle (#1165). */
+  | { key: 'apex-not-a-vertex'; detail: string }
   /** A crossing the student named that the figure already names — carrying WHO holds it (#1175). */
   | { key: 'crossing-already-named'; detail: string; holder: string }
   /**
