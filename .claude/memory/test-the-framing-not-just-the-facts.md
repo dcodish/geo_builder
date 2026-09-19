@@ -61,3 +61,14 @@ derived one. Reading 2-D's renderer showed it feeds `rightAngles` from `definite
 sibling before citing it as the answer, not only before citing it as the problem**
 ([[cross-product-disparity-is-a-wiring-smell]] is the same coin: a disparity is a smell in whichever
 direction it points).
+
+**2026-09-19, #1242 — an ADR cited as justification may be about a NARROWER case.** A refused line
+was filed as "the refusal is correct, make it total", justified by ADR-AG-015's *a reference may not
+invent a point*. The operator overruled the premise: *"the idea of order is not relevant since the
+diagram should either respect all input or refuse to build."* The ADR was about **inventing** a point;
+the case in front of me needed the constraint to **wait** for one — a distinction the citation hid.
+Worse, the principle was already ruled in the sibling: ADR-104 is titled *"order-independence: a
+constraint that can't be satisfied yet is DEFERRED"* and quotes the operator saying the same sentence
+in June. **Before citing an ADR to justify a refusal, read its Context and ask whether it covers THIS
+case — and grep the sibling's log for the same principle, which may already have been decided the
+other way.**
