@@ -5246,3 +5246,40 @@ The bidi previewer stays as the fallback and is not the lesser path: `hasMath` i
 ### A brittle lock, widened rather than deleted
 
 `bidi-wiring.test.ts` matched a seam with `\{[^}]*`, which stops at the FIRST `}` — so the moment the expression contained nested JSX (`<MathText text={s} />`) it went red on a change that kept the wiring it guards. A matcher that cannot survive a legitimate edit to the thing it protects will be deleted by whoever hits it next, so it counts braces now. The rule it encodes was right and is untouched.
+## ADR-AG-101 — «Another configuration» compares the whole figure, not only its points (#1220)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — «הציגו תצורה אחרת» reaches every configuration the givens allow; no new row. **Design:** [04c](04c-design-analytic.md) — the configuration search's sameness test. **LADDER stage:** configuration search; no engine or solve change.
+
+**Operator, 2026-09-19, playing T24** on «נתונה פרבולה שמשוואתה y^2=2px»: *"p is unknown but when i ask for another config, there is no other config which is wrong"*.
+
+### The engine was innocent
+
+```
+seed 1  p =  1.314     seed 3  p = -2.889
+seed 2  p = -3.400     seed 7  p = -3.754     seed 15  p =  3.491
+```
+
+Five seeds, five genuinely different parabolas, all drawn. ADR-052 is honoured: `p` is sampled as the free DOF it is, and no default is masquerading as fixed. **Nothing false was ever on the canvas.**
+
+### Root cause — the sameness test looked at points, and this figure has none
+
+```js
+const signature = (lines, seed) =>
+  derive(lines, seed).figure.points.map(…).join('|');
+```
+
+`nPoints = 0`, `nCurves = 1`, at every seed. The signature was the empty string, `anotherConfiguration` exhausted its 24 tries, and the seed never moved.
+
+The *message* is what makes this wrong rather than merely unhelpful. This function's own comment reads: *"when nothing differs, saying so is the honest answer. A determined figure has one configuration."* So `found: false` **means** "this figure is determined" — said about a figure with infinitely many, one of which was on screen. The reasoning was right; the signature it rested on silently excluded an entire class of figure, and the same blindness hits any curve-only one.
+
+### A line signs NORMALISED, and that is the load-bearing part
+
+`(a, b, c)` and `(2a, 2b, 2c)` are the same line, and a least-squares solve can land on differently scaled triples across seeds. Signing them raw would make one line look like two, and the button would announce "another configuration" while redrawing an identical picture — the failure in the opposite direction the same comment already warns about:
+
+> two configurations differing in the sixth decimal are one picture, and offering them as "another configuration" would be the button lying in the other direction.
+
+`normalizedLine` (#1201) is the one place that decides when two lines are the same line, so it is **called**, not reproduced ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)). The other kinds sign as their own resolved parameters at the same 4 decimals the points use.
+
+### The anti-lock matters as much as the fix
+
+A fix that loosened this until everything differed would trade a button that never moves for one that always claims success. `src-analytic/__tests__/issue-1220-curve-configuration.test.ts` (6) therefore asserts both directions: the operator's parabola finds another configuration **and `p` actually differs there**, while a fully stated triangle still answers `found: false`, and a stated line does too — which is the normalisation guard read from the other side.
