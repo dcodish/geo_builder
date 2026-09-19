@@ -25,7 +25,7 @@ import { describe, expect, it } from 'vitest';
 import { ask } from '../app/ask';
 import { derive } from '../engine/derive';
 import { locusOf } from '../engine/locus';
-import { locusEquation } from '../engine/locusFit';
+import { locusEquation, snapAndVerify } from '../engine/locusFit';
 import { fmtAnalytic } from '../format';
 
 /** חורף 25 with the exam's own parameter — the locus is a different circle at every `a`. */
@@ -137,21 +137,42 @@ describe('#1176 — the point lies on its own locus', () => {
   });
 
   /**
-   * AND THE CONSERVATIVE CASE, locked deliberately rather than worked around.
+   * THE ILL-CONDITIONED CONFIGURATION NOW PRINTS ITS EQUATION — and #1224 is why.
    *
-   * At seed 2 this figure draws its locus over ~1600 units while `A` and `B` sit 8 apart, so
-   * `MA = MB` pins `x` to about 1e−4 out there and the snapped `x = 4` cannot be re-verified against
-   * the trace. ADR-AG-072 §7 says exactly what to do: **if it will not snap, print nothing** — the
-   * kind still shows, and the tool never states an equation it could not check.
+   * This asserted the opposite until #1224, with the note *"asserted so that a future change which
+   * starts printing an equation here has to say why"*. Saying why:
    *
-   * This is the self-check working, not a gap. It is asserted so that a future change which starts
-   * printing an equation here has to say why.
+   * At seed 2 the figure draws its locus over ~974 units while `A` and `B` sit 8 apart. The old
+   * premise was that the snapped `x = 4` *"cannot be re-verified against the trace"* — but that was a
+   * consequence of `snapRational`'s ABSOLUTE tolerance, not of the verification. The snap failed
+   * first, so nothing ever reached the check.
+   *
+   * With the snap taken from the trace's own scatter (#1224), the equation reaches verification and
+   * **passes it**: measured, the trace's worst deviation from `x = 4` is `1.85e−3` against a
+   * verification tolerance of `0.95`. And `x = 4` is the TRUE locus here at every seed — the
+   * perpendicular bisector of `(0,0)` and `(8,0)` does not depend on where `M` happens to sit.
+   *
+   * So the tool is not stating something it could not check; it is now checking something it
+   * previously could not reach. The honesty rule — never print an equation that fails the trace — is
+   * untouched, and the next test is what holds it.
    */
-  it('where the trace cannot be verified, the KIND shows and NO equation is invented', () => {
+  it('an ill-conditioned configuration still reaches its TRUE equation (#1224)', () => {
     const kind = ((k: string) => (k === 'line' ? 'ישר' : k)) as never;
     const v = ask(derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 2), 'המקום הגיאומטרי של M', fmtAnalytic, kind).value;
-    expect(v).toBe('ישר');
-    expect(v).not.toContain('=');
+    expect(v).toBe('ישר · x = 4');
+  });
+
+  it('AND AN EQUATION THAT FAILS THE TRACE IS STILL REFUSED — the rule #1224 did not touch', () => {
+    /**
+     * The honesty half, asserted directly rather than inferred from a case that happened to fail the
+     * snap. `snapAndVerify` re-checks the snapped conic against every point, and a conic that does
+     * not describe the trace must come back `null` however loose the snap was.
+     */
+    const d = derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 0);
+    const pts = (locusOf(d.construction, 'M', [0, 1], d.box) as ReturnType<typeof locusOf>)?.trace?.points ?? [];
+    expect(pts.length, 'the trace exists').toBeGreaterThan(1);
+    // `x = 40` is nowhere near this locus; no tolerance may let it through.
+    expect(snapAndVerify({ A: 0, B: 0, C: 0, D: 1, E: 0, F: -40 }, pts)).toBeNull();
   });
 
   /** And the parameterised figure still declines to print an equation, at every seed. */

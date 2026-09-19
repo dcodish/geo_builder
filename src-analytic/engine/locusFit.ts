@@ -303,8 +303,45 @@ function fitLine(pts: readonly LocusPt[]): Conic | null {
 export function snapAndVerify(k: Conic, pts: readonly LocusPt[]): Conic | null {
   const norm = normalized(k);
   if (!norm) return null;
-  const out = snapConic(norm, SNAP_TOL);
+  /**
+   * THE SNAP MAY NOT DEMAND PRECISION THE TRACE NEVER PROMISED (#1224).
+   *
+   * `SNAP_TOL` is ABSOLUTE and the trace's accuracy is RELATIVE to how far it walks, so the snap and
+   * the verification below — which has always been relative — disagreed about what precision means.
+   * Measured, on `A(0,0)` `B(…)` «נקודה M» «MA = MB», against the TRUE bisector:
+   *
+   * ```
+   *            traced span   worst deviation   snapped?
+   * B(8,0)              68          ~0         yes — the solve pins x exactly
+   * B(2,0)              40          1.9e−5     NO  — 19× the absolute tolerance
+   * B(6,8)            2685          1.5e−2     NO  — four orders past it
+   * ```
+   *
+   * So a slanted bisector — the corpus's commonest locus — drew correctly and printed no equation,
+   * while `shapeOfTrace` had the right line in hand the whole time (`a=1, b=4/3, c=−8.327`, which is
+   * `3x + 4y = 25` to three figures). Nothing was wrong with the fit, the classifier or the gate.
+   *
+   * The tolerance is therefore taken FROM the trace: its own worst residual about the fitted curve is
+   * the precision this data actually has. Tighter than that can only fail; looser is not a licence,
+   * because **the verification below re-checks the snapped equation against every point** and is what
+   * keeps a wrong snap from being printed. Never tighter than `SNAP_TOL`, so an exact trace still
+   * snaps exactly.
+   */
+  const scatter = Math.max(0, ...pts.map((p) => Math.abs(evalConic(norm, p))));
+  const out = snapConic(norm, Math.max(SNAP_TOL, scatter));
   if (!out) return null; // will not snap ⇒ print nothing
+  /**
+   * A TOLERANCE WIDE ENOUGH TO ERASE EVERY COEFFICIENT IS NOT AN EQUATION.
+   *
+   * Caught by this file's own honesty lock while #1224 was being built, which is the reason that lock
+   * asserts the refusal directly rather than inferring it from a case that happened to fail the snap.
+   *
+   * Handed a conic that does not describe the trace at all — `x = 40` against a trace at `x = 4` — the
+   * scatter is 36, every coefficient snaps to 0, and `0 = 0` then satisfies the verification below at
+   * every point. A wrong-but-NONZERO snap is caught there; the degenerate one is the single case that
+   * cannot be, because it is true everywhere.
+   */
+  if (!normalized(out)) return null;
 
   const scale = Math.max(1, ...pts.map((p) => Math.hypot(p.x, p.y)));
   const tol = 1e-6 * scale * scale;

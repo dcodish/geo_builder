@@ -5603,3 +5603,49 @@ The open case now carries `expr?: string`, set from `exprText(e)` in the `kind =
 A numeric point still draws its numbers. **A carrier point still draws `x_A`** — «A על הישר y=x» is a `free` object, the student stated no expression for its x, and inventing one there would be the opposite error to the one this fixes. And no sampled number ever reaches a label for an open coordinate: the lock asserts the absence of a decimal, not merely the presence of `-9·a`.
 
 The last lock asserts the two surfaces agree by construction rather than checking two separately-correct strings that could drift apart later.
+
+## ADR-AG-106 — The snap may not demand precision the trace never promised (#1224)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the locus states its equation when the givens fix it; no new row. **Design:** [04c](04c-design-analytic.md) — the locus fit and its determinacy gate. **LADDER stage:** display only; no engine or solve change.
+
+Found while verifying PR #1172's own play cases before handing the operator a sheet. All four documented cases passed; varying the figure showed the lane's headline feature failing on the ordinary one.
+
+```
+B(8,0)   bisector x = 4         «ישר · x = 4»   ✓
+B(0,8)   bisector y = 4         «ישר · y = 4»   ✓
+B(6,8)   bisector 3x + 4y = 25  «ישר»           ✗   drawn correctly, no equation
+B(4,4)   bisector at 45°        «ישר»           ✗
+B(2,0)   bisector x = 1         «ישר»           ✗   axis-aligned, and still failing
+```
+
+`B(2,0)` is what ruled out *"slanted breaks it"*: whatever the gate measured was **scale**-sensitive.
+
+### Neither candidate in the issue was the cause
+
+`shapeOfTrace.curve` held the correct line in every case — `x = 1`, and `a=1, b=4/3, c=−8.327`, which is `3x + 4y = 25` to three figures. `locusEquation` discarded it at its opening `if (!shape.conic) return null`, and `conic` was absent because **`snapRational` uses an ABSOLUTE `1e−6` while the trace's accuracy is RELATIVE to how far it walks**:
+
+```
+          traced span   worst deviation from the TRUE line
+B(2,0)             40   1.9e−5      19× the absolute tolerance
+B(6,8)           2685   1.5e−2      four orders past it
+```
+
+The same function's **verification has always been relative** (`1e−6 × scale²`). So the two halves of `snapAndVerify` disagreed about what precision means, and the half that ran first rejected data the half that guards correctness would have accepted.
+
+The snap now takes its tolerance from **the trace's own scatter about the fitted curve** — the precision this data actually has. Never tighter than `SNAP_TOL`, so an exact trace still snaps exactly. This is not a loosening: the verification is untouched and is what keeps a wrong snap from being printed.
+
+### The hole that opened, and the lock that caught it
+
+A scatter-derived tolerance can be wide, and a wide enough one snaps **every coefficient to zero** — after which `0 = 0` satisfies the verification at every point. Handed `x = 40` against a trace at `x = 4`, the scatter is 36 and the result was `{0,0,0,0,0,0}`.
+
+`issue-1176`'s honesty lock caught it, which is the argument for writing that lock as a **direct** assertion rather than inferring the refusal from a case that happened to fail the snap. A degenerate snapped conic is now refused; a wrong-but-nonzero one the verification catches unaided, because it is false somewhere. The degenerate one is the single case it cannot catch, because it is true everywhere.
+
+### A lock that asserted the old behaviour, updated rather than worked around
+
+`issue-1176-locus-configuration.test.ts` asserted that seed 2 of the plain bisector prints the kind alone, with the note *"asserted so that a future change which starts printing an equation here has to say why"*.
+
+Saying why: that seed draws its locus over ~974 units while `A` and `B` sit 8 apart, and the old premise was that `x = 4` *"cannot be re-verified against the trace"*. It was never re-verified — the absolute snap failed first, so nothing reached the check. It now reaches it and **passes**: the trace's worst deviation from `x = 4` is `1.85e−3` against a verification tolerance of `0.95`. And `x = 4` is the true locus there, at every seed. The tool is not stating something it could not check; it is now checking something it could not previously reach.
+
+### What this unblocks
+
+[#1191](https://github.com/dcodish/geo_builder/issues/1191) is a P1 about `4y = −3x + 25` rendering as `4 · ישר y = −3x + 25` on the canvas. While #1224 stood, that figure printed «ישר» with nothing after it — **so the P1's fix could not be play-verified at all**, and its play case was marked unplayable on the operator's sheet. That figure now produces the label, which is what makes the P1 checkable.
