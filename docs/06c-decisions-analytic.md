@@ -5112,3 +5112,49 @@ Numbers go through `fmtAnalytic` (ADR-AG-084), so fractions and exact forms (#11
 `src-analytic/__tests__/issue-1212-curve-equation.test.ts` (8) calls `curveParts` and `ask` directly,
 including the operator's own circle end to end and the #1023 guarantee that an unfixed parabola still
 shows its open form rather than an invented equation.
+
+## ADR-AG-103 — A figure the student BUILDS is visible, not only one they open (#1225, amends ADR-AG-096)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R101** — extended from *opens* to *builds*. **Design:** [04c](04c-design-analytic.md) — the canvas view's lifetime. **LADDER stage:** view state; no engine, solve or display change.
+
+**Operator, 2026-09-19, playing T34:** *"when i put MA=5 the focus on the canvas is lost and the image is not centered. pressing the center button does the work but this should be automatic"* — the canvas framed x ≈ 12…28 while the whole figure sat at x ≈ 0…8.
+
+### The third door on ADR-AG-096's own class
+
+That ADR states the rule and #1209 shut two doors. Every `setView` before this:
+
+```
+showWholeFigure()      load a file        #1209
+showWholeFigure()      clear all          #1209
+setView(zoomedAt(…))   the wheel          user gesture
+setView(panned(…))     a drag             user gesture
+setView(INITIAL_VIEW)  the reset button   user gesture
+setView(zoomedAt(…))   the zoom buttons   user gesture
+```
+
+**Adding a FACT is on no list.** It changes the figure while the transform computed for the previous one stays applied. It bites hardest exactly where the operator hit it: while `M` was free the sampled figure was large, so the view was wide; pinning it with «MA = 5» shrank the figure into a corner of that view.
+
+### A predicate, not an unconditional re-fit
+
+Re-fitting on every fact would trade this defect for a worse one — a student who deliberately zoomed into a vertex losing it on every subsequent line, the tool overriding a gesture again and again. So: **re-fit only when the figure would otherwise not be substantially visible.** A deliberate zoom survives while the figure is on screen; blank paper never survives.
+
+The operator has not ruled on this; it is the session's recommendation, recorded here and on the issue so reversing it is cheap.
+
+`figureIsVisible` measures per AXIS rather than by area, because a figure can be perfectly flat — three collinear points have zero height, and an area ratio is `0/0` there. A degenerate axis counts as visible when the figure's extent on it falls inside the view's. The effect keys on the figure's BOX, so it fires only when the extent actually changes, and returns the view unchanged when the figure is fine — a React no-op, which is what keeps it from looping.
+
+### Verified by driving, because it is geometry on screen
+
+Counting drawn points inside the canvas box, the way ADR-AG-096 did — `main` and this branch, same script:
+
+```
+                                 main      with the fix
+built                            6/6       6/6
+after zooming into a corner      0/6       0/6      (a deliberate gesture, respected)
+after a fact changes the box     0/8       8/8      ← the defect, and the fix
+```
+
+**The operator's own figure could not be used for this.** «נקודה M» is the locus lane's sentence (#1136) and lives only on PR #1172's branch, so on `main` the whole T34 sequence is refused at line 3. The defect is not locus-specific — any fact that changes the figure's extent reaches it — so the reproduction uses a figure `main` can build. Recorded because a later session reading T34 will otherwise try the operator's lines here and conclude the bug does not exist.
+
+A unit test cannot reach `App.tsx`'s view state (no extracted component — the constraint ADR-AG-094 and ADR-AG-096 both record), so `issue-1225-view-follows-figure.test.ts` (6) locks the PREDICATE, including the anti-lock that a zoom onto the figure's centre survives, and the ADR carries the driven measurement.
+
+One belief this corrected on the way: a figure that merely GROWS is not a failure mode, because `viewBox` takes its half-extents from the current figure — at zoom 1 a grown figure still fits. What hides it is a stale centre or a stale zoom. A first draft of the lock asserted otherwise and would have frozen a false belief into the suite.
