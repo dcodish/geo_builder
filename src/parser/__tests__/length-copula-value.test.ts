@@ -122,3 +122,78 @@ describe('ADR-524 — a trailing unit word is not part of the value (#1157)', ()
     expect(cmds('BC = 10')).toEqual(canonical('BC=10'));
   });
 });
+
+/**
+ * #1248 (ADR-524 Am. 1) — A NON-COPULA CONNECTIVE NEVER BECOMES AN EQUALITY.
+ *
+ * ADR-524 shipped its guard as a DENYLIST of relation words, and it was incomplete in the way every
+ * denylist is: what it missed, it read as an equality. «אורך הקטע BC > 10» — the student saying BC is
+ * GREATER THAN 10 — committed `set-distance: 10`. A stated REGION became an EQUALITY at its own bound,
+ * and no honesty gate could catch it, because the `10` was now accounted for. It committed green.
+ *
+ * The guard is inverted to an ALLOWLIST of copulas, and this suite is written the same way round: the
+ * table below is the CLASS — every way a student can relate a length to a number that is not "is" —
+ * and each row asserts the absence of `set-distance`, never a particular outcome. What the sentence
+ * DOES become (a bound, a ratio, an escalation) is another rule's business and is deliberately not
+ * asserted here, so this lock cannot go green by re-implementing that rule.
+ */
+describe('ADR-524 Am. 1 — only a copula produces an equality (#1248)', () => {
+  const commands = (u: string): { type: string }[] => {
+    const r = parse(u);
+    return r.ok ? (r.commands as { type: string }[]) : [];
+  };
+
+  // Every connective here is a RELATION, not a copula. None may yield an equality.
+  it.each([
+    ['greater-than glyph', '>'],
+    ['less-than glyph', '<'],
+    ['at-least glyph', '≥'],
+    ['at-most glyph', '≤'],
+    ['ascii at-least', '>='],
+    ['ascii at-most', '<='],
+    ['Hebrew greater', 'גדול מ-'],
+    ['Hebrew smaller', 'קטן מ-'],
+    ['Hebrew feminine greater', 'גדולה מ-'],
+    ['Hebrew at least', 'לפחות'],
+    ['Hebrew at most', 'לכל היותר'],
+    ['English at least', 'at least'],
+    ['English greater than', 'greater than'],
+    ['English no more than', 'no more than'],
+    ['a ratio', 'גדול פי'],
+  ])('«אורך הקטע BC %s 10» is not an equality', (_name, conn) => {
+    const types = commands(`אורך הקטע BC ${conn} 10`).map((c) => c.type);
+    expect(types, `«${conn}» must not lower to a stated length`).not.toContain('set-distance');
+  });
+
+  // The same, on the other two nouns the registry admits — the defect was never about «אורך».
+  it.each([['הקטע'], ['הצלע']])('«%s BC > 10» is not an equality either', (noun) => {
+    expect(commands(`${noun} BC > 10`).map((c) => c.type)).not.toContain('set-distance');
+  });
+
+  /**
+   * FAILING CLOSED is the point. A connective the tool has never seen must not be guessed at: it is
+   * left alone, the value goes unaccounted, and the honesty battery escalates — which is exactly what
+   * this construct did before ADR-524, and honest. Inventing «= 10» from an unknown word is not.
+   */
+  it.each([['בערך'], ['כמעט'], ['לכל הפחות'], ['roughly'], ['about']])(
+    'an unfamiliar connective «%s» is left alone, never read as "="',
+    (conn) => {
+      expect(commands(`אורך הקטע BC ${conn} 10`).map((c) => c.type)).not.toContain('set-distance');
+    },
+  );
+
+  /**
+   * The other half of the same claim, and the one that keeps the allowlist honest: every copula DOES
+   * produce the equality, and produces the SAME one as the canonical spelling. If a future edit
+   * narrows the allowlist to make some new row pass, these go red.
+   */
+  // Hebrew only: a connective cannot contain Latin letters by construction, so an English copula never
+  // reaches this guard. «BC = 10» is English’s way in and is locked above.
+  it.each([['', 'juxtaposed'], ['=', 'equals sign'], ['הוא', 'masculine copula'], ['היא', 'feminine copula'],
+    ['שווה', 'the verb'], ['שווה ל-', 'the verb with its preposition']])(
+    'a copula (%s — %s) still states the length',
+    (conn) => {
+      expect(commands(`אורך הקטע BC ${conn} 10`)).toEqual(commands('BC=10'));
+    },
+  );
+});

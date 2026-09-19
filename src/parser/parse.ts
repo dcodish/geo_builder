@@ -10130,11 +10130,38 @@ const VERBOSE_LENGTH = new RegExp(
   String.raw`${LENGTH_NOUN}\s+(${LABEL}\s*${LABEL})(${LENGTH_CONNECTIVE})(?=[√\d(])`,
   'g',
 );
-/** «פי»/"times" joins the comparison words here: a RATIO is as much a relation as a bound, and it is
- *  the member `COMPARES_WITH_NUMBER` cannot see (its comparative and its number are not adjacent). */
-const LENGTH_RELATION = new RegExp(String.raw`${CMP_BIG}|${CMP_SMALL}|פי(?![א-ת])|\btimes\b|יחס`, 'i');
+/**
+ * THE CONNECTIVE MUST BE A COPULA — an ALLOWLIST, and the distinction is the whole fix (#1248).
+ *
+ * This guard shipped as a DENYLIST of relation words (`CMP_BIG|CMP_SMALL|פי|times|יחס`) and was wrong in
+ * the way every denylist is wrong: it was incomplete, and what it missed it read as an equality.
+ * Measured on the shipped build, «אורך הקטע BC > 10» — the student saying BC is GREATER THAN 10 —
+ * committed `set-distance: 10`. A stated REGION silently became an EQUALITY at its own bound, which is
+ * ADR-390's cardinal sin, and the honesty gates could not catch it because the `10` was now accounted
+ * for. It committed green. «≥», «<», «לפחות» and «לכל היותר» all did the same.
+ *
+ * The denylist could not have been completed by adding the glyphs, because the question it asks is
+ * open-ended: *the ways a sentence can relate two things are not enumerable.* The question that IS
+ * closed is the other one — **the ways to say "is"** — so the guard is inverted. A rewrite to `SEG = value`
+ * fires only when what stands between them is a copula: nothing at all, an `=`, or one of the few words
+ * that mean "is". Anything else is left exactly as the student wrote it.
+ *
+ * So this fails CLOSED. An unfamiliar connective is not rewritten, the value goes unaccounted, and the
+ * honesty battery escalates the utterance — the outcome this construct had before ADR-524 and a
+ * perfectly honest one. A false equality, by contrast, invents a given the student never gave, which is
+ * worse than both a dropped warning and a false drop.
+ *
+ * This does NOT re-open what ADR-498/ADR-524 closed. That decision is about **locating the value** — it
+ * stays positional, and no copula is required. This decides a different question: **whether the sentence
+ * is an equality at all.** Enumerating copulas to answer it is sound precisely because that set is finite;
+ * enumerating relations to answer it was not.
+ */
+// Hebrew only, and necessarily so: `LENGTH_CONNECTIVE` excludes Latin letters (it must not be able to
+// cross a label), so an English copula could never appear in a connective anyway. The Hebrew nouns this
+// construct is built on make that a closed question rather than a gap — «BC = 10» is English’s own way in.
+const LENGTH_COPULA = new RegExp(String.raw`^[\s.,:]*(?:=|הוא|היא|הם|הן|שווה(?:\s*ל)?)?[\s.,:-]*$`);
 const normalizeVerboseLength = (s: string): string =>
-  s.replace(VERBOSE_LENGTH, (m: string, seg: string, conn: string) => (LENGTH_RELATION.test(conn) ? m : `${seg} = `));
+  s.replace(VERBOSE_LENGTH, (m: string, seg: string, conn: string) => (LENGTH_COPULA.test(conn) ? `${seg} = ` : m));
 
 
 /**

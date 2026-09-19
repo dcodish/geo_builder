@@ -12196,3 +12196,39 @@ A test pinned to coordinates would lock in a placement the student never stated 
 `engine/sample.ts`: `untetheredFreePoints` and `figureScale` above `applySeed`, and one branch in its free-point arm.
 
 `untethered-free-point-1192.test.ts` (8). 2-D lane green.
+
+### ADR-524 Am. 1 — the connective guard is an ALLOWLIST of copulas, not a denylist of relations (#1248)
+
+**Status:** accepted, 2026-09-19 · **P1, mine** — introduced by ADR-524 hours earlier in round #1244, found while triaging the operator's T5 report. Never deployed (`prod/2026-09-19-3` predates it).
+
+**Requirements:** none (internal) — the promise is unchanged; a stated region stops being recorded as an equality. **Design:** [04](04-design.md) — the verbose-length frame’s connective guard. **LADDER stage:** the utterance normaliser, ahead of every value-bearing rule. **Amends** ADR-524; **restores** ADR-390 for lengths.
+
+**The defect.** «אורך הקטע BC > 10» — the student saying BC is GREATER THAN 10 — committed **`set-distance: 10`**. A stated REGION became an EQUALITY at its own bound. Measured, the whole family went the same way:
+
+```
+אורך הקטע BC > 10        -> set-distance:10        (before ADR-524: segment only, escalated)
+אורך הקטע BC < 10        -> set-distance:10
+אורך הקטע BC ≥ 10        -> set-distance:10
+אורך הקטע BC לפחות 10    -> set-distance:10
+הקטע BC > 10             -> set-distance:10
+```
+
+**And no gate could catch it.** That is what makes this the worst shape in the honesty taxonomy rather than merely a bug: before the change the `10` went unaccounted and the battery escalated the utterance; after it, the `10` *is* accounted for — by the wrong constraint. The figure commits green, the panel asserts a given the student never gave, and every tripwire reads clean. ADR-390 (#277) names this exact failure for angles; ADR-524 re-opened it for lengths.
+
+**Root cause — the shape of the guard, not its contents.** ADR-524's guard asked *"does the connective carry a relation?"* against a list: `CMP_BIG|CMP_SMALL|פי|times|יחס`. It had the comparison **words** and not the comparison **glyphs**, and it had no bound words at all.
+
+Adding `>`, `<`, `≥`, `≤`, «לפחות» and «לכל היותר» would have been the obvious repair and would have been wrong in the same way, because **the question a denylist asks here has no closed answer**: the ways a sentence can relate a length to a number are not enumerable, and every one this list misses is read as an equality. That is the [ADR-498](#adr-498) lesson arriving one level up — *any enumeration is a list that is already incomplete* — and ADR-524 quoted it while committing it.
+
+**The decision.** The guard is inverted. A rewrite to `SEG = value` fires only when the connective **is a copula**: nothing at all, `=`, or one of the few words that mean "is" (`הוא`, `היא`, `הם`, `הן`, `שווה`, `שווה ל`). Everything else is left exactly as the student wrote it.
+
+That question **is** closed — the ways to say "is" are finite — which is precisely why enumerating them is sound where enumerating relations was not.
+
+**This does not re-open what ADR-498/ADR-524 decided.** That decision governs **where the value is** — still positional, still no copula required to *find* it. This governs a different question: **whether the sentence is an equality at all.** Conflating the two is what produced the defect.
+
+**It fails CLOSED, deliberately.** An unfamiliar connective («בערך», «כמעט», a word nobody has thought of) is not rewritten; the value goes unaccounted and the battery escalates — the behaviour this construct had before ADR-524, and an honest one. The old guard failed OPEN, and a false equality invents a given, which is worse than a missed warning *and* worse than a false drop.
+
+**Hebrew only, and necessarily.** `LENGTH_CONNECTIVE` excludes Latin letters so it can never cross a label, so an English copula cannot reach this guard at all. `is`/`equals` were in the first draft of the allowlist and are removed as dead code — a test row asserting them found it. «BC = 10» is English's own way in.
+
+**Lock.** `length-copula-value.test.ts` gains a suite written as the CLASS: fifteen non-copula connectives — every glyph, both directions, the Hebrew and English comparison words, the bound words, a ratio — each asserting the **absence** of `set-distance`, never a particular outcome, so the lock cannot go green by re-implementing the bound rule. Five unfamiliar connectives assert the fail-closed behaviour. The copula rows assert the equality still forms and still equals the canonical «BC=10» parse, so a future narrowing of the allowlist goes red.
+
+**Consequences.** `parser/parse.ts`: `LENGTH_RELATION` (a denylist) becomes `LENGTH_COPULA` (an allowlist); the callback's branches swap. `length-copula-value.test.ts` grows from 25 to 53.
