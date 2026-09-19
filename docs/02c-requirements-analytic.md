@@ -1048,6 +1048,21 @@ seeds it must come back the same curve. Where a parameter moves the set, as in �
 asserting one sample's `a` as a given (P3, [ADR-052](06-decisions.md#adr-052)) or deriving a symbolic
 form, which is the NO-CAS boundary.
 
+**R25a — the object the student asked for is ON SCREEN**
+([ADR-AG-120](06c-decisions-analytic.md#adr-ag-120),
+[#1198](https://github.com/dcodish/geo_builder/issues/1198)). The view is fitted to everything that
+gets DRAWN, not to the figure alone. A traced locus is decoration the caller hands to the renderer
+after the frame has been decided, and measured on the figure above it fell outside the frame in **4
+of 6 configurations** — the tool clipping the one thing the question was about. A trace the student
+has collapsed does not widen the frame: it is not on the canvas, and zooming out for something
+invisible is the same failure pointing the other way.
+
+**Still open, and it is a ruling:** the frame is re-fitted from nothing on every «הציגו תצורה אחרת»,
+so with a symbolic parameter it lurches — measured, its width varies by a factor of 2.6 and its
+centre swings from +55 to −63. What that control should feel like (a frame kept while only the
+figure moves · a scale normalised by the parameter · a clamp on how far it may move) is a product
+decision, and is #1198's second symptom.
+
 **The tool never grades.** The student does not type a claimed equation to be marked ✓ or ✗ (operator,
 2026-09-16: *"I dont want a validation tool"* — ADR-AG-072 §6, amending
 [ADR-AG-001](06c-decisions-analytic.md#adr-ag-001) D1). The tool's own arithmetic is still checked

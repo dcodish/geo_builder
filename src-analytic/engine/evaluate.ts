@@ -1122,10 +1122,36 @@ const FALLBACK: Box = { minX: -10, minY: -10, maxX: 10, maxY: 10 };
  * parabola contributes nothing (it would otherwise decide the window by where it happens to be
  * sampled). Always includes the origin, because the axes are the subject here.
  */
-export function viewBox(f: Figure, pad = 0.15): Box {
+export function viewBox(
+  f: Figure,
+  pad = 0.15,
+  /**
+   * WORLD GEOMETRY THAT IS DRAWN BUT IS NOT IN THE FIGURE (#1198).
+   *
+   * Operator, playing round #1193 T11: *"pressing on show another config causes the image to jump
+   * right and left and the entire shape is not shown."*
+   *
+   * A traced locus is caller-owned decoration on `SceneKnowledge` — the same seam as `marks` and
+   * `crossings` — so it reaches the renderer AFTER the frame has been decided, and the frame was
+   * decided from the figure's points and curves alone. Measured on the operator's own figure, the
+   * traced circle fell outside the box in **4 of 6 configurations**: the tool clipped the one object
+   * the student had asked to see.
+   *
+   * Nothing was wrong in the tracer. The box was simply fitted to a SUBSET of what gets drawn, and
+   * the fix is to let the caller say what else is on the canvas rather than to teach the engine
+   * about the ask lane — which would put a question's answer inside the figure it is a question
+   * about. The padding and the isotropy stay here, in the one place that owns them, so no caller
+   * ever re-derives a frame rule.
+   */
+  extra: readonly { x: number; y: number }[] = [],
+): Box {
   const xs: number[] = [0];
   const ys: number[] = [0];
   for (const p of f.points) {
+    xs.push(p.x);
+    ys.push(p.y);
+  }
+  for (const p of extra) {
     xs.push(p.x);
     ys.push(p.y);
   }

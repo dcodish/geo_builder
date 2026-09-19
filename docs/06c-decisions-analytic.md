@@ -6412,3 +6412,68 @@ Verified to bite, both halves independently: disabling the symbolic rewrite turn
 ### Consequences
 
 `engine/lengths.ts` (the two normalisations), `parser/catalogAnalytic.ts` (three rows — one per family of spelling, since the lock already proves the thirteen equal), `App.tsx` (the chip, and the export), `i18n/index.ts` (both locales), `__tests__/issue-1246-equation-claim.test.ts` (three rows moved out).
+
+## ADR-AG-120 — The frame is fitted to everything DRAWN, not to the figure alone (#1198, symptom 1)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the object a student asks for is on screen. **Design:** [04c](04c-design-analytic.md) — where the frame is composed, and why not in `derive`. **LADDER stage:** render/app. No parser, engine or solver change. **Related:** [ADR-AG-086](#adr-ag-086) / #1176 (the trace follows the configuration — this is the frame failing to), #1182 (a different cause with the same feel).
+
+**Operator, 2026-09-18, playing round #1193 T11:** *"pressing on show another config causes the image to jump right and left and the entire shape is not shown."*
+
+### Measured, before and after
+
+```
+A(-9a,0) · B(41a,0) · נקודה P · PA מאונך ל-PB     ask «המקום הגיאומטרי של P»
+
+seed |            box            |           locus           | before | after
+  0  | x[ -57, 168] y[-147,  78] | x[ -31, 142] y[ -86,  86] |  CUT   | contained
+  1  | x[ -22,  64] y[ -53,  32] | x[ -12,  54] y[ -33,  33] |  CUT   | contained
+  2  | x[-165,  56] y[-129,  92] | x[-139,  31] y[ -85,  85] | contained | contained
+  3  | x[-140,  48] y[ -65, 122] | x[-118,  26] y[ -72,  72] |  CUT   | contained
+  4  | x[ -55, 162] y[-122,  95] | x[ -30, 137] y[ -83,  83] | contained | contained
+  5  | x[ -44, 130] y[ -56, 119] | x[ -24, 110] y[ -67,  67] |  CUT   | contained
+
+                                                   cut in 4 of 6  ->  0 of 6
+```
+
+The tool clipped, in two thirds of the configurations a student can reach, **the one object they had asked to see.**
+
+### Nothing was wrong in the tracer
+
+The box was fitted to a SUBSET of what gets drawn. `derive`'s box frames the figure's points and curves; a traced locus is not in the figure — it is caller-owned decoration on `SceneKnowledge`, the same seam as `marks` and `crossings` — so it reaches the renderer *after* the frame has been decided, and the frame never heard about it.
+
+`viewBox` therefore grows one optional input: world geometry that is drawn but is not in the figure. The padding and the isotropy stay inside it, in the one place that owns them, so no caller ever re-derives a frame rule.
+
+### The seam, which is the part this ADR is for
+
+The issue left it open: *"the caller may need to hand its extent to `derive`/the box rather than only to the renderer; that seam choice is the ADR."*
+
+**It is composed in `app/`, and `derive` is not told.** Feeding a question's trace back into the derivation would make the figure depend on the questions asked about it, and [02c R24](02c-requirements-analytic.md) forbids exactly that in as many words — *an ask is a dry-run construction, built internally, evaluated, discarded; it must never change the figure*. The app layer is the only one holding both the derivation and the answers, so that is where they meet.
+
+It is a FUNCTION (`app/drawnBox.ts`) rather than three lines inside the component, because the decision "what is on the canvas" is testable only if something can call it ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)). A lock that recomputed the union itself would stay green through the component forgetting to use it.
+
+Two details that are not incidental:
+
+- **Only SHOWN answers count.** A trace the student has collapsed is not on the canvas, and framing for it would zoom out for something invisible — the opposite failure, and just as confusing.
+- **With no trace, the figure's own box is returned UNCHANGED** — the same object, not an equal one built a second way. The auto-refit effect (#1225) keys on the box's numbers, so a recomputation differing in the last bit would re-frame the canvas under a student who had deliberately zoomed.
+
+### ⚠ HALF of #1198 is deliberately not fixed
+
+The frame still **lurches** between configurations: measured on the same figure, its width varies by a factor of **2.6** and its centre swings from **+55 to −63**, because it is re-fitted from nothing on every press. With a symbolic parameter the points themselves scale and flip with `a`, so a box that follows them faithfully swings by the full range of `a`.
+
+That is a **product ruling**, not a detail — what should «הציגו תצורה אחרת» feel like? Fit once and keep the frame while only the figure moves · normalise the scale by the parameter so the drawing stays one size · clamp how far the frame may move per press. The issue says so itself, and says (1) is worth landing without it.
+
+**One lock row pins the lurch as a KNOWN state**, asserting the factor is still greater than 2. When a ruling lands and this improves, that row goes red and sends the reader to the ruling — rather than letting the change arrive unnoticed and unexplained.
+
+### Not #1182, and they must not close each other
+
+[#1182](https://github.com/dcodish/geo_builder/issues/1182) is a free point **solving far from the stated figure** — about where the geometry goes. This is about where the camera points; here `A`, `B` and `P` all sit exactly where `a` puts them. The two look alike while playing and neither fix contains the other.
+
+### Lock
+
+`issue-1198-locus-in-view.test.ts` (10). **Containment over a sweep**, not the measured numbers: the property is *the thing the student asked for is on screen*, and the defect was configuration-dependent — a single-seed assertion would have passed on seeds 2 and 4 while the tool clipped the other four. The pre-fix frame's clipping is asserted too, so the lock cannot quietly stop measuring what it claims to.
+
+Verified to bite: reverting the composition to the figure's own box turns **5 of 10** red.
+
+### Consequences
+
+`engine/evaluate.ts` (`viewBox` gains its optional extra extent), `app/drawnBox.ts` (new — the composition), `App.tsx` (three `d.box` sites now read the drawn box: the ref, the auto-refit key, and the projection).

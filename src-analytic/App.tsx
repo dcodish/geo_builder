@@ -34,6 +34,7 @@ import { panelListsCurve } from './app/panelRows';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
 import { domainText, positionalOf } from './engine/types';
 import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
+import { drawnBox as composeDrawnBox } from './app/drawnBox';
 import { exprText } from './engine/expr';
 import { MathText, hasMath } from '../shell/math';
 import { Banner } from '../shell/frame/Banner';
@@ -430,11 +431,38 @@ export function App() {
   );
 
   /**
+   * THE FRAME IS FITTED TO EVERYTHING THAT WILL BE DRAWN (#1198).
+   *
+   * Operator, playing round #1193 T11: *"pressing on show another config causes the image to jump
+   * right and left and the entire shape is not shown."*
+   *
+   * `d.box` frames the FIGURE, and a traced locus is not in the figure — it is caller-owned
+   * decoration handed to the renderer afterwards, the same seam as `marks` and `crossings`. So the
+   * trace was projected into a frame decided without it, and measured on the operator's own figure
+   * it fell outside in **4 of 6 configurations**: the tool clipped the one object he had asked to
+   * see.
+   *
+   * Composed HERE rather than inside `derive`, because this is the only layer that holds both the
+   * derivation and the answers. Putting a question's trace into the derivation would make the figure
+   * depend on the questions asked about it, which is the layering (02c R24 — an ask never mutates
+   * the figure) rather than a convenience.
+   *
+   * Only SHOWN answers count: a trace the student has collapsed is not on the canvas, and framing
+   * for it would zoom out for something invisible.
+   *
+   * ⚠ This is HALF of #1198. The frame still lurches between configurations (measured: width varies
+   * by a factor of 2.6, centre swings from +55 to −63), because it is re-fitted from nothing on
+   * every press. That half is a product ruling about what «הציגו תצורה אחרת» should feel like —
+   * fit once and keep it, normalise by the parameter, or clamp the movement — and the issue says so.
+   */
+  const drawnBox = useMemo(() => composeDrawnBox(d.figure, d.box, answers), [answers, d]);
+
+  /**
    * The box and the view in REFS as well as in state (#1094): the wheel listener below is registered
    * once and would otherwise close over the first render's values forever.
    */
-  const figureBoxRef = useRef(d.box);
-  figureBoxRef.current = d.box;
+  const figureBoxRef = useRef(drawnBox);
+  figureBoxRef.current = drawnBox;
   const viewRef = useRef(view);
   viewRef.current = view;
 
@@ -455,7 +483,7 @@ export function App() {
    * so a zoom into a vertex survives the next line. Returning `v` unchanged is a React no-op, which
    * is what keeps this from looping.
    */
-  const figureBoxKey = `${d.box.minX},${d.box.minY},${d.box.maxX},${d.box.maxY}`;
+  const figureBoxKey = `${drawnBox.minX},${drawnBox.minY},${drawnBox.maxX},${drawnBox.maxY}`;
   useEffect(() => {
     setView((v) => (figureIsVisible(figureBoxRef.current, v) ? v : INITIAL_VIEW));
   }, [figureBoxKey]);
@@ -587,7 +615,7 @@ export function App() {
     // The box the VIEW is looking at (#1094) — the figure's own box moved and scaled by what the
     // student has done to it. Re-projecting rather than transforming is what keeps the grid crisp
     // and the tick labels true at every zoom; see `render/view.ts`.
-    const zoomed = viewBox(d.box, view, { width: canvasSize.w, height: canvasSize.h });
+    const zoomed = viewBox(drawnBox, view, { width: canvasSize.w, height: canvasSize.h });
     /**
      * The renderer cannot ask whether a value is KNOWLEDGE — that is a question about the
      * construction across configurations, and a `Figure` is one configuration (#1024). So the gate
