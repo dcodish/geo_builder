@@ -142,7 +142,13 @@ export interface FactBase {
 export type Fact =
   | (FactBase & { t: 'param'; sym: string; domain: Domain })
   | (FactBase & { t: 'point'; id: Id; x: Expr; y: Expr })
-  | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve; stated: boolean })
+  /**
+   * `inheritExtent` (#1234) — the student named the object and gave its equation but wrote NO noun
+   * («משוואת CE היא x-3y=0»), so whether this is a drawn line or a condition on an existing segment
+   * cannot be decided at parse time: `parseLine` takes no figure context. The fold decides it, which
+   * is the only layer that can see whether `seg-CE` is already there.
+   */
+  | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve; stated: boolean; inheritExtent?: true })
   | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule })
   | (FactBase & { t: 'segment'; id: Id; a: Id; b: Id })
   | (FactBase & { t: 'polygon'; id: Id; vertices: Id[]; noun?: string })
