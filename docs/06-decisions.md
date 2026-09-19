@@ -11972,3 +11972,82 @@ Three further rows lock the *non*-signs — maqaf, digit-preceded, letter-preced
 `parser/parse.ts` only: two blanking passes made length-preserving, one `negAt` predicate, and the sign applied in the fraction/radical loop and the plain-digit loop.
 
 `adr-250.test.ts` grows from 18 to 24. 2-D lane green.
+## ADR-524 — The copula is not part of the LENGTH value reader's vocabulary (#1157)
+
+**Requirements:** [02](02-requirements.md) FR-IN-6 — the amendment ADR-498 made for angles now reads for lengths too: a stated magnitude is located by position, so the spelling of the copula is not part of the promise. **Design:** [04](04-design.md) — "Addressing a length: one reader, many spellings". **LADDER stage:** the utterance normaliser, ahead of every value-bearing rule. No engine, solver or render change. **Ports** ADR-498 (#969); **extends** ADR-390's region guard.
+
+**Source:** prod log triage 2026-09-17 (2-D), one user, in the **⇗ would-escalate** bucket.
+
+### The defect
+
+«אורך הקטע BC = 10» emitted the segment and **dropped the 10**. An explicit `=` and a bare number, and the construct still committed a length-less segment.
+
+Measured at HEAD, context-free `parse()`:
+
+```
+BC=10                      -> segment + set-distance:10     ✓
+אורך BC = 10               -> segment + set-distance:10     ✓
+אורך הקטע BC הוא 10        -> segment + set-distance:10     ✓
+אורך הקטע BC שווה 10       -> segment + set-distance:10     ✓
+הקטע BC = 10               -> segment ONLY                  ✗
+אורך הקטע BC = 10          -> segment ONLY                  ✗
+אורך הקטע BC 10            -> segment ONLY                  ✗
+אורך הקטע BC 10 יחידות     -> segment ONLY                  ✗
+אורך הקטע AB שווה ל-10     -> segment ONLY                  ✗
+אורך הקטע BC = √8          -> segment ONLY                  ✗
+אורך BC 10                 -> NOT-HANDLED                   ✗
+אורך הקטע BC הוא 10 יחידות -> NOT-HANDLED                   ✗
+```
+
+Nothing is lost *silently*: the span accountant and `droppedGivenNumbers` flag the unaccounted `10` and the whole utterance escalates. That is the gate doing its job, and it is why this is P2. The cost is a wrong-shaped parse plus **a paid LLM call per occurrence** on a sentence the grammar had all but read.
+
+> The issue body's stated root cause was **wrong** — it blamed the `אורך הקטע` construct for "returning before the trailing measure is consumed". Measured, that construct is fine. The defect is one line further out, in the utterance normaliser. The plan was corrected on the issue before this work began.
+
+### Root cause — a value located by VOCABULARY
+
+The verbose-length frame was a normaliser rewrite that found its value **after a literal copula**:
+
+```
+(?:אורך|הצלע|הקטע)\s+(SEG)\s+(?:הוא|היא|שווה(?:\s*ל-?)?)\s+(?=[√\d(])   →   "$1 = "
+```
+
+Three spellings die on that enumeration at once: `=` is not in the list, a **juxtaposed** number has no copula at all, and «שווה ל-10» fails because the maqaf leaves no whitespace for the trailing `\s+`. `אורך BC = 10` survived only because a *different*, one-noun rule read it.
+
+This is ADR-498 (#969) exactly, one construct over: there the angle's symbolic lane required a literal `=` while its numeric sibling needed no copula, and the fix was to stop locating the value by vocabulary. ADR-498's own sentence is the reason **adding `=` to the alternation was rejected here**: *any enumeration is a list that is already incomplete against its sibling — the seventh spelling reopens the hole exactly as the sixth did.*
+
+### The decision — the connective is defined by what it is NOT
+
+The value is found by **position**. Whatever stands between the segment and its value is CONNECTIVE, and a connective is a run carrying **no operand of its own** — no digit, no Latin letter, no value glyph. That is all a copula, an `=`, a maqaf or punctuation can be, and it needs no list.
+
+Because the connective cannot cross an operand, the rewrite stays local: a compound line («אורך הקטע BC = 10, AB = 5») is still split by `multiStatement` exactly as before, and a following label run («הקטע BC, AB = 10») blocks the rewrite rather than being jumped over.
+
+### The one guard, and why it is applied to the CONNECTIVE
+
+**A connective that carries a RELATION is not a connective** — it is the statement's operator, and the number after it is a BOUND or a RATIO, never the length itself. «אורך הקטע BC גדול מ-10» and «הצלע BC גדולה פי 2 מ-AB» must reach the bound and ratio rules untouched.
+
+The first build of this fix used the shared whole-line `COMPARES_WITH_NUMBER` predicate, as the plan proposed. **Measurement rejected it, and it is worth recording why**, because the reasoning looked right:
+
+- it **misses** «גדולה פי 2» — the comparative and the number are not adjacent, so the predicate does not fire, and the ratio was silently rewritten into «BC = 2». That is ADR-498's *"a symbolic bound would have been stolen"*, reproduced by the very guard meant to prevent it;
+- it **over-refuses** a compound whose *other* statement carries a comparison («אורך הקטע BC = 10, AB > 5»).
+
+The relation that matters is the one standing between *this* segment and *this* value. So the guard reads the captured connective, built from the comparison vocabulary the bound rules already own (`CMP_BIG`/`CMP_SMALL`) plus «פי»/"times" — the ratio member `COMPARES_WITH_NUMBER` structurally cannot see.
+
+### The second arm — a trailing unit word is not part of the value
+
+«BC = 10 יחידות» was `not-handled`, while «זווית ABC = 40 מעלות» and «רדיוס המעגל O הוא 5 ס"מ» both worked: the angle lane and the radius lane had each grown their own unit tolerance and the length lane had none — the same per-lane enumeration, one level down. The unit is now stripped at the utterance boundary, so the tolerance belongs to the tool rather than to whichever lane paid for it. It requires a digit before it and a word boundary after, so it can never be taken out of a label run or the middle of a Hebrew word; «מעלות» is deliberately absent, since a degree is a unit the angle rules read as *meaning*, not noise.
+
+**This arm closed a latent honesty defect nobody had filed:** «BC = 10 cm» previously parsed to **`set-ratio`** — a stated length committed as a ratio, which is a wrong given, not merely a refusal. It now reads `set-distance:10`.
+
+### The lock is a PARITY assertion
+
+Each spelling is asserted to produce **the same commands as the canonical «BC=10»**, never a hand-written expectation, so the test cannot go green by re-implementing the grammar it guards (ADR-W-053). Radical and decimal values are locked the same way — against `BC = √8` and `BC = 2.5` — so the value KIND is not enumerated either.
+
+The bound and ratio rows are locked as *not* producing `set-distance`, and the compound row is locked as producing both a distance and a bound — that pair is what distinguishes the connective guard from the whole-line one that was rejected.
+
+Verified to bite: **13 of the 25 assertions fail against pristine `parse.ts`.**
+
+### Consequences
+
+`parser/parse.ts`: the copula alternation is gone, replaced by `stripValueUnits` and `normalizeVerboseLength` above `normalizeUtterance`, both applied in its chain.
+
+`length-copula-value.test.ts` (25), named after its ADR-498 sibling `angle-copula-value.test.ts`. 2-D lane green.
