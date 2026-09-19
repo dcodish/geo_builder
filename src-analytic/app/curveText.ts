@@ -107,14 +107,41 @@ export interface CurveParts {
  * A LINE has no details: it was already nothing but its equation, and #1212 leaves its row exactly
  * as it was. The other three each gain the equation they never printed.
  */
-export function curveParts(c: NumCurve): CurveParts {
+/**
+ * A DESCRIBED POSITION IS NAMED BY THE POINT THAT OCCUPIES IT, AND BY NOTHING OTHERWISE (#1167).
+ *
+ * Operator, 2026-09-17: *"i see that we now have 2 points on the same location A and O. this should
+ * not happen. if a point that we didnt name is now on a given point, it should get the point that is
+ * already there"*.
+ *
+ * There was never a point `O`. `O`, `F`, `F₁` and `F₂` were string literals in the switch below —
+ * four instances of one defect, which is why fixing the circle alone would have been the patch shape.
+ * A figure holding a real `F` and a parabola printed two different `F`s in one panel.
+ *
+ * `nameAt` is passed in rather than computed here: the answer needs the FIGURE and its scale, and the
+ * caller already holds both. It is `pointAt` from `engine/crossings.ts` — the same function
+ * `centresOf` uses to decide whether to offer a centre ring, so the panel and the ring can no longer
+ * disagree about whether a position is taken.
+ *
+ * When nobody occupies the position, the coordinates stand alone: `(0, 0), r = 4`. Inventing a letter
+ * is what this fixes, so falling back to one would be the defect with a different spelling.
+ */
+const at = (nameAt: NameAt | undefined, x: number, y: number, coords: string): string => {
+  const who = nameAt?.(x, y) ?? null;
+  return who ? `${who}(${coords})` : `(${coords})`;
+};
+
+/** Who sits at a position, if anyone — `pointAt(figure, …)`, supplied by the caller. */
+export type NameAt = (x: number, y: number) => string | null;
+
+export function curveParts(c: NumCurve, nameAt?: NameAt): CurveParts {
   switch (c.kind) {
     case 'line':
       return { equation: lineText(c.a, c.b, c.c) };
     case 'circle':
       return {
         equation: `${shifted('x', c.cx)} + ${shifted('y', c.cy)} = ${fmt(c.r * c.r)}`,
-        details: `O(${fmt(c.cx)}, ${fmt(c.cy)}), r = ${fmt(c.r)}`,
+        details: `${at(nameAt, c.cx, c.cy, `${fmt(c.cx)}, ${fmt(c.cy)}`)}, r = ${fmt(c.r)}`,
       };
     case 'parabola': {
       const f = parabolaFocus(c);
@@ -123,14 +150,14 @@ export function curveParts(c: NumCurve): CurveParts {
       const mag = fmt(Math.abs(k)) === fmt(1) ? '' : fmt(Math.abs(k));
       return {
         equation: `y² = ${k < 0 ? '-' : ''}${mag}x`,
-        details: `F(${fmt(f.x)}, 0), x = ${fmt(-c.p / 2)}`,
+        details: `${at(nameAt, f.x, 0, `${fmt(f.x)}, 0`)}, x = ${fmt(-c.p / 2)}`,
       };
     }
     case 'ellipse': {
       const [f1, f2] = ellipseFoci(c);
       return {
         equation: `x²/${fmt(c.a * c.a)} + y²/${fmt(c.b * c.b)} = 1`,
-        details: `a = ${fmt(c.a)}, b = ${fmt(c.b)}, F₁(${fmt(f1.x)}, ${fmt(f1.y)}), F₂(${fmt(f2.x)}, ${fmt(f2.y)})`,
+        details: `a = ${fmt(c.a)}, b = ${fmt(c.b)}, ${at(nameAt, f1.x, f1.y, `${fmt(f1.x)}, ${fmt(f1.y)}`)}, ${at(nameAt, f2.x, f2.y, `${fmt(f2.x)}, ${fmt(f2.y)}`)}`,
       };
     }
   }
@@ -166,8 +193,8 @@ export function curveDetailsKey(kind: NumCurve['kind']): string {
 }
 
 /** The whole row on one line, named — what a caller with nowhere to fold the detail away shows. */
-export function describeCurve(name: string, c: NumCurve): string {
-  const { equation, details } = curveParts(c);
+export function describeCurve(name: string, c: NumCurve, nameAt?: NameAt): string {
+  const { equation, details } = curveParts(c, nameAt);
   return `${name ? `${name}: ` : ''}${equation}${details ? `, ${details}` : ''}`;
 }
 

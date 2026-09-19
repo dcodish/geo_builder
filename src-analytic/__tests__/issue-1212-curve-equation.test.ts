@@ -43,11 +43,26 @@ import { knownCurve } from '../engine/evaluate';
 import { curveParts } from '../app/curveText';
 import { fmtAnalytic } from '../format';
 
+/**
+ * ⚠ THE LETTERS IN THESE EXPECTATIONS CHANGED — #1167 / ADR-AG-115.
+ *
+ * They read `O(3, 4)`, `F(2, 0)` and `F₁`/`F₂`, which were string literals inside `curveParts` —
+ * letters the tool invented for positions. A figure holding a real point `F` and a parabola printed
+ * two different `F`s in one panel, and a circle centred on `A` printed `O(0, 0)` directly beneath
+ * `A = (0, 0)`.
+ *
+ * A described position is now named by the point that OCCUPIES it, and by nothing otherwise. These
+ * calls pass no figure, so nobody occupies anything and the coordinates stand alone — the correct
+ * answer for a bare call, not a loss of coverage. #1167's own suite covers the naming itself.
+ *
+ * Nothing about #1212 changed: every assertion on the EQUATION is untouched, and the equation is what
+ * this file exists to guard.
+ */
 describe('#1212 — every curve kind states an equation', () => {
   it('a circle writes the centre-radius form, not its centre and radius', () => {
     expect(curveParts({ kind: 'circle', cx: 3, cy: 4, r: 3 })).toEqual({
       equation: '(x - 3)² + (y - 4)² = 9',
-      details: 'O(3, 4), r = 3',
+      details: '(3, 4), r = 3',
     });
   });
 
@@ -62,11 +77,11 @@ describe('#1212 — every curve kind states an equation', () => {
     expect(p.equation).toBe('x²/16 + y²/9 = 1');
     // a = 4, b = 3 → c² = 7, so the foci are at (±√7, 0) — present, but no longer the whole row.
     // `ellipseFoci` names the POSITIVE one F₁, which #1212 does not touch; only their home moved.
-    expect(p.details).toBe(`a = 4, b = 3, F₁(${fmtAnalytic(Math.sqrt(7))}, 0), F₂(${fmtAnalytic(-Math.sqrt(7))}, 0)`);
+    expect(p.details).toBe(`a = 4, b = 3, (${fmtAnalytic(Math.sqrt(7))}, 0), (${fmtAnalytic(-Math.sqrt(7))}, 0)`);
   });
 
   it("a parabola's focus and directrix move out of the equation line", () => {
-    expect(curveParts({ kind: 'parabola', p: 4 })).toEqual({ equation: 'y² = 8x', details: 'F(2, 0), x = -2' });
+    expect(curveParts({ kind: 'parabola', p: 4 })).toEqual({ equation: 'y² = 8x', details: '(2, 0), x = -2' });
     // The line terms' magnitude rule applies here too: `y² = x`, never `y² = 1x`.
     expect(curveParts({ kind: 'parabola', p: 0.5 }).equation).toBe('y² = x');
     expect(curveParts({ kind: 'parabola', p: -2 }).equation).toBe('y² = -4x');

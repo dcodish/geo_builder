@@ -378,6 +378,25 @@ export interface Namable {
  * It travels the crossing's road rather than forking it: the same `Namable` shape, the same `freeLetter`,
  * and the sentence is what the parser reads back — never a point minted behind the grammar's back.
  */
+/**
+ * WHO OCCUPIES THIS POSITION — the one place that answers it, at the figure's own scale (#1167).
+ *
+ * `centresOf` has asked this since #1024, to avoid offering a ring where a point already sits. The
+ * DESCRIPTION layer never asked it at all, and printed invented letters instead: a circle centred at
+ * the origin read «O(0, 0), r = 4» in the panel while «A = (0, 0)» sat directly above it — two
+ * letters for one position, one of which the student never created.
+ *
+ * Extracted rather than copied, because the alternative is a second `Math.hypot` test beside this
+ * one with its own idea of "near", and the two would drift the first time the tolerance changed. It
+ * is RELATIVE to the figure (`apart`), never absolute — ADR-AG-021's rule, which #1113 installed here
+ * and which an absolute epsilon in a second copy would quietly undo.
+ */
+export function pointAt(figure: Figure, x: number, y: number): string | null {
+  const near = apart(figure);
+  const hit = figure.points.find((p) => Math.hypot(p.x - x, p.y - y) < near);
+  return hit ? hit.id : null;
+}
+
 export function centresOf(figure: Figure, letter: string): Namable[] {
   const out: Namable[] = [];
   for (const cu of figure.curves) {
@@ -398,11 +417,9 @@ export function centresOf(figure: Figure, letter: string): Namable[] {
     const name = cu.id.slice(PREFIX.length);
     if (!name) continue;
 
-    // Already named: a point sits on the centre, whatever route put it there.
-    const taken = figure.points.some(
-      (p) => Math.hypot(p.x - circle.cx!, p.y - circle.cy!) < apart(figure),
-    );
-    if (taken) continue;
+    // Already named: a point sits on the centre, whatever route put it there. Same question the
+    // description layer asks, and now literally the same function (#1167).
+    if (pointAt(figure, circle.cx, circle.cy) !== null) continue;
 
     out.push({
       id: `centre-${cu.id}`,
