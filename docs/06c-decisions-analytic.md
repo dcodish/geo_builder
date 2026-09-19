@@ -5283,3 +5283,39 @@ The *message* is what makes this wrong rather than merely unhelpful. This functi
 ### The anti-lock matters as much as the fix
 
 A fix that loosened this until everything differed would trade a button that never moves for one that always claims success. `src-analytic/__tests__/issue-1220-curve-configuration.test.ts` (6) therefore asserts both directions: the operator's parabola finds another configuration **and `p` actually differs there**, while a fully stated triangle still answers `found: false`, and a stated line does too — which is the normalisation guard read from the other side.
+## ADR-AG-102 — The working states its intermediate, and each statement gets a row (#1221, amends ADR-AG-094)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R100** — the working is shown and can be folded; this adds that it must be *complete*. **Design:** [04c](04c-design-analytic.md) — the technique traces. **LADDER stage:** display only.
+
+**Operator, 2026-09-19, playing T25:** *"never include more than 2 equations in a line. the m= should have a final answer there."*
+
+### The `m` half was not a formatting nit
+
+Every trace this tree can produce:
+
+| question | trace | its result was… |
+| --- | --- | --- |
+| «משוואת הישר AB» | `m = (4 - 0) / (3 - 0),  y - 0 = m(x - 0)` | **nowhere** |
+| «AB» | `d = √((3 - 0)² + (4 - 0)²)` | the answer row: `5` |
+| «המרחק מ-C לישר AB» | `d(C, AB) = |0·3 + 1·5 + 0| / √(0² + 1²)` | the answer row: `5` |
+
+The line trace is the only one carrying an **intermediate**, and it stated its value on no surface. `d` needs no result printed — the answer row directly above says `5`. `m` is different: it is not the answer (the answer is `4x - 3y = 0`), and the second step consumes it symbolically, so the student was shown `y - 0 = m(x - 0)` and never told what `m` was. **The trace handed them the last step**, which is exactly what ADR-AG-060 (#1053) built it not to do.
+
+### The rule, because "show more working" has no natural end
+
+> **An intermediate the next step consumes is evaluated. A final value already shown in the answer row is not repeated.**
+
+Under it the two distance traces are already correct and stay byte-identical — asserted, not assumed, so a later session does not "improve" them with a `= 5` the row above already carries.
+
+### One statement, one row
+
+#1125 had already established these are two statements — it is why `EXPR` carries no comma (*"«m = (4-0)/(3-0), y - 0 = …» is two statements, not one expression"*) — and they were rendered on one line anyway. The separator is now a newline and the component maps each part to its own row.
+
+Split rather than `white-space: pre-line`, deliberately: each row is then typeset independently, so a fraction is found inside ITS statement rather than inside a run containing two of them.
+
+### Two notation corrections the change forced
+
+- **A substituted slope is bracketed when it would otherwise be ambiguous.** `4/3(x - 0)` reads as `4/(3(x - 0))` at least as readily as `(4/3)(x - 0)` — #1180's ambiguity, ruled on for the panel's line rows and applied here rather than leaving one surface ambiguous because nobody looked. An integer slope is untouched.
+- **«y - (0)» is gone.** Pre-existing and surfaced by this work: the bracket around `a.y` was chosen by **`b.y`**'s sign, so `A(0,0)`, `B(3,-6)` printed `y - (0)`. A zero is never bracketed; a genuine negative still is.
+
+`techniques.test.ts`'s #1053 assertion was updated rather than worked around — it is the lock for the behaviour this ADR changes, and it now records why (it injects `fmtNum`, so it reads `1.33` where the product reads `4/3`).

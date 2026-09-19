@@ -1263,8 +1263,25 @@ export function App() {
                         <summary style={askTraceToggle} title={t('askTraceToggle')}>
                           {t('askTraceLabel')}
                         </summary>
+                        {/*
+                          ONE STATEMENT, ONE ROW (#1221).
+
+                          Operator, playing T25: *"never include more than 2 equations in a line"*.
+                          The trace carried two statements joined by a comma and rendered them on one
+                          line; #1125 had already established they ARE two («m = (4-0)/(3-0), y - 0 =
+                          …» is why `EXPR` carries no comma), so the separator became a newline and
+                          each part gets its own row.
+
+                          Split rather than `white-space: pre-line`, deliberately: each row is then
+                          typeset independently, so a fraction is found inside ITS statement rather
+                          than inside a run containing two of them.
+                        */}
                         <div style={askTrace}>
-                          <MathText text={a.trace} />
+                          {a.trace.split('\n').map((step, k) => (
+                            <div key={k}>
+                              <MathText text={step} />
+                            </div>
+                          ))}
                         </div>
                       </details>
                     )}
