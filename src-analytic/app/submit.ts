@@ -80,7 +80,9 @@ export function decideSubmit(
 
   const parsed = parseLine(line);
   if (!parsed.ok) {
-    return { kind: 'refused', error: { key: parsed.code, detail: parsed.detail } as InputError };
+    // #1175 — a refusal that carries WHO is already there must not lose them on the way to the UI.
+    // Spread rather than listed field-by-field, so the next code that carries context arrives intact.
+    return { kind: 'refused', error: { ...parsed, ok: undefined, key: parsed.code } as unknown as InputError };
   }
 
   /**

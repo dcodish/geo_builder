@@ -647,6 +647,7 @@ export function App() {
           'bad-arity': 'errBadArity',
           'repeated-vertex': 'errRepeatedVertex',
           'degenerate-role': 'errDegenerateRole',
+          'crossing-already-named': 'errCrossingAlreadyNamed',
           'llm-busy': 'errLlmBusy',
           'bad-operand': 'errBadOperand',
           'conflicting-restatement': 'errConflict',

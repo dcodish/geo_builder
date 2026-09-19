@@ -130,6 +130,10 @@ const he = {
   errDegenerateRole:
     'תיכון וגובה יוצאים מקודקוד אל הצלע שמולו, ובמשפט "{{detail}}" הקודקוד עצמו נמצא על הצלע הזאת ' +
     '(או שהוא גם הקודקוד וגם הרגל). אפשר לכתוב למשל "AD תיכון לצלע BC".',
+  // #1175 — the refusal's job is to tell them WHICH point is already there. It names the holder and
+  // the reason, so a student who mis-read their own figure learns the thing they got wrong.
+  errCrossingAlreadyNamed:
+    'הישרים האלה נפגשים ב-{{holder}}, ולנקודה הזאת כבר יש שם. המשפט "{{detail}}" היה נותן לה שם שני. אם התכוונתם לנקודה אחרת, בדקו אילו שני ישרים נחתכים בה.',
   // #1251 — a THROTTLE is not a misunderstanding. The student is told the service is busy, never
   // that their sentence was wrong: the tool did not get as far as looking at it.
   errLlmBusy:
@@ -294,6 +298,8 @@ const en: typeof he = {
     'A median or an altitude runs from a vertex to the side OPPOSITE it, and in "{{detail}}" that ' +
     'vertex lies on the side itself (or is its own foot). Write it as, for example, ' +
     '"AD is the median to side BC".',
+  errCrossingAlreadyNamed:
+    'Those lines meet at {{holder}}, and that point already has a name. "{{detail}}" would give it a second one. If you meant a different point, check which two lines cross there.',
   errLlmBusy:
     'The service is busy, so I could not check "{{detail}}". Try again in a moment, or write it in one of the forms listed in the commands panel.',
   thinking: 'Thinking…',

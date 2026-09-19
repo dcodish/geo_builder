@@ -6157,3 +6157,61 @@ Placed beside the #1059 guard at `matchCurve`'s caller, it covers every branch a
 ### Lock
 
 `issue-1246-equation-claim.test.ts` (17): every noun in the registry plus the bare «אורך» form asserting `not-handled` and never `bad-equation`; **the pre-existing `הישר` member**, which is what makes this class-level rather than per-noun; the truncated-equation row that defines the discriminator; ADR-AG-111's whole table still building; and #1059's prose guard, kept beside the new condition because the two now share one gate. 8 of 17 fail against pristine `parseAnalytic.ts`.
+
+## ADR-AG-116 — A named crossing may not be a point the figure already names (#1175)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — a position has ONE name; the intersection sentence is held to it like every other naming. **Design:** [04c](04c-design-analytic.md) — the intersection rule's structural gate, and its stated scope. **LADDER stage:** parse. No engine, solver or render change. **Family of** #1113 / #1153 / #1167.
+
+**Operator, playing round #1169 T4:** *"the data input should have been rejected since point B is already there"*.
+
+### Measured
+
+```
+משולש ABC · A(2,-5) · P נקודת החיתוך של הישר AB עם הישר BC
+
+verdict   accepted, no note      |PB| = 1.2e-8      faults: []
+```
+
+`AB` and `BC` share the vertex `B`; their intersection **is** `B`. The figure ends up with two names for one point, and «משולש ABC» had already given it one.
+
+It **compounds**, which is what lifts it above a cosmetic duplicate: `P` is a distinct object with its own row, its own two incidences and its own entry in the DOF accounting, so every later statement about `P` is solved against a point the student believes is separate from `B`.
+
+### The ruling, and the message it dictates
+
+**Operator, 2026-09-17: refuse, naming `B`** — *"AB and BC meet at B"* is the information the student is missing. Refusal also cannot silently discard a given, which absorbing it as a rename could.
+
+So the refusal carries a **`holder`**, and that is why it gets its own `ParseFailure` code rather than reusing `already-named` (#1153): that code's message tells the student to delete a line and rewrite it, which is advice for a different mistake. A code with only a `detail` could not name the letter at all.
+
+### The test is STRUCTURAL, and that is the whole reason it is safe
+
+Both operands are written in the sentence, so two lines named by two points each **that share exactly one letter** meet at that letter — in every configuration, with no solve, no seed and no tolerance. The check is textual and total.
+
+### ⚠ The scope, measured rather than assumed — which the ruling required
+
+The ruling asked the implementing round to **measure the other members of the class before deciding to stop at the structural one, and to say so rather than leave the rest silent by omission.** Three were measured:
+
+| member | before | after |
+| --- | --- | --- |
+| named carriers sharing a written letter | `\|PB\| = 1.2e-8`, `faults: []` | **refused, naming `B`** |
+| two EQUATIONS crossing where a point already sits | `\|PA\| = 1e-9`, `faults: []` | **unchanged — still minted** |
+| a line and a circle meeting at a point already on both | `bad-operand` | `bad-operand` — that sentence does not parse at all |
+
+**The second member is real and is NOT fixed here.** Catching it means computing the crossing and comparing it to the figure's points — a positional test with its own tolerance question, which the ruling pre-declared *"an escalation, not an expansion"*. Filed as **#1254**, with the distinction it will have to draw: an *invariant* coincidence (a pinned point, fixed equations) is the same point and should be refused; an *incidental* one that holds at one configuration and not another must still build, which is this issue's own third lock.
+
+The third member is not reachable by that sentence and is a separate gap, not this defect.
+
+### A second finding, filed not fixed
+
+«הישר AB עם הישר BA» is **one line**, so its "crossing" is the whole line rather than a point. Measured, it builds an under-determined `P` floating along `AB` with `faults: []`. That is a different defect — an unconstrained point, not a duplicate name — and its honest answer may be a refusal or may be «P על הישר AB», which is the student's to decide. **#1255**; deliberately untouched here so this code never claims a sentence it cannot explain.
+
+### Lock
+
+`issue-1175-crossing-named.test.ts` (8): the operator's own line refused and naming `B`; **no second point at B's position, asserted as a property of the figure** rather than a fault code alone, because a refusal that still left a point behind would satisfy a code-only check; the holder asserted to survive the trip to the submit layer; both letter orders and both shared vertices; and — the whole risk — **a genuine crossing where nothing is named still builds and still names `P`**.
+
+One row asserts the **known-incomplete** positional behaviour on purpose: if a later change starts refusing it, that is #1254 being answered, and the row is the prompt to read that ruling rather than to delete it.
+
+Verified to bite: 5 of the 8 fail against pristine `parseAnalytic.ts`.
+
+### Consequences
+
+`parser/parseAnalytic.ts` (the code and the structural gate), `app/submit.ts` (the refusal now carries its context to the UI by spread, so the next code that carries some arrives intact), `store/useAnalyticStore.ts`, `App.tsx`, `i18n/index.ts` (both locales).

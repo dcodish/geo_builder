@@ -70,6 +70,18 @@ export type ParseFailure =
    */
   | { code: 'degenerate-role'; detail: string }
   /**
+   * A crossing the student asked to NAME that is a point the figure already names — «P נקודת החיתוך
+   * של הישר AB עם הישר BC», where `AB` and `BC` meet at `B` (#1175).
+   *
+   * Its own code because it carries `holder`: the refusal's whole job is to tell the student WHICH
+   * letter is already there, which is the information they are missing — the operator's ruling,
+   * 2026-09-17 (*"AB and BC meet at B"*). A code with only a detail could not say it.
+   *
+   * NOT `already-named` (#1153): that one is about naming an object twice and its message tells the
+   * student to delete a line and rewrite it, which is advice for a different mistake.
+   */
+  | { code: 'crossing-already-named'; detail: string; holder: string }
+  /**
    * A relation whose VERB was understood and whose operand was not — «DE מקביל לפיל» (#1052).
    *
    * Its own code because the student got the sentence shape right: telling them "I did not
@@ -865,6 +877,40 @@ function parseIntersection(line: string): RuleOutcome {
   // The verb was understood and an operand was not — #1052’s refusal, which names the formats that
   // do work rather than calling the whole sentence unintelligible.
   if (!left || !right) return refuse('bad-operand', line);
+  /**
+   * THE CROSSING THE STUDENT NAMED IS A POINT THEY ALREADY HAVE (#1175).
+   *
+   * Operator, playing round #1169 T4: *"the data input should have been rejected since point B is
+   * already there"*. Measured, «P נקודת החיתוך של הישר AB עם הישר BC» minted `P` at `|PB| = 1.2e-8`
+   * with `faults: []` — two letters for one position, and the student's own «משולש ABC» had already
+   * given it one. It is the #1113 family (*"four ring clicks give four letters on ONE point"*),
+   * reached through a typed sentence rather than a click, and it compounds: `P` becomes a separate
+   * object with its own constraints and its own DOF, so every later statement about `P` is solved
+   * against a point the student believes is distinct from `B`.
+   *
+   * The test is STRUCTURAL and needs no figure: both operands are written in the sentence, so two
+   * lines named by two points each that share exactly one letter meet at that letter, whatever the
+   * configuration. No solve, no seed, no tolerance.
+   *
+   * **Sharing BOTH letters is a different sentence and is NOT answered here** — «הישר AB עם הישר BA»
+   * is one line, not two, so its "crossing" is the whole line rather than a point. Measured, it
+   * currently BUILDS an under-determined `P` floating somewhere along AB with `faults: []` — a real
+   * defect, but a different one (an unconstrained point, not a duplicate name) whose honest answer
+   * might be a refusal or might be «P on AB», which is the student's to decide. Filed separately and
+   * left alone here, so this code never claims a sentence it cannot explain.
+   *
+   * ⚠ THIS IS THE STRUCTURAL MEMBER ONLY, and that is deliberate. Two lines given by EQUATIONS that
+   * happen to cross where a point already sits is the same defect — measured, «l1: y=x» and
+   * «l2: y=-x» with `A(0,0)` mints `P` at `|PA| = 1e-9` — but catching it needs a POSITIONAL test
+   * with its own tolerance question, which the operator's ruling pre-declared an escalation rather
+   * than an expansion. Filed separately; see the ADR.
+   */
+  if (left.t === 'on-line-2pt' && right.t === 'on-line-2pt') {
+    const shared = [left.a, left.b].filter((p) => p === right.a || p === right.b);
+    if (shared.length === 1) {
+      return { ok: false, code: 'crossing-already-named', detail: line, holder: shared[0] } as ParseResult;
+    }
+  }
   return made([
     { t: 'declare', id, src: line },
     { t: 'constraint', k: left, src: line },
