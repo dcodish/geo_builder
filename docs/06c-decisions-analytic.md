@@ -5364,3 +5364,43 @@ after a fact changes the box     0/8       8/8      ← the defect, and the fix
 A unit test cannot reach `App.tsx`'s view state (no extracted component — the constraint ADR-AG-094 and ADR-AG-096 both record), so `issue-1225-view-follows-figure.test.ts` (6) locks the PREDICATE, including the anti-lock that a zoom onto the figure's centre survives, and the ADR carries the driven measurement.
 
 One belief this corrected on the way: a figure that merely GROWS is not a failure mode, because `viewBox` takes its half-extents from the current figure — at zoom 1 a grown figure still fits. What hides it is a stale centre or a stale zoom. A first draft of the lock asserted otherwise and would have frozen a false belief into the suite.
+## ADR-AG-104 — A coordinate the student wrote is shown, even when it is not a number (#1226)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — honesty: everything the student stated is visible on the figure; no new row. **Design:** [04c](04c-design-analytic.md) — the point row's open form. **LADDER stage:** display only; nothing is computed that was not computed already.
+
+**Operator, 2026-09-19, playing T32** on «A(-9a,0)» / «B(41a,0)»: *"9a and 41a are still not shown on the canvas or data panel which is wrong."*
+
+### The tool held the expression and printed its own symbol instead
+
+```
+A.x                 mul(neg(num 9), sym 'a')     his own -9a, exactly
+exprText(A.x)       "-9·a"                       renderable all along
+the panel row       A = (x_A, 0)                 the TOOL's symbol, not the student's
+```
+
+`isKnowledge` is false because `a` is free, so the row fell through to the one-coordinate-open reading and printed `x_A`. **That is worse than the dash it replaced**: `x_A` looks like an answer while silently standing in for something the student stated.
+
+### The same fix #1023 made for the other object kind
+
+> A curve the givens have not FIXED still has an equation, and the student wrote it. Printing a dash threw it away — «נתונה פרבולה שמשוואתה y²=2px» read as `—` on a row that could have said `y^2 - 2·p·x = 0`.
+>
+> It states no VALUE, so ADR-AG-003 §2 is untouched — it names the dependency, which is more than the dash said and less than a number.
+
+Every word applies to a point whose coordinate is `-9a`. #1023 closed this for curves and left it open for points.
+
+### The guard was measured, not reasoned
+
+```
+A(-9a,0)          kind = 'point'    x = mul(…)     ← the new branch
+A(2,5)            kind = 'point'    x = num        ← numbers still win, answered earlier
+«A על הישר y=x»   kind = 'free'                    ← the (x_B, x_B) reading (#1078), untouched
+«P אמצע AB»       kind = 'derived'                 ← derived rows, untouched
+```
+
+A stated point is `point`; a carrier point is `free`; a derived point is `derived`. The branch is unreachable from either neighbour, which is what makes it safe to place ahead of both. The lock asserts all four kinds rather than only the fixed one.
+
+### What this is NOT
+
+**Not the canvas.** The label still reads `A` there, and per #1211's ruling coordinates on the canvas are opt-in — so that half belongs to #1211's mechanism rather than becoming automatic here.
+
+**Not the locus equation.** [#1186](https://github.com/dcodish/geo_builder/issues/1186) asks for `(x − 16a)² + y² = 625a²` and is a harder problem: recognising a symbolic dependence across sampled traces, which ADR-AG-072 §4 called the CAS boundary. This needs no inference at all — it prints what is already stored — so it lands first and independently.
