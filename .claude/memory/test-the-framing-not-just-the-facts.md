@@ -45,3 +45,19 @@ than defending the menu.
 
 Related: [[measure-before-diagnosing]] (the facts are hypotheses); [[prior-rulings-live-in-comments]]
 (check what was already settled before asking).
+
+**2026-09-19, #1240 — the same rule applies to a BASELINE the operator names.** Playing #1232, he
+asked for more altitude spellings and set the reference himself: *"baseline is what 2d supports."*
+Measuring 2-D rather than porting it found two holes in the premise: `גובה לצלע BC` — one of the four
+forms he listed — is **refused by 2-D too**, so it is new capability for both tools and not a port at
+all; and 2-D's own median is poorer than its altitude (`AD גובה` parses, `AD תיכון` does not), so
+porting "what 2-D supports" literally would have copied an asymmetry into the younger tree. A named
+reference implementation is a claim about that implementation, and it is measurable in minutes.
+
+Same session, #1241: the operator ruled that a knee draws only for a **stated** right angle, never a
+derived one. Reading 2-D's renderer showed it feeds `rightAngles` from `definiteAngles` — a
+*determinacy* notion, not a *provenance* one — so 2-D probably does the opposite. Had that gone in as
+"port the 2-D knee", the two products would have disagreed about what the mark MEANS. **Check the
+sibling before citing it as the answer, not only before citing it as the problem**
+([[cross-product-disparity-is-a-wiring-smell]] is the same coin: a disparity is a smell in whichever
+direction it points).
