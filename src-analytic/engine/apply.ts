@@ -18,6 +18,7 @@
 import { fitConic } from './conic';
 import { resolveCurve } from './curves';
 import { curveParentOf, parentsOf, type DerivedRule } from './derived';
+import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, sameConstraint } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, shapeRow } from './shapes';
 import { evalExpr, type Env } from './expr';
@@ -84,6 +85,18 @@ export type ApplyErrorCode =
    * never made. The message names the endpoints form instead.
    */
   | 'undistinguished-diagonal'
+  /**
+   * NAMING SOMETHING THAT ALREADY HAS A NAME (#1153).
+   *
+   * «P מרכז המעגל I» then «O מרכז המעגל I» minted a SECOND point on top of the first, and a
+   * third naming minted a third — three letters stacked on one position, no fault, nothing said.
+   * A position carries at most one name, so the second naming is refused and the message names the
+   * holder: *"the centre of the circle is already called P"*.
+   *
+   * Operator ruling, 2026-09-17: refuse and name the holder; renaming is an explicit action the
+   * student takes, never a silent substitution.
+   */
+  | 'already-named'
   /** A stated given the solve could not satisfy — reported, never drawn as if it held. */
   | 'unsatisfiable';
 
@@ -116,6 +129,14 @@ export interface ApplyError {
    * the gender carries through the whole sentence («הנקודה … הוגדרה» vs «הישר … הוגדר»).
    */
   expected?: RefKind;
+  /**
+   * WHO ALREADY HOLDS the position a naming tried to claim (#1153).
+   *
+   * The student's own letter for it — «מרכז המעגל כבר נקרא P» — so the refusal SHOWS them the
+   * collision instead of telling them their letter was bad. A name, never a sentence: the engine
+   * stays language-free and the locale builds the message around it.
+   */
+  holder?: Id;
 }
 
 /**
@@ -499,12 +520,26 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
            * because the student already asked to see it and nothing they said withdraws that.
            */
           if (f.stated && !prior.stated) {
+            /**
+             * THE PROMOTION CARRIES THE LABEL (#1149).
+             *
+             * `{ ...prior, stated: true }` kept the CARRIER's label and threw away the stated
+             * sentence's, so a promoted line lost the `kind` and `eqSrc` the student had just
+             * written — and `words()` can name an anonymous curve only by its equation. The result
+             * was two identical figures behaving differently: lines stated outright offered their
+             * crossing ring, and the same lines reached as carriers first offered none.
+             *
+             * A promoted carrier must be indistinguishable from a curve stated outright, so the
+             * incoming label wins — except for a NAME the prior already holds, which is the
+             * student's own and cannot be erased by an anonymous restatement.
+             */
+            const label = { ...prior.label, ...f.label, name: prior.label.name || f.label.name };
             return {
               ok: true,
               effect: 'created',
               next: {
                 ...c,
-                objects: c.objects.map((o) => (o.id === f.id ? { ...prior, stated: true } : o)),
+                objects: c.objects.map((o) => (o.id === f.id ? { ...prior, label, stated: true } : o)),
               },
             };
           }
@@ -1029,6 +1064,30 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
           return { ok: true, effect: 'known', next: c };
         }
         return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+      }
+
+      /**
+       * ONE POSITION, ONE NAME (#1153) — the invariant, at the figure rather than in one rule.
+       *
+       * Measured before this: «P מרכז המעגל I» · «O מרכז המעגל I» · «T מרכז המעגל I» left
+       * THREE points stacked at (3,4) with no fault — the class #1113 already reported once and #1126
+       * measured again on curves. Putting the check in the centre rule would be the patch shape and
+       * would guarantee a fourth occurrence, so it sits where EVERY derived naming is minted: the
+       * seven `DerivedRule` kinds (midpoint, centroid, incentre, orthocentre, circumcentre, diagonals,
+       * circle-centre) all pass through here.
+       *
+       * The test is STRUCTURAL, not positional: two objects deriving the same thing the same way ARE
+       * the same point, exactly and with no tolerance. That also scopes it correctly — «A(3,4)» and
+       * «B(3,4)» are two independent statements that merely coincide, which is a different question
+       * and deliberately NOT answered here (see the ADR; escalated to the operator).
+       */
+      if (f.t === 'derived') {
+        const holder = c.objects.find(
+          (o) => o.kind === 'derived' && o.id !== f.id && sameDerivation(o.rule, f.rule),
+        );
+        if (holder) {
+          return { ok: false, error: { code: 'already-named', detail: f.src, holder: statedName(holder.id) } };
+        }
       }
 
       const made: GeoObject =

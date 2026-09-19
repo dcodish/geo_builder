@@ -37,7 +37,7 @@ const he = {
   hideConstruction: 'הסתר בנייה',
   dataHide: 'הסתר נתונים',
   secPoints: 'נקודות',
-  secCurves: 'עקומים',
+  secEquations: 'משוואות',
   secLengths: 'אורכים',
   secSlopes: 'שיפועים',
   // The ASK lane (#1027) — the panel's own input: two surfaces, one grammar.
@@ -45,6 +45,21 @@ const he = {
   askPlaceholder: 'שאלו: AB, שטח ABC',
   askAdd: 'שאל',
   /** The ✕ that retires a measurement and the height it drew (#1118). */
+  askTraceLabel: 'איך מגיעים לזה',
+  askTraceToggle: 'הצגה/הסתרה של דרך החישוב',
+  /** A curve row's derived properties — centre, radius, foci, directrix — folded under its equation (#1212). */
+  /**
+   * ONE LABEL PER KIND, because «עקום» is our word and not the exam's (#1214, and #1147 before it).
+   *
+   * Whole strings rather than «נתוני ה» + a slotted noun: ADR-AG-085 settled that for the refusals
+   * on the same grammar, and the definite article is exactly the kind of joint that breaks when the
+   * fifth noun arrives.
+   */
+  curveDetailsCircle: 'נתוני המעגל',
+  curveDetailsParabola: 'נתוני הפרבולה',
+  curveDetailsEllipse: 'נתוני האליפסה',
+  /** The tooltip names no kind, so it needs no fourth string and cannot reintroduce the old noun. */
+  curveDetailsToggle: 'הצגה/הסתרה של הנתונים',
   askRemove: 'הסירו את המדידה',
   // Three different answers, because they are three different situations.
   askOpen: 'עדיין לא נקבע מהנתונים',
@@ -87,6 +102,7 @@ const he = {
   errUnknownRefPoint: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
   errUnknownRefLine: 'הישר {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
   errUnknownRefCircle: 'המעגל {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
+  errAlreadyNamed: 'כבר יש שם לנקודה הזו: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
   // The locus families (#1137) — keyed by the engine's own kind, so a family added later shows its
   // internal name rather than nothing at all.
@@ -192,11 +208,17 @@ const en: typeof he = {
   hideConstruction: 'Hide construction',
   dataHide: 'Hide data',
   secPoints: 'Points',
-  secCurves: 'Curves',
+  secEquations: 'Equations',
   secLengths: 'Lengths',
   secSlopes: 'Slopes',
   askPlaceholder: 'Ask: AB, area of ABC',
   askAdd: 'Ask',
+  askTraceLabel: 'how this is reached',
+  askTraceToggle: 'show or hide the working',
+  curveDetailsCircle: "the circle's properties",
+  curveDetailsParabola: "the parabola's properties",
+  curveDetailsEllipse: "the ellipse's properties",
+  curveDetailsToggle: 'show or hide these properties',
   askRemove: 'Remove this measurement',
   askOpen: 'not fixed by the givens yet',
   askNoValue: 'cannot be computed from the givens',
@@ -232,6 +254,7 @@ const en: typeof he = {
   errUnknownRefPoint: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefLine: 'The line {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefCircle: 'The circle {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
   'locus.line': 'line',
   'locus.circle': 'circle',

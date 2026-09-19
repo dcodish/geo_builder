@@ -59,6 +59,7 @@ import { autoNamedLabels, deferralWorthwhile, dryRunOutcome, primeFoldFor, repla
 import { geoWork, isCancelled } from '@/store/geoWork';
 import { spanShadow, unaccountedSpans } from '@/parser/spanAccounting';
 import { honestyGateReport } from './honestyGates';
+import { honoursConstruct, roleReadings } from './roleReadings';
 import { logDebug } from '@/debug/sessionLog';
 
 export interface SubmitUi {
@@ -428,7 +429,44 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
       // A deterministic parse can "succeed" yet build NOTHING — apply with an error (kept-prior) or
       // change nothing at all. Dry-run before committing so a silent fail isn't shown as success
       // (operator request); a step that builds something commits immediately.
-      const outcome = dryRunOutcome(st.facts, r.commands, st.seed);
+      let outcome = dryRunOutcome(st.facts, r.commands, st.seed);
+      /**
+       * A ROLE-ASSIGNED LETTER RUN IS RE-READ BEFORE IT IS REFUSED (#1012).
+       *
+       * «רבע מעגל OAB» means *centre O, ends A and B* — a convention the catalog never taught. So
+       * «רבע מעגל ODC» was refused after ~17 s, blaming the student's «O על AC», while «רבע מעגל CDO»
+       * built the very same figure in one second.
+       *
+       * The run is re-read over the other role assignments and the first that BUILDS is adopted, then
+       * taught below through the canonical-hint seam that already exists. Ordered by a probe over the
+       * figure the student already has, so the reading that works is tried first and costs one dry run
+       * rather than three (`roleReadings`).
+       *
+       * Nothing is spent when there is no such run — the overwhelmingly common case returns `null`
+       * before any work — and nothing is spent when no alternative reading is more promising than what
+       * the student wrote, which is what keeps an honest refusal close to the cost it has today.
+       */
+      let adopted: string | null = null;
+      if (!outcome.produced) {
+        const readings = roleReadings(utterance, r.commands, (seed) => replay(st.facts, seed).positions);
+        for (const reading of readings ?? []) {
+          const alt = parse(reading.utterance, pctx);
+          if (!alt.ok || !honestyGateReport(reading.utterance, alt.commands, pctx).clean) continue;
+          const tryOutcome = dryRunOutcome(st.facts, alt.commands, st.seed);
+          if (!tryOutcome.produced) continue;
+          /**
+           * `produced` means SOMETHING was built, not that the construct's promise holds — measured,
+           * «רבע מעגל CAB» produces a "quarter circle" whose two radii are 15 and 10. Answering a
+           * refusal with a wrong figure would be strictly worse than the refusal, so an adopted
+           * reading has to honour what it claims to be.
+           */
+          if (!honoursConstruct(alt.commands, replay(trialFacts(st.facts, alt.commands), st.seed).positions)) continue;
+          r = alt;
+          outcome = tryOutcome;
+          adopted = reading.utterance;
+          break;
+        }
+      }
       if (outcome.produced) {
         // One utterance → one BATCH commit (one group id, one set, ONE undo entry — E4/STO-4).
         store().executeMany(r.commands, utterance);
@@ -449,8 +487,11 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
         // later clause CONSTRAINS the earlier — gets no tip. A false "independent" here costs a spurious tip,
         // not a refusal: the safe direction, which is why the check may sit in the deterministic lane at all.
         const packed = independentConstructs(utterance);
-        const teach = packed ? null : teachCanonical(utterance, r.commands, locale);
-        if (packed) {
+        // An ADOPTED reading is its own canonical spelling (#1012): the sentence we actually built is
+        // the one to teach, and teaching it is what keeps the adoption from being silent (#778).
+        const teach = adopted ?? (packed ? null : teachCanonical(utterance, r.commands, locale));
+        if (adopted) ui.setInputNote(t('input.canonicalHint', { canonical: adopted }));
+        else if (packed) {
           logDebug({ kind: 'input', utterance, locale, source: 'parser', result: 'advisory:independent-clauses', commands: r.commands });
           ui.setInputNote(t('input.scope.split-advisory', packed.params));
         } else if (teach) ui.setInputNote(t('input.canonicalHint', { canonical: teach }));

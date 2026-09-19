@@ -88,6 +88,13 @@ export type InputError =
   | { key: 'ambiguous-shape'; detail: string }
   /** «האלכסון הראשי» where the shape distinguishes no principal diagonal (#1070). */
   | { key: 'undistinguished-diagonal'; detail: string }
+  /**
+   * A naming of something that already has a name (#1153) — carrying WHO holds it.
+   *
+   * «P מרכז המעגל I» then «O מרכז המעגל I» used to mint a second point on top of the first.
+   * The refusal names the holder so the student sees the collision, not a scolding about their letter.
+   */
+  | { key: 'already-named'; detail: string; holder?: string }
   /** A given the figure cannot satisfy (#1016). */
   | { key: 'unsatisfiable'; detail: string }
   /**

@@ -99,7 +99,7 @@ describe('#1127 — «קדקוד», the exam’s own noun for a vertex', () => {
 
 describe('#1134 — the «של» word order in a distance question', () => {
   const FIG = ['A(0,0)', 'B(6,0)', 'C(3,5)', 'משולש ABC', 'נתון הישר l1: y=2'];
-  const answer = (q: string) => ask(derive(FIG, 0), q, (v) => String(v), () => '');
+  const answer = (q: string) => ask(derive(FIG, 0), q, (v) => String(v));
 
   it('the operator’s own wording answers, and agrees with the canonical spelling', () => {
     const his = answer('מרחק של A מ-l1');

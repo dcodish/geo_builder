@@ -30,7 +30,7 @@ const st = () => useAnalyticStore.getState();
 /** The component's own derivation, in one line — the thing the panel renders. */
 const rowsNow = () => {
   const d = derive(st().lines, st().seed);
-  return st().queries.map((q) => ask(d, q.sentence, (n) => String(n), () => ''));
+  return st().queries.map((q) => ask(d, q.sentence, (n) => String(n)));
 };
 
 const askIt = (sentence: string) => st().setQueries(askOnceAnswer(st().queries, sentence));

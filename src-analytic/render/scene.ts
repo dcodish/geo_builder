@@ -366,11 +366,30 @@ export function buildScene(
 
   const points: ScenePoint[] = fig.points.map((p) => {
     const prov = fig.provenance[p.id];
-    const part = (comp: { known: boolean; value?: number } | undefined, axis: 'x' | 'y'): ScenePart =>
-      comp && comp.known ? { text: fmtAnalytic(comp.value as number) } : { text: axis, sub: p.id };
-    // Shown only when the givens said SOMETHING about this point; a point described by nothing —
-    // or only by a constraint shared with others — carries its name alone.
-    const any = prov && (prov.x.known || prov.y.known);
+    /**
+     * A STATED EXPRESSION BEATS THE INVENTED SYMBOL (#1230).
+     *
+     * Operator, playing T44: *"the data panel is now correct but canvas is not"* — the panel read
+     * `A = (-9·a, 0)` while the canvas beside it still read `A(x_A, 0)`. #1226 fixed one surface and
+     * scoped this one out on the belief that the canvas showed the name alone; his screenshot shows
+     * it does not.
+     *
+     * `x_A` is the tool's own symbol standing in for something the student wrote, which is worse than
+     * showing nothing. A number is still never printed for an open coordinate.
+     */
+    const part = (
+      comp: { known: boolean; value?: number; expr?: string } | undefined,
+      axis: 'x' | 'y',
+    ): ScenePart =>
+      comp && comp.known
+        ? { text: fmtAnalytic(comp.value as number) }
+        : comp?.expr
+          ? { text: comp.expr }
+          : { text: axis, sub: p.id };
+    // Shown when the givens said SOMETHING about this point — a number OR an expression the student
+    // wrote. A point described by nothing, or only by a constraint shared with others, carries its
+    // name alone.
+    const any = prov && (prov.x.known || prov.y.known || !!prov.x.expr || !!prov.y.expr);
     return {
       id: p.id,
       cx: t.sx(p.x),

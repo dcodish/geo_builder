@@ -16,6 +16,7 @@ import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
 import { pairKey, pinnedLengths } from './lengths';
+import { lineByName, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { ringFaultsOf, type RingFault } from './rings';
 import { dirVector, freeRank, residual, resolveChoices, solveLM, type Constraint } from './solve';
@@ -333,10 +334,25 @@ export function carrierSystem(c: Construction, env: Env): CarrierSystem {
     asMap,
     toVec: (free) => ids.flatMap((id) => [free.get(id)!.x, free.get(id)!.y]),
     positionsAt,
+    /**
+     * `lineAtOf` is threaded here, not only at the call sites (#1201 meets #1137).
+     *
+     * #1201 gave `residual` a line resolver so a stated distance to a line is DRIVEN rather than
+     * silently dropped, and threaded it through the two solve call sites that existed then. #1137
+     * later lifted those call sites into this system so the locus tracer walks the SAME residuals the
+     * solve does — which is the whole point of the abstraction.
+     *
+     * Merging the two naively would have kept one and lost the other: the branch's `carrierSystem`
+     * carried no `lineAtOf`, so a locus figure with a point-to-line distance would have solved against
+     * a residual that could not see the line — #1201's defect, restored, inside the one place built to
+     * guarantee the tracer and the solver agree. [#1210](https://github.com/dcodish/geo_builder/issues/1210)
+     * predicted exactly this: *"the branch predates #1201 — a rebase changes what a locus is."*
+     */
     residualsAt: (x) => {
       const pos = positionsAt(x);
+      const at = (id: Id) => pos.get(id) ?? null;
       return c.constraints.flatMap(
-        (k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null)) ?? [0],
+        (k) => residual(k, at, env, curveAtOf(c, env, at), lineAtOf(c, env, at)) ?? [0],
       );
     },
   };
@@ -367,7 +383,7 @@ export function carrierSystem(c: Construction, env: Env): CarrierSystem {
  * A `circle-at` needs the PLACED centre, which is why this takes the placement and not only the
  * environment.
  */
-function curveAtOf(c: Construction, env: Env, at?: (id: Id) => Pt | null): (id: Id) => NumCurve | null {
+export function curveAtOf(c: Construction, env: Env, at?: (id: Id) => Pt | null): (id: Id) => NumCurve | null {
   return (id) => {
     const o = objectById(c, id);
     if (!o) return null;
@@ -381,6 +397,32 @@ function curveAtOf(c: Construction, env: Env, at?: (id: Id) => Pt | null): (id: 
     const res = resolveCurve(o.curve, env);
     return res.ok ? res.curve : null;
   };
+}
+
+/**
+ * The line a NAME denotes, in the configuration currently being judged (#1201).
+ *
+ * Built beside `curveAtOf` and for the same reason: `solve.ts` knows points by id and nothing else, so
+ * anything that needs the CONSTRUCTION to resolve arrives already resolved. The resolution itself is
+ * `engine/lines.ts`, shared with the ask lane and the click menu — one object, one answer, which is the
+ * rule #1148 established and #1201 found a third caller for.
+ *
+ * `at` is the live positions, so the two-point reading follows the solver's iterate rather than some
+ * earlier figure.
+ */
+export function lineAtOf(c: Construction, env: Env, at: (id: Id) => Pt | null): (name: string) => NamedLine | null {
+  const curves = curveAtOf(c, env, at);
+  return (name) =>
+    lineByName(
+      name,
+      (n: string) => {
+        const o = c.objects.find(
+          (q) => q.kind === 'curve' && (q.label.name === n || q.id === `line-${n}` || q.id === `circle-${n}`),
+        );
+        return o ? curves(o.id) : null;
+      },
+      at,
+    );
 }
 
 /**
@@ -409,7 +451,7 @@ function carrierDofOf(c: Construction, env: Env, free: Map<Id, Pt>, ids: Id[]): 
     new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
   return freeRank(vec, (x) => {
     const pos = place(c, env, asMap(x));
-    return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null)) ?? [0]);
+    return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null), lineAtOf(c, env, (id) => pos.get(id) ?? null)) ?? [0]);
   });
 }
 
@@ -611,7 +653,7 @@ export function evaluate(raw: Construction, seed = 0): Figure {
   if (c.constraints.length > 0) {
     const pos = place(c, env, free);
     for (const k of c.constraints) {
-      const r = residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null));
+      const r = residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null), lineAtOf(c, env, (id) => pos.get(id) ?? null));
       // `null` is "cannot be judged", not "false": a constraint naming a point that vanished at this
       // parameter value must not be reported as a given the student got wrong — that would blame the
       // wrong statement, and vacancy is not a fault ([ADR-AG-008]).

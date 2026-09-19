@@ -19,8 +19,7 @@ import { ask } from '../app/ask';
 import { derive } from '../engine/derive';
 import { TECHNIQUES, techniqueFor, traceDistance2pt, traceLine2pt } from '../engine/techniques';
 
-const noCurve = () => '';
-const askAt = (lines: string[], q: string) => ask(derive(lines, 0), q, fmtNum, noCurve);
+const askAt = (lines: string[], q: string) => ask(derive(lines, 0), q, fmtNum);
 
 describe('#1053 — a distance shows the move that produces it', () => {
   it('«AB» carries the distance formula with THIS figure’s numbers', () => {
@@ -64,9 +63,18 @@ describe('#1053 — a distance shows the move that produces it', () => {
 });
 
 describe('#1053 — a line’s equation shows the move that produces it', () => {
-  it('«משוואת הישר AB» carries the two-point form, substituted', () => {
+  it('«משוואת הישר AB» carries the two-point form, substituted AND evaluated', () => {
+    /**
+     * Updated by #1221, which is a change to this very behaviour rather than a break in it. The form
+     * was `m = (5 - 1) / (4 - 1),  y - 1 = m(x - 1)` — two statements on one row, and `m` never given
+     * a value on any surface, so the student was left to finish it. Now: one statement per row, and
+     * the intermediate the next step consumes is evaluated.
+     *
+     * `1.33` rather than `4/3` because THIS file injects `fmtNum`; the product injects `fmtAnalytic`
+     * and keeps the exact form (#1120), which `issue-1221-trace-complete.test.ts` asserts.
+     */
     const a = askAt(['A(1,1)', 'B(4,5)', 'משוואת הישר AB היא y=(4/3)x-1/3'], 'משוואת הישר AB');
-    expect(a.trace).toBe('m = (5 - 1) / (4 - 1),  y - 1 = m(x - 1)');
+    expect(a.trace).toBe('m = (5 - 1) / (4 - 1) = 1.33\ny - 1 = 1.33(x - 1)');
   });
 
   it('a VERTICAL line says the formula does not apply, rather than dividing by zero', () => {

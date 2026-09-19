@@ -13,17 +13,36 @@
  * the term grammar, which is the #313 MathML rework's job; this formatter never guesses.
  */
 
+import { COMBINING_ARROW, SPACING_ARROWS, VECTOR_WORD_SRC } from '../lexicon/marks3';
+
 /** Command types whose rows read as vector statements (the word וקטור is decoration). */
 export const VEC_CMD_TYPES = new Set(['name-vector', 'vec-rel', 'dot-given', 'inject-vector', 'point-in-span']);
 
 /** Apply textbook vector notation to a vector-statement utterance: pair arrows + name underlines. */
 export function vectorNotation(utterance: string, vecNames: Set<string>): string {
-  let u = utterance.replace(/(?:^|(?<=[\s,:]))(?:ה?ו?וקטור|vectors?)\s+/gi, '');
+  let u = utterance.replace(new RegExp(String.raw`(?:^|(?<=[\s,:]))${VECTOR_WORD_SRC}\s+`, 'gi'), '');
+  /**
+   * #1194 — A SPACING ARROW BECOMES THE COMBINING ONE. It does not survive beside it.
+   *
+   * The pair rule below adds `⃗` unless the pair is ALREADY marked, and its guard listed only
+   * U+20D7 — so `DC→=3AB→` collected a second arrow and kept the first: `DC⃗→=3AB⃗→`, the operator's
+   * report. `→` and `⟶` are spacing characters that MEAN what the combining arrow means, so display
+   * replaces them with it, exactly as the word above is consumed once the notation carries its
+   * meaning. Converting here (rather than widening the guard) is what makes the four spellings
+   * render identically instead of merely avoiding a doubled arrow.
+   *
+   * Targeted at a mark that FOLLOWS A PAIR: a stray arrow elsewhere in a sentence is the student's
+   * own character in a position this formatter does not claim to understand, and it is left alone.
+   */
+  u = u.replace(new RegExp(String.raw`([A-Z]\d*'?[A-Z]\d*'?)\s*[${SPACING_ARROWS}]`, 'g'), `$1${COMBINING_ARROW}`);
   // #398 (ADR-3D-108): the lookBEHIND is the twin of the existing lookahead — inside a ≥3-label
   // point-run (ABC), the tail 'BC' used to pass the lookahead (nothing follows) and take an arrow
   // mid-run. A letter/quote before the pair means it is part of a LONGER run, so it is not a pair.
   // Digits stay allowed before (a glued coefficient «2KA'» is a real vector term).
-  u = u.replace(/(?<![A-Za-z'⃗])([A-Z]\d*'?[A-Z]\d*'?)(?![⃗A-Za-z\d'])/g, '$1⃗');
+  u = u.replace(
+    new RegExp(String.raw`(?<![A-Za-z'${COMBINING_ARROW}])([A-Z]\d*'?[A-Z]\d*'?)(?![${COMBINING_ARROW}A-Za-z\d'])`, 'g'),
+    `$1${COMBINING_ARROW}`,
+  );
   if (vecNames.size > 0) {
     const names = [...vecNames].join('|');
     // standalone-letter-token boundaries: no letter before (digits/parens/operators fine — «2v»,

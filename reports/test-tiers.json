@@ -6,12 +6,13 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-09-15",
+  "updatedAt": "2026-09-18",
   "slow": [
     "src/__tests__/determined-prints-1.test.ts",
     "src/__tests__/determined-prints-2.test.ts",
     "src/__tests__/determined-prints-3.test.ts",
     "src/__tests__/determined-prints-4.test.ts",
+    "src/__tests__/issue-1012-role-readings.test.ts",
     "src/__tests__/issue-566.test.ts",
     "src/__tests__/issue-942-coincident-views.test.ts",
     "src/__tests__/issue-955-refused-label.test.ts",

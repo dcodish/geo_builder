@@ -27,7 +27,7 @@ import { decideSubmit } from '../app/submit';
 import { derive } from '../engine/derive';
 import { knownCurve } from '../engine/evaluate';
 import { refKindOf } from '../engine/apply';
-import { lineText } from '../App';
+import { lineText } from '../app/curveText';
 import { fmtAnalytic, fractionClearingFactor } from '../format';
 import { analyticI18n } from '../i18n';
 
@@ -76,7 +76,7 @@ describe('#1180 — no fraction survives as a coefficient', () => {
   it('the STANDALONE value keeps its fraction — 4/3 is a value, not a coefficient', () => {
     expect(fmtAnalytic(4 / 3)).toBe('4/3');
     const d = derive(['A(0,0)', 'B(3,4)', 'משוואת הישר AB היא y=(4/3)x'], 0);
-    expect(ask(d, 'שיפוע הישר AB', fmtAnalytic, () => '').value).toBe('4/3');
+    expect(ask(d, 'שיפוע הישר AB', fmtAnalytic).value).toBe('4/3');
   });
 
   it('the sign is not normalised — the ruling wrote -4x + 3y = 0, not 4x - 3y = 0', () => {

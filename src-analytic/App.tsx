@@ -21,17 +21,18 @@ import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
-import { INITIAL_VIEW, centreOf, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
+import { INITIAL_VIEW, centreOf, figureIsVisible, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
-import { fmtAnalytic, fractionClearingFactor } from './format';
+import { fmtAnalytic } from './format';
+import { curveDetailsKey, curveParts } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
 import { decideSubmit } from './app/submit';
-import { domainText, positionalOf, type NumCurve } from './engine/types';
+import { domainText, positionalOf } from './engine/types';
 import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
 import { exprText } from './engine/expr';
-import { MathText } from '../shell/math';
+import { MathText, hasMath } from '../shell/math';
 import { Banner } from '../shell/frame/Banner';
 import { FigureName } from '../shell/frame/FigureName';
 import { ManualScreen } from '../shell/frame/ManualScreen';
@@ -39,7 +40,6 @@ import { svgToPng } from '../shell/export/svgToPng';
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { ANALYTIC_APP, ANALYTIC_SAVE_VERSION } from './store/useAnalyticStore';
 import { COMMAND_CATALOG_ANALYTIC } from './parser/catalogAnalytic';
-import { ellipseFoci, parabolaFocus } from './engine/curves';
 import { analyticBidi } from './i18n';
 import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
@@ -218,6 +218,8 @@ export function App() {
         seed: typeof saved.seed === 'number' ? saved.seed : 0,
         name: typeof saved.name === 'string' ? saved.name : figureNameFromFileName(file.name, 'analytic'),
       });
+      // A load is a new figure, so the view it is seen through is a new view too (#1209).
+      showWholeFigure();
       /**
        * A LOAD IS AUDITED, not trusted (#1087). The lines are re-parsed on the way in, and a line
        * that no longer builds is reported rather than dropped in silence — which is the whole value
@@ -360,10 +362,26 @@ export function App() {
    * retires them with the lines. That is the general fix this comment used to say was still owed —
    * a reading of a figure that no longer exists cannot be rendered, because no reading is stored.
    */
+  /**
+   * THE VIEW BELONGS TO THE FIGURE IT WAS COMPUTED FOR (#1209).
+   *
+   * Pan and zoom are a transform ON TOP of the figure's own box. Replace the figure wholesale and the
+   * old transform is applied to something it was never computed for — load a small figure while zoomed
+   * into the corner of a large one and it lands entirely off-screen. The operator loaded a two-given
+   * save and got a canvas showing grid and nothing else, while the data panel listed the figure
+   * perfectly: it reads as data loss, on the student's own save.
+   *
+   * So every seam that REPLACES the figure resets the view, and they all come through here rather than
+   * each remembering to — which is the shape `clearAll` itself records as having been reintroduced by a
+   * third and fourth product.
+   */
+  const showWholeFigure = () => setView(INITIAL_VIEW);
+
   const clearSession = () => {
     clearAll();
     setDraft('');
     setAskText('');
+    showWholeFigure();
   };
   const [dataOpen, setDataOpen] = useState(true);
   /**
@@ -401,8 +419,9 @@ export function App() {
   const locusKind = useCallback((kind: string) => t(`locus.${kind}`), [t]);
 
   const answers = useMemo<Answer[]>(
-    () => queries.map((q) => ({ ...ask(d, q.sentence, fmt, describeCurve, locusKind), shown: q.shown })),
-    [queries, d, fmt, describeCurve, locusKind],
+    // #1212 removed `describeCurve` (imported now); #1137's `locusKind` stays — it is locale.
+    () => queries.map((q) => ({ ...ask(d, q.sentence, fmt, locusKind), shown: q.shown })),
+    [queries, d, fmt, locusKind],
   );
 
   /**
@@ -413,6 +432,28 @@ export function App() {
   figureBoxRef.current = d.box;
   const viewRef = useRef(view);
   viewRef.current = view;
+
+  /**
+   * A FIGURE THE STUDENT BUILDS IS VISIBLE (#1225) — the third door on ADR-AG-096.
+   *
+   * Operator, playing T34: *"when i put MA=5 the focus on the canvas is lost and the image is not
+   * centered. pressing the center button does the work but this should be automatic"*.
+   *
+   * #1209 gave loading and «נקה הכל» a `showWholeFigure()`. Every other `setView` is a user gesture,
+   * so adding a FACT — which changes the figure — left the previous figure's transform applied to a
+   * new one it was never computed for. «MA = 5» collapses M from two free DOFs to a discrete pair,
+   * and the wide view computed while M roamed then showed empty paper.
+   *
+   * It runs on the BOX, not on every render: the effect fires only when the figure's extent actually
+   * changes, so a deliberate zoom is untouched for as long as the student keeps looking at the same
+   * figure. And it re-fits only when `figureIsVisible` says the figure has largely left the screen,
+   * so a zoom into a vertex survives the next line. Returning `v` unchanged is a React no-op, which
+   * is what keeps this from looping.
+   */
+  const figureBoxKey = `${d.box.minX},${d.box.minY},${d.box.maxX},${d.box.maxY}`;
+  useEffect(() => {
+    setView((v) => (figureIsVisible(figureBoxRef.current, v) ? v : INITIAL_VIEW));
+  }, [figureBoxKey]);
 
   /**
    * WHEEL TO ZOOM, about the cursor (#1094).
@@ -574,13 +615,14 @@ export function App() {
           'ambiguous-angle': 'errAmbiguousAngle',
           'ambiguous-shape': 'errAmbiguousShape',
           'undistinguished-diagonal': 'errNoPrincipalDiagonal',
+          'already-named': 'errAlreadyNamed',
           'unsatisfiable': 'errUnsatisfiable',
           // A save file this tool will not open, named by WHICH of the three reasons (#1087).
           'load-foreign': 'errLoadForeign',
           'load-newer': 'errLoadNewer',
           'load-unreadable': 'errLoadUnreadable',
         }[error.key],
-        { detail: error.detail, existing: t(existingKey(error)) },
+        { detail: error.detail, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '' },
       )
     : null;
 
@@ -697,7 +739,33 @@ export function App() {
                * equation's characters, and the student reads a formula they did not write.
                */
               quickDisplay={(c) => analyticBidi.isolateLtrRuns(c)}
-              preview={(s) => analyticBidi.inputPreview(s)}
+              /**
+               * THE PREVIEW TYPESETS WHAT IT PREVIEWS (#1215).
+               *
+               * Operator, 2026-09-19, on «מעגל (x-3)^2+(y-5)^2=25»: *"note the text below the textbox
+               * isnt mathml"* — the preview printed `^2` while the fact row two lines below printed
+               * `²`. The student saw their own sentence twice, typeset once.
+               *
+               * Nothing needed building. `InputArea`'s `preview` prop takes a **ReactNode**, and its
+               * own comment says *"2-D's maths renderer rides the same prop at its adoption"*. 2-D
+               * adopted it; this tree — where equations are the entire subject — did not, and
+               * `hasMath`/`MathText` have been sitting in `shell/math.tsx` the whole time.
+               *
+               * The bidi previewer stays as the fallback, and it is not a lesser one: it is what
+               * carries the RTL reading order while an equation is still half-typed. `hasMath` is
+               * false until an exponent or a fraction completes, so early keystrokes take that path
+               * exactly as before and no half-formed formula is ever half-typeset (ADR-W-060).
+               *
+               * **ISOLATE FIRST, THEN TYPESET — the order matters and was found by looking.** Handing
+               * the raw string to `MathText` typeset it perfectly and laid it out backwards: the
+               * renderer emits several `<math>` islands with text between them, and in an RTL
+               * paragraph that whole sequence runs right-to-left, so «מעגל (x-3)²+(y-5)²=25» drew
+               * with `=25` at the far LEFT. That is the defect this preview exists to prevent,
+               * reintroduced by its own fix. The answer rows already do it in this order (#1097).
+               */
+              preview={(s) =>
+                hasMath(s) ? <MathText text={analyticBidi.isolateLtrRuns(s, true)} /> : analyticBidi.inputPreview(s)
+              }
               previewDir={(s) => analyticBidi.textDir(s)}
               boxDir={(s) => analyticBidi.textDir(s)}
             >
@@ -989,7 +1057,7 @@ export function App() {
               },
               {
                 key: 'curves',
-                title: t('secCurves'),
+                title: t('secEquations'),
                 dir: 'ltr',
                 /**
                  * A CARRIER gets no row (#1078) — an operator ruling that reverses the panel half of
@@ -1018,8 +1086,8 @@ export function App() {
                    * invariants forbid and which #1029 had already caught in its other form. It was
                    * invisible while the ids read `parabola` and `ellipse` and would have become
                    * unmissable the moment content-derived ids landed. The row needs no name anyway:
-                   * `describeCurve` prints the equation and the focus, which is what tells two
-                   * anonymous parabolas apart — and it is the student's own equation, not ours.
+                   * `curveParts` prints the equation, which is what tells two anonymous parabolas
+                   * apart — and it is the student's own equation, not ours.
                    */
                   const name = c.label.name;
                   /**
@@ -1031,9 +1099,42 @@ export function App() {
                    * is more than the dash said and less than a number.
                    */
                   const lead = name ? `${name}: ` : '';
+                  /**
+                   * THE ROW LEADS WITH THE EQUATION; THE PROPERTIES FOLD AWAY (#1212).
+                   *
+                   * Operator, playing T18: *"the circle equation is not an equation. under equations
+                   * we should see the equation and then we can have the center and radius. these
+                   * should be collapsable like i requested for the line equations"*.
+                   *
+                   * Same `<details>` as the ask lane's trace (#1206), and shown by the same reasoning:
+                   * the centre and radius ARE what a student was given for a stated circle, so folding
+                   * them shut by default would hide the givens. It is an opt-out, not a demotion.
+                   *
+                   * A line has no `details` and so gets no disclosure at all — its row is untouched.
+                   */
+                  const parts = known ? curveParts(known) : null;
                   return (
                     <span key={c.id}>
-                      <ValueRow text={known ? describeCurve(name, known) : `${lead}${openCurveText(d, c.id)}`} />
+                      <ValueRow text={parts ? `${lead}${parts.equation}` : `${lead}${openCurveText(d, c.id)}`} />
+                      {parts?.details && (
+                        <details style={askTraceBox} open>
+                          <summary style={askTraceToggle} title={t('curveDetailsToggle')}>
+                            {/*
+                              THE LABEL NAMES THE KIND, IN THE STUDENT'S WORD (#1214).
+
+                              It said «נתוני העקום» — the internal category (`kind: 'curve'`) reaching
+                              a student, which is the defect #1147 removed from the heading above it
+                              hours earlier, reintroduced by the label #1212 added. `curveDetailsKey`
+                              is total over the kinds that HAVE details, so a fifth conic cannot ship
+                              a blank summary.
+                            */}
+                            {t(curveDetailsKey(known!.kind))}
+                          </summary>
+                          <div style={askTrace}>
+                            <MathText text={braced(parts.details)} />
+                          </div>
+                        </details>
+                      )}
                     </span>
                   );
                 }),
@@ -1129,7 +1230,7 @@ export function App() {
                   >
                     ✕
                   </button>
-                  <div>
+                  <div style={askAnswerCol}>
                     {/*
                       THE ANSWER ROW IS TYPESET, AND PUNCTUATED (#1117 + #1112).
 
@@ -1152,24 +1253,77 @@ export function App() {
                     ) : (
                       <MathText
                         text={analyticBidi.isolateLtrRuns(
-                          `${a.question}${a.value && a.value.includes('=') ? ':' : ' ='} ${a.value ?? t(figureIsOpen(d) ? 'askOpen' : 'askNoValue')}`,
+                          /**
+                           * A VERTICAL SLOPE IS AN ANSWER, NOT A FAILURE (#1223).
+                           *
+                           * `a.fact` is checked before the `figureIsOpen` guess, because that guess
+                           * only ever chooses between two kinds of *absence* and this is neither. It
+                           * reuses `slopeVertical` — the string the «שיפועים» section already prints
+                           * for a vertical segment — so the two surfaces cannot come to disagree
+                           * about what a vertical thing's slope is.
+                           */
+                          `${a.question}${a.value && a.value.includes('=') ? ':' : ' ='} ${
+                            a.value ??
+                            (a.fact === 'vertical'
+                              ? t('slopeVertical')
+                              : t(figureIsOpen(d) ? 'askOpen' : 'askNoValue'))
+                          }`,
                         )}
                       />
                     )}
-                  </div>
-                  {/*
-                    HOW IT WAS REACHED (#1053) — the formula with this figure's numbers in it.
 
-                    Operator: *"we don't just show the result — we show what to use to get to this
-                    result"*, at the level he ruled: substituted, never worked through. Rendered as
-                    MathML like everything else numeric in this tool (#1097), and quieter than the
-                    answer, because it is the method and not the result.
-                  */}
-                  {a.trace && (
-                    <div style={askTrace}>
-                      <MathText text={a.trace} />
-                    </div>
-                  )}
+                    {/*
+                      HOW IT WAS REACHED (#1053), ON ITS OWN ROW AND FOLDABLE (#1206).
+
+                      The formula with this figure's numbers in it. Operator, on #1053: *"we don't just
+                      show the result — we show what to use to get to this result"*, at the level he
+                      ruled: substituted, never worked through. Typeset as MathML like everything else
+                      numeric here (#1097), and quieter than the answer, because it is the method and
+                      not the result.
+
+                      Operator, playing T1: *"having all the equations in one line doesnt look nice so we
+                      should have each line on a new row. we should be able to collapse the items so if
+                      user doesnt want to see them, only the equation is shown"*.
+
+                      It sat here as a FLEX SIBLING of the answer, so the two shared one baseline however
+                      the trace was styled — its own `marginTop` could never apply. It is now inside the
+                      answer's column, which is what puts it on its own line; the `✕` stays beside the
+                      answer's first line rather than centring against a two-line block.
+
+                      SHOWN by default, deliberately: #1053 is an operator ruling that the method is part
+                      of the answer — *"we don't just show the result — we show what to use to get to this
+                      result"* — so collapsing it by default would quietly reverse that. The request is an
+                      opt-out, and `<details>` gives the student one for free: keyboard-reachable, out of
+                      the accessibility tree when closed, and no state for this component to hold.
+                    */}
+                    {a.trace && (
+                      <details style={askTraceBox} open>
+                        <summary style={askTraceToggle} title={t('askTraceToggle')}>
+                          {t('askTraceLabel')}
+                        </summary>
+                        {/*
+                          ONE STATEMENT, ONE ROW (#1221).
+
+                          Operator, playing T25: *"never include more than 2 equations in a line"*.
+                          The trace carried two statements joined by a comma and rendered them on one
+                          line; #1125 had already established they ARE two («m = (4-0)/(3-0), y - 0 =
+                          …» is why `EXPR` carries no comma), so the separator became a newline and
+                          each part gets its own row.
+
+                          Split rather than `white-space: pre-line`, deliberately: each row is then
+                          typeset independently, so a fraction is found inside ITS statement rather
+                          than inside a run containing two of them.
+                        */}
+                        <div style={askTrace}>
+                          {a.trace.split('\n').map((step, k) => (
+                            <div key={k}>
+                              <MathText text={step} />
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
                 </div>
               ))}
               <AskLane
@@ -1300,45 +1454,6 @@ const SYMBOLS = [
 ] as const;
 
 /**
- * `a x + b y + c = 0`, written the way a textbook writes it: no `1x`, no `+ 0`, no `+ -3`. The raw
- * coefficients are arithmetic; this is notation, and the panel is read by a student.
- */
-/**
- * Exported so its lock CALLS it (#1119, per [ADR-W-053](../docs/06w-decisions-workspace.md#adr-w-053)).
- *
- * It was module-private, which left a test only able to reproduce it -- and a reproduction of this
- * function would have carried the same bug in the same shape and agreed with it.
- */
-export function lineText(a0: number, b0: number, c0: number): string {
-  /**
-   * NO FRACTION IS LEFT AS A COEFFICIENT (#1180) — the whole equation is scaled instead.
-   *
-   * `-4/3x + y = 0` is ambiguous (`4/(3x)`?) and typesets badly; `-4x + 3y = 0` is what a textbook
-   * prints. The scaling is decided in `format.ts`, which is where this tree's number presentation
-   * lives; when nothing can be cleared — a surd coefficient — the factor is 1 and this is a no-op.
-   */
-  const k = fractionClearingFactor([a0, b0, c0]) ?? 1;
-  const [a, b, c] = [a0 * k, b0 * k, c0 * k];
-  const term = (k: number, sym: string): string => {
-    if (Math.abs(k) < 1e-12) return '';
-    /**
-     * THE MAGNITUDE RULE BELONGS TO THE SYMBOL, NOT TO THE TERM (#1119).
-     *
-     * Suppressing `1` is correct notation for a COEFFICIENT -- `1x` must print as `x`. The constant
-     * term is formatted by this same helper with `sym = ''`, so the rule erased the number itself and
-     * «3x - 4y + 1 = 0» printed as «3x - 4y + = 0». It fired for any line whose constant is +/-1, not
-     * only the #1093-built ones the DEPLOY-LOG entry described.
-     */
-    const mag = Math.abs(k) === 1 && sym !== '' ? '' : fmt(Math.abs(k));
-    return `${k < 0 ? '-' : '+'} ${mag}${sym} `;
-  };
-  const parts = `${term(a, 'x')}${term(b, 'y')}${term(c, '')}`.trim();
-  // A leading `+ ` is noise; a leading `- ` is a sign and stays attached.
-  const body = parts.startsWith('+ ') ? parts.slice(2) : parts.replace(/^- /, '-');
-  return `${body} = 0`;
-}
-
-/**
  * Display precision, delegated to the workspace's ONE chokepoint (#1029).
  *
  * This tree kept a private `toPrecision(10)` rounder, which is the thing `shell/format.ts` exists to
@@ -1355,12 +1470,6 @@ function fmt(v: number): string {
   return fmtAnalytic(v);
 }
 
-/**
- * One line of data per curve. Deliberately DESCRIPTIVE (centre, radius, focus) rather than a
- * restatement of the equation the student just typed — the panel's job is to organise what is
- * known, and the memorised triple (`y²=2px` → focus, directrix) is exactly what the formula sheet
- * withholds.
- */
 /**
  * What the givens SAY about a point, as the panel should read it (#1078).
  *
@@ -1410,6 +1519,30 @@ function pointText(
         return drawn ? `[${text}]` : text;
       })
       .join(' או ');
+  }
+
+  /**
+   * A COORDINATE THE STUDENT WROTE IS SHOWN, EVEN WHEN IT IS NOT A NUMBER (#1226).
+   *
+   * Operator, playing T32 on «A(-9a,0)» / «B(41a,0)»: *"9a and 41a are still not shown on the canvas
+   * or data panel which is wrong."*
+   *
+   * The tool holds `A.x` as `mul(neg(9), sym a)` — his own `-9a`, exactly — and `exprText` has
+   * rendered it all along. The row printed `(x_A, 0)` instead: the tool's OWN symbol substituted for
+   * the student's expression, which is worse than the dash it replaced. *"Everything the student
+   * stated is visible on the figure"* is the invariant, and `-9a` was stated.
+   *
+   * This is #1023's fix for the other object kind, in its own words: *"it states no VALUE, so
+   * ADR-AG-003 §2 is untouched — it names the dependency, which is more than the dash said and less
+   * than a number."*
+   *
+   * Only a STATED point (`kind: 'point'`) with a non-numeric coordinate. A carrier point is `free`
+   * and a midpoint is `derived`, so neither the `(x_B, x_B)` reading below nor the derived rows can
+   * be reached by this branch — measured, not assumed.
+   */
+  const stated = d.construction.objects.find((o) => o.id === id);
+  if (stated?.kind === 'point' && (stated.x.kind !== 'num' || stated.y.kind !== 'num')) {
+    return `(${exprText(stated.x)}, ${exprText(stated.y)})`;
   }
 
   const on = d.construction.constraints.find(
@@ -1510,8 +1643,37 @@ const askRow: CSSProperties = {
   padding: '2px 0',
   opacity: 0.9,
   display: 'flex',
-  alignItems: 'baseline',
+  // `flex-start`, not `baseline` (#1206): the row's second child is now a COLUMN that may be two
+  // lines tall, and a baseline would centre the dismiss button against the whole block.
+  alignItems: 'flex-start',
   gap: 6,
+};
+
+/** The answer and its derivation, stacked — what actually puts the trace on its own line (#1206). */
+const askAnswerCol: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 1,
+  minWidth: 0, // so a long equation wraps inside the column instead of widening the panel
+};
+
+/** The disclosure around the trace. `<details>` carries the open/closed state, so nothing here does. */
+const askTraceBox: CSSProperties = {
+  marginTop: 1,
+};
+
+/**
+ * The fold control — quiet, because the METHOD is secondary to the answer above it.
+ *
+ * The native disclosure marker is KEPT. Hiding it (`list-style: none`) left the label reading as inert
+ * grey text with nothing to say it could be clicked — caught by looking at the rendered row, which is
+ * the only way a layout change is actually judged.
+ */
+const askTraceToggle: CSSProperties = {
+  cursor: 'pointer',
+  fontSize: fs.small,
+  color: color.muted,
+  userSelect: 'none',
 };
 
 /** The ✕ that retires a measurement (#1118) — quiet, and never louder than the answer it removes. */
@@ -1539,22 +1701,4 @@ function openCurveText(d: ReturnType<typeof derive>, id: string): string {
   if (o?.kind === 'curve') return `${exprText(o.curve.eq)} = 0`;
   if (o?.kind === 'circle-at') return `O(${o.centre}), r = ${exprText(o.r)}`;
   return '—';
-}
-
-function describeCurve(name: string, c: NumCurve): string {
-  const n = name ? `${name}: ` : '';
-  switch (c.kind) {
-    case 'line':
-      return `${n}${lineText(c.a, c.b, c.c)}`;
-    case 'circle':
-      return `${n}O(${fmt(c.cx)}, ${fmt(c.cy)}), r = ${fmt(c.r)}`;
-    case 'parabola': {
-      const f = parabolaFocus(c);
-      return `${n}y² = ${fmt(2 * c.p)}x, F(${fmt(f.x)}, 0), x = ${fmt(-c.p / 2)}`;
-    }
-    case 'ellipse': {
-      const [f1, f2] = ellipseFoci(c);
-      return `${n}a = ${fmt(c.a)}, b = ${fmt(c.b)}, F₁(${fmt(f1.x)}, ${fmt(f1.y)}), F₂(${fmt(f2.x)}, ${fmt(f2.y)})`;
-    }
-  }
 }

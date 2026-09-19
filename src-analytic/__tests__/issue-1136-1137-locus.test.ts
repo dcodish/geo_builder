@@ -29,7 +29,7 @@ import { parseLine } from '../parser/parseAnalytic';
 const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(2));
 const HE: Record<string, string> = { line: 'ישר', circle: 'מעגל', parabola: 'פרבולה', ellipse: 'אליפסה' };
 const answer = (lines: string[], question: string) =>
-  ask(derive(lines, 0), question, fmt, () => '', ((k: string) => HE[k] ?? k) as never);
+  ask(derive(lines, 0), question, fmt, ((k: string) => HE[k] ?? k) as never);
 
 const BISECTOR = ['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'];
 /** חורף 25 — the circle on diameter AB, from ∠APB = 90°. */

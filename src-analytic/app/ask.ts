@@ -27,30 +27,8 @@ import { locusOf } from '../engine/locus';
 import { locusEquation } from '../engine/locusFit';
 import { objectById, type Id } from '../engine/types';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
-
-/**
- * The line a NAME refers to, as this configuration drew it (#1048).
- *
- * Two spellings mean two different things and both are legal: «l1» is a curve the student named, and
- * «AB» is the line through two points they placed — which need not have been stated as a line at all.
- * Resolving both here keeps `lengths.ts` free of any knowledge about objects.
- */
-function lineNamed(f: Derivation['figure'], name: string): { a: number; b: number; c: number } | null {
-  const curve = f.curves.find((c) => c.label.name === name || c.id === `line-${name}` || c.id === `circle-${name}`);
-  if (curve && curve.curve.kind === 'line') return { a: curve.curve.a, b: curve.curve.b, c: curve.curve.c };
-  const pair = /^([A-Z][0-9]?)([A-Z][0-9]?)$/.exec(name);
-  if (pair) {
-    const p = f.points.find((q) => q.id === pair[1]);
-    const q2 = f.points.find((q) => q.id === pair[2]);
-    if (p && q2) {
-      // Through two points: the line whose normal is perpendicular to P→Q.
-      const a = q2.y - p.y;
-      const b = -(q2.x - p.x);
-      if (Math.hypot(a, b) > 1e-12) return { a, b, c: -(a * p.x + b * p.y) };
-    }
-  }
-  return null;
-}
+import { asPair, lineNamed } from './lines';
+import { curveParts } from './curveText';
 
 /** The question is EXACTLY one point-to-line distance, for the same reason `BARE_LENGTH` exists. */
 const POINT_LINE_ONLY = /^(?:ה?מרחק|[Dd]istance)\s+\S.*$/;
@@ -76,6 +54,23 @@ export interface Answer {
    * Here the conflicting statement is in hand, so it is carried rather than discarded.
    */
   missing?: { name: string; kind: 'point' | 'curve' };
+  /**
+   * THE FIGURE DETERMINES THE ANSWER, AND THE ANSWER IS THAT THERE IS NONE (#1223).
+   *
+   * A fourth outcome, and the one `null` was quietly carrying. `value: null` means *the figure does
+   * not fix this*, and the component picks its wording from `figureIsOpen` — so on a DETERMINED
+   * figure a vertical slope was reported as «לא ניתן לחשב מהנתונים», telling the student their own
+   * givens were insufficient when they were complete.
+   *
+   * Operator, 2026-09-19: *"when i ask for שיפוע PB it says it cannot be claculated which is wrong.
+   * its just that the slope is not defined"* — with a screenshot whose panel read
+   * «הכול נקבע על-ידי הנתונים» four rows above it.
+   *
+   * A TOKEN, not a sentence, for the reason ADR-AG-085 gives: this module is the lane's engine and
+   * holds no locale. `vertical` is the only member today; the field exists so the next fact-shaped
+   * answer joins it rather than collapsing into `null` again (#1227 is already queued behind it).
+   */
+  fact?: 'vertical';
   /**
    * HOW THE ANSWER WAS REACHED (#1053) — the formula with this figure's values substituted.
    *
@@ -165,23 +160,31 @@ const LOCUS_OF = /^(?:ה?מקום\s+ה?גיאומטרי|[Tt]he\s+locus|[Ll]ocus)
 /**
  * Answer one question against the figure the student has built.
  *
- * `fmt` and `describeCurve` are injected rather than imported: they are the CALLER's formatting, and
- * an answer row must read exactly as the inventory rows above it do — the same rounding, the same
- * equation text. A second formatter here is how two surfaces of one panel start disagreeing.
+ * `fmt` is injected rather than imported: it is the CALLER's precision, and an answer row must read
+ * exactly as the inventory rows above it do. A second formatter here is how two surfaces of one panel
+ * start disagreeing.
+ *
+ * The curve text was injected for the same reason until #1212 moved it INTO this layer. Injection had
+ * a cost the reasoning missed: every test but one passed a stub (`() => ''`), so the equation an
+ * answer gives was never actually asserted through `ask`. Importing it makes the shared formatting a
+ * fact rather than a convention the callers have to keep.
+ */
+/**
+ * The signature after #1212 met #1137.
+ *
+ * `describeCurve` is GONE, not dropped: #1212 moved curve text into `app/curveText.ts`, which this
+ * module can simply import — and its argument for doing so was that injection let every test pass a
+ * stub, so the lock could never assert what an answer actually said.
+ *
+ * `kindWord` stays injected, because it is pure LOCALE and this module holds none (ADR-AG-085). It
+ * maps a resolved curve kind to the student's noun — «מעגל», «ישר». Defaulting to the internal kind
+ * means a caller that forgets shows `circle` rather than «מעגל»: visibly wrong rather than silently
+ * absent, which is the direction this tree prefers to fail in.
  */
 export function ask(
   d: Derivation,
   question: string,
   fmt: (v: number) => string,
-  describeCurve: (name: string, c: NonNullable<ReturnType<typeof knownCurve>>) => string,
-  /**
-   * The family's name in the student's language — «מעגל», «ישר» (#1137).
-   *
-   * Injected for the reason the two formatters above are: it is the CALLER's wording, and this module
-   * is the lane's engine and holds no locale. Defaulting to the internal kind means a caller that
-   * forgets shows `circle` rather than `מעגל` — visibly wrong rather than silently absent, which is
-   * the direction this tree prefers to fail in.
-   */
   kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind']) => string = (k) => k,
 ): Answer {
   const text = question.trim();
@@ -256,8 +259,14 @@ export function ask(
     const name = sl[1].trim();
     const line = lineNamed(d.figure, name);
     if (!line) return { question, value: null, missing: { name, kind: 'curve' } };
-    // A vertical line HAS no slope, and that is an answer about the figure rather than a failure.
-    if (Math.abs(line.b) < 1e-12) return { question, value: null };
+    /**
+     * A vertical line HAS no slope, and that is an answer about the figure rather than a failure.
+     *
+     * The comment said exactly this before #1223 and the return contradicted it: `value: null` is the
+     * failure channel, so the row read «לא ניתן לחשב מהנתונים» — *your givens are insufficient* — on a
+     * figure where every point is fixed. `fact: 'vertical'` is the outcome the sentence always meant.
+     */
+    if (Math.abs(line.b) < 1e-12) return { question, value: null, fact: 'vertical' };
     const k = isKnowledge(d.construction, (f) => {
       const l = lineNamed(f, name);
       return l && Math.abs(l.b) > 1e-12 ? -l.a / l.b : null;
@@ -272,7 +281,39 @@ export function ask(
     const curve = d.construction.objects.find(
       (o) => o.kind === 'curve' && (o.label.name === name || o.id === `line-${name}` || o.id === `circle-${name}`),
     );
-    if (!curve) return { question, value: null, missing: { name, kind: 'curve' } };
+    /**
+     * A LINE THROUGH TWO POINTS IS A LINE TO THIS QUESTION TOO (#1148).
+     *
+     * It was not, and that was the whole defect: on «משולש ABC» the figure holds no curve object for
+     * `AB`, so this branch reported the name MISSING while «שיפוע AB» answered `0` and «AB» answered
+     * `6` — three resolvers, one of which could not see what the other two could.
+     *
+     * It now resolves through `lineNamed`, the same path the slope branch and the measure grammar
+     * use, so the three cannot disagree again. The honesty gate comes with it in the shape that
+     * branch already uses: an equation is printed only when the coefficients are the SAME in every
+     * configuration (ADR-052). An under-determined line stays open — it does not get one sampled
+     * configuration's equation printed as though it were the answer.
+     */
+    if (!curve) {
+      const here = lineNamed(d.figure, name);
+      if (!here) return { question, value: null, missing: { name, kind: 'curve' } };
+      const ka = isKnowledge(d.construction, (f) => lineNamed(f, name)?.a ?? null);
+      const kb = isKnowledge(d.construction, (f) => lineNamed(f, name)?.b ?? null);
+      const kc = isKnowledge(d.construction, (f) => lineNamed(f, name)?.c ?? null);
+      const known = ka.known && kb.known && kc.known;
+      const pair = asPair(name);
+      let trace: string | undefined;
+      if (known && pair) {
+        const a0 = d.figure.points.find((q) => q.id === pair[0]);
+        const b0 = d.figure.points.find((q) => q.id === pair[1]);
+        if (a0 && b0) trace = traceLine2pt(a0, b0, fmt);
+      }
+      return {
+        question,
+        value: known ? curveParts({ kind: 'line', a: ka.value, b: kb.value, c: kc.value }).equation : null,
+        ...(trace ? { trace } : {}),
+      };
+    }
     const known = knownCurve(d.construction, curve.id);
     /**
      * A LINE NAMED BY TWO POINTS gets the move that produces it (#1053) — the operator's second
@@ -283,15 +324,15 @@ export function ask(
      * the tool explaining the student to themselves.
      */
     let trace: string | undefined;
-    const pair = /^([A-Z][0-9]?)([A-Z][0-9]?)$/.exec(name);
+    const pair = asPair(name);
     if (pair && known?.kind === 'line') {
-      const a0 = d.figure.points.find((q) => q.id === pair[1]);
-      const b0 = d.figure.points.find((q) => q.id === pair[2]);
+      const a0 = d.figure.points.find((q) => q.id === pair[0]);
+      const b0 = d.figure.points.find((q) => q.id === pair[1]);
       if (a0 && b0) trace = traceLine2pt(a0, b0, fmt);
     }
     return {
       question,
-      value: known ? describeCurve('', known) : null,
+      value: known ? curveParts(known).equation : null,
       ...(trace && known ? { trace } : {}),
     };
   }
@@ -299,11 +340,23 @@ export function ask(
   // --- anything else: a measure expression, through the one grammar ---
   const measure = parseLengthExpr(text);
   if (!measure) return { question, value: null, unreadable: true };
-  // Every point it names must exist, or the question is about a figure the student has not drawn.
-  const missing = measure.terms
+  /**
+   * EVERY operand must resolve — including the LINE (#1151).
+   *
+   * Only the points were checked, so «המרחק בין C ל-QR» on a figure with no `QR` answered `null`:
+   * «לא ניתן לחשב מהנתונים» — a statement ABOUT the figure, for a question naming something the
+   * figure has not got. #1111 built the missing-object message for exactly this, and one operand
+   * was walking past it.
+   */
+  const missingPoint = measure.terms
     .flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : [t.a, t.b]))
     .find((id: Id) => !objectById(d.construction, id));
-  if (missing !== undefined) return { question, value: null, missing: { name: missing, kind: 'point' } };
+  if (missingPoint !== undefined)
+    return { question, value: null, missing: { name: missingPoint, kind: 'point' } };
+  const missingLine = measure.terms
+    .flatMap((t) => (t.kind === 'point-line' ? [t.line] : []))
+    .find((name) => !lineNamed(d.figure, name));
+  if (missingLine !== undefined) return { question, value: null, missing: { name: missingLine, kind: 'curve' } };
 
   const k = isKnowledge(d.construction, (f) =>
     evalLengthExpr(

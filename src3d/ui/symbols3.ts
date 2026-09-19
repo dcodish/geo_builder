@@ -24,7 +24,20 @@ export const SYMBOL_PALETTE_3: readonly Symbol3[] = [
   ['δ', 'δ', 0],
   ['θ', 'θ', 0],
   ['<', '<', 0], // a bound / ordering between measures
-  ['⃗', '⃗', 0],
+  // #1185: the VECTOR arrow. Deliberately `→` (U+2192) and NOT the combining U+20D7 this button
+  // used to carry: a combining mark is DEFINED to render over the preceding base character, so with
+  // no base it is renderer-dependent — a dotted circle, a stray mark, or tofu, which is what the
+  // operator saw on the button and again as `DC□=AB□` in the input.
+  //
+  // Operator ruling 2026-09-18, asked which character the button should INSERT: `→`. `parse3` already
+  // accepts `[→⃗⟶]` interchangeably, so `AB→` parses identically to `AB⃗` — no grammar change and no
+  // font work. The textbook over-letter arrow is knowingly given up for legibility; that trade-off was
+  // put to the operator explicitly and this is their answer.
+  //
+  // The `err.ambiguousVectorLength*` messages teach THIS character, and #1183 makes the spelling it
+  // teaches actually reachable. Those three move together or the tool recommends a key that does
+  // nothing — which is the failure #1183 was filed for.
+  ['→', '→', 0],
   ['|·|', '||', 1],
   ['√', '√', 0],
   // #511: the POWER, the second half of the operator's #509 report («I also dont have the power option

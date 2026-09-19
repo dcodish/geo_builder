@@ -1179,3 +1179,128 @@ ruling is untouched, and this sits ABOVE it). **A decimal the student typed is t
 
 There is no √ or π form in this tool yet — those values show as decimals until the corpus asks for
 them.
+them.
+
+**R95 — a name that denotes a line denotes it to every question, and to every surface**
+([#1148](https://github.com/dcodish/geo_builder/issues/1148), [#1139](https://github.com/dcodish/geo_builder/issues/1139)).
+
+`AB` is a line whenever `A` and `B` are points the figure holds — whether the student drew it as a
+line, stated it as a segment, or got it as a side of «משולש ABC». Every question that can be asked
+about a line can be asked about it: its **equation**, its **slope**, and the **distance** from a point
+to it. A question the tool answers in one spelling and refuses in another is the tool disagreeing with
+itself about what the figure contains.
+
+**The menu offers exactly what the lane answers.** An option the click menu composes must be a
+sentence the ask lane answers; the two are one enumeration, not two lists that happen to agree. A
+drawn side is an object the student can see, so it is an object they can click.
+
+**The honesty gate is unchanged and applies per question.** A line whose coefficients are the same in
+every configuration has an equation; one that moves does not, and says so. A line can be knowledge
+while the points naming it are not — «A(0,0)» with «B על הישר y=x» has the equation `x - y = 0` and no
+length — and each question is answered on its own terms.
+
+**R96 — every spelling of one question gets one answer, and the operands decide the roles**
+([#1151](https://github.com/dcodish/geo_builder/issues/1151)).
+
+«המרחק בין C ל-AB» and «המרחק בין AB ל-C» are the same question. So are «מרחק של C מ-AB»,
+«distance from C to AB» and «distance between AB and C». A grammar that answers one and refuses
+another is teaching the student that the tool has a secret word order, which no exam has.
+
+**Roles come from what each operand IS, never from where it sits.** A one-letter name is a point; a
+two-letter name or a curve name is a line. Two points are a plain distance — «המרחק בין A ל-B» is the
+length `AB` and answers the same number — and a point with a line is the distance to that line,
+written in either order.
+
+**A question naming something absent is told so.** «המרחק בין C ל-QR» on a figure with no `QR` reports
+the missing object; it never answers «לא ניתן לחשב מהנתונים», which is a claim about the figure rather
+than about the question.
+
+**A stated curve is nameable however it entered the figure**
+([#1149](https://github.com/dcodish/geo_builder/issues/1149)). A line the student first used to carry
+a point and then stated on its own is the SAME line as one stated outright, and behaves identically —
+same crossing rings, same name. How an object came to exist is the tool's bookkeeping, not something
+the student should be able to feel.
+
+**R97 — a given the tool accepted is DRIVEN, or it is refused; it is never quietly ignored**
+([#1201](https://github.com/dcodish/geo_builder/issues/1201)).
+
+«המרחק מ-A לישר l1 = 5» is a statement about the figure, exactly as «AB = 5» is. Once accepted it must
+shape the drawing — and when no configuration can satisfy it, the tool says so and names the student's
+own sentence. What it may never do is draw a figure that contradicts a given while listing that given
+as one it holds.
+
+**This is the honesty invariant at the level of the SOLVE, not the parser.** A statement can survive
+parsing, become the right constraint, and still be dropped on the way to the drawing — and that is the
+worst of the three failures, because nothing on screen says anything is wrong.
+
+**A magnitude that cannot be measured is not a magnitude that is satisfied.** Where the tool cannot
+evaluate a stated quantity at all, it must treat that as a fault to report rather than as a residual of
+zero — which is what "no opinion" silently becomes inside a least-squares solve.
+
+**R98 — a position carries at most one name, and a second naming is REFUSED, never silent**
+([#1153](https://github.com/dcodish/geo_builder/issues/1153)).
+
+«P מרכז המעגל I» names the centre. A later «O מרכז המעגל I» is not a second point — it is the same
+point, named again — and the tool says so, naming the letter that already holds it. Three letters
+stacked on one position is a figure the student cannot read, and it is drawn from statements that each
+looked accepted.
+
+**Renaming is an action the student takes, never a substitution the tool performs.** The refusal names
+the holder and says what to do about it; nothing is silently re-pointed at a different letter.
+
+**Naming the same thing with the SAME letter stays a no-op.** Repeating «P מרכז המעגל I» is a student
+restating themselves, and restatement has always been absorbed.
+
+This is about **one object named twice**. Two points the student stated independently that happen to
+land on one position is a different question — the tool may not assume a coincidence was asserted when
+an unstated magnitude is a free DOF (ADR-052) — and it is not answered by this requirement.
+
+**R99 — a panel heading names what the rows ARE, in the student's own word**
+([#1147](https://github.com/dcodish/geo_builder/issues/1147)).
+
+The data panel's equations section lists what the student stated or asked about the curves in their
+figure, and every row in it is an equation. So it is headed «משוואות» / «Equations» — not «עקומים», which
+is the tool's internal category (`kind: 'curve'`) and a word the exam never uses.
+
+**A heading is a promise about its rows.** Naming the implementation's type there teaches the student a
+vocabulary the question paper does not share, and it is the same defect as showing them an internal id.
+
+**R100 — an answer and its working are separate rows, and the working can be folded away**
+([#1206](https://github.com/dcodish/geo_builder/issues/1206), [#1207](https://github.com/dcodish/geo_builder/issues/1207)).
+
+A question the student asked shows its answer on one line and, beneath it, how that answer was reached.
+The two never share a line: a formula running on past the equation it belongs to reads as a second,
+unrelated fragment.
+
+**The working is shown by default and the student may fold it.** It is part of the answer (#1053), so
+it is not hidden until they say so — and folding it leaves the question and its equation, which is what
+they asked to keep.
+
+**The measure menu offers only questions worth asking.** An option is offered when the ask lane answers
+it AND the answer can be something other than zero — so clicking a vertex does not offer the distance to
+the sides that vertex is an endpoint of.
+
+**R101 — a figure the student opens is visible**
+([#1209](https://github.com/dcodish/geo_builder/issues/1209)).
+
+Pan and zoom belong to the figure they were computed for. Opening a saved figure, or clearing and
+starting a new one, shows that figure whole — the previous view is not carried onto something it was
+never computed for.
+
+A loaded save that appears empty reads as **data loss**: the student's own file looks like it failed to
+open, and nothing on screen contradicts that.
+**R102 — a curve row states an EQUATION, and its derived properties fold beneath it**
+([#1212](https://github.com/dcodish/geo_builder/issues/1212)).
+
+Under «משוואות», every curve — line, circle, parabola, ellipse — leads with its own equation. The centre
+and radius, the semi-axes, the foci, the directrix are true and useful and **secondary**: they sit on a
+second row the student can fold away, exactly as R100 folds an answer's working.
+
+**The given is never replaced by something derived from it.** A student who typed
+«(x-3)^2+(y-4)^2=9» and is shown only `O(3, 4), r = 3` has had their own statement taken off the screen
+and a consequence of it put in its place — which is the honesty invariant read backwards. The derived
+properties are the addition; the equation is the given. And «משוואת המעגל» is answered with the
+equation, because that is what was asked.
+
+The exception is a curve the givens have not FIXED, which shows its open form rather than an invented
+equation — no coefficient is ever sampled and printed as fact (R21, [#1023](https://github.com/dcodish/geo_builder/issues/1023)).

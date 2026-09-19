@@ -733,6 +733,52 @@ function ratioStatement(
  *   about, so it falls through to the ordinary claim lane, where an inconsistent ratio still refuses.
  * - `k > 0`, which is also why a driven `t` can never leave the segment (`riderChainT`)
  */
+/**
+ * Is this `XY = k·ZW` the AMBIGUOUS shape — the one the tool must ask about rather than decide?
+ *
+ * All five conditions are load-bearing, and each protects a lane that must keep working:
+ *
+ * - **a single PAIR term with a numeric coefficient** — a named vector («AC' = u + v + w») is a
+ *   different statement and stays the verified claim v7-t1 locks;
+ * - **`k ≠ 1`** — the bare `c = 1` form is already asked about, by the parser, before it gets here;
+ * - **every point already known** — with an unknown the relation DEFINES it (ADR-3D-010's affine
+ *   lane, the 2018 gate's «A'K = 4/5 DN»), and that is untouched;
+ * - **neither pair rides a segment** — the rider family's readings have a known relationship and #748
+ *   has already ruled on it, chain form and non-chain form alike;
+ * - **the pairs are distinct** — «AB = 2AB» is a statement about one segment, not two.
+ */
+function ambiguousPairRatio(c: Construction3, cmd: Command3): EngineError3 | null {
+  if (cmd.type !== 'vec-rel' || cmd.symbol) return null;
+  /**
+   * #1183 — AN EXPLICITLY MARKED STATEMENT HAS ALREADY ANSWERED THE QUESTION.
+   *
+   * The clarification below tells the student to write the arrow form if they meant vectors. Until
+   * this line, that form arrived here as the byte-identical command the bare form produces and got
+   * the SAME refusal — the tool asking a question, offering two answers, and rejecting one of them
+   * with the question. The ask is right; it was unanswerable because the answer was indistinguishable
+   * from the question.
+   *
+   * Nothing about the ambiguity ruling changes: an UNMARKED `XY = k·ZW` still asks, so #748 (refuse
+   * rather than pick where the readings disagree) and ADR-3D-249 both stand untouched. This only
+   * declines to ask a student who already said which reading they meant, down the vector lane
+   * ADR-3D-010 says a coefficient commits to at parse time.
+   */
+  if (cmd.marked) return null;
+  if (cmd.terms.length !== 1) return null;
+  const [term] = cmd.terms;
+  if (term.atom.kind !== 'pair' || term.coeff.p !== 0) return null;
+  const k = term.coeff.k;
+  if (Math.abs(k - 1) < 1e-12) return null; // the parser already asks about this one
+  const pair1: [Id, Id] = [cmd.from, cmd.to];
+  const pair2: [Id, Id] = [term.atom.from, term.atom.to];
+  if (pair1.every((p) => pair2.includes(p))) return null; // one segment, not two
+  const all = [...pair1, ...pair2];
+  if (all.some((id) => !c.points.has(id))) return null; // a definition, not a statement
+  // The rider family — #748's ruling owns it.
+  if (all.some((id) => c.points.get(id)?.kind === 'on-segment')) return null;
+  return { code: 'ambiguous-vector-length', a1: pair1[0], b1: pair1[1], a2: pair2[0], b2: pair2[1], c: k };
+}
+
 function riderRatioRetarget(c: Construction3, cmd: Command3): Command3 | null {
   const st = ratioStatement(c, cmd);
   if (!st) return null;
@@ -814,8 +860,48 @@ function placeholderYields(c: Construction3, cmd: Command3): Construction3 | nul
   return { ...c, points };
 }
 
+/**
+ * How deep the reducer is inside its own lowerings.
+ *
+ * The ambiguity question below is about **the sentence the student submitted**, and several commands
+ * lower to a `vec-rel` internally — `point-on-segment3` on an existing id is ADR-3D-047's "vec-rel
+ * dual", and it produces exactly the shape the question is asked about. Asking it of the engine's own
+ * rewrite would refuse a statement nobody wrote that way. So it is asked once, at the outermost call.
+ */
+let APPLY_DEPTH = 0;
+
 export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
-  const r = applyCommand3Inner(c, cmd);
+  /**
+   * «AA'=3BC» ON EXISTING POINTS IS AMBIGUOUS, AND IS ASKED ABOUT — never refuted (#1156).
+   *
+   * From the prod log: a student stated one edge of a bare `תיבה` as a multiple of another, four
+   * spellings, every one answered `claim-refuted` — the tool telling them their true statement was
+   * false — and they gave up and rebuilt the figure without the relation.
+   *
+   * The sentence has two readings. Between two non-collinear edges the VECTOR reading is genuinely
+   * impossible, so it fell out of the drive lane into the claim lane and was verified against
+   * proportions the tool had **sampled itself** — [ADR-052](../../docs/06-decisions.md#adr-052)'s
+   * cardinal sin. The LENGTH reading cannot simply be assumed either: #748 ruled that where the two
+   * readings disagree the tool **refuses rather than picks**, and ADR-3D-010 ruled that a coefficient
+   * commits to the vector lane at PARSE time. Both stand, so this ASKS.
+   *
+   * It could not be asked at parse time: with an unknown point the identical sentence DEFINES it (the
+   * 2018 gate's «A'K = 4/5 DN»), which is why widening the parser's guard to the coefficient form
+   * broke twelve tests when it was tried (ADR-3D-010's own correction note). The question needs the
+   * figure, so it is asked here — at the OUTERMOST call, because the engine lowers other commands to
+   * this same shape and they are not sentences anyone wrote.
+   */
+  if (APPLY_DEPTH === 0) {
+    const amb = ambiguousPairRatio(c, cmd);
+    if (amb) return { ok: false, error: amb };
+  }
+  APPLY_DEPTH += 1;
+  let r: ApplyResult3;
+  try {
+    r = applyCommand3Inner(c, cmd);
+  } finally {
+    APPLY_DEPTH -= 1;
+  }
   if (r.ok) r.next.scalarPins = dedupDeep(r.next.scalarPins);
   return r;
 }
@@ -1475,6 +1561,51 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // against still-free dims and checks it exactly against a rigid one.
         if (cmd.claim.type === 'length-eq' && c.scaleGivens.length === 0) {
           next.scalarPins.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
+          return { ok: true, next };
+        }
+        /**
+         * A RATIO BETWEEN TWO LENGTHS DRIVES, exactly as a length equation does (#1156, second half).
+         *
+         * «AB:BC = 3:1» on a bare `תיבה` answered `claim-refuted` — the tool checking a true given
+         * against proportions it had sampled itself, [ADR-052](../../docs/06-decisions.md#adr-052)'s
+         * cardinal sin, and the same wrong message the bare-label spelling gave.
+         *
+         * Unlike that spelling this needs no ruling and no clarification: **`A:B = p:q` has no vector
+         * reading at all**, so there is nothing ambiguous to ask about. It is a length relation in the
+         * only sense it can be, and the pin it needs — `length-rel`, a ratio of two lengths, and
+         * similarity-INVARIANT like the rest of the M1 scalar family — has existed since T2.
+         *
+         * Shipping the ambiguity clarification without this would leave the student one keystroke from
+         * the same false accusation they just escaped.
+         */
+        /**
+         * A VECTOR EQUATION DRIVES, exactly as a length equation and a length ratio do (#1183).
+         *
+         * «נסמן: AB = u» then «DC = 3u» on a bare `טרפז ABCD` answered `claim-refuted`. A trapezoid
+         * has DC ∥ AB and free dims, so `DC = 3AB` is satisfiable and is a GIVEN — refuting it against
+         * the proportions the tool sampled itself is [ADR-052](../../docs/06-decisions.md#adr-052)'s
+         * cardinal sin, the very thing #1156 fixed for the pair form and this is one spelling over.
+         *
+         * Placed with its scalar siblings rather than beside the `vec-rel` fork, because the sentence
+         * reaches here through THREE spellings — the named-vector route, the marked pair route
+         * (#1183's `marked` bit), and a `vec-eq` claim lowered by some other command — and a drive
+         * bound to one of them is the code-path capability docs/17 warns about.
+         *
+         * Pin AND claim, the ADR-3D-030 pattern: the pin drives the free dims toward the statement,
+         * and the recorded claim stays the FINAL ARBITER — so a vector equation that genuinely cannot
+         * hold («AA'⃗ = 3BC⃗» between two perpendicular edges of a box) still refuses, now because the
+         * figure truly cannot satisfy it rather than because one sample did not.
+         */
+        if (cmd.claim.type === 'vec-eq') {
+          next.scalarPins.push({ kind: 'vec-eq', lhs: cmd.claim.lhs, rhs: cmd.claim.rhs });
+          next.claims.push(cmd.claim);
+          return { ok: true, next };
+        }
+        if (cmd.claim.type === 'length-ratio' && cmd.claim.q !== 0) {
+          const { a1, b1, a2, b2, p, q } = cmd.claim;
+          next.scalarPins.push({ kind: 'length-rel', a1, b1, a2, b2, c: p / q });
+          // Recorded as a claim too — the final verification stays the arbiter, the ADR-3D-030 pattern.
+          next.claims.push(cmd.claim);
           return { ok: true, next };
         }
         // #909 — a stated angle between two SEGMENTS is a GIVEN, whatever the two segments' spelling.
@@ -2181,6 +2312,30 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
            */
           return { ok: false, error: { code: 'no-solution', id: cmd.to } };
         }
+        /**
+         * «AA'=3BC» ON EXISTING POINTS IS AMBIGUOUS, AND IS ASKED ABOUT — never refuted (#1156).
+         *
+         * From the prod log: a student stated one edge of a bare `תיבה` as a multiple of another,
+         * four spellings, every one answered `claim-refuted` — the tool telling them their true
+         * statement was false — and they gave up and rebuilt the figure without the relation.
+         *
+         * The sentence has two readings. Between two non-collinear edges the VECTOR reading is
+         * genuinely impossible, so it fell out of the drive lane into the claim lane and was verified
+         * against proportions the tool had **sampled itself** — [ADR-052](../../docs/06-decisions.md#adr-052)'s
+         * cardinal sin. But the LENGTH reading cannot simply be assumed either: #748 ruled that where
+         * the two readings disagree the tool **refuses rather than picks**, and ADR-3D-010 ruled that
+         * a coefficient commits to the vector lane at PARSE time. Both stand.
+         *
+         * So this asks, exactly as the parser already asks for the `c = 1` form. It could not be done
+         * at parse time — with an unknown point the identical sentence DEFINES it (the 2018 gate's
+         * «A'K = 4/5 DN»), which is why widening the parser's guard broke twelve tests when it was
+         * tried — so the question is put here, where the figure says which points exist.
+         *
+         * **The rider family is left alone**, and that is what keeps #748 whole: when the two pairs
+         * share a point that rides a segment, the vector and length readings have a known
+         * relationship, `riderRatioRetarget` above has already taken the chain form, and the
+         * non-chain form's refusal is a decided answer rather than this ambiguity.
+         */
         const asClaim = applyCommand3(c, {
           type: 'claim',
           claim: { type: 'vec-eq', lhs: [{ coeff: 1, atom: { kind: 'pair', from: cmd.from, to: cmd.to } }], rhs: cmd.terms.map((t) => ({ coeff: t.coeff.k, atom: t.atom })) },

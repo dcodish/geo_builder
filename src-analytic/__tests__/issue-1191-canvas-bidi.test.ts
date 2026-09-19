@@ -59,7 +59,7 @@ const OPERATOR = ['A(0,0)', 'B(6,8)', 'נקודה M', 'MA = MB'];
 /** The whole reported path: derive → ask → the drawn-loci reading → the scene. */
 const locusLabelOnCanvas = (lines: string[], seed: number, who: string) => {
   const d = derive(lines, seed);
-  const a = ask(d, `המקום הגיאומטרי של ${who}`, fmt, () => '', ((k: string) => HE[k] ?? k) as never);
+  const a = ask(d, `המקום הגיאומטרי של ${who}`, fmt, ((k: string) => HE[k] ?? k) as never);
   const loci = drawnLoci([a]);
   const scene = buildScene(d.figure, d.box, 600, 400, { loci });
   return { value: a.value ?? null, label: scene.loci[0]?.label?.text ?? null };

@@ -24,7 +24,7 @@ const FIG = ['נתונה הנקודה A(2,5)', 'נתון הישר l1: 3x-4y+1=0'
 const fmt = (n: number) => fmtNum(n);
 const answer = (lines: string[], q: string) => {
   const d = derive(lines, 0);
-  return { d, a: ask(d, q, fmt, () => '') };
+  return { d, a: ask(d, q, fmt) };
 };
 
 describe('#1048 — the menu offers only what the figure can answer', () => {
@@ -65,7 +65,7 @@ describe('#1048 — the menu offers only what the figure can answer', () => {
       { kind: 'curve' as const, id: 'line-l1' },
     ]) {
       for (const m of measurablesOf(d.construction, what)) {
-        const a = ask(d, m.sentence, fmt, () => 'curve');
+        const a = ask(d, m.sentence, fmt);
         expect(a.unreadable, `«${m.sentence}» was offered and is not understood`).toBeFalsy();
       }
     }
@@ -120,7 +120,7 @@ describe('#1048 — the distance, and the height that explains it', () => {
   it('an ask NEVER mutates the figure (02c R24)', () => {
     const d = derive(FIG, 0);
     const before = JSON.stringify(d.construction);
-    ask(d, 'המרחק מ-A לישר l1', fmt, () => '');
+    ask(d, 'המרחק מ-A לישר l1', fmt);
     expect(JSON.stringify(d.construction)).toBe(before);
   });
 });
@@ -128,7 +128,7 @@ describe('#1048 — the distance, and the height that explains it', () => {
 describe('#1048 — the height reaches the canvas', () => {
   it('buildScene projects the mark, with its right-angle tick and the value on it', () => {
     const d = derive(FIG, 0);
-    const a = ask(d, 'המרחק מ-A לישר l1', fmt, () => '');
+    const a = ask(d, 'המרחק מ-A לישר l1', fmt);
     const scene = buildScene(d.figure, d.box, 800, 600, {
       marks: [{ from: a.mark!.from, foot: a.mark!.foot, label: a.value ?? undefined }],
     });
