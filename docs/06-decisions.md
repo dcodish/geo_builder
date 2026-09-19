@@ -12232,3 +12232,62 @@ That question **is** closed — the ways to say "is" are finite — which is pre
 **Lock.** `length-copula-value.test.ts` gains a suite written as the CLASS: fifteen non-copula connectives — every glyph, both directions, the Hebrew and English comparison words, the bound words, a ratio — each asserting the **absence** of `set-distance`, never a particular outcome, so the lock cannot go green by re-implementing the bound rule. Five unfamiliar connectives assert the fail-closed behaviour. The copula rows assert the equality still forms and still equals the canonical «BC=10» parse, so a future narrowing of the allowlist goes red.
 
 **Consequences.** `parser/parse.ts`: `LENGTH_RELATION` (a denylist) becomes `LENGTH_COPULA` (an allowlist); the callback's branches swap. `length-copula-value.test.ts` grows from 25 to 53.
+
+## ADR-527 — The two cevian roles share a shape and not a rule (#1247)
+
+**Requirements:** [02](02-requirements.md) — an altitude to a side through one of its own endpoints is a supported given (it states a right angle at that vertex). **Design:** [04](04-design.md) — the cevian lowering is per-role. **LADDER stage:** parse. No engine, solver or render change. **Amends** ADR-525 (#1233).
+
+**Operator, 2026-09-19**, playing round #1244 hours after ADR-525 landed:
+
+> *"AB גובה לצלע BC - not accepted and it should. in this case its a right angle triangle"*
+
+He is right, and the refusal was mine.
+
+### What ADR-525 got wrong
+
+It shipped one predicate for both roles and called it *"the role's own definition"*. It is not — the clause `foot ∉ side` is right for a median and **wrong for an altitude**:
+
+| role | the foot being an endpoint of the side means | verdict |
+| --- | --- | --- |
+| median | the MIDPOINT of `BC` is `B` — so `BC` has zero length | impossible → refuse |
+| altitude | the perpendicular from `A` meets `BC` at `B` — a right angle at `B` | **ordinary** → must build |
+
+«AB גובה לצלע BC» is how an exam states a right triangle. ADR-525 refused it.
+
+### It never worked properly, so this is not a restoration
+
+Measured on `18f75b7e`, before ADR-525:
+
+```
+משולש ABC · AB גובה לצלע BC        builds, err null, ∠ABC forced to 90°  — via a hidden ~B minted on top of B
+ABC משולש ישר זווית · AB גובה לצלע BC   over-constrained: B coincides with its constructed target
+```
+
+The general case produced the right geometry through a junk duplicate point; the operator's own right-triangle case errored. **Both are wrong**, so the sentence is now lowered to what it actually says rather than to what it used to do.
+
+### The decision
+
+`cevianWellFormed` takes the role. `foot ∈ side` is refused for a median and admitted for an altitude — and when admitted, the emit is a **perpendicularity, not a `foot`**:
+
+```
+AB ⟂ BC          ->  segment(A,B)  segment(B,C)  set-perpendicular(A,B,B,C)
+AB גובה לצלע BC   ->  the same three commands, exactly
+```
+
+Emitting `foot(id: B, …)` was the cause of both old symptoms: it mints a point that already exists, which is the hidden `~B` and, where `B` is already pinned, the over-constrained error. No new point is needed — the foot the student named *is* a vertex the figure has.
+
+The `foot` rule's own spelling («B רגל האנך מ-A ל-BC») gets the same reading: one family, one answer.
+
+### Everything else ADR-525 established stands
+
+An apex ON the side it is drawn to is degenerate in **both** roles («BD גובה לצלע AB» is a zero-length altitude), and an apex that IS its own foot is degenerate in both. The operator played those as T7/T8/T9 and confirmed them; they are unchanged and still locked.
+
+### ⚠ Two rows of ADR-525's lock were MOVED, and that is recorded rather than quiet
+
+`cevian-well-formed.test.ts` asserted «AB גובה לצלע BC» and «AC גובה לצלע BC» as refusals. **The full suite went red on exactly those two**, which is the gate working: they encoded the rule this ADR overturns.
+
+They were **not deleted**. They moved to `altitude-foot-at-vertex.test.ts` with the opposite expectation, and a comment stands in their place in the old table explaining why — a lock that simply disappears looks like coverage that was never written. Relaxing a lock to make a change pass is the tripwire this repo names; relaxing one because the operator overturned the rule it encoded is a different act, and the difference is only visible if it is written down.
+
+### Lock
+
+`altitude-foot-at-vertex.test.ts` (17). The headline is a **parity assertion** — «AB גובה לצלע BC» must produce the *same commands* as «AB ⟂ BC» — which this case makes available and which cannot go green by re-implementing the perpendicular rule. Plus: no point minted and no hidden `~` duplicate; the angle at the foot driven to 90°; all seven of ADR-525's refusals still refused; **the median and the altitude asserted to disagree on the SAME letters** (the cell that proves the split is by role, not a blanket relaxation); and a second right angle on an already-right triangle still refused with the conflict named. Verified to bite: 7 of the 17 fail against pristine `parse.ts`.

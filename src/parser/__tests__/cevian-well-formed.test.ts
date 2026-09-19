@@ -60,8 +60,20 @@ describe('ADR-525 — the cevian incidence is checked in every rule that emits a
     ['altitude he apex=u', 'BD גובה לצלע AB'],
     ['altitude he apex=v', 'AD גובה לצלע AB'],
     ['altitude he apex=foot', 'AA גובה לצלע BC'],
-    ['altitude he foot=u', 'AB גובה לצלע BC'],
-    ['altitude he foot=v', 'AC גובה לצלע BC'],
+    /**
+     * ⚠ `foot ∈ side` FOR AN ALTITUDE WAS HERE AND IS NOW WRONG — #1247 / ADR-527.
+     *
+     * «AB גובה לצלע BC» and «AC גובה לצלע BC» were locked as refusals by this table. The operator
+     * reported them the same day ADR-525 landed: *"AB גובה לצלע BC - not accepted and it should. in
+     * this case its a right angle triangle"*. He is right — the foot being an endpoint means the
+     * angle THERE is 90°, which is an ordinary given. The clause is correct for a MEDIAN (the
+     * midpoint of BC can only be B if BC is degenerate) and it is those rows, below, that stay.
+     *
+     * The two rows are NOT deleted — they moved, with the opposite expectation, to
+     * `altitude-foot-at-vertex.test.ts`, where they assert parity with «AB ⟂ BC». Recorded here
+     * rather than silently removed, because a lock that disappears from a table looks like coverage
+     * that was never there.
+     */
     // ── altitude, English ──
     ['altitude en apex=u', 'BD altitude to side AB'],
     ['altitude en apex=foot', 'AA altitude to side BC'],

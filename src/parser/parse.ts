@@ -1979,7 +1979,11 @@ const foot: Rule = (s) => {
   // #1233 — the same incidence, stated in the third spelling the family owns: «F רגל האנך מ-B ל-AB»
   // put F exactly on B and reported success.
   const [id, from, a, b] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
-  return cevianWellFormed(from, id, [a, b]) ? [{ type: 'foot', id, from, a, b }] : null;
+  if (!cevianWellFormed(from, id, [a, b], 'altitude')) return null;
+  // #1247 — «B רגל האנך מ-A ל-BC» names an existing vertex as the foot: a right angle at B, not a
+  // new point. The same reading the altitude rule gives its own spelling.
+  if (id === a || id === b) return altitudeAtVertex(from, id, [a, b]);
+  return [{ type: 'foot', id, from, a, b }];
 };
 
 /** "M is the midpoint of AB" / "M אמצע AB" / "C is the midpoint of OB". */
@@ -8109,8 +8113,49 @@ const roleSideLine: Rule = (s, ctx) => {
  * out deliberately rather than smuggled in here. The analytic sibling #1231 answers it the other way
  * in a tree that HAS that vocabulary.
  */
-const cevianWellFormed = (apex: Id, foot: Id, side: readonly [Id, Id]): boolean =>
-  apex !== side[0] && apex !== side[1] && apex !== foot && foot !== side[0] && foot !== side[1];
+/**
+ * THE TWO ROLES SHARE A SHAPE AND NOT A RULE (#1247).
+ *
+ * ADR-525 applied ONE predicate to both and called it "the role's own definition". It is not: the
+ * clause `foot ∉ side` is right for a median and WRONG for an altitude.
+ *
+ *   «AB תיכון לצלע BC»  — the MIDPOINT of BC is B ⇒ BC has zero length. Impossible. Refuse.
+ *   «AB גובה לצלע BC»   — the perpendicular from A meets BC at B ⇒ the angle at B is 90°.
+ *                          Ordinary, and the way an exam states a right triangle. MUST build.
+ *
+ * The operator reported the second, refused, the day ADR-525 landed. Measured before that ADR it did
+ * not work properly either: it produced the right geometry through a hidden `~B` minted on top of B,
+ * and errored outright when B was already pinned. So this is not a restoration — the sentence now
+ * lowers to what it actually says (see `altitudeAtVertex`).
+ *
+ * Everything else ADR-525 established is unchanged and still load-bearing: an apex ON the side it is
+ * drawn to is degenerate in BOTH roles («BD גובה לצלע AB» is a zero-length altitude), and an apex that
+ * IS its own foot is degenerate in both.
+ */
+type CevianRole = 'median' | 'altitude';
+const cevianWellFormed = (apex: Id, foot: Id, side: readonly [Id, Id], role: CevianRole): boolean =>
+  apex !== side[0] &&
+  apex !== side[1] &&
+  apex !== foot &&
+  // a median's foot is the midpoint and can only be an endpoint if the side is degenerate; an
+  // altitude's foot is an endpoint exactly when the angle there is right
+  (role === 'altitude' || (foot !== side[0] && foot !== side[1]));
+
+/**
+ * The altitude whose foot IS an endpoint of the side: «AB גובה לצלע BC» ⇒ AB ⟂ BC (#1247).
+ *
+ * It mints NO point — the foot the student named is a vertex the figure already has, and emitting a
+ * `foot` command for it was what produced the hidden `~B` and the over-constrained error. The
+ * lowering is exactly what the student's own «AB ⟂ BC» produces, which is what the lock asserts.
+ */
+const altitudeAtVertex = (apex: Id, foot: Id, side: readonly [Id, Id]): Command[] => {
+  const other = side[0] === foot ? side[1] : side[0];
+  return [
+    { type: 'segment', a: apex, b: foot },
+    { type: 'segment', a: foot, b: other },
+    { type: 'set-perpendicular', a: apex, b: foot, c: foot, d: other },
+  ];
+};
 
 /**
  * "median from A in ABC" / "תיכון מ-A במשולש ABC" — the median from a vertex to the
@@ -8156,7 +8201,7 @@ const median: Rule = (s, ctx) => {
     }
     // #1233 — the gate that used to read only `apex ∈ opp` here is now the shared definition, so the
     // altitude and the foot rule cannot drift from it again.
-    if (!cevianWellFormed(apex, foot, opp)) return null;
+    if (!cevianWellFormed(apex, foot, opp, 'median')) return null;
     return [
       { type: 'midpoint', id: foot, a: opp[0], b: opp[1] },
       { type: 'segment', a: apex, b: foot },
@@ -8330,7 +8375,7 @@ const altitude: Rule = (s, ctx) => {
     const foot2 = existingFootOf(ctx, apx, sd[0], sd[1]) ?? freeLabel([apx, ...sd, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']); // reuse (Am. 2)
     // #1233 — the apex is derived from the polygon here, so this cannot currently be degenerate; asked
     // anyway, because "cannot currently be" is what the median's gate said about the altitude.
-    if (!cevianWellFormed(apx, foot2, sd)) return null;
+    if (!cevianWellFormed(apx, foot2, sd, 'altitude')) return null;
     return [
       { type: 'foot', id: foot2, from: apx, a: sd[0], b: sd[1] },
       { type: 'segment', a: apx, b: foot2 },
@@ -8403,9 +8448,12 @@ const altitude: Rule = (s, ctx) => {
   // #1233 — the altitude had NO counterpart to the median's apex gate, so «BD גובה לצלע AB» built a
   // zero-length altitude and reported success. Asked HERE, at the single emit point, so every way the
   // apex and the side are resolved above is covered by one check.
-  if (!cevianWellFormed(apex, f, [p, q])) return null;
+  if (!cevianWellFormed(apex, f, [p, q], 'altitude')) return null;
   const cmds: Command[] = [];
   if (tri) cmds.push({ type: 'triangle', ids: [tri[0], tri[1], tri[2]] });
+  // #1247 — the foot may BE an endpoint of the side, and then the sentence is a right angle at that
+  // vertex rather than a new point. Deciding it here, at the one emit, keeps both readings in one place.
+  if (f === p || f === q) return [...cmds, ...altitudeAtVertex(apex, f, [p, q])];
   cmds.push({ type: 'foot', id: f, from: apex, a: p, b: q });
   cmds.push({ type: 'segment', a: apex, b: f });
   return cmds;
