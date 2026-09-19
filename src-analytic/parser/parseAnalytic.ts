@@ -2149,7 +2149,46 @@ export function parseLine(raw: string): ParseResult {
    * the operator's 2026-09-15 ruling — belongs with the circle-by-centre object #1060 needs, and is
    * deliberately not done here.
    */
-  if (curve && /[֐-׿]/.test(curve.eqSrc)) {
+  /**
+   * A NOUN GATE MAY NOT CLAIM A TAIL THAT IS NOT AN EQUATION (#1246) — the second half of the #1059
+   * guard below, and the half it was missing.
+   *
+   * The Hebrew test alone asks *"did the sentence continue in prose?"*. It does not ask *"is this an
+   * equation at all?"*, and «הקטע BC = 10» is neither prose nor an equation — it is a LENGTH. So the
+   * rule claimed it, handed `10` to `equationExpr`, and answered «לא הצלחתי לקרוא את המשוואה» about
+   * an equation the student never wrote, sending them to hunt for a typo in something that does not
+   * exist. That breaks the honesty invariant on messages: an error names the conflicting STATEMENT,
+   * never internal state.
+   *
+   * ADR-AG-111 did not create this — it enlarged it. «הישר BC = 10» answered `bad-equation` before
+   * that ADR too; widening the noun registry from two members to nine simply took the same defect
+   * from one noun to nine. The fix closes the older member as well, which is how it is known to be at
+   * the right altitude rather than aimed at the new nouns.
+   *
+   * **The discriminator is the plane's own variables** — the signal the bare-colon and bare-equation
+   * branches also key on: *does the tail name `x` or `y`?* `10` names neither, so the rule has no
+   * claim on it. It deliberately does NOT require the tail to PARSE as an equation: a truncated one
+   * («…שמשוואתו (x-3)^2+(y-4)^2», no `=`) parses as nothing and must still be told it is unreadable,
+   * and requiring a clean parse turned that honest `bad-equation` into `not-handled` — measured, and
+   * the reason this asks what the student MEANT rather than what the text achieves. Asked HERE, at
+   * `matchCurve`'s single exit, it covers every branch at once — asked per-branch it does not, and
+   * measurably so: gating `heLineNamed` alone lets the sentence fall through to the no-noun branch,
+   * which claims it and MINTS A CURVE. That was tried and rejected.
+   *
+   * A truncated equation is still `bad-equation`: «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2» mentions
+   * `x` and `y`, so the student meant an equation and got it wrong, and must be told so (#1059).
+   */
+  const curveTailMeansEquation = ((): boolean => {
+    if (!curve) return false;
+    // Deliberately NOT "does it parse as an equation". A TRUNCATED equation must still be told it is
+    // unreadable (#1059's «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2» — no `=`, so it parses as nothing),
+    // and requiring a clean parse here turned that honest `bad-equation` into `not-handled`. The
+    // question is what the student MEANT, and naming the plane's own variables is what says it.
+    return [...RESERVED_SYMBOLS].some((v) =>
+      new RegExp(`(?<![A-Za-z])${v}(?![A-Za-z])`).test(curve.eqSrc),
+    );
+  })();
+  if (curve && (/[֐-׿]/.test(curve.eqSrc) || !curveTailMeansEquation)) {
     // fall through: the noun matched, the tail is not an equation, so this rule has no claim
   } else if (curve) {
     const eq = equationExpr(curve.eqSrc);
