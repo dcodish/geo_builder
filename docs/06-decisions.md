@@ -11914,3 +11914,80 @@ Deliberately, and for the reason ADR-518 gives: `runViewResolve` already early-r
 `app/editPipeline.ts` gains `runSetGroupEnabled`, `runToggleFact` and `runRemoveFact`; `App.tsx`'s step-list `onToggle` routes through the first rather than calling the store inline (CLAUDE.md's module table — this behaviour belongs in `src/app/`). The #1132 registry in `issue-1041-edit-resolve.test.ts` grows from three rows to **six**, with the count asserted so a seventh seam cannot be added silently.
 
 `issue-1133-enable-resolve.test.ts` (5). 2-D lane green.
+
+## ADR-526 — An untethered free point's DISTANCE is sampled, in the figure's own units (#1192)
+
+**Requirements:** [02](02-requirements.md) FR-CF — «הציגו תצורה אחרת» is the promise that an unstated relation is not silently decided; this makes it true for a free point's distance. **Design:** [04](04-design.md) — the seed sampler's DOF inventory. **LADDER stage:** configuration sampling (`applySeed`). No parse, apply or solver change. **Cites** ADR-052, ADR-018.
+
+**Operator report, 2026-09-18, while playing PR #1010's T34:** *"the point D is stuck inside the circle and no other option shows it outside."* Confirmed by hand in the UI, in both directions: at radius 5, D was inside at every configuration; at radius 1, outside at every configuration — *"yes - D is always outside"*.
+
+### Measured — the verdict was decided by a constant
+
+24 configurations per row, `|DO|` against the stated radius:
+
+| stated radius | inside | outside | max `\|DO\|` reached |
+| ---: | ---: | ---: | ---: |
+| 1 | 0 | **24** | 4.326 |
+| 5 | **24** | 0 | 4.326 |
+| 50 | **24** | 0 | 4.326 |
+
+**The reach is 4.326 whatever the student stated.** The radius moves and the sampler does not notice. So which of two admissible, unstated readings the student is told — D inside the circle, or D outside — is decided by a number unrelated to anything they wrote, and the button that exists to offer the other reading cannot reach it.
+
+That is ADR-052's cardinal sin (a figure asserting a given nobody gave) and specifically the conformance smell CLAUDE.md names: *a value counted by `rawMovableDof` but absent from what is actually sampled — a default masquerading as fixed.*
+
+### Root cause — the plan named half of it; the measurement named the rest
+
+The issue's plan blamed the parser literal: «נקודה D» lowers to `{free-point, x: 3, y: 2}`, a spot chosen with no knowledge of the figure it is joining. That literal is real. **It is not what makes the other answer unreachable.**
+
+`applySeed` perturbs the free-point cluster by a seeded **spin about its centroid** plus a per-point jitter, and the jitter width is
+
+```ts
+let span = 1;
+for (const p of free) span = Math.max(span, |p.x - cx| * 2, |p.y - cy| * 2);
+const jit = span * 0.22;
+```
+
+Two things follow, and together they are the defect:
+
+1. **Only the DIRECTION is sampled.** A spin about the cluster's centroid preserves every point's distance from it. A free point's radial distance is therefore whatever its default put it at — never varied, at any seed.
+2. **The width is measured in the DEFAULTS' units.** `span` is computed over the free points' own coordinates, which are themselves defaults. Nothing the figure states — a radius of 50, a side of 200 — enters. For «מעגל O רדיוס r» + «נקודה D» the free points are `O(0,0)` and `D(3,2)`, so `span = 3` and `jit = 0.66` for every r, which is precisely the constant 4.326.
+
+Fixing the literal alone would move the constant, not remove it: the sampled positions would still all sit at one radius from the centroid, so at a large enough stated radius the other answer would still be unreachable. **The deliverable the issue asks for — both answers reachable at r ∈ {1, 5, 50} — needs the sampler.**
+
+### The decision
+
+An **untethered** free point — one that no other object and no constraint refers to — has a genuinely unstated distance from the figure, and it is sampled: a seeded direction *and* a seeded radius, the radius drawn as `0.15×–1.5×` the **figure's own scale**.
+
+**This is not a new mechanism.** Sampling an unstated magnitude as a multiple of an extent is `applySeed`'s established idiom: a free on-line marker already ranges `0.4×–2.4×`, a samplable extension `0.55×–1.85×`. The untethered free point is the member of that family that never got it — and the only member whose default carries no figure information at all, which is why it takes its units from `figureScale` rather than from its own coordinates.
+
+Three boundaries, each load-bearing:
+
+- **`figureScale` EXCLUDES the untethered points themselves.** Their coordinates are defaults; measuring the figure with them in it would let a default vouch for its own size. With radius 5 the scale is 5; with radius 50 it is 50.
+- **Untethered is decided by a generic scan** for the id across every other object and constraint — never by a table of "which object kinds can reference a point", which is the enumeration that goes stale the next time an object kind is added.
+- **Only untethered points are rescaled.** A polygon vertex or a constrained point has its distance decided by the structure it belongs to; rescaling those is the figure's overall SIZE, a different DOF with its own `scalePinned` machinery. The triangle is sampled exactly as before.
+
+**Seed 0 returns early, so the default drawing is bit-identical.** The student's first view is unchanged; it is the *alternatives* that gained the missing DOF — which is exactly what ADR-052 permits and requires: *"a default value is allowed as a starting point so the figure can be drawn, but it must change on «show another configuration»."*
+
+### Deviation from the plan, stated plainly
+
+The plan's arm 1 was *"place a newly minted free point relative to the extent of what is already drawn"* — i.e. change the parser literal. **That arm was not built.** Once the sampler samples the radial DOF, the literal is a legitimate starting point under ADR-052's own wording rather than a default masquerading as fixed, and changing it would move every figure's seed-0 drawing — a large, unrelated blast radius for no gain against this issue's own locks. The narrower fix satisfies all four of them. The literal remains open as cosmetics (at radius 50 the default draws D very near the centre); it is not dishonesty and is not folded in here.
+
+### Measured after
+
+| stated radius | inside | outside | max `\|DO\|` |
+| ---: | ---: | ---: | ---: |
+| 1 | 2 | 22 | 4.807 |
+| 5 | 15 | 9 | 8.470 |
+| 50 | 16 | 8 | 66.486 |
+
+Both answers reachable at every radius, and the reach now scales with the stated figure.
+
+### The locks assert reachability and RATIOS, never coordinates
+
+A test pinned to coordinates would lock in a placement the student never stated — the defect this fixes, in test form. So: both answers reachable at each radius; the reach of a ten-times-larger figure is more than five times wider (the pre-fix signature was a ratio of exactly 1); a stated «D בתוך המעגל» / «D מחוץ למעגל» still holds at **every** configuration (structurally — a point a constraint names is not untethered); a polygon vertex is not rescaled; and seed 0 is unchanged. Verified to bite: 4 of the 8 assertions fail against pristine `sample.ts`.
+
+### Consequences
+
+`engine/sample.ts`: `untetheredFreePoints` and `figureScale` above `applySeed`, and one branch in its free-point arm.
+
+`untethered-free-point-1192.test.ts` (8). 2-D lane green.
