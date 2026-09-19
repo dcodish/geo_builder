@@ -34,14 +34,25 @@ describe('ADR-AG-114 — a length is not a broken equation (#1246)', () => {
    * wrote no equation, so the honest answer is that the sentence was not understood.
    */
   it.each([
-    ['הקטע BC = 10'],
-    ['הצלע BC = 10'],
     ['התיכון BC = 10'],
     ['הגובה BC = 10'],
     ['השוק BC = 10'],
     ['הבסיס BC = 10'],
     ['היתר BC = 10'],
-    ['אורך הקטע BC = 10'],
+    // ⚠ «הקטע BC = 10», «הצלע BC = 10» and «אורך הקטע BC = 10» were rows of THIS table and have
+    // MOVED to issue-1128-distance-spellings.test.ts, with the opposite expectation.
+    //
+    // They are not deleted, and the distinction matters: this issue's ruling was «never
+    // bad-equation», and `not-handled` was the best answer AVAILABLE at the time, not the goal —
+    // this file's own header says so («They wrote a LENGTH»). #1128 (ADR-AG-119) gave those three
+    // a real answer, so they are now accepted, and asserting they are refused would pin a gap the
+    // product has closed. A lock that simply disappeared would look like coverage nobody wrote.
+    //
+    // The five that STAY are the ones a length reading would damage: «תיכון», «גובה», «שוק»,
+    // «בסיס» and «יתר» each assert something BESIDES a length — that BC is a median, a height, a
+    // leg, a base, a hypotenuse — and reducing them to |BC| = 10 would drop that claim silently,
+    // which is the invariant this tree treats as cardinal. #1128's noun list is deliberately only
+    // the nouns that add nothing to the pair they precede.
   ])('«%s» is not-handled, never bad-equation', (line) => {
     expect(code(line)).toBe('not-handled');
   });

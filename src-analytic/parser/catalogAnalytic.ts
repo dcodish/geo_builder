@@ -128,6 +128,32 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // Only the nouns that carry no constraint of their own. «מקבילית» / «טרפז» / «ריבוע» each carry a
   // given this slice cannot honour, so they are refused by name rather than taught here.
   { category: 'shapes', family: 'F17', he: 'הקטע AB', en: 'segment AB', needs: ['A(0,0)', 'B(4,3)'] },
+  // --- F19 · the DISTANCE, in the spellings a student actually writes (#1128) ---
+  // Three rows walking the three FAMILIES of spelling — the plain Hebrew noun, the textbook
+  // subscript, the absolute-value bars — rather than all thirteen, which are one term and are
+  // proved equal to each other by the lock. The card's job is to show that each family exists.
+  {
+    category: 'relations',
+    family: 'F19',
+    he: 'אורך הקטע AB = 10',
+    en: 'length AB = 10',
+    needs: ['A(0,0)', 'נקודה B'],
+  },
+  {
+    category: 'relations',
+    family: 'F19',
+    he: 'd_{AB} = 10',
+    en: 'd_{AB} = 10',
+    needs: ['A(0,0)', 'נקודה B'],
+  },
+  {
+    category: 'relations',
+    family: 'F19',
+    he: 'המרחק בין A ל-B = 10',
+    en: 'the distance between A and B = 10',
+    needs: ['A(0,0)', 'נקודה B'],
+  },
+
   {
     category: 'shapes',
     family: 'F17',

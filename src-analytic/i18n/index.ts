@@ -69,6 +69,7 @@ const he = {
   askMissingPoint: 'אין בשרטוט נקודה בשם {{name}}',
   askMissingCurve: 'אין בשרטוט ישר או מעגל בשם {{name}}',
   paletteShow: 'סמלים',
+  symDist: 'מרחק בין שתי נקודות',
   // A vertical segment HAS no slope, and that is an answer rather than an absence (#1078).
   slopeVertical: 'אנכי (אין שיפוע)',
   secParams: 'פרמטרים',
@@ -245,6 +246,7 @@ const en: typeof he = {
   askMissingPoint: 'there is no point {{name}} in your figure',
   askMissingCurve: 'there is no line or circle named {{name}} in your figure',
   paletteShow: 'Symbols',
+  symDist: 'distance between two points',
   slopeVertical: 'vertical (no slope)',
   secParams: 'Parameters',
   freeDof: '{{count}} degrees of freedom',

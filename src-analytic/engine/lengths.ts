@@ -162,6 +162,56 @@ const DISTANCE_FRAMES: RegExp[] = [
   frame(String.raw`מ-?|from\s+`, String.raw`לבין\s+|א?ל-?|to\s+`),
 ];
 
+/**
+ * THE SYMBOLIC SPELLINGS, REWRITTEN INTO THE WORDED ONE (#1128).
+ *
+ * **Operator ruling, 2026-09-16:** *"`d_{AB}` should also work for questions. as well as `|AB|`"* —
+ * and, asked about the spelling list, *"we need to support all of these"*.
+ *
+ * `d_{AB}`, `d_{A,B}`, `d(A,B)` and `|AB|` are NOTATIONS for the question «המרחק בין A ל-B», not
+ * new questions. So they are rewritten into that sentence and handed to the frames below, rather
+ * than given patterns of their own that would need their own copy of the role logic. The roles —
+ * which operand is a point and which a line — are then decided in the ONE place #1151 put them, and
+ * a spelling cannot disagree with its own synonym ([ADR-W-053](../../docs/06w-decisions-workspace.md)).
+ *
+ * That is also what makes `d_{A,l1}` work for free: the frame reads `l1` as a line exactly as the
+ * worded «המרחק בין A לישר l1» does, so the symbolic form inherits the point-to-line capability
+ * instead of being refused beside it.
+ *
+ * The operands are deliberately **not** restricted to point names here. Restricting them would make
+ * `d_{A,l1}` fall through to `LENGTH_TOKEN`, which would eat a pair out of the middle of it and
+ * answer a DIFFERENT measurement — the exact honesty failure #1151 records for the English form.
+ */
+const SYM_OPERAND = String.raw`[A-Za-zℓ][0-9]?[A-Z]?[0-9]?`;
+const SYMBOLIC_DISTANCE: Array<[RegExp, string]> = [
+  // d_{AB} · d_{A,B} · d_{A,l1}
+  [new RegExp(String.raw`\bd\s*_\s*\{\s*(${SYM_OPERAND})\s*,?\s*(${SYM_OPERAND})\s*\}`, 'g'), 'המרחק בין $1 ל-$2'],
+  // d(A,B) — the comma is required, or `d(x)` of a function would be claimed
+  [new RegExp(String.raw`\bd\s*\(\s*(${SYM_OPERAND})\s*,\s*(${SYM_OPERAND})\s*\)`, 'g'), 'המרחק בין $1 ל-$2'],
+  // |AB| — the bars are the absolute-value notation for a length, and only a POINT PAIR is a length
+  [new RegExp(String.raw`\|\s*([A-Z][0-9]?)\s*([A-Z][0-9]?)\s*\|`, 'g'), 'המרחק בין $1 ל-$2'],
+];
+
+/**
+ * A LENGTH NOUN standing directly in front of a pair — «אורך AB», «הקטע AB», «צלע AB» (#1128).
+ *
+ * Operator, playing the 2-D round of 2026-09-19: *"אורך הקטע BC = 10 is not recognized in analytics
+ * tool"*. A student had exactly one way to state a length here — the bare symbolic `AB = 10` — and
+ * every plain Hebrew word for it was refused. The noun adds no meaning to a pair that is already a
+ * length, so it is removed and the pair speaks for itself.
+ *
+ * The LOOKAHEAD is the whole safety of this. The noun is dropped only where a point pair follows it
+ * immediately, so «הקטע AB» becomes `AB` while «הקטע» in any other sentence is untouched — and
+ * «המרחק בין A ל-B», which the frames above have already consumed, never reaches here at all.
+ *
+ * Runs AFTER the frames and BEFORE `LENGTH_TOKEN`, which is the same slot, and the same reason, as
+ * the area token: a noun stripped too early would leave «בין A ל-B» with no frame left to read it.
+ */
+const LENGTH_NOUN = new RegExp(
+  String.raw`(?:ה?אורך|ה?מרחק|[Ll]ength(?:\s+of)?|[Dd]istance)\s+(?:ה?(?:קטע|צלע|ישר)\s+)?(?=[A-Z][0-9]?[A-Z][0-9]?\b)|(?:ה?(?:קטע|צלע)|[Ss]egment|[Ss]ide)\s+(?=[A-Z][0-9]?[A-Z][0-9]?\b)`,
+  'g',
+);
+
 /** One letter (with an optional index) is a POINT and can be nothing else. */
 const IS_POINT = /^[A-Z][0-9]?$/;
 
@@ -178,7 +228,9 @@ export function parseLengthExpr(src: string): LengthExpr | null {
    * settled here, from the names themselves. That is what makes «המרחק בין C ל-AB» and
    * «המרחק בין AB ל-C» the same question rather than one answer and one «לא הבנתי».
    */
-  let withPL = normalizeMath(src);
+  // The symbolic notations become the worded question first, so the frames below decide the roles
+  // for every spelling at once (#1128).
+  let withPL = SYMBOLIC_DISTANCE.reduce((s, [re, to]) => s.replace(re, to), normalizeMath(src));
   for (const f of DISTANCE_FRAMES) {
     withPL = withPL.replace(f, (_m, x: string, y: string) => {
       const push = (t: MeasureTerm, same: (u: MeasureTerm) => boolean) => {
@@ -204,7 +256,9 @@ export function parseLengthExpr(src: string): LengthExpr | null {
       );
     });
   }
-  const withAreas = withPL.replace(AREA_TOKEN, (_m, run: string) => {
+  // A length noun in front of a bare pair adds nothing to it — «אורך AB» IS «AB» (#1128).
+  const withNouns = withPL.replace(LENGTH_NOUN, '');
+  const withAreas = withNouns.replace(AREA_TOKEN, (_m, run: string) => {
     const ids = run.match(/[A-Z][0-9]?/g) ?? [];
     const key = ids.join();
     const at = terms.findIndex((t) => t.kind === 'area' && t.ids.join() === key);
