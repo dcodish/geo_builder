@@ -1417,6 +1417,30 @@ function pointText(
       .join(' או ');
   }
 
+  /**
+   * A COORDINATE THE STUDENT WROTE IS SHOWN, EVEN WHEN IT IS NOT A NUMBER (#1226).
+   *
+   * Operator, playing T32 on «A(-9a,0)» / «B(41a,0)»: *"9a and 41a are still not shown on the canvas
+   * or data panel which is wrong."*
+   *
+   * The tool holds `A.x` as `mul(neg(9), sym a)` — his own `-9a`, exactly — and `exprText` has
+   * rendered it all along. The row printed `(x_A, 0)` instead: the tool's OWN symbol substituted for
+   * the student's expression, which is worse than the dash it replaced. *"Everything the student
+   * stated is visible on the figure"* is the invariant, and `-9a` was stated.
+   *
+   * This is #1023's fix for the other object kind, in its own words: *"it states no VALUE, so
+   * ADR-AG-003 §2 is untouched — it names the dependency, which is more than the dash said and less
+   * than a number."*
+   *
+   * Only a STATED point (`kind: 'point'`) with a non-numeric coordinate. A carrier point is `free`
+   * and a midpoint is `derived`, so neither the `(x_B, x_B)` reading below nor the derived rows can
+   * be reached by this branch — measured, not assumed.
+   */
+  const stated = d.construction.objects.find((o) => o.id === id);
+  if (stated?.kind === 'point' && (stated.x.kind !== 'num' || stated.y.kind !== 'num')) {
+    return `(${exprText(stated.x)}, ${exprText(stated.y)})`;
+  }
+
   const on = d.construction.constraints.find(
     (k) => k.t === 'on-curve' && k.id === id,
   );
