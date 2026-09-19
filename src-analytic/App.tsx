@@ -647,6 +647,7 @@ export function App() {
           'bad-arity': 'errBadArity',
           'repeated-vertex': 'errRepeatedVertex',
           'degenerate-role': 'errDegenerateRole',
+          'apex-not-a-vertex': 'errApexNotAVertex',
           'crossing-already-named': 'errCrossingAlreadyNamed',
           'llm-busy': 'errLlmBusy',
           'bad-operand': 'errBadOperand',

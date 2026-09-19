@@ -327,6 +327,28 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'P is the circumcentre of triangle ABC',
     needs: ['A(0,0)', 'B(4,0)', 'C(0,3)'],
   },
+  // --- F16 · CEVIANS · the named segment from a vertex (#1165) ---
+  // Two rows, walking the two axes that the rule actually has to get right rather than four
+  // phrasings of one thing: the ROLE (median · altitude) and how the target is NAMED (by the
+  // triangle, which determines the side, or by the side outright). The reference card has to show
+  // the triangle spelling, because that is the one a student writes and the one that was
+  // «not-handled» until this issue.
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'AD תיכון במשולש ABC',
+    en: 'AD is the median in triangle ABC',
+    needs: ['A(1,3)', 'B(-4,1)', 'C(-3,8)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'AD גובה לצלע BC',
+    en: 'AD is the altitude to side BC',
+    // An ACUTE triangle, so the foot lands between B and C: the rule admits an obtuse figure too
+    // (the foot beyond an endpoint is honest), but a reference card should show the ordinary case.
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
+  },
   {
     category: 'derived',
     family: 'F16',

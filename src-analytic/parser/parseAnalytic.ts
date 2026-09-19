@@ -70,6 +70,18 @@ export type ParseFailure =
    */
   | { code: 'degenerate-role'; detail: string }
   /**
+   * A cevian named by its TRIANGLE whose apex is not one of that triangle's vertices — «XD תיכון
+   * במשולש ABC» (#1165).
+   *
+   * Its own code because the two near neighbours would both say something untrue. «ABC» has exactly
+   * three vertices, so `bad-arity`'s "a triangle has three vertices and a quadrilateral four"
+   * describes a run that is already correct. And `degenerate-role` says the apex "lies on the side
+   * itself", which it does not — `X` is not in the figure's triangle at all. What is actually
+   * missing is the apex's membership, which is the ONE thing that makes the triangle spelling
+   * determinate: remove the apex from the ring and the other two letters are the side.
+   */
+  | { code: 'apex-not-a-vertex'; detail: string }
+  /**
    * A crossing the student asked to NAME that is a point the figure already names — «P נקודת החיתוך
    * של הישר AB עם הישר BC», where `AB` and `BC` meet at `B` (#1175).
    *
@@ -1280,11 +1292,37 @@ const AREA_EN = new RegExp(
  * point, while this is an object the student named, measures, and makes the subject of the next
  * sentence. Same geometry, opposite status.
  */
+/**
+ * THE TRIANGLE IDENTIFIES THE SIDE, INSTEAD OF DECORATING IT (#1165).
+ *
+ * Operator, 2026-09-17, with a screenshot: *"we need to support things like `AD תיכון` and
+ * `AD חוצה זווית` like we do in the 2d tool."* «AD תיכון במשולש ABC» was `not-handled` here while
+ * 2-D answers the same sentence — a sibling disparity, which is the framing that makes it worth
+ * fixing rather than tail work.
+ *
+ * The side run was MANDATORY and «במשולש ABC» only an optional trailing decoration after it, so the
+ * triangle was recognised as text and could never be the thing that identifies the target. It is now
+ * an ALTERNATIVE: a cevian starts at a named vertex, so apex `A` plus triangle `ABC` determines the
+ * opposite side `BC` with no ambiguity, and the existing lowering is reused unchanged.
+ *
+ * Determined from the SENTENCE, never from the figure — this parser is context-free by design, and
+ * the two forms here name everything they need. The spellings that name no target at all
+ * («AD גובה», «גובה מנקודה A») genuinely require the figure and are #1240, not this.
+ *
+ * The maqaf is admitted with it (#1222): «AD תיכון ל-BC» failed only because the rule had no `-`
+ * allowance before a Latin run, while the tool relies on that convention itself elsewhere.
+ */
+const CEVIAN_ROLE_HE = 'תיכון|גובה';
+/** Either the side named outright, or the triangle that determines it. Groups: side u, side v, triangle run. */
+const CEVIAN_TARGET_HE =
+  `(?:(?:ל|אל\\s+ה?)?-?\\s*(?:ה?צלע\\s+)?(${NAME})(${NAME})(?:\\s+ב?ה?משולש\\s+${NAME_RUN})?|ב?ה?משולש\\s+(${NAME_RUN}))`;
 const CEVIAN_HE = new RegExp(
-  `^${HE_GIVEN}(${NAME})(${NAME})${HE_IS}\\s*(?:ה?)(תיכון|גובה)\\s+(?:ל|אל\\s+ה?)?(?:ה?צלע\\s+)?(${NAME})(${NAME})(?:\\s+ב?ה?משולש\\s+${NAME_RUN})?$`,
+  `^${HE_GIVEN}(${NAME})(${NAME})${HE_IS}\\s*(?:ה?)(${CEVIAN_ROLE_HE})\\s*${CEVIAN_TARGET_HE}$`,
 );
+const CEVIAN_TARGET_EN =
+  `(?:to\\s+(?:side\\s+)?(${NAME})(${NAME})(?:\\s+in\\s+triangle\\s+${NAME_RUN})?|in\\s+triangle\\s+(${NAME_RUN}))`;
 const CEVIAN_EN = new RegExp(
-  `^(${NAME})(${NAME})\\s+is\\s+(?:the\\s+)?(median|altitude)\\s+to\\s+(?:side\\s+)?(${NAME})(${NAME})(?:\\s+in\\s+triangle\\s+${NAME_RUN})?$`,
+  `^(${NAME})(${NAME})\\s+is\\s+(?:the\\s+)?(median|altitude)\\s+${CEVIAN_TARGET_EN}$`,
   'i',
 );
 
@@ -1744,8 +1782,28 @@ function parseConstraint(raw: string): RuleOutcome {
 
   const cev = CEVIAN_HE.exec(line) ?? CEVIAN_EN.exec(line);
   if (cev) {
-    const [, apex, foot, roleSrc, u, v] = cev;
+    const [, apex, foot, roleSrc, u0, v0, triRun] = cev;
     const median = /תיכון|median/i.test(roleSrc);
+    /**
+     * The side, from whichever form the student used (#1165).
+     *
+     * Named outright it is those two letters. Named by the TRIANGLE it is the two vertices that are
+     * not the apex — which is exactly what makes the triangle form unambiguous, and also what makes
+     * an apex outside the run meaningless: «XD תיכון במשולש ABC» leaves three candidates, so it is
+     * refused rather than guessed at (ADR-052 — never invent what the student did not state).
+     */
+    let u = u0;
+    let v = v0;
+    if (!u || !v) {
+      const ring = (triRun ?? '').match(new RegExp(NAME, 'g')) ?? [];
+      const others = ring.filter((p) => p !== apex);
+      // Two different wrongs, answered separately, because one message cannot be true of both:
+      // «במשולש ABCD» is a noun disagreeing with its own vertex count, and «XD … במשולש ABC» is a
+      // run that is a perfectly good triangle the apex simply is not part of.
+      if (ring.length !== 3) return refuse('bad-arity', line);
+      if (others.length !== 2) return refuse('apex-not-a-vertex', line);
+      [u, v] = others;
+    }
     if (u === v) return refuse('repeated-vertex', line); // «AD תיכון לצלע BB» names no side
     /**
      * THE ROLE'S OWN INCIDENCE, CHECKED (#1231).
