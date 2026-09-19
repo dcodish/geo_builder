@@ -1180,7 +1180,21 @@ export function App() {
                     ) : (
                       <MathText
                         text={analyticBidi.isolateLtrRuns(
-                          `${a.question}${a.value && a.value.includes('=') ? ':' : ' ='} ${a.value ?? t(figureIsOpen(d) ? 'askOpen' : 'askNoValue')}`,
+                          /**
+                           * A VERTICAL SLOPE IS AN ANSWER, NOT A FAILURE (#1223).
+                           *
+                           * `a.fact` is checked before the `figureIsOpen` guess, because that guess
+                           * only ever chooses between two kinds of *absence* and this is neither. It
+                           * reuses `slopeVertical` — the string the «שיפועים» section already prints
+                           * for a vertical segment — so the two surfaces cannot come to disagree
+                           * about what a vertical thing's slope is.
+                           */
+                          `${a.question}${a.value && a.value.includes('=') ? ':' : ' ='} ${
+                            a.value ??
+                            (a.fact === 'vertical'
+                              ? t('slopeVertical')
+                              : t(figureIsOpen(d) ? 'askOpen' : 'askNoValue'))
+                          }`,
                         )}
                       />
                     )}

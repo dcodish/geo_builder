@@ -53,6 +53,23 @@ export interface Answer {
    */
   missing?: { name: string; kind: 'point' | 'curve' };
   /**
+   * THE FIGURE DETERMINES THE ANSWER, AND THE ANSWER IS THAT THERE IS NONE (#1223).
+   *
+   * A fourth outcome, and the one `null` was quietly carrying. `value: null` means *the figure does
+   * not fix this*, and the component picks its wording from `figureIsOpen` — so on a DETERMINED
+   * figure a vertical slope was reported as «לא ניתן לחשב מהנתונים», telling the student their own
+   * givens were insufficient when they were complete.
+   *
+   * Operator, 2026-09-19: *"when i ask for שיפוע PB it says it cannot be claculated which is wrong.
+   * its just that the slope is not defined"* — with a screenshot whose panel read
+   * «הכול נקבע על-ידי הנתונים» four rows above it.
+   *
+   * A TOKEN, not a sentence, for the reason ADR-AG-085 gives: this module is the lane's engine and
+   * holds no locale. `vertical` is the only member today; the field exists so the next fact-shaped
+   * answer joins it rather than collapsing into `null` again (#1227 is already queued behind it).
+   */
+  fact?: 'vertical';
+  /**
    * HOW THE ANSWER WAS REACHED (#1053) — the formula with this figure's values substituted.
    *
    * Operator: *"we don't just show the result — we show what to use to get to this result"*, at the
@@ -154,8 +171,14 @@ export function ask(d: Derivation, question: string, fmt: (v: number) => string)
     const name = sl[1].trim();
     const line = lineNamed(d.figure, name);
     if (!line) return { question, value: null, missing: { name, kind: 'curve' } };
-    // A vertical line HAS no slope, and that is an answer about the figure rather than a failure.
-    if (Math.abs(line.b) < 1e-12) return { question, value: null };
+    /**
+     * A vertical line HAS no slope, and that is an answer about the figure rather than a failure.
+     *
+     * The comment said exactly this before #1223 and the return contradicted it: `value: null` is the
+     * failure channel, so the row read «לא ניתן לחשב מהנתונים» — *your givens are insufficient* — on a
+     * figure where every point is fixed. `fact: 'vertical'` is the outcome the sentence always meant.
+     */
+    if (Math.abs(line.b) < 1e-12) return { question, value: null, fact: 'vertical' };
     const k = isKnowledge(d.construction, (f) => {
       const l = lineNamed(f, name);
       return l && Math.abs(l.b) > 1e-12 ? -l.a / l.b : null;
