@@ -125,6 +125,11 @@ const he = {
   errBadArity:
     'מספר הקודקודים אינו מתאים לשם הצורה במשפט "{{detail}}" — במשולש שלושה קודקודים ובמרובע ארבעה.',
   errRepeatedVertex: 'באותו משפט אותה אות מופיעה יותר מפעם אחת: "{{detail}}". לכל קודקוד צריך שם משלו.',
+  // #1231 — names the STATEMENT and the reason, never internal state, and shows what a correct
+  // sentence looks like: a median or an altitude runs from a vertex to the side facing it.
+  errDegenerateRole:
+    'תיכון וגובה יוצאים מקודקוד אל הצלע שמולו, ובמשפט "{{detail}}" הקודקוד עצמו נמצא על הצלע הזאת ' +
+    '(או שהוא גם הקודקוד וגם הרגל). אפשר לכתוב למשל "AD תיכון לצלע BC".',
   errBadOperand:
     'הבנתי את היחס במשפט "{{detail}}", אבל לא זיהיתי את אחד האגפים. אפשר לציין שני קודקודים (AB), ' +
     'צלע (הצלע AB), ישר (הישר l1) או ציר (ציר ה-x).',
@@ -280,6 +285,10 @@ const en: typeof he = {
     'vertices and a quadrilateral four.',
   errRepeatedVertex:
     'The same letter appears more than once in "{{detail}}". Each vertex needs its own name.',
+  errDegenerateRole:
+    'A median or an altitude runs from a vertex to the side OPPOSITE it, and in "{{detail}}" that ' +
+    'vertex lies on the side itself (or is its own foot). Write it as, for example, ' +
+    '"AD is the median to side BC".',
   errBadOperand:
     'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +
     'a side (side AB), a line (line l1) or an axis (the x-axis).',

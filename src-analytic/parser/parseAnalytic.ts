@@ -60,6 +60,16 @@ export type ParseFailure =
   /** One label used for two vertices of the same figure — «משולש ABA» (#1042). */
   | { code: 'repeated-vertex'; detail: string }
   /**
+   * A sentence that names a construct by the ROLE one point plays relative to an object, whose own
+   * letters contradict the incidence that role requires — «BD תיכון לצלע AB» (#1231).
+   *
+   * Its OWN code, and not `repeated-vertex`: nothing repeats inside a run here. «AB» is a perfectly
+   * good side and «BD» a perfectly good segment; what is wrong is the RELATION between them — a
+   * median runs from a vertex to the OPPOSITE side, and `B` is an endpoint of `AB`. Telling the
+   * student "the same letter appears twice" would send them to fix a run that is already correct.
+   */
+  | { code: 'degenerate-role'; detail: string }
+  /**
    * A relation whose VERB was understood and whose operand was not — «DE מקביל לפיל» (#1052).
    *
    * Its own code because the student got the sentence shape right: telling them "I did not
@@ -1631,6 +1641,28 @@ function parseConstraint(raw: string): RuleOutcome {
     const [, apex, foot, roleSrc, u, v] = cev;
     const median = /תיכון|median/i.test(roleSrc);
     if (u === v) return refuse('repeated-vertex', line); // «AD תיכון לצלע BB» names no side
+    /**
+     * THE ROLE'S OWN INCIDENCE, CHECKED (#1231).
+     *
+     * The rule used to validate only the SIDE's internal well-formedness (`u === v`) and then emit
+     * unconditionally — it checked the letters of one operand and never the relation between the two,
+     * which is the part «תיכון»/«גובה» actually asserts. So «BD תיכון לצלע AB» was accepted and drawn:
+     * measured, `|BD|` was exactly `|AB|/2` at every seed, with `faults: []` — the segment the tool
+     * drew as a median was the second half of the side it was supposedly drawn to, and the tool
+     * asserted the figure was correct.
+     *
+     * Stated as the DEFINITION rather than as the three observed failures: a cevian runs apex → foot,
+     * the foot lies on side (u,v), the apex does NOT, and the apex is not the foot itself. `foot ∈ side`
+     * is refused here rather than left to the solver's `unsatisfiable`, because parse time is where the
+     * message can name the student's statement instead of reporting an unsatisfiable system.
+     *
+     * A refusal, never `null`: `null` routes a sentence this rule clearly matched to the LLM seam,
+     * which #1039/#1042 ruled against in this tree — a rule that matched owes the student an answer.
+     * This is the one place the analytic tree deliberately does NOT copy 2-D, whose median gate
+     * escalates (see the 2-D sibling, #1233).
+     */
+    if (apex === u || apex === v || apex === foot || foot === u || foot === v)
+      return refuse('degenerate-role', line);
     return made([
       // The sentence NAMES the foot — «AD תיכון לצלע BC» is where `D` first appears — so it is
       // declared here. Without this the segment below would refuse it as an unknown reference, which
