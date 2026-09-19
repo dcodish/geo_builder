@@ -5938,3 +5938,74 @@ The ruling's own table, driven end to end through `derive`: each noun's extent, 
 `parser/parseAnalytic.ts` (the registry, the captured noun, the extent on `CurveHit`, the carrier + segment emit), `engine/types.ts` (`inheritExtent` on the curve fact), `engine/apply.ts` (the fold's resolution + `segmentOverSameEnds`).
 
 `issue-1234-equation-extent.test.ts` (19). Analytic lane green.
+
+## ADR-AG-112 — The analytic Builder gets the LLM fallback, and the proxy routes by registry (#1251)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — an unrecognised sentence is escalated rather than refused outright; the tool's promise now matches 2-D's and 3-D's. **Design:** [04c](04c-design-analytic.md) — the fallback seam; [28](28-shared-chrome.md) — the proxy's per-tool routing. **LADDER stage:** after the deterministic parse, before the refusal is shown. No engine, solver or render change.
+
+**Operator ruling, 2026-09-19**, playing round #1244 (T19 asked whether this tool had an LLM connection):
+
+> *"we should have an llm fallback like we have in 2d and 3d. this is true to all tools"*
+
+Scoped by him to analytic first: *"lets do this for the analytics for now"*.
+
+### What was missing, measured
+
+| tree | client wiring | LLM fallback |
+| --- | --- | --- |
+| `src/` (2-D) | `src/parser/llm.ts` | yes |
+| `src3d/` | wired | yes |
+| `src-analytic/` | **no `fetch`, no network path of any kind** | **no** |
+
+`parseLine`'s `not-handled` mapped straight to `errNotHandled` and rendered. The `ParseFailure` type calls that code *"the LLM-escalation seam"*, but the name described its role in the **other** trees; here there was nothing behind it.
+
+**That cost more here than the same gap costs elsewhere.** In 2-D an unrecognised sentence gets a second chance, so a grammar hole costs a paid call and usually still works. In analytic every hole was a hard wall and every refusal was the student's final answer — which is why the open grammar-coverage issues (#1128, #1222, #1165, #1240) and the refusal-quality ones (#1246) are all worth more in this tree than their labels suggest.
+
+### The model never emits facts
+
+It normalises freeform into the **canonical command lines of `COMMAND_CATALOG_ANALYTIC`**, and every line is put back through `decideSubmit` — the same gate a student's typing meets, parser and fold included.
+
+**That is the whole safety argument, and it is structural rather than a matter of prompt discipline.** A hallucinated line is refused exactly as a typo is; the model has no privileged route into the engine and cannot commit a figure the fold rejects. It is the `llmShared.ts` / `llmShared3.ts` pattern, third instance, and it is why adding a fallback here does not widen what the tool can be made to draw.
+
+**All-or-nothing:** if any returned line is refused, nothing is recorded. A partial construction is the honesty failure this repo treats as cardinal — the student asked for one figure and would silently get part of one, with no indication which part went missing. `already-known` / `already-follows` are not refusals: a model restating something true has produced a valid line that adds nothing, and the rest still stand.
+
+**The seam is `not-handled` ONLY.** Every other refusal is an *owned* answer — a degenerate role, a reserved coordinate, a name clash — where the tool understood the student and disagreed. Handing those to a model would replace a correct explanation with a guess, so they never escalate.
+
+### The proxy's ternary becomes a registry, and this is the load-bearing half
+
+`server/parseHandler.ts` chose its prompt with
+
+```ts
+const request = tool === '3d' ? buildLlmRequest3(utterance, context) : buildLlmRequest(utterance, context);
+```
+
+A two-way branch whose else-arm was the 2-D prompt. Correct while exactly two products called the proxy, and **silently wrong the moment a third did**: wiring this client up against it would have sent analytic sentences out with the 2-D command catalogue, and the model would have answered an analytic figure with 2-D commands. Not a refusal — a confidently wrong parse, on a paid call, looking for all the world like it had been routed.
+
+So it is a `Record<string, builder>` with **no default**, and an unregistered tool is refused with `400 unknown-tool` **before any quota is touched** (a client bug must not be able to drain the day's budget). A fourth product that forgets to register gets a refusal and falls back to its own deterministic answer — it cannot inherit a third product's grammar by omission.
+
+An absent `tool` still means 2-D, as it always has: that client does not send the field.
+
+### The prompt carries rulings, not style
+
+Four rules in it encode decisions with their own ADRs, and each is locked:
+
+- **ADR-052** — never invent an unstated value. Emit the form that leaves it open rather than a made-up number.
+- **ADR-AG-111** — the noun decides the extent: «הישר AB» is the infinite line, «הצלע AB» the segment.
+- **ADR-AG-110** — a cevian's apex may not lie on the side it is drawn to, so the model is told rather than left to produce a line the re-parse will refuse.
+- **#1245** — a point at coordinates is `A(3,5)`, never `A=(3,5)`; the latter is 2-D's spelling and this tool refuses it. A prompt teaching it would produce a refusal on the model's own advice.
+
+### No live call, anywhere
+
+`runFallback` takes its transport as an argument, so the suite never reaches the network — `docs/08` requires the fallback to be mocked, and **standing rule 2 forbids firing one without the operator**. The few-shot examples were authored by reasoning out the lines the model should emit and then **verifying every one through the real `parseLine`** (the PAR-10 contract), which is the oracle role that rule prescribes. **This ADR ships unexercised against a live model**, deliberately: the first real call is the operator's to authorise.
+
+### Locks
+
+`issue-1251-llm-fallback.test.ts` (31): every prompt example parses; at least one teaches the honest empty answer; none teaches the 2-D coordinate spelling; the four ruling-bearing rules are present; a line the deterministic parser refuses is refused here too; a *later* refused line discards the whole answer; a degenerate cevian is refused even though it parses; a throttle reports busy rather than a misunderstanding; a restatement is dropped rather than duplicated; and the accepted lines are asserted to actually build.
+
+`parse-tool-registry.test.ts` (8): every tool registered, every tool mapped to a **distinct** builder, **no fallthrough** (a `??`/`||` default or a revived ternary fails it — verified by reintroducing one), the unknown-tool refusal present and **ordered before the quota counter**. The locks read the handler with **comments stripped**, because the registry's own docblock quotes the ternary it forbids and a naive scan matched the documentation.
+
+### Consequences
+
+New: `parser/llmSharedAnalytic.ts` (prompt + request builder), `parser/llmAnalytic.ts` (transport), `app/fallback.ts` (the decision, pure and injectable). Changed: `server/parseHandler.ts` (registry + validation), `App.tsx` (the seam, the spinner), `store/useAnalyticStore.ts` + `i18n/index.ts` (the `llm-busy` key, both locales).
+
+**Not done here:** the complex Builder, which has the same gap. The operator scoped this to analytic; #1251 keeps the complex arm open, and it is now a smaller job — the registry work is shared and only its prompt and client remain.
