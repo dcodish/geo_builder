@@ -38,9 +38,31 @@ describe('#1088 — the segmentation was always right', () => {
 });
 
 describe('#1088 — every seam the siblings pass, this panel passes', () => {
-  /** `<prop>={…analyticBidi.<fn>…}` — the wiring, not its whitespace. */
-  const passes = (prop: string, fn: string) =>
-    new RegExp(`${prop}=\{[^}]*analyticBidi\.${fn}`).test(APP);
+  /**
+   * The full `<prop>={…}` expression, brace-matched.
+   *
+   * This read `\{[^}]*` until #1215, which stopped at the FIRST `}` — so the moment a seam's
+   * expression contained nested JSX (`hasMath(s) ? <MathText text={s} /> : …`) the lock went red on a
+   * change that kept the wiring it exists to protect. A matcher that cannot survive a legitimate edit
+   * to the thing it guards will be deleted by whoever hits it next, so it counts braces instead.
+   */
+  const propValue = (prop: string): string => {
+    const at = APP.indexOf(`${prop}={`);
+    if (at < 0) return '';
+    let depth = 0;
+    const from = at + prop.length + 1;
+    for (let i = from; i < APP.length; i += 1) {
+      if (APP[i] === '{') depth += 1;
+      else if (APP[i] === '}') {
+        depth -= 1;
+        if (depth === 0) return APP.slice(from, i + 1);
+      }
+    }
+    return '';
+  };
+
+  /** `<prop>={…analyticBidi.<fn>…}` — the wiring, not its whitespace and not its shape. */
+  const passes = (prop: string, fn: string) => propValue(prop).includes(`analyticBidi.${fn}`);
 
   it('the quick strip renders the display form (the reported defect)', () => {
     expect(passes('quickDisplay', 'isolateLtrRuns')).toBe(true);

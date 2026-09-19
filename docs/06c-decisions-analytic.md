@@ -5204,3 +5204,45 @@ The tooltip names no kind, so it needs no fourth string and cannot reintroduce t
 ### The operator's own example cannot happen yet
 
 «נתוני הישר» will not appear: a line returns no `details` and renders no disclosure (ADR-AG-097, asserted at T23). The three kinds that fold are circle, parabola and ellipse. [#1219](https://github.com/dcodish/geo_builder/issues/1219) would give a line a fold, and the table gains its fourth entry then — which is why the lock is written against `curveParts` rather than a hardcoded three.
+## ADR-AG-100 — The input preview typesets what it previews, and isolates before it does (#1215)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown (the #1097/#1208 rule), extended to the input preview; no new row. **Design:** [04c](04c-design-analytic.md) — the input area's preview seam. **LADDER stage:** display only.
+
+**Operator, 2026-09-19**, typing «מעגל (x-3)^2+(y-5)^2=25»: *"note the text below the textbox isnt mathml"*.
+
+```
+the BOX        2+(y-5)^2=25^(x-3) מעגל       reordered by bidi while typing
+the PREVIEW    מעגל (x-3)^2+(y-5)^2=25       right order, raw ^2      ← the report
+the FACT ROW   מעגל (x - 3)² + (y - 5)² = 25 right order, typeset
+```
+
+### Nothing needed building — one product had not reached for a shared thing
+
+`InputArea`'s `preview` prop takes a **ReactNode**, and its own comment says *"2-D's maths renderer rides the same prop at its adoption"*:
+
+```
+src/App.tsx      preview={(s) => (hasMath(s) ? <MathText text={s} /> : inputPreview(s))}    adopted
+src-analytic     preview={(s) => analyticBidi.inputPreview(s)}                              not
+src3d, complex   the same gap — separate products, separate issues
+```
+
+`hasMath` and `MathText` have been in `shell/math.tsx` the whole time, in the tree where equations are the entire subject.
+
+### The order is the decision, and it was found by LOOKING
+
+The obvious adoption — hand the raw string to `MathText` — typesets perfectly and lays it out **backwards**. `MathText` emits several `<math>` islands with text between them, and in an RTL paragraph that sequence runs right-to-left, so the preview drew with `=25` at the far LEFT: the exact defect the preview exists to prevent, reintroduced by its own fix.
+
+Driven in a browser and measured by the islands' x-positions:
+
+```
+raw string        left-to-right:  [(y-5)², (x-3)²]      backwards
+isolated first    left-to-right:  [(x-3)², (y-5)²]      correct — «מעגל» rightmost, equation LTR to its left
+```
+
+So: **isolate, then typeset** — the order the answer rows already use (#1097). A unit test cannot hold this (jsdom does no bidi layout), so the lock holds the *cause* — that `isolateLtrRuns` is still applied on this path — and the ADR records the measurement, as ADR-AG-096 did for the same reason.
+
+The bidi previewer stays as the fallback and is not the lesser path: `hasMath` is false until an exponent or fraction completes, so every early keystroke takes it exactly as before, and no half-formed formula is ever half-typeset (ADR-W-060).
+
+### A brittle lock, widened rather than deleted
+
+`bidi-wiring.test.ts` matched a seam with `\{[^}]*`, which stops at the FIRST `}` — so the moment the expression contained nested JSX (`<MathText text={s} />`) it went red on a change that kept the wiring it guards. A matcher that cannot survive a legitimate edit to the thing it protects will be deleted by whoever hits it next, so it counts braces now. The rule it encodes was right and is untouched.
