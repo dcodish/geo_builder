@@ -71,6 +71,14 @@ export type InputError =
   | { key: 'repeated-vertex'; detail: string }
   /** A cevian whose apex lies on the side it is drawn to, or is its own foot (#1231). */
   | { key: 'degenerate-role'; detail: string }
+  /**
+   * The LLM fallback was THROTTLED, not confused (#1251) — a per-IP or daily cap.
+   *
+   * Its own key because it is not a statement about the student's sentence at all: telling them the
+   * tool did not understand, when the tool never got to look, is the wrong thing in the one place
+   * they find out what happened.
+   */
+  | { key: 'llm-busy'; detail: string }
   /** A relation whose verb was understood and whose operand was not (#1052). */
   | { key: 'bad-operand'; detail: string }
   /** The statement contradicts what an earlier statement already fixed. */

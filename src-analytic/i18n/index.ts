@@ -130,6 +130,11 @@ const he = {
   errDegenerateRole:
     'תיכון וגובה יוצאים מקודקוד אל הצלע שמולו, ובמשפט "{{detail}}" הקודקוד עצמו נמצא על הצלע הזאת ' +
     '(או שהוא גם הקודקוד וגם הרגל). אפשר לכתוב למשל "AD תיכון לצלע BC".',
+  // #1251 — a THROTTLE is not a misunderstanding. The student is told the service is busy, never
+  // that their sentence was wrong: the tool did not get as far as looking at it.
+  errLlmBusy:
+    'השירות עמוס כרגע ולא הצלחתי לבדוק את המשפט "{{detail}}". אפשר לנסות שוב בעוד רגע, או לנסח אותו באחת הצורות שמופיעות ברשימת הפקודות.',
+  thinking: 'חושב…',
   errBadOperand:
     'הבנתי את היחס במשפט "{{detail}}", אבל לא זיהיתי את אחד האגפים. אפשר לציין שני קודקודים (AB), ' +
     'צלע (הצלע AB), ישר (הישר l1) או ציר (ציר ה-x).',
@@ -289,6 +294,9 @@ const en: typeof he = {
     'A median or an altitude runs from a vertex to the side OPPOSITE it, and in "{{detail}}" that ' +
     'vertex lies on the side itself (or is its own foot). Write it as, for example, ' +
     '"AD is the median to side BC".',
+  errLlmBusy:
+    'The service is busy, so I could not check "{{detail}}". Try again in a moment, or write it in one of the forms listed in the commands panel.',
+  thinking: 'Thinking…',
   errBadOperand:
     'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +
     'a side (side AB), a line (line l1) or an axis (the x-axis).',

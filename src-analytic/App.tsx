@@ -29,6 +29,8 @@ import { color, fs } from '../shell/theme';
 import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
 import { decideSubmit } from './app/submit';
+import { runFallback } from './app/fallback';
+import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
 import { domainText, positionalOf } from './engine/types';
 import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
 import { exprText } from './engine/expr';
@@ -156,6 +158,8 @@ export function App() {
   const canUndo = useStore(useAnalyticStore.temporal, (t) => t.pastStates.length > 0);
   const canRedo = useStore(useAnalyticStore.temporal, (t) => t.futureStates.length > 0);
   const [draft, setDraft] = useState('');
+  /** #1251 — the LLM fallback is in flight. Owns only the spinner; the decision lives in app/fallback.ts. */
+  const [thinking, setThinking] = useState(false);
 
   /**
    * SAVE and LOAD (#1087) — the shared envelope, the shared naming, the sibling’s own order.
@@ -516,6 +520,17 @@ export function App() {
       case 'ignored':
         return;
       case 'refused':
+        /**
+         * THE LLM SEAM (#1251). `not-handled` means no rule matched — the one code that means "I do
+         * not know this sentence" rather than "this sentence is wrong". Every other refusal is an
+         * OWNED answer (a degenerate role, a reserved coordinate, a name clash) and must stand: the
+         * tool understood the student and disagreed, and handing that to a model would replace a
+         * correct explanation with a guess.
+         */
+        if (verdict.error.key === 'not-handled') {
+          void tryFallback(raw, verdict.error);
+          return;
+        }
         setError(verdict.error);
         return;
       case 'already-known':
@@ -530,6 +545,40 @@ export function App() {
         recordLine(verdict.line);
         setDraft('');
         return;
+    }
+  };
+
+  /**
+   * Ask the proxy to normalise a sentence this tool did not recognise (#1251).
+   *
+   * Everything the model returns goes back through `decideSubmit` inside `runFallback`, so this
+   * function decides nothing about geometry — it owns the SPINNER and the MESSAGE, and nothing else.
+   * On any outcome but a clean set of lines the student keeps the original refusal, because that
+   * refusal is about words they actually wrote.
+   */
+  const tryFallback = async (raw: string, original: InputError) => {
+    setThinking(true);
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS_ANALYTIC);
+    try {
+      const out = await runFallback(raw, lines, seed, (utterance, context) =>
+        llmParseAnalytic(utterance, context, { signal: ctl.signal }),
+      );
+      if (out.kind === 'lines') {
+        for (const l of out.lines) recordLine(l);
+        setDraft('');
+        return;
+      }
+      if (out.kind === 'busy') {
+        setError({ key: 'llm-busy', detail: raw });
+        return;
+      }
+      // 'none' and 'rejected' alike: the student keeps the refusal about their own sentence. Naming
+      // the model's rejected line would report internal state for words they never typed.
+      setError(original);
+    } finally {
+      clearTimeout(timer);
+      setThinking(false);
     }
   };
 
@@ -597,6 +646,7 @@ export function App() {
           'bad-arity': 'errBadArity',
           'repeated-vertex': 'errRepeatedVertex',
           'degenerate-role': 'errDegenerateRole',
+          'llm-busy': 'errLlmBusy',
           'bad-operand': 'errBadOperand',
           'conflicting-restatement': 'errConflict',
           'name-kind-clash': 'errNameClash',
@@ -718,6 +768,9 @@ export function App() {
               onSubmit={() => submit(draft)}
               placeholder={t('inputPlaceholder')}
               submitLabel={t('add')}
+              /* #1251 — the fallback is a network round-trip; the student sees it working. */
+              busy={thinking}
+              busyLabel={t('thinking')}
               symbols={SYMBOLS}
               /*
                 NO compact chip strip above the input (#1105).
