@@ -9999,6 +9999,66 @@ const normalizeWordEquality = (s: string): string =>
     .replace(new RegExp(String.raw`\b(?:is|are)\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:the\s+)?(?:angle|∠|∢|arcs?|⌢)\s*${LABEL})`, 'gi'), '= ');
 
 /**
+ * A trailing UNIT word is not part of the value (#1157).
+ *
+ * «BC = 10 יחידות» — an ordinary student line — was `not-handled`, while «זווית ABC = 40 מעלות» and
+ * «רדיוס המעגל O הוא 5 ס"מ» both worked: the angle lane and the radius lane had each grown their own
+ * unit tolerance and the LENGTH lane had none. That is the same per-lane enumeration ADR-498 named,
+ * one level down. Stripped HERE, at the one boundary every rule reads, so a unit costs nothing in any
+ * construct instead of each lane paying for it separately.
+ *
+ * Requires a DIGIT before it and a word boundary after, so a unit can never be taken out of a label
+ * run or the middle of a Hebrew word. «מעלות» is deliberately absent — a degree is a unit the angle
+ * rules read as meaning, not noise.
+ */
+const VALUE_UNIT = String.raw`(?:יחידות|יחידה|יח['׳]|ס"?מ|מ"?מ|מטרים|מטר|cm|mm|units?)`;
+const VALUE_UNIT_RX = new RegExp(String.raw`(?<=\d)\s*${VALUE_UNIT}(?![א-תA-Za-z])`, 'gi');
+const stripValueUnits = (s: string): string => s.replace(VALUE_UNIT_RX, '');
+
+/**
+ * THE COPULA IS NOT PART OF THE LENGTH VALUE'S VOCABULARY (#1157) — the length twin of
+ * [ADR-498](../../docs/06-decisions.md)'s `angleValueOf`, and the same defect one construct over.
+ *
+ * The verbose frame «אורך/הצלע/הקטע <seg> … <value>» located its value by a list of copulas —
+ * «הוא», «היא», «שווה», «שווה ל» — so «אורך הקטע BC = 10» (an explicit `=` and a bare number) emitted
+ * the segment and DROPPED the 10, as did the juxtaposed «אורך הקטע BC 10». ADR-498's own words apply
+ * verbatim: *any enumeration is a list that is already incomplete against its sibling — the seventh
+ * spelling reopens the hole exactly as the sixth did.* Adding `=` to the alternation is that seventh
+ * spelling, and standing rule 1 forbids it.
+ *
+ * So the value is found by POSITION. Whatever sits between the segment and its value is CONNECTIVE,
+ * defined by what it is NOT: a run carrying no operand of its own — no digit, no Latin letter, no
+ * value glyph — which is all a copula, an `=`, a maqaf or punctuation can be. The connective
+ * therefore cannot cross another operand, so the rewrite stays local and a compound line
+ * («אורך הקטע BC = 10, AB = 5») is still split by `multiStatement` exactly as before.
+ *
+ * ONE GUARD, and it is the one ADR-498 says is load-bearing: **a connective that carries a RELATION
+ * is not a connective** — it is the statement's operator, and the number after it is a BOUND or a
+ * RATIO, never the length itself (ADR-390; ADR-498's "a symbolic bound would have been stolen"). So
+ * «אורך הקטע BC גדול מ-10» and «הצלע BC גדולה פי 2 מ-AB» are left untouched for the bound and ratio
+ * rules, instead of being rewritten into a silently WRONG «BC = 10» / «BC = 2».
+ *
+ * The guard is applied to the CONNECTIVE, not to the whole line, and this is deliberate. A whole-line
+ * test was tried first and is wrong twice over: it MISSES «גדולה פי 2» (the comparative and the number
+ * are not adjacent, so `COMPARES_WITH_NUMBER` does not fire) and it over-refuses a compound line whose
+ * OTHER statement happens to carry a comparison («אורך הקטע BC = 10, AB > 5»). The relation that
+ * matters is the one standing between this segment and this value. Built from the comparison
+ * vocabulary the bound rules already own — not a second copy of it.
+ */
+const LENGTH_NOUN = String.raw`(?:אורך|הצלע|הקטע)`;
+const LENGTH_CONNECTIVE = String.raw`[^A-Za-z0-9√()]*`;
+const VERBOSE_LENGTH = new RegExp(
+  String.raw`${LENGTH_NOUN}\s+(${LABEL}\s*${LABEL})(${LENGTH_CONNECTIVE})(?=[√\d(])`,
+  'g',
+);
+/** «פי»/"times" joins the comparison words here: a RATIO is as much a relation as a bound, and it is
+ *  the member `COMPARES_WITH_NUMBER` cannot see (its comparative and its number are not adjacent). */
+const LENGTH_RELATION = new RegExp(String.raw`${CMP_BIG}|${CMP_SMALL}|פי(?![א-ת])|\btimes\b|יחס`, 'i');
+const normalizeVerboseLength = (s: string): string =>
+  s.replace(VERBOSE_LENGTH, (m: string, seg: string, conn: string) => (LENGTH_RELATION.test(conn) ? m : `${seg} = `));
+
+
+/**
  * The vocabulary for "a shape declared WITH its side length" — «ריבוע ABCD שצלעו הוא 1» /
  * "square ABCD whose side is 1" (#185 row 7, the ADR-228 size-given seam).
  *
@@ -10085,17 +10145,17 @@ export function normalizeUtterance(raw: string): string {
     // (a non-Hebrew character on each side) and to sit where a connective sits: before a hyphen, or
     // between two uppercase labels.
     .replace(/(?<![א-ת])ן(?=-)/g, 'ו')
-    .replace(/(?<=[A-Z]\d?\s)ן(?=\s*[A-Z])/g, 'ו')
-    // Verbose length frame "אורך/הצלע/הקטע <seg> הוא/היא/שווה <value>" → "<seg> = <value>" (issue #105), so
-    // the existing length rules handle the wordy phrasing. Requires a VALUE (√/digit/"(") after the copula,
-    // so the ratio form "הצלע BC גדולה פי 2 …" (no copula, a comparative) is left to `ratioConstraint`.
-    .replace(/(?:אורך|הצלע|הקטע)\s+([A-Za-z]\d*\s*[A-Za-z]\d*)\s+(?:הוא|היא|שווה(?:\s*ל-?)?)\s+(?=[√\d(])/g, '$1 = ');
+    .replace(/(?<=[A-Z]\d?\s)ן(?=\s*[A-Z])/g, 'ו');
   // #185: number words before a degree word → digits, THEN the angle/arc word-equality → `=` (its value
   // lookahead needs the digits), THEN the shape-with-side appositive rewrite. All three are scoped (a
   // degree suffix / an angle-arc operand / an equilateral-sided shape), so nothing else is touched.
   // #591: `normalizeShapeSide` used to wrap this — the side clause is now read at the shape macro
   // (`statedSideLength`), where the ring's ids exist, so no rewrite happens at the utterance boundary.
-  const words = normalizeWordEquality(normalizeWordDegrees(orth));
+  // #1157 (ADR-524) — the verbose length frame is read POSITIONALLY, after the unit tolerance its
+  // sibling lanes already had. Both run on the fully-orthographic text, so every value-bearing rule
+  // downstream sees one shape.
+  const lengths = normalizeVerboseLength(stripValueUnits(orth));
+  const words = normalizeWordEquality(normalizeWordDegrees(lengths));
   return normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(words.trim().replace(/\s+/g, ' ')))));
 }
 
