@@ -6067,3 +6067,53 @@ A second flag (`drawn` beside `listed`) was considered and **rejected**: it woul
 ### Consequences
 
 `app/panelRows.ts` (new — the decision and its docblock), `App.tsx` (calls it).
+## ADR-AG-115 — A described position is named by the point that occupies it, never by an invented letter (#1167)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — what the panel promises about the letters it prints: every letter it shows names something the student created. **Design:** [04c](04c-design-analytic.md) — the description layer asks the figure who is there. **LADDER stage:** presentation. No parse, engine or solver change. **Extends** ADR-AG-021's relative-tolerance rule; sibling of #1153 / #1126.
+
+**Operator, 2026-09-17**, with a screenshot:
+
+> *"i see that we now have 2 points on the same location A and O. this should not happen. if a point that we didnt name is now on a given point, it should get the point that is already there"*
+
+The panel printed `O(0, 0), r = 4` under «עקומים» while `A = (0, 0)` sat directly above it under «נקודות». Two letters, one position, and the student had created only one of them.
+
+### There was never a point `O`
+
+Measured through the real `derive` → `buildScene` path: the figure holds four points and draws four points; `centresOf` correctly offers nothing; `freeLetter` returns `Q`. **`O` was a string literal in the description function** — and so were `F`, `F₁` and `F₂`, in the same `switch`. A figure holding a real point `F` and a parabola printed two different `F`s in one panel.
+
+Fixing the circle branch alone would have been the patch shape: the defect is *the description layer names positions with invented letters*, and it had four instances.
+
+### The rule
+
+**A described position is named by the point that occupies it, and by nothing otherwise.**
+
+```
+circle centred where A sits      ->  A(0, 0), r = 4
+circle centred where nobody sits ->   (0, 0), r = 4          <- no letter, not a new one
+parabola, no point at the focus  ->   (27/2, 0), x = -27/2
+parabola with the student's F    ->  F(27/2, 0), x = -27/2
+```
+
+Falling back to an invented letter when nobody is there would be the defect with a different spelling, so the coordinates stand alone.
+
+### The occupancy question is EXTRACTED, not copied
+
+`centresOf` has asked *"is a point already here?"* since #1024, to avoid offering a ring where one sits — with a tolerance **relative to the figure** (`apart`), which is ADR-AG-021's rule and what #1113 installed. The description layer never asked at all.
+
+`pointAt(figure, x, y)` is now that one question, and `centresOf` calls it too. The alternative — a second `Math.hypot` test beside the first — is what the issue's own plan warned against: two ideas of "near" that drift the moment the tolerance changes, and an absolute epsilon in the copy would quietly undo the relative discipline. The panel and the centre ring can no longer disagree about whether a position is taken.
+
+`curveParts` takes the answer as a parameter rather than computing it, because the question needs the figure and its scale and the caller already holds both.
+
+### ⚠ Three #1212 expectations changed, and that is recorded rather than quiet
+
+`issue-1212-curve-equation.test.ts` asserted `O(3, 4)`, `F(2, 0)` and `F₁`/`F₂` — **the invented letters that are the defect**. They call `curveParts` with no figure, so nobody occupies anything and the coordinates now stand alone, which is the correct answer for a bare call rather than a loss of coverage.
+
+Every assertion on the **equation** — what that file exists to guard — is untouched. Changing a test to make one's own code pass is the tripwire this repo names; changing one that encoded the bug is a different act, and the difference is only visible when it is written down.
+
+### Lock
+
+`issue-1167-panel-names.test.ts`: the operator's own figure asserting `A(0, 0), r = 4`; a circle centred where no point sits asserting **no letter at all**; a parabola with and without a real `F` at its focus, asserting the student's letter is used and never invented; and `centresOf` asserted to still decline a taken centre, since both now depend on the one extracted predicate.
+
+### Consequences
+
+`engine/crossings.ts` (`pointAt` extracted, `centresOf` calls it), `app/curveText.ts` (the four sites ask instead of inventing), `App.tsx` (supplies the figure's answer).

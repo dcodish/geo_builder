@@ -51,7 +51,7 @@ import { ask, figureIsOpen, type Answer } from './app/ask';
 import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
 import { anotherConfiguration, seedShowing } from './app/another';
-import { centresOf, crossingSentence, crossingsOf, freeLetter } from './engine/crossings';
+import { centresOf, crossingSentence, crossingsOf, freeLetter, pointAt } from './engine/crossings';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
 
 declare const __BUILD__: string;
@@ -1187,7 +1187,9 @@ export function App() {
                    *
                    * A line has no `details` and so gets no disclosure at all — its row is untouched.
                    */
-                  const parts = known ? curveParts(known) : null;
+                  // #1167 — the panel asks WHO occupies a described position instead of inventing a
+                  // letter for it. Same function the centre ring uses, so the two cannot disagree.
+                  const parts = known ? curveParts(known, (x, y) => pointAt(d.figure, x, y)) : null;
                   return (
                     <span key={c.id}>
                       <ValueRow text={parts ? `${lead}${parts.equation}` : `${lead}${openCurveText(d, c.id)}`} />
