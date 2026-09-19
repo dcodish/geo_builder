@@ -3210,3 +3210,72 @@ The cost is accepted and named: `F(27/2, 0)` matches `EXPR` as `F(27/2`, an open
 `shell/math.tsx` is shared by 2-D, 3-D, complex and analytic, so the full suite is the gate rather than a product lane. `shell/__tests__/issue-1217-longest-match.test.ts` (8) leads with the regression guards and ends with #1208 and #1125 intact; the fixed cases sit in between.
 
 It also repairs a row this workspace shipped hours earlier: #1212's ellipse equation `x²/16 + y²/9 = 1` composes with the `²` character, which `SUP` matched as readily as `^2`, so the panel row that issue added was broken from the moment it landed.
+
+## ADR-W-063 — The leading peel takes whatever sits before the unmatched bracket (#1229)
+
+**Requirements:** [19](19-analytic-geometry-tool.md)/[02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown; no new row. **Design:** the shared renderer's span boundaries. **LADDER stage:** presentation only — `shell/math.tsx`, no product code. **Extends** [ADR-W-060](#adr-w-060) (#1208).
+
+Split out of #1217 rather than fixed inside it, and the reason is the whole decision.
+
+### The symptom
+
+```
+F(27/2, 0), x = -27/2   ->   the trailing fraction stacks; the bracketed one stays flat
+```
+
+It is the parabola's folded detail from #1212, so it is on screen today, in all four products — `shell/` is shared by construction.
+
+### Cause — a span boundary, not malformed input
+
+`EXPR` carries no comma on purpose (#1125: «m = (4-0)/(3-0), y - 0 = …» is two statements). So the span here is `F(27/2` — an opening bracket whose partner sits past the boundary, with a **non-bracket prefix in front of it**. `exprML` refuses it, correctly, and the perfectly good `27/2` goes down with it.
+
+ADR-W-060's `peelBrackets` already handles exactly this shape — *"an unmatched bracket at either EDGE is peeled off and rendered as the text it is"* — but its loop was written as
+
+```ts
+while (core.startsWith('(') && unmatched(core, '(', ')') > 0)
+```
+
+so it fired only when the span BEGAN with the bracket. Here it begins with `F`, and nothing peeled.
+
+### The decision
+
+The leading peel takes the run **up to and including** the unmatched `(`, rather than requiring the span to start with it. The `esc(lead) + ml + esc(tail)` assembly is unchanged.
+
+**The loop is still driven by bracket DEPTH**, and that is what keeps ADR-W-060's line intact:
+
+| | `\|3 - 2 / 4` | `F(27/2, 0)` |
+| --- | --- | --- |
+| the imbalance is | in the student's own text | created by the span boundary |
+| bracket depth | 0 — the loop never runs | +1 — the loop peels the prefix |
+| correct behaviour | keep it all as text | peel the prefix, render the rest |
+
+### The falsified alternative, recorded so it is not re-tried
+
+The obvious repair — *when a span fails to render, advance one character and look again* — was tried in #1217 and **turned `issue-1125-expression-math.test.ts` red on `|3 - 2 / 4`**. That bar is unmatched in the student's own text, and stepping over it typesets `2/4` beside a stray `|`: a formula the student was never given. The lock was right, and #1217 now records that a refusal consumes its whole span deliberately.
+
+A depth-driven peel cannot make that mistake, because a balanced span has nothing to peel.
+
+### Measured
+
+| span | before | after |
+| --- | ---: | ---: |
+| `F(27/2, 0), x = -27/2` | 1 fraction | **2** |
+| `F(27/2` | 0 | **1** |
+| `A(1/2, 3/4)` | 1 | **2** |
+| `\|3 - 2 / 4` | 0 | 0 |
+| `√(3 + ` | 0 | 0 |
+| `(4 - 0) / (3 - 0` | 0 | 0 |
+| `P = (14/3, 31/3)` | 2 | 2 |
+| `m = (4-0)/(3-0), y - 0 = 2x` | 1 | 1 |
+
+`A(1/2, 3/4)` was not in the report and is the same class — a named ordered pair — which is the sign the fix is at the right altitude.
+
+### The lock
+
+The three refusal rows are the ones that matter, and they are asserted alongside the three sibling suites (#1125, #1208, #1217), all of which stay green. Verified to bite: 3 of the 9 assertions fail against pristine `shell/math.tsx`.
+
+### Consequences
+
+`shell/math.tsx` — `peelBrackets`'s leading loop, four lines.
+
+`issue-1229-prefixed-bracket.test.ts` (9). Analytic and complex lanes green (both carry `shell/`).
