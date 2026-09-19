@@ -91,6 +91,43 @@ export function viewBox(figure: Box, view: CanvasView, surface?: Surface): Box {
 }
 
 /**
+ * IS THE FIGURE STILL WORTH LOOKING AT THROUGH THIS VIEW? (#1225)
+ *
+ * Operator, playing T34: *"when i put MA=5 the focus on the canvas is lost and the image is not
+ * centered. pressing the center button does the work but this should be automatic"* — the canvas
+ * showed x ≈ 12…28 while the whole figure sat at x ≈ 0…8.
+ *
+ * ADR-AG-096 states the rule — *the view belongs to the figure it was computed for* — and #1209 shut
+ * two doors, loading a file and «נקה הכל». Adding a FACT is a third: it changes the figure while the
+ * transform computed for the previous, much larger one stays applied.
+ *
+ * **Why a predicate and not an unconditional re-fit.** A student who deliberately zoomed in to inspect
+ * a vertex must not lose that on every subsequent line — that would trade this defect for a worse one,
+ * the tool overriding a deliberate gesture again and again. So a deliberate zoom survives as long as
+ * the figure is still on screen, and blank paper never survives.
+ *
+ * Measured per AXIS rather than by area, because a figure can be perfectly flat — three collinear
+ * points have zero height — and an area ratio is `0/0` there. A degenerate axis counts as visible when
+ * the figure's extent on it falls inside the view's.
+ */
+export function figureIsVisible(figure: Box, view: CanvasView, surface?: Surface, need = 0.5): boolean {
+  const shown = viewBox(figure, view, surface);
+  const axis = (fMin: number, fMax: number, sMin: number, sMax: number): number => {
+    const span = fMax - fMin;
+    const overlap = Math.min(fMax, sMax) - Math.max(fMin, sMin);
+    // A flat axis has no span to be a fraction OF: it is visible, or it is not.
+    if (span < 1e-9) return fMin >= sMin && fMax <= sMax ? 1 : 0;
+    return Math.max(0, overlap) / span;
+  };
+  return (
+    Math.min(
+      axis(figure.minX, figure.maxX, shown.minX, shown.maxX),
+      axis(figure.minY, figure.maxY, shown.minY, shown.maxY),
+    ) >= need
+  );
+}
+
+/**
  * Drag: the world point under the cursor stays under the cursor.
  *
  * `dxPx`/`dyPx` are the pointer's travel since the drag began, and `rect` the canvas's rendered size

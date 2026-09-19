@@ -21,7 +21,7 @@ import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
-import { INITIAL_VIEW, centreOf, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
+import { INITIAL_VIEW, centreOf, figureIsVisible, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import { fmtAnalytic } from './format';
 import { curveDetailsKey, curveParts } from './app/curveText';
@@ -421,6 +421,28 @@ export function App() {
   figureBoxRef.current = d.box;
   const viewRef = useRef(view);
   viewRef.current = view;
+
+  /**
+   * A FIGURE THE STUDENT BUILDS IS VISIBLE (#1225) — the third door on ADR-AG-096.
+   *
+   * Operator, playing T34: *"when i put MA=5 the focus on the canvas is lost and the image is not
+   * centered. pressing the center button does the work but this should be automatic"*.
+   *
+   * #1209 gave loading and «נקה הכל» a `showWholeFigure()`. Every other `setView` is a user gesture,
+   * so adding a FACT — which changes the figure — left the previous figure's transform applied to a
+   * new one it was never computed for. «MA = 5» collapses M from two free DOFs to a discrete pair,
+   * and the wide view computed while M roamed then showed empty paper.
+   *
+   * It runs on the BOX, not on every render: the effect fires only when the figure's extent actually
+   * changes, so a deliberate zoom is untouched for as long as the student keeps looking at the same
+   * figure. And it re-fits only when `figureIsVisible` says the figure has largely left the screen,
+   * so a zoom into a vertex survives the next line. Returning `v` unchanged is a React no-op, which
+   * is what keeps this from looping.
+   */
+  const figureBoxKey = `${d.box.minX},${d.box.minY},${d.box.maxX},${d.box.maxY}`;
+  useEffect(() => {
+    setView((v) => (figureIsVisible(figureBoxRef.current, v) ? v : INITIAL_VIEW));
+  }, [figureBoxKey]);
 
   /**
    * WHEEL TO ZOOM, about the cursor (#1094).
