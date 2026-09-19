@@ -189,6 +189,21 @@ export function hasMath(text: string): boolean {
  *
  * Peeled one layer at a time from the edges only — an unmatched bracket in the MIDDLE means the span is
  * genuinely malformed, and `exprML` still refuses it, keeping the "never half-parse a formula" rule.
+ *
+ * #1229 — THE LEADING PEEL TAKES WHATEVER SITS BEFORE THE UNMATCHED BRACKET, not only the bracket.
+ *
+ * `F(27/2, 0), x = -27/2` rendered its trailing fraction and left the bracketed one flat. A comma ends a
+ * span (#1125), so the span is `F(27/2`: an opening bracket whose partner sits past the boundary, with a
+ * non-bracket prefix in front of it. The old loop required `core.startsWith('(')`, so nothing peeled and
+ * the perfectly good `27/2` went down with the bracket.
+ *
+ * The distinction this keeps is [ADR-W-060](../docs/06w-decisions-workspace.md)'s, unchanged: an
+ * imbalance at the span's EDGE is an artefact of where the span was cut, while one in the MIDDLE is the
+ * student's own text and must stay text. The loop is still driven by the bracket DEPTH — it runs only
+ * while a bracket is genuinely unmatched — so `|3 - 2 / 4` (balanced: depth 0) still peels nothing and
+ * still renders nothing. That row is the reason this was split out of #1217 rather than fixed inside it:
+ * the obvious "advance one character and look again" repair turned it red, typesetting `2/4` beside a
+ * stray bar — a formula the student was never given.
  */
 function peelBrackets(span: string): { lead: string; core: string; tail: string } {
   let lead = '';
@@ -202,9 +217,11 @@ function peelBrackets(span: string): { lead: string; core: string; tail: string 
     }
     return depth;
   };
-  while (core.startsWith('(') && unmatched(core, '(', ')') > 0) {
-    lead += '(';
-    core = core.slice(1);
+  while (unmatched(core, '(', ')') > 0) {
+    const i = core.indexOf('(');
+    if (i < 0) break; // depth says there is one and there is not — leave the span alone
+    lead += core.slice(0, i + 1);
+    core = core.slice(i + 1);
   }
   while (core.endsWith(')') && unmatched(core, '(', ')') < 0) {
     tail = ')' + tail;
