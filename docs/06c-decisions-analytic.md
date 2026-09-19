@@ -6293,3 +6293,60 @@ The negative control is the row that matters — the refusals above are all sati
 ### Consequences
 
 `parser/parseAnalytic.ts` (the target alternation, the resolution, the new code), `parser/catalogAnalytic.ts`, `store/useAnalyticStore.ts`, `App.tsx`, `i18n/index.ts` (both locales).
+
+## ADR-AG-118 — An Arabic digit names a circle, exactly as a Roman numeral does (#1216)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R63 — which tokens name a circle, and which name its centre. **Design:** [04c](04c-design-analytic.md) — the numeral token and the two traps its separator lookahead now covers. **LADDER stage:** parse. No engine, solver or render change. **Extends** [ADR-AG-038](#adr-ag-038) / [ADR-AG-006](#adr-ag-006) (#1059).
+
+**Operator ruling, 2026-09-19:** *"I think the rule of I, II, III for circle names AND 1,2,3 are ok. so נתון מעגל 1 should be ok too. any other capital letters would become the name of the center."*
+
+### Measured, before anything changed
+
+```
+נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9   ->  not-handled
+circle 1 is (x-3)^2+(y-4)^2=9            ->  OK, curve-anond1trc2     ← the «1» silently DROPPED
+נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9   ->  OK, circle-I
+נתון מעגל O שמשוואתו (x-3)^2+(y-4)^2=9   ->  OK, anonymous curve + point O
+```
+
+The English row is the honesty one: a stated name vanished with no refusal, which is the invariant that says nothing the student stated is silently dropped.
+
+**One of the issue's three reported failures had already been fixed, hours earlier the same night.** #1216 records «נתון מעגל 1» answering `bad-equation: "1"` — quoting the circle's NAME back at the student as a bad equation. It now answers `not-handled`, because [ADR-AG-114](#adr-ag-114) (#1246, landed in this same run) stopped a noun gate claiming a tail that is not an equation. Recorded rather than quietly enjoyed: it is evidence that the claim gate reached a case nobody wrote it for.
+
+### The change is one token, and that is the finding
+
+The numeral lives in two constants and is used by four rules — Hebrew centre, Hebrew numeral, English centre, English numeral. Widening it to admit `[1-5]` **is** the feature: `circle-1` and «מעגל 1» fall out of the existing id and label construction, and not one rule learned a digit case of its own. The constants are renamed `ROMAN_LETTERS`/`ROMAN_RUN` → `CIRCLE_NUMERALS`/`CIRCLE_NUMERAL_RUN`, because "ROMAN" stopped being true of the thing and a name that lies is how the next reader adds a digit case in the wrong place.
+
+**A digit needs no tie-breaking device, where a Roman numeral does.** A point name is `[A-Z][0-9]?`, so `I` and `V` ARE legal points — which is exactly why #1059 needed an ordered pair of rules and a case-sensitive lookahead to tell «מעגל I» (the circle) from «מעגל O» (the centre). A bare digit is not a legal point name at all, so «מעגל 1» has no competing reading to be told apart from. The digit half is the easy half *because* of how the hard half was built.
+
+### The range, which is the one judgement call
+
+**1–5, mirroring the Roman range exactly.** That range was itself chosen from corpus evidence about how many circles one question carries, so the two halves of the token share one justification instead of acquiring two. «מעגל 6» is refused, and the lock pins that boundary so widening it later is a deliberate act rather than a drift. The issue proposed this and offered 1–9; taken as proposed, and it is a one-character edit.
+
+### The separator lookahead is now doing two jobs
+
+[ADR-AG-006](#adr-ag-006) records a permissive `[IVX]{1,3}` reading the `x` of «המעגל x²+y²−2ax−2x=0» as a numeral and swallowing it. The digit twin of that trap is **«המעגל 4x²+4y²=1»**, where the leading digit is a COEFFICIENT — and the `(?=[\s:])` lookahead is the only thing between the two readings, because the `x` after the `4` is not a separator. One device, two traps, and the second is asserted in the lock rather than trusted.
+
+### ⚠ What is NOT built — the operator's own sentence, exactly
+
+The ruling names the string «נתון מעגל 1». **That bare form is still `not-handled`**, and it is a structural gap rather than a decision this change could take: the bare form lowers through `circleAtFacts(centre, …)`, whose every id is keyed on the centre's letter (`circle-at-O`, radius `r_O`). «מעגל O» has a letter; «מעגל 1» has none — and it has none for precisely the reason that makes it unambiguous as a circle name. Supporting it is a second identity path, with its own questions (what is the radius parameter called; is a centre point minted at all, given that `apply.ts` mints no names), plus the behaviour question of what a bare named circle MEANS.
+
+Filed as **[#1257](https://github.com/dcodish/geo_builder/issues/1257)** with the measurement, `needs-operator`. Stated here rather than left to be discovered, because the shipped arm answers the ruling's INTENT and not its literal sentence, and that distinction belongs in the record.
+
+It also exposes an inconsistency that exists on `main` right now: bare «נתון מעגל I» makes `I` the CENTRE, a reading this ruling arguably overturns. Deliberately untouched — reversing it is #1257's to rule, not this change's to assume.
+
+### Lock
+
+`issue-1216-digit-circle-names.test.ts` (20). The positive half is small; the **negative half is the bigger half**, because widening a token that sits in front of an equation is how a coefficient gets eaten:
+
+- every centre letter (`O`, `X`, `K`, and the English form) still creates the point and leaves the circle anonymous — if this regressed, the widening would have quietly reversed the ruling it claims to extend;
+- the Roman numerals still name circles;
+- «המעגל 4x²+4y²=1» and «המעגל 2x²+2y²=8» stay **anonymous** — asserted as *the name is empty and the id is not a named-circle id*, not merely as "it parses";
+- the range boundary: 5 in, 6 out;
+- and a PARITY row — a digit and a Roman numeral are indistinguishable apart from the token, which cannot go green by re-implementing the grammar it guards ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)).
+
+Verified to bite: removing the two digit alternatives turns **8 of 20** red.
+
+### Consequences
+
+`parser/parseAnalytic.ts` (the token and its four consumers), `parser/catalogAnalytic.ts` (one row — the card's job is to show the digit form exists, and the numeral is the only thing that varies).
