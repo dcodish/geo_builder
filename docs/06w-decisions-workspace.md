@@ -3155,3 +3155,58 @@ Each product now declares the trees it is built from, and **`shell/` is in all f
 `scripts/preflight-targets.mjs` holds the targets and the two decisions, because importing `deploy-preflight.mjs` runs a preflight — including the ssh reads — which a test may not do. `server/__tests__/preflight-staleness.test.ts` (6) calls the real decisions rather than restating them, and covers the boundary that matters: a test file is not a source, and NOT BUILT is not STALE (they send the operator to two different actions).
 
 Demonstrated end to end: a freshly built bundle compares normally; touching one analytic source flips analytic to STALE; touching one `shell/` source flips it too.
+
+## ADR-W-062 — The longest match that RENDERS wins, not the first one that matches (#1217)
+
+**Requirements:** [19](19-analytic-geometry-tool.md)/[02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown; no new row. **Design:** the shared renderer's tokenizer precedence. **Product:** workspace (`shell/`), reported in analytic, fixed for all four.
+
+**Operator, 2026-09-19, playing T21:** *"the mathml on the row below textbox and the input rows are not working. This rule of using mathml is for all shapes so why does it work on circle but not elipeses? it is also the same rule for all tools (2d/3d/complex)"*.
+
+### The circle was not working either
+
+`█` marks a rendered island; everything else came out as plain text.
+
+```
+x/9                       frac 1  sup 0   ->  █                  a plain fraction always worked
+x^2/9                     frac 0  sup 1   ->  █/9                adding a power broke it
+(x^2)/9                   frac 1  sup 1   ->  █                  bracketing it brought it back
+
+x^2/9+y^2/16=1            frac 0  sup 1   ->  █/9+y^2/16=1       the ellipse he reported
+מעגל (x-3)^2+(y-5)^2=25   frac 0  sup 2   ->  מעגל █+█=25        the circle he thought worked
+```
+
+The circle's leftovers are `+` and `=25` — an operator and a number, unremarkable as plain text. The ellipse's leftover is `/9+`, a fraction bar that visibly is not a fraction. One defect, two appearances, which is exactly why it read as ellipse-specific.
+
+### Root cause — a tie, decided by declaration order
+
+Every alternative lived in one alternation, and JS takes the first BRANCH that matches at the earliest position:
+
+```js
+const TOKEN = new RegExp(`(${ARC})|(${SUB})|(${SUP})|(${VALUE})|(${EXPR})`, 'gu');
+```
+
+At index 0 of `x^2/9`, `SUP` matches `x^2` and `EXPR` matches `x^2/9`. `SUP` is declared first, so it won and consumed the numerator — after which the `/9` had nothing on its left to be a fraction with.
+
+The third measured line is the proof this is precedence and not a missing capability: `(x^2)/9` renders correctly because the brackets make `SUP` fail at index 0, and `exprML` then composes the power inside the fraction perfectly well. **The renderer could always do this.**
+
+The old comment — *"ORDER IS LOAD-BEARING. `SUP` precedes `EXPR` so `(x-3)^2` keeps rendering as the superscript island the corpus asserts"* — was sound and is still true. What it did not anticipate was a power that is **part of a larger expression** rather than a standalone island.
+
+### The fix, and what still protects the old behaviour
+
+The alternatives become sticky regexes tried at each position; the **longest match that actually renders** wins, with the declared order kept only as the tie-break. `tokenML` returns `null` when an alternative cannot render the text it matched, which is what makes the change safe in one direction: a candidate that declines is passed over for a shorter one, so this can never render *less* than before.
+
+The protection is not the ordering, and never was — it is `EXPR`'s own lookahead, which asserts a `√` or a `/` inside the span. Neither `(x-3)^2+(y-4)^2=9` nor `y^2 = 54x` contains one, so `EXPR` does not match there at all and the corpus's superscript islands are byte-identical. Those are the first assertions in the lock, not an afterthought.
+
+### A red test that was the gate working
+
+The first attempt also advanced **one character** when nothing rendered, instead of consuming the failed span. It fixed `F(27/2, 0)` and turned `issue-1125-expression-math.test.ts` red on `|3 - 2 / 4`.
+
+The test was right. Stepping over a malformed delimiter and typesetting the remainder shows `2/4` as a fraction beside a stray unmatched bar — a formula the student was never given, which is the whole class #1125 exists to forbid. So **a refusal consumes its entire span**, deliberately, and that is now written down where the next session will read it.
+
+The cost is accepted and named: `F(27/2, 0)` matches `EXPR` as `F(27/2`, an opener whose partner sits past the comma, so `exprML` refuses and the good `27/2` goes down with it. That is a **span-boundary artefact**, not malformed input — the distinction ADR-W-060 already drew for brackets at a span's edges — which makes it a different fix and its own issue (#1229), not something to smuggle in by weakening an honesty lock.
+
+### Blast radius
+
+`shell/math.tsx` is shared by 2-D, 3-D, complex and analytic, so the full suite is the gate rather than a product lane. `shell/__tests__/issue-1217-longest-match.test.ts` (8) leads with the regression guards and ends with #1208 and #1125 intact; the fixed cases sit in between.
+
+It also repairs a row this workspace shipped hours earlier: #1212's ellipse equation `x²/16 + y²/9 = 1` composes with the `²` character, which `SUP` matched as readily as `^2`, so the panel row that issue added was broken from the moment it landed.

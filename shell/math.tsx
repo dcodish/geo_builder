@@ -80,7 +80,19 @@ const EXPR = String.raw`(?=[${MATHCH}\s]*[√\/])[${MATHCH}](?:[${MATHCH}\s]*[${
  * the corpus asserts, and `VALUE` precedes it so every stated magnitude takes the byte-identical path it
  * always did. `EXPR` is the fallback that catches what the value grammar cannot express.
  */
-const TOKEN = new RegExp(`(${ARC})|(${SUB})|(${SUP})|(${VALUE})|(${EXPR})`, 'gu');
+const TOKEN_KINDS = ['arc', 'sub', 'sup', 'value', 'expr'] as const;
+type TokenKind = (typeof TOKEN_KINDS)[number];
+
+/**
+ * The alternatives as STICKY regexes, in precedence order — the order now breaks TIES only (#1217).
+ */
+const TOKENS: ReadonlyArray<{ kind: TokenKind; re: RegExp }> = [
+  { kind: 'arc', re: new RegExp(ARC, 'yu') },
+  { kind: 'sub', re: new RegExp(SUB, 'yu') },
+  { kind: 'sup', re: new RegExp(SUP, 'yu') },
+  { kind: 'value', re: new RegExp(VALUE, 'yu') },
+  { kind: 'expr', re: new RegExp(EXPR, 'yu') },
+];
 
 const esc = (s: string): string => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] ?? c);
 const mn = (s: string): string => `<mn>${esc(s.trim())}</mn>`;
@@ -201,31 +213,106 @@ function peelBrackets(span: string): { lead: string; core: string; tail: string 
   return { lead, core, tail };
 }
 
-/** Render `text` to an HTML string: MathML for the math tokens, escaped verbatim text for the rest. */
-export function mathHtml(text: string): string {
-  let out = '';
-  let last = 0;
-  for (const m of text.matchAll(TOKEN)) {
-    const i = m.index!;
-    out += esc(text.slice(last, i));
-    if (m[1]) out += arcML(m[2] ?? m[3]); // m[2] = braced pair (⌢{AC}), m[3] = bare pair — either way the over-arc replaces the token
-    else if (m[4]) out += subML(m[4]);
-    else if (m[5]) out += supML(m[5]);
-    else if (m[6] && /√|\//.test(m[6])) out += valueML(m[6]);
-    else if (m[7] && /√|\//.test(m[7])) {
+/**
+ * The MathML one token renders to, or `null` when this alternative cannot render this text.
+ *
+ * `null` is what makes "longest match" safe (#1217): a candidate that declines is passed over for a
+ * shorter one rather than swallowing the span, so the fix can never render LESS than the old
+ * first-alternative-wins order did.
+ */
+function tokenML(kind: TokenKind, m: RegExpExecArray): string | null {
+  switch (kind) {
+    // m[1] = the braced pair (⌢{AC}), m[2] = the bare pair — either way the over-arc replaces the token.
+    case 'arc':
+      return arcML(m[1] ?? m[2]);
+    case 'sub':
+      return subML(m[0]);
+    case 'sup':
+      return supML(m[0]);
+    // A lone number is not math — it stays plain text, exactly as it always has.
+    case 'value':
+      return /√|\//.test(m[0]) ? valueML(m[0]) : null;
+    case 'expr': {
       /**
        * An expression the value grammar could not express (#1125). `exprML` returns null when the span
        * is not a well-formed expression, and then the span stays verbatim — a renderer that half-parses
        * a formula would show the student a formula that is not the one they were given.
        */
-      const { lead, core, tail } = peelBrackets(m[7]);
+      if (!/√|\//.test(m[0])) return null;
+      const { lead, core, tail } = peelBrackets(m[0]);
       const ml = /√|\//.test(core) ? exprML(core) : null;
-      out += ml ? esc(lead) + ml + esc(tail) : esc(m[0]);
+      return ml ? esc(lead) + ml + esc(tail) : null;
     }
-    else out += esc(m[0]); // a lone number, or a run with no √ and no / — keep as plain text
-    last = i + m[0].length;
   }
-  out += esc(text.slice(last));
+}
+
+/**
+ * Render `text` to an HTML string: MathML for the math tokens, escaped verbatim text for the rest.
+ *
+ * THE LONGEST MATCH THAT RENDERS WINS, NOT THE FIRST ONE THAT MATCHES (#1217).
+ *
+ * The alternatives used to sit in one alternation, and JS takes the first branch that matches at the
+ * earliest position. At index 0 of `x²/9` both `SUP` (`x²`) and `EXPR` (`x²/9`) can start, so `SUP`
+ * won, ate the numerator, and left a `/9` with nothing on its left to be a fraction with:
+ *
+ * ```
+ * x/9       ->  a fraction                    a plain fraction always worked
+ * x^2/9     ->  «x²» then the text «/9»       adding a power broke it
+ * (x^2)/9   ->  a fraction with a power       bracketing it brought the fraction back
+ * ```
+ *
+ * That third line is the proof this is precedence and not a rendering gap: `exprML` already composes a
+ * power inside a fraction. The brackets only stopped `SUP` from matching first.
+ *
+ * The old order was not arbitrary and is preserved where it mattered — `EXPR` asserts a `√` or a `/`
+ * inside its span up front, so on `(x-3)^2+(y-4)^2=9` and `y^2 = 54x` it never matches at all and the
+ * superscript islands the corpus asserts are untouched. Ties keep the declared order.
+ */
+export function mathHtml(text: string): string {
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    let best: { kind: TokenKind; m: RegExpExecArray } | null = null;
+    const candidates: Array<{ kind: TokenKind; m: RegExpExecArray }> = [];
+    for (const { kind, re } of TOKENS) {
+      re.lastIndex = i;
+      const m = re.exec(text);
+      if (m) candidates.push({ kind, m });
+    }
+    // Longest first; `>` not `>=` keeps the declared order as the tie-break.
+    candidates.sort((p, q) => q.m[0].length - p.m[0].length);
+    let html: string | null = null;
+    for (const c of candidates) {
+      html = tokenML(c.kind, c.m);
+      if (html !== null) {
+        best = c;
+        break;
+      }
+    }
+    if (best && html !== null) {
+      out += html;
+      i += best.m[0].length;
+      continue;
+    }
+    /**
+     * Nothing rendered. The longest span that MATCHED is consumed as plain text — which is exactly
+     * what the old fall-through did — or one character, so the scan always advances.
+     *
+     * **A refusal must consume its whole span, and that is deliberate.** Advancing one character here
+     * instead would let the renderer step over a malformed delimiter and typeset the remainder:
+     * `|3 - 2 / 4` carries an unmatched bar, and skipping it renders `2/4` as a fraction beside a
+     * stray `|`, which is a formula the student was never given. #1125's lock catches precisely that,
+     * and it caught this while #1217 was being built.
+     *
+     * The cost is real and accepted: `F(27/2, 0)` matches `EXPR` as `F(27/2`, whose opener sits past
+     * the comma, so `exprML` refuses it and the good `27/2` inside goes down with it. That is a
+     * SPAN-BOUNDARY artefact rather than malformed input, which makes it a different fix (#1208 drew
+     * the same line for brackets at a span's edges) — and a different issue.
+     */
+    const span = candidates[0]?.m[0] ?? String.fromCodePoint(text.codePointAt(i) as number);
+    out += esc(span);
+    i += span.length;
+  }
   return out;
 }
 
