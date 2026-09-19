@@ -108,7 +108,51 @@ const HE_POINT = '(?:ה?(?:נקוד(?:ה|ות)|קדקוד)\\s+)?';
  * a noun the line rule did not accept, not a new construct — and adding it here means the diagonal
  * inherits ADR-AG-026 (the name is a claim: A and C are ON that line) rather than re-deriving it.
  */
-const HE_LINE = 'ה?(?:ישר|אלכסון)';
+/**
+ * THE NOUNS THAT NAME A STRAIGHT OBJECT, WITH THE EXTENT EACH ONE MEANS (#1236 / #1234).
+ *
+ * `HE_LINE` used to be `ה?(?:ישר|אלכסון)` — a two-member list that decided whether a sentence was
+ * UNDERSTOOD AT ALL. «משוואת הצלע BD היא 4x+5y=0» was `not-handled` while «משוואת הישר BD …» worked,
+ * for one noun's difference, and the student had to guess a different word for the same thing.
+ *
+ * That list had already been fixed once, one member at a time: the comment #1070 left above it
+ * records «אלכסון» being added for exactly this reason. «צלע», «קטע», «תיכון», «גובה», «שוק»,
+ * «בסיס» and «יתר» were still missing, and adding three of them would have been the same fix a
+ * fourth, fifth and sixth time.
+ *
+ * **A list is unavoidable here and the registry is what makes it safe.** An unknown noun MUST stay
+ * `not-handled` — «משוואת הפיל BD היא …» may not mint anything — so the rule cannot simply accept
+ * any word. What it can do is stop keeping the vocabulary in a regex, in one rule, with the
+ * meaning of each noun decided somewhere else. Here every noun carries its own extent, so adding
+ * one is a single row and its semantics arrive with it.
+ *
+ * **Operator ruling, 2026-09-19:** *"משוואת הישר should draw the line. משוואת הצלע or הקטע should
+ * draw a segment (in not yet draw)"*, and — asked whether the infinite line still EXISTS behind a
+ * bounded noun — *"only draws CE"*. So a bounded noun draws the segment and nothing else; see the
+ * emit site for how the line survives as an undrawn carrier rather than as a second drawn object.
+ *
+ * «תיכון» and «גובה» are bounded by DEFINITION rather than by the ruling, which did not name them:
+ * a median and an altitude are segments, and reading them as infinite lines would contradict every
+ * other rule in the tree that draws them.
+ */
+const STRAIGHT_NOUNS: readonly { he: string; bounded: boolean }[] = [
+  { he: 'ישר', bounded: false },
+  { he: 'אלכסון', bounded: false },
+  { he: 'צלע', bounded: true },
+  { he: 'קטע', bounded: true },
+  { he: 'תיכון', bounded: true },
+  { he: 'גובה', bounded: true },
+  { he: 'שוק', bounded: true },
+  { he: 'בסיס', bounded: true },
+  { he: 'יתר', bounded: true },
+];
+/** The nouns as an alternation — DERIVED from the registry, so the two can never drift. */
+const HE_LINE = `ה?(?:${STRAIGHT_NOUNS.map((n) => n.he).join('|')})`;
+/** What extent a captured noun means. An unrecognised or absent noun decides nothing. */
+const extentOfNoun = (noun: string | undefined): 'line' | 'segment' | undefined => {
+  const hit = noun ? STRAIGHT_NOUNS.find((n) => noun.includes(n.he)) : undefined;
+  return hit ? (hit.bounded ? 'segment' : 'line') : undefined;
+};
 /** «המעגל» / «מעגל». */
 const HE_CIRCLE = 'ה?מעגל';
 /** «שמשוואתו» / «שמשוואתה» / «משוואת» / «שמשוואת» — the "whose equation is" connector. */
@@ -302,6 +346,14 @@ interface CurveHit {
   kind: CurveKind;
   eqSrc: string;
   /**
+   * WHAT THE NOUN SAID THE OBJECT IS (#1234) — `'line'` infinite, `'segment'` bounded, `undefined`
+   * when the student wrote no noun and the extent must be inherited from what the figure already
+   * holds. `direction()` deliberately discards the noun, so routing the operand through it alone
+   * would throw away exactly the information the operator's ruling turns on; the noun is captured
+   * separately instead — the split `ON_OBJECT` already uses for its `bounded` decision.
+   */
+  extent?: 'line' | 'segment';
+  /**
    * The letter the student gave as this circle`s CENTRE — «מעגל O שמשוואתו …» (#1059).
    *
    * Operator ruling, 2026-09-15: *"«מעגל O» means the center letter is O"*. So the letter names a
@@ -324,10 +376,16 @@ const ROMAN_RUN = '(?:(I|II|III|IV|V)(?=[\\s:]))?';
 function matchCurve(line: string): CurveHit | null {
   // --- line: «נתון הישר ℓ1: 4y-3x-20=0» · «משוואת הישר AC היא y=-2x+8» · «הישר x=-4» ---
   const heLineNamed = line.match(
-    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_LINE}\\s+(${LINE_NAME})${HE_IS}\\s*:?\\s*(.+)$`),
+    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?(${HE_LINE})\\s+(${LINE_NAME})${HE_IS}\\s*:?\\s*(.+)$`),
   );
   if (heLineNamed) {
-    return { id: `line-${heLineNamed[1]}`, name: heLineNamed[1], kind: 'line', eqSrc: heLineNamed[2] };
+    return {
+      id: `line-${heLineNamed[2]}`,
+      name: heLineNamed[2],
+      kind: 'line',
+      eqSrc: heLineNamed[3],
+      extent: extentOfNoun(heLineNamed[1]),
+    };
   }
   /**
    * The NOUN is optional after «משוואת», and the NAME survives — «משוואת AB היא y=2x» (#1072).
@@ -402,9 +460,11 @@ function matchCurve(line: string): CurveHit | null {
     // Not an equation in the plane's variables — this rule has no claim on the sentence. Fall through.
   }
 
-  const heLineBare = line.match(new RegExp(`^${HE_GIVEN}${HE_LINE}\\s+(.+=.+)$`));
+  const heLineBare = line.match(new RegExp(`^${HE_GIVEN}(${HE_LINE})\\s+(.+=.+)$`));
   if (heLineBare) {
-    return { id: `curve-${anonIndex(heLineBare[1])}`, name: '', kind: 'line', eqSrc: heLineBare[1] };
+    // An ANONYMOUS straight given by its equation alone: there are no endpoints to bound it between,
+    // so a bounded noun has nothing to draw a segment over and the line is what the student gets.
+    return { id: `curve-${anonIndex(heLineBare[2])}`, name: '', kind: 'line', eqSrc: heLineBare[2] };
   }
   /**
    * NOT flagged `i`, and the English words carry their own case alternatives instead (#1093).
@@ -2091,6 +2151,34 @@ export function parseLine(raw: string): ParseResult {
       : [];
 
     const named = curve.kind === 'line' ? TWO_POINT_NAME.exec(curve.name) : null;
+    /**
+     * THE NOUN DECIDES THE EXTENT, AND A BOUNDED ONE DRAWS ONLY THE SEGMENT (#1234 / #1236).
+     *
+     * Operator ruling, 2026-09-19: *"משוואת הישר should draw the line. משוואת הצלע or הקטע should
+     * draw a segment (in not yet draw)"* and, asked whether the infinite line still EXISTS behind a
+     * bounded noun, *"only draws CE"*.
+     *
+     * So a bounded noun emits the segment — minted here, idempotent if the figure already has it —
+     * and the line survives as an UNDRAWN CARRIER (`stated: false`). That is not a new concept: it
+     * is the same flag «B על הישר y=x» already uses for a line that exists to hold a point rather
+     * than to be drawn, and `scene.ts` draws only `stated` curves. The carrier is what the two
+     * endpoints are constrained ONTO, so the equation is a real condition rather than decoration;
+     * without it «משוואת הצלע CE היא x-3y=0» would state nothing at all.
+     *
+     * A student who later writes «משוואת הישר CE היא …» upgrades the same object to `stated: true`
+     * (the fold already does this), which is the deliberate line-over-segment pair #1234 describes —
+     * reached only by asking for it, never minted behind the student's back.
+     *
+     * With NO noun the extent is inherited from what the figure already holds, and that is a
+     * question this parser cannot answer: it takes no figure context. The fact carries
+     * `inheritExtent` and the fold decides.
+     */
+    const bounded = curve.extent === 'segment' && named !== null;
+    const inherits = curve.extent === undefined && named !== null;
+    const boundedSeg: Fact[] =
+      bounded && named
+        ? [{ t: 'segment', id: segmentId(named[1], named[2]), a: named[1], b: named[2], src: line }]
+        : [];
     const through: Fact[] = named
       ? [
           { t: 'declare', id: named[1], src: line },
@@ -2111,11 +2199,14 @@ export function parseLine(raw: string): ParseResult {
            */
           label: { name: curve.name, kind: curve.kind, ...(curve.name ? {} : { eqSrc: trim(curve.eqSrc) }) },
           curve: { kind: curve.kind, eq },
-          // The student named the curve and gave its equation — this sentence IS the curve.
-          stated: true,
+          // The student named the curve and gave its equation — this sentence IS the curve, UNLESS a
+          // bounded noun said the drawn object is the segment (then the line is its carrier).
+          stated: !bounded,
+          ...(inherits ? { inheritExtent: true as const } : {}),
           src: line,
         },
         ...through,
+        ...boundedSeg,
         ...centre,
       ],
     };

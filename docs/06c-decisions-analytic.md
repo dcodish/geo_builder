@@ -5773,3 +5773,93 @@ This does not contradict [ADR-AG-032](#adr-ag-032)'s "the noun decides boundedne
 The plan asked for `dist < 1e-9`. The minimiser converges to ~1.5e-8 relative off-line and ~5.6e-8 in cos over 24 seeds — measured, and a lock at 1e-9 would have gone red on correct output. The tolerance is 1e-6: clear of the noise, and still a millionth of the side.
 
 `issue-1232-altitude-foot.test.ts` locks both halves over 8 seeds, the English sentence, the obtuse case, the median, and — the class — that the RULE emits both constraints. Verified red on the pre-change code: 4 of its 5 cases fail, the median's passes, which is exactly the shape of the defect.
+
+## ADR-AG-111 — The noun decides the extent, and a bounded one draws only the segment (#1236 + #1234)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R6 (amended) — «משוואת …» accepts every noun that names a straight object, and the noun states what is drawn. **Design:** [04c](04c-design-analytic.md) — the equation rule's noun registry, and the fold's extent resolution. **LADDER stage:** parse (recognition + extent) and the fold (the inherited extent). No solver or renderer change. **Extends** ADR-AG-019 / ADR-AG-023 / ADR-AG-060; **cites** the `stated: false` carrier convention (#1076).
+
+Two halves of one sentence, neither observable without the other, built as one item. Escalated first (round #1244) on the design question below and re-built on the operator's answer the same day.
+
+### The two symptoms
+
+**#1236 — the noun was a gate.** `HE_LINE = 'ה?(?:ישר|אלכסון)'` decided whether a sentence was understood at all:
+
+```
+OK     משוואת הישר BD …      OK   משוואת האלכסון BD …   OK   משוואת BD …
+FAIL   משוואת הצלע BD …      FAIL משוואת הקטע BD …      FAIL משוואת התיכון BD …
+FAIL   משוואת הגובה BD …     FAIL משוואת השוק BD …      FAIL משוואת הבסיס BD …
+```
+
+Identical meaning, identical facts required, and the student had to guess a different word for the same thing. **The list had already been fixed once, one member at a time** — the comment #1070 left above it records «אלכסון» being added for exactly this reason.
+
+**#1234 — the twin.** On the operator's own figure, «משוואת CE היא x-3y=0» minted `line-CE` **beside** the `seg-CE` the figure already held:
+
+```
+segments: poly-ABC-0..2, seg-BD, seg-CE
+curves:   line-CE          <- a second object for one name
+faults:   []
+```
+
+### The ruling
+
+> **2026-09-19:** *"משוואת הישר should draw the line. משוואת הצלע or הקטע should draw a segment (in not yet draw)"*
+
+and, asked in this round's escalation whether the infinite line still EXISTS behind a bounded noun:
+
+> *"only draws CE"*
+
+### The decision — a noun REGISTRY, and the extent it carries
+
+The noun stops being a gate in a regex and becomes a registry row: `{ he, bounded }`, with `HE_LINE` **derived** from it so the two cannot drift, and one `extentOfNoun` consulted where the decision is made.
+
+**A list is unavoidable here, and saying so plainly is part of the decision.** An unknown noun must stay `not-handled` — «משוואת הפיל BD היא …» may not mint anything — so the rule cannot simply accept any word. What it *can* stop doing is keeping the vocabulary in one rule's regex with the meaning of each noun decided somewhere else. Adding a noun is now one row, and its semantics arrive with it.
+
+`direction()` was the plan's proposed route and is the wrong one **on its own**: it discards the noun by construction, which is exactly the information the ruling turns on. `ON_OBJECT` had already solved this shape — resolve WHICH object one way, capture the noun separately for its EXTENT — and that split is what is copied.
+
+### The line survives as a CARRIER, which is not a new concept
+
+A bounded noun emits the segment (minted here, idempotent when the figure already has it) and the line as an **undrawn carrier**, `stated: false`. `scene.ts` draws only `stated` curves, and «B על הישר y=x» has used this flag since #1076 for a line that exists to hold a point rather than to be drawn.
+
+The carrier is what the two endpoints are constrained *onto*. Without it the sentence would state nothing at all — the student's equation would be accepted and then have no effect, which is the honesty failure this issue is about, arriving through a different door.
+
+> **Correction to this round's escalation.** It asserted that *"the analytic tree has no drawn-vs-carrier concept; every curve object is drawn"*, and priced the option accordingly. That was wrong: `stated` is exactly that concept, and `apply.ts` already upgrades a carrier to drawn when a later sentence states it. The escalation's question was still the right one to ask — the ruling was needed — but its cost estimate for the alternative was too high, and a future session should not inherit that claim.
+
+A student who later writes «משוואת הישר CE היא …» upgrades the same object to `stated: true` — the deliberate line-over-segment pair #1234 describes, reached only by asking for it and never minted behind the student's back.
+
+### The bare form is decided at the FOLD, because the parser cannot decide it
+
+«משוואת CE היא x-3y=0» writes no noun and so says nothing about which object it means. Per the ruling it takes the extent the object **already has** — and that is a question `parseLine(raw)` structurally cannot answer: **the analytic parser takes no figure context**, by design.
+
+So the fact carries `inheritExtent`, and `apply.ts`'s `case 'curve'` — which already looks the figure up through `priorOf` — asks whether a segment spans the same two points. It compares ENDPOINTS, never ids: `line-CE` and `seg-CE` are different strings by design, so the twin is not something the id space can catch.
+
+The plan placed this at the equation rule. That is one layer off, and recording it matters more than the fix: *a plan that names a chokepoint in a context-free parser for a context-dependent decision has named the wrong layer, however right the rest of it is.*
+
+### Measured after
+
+| sentence | segment | drawn | carrier |
+| --- | --- | --- | --- |
+| «משוואת הישר CE» (seg exists) | `CE` | **`line-CE`** | — |
+| «משוואת הצלע CE» (seg exists) | `CE` | — | `line-CE` |
+| «משוואת CE» — **the reported line** | `CE` | — | `line-CE` |
+| «משוואת הצלע PQ» (nothing exists) | **`PQ` minted** | — | `line-PQ` |
+| «משוואת PQ» (nothing exists) | — | `line-PQ` | — |
+
+### Arm 2 was NOT built, and the measurement is why
+
+#1234's plan called `crossingsOf`'s self-pairing *"load-bearing, not defence in depth"*, on the reasoning that *"without this, the noun fix converts a twin bug into a spurious-ring bug."*
+
+**Measured, that does not happen.** `crossings.ts:275` already skips unstated curves, so a carrier never enters the search. The reported sequence now offers **exactly what the same figure without the equation offers — 1 ring at each of 8 seeds, zero self-pairs** — identical to the figure before the line was added.
+
+The residue is the *deliberate* pair, where both objects are stated and `meet`'s **absolute** `1e-12` determinant test fails to see two spellings of one line (5 self-pairs over 8 seeds). That is not this issue's arm — it is **#1235** verbatim (*"crossings.ts decides degeneracy with ABSOLUTE thresholds — a duplicate line is 5 orders above the guard"*), which is filed, armed and describes this exact repair. Doing it here would be this round doing an unannounced issue's work, and the measurement is recorded on #1235 instead.
+
+*The plan's "therefore" is a separate hypothesis from its diagnosis, and it was the cheapest thing to falsify.*
+
+### The lock
+
+The ruling's own table, driven end to end through `derive`: each noun's extent, the minting, the bare form in both directions. Recognition is locked over all nine nouns plus three unknown ones that must stay `not-handled`, and all spellings are asserted to produce the **same object id** (ADR-AG-023's identity rule). The ring assertion compares the reported figure against the same figure without the equation at 8 seeds, rather than against a hard-coded count a future change could match by accident. Verified to bite: **12 of the 19 assertions fail against pristine sources.**
+
+### Consequences
+
+`parser/parseAnalytic.ts` (the registry, the captured noun, the extent on `CurveHit`, the carrier + segment emit), `engine/types.ts` (`inheritExtent` on the curve fact), `engine/apply.ts` (the fold's resolution + `segmentOverSameEnds`).
+
+`issue-1234-equation-extent.test.ts` (19). Analytic lane green.

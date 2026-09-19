@@ -553,12 +553,30 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
          */
         return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
       }
+      /**
+       * THE BARE FORM TAKES THE EXTENT THE OBJECT ALREADY HAS (#1234).
+       *
+       * «משוואת CE היא x-3y=0» writes no noun, so it says nothing about whether the student means the
+       * infinite line or the median they already drew. Measured on the operator's own sequence, it
+       * minted `line-CE` BESIDE the existing `seg-CE` — one name, two drawn objects, with
+       * `faults: []` — and the spurious crossing rings followed from the twin.
+       *
+       * The decision belongs HERE and nowhere else: `parseLine(raw)` takes no figure context, so the
+       * rule that recognises the sentence structurally cannot know whether `seg-CE` exists. This case
+       * already looks the figure up through `priorOf`; asking one more question of it costs nothing.
+       *
+       * An existing segment over the same two points ⇒ the equation is a CONDITION on that segment,
+       * and the line it lies on is an undrawn carrier. Nothing existing ⇒ the line is what the
+       * student gets, which is the behaviour this form always had.
+       */
+      const inheritedStated =
+        f.inheritExtent && segmentOverSameEnds(c, f.id) ? false : f.stated;
       return {
         ok: true,
         effect: 'created',
         next: {
           ...c,
-          objects: [...c.objects, { kind: 'curve', id: f.id, label: f.label, curve: f.curve, stated: f.stated }],
+          objects: [...c.objects, { kind: 'curve', id: f.id, label: f.label, curve: f.curve, stated: inheritedStated }],
         },
       };
     }
@@ -1229,4 +1247,21 @@ function normalizeDomain(d: Domain): Record<string, unknown> {
     maxOpen: d.maxOpen ?? false,
     exclude: [...new Set(d.exclude ?? [])].sort((a: number, b: number) => a - b),
   };
+}
+
+/**
+ * Does the figure already hold a SEGMENT over the two points a curve id names (#1234)?
+ *
+ * `line-CE` and `seg-CE` are different ids by design, so the twin is not a collision the id space
+ * catches. The question the bare «משוואת CE היא …» actually asks is whether the student has already
+ * given `CE` an extent, and a drawn segment over `C` and `E` is that answer whatever its own id
+ * happens to be — so the endpoints are compared, never the string.
+ */
+function segmentOverSameEnds(c: Construction, curveId: Id): boolean {
+  const m = /^line-([A-Z][0-9]?)([A-Z][0-9]?)$/.exec(curveId);
+  if (!m) return false;
+  const [, a, b] = m;
+  return c.objects.some(
+    (o) => o.kind === 'segment' && ((o.a === a && o.b === b) || (o.a === b && o.b === a)),
+  );
 }
