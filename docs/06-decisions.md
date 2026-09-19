@@ -11914,3 +11914,61 @@ Deliberately, and for the reason ADR-518 gives: `runViewResolve` already early-r
 `app/editPipeline.ts` gains `runSetGroupEnabled`, `runToggleFact` and `runRemoveFact`; `App.tsx`'s step-list `onToggle` routes through the first rather than calling the store inline (CLAUDE.md's module table — this behaviour belongs in `src/app/`). The #1132 registry in `issue-1041-edit-resolve.test.ts` grows from three rows to **six**, with the count asserted so a seventh seam cannot be added silently.
 
 `issue-1133-enable-resolve.test.ts` (5). 2-D lane green.
+
+## ADR-523 — The dropped-given scan reads a number's SIGN (#1161)
+
+**Requirements:** none (internal) — the promise is unchanged. 2-D has always supported placing a free point at coordinates, and `scope.ts`'s own note says so; this restores the promise at a gate that had started refusing it. **Design:** none (internal) — no new mechanism, no new seam; one existing scanner learns a character it was blind to. **LADDER stage:** the pre-commit honesty battery. No parse rule, engine or solver change. **Extends** ADR-250 / ADR-437 / ADR-462.
+
+Found in the 2026-09-17 prod-log triage, in the **⇗ would-escalate** bucket — one user, six submits across three spellings, all reading `dropped:1`.
+
+### The symptom — an honesty gate refusing a parse that was already right
+
+Measured at HEAD through the real gate stack, each row parsed and then gated:
+
+```
+E=(1,7)          free-point x:1  y:7    droppedNums []      clean true
+E=(-1,7)         free-point x:-1 y:7    droppedNums [1]     clean FALSE
+E=(-1,-7)        free-point x:-1 y:-7   droppedNums [1,7]   clean FALSE
+הנקודה E=(-1,7)  free-point x:-1 y:7    droppedNums [1]     clean FALSE
+```
+
+The pattern is exact: positive coordinates clean, negative ones flagged, **one flag per negative number**. The span accountant (`unaccountedSpans`) is clean on every row — the defect is isolated to one function.
+
+### Root cause
+
+`droppedGivenNumbers` extracted the utterance's stated numbers with `\d+(?:\.\d+)?`, a pattern that cannot see a leading minus. So `-1` was scanned as an occurrence of **`1`**, the multiset accountant looked for an account for `+1`, found only `-1` among the command payloads, and concluded the `1` was dropped.
+
+This is a **false positive in an honesty gate** — the mirror image of the failure the gates exist to prevent — and it is expensive in both directions. Every negative coordinate burned a paid LLM fallback call on a sentence the deterministic grammar had already handled correctly; worse, the escalation then let the LLM commit something *different* from the correct `free-point` the parser had in hand. The gate replaced a right answer with a re-roll.
+
+### The fix is at the scanner, and the class is not `free-point`
+
+The scan is now sign-aware. The tempting fix — exempt `free-point`, or match a sign only inside a coordinate pair — is the per-input patch standing rule 1 forbids: **any** command carrying a negative payload rides the same scanner, and the negative coordinate is merely the first construct to reach it. A signed distance, a negative offset, whatever a future construct lowers to, all inherit this.
+
+**A minus is a SIGN only where no operand can precede it** — start of text, or immediately after an opener, a separator or an operator. Everywhere else it is a binary minus or a Hebrew maqaf:
+
+| shape | character before the `-` | read as |
+| --- | --- | --- |
+| `E=(-1,7)`, `x = -3`, `(3,-5)` | `(`, `=`, `,` | **sign** |
+| `(4-0)/(3-0)` | a digit | subtraction |
+| `x-3y=0`, `AB-3` | a Latin letter | subtraction |
+| «ב-5 ס"מ», «ל-10» | a Hebrew letter | **maqaf**, not a sign |
+
+The maqaf row is the one that decides the shape of the rule. Reading «ב-5» as −5 would invert a stated magnitude and produce a **false drop**, and this gate's standing doctrine is that the two errors are not symmetric: *a false account only suppresses a warning, while a false drop breaks a working input.* So the sign context is an **allowlist** of positions, never a denylist — an unfamiliar character before a minus falls through to the old, unsigned reading.
+
+The lookbehind is read on `counted` (which still carries its letters) at the index the digit match has in the letter-blanked `s`, so the two blanking passes were made **length-preserving**. That is the only reason the change touches them; every downstream consumer separates on optional whitespace, so widened blank runs are invisible to it.
+
+### What was measured, not assumed
+
+Fifteen rows were run through parse + gate before and after. The **only** rows that changed are the three negative ones; `BC=10`, `ריבוע במידות 4*4` (the ADR-437 multiset case), `מלבן במידות 4*6`, `היקף מעגל O1 הוא 6` (the ADR-462 declared account), `BM:MF=1:2` (the ADR-396 colon ratio) and the rest are byte-identical. The colon-ratio loop was deliberately left unsigned: `1:-2` is not a ratio a student writes, and widening it would add sign contexts with no case behind them.
+
+### The lock is a PARITY PAIR, because a parse-only test would have stayed green
+
+The parse was correct throughout this bug. A test asserting `parse('E=(-1,7)')` would have passed every day the defect shipped. So each row asserts the parse **and** `honestyGateReport(...).clean`, with the negative row placed beside its positive twin — the negative must reach the same verdict shape as the positive, which is a claim about the gate and not about the grammar. Verified to bite: 6 of the new assertions fail against pristine `parse.ts`.
+
+Three further rows lock the *non*-signs — maqaf, digit-preceded, letter-preceded — because those are where a wider rule would have caused the false drop.
+
+### Consequences
+
+`parser/parse.ts` only: two blanking passes made length-preserving, one `negAt` predicate, and the sign applied in the fraction/radical loop and the plain-digit loop.
+
+`adr-250.test.ts` grows from 18 to 24. 2-D lane green.

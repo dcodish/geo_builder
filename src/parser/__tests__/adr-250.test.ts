@@ -15,6 +15,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { COMMAND_CATALOG, buildParseCtx, droppedGivenNumbers, parse } from '@/parser';
+import { honestyGateReport } from '@/app/honestyGates';
 import { replay } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
@@ -175,5 +176,80 @@ describe('ADR-250/2 — a stated carrier is DRAWN (withCarrierSegments + lineMee
       expect(pairs).toContain('AE');
       expect(pairs).toContain('DE');
     }
+  });
+});
+
+/**
+ * ADR-523 (#1161) — the scan is SIGN-AWARE.
+ *
+ * `droppedGivenNumbers` extracted stated numbers without their sign, so «E=(-1,7)» was scanned as an
+ * occurrence of `1`, no command supplied an account for `+1`, and the multiset accountant reported a
+ * dropped given against a parse that was perfectly faithful (`free-point x:-1 y:7`). A FALSE POSITIVE
+ * in an honesty gate — it escalated a construction 2-D deliberately supports, burning a paid fallback
+ * call and letting the LLM re-roll a right answer.
+ *
+ * Asserted as PARITY PAIRS: the negative row must reach the same verdict SHAPE as its positive twin.
+ * A test that only asserted the parse would have stayed green through the entire bug — the parse was
+ * always correct — so every row asserts the parse AND `honestyGateReport(...).clean`.
+ */
+describe('ADR-523 — a negative payload is not a dropped given (#1161)', () => {
+  const gate = (u: string): { x: number; y: number; clean: boolean; nums: number[] } => {
+    const r = parse(u);
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error('unreachable');
+    const fp = r.commands.find((c) => c.type === 'free-point');
+    expect(fp).toBeDefined();
+    const report = honestyGateReport(u, r.commands, {});
+    return { x: (fp as { x: number }).x, y: (fp as { y: number }).y, clean: report.clean, nums: report.droppedNums };
+  };
+
+  // the six rows measured on the issue, positive and negative side by side
+  it.each([
+    ['E=(1,7)', 1, 7],
+    ['E=(-1,7)', -1, 7],
+    ['E=(3,5)', 3, 5],
+    ['E=(-3,5)', -3, 5],
+    ['E=(-1,-7)', -1, -7],
+    ['A = (3,5)', 3, 5],
+    ['A = (-3,-5)', -3, -5],
+    ['הנקודה E=(-1,7)', -1, 7],
+  ])('%s parses to its stated coordinates AND clears the gate', (u, x, y) => {
+    const g = gate(u as string);
+    expect([g.x, g.y]).toEqual([x, y]);
+    expect(g.nums).toEqual([]);
+    expect(g.clean).toBe(true);
+  });
+
+  // The class is the SCANNER, not `free-point` — an exemption for the reported construct would be the
+  // per-input patch. A negative value reaches the gate the same way whatever command carries it.
+  it('the scanner accounts a negative value wherever it appears, not only in a coordinate pair', () => {
+    expect(droppedGivenNumbers('x = -4', [{ type: 'set-distance', a: 'A', b: 'B', value: -4 } as never])).toEqual([]);
+    expect(droppedGivenNumbers('x = -4', [{ type: 'set-distance', a: 'A', b: 'B', value: 4 } as never])).toEqual([-4]);
+  });
+
+  // The sign is read ONLY where no operand can precede the minus. These are the three shapes that must
+  // NOT be read as a sign — each would invert a stated magnitude and cause a FALSE DROP, which this
+  // gate's doctrine forbids ("a false account only suppresses a warning; a false drop breaks a working
+  // input").
+  it.each([
+    ['a Hebrew maqaf is not a minus', 'AB גדול ב-5 מ-CD', 5],
+    ['a subtraction after a digit is not a minus', 'AB = (4-0)', 4],
+    ['a subtraction after a Latin letter is not a minus', 'AB = x-3', 3],
+  ])('%s', (_name, utterance, stated) => {
+    // nothing accounts for it, so the STATED value is what the gate reports — unsigned
+    expect(droppedGivenNumbers(utterance as string, [])).toContain(stated);
+  });
+
+  // The positive rows and the existing lowerings are untouched — the same accounting the gate
+  // documented before this change.
+  it('the existing accounts are unchanged by the sign pass', () => {
+    const cases: [string, AnyCommand[]][] = [
+      ['BC=10', parse('BC=10').ok ? (parse('BC=10') as { commands: AnyCommand[] }).commands : []],
+      ['ריבוע במידות 4*4', parse('ריבוע במידות 4*4').ok ? (parse('ריבוע במידות 4*4') as { commands: AnyCommand[] }).commands : []],
+      ['מלבן במידות 4*6', parse('מלבן במידות 4*6').ok ? (parse('מלבן במידות 4*6') as { commands: AnyCommand[] }).commands : []],
+      ['היקף מעגל O1 הוא 6', parse('היקף מעגל O1 הוא 6').ok ? (parse('היקף מעגל O1 הוא 6') as { commands: AnyCommand[] }).commands : []],
+      ['BM:MF=1:2', parse('BM:MF=1:2').ok ? (parse('BM:MF=1:2') as { commands: AnyCommand[] }).commands : []],
+    ];
+    for (const [u, cmds] of cases) expect([u, droppedGivenNumbers(u, cmds)]).toEqual([u, []]);
   });
 });

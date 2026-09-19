@@ -9757,8 +9757,32 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
   // the false DROP broke a working input.
   // "פעמים"/"times" end in a plural suffix but head a RATIO ("גדול 2 פעמים", "2 times CD") — excluded,
   // that digit is a magnitude.
-  const counted = raw.replace(/(?<![\d.,])(?<!פי\s)\d+\s+(?=(?!פעמים)[א-ת]+(?:ים|ות)(?![א-ת])|(?!times\b)[A-Za-z][a-z]+s(?![A-Za-z]))/g, ' ');
-  const s = counted.replace(/[A-Za-z]\d*/g, ' ');
+  // Both blanking passes are LENGTH-PRESERVING (#1161): the sign lookbehind below reads the
+  // letter-bearing text at the SAME index as the digit match in `s`, so a blank must occupy exactly
+  // the span it replaced. Every consumer downstream separates on optional whitespace, so the widened
+  // runs are invisible to it.
+  const blank = (m: string): string => ' '.repeat(m.length);
+  const counted = raw.replace(/(?<![\d.,])(?<!פי\s)\d+\s+(?=(?!פעמים)[א-ת]+(?:ים|ות)(?![א-ת])|(?!times\b)[A-Za-z][a-z]+s(?![A-Za-z]))/g, blank);
+  const s = counted.replace(/[A-Za-z]\d*/g, blank);
+  // #1161 (ADR-523) — the scan is SIGN-AWARE. A stated number’s leading minus belongs to the number:
+  // «E=(-1,7)» states −1, and reading it unsigned hunted for an account for +1, found only −1 among
+  // the payloads, and reported a dropped given against a parse that was perfectly faithful. That is a
+  // FALSE POSITIVE in an honesty gate — the mirror image of what the gate exists for — and it escalated
+  // a construction 2-D deliberately supports, burning a paid fallback call and letting the LLM re-roll
+  // a right answer. The class is ANY command carrying a negative payload (a coordinate, a signed
+  // distance, whatever a future construct lowers to); exempting `free-point` would be the per-input
+  // patch this rule forbids.
+  //
+  // A minus is a SIGN only where no operand can precede it — start of text, or after an opener, a
+  // separator or an operator. Everywhere else it is a BINARY minus or a Hebrew MAQAF, and reading
+  // either as a sign would invert a stated magnitude and cause the false DROP this gate’s doctrine
+  // forbids (a false account only suppresses a warning; a false drop breaks a working input):
+  //   «(4-0)/(3-0)»  digit before        → subtraction
+  //   «x-3y=0»       Latin letter before  → subtraction
+  //   «ב-5 ס"מ»       Hebrew letter before → maqaf, not a sign
+  // Read on `counted`, which still carries its letters, at the index the match has in `s`.
+  const SIGN_CONTEXT = /(?:^|[([{,;=<>≤≥:*·+\-/√])\s*$/;
+  const negAt = (i: number): boolean => counted[i - 1] === '-' && SIGN_CONTEXT.test(counted.slice(0, i - 1));
   // A DIAMETER given lowers to radius = d/2 (ADR-259). Checked on the UN-blanked text: blanking wipes the
   // English keyword "diameter" (each Latin letter → space), so the number's radius half would look dropped.
   const hasDiameter = /diameter|קוטר/i.test(raw);
@@ -9815,25 +9839,29 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
     const i = m.index!;
     if (spans.some(([x, y]) => i >= x && i < y)) continue;
     spans.push([i, i + m[0].length]);
-    const numV = evalTerm(m[1]);
+    const sign = negAt(i) ? -1 : 1; // #1161 — «= -3/4» states −0.75, not 0.75
+    const numV = sign * evalTerm(m[1]);
     const denV = m[2] !== undefined ? evalTerm(m[2]) : 1;
     const val = denV !== 0 ? numV / denV : numV;
-    if (!ok([val, numV, denV]) && !seen.has(m[0])) {
-      seen.add(m[0]);
+    const key = (sign < 0 ? '-' : '') + m[0];
+    if (!ok([val, numV, denV]) && !seen.has(key)) {
+      seen.add(key);
       dropped.push(val);
     }
   }
   for (const m of s.matchAll(/\d+(?:\.\d+)?/g)) {
     const i = m.index!;
     if (spans.some(([x, y]) => i >= x && i < y)) continue;
-    const n = parseFloat(m[0]);
+    const neg = negAt(i); // #1161 — the sign is part of the stated number
+    const n = (neg ? -1 : 1) * parseFloat(m[0]);
     const rest = s.slice(i + m[0].length);
     const cands = [n];
     if (/^\s*π/.test(rest)) cands.push(n / 2, Math.sqrt(n)); // nπ — circumference/area sizes lower to a radius
     if (/^\s*%/.test(rest)) cands.push(n / 100); // n% — lowers to a fraction
     if (hasDiameter) cands.push(n / 2); // "diameter 10" / "קוטר 10" → radius d/2 (ADR-259)
-    if (!ok(cands) && !seen.has(m[0])) {
-      seen.add(m[0]);
+    const key = (neg ? '-' : '') + m[0];
+    if (!ok(cands) && !seen.has(key)) {
+      seen.add(key);
       dropped.push(n);
     }
   }
