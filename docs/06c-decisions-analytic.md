@@ -6117,3 +6117,43 @@ Every assertion on the **equation** — what that file exists to guard — is un
 ### Consequences
 
 `engine/crossings.ts` (`pointAt` extracted, `centresOf` calls it), `app/curveText.ts` (the four sites ask instead of inventing), `App.tsx` (supplies the figure's answer).
+## ADR-AG-114 — A noun gate may not claim a tail that is not an equation (#1246)
+
+**Requirements:** none (internal) — no promise changes; a refusal stops naming the wrong thing. **Design:** [04c](04c-design-analytic.md) — `matchCurve`'s claim gate. **LADDER stage:** parse. No engine, solver or render change. **Completes** the #1059 guard; **repairs** a regression of [ADR-AG-111](#adr-ag-111).
+
+### The defect
+
+«הקטע BC = 10» answered **`bad-equation`** — «לא הצלחתי לקרוא את המשוואה» about an equation the student never wrote. They wrote a **length**. The message sent them to hunt for a typo in something that does not exist, which is the honesty invariant on error messages failing: *an error names the conflicting STATEMENT, never internal state.*
+
+Measured, `parseLine`, before ADR-AG-111 and after:
+
+| utterance | before (`18f75b7e`) | after (`33f6a08f`) |
+| --- | --- | --- |
+| `הקטע BC = 10` | `not-handled` | **`bad-equation`** |
+| `הצלע BC = 10` | `not-handled` | **`bad-equation`** |
+| `התיכון BC = 10` | `not-handled` | **`bad-equation`** |
+| `הישר BC = 10` | `bad-equation` | `bad-equation` *(pre-existing)* |
+
+**ADR-AG-111 did not create this — it enlarged it.** Widening the noun registry from two members to nine took the same defect from one noun to nine. The fix closes the older `הישר` member too, which is how it is known to be aimed at the class rather than at the nouns that happened to be added.
+
+### Root cause — a documented class this branch never joined
+
+The fourth instance of one shape, three of which this file already documents (#1059, #1093, #1068/#1123): **a rule recognises a PREFIX, claims the remainder unconditionally, then refuses on the student's behalf.**
+
+`matchCurve`'s caller already held half the cure — the #1059 test that the tail contains no Hebrew, which asks *"did the sentence continue in prose?"*. It does not ask *"is this an equation at all?"*, and `10` is neither prose nor an equation.
+
+### The discriminator is the PLANE'S OWN VARIABLES, and deliberately not a parse
+
+*Does the tail name `x` or `y`?* `10` names neither, so the rule has no claim on it.
+
+It does **not** require the tail to parse as an equation, and that distinction was found by measurement rather than reasoning. The first draft did require it, and it turned #1059's own case — «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2», a **truncated** equation with no `=`, which parses as nothing — from an honest `bad-equation` into `not-handled`. The student plainly meant an equation and must be told it is unreadable. So the gate asks what was **meant**, not what the text achieves.
+
+### Asked at the single exit, because per-branch does not work
+
+Placed beside the #1059 guard at `matchCurve`'s caller, it covers every branch at once — they all funnel through it.
+
+**Gating `heLineNamed` alone was tried and REJECTED, measured:** the sentence then falls through to the no-noun branch, which claims it and **mints a curve**. Worse than either refusal, and a fix that moves the failure one branch down is not a fix. Recorded so it is not re-derived.
+
+### Lock
+
+`issue-1246-equation-claim.test.ts` (17): every noun in the registry plus the bare «אורך» form asserting `not-handled` and never `bad-equation`; **the pre-existing `הישר` member**, which is what makes this class-level rather than per-noun; the truncated-equation row that defines the discriminator; ADR-AG-111's whole table still building; and #1059's prose guard, kept beside the new condition because the two now share one gate. 8 of 17 fail against pristine `parseAnalytic.ts`.
