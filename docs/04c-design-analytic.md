@@ -129,6 +129,19 @@ happen again: `AB = 4√5` is a metric given whose symbols are `A` and `B`, and 
 form. The set was **measured against those corpus lines before the branch was written**, which is the
 standard this tree holds itself to after being bitten twice.
 
+**The circle numeral is one token, used by four rules** ([ADR-AG-118](06c-decisions-analytic.md#adr-ag-118)).
+`CIRCLE_NUMERALS` (the lookahead that keeps a centre NAME from eating a numeral) and
+`CIRCLE_NUMERAL_RUN` (the capture that becomes the circle's id and name) are the whole of it, and the
+Hebrew/English × centre/numeral rules take them. Widening the token to admit `[1-5]` is therefore the
+entire digit feature — `circle-1` and «מעגל 1» fall out of the existing id and label construction,
+and no rule learned a digit case of its own.
+
+The range 1–5 **mirrors the Roman range exactly**, so the two halves of the token share one
+justification instead of acquiring two. And the `(?=[\s:])` separator lookahead, which #1059 added
+to stop `[IVX]` swallowing the `x` of «המעגל x²+y²−2ax−2x=0», is what now also keeps «המעגל
+4x²+4y²=1» anonymous: the `x` after the digit is not a separator, so the numeral branch cannot claim
+the coefficient. One device, two traps.
+
 **`Curve.kind` is therefore an EXPECTATION, not an answer**, and optional. `classify` fits six
 coefficients and names the family; the expectation only lets a refusal be specific ("you wrote «אליפסה»
 and this is a hyperbola" — R7). Two consequences follow, and the second is the subtle one:

@@ -809,10 +809,25 @@ y=2x» is «משוואת הישר AC היא y=2x». **«האלכסון הראש�
 shape noun distinguishes them** — a kite does, a parallelogram and a rhombus do not — and elsewhere
 are refused by name rather than guessed.
 
-**R63 — a letter after «מעגל» is the centre** ([ADR-AG-038](06c-decisions-analytic.md#adr-ag-038)).
+**R63 — a letter after «מעגל» is the centre; a NUMERAL is the circle's own name**
+([ADR-AG-038](06c-decisions-analytic.md#adr-ag-038), extended by
+[ADR-AG-118](06c-decisions-analytic.md#adr-ag-118)).
 «נתון מעגל O שמשוואתו (x-3)²+(y-5)²=25» draws the circle and places `O` at its centre, as a point
-the student can then talk about. A ROMAN NUMERAL still names the circle itself («מעגל I»), and the
-circle named by a centre letter stays anonymous, so one letter never means two objects.
+the student can then talk about. A NUMERAL names the circle itself — a Roman numeral («מעגל I») or an
+**Arabic digit («מעגל 1»)**, both 1–5 — and the circle named by a centre letter stays anonymous, so
+one letter never means two objects.
+
+The digit half is the operator's ruling of 2026-09-19 (*"the rule of I, II, III for circle names AND
+1,2,3 are ok … any other capital letters would become the name of the center"*), and it is an
+extension rather than a change: the set of naming tokens grows and every other capital letter keeps
+its meaning. A digit needs no tie-breaking device at all, where a Roman numeral does: a point name is
+`[A-Z][0-9]?`, so `I` and `V` are legal points and a bare digit is not, and «מעגל 1» therefore has no
+competing centre reading to be told apart from.
+
+**Still refused, and it is a gap rather than a decision:** «נתון מעגל 1» with NO equation. The bare
+form builds an open circle today by keying its identity on the centre's letter (`circle-at-O`,
+radius `r_O`), which a digit-named circle has no letter for —
+[#1257](https://github.com/dcodish/geo_builder/issues/1257).
 **R56 — a curve minted to CARRY a point is not drawn**
 ([ADR-AG-032](06c-decisions-analytic.md#adr-ag-032)). «נקודה B על הישר y=x» means *B is (t,t)*: the
 point appears, the line does not. Stating «y=x» on its own line draws it — and when the carrier was

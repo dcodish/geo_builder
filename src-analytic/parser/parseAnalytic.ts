@@ -402,10 +402,30 @@ interface CurveHit {
  * following separator, because neither shortcut survives contact with the corpus: a case-insensitive
  * `[IVX]{1,3}` reads the `x` of «the circle x²+y²−2ax−2x=0» as a Roman numeral and swallows it, and a
  * class that admits `X` while the validator does not silently turns a numeral into an anonymous id.
+ *
+ * ARABIC DIGITS NAME A CIRCLE TOO (#1216). **Operator ruling, 2026-09-19:** *"I think the rule of I,
+ * II, III for circle names AND 1,2,3 are ok. so נתון מעגל 1 should be ok too. any other capital
+ * letters would become the name of the center."* This EXTENDS [#1059](../../docs/06c-decisions-analytic.md)
+ * rather than changing it — the set of tokens that NAME a circle grows; every other capital letter
+ * still means the centre.
+ *
+ * Digits are in a stronger position than the Roman letters, which is why they need no new machinery:
+ * `NAME` is `[A-Z][0-9]?`, so a bare digit **cannot be a point name at all** and «מעגל 1» has no
+ * competing centre reading to be told apart from. `I` and `V` ARE legal point names, which is
+ * exactly why #1059 needed an ordered pair of rules and a case-sensitive lookahead.
+ *
+ * The range is **1–5, mirroring the Roman range exactly** — that range was itself chosen from corpus
+ * evidence about how many circles one question carries, so the two halves of the token have one
+ * justification instead of two. Widening it is a one-character edit if a question ever needs it.
+ *
+ * The separator lookahead is what keeps this safe, and it is doing more work now than it was: it is
+ * the whole reason «המעגל 4x^2+4y^2=1» is not read as a circle named 4 — the `x` after the digit is
+ * not a separator, so the numeral branch cannot claim it. That is the digit twin of the trap the
+ * paragraph above records.
  */
 /** The numerals themselves, for the lookahead that keeps a NAME from eating one (#1059). */
-const ROMAN_LETTERS = '(?:I|II|III|IV|V)';
-const ROMAN_RUN = '(?:(I|II|III|IV|V)(?=[\\s:]))?';
+const CIRCLE_NUMERALS = '(?:I|II|III|IV|V|[1-5])';
+const CIRCLE_NUMERAL_RUN = '(?:(I|II|III|IV|V|[1-5])(?=[\\s:]))?';
 
 function matchCurve(line: string): CurveHit | null {
   // --- line: «נתון הישר ℓ1: 4y-3x-20=0» · «משוואת הישר AC היא y=-2x+8» · «הישר x=-4» ---
@@ -543,7 +563,7 @@ function matchCurve(line: string): CurveHit | null {
    * thing and the M1 id space has no collision in it.
    */
   const heCircleCentre = line.match(
-    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s+(?!${ROMAN_LETTERS}(?=[\\s:]))(${NAME})\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
+    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s+(?!${CIRCLE_NUMERALS}(?=[\\s:]))(${NAME})\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
   );
   if (heCircleCentre) {
     return {
@@ -557,13 +577,13 @@ function matchCurve(line: string): CurveHit | null {
 
   // --- circle: «נתון מעגל I שמשוואתו …» · «משוואת המעגל …» ---
   const heCircle = line.match(
-    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s*${ROMAN_RUN}\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
+    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s*${CIRCLE_NUMERAL_RUN}\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
   );
   if (heCircle) {
-    const roman = heCircle[1] ?? '';
+    const numeral = heCircle[1] ?? '';
     return {
-      id: roman ? `circle-${roman}` : `curve-${anonIndex(heCircle[2])}`,
-      name: roman ? `מעגל ${roman}` : '',
+      id: numeral ? `circle-${numeral}` : `curve-${anonIndex(heCircle[2])}`,
+      name: numeral ? `מעגל ${numeral}` : '',
       kind: 'circle',
       eqSrc: heCircle[2],
     };
@@ -571,7 +591,7 @@ function matchCurve(line: string): CurveHit | null {
 
   // The English centre form, for the same reason and with the same numeral exclusion (#1059).
   const enCircleCentre = line.match(
-    new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s+(?!${ROMAN_LETTERS}(?=[\\s:]))(${NAME})\\s*:?\\s*(?:is\\s+|whose equation is\\s+)?(.+)$`),
+    new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s+(?!${CIRCLE_NUMERALS}(?=[\\s:]))(${NAME})\\s*:?\\s*(?:is\\s+|whose equation is\\s+)?(.+)$`),
   );
   if (enCircleCentre) {
     return {
@@ -583,12 +603,12 @@ function matchCurve(line: string): CurveHit | null {
     };
   }
 
-  const enCircle = line.match(new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s*${ROMAN_RUN}\\s*:?\\s*(?:is\\s+)?(.+)$`));
+  const enCircle = line.match(new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s*${CIRCLE_NUMERAL_RUN}\\s*:?\\s*(?:is\\s+)?(.+)$`));
   if (enCircle) {
-    const roman = enCircle[1] ?? '';
+    const numeral = enCircle[1] ?? '';
     return {
-      id: roman ? `circle-${roman}` : `curve-${anonIndex(enCircle[2])}`,
-      name: roman ? `circle ${roman}` : '',
+      id: numeral ? `circle-${numeral}` : `curve-${anonIndex(enCircle[2])}`,
+      name: numeral ? `circle ${numeral}` : '',
       kind: 'circle',
       eqSrc: enCircle[2],
     };

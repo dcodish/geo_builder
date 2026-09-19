@@ -95,6 +95,15 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1',
     en: 'circle II: (x+5)^2+(y-2)^2=1',
   },
+  // A DIGIT names a circle exactly as a Roman numeral does (#1216, operator ruling 2026-09-19). One
+  // row, not five: the card's job is to show that the digit form exists, and the numeral is the only
+  // thing that varies. The Roman rows above stay — the ruling extends that set, it does not replace it.
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9',
+    en: 'circle 1: (x-3)^2+(y-4)^2=9',
+  },
   { category: 'circles', family: 'F5', he: 'משוואת המעגל x^2+y^2-2ax-2x=0', en: 'the circle x^2+y^2-2ax-2x=0' },
 
   // --- F6 · conics by equation (canonical only — D6/§2a) ---
