@@ -299,6 +299,65 @@ function place(c: Construction, env: Env, free: Map<Id, Pt>): Map<Id, Pt> {
   return at;
 }
 
+/**
+ * THE CARRIER SYSTEM — the free vertices as a vector, and what the constraints say about it.
+ *
+ * Extracted (#1137) so the SOLVE and the LOCUS TRACER read the same residuals. The tracer walks the
+ * null space of this exact Jacobian and re-solves at every step, and a second construction of "what
+ * the constraints say" would be two definitions of the figure that drift apart — the failure this
+ * codebase names repeatedly. `evaluate`'s own solve is the first caller and
+ * [`locus.ts`](./locus.ts) is the second; there is no third way to ask.
+ *
+ * Pure over `(c, env)`: no seed, no starting point. WHERE the walk starts is the caller's business —
+ * `evaluate` samples it, the tracer inherits the solved figure — and keeping that out of here is what
+ * makes the system reusable at all.
+ */
+export interface CarrierSystem {
+  /** The free vertices, in the order their coordinates occupy the vector (two entries each). */
+  ids: Id[];
+  /** Positions → vector, and back. */
+  toVec: (free: Map<Id, Pt>) => number[];
+  asMap: (x: number[]) => Map<Id, Pt>;
+  /** Every object's position at these carrier values — derived points included. */
+  positionsAt: (x: number[]) => Map<Id, Pt>;
+  /** The constraint residuals there. Empty when the figure states none. */
+  residualsAt: (x: number[]) => number[];
+}
+
+export function carrierSystem(c: Construction, env: Env): CarrierSystem {
+  const ids = freeIds(c);
+  const asMap = (x: number[]) =>
+    new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
+  const positionsAt = (x: number[]) => place(c, env, asMap(x));
+  return {
+    ids,
+    asMap,
+    toVec: (free) => ids.flatMap((id) => [free.get(id)!.x, free.get(id)!.y]),
+    positionsAt,
+    /**
+     * `lineAtOf` is threaded here, not only at the call sites (#1201 meets #1137).
+     *
+     * #1201 gave `residual` a line resolver so a stated distance to a line is DRIVEN rather than
+     * silently dropped, and threaded it through the two solve call sites that existed then. #1137
+     * later lifted those call sites into this system so the locus tracer walks the SAME residuals the
+     * solve does — which is the whole point of the abstraction.
+     *
+     * Merging the two naively would have kept one and lost the other: the branch's `carrierSystem`
+     * carried no `lineAtOf`, so a locus figure with a point-to-line distance would have solved against
+     * a residual that could not see the line — #1201's defect, restored, inside the one place built to
+     * guarantee the tracer and the solver agree. [#1210](https://github.com/dcodish/geo_builder/issues/1210)
+     * predicted exactly this: *"the branch predates #1201 — a rebase changes what a locus is."*
+     */
+    residualsAt: (x) => {
+      const pos = positionsAt(x);
+      const at = (id: Id) => pos.get(id) ?? null;
+      return c.constraints.flatMap(
+        (k) => residual(k, at, env, curveAtOf(c, env, at), lineAtOf(c, env, at)) ?? [0],
+      );
+    },
+  };
+}
+
 /** Carrier freedom left after the constraints — `carriers − rank(J)`, so dependent givens do not
  *  over-count (see `freeRank`). */
 /**
@@ -569,14 +628,10 @@ export function evaluate(raw: Construction, seed = 0): Figure {
   let free = seeded;
 
   if (ids.length > 0 && c.constraints.length > 0) {
-    const vec = ids.flatMap((id) => [seeded.get(id)!.x, seeded.get(id)!.y]);
-    const asMap = (x: number[]) =>
-      new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
-    const res = solveLM(vec, (x) => {
-      const pos = place(c, env, asMap(x));
-      return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null), lineAtOf(c, env, (id) => pos.get(id) ?? null)) ?? [0]);
-    });
-    free = asMap(res.values);
+    // Through `carrierSystem` (#1137) so the locus tracer walks the SAME residuals this solves.
+    const sys = carrierSystem(c, env);
+    const res = solveLM(sys.toVec(seeded), sys.residualsAt);
+    free = sys.asMap(res.values);
   }
 
   /**

@@ -11,11 +11,12 @@
  * THIS tool; a missing `switcherAnalytic` in a sibling is a blank chip THERE (ADR-AG-004 §2 — the
  * checklist item whose failure surfaces in the wrong product).
  */
-import { makeBidi } from '../../shell/bidi';
 import { createProductI18n } from '../../shell/i18n';
 
-/** The bidi kit — exported for composed (non-`t()`) strings and for the palette drift lock. */
-export const analyticBidi = makeBidi({ extraCore: '_' });
+// #1191: the kit itself lives in ./bidi so the RENDERER can reach it without importing this bootstrap.
+// Re-exported here because every existing caller imports it from './i18n' — one instance, two doors.
+export { analyticBidi } from './bidi';
+import { analyticBidi } from './bidi';
 
 const he = {
   // The suite's display names are the CURRICULUM's subject names (operator ruling 2026-08-17).
@@ -103,6 +104,12 @@ const he = {
   errUnknownRefCircle: 'המעגל {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
   errAlreadyNamed: 'כבר יש שם לנקודה הזו: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
+  // The locus families (#1137) — keyed by the engine's own kind, so a family added later shows its
+  // internal name rather than nothing at all.
+  'locus.line': 'ישר',
+  'locus.circle': 'מעגל',
+  'locus.parabola': 'פרבולה',
+  'locus.ellipse': 'אליפסה',
   errNoPrincipalDiagonal:
     'בצורה הזאת אין אלכסון ראשי ואלכסון משני — ההבחנה הזאת קיימת רק בצורות כמו דלתון: "{{detail}}". אפשר לציין את האלכסון לפי הקודקודים, למשל «משוואת האלכסון AC היא y=2x».',
   errAmbiguousShape:
@@ -249,6 +256,10 @@ const en: typeof he = {
   errUnknownRefCircle: 'The circle {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
+  'locus.line': 'line',
+  'locus.circle': 'circle',
+  'locus.parabola': 'parabola',
+  'locus.ellipse': 'ellipse',
   errNoPrincipalDiagonal:
     'This shape has no principal and secondary diagonal — that distinction exists only for shapes ' +
     'like a kite: "{{detail}}". Name the diagonal by its vertices instead, for example "the ' +

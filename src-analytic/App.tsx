@@ -9,7 +9,7 @@
  * shared chassis existed ([docs/28 §5](../docs/28-product-unification.md) Phase 4), and mounting
  * rather than re-deriving the chrome is the whole return on that work.
  */
-import { useMemo, useState, useRef, useEffect, type ChangeEvent, type CSSProperties } from 'react';
+import { useCallback, useMemo, useState, useRef, useEffect, type ChangeEvent, type CSSProperties } from 'react';
 import { useStore } from 'zustand';
 import { useTranslation } from 'react-i18next';
 import registry from '../products.json';
@@ -45,7 +45,7 @@ import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
 import { AskLane } from '../shell/frame/AskLane';
 import { ask, figureIsOpen, type Answer } from './app/ask';
-import { askOnceAnswer, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
+import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
 import { anotherConfiguration, seedShowing } from './app/another';
 import { centresOf, crossingSentence, crossingsOf, freeLetter } from './engine/crossings';
@@ -408,9 +408,20 @@ export function App() {
    * the same shape as everything else derived here, and the shape complex already had (its `askRows`
    * come from `queries`), which is why this defect was analytic's alone.
    */
+  /**
+   * The family's name in the student's language — «מעגל», «ישר», «פרבולה», «אליפסה» (#1137).
+   *
+   * `ask` is the lane's ENGINE and holds no locale, so the wording is injected here beside `fmt` and
+   * `describeCurve`, exactly as those two are. One key per family, and the internal kind is the key —
+   * a family added later has no translation and shows its own name, which is visibly wrong rather
+   * than silently missing.
+   */
+  const locusKind = useCallback((kind: string) => t(`locus.${kind}`), [t]);
+
   const answers = useMemo<Answer[]>(
-    () => queries.map((q) => ({ ...ask(d, q.sentence, fmt), shown: q.shown })),
-    [queries, d, fmt],
+    // #1212 removed `describeCurve` (imported now); #1137's `locusKind` stays — it is locale.
+    () => queries.map((q) => ({ ...ask(d, q.sentence, fmt, locusKind), shown: q.shown })),
+    [queries, d, fmt, locusKind],
   );
 
   /**
@@ -543,6 +554,11 @@ export function App() {
        * answers that HAVE a mark contribute, which `ask` grants only when the distance is knowledge.
        */
       marks: drawnMarks(answers),
+      /**
+       * The מקומות גיאומטריים an answer is about (#1137) — the same `shown` lifetime as the marks
+       * above, so ADR-AG-067's three gestures govern a trace without a fourth rule being invented.
+       */
+      loci: drawnLoci(answers),
       /**
        * The crossings a student may promote (#1025) — operator: *"when a line we draw crosses another
        * line, we need to see the dashed circle allowing us to create that point"*.

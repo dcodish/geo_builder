@@ -34,6 +34,7 @@
 import { fmtAnalytic, fractionClearingFactor } from '../format';
 import { ellipseFoci, parabolaFocus } from '../engine/curves';
 import type { NumCurve } from '../engine/types';
+import type { LocusShape } from '../engine/locusFit';
 
 const fmt = (v: number): string => fmtAnalytic(v);
 
@@ -168,4 +169,65 @@ export function curveDetailsKey(kind: NumCurve['kind']): string {
 export function describeCurve(name: string, c: NumCurve): string {
   const { equation, details } = curveParts(c);
   return `${name ? `${name}: ` : ''}${equation}${details ? `, ${details}` : ''}`;
+}
+
+/**
+ * THE LOCUS'S EQUATION, written the way a student writes it — or `null`.
+ *
+ * `null` whenever the shape carries no snapped conic, which is the determinacy gate's «shape only»
+ * verdict reaching the surface: the row then says «מעגל» and prints no equation, exactly as ruled.
+ *
+ * The CANONICAL form per family, not the general six-coefficient one: nobody answers
+ * «x² + y² − 32x − 369 = 0» when the question asks for a locus — they answer
+ * «(x − 16)² + y² = 625». The numbers come from the classified curve, whose values were derived from
+ * the snapped coefficients, so they are the exact ones.
+ *
+ * `fmt` is the CALLER's formatter for the same reason it is everywhere else in this lane: this tree
+ * has no private display rounder, and a second one here is how two surfaces of one panel start
+ * disagreeing about what `4/3` looks like.
+ */
+export function locusEquation(shape: LocusShape, fmt: (v: number) => string): string | null {
+  if (!shape.conic) return null;
+  const c = shape.curve;
+  // `x`, `x − 3`, `x + 3` — the bracketed term of a translated conic, with the no-op omitted.
+  const shift = (v: string, k: number) =>
+    Math.abs(k) < 1e-12 ? v : `(${v} ${k > 0 ? '−' : '+'} ${fmt(Math.abs(k))})`;
+  switch (c.kind) {
+    case 'line':
+      /**
+       * THE PANEL'S PRINTER, NOT A SECOND ONE (#1197).
+       *
+       * Operator, twice: *"when a line is shown - we always write it as Ax+By+C=0 and not like
+       * the image has"*, and again playing T54. The lane had its own line notation — `x = 4`,
+       * `4y = -3x + 25` — while the data panel two inches away wrote `3x + 4y - 25 = 0`. Two
+       * printers for one object is how one surface drifts from another, and the convention was
+       * already written down in `lineText`.
+       *
+       * The SNAPPED coefficients, not the classified curve's: they are the exact ones the
+       * determinacy gate accepted, and `lineText` clears the fractions itself (#1180).
+       */
+      return lineText(shape.conic.D, shape.conic.E, shape.conic.F);
+    case 'circle': {
+      /**
+       * THE RIGHT-HAND SIDE IS `r²`, WRITTEN AS `r²` (#1187).
+       *
+       * Operator, playing T31: *"the radius in equation should show as 25^2 and not 625"*. He is
+       * right, and it is not a formatting preference — `(x − 16)² + y² = 625` makes the student
+       * compute a square root to find the radius the tool already knows, on a row whose whole job is
+       * to tell them what the circle IS. The exam writes `= 25²`.
+       *
+       * Only when the radius is a clean value to square: `fmt(r)` must round-trip, or `= 12.25²`
+       * would be a worse row than the number it replaced. Otherwise the square stands as it did.
+       */
+      const r2 = c.r * c.r;
+      const shown = fmt(c.r);
+      const exact = Number.parseFloat(shown);
+      const clean = Number.isFinite(exact) && Math.abs(exact * exact - r2) < 1e-9;
+      return `${shift('x', c.cx)}² + ${shift('y', c.cy)}² = ${clean ? `${shown}²` : fmt(r2)}`;
+    }
+    case 'parabola':
+      return `y² = ${fmt(2 * c.p)}x`;
+    case 'ellipse':
+      return `x²/${fmt(c.a * c.a)} + y²/${fmt(c.b * c.b)} = 1`;
+  }
 }

@@ -4464,6 +4464,72 @@ His second sentence was *"we need to give the user different options and not sim
 
 **Consequences.** `engine/rings.ts` (new), `Figure.ringFaults`, one term in `whole()`. `issue-1158-1166-polygon-noun-validity.test.ts` (24 tests, sweeping `SHAPES` so a noun added later inherits the lock). Analytic lane 80 files / 1235 tests.
 
+## ADR-AG-081 — The locus lane, V1a: the button shown all at once (#1136 + #1137)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R87 (specified), R92 (the free point). **Design:** [`src-analytic/CLAUDE.md`](../src-analytic/CLAUDE.md). **LADDER stage:** a reader over the solved figure — it walks the carrier system `evaluate` already builds and mutates nothing.
+
+Implements [ADR-AG-072](#adr-ag-072), scoped with the operator 2026-09-16. Locus is **13 of 20** sampled 572 Q1s — the most-asked construct in the corpus.
+
+**What a student can now do:**
+
+```
+A(-9,0)
+B(41,0)
+נקודה P
+PA מאונך ל-PB
+```
+
+then ask **«המקום הגיאומטרי של P»** and get the circle **drawn**, the row reading **«מעגל»**, and its equation **`(x − 16)² + y² = 625`**.
+
+### The engine already solved it — confirmed before anything was built
+
+Measured through the real `parse → fold → evaluate` path: `MA = MB` puts `M` at **x = 4.00 at every seed** with a different `y` each time; `∠APB = 90°` puts `P` at **distance 25.00 from (16, 0)** at every seed. `carrierDof = 1` in both. docs/19 §6 called the tracer "new core #3"; **it is not a new core**, and no constraint kind was added.
+
+> A locus is a named point whose residual `carrierDof` is 1. «הציגו תצורה אחרת» is already walking it, one point at a time. This lane is that button shown all at once.
+
+### #1136 first, because the workaround was itself the cardinal sin
+
+Every measurement in #1137 had to smuggle a 2-DOF point in as `משולש ABM` — asserting a triangle the student never mentioned, which is [ADR-052](06-decisions.md#adr-052) through the front door. The `free` carrier family has existed since slice A; **only the sentence was missing**, so «נקודה M» emits the `declare` fact the cevian and polygon rules already emit.
+
+**The class was measured, not assumed** (#1136's plan asked for it): «מעגל O» could already be declared unplaced; **«ישר k» still cannot**, for the same reason the point could not. That half is NOT fixed here — a free line has no object kind and no `carrierOf` row, so it is engine work rather than a sentence, and it is [#1171](https://github.com/dcodish/geo_builder/issues/1171). The lock asserts the split so it cannot be quietly forgotten.
+
+### CONTINUATION, and the two alternatives are refuted by measurement
+
+Solve once, step along the null space of the Jacobian by a fixed arclength, re-solve; outward both ways, to closure or to a bound.
+
+- **Seed scatter is not a trace.** Seed 2 puts `M` at `y = 317.54`, seed 3 at `y = 1.23`. Joined in seed order that is confetti, and sorting has no honest key in 2-D — angle works for the circle and fails for the bisector and the parabola.
+- **Marching squares cannot reach V1b.** #1138's traced point is DOWNSTREAM of the free one, so it has no scalar residual in its own `(x,y)` and there is nothing to contour. Continuation walks the FIGURE's freedom, so the same tracer covers both halves — `positionsAt` re-evaluates the whole dependent chain per step and traces whichever point was asked about.
+
+`carrierSystem` was extracted from `evaluate` so the solve and the tracer read **the same residuals**; a second construction of "what the constraints say" would be two definitions of the figure drifting apart.
+
+### The determinacy gate, and it is the honesty gate
+
+> *"only if we are positive about the equation we show it. otherwise, we stick to showing the shape."*
+
+Trace at two configurations, compare the **sets**. Same ⇒ print the equation; different ⇒ the kind alone. It is the set-level sibling of `isKnowledge` — that predicate asks whether a VALUE is invariant, and a locus point is by definition not, which is exactly why the *set* needs its own predicate.
+
+It falls out with no special-casing: the bisector prints `x = 4`; **חורף 25 with `A(−9a,0)` `B(41a,0)` prints «מעגל» and no equation**, because reaching `(x − 16a)² + y² = 625a²` means recognising a symbolic dependence across samples — the CAS boundary. And the KIND still shows, because the kind IS invariant and *"show that the locus of P is a circle"* is precisely what that exam asks.
+
+### The self-check earned its place three times over
+
+`fit → snap to rationals → RE-VERIFY the snapped equation against the trace → print, or print nothing`. With no student-side validation anywhere in this product, nothing else stands between an over-eager snap and a confident wrong equation. Three defects were found by measuring it rather than reasoning about it, and each was a class:
+
+1. **A line is not a well-posed conic fit.** Infinitely many conics contain a straight line, so the least-squares eigenspace is degenerate and the most elementary locus in the corpus classified as `rotated`. Cured by fitting the **lowest-degree curve first**, which is also what a student writes.
+2. **Snapping must be RELATIVE.** חורף 25's `F` fits to `−368.99998759` against `−369` — absolute error `1.2e−5`, relative `3.4e−8`. Held to an absolute `1e−6` a perfectly determinate locus printed nothing.
+3. **Normalisation must be MONIC.** Dividing by the largest coefficient makes that same circle's `A = −1/225`, which is not a rational with a denominator under 64. Monic gives `1, 1, −32, −225` — integers, which is what exam loci have.
+
+A fourth was a scope question rather than a bug: the view box is driven by the STATED objects, so «A(0,0)» + «MA = 5» gives a box about five across for a curve ten across, and tracing only inside it produced a **23° arc** — too little to identify (the gate then reported "shape only" about a determinate locus) and too little to show the student their answer. The walk now goes wider than the frame and the RENDERER clips, which leaves ADR-AG-072 §9 intact: the frame is still driven by the stated objects and an infinite locus still does not inflate it.
+
+### The knowledge gate needed a SECOND ARM, not a bypass
+
+`Answer.mark` is present *only* when a distance is knowledge, because drawing it on an under-determined figure would assert a magnitude nobody gave. A locus is the **inverse**: it is honest *because* the figure is under-determined, since it draws every position rather than one. The gate as written would have suppressed the trace on exactly the figures it exists for — and *"every surface that prints a number is gated, and remembering only one is the recurring failure"* is this tree's own documented trap.
+
+The trace rides ADR-AG-067's existing `shown` lifetime rather than inventing a fourth rule, so «click the entry again» hides a locus exactly as it hides a height and the row stays.
+
+**Consequences.** `engine/locus.ts` and `engine/locusFit.ts` (new), `carrierSystem` extracted from `evaluate`, `Answer.locus`, `drawnLoci`, `SceneLocus`, four `locus.*` locale keys, one catalog entry. `issue-1136-1137-locus.test.ts` (24). Analytic lane 88 files / 1236 tests.
+
+**Not in this slice:** #1138 (V1b, the construction locus) — it inherits the tracer, the surface, the gate and the fit pipeline whole. The set-former phrasing «המקום הגיאומטרי של כל הנקודות M המקיימות…» stays sugar for later (ADR-AG-072 §1). «המקום הגיאומטרי של מרכזי המעגלים…» quantifies over *circles* and is still refused by name.
+
 ## ADR-AG-082 — A shape noun's UNSTATED choice is the tool's assumption, and a statement pins it (#1159)
 
 **Requirements:** [02c](02c-requirements-analytic.md) R93. **Design:** [04c](04c-design-analytic.md) — *a noun's unstated choice is the tool's*. **LADDER stage:** the apply boundary — the noun lowers as before, and what changes is what a later statement may do to it.
@@ -4618,6 +4684,99 @@ Sign is not normalised: `-4x + 3y = 0`, exactly as the ruling wrote it. A conven
 **Four sentences, written out, not one templated noun.** Hebrew gender carries through the whole clause — «הנקודה … הוגדרה» against «הישר … הוגדר» — so slotting a noun into one sentence would be wrong in three cases of four. An anonymous curve (`curve-<hash>`) gets the **kind-free** wording: it has no name the student wrote, so no noun would be true.
 
 **Consequences.** `fractionClearingFactor` (`format.ts`), one scaling in `lineText`; `RefKind`/`refKindOf`/`unknownRef` (`apply.ts`), `expected` threaded through `derive` → `submit` → the store, four locale strings per language. `issue-1180-1179-equation-and-noun.test.ts` (14) — asserting the **rendered** sentence through the real locale, because a key that exists proves nothing about what a student reads. Analytic lane 84 files / 1278 tests.
+## ADR-AG-086 — A locus is traced at the configuration being SHOWN, and a neighbour it cannot measure is skipped (#1176)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R87 — unchanged in what it promises; this is the implementation failing to keep it. **Design:** [04c](04c-design-analytic.md) — *the locus lane*. **LADDER stage:** the ask lane's read of the figure.
+
+**Operator, playing PR #1172's T10:** *"when pressing show another option, the shape breaks"* — with `P` well off the circle drawn as its own locus.
+
+### The canvas drew a curve that did not contain the point it named
+
+`ask.ts` called `locusOf(…, [0, 1], …)` with the seed pair **hardcoded**, while the figure sits at the session's seed. From the first press of «הציגו תצורה אחרת» the drawn locus therefore belonged to a different value of the figure's free parameter:
+
+| seed | `a` | P | traced circle | on it? |
+|--:|--:|---|---|---|
+| 0 | 3.458 | (108.0, −68.6) | centre (54.6, 0) r 86.4 | yes |
+| 1 | 1.314 | (−4.5, −20.7) | centre (55.3, 0) r 86.4 | **no** |
+| 2 | −3.400 | (21.9, −37.5) | centre (55.4, −0.2) r 86.4 | **no** — the screenshot |
+
+The traced circle was **identical at every seed** while `P` moved. It also broke ADR-AG-072 §4's own stated side effect — *"«הציגו תצורה אחרת» then makes the circle GROW with `a` on screen"* — because it was never re-traced.
+
+**A `Derivation` now carries its `seed`.** Not carrying it is what made the defect possible: `ask` had no way to know which configuration it was answering about. Carried rather than re-derived, so a consumer cannot disagree with its own figure by construction.
+
+### The lock is the deliverable, not the one-line fix
+
+All 24 locks in `issue-1136-1137-locus.test.ts` passed throughout. They assert the trace's SHAPE and the gate's VERDICT — both true — and neither asked the question that matters on a figure that moves:
+
+> the traced point lies **on its own trace**, at the configuration shown, at every seed.
+
+It is invisible without a parameter, because there the locus really is the same set at every seed. So the parameterised figure is not an edge case for this feature; it is the only case that can fail.
+
+### The comparison sample must be MEASURABLE, not merely different
+
+Exposed by the fix and owned with it. The determinacy gate answers "kind only" when the two traced sets differ — but it was also answering that when it simply **could not measure one of them**, which is not evidence about the set at all.
+
+Measured: the plain bisector traces `x = 4` exactly at almost every configuration, but at seed 2 the free point solves out at `y ≈ 317`, so the figure is drawn fifty times larger than the points defining it and `MA = MB` pins `x` to only ~1e−4 out there. That trace legitimately fails the self-check — and as the *neighbour* of seed 1 it was suppressing the equation on a configuration that measured perfectly well. The comparison now advances past a configuration it cannot measure, bounded by `COMPARE_TRIES = 3`. It never widens what counts as agreement: two traces that both measure and disagree still print the kind alone.
+
+**Investigated and rejected before settling there.** A finer step does not help — measured, the drift is `1.9e-3` at step 14.6, 7.3 and 3.65 alike, because it is ill-conditioning and not accumulation. Trimming the fit to the view box does not help either (`2.6e-4`, still short of the snap bar). At an ill-conditioned configuration the tool genuinely cannot verify `x = 4`, and ADR-AG-072 §7 already says what to do: **if it will not snap, print nothing.** That case is now asserted deliberately rather than worked around, so a future change which starts printing an equation there has to say why.
+
+### Riding along: #1180's ruling reaches this surface too
+
+`locusEquation`'s slope arm built `y = <slope>x + c`, so a fractional slope printed `y = 4/3x + 2` — the ambiguity (`4/(3x)`?) the operator reported against the panel's curve row. Same ruling, same treatment: the equation clears its fractions, `3y = 4x + 6`, using the `fractionClearingFactor` that landed with round #1173. The two axis-parallel arms keep their exact value (`x = 4/3`): nothing follows them, so there is nothing to misread.
+
+**Consequences.** `Derivation.seed`, one call site in `ask.ts`, `COMPARE_TRIES` in `locus.ts`, the slope arm in `locusFit.ts`. `issue-1176-locus-configuration.test.ts` (11). Analytic lane 86 files / 1388 tests.
+
+## ADR-AG-087 — the CANVAS gets a bidi chokepoint, so a label cannot reorder a number (#1191)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — **R87 unchanged**; this is the implementation failing to keep it, one surface over. **Design:** [04c](04c-design-analytic.md) — the renderer's label seam. **LADDER stage:** render only; nothing in the engine, the tracer or the ask lane moves.
+
+**Operator, playing PR #1172.** A perpendicular bisector of `A(0,0)`–`B(6,8)`, drawn dashed, labelled on the canvas:
+
+```
+4 · ישרy = −3x + 25        ← what the student READ  (captured in a browser, before)
+ישר · 4y = −3x + 25        ← what the tool computed (captured in a browser, after)
+```
+
+`3x + 4y = 25` **is** the perpendicular bisector, and the drawn `M` sits on it. The geometry, the tracer and the determinacy gate are all correct. **This is display only** — and it is the class `Figure.tsx`'s own header comment calls *"the worst class of bug this tool can have"*: the canvas silently lying about a number, reached through a label instead of a tick.
+
+### Root cause — the canvas had no bidi chokepoint at all
+
+The label went onto the canvas as a raw string: `ask.ts` composes `value = \`${kindWord} · ${eq}\``, `App.tsx` hands it to `buildScene` as `loci[].label`, `scene.ts` copies it into `SceneLocus.label.text`, `Figure.tsx` renders it in a plain SVG `<text>`.
+
+The root `<svg>` sets `direction: ltr`, so the paragraph level is LTR. In `ישר · 4y = …` the `·` sits between a Hebrew word and a **European Number**; UBA N1 resolves that neutral to RTL and I1 lifts the digit above the base level, so `4 · ישר` reorders as one unit and the rest of the equation is stranded.
+
+**Only an equation that STARTS with a digit scrambles**, which is why the locus lane's own worked example survived the build:
+
+| locus | equation | first char | renders |
+| --- | --- | --- | --- |
+| circle | `(x − 16)² + y² = 625` | `(` then `x` (strong L) | correct |
+| parabola | `y² = 8x` | `y` | correct |
+| line, unit `y` | `y = −3x + 4`, `x = 4` | `x`/`y` | correct |
+| **line, non-unit `y`** | **`4y = −3x + 25`** | **`4` (EN)** | **scrambled** |
+
+The whole analytic renderer contained **one** bidi call — `unicodeBidi: 'isolate'` on the circle-centre label — which could not have helped: the scramble is *inside* the string, not around it. The **panel** row for the very same value was already correct, because it goes through `analyticBidi.isolateLtrRuns`. The canvas was simply a second display surface that never adopted the kit.
+
+### Where the fix belongs, and where it deliberately does not
+
+**Not** by reordering the label or dropping the `·`. That hides the class and leaves the next Hebrew-carrying canvas label to break: `drawnMarks` feeds `measures[].label` from the same `Answer.value` through the same unisolated `<text>`, and today those values are bare numbers — one Hebrew word away from the identical defect.
+
+The isolation goes in `buildScene`, which already declares (#723/#1029) that *formatting is a DISPLAY concern, so it happens here* and is the single place every canvas label — locus, measure, segment length, centre, construction mark — is produced. No call site can forget, and a label added later is isolated by construction. SVG `<text>` honours U+2066/U+2069 natively; ADR-431 Am. 1's exception is about `.docx`, not the browser.
+
+**`crossings[].sentence` is deliberately NOT isolated.** It is not canvas `<text>` — it is a `<title>` tooltip, and the same string is submitted back as an utterance when the ring is clicked. Format controls belong in display strings, never in something that round-trips into the parser.
+
+### The import question, answered as the issue said it could be
+
+`scene.ts` imported nothing from `i18n/`, and that is *why* the canvas never adopted the kit: reaching one function would have dragged i18next, every locale and the post-processor chain into a pure renderer.
+
+So the kit moves to its own module (`i18n/bidi.ts`) and `i18n/index.ts` re-exports it — every existing caller is untouched, and the renderer imports two lines instead of a bootstrap. The injection alternative (`SceneKnowledge`) was rejected: **an injected isolator is one a caller can forget, and forgetting is the entire defect.** One instance also means `extraCore` cannot drift between the panel and the canvas, which two kits would eventually do.
+
+### Verification
+
+A unit lock over the **composed** label string, calling `ask` and `buildScene` rather than reproducing them, and comparing the canvas label to `isolateLtrRuns` of the panel's own value rather than to a spelled-out expectation (ADR-W-053) — so the assertion is *the canvas and the panel agree*, which is the real invariant. Proven to FAIL without the fix: 5 of its 6 cases go red when `lbl` is made the identity.
+
+And, because a bidi bug is a **visual order** bug that no string assertion can see, driven in a real browser at the operator's own figure, before and after — the two renderings quoted at the top of this entry are screenshots, not reasoning.
+
+**Consequences.** `i18n/bidi.ts` (new, the kit); `i18n/index.ts` re-exports it; `buildScene` gains one `lbl()` seam applied at all five label channels. Lock: `issue-1191-canvas-bidi.test.ts` (6), including the class assertion that every label channel is isolated and that a pure-LTR label is left alone.
 
 ## ADR-AG-088 — A name that denotes a line denotes it to EVERY surface (#1148 + #1139)
 
@@ -5444,3 +5603,109 @@ The open case now carries `expr?: string`, set from `exprText(e)` in the `kind =
 A numeric point still draws its numbers. **A carrier point still draws `x_A`** — «A על הישר y=x» is a `free` object, the student stated no expression for its x, and inventing one there would be the opposite error to the one this fixes. And no sampled number ever reaches a label for an open coordinate: the lock asserts the absence of a decimal, not merely the presence of `-9·a`.
 
 The last lock asserts the two surfaces agree by construction rather than checking two separately-correct strings that could drift apart later.
+
+## ADR-AG-106 — The snap may not demand precision the trace never promised (#1224)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the locus states its equation when the givens fix it; no new row. **Design:** [04c](04c-design-analytic.md) — the locus fit and its determinacy gate. **LADDER stage:** display only; no engine or solve change.
+
+Found while verifying PR #1172's own play cases before handing the operator a sheet. All four documented cases passed; varying the figure showed the lane's headline feature failing on the ordinary one.
+
+```
+B(8,0)   bisector x = 4         «ישר · x = 4»   ✓
+B(0,8)   bisector y = 4         «ישר · y = 4»   ✓
+B(6,8)   bisector 3x + 4y = 25  «ישר»           ✗   drawn correctly, no equation
+B(4,4)   bisector at 45°        «ישר»           ✗
+B(2,0)   bisector x = 1         «ישר»           ✗   axis-aligned, and still failing
+```
+
+`B(2,0)` is what ruled out *"slanted breaks it"*: whatever the gate measured was **scale**-sensitive.
+
+### Neither candidate in the issue was the cause
+
+`shapeOfTrace.curve` held the correct line in every case — `x = 1`, and `a=1, b=4/3, c=−8.327`, which is `3x + 4y = 25` to three figures. `locusEquation` discarded it at its opening `if (!shape.conic) return null`, and `conic` was absent because **`snapRational` uses an ABSOLUTE `1e−6` while the trace's accuracy is RELATIVE to how far it walks**:
+
+```
+          traced span   worst deviation from the TRUE line
+B(2,0)             40   1.9e−5      19× the absolute tolerance
+B(6,8)           2685   1.5e−2      four orders past it
+```
+
+The same function's **verification has always been relative** (`1e−6 × scale²`). So the two halves of `snapAndVerify` disagreed about what precision means, and the half that ran first rejected data the half that guards correctness would have accepted.
+
+The snap now takes its tolerance from **the trace's own scatter about the fitted curve** — the precision this data actually has. Never tighter than `SNAP_TOL`, so an exact trace still snaps exactly. This is not a loosening: the verification is untouched and is what keeps a wrong snap from being printed.
+
+### The hole that opened, and the lock that caught it
+
+A scatter-derived tolerance can be wide, and a wide enough one snaps **every coefficient to zero** — after which `0 = 0` satisfies the verification at every point. Handed `x = 40` against a trace at `x = 4`, the scatter is 36 and the result was `{0,0,0,0,0,0}`.
+
+`issue-1176`'s honesty lock caught it, which is the argument for writing that lock as a **direct** assertion rather than inferring the refusal from a case that happened to fail the snap. A degenerate snapped conic is now refused; a wrong-but-nonzero one the verification catches unaided, because it is false somewhere. The degenerate one is the single case it cannot catch, because it is true everywhere.
+
+### A lock that asserted the old behaviour, updated rather than worked around
+
+`issue-1176-locus-configuration.test.ts` asserted that seed 2 of the plain bisector prints the kind alone, with the note *"asserted so that a future change which starts printing an equation here has to say why"*.
+
+Saying why: that seed draws its locus over ~974 units while `A` and `B` sit 8 apart, and the old premise was that `x = 4` *"cannot be re-verified against the trace"*. It was never re-verified — the absolute snap failed first, so nothing reached the check. It now reaches it and **passes**: the trace's worst deviation from `x = 4` is `1.85e−3` against a verification tolerance of `0.95`. And `x = 4` is the true locus there, at every seed. The tool is not stating something it could not check; it is now checking something it could not previously reach.
+
+### What this unblocks
+
+[#1191](https://github.com/dcodish/geo_builder/issues/1191) is a P1 about `4y = −3x + 25` rendering as `4 · ישר y = −3x + 25` on the canvas. While #1224 stood, that figure printed «ישר» with nothing after it — **so the P1's fix could not be play-verified at all**, and its play case was marked unplayable on the operator's sheet. That figure now produces the label, which is what makes the P1 checkable.
+
+## ADR-AG-107 — The yud is optional, and a circle states its radius squared (#1210, #1187)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the locus lane answers the question the student asked, in the exam's notation; no new row. **Design:** [04c](04c-design-analytic.md) — the locus question's pattern and the circle's equation. **LADDER stage:** parse + display.
+
+The last two of the three things standing between PR #1172 and its merge, and therefore between the P1s (#1191, #1176) and production. The third was ADR-AG-106.
+
+### #1210 — refusing a spelling answers a spelling, not a question
+
+«המקום הגאומטרי של M» returned «לא הבנתי את השאלה» while «המקום הגיאומטרי» worked.
+
+*Ktiv male* «גיאומטרי» and *ktiv haser* «גאומטרי** are the same word. A student who omits the yud has made no mistake, and a tool that refuses one of them is teaching orthography on a geometry question — the class #1156 and #1183 named, where the remedy offered is about the student's typing rather than their figure.
+
+`י?` — one optional character at the one place the two forms differ, rather than a second alternation that could drift. The lock asserts eight neighbouring forms still resolve, and that the pattern did not become a wildcard: «שיפוע AB» is still not a locus question.
+
+### #1187 — the row's job is to say what the circle IS
+
+**Operator, playing T31:** *"the radius in equation should show as 25^2 and not 625"*.
+
+`(x − 16)² + y² = 625` makes the student take a square root to recover a radius the tool already holds, on the one row that exists to tell them. The exam writes `= 25²`.
+
+**Conditional on the radius being worth squaring.** The squared form is shown only when the displayed radius round-trips — `fmt(r)` parsed back and squared must equal the constant. Otherwise `= 12.25²` would be a worse row than the number it replaces, and a tidy-looking square that does not hold would misstate the figure. When it does not round-trip the plain constant stands, exactly as before.
+
+### Three existing locks asserted the old form, and were updated with the reason
+
+`issue-1136-1137-locus`, `issue-1176-locus-configuration` and `issue-1224-slanted-locus` all asserted `= 625` — the last of them written earlier the same day. Each now asserts `= 25²` and carries the operator's ruling inline, so the next session reads *why* the expected value changed rather than finding a bare edit. The `(x − 16)² + y²` half is asserted separately, because #1187 changes one side of the equation and must not be read as licence to restyle the other.
+
+## ADR-AG-108 — One printer for a line, and it is the panel's (#1197)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — a line is written `Ax + By + C = 0` wherever it is shown; no new row. **Design:** [04c](04c-design-analytic.md) — the locus label's notation, and where `locusEquation` lives. **LADDER stage:** display only.
+
+**Operator, twice.** 2026-09-18, playing round #1193 T10: *"when a line is shown - we always write it as Ax+By+C=0 and not like the image has"*. And again 2026-09-19, playing T54 on the integrated branch: *"the line needs to be in the format of Ax+By+C=0 and not like it is now"*.
+
+### The convention was already written down; the lane had its own
+
+```
+the data panel (lineText)        3x + 4y - 25 = 0     ✅ the convention
+the locus label (locusEquation)  4y = −3x + 25        ❌
+```
+
+Two printers for one object, two inches apart on the same screen. `lineText`'s own docblock is the rule — *"written the way a textbook writes it: no `1x`, no `+ 0`, no `+ -3`"* — and it already carries #1180's fraction clearing and #1119's magnitude rule. The locus lane reimplemented the notation instead of calling it, which is the failure [ADR-W-053](06w-decisions-workspace.md#adr-w-053) names, in the direction that is easiest to miss: not a test reproducing a decision, but a second *implementation* of one.
+
+### The move that made the call possible
+
+`lineText` lives in `app/curveText.ts`; `locusEquation` lived in `engine/locusFit.ts`. An engine module importing upward would have been the real cost of a one-line fix.
+
+So `locusEquation` moved **up** into `app/curveText.ts` — which is the right home on its own terms, and the mirror of what #1201 did when it moved line *resolution* DOWN into the engine. The test is what the thing IS: resolution is geometry and belongs below; notation is a sentence for a student and belongs above. `ask.ts`, in `app/`, was already its only production caller.
+
+The line branch now calls `lineText(D, E, F)` on the **snapped** coefficients — the exact ones the determinacy gate accepted — and `lineText` clears the fractions itself. Circle, parabola and ellipse keep their canonical forms: `Ax + By + C = 0` is the convention for a LINE, and `(x − 16)² + y² = 25²` is how a circle is written.
+
+```
+x = 4               →  x - 4 = 0
+y = 4               →  y - 4 = 0
+4y = −3x + 25       →  3x + 4y - 25 = 0
+y = −x + 4          →  x + y - 4 = 0
+```
+
+### Twenty-three assertions, changed with the reason attached
+
+Four locus test files asserted the retired notation, across 23 places. Each pair was listed explicitly in the migration rather than pattern-matched, so a wrong pair would be visible in review — `y = 2x` and `-2x + y = 0` are the same line, and a script that guessed could quietly have made them different ones. The prose in those files was updated too, so no file describes a notation it no longer asserts.

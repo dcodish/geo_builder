@@ -2112,6 +2112,47 @@ export function parseLine(raw: string): ParseResult {
   // reject sentences the tool now understands. Removing it IS the fix, not a side effect of it.
 
   /**
+   * A POINT NAMED WITHOUT BEING PLACED — «נקודה M», «נתונה נקודה M», «M היא נקודה» (#1136).
+   *
+   * The `free` carrier family has existed since slice A — *"a named but unplaced point, two degrees
+   * of freedom, its own"* (#1017) — and `evaluate` places it, solves it and counts it. **The engine
+   * was complete; only the sentence was missing.** So this rule emits the `declare` fact the cevian
+   * and polygon rules already emit, and adds no engine concept.
+   *
+   * Until now the only route to a 2-DOF point was to smuggle it in as a polygon vertex —
+   * «משולש ABM» — which asserts a triangle the student never mentioned: a given the question never
+   * gave, [ADR-052](../../docs/06-decisions.md#adr-052)'s cardinal sin arriving through the front
+   * door. Every worked example in #1136 and in the locus issues had to use that workaround to be
+   * measured at all.
+   *
+   * **It runs LAST among the point forms, and matches only to end-of-line.** «נקודה D נמצאת על הצלע
+   * BC» and «נקודה M(3,4)» are longer sentences that `parsePoints` has already answered; a rule that
+   * matched a prefix would swallow them, which is the #1059 swallowing defect. The anchor is what
+   * keeps this a declaration rather than a wildcard.
+   *
+   * Hebrew morphology is written out rather than abbreviated (`HE_GIVEN`): «נתון» ends in FINAL nun
+   * and every other form in medial nun, so the convenient `נתונ(ה|ים|ות)?` silently drops the
+   * commonest spelling. This tree has paid for that letter three times.
+   *
+   * **The sibling nouns were measured at the same time** (#1136's class check). «מעגל O» already
+   * declares a free-centred circle; «ישר k» and «line k» are refused for the SAME reason this was,
+   * and are NOT fixed here — a free line has no object kind and no `carrierOf` row, so it is real
+   * engine work rather than a sentence. Filed rather than folded in.
+   */
+  const FREE_POINT_HE = new RegExp(
+    `^${HE_GIVEN}(?:ה?(?:נקוד(?:ה|ות)|קדקוד)\\s+(${NAME})|(${NAME})\\s+(?:היא|הינה)?\\s*ה?(?:נקודה|קדקוד))$`,
+  );
+  const FREE_POINT_EN = new RegExp(
+    `^(?:a\\s+|the\\s+|given\\s+(?:a\\s+|the\\s+)?)?point\\s+(${NAME})$`,
+    'i',
+  );
+  const freePt = FREE_POINT_HE.exec(line) ?? FREE_POINT_EN.exec(line);
+  if (freePt) {
+    const id = freePt[1] ?? freePt[2];
+    if (id) return { ok: true, facts: [{ t: 'declare', id, src: line }] };
+  }
+
+  /**
    * F3/F5/F6 WITHOUT the noun — `x-y+2=0`, `y^2=54x`, `(x-3)^2+(y-4)^2=9` (#1037).
    *
    * [02c R6](../../docs/02c-requirements-analytic.md) (operator ruling, 2026-09-04) made the shape

@@ -55,6 +55,15 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'points', family: 'F1', he: 'נתונה הנקודה A(2,6)', en: 'point A(2,6)' },
   { category: 'points', family: 'F1', he: 'נתונות הנקודות A(0,24), B(18,0)', en: 'points A(0,24), B(18,0)' },
   { category: 'points', family: 'F1', he: 'A(-9a,0)', en: 'A(-9a,0)' },
+  /**
+   * A point NAMED without being PLACED (#1136) — two degrees of freedom, its own.
+   *
+   * The sentence the locus lane stands on: «המקום הגיאומטרי של M» asks about a point that must exist
+   * before any property can be stated about it. Until this, the only route to a 2-DOF point was to
+   * smuggle it in as a polygon vertex («משולש ABM»), which asserts a triangle the student never
+   * mentioned — ADR-052's cardinal sin through the front door.
+   */
+  { category: 'points', family: 'F1', he: 'נקודה M', en: 'point M' },
 
   // --- F3 · lines by equation ---
   { category: 'lines', family: 'F3', he: 'נתון הישר l1: 4y-3x-20=0', en: 'line l1: 4y-3x-20=0' },
