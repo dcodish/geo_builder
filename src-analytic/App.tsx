@@ -596,6 +596,7 @@ export function App() {
           'reserved-coordinate': 'errReservedCoordinate',
           'bad-arity': 'errBadArity',
           'repeated-vertex': 'errRepeatedVertex',
+          'degenerate-role': 'errDegenerateRole',
           'bad-operand': 'errBadOperand',
           'conflicting-restatement': 'errConflict',
           'name-kind-clash': 'errNameClash',

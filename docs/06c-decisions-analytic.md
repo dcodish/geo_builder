@@ -5773,3 +5773,79 @@ This does not contradict [ADR-AG-032](#adr-ag-032)'s "the noun decides boundedne
 The plan asked for `dist < 1e-9`. The minimiser converges to ~1.5e-8 relative off-line and ~5.6e-8 in cos over 24 seeds — measured, and a lock at 1e-9 would have gone red on correct output. The tolerance is 1e-6: clear of the noise, and still a millionth of the side.
 
 `issue-1232-altitude-foot.test.ts` locks both halves over 8 seeds, the English sentence, the obtuse case, the median, and — the class — that the RULE emits both constraints. Verified red on the pre-change code: 4 of its 5 cases fail, the median's passes, which is exactly the shape of the defect.
+
+## ADR-AG-110 — A role's own incidence is checked at the rule, with an owned refusal (#1231)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the cevian forms, amended: a sentence whose letters contradict the role it names is refused, not drawn. **Design:** [04c](04c-design-analytic.md) — the cevian rule and the `ParseFailure` registry. **LADDER stage:** parse. No engine or solver change. **Extends** ADR-AG-109 (#1232); sibling of the 2-D ADR for #1233.
+
+**Operator report, 2026-09-19** (screenshot): the tool accepted
+
+```
+משולש ABC
+A(2,-5)
+BD תיכון לצלע AB
+```
+
+and drew it.
+
+### Measured, not read off the code
+
+`derive(['משולש ABC','A(2,-5)','BD תיכון לצלע AB'], seed)`:
+
+| seed | `\|BD\|` | `\|AB\|` | faults |
+| --- | --- | --- | --- |
+| 0 | 4.97 | 9.94 | `[]` |
+| 1 | 5.45 | 10.90 | `[]` |
+| 2 | 1.92 | 3.84 | `[]` |
+
+`|BD|` is exactly `|AB|/2` at every seed: `D` is the midpoint of `AB`, and the segment the tool draws as a *median* is the second half of the side it was supposedly drawn to. `faults: []` — the tool asserts the figure is correct.
+
+Measured at parse, the silently-wrong set is exactly **apex ∈ {u,v}** (both roles, both letters), **apex = foot**, and **foot ∈ {u,v}** — the last reaching the solver as `unsatisfiable` rather than being answered.
+
+### Root cause
+
+The `CEVIAN_HE`/`CEVIAN_EN` handler validated **only the side's own two letters**:
+
+```ts
+if (u === v) return refuse('repeated-vertex', line); // «AD תיכון לצלע BB» names no side
+```
+
+and then emitted unconditionally. It checked the letters of one operand and never the **relation between the two operands**, which is the part the word «תיכון»/«גובה» actually asserts.
+
+**Class:** *a sentence that names a construct by the ROLE one point plays relative to another object is accepted without checking the incidence that role itself imposes — so a degenerate naming builds a figure contradicting the word the student used, with `faults: []`.*
+
+This is the parse-time twin of ADR-AG-109 (#1232), and of #1158/#1166's *"the configuration drawn must honour the noun that declared it"*. There the noun is honoured by a **configuration** check; here the sentence is degenerate by its letters alone, so it must be refused at parse time and never reach the solver.
+
+### The decision — the definition, not the three observed failures
+
+```
+a cevian runs apex → foot; the foot lies on side (u,v); the apex does NOT; and apex ≠ foot
+```
+
+`foot ∈ side` is refused here rather than left to the solver, because parse time is where the message can **name the student's statement** instead of reporting an unsatisfiable system — the honesty invariant that error messages name the conflicting statement, never internal state.
+
+### An OWNED code, and why `repeated-vertex` is the wrong word
+
+`degenerate-role` is a new `ParseFailure` code. The registry is deliberately small, so the case for adding to it has to be made: **nothing repeats inside a run here.** «AB» is a perfectly good side and «BD» a perfectly good segment; what is wrong is the relation between them. Telling the student *"the same letter appears more than once"* would send them to fix a run that is already correct — the refusal would name the wrong thing, which is the failure mode owned codes exist to prevent. «AD תיכון לצלע BB» genuinely repeats and keeps `repeated-vertex`.
+
+The message names the statement, gives the reason in the student's own vocabulary (*a median runs from a vertex to the side opposite it*), and **teaches a spelling that works**. That last clause is asserted, not assumed: a test drives «AD תיכון לצלע BC» through `parseLine` and requires it to build, because a remedy that returns the same refusal is worse than none (the #1156/#1183 lesson).
+
+### Never `null` — the one place this tree does NOT copy 2-D
+
+Returning `null` would route a sentence this rule clearly *matched* to the `not-handled` seam and on to the LLM, which #1039/#1042 ruled against here: **a rule that matched owes the student an answer.**
+
+2-D's equivalent gate escalates, and its sibling fix (#1233, landed the same day) keeps that. The split is deliberate and recorded on both sides so neither is later read as the other's precedent: 2-D has no owned-refusal vocabulary equivalent to `ParseFailure`, and building one there is a larger change split out under its own issue.
+
+### The lock
+
+A table over `{תיכון, גובה} × {median, altitude} × {apex=u, apex=v, apex=foot, foot=u, foot=v}`, plus the «נתון»-prefixed and triangle-tailed spellings that ride the same rule. It **calls** `parseLine` rather than re-implementing the predicate (ADR-W-053).
+
+The negative controls are the half that matters: every well-formed spelling in both roles and both locales still builds, and — because a gate added to this rule is exactly the edit that would quietly drop a leg — the altitude is asserted to still lower to **both** halves of ADR-AG-109's conjunction, `on-line-2pt` **and** `perpendicular`. Verified to bite: **17 of the 27 assertions fail against pristine `parseAnalytic.ts`.**
+
+### Consequences
+
+`parser/parseAnalytic.ts` (the code + the predicate), `store/useAnalyticStore.ts` (the error union), `App.tsx` (the code → message map), `i18n/index.ts` (both locales).
+
+`issue-1231-degenerate-role.test.ts` (27). Analytic lane green.
+
+**Sequencing note for what follows:** #1222 and #1165 widen this same rule (the apex-fronted form, cevians by triangle, the angle bisector). They must be built **on top of** this gate — porting 2-D's cevians without it would carry 2-D's own missing altitude gate into this tree.
