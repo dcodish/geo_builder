@@ -125,6 +125,7 @@
     "cevianMedianFootAtEnd": "The midpoint of {{side}} cannot be {{foot}} — that would need {{side}} to have zero length.",
     "cevianApexIsFoot": "{{apex}}{{foot}} is not a segment — {{kind}} runs from a vertex to a different point.",
     "cevianWrongSide": "The bisector from {{apex}} meets side {{actual}}, not {{stated}}.",
+    "arcCopula": "\"arc {{a}} is arc {{b}}\" says they are the same arc. To say their measures are equal: \"arc {{a}} equals arc {{b}}\".",
     "crossingAlreadyNamed": "The point you asked for is «{{holder}}» — a point already in the figure. {{s1}} and {{s2}} do meet there, but there is no new point here to call «{{id}}»; if you meant another point, check which two lines cross there."
   },
   "explore": {

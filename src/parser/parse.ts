@@ -112,7 +112,16 @@ export type ParseResult =
    *  that the rest are NOT supported and say so by name, rather than escalating to an LLM that would
    *  invent a figure. `noun` is the student's word; `offer` names what does build, so the message can
    *  point somewhere useful instead of only refusing. */
-  | { ok: false; reason: 'polygon-not-supported'; noun: string; offer: string[] };
+  | { ok: false; reason: 'polygon-not-supported'; noun: string; offer: string[] }
+  /**
+   * #1000 (operator ruling 2026-09-14): «קשת CD היא קשת DE». In Hebrew a bare copula between two
+   * arcs reads as IDENTITY — this arc *is* that arc — which between two differently-named arcs means
+   * nothing. Accepting it as equality of MEASURE, as ADR-507 did, teaches a sentence that means
+   * something else, which is what ADR-W-030 forbids. The tool refuses it and offers the sentence it
+   * does accept: «קשת CD שווה לקשת DE». `a`/`b` are the student's own arc labels, so the offer is
+   * their line with one word changed.
+   */
+  | { ok: false; reason: 'arc-copula'; a: string; b: string };
 
 /**
  * Figure context the parser may consult to resolve implicit references — chiefly
@@ -281,7 +290,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -2660,9 +2669,47 @@ const angleAliasRule: Rule = (s, ctx) => {
  * arc lives on the circle boundary, not as central radii (matches the textbook figure). The arc endpoints are
  * assumed on that circle (true in the corpus). Runs before `angleEquality` (its own `arc`/`קשת` keyword).
  */
+/**
+ * A BARE COPULA JOINING TWO LABELLED ARCS — the spelling #1000 narrowed out of the equality seam.
+ *
+ * Deliberately excludes «שווה ל» with its `ל`: that form is canonical and has already become `=` upstream,
+ * so matching it here could only mean the normaliser stopped working — and teaching a student to write
+ * the sentence they just wrote is the #1156 failure mode.
+ */
+/** An arc reference is a two-letter RUN, not a single `LABEL` — `CD`, never `C`. */
+/**
+ * A BARE COPULA JOINING TWO LABELLED ARCS — the spelling #1000 narrowed out of the equality seam.
+ *
+ * An arc reference is a two-letter RUN (`CD`), not a single `LABEL`, which is `[A-Za-z]\d*`.
+ *
+ * Deliberately excludes «שווה ל» with its `ל`: that form is canonical and has already become `=`
+ * upstream, so matching it here could only mean the normaliser stopped working — and teaching a
+ * student to write the sentence they just wrote is the #1156 failure mode.
+ */
+const ARC_RUN = String.raw`${LABEL}\s*${LABEL}`;
+const ARC_COPULA_RX = new RegExp(
+  String.raw`(?:ה?קשת|⌢|⏜|\barcs?\b)\s*(${ARC_RUN})\s*(?:(?<![א-ת])(?:היא|הוא|שוו(?:ה|ות)(?!\s*ל))(?![א-ת])|\b(?:is|are)\b)\s*(?:ה?קשת|⌢|⏜|\barcs?\b)\s*(${ARC_RUN})`,
+  'i',
+);
+
 const arcEquality: Rule = (s, ctx) => {
   if (!/arc|קשת|⌢/i.test(s)) return null;
   if (/midpoint|אמצע/i.test(s)) return null; // "midpoint of arc …" → arcMidpoint, not a measure relation
+  /**
+   * THE COPULA BETWEEN TWO ARCS IS TAUGHT, NOT ACCEPTED (#1000, ADR-533).
+   *
+   * Operator, playing round #998 T10: *"when you say «קשת CD היא קשת DE» it is the same arc
+   * (which doesn’t make sense). So the user should have said arc X is equal to arc Y"* — and the
+   * ruling: *"for 1000 - this is the ruling: «קשת CD שווה לקשת DE»."*
+   *
+   * By the time this runs the canonical spellings are already `=` (`normalizeWordEquality` rewrote
+   * «שווה ל» and `equals`/`is equal to`), so a copula still standing here is one of the narrowed
+   * forms. It is refused with the canonical sentence offered rather than dropped into `not-handled`,
+   * which would send a form the tool deliberately declines to a paid model (the #957 lesson) and tell
+   * the student their words were unreadable when the tool understood them exactly.
+   */
+  const taught = ARC_COPULA_RX.exec(s);
+  if (taught) return { clarify: 'arc-copula', a: up(taught[1].replace(/s+/g, '')), b: up(taught[2].replace(/s+/g, '')) };
   const parts = s.split('=');
   if (parts.length !== 2) return null; // a single '=' relation
   const center = resolveCenter(s, ctx);
@@ -10231,6 +10278,18 @@ function normalizeWordDegrees(s: string): string {
  * and "angle ABC is a right angle" carry no label after the keyword and keep their own lanes, and a
  * copula before a VALUE («היא 2α», «היא 40») never reaches it (the ADR-498 lane). One chokepoint for
  * every relation reader — never a copula added to one rule's regex.
+ *
+ * #1000 (operator ruling 2026-09-14, ADR-533) — **the bare copulas are ANGLES ONLY.** ADR-507 admitted
+ * them "for labelled angle and arc references alike" and generalised in one step. That was never wrong
+ * for angles and never right for arcs, because what a copula between two of them MEANS differs:
+ * «זווית ABC היא זווית DEF» compares two measures, while «קשת CD היא קשת DE» says one arc IS
+ * the other, which between two differently-named arcs says nothing. The rule reads structure; this
+ * distinction is semantic, so it is drawn at the keyword.
+ *
+ * The first two rules — explicit «שווה ל…» and `equals`/`is equal to` — KEEP their arc keywords:
+ * those are the canonical spellings and the ruling names one of them as the sentence. The narrowed
+ * spellings are not dropped into `not-handled`; `arcEquality` recognises them and teaches the
+ * canonical form.
  */
 const normalizeWordEquality = (s: string): string =>
   s
@@ -10238,8 +10297,8 @@ const normalizeWordEquality = (s: string): string =>
     .replace(/שוו(?:ה|ות)\s+(?:ל-?\s*)?(?=-?\d+(?:\.\d+)?\s*(?:°|מעלות))/g, '= ')
     .replace(/\b(?:equals|is\s+equal\s+to)\s+(?=(?:the\s+)?(?:angle|∠|arcs?|⌢))/gi, '= ')
     .replace(/\b(?:equals|is\s+equal\s+to)\s+(?=-?\d+(?:\.\d+)?\s*(?:°|degrees?))/gi, '= ')
-    .replace(new RegExp(String.raw`(?<![א-ת])(?:היא|הוא|שוו(?:ה|ות))(?![א-ת])\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:ה?זוו?ית|∠|∢|ה?קשת|⌢)\s*${LABEL})`, 'g'), '= ')
-    .replace(new RegExp(String.raw`\b(?:is|are)\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:the\s+)?(?:angle|∠|∢|arcs?|⌢)\s*${LABEL})`, 'gi'), '= ');
+    .replace(new RegExp(String.raw`(?<![א-ת])(?:היא|הוא|שוו(?:ה|ות))(?![א-ת])\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:ה?זוו?ית|∠|∢)\s*${LABEL}|${NUM}\s*[*·]?\s*(?:ה?קשת|⌢)\s*${LABEL})`, 'g'), '= ')
+    .replace(new RegExp(String.raw`\b(?:is|are)\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:the\s+)?(?:angle|∠|∢)\s*${LABEL}|${NUM}\s*[*·]?\s*(?:the\s+)?(?:arcs?|⌢)\s*${LABEL})`, 'gi'), '= ');
 
 /**
  * A trailing UNIT word is not part of the value (#1157).
@@ -11057,6 +11116,7 @@ function refusalOf(res: Clarify): ParseResult {
     return { ok: false, reason: 'cevian-wrong-side', apex: res.apex, stated: res.stated, actual: res.actual };
   if (res.clarify === 'crossing-already-named')
     return { ok: false, reason: 'crossing-already-named', holder: res.holder, id: res.id, s1: res.s1, s2: res.s2 };
+  if (res.clarify === 'arc-copula') return { ok: false, reason: 'arc-copula', a: res.a, b: res.b };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 
