@@ -486,3 +486,34 @@ label.
 
 Not gated by `showWitnesses` (a stated given is not a debug overlay) and not gated by edge visibility
 (the operator's ruling — see the ADR).
+
+## Who may introduce a point: the drawing registers (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253))
+
+Most commands that mention a pair are **carriers** — «נסמן: AB = u» draws the vector's segment before
+naming it — and a carrier may never introduce its own subject, or a NAMING would mint what it claims to
+name (`v7-t1` locks that refusal). Only a **drawing register**, where the student's whole sentence *is*
+the object, may introduce points: `segment3 {bare}` and `draw-arrow`.
+
+Both registers refuse a pair with two unknown endpoints, and that refusal is the typo guard: «קטע QZ»
+names the label the student got wrong instead of inventing two points. `canStartFigure(c)` — no points,
+no solids — is the one exception, and it is exactly where the guard has nothing to protect: an empty
+canvas has nothing to have mistyped against.
+
+**It is applied to the ARROW lane only, and the scope was measured rather than assumed.** Widening the
+bare-segment lane too moves two locks that encode decisions which should stand:
+
+| widened lane | what moves |
+| --- | --- |
+| `draw-arrow` | nothing — an arrow is not an input to any other rule |
+| `segment3 {bare}` | «קטע AB» + «דלתון ABCD» stops being a DECLARATION and takes the completion arm with two unknowns (#601); «אלכסון AB» before any solid stops being refused although no solid exists for it to be a diagonal of (#978) |
+
+The difference is structural, not a preference: the segment lane feeds shape-completion and role rules
+that ask *which points already exist*, so widening it changes what THEY do. `canStartFigure` is a named
+predicate either way, so the next register that needs this asks the same question in the same place, and
+a bare segment on an empty canvas remains its own question rather than a side effect of this one.
+
+**What still cannot start a figure**: a vector given by its COMPONENTS with no points at all
+(«נתון: v = (10,-5,0)»). `Construction3.vectors` is `Map<name, {from, to}>` — a vector IS a point pair —
+so this needs the positionless-vector design in
+[#1188](https://github.com/dcodish/geo_builder/issues/1188), including the pedagogical question of how an
+object with no position is drawn.
