@@ -12494,3 +12494,33 @@ The refusal turned the 2-D lane red on **13 tests across 9 files**. Every one wa
 **The gap this exposed, filed not built:** a corpus scenario cannot say *"this step is expected to be refused"* — `factsOf` throws on a non-parse — so a ruling that turns a sentence into a refusal forces editing or deleting the operator's own sequence. [#1288](https://github.com/dcodish/geo_builder/issues/1288).
 
 **Consequences.** One `Clarify` member, one `ParseResult` reason, one `refusalOf` mapping, one `runSubmit` arm with its log line, one string per locale. `issue-1274-crossing-already-named.test.ts` (12): the #944 sentence and four more spellings each naming their holder, both carriers quoted, the note + no-commit + no-LLM-call row, the *no second point at B's position* row (the defect stated as geometry), the extension form refused for the same reason, honest crossings and the diagonals still building, and — the boundary — **ADR-123's notice channel still working** for two existing points the givens drive together.
+
+## ADR-532 — The taken-letter offer is symmetric: always allow switching (#1199)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1199 (bug, P2, `2d`) · operator ruling 2026-09-18, playing round #1193 T14 · round #1292
+**Requirements:** [02](02-requirements.md) — FR-RN-14 · **Design:** none (internal — the offer’s gate moves from a data flag to a named predicate inside one component; docs/04 carries no letter-box section and this does not warrant inventing one)
+**Settles** the scope question [ADR-520 Am. 1](#adr-520) deliberately left open
+
+**The report.** *"this one is weird. pressing on D and asking it to be A is refused, but pressing on A and asking it to be D is allowed (offers to switch between them). I see no difference in the cases so we should always allow switching names of nodes."*
+
+**Root cause.** `letterHolder` carried a `swappable` flag and the offer gated on it. That flag was written to answer *"is deleting the holder safe?"* — back when the offer DELETED the holder's statement. #1013 retired the delete and kept the flag as the offer's SCOPE, deliberately and on his earlier approval. With the delete gone it was answering a question nobody asks; and because the gate read the **target's** holder only, the same pair of letters was refused in one direction and offered in the other, decided by nothing but which of the two the student clicked first.
+
+**The fix.** The flag is **removed**, not pinned to `true` — an always-true predicate is a question the code keeps asking after the answer stopped mattering. The offer's scope becomes a named, exported predicate, `swapOffered(holder)`, which the JSX gate calls: the decision now has one home, so a future narrowing has to come through it and has somewhere to be locked.
+
+**The within-a-ring sub-case — measured, and the issue body has it backwards.** #1199 flagged «מרובע ABCD» `swap(A,C)` as silently becoming a crossed quadrilateral *"because A and C are opposite vertices"*. Measured on the construction:
+
+```
+swap(A,C) → «מרובע CBAD»   sides  seg-AB seg-AD seg-BC seg-CD   ← IDENTICAL to ABCD's
+swap(B,D) → «מרובע ADCB»   sides  seg-AB seg-AD seg-BC seg-CD   ← identical
+swap(A,B) → «מרובע BACD»   sides  seg-AB seg-AC seg-BD seg-CD   ← the diagonals: a DIFFERENT ring
+```
+
+Exchanging two **opposite** vertices reverses the ring, and a ring equals its own reverse, so those are pure relabellings. It is the **adjacent** pair that re-declares the shape — the case the issue did not flag. Recorded because the sub-case it warned about is not the sub-case that exists, and a session reading only the issue would guard the wrong thing.
+
+Option **(1)** of the arming comment is taken — allow it; the declaration follows the letters — and the measurement is why that is safe rather than merely permitted: two of the three swap classes on a quadrilateral do not touch the ring at all, and the third produces a legitimate quadrilateral over four free points (2-D's own convexity preference draws it convex), not a crossed figure and not an error. The student asked to exchange two names and got exactly that, with the shape they declared following the letters they now use.
+
+**Measured after.** Every pair tested answers the same in both directions, which is the property he reported rather than either direction's answer. Every swap keeps every statement, one undo restores the session, and a dependent statement follows its letter («AF» becomes «AD»). A letter nobody holds still offers nothing, so the predicate is not simply `true`.
+
+**A note on the first lock written for this, because it is the reusable lesson.** The store's `swap` action was ALWAYS symmetric — the asymmetry lived one layer up, in the offer. A lock driving only the store therefore passed on the unfixed code, and it was measured doing so before the gate block was added. That is the `locks-must-call` failure mode ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)) in its purest form: the test exercised the layer that was never broken. Extracting `swapOffered` is what made the real decision callable.
+
+**Consequences.** `store/geoStore.ts` (−`swappable` from `LetterHolder` and from the predicate, which is now four lines shorter); `render/Figure.tsx` (−the flag from `FigureLetterHolder`, +`swapOffered`, the gate rewired). `issue-1199-symmetric-letter-offer.test.ts` (17): both-directions agreement over four setups; the OFFER asserted through `swapOffered` on real `letterHolder` output, including the shape-held letter that was refused before; nothing dropped and one-undo restoration; and the ring block, stated as a property of the SIDE SET rather than as a claim about which letters are opposite. `issue-238-letter-holder.test.ts`: the three rows that asserted `swappable` now assert what they were really about — the refusal still names its holder, and the swap still drops nothing — with the shape-held row flipped from "not offered" to "offered, and it keeps every point", which is what #1013 predicted it would be.
