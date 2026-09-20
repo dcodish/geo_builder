@@ -80,6 +80,68 @@ place. A kind that can forward-reference is what would earn one.
   renderer draws. **Pure**, so the renderer stays a consumer rather than a second geometry implementation
   — the same split every sibling uses.
 
+## The configuration search: validity, then preference ([ADR-AG-128](06c-decisions-analytic.md#adr-ag-128))
+
+`drawableAt` is the one place that chooses which configuration the tool shows, so canvas, data panel,
+«הציגו תצורה אחרת» and the honesty gates are all corrected there rather than per consumer. Its sweep
+has four tiers, strongest first:
+
+| tier | predicate | added by |
+| --- | --- | --- |
+| preferred | whole **and** every declared ring at least `SPREAD_MIN_DEG` open | #1174 |
+| whole | selectors hold · nothing vacant · no ring contradicts its noun | #1083, #1158/#1166 |
+| second best | the selectors hold, something named is missing | #1083 |
+| fallback | the raw figure at this seed | — |
+
+**The top tier is opt-in and defaults to OFF.** Spread is a display preference; `isKnowledge`,
+`knownOptions` and the locus determinacy gate ask what holds across the configurations the tool would
+ADMIT, and narrowing that pool to the pretty ones would let the tool claim knowledge it does not have.
+Defaulting to off means a caller added later inherits the honest behaviour and must ask for the other;
+only `derive` asks. The drawable cache is keyed by mode as well as by seed, because the two modes
+answer differently for the same seed and one shared cache would let whichever caller ran first decide
+what the other sees.
+
+**Validity and preference are separate predicates on purpose.** `ringViolation` rejects a ring that
+contradicts its noun and its tolerance sits two orders of magnitude under the ugly band, because a
+3° triangle is ugly but true. `minInteriorAngleOf` measures how open the rings are and decides
+nothing. Folding them into one number would turn a preference into a refusal and assert a given the
+student never gave.
+## Where a fault is raised, and why ORDER matters there ([ADR-AG-129](06c-decisions-analytic.md#adr-ag-129))
+
+`derive` raises its faults in a fixed order, and the order is load-bearing rather than incidental: a
+line that already carries a message does not get a second one, so an arm that must defer to a truer
+message has to run BELOW it.
+
+The ring-fault arm (#1170) is the case that made this explicit. «P מפגש האנכים האמצעיים במשולש ABC»
+on three collinear points declares the triangle and asks for its circumcentre, so one line carries both
+a ring fault and ADR-AG-008’s `does-not-exist`. The latter names what the student actually asked for
+and is the better answer, so the ring arm sits after the vacancy loop — the only position from which it
+can see what has already been said — and skips any line already in `faults`.
+
+**A fault is also the refusal.** `decideSubmit` dry-runs the whole list with the new line appended and
+refuses when a fault lands on that line, so raising a fault in `derive` is what makes a line not be
+recorded. There is no second refusal mechanism to keep in step, which is why an operator ruling of
+“refuse the line” lands as one arm here rather than as a change in the app layer.
+## The crossing module’s tolerances ([ADR-AG-130](06c-decisions-analytic.md#adr-ag-130))
+
+Three named constants, each answering one question, each relative to the figure’s own scale
+(ADR-AG-021 — *never an absolute magnitude*). They are registry-shaped in the docs/17 §3b sense:
+changing one changes what the tool offers, so each carries its measurement in its own docblock.
+
+| constant | the question | measured against |
+| --- | --- | --- |
+| `apart(figure)` = span · 1e-6 | is there already a point there? | the solve leaves ~2e-10 relative on a satisfied incidence, so this has 3–4 orders of margin |
+| `CROSS_MIN_SINE` = 1e-6 | are these two straights the same line? | two representations of one line measured 6.65e-8 apart by this reading |
+
+`occupied()` and `angleSine()` are the predicates; both loops call the first and `meet()` calls the
+second. The point of naming them is that there is **one** answer per question: the two loops used to
+ask the occupancy question differently — one relative, one with a hard-coded `1e-6` — and the same
+figure came out two ways.
+
+**`CROSS_MIN_SINE` is not an extent test.** Two genuinely different lines meeting at a shallow angle
+cross far outside the drawing; that is `within`’s question. Widening the angular bar to cover it would
+start calling distinct lines identical, which is the defect it was introduced to remove.
+
 ## The parser's rule contract ([ADR-AG-017](06c-decisions-analytic.md#adr-ag-017))
 
 A rule in `parseAnalytic.ts` answers one of **three** ways, and the third is the one round #1056 added:
@@ -111,6 +173,37 @@ same wrong input answered the same way whichever rule caught it.
 `App.tsx`. The engine stays language-free and the message can still say *what* the name already holds
 — the split that lets a refusal name a construct without the engine knowing any Hebrew.
 
+## A given’s connective, and who gets the sentence ([ADR-AG-127](06c-decisions-analytic.md#adr-ag-127))
+
+**One vocabulary for "is".** `COPULA_WORDS` — «הוא/היא/הם/הן/שווה [ל-]» — is the single source in
+`parseAnalytic.ts`, and `HE_IS` is derived from it. Every rule that admits a Hebrew copula reads it from
+there. The set was previously spelled inline per rule, and the drift that invites is not hypothetical:
+`LENGTH_EQ` admitted a literal `=` and no words, while `AREA_HE` immediately beside it admitted the words
+and no `=`. One sentence shape, two answers, decided by which rule happened to spell what.
+
+**The connective is an ALLOWLIST, so it fails closed.** Whether a sentence is an equality is decided by
+recognising a copula, never by failing to recognise a relation. The ways to say "is" are a closed set; the
+ways to relate two things are not. 2-D learned this as a P1 ([ADR-524 Am. 1](06-decisions.md#adr-524)) and
+the discipline is ported rather than re-derived. The two trees keep their own copy — the `lexicon` layer’s
+cross-product sharing is UNDECIDED in `BOUNDARIES.json` (ADR-W-003) and `shell/` may not import a product
+tree — so `shell/__tests__/length-copula-parity.test.ts` reads both real patterns out of source and runs
+them, and a tree that changes its mind about what "is" means fails there.
+
+**When two rules can both read a sentence, the one that records MORE wins.** «שטח המשולש ABC הוא 24»
+is readable by the length rule (`parseLengthExpr` carries an `area` term, giving a correct area
+constraint) and by the area rule — but only the area rule also DECLARES the triangle the student named.
+The length rule therefore yields when the area rule will really claim the line, calling `AREA_HE`/`AREA_EN`
+rather than restating them. Dropping a stated object because another rule got to the sentence first is an
+honesty failure, not a parsing preference.
+
+**Why precedence is a guard and not a reordering.** The table above says `null` means *"not my sentence,
+try the next rule"* — and that is true of the four top-level rules `parseLine` chains with `??`. It is NOT
+true of the rule blocks INSIDE `parseConstraint`: there, `return null` returns from the whole function, so
+a block cannot decline in favour of the block below it. Hoisting the area rule above the length rule — the
+shape the relation and slope rules use — therefore took #1075’s area-as-a-term («שטח ABC = שטח CEF + 4»)
+away, measured as seven failing locks. Giving the blocks a real fall-through means reworking the decline
+contract for every rule in the function; until that is worth doing, precedence inside `parseConstraint` is
+expressed as an explicit guard at the rule that must yield.
 ## The parser's last branch: a bare equation ([ADR-AG-019](06c-decisions-analytic.md#adr-ag-019))
 
 `parseLine` ends with a branch that accepts an equation carrying no noun at all — `x-y+2=0`,
@@ -1027,3 +1120,40 @@ precisely why the correction #1084 made for the button never reached the gate.
 
 The tolerance is untouched: the defect was never that the spread was measured too finely, it was that
 there was no spread to measure.
+
+## The session trace ([ADR-AG-131](06c-decisions-analytic.md#adr-ag-131))
+
+`src-analytic/debug/sessionLogAnalytic.ts` fire-and-forgets one JSON line per event to the shared Vite dev
+plugin (`server/logProxy.ts`) at `${BASE_URL}api/log`, tagged `tool:'analytic'`, which routes it to
+`logs/debug-log-analytic.jsonl`. **Dev only** — the tool is not deployed ([ADR-AG-007](06c-decisions-analytic.md#adr-ag-007)),
+so unlike its 2-D and 3-D siblings this module has no production analytics sink, and the `import.meta.env.DEV`
+early return is the whole of that posture.
+
+**What it records, and why that set is a complete reconstruction.** The session here IS the line list — the
+store's source of truth is `(lines, seed)` and the figure is replayed from it — so nothing derived needs
+storing:
+
+| kind | carries |
+| --- | --- |
+| `input` | the utterance, the locale, `source: 'parser' \| 'llm'`, the verdict as `result`, `intermediate` on a parser step that is about to escalate, and on the LLM path the **steps the model returned** |
+| `figure` | `seed`, `lines`, the per-line `faults` and `outcomes` |
+| `action` | `clear`, `undo`, `redo`, `show-another` (with the resulting seed), `edit`, `delete`, `load` (with the audit's result) |
+
+A blank submit writes nothing — there is no utterance to reconstruct, and a stray Enter is not an event.
+
+One submitted utterance that escalates produces a joinable PAIR — the `intermediate` parser refusal and the
+`llm` outcome — so a reader never counts it twice and can always see what the model actually said.
+
+**The figure snapshot is deduped by CONTENT**, in `logAnalyticFigure`, not by the effect's dependency list:
+`StrictMode`'s double-invoke, a remount and a discarded `useMemo` cache each re-fire the effect without the
+figure changing, and the first version wrote three identical snapshots per change on the operator's own
+session. The log's question is *"is this the same figure I last recorded?"*, and it is answered once.
+
+**The sink routes by registry.** `logFileFor` maps a tool tag to its file; an **unknown tag is refused** and
+written nowhere, because the previous two-way branch fell back to `debug-log.jsonl` — the corpus the 2-D
+scenario suite, the theorem audit and the log-triage skill all read as real user data. An ABSENT tag still
+means 2-D: `src/debug/sessionLog.ts` has never tagged its events, and that is back-compat rather than a
+default.
+
+Logging is best-effort throughout: it never throws and never blocks a submit. A logger that can break the
+app is worse than no logger.

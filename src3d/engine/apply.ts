@@ -287,6 +287,38 @@ function missingPoint(c: Construction3, ids: Id[]): EngineError3 | null {
   return null;
 }
 
+/**
+ * A DRAWING REGISTER MAY INTRODUCE ITS OWN POINTS ON AN EMPTY CANVAS (#1184).
+ *
+ * Operator, 2026-09-18: *"on 3d tool, i cannot create a simple vector AB. on first classes of the
+ * subject this is required."* The 3-D tool was solid-first: every lane that draws a pair refused two
+ * unknown endpoints, which is right once a figure exists — «קטע QZ» with both ends unknown is a typo,
+ * and minting for it would hide the mistake. On an EMPTY canvas every pair is both-fresh, so the
+ * typo guard also blocked the first thing the vectors unit asks a student to draw.
+ *
+ * An empty canvas has nothing to have mistyped against, so there is no typo to catch and nothing is
+ * lost by drawing what they asked for. Once ANY figure exists the guard is exactly as it was.
+ *
+ * **Applied to the ARROW lane only**, and that scope was measured rather than assumed. Widening the
+ * bare-segment lane too moves two locks that encode decisions which should stand: «קטע AB» then
+ * «דלתון ABCD» stops being a declaration and takes the completion arm with two unknowns (#601), and
+ * «אלכסון AB» before any solid stops being refused although no solid exists for it to be a diagonal
+ * of (#978). The difference is structural, not arbitrary: the segment lane feeds shape-completion and
+ * role rules that ask *which points already exist*, so widening it changes what THEY do; an arrow
+ * feeds none of them. It is a named predicate anyway, so the next register that needs this asks the
+ * same question in the same place.
+ */
+function canStartFigure(c: Construction3): boolean {
+  return c.points.size === 0 && c.solids.length === 0;
+}
+
+/** Mint the missing endpoints as `free3` (ADR-052 — an unstated position is a free DOF, never a fixed default). */
+function mintFree(c: Construction3, ids: Id[]): Construction3 {
+  const next = clone(c);
+  for (const id of ids) if (!next.points.has(id)) next.points.set(id, { kind: 'free3' });
+  return next;
+}
+
 /** Validate a VecAtom operand (V8-f): a named vector must be declared; a pair's points must exist. */
 function atomRefError(c: Construction3, atom: import('./types').VecAtom): EngineError3 | null {
   if (atom.kind === 'named') return c.vectors.has(atom.name) ? null : { code: 'unknown-vector', id: atom.name };
@@ -1298,9 +1330,21 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
        * the drawing register may introduce a point.
        */
       const fresh = [cmd.a, cmd.b].filter((id) => !c.points.has(id));
+      /**
+       * THE BOTH-FRESH REFUSAL STAYS HERE, and #1184 measured why (see `canStartFigure`).
+       *
+       * The empty-canvas relaxation that lets «וקטור AB» start a figure is applied to the ARROW lane
+       * only. Widening it here as well was built and measured, and it moves two locks that encode
+       * decisions which should stand: «קטע AB» then «דלתון ABCD» stops being a DECLARATION and takes
+       * the completion arm with two unknowns (#601), and «אלכסון AB» before any solid stops being
+       * refused although there is no solid for it to be a diagonal of (#978). Both follow from this
+       * lane feeding rules that ask *which points already exist*; the arrow lane feeds none.
+       *
+       * So a bare segment on an empty canvas is a separate question with its own answer to find,
+       * filed rather than decided here.
+       */
       if (cmd.bare && fresh.length > 0 && fresh.length < 2) {
-        const next = clone(c);
-        for (const id of fresh) next.points.set(id, { kind: 'free3' });
+        const next = mintFree(c, fresh);
         if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]);
         return { ok: true, next };
       }
@@ -1435,9 +1479,16 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
 
     case 'draw-arrow': {
       // #72: `חץ A'C` — pure ink: record the unnamed arrow + draw its carrier segment.
-      const missing = missingPoint(c, [cmd.from, cmd.to]);
+      /**
+       * #1184: the arrow is a DRAWING REGISTER, so it may start a figure on an empty canvas — the
+       * same rule, and the same predicate, as the bare segment above. It matters more here than
+       * there: after arm 3 this is the lane «וקטור AB» lands in, and the vectors unit begins with
+       * nothing on the canvas at all.
+       */
+      const base = canStartFigure(c) ? mintFree(c, [cmd.from, cmd.to]) : c;
+      const missing = missingPoint(base, [cmd.from, cmd.to]);
       if (missing) return { ok: false, error: missing };
-      const next = clone(c);
+      const next = clone(base);
       if (!next.arrows.some(([f, t]) => f === cmd.from && t === cmd.to)) next.arrows.push([cmd.from, cmd.to]);
       if (!hasSegment(next, cmd.from, cmd.to)) next.segments.push([cmd.from, cmd.to]);
       return { ok: true, next };

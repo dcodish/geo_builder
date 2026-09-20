@@ -204,12 +204,30 @@ describe('M1 — restating a construction is absorbed, contradicting it is refus
     expect(d.figure.segments).toHaveLength(4);
   });
 
+  /**
+   * The canonical form must not over-merge: reordering into a different side set is a new figure, and
+   * silently absorbing it would drop a figure the student asked for.
+   *
+   * **The FIXTURE moved with #1170 (ADR-AG-129), the claim did not.** It used to pin four points in
+   * convex position, where only ONE of the three cyclic orders is a simple ring — so «מרובע ABDC» was
+   * crossed, and once a pinned crossed ring is refused the figure could no longer reach the eight
+   * sides this is about. These points put D inside triangle ABC, where ABCD and ABDC are BOTH simple,
+   * so the identity claim is tested on its own rather than through a ring the tool now declines.
+   */
   it('but ABDC is a DIFFERENT quadrilateral and keeps its own identity', () => {
-    // The canonical form must not over-merge: reordering into a different side set is a new figure,
-    // and silently absorbing it would drop a figure the student asked for.
-    const d = derive(['A(-2,1)', 'B(4,5)', 'C(5,2)', 'D(-1,-2)', 'מרובע ABCD', 'מרובע ABDC']);
+    const d = derive(['A(0,0)', 'B(4,0)', 'C(2,4)', 'D(2,1)', 'מרובע ABCD', 'מרובע ABDC']);
     expect(d.faults).toEqual([]);
     expect(d.figure.segments).toHaveLength(8);
+  });
+
+  /**
+   * And the other half of that move, stated rather than left implicit: on points where the second
+   * order IS crossed, it is refused (#1170) — not absorbed into the first, which would be the
+   * over-merge this pair of locks exists to prevent, and not drawn, which the operator ruled against.
+   */
+  it('a reordering that CROSSES is refused, not merged away (#1170)', () => {
+    const d = derive(['A(-2,1)', 'B(4,5)', 'C(5,2)', 'D(-1,-2)', 'מרובע ABCD', 'מרובע ABDC']);
+    expect(d.faults).toEqual([{ index: 5, code: 'ring-contradicts-noun', detail: 'מרובע ABDC' }]);
   });
 
   it('refuses a restatement that means something different under the same name', () => {

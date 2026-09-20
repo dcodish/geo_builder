@@ -27,8 +27,22 @@ import type { Transform } from './transform';
 export interface FigureLetterHolder {
   factId: string;
   utterance: string;
-  swappable: boolean;
 }
+
+/**
+ * THE TAKEN-LETTER OFFER’S SCOPE (#1199) — a swap is offered wherever the letter has a holder.
+ *
+ * **Operator ruling, 2026-09-18: «always allow switching names of nodes».** Before it, the offer was
+ * gated on a `swappable` flag that #1013 had kept from the destructive version of this feature; because
+ * the gate read the TARGET’s holder only, the same pair of letters was refused in one direction and
+ * offered in the other.
+ *
+ * It is a named predicate rather than an inline `true` so the decision is CALLABLE: the offer’s scope
+ * now has one home and one lock, and a future narrowing has to come through here
+ * ([ADR-W-053](../../docs/06w-decisions-workspace.md) — a lock that reproduces a decision stays green
+ * through the change that breaks it).
+ */
+export const swapOffered = (holder: FigureLetterHolder | null | undefined): boolean => holder != null;
 
 export interface FigureProps {
   construction: Construction;
@@ -301,9 +315,11 @@ export function Figure({
    * have automatically done as users will not expect the consequences."*
    *
    * A swap destroys nothing, so the whole safety apparatus the delete needed stops being load-bearing.
-   * The offer is still shown only where the destructive one was (a plain point statement, never a
-   * shape) — deliberately NOT widened, because whether a shape-held letter should become swappable is
-   * an open ruling.
+   *
+   * **#1199 — the offer is now shown wherever a letter is taken.** It used to appear only where the
+   * destructive one had, which left the asymmetry the operator reported: D→A refused while A→D was
+   * offered, for the same two letters, decided by which one he clicked first. **Operator ruling,
+   * 2026-09-18: always allow switching names of nodes.**
    */
   function swapLetters(id: string) {
     if (!takenBy || !onSwap) return;
@@ -1151,7 +1167,7 @@ export function Figure({
                   <div style={{ fontSize: 11, color: '#64748b', display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {/* #238: the holder, in the student's OWN wording — a step row they can recognise. */}
                     <span>{(pointMenuText?.takenBy ?? '{{what}}').replace('{{what}}', takenBy.holder.utterance)}</span>
-                    {takenBy.holder.swappable && onSwap && (
+                    {onSwap && swapOffered(takenBy.holder) && (
                       <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => swapLetters(menu.id)}>
                         {(pointMenuText?.swapLetters ?? 'swap {{a}} and {{b}}')
                           .replace('{{a}}', menu.id)

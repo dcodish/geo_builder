@@ -73,15 +73,46 @@ describe('#976 — the six copulas × He/En on «זווית ABC ⟨copula⟩ ז�
   });
 });
 
-describe('#976 — arcs share the seam', () => {
-  it.each(['קשת CD = קשת DE', 'קשת CD היא קשת DE', 'קשת CD שווה לקשת DE', 'arc CD is arc DE', 'arc CD equals arc DE'])(
-    '%s → the central-angle ratio at O',
+/**
+ * ARCS SHARE THE SEAM — BUT ONLY WHERE A COPULA CANNOT MEAN IDENTITY (#1000, ADR-533).
+ *
+ * This block used to assert that «קשת CD היא קשת DE» states equal arcs. **Operator ruling, 2026-09-14:
+ * it does not.** In Hebrew a bare copula between two arcs reads as IDENTITY — this arc *is* that arc —
+ * which between two differently-named arcs says nothing, and accepting it teaches a sentence that means
+ * something else (ADR-W-030). His words: *"for 1000 - this is the ruling: «קשת CD שווה לקשת DE»."*
+ *
+ * So two rows flip from accepting to refusing, deliberately and with the ruling that moved them. ADR-507
+ * stands everywhere else: the explicit spellings are untouched, and every ANGLE row below is unchanged.
+ *
+ * **The coefficient row does NOT flip, and that line is the interesting one.** «קשת CD היא 2 קשת DE»
+ * cannot be read as identity — nothing is identical to twice itself — so the ambiguity the ruling is
+ * about does not arise, and narrowing there would take away a working capability for no reason the
+ * operator gave. The rule is therefore: a copula before a BARE arc reference is refused; before a
+ * SCALED one it reads as the comparison it plainly is.
+ */
+describe('#976 + #1000 — arcs share the seam, where a copula cannot mean identity', () => {
+  it.each(['קשת CD = קשת DE', 'קשת CD שווה לקשת DE', 'arc CD equals arc DE'])(
+    'the EXPLICIT spellings still state the central-angle ratio at O: %s',
     (u) => {
       expect(rel(u, circ())).toMatchObject({ v1: 'O', a1: 'C', b1: 'D', v2: 'O', a2: 'D', b2: 'E', k: 1 });
     },
   );
-  it('«קשת CD היא 2 קשת DE» keeps the coefficient', () => {
+
+  it.each(['קשת CD היא קשת DE', 'arc CD is arc DE'])(
+    'but a BARE copula between two arcs is now refused and taught: %s',
+    (u) => {
+      const r = parse(u, circ());
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.reason).toBe('arc-copula');
+    },
+  );
+
+  it('«קשת CD היא 2 קשת DE» keeps the coefficient — a copula before a SCALED arc is not identity', () => {
     expect(rel('קשת CD היא 2 קשת DE', circ()).k).toBe(2);
+  });
+
+  it('and its English twin, for the same reason', () => {
+    expect(rel('arc CD is 2 arc DE', circ()).k).toBe(2);
   });
 });
 

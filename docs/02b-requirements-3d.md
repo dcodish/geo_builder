@@ -120,6 +120,25 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   figure genuinely cannot satisfy — two perpendicular edges of a box — is still **refused**, because
   reaching the vector lane is not the same as being believed. *(Realised —
   [ADR-3D-250](06b-decisions-3d.md#adr-3d-250), #1183/#1185; `issue-1183-vector-marked.test.ts`.)*
+- **FR-VC-1b (Must)** — **A vector can START a figure, and the word «וקטור» draws a vector.** The
+  vectors unit opens on an empty canvas, so «וקטור AB» must build there: both endpoints are
+  introduced as free points ([ADR-052](06-decisions.md#adr-052) — an unstated position is a free DOF
+  that moves on «הציגו תצורה אחרת», never a fixed default), and the student can name what they drew
+  in the next line («נסמן: AB = u»). Before this the tool was solid-first: every vector lane
+  presupposed a figure that already existed, so the first lesson of the unit could not be typed.
+
+  **The word is not decoration.** «וקטור AB» draws an ARROW — a direction the figure records — not a
+  plain segment; a stated meaning is never silently dropped. The word and an explicit `→`/`⃗` mark
+  the same thing (FR-VC-1a), so there is one notion of "the student said vector" and not two.
+
+  **Only on an empty canvas, and only for a vector.** Once any figure exists, a pair with two unknown
+  endpoints is still refused by name — «קטע QZ» is a typo, and inventing two points for it would hide
+  the mistake the student needs to see. A bare «קטע AB» on an empty canvas also stays refused: that
+  lane feeds shape-completion and role rules which ask *which points already exist*, so it is a
+  separate question. *(Realised — [ADR-3D-253](06b-decisions-3d.md#adr-3d-253), #1184;
+  `issue-1184-vector-starts-a-figure.test.ts`. **Not yet:** a vector declared from its COMPONENTS with
+  no points at all — «נתון: v = (10,-5,0)» — which needs the positionless-vector design in
+  [#1188](https://github.com/dcodish/geo_builder/issues/1188).)*
 - **FR-VC-2 (Must)** — Support **at most one symbolic parameter** in a vector expression, pinned by a
   given through root-finding. *(Two unknowns in one expression is a known boundary — issue #301.)*
 - **FR-VC-2a (Must)** — **A POWER in a coordinate component is supported where the solver can pin it,

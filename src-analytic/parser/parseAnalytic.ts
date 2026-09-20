@@ -192,7 +192,20 @@ const HE_CIRCLE = 'ה?מעגל';
 /** «שמשוואתו» / «שמשוואתה» / «משוואת» / «שמשוואת» — the "whose equation is" connector. */
 const HE_EQ_OF = '(?:ש?משוואת(?:ו|ה)?)';
 /** «הוא» / «היא» / «הם» / «הן» — the copula, optional. */
-const HE_IS = '(?:\\s*(?:הוא|היא|הם|הן))?';
+/**
+ * THE CLOSED SET OF WORDS THAT MEAN "IS" (#1260).
+ *
+ * Every rule that admits a Hebrew copula reads it from HERE. Before #1260 the vocabulary was
+ * spelled inline in each rule, which is how `LENGTH_EQ` came to admit a literal `=` and nothing
+ * else while `AREA_HE` beside it admitted the words and not the `=`: the same sentence shape,
+ * two different answers, decided by which rule happened to spell what.
+ *
+ * «שווה» / «שווה ל-» is part of the set, not a separate case — `AREA_HE` already
+ * treated it as one.
+ */
+const COPULA_WORDS = 'הוא|היא|הם|הן|שווה(?:\\s*ל\\s*-?)?';
+/** A copula as an OPTIONAL suffix of a noun phrase — the long-standing spelling, now sourced from the set. */
+const HE_IS = `(?:\\s*(?:${COPULA_WORDS}))?`;
 
 /** A point/vertex name: a capital letter with an optional digit subscript (`F1`, `D2`). */
 const NAME = '[A-Z][0-9]?';
@@ -1723,7 +1736,37 @@ function asEquation(line: string): string | null {
   return null;
 }
 
-const LENGTH_EQ = /^(?:נתון\s+כי\s+|נתון\s+)?(.+?)\s*=\s*(.+)$/;
+/**
+ * THE CONNECTIVE OF A LENGTH GIVEN IS AN **ALLOWLIST OF COPULAS**, NEVER "anything that is not `=`"
+ * (#1260 · ADR-AG-NNN, porting 2-D’s ADR-524 Am. 1 mechanism).
+ *
+ * A length given used to admit a literal `=` and nothing else, so «אורך הקטע AB הוא 10» — an ordinary
+ * Hebrew sentence — was refused while its symbolic twin was understood.
+ *
+ * **Why an allowlist and not a denylist.** 2-D shipped this widening as a DENYLIST of relation words and
+ * it produced a P1 (#1248): «אורך הקטע BC > 10» — a stated RANGE — committed an EQUALITY at its own
+ * bound, and no honesty gate could catch it because the `10` *was* accounted for, by the wrong
+ * constraint. A denylist cannot be completed, because *the ways a sentence can relate two things are
+ * not enumerable*. The other question IS closed — **the ways to say "is"** — so the guard is inverted.
+ *
+ * So this fails CLOSED: an unfamiliar connective is not read as an equality, the line falls through to
+ * the later rules and, failing those, to an honest `not-handled`. A false equality would instead invent
+ * a given the student never gave.
+ *
+ * **The vocabulary is deliberately the same set as 2-D’s `LENGTH_COPULA`** (`src/parser/parse.ts`).
+ * The two trees hold their own copy because the `lexicon` layer’s cross-product sharing is recorded
+ * UNDECIDED in `BOUNDARIES.json` (ADR-W-003) and deciding it is not this fix’s business; the drift that
+ * duplication invites is caught by `shell/__tests__/length-copula-parity.test.ts`, which reads both
+ * definitions rather than restating either.
+ *
+ * Unlike 2-D’s, this connective is **not optional**: 2-D locates the value positionally inside a verbose
+ * length phrase, whereas here the connective is what splits the sentence in two, so an empty one would
+ * make «אורך הקטע AB 10» an equality — a widening nobody asked for.
+ */
+
+const LENGTH_EQ = new RegExp(
+  String.raw`^(?:נתון\s+כי\s+|נתון\s+)?(.+?)\s*(?:=|\s(?:${COPULA_WORDS}))\s*(.+)$`,
+);
 function parseConstraint(raw: string): RuleOutcome {
   /**
    * A comparison is REWRITTEN into its equation before any rule sees the line (#1075), so every
@@ -1763,7 +1806,24 @@ function parseConstraint(raw: string): RuleOutcome {
   }
 
 
-  const lengthEq = LENGTH_EQ.exec(line);
+  /**
+   * AN AREA GIVEN BELONGS TO THE AREA RULE, EVEN THOUGH THIS ONE COULD READ IT (#1260).
+   *
+   * Both rules can read «שטח המשולש ABC הוא 24»: `parseLengthExpr` carries an `area` term, so the
+   * length rule produces a correct area CONSTRAINT — but only the area rule also DECLARES the
+   * polygon the student named. Before #1260 the split was decided by an accident of spelling: the
+   * `=` form reached the length rule and the copula form did not, because this rule admitted no
+   * copula. Widening the connective without this guard would have moved the copula form here too
+   * and silently dropped «המשולש ABC» from the figure — a stated object going unrecorded, which
+   * the honesty invariant forbids.
+   *
+   * The guard calls the AREA rule’s own pattern rather than restating it, and yields only when that
+   * rule will really claim the line — a plain value it can read. «שטח ABC = שטח CEF + 4» (#1075,
+   * an area as one term among others) has no such value, so it stays here, where it belongs.
+   */
+  const areaGiven = AREA_HE.exec(line) ?? AREA_EN.exec(line);
+  const areaGivenValue = areaGiven ? parseExpr(normalizeMath(areaGiven[3])) : null;
+  const lengthEq = areaGivenValue ? null : LENGTH_EQ.exec(line);
   if (lengthEq) {
     const left = parseLengthExpr(lengthEq[1]);
     const right = parseLengthExpr(lengthEq[2]) ?? constantLengthExpr(lengthEq[2]);

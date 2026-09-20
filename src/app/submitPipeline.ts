@@ -318,6 +318,19 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
    * #1267: «BD חוצה זווית לצלע BC» — the bisector from B meets AC, and the side the student NAMED
    * is not one it can meet. Both are quoted back; the figure is never quietly drawn to the other one.
    */
+  /**
+   * #1000 (operator ruling 2026-09-14): a bare copula between two arcs reads as IDENTITY in Hebrew —
+   * this arc *is* that arc — which between two differently-named arcs says nothing. The tool declines
+   * it and offers the sentence it accepts, with the student’s own labels in it, so the correction is
+   * one word rather than a rewrite. Never escalated: the LLM would only be asked to accept a spelling
+   * this tool deliberately declines.
+   */
+  if (!r.ok && r.reason === 'arc-copula') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `arc-copula:${r.a}/${r.b}` });
+    ui.setInputNote(t('input.arcCopula', { a: r.a, b: r.b }));
+    ui.setBusy(false);
+    return;
+  }
   if (!r.ok && r.reason === 'cevian-wrong-side') {
     logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `cevian-wrong-side:${r.apex}:${r.stated.join('')}/${r.actual.join('')}` });
     ui.setInputNote(t('input.cevianWrongSide', { apex: r.apex, stated: r.stated.join(''), actual: r.actual.join('') }));

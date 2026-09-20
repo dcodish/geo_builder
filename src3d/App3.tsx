@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import { useTranslation } from 'react-i18next';
 // The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
 import { AppFrame } from '../shell/frame/AppFrame';
+import { hasMath, MathText } from '../shell/math';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
@@ -680,7 +681,28 @@ export default function App3() {
             busy={busy}
             busyLabel={t('input.thinking')}
             symbols={SYMBOL_SPECS_3}
-            preview={(s) => inputPreview3(s)}
+            /**
+             * THE STRIP TYPESETS MATHEMATICS (#1152, ADR-W-069).
+             *
+             * The fact row directly below this box shows a real superscript; the strip used to print
+             * `^2` — so the student sees their own equation two ways, one of them raw, in two
+             * elements a few pixels apart. #1082 ruled that mathematics is typeset rather than
+             * printed, and #1097 already had to chase that ruling into a second panel.
+             *
+             * **ISOLATE FIRST, THEN TYPESET.** The bidi runs are decided by `shell/bidi`, and its
+             * isolate characters ride through `MathText` untouched, so the Hebrew stays Hebrew. The
+             * 2-D line this is modelled on typesets the RAW string; copying it verbatim into an
+             * RTL-Hebrew product would typeset unisolated text and could reorder the equation —
+             * which is the very thing this strip exists to prevent.
+             *
+             * **The trigger is the presence of MATHEMATICS, not the presence of a bidi change.**
+             * `inputPreview` returns `null` when isolation changes nothing, so a pure-LTR equation
+             * had no strip at all. It gets one now. That is deliberate: the strip stops being "a
+             * bidi repair" and becomes "what you typed, typeset".
+             */
+            preview={(s) =>
+              hasMath(s) ? <MathText text={isolateLtrRuns3(s, true)} /> : inputPreview3(s)
+            }
             previewDir={(s) => textDir3(s)}
             boxDir={(s) => textDir3(s)}
           />

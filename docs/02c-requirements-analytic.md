@@ -983,6 +983,20 @@ becomes «2+(y-4)^2=9^(x-3)», a formula the student did not write. Every surfac
 the box while typing, its live preview, the example chips, the fact list and its editor — isolates the
 runs and takes its direction from the content.
 
+**And the live preview TYPESETS what it shows** ([ADR-W-069](06w-decisions-workspace.md#adr-w-069) ·
+[#1152](https://github.com/dcodish/geo_builder/issues/1152)). The strip under the box and the fact row
+a few pixels below it show the same equation, so one of them printing `^2` where the other draws a real
+superscript tells the student their transcription came out wrong when it did not. Mathematics is
+typeset wherever it is shown — the #1082 ruling, on this surface.
+
+**Its trigger is the presence of MATHEMATICS, not the presence of a bidi change.** A pure-LTR equation
+— «(x-3)^2+(y-4)^2=9» with no Hebrew around it — needs no isolation, so it used to get no strip at
+all. It gets one: the strip is not a bidi repair that sometimes appears, it is what you typed, typeset.
+
+**Order matters: isolate first, then typeset.** The runs are decided by the bidi layer and its isolate
+characters ride through the typesetter untouched. Typesetting the raw text instead would reorder the
+equation — exactly what R78 exists to prevent.
+
 **R79 — a centre the student NAMED carries its value**
 ([ADR-AG-055](06c-decisions-analytic.md#adr-ag-055)). «נתון מעגל O שמשוואתו (x-3)^2+(y-5)^2=25» draws
 `O(3, 5)`: the equation is read, not solved, so the centre is as given as writing `O(3,5)` would be.
@@ -1139,6 +1153,19 @@ it would silently drop a stated given.
 A product that writes a notation and then refuses it back teaches the student that their own correct
 transcription is wrong, and sends them hunting for a mistake they did not make.
 
+**And the converse: a sentence the tool OFFERS must be one worth writing**
+([ADR-AG-130](06c-decisions-analytic.md#adr-ag-130) ·
+[#1235](https://github.com/dcodish/geo_builder/issues/1235)). A clickable crossing ring composes a given
+and puts it in the student’s own list of what they stated, so it carries the tool’s word that the
+sentence means something. «P נקודת החיתוך של הישר CE עם הישר CE» does not — a line does not cross
+itself — and a student cannot be expected to know that is something the tool should have known.
+
+**No offered ring names one object twice, and none is offered where a point already sits.** Both are
+questions about whether two things are the SAME thing, so both are judged relative to the figure’s own
+scale, never against an absolute number (ADR-AG-021). An absolute threshold on a quantity that carries
+the scale is not a threshold on anything geometric, and it is how a second and third letter reach one
+location.
+
 **A component states ONE coordinate.** `x_A = 5` leaves `y` free, as every component form does — pinning
 both would invent a given the student never stated (ADR-052).
 
@@ -1180,9 +1207,38 @@ configuration to show: a crossed or collapsed ring is never drawn, and never off
 Rejecting either of the two right-hand cases would assert a given the student never gave, which is
 the same cardinal sin as drawing a figure that violates its givens ([ADR-052](06-decisions.md#adr-052)).
 
+**R92 — among the configurations it MAY show, the tool opens on one that is not a sliver**
+([ADR-AG-128](06c-decisions-analytic.md#adr-ag-128) ·
+[#1174](https://github.com/dcodish/geo_builder/issues/1174)). R91 decides what may be drawn; this
+decides which of those is drawn first. A student who states «משולש ABC» and nothing about its shape
+should not be shown a 1.4° wedge when a 25° triangle is two presses away — the tool is choosing, and
+when it chooses it should choose a figure the student can work on.
+
+**It is a PREFERENCE and never a requirement**, which is what keeps it on the right side of R14. A
+figure whose givens force a tight wedge is still drawn, unmoved and without complaint; the preference
+simply has nothing better to offer. And it never reaches what the tool CLAIMS: a value is known only
+if it holds across the configurations the tool would admit, not across the ones it finds handsome.
+
+**Variety survives it.** «הציגו תצורה אחרת» still walks ten distinct configurations in ten presses
+on the reported figures; a preference that narrowed the figure down to one picture would be trading
+one defect for a worse one.
+
 **Where the student's own coordinates force a bad ring** — four pinned points written in an order
-that crosses — the figure is determined and there is no configuration to choose. That case is
-[#1170](https://github.com/dcodish/geo_builder/issues/1170) and is not yet answered.
+that crosses, or three collinear points called a triangle — **the line is refused**
+([ADR-AG-129](06c-decisions-analytic.md#adr-ag-129) ·
+[#1170](https://github.com/dcodish/geo_builder/issues/1170)). The figure is determined, so there is no
+configuration to choose and nothing the tool can do to honour the noun. Operator ruling, 2026-09-17,
+having been offered draw-with-a-notice instead: refuse it.
+
+The refusal is about the RING and names the statement the student wrote, never a search that failed —
+on a determined figure there was only ever one configuration, so «לא נמצאה תצורה» would not be a true
+sentence. It points at the two things the student can change: the order of the letters, or the
+coordinates.
+
+**One line gets one message, and the more specific one wins.** «P מפגש האנכים האמצעיים במשולש ABC» on
+three collinear points declares the triangle and asks for its circumcentre at once; it keeps R-level
+ADR-AG-008’s answer — the circumcentre is what was asked for and it is what does not exist — and gains
+no second refusal beside it.
 
 **R92 — a point may be NAMED before it is PLACED**
 ([#1136](https://github.com/dcodish/geo_builder/issues/1136)).
@@ -1316,8 +1372,15 @@ median, a height, a leg, a base, a hypotenuse — and reading those as a bare le
 student's claim silently, so they stay refused until the tool can honour both halves. «הישר AB» is
 refused for its own reason: a line has no length (R103's extent ruling).
 
-**Still refused, and filed:** the Hebrew copula. «אורך הקטע AB הוא 10» is not accepted where
-«אורך הקטע AB = 10» is — [#1260](https://github.com/dcodish/geo_builder/issues/1260).
+**The Hebrew word for «=» is one of the spellings** ([ADR-AG-127](06c-decisions-analytic.md#adr-ag-127),
+[#1260](https://github.com/dcodish/geo_builder/issues/1260)). «אורך הקטע AB הוא 10» states exactly what
+«אורך הקטע AB = 10» states — as do «היא», «הם», «הן», «שווה» and «שווה ל-» — so a student
+who finishes the sentence in words is understood.
+
+**And a BOUND is never an equality.** The connective is an allowlist of the words that mean "is",
+not a list of the words that do not. «אורך AB גדול מ-10», «אורך AB לפחות 10» and «אורך AB > 10»
+state a RANGE; none of them may commit `AB = 10`. An unfamiliar connective goes unread and
+escalates — the tool would rather not understand a sentence than invent a given from it.
 
 **A stated curve is nameable however it entered the figure**
 ([#1149](https://github.com/dcodish/geo_builder/issues/1149)). A line the student first used to carry

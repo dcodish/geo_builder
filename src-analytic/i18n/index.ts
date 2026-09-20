@@ -132,6 +132,12 @@ const he = {
   errDoesNotExist:
     'בשרטוט הזה {{existing}} לא קיים — הנתונים כבר קובעים את כל הנקודות, ואין תצורה אחרת שבה הוא ' +
     'היה קיים. המשפט "{{detail}}" לא נוסף.',
+  // #1170 — about the RING, never about a failed search: on a figure whose points are all pinned
+  // there was only ever one configuration, so «לא נמצאה תצורה» would be a false sentence. Names
+  // the student's own statement (#1145) and points at the two things they can actually change.
+  errRingContradictsNoun:
+    'הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "{{detail}}". אפשר לשנות את סדר האותיות ' +
+    'כך שהצלעות לא ייחתכו, או לשנות את השיעורים — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.',
   errReservedCoordinate:
     'האותיות x ו-y שמורות לצירי מערכת הצירים, ולכן אי אפשר להשתמש בהן כנעלם בשיעורי נקודה: "{{detail}}". ' +
     'אפשר להשתמש באות אחרת, למשל M(3,t).',
@@ -316,6 +322,9 @@ const en: typeof he = {
   errDoesNotExist:
     'In this figure {{existing}} does not exist — the givens already fix every point, and there is ' +
     'no other configuration where it would. "{{detail}}" was not added.',
+  errRingContradictsNoun:
+    'The points you gave do not form that shape in this order: "{{detail}}". Reorder the letters so ' +
+    'the sides do not cross, or change the coordinates — as written the vertices fall on one line or the shape folds over itself.',
   errReservedCoordinate:
     'The letters x and y name the axes, so they cannot be a point\'s unknown: "{{detail}}". ' +
     'Use another letter — for example M(3,t).',

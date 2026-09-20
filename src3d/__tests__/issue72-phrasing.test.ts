@@ -42,8 +42,21 @@ describe('#72 — parse: the prod phrasings lower deterministically', () => {
   it("arrow noun → draw-arrow (exact prod: חץ A'C)", () => {
     expect(cmd("חץ A'C")).toMatchObject([{ type: 'draw-arrow', from: "A'", to: 'C' }]);
     expect(cmd("arrow A'C")).toMatchObject([{ type: 'draw-arrow' }]);
-    // the vector WORD stays normalize3-stripped decoration — the established segment reading
-    expect(cmd("הוקטור A'C")).toMatchObject([{ type: 'segment3' }]);
+    /**
+     * **RETIRED BY #1184 (operator ruling, 2026-09-18): the vector WORD draws an ARROW.**
+     *
+     * This line asserted the opposite, on ADR-3D-039’s scope note — but #72, the batch the operator
+     * approved, never mentions «וקטור AB»; that note was written by the implementing session about
+     * what it had NOT changed, and this file contradicted itself accordingly: its own header lists
+     * the third gap as *"`חץ A'C` / `הוקטור A'C` — an UNNAMED ink arrow"*, which is what the batch
+     * meant and what the body then asserted away.
+     *
+     * Asked directly, and shown this cost, the operator chose the arrow. Flipped here rather than
+     * deleted, so the change is visible at the line that made the old claim.
+     */
+    expect(cmd("הוקטור A'C")).toMatchObject([{ type: 'draw-arrow', from: "A'", to: 'C' }]);
+    // and the marking is the SAME one an explicit arrow sets (#1183), not a second notion
+    expect(cmd("A'C⃗")).toMatchObject([{ type: 'draw-arrow' }]);
   });
   it('אורך AB=BC disambiguates to a LENGTH relation (exact prod)', () => {
     expect(cmd('אורך AB=BC')).toMatchObject([

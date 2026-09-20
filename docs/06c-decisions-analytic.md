@@ -6718,3 +6718,177 @@ Layering is why it goes to the engine and not the other way: `app → engine`, a
 **The invariant this exposes, filed not built.** `reportedDof > 0` while every quantity reports `known` is a state the tool should not be able to occupy, and a cheap corpus-wide assertion would have caught this on day one. It is locked here **on the figure that violated it**; as a sweep over every analytic scenario it is a wider change with its own blast radius, filed as [#1289](https://github.com/dcodish/geo_builder/issues/1289).
 
 **Consequences.** `engine/evaluate.ts` (+`figureSignature`, +`curveSignature`, +`distinctConfigSeeds`, one default parameter changed); `app/another.ts` (−36 lines, now a one-line call). `issue-1282-knowledge-distinct-configs.test.ts` (10): the operator's figure reporting unknown where he gave nothing and known where he gave something; **the collapse asserted as a PRECONDITION**, so a future change that happens to spread seeds 0–2 cannot make the lock vacuous; the freedom-implies-an-unknown invariant on that figure; the after-figure's values genuinely determined; «הציגו תצורה אחרת» still finding a differing figure through the shared signature; and a determined figure still reporting one configuration and known values.
+
+## ADR-AG-127 — A length given's connective is an ALLOWLIST of copulas (#1260)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1260 (bug, P2, `analytic`) · found while building #1128, filed by the overnight run #1252 · round #1292
+**Requirements:** [02c](02c-requirements-analytic.md) — R61, the distance row's connective · **Design:** [04c](04c-design-analytic.md)
+**Ports** [ADR-524 Am. 1](06-decisions.md#adr-524)/#1248, the 2-D mechanism, into this tree
+
+**The report.** A length given accepted `=` and refused the ordinary Hebrew word for it. Measured before the fix:
+
+```
+אורך הקטע AB = 10          ->  OK
+אורך הקטע AB הוא 10        ->  not-handled
+המרחק בין A ל-B = 10       ->  OK
+המרחק בין A ל-B הוא 10     ->  not-handled
+```
+
+A student writing a sentence is refused; the same student writing the symbolic form is understood. #1128 made this worse rather than better, because the worded spellings it added are exactly the ones a copula finishes.
+
+**Root cause.** `LENGTH_EQ` split the sentence on a literal `=` and nothing else, although `HE_IS` — the closed copula set «הוא/היא/הם/הן» that most rules in the file already read — sat twelve hundred lines above it.
+
+**The mechanism is inverted, and that is the whole point.** 2-D shipped this same widening as a DENYLIST of relation words and it produced a P1: «אורך הקטע BC > 10» — a stated RANGE — committed an equality at its own bound, and no honesty gate could catch it, because the `10` *was* accounted for, by the wrong constraint. A denylist cannot be completed: *the ways a sentence can relate two things are not enumerable.* The other question is closed — **the ways to say "is"** — so the guard is an allowlist and fails CLOSED. An unfamiliar connective is not read as an equality; the line goes unread and escalates, which is honest.
+
+**What changed.**
+
+1. **One vocabulary in the file.** `COPULA_WORDS` («הוא/היא/הם/הן/שווה [ל-]») is now the single source; `HE_IS` is derived from it. Before, each rule spelled the set inline, which is precisely how `LENGTH_EQ` came to admit `=` and no words while `AREA_HE` beside it admitted words and no `=`: one sentence shape, two answers, decided by which rule happened to spell what.
+2. **`LENGTH_EQ` splits on `=` or a copula.** Unlike 2-D's, the connective is **required**: 2-D locates the value positionally inside a verbose length phrase, whereas here the connective is what divides the sentence, so an empty one would make «אורך הקטע AB 10» an equality — a widening nobody asked for.
+3. **A precedence guard, which the issue's plan did not foresee and which the measurement forced.** Both rules can read «שטח המשולש ABC הוא 24»: `parseLengthExpr` carries an `area` term, so the length rule produces a correct area *constraint* — but only the area rule also **declares the polygon the student named**. Before this fix the split was an accident of spelling: the `=` form reached the length rule and the copula form could not. Widening the connective without the guard moved the copula form to the length rule too and silently dropped «המשולש ABC» from the figure — a stated object going unrecorded, which the honesty invariant forbids. So the length rule now yields when the area rule will really claim the line, calling `AREA_HE`/`AREA_EN` rather than restating them, and yielding only for a plain value that rule can read.
+
+**What was tried and rejected.** Hoisting the area rule above the length rule — the obvious ordering fix, and the shape the relation and slope rules already use. It fails on this file's control flow: a rule block that declines with `return null` returns from `parseConstraint` entirely rather than falling through to the next rule, so hoisting took #1075's area-as-a-term («שטח ABC = שטח CEF + 4») away — seven locks, measured. Making the hoisted rule fall through instead would mean reworking the decline contract for every rule in the function, which is a larger change than this issue diagnosed and would be its own ADR.
+
+**Measured after.** Every copula spelling builds the identical figure to its `=` twin. Every bound — «גדול מ», «קטן מ», «לפחות», «לכל היותר», `>`, «פי 2» — is still not an equality and still commits no `AB = 10`. «AD הוא תיכון לצלע BC», «M הוא אמצע AB», «שיפוע AB הוא 2», «הישר l1 הוא y=2x+1» are all still read by their own rules, and both area readings are exactly what they were before.
+
+**Consequences.** `src-analytic/parser/parseAnalytic.ts` (+`COPULA_WORDS`, `HE_IS` derived from it, `LENGTH_EQ` widened, the precedence guard). `issue-1260-length-copula.test.ts` (39): the copula spellings asserted as EQUAL to the `=` form rather than as spelled-out expectations, on the parse and on the built figure; #1128's spelling table finished with a copula; the six bound rows as the #1248 regression, one tree over; the four neighbouring rules; and the area guard from both sides — the polygon declaration kept, and #1075's area term not taken. `shell/__tests__/length-copula-parity.test.ts` (14) is the drift net the duplication needs: it reads each tree's real pattern out of its source and runs it, so the two trees cannot come to disagree about what "is" means. The vocabulary is duplicated rather than shared because the `lexicon` layer's cross-product sharing is recorded UNDECIDED in `BOUNDARIES.json` (ADR-W-003), and `shell/` may not import a product tree in any case (ADR-W-016 rule 2).
+## ADR-AG-128 — The configuration search PREFERS spread, it does not merely accept validity (#1174)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1174 (bug, P2, `analytic`) · operator reports 2026-09-17, twice, on two different figures · round #1292
+**Requirements:** [02c](02c-requirements-analytic.md) — the configuration shown · **Design:** [04c](04c-design-analytic.md)
+**Completes** [ADR-AG-080](#adr-ag-080)/#1166, which ruled this residue *"a seed preference, in the `spread.ts` mould"* and left it out of scope
+
+**The report.** *"still too close to a straight line and there is no reason we need to do this — so many other configs that will look nicer"* — and again, on the next figure, about the next three presses of «הציגו תצורה אחרת». A defect that interrupts a play pass twice is costing more than its P2 suggests.
+
+**Root cause.** `drawableAt`'s `whole()` is a VALIDITY predicate — selectors hold · nothing vacant · no ring contradicts its noun. It answers *may this be drawn*, and among the many configurations that may be, the function took **the first**. There was no notion of one drawable configuration being better than another, so the sampler's luck was presented as the answer. 2-D solved exactly this in `spread.ts` (#194, ADR-474) and that module is 2-D's alone; this tree had no preference of any kind.
+
+**Measured before, minimum interior angle of `ABC` over seeds 0–7:**
+
+```
+«משולש ABC» «A(2,-5)» «AD תיכון לצלע BC»           1.4  2.3 14.9 25.4 14.1 18.2 25.4  1.9
+…plus «CE תיכון לצלע AB» and their meeting point   2.3  2.4  6.6 19.7 12.2 32.7  9.3  5.4
+«משולש ABC» alone                                 15.9 21.1 29.1 13.8 35.3 22.5 12.3 30.8
+```
+
+He opened on 1.4° and on 2.3°, with 25.4° and 19.7° two seeds away. Nothing forced any of it.
+
+**The fix.** A fourth tier above validity in the existing budgeted sweep, so canvas, «הציגו תצורה אחרת» and every consumer of the displayed figure are corrected at one chokepoint:
+
+```
+preferred = whole AND well-spread   → take the first
+otherwise = whole                    → today's answer
+otherwise = selectors hold           → the existing fallback
+```
+
+`minInteriorAngleOf` lives in `rings.ts` beside `ringFaultsOf`, over the same polygon enumeration, because it is the same question asked at a different strength — and that module's header already draws the line this ADR depends on: *"a 3° triangle is ugly but TRUE"*. `SPREAD_MIN_DEG = 15` carries its measurement in its own docblock: reachable in all three figures inside the existing 24-seed budget, while still excluding every sliver reported.
+
+**The honesty boundary, which is the whole risk of this change.** `isKnowledge`, `knownOptions` and the locus determinacy gate ask what holds across the configurations the tool would ADMIT. Narrowing that pool to the pretty ones would let the tool claim knowledge it does not have — the one way a cosmetic preference becomes an honesty bug. So `preferSpread` is a parameter that **defaults to `false`**: a caller added later inherits the honest behaviour and has to ask for the other. Only `derive` — the figure on the canvas, and through it the «הציגו תצורה אחרת» walk — asks for it. The drawable cache is keyed by mode as well as by seed, so whichever caller runs first cannot decide what the other sees.
+
+**Measured after.** Seed 0 opens on 25.4° · 19.7° · 15.9°, and all of seeds 0–7 clear 15° on all three figures. A pinned 1°-triangle («A(0,0)» «B(10,0)» «C(5,0.1)» «משולש ABC») is still drawn, unmoved and without a fault — the preference never becomes a requirement. «הציגו תצורה אחרת» still walks **ten distinct configurations** in ten presses on each free figure, and a determined figure still answers honestly that there is no other one: the preference narrows what may be shown without collapsing the variety, which is the #1282 failure this could otherwise have reproduced.
+
+**Consequences.** `engine/rings.ts` (+`minInteriorAngleOf`, +`SPREAD_MIN_DEG`); `engine/evaluate.ts` (`drawableAt` gains the opt-in parameter, a mode-keyed cache and the fourth tier); `engine/derive.ts` (one call opts in). `issue-1174-spread-preference.test.ts` (16): the three figures well-spread at every one of the first eight starts; **the un-preferred sweep asserted to still find the sliver**, so the lock cannot go vacuous if a later change happens to make seed 0 pretty on its own; the forced sliver still drawn; the gate's default asserted to be the un-preferred answer and a free coordinate still reported unknown; and the variety measured as distinct pictures rather than as a seed list.
+## ADR-AG-129 — A pinned ring that contradicts its noun is REFUSED, not silently drawn (#1170)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1170 (bug, P2, `analytic`) · operator ruling 2026-09-17 · round #1292
+**Requirements:** [02c](02c-requirements-analytic.md) — R91's pinned case · **Design:** [04c](04c-design-analytic.md)
+**Completes** [ADR-AG-080](#adr-ag-080)/#1158/#1166, whose arm 2 was built, measured and withdrawn to this issue
+
+**The report, and how it arrived.** Playing round #1169 T5 the operator typed `D(1,0)` instead of the sheet's `D(0,4)`, which put `D` on segment `AB`, and said: *"a quad should have been rejected for this case"*. He did not know he was looking at a known gap, which makes it a better signal than a test of it would have been.
+
+**Measured before, his exact five lines:**
+
+```
+A(0,0)  B(4,0)  C(1,1)  D(1,0)  מרובע ABCD
+
+figure.ringFaults  [{ id: 'poly-ABCD', noun: 'מרובע', violation: 'degenerate' }]   ← the seam SEES it
+faults             []                                                              ← and nothing is said
+decideSubmit(…)    record                                                          ← and the line is kept
+```
+
+`A`, `D` and `B` are collinear, so the ring's corner at `A` has both edges along the x-axis: the "quadrilateral" is a triangle with a spare vertex. The seam has detected this since #1158/#1166; the arm that would say so was the one this issue was opened to rule on.
+
+**The ruling.** Of the three options put to him — draw it, draw-with-a-notice, or refuse the line — he chose **(2), refuse**, overruling the session's recommendation of (3). Recorded as given. **Reach:** he ruled on a *degenerate* pinned ring, and this is taken as covering the *crossed* one too (four pinned points in a bow-tie order), since the sentence he was reacting to — *a shape noun promises a ring, and these points are not that ring* — is identical, and splitting them would leave the crossed half silent for no reason either of us has given.
+
+**Why the arm could not simply be switched on.** Both obvious gates were already argued against in this tree. `reportedDof === 0` is exactly the three `derived.test.ts` locks encoding ADR-AG-008's `does-not-exist` answer; `reportedDof > 0` is what the selector arm refuses to do, because with freedom left 24 exhausted seeds are evidence and not proof (#1071). The measurement that stopped it is now its *condition* rather than its blocker: **every figure it fires on has `reportedDof = 0`**, because with the polygon-noun preference inside the configuration search a figure that still has freedom never arrives here carrying a ring fault.
+
+**The reconciliation, which was the real work.** «P מפגש האנכים האמצעיים במשולש ABC» on three collinear points declares the triangle *and* asks for its circumcentre, so one line carries a ring fault and `does-not-exist` at once. `does-not-exist` names what the student actually asked for and is the truer message. The arm therefore runs **below every other fault in `derive`** — the only position from which it can see what has already been said — and skips a line that is already faulted. One line, one message, and the truer one wins. (The note in the old, empty slot now points here and says why the arm cannot live there.)
+
+**The message.** A new owned code, `ring-contradicts-noun`, with its own locale string, about the RING and naming the student's own statement (#1145): «הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "…"», and pointing at the two things they can change — the order of the letters, or the coordinates. Never «לא נמצאה תצורה שבה מתקיים», which is false on a determined figure.
+
+**Measured after.** His five lines are refused on the line that named the shape, and refused at the submit gate, so the figure never records it. The sheet's intended `D(0,4)` — a genuine concave quadrilateral — still builds and is still recorded: **concave is not crossed**, and R91's boundary is untouched. A pinned crossed quad and a pinned collinear triangle are both refused. The collinear circumcentre still gets exactly one message, `does-not-exist`. A free quadrilateral, and a partly-pinned one with freedom left, are unaffected — and the same ring pinned into a bow-tie is refused, which is what proves the freedom is doing the sparing.
+
+**Three locks moved, deliberately.** Two are named `#1170 boundary` in `issue-1158-1166-polygon-noun-validity.test.ts` and were written in as many words for this moment — *"when it lands, this line is what changes"*; their `ringFaults` half is untouched and only the `faults` line moves, from silence to the refusal. The third, `derived.test.ts`'s *"but ABDC is a DIFFERENT quadrilateral"*, keeps its claim and changes its **fixture**: it pinned four points in convex position, where only one cyclic order is a simple ring, so once a pinned crossed ring is refused the figure could no longer reach the eight sides that lock is about. Its points now put `D` inside triangle `ABC`, where `ABCD` and `ABDC` are both simple — the identity claim tested on its own rather than through a ring the tool declines — and a companion row states the other half explicitly: a reordering that crosses is refused, not merged away.
+
+**Consequences.** `engine/apply.ts` (+the code), `i18n/index.ts` (+he/en), `App.tsx` and `store/useAnalyticStore.ts` (+the mapping), `engine/derive.ts` (the arm, and the note in its old slot). `issue-1170-pinned-ring-refused.test.ts` (9): his own figure on both surfaces, the intended concave quad as the counter-direction, both members of the ruling, the single-message reconciliation, and the freedom gate asserted with the precondition that makes it non-vacuous.
+## ADR-AG-130 — The crossing module judges degeneracy RELATIVELY (#1235)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1235 (bug, P3, `analytic`) · split from the 2026-09-19 spurious-ring report · round #1292
+**Requirements:** [02c](02c-requirements-analytic.md) — R89's offered-ring honesty · **Design:** [04c](04c-design-analytic.md)
+**Extends** [ADR-AG-021](#adr-ag-021)'s *never an absolute magnitude* to the last two places in this module that ignored it, and completes [#1113](https://github.com/dcodish/geo_builder/issues/1113)'s fix in the loop it missed
+
+**The class.** *A crossing is offered for a pair of objects that do not cross, because the degeneracy tests are written as absolute thresholds on quantities that carry the figure's scale, so they never fire.*
+
+**Defect 1 — `meet()`'s guard was not a threshold on anything geometric.**
+
+```ts
+const det = p.a * q.b - q.a * p.b;
+if (Math.abs(det) < 1e-12) return null; // parallel, or the same line
+```
+
+`det` scales with both lines' coefficient magnitudes. Measured on the reported figure, where a segment and a stated line were the same line to solver tolerance: `det = -2.07e-7` — five orders of magnitude above the guard — while the **normalised** value, the sine of the angle between them, was `-6.65e-8`, an angle of 3.8e-6 degrees. The guard's own comment says it is there to catch "parallel, or the same line". It did not, and the tool went on to offer «P נקודת החיתוך של הישר CE עם הישר CE» — authoring a meaningless given into the one list the student checks to see what the tool understood.
+
+**Defect 2 — two answers to one question.** The straight×straight loop deduped against existing points with a hard-coded `1e-6`; the straight×conic loop four lines below used `apart()`, the relative tolerance #1113 was filed to introduce. On a figure spanning 18.6 those differ by 50×, so a ring was offered on top of a point that already had a letter — the #1113/#1175 family, which is how a third and fourth name reach one location.
+
+**Why it stopped being a curiosity.** Before the 2026-09-19 ruling (ADR-AG-111) a student could not deliberately hold both a segment and its infinite line. Now «משוואת הצלע CE …» then «משוואת הישר CE …» is an ordinary two-line sequence — and it is precisely the near-zero-determinant pair. The operator met it on his first pass through that feature.
+
+**The constants, measured before they were chosen** (docs/17 §3b — these are registry-shaped).
+
+- **The solver's actual residual**, on a satisfied incidence: ~2e-9 absolute on spans of 10–15, about **2e-10 relative**. So `apart() = span · 1e-6` has three to four orders of margin over solver noise while remaining invisible on the canvas — it is a good occupancy tolerance and is now the only one.
+- **`CROSS_MIN_SINE = 1e-6`**, an angle of 5.7e-5 degrees. Two orders above the 6.65e-8 measured between two representations of one line, and far below any angle a student means. It answers *"are these the same line?"* and nothing else: two genuinely different lines meeting at a shallow angle cross far outside the drawing, which is an EXTENT question for `within`, and widening this constant to cover it would start calling distinct lines identical.
+
+**The fix.** Two named predicates beside `apart()`, in the module that already owns *what counts as the same thing here*: `angleSine(p, q)` (the normalised determinant) with `CROSS_MIN_SINE`, used by `meet()`; and `occupied(figure, at)`, relative, now used by **both** loops. Deleting the hard-coded `1e-6` is most of the change; the point is that the loops no longer hold two answers to one question.
+
+**Defect 3 is deliberately NOT here, and that is a scope decision worth stating.** The issue's plan also asked to refuse the typed «P נקודת החיתוך של הישר BD עם הישר BD». That sentence is [#1255](https://github.com/dcodish/geo_builder/issues/1255), which is **`needs-operator`**: refuse it, or read it as «P על הישר AB» and give the student the 1-DOF point they may actually have wanted? `parseIntersection`'s own docblock already parks it for the same reason. It is a question about what the sentence MEANS, not about a threshold, and building the refusal here would transcribe a ruling nobody has given. The split is clean and is the honest half of this issue: **the tool must never AUTHOR a meaningless given on the student's behalf** — fixed here, because `meet()` no longer returns a crossing for a line with itself — while what to do when the student writes one themselves stays with #1255.
+
+**Measured after.** On the twin line+segment figure, 0 self-crossing rings at every seed, where the surface previously offered them; a genuine two-segment crossing still offers exactly one ring; a point 3e-6 from a crossing on a span of 6 — inside the old guard's blind spot — now suppresses its ring, and moving the point away brings the ring back.
+
+**Consequences.** `engine/crossings.ts` (+`occupied`, +`angleSine`, +`CROSS_MIN_SINE`; `meet` and both loops rewired; two hard-coded tolerances deleted). `issue-1235-relative-crossing-tolerances.test.ts` (14): the self-crossing asserted as a **property of every offered ring** (`first !== second`) across eight seeds rather than as a ring count; an angular table stepping an order of magnitude either side of the bar, deliberately not ON it, since a row at exactly `1e-6` would lock floating-point rounding rather than the decision; the occupancy fixture with its **blind-spot precondition asserted first**, so it cannot quietly stop testing what it was built for; and the negative controls in both directions.
+
+## ADR-AG-131 — The analytic tool gets a session trace, and the shared sink routes by REGISTRY (#1300)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1300 (debt, P2, `analytic`)
+**Requirements:** none (internal — dev tooling; nothing the product promises changes) · **Design:** [04c](04c-design-analytic.md)
+
+**The report.** Operator, 2026-09-20: *"why dont we have a log for this tool. this is important for debug so add it"*.
+
+**The cost, an hour earlier and concrete.** Triaging #1297 — *the LLM fallback answered in English* — nothing could establish what he had typed. `logs/` held `debug-log.jsonl` (2-D) and `debug-log-3d.jsonl` (3-D) and nothing for analytic; the tool is not deployed ([ADR-AG-007](#adr-ag-007)) so there was no prod event either. His utterance had to be inferred from the SHAPE of his fact list and then confirmed by asking him. With 39 open analytic issues, the most active product in the queue was the only one whose sessions could not be replayed.
+
+**What was already there.** The sink is shared and already mounted for every dev app: `server/logProxy.ts` serves `POST /api/log`, and `vite.config.ts` mounts it for all four entry points. Missing were a client in `src-analytic/` and a routing entry for a third tool.
+
+**The routing defect this had to fix on the way past — and why a third ternary arm was the wrong shape.**
+
+```ts
+await appendFile(obj.tool === '3d' ? path.join(logDir, 'debug-log-3d.jsonl') : logPath, line, 'utf8');
+```
+
+A two-way branch on product identity with **2-D as the ELSE**, which is [ADR-W-003](06w-decisions-workspace.md)'s *"branching on product identity inside a shared module is a fork wearing a shared file's name"*. The style is not the point; the `else` is. **An unknown or mistyped tool tag was appended to `debug-log.jsonl`** — the file `src/__tests__/scenarios-corpus-*.ts`, `src/theorems/audit.ts` and the log-triage skill all read as genuine 2-D user data. A new product posting a tag this file did not know would have poisoned the 2-D triage corpus with sentences from a different grammar, silently. So: a `TOOL_LOGS` registry, an **unknown tool REFUSED** (400, written nowhere), and an ABSENT tag mapping to 2-D as the one documented back-compat case — `src/debug/sessionLog.ts` has never tagged its events and does not need to start. `complex` is in the registry although that tree has no client; the entry costs one line and its absence is what would make the fifth product repeat this.
+
+**No production sink, deliberately.** Both siblings carry a second, lean analytics sink for the admin dashboard. This module has none: analytic is **not deployed**, so building that half now would ship an untested path to an endpoint that does not exist, feeding a dashboard with no data. `logAnalytic` returns early outside DEV, and that early return is the whole production posture — which is why it has its own lock. When analytic deploys, the prod sink is separate, sized work; `server/admin.ts` already carries the label it will need.
+
+**The defect found by LOOKING, which is the part worth recording.** The module went live on the operator's own running dev server (Vite restarted on the config dependency change) and the first trace it produced showed **three identical figure snapshots per single change** — one pair sharing a millisecond (React `StrictMode` double-invokes effects in dev), further copies seconds apart from re-renders that changed nothing. A trace that triples its most voluminous event is harder to read than no trace. The fix is `logAnalyticFigure`, deduping on the payload's **content** rather than on the effect's dependency list: a `useMemo` identity is a React implementation detail that StrictMode, a remount and a discarded memo cache can each churn independently, so a component-side guard would have had to be right about all three. *"Is this the same figure I last recorded?"* is the question the log actually has, and it is answerable in one place. This was measured, not predicted — the unit tests were green before it was found.
+
+**Measured after**, driving the real page through Playwright with `/api/parse` **aborted at the browser** so standing rule 2 was not touched (2 escalations blocked, 0 calls made):
+
+```
+FIGURE seed=0 lines=[]
+INPUT  parser not-handled  intermediate=true  | משוואת ישר 1 היא 2x-y+8=0
+INPUT  llm    none                            | משוואת ישר 1 היא 2x-y+8=0
+INPUT  parser record                          | נתון הישר l1: 2x-y+8=0
+FIGURE seed=0 lines=['נתון הישר l1: 2x-y+8=0']
+INPUT  parser not-handled  intermediate=true  | נקודה (-2,4) נמצאת על ישר 3
+INPUT  llm    none                            | נקודה (-2,4) נמצאת על ישר 3
+ACTION show-another none
+```
+
+One figure line per real change; the escalation recorded as a joinable PAIR; Hebrew stored intact (verified on the file's bytes, not on a console that cannot print it). This is exactly the record #1297 could not obtain. Incidentally it confirms #1296 independently: the stored utterance is `נקודה (-2,4) נמצאת על ישר 3`, minus in the right place — that defect is display-only.
+
+**Consequences.** `server/logProxy.ts` (+`TOOL_LOGS`, +`logFileFor` exported so its lock CALLS it, the `else` deleted, the unknown tag refused). `src-analytic/debug/sessionLogAnalytic.ts` (new — copied from `sessionLog3.ts`, never imported: product trees do not import each other). `src-analytic/App.tsx` (+the submit trace read off the exhaustive verdict, so a new verdict kind cannot skip it; +the escalation outcome WITH the model's steps, the field #1297 needed; +the deduped figure effect; +the seven store actions a replay needs). `issue-1300-log-routing.test.ts` (5): the mapping, the distinctness, the **unknown-tag rejection** — the row a future third ternary arm would break while satisfying all the others — and the absent-tag back-compat case asserted as deliberate. `issue-1300-session-log.test.ts` (8): the DEV guard on both entry points, the `tool` tag, the escalation pair as the acceptance case, the content dedupe with its precondition asserted first, and both of `fetch`'s failure modes since the module guards them separately.
