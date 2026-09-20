@@ -179,3 +179,70 @@ export function ringFaultsOf(c: Construction, at: (id: Id) => RingPt | undefined
   }
   return faults;
 }
+
+/**
+ * SPREAD — HOW OPEN THE DRAWN RINGS ARE (#1174).
+ *
+ * The minimum interior angle over every declared polygon, in degrees; `Infinity` when there is no
+ * ring to judge. A figure with no declared polygon is vacuously as spread as any other, which is the
+ * answer a preference wants — it removes itself rather than rejecting everything.
+ *
+ * **This is a PREFERENCE and it is not validity.** `ringViolation` above answers *"does this drawing
+ * contradict the noun?"* and its tolerance deliberately sits two orders of magnitude under the "ugly"
+ * band, because a 3° triangle is ugly but TRUE and refusing it would assert a given nobody gave
+ * (ADR-052). Nothing here changes that: a figure whose givens force a sliver is still valid, still
+ * drawn, and still reachable. The only claim is that when the tool may choose, it should not open on
+ * the sliver.
+ *
+ * Operator, 2026-09-17, twice on two different figures: *"still too close to a straight line and
+ * there is no reason we need to do this — so many other configs that will look nicer"*.
+ *
+ * A vertex that did not resolve skips its polygon, exactly as `ringFaultsOf` skips it, and for the
+ * same reason: an unplaced point is a vacancy (ADR-AG-008), not a narrow angle.
+ */
+export function minInteriorAngleOf(c: Construction, at: (id: Id) => RingPt | undefined): number {
+  let smallest = Infinity;
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon') continue;
+    const pts = o.vertices.map(at);
+    if (pts.some((p) => !p)) continue;
+    const ring = pts as RingPt[];
+    if (ring.length < 3) continue;
+    for (let i = 0; i < ring.length; i += 1) {
+      const prev = ring[(i + ring.length - 1) % ring.length];
+      const here = ring[i];
+      const next = ring[(i + 1) % ring.length];
+      const ux = prev.x - here.x;
+      const uy = prev.y - here.y;
+      const vx = next.x - here.x;
+      const vy = next.y - here.y;
+      const nu = Math.hypot(ux, uy);
+      const nv = Math.hypot(vx, vy);
+      // A collapsed corner is `ringViolation`'s business, not this one — it contributes no angle
+      // rather than a fake zero, so a degenerate ring cannot masquerade as merely narrow here.
+      if (nu === 0 || nv === 0) continue;
+      const cos = Math.max(-1, Math.min(1, (ux * vx + uy * vy) / (nu * nv)));
+      smallest = Math.min(smallest, (Math.acos(cos) * 180) / Math.PI);
+    }
+  }
+  return smallest;
+}
+
+/**
+ * The bar a configuration must clear to be PREFERRED, in degrees.
+ *
+ * **Measured, 2026-09-20**, minimum interior angle of `ABC` over seeds 0–7 on the operator's two
+ * reported figures and on the bare triangle:
+ *
+ * ```
+ * «משולש ABC» «A(2,-5)» «AD תיכון לצלע BC»        1.4  2.3 14.9 25.4 14.1 18.2 25.4  1.9
+ * …plus «CE תיכון לצלע AB» and their meeting point 2.3  2.4  6.6 19.7 12.2 32.7  9.3  5.4
+ * «משולש ABC» alone                               15.9 21.1 29.1 13.8 35.3 22.5 12.3 30.8
+ * ```
+ *
+ * 15° is reachable in all three within the existing budget while still excluding every sliver the
+ * operator reported — he opened on 1.4° and 2.3°. Raising it further would start rejecting
+ * configurations nobody would complain about and would make the preference fire more often than it
+ * needs to; it is a bar for "not a sliver", not an aesthetic optimum.
+ */
+export const SPREAD_MIN_DEG = 15;

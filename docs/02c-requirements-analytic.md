@@ -1180,6 +1180,22 @@ configuration to show: a crossed or collapsed ring is never drawn, and never off
 Rejecting either of the two right-hand cases would assert a given the student never gave, which is
 the same cardinal sin as drawing a figure that violates its givens ([ADR-052](06-decisions.md#adr-052)).
 
+**R92 — among the configurations it MAY show, the tool opens on one that is not a sliver**
+([ADR-AG-128](06c-decisions-analytic.md#adr-ag-128) ·
+[#1174](https://github.com/dcodish/geo_builder/issues/1174)). R91 decides what may be drawn; this
+decides which of those is drawn first. A student who states «משולש ABC» and nothing about its shape
+should not be shown a 1.4° wedge when a 25° triangle is two presses away — the tool is choosing, and
+when it chooses it should choose a figure the student can work on.
+
+**It is a PREFERENCE and never a requirement**, which is what keeps it on the right side of R14. A
+figure whose givens force a tight wedge is still drawn, unmoved and without complaint; the preference
+simply has nothing better to offer. And it never reaches what the tool CLAIMS: a value is known only
+if it holds across the configurations the tool would admit, not across the ones it finds handsome.
+
+**Variety survives it.** «הציגו תצורה אחרת» still walks ten distinct configurations in ten presses
+on the reported figures; a preference that narrowed the figure down to one picture would be trading
+one defect for a worse one.
+
 **Where the student's own coordinates force a bad ring** — four pinned points written in an order
 that crosses — the figure is determined and there is no configuration to choose. That case is
 [#1170](https://github.com/dcodish/geo_builder/issues/1170) and is not yet answered.

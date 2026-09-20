@@ -80,6 +80,33 @@ place. A kind that can forward-reference is what would earn one.
   renderer draws. **Pure**, so the renderer stays a consumer rather than a second geometry implementation
   — the same split every sibling uses.
 
+## The configuration search: validity, then preference ([ADR-AG-128](06c-decisions-analytic.md#adr-ag-128))
+
+`drawableAt` is the one place that chooses which configuration the tool shows, so canvas, data panel,
+«הציגו תצורה אחרת» and the honesty gates are all corrected there rather than per consumer. Its sweep
+has four tiers, strongest first:
+
+| tier | predicate | added by |
+| --- | --- | --- |
+| preferred | whole **and** every declared ring at least `SPREAD_MIN_DEG` open | #1174 |
+| whole | selectors hold · nothing vacant · no ring contradicts its noun | #1083, #1158/#1166 |
+| second best | the selectors hold, something named is missing | #1083 |
+| fallback | the raw figure at this seed | — |
+
+**The top tier is opt-in and defaults to OFF.** Spread is a display preference; `isKnowledge`,
+`knownOptions` and the locus determinacy gate ask what holds across the configurations the tool would
+ADMIT, and narrowing that pool to the pretty ones would let the tool claim knowledge it does not have.
+Defaulting to off means a caller added later inherits the honest behaviour and must ask for the other;
+only `derive` asks. The drawable cache is keyed by mode as well as by seed, because the two modes
+answer differently for the same seed and one shared cache would let whichever caller ran first decide
+what the other sees.
+
+**Validity and preference are separate predicates on purpose.** `ringViolation` rejects a ring that
+contradicts its noun and its tolerance sits two orders of magnitude under the ugly band, because a
+3° triangle is ugly but true. `minInteriorAngleOf` measures how open the rings are and decides
+nothing. Folding them into one number would turn a preference into a refusal and assert a given the
+student never gave.
+
 ## The parser's rule contract ([ADR-AG-017](06c-decisions-analytic.md#adr-ag-017))
 
 A rule in `parseAnalytic.ts` answers one of **three** ways, and the third is the one round #1056 added:
