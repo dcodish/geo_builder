@@ -22,3 +22,14 @@ the plan cites (`grep -rn "<function>\|#<issue>" src*/__tests__`), and read any 
 behaviour the plan changes. If one records a ruling the plan reverses, escalate that arm with both
 rulings quoted; deliver the arms that do not collide. Related: [[test-the-framing-not-just-the-facts]],
 [[locks-and-gates-are-hypotheses]].
+
+**A CROSS-PRODUCT port is the highest-risk shape of this** (2026-09-20, #1274 vs #944, round #1280). A
+ruling given while playing one product — *"the 2d and 3d tools should follow the same logic"* — reaches
+trees whose own rulings were never re-read. 2-D's member of the coincidence rule refused «משולש ABC» +
+«D = חיתוך AB ו-BC»; that exact sentence is #944/ADR-489, where the operator reported the opposite and
+the shipped lock asserts D IS minted at B. The tell was available before any code: the sibling's lock
+files are searchable by the SENTENCE, not only by the function. Grep the other product's `__tests__` for
+the literal utterance the port will refuse — `grep -rn "חיתוך AB" src/__tests__` would have found it in
+one command. And when the ADR you are writing says "N locks assert this and stay green; if any goes red
+a fix has reached past this ruling", that is not a rhetorical flourish — run that check before building,
+not as a post-hoc explanation of a red lane.
