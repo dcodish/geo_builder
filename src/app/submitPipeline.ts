@@ -295,6 +295,35 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   // (that would be a line-line angle — a constraint kind 2-D does not have). Picking some nearby vertex
   // would assert a given the student never stated; escalating hands the LLM the same invention to make.
   // So it is refused BY NAME, quoting the two segments back (the honesty invariant), and the text stays.
+  /**
+   * #1266: a CEVIAN sentence the grammar read and rejected on its own letters — «BD גובה לצלע AB»,
+   * «AB תיכון לצלע BC». It used to answer `not-handled`, which sent a sentence the tool understands
+   * perfectly to the paid model and told the student their words were unreadable. The rule owes an
+   * answer about what it matched, and `why` decides which impossibility to name.
+   */
+  if (!r.ok && r.reason === 'cevian-degenerate') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `cevian-degenerate:${r.why}:${r.apex}${r.foot}/${r.side.join('')}` });
+    const kind = t(r.role === 'median' ? 'input.cevianRoleMedian' : 'input.cevianRoleAltitude');
+    const key =
+      r.why === 'apex-on-side'
+        ? 'input.cevianApexOnSide'
+        : r.why === 'median-foot-at-end'
+          ? 'input.cevianMedianFootAtEnd'
+          : 'input.cevianApexIsFoot';
+    ui.setInputNote(t(key, { apex: r.apex, foot: r.foot, side: r.side.join(''), kind }));
+    ui.setBusy(false);
+    return;
+  }
+  /**
+   * #1267: «BD חוצה זווית לצלע BC» — the bisector from B meets AC, and the side the student NAMED
+   * is not one it can meet. Both are quoted back; the figure is never quietly drawn to the other one.
+   */
+  if (!r.ok && r.reason === 'cevian-wrong-side') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `cevian-wrong-side:${r.apex}:${r.stated.join('')}/${r.actual.join('')}` });
+    ui.setInputNote(t('input.cevianWrongSide', { apex: r.apex, stated: r.stated.join(''), actual: r.actual.join('') }));
+    ui.setBusy(false);
+    return;
+  }
   if (!r.ok && r.reason === 'angle-sides-disjoint') {
     logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `angle-sides-disjoint:${r.s1}/${r.s2}` });
     ui.setInputNote(t('input.angleSidesDisjoint', { s1: r.s1, s2: r.s2 }));

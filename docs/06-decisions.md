@@ -12402,3 +12402,27 @@ They were **not deleted**. They moved to `altitude-foot-at-vertex.test.ts` with 
 ### Lock
 
 `altitude-foot-at-vertex.test.ts` (17). The headline is a **parity assertion** — «AB גובה לצלע BC» must produce the *same commands* as «AB ⟂ BC» — which this case makes available and which cannot go green by re-implementing the perpendicular rule. Plus: no point minted and no hidden `~` duplicate; the angle at the foot driven to 90°; all seven of ADR-525's refusals still refused; **the median and the altitude asserted to disagree on the SAME letters** (the cell that proves the split is by role, not a blanket relaxation); and a second right angle on an already-right triangle still refused with the conflict named. Verified to bite: 7 of the 17 fail against pristine `parse.ts`.
+
+## ADR-528 — A rule that READ the sentence owes an answer about it; and the cevian's side has one reader (#1266, #1267)
+
+**Status:** accepted, 2026-09-20 · **Issues:** #1266 (the operator's T6/T7), #1267 (found measuring it) · round #1280
+**Requirements:** [02](02-requirements.md) — a sentence the grammar reads and rejects is refused by name, never reported as unreadable · **Design:** [04](04-design.md) — the `Clarify` route, and one reader for a cevian's stated side
+**Completes** [ADR-525](#adr-525)/[ADR-527](#adr-527), which built the gate and deliberately left its refusal for later
+
+**What the student saw.** *"T6 - BD גובה לצלע AB - it says it cannot read this - but the message should be more informative"*, and on the median twin, *"same for T7"*. Both refusals were CORRECT — that gate is ADR-525's. What was wrong is the CHANNEL: measured, all five degenerate spellings answered `not-handled`, which sent a sentence the tool understands perfectly to the paid model and told the student their words were unreadable.
+
+**The deferral's premise was wrong, and that is the ADR-worthy part.** ADR-525's own comment split this off:
+
+> *"An OWNED refusal that names the statement is the better answer and is a larger change (2-D has no refusal vocabulary equivalent to the analytic tree's `ParseFailure` codes); it is split out deliberately rather than smuggled in here."*
+
+2-D has had that vocabulary for months: `Clarify` carries fifteen members, `refusalOf` maps every one to a typed reason, and `runSubmit` has ten arms that log the refusal, set a named note, keep the student's text and **make no LLM call**. [#967](https://github.com/dcodish/geo_builder/issues/967)'s `angle-sides-disjoint` is the identical shape — the grammar read it, the geometry is impossible, so it is refused quoting the student's own letters. The "larger change" was one union member and a few strings. **A split-out with a stated reason reads as settled and is quoted forward; its reason is a hypothesis like any other.**
+
+**Decision 1 — the gate returns WHY, not `false`.** `cevianWellFormed` becomes `cevianFault`, returning a `cevian-degenerate` clarify or `null`. `why` is what lets the note say the right sentence, and there are exactly three: an apex ON the side is a zero-length cevian; an apex that IS its own foot is not a segment; a median's foot at an endpoint would need the side to have no length. (An altitude's foot MAY be an endpoint — ADR-527 — and that stays a right angle, not a fault.) All four emit points propagate it unchanged.
+
+**Decision 2 — a cevian's stated side has ONE reader.** The median rule and the altitude rule each carried their own matcher for «לצלע BC» / «אל BC» / «ל-BC» / "to side BC", the altitude's a superset. The **angle bisector carried none**: it hunted for a three-letter angle triple, found none in «BD חוצה זווית לצלע BC», and fell through to deriving the side from the figure — so «לצלע BC», «לצלע AC» and «לצלע AB» produced **byte-identical commands** and the student's stated incidence vanished without a word. `statedSide` is now that one reader (the superset, so the median inherits «לקטע» and «אל הצלע»), and the bisector both strips it before the triple hunt and CHECKS it: a bisector from a vertex meets the opposite side and only that one, so a different named side is refused with **both sides quoted** — never silently redirected to the real one.
+
+**Why the bisector does not also call `cevianFault`.** Its side is either derived from the figure (and then cannot be degenerate) or stated — and a stated side that the bisector cannot meet is already refused by the wrong-side check, which is strictly stronger and names both sides. Adding a third `CevianRole` to say the same thing less well is the enumeration ADR-525 exists to avoid.
+
+**Consequences.** Two `ParseResult` reasons (`cevian-degenerate`, `cevian-wrong-side`), two `refusalOf` mappings, two `runSubmit` arms with their log lines, six strings per locale. `issue-1266-1267-cevian-refusal.test.ts` (13), verified to fail against the pre-fix code on **ten** assertions — including the one that states the #1267 defect exactly: the two spellings' parse results *"expected not to be"* identical. Every refusal row asserts **`llmParse` was not called**: the paid half is invisible to a message assertion and is the half that silently comes back.
+
+**The audit this opens.** `return null` is right for *"this rule does not own this sentence"* and wrong for *"this rule owns it and it is impossible"*. Every rule that matches a construct and then rejects it on geometry is the same defect; this ADR fixes the cevian family, and the sweep is filed rather than done here.

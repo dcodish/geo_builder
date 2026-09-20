@@ -118,7 +118,13 @@
     "canonicalHint": "Got it. Next time you can write: {{canonical}} — that form always works.",
     "polygonNotSupported": "The polygon \"{{noun}}\" is not supported. Supported: {{offer}} — add \"regular\" for a regular one (e.g. \"regular pentagon\").",
     "incompleteComparative": "{{factor}} times WHAT? Name the segment it is compared to — e.g. \"{{subject}} is {{factor}} times AB\".",
-    "angleSidesDisjoint": "The segments {{s1}} and {{s2}} do not meet, so there is no angle between them. Name two sides that share an endpoint, or name the angle by its three letters."
+    "angleSidesDisjoint": "The segments {{s1}} and {{s2}} do not meet, so there is no angle between them. Name two sides that share an endpoint, or name the angle by its three letters.",
+    "cevianRoleAltitude": "the altitude",
+    "cevianRoleMedian": "the median",
+    "cevianApexOnSide": "{{apex}} lies on side {{side}}, so {{kind}} from {{apex}} to {{side}} has zero length. A cevian runs from a vertex to the side opposite it.",
+    "cevianMedianFootAtEnd": "The midpoint of {{side}} cannot be {{foot}} — that would need {{side}} to have zero length.",
+    "cevianApexIsFoot": "{{apex}}{{foot}} is not a segment — {{kind}} runs from a vertex to a different point.",
+    "cevianWrongSide": "The bisector from {{apex}} meets side {{actual}}, not {{stated}}."
   },
   "explore": {
     "title": "Explore the figure"

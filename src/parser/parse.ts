@@ -41,6 +41,15 @@ export type ParseResult =
   // rather than bound to some nearby vertex or guessed by the LLM. `s1`/`s2` are the student's own
   // segment names, so the note can quote them back.
   | { ok: false; reason: 'angle-sides-disjoint'; s1: string; s2: string }
+  // #1266: a cevian sentence whose own letters make it impossible — «BD גובה לצלע AB» asks for the
+  // perpendicular from B to a side B is an endpoint of. The grammar READ the sentence and rejected it on
+  // the geometry, so `not-handled` was a lie: it said "I do not know this sentence" about one the tool
+  // understands, escalated it to a paid model that cannot build it either, and told the student their
+  // words were unreadable. `why` picks which impossibility to name; the rest is the student's own letters.
+  | { ok: false; reason: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: string; foot: string; side: [string, string] }
+  // #1267: «BD חוצה זווית לצלע BC» — the bisector from B meets AC, and the side the student NAMED is not
+  // the one it can meet. Refused with both sides quoted, never silently redirected to the real one.
+  | { ok: false; reason: 'cevian-wrong-side'; apex: string; stated: [string, string]; actual: [string, string] }
   // #770: a definite SHAPE reference («אלכסוני הריבוע») whose named kind has no declared match in the
   // figure — the statement is refused BY NAME (the honesty invariant: name the conflicting statement),
   // never bound to "whichever quad exists" and never guessed by the LLM. `noun` is the student's word.
@@ -267,7 +276,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -1979,7 +1988,8 @@ const foot: Rule = (s) => {
   // #1233 — the same incidence, stated in the third spelling the family owns: «F רגל האנך מ-B ל-AB»
   // put F exactly on B and reported success.
   const [id, from, a, b] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
-  if (!cevianWellFormed(from, id, [a, b], 'altitude')) return null;
+  const footFault = cevianFault(from, id, [a, b], 'altitude');
+  if (footFault) return footFault; // #1266: refuse BY NAME, never `not-handled`
   // #1247 — «B רגל האנך מ-A ל-BC» names an existing vertex as the foot: a right angle at B, not a
   // new point. The same reading the altitude rule gives its own spelling.
   if (id === a || id === b) return altitudeAtVertex(from, id, [a, b]);
@@ -8132,14 +8142,58 @@ const roleSideLine: Rule = (s, ctx) => {
  * drawn to is degenerate in BOTH roles («BD גובה לצלע AB» is a zero-length altitude), and an apex that
  * IS its own foot is degenerate in both.
  */
+/**
+ * THE SIDE A CEVIAN SENTENCE NAMES — one reader, for every rule that takes one (#1267).
+ *
+ * «לצלע BC», «על צלע BC», «אל BC», «ל-BC», «לקטע BC», "to side BC", "on side BC". The median rule and
+ * the altitude rule each carried their own copy (the altitude's a superset — it tolerated «לקטע» and
+ * «אל הצלע»), and the ANGLE BISECTOR carried none at all: it looked for a three-letter angle triple,
+ * found none in «BD חוצה זווית לצלע BC», and fell through to deriving the side from the figure. So
+ * «לצלע BC», «לצלע AC» and «לצלע AB» produced byte-identical commands and the student's stated side
+ * vanished without a word — a given disappearing, which is the one thing this tool may never do.
+ *
+ * Returns the match too, so the caller can strip it before hunting for letter runs — the reason the
+ * copies existed at all.
+ */
+const statedSide = (s: string): { side: [Id, Id]; match: string } | null => {
+  const m = s.match(
+    /(?:\bto\s+(?:the\s+)?(?:side\s+)?|\bon\s+side\s+|אל\s*(?:ה?צלע\s+)?|על\s+ה?צלע\s+|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+  );
+  return m ? { side: [up(m[1]), up(m[2])], match: m[0] } : null;
+};
+
 type CevianRole = 'median' | 'altitude';
-const cevianWellFormed = (apex: Id, foot: Id, side: readonly [Id, Id], role: CevianRole): boolean =>
-  apex !== side[0] &&
-  apex !== side[1] &&
-  apex !== foot &&
+
+/**
+ * WHY this cevian cannot stand — `null` when it can (#1233, and its refusal in #1266).
+ *
+ * The predicate is unchanged; what changed is its RETURN. It answered `boolean`, and every caller
+ * turned `false` into `return null` — the parser's "no rule owns this sentence". That is false of a
+ * sentence this rule read, named the apex of, named the side of, and rejected on the geometry: the
+ * student was told their words were unreadable, and a paid model was asked to build what the tool had
+ * just proved impossible. #1233's own comment called this out and split the refusal off as "a larger
+ * change (2-D has no refusal vocabulary)". That premise was wrong — `Clarify` has fifteen members and
+ * `runSubmit` ten arms — so the split is closed here by returning the refusal instead of the silence.
+ *
+ * `why` is what lets the note say the right sentence: an apex ON the side is a zero-length cevian, an
+ * apex that IS its own foot is not a segment, and a median's foot at an endpoint would need the side to
+ * have no length. An altitude's foot MAY be an endpoint (ADR-527) — that is a right angle, not a fault.
+ */
+const cevianFault = (
+  apex: Id,
+  foot: Id,
+  side: readonly [Id, Id],
+  role: CevianRole,
+): Extract<Clarify, { clarify: 'cevian-degenerate' }> | null => {
+  const at = (why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end') =>
+    ({ clarify: 'cevian-degenerate' as const, role, why, apex, foot, side: [side[0], side[1]] as [Id, Id] });
+  if (apex === side[0] || apex === side[1]) return at('apex-on-side');
+  if (apex === foot) return at('apex-is-foot');
   // a median's foot is the midpoint and can only be an endpoint if the side is degenerate; an
   // altitude's foot is an endpoint exactly when the angle there is right
-  (role === 'altitude' || (foot !== side[0] && foot !== side[1]));
+  if (role === 'median' && (foot === side[0] || foot === side[1])) return at('median-foot-at-end');
+  return null;
+};
 
 /**
  * The altitude whose foot IS an endpoint of the side: «AB גובה לצלע BC» ⇒ AB ⟂ BC (#1247).
@@ -8166,14 +8220,14 @@ const median: Rule = (s, ctx) => {
   if (!/\bmedian\b|תיכון/i.test(s)) return null;
 
   // An explicitly named opposite side: "to side BC" / "to BC" / "לצלע BC" / "על צלע BC" / "אל BC" / "ל-BC".
-  const sideM = s.match(/(?:\bto\s+(?:side\s+)?|\bon\s+side\s+|לצלע\s*|על\s+ה?צלע\s+|אל\s*|ל-?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
-  const side = sideM ? ([up(sideM[1]), up(sideM[2])] as [Id, Id]) : null;
+  const sideM = statedSide(s); // #1267: the ONE reader (this rule’s own copy was the narrower of two)
+  const side = sideM ? sideM.side : null;
 
   // Named form "AD תיכון" / "median AD": the median segment is named apex-first,
   // foot second, so D is the student's chosen name for the opposite-side midpoint.
   // Strip the keyword and any explicit-side phrase so only the median pair remains.
   let body = s.replace(/\bmedian\b|תיכון/gi, ' ');
-  if (sideM) body = body.replace(sideM[0], ' ');
+  if (sideM) body = body.replace(sideM.match, ' ');
   const seg = labelRun(body, 2);
   if (seg && seg[0] !== seg[1]) {
     const apex = seg[0];
@@ -8201,7 +8255,8 @@ const median: Rule = (s, ctx) => {
     }
     // #1233 — the gate that used to read only `apex ∈ opp` here is now the shared definition, so the
     // altitude and the foot rule cannot drift from it again.
-    if (!cevianWellFormed(apex, foot, opp, 'median')) return null;
+    const medFault = cevianFault(apex, foot, opp, 'median');
+    if (medFault) return medFault; // #1266
     return [
       { type: 'midpoint', id: foot, a: opp[0], b: opp[1] },
       { type: 'segment', a: apex, b: foot },
@@ -8375,14 +8430,15 @@ const altitude: Rule = (s, ctx) => {
     const foot2 = existingFootOf(ctx, apx, sd[0], sd[1]) ?? freeLabel([apx, ...sd, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']); // reuse (Am. 2)
     // #1233 — the apex is derived from the polygon here, so this cannot currently be degenerate; asked
     // anyway, because "cannot currently be" is what the median's gate said about the altitude.
-    if (!cevianWellFormed(apx, foot2, sd, 'altitude')) return null;
+    const roleFault = cevianFault(apx, foot2, sd, 'altitude');
+    if (roleFault) return roleFault; // #1266
     return [
       { type: 'foot', id: foot2, from: apx, a: sd[0], b: sd[1] },
       { type: 'segment', a: apx, b: foot2 },
     ];
   }
   // Opposite side: "to BC" / "to side BC" / "ל BC" / "ל-BC" / "לצלע BC" / "על צלע BC" / "לקטע BC" (descriptor noun tolerated).
-  const sideM = s.match(/(?:\bto\s+(?:the\s+)?(?:side\s+)?|\bon\s+side\s+|אל\s*(?:ה?צלע\s+)?|על\s+ה?צלע\s+|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // explicit opposite side "to BC"
+  const sideM = statedSide(s); // #1267: the ONE reader — this rule’s copy is where it came from
   let p: string, q: string;
   let tri: Id[] | null = null;
   // #1233 — this used to read `sideM && up(sideM[1]) !== apex`: a HALF gate that checked only the
@@ -8392,8 +8448,8 @@ const altitude: Rule = (s, ctx) => {
   // ("no stated given is ever silently dropped") failing at a seam nobody had looked at. A STATED side
   // is a given: it is used, and `cevianWellFormed` below decides whether the statement stands.
   if (sideM) {
-    p = up(sideM[1]);
-    q = up(sideM[2]);
+    p = sideM.side[0];
+    q = sideM.side[1];
   } else {
     // A trapezoid height: the apex sits on one parallel base and drops perpendicular to the OPPOSITE base
     // (ADR-169). The triangle inference below can't reach it — the apex's two neighbours are a diagonal, not
@@ -8448,7 +8504,8 @@ const altitude: Rule = (s, ctx) => {
   // #1233 — the altitude had NO counterpart to the median's apex gate, so «BD גובה לצלע AB» built a
   // zero-length altitude and reported success. Asked HERE, at the single emit point, so every way the
   // apex and the side are resolved above is covered by one check.
-  if (!cevianWellFormed(apex, f, [p, q], 'altitude')) return null;
+  const altFault = cevianFault(apex, f, [p, q], 'altitude');
+  if (altFault) return altFault; // #1266
   const cmds: Command[] = [];
   if (tri) cmds.push({ type: 'triangle', ids: [tri[0], tri[1], tri[2]] });
   // #1247 — the foot may BE an endpoint of the side, and then the sentence is a right angle at that
@@ -8570,7 +8627,20 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
   if (!seg) return null;
   const apex = up(seg[1]);
   const D = up(seg[2]);
-  const after = s.slice(s.search(/bisects?|חוצ/i)).replace(/bisects?|חוצ\w*|angles?|the|את|הזוו?ית|זוו?ית|של/gi, ' ');
+  /**
+   * THE SIDE THE STUDENT NAMED (#1267).
+   *
+   * This rule never looked for one. «BD חוצה זווית לצלע BC» has no three-letter angle run, so the hunt
+   * below failed, the figure path derived the opposite side itself, and «לצלע BC», «לצלע AC» and
+   * «לצלע AB» produced byte-identical commands — a stated incidence vanishing without a word.
+   *
+   * Read first, and REMOVED from the text the triple is hunted in: its two letters are a side, not an
+   * angle, and leaving them in is how a side name becomes half an angle.
+   */
+  const stated = statedSide(s);
+  let after = s.slice(s.search(/bisects?|חוצ/i)).replace(/bisects?|חוצ\w*|angles?|the|את|הזוו?ית|זוו?ית|של/gi, ' ');
+  const statedInAfter = statedSide(after);
+  if (statedInAfter) after = after.replace(statedInAfter.match, ' ');
   let tri = labelRun(after, 3);
   if (!tri) {
     // No explicit angle triple ("CD חוצה זוית" / "CD bisects the angle"): resolve the angle from the
@@ -8592,6 +8662,15 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
     // "AD bisects ∠BAC": the segment's FIRST letter is the angle vertex.
     const [o1, o2] = tri.filter((t) => t !== vertex);
     if (o2 === undefined) return null;
+    /**
+     * #1267: the bisector from a vertex meets the side OPPOSITE it, and only that one. A student who
+     * names a different side has written something false of the figure — «BD חוצה זווית לצלע BC»,
+     * where the bisector from B meets AC. Refused with BOTH sides quoted, never silently redirected:
+     * drawing D on AC while the sentence says BC is the given-vanishing this issue is about.
+     */
+    if (stated && !(stated.side.includes(o1) && stated.side.includes(o2))) {
+      return { clarify: 'cevian-wrong-side', apex, stated: stated.side, actual: [o1, o2] };
+    }
     // If the bisector-foot point D ALREADY EXISTS (e.g. "G on DF" was placed first, then "EG bisects ∠DEF"),
     // DON'T re-create it — that's a redefinition conflict ("'G' is already defined"). It's a CONSTRAINT:
     // EG bisects ∠DEF ⇔ ∠(o1, vertex, D) = ∠(D, vertex, o2), which drives the existing point (on its
@@ -10935,6 +11014,10 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'side-unspecified') return { ok: false, reason: 'side-unspecified', noun: res.noun, value: res.value };
   if (res.clarify === 'incomplete-comparative') return { ok: false, reason: 'incomplete-comparative', subject: res.subject, factor: res.factor };
   if (res.clarify === 'angle-sides-disjoint') return { ok: false, reason: 'angle-sides-disjoint', s1: res.s1, s2: res.s2 };
+  if (res.clarify === 'cevian-degenerate')
+    return { ok: false, reason: 'cevian-degenerate', role: res.role, why: res.why, apex: res.apex, foot: res.foot, side: res.side };
+  if (res.clarify === 'cevian-wrong-side')
+    return { ok: false, reason: 'cevian-wrong-side', apex: res.apex, stated: res.stated, actual: res.actual };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 
