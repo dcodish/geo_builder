@@ -1294,7 +1294,21 @@ const toolbarTray: CSSProperties = {
   padding: 4,
   boxShadow: '0 1px 4px rgba(15,23,42,0.06)',
 };
-const ctrlBtn: CSSProperties = {
+export const ctrlBtn: CSSProperties = {
+  /**
+   * The COLOUR IS DECLARED, because a button inherits it (#1277).
+   *
+   * Operator, playing #1010: *"the button is grayed so user might think this option is not available"*.
+   * Measured in the running app: the swap offer computed `#64748b` — `--color-text-muted`, the token for
+   * inactive text — while the button two rows below it computed `--color-text`. Nothing was disabled;
+   * the swap button sits inside the holder note's muted block and inherited it.
+   *
+   * Declaring the colour fixes the CLASS rather than that button: any control nested in a coloured block
+   * keeps the menu's own text colour. And it must be declared rather than left to cascade, because
+   * whether a `<button>` inherits `color` at all is UA behaviour this code does not control — measured,
+   * a bare button inherits here and does not on a plain page with the same markup.
+   */
+  color: 'var(--color-text)',
   padding: '5px 9px',
   fontSize: 13,
   lineHeight: 1.2,

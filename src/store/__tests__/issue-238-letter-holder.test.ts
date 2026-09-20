@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parse, buildParseCtx } from '@/parser';
 import { useGeoStore, replay, letterHolder } from '@/store/geoStore';
+import { ctrlBtn } from '@/render/Figure';
 
 /**
  * #238 / [ADR-520](../../../docs/06-decisions.md#adr-520) — a taken letter NAMES its holder, and can be
@@ -122,5 +123,24 @@ describe('#238 — the refusal names who holds the letter', () => {
   it('a letter nobody holds has no holder — the refusal path is not reached', () => {
     build(['משולש ABC']);
     expect(letterHolder(useGeoStore.getState().facts, 'Z')).toBeNull();
+  });
+
+  /**
+   * THE OFFER MUST NOT LOOK DISABLED (#1277).
+   *
+   * Operator, playing this PR: *"the button is grayed so user might think this option is not available"*.
+   * Measured in the running app, the swap offer computed `#64748b` — `--color-text-muted`, the token this
+   * tree uses for inactive text — because it is nested inside the holder note's muted block and a
+   * `<button>` inherits `color`. Nothing was disabled; only the colour said so.
+   *
+   * The lock CALLS the style ([ADR-W-053](../../../docs/06w-decisions-workspace.md#adr-w-053)) rather than
+   * grepping the file, and it asserts the property that fixes the CLASS: the menu's button style declares
+   * its own colour, so no control nested in a coloured block can silently go muted. Asserting the literal
+   * `#0f172a` would lock the palette instead of the rule — the token is what must be there.
+   */
+  it('the point-menu button declares its own colour, so a nested one cannot inherit a muted block', () => {
+    expect(ctrlBtn.color, 'ctrlBtn must not leave its colour to the cascade').toBeDefined();
+    expect(String(ctrlBtn.color)).toContain('--color-text');
+    expect(String(ctrlBtn.color)).not.toContain('muted');
   });
 });

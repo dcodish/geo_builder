@@ -11899,6 +11899,29 @@ The copy follows the mechanism: «קחו את האות והסירו את השל�
 
 **Consequences.** The `reclaim` store action and its `onReclaim` prop are deleted; the point menu calls the existing `onSwap`; `LetterHolder.reclaimable` → `swappable`; `pointMenu.reclaim` → `pointMenu.swapLetters` in both locales, interpolating both letters. `issue-238-letter-holder.test.ts` is **revised, not extended** (7): the operator's own sequence now asserts what SURVIVES — five points stay five, no fact is dropped, both «נקודה» rows are still in the list — the shape-held refusal is locked as *unwidened*, and the retirement is asserted directly (`'reclaim' in store` is false), because a lock that only checked the button's wording would pass with the delete still sitting in the store for the next caller to find.
 
+### ADR-520 Amendment 2 — the point-menu button DECLARES its colour, so a live offer stops reading as disabled (#1277)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1277 (bug, P3) · operator change request against PR #1010, found playing T1–T4 (all of which passed)
+**Requirements:** none (internal — nothing the product promises changes) · **Design:** [04](04-design.md) — the point menu's button style declares its own colour
+
+**What the operator saw.** *"when offering to switch letters, the button is grayed so user might think this option is not available"*.
+
+**Measured in the running app**, not read off the code — Playwright against the PR's own server, opening the menu on `D` and typing `E`:
+
+```
+«החליפו בין D ל-E»   color #64748b   disabled=false  opacity=1
+«הסתירו תווית»        color #0f172a   disabled=false  opacity=1
+                      (same background #f8fafc, same border #cbd5e1, same 13px)
+```
+
+`#64748b` is `--color-text-muted`, the token this tree uses for inactive text. Nothing was disabled; only the colour said so — about the one affordance Am. 1 exists to offer.
+
+**Root cause is a class, not a button.** `ctrlBtn` declared padding, border, background and cursor and **no colour**. Every other menu button therefore inherits the page's `--color-text`; the swap offer is nested inside the holder note's muted block (`fontSize: 11, color: '#64748b'`) and inherited *that*.
+
+**Why the colour must be DECLARED rather than the button re-parented or the note re-tinted.** Whether a `<button>` inherits `color` is not something this code controls: measured, a bare button injected into a `color: rgb(1,2,3)` div in this app computes `rgb(1,2,3)`, while the same markup on a plain page computes `rgb(0,0,0)`, and **no stylesheet rule does it** — it is UA behaviour in this context. Re-parenting would also break the grouping that makes the offer read as belonging to the refusal, which the operator approved; re-tinting the note would make a note look like an action.
+
+**Consequences.** `ctrlBtn` gains `color: 'var(--color-text)'` and is **exported** so the lock calls it ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)). `issue-238-letter-holder.test.ts` 7 → 8: the new row asserts the style declares a colour and that it carries the `--color-text` token rather than the literal `#0f172a` — the rule is *"the style declares its own colour"*, not *"the palette is this"*. It cannot pass against the pre-fix code, where the style was module-private and had no colour to assert. Verified the way it was measured: after the change both buttons compute `rgb(15, 23, 42)` and neither is disabled.
+
 ## ADR-521 — A role-assigned letter run is RE-READ before it is refused (#1012)
 
 **Requirements:** [02](02-requirements.md) — the catalog row now states the reading it assumes. **Design:** [04](04-design.md) — the submit pipeline's re-reading step. **LADDER stage:** submit-time reading selection, after the dry run and before the refusal; no engine, solver or gate semantics change. **Amends** ADR-355/ADR-357 (the role-assignment discipline).
