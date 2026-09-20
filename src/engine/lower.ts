@@ -252,8 +252,8 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       if (!B) return [];
       if (B.coef !== 1 || (B.pow ?? 1) !== 1 || B.affine) return [];
       const { min, max } = cmd;
-      if (B.kind === 'ang') return [{ type: 'set-angle-bound', vertex: B.refs[0], ray1: B.refs[1], ray2: B.refs[2], min, max }];
-      if (B.kind === 'len') return [{ type: 'set-length-bound', a: B.refs[0], b: B.refs[1], min, max }];
+      if (B.kind === 'ang') return [{ type: 'set-angle-bound', vertex: B.refs[0], ray1: B.refs[1], ray2: B.refs[2], min, max, minStrict: cmd.minStrict, maxStrict: cmd.maxStrict }];
+      if (B.kind === 'len') return [{ type: 'set-length-bound', a: B.refs[0], b: B.refs[1], min, max, minStrict: cmd.minStrict, maxStrict: cmd.maxStrict }];
       return []; // an area binding has no bound constraint yet
     }
     case 'shape-variant':

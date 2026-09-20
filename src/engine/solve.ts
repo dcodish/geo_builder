@@ -17,6 +17,7 @@
 import type { Constraint, Construction, Id, LengthBoundConstraint, SolveDirective, SolvedOnSegmentPoint, Vec } from './types';
 import {
   ANGLE_EPS,
+  LEN_EPS,
   ORDER_ANGLE_MARGIN_DEG,
   ORDER_ANGLE_MIN_GAP_DEG,
   ORDER_LEN_MARGIN_FRAC,
@@ -28,6 +29,38 @@ import { add, angleDeg, circumcenter, dist, polygonArea, polygonPerimeter, scale
 
 /** A length bound's aim/accept margins in LENGTH units: the order fractions taken against the stated
  *  bound, then window-clamped (`boundAim`) so a narrow range keeps a reachable target (ADR-390). */
+/**
+ * DOES THE STATED INEQUALITY HOLD (#1265) — the acceptance question, asked where it can be read.
+ *
+ * ADR-390 aims a free bounded measure a visible gap INSIDE its region so the figure does not read as
+ * an equality. That is a statement about what to DRAW, and it was also being used as the statement
+ * about what may HOLD: `residualTolerance` returned `margin − minGap`, so «BC ≥ 10» then «BC = 10»
+ * came back `over-constrained` about the value the sentence admits.
+ *
+ * The two questions are now separate. The residual and its tolerance stay exactly as ADR-390 wrote
+ * them — the AIM, which the optimizer’s cost follows — and the ACCEPT test is this function.
+ *
+ * **The edge is not a visible gap.** A non-strict bound needs only a float cushion, sized to the
+ * group’s own tolerance (below it, two numbers are already the same number to this engine). A strict
+ * one must exclude its value by MORE than an equality can absorb: measured, a 1e-5 edge let
+ * «BC > 10» + «BC = 10» settle at 10.00001 with BOTH constraints reporting satisfied — a contradiction
+ * accepted in silence, the mirror of the defect this fixes.
+ *
+ * **It must never enter the AIM.** Measured the hard way: folding the edge into the residual pushed the
+ * angle target a degree further out and «זווית ABC גדולה מ-40» became unsolvable at 18 of 40 seeds
+ * (#281’s lock). A test that changes what the solver reaches for is not a test.
+ */
+function boundHolds(value: number, min: number | undefined, max: number | undefined, minStrict: boolean | undefined, maxStrict: boolean | undefined, eps: number): boolean {
+  const ref = Math.max(Math.abs(max ?? 0), Math.abs(min ?? 0), 1);
+  // `eps` is the measure's own equality tolerance — LEN_EPS in units, ANGLE_EPS in degrees. `admits` is
+  // the float cushion (never tighter than that tolerance); `excludes` clears it, so a strict bound and an
+  // equality at the same number cannot both report satisfied.
+  const admits = Math.max(eps, 2e-4 * ref);
+  const excludes = Math.max(eps * 2, 1e-3 * ref);
+  if (min !== undefined && !(minStrict === false ? value >= min - admits : value >= min + excludes)) return false;
+  if (max !== undefined && !(maxStrict === false ? value <= max + admits : value <= max - excludes)) return false;
+  return true;
+}
 function lengthBoundAim(con: LengthBoundConstraint): { margin: number; minGap: number } {
   const ref = Math.max(Math.abs(con.max ?? con.min ?? 0), 1e-9);
   return boundAim(con.min, con.max, ORDER_LEN_MARGIN_FRAC * ref, ORDER_LEN_MIN_FRAC * ref);
@@ -370,6 +403,16 @@ export function residualTolerance(con: Constraint, scale = 1): number {
  * hand-recopied at four sites (ADR-045).
  */
 export function isSatisfied(con: Constraint, get: (id: Id) => Vec): boolean {
+  // #1265: a stated BOUND is accepted when its own inequality holds — not when the figure has also
+  // reached the visible gap ADR-390 aims for. Everything else keeps the single residual/tolerance gate.
+  if (con.type === 'length-bound') {
+    return boundHolds(dist(get(con.a), get(con.b)), con.min, con.max, con.minStrict, con.maxStrict, LEN_EPS);
+  }
+  if (con.type === 'angle-bound') {
+    const a = angleDeg(get(con.vertex), get(con.ray1), get(con.ray2));
+    // degrees: an angle equality is satisfied to ANGLE_EPS, so a strict bound clears twice that
+    return Number.isNaN(a) ? true : boundHolds(a, con.min, con.max, con.minStrict, con.maxStrict, ANGLE_EPS);
+  }
   return Math.abs(residual(con, get)) <= residualTolerance(con, constraintScale(con, get));
 }
 
@@ -399,10 +442,25 @@ export function jointCostTerm(con: Constraint, get: (id: Id) => Vec): number {
   return v * v;
 }
 
-/** "40 < ∠ABC < 60" / "∠ABC > 40" / "|AB| < 5" — a bound rendered the way the student wrote it. */
-function boundText(measure: string, min: number | undefined, max: number | undefined): string {
-  if (min !== undefined && max !== undefined) return `${min} < ${measure} < ${max}`;
-  return min !== undefined ? `${measure} > ${min}` : `${measure} < ${max}`;
+/**
+ * "40 ≤ ∠ABC < 60" / "∠ABC > 40" / "|AB| ≤ 5" — a bound rendered the way the student wrote it.
+ *
+ * #1265: every bound used to render with `>` and `<`, so a figure carrying «BC ≥ 10» was refused with
+ * *"|BC| > 10 cannot hold"* — the tool quoting a statement the student did not make, in the message
+ * that exists to explain the conflict.
+ */
+function boundText(
+  measure: string,
+  min: number | undefined,
+  max: number | undefined,
+  minStrict?: boolean,
+  maxStrict?: boolean,
+): string {
+  if (min !== undefined && max !== undefined)
+    return `${min} ${minStrict === false ? "≤" : "<"} ${measure} ${maxStrict === false ? "≤" : "<"} ${max}`;
+  return min !== undefined
+    ? `${measure} ${minStrict === false ? "≥" : ">"} ${min}`
+    : `${measure} ${maxStrict === false ? "≤" : "<"} ${max}`;
 }
 
 /** Human-readable form of a constraint, for error messages. */
@@ -444,9 +502,9 @@ export function describeConstraint(con: Constraint): string {
     case 'collinear-order':
       return `${con.points.join('–')} in order on a line`;
     case 'angle-bound':
-      return `${boundText(`∠${con.ray1}${con.vertex}${con.ray2}`, con.min, con.max)}`;
+      return `${boundText(`∠${con.ray1}${con.vertex}${con.ray2}`, con.min, con.max, con.minStrict, con.maxStrict)}`;
     case 'length-bound':
-      return `${boundText(`|${con.a}${con.b}|`, con.min, con.max)}`;
+      return `${boundText(`|${con.a}${con.b}|`, con.min, con.max, con.minStrict, con.maxStrict)}`;
     case 'area':
       return `area(${con.ids.join('')}) = ${con.value}`;
     case 'area-ratio':

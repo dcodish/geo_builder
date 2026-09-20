@@ -2402,21 +2402,35 @@ const boundOperand = (raw: string, ctx: ParseContext): BoundOperand | Clarify | 
 };
 
 /** The commands a resolved bound lowers to: the measure's ink (idempotent) + the bound itself. */
-const boundCommands = (op: BoundOperand, min: number | undefined, max: number | undefined): AnyCommand[] | null => {
+/**
+ * #1265: the STRICTNESS travels with the bound. `measureBound` has always known whether the student
+ * wrote `<` or `<=` (`normOp`/`isLess` read it), and threw the answer away one line later — so `≥` was
+ * executed as `>`, and «BC ≥ 10» then «BC = 10» came back `over-constrained` about the value the
+ * sentence had just admitted. Absent ⇒ strict, which is what the word forms («גדול מ», "greater than")
+ * and every saved figure already meant.
+ */
+type BoundStrict = { minStrict?: boolean; maxStrict?: boolean };
+
+const boundCommands = (
+  op: BoundOperand,
+  min: number | undefined,
+  max: number | undefined,
+  strict: BoundStrict = {},
+): AnyCommand[] | null => {
   if (min !== undefined && max !== undefined && min >= max) return null; // an EMPTY window ("60 < α < 40") is a
   // contradiction, not a statement: defer so the student is told it wasn't understood, never a silent no-op
   if (op.kind === 'ang')
     return [
       { type: 'segment', a: op.v, b: op.r1 },
       { type: 'segment', a: op.v, b: op.r2 },
-      { type: 'set-angle-bound', vertex: op.v, ray1: op.r1, ray2: op.r2, min, max },
+      { type: 'set-angle-bound', vertex: op.v, ray1: op.r1, ray2: op.r2, min, max, ...strict },
     ];
   if (op.kind === 'len')
     return [
       { type: 'segment', a: op.a, b: op.b },
-      { type: 'set-length-bound', a: op.a, b: op.b, min, max },
+      { type: 'set-length-bound', a: op.a, b: op.b, min, max, ...strict },
     ];
-  return [{ type: 'measure-bound', name: op.name, min, max }];
+  return [{ type: 'measure-bound', name: op.name, min, max, ...strict }];
 };
 
 /**
@@ -2469,13 +2483,16 @@ const measureBound: Rule = (s, ctx) => {
       if (!op) return null;
     if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
       const n = numChunk(r);
-      return boundCommands(op, isLess(o) ? undefined : n, isLess(o) ? n : undefined); // X < n ⇒ max
+      // #1265: `<=`/`>=` admit the value; `<`/`>` do not. The side being set carries the answer.
+      const lax = o === "<=" || o === ">=";
+      return boundCommands(op, isLess(o) ? undefined : n, isLess(o) ? n : undefined, isLess(o) ? { maxStrict: !lax } : { minStrict: !lax }); // X < n ⇒ max
     }
     const op = boundOperand(r, ctx);
     if (!op) return null;
     if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
     const n = numChunk(l);
-    return boundCommands(op, isLess(o) ? n : undefined, isLess(o) ? undefined : n); // n < X ⇒ min
+    const laxN = o === "<=" || o === ">=";
+    return boundCommands(op, isLess(o) ? n : undefined, isLess(o) ? undefined : n, isLess(o) ? { minStrict: !laxN } : { maxStrict: !laxN }); // n < X ⇒ min
   }
   if (parts.length === 5) {
     const [a, o1, mid, o2, c] = [parts[0], normOp(parts[1]), parts[2], normOp(parts[3]), parts[4]];
@@ -2484,7 +2501,13 @@ const measureBound: Rule = (s, ctx) => {
     if (!op) return null;
     if ('clarify' in op) return op; // #970: the ONE reader can refuse BY NAME — propagate, never escalate
     const [lo, hi] = isLess(o1) ? [numChunk(a), numChunk(c)] : [numChunk(c), numChunk(a)];
-    return boundCommands(op, lo, hi);
+    // #1265: each END keeps its own operator. `40 ≤ α < 60` admits 40 and excludes 60.
+    const lax1 = o1 === "<=" || o1 === ">=";
+    const lax2 = o2 === "<=" || o2 === ">=";
+    const ends: BoundStrict = isLess(o1)
+      ? { minStrict: !lax1, maxStrict: !lax2 }
+      : { maxStrict: !lax1, minStrict: !lax2 };
+    return boundCommands(op, lo, hi, ends);
   }
   return null;
 };

@@ -62,8 +62,10 @@ describe('ADR-390 — a numeric bound on a measure', () => {
 
   describe('length forms', () => {
     it('bare and barred segments', () => {
-      expect(bound('|AB| > 5')).toEqual({ type: 'set-length-bound', a: 'A', b: 'B', min: 5 });
-      expect(bound('AB > 5')).toEqual({ type: 'set-length-bound', a: 'A', b: 'B', min: 5 });
+      // #1265: the command carries the student's relation. `>` is STRICT, so `minStrict: true`.
+      expect(bound('|AB| > 5')).toEqual({ type: 'set-length-bound', a: 'A', b: 'B', min: 5, max: undefined, minStrict: true });
+      expect(bound('AB > 5')).toEqual({ type: 'set-length-bound', a: 'A', b: 'B', min: 5, max: undefined, minStrict: true });
+      expect(bound('AB ≥ 5')).toEqual({ type: 'set-length-bound', a: 'A', b: 'B', min: 5, max: undefined, minStrict: false });
       expect(bound('5 < AB < 9')).toMatchObject({ min: 5, max: 9 });
       expect(bound('AB בין 5 ל-9')).toMatchObject({ min: 5, max: 9 });
     });
@@ -71,15 +73,17 @@ describe('ADR-390 — a numeric bound on a measure', () => {
 
   describe('named measures (the α the student labelled an angle with)', () => {
     it('parses to a measure-bound, resolved by the symbol table at lowering', () => {
-      expect(bound('α > 40')).toEqual({ type: 'measure-bound', name: 'α', min: 40 });
-      expect(bound('60 < α < 90')).toEqual({ type: 'measure-bound', name: 'α', min: 60, max: 90 });
+      // #1265: a named measure's bound keeps the relation too, all the way to `lower`.
+      expect(bound('α > 40')).toEqual({ type: 'measure-bound', name: 'α', min: 40, max: undefined, minStrict: true });
+      expect(bound('60 < α < 90')).toEqual({ type: 'measure-bound', name: 'α', min: 60, max: 90, minStrict: true, maxStrict: true });
+      expect(bound('60 ≤ α ≤ 90')).toEqual({ type: 'measure-bound', name: 'α', min: 60, max: 90, minStrict: false, maxStrict: false });
     });
 
     it('lowers onto whichever measure the symbol names', () => {
       const chain = [...cmds('∠ABC = α'), ...cmds('60 < α < 90')];
-      expect(lower(chain)).toContainEqual({ type: 'set-angle-bound', vertex: 'B', ray1: 'A', ray2: 'C', min: 60, max: 90 });
+      expect(lower(chain)).toContainEqual({ type: 'set-angle-bound', vertex: 'B', ray1: 'A', ray2: 'C', min: 60, max: 90, minStrict: true, maxStrict: true });
       const len = [...cmds('AB = x'), ...cmds('x > 5')];
-      expect(lower(len)).toContainEqual({ type: 'set-length-bound', a: 'A', b: 'B', min: 5, max: undefined });
+      expect(lower(len)).toContainEqual({ type: 'set-length-bound', a: 'A', b: 'B', min: 5, max: undefined, minStrict: true, maxStrict: undefined });
     });
 
     it('an unbound symbol lowers to nothing (no measure to bound yet)', () => {
