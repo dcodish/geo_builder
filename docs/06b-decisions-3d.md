@@ -10086,3 +10086,40 @@ The narrow repair — widen the guard so `→` counts as "already marked" — wo
 **Targeted at a mark that FOLLOWS A PAIR.** A stray arrow elsewhere in a sentence is the student's own character in a position this formatter does not claim to understand, and it is left alone — a blanket strip would be a formatter editing prose.
 
 **Consequences.** `lexicon/marks3.ts` (new, imports nothing); `normalize3`, `markVectorContext` and `vectorNotation` all read it; one conversion added ahead of the pair rule. The grammar is unchanged — every spelling still parses to the same `marked: true` command. Lock: `issue-1194-one-arrow.test.ts` (18) — **parity**, never a spelled-out expected row (ADR-W-053): all five spellings render the same row, each pair carries exactly ONE `U+20D7`, no finished row carries a spacing arrow, the parse is asserted unmoved, and the stray-arrow case is locked as deliberately untouched.
+
+### ADR-3D-254 — The data panel shows what the student STATED about vectors (#1196)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1196 (feature, P2, `3d`) · operator report + scope rulings 2026-09-18/19 · round #1292
+**Requirements:** [02b](02b-requirements-3d.md) — the data panel · **Design:** [04b](04b-design-3d.md)
+
+**The report**, playing round #1193 T3: *"the data panel says noting in known. we should be able to say that AB=u and DC=3u."*
+
+The figure builds correctly — that is T3 passing. Beside it the panel said «אין עדיין נתונים יציבים להצגה» on a figure where the student had just written down **two** things that are true at every configuration.
+
+**Measured before:**
+
+```
+טרפז ABCD  ·  נסמן: AB = u  ·  DC = 3u
+
+construction.vectors  [["u", { from: "A", to: "B" }]]
+construction.claims   [ …, { type: "vec-eq", lhs: [1·DC⃗], rhs: [3·u] } ]
+dataView              { relations: [], mutual: [], vectors: [], points: [], planes: [], params: [] }
+```
+
+Note `vectors: []` even though `c.vectors` holds `u`.
+
+**Root cause — the panel reports what it can MEASURE, and this figure's knowledge is RELATIONAL.** Every `DataPanel` field was a measurement: coordinates, a vector's components and magnitude, pinned symbols. Each needs a number the figure holds still. A trapezoid with free dimensions has none, so `u`'s entry is dropped and the section comes back empty. The panel then correctly reported that it had nothing — **by its own definition of "something"**.
+
+But «AB = u» and «DC = 3u» are not measurements awaiting a figure. They are givens. The panel's own hint promises them first — «הצגת הנתונים בכתיב וקטורי, בקואורדינטות ובגדלים» — and vector notation is the one of the three that needs no determined figure at all. It offered it and could not deliver it.
+
+**The fix.** A `stated` section, composed from the construction: the naming rows from `c.vectors` (`u = AB⃗`) and the relation rows from the `vec-eq` claims (`DC⃗ = 3u`). It leads the panel, because that is the order the hint promises. `panelIsEmpty` counts it, since the guard and the render must read emptiness the same way (#296's own lesson, and this figure is exactly the case that reported a false "nothing to show").
+
+**Scope, in the operator's words:** *"stated+what follows. this is important for students learning geometric vectors"*, and *"we need to keep it simple enough. so only stated vectors. anything else, the user can ask for specifically."* So the section reads the two things the student STATED about vectors and nothing else; derived vector facts remain the ask lane's business. The lock asserts that boundary from the other side — a solid with no vector statement, and a plain segment, contribute no rows.
+
+**Where it lives, and why not in `render/`.** `dataView` already composes display text (`relations`, `points`, `planes`), and the layering runs `render → engine`, never back — so the composer is in the engine beside the rows it belongs to. The one thing it must agree with the renderer about is WHICH arrow a finished row carries, and that comes from `lexicon/marks3`'s `COMBINING_ARROW` — the leaf that imports nothing and exists so the grammar and the display cannot drift about a marking (#1194).
+
+**One existing lock caught a real mistake**, which is worth recording because it is the lock working exactly as written. The section first shipped as `dir: 'ltr'` — the rows are pure LTR and pinning them looks obviously right — and `bidi3.test.ts`'s #559 guard refused it: *"no section imposes a direction — every 3-D section follows the app"*, the list-wide override that issue exists to prevent. Its section COUNT is also deliberate (*"a new section must be a decision, not a drive-by"*), so the count moves from six to seven here, naming this section, exactly as #847 did for `planes`.
+
+**Measured after.** The operator's three lines produce `stated: ["u = AB⃗", "DC⃗ = 3u"]` and a panel that is no longer empty — with the precondition asserted that nothing there is measurable yet, so the rows cannot pass for the wrong reason if a later change determines the figure. The rows are identical at seeds 0, 1, 2, 7 and 99, which is what "a given, not a measurement" means operationally. A determined figure keeps all its coordinate rows and gains its stated ones.
+
+**Consequences.** `engine/dataView.ts` (+`stated` on `DataPanel`, +`statedVectorRows` and its side composer, `panelIsEmpty` widened); `App3.tsx` (+the leading section); both locales (+`secStated`). `issue-1196-stated-vector-rows.test.ts` (9); `bidi3.test.ts`'s section count and `data-view.test.ts`'s empty fixture updated with the reason.
