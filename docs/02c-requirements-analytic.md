@@ -1351,6 +1351,18 @@ two-letter name or a curve name is a line. Two points are a plain distance — �
 length `AB` and answers the same number — and a point with a line is the distance to that line,
 written in either order.
 
+**The distance between two PARALLEL lines is askable, and between crossing ones it is refused**
+([ADR-AG-132](06c-decisions-analytic.md#adr-ag-132) ·
+[#1205](https://github.com/dcodish/geo_builder/issues/1205)). «המרחק בין AB ל-l1» answers when the two are
+parallel — the third member of the measure family, beside a point pair and a point-to-line.
+
+**When they cross, the tool refuses and says why.** There is no single distance between intersecting
+lines — it is zero at the crossing and grows away from it — so answering `0` would let a misconception
+stand (operator ruling, 2026-09-19). The refusal names the parallel condition and names what CAN be
+asked instead: the distance from a point to a line, or the crossing point itself. It is not
+«לא הבנתי את השאלה» — the question was understood — and not «לא ניתן לחשב מהנתונים» either, which
+would blame the student’s givens for a question that has no single answer at all.
+
 **A question naming something absent is told so.** «המרחק בין C ל-QR» on a figure with no `QR` reports
 the missing object; it never answers «לא ניתן לחשב מהנתונים», which is a claim about the figure rather
 than about the question.

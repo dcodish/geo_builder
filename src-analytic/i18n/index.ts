@@ -64,6 +64,11 @@ const he = {
   // Three different answers, because they are three different situations.
   askOpen: 'עדיין לא נקבע מהנתונים',
   askNoValue: 'לא ניתן לחשב מהנתונים',
+  // #1205 — the refusal TEACHES: it names why there is no single distance, and names the two
+  // questions that ARE askable here. Both suggestions are driven in the lock, because a remedy the
+  // tool cannot itself answer is the #1156 failure mode.
+  askLinesCross:
+    'הישרים נחתכים, ולכן אין ביניהם מרחק אחד — הוא אפס בנקודת החיתוך וגדל ככל שמתרחקים ממנה. מרחק מוגדר רק בין ישרים מקבילים. אפשר לשאול על המרחק מנקודה לישר, למשל «המרחק מ-A לישר l1», או לסמן את נקודת החיתוך עצמה.',
   askUnreadable: 'לא הבנתי את השאלה',
   /** #1111 — the sentence was understood; the figure has no such object. The LETTER is the point. */
   askMissingPoint: 'אין בשרטוט נקודה בשם {{name}}',
@@ -260,6 +265,8 @@ const en: typeof he = {
   askRemove: 'Remove this measurement',
   askOpen: 'not fixed by the givens yet',
   askNoValue: 'cannot be computed from the givens',
+  askLinesCross:
+    'the lines intersect, so there is no single distance between them — it is zero at the crossing and grows away from it. A distance is defined only between PARALLEL lines. You can ask for the distance from a point to a line, for example "the distance from A to line l1", or name the crossing point itself.',
   askUnreadable: 'I did not understand the question',
   askMissingPoint: 'there is no point {{name}} in your figure',
   askMissingCurve: 'there is no line or circle named {{name}} in your figure',
