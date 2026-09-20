@@ -5310,18 +5310,45 @@ const semicircle: Rule = (s, ctx) => {
     ' ',
   );
   const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
-  const dia = labelRun(restNoC, 2);
+  /**
+   * A CENTRE-FIRST 3-RUN — «חצי מעגל ODC» (#1204, ADR-NNN).
+   *
+   * The arc family reads a 3-run as *centre, then the two ends*: «רבע מעגל ODC» and «גזרה ODC» both do,
+   * and the semicircle was the one member that read no 3-run at all — it went to the LLM lane or to
+   * «לא הבנתי», while its two siblings built. Measured before the fix, on one figure:
+   *
+   * ```
+   * רבע מעגל ODC   ->  centre O, ends D and C, span 90    ✓
+   * גזרה ODC       ->  centre O, ends D and C, span free   ✓
+   * חצי מעגל ODC   ->  not-handled                         ✗
+   * ```
+   *
+   * **The convention is FORCED here, not chosen.** For a semicircle, centre-first plus two ends ON the
+   * circle plus a span of 180° says `O` is the midpoint of `DC` — that is what the sentence means, not
+   * an extra assumption, and it is exactly what the 2-run spelling already builds. The general branch
+   * below lowers it as CONSTRAINTS rather than asserting it: both ends are members of a free-radius
+   * circle centred at `O` (so |OD| = |OC|) and `set-collinear(D, O, C)` closes it. A figure that cannot
+   * honour that is refused honestly instead of being drawn wrong.
+   *
+   * A separately NAMED centre still wins its own spelling («חצי מעגל P שקוטרו CD»): the 3-run is tried
+   * first and the 2-run is the fallback, which is the quarter rule’s own order.
+   */
+  const centreFirst = labelRun(restNoC, 3);
+  const dia = centreFirst ? [centreFirst[1], centreFirst[2]] : labelRun(restNoC, 2);
   // Unnamed diameter defaults pick FRESH labels — a bare «חצי מעגל» beside an existing triangle must
   // never bind its A,B as the diameter (the ADR-116/263 label-hijack class, ADR-355). Alphabet
   // exhausted → the legacy A,B rather than a crash.
   const freshDia = autoVertexLabels(2, ctx.points ?? []);
   const [a, b] = dia ?? (freshDia.length === 2 ? freshDia : ['A', 'B']);
   const bulge = semicircleBulge(s, ctx, up(a), up(b));
-  if (shapeLeftover(stripConsumedNumber(removeClaimed(restNoC, [a, b]), r.numeric))) return 'stop'; // a compound ("semicircle … with AC=5") → escalate, don't half-parse
+  // The 3-run’s CENTRE is claimed by this rule too, or the leftover guard reads it as unconsumed meaning.
+  if (shapeLeftover(stripConsumedNumber(removeClaimed(restNoC, centreFirst ? [...centreFirst] : [a, b]), r.numeric))) return 'stop'; // a compound ("semicircle … with AC=5") → escalate, don't half-parse
   // The unnamed-centre pick consults ctx.circles too (#213): an ADR-342 ANONYMOUS centre ('@ctr-O')
   // never appears in ctx.points — the ctx.points-only pick re-chose O for every unnamed semicircle,
   // so the second one re-emitted the first's ids and refused «coincides with its constructed target».
   const center =
+    // #1204: the 3-run names it outright, and that reading wins — the student wrote the centre first.
+    (centreFirst ? up(centreFirst[0]) : null) ??
     (namedC && up(namedC) !== up(a) && up(namedC) !== up(b) ? up(namedC) : null) ??
     freeLabel([up(a), up(b), ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M', 'N', 'S']);
   const circ = circleId(center);
@@ -5334,7 +5361,7 @@ const semicircle: Rule = (s, ctx) => {
   if (exists(a) && exists(b) && !r.numeric && !exists(center)) {
     const cmds: AnyCommand[] = [
       { type: 'midpoint', id: up(center), a: up(a), b: up(b) },
-      { type: 'circle-through', id: circ, center: up(center), through: up(a), hidden: true, ...(namedC ? {} : { autoCenter: true }) },
+      { type: 'circle-through', id: circ, center: up(center), through: up(a), hidden: true, ...(namedC || centreFirst ? {} : { autoCenter: true }) },
     ];
     if (r.varCmd) cmds.push(r.varCmd);
     cmds.push(
@@ -5345,7 +5372,7 @@ const semicircle: Rule = (s, ctx) => {
     return cmds;
   }
   const cmds: AnyCommand[] = [
-    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(namedC ? {} : { autoCenter: true }) },
+    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(namedC || centreFirst ? {} : { autoCenter: true }) },
   ];
   if (r.varCmd) cmds.push(r.varCmd);
   const members = membersOfCenter(ctx, center);

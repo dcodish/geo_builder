@@ -217,3 +217,13 @@ student nothing and leaves them writing a sentence we only sometimes honour.
 **Adoption never buys a figure with honesty.** A re-reading is taken only if the figure it builds
 honours the construct — a quarter circle's two radii are equal, and its central angle is 90°. When no
 reading is honest the step refuses, exactly as it would have.
+
+**And the whole arc family reads a run the same way** ([ADR-534](06-decisions.md#adr-534),
+[#1204](https://github.com/dcodish/geo_builder/issues/1204)). «רבע מעגל ODC», «גזרה ODC» and
+«חצי מעגל ODC» all mean *centre O, ends D and C* — the semicircle was the one member that read no
+three-letter run at all, so a spelling a student would naturally try was answered «לא הבנתי» while its
+siblings built. A family with two conventions is one a student cannot learn.
+
+For a semicircle that reading also says the centre is the MIDPOINT of the two ends — not an extra
+assumption but what the sentence means, and what its own two-letter spelling already builds. It lowers
+to constraints, so a figure that cannot honour it is refused honestly rather than drawn wrong.
