@@ -47,7 +47,25 @@ export type MeasureTerm =
    * tell them apart. Resolving it here would mean this module knowing about objects, which is the
    * layering the rest of the file is careful to avoid.
    */
-  | { kind: 'point-line'; p: Id; line: string };
+  | { kind: 'point-line'; p: Id; line: string }
+  /**
+   * «המרחק בין AB ל-l1» — the distance between two LINES (#1205).
+   *
+   * Split from #1151, which added the point-to-line member and left this one with the note that it
+   * was *"a real question, and a CAPABILITY rather than this bug"*. It is the third member of the
+   * same union for the same reason the second was: a measure is a measure, so «המרחק בין AB ל-l1 = 5»
+   * becomes the same constraint kind as «AB = 5» without any new solver code.
+   *
+   * **Defined only when the two lines are PARALLEL.** Between intersecting lines there is no single
+   * distance — it is zero at the crossing and unbounded away from it — so the evaluator answers
+   * `null` there and the ask lane refuses with an explanation. **Operator ruling, 2026-09-19:** asked
+   * whether the intersecting case should answer `0` or refuse, he chose **refuse and explain**, on the
+   * grounds that the refusal teaches the concept while `0` lets the misconception stand.
+   *
+   * Both names are AS WRITTEN, for the reason the point-line member records: «l1» and «AB» are both
+   * legal and mean different things, and only the caller holding the figure can tell them apart.
+   */
+  | { kind: 'line-line'; u: string; v: string };
 
 /** @deprecated the name the union grew out of — kept so existing callers read unchanged. */
 export type LengthTerm = MeasureTerm;
@@ -213,6 +231,19 @@ const LENGTH_NOUN = new RegExp(
 );
 
 /** One letter (with an optional index) is a POINT and can be nothing else. */
+/**
+ * The bar two lines must clear to be said to CROSS rather than be parallel, as a SINE (#1205).
+ *
+ * Same instrument and same magnitude as `CROSS_MIN_SINE` in `engine/crossings.ts` (ADR-AG-130), for
+ * the same measured reason: the solve leaves ~2e-10 relative on a satisfied incidence, two
+ * representations of one line were measured 6.65e-8 apart by this reading, and 1e-6 sits two orders
+ * above that noise while corresponding to an angle of 5.7e-5 degrees — which no student means.
+ *
+ * Duplicated rather than imported because `crossings.ts` is a consumer of this layer and importing it
+ * here would invert that; the two are pinned together by `issue-1205-line-line-distance.test.ts`.
+ */
+const PARALLEL_SINE = 1e-6;
+
 const IS_POINT = /^[A-Z][0-9]?$/;
 
 const AREA_TOKEN = /(?:שטח|[Aa]rea\s+of)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9]?){3,})/g;
@@ -241,14 +272,22 @@ export function parseLengthExpr(src: string): LengthExpr | null {
       // «AB» are one question with one answer instead of a point-line term naming a line called «B».
       if (IS_POINT.test(x) && IS_POINT.test(y)) {
         if (x === y) return _m; // a degenerate statement, as LENGTH_TOKEN also refuses
-        return push({ a: x, b: y }, (t) => t.kind !== 'area' && t.kind !== 'point-line' && t.a === x && t.b === y);
+        return push({ a: x, b: y }, (t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.a === x && t.b === y);
       }
       // Exactly one point: the other operand is the line, whichever side it was written on.
       const p = IS_POINT.test(x) ? x : IS_POINT.test(y) ? y : null;
       const line = p === x ? y : p === y ? x : null;
-      // Neither is a point: two lines. A real question, and a CAPABILITY rather than this bug --
-      // left unconsumed, so it still answers «לא הבנתי» exactly as it does today.
-      if (!p || !line) return _m;
+      // Neither is a point: two LINES — the capability #1151 named and left (#1205). Consumed here
+      // now, so the ask lane can answer it; whether the pair is actually parallel is a question about
+      // the FIGURE, which this module deliberately cannot see, so it is the evaluator that decides.
+      if (!p || !line) {
+        if (x === y) return _m; // one line is no distance from itself — not this question
+        const lkey = `${x}|${y}`;
+        return push(
+          { kind: 'line-line', u: x, v: y },
+          (t) => t.kind === 'line-line' && `${t.u}|${t.v}` === lkey,
+        );
+      }
       const key = `${p}|${line}`;
       return push(
         { kind: 'point-line', p, line },
@@ -269,7 +308,7 @@ export function parseLengthExpr(src: string): LengthExpr | null {
     // Identical endpoints have zero length always; they are a degenerate statement rather than a
     // term, and admitting them would let `AA = 5` look satisfiable-but-failing instead of wrong.
     if (a === b) return `${a}${b}`;
-    const at = terms.findIndex((t) => t.kind !== 'area' && t.kind !== 'point-line' && t.a === a && t.b === b);
+    const at = terms.findIndex((t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.a === a && t.b === b);
     const i = at >= 0 ? at : terms.push({ a, b }) - 1;
     return String.fromCharCode(PLACEHOLDER_BASE + i);
   });
@@ -312,6 +351,33 @@ export function evalLengthExpr(
       const ps = term.ids.map(at);
       if (ps.some((p) => p === null)) return null;
       value = polygonArea(ps as Pt[]);
+    } else if (term.kind === 'line-line') {
+      /**
+       * THE DISTANCE BETWEEN TWO PARALLEL LINES (#1205).
+       *
+       * On normalised coefficients it is `|c₁ − c₂|` — which is why both sides are divided through by
+       * their own norm first rather than compared raw. `app/lines.ts` produces `ax + by + c = 0` by
+       * construction, so there is nothing to parse here.
+       *
+       * **Not parallel → `null`, deliberately.** Between intersecting lines no single distance exists,
+       * and answering the perpendicular distance at some sampled point would be a magnitude the figure
+       * never had (ADR-052). `null` is the same answer every other term gives for "cannot be judged",
+       * so the ask lane refuses it through the path it already has.
+       *
+       * Parallelism is judged on the normalised cross term — the SINE of the angle between them, never
+       * a raw determinant, which carries the lines’ coefficient magnitudes and is a threshold on
+       * nothing (ADR-AG-021, and ADR-AG-130 one module over).
+       */
+      const lu = lineAt?.(term.u) ?? null;
+      const lv = lineAt?.(term.v) ?? null;
+      if (!lu || !lv) return null;
+      const nu = Math.hypot(lu.a, lu.b);
+      const nv = Math.hypot(lv.a, lv.b);
+      if (nu < 1e-12 || nv < 1e-12) return null; // not a line at all
+      if (Math.abs(lu.a * lv.b - lv.a * lu.b) / (nu * nv) > PARALLEL_SINE) return null; // they cross — the ask lane says so
+      // Same normal DIRECTION, or the constants subtract the wrong way: orient v to u before comparing.
+      const flip = lu.a * lv.a + lu.b * lv.b < 0 ? -1 : 1;
+      value = Math.abs(lu.c / nu - (flip * lv.c) / nv);
     } else if (term.kind === 'point-line') {
       const p = at(term.p);
       const l = lineAt?.(term.line) ?? null;
@@ -336,7 +402,7 @@ export function evalLengthExpr(
 export function lengthRefs(le: LengthExpr): Id[] {
   // A point-to-line term references the POINT only: the line is named, and whether that name is a
   // curve or a pair of vertices is the caller's question, not the solver's.
-  return le.terms.flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : [t.a, t.b]));
+  return le.terms.flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : t.kind === 'line-line' ? [] : [t.a, t.b]));
 }
 
 /** The student's own words are carried on the fact; this is the internal shorthand for a refusal. */
@@ -348,7 +414,9 @@ export function describeLengthExpr(le: LengthExpr): string {
         ? `שטח ${t.ids.join('')}`
         : t.kind === 'point-line'
           ? `מרחק ${t.p}-${t.line}`
-          : `${t.a}${t.b}`,
+          : t.kind === 'line-line'
+            ? `מרחק ${t.u}-${t.v}`
+            : `${t.a}${t.b}`,
     )
     .join('+');
 }
@@ -402,7 +470,7 @@ export function pinnedLengths(
     const only = lengthy[0].terms[0];
     // A pinned SEGMENT only. An area pins none, and a point-to-line distance pins a point against a
     // line rather than a pair of vertices — a different thing, and not what this map is for (#1048).
-    if (only.kind === 'area' || only.kind === 'point-line') continue;
+    if (only.kind === 'area' || only.kind === 'point-line' || only.kind === 'line-line') continue;
     out.set(pairKey(only.a, only.b), v);
   }
   return out;

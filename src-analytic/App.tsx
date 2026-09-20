@@ -1472,7 +1472,9 @@ export function App() {
                             a.value ??
                             (a.fact === 'vertical'
                               ? t('slopeVertical')
-                              : t(figureIsOpen(d) ? 'askOpen' : 'askNoValue'))
+                              : a.fact === 'lines-cross'
+                                ? t('askLinesCross')
+                                : t(figureIsOpen(d) ? 'askOpen' : 'askNoValue'))
                           }`,
                         )}
                       />

@@ -72,14 +72,28 @@ describe('#1151 — one question, every spelling, one answer', () => {
     expect(answer('המרחק בין Q ל-AB').missing).toEqual({ name: 'Q', kind: 'point' });
   });
 
-  it('the fix is not a blanket accept — degenerate and unbuilt questions still refuse', () => {
+  it('the fix is not a blanket accept — a degenerate question still refuses', () => {
     // A point to itself is not a distance; it is a degenerate statement, as LENGTH_TOKEN also holds.
     expect(answer('המרחק בין A ל-A').unreadable).toBe(true);
-    // TWO LINES is a real question and a CAPABILITY, deliberately not built under this bug's banner.
-    // It still says it did not understand, exactly as it does today.
-    expect(answer('המרחק בין AB ל-l1').unreadable).toBe(true);
   });
 
+  /**
+   * **THE TWO-LINE ROW MOVED, AND IT WAS WRITTEN TO (#1205).**
+   *
+   * This lock used to assert that «המרחק בין AB ל-l1» says it did not understand — pinning the gap as a
+   * KNOWN state, with the note that two lines were *"a real question and a CAPABILITY, deliberately not
+   * built under this bug’s banner"*. That capability is now built, so the row asserts the answer
+   * instead of the refusal.
+   *
+   * `AB` lies on `y = 0` and so does `l1`, so on THIS figure the two lines are the same line and the
+   * distance between them is zero — which is the honest answer and not a refusal. What must not happen
+   * is the old `unreadable`: the question is understood.
+   */
+  it('…but two LINES are now a question this lane answers (#1205)', () => {
+    const a = answer('המרחק בין AB ל-l1');
+    expect(a.unreadable, 'the question is understood now').toBeUndefined();
+    expect(a.value).toBe(fmt(0));
+  });
   it('the neighbouring measures are untouched — they never read roles by position', () => {
     /**
      * The class check (standing rule 1). `AREA_TOKEN` reads ONE run of vertices and `LENGTH_TOKEN`

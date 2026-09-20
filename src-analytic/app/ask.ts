@@ -70,8 +70,14 @@ export interface Answer {
    * A TOKEN, not a sentence, for the reason ADR-AG-085 gives: this module is the lane's engine and
    * holds no locale. `vertical` is the only member today; the field exists so the next fact-shaped
    * answer joins it rather than collapsing into `null` again (#1227 is already queued behind it).
+   *
+   * #1205 adds 'lines-cross': two lines that INTERSECT have no single distance between them — it is
+   * zero at the crossing and grows without bound away from it. That is a fact about the figure, not a
+   * gap in the givens, so it belongs here rather than in `null`. **Operator ruling, 2026-09-19:** asked
+   * whether the intersecting case should answer 0 or refuse, he chose refuse-and-explain — the refusal
+   * teaches the concept, while 0 lets the misconception stand.
    */
-  fact?: 'vertical';
+  fact?: 'vertical' | 'lines-cross';
   /**
    * HOW THE ANSWER WAS REACHED (#1053) — the formula with this figure's values substituted.
    *
@@ -280,7 +286,7 @@ export function ask(
     // #1276: relatively, through the one shared answer — `|b| < 1e-12` called a solved vertical line
     // NOT vertical (its `b` carries the solver's residual) and answered with a slope of a billion.
     if (isVerticalLine(line.a, line.b)) return { question, value: null, fact: 'vertical' };
-    const k = isKnowledge(d.construction, (f) => {
+  const k = isKnowledge(d.construction, (f) => {
       const l = lineNamed(f, name);
       return l && !isVerticalLine(l.a, l.b) ? -l.a / l.b : null;
     });
@@ -362,14 +368,41 @@ export function ask(
    * was walking past it.
    */
   const missingPoint = measure.terms
-    .flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : [t.a, t.b]))
+    // #1205: a line-line term names no POINT — both its operands are lines, checked just below.
+    .flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : t.kind === 'line-line' ? [] : [t.a, t.b]))
     .find((id: Id) => !objectById(d.construction, id));
   if (missingPoint !== undefined)
     return { question, value: null, missing: { name: missingPoint, kind: 'point' } };
   const missingLine = measure.terms
-    .flatMap((t) => (t.kind === 'point-line' ? [t.line] : []))
+    .flatMap((t) => (t.kind === 'point-line' ? [t.line] : t.kind === 'line-line' ? [t.u, t.v] : []))
     .find((name) => !lineNamed(d.figure, name));
   if (missingLine !== undefined) return { question, value: null, missing: { name: missingLine, kind: 'curve' } };
+
+    /**
+   * TWO LINES THAT CROSS HAVE NO SINGLE DISTANCE (#1205).
+   *
+   * Asked BEFORE the knowledge gate, because this is not a gap in the givens that more information
+   * would close — it is a fact about the figure, true at every configuration where the two lines are
+   * not parallel. Left to fall through it reaches «לא ניתן לחשב מהנתונים», which tells the student their
+   * own givens are insufficient when the question simply has no single answer — #1223’s lesson, on a
+   * second surface.
+   *
+   * Judged on the NORMALISED cross term — the sine of the angle between the two lines — never a raw
+   * determinant, which carries their coefficient magnitudes and is a threshold on nothing
+   * (ADR-AG-021; ADR-AG-130 one module over, for the same reason).
+   */
+  const crossing = measure.terms.find((t) => {
+    if (t.kind !== 'line-line') return false;
+    const lu = lineNamed(d.figure, t.u);
+    const lv = lineNamed(d.figure, t.v);
+    if (!lu || !lv) return false;
+    const nu = Math.hypot(lu.a, lu.b);
+    const nv = Math.hypot(lv.a, lv.b);
+    if (nu < 1e-12 || nv < 1e-12) return false;
+    return Math.abs(lu.a * lv.b - lv.a * lu.b) / (nu * nv) > 1e-6;
+  });
+  if (crossing) return { question, value: null, fact: 'lines-cross' };
+
 
   const k = isKnowledge(d.construction, (f) =>
     evalLengthExpr(
@@ -388,7 +421,7 @@ export function ask(
    * it. The trace explains a row; it does not narrate a calculation.
    */
   const one = measure.terms.length === 1 ? measure.terms[0] : null;
-  const plain = one && one.kind !== 'area' && one.kind !== 'point-line' ? one : null;
+  const plain = one && one.kind !== 'area' && one.kind !== 'point-line' && one.kind !== 'line-line' ? one : null;
   let trace: string | undefined;
   let mark: Answer['mark'];
   /**
