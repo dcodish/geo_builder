@@ -940,6 +940,16 @@ export interface AngleBoundConstraint {
   ray2: Id;
   min?: number; // degrees — the angle must exceed this
   max?: number; // degrees — the angle must fall below this
+  /**
+   * WHETHER THE BOUND ADMITS ITS OWN VALUE (#1265).
+   *
+   * `>` and `<` are strict; `≥`, `≤` and «לפחות» are not, and the difference is the whole of what a
+   * student can say next. Absent ⇒ STRICT, which is what every saved figure (ADR-232) written before
+   * this field meant: the comparison words the parser reads («גדול מ», "greater than") are strict, and
+   * an old `{min: 10}` came from one of those or from a `>` glyph.
+   */
+  minStrict?: boolean;
+  maxStrict?: boolean;
 }
 
 /** A length BOUNDED against numbers — |ab| above `min` / below `max` / between. The length twin of
@@ -950,6 +960,9 @@ export interface LengthBoundConstraint {
   b: Id;
   min?: number;
   max?: number;
+  /** @see {@link AngleBoundConstraint.minStrict} — the same question, for a length (#1265). */
+  minStrict?: boolean;
+  maxStrict?: boolean;
 }
 
 export type Constraint =
@@ -1052,8 +1065,8 @@ export type Command =
   // A student's own NUMERIC bound on a measure (ADR-390): "∠ABC > 40" / "40 < ∠ABC < 60" / "α > 40",
   // "|AB| > 5". At least one of min/max is present; both ⇒ a range. NOT an equality — it restricts
   // which configurations are valid without determining one, so the measure keeps its DOF.
-  | { type: 'set-angle-bound'; vertex: Id; ray1: Id; ray2: Id; min?: number; max?: number }
-  | { type: 'set-length-bound'; a: Id; b: Id; min?: number; max?: number }
+  | { type: 'set-angle-bound'; vertex: Id; ray1: Id; ray2: Id; min?: number; max?: number; minStrict?: boolean; maxStrict?: boolean }
+  | { type: 'set-length-bound'; a: Id; b: Id; min?: number; max?: number; minStrict?: boolean; maxStrict?: boolean }
   | { type: 'set-parallel'; a: Id; b: Id; c: Id; d: Id }
   // `implicit` ⇒ the perpendicularity is structurally implied (a radius ⟂ a tangent line), NOT a
   // right angle the student stated; it constrains the figure but draws no right-angle mark (a
@@ -1202,7 +1215,7 @@ export type SymbolicCommand =
   // `measure-order`: lowered once the symbol table says which measure `name` binds to, to a
   // `set-angle-bound`/`set-length-bound`. The spelled-out form ("∠ABC > 40") skips this and emits
   // the set-* command directly, since no symbol needs resolving.
-  | { type: 'measure-bound'; name: string; min?: number; max?: number }
+  | { type: 'measure-bound'; name: string; min?: number; max?: number; minStrict?: boolean; maxStrict?: boolean }
   // A named shape whose CONFIGURATION is an ambiguous, cyclable VARIANT ([ADR-138](docs/06-decisions.md#adr-138)):
   // a kite (which diagonal is the axis of symmetry — 2 variants), an isosceles triangle (which vertex is the
   // apex — 3), or a base-less midsegment whose second endpoint rides one of two other sides ([ADR-199](docs/06-decisions.md#adr-199),
