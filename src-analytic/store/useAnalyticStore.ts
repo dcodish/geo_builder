@@ -96,6 +96,7 @@ export type InputError =
   | { key: 'unknown-reference'; detail: string; expected?: 'point' | 'line' | 'circle' | 'curve' }
   /** A construct that cannot exist in this figure, which has no freedom left to try (#1058). */
   | { key: 'does-not-exist'; detail: string; existing?: string }
+  | { key: 'ring-contradicts-noun'; detail: string }
   /** A vertex that does not name an angle on its own — no shape through it, or several (#1049). */
   | { key: 'ambiguous-angle'; detail: string }
   /** A shape named by its noun alone, where the figure has no such shape or several (#1049). */

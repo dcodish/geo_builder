@@ -6786,3 +6786,36 @@ otherwise = selectors hold           → the existing fallback
 **Measured after.** Seed 0 opens on 25.4° · 19.7° · 15.9°, and all of seeds 0–7 clear 15° on all three figures. A pinned 1°-triangle («A(0,0)» «B(10,0)» «C(5,0.1)» «משולש ABC») is still drawn, unmoved and without a fault — the preference never becomes a requirement. «הציגו תצורה אחרת» still walks **ten distinct configurations** in ten presses on each free figure, and a determined figure still answers honestly that there is no other one: the preference narrows what may be shown without collapsing the variety, which is the #1282 failure this could otherwise have reproduced.
 
 **Consequences.** `engine/rings.ts` (+`minInteriorAngleOf`, +`SPREAD_MIN_DEG`); `engine/evaluate.ts` (`drawableAt` gains the opt-in parameter, a mode-keyed cache and the fourth tier); `engine/derive.ts` (one call opts in). `issue-1174-spread-preference.test.ts` (16): the three figures well-spread at every one of the first eight starts; **the un-preferred sweep asserted to still find the sliver**, so the lock cannot go vacuous if a later change happens to make seed 0 pretty on its own; the forced sliver still drawn; the gate's default asserted to be the un-preferred answer and a free coordinate still reported unknown; and the variety measured as distinct pictures rather than as a seed list.
+## ADR-AG-129 — A pinned ring that contradicts its noun is REFUSED, not silently drawn (#1170)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1170 (bug, P2, `analytic`) · operator ruling 2026-09-17 · round #1292
+**Requirements:** [02c](02c-requirements-analytic.md) — R91's pinned case · **Design:** [04c](04c-design-analytic.md)
+**Completes** [ADR-AG-080](#adr-ag-080)/#1158/#1166, whose arm 2 was built, measured and withdrawn to this issue
+
+**The report, and how it arrived.** Playing round #1169 T5 the operator typed `D(1,0)` instead of the sheet's `D(0,4)`, which put `D` on segment `AB`, and said: *"a quad should have been rejected for this case"*. He did not know he was looking at a known gap, which makes it a better signal than a test of it would have been.
+
+**Measured before, his exact five lines:**
+
+```
+A(0,0)  B(4,0)  C(1,1)  D(1,0)  מרובע ABCD
+
+figure.ringFaults  [{ id: 'poly-ABCD', noun: 'מרובע', violation: 'degenerate' }]   ← the seam SEES it
+faults             []                                                              ← and nothing is said
+decideSubmit(…)    record                                                          ← and the line is kept
+```
+
+`A`, `D` and `B` are collinear, so the ring's corner at `A` has both edges along the x-axis: the "quadrilateral" is a triangle with a spare vertex. The seam has detected this since #1158/#1166; the arm that would say so was the one this issue was opened to rule on.
+
+**The ruling.** Of the three options put to him — draw it, draw-with-a-notice, or refuse the line — he chose **(2), refuse**, overruling the session's recommendation of (3). Recorded as given. **Reach:** he ruled on a *degenerate* pinned ring, and this is taken as covering the *crossed* one too (four pinned points in a bow-tie order), since the sentence he was reacting to — *a shape noun promises a ring, and these points are not that ring* — is identical, and splitting them would leave the crossed half silent for no reason either of us has given.
+
+**Why the arm could not simply be switched on.** Both obvious gates were already argued against in this tree. `reportedDof === 0` is exactly the three `derived.test.ts` locks encoding ADR-AG-008's `does-not-exist` answer; `reportedDof > 0` is what the selector arm refuses to do, because with freedom left 24 exhausted seeds are evidence and not proof (#1071). The measurement that stopped it is now its *condition* rather than its blocker: **every figure it fires on has `reportedDof = 0`**, because with the polygon-noun preference inside the configuration search a figure that still has freedom never arrives here carrying a ring fault.
+
+**The reconciliation, which was the real work.** «P מפגש האנכים האמצעיים במשולש ABC» on three collinear points declares the triangle *and* asks for its circumcentre, so one line carries a ring fault and `does-not-exist` at once. `does-not-exist` names what the student actually asked for and is the truer message. The arm therefore runs **below every other fault in `derive`** — the only position from which it can see what has already been said — and skips a line that is already faulted. One line, one message, and the truer one wins. (The note in the old, empty slot now points here and says why the arm cannot live there.)
+
+**The message.** A new owned code, `ring-contradicts-noun`, with its own locale string, about the RING and naming the student's own statement (#1145): «הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "…"», and pointing at the two things they can change — the order of the letters, or the coordinates. Never «לא נמצאה תצורה שבה מתקיים», which is false on a determined figure.
+
+**Measured after.** His five lines are refused on the line that named the shape, and refused at the submit gate, so the figure never records it. The sheet's intended `D(0,4)` — a genuine concave quadrilateral — still builds and is still recorded: **concave is not crossed**, and R91's boundary is untouched. A pinned crossed quad and a pinned collinear triangle are both refused. The collinear circumcentre still gets exactly one message, `does-not-exist`. A free quadrilateral, and a partly-pinned one with freedom left, are unaffected — and the same ring pinned into a bow-tie is refused, which is what proves the freedom is doing the sparing.
+
+**Three locks moved, deliberately.** Two are named `#1170 boundary` in `issue-1158-1166-polygon-noun-validity.test.ts` and were written in as many words for this moment — *"when it lands, this line is what changes"*; their `ringFaults` half is untouched and only the `faults` line moves, from silence to the refusal. The third, `derived.test.ts`'s *"but ABDC is a DIFFERENT quadrilateral"*, keeps its claim and changes its **fixture**: it pinned four points in convex position, where only one cyclic order is a simple ring, so once a pinned crossed ring is refused the figure could no longer reach the eight sides that lock is about. Its points now put `D` inside triangle `ABC`, where `ABCD` and `ABDC` are both simple — the identity claim tested on its own rather than through a ring the tool declines — and a companion row states the other half explicitly: a reordering that crosses is refused, not merged away.
+
+**Consequences.** `engine/apply.ts` (+the code), `i18n/index.ts` (+he/en), `App.tsx` and `store/useAnalyticStore.ts` (+the mapping), `engine/derive.ts` (the arm, and the note in its old slot). `issue-1170-pinned-ring-refused.test.ts` (9): his own figure on both surfaces, the intended concave quad as the counter-direction, both members of the ruling, the single-message reconciliation, and the freedom gate asserted with the precondition that makes it non-vacuous.

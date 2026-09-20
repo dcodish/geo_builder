@@ -133,21 +133,12 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   }
 
   /**
-   * THERE IS DELIBERATELY NO RING-FAULT ARM HERE — see [#1170](https://github.com/dcodish/geo_builder/issues/1170).
+   * THE RING-FAULT ARM IS FURTHER DOWN, after the vacancy loop — see
+   * [#1170](https://github.com/dcodish/geo_builder/issues/1170) and ADR-AG-129.
    *
-   * `figure.ringFaults` says a declared polygon is drawn as a ring its noun does not promise
-   * (#1158, #1166). `drawableAt` uses it to CHOOSE a configuration, which is what fixed both reported
-   * bugs. Reporting the leftovers here was the plan's second arm, and it was built, measured and
-   * withdrawn: with the choice in place, every figure it fires on has **`reportedDof = 0`** — the
-   * student pinned the coordinates, and those coordinates are what make the ring crossed or
-   * collapsed. There is no configuration search to have failed, so
-   * «לא נמצאה תצורה שבה מתקיים» would not even be a true sentence about such a figure.
-   *
-   * Both obvious gates are argued against in this file already: gating on `reportedDof === 0` is
-   * exactly the three `derived.test.ts` locks that encode ADR-AG-008's `does-not-exist` answer, and
-   * gating on `reportedDof > 0` is what the selector arm above refuses to do, for #1071's reason —
-   * with freedom left, 24 exhausted seeds are evidence and not proof. #1166 foresaw this case and
-   * ruled it *"out of scope here"*; #1170 carries the ruling it needs.
+   * It cannot run here. Its one hard requirement is that a line already carrying a truer message
+   * does not get a second one, and the messages it must not double — `does-not-exist` above all —
+   * are pushed below this point.
    */
 
   /**
@@ -289,6 +280,51 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
     });
   }
 
+  /**
+   * A SHAPE NOUN PROMISES A RING, AND THESE PINNED POINTS ARE NOT THAT RING (#1170, ADR-AG-129).
+   *
+   * **Operator ruling, 2026-09-17: refuse the line.** He hit it by accident playing round #1169 —
+   * typed `D(1,0)` instead of the sheet’s `D(0,4)`, which put `D` on segment `AB`, and reported
+   * *"a quad should have been rejected for this case"* without knowing he was looking at a known
+   * gap. He was offered draw-with-a-notice and chose the refusal.
+   *
+   * `ringFaultsOf` has SEEN this since #1158/#1166; `drawableAt` uses it to choose a configuration,
+   * which is what fixed both of those. What was missing is the case where there is nothing to
+   * choose: every figure this fires on has **`reportedDof = 0`**, because with the preference in the
+   * search a figure that still has freedom never arrives here carrying a ring fault. The student
+   * pinned the coordinates, and those coordinates are what make the ring collapsed or crossed.
+   *
+   * That is also why the message is about the RING and not about a failed search:
+   * «לא נמצאה תצורה שבה מתקיים» would be false on a determined figure — there was only ever one
+   * configuration, and it is the one they described.
+   *
+   * **Both members, on the ruling’s own reach.** He ruled on a degenerate pinned ring; a crossed one
+   * (four pinned points in a bow-tie order) is the same sentence — *a shape noun promises a ring, and
+   * these points are not that ring* — and splitting them would leave that half silent for no reason
+   * either of us has given.
+   *
+   * **One message per line, and the truer one wins.** «P מפגש האנכים האמצעיים במשולש ABC» on three
+   * collinear points declares the triangle AND asks for its circumcentre, so one line carries both a
+   * ring fault and ADR-AG-008’s `does-not-exist`. `does-not-exist` names what the student actually
+   * asked for and is the better answer; a second, differently-worded refusal on the same line is
+   * noise rather than honesty. This is why the arm runs here, below every other fault: it can see
+   * what has already been said.
+   */
+  if (figure.ringFaults.length > 0 && reportedDof(construction, figure.carrierDof) === 0) {
+    /** Which line declared each polygon — the line the refusal belongs on (#1145). */
+    const declaredPolygonOn = new Map<string, number>();
+    facts.forEach((f, i) => {
+      if (f.t === 'polygon' && !declaredPolygonOn.has(f.id)) declaredPolygonOn.set(f.id, owner[i]);
+    });
+    const alreadyFaulted = new Set(faults.map((f) => f.index));
+    for (const rf of figure.ringFaults) {
+      const index = declaredPolygonOn.get(rf.id);
+      if (index === undefined) continue; // no line owns it — nothing honest to say about it
+      if (alreadyFaulted.has(index)) continue;
+      alreadyFaulted.add(index);
+      faults.push({ index, code: 'ring-contradicts-noun', detail: lines[index] });
+    }
+  }
   /**
    * Roll the per-FACT effects up to per-LINE outcomes (#1045).
    *
