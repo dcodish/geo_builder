@@ -26,9 +26,19 @@ import { ctrlBtn } from '@/render/Figure';
  * not merely guarded** — keeping it behind a stricter gate would still be a delete nobody asked for.
  *
  * What this file now locks is therefore the opposite property: **no path from the letter box drops a
- * fact**. `swappable` keeps the offer's SCOPE exactly where it was (a plain point statement, never a
- * shape) — deliberately not widened, since whether a shape-held letter should become swappable is an
- * open ruling.
+ * fact**.
+ *
+ * ## #1199 (ADR-532) — the offer appears wherever a letter is taken
+ *
+ * #1013 kept the predicate as the offer's SCOPE and called the widening a separate ruling. That ruling
+ * came, playing round #1193 T14: *"pressing on D and asking it to be A is refused, but pressing on A and
+ * asking it to be D is allowed … I see no difference in the cases so we should always allow switching
+ * names of nodes."*
+ *
+ * The gate read the TARGET’s holder only, so the same pair of letters was refused in one direction and
+ * offered in the other. `swappable` is therefore gone — not pinned to `true` — and the rows below that
+ * asserted it now assert what they were really about: that the refusal still NAMES its holder, and that
+ * the swap still drops nothing.
  */
 
 function ctxOf() {
@@ -59,15 +69,35 @@ describe('#238 — the refusal names who holds the letter', () => {
   });
 
   /**
-   * T7's refusal, unchanged. A swap would be mechanically safe here — the triangle's vertex A and the
-   * loose point D could simply exchange names — but the operator approved this refusal as it stands, so
-   * #1013 does NOT widen the offer to it. That is a separate ruling.
+   * T7’s refusal — **and the swap #1199 now offers beside it.** #1013 said in as many words that this
+   * swap *"would be mechanically safe here — the triangle’s vertex A and the loose point D could simply
+   * exchange names"* and left it to a ruling. The ruling came; the swap is asserted to be as safe as that
+   * sentence predicted, on the figure rather than on the prediction.
    */
-  it('a letter held by a SHAPE is not offered — the refusal stands, unwidened', () => {
+  it('a letter held by a SHAPE is offered too, and the swap keeps every point (#1199)', () => {
     build(['משולש ABC', 'נקודה D']);
     const h = letterHolder(useGeoStore.getState().facts, 'A')!;
-    expect(h.swappable, '«משולש ABC» holds A, so no offer appears beside the refusal').toBe(false);
-    expect(h.utterance, 'and the refusal still names the holder in the student’s wording').toBe('משולש ABC');
+    expect(h.utterance, 'the refusal still names the holder in the student’s wording').toBe('משולש ABC');
+
+    const before = useGeoStore.getState().facts.length;
+    expect(useGeoStore.getState().swap('A', 'D').ok, 'the swap the old gate refused').toBe(true);
+    const after = useGeoStore.getState();
+    expect(after.facts.length, 'NO fact was dropped').toBe(before);
+    expect(after.facts.map((f) => f.utterance)).toEqual(['משולש DBC', 'נקודה A']);
+  });
+
+  /**
+   * THE ASYMMETRY ITSELF, which is what he reported. Asserted as the two directions AGREEING rather than
+   * as either one’s answer — the defect was never that one direction was wrong, it was that they differed
+   * for the same pair of letters.
+   */
+  it('the offer is symmetric — the same pair answers the same way both ways', () => {
+    const swapFrom = (a: string, b: string) => {
+      build(['משולש ABC', 'נקודה D']);
+      return useGeoStore.getState().swap(a, b).ok;
+    };
+    expect(swapFrom('A', 'D')).toBe(swapFrom('D', 'A'));
+    expect(swapFrom('A', 'D'), 'and the answer is yes — «always allow switching»').toBe(true);
   });
 
   /**
@@ -77,7 +107,7 @@ describe('#238 — the refusal names who holds the letter', () => {
   it('the offer SWAPS the two letters — five points stay five, and both statements survive', () => {
     build(['משולש ABC', 'נקודה D', 'נקודה E']);
     const h = letterHolder(useGeoStore.getState().facts, 'E')!;
-    expect(h.swappable, '«נקודה E» introduces E and nothing else').toBe(true);
+    expect(h.utterance, '«נקודה E» is the statement that introduced E').toBe('נקודה E');
 
     const countBefore = useGeoStore.getState().facts.length;
     const res = useGeoStore.getState().swap('D', 'E');
@@ -105,10 +135,18 @@ describe('#238 — the refusal names who holds the letter', () => {
     expect(useGeoStore.getState().facts, 'a single undo restores the session exactly').toEqual(before);
   });
 
-  it('a letter something else DEPENDS on is not offered', () => {
-    // F is used by a second statement. The offer's SCOPE is unchanged by #1013, deliberately.
+  /**
+   * A letter another statement DEPENDS on. The old gate refused the offer here, because dropping the
+   * holder would have taken «AF» with it. Nothing is dropped any more, so #1199 allows it — and what
+   * matters is that the dependent statement FOLLOWS the letter rather than being orphaned or lost.
+   */
+  it('a letter another statement depends on swaps, and that statement follows it (#1199)', () => {
     build(['משולש ABC', 'נקודה D', 'נקודה F', 'AF']);
-    expect(letterHolder(useGeoStore.getState().facts, 'F')!.swappable, 'segment AF still mentions F').toBe(false);
+    const before = useGeoStore.getState().facts.length;
+    expect(useGeoStore.getState().swap('F', 'D').ok).toBe(true);
+    const after = useGeoStore.getState();
+    expect(after.facts.length, 'the dependent statement survives').toBe(before);
+    expect(after.facts.map((f) => f.utterance)).toContain('AD');
   });
 
   /**

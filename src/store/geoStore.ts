@@ -135,34 +135,27 @@ export interface LetterHolder {
   factId: string;
   /** The student's own wording of that statement, to quote back. */
   utterance: string;
-  /** Safe to take the letter back: dropping this statement removes the letter AND NOTHING ELSE. */
-  swappable: boolean;
 }
 
 export type RenameResult = { ok: true } | { ok: false; reason: 'same' | 'no-source' } | { ok: false; reason: 'target-taken'; holder: LetterHolder | null };
 
 /**
- * The statement that introduced `letter`, and whether the two letters may be OFFERED as a swap (#238).
+ * The statement that introduced `letter` — who to name in «האות כבר בשימוש» (#238).
  *
- * #1013 (ADR-520 Am. 1) — this predicate was written to answer *"is deleting the holder safe?"*, because
- * the offer used to delete. It no longer does: the offer swaps, and a swap destroys nothing, so nothing
- * here is load-bearing for safety any more.
+ * **It no longer decides whether a swap is OFFERED (#1199).** It carried a `swappable` flag for that,
+ * and the flag answered a question nobody asks any more: *"is deleting the holder safe?"*, back when
+ * the offer deleted the holder’s statement. #1013 (ADR-520 Am. 1) retired the delete and kept the
+ * predicate as the offer’s SCOPE, deliberately and on the operator’s earlier approval.
  *
- * It is kept, unchanged, as the SCOPE of the offer. The operator approved the shape-held refusal as it
- * stands, so the swap appears exactly where the destructive offer appeared and nowhere new; whether a
- * letter held by «משולש ABC» should also become swappable is a separate ruling, called out rather than
- * assumed. Renamed `reclaimable` → `swappable` so the name says what it now gates.
+ * The visible residue was an ASYMMETRY, reported playing round #1193 T14: *"pressing on D and asking
+ * it to be A is refused, but pressing on A and asking it to be D is allowed … I see no difference in
+ * the cases so we should always allow switching names of nodes."* The gate read the TARGET’s holder
+ * only, so one pair of letters was refused in one direction and offered in the other — decided by
+ * nothing but which of the two the student happened to click first.
  *
- * "No dependents" is asked as a question about the FIGURE, not about a command kind. So it is swappable
- * exactly when
- *
- *  - no OTHER enabled statement mentions the letter (nothing is built on it), and
- *  - every point this statement introduces that did not exist BEFORE it is the letter itself — which is
- *    what keeps «משולש ABC» out of the offer.
- *
- * Stated that way it covers the whole class the issue names — an undone/redone step, a deleted-then-
- * recreated construction, a derived point whose carrier was disabled (the ADR-010 auto-drop) — without
- * enumerating any of them, because all of them reduce to "who still needs this letter?".
+ * **Operator ruling, 2026-09-18: always allow switching.** A swap destroys nothing, so no safety
+ * question is left for a gate to answer, and the flag is REMOVED rather than pinned to `true`: an
+ * always-true predicate is a question the code keeps asking after the answer stopped mattering.
  */
 export function letterHolder(facts: Fact[], letter: Id): LetterHolder | null {
   const L = letter.toUpperCase();
@@ -170,12 +163,7 @@ export function letterHolder(facts: Fact[], letter: Id): LetterHolder | null {
   const idx = enabled.findIndex((f) => commandPointIds(f.cmd).includes(L));
   if (idx < 0) return null;
   const holder = enabled[idx];
-  const usedElsewhere = enabled.some((f, i) => i !== idx && commandPointIds(f.cmd).includes(L));
-  const earlier = new Set(enabled.slice(0, idx).flatMap((f) => commandPointIds(f.cmd)));
-  const introduces = commandPointIds(holder.cmd).filter((id) => !earlier.has(id));
-  // Dropping the holder must remove the letter AND NOTHING ELSE — so it may introduce nothing but it.
-  const onlyTheLetter = introduces.length === 1 && introduces[0] === L;
-  return { factId: holder.id, utterance: holder.utterance ?? '', swappable: !usedElsewhere && onlyTheLetter };
+  return { factId: holder.id, utterance: holder.utterance ?? '' };
 }
 
 /**
