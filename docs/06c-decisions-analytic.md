@@ -6892,3 +6892,32 @@ ACTION show-another none
 One figure line per real change; the escalation recorded as a joinable PAIR; Hebrew stored intact (verified on the file's bytes, not on a console that cannot print it). This is exactly the record #1297 could not obtain. Incidentally it confirms #1296 independently: the stored utterance is `נקודה (-2,4) נמצאת על ישר 3`, minus in the right place — that defect is display-only.
 
 **Consequences.** `server/logProxy.ts` (+`TOOL_LOGS`, +`logFileFor` exported so its lock CALLS it, the `else` deleted, the unknown tag refused). `src-analytic/debug/sessionLogAnalytic.ts` (new — copied from `sessionLog3.ts`, never imported: product trees do not import each other). `src-analytic/App.tsx` (+the submit trace read off the exhaustive verdict, so a new verdict kind cannot skip it; +the escalation outcome WITH the model's steps, the field #1297 needed; +the deduped figure effect; +the seven store actions a replay needs). `issue-1300-log-routing.test.ts` (5): the mapping, the distinctness, the **unknown-tag rejection** — the row a future third ternary arm would break while satisfying all the others — and the absent-tag back-compat case asserted as deliberate. `issue-1300-session-log.test.ts` (8): the DEV guard on both entry points, the `tool` tag, the escalation pair as the acceptance case, the content dedupe with its precondition asserted first, and both of `fetch`'s failure modes since the module guards them separately.
+
+## ADR-AG-132 — The distance between two PARALLEL lines, and an honest refusal when they cross (#1205)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1205 (feature, P3, `analytic`) · operator ruling 2026-09-19 · round #1306
+**Requirements:** [02c](02c-requirements-analytic.md) — the measure union · **Design:** [04c](04c-design-analytic.md)
+**Completes** [#1151](https://github.com/dcodish/geo_builder/issues/1151), which added the point-to-line member and named this one in a code comment as *"a real question, and a CAPABILITY rather than this bug"*
+
+**The gap, measured before.** On both a parallel pair and an intersecting one:
+
+```
+ask(…, 'המרחק בין AB ל-l1')  ->  { value: null, unreadable: true }   ← «לא הבנתי את השאלה»
+```
+
+The token reached a line/line pair and built no term. `parseLengthExpr`'s classifier had two arms — two points, or exactly one point — and returned the match unconsumed when neither held.
+
+**The ruling, and it overrode this issue's own recommendation.** Asked whether the INTERSECTING case should answer `0` or refuse, the operator chose **refuse and explain**: the refusal teaches the concept, while `0` lets the misconception stand.
+
+**So the two outcomes are different kinds of thing, and that is the design.**
+
+- **Parallel** → the distance, `|c₁ − c₂|` on normalised coefficients. Normalising is what makes it a distance rather than a coefficient difference: `y = 5` and `3y = 15` are one line, and an un-normalised subtraction would answer differently for the same pair.
+- **Intersecting** → `fact: 'lines-cross'`, joining the token `fact` field [ADR-AG-098](#adr-ag-098)/#1223 introduced for a vertical slope. It is a **fact about the figure**, not a gap in the givens: no single distance exists, it is zero at the crossing and unbounded away from it. Left to fall through it would reach «לא ניתן לחשב מהנתונים», which tells the student their own givens are insufficient when the question has no single answer at all — #1223's defect on a second surface, which is exactly why that field says it was built so *"the next fact-shaped answer joins it rather than collapsing into `null` again"*.
+
+**Parallelism is judged on the NORMALISED cross term** — the sine of the angle between the two lines — never a raw determinant, which carries the lines' coefficient magnitudes and is a threshold on nothing. That is ADR-AG-021's rule and [ADR-AG-130](#adr-ag-130)'s measurement one module over: `PARALLEL_SINE = 1e-6` sits two orders above the 6.65e-8 measured between two representations of one line, and corresponds to an angle of 5.7e-5 degrees. The constant is duplicated rather than imported because `crossings.ts` is a consumer of this layer and importing it here would invert that; the lock pins the two together.
+
+**The refusal TEACHES, and the remedy is driven.** The message names why there is no single distance and names what IS askable — the point-to-line distance, and the crossing point itself. #1156 shipped a message teaching a spelling that returned the same refusal, so both suggestions are pulled out of the locale string and pushed back through the real ask lane and the real parser in the lock. The message is read from SOURCE rather than restated in the test, because the locale object is module-private and a test that spelled it out would pass while the real one drifted.
+
+**One existing lock moved, deliberately, and it was written to.** `issue-1151-operand-roles.test.ts` asserted that «המרחק בין AB ל-l1» says it did not understand, pinning the gap as a KNOWN state with the note that two lines were *"a real question and a CAPABILITY, deliberately not built under this bug's banner"*. The row now asserts the answer. On that file's own figure `AB` lies on `y = 0` and so does `l1`, so the two lines coincide and the distance is zero — the honest answer, and not a refusal.
+
+**Consequences.** `engine/lengths.ts` (+the `line-line` member, +`PARALLEL_SINE`, the classifier's third arm, the evaluator's branch, and the three places that enumerate term kinds); `app/ask.ts` (+the crossing detection before the knowledge gate, +the `fact` token, the operand checks widened); `App.tsx` and both locales (+the message). `issue-1205-line-line-distance.test.ts` (13): the parallel answer in both operand orders and under rescaling; the crossing reported as a `fact` and asserted NOT to be `unreadable` or `missing`, which is the #1111 distinction the ruling turns on; the message read from source and both its suggestions driven on the very figure that was refused; and #1151's own table unmoved.

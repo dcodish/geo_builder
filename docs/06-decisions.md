@@ -12566,3 +12566,32 @@ sentence that can mean two things, so it applies exactly where two readings exis
 **Interaction with #778, stated because the issue asked for it.** #778 is the workspace-wide *"non-canonical input is TAUGHT"* programme. This is a local use of the owned-refusal channel that already carries `cevian-wrong-side` and `crossing-already-named`, not a new mechanism and not the shape #778 will generalise: #778 is about PRE-FILLING the canonical sentence in the box, which this does not do. When it lands, this message is one of the places it should subsume, and the wording here is deliberately already in its register.
 
 **Consequences.** `parser/parse.ts` (the two lookaheads narrowed, +`ARC_RUN`/`ARC_COPULA_RX`, +the `arc-copula` result and clarify, +the guard at the head of `arcEquality`); `app/submitPipeline.ts` and both locales (+the message); `parser/catalog.ts` (the row corrected). `issue-1000-arc-copula.test.ts` (17): the four canonical rows unmoved, the four narrowed rows refused **with their labels**, the non-escalation asserted separately, the taught sentence driven, and the ADR-507 angle rows plus the «זווית ישרה» lane as the over-narrowing guard. `scenarios-corpus-4.ts` adds the canonical sequence end-to-end, asserting **equal chords on the built figure** rather than the command it lowered to — the refusal half cannot live in that harness, which fails a scenario on any step that does not parse, by design, and the scenario's own note says where it lives instead.
+
+## ADR-534 — The semicircle reads a centre-first 3-run, like the rest of the arc family (#1204)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1204 (feature, P3, `2d`) · measured while fixing #1012 in round #1200 · round #1306
+**Requirements:** [02](02-requirements.md) — the arc family's letter run · **Design:** [04](04-design.md)
+**Completes** the family [ADR-521](#adr-521)/#1012 made re-readable, whose third member could not benefit because it produced no parse to re-read
+
+**The gap.** Measured on «ABC משולש ישר זוית» · «AC=15» · «BC=10» · «O על AC» · «D על CB»:
+
+```
+רבע מעגל ODC   ->  centre O, ends D and C, span 90    ✓
+גזרה ODC       ->  centre O, ends D and C, span free   ✓
+חצי מעגל ODC   ->  not-handled                         ✗
+חצי עיגול ODC  ->  not-handled                         ✗
+```
+
+Both siblings read a 3-run as *centre, then the two ends*. The semicircle read no 3-run at all — `labelRun(restNoC, 2)` and nothing else — so a spelling a student would naturally try fell to the LLM lane or to «לא הבנתי» while the family was two-thirds consistent.
+
+**The convention is FORCED, and that is why this needed no ruling.** For a semicircle, centre-first plus two ends ON the circle plus a span of 180° says `O` is the midpoint of `DC`. That is what the sentence means rather than an extra assumption, and it is exactly what the 2-run spelling already builds. It also lowers to CONSTRAINTS and not to an assertion: both ends are members of a free-radius circle centred at `O` (so |OD| = |OC|) and `set-collinear(D, O, C)` closes it, so a figure that cannot honour it is refused honestly — measured, the operator's own over-constrained figure refuses **with the same message its quarter sibling gives**, which is the parity this fix is about.
+
+**The fix is the run reading, and nothing else.** `labelRun(restNoC, 3)` is tried first and the 2-run is the fallback — the quarter rule's own order — the run's first letter becomes the centre, and the leftover guard learns the centre is claimed. The general branch below it already produced the right geometry; it had simply never been reached with a named centre and two ends.
+
+**Measured after.** «חצי מעגל ODC» places `O` at the midpoint of `DC` to 1e-6 with |OD| = |OC|; the quarter on the same figure keeps equal radii but its centre sits 3.54 away from that midpoint, which is the contrast that stops "equal radii" from being mistaken for the whole claim. Every previously-working spelling is byte-identical, measured on the pre-change tree in the same context.
+
+**#1012's re-read is inherited, and it is DRIVEN rather than assumed.** ADR-521's mechanism keys off the `arc` a construct emits, so it reaches this construct the moment the construct produces a parse to re-read. Locked by building «חצי מעגל DCO» on a figure where `O` is already pinned as the midpoint of `DC`: the stated order cannot hold, the run is re-read, and the reading that builds is adopted — the family stays ONE mechanism rather than three conventions that happen to agree.
+
+**The catalog is updated**, because it is the user-facing reference and the coverage map at once: the semicircle row now teaches the 3-run and says what it means.
+
+**Consequences.** `parser/parse.ts` (the `semicircle` rule: +the 3-run read, the centre from the run, the leftover guard and the `autoCenter` flag following it); `parser/catalog.ts` (the row). `issue-1204-semicircle-run.test.ts` (11): the two new spellings read; the lowering asserted **against the quarter's skeleton** rather than written out, so the family cannot drift; the geometry read off the BUILT figure with the quarter as the counter-case; the previously-working spellings pinned to their measured pre-change lowerings; and the role re-reading driven through the real submit path.
