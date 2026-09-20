@@ -81,6 +81,7 @@ place. A kind that can forward-reference is what would earn one.
   — the same split every sibling uses.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 ## The configuration search: validity, then preference ([ADR-AG-128](06c-decisions-analytic.md#adr-ag-128))
 
 `drawableAt` is the one place that chooses which configuration the tool shows, so canvas, data panel,
@@ -125,6 +126,27 @@ refuses when a fault lands on that line, so raising a fault in `derive` is what 
 recorded. There is no second refusal mechanism to keep in step, which is why an operator ruling of
 “refuse the line” lands as one arm here rather than as a change in the app layer.
 >>>>>>> fix/1170-pinned-ring
+=======
+## The crossing module’s tolerances ([ADR-AG-130](06c-decisions-analytic.md#adr-ag-130))
+
+Three named constants, each answering one question, each relative to the figure’s own scale
+(ADR-AG-021 — *never an absolute magnitude*). They are registry-shaped in the docs/17 §3b sense:
+changing one changes what the tool offers, so each carries its measurement in its own docblock.
+
+| constant | the question | measured against |
+| --- | --- | --- |
+| `apart(figure)` = span · 1e-6 | is there already a point there? | the solve leaves ~2e-10 relative on a satisfied incidence, so this has 3–4 orders of margin |
+| `CROSS_MIN_SINE` = 1e-6 | are these two straights the same line? | two representations of one line measured 6.65e-8 apart by this reading |
+
+`occupied()` and `angleSine()` are the predicates; both loops call the first and `meet()` calls the
+second. The point of naming them is that there is **one** answer per question: the two loops used to
+ask the occupancy question differently — one relative, one with a hard-coded `1e-6` — and the same
+figure came out two ways.
+
+**`CROSS_MIN_SINE` is not an extent test.** Two genuinely different lines meeting at a shallow angle
+cross far outside the drawing; that is `within`’s question. Widening the angular bar to cover it would
+start calling distinct lines identical, which is the defect it was introduced to remove.
+>>>>>>> fix/1235-crossings
 
 ## The parser's rule contract ([ADR-AG-017](06c-decisions-analytic.md#adr-ag-017))
 

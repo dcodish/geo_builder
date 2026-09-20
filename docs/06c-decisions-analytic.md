@@ -6819,3 +6819,36 @@ decideSubmit(…)    record                                                     
 **Three locks moved, deliberately.** Two are named `#1170 boundary` in `issue-1158-1166-polygon-noun-validity.test.ts` and were written in as many words for this moment — *"when it lands, this line is what changes"*; their `ringFaults` half is untouched and only the `faults` line moves, from silence to the refusal. The third, `derived.test.ts`'s *"but ABDC is a DIFFERENT quadrilateral"*, keeps its claim and changes its **fixture**: it pinned four points in convex position, where only one cyclic order is a simple ring, so once a pinned crossed ring is refused the figure could no longer reach the eight sides that lock is about. Its points now put `D` inside triangle `ABC`, where `ABCD` and `ABDC` are both simple — the identity claim tested on its own rather than through a ring the tool declines — and a companion row states the other half explicitly: a reordering that crosses is refused, not merged away.
 
 **Consequences.** `engine/apply.ts` (+the code), `i18n/index.ts` (+he/en), `App.tsx` and `store/useAnalyticStore.ts` (+the mapping), `engine/derive.ts` (the arm, and the note in its old slot). `issue-1170-pinned-ring-refused.test.ts` (9): his own figure on both surfaces, the intended concave quad as the counter-direction, both members of the ruling, the single-message reconciliation, and the freedom gate asserted with the precondition that makes it non-vacuous.
+## ADR-AG-130 — The crossing module judges degeneracy RELATIVELY (#1235)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1235 (bug, P3, `analytic`) · split from the 2026-09-19 spurious-ring report · round #1292
+**Requirements:** [02c](02c-requirements-analytic.md) — R89's offered-ring honesty · **Design:** [04c](04c-design-analytic.md)
+**Extends** [ADR-AG-021](#adr-ag-021)'s *never an absolute magnitude* to the last two places in this module that ignored it, and completes [#1113](https://github.com/dcodish/geo_builder/issues/1113)'s fix in the loop it missed
+
+**The class.** *A crossing is offered for a pair of objects that do not cross, because the degeneracy tests are written as absolute thresholds on quantities that carry the figure's scale, so they never fire.*
+
+**Defect 1 — `meet()`'s guard was not a threshold on anything geometric.**
+
+```ts
+const det = p.a * q.b - q.a * p.b;
+if (Math.abs(det) < 1e-12) return null; // parallel, or the same line
+```
+
+`det` scales with both lines' coefficient magnitudes. Measured on the reported figure, where a segment and a stated line were the same line to solver tolerance: `det = -2.07e-7` — five orders of magnitude above the guard — while the **normalised** value, the sine of the angle between them, was `-6.65e-8`, an angle of 3.8e-6 degrees. The guard's own comment says it is there to catch "parallel, or the same line". It did not, and the tool went on to offer «P נקודת החיתוך של הישר CE עם הישר CE» — authoring a meaningless given into the one list the student checks to see what the tool understood.
+
+**Defect 2 — two answers to one question.** The straight×straight loop deduped against existing points with a hard-coded `1e-6`; the straight×conic loop four lines below used `apart()`, the relative tolerance #1113 was filed to introduce. On a figure spanning 18.6 those differ by 50×, so a ring was offered on top of a point that already had a letter — the #1113/#1175 family, which is how a third and fourth name reach one location.
+
+**Why it stopped being a curiosity.** Before the 2026-09-19 ruling (ADR-AG-111) a student could not deliberately hold both a segment and its infinite line. Now «משוואת הצלע CE …» then «משוואת הישר CE …» is an ordinary two-line sequence — and it is precisely the near-zero-determinant pair. The operator met it on his first pass through that feature.
+
+**The constants, measured before they were chosen** (docs/17 §3b — these are registry-shaped).
+
+- **The solver's actual residual**, on a satisfied incidence: ~2e-9 absolute on spans of 10–15, about **2e-10 relative**. So `apart() = span · 1e-6` has three to four orders of margin over solver noise while remaining invisible on the canvas — it is a good occupancy tolerance and is now the only one.
+- **`CROSS_MIN_SINE = 1e-6`**, an angle of 5.7e-5 degrees. Two orders above the 6.65e-8 measured between two representations of one line, and far below any angle a student means. It answers *"are these the same line?"* and nothing else: two genuinely different lines meeting at a shallow angle cross far outside the drawing, which is an EXTENT question for `within`, and widening this constant to cover it would start calling distinct lines identical.
+
+**The fix.** Two named predicates beside `apart()`, in the module that already owns *what counts as the same thing here*: `angleSine(p, q)` (the normalised determinant) with `CROSS_MIN_SINE`, used by `meet()`; and `occupied(figure, at)`, relative, now used by **both** loops. Deleting the hard-coded `1e-6` is most of the change; the point is that the loops no longer hold two answers to one question.
+
+**Defect 3 is deliberately NOT here, and that is a scope decision worth stating.** The issue's plan also asked to refuse the typed «P נקודת החיתוך של הישר BD עם הישר BD». That sentence is [#1255](https://github.com/dcodish/geo_builder/issues/1255), which is **`needs-operator`**: refuse it, or read it as «P על הישר AB» and give the student the 1-DOF point they may actually have wanted? `parseIntersection`'s own docblock already parks it for the same reason. It is a question about what the sentence MEANS, not about a threshold, and building the refusal here would transcribe a ruling nobody has given. The split is clean and is the honest half of this issue: **the tool must never AUTHOR a meaningless given on the student's behalf** — fixed here, because `meet()` no longer returns a crossing for a line with itself — while what to do when the student writes one themselves stays with #1255.
+
+**Measured after.** On the twin line+segment figure, 0 self-crossing rings at every seed, where the surface previously offered them; a genuine two-segment crossing still offers exactly one ring; a point 3e-6 from a crossing on a span of 6 — inside the old guard's blind spot — now suppresses its ring, and moving the point away brings the ring back.
+
+**Consequences.** `engine/crossings.ts` (+`occupied`, +`angleSine`, +`CROSS_MIN_SINE`; `meet` and both loops rewired; two hard-coded tolerances deleted). `issue-1235-relative-crossing-tolerances.test.ts` (14): the self-crossing asserted as a **property of every offered ring** (`first !== second`) across eight seeds rather than as a ring count; an angular table stepping an order of magnitude either side of the bar, deliberately not ON it, since a row at exactly `1e-6` would lock floating-point rounding rather than the decision; the occupancy fixture with its **blind-spot precondition asserted first**, so it cannot quietly stop testing what it was built for; and the negative controls in both directions.
