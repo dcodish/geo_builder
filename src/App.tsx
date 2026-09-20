@@ -1085,6 +1085,12 @@ export default function App() {
             showCenters={showCenters}
             hidden={hiddenSet}
             onRename={rename}
+            // #238: the holder is a STEP ROW the student has no reason to connect to «האות כבר בשימוש» —
+            // selecting it lights it up through the machinery that already highlights a fact's objects.
+            onHighlightFact={(factId) => {
+              const held = facts.find((f) => f.id === factId);
+              if (held) useGeoStore.getState().select(groupKey(held));
+            }}
             onToggleHidden={toggleHidden}
             pointMenuText={{
               rename: t('pointMenu.rename'),
@@ -1092,6 +1098,8 @@ export default function App() {
               show: t('pointMenu.show'),
               apply: t('pointMenu.apply'),
               taken: t('pointMenu.taken'),
+              takenBy: t('pointMenu.takenBy'),
+              swapLetters: t('pointMenu.swapLetters'),
               bad: t('pointMenu.bad'),
             }}
             segStyle={segStyle}

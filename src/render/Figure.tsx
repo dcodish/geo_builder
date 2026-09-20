@@ -23,6 +23,13 @@ import { MathSvg } from './mathSvg';
 import { alignRotation, fitTransform, keepOrRefit, orient } from './transform';
 import type { Transform } from './transform';
 
+/** #238 — who holds a letter, as the HOST reports it (the store's `LetterHolder`, structurally). */
+export interface FigureLetterHolder {
+  factId: string;
+  utterance: string;
+  swappable: boolean;
+}
+
 export interface FigureProps {
   construction: Construction;
   positions: Map<Id, Vec>;
@@ -84,11 +91,16 @@ export interface FigureProps {
   /** Relabel a point (clicked on the canvas) — the host wires the store's `rename`; the result drives an
    *  inline note (e.g. the new letter is already taken). When provided (with `onToggleHidden`), points
    *  become clickable and open the edit menu. */
-  onRename?: (from: Id, to: Id) => { ok: boolean; reason?: string };
+  /** #238: a refused rename may name WHO holds the target letter. Typed structurally, like the rest of
+   *  this component's host callbacks, so the renderer stays a pure consumer with no store import. */
+  onRename?: (from: Id, to: Id) => { ok: boolean; reason?: string; holder?: FigureLetterHolder | null };
   /** Hide/show a point's label + dot (clicked on the canvas) — the host wires the store's `toggleHidden`. */
   onToggleHidden?: (id: Id) => void;
   /** Localised strings for the on-canvas point-edit menu (rename / hide / show / the no-op reasons). */
-  pointMenuText?: { rename: string; hide: string; show: string; apply: string; taken: string; bad: string };
+  pointMenuText?: { rename: string; hide: string; show: string; apply: string; taken: string; bad: string; takenBy?: string; swapLetters?: string };
+  /** #238: take the letter back from an orphaned construction, then rename onto it. */
+  /** #238: highlight the statement that holds a letter, so the refusal points at something visible. */
+  onHighlightFact?: (factId: string) => void;
   /** Per-segment display style (keyed by seg id) — hidden and/or dashed (FR-RN-10). */
   segStyle?: Record<Id, { hidden?: boolean; dashed?: boolean }>;
   /** Hide/show a segment (clicked on the canvas) — the host wires the store's `toggleSegHidden`. */
@@ -187,6 +199,7 @@ export function Figure({
   onRename,
   onToggleHidden,
   pointMenuText,
+  onHighlightFact,
   segStyle,
   onToggleSegHidden,
   onToggleSegDashed,
@@ -226,6 +239,8 @@ export function Figure({
   const [menu, setMenu] = useState<{ kind: 'point' | 'segment' | 'circle'; id: string; x: number; y: number } | null>(null);
   const [renameVal, setRenameVal] = useState('');
   const [menuNote, setMenuNote] = useState('');
+  /** #238: WHO holds the letter the student just tried to use, when the refusal knows. */
+  const [takenBy, setTakenBy] = useState<{ holder: FigureLetterHolder; to: string } | null>(null);
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   // The toolbar sits ABOVE the SVG in normal flow (never overlapping it — the "buttons hide the canvas"
@@ -255,13 +270,49 @@ export function Figure({
     setMenu({ kind, id, x: view.panX + screen.x * view.zoom, y: view.panY + screen.y * view.zoom });
     setRenameVal('');
     setMenuNote('');
+    setTakenBy(null);
   }
   function applyRename(id: string) {
     const to = renameVal.trim().toUpperCase();
     if (!to || !onRename) return;
     const res = onRename(id, to);
-    if (res.ok) setMenu(null);
-    else setMenuNote(res.reason === 'target-taken' ? (pointMenuText?.taken ?? 'taken') : (pointMenuText?.bad ?? ''));
+    setTakenBy(null);
+    if (res.ok) {
+      setMenu(null);
+      return;
+    }
+    if (res.reason !== 'target-taken') {
+      setMenuNote(pointMenuText?.bad ?? '');
+      return;
+    }
+    // #238 (ADR-520): «האות כבר בשימוש» with no way to see WHO held it was the dead end. Name the holder,
+    // quote the student's own wording back, and offer the letter back when taking it is safe.
+    setMenuNote(pointMenuText?.taken ?? 'taken');
+    setTakenBy(res.holder ? { holder: res.holder, to } : null);
+    if (res.holder && onHighlightFact) onHighlightFact(res.holder.factId);
+  }
+
+/**
+   * #1013 — THE OFFER EXCHANGES TWO LETTERS. IT NEVER DELETES A STATEMENT.
+   *
+   * It used to drop the holder and rename onto the freed letter, so «משולש ABC» · «נקודה D» ·
+   * «נקודה E» then D → E left FOUR points and no «נקודה D» — the student asked to re-letter one point
+   * and lost another. Operator ruling 2026-09-18: *"deleting a phase is a capability I do not want to
+   * have automatically done as users will not expect the consequences."*
+   *
+   * A swap destroys nothing, so the whole safety apparatus the delete needed stops being load-bearing.
+   * The offer is still shown only where the destructive one was (a plain point statement, never a
+   * shape) — deliberately NOT widened, because whether a shape-held letter should become swappable is
+   * an open ruling.
+   */
+  function swapLetters(id: string) {
+    if (!takenBy || !onSwap) return;
+    const res = onSwap(id, takenBy.to);
+    if (res.ok) {
+      setMenu(null);
+      setTakenBy(null);
+      setMenuNote('');
+    } else setMenuNote(pointMenuText?.bad ?? '');
   }
 
   const { scene, transform, crossings, labelDirs, oriented } = useMemo(() => {
@@ -1082,6 +1133,7 @@ export function Figure({
                       onChange={(e) => {
                         setRenameVal(e.target.value);
                         if (menuNote) setMenuNote('');
+                        if (takenBy) setTakenBy(null);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') applyRename(menu.id);
@@ -1095,6 +1147,19 @@ export function Figure({
                   </div>
                 )}
                 {menuNote && <div style={{ fontSize: 11, color: '#dc2626' }}>{menuNote}</div>}
+                {takenBy && (
+                  <div style={{ fontSize: 11, color: '#64748b', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {/* #238: the holder, in the student's OWN wording — a step row they can recognise. */}
+                    <span>{(pointMenuText?.takenBy ?? '{{what}}').replace('{{what}}', takenBy.holder.utterance)}</span>
+                    {takenBy.holder.swappable && onSwap && (
+                      <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => swapLetters(menu.id)}>
+                        {(pointMenuText?.swapLetters ?? 'swap {{a}} and {{b}}')
+                          .replace('{{a}}', menu.id)
+                          .replace('{{b}}', takenBy.to)}
+                      </button>
+                    )}
+                  </div>
+                )}
                 {onToggleHidden && (
                   <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onToggleHidden(menu.id); setMenu(null); }}>
                     {isHidden(menu.id) ? (pointMenuText?.show ?? 'show') : (pointMenuText?.hide ?? 'hide')}
@@ -1229,7 +1294,21 @@ const toolbarTray: CSSProperties = {
   padding: 4,
   boxShadow: '0 1px 4px rgba(15,23,42,0.06)',
 };
-const ctrlBtn: CSSProperties = {
+export const ctrlBtn: CSSProperties = {
+  /**
+   * The COLOUR IS DECLARED, because a button inherits it (#1277).
+   *
+   * Operator, playing #1010: *"the button is grayed so user might think this option is not available"*.
+   * Measured in the running app: the swap offer computed `#64748b` — `--color-text-muted`, the token for
+   * inactive text — while the button two rows below it computed `--color-text`. Nothing was disabled;
+   * the swap button sits inside the holder note's muted block and inherited it.
+   *
+   * Declaring the colour fixes the CLASS rather than that button: any control nested in a coloured block
+   * keeps the menu's own text colour. And it must be declared rather than left to cascade, because
+   * whether a `<button>` inherits `color` at all is UA behaviour this code does not control — measured,
+   * a bare button inherits here and does not on a plain page with the same markup.
+   */
+  color: 'var(--color-text)',
   padding: '5px 9px',
   fontSize: 13,
   lineHeight: 1.2,
