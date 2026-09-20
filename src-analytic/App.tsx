@@ -696,6 +696,7 @@ export function App() {
                 }[error.expected]
               : 'errUnknownRef',
           'does-not-exist': 'errDoesNotExist',
+          'ring-contradicts-noun': 'errRingContradictsNoun',
           'ambiguous-angle': 'errAmbiguousAngle',
           'ambiguous-shape': 'errAmbiguousShape',
           'undistinguished-diagonal': 'errNoPrincipalDiagonal',

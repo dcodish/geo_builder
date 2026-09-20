@@ -1181,8 +1181,21 @@ Rejecting either of the two right-hand cases would assert a given the student ne
 the same cardinal sin as drawing a figure that violates its givens ([ADR-052](06-decisions.md#adr-052)).
 
 **Where the student's own coordinates force a bad ring** — four pinned points written in an order
-that crosses — the figure is determined and there is no configuration to choose. That case is
-[#1170](https://github.com/dcodish/geo_builder/issues/1170) and is not yet answered.
+that crosses, or three collinear points called a triangle — **the line is refused**
+([ADR-AG-129](06c-decisions-analytic.md#adr-ag-129) ·
+[#1170](https://github.com/dcodish/geo_builder/issues/1170)). The figure is determined, so there is no
+configuration to choose and nothing the tool can do to honour the noun. Operator ruling, 2026-09-17,
+having been offered draw-with-a-notice instead: refuse it.
+
+The refusal is about the RING and names the statement the student wrote, never a search that failed —
+on a determined figure there was only ever one configuration, so «לא נמצאה תצורה» would not be a true
+sentence. It points at the two things the student can change: the order of the letters, or the
+coordinates.
+
+**One line gets one message, and the more specific one wins.** «P מפגש האנכים האמצעיים במשולש ABC» on
+three collinear points declares the triangle and asks for its circumcentre at once; it keeps R-level
+ADR-AG-008’s answer — the circumcentre is what was asked for and it is what does not exist — and gains
+no second refusal beside it.
 
 **R92 — a point may be NAMED before it is PLACED**
 ([#1136](https://github.com/dcodish/geo_builder/issues/1136)).

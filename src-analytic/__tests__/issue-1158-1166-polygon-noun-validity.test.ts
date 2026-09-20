@@ -189,9 +189,15 @@ describe('#1158/#1166 — a declared polygon is drawn as the ring its noun promi
    * it collides with three `derived.test.ts` locks encoding ADR-AG-008's answer, so it was withdrawn
    * to #1170 rather than gated on a judgement this round is not entitled to make.
    *
-   * These two assert the CURRENT answer rather than the desired one — so when #1170 is ruled, the
-   * change is deliberate and visible here instead of drifting. `ringViolation` still SEES the
-   * violation; nothing reports it.
+   * **#1170 IS NOW RULED, and these two changed with it** (operator, 2026-09-17: *refuse the line*;
+   * ADR-AG-129). They asserted the CURRENT answer rather than the desired one precisely so that this
+   * moment would be deliberate and visible here instead of drifting, which is what happened: the
+   * `ringFaults` half is untouched — the seam has seen these since #1158/#1166 — and only the
+   * `faults` line moves, from silence to the refusal.
+   *
+   * They stay in this file rather than moving to #1170's own, because what they lock is still this
+   * fix's boundary: the configuration search may not CHOOSE a bad ring, and a ring the student
+   * pinned was never the search’s to choose.
    */
   it('#1170 boundary: a pinned crossed quad is still drawn, and the seam can see it', () => {
     const lines = ['מרובע ABCD', 'A(0,0)', 'B(1,0)', 'C(0,1)', 'D(1,1)'];
@@ -199,8 +205,8 @@ describe('#1158/#1166 — a declared polygon is drawn as the ring its noun promi
     expect(d.figure.ringFaults).toEqual([
       { id: 'poly-ABCD', noun: 'מרובע', violation: 'crossed' },
     ]);
-    // Not reported today. #1170 carries the ruling; when it lands, this line is what changes.
-    expect(d.faults).toEqual([]);
+    // #1170/ADR-AG-129: refused, on the line that named the shape.
+    expect(d.faults).toEqual([{ index: 0, code: 'ring-contradicts-noun', detail: 'מרובע ABCD' }]);
   });
 
   it('#1170 boundary: a pinned collinear triangle, likewise', () => {
@@ -209,7 +215,7 @@ describe('#1158/#1166 — a declared polygon is drawn as the ring its noun promi
     expect(d.figure.ringFaults).toEqual([
       { id: 'poly-ABC', noun: 'משולש', violation: 'degenerate' },
     ]);
-    expect(d.faults).toEqual([]);
+    expect(d.faults).toEqual([{ index: 0, code: 'ring-contradicts-noun', detail: 'משולש ABC' }]);
   });
 
   /**

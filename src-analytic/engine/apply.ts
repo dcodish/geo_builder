@@ -62,6 +62,23 @@ export type ApplyErrorCode =
    */
   | 'does-not-exist'
   /**
+   * The student PINNED the coordinates, and in that order they do not make the shape they named
+   * (#1170) — «A(0,0) B(4,0) C(1,1) D(1,0)» then «מרובע ABCD», where A, D and B are collinear so
+   * the "quadrilateral" is a triangle with a spare vertex; or four pinned points written in a
+   * bow-tie order, where the ring crosses itself.
+   *
+   * Distinct from every neighbour above. `unsatisfiable` is a given the solve could not MEET, and
+   * there is nothing here the solve failed at — the figure is exactly what was asked for.
+   * `does-not-exist` is a construct with no answer in this figure. This one is the NOUN: a shape
+   * word promises a ring, and these points are not that ring.
+   *
+   * It fires only where `reportedDof === 0`. With the polygon-noun preference inside the
+   * configuration search (ADR-AG-080), a figure that still has freedom never arrives carrying a
+   * ring fault — it found a valid configuration. So this is always about coordinates the student
+   * wrote, never about a search that ran out.
+   */
+  | 'ring-contradicts-noun'
+  /**
    * «זווית B ישרה» where the vertex alone does not name an angle (#1049).
    *
    * A vertex names an angle only when the figure says which two rays meet there. With no shape
