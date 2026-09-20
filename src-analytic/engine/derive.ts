@@ -102,7 +102,9 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
    * extended, and drawing that figure while another has the point is a poor choice rather than an
    * honest one.
    */
-  let figure = drawableAt(construction, seed);
+  // THE DISPLAYED figure asks for the spread preference (#1174): among the configurations that may
+  // be drawn, open on one that is not a sliver. Every honesty gate calls `drawableAt` without it.
+  let figure = drawableAt(construction, seed, true);
 
   /**
    * A selector that can NEVER hold is reported — the docblock above has always said so, and nothing

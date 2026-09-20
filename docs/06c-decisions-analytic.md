@@ -6751,3 +6751,38 @@ A student writing a sentence is refused; the same student writing the symbolic f
 **Measured after.** Every copula spelling builds the identical figure to its `=` twin. Every bound — «גדול מ», «קטן מ», «לפחות», «לכל היותר», `>`, «פי 2» — is still not an equality and still commits no `AB = 10`. «AD הוא תיכון לצלע BC», «M הוא אמצע AB», «שיפוע AB הוא 2», «הישר l1 הוא y=2x+1» are all still read by their own rules, and both area readings are exactly what they were before.
 
 **Consequences.** `src-analytic/parser/parseAnalytic.ts` (+`COPULA_WORDS`, `HE_IS` derived from it, `LENGTH_EQ` widened, the precedence guard). `issue-1260-length-copula.test.ts` (39): the copula spellings asserted as EQUAL to the `=` form rather than as spelled-out expectations, on the parse and on the built figure; #1128's spelling table finished with a copula; the six bound rows as the #1248 regression, one tree over; the four neighbouring rules; and the area guard from both sides — the polygon declaration kept, and #1075's area term not taken. `shell/__tests__/length-copula-parity.test.ts` (14) is the drift net the duplication needs: it reads each tree's real pattern out of its source and runs it, so the two trees cannot come to disagree about what "is" means. The vocabulary is duplicated rather than shared because the `lexicon` layer's cross-product sharing is recorded UNDECIDED in `BOUNDARIES.json` (ADR-W-003), and `shell/` may not import a product tree in any case (ADR-W-016 rule 2).
+## ADR-AG-128 — The configuration search PREFERS spread, it does not merely accept validity (#1174)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1174 (bug, P2, `analytic`) · operator reports 2026-09-17, twice, on two different figures · round #1292
+**Requirements:** [02c](02c-requirements-analytic.md) — the configuration shown · **Design:** [04c](04c-design-analytic.md)
+**Completes** [ADR-AG-080](#adr-ag-080)/#1166, which ruled this residue *"a seed preference, in the `spread.ts` mould"* and left it out of scope
+
+**The report.** *"still too close to a straight line and there is no reason we need to do this — so many other configs that will look nicer"* — and again, on the next figure, about the next three presses of «הציגו תצורה אחרת». A defect that interrupts a play pass twice is costing more than its P2 suggests.
+
+**Root cause.** `drawableAt`'s `whole()` is a VALIDITY predicate — selectors hold · nothing vacant · no ring contradicts its noun. It answers *may this be drawn*, and among the many configurations that may be, the function took **the first**. There was no notion of one drawable configuration being better than another, so the sampler's luck was presented as the answer. 2-D solved exactly this in `spread.ts` (#194, ADR-474) and that module is 2-D's alone; this tree had no preference of any kind.
+
+**Measured before, minimum interior angle of `ABC` over seeds 0–7:**
+
+```
+«משולש ABC» «A(2,-5)» «AD תיכון לצלע BC»           1.4  2.3 14.9 25.4 14.1 18.2 25.4  1.9
+…plus «CE תיכון לצלע AB» and their meeting point   2.3  2.4  6.6 19.7 12.2 32.7  9.3  5.4
+«משולש ABC» alone                                 15.9 21.1 29.1 13.8 35.3 22.5 12.3 30.8
+```
+
+He opened on 1.4° and on 2.3°, with 25.4° and 19.7° two seeds away. Nothing forced any of it.
+
+**The fix.** A fourth tier above validity in the existing budgeted sweep, so canvas, «הציגו תצורה אחרת» and every consumer of the displayed figure are corrected at one chokepoint:
+
+```
+preferred = whole AND well-spread   → take the first
+otherwise = whole                    → today's answer
+otherwise = selectors hold           → the existing fallback
+```
+
+`minInteriorAngleOf` lives in `rings.ts` beside `ringFaultsOf`, over the same polygon enumeration, because it is the same question asked at a different strength — and that module's header already draws the line this ADR depends on: *"a 3° triangle is ugly but TRUE"*. `SPREAD_MIN_DEG = 15` carries its measurement in its own docblock: reachable in all three figures inside the existing 24-seed budget, while still excluding every sliver reported.
+
+**The honesty boundary, which is the whole risk of this change.** `isKnowledge`, `knownOptions` and the locus determinacy gate ask what holds across the configurations the tool would ADMIT. Narrowing that pool to the pretty ones would let the tool claim knowledge it does not have — the one way a cosmetic preference becomes an honesty bug. So `preferSpread` is a parameter that **defaults to `false`**: a caller added later inherits the honest behaviour and has to ask for the other. Only `derive` — the figure on the canvas, and through it the «הציגו תצורה אחרת» walk — asks for it. The drawable cache is keyed by mode as well as by seed, so whichever caller runs first cannot decide what the other sees.
+
+**Measured after.** Seed 0 opens on 25.4° · 19.7° · 15.9°, and all of seeds 0–7 clear 15° on all three figures. A pinned 1°-triangle («A(0,0)» «B(10,0)» «C(5,0.1)» «משולש ABC») is still drawn, unmoved and without a fault — the preference never becomes a requirement. «הציגו תצורה אחרת» still walks **ten distinct configurations** in ten presses on each free figure, and a determined figure still answers honestly that there is no other one: the preference narrows what may be shown without collapsing the variety, which is the #1282 failure this could otherwise have reproduced.
+
+**Consequences.** `engine/rings.ts` (+`minInteriorAngleOf`, +`SPREAD_MIN_DEG`); `engine/evaluate.ts` (`drawableAt` gains the opt-in parameter, a mode-keyed cache and the fourth tier); `engine/derive.ts` (one call opts in). `issue-1174-spread-preference.test.ts` (16): the three figures well-spread at every one of the first eight starts; **the un-preferred sweep asserted to still find the sliver**, so the lock cannot go vacuous if a later change happens to make seed 0 pretty on its own; the forced sliver still drawn; the gate's default asserted to be the un-preferred answer and a free coordinate still reported unknown; and the variety measured as distinct pictures rather than as a seed list.

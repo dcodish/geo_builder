@@ -18,7 +18,7 @@ import { evalExpr, type Env } from './expr';
 import { pairKey, pinnedLengths } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
-import { ringFaultsOf, type RingFault } from './rings';
+import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, type RingFault } from './rings';
 import { dirVector, freeRank, residual, resolveChoices, solveLM, type Constraint } from './solve';
 import { inDomain, isFree, objectById, type Construction, type Domain, type Id, type CurveLabel, type NumCurve } from './types';
 
@@ -915,7 +915,10 @@ const DRAWABLE_TRIES = 24;
  * Per construction, the drawable figure at each seed. The panel asks per coordinate per point, and
  * each answer may now cost several evaluations, so the work is done once.
  */
-const drawableCache = new WeakMap<Construction, Map<number, Figure>>();
+// Keyed by seed AND by whether the spread preference was applied (#1174): the two modes answer
+// differently for the same seed, and sharing one cache would let whichever caller ran first
+// decide what the other one sees.
+const drawableCache = new WeakMap<Construction, Map<string, Figure>>();
 
 /**
  * The figure the tool would SHOW at this seed (#1083).
@@ -936,13 +939,30 @@ const drawableCache = new WeakMap<Construction, Map<number, Figure>>();
  * Falls back to the raw figure when nothing in the budget holds — the same thing `derive` shows,
  * for the same reason: a figure is still drawn, and the gate must judge THAT one.
  */
-export function drawableAt(c: Construction, seed: number): Figure {
+export function drawableAt(
+  c: Construction,
+  seed: number,
+  /**
+   * Prefer a WELL-SPREAD configuration among the valid ones (#1174).
+   *
+   * **Default `false`, deliberately.** This preference must never reach `isKnowledge`,
+   * `knownOptions` or the locus determinacy gate: those ask what is true across the configurations
+   * the tool would ADMIT, and narrowing that pool to the pretty ones would let the tool claim
+   * knowledge it does not have — the one way this change can become an honesty bug. Defaulting to
+   * off means a caller added later inherits the honest behaviour and has to ask for the other.
+   *
+   * The DISPLAY callers ask for it: `derive` (the figure on the canvas) and the walk behind
+   * «הציגו תצורה אחרת».
+   */
+  preferSpread = false,
+): Figure {
   let perSeed = drawableCache.get(c);
   if (!perSeed) {
     perSeed = new Map();
     drawableCache.set(c, perSeed);
   }
-  const hit = perSeed.get(seed);
+  const key = `${seed}:${preferSpread ? 1 : 0}`;
+  const hit = perSeed.get(key);
   if (hit) return hit;
 
   /**
@@ -974,25 +994,47 @@ export function drawableAt(c: Construction, seed: number): Figure {
    * ZERO starts with none inside `DRAWABLE_TRIES`, so the budget did not need raising.
    */
   const whole = (f: Figure) => f.selectorsOk && f.vacant.length === 0 && f.ringFaults.length === 0;
+  /**
+   * …and, for the display callers only, a FOURTH term above validity (#1174).
+   *
+   * `whole` answers *may this be drawn*. Among the many configurations that may be, this function
+   * used to take the FIRST — so the sampler’s luck was presented as the answer, and the operator
+   * twice stopped a play pass to report a near-flat triangle with a 25° one two seeds away.
+   *
+   * It is a PREFERENCE and never a requirement: every tier below it still applies, so a figure whose
+   * givens genuinely force a tight wedge is still drawn (ADR-052 — a valid configuration must stay
+   * reachable). It only decides which of several equally valid drawings is opened on.
+   */
+  const spread = (f: Figure) =>
+    minInteriorAngleOf(c, (id) => {
+      const p = f.points.find((q) => q.id === id);
+      return p ? { x: p.x, y: p.y } : undefined;
+    }) >= SPREAD_MIN_DEG;
+  const preferred = (f: Figure) => whole(f) && (!preferSpread || spread(f));
 
   const first = evaluate(c, seed);
   let chosen = first;
+  // The tiers, weakest last: a whole figure that is merely narrow still beats one with a vacancy,
+  // which still beats one that fails a selector outright.
+  let wholeFallback: Figure | null = whole(first) ? first : null;
   let fallback: Figure | null = first.selectorsOk ? first : null;
-  if (!whole(first)) {
+  if (!preferred(first)) {
     for (let extra = 1; extra <= DRAWABLE_TRIES; extra += 1) {
       const candidate = evaluate(c, seed + extra);
-      if (whole(candidate)) {
+      if (preferred(candidate)) {
         chosen = candidate;
         fallback = candidate;
+        wholeFallback = candidate;
         break;
       }
+      if (!wholeFallback && whole(candidate)) wholeFallback = candidate;
       // Second best: the selectors hold and something the student named is missing. Remembered, so a
       // figure with a vacancy still beats one that fails a selector outright.
       if (!fallback && candidate.selectorsOk) fallback = candidate;
     }
-    if (!whole(chosen) && fallback) chosen = fallback;
+    if (!preferred(chosen)) chosen = wholeFallback ?? fallback ?? chosen;
   }
-  perSeed.set(seed, chosen);
+  perSeed.set(key, chosen);
   return chosen;
 }
 /**
