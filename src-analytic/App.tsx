@@ -36,6 +36,7 @@ import { domainText, positionalOf } from './engine/types';
 import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
 import { drawnBox as composeDrawnBox } from './app/drawnBox';
 import { SYMBOLS } from './ui/symbols';
+import { logAnalytic, logAnalyticFigure } from './debug/sessionLogAnalytic';
 import { exprText } from './engine/expr';
 import { MathText, hasMath } from '../shell/math';
 import { Banner } from '../shell/frame/Banner';
@@ -238,6 +239,15 @@ export function App() {
         total: savedLines.length,
         failed: replayed.faults.map((f) => ({ line: savedLines[f.index] ?? '', reason: f.code })),
       });
+      // #1300 — a load REPLACES the figure, so a replay that misses it continues from the wrong one. The
+      // audit's own result rides along: a file that stopped loading is the parser-drift signal this trace
+      // exists to make visible.
+      logAnalytic({
+        kind: 'action',
+        action: 'load',
+        detail: `${savedLines.length} lines`,
+        result: replayed.faults.length ? `${replayed.faults.length} failed` : 'ok',
+      });
     });
   };
 
@@ -386,6 +396,7 @@ export function App() {
   const showWholeFigure = () => setView(INITIAL_VIEW);
 
   const clearSession = () => {
+    logAnalytic({ kind: 'action', action: 'clear' });
     clearAll();
     setDraft('');
     setAskText('');
@@ -403,6 +414,22 @@ export function App() {
   const [showConstruction, setShowConstruction] = useState(false);
 
   const d = useMemo(() => derive(lines, seed), [lines, seed]);
+
+  /**
+   * THE FIGURE SNAPSHOT (#1300) — the sibling effect, over this product's own source of truth.
+   *
+   * 2-D and 3-D snapshot their fact lists with per-fact statuses. Here the session IS the line list
+   * (`store/useAnalyticStore.ts`: *"lines as the source of truth"*), and the figure is replayed from it, so
+   * the lines plus the seed plus the per-line faults are a complete reconstruction — nothing derived needs
+   * storing, which is the same property that makes a save file a parser-drift net.
+   *
+   * The effect's dependency list is NOT what keeps this to one line per change — `logAnalyticFigure` dedupes
+   * on the payload itself, because StrictMode's double-invoke and ordinary re-renders both re-fire this and
+   * neither is a figure change. Measured: three identical snapshots per change before the dedupe.
+   */
+  useEffect(() => {
+    logAnalyticFigure({ seed, lines, faults: d.faults, outcomes: d.outcomes });
+  }, [d, lines, seed]);
 
   /**
    * THE ANSWERS ARE DERIVED (#1110), never stored.
@@ -547,6 +574,28 @@ export function App() {
    */
   const submit = (raw: string) => {
     const verdict = decideSubmit(raw, lines, seed, d);
+    /**
+     * THE TRACE (#1300) — one line per submitted utterance, including the ones that fail.
+     *
+     * Logged from the verdict rather than from each branch below, so a new verdict kind cannot be added
+     * without appearing here: the switch is exhaustive and this reads its result. `intermediate` marks the
+     * parser step of a submission that is about to escalate, so a reader (and any future analytics) does
+     * not count one utterance twice — the sibling rule, and the reason `sessionLog3` carries the flag.
+     *
+     * `ignored` is the ONE kind that writes nothing: it means the box was blank, so there is no utterance
+     * and no student action to reconstruct — a stray Enter is not an event. Every other kind is recorded,
+     * including all the refusals, which are the ones a report is usually about.
+     */
+    if (verdict.kind !== 'ignored') {
+      logAnalytic({
+        kind: 'input',
+        utterance: raw,
+        locale: i18n.language,
+        source: 'parser',
+        result: verdict.kind === 'refused' ? verdict.error.key : verdict.kind,
+        ...(verdict.kind === 'refused' && verdict.error.key === 'not-handled' ? { intermediate: true } : {}),
+      });
+    }
     switch (verdict.kind) {
       case 'ignored':
         return;
@@ -595,6 +644,23 @@ export function App() {
       const out = await runFallback(raw, lines, seed, (utterance, context) =>
         llmParseAnalytic(utterance, context, { signal: ctl.signal }),
       );
+      /**
+       * THE ESCALATION'S OUTCOME (#1300) — the event that could not be answered when #1297 was triaged.
+       *
+       * The model's own LINES are what make this worth logging: a `source:'llm'` event without them says
+       * only that a call happened, and the question a report actually asks is *what did the model say*.
+       * #1297 (English canonical lines) and #1278 (English prose) are both invisible without this field.
+       */
+      logAnalytic({
+        kind: 'input',
+        utterance: raw,
+        locale: i18n.language,
+        source: 'llm',
+        result: out.kind,
+        ...(out.kind === 'lines' ? { steps: out.lines } : {}),
+        ...(out.kind === 'rejected' ? { steps: [out.refusedStep] } : {}),
+        ...(out.kind === 'busy' ? { why: out.why } : {}),
+      });
       if (out.kind === 'lines') {
         for (const l of out.lines) recordLine(l);
         setDraft('');
@@ -902,10 +968,15 @@ export function App() {
                 const i = Number(id);
                 const trial = derive(lines.map((l, j) => (j === i ? next : l)), seed);
                 if (trial.faults.some((f) => f.index === i)) return false;
+                // #1300 — an edit rewrites a line in place, so a replay without it diverges silently.
+                logAnalytic({ kind: 'action', action: 'edit', detail: `${i}:${next}` });
                 replaceLine(i, next);
                 return true;
               }}
-              onDelete={(id) => removeLine(Number(id))}
+              onDelete={(id) => {
+                logAnalytic({ kind: 'action', action: 'delete', detail: lines[Number(id)] ?? id });
+                removeLine(Number(id));
+              }}
               footer={
                 /* CLEAR-ALL MOVED to the under-canvas row (#1098) — it acts on the figure, like
                    undo/redo, and #739 made that call for complex for the same reason. What stays
@@ -1077,6 +1148,9 @@ export function App() {
                  * freedom. When nothing differs, saying so beats redrawing in silence.
                  */
                 const next = anotherConfiguration(lines, seed);
+                // #1300: the seed IS the configuration, so a replay that loses this press redraws a
+                // different figure from the one the report is about.
+                logAnalytic({ kind: 'action', action: 'show-another', detail: next.found ? next.seed : 'none' });
                 if (next.found) goToSeed(next.seed);
                 else setNotice(t('noticeOnlyConfiguration'));
               }}
@@ -1095,10 +1169,26 @@ export function App() {
 
             <span style={rowSpacerStyle} />
 
-            <button type="button" style={canUndo ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canUndo} onClick={undo}>
+            <button
+              type="button"
+              style={canUndo ? rowSubtleStyle : rowSubtleOffStyle}
+              disabled={!canUndo}
+              onClick={() => {
+                logAnalytic({ kind: 'action', action: 'undo' }); // #1300
+                undo();
+              }}
+            >
               {t('undo')}
             </button>
-            <button type="button" style={canRedo ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canRedo} onClick={redo}>
+            <button
+              type="button"
+              style={canRedo ? rowSubtleStyle : rowSubtleOffStyle}
+              disabled={!canRedo}
+              onClick={() => {
+                logAnalytic({ kind: 'action', action: 'redo' }); // #1300
+                redo();
+              }}
+            >
               {t('redo')}
             </button>
             {/* Clear-all wears the danger tone over the subtle shape, and sits HERE rather than on

@@ -6852,3 +6852,43 @@ if (Math.abs(det) < 1e-12) return null; // parallel, or the same line
 **Measured after.** On the twin line+segment figure, 0 self-crossing rings at every seed, where the surface previously offered them; a genuine two-segment crossing still offers exactly one ring; a point 3e-6 from a crossing on a span of 6 — inside the old guard's blind spot — now suppresses its ring, and moving the point away brings the ring back.
 
 **Consequences.** `engine/crossings.ts` (+`occupied`, +`angleSine`, +`CROSS_MIN_SINE`; `meet` and both loops rewired; two hard-coded tolerances deleted). `issue-1235-relative-crossing-tolerances.test.ts` (14): the self-crossing asserted as a **property of every offered ring** (`first !== second`) across eight seeds rather than as a ring count; an angular table stepping an order of magnitude either side of the bar, deliberately not ON it, since a row at exactly `1e-6` would lock floating-point rounding rather than the decision; the occupancy fixture with its **blind-spot precondition asserted first**, so it cannot quietly stop testing what it was built for; and the negative controls in both directions.
+
+## ADR-AG-131 — The analytic tool gets a session trace, and the shared sink routes by REGISTRY (#1300)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1300 (debt, P2, `analytic`)
+**Requirements:** none (internal — dev tooling; nothing the product promises changes) · **Design:** [04c](04c-design-analytic.md)
+
+**The report.** Operator, 2026-09-20: *"why dont we have a log for this tool. this is important for debug so add it"*.
+
+**The cost, an hour earlier and concrete.** Triaging #1297 — *the LLM fallback answered in English* — nothing could establish what he had typed. `logs/` held `debug-log.jsonl` (2-D) and `debug-log-3d.jsonl` (3-D) and nothing for analytic; the tool is not deployed ([ADR-AG-007](#adr-ag-007)) so there was no prod event either. His utterance had to be inferred from the SHAPE of his fact list and then confirmed by asking him. With 39 open analytic issues, the most active product in the queue was the only one whose sessions could not be replayed.
+
+**What was already there.** The sink is shared and already mounted for every dev app: `server/logProxy.ts` serves `POST /api/log`, and `vite.config.ts` mounts it for all four entry points. Missing were a client in `src-analytic/` and a routing entry for a third tool.
+
+**The routing defect this had to fix on the way past — and why a third ternary arm was the wrong shape.**
+
+```ts
+await appendFile(obj.tool === '3d' ? path.join(logDir, 'debug-log-3d.jsonl') : logPath, line, 'utf8');
+```
+
+A two-way branch on product identity with **2-D as the ELSE**, which is [ADR-W-003](06w-decisions-workspace.md)'s *"branching on product identity inside a shared module is a fork wearing a shared file's name"*. The style is not the point; the `else` is. **An unknown or mistyped tool tag was appended to `debug-log.jsonl`** — the file `src/__tests__/scenarios-corpus-*.ts`, `src/theorems/audit.ts` and the log-triage skill all read as genuine 2-D user data. A new product posting a tag this file did not know would have poisoned the 2-D triage corpus with sentences from a different grammar, silently. So: a `TOOL_LOGS` registry, an **unknown tool REFUSED** (400, written nowhere), and an ABSENT tag mapping to 2-D as the one documented back-compat case — `src/debug/sessionLog.ts` has never tagged its events and does not need to start. `complex` is in the registry although that tree has no client; the entry costs one line and its absence is what would make the fifth product repeat this.
+
+**No production sink, deliberately.** Both siblings carry a second, lean analytics sink for the admin dashboard. This module has none: analytic is **not deployed**, so building that half now would ship an untested path to an endpoint that does not exist, feeding a dashboard with no data. `logAnalytic` returns early outside DEV, and that early return is the whole production posture — which is why it has its own lock. When analytic deploys, the prod sink is separate, sized work; `server/admin.ts` already carries the label it will need.
+
+**The defect found by LOOKING, which is the part worth recording.** The module went live on the operator's own running dev server (Vite restarted on the config dependency change) and the first trace it produced showed **three identical figure snapshots per single change** — one pair sharing a millisecond (React `StrictMode` double-invokes effects in dev), further copies seconds apart from re-renders that changed nothing. A trace that triples its most voluminous event is harder to read than no trace. The fix is `logAnalyticFigure`, deduping on the payload's **content** rather than on the effect's dependency list: a `useMemo` identity is a React implementation detail that StrictMode, a remount and a discarded memo cache can each churn independently, so a component-side guard would have had to be right about all three. *"Is this the same figure I last recorded?"* is the question the log actually has, and it is answerable in one place. This was measured, not predicted — the unit tests were green before it was found.
+
+**Measured after**, driving the real page through Playwright with `/api/parse` **aborted at the browser** so standing rule 2 was not touched (2 escalations blocked, 0 calls made):
+
+```
+FIGURE seed=0 lines=[]
+INPUT  parser not-handled  intermediate=true  | משוואת ישר 1 היא 2x-y+8=0
+INPUT  llm    none                            | משוואת ישר 1 היא 2x-y+8=0
+INPUT  parser record                          | נתון הישר l1: 2x-y+8=0
+FIGURE seed=0 lines=['נתון הישר l1: 2x-y+8=0']
+INPUT  parser not-handled  intermediate=true  | נקודה (-2,4) נמצאת על ישר 3
+INPUT  llm    none                            | נקודה (-2,4) נמצאת על ישר 3
+ACTION show-another none
+```
+
+One figure line per real change; the escalation recorded as a joinable PAIR; Hebrew stored intact (verified on the file's bytes, not on a console that cannot print it). This is exactly the record #1297 could not obtain. Incidentally it confirms #1296 independently: the stored utterance is `נקודה (-2,4) נמצאת על ישר 3`, minus in the right place — that defect is display-only.
+
+**Consequences.** `server/logProxy.ts` (+`TOOL_LOGS`, +`logFileFor` exported so its lock CALLS it, the `else` deleted, the unknown tag refused). `src-analytic/debug/sessionLogAnalytic.ts` (new — copied from `sessionLog3.ts`, never imported: product trees do not import each other). `src-analytic/App.tsx` (+the submit trace read off the exhaustive verdict, so a new verdict kind cannot skip it; +the escalation outcome WITH the model's steps, the field #1297 needed; +the deduped figure effect; +the seven store actions a replay needs). `issue-1300-log-routing.test.ts` (5): the mapping, the distinctness, the **unknown-tag rejection** — the row a future third ternary arm would break while satisfying all the others — and the absent-tag back-compat case asserted as deliberate. `issue-1300-session-log.test.ts` (8): the DEV guard on both entry points, the `tool` tag, the escalation pair as the acceptance case, the content dedupe with its precondition asserted first, and both of `fetch`'s failure modes since the module guards them separately.

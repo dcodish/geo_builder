@@ -1120,3 +1120,40 @@ precisely why the correction #1084 made for the button never reached the gate.
 
 The tolerance is untouched: the defect was never that the spread was measured too finely, it was that
 there was no spread to measure.
+
+## The session trace ([ADR-AG-131](06c-decisions-analytic.md#adr-ag-131))
+
+`src-analytic/debug/sessionLogAnalytic.ts` fire-and-forgets one JSON line per event to the shared Vite dev
+plugin (`server/logProxy.ts`) at `${BASE_URL}api/log`, tagged `tool:'analytic'`, which routes it to
+`logs/debug-log-analytic.jsonl`. **Dev only** — the tool is not deployed ([ADR-AG-007](06c-decisions-analytic.md#adr-ag-007)),
+so unlike its 2-D and 3-D siblings this module has no production analytics sink, and the `import.meta.env.DEV`
+early return is the whole of that posture.
+
+**What it records, and why that set is a complete reconstruction.** The session here IS the line list — the
+store's source of truth is `(lines, seed)` and the figure is replayed from it — so nothing derived needs
+storing:
+
+| kind | carries |
+| --- | --- |
+| `input` | the utterance, the locale, `source: 'parser' \| 'llm'`, the verdict as `result`, `intermediate` on a parser step that is about to escalate, and on the LLM path the **steps the model returned** |
+| `figure` | `seed`, `lines`, the per-line `faults` and `outcomes` |
+| `action` | `clear`, `undo`, `redo`, `show-another` (with the resulting seed), `edit`, `delete`, `load` (with the audit's result) |
+
+A blank submit writes nothing — there is no utterance to reconstruct, and a stray Enter is not an event.
+
+One submitted utterance that escalates produces a joinable PAIR — the `intermediate` parser refusal and the
+`llm` outcome — so a reader never counts it twice and can always see what the model actually said.
+
+**The figure snapshot is deduped by CONTENT**, in `logAnalyticFigure`, not by the effect's dependency list:
+`StrictMode`'s double-invoke, a remount and a discarded `useMemo` cache each re-fire the effect without the
+figure changing, and the first version wrote three identical snapshots per change on the operator's own
+session. The log's question is *"is this the same figure I last recorded?"*, and it is answered once.
+
+**The sink routes by registry.** `logFileFor` maps a tool tag to its file; an **unknown tag is refused** and
+written nowhere, because the previous two-way branch fell back to `debug-log.jsonl` — the corpus the 2-D
+scenario suite, the theorem audit and the log-triage skill all read as real user data. An ABSENT tag still
+means 2-D: `src/debug/sessionLog.ts` has never tagged its events, and that is back-compat rather than a
+default.
+
+Logging is best-effort throughout: it never throws and never blocks a submit. A logger that can break the
+app is worse than no logger.
