@@ -547,3 +547,38 @@ imports nothing and exists so the grammar and the display cannot drift about a m
 exactly that here: `stated` first shipped as `dir: 'ltr'`, since its rows are pure LTR and pinning them
 looks obviously right. That is the list-wide override #559 exists to prevent; the bidi layer places an
 LTR run inside an RTL base correctly, and a section that decides for itself is how that stopped.
+
+## The input preview composes, and who may import whom (#1195, [ADR-3D-255](06b-decisions-3d.md#adr-3d-255))
+
+The strip under the input box is built by composing two independent transforms, in this order:
+
+1. **bidi isolation** (`i18n/bidi.isolateLtrRuns3`) — decides the runs;
+2. **notation** (`render/notation.vectorNotation`) — draws the arrow over a pair.
+
+Order matters and is the same rule #1152 set for the mathematics strip: the isolate characters ride
+through the notation untouched, while the reverse could reorder the equation, which is what the strip
+exists to prevent.
+
+**The composition lives in `render/notation.ts`, not in `i18n/bidi.ts`.** `i18n/bidi.ts` imports
+**nothing** — it is a leaf, which is what lets `parser/`, `engine/` and `render/` all depend on it — so
+having it reach into `render` would invert the dependency. `render` already depends downward on `i18n`
+and `lexicon`, so the composed function sits there, beside `factDisplay3`, which is also the function
+its lock compares against.
+
+| layer | imports | why |
+| --- | --- | --- |
+| `lexicon/marks3` | nothing | the marking vocabulary, readable by grammar and display alike (#1194) |
+| `i18n/bidi` | nothing | the isolation transform, a leaf for the same reason |
+| `render/notation` | `lexicon`, `i18n` | composes both; the display layer is the consumer |
+
+**Three gates, three different questions, and they must not be confused:**
+
+| surface | what it can ask | gate |
+| --- | --- | --- |
+| step row (`factDisplay3`) | the COMMANDS exist | `isVectorFact3` |
+| input preview (`inputPreviewDisplay3`) | only the RAW TEXT — no command yet | `isVectorMarked3` |
+| `vectorNotation` itself | — | **none; it is unconditional** |
+
+That last row is the one to remember: `vectorNotation` will arrow «אורך AB = 5» and a bare `DC=3AB`
+given the chance. Every caller supplies the honesty gate, and a new caller that forgets asserts
+vector-ness the student never claimed.

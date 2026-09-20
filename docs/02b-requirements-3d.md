@@ -120,6 +120,14 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   figure genuinely cannot satisfy — two perpendicular edges of a box — is still **refused**, because
   reaching the vector lane is not the same as being believed. *(Realised —
   [ADR-3D-250](06b-decisions-3d.md#adr-3d-250), #1183/#1185; `issue-1183-vector-marked.test.ts`.)*
+
+  **And the student sees the notation BEFORE they commit** ([ADR-3D-255](06b-decisions-3d.md#adr-3d-255),
+  [#1195](https://github.com/dcodish/geo_builder/issues/1195)). The strip under the input shows a marked
+  line the way the step row will show it — `DC⃗ = 3AB⃗` — so the marking is visibly understood while it can
+  still be corrected. **Only for a line the student MARKED:** the preview runs on unparsed text, so the gate
+  is the arrow or the word they typed, never a guess. An unmarked «DC=3AB» previews nothing, because the tool
+  does not yet know whether that sentence is about vectors — and «אורך AB = 5» never grows an arrow, which
+  would assert vector-ness the statement never had.
 - **FR-VC-1b (Must)** — **A vector can START a figure, and the word «וקטור» draws a vector.** The
   vectors unit opens on an empty canvas, so «וקטור AB» must build there: both endpoints are
   introduced as free points ([ADR-052](06-decisions.md#adr-052) — an unstated position is a free DOF

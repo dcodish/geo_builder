@@ -27,7 +27,8 @@ import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
-import { bidiSegments3, inputPreview3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
+import { bidiSegments3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
+import { inputPreviewDisplay3 } from './render/notation';
 import { questionLines3 } from './export/questionLines3';
 import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { SYMBOL_SPECS_3 } from './ui/symbols3';
@@ -700,8 +701,20 @@ export default function App3() {
              * had no strip at all. It gets one now. That is deliberate: the strip stops being "a
              * bidi repair" and becomes "what you typed, typeset".
              */
+            /**
+             * #1195 — and the VECTOR notation, for a line the student explicitly marked.
+             *
+             * `inputPreviewDisplay3` composes the bidi isolation with the arrow-over-the-letters form
+             * and keeps the null-when-nothing-changes contract, so a plain line still grows no second
+             * row. The mathematics branch above (#1152) is unchanged and stays FIRST: a line carrying
+             * an equation is typeset, and one carrying a vector marking is arrowed.
+             */
             preview={(s) =>
-              hasMath(s) ? <MathText text={isolateLtrRuns3(s, true)} /> : inputPreview3(s)
+              hasMath(s) ? (
+                <MathText text={isolateLtrRuns3(s, true)} />
+              ) : (
+                inputPreviewDisplay3(s, new Set(derived.construction.vectors.keys()))
+              )
             }
             previewDir={(s) => textDir3(s)}
             boxDir={(s) => textDir3(s)}

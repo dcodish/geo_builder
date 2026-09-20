@@ -10156,3 +10156,42 @@ But «AB = u» and «DC = 3u» are not measurements awaiting a figure. They are 
 **Measured after.** The operator's three lines produce `stated: ["u = AB⃗", "DC⃗ = 3u"]` and a panel that is no longer empty — with the precondition asserted that nothing there is measurable yet, so the rows cannot pass for the wrong reason if a later change determines the figure. The rows are identical at seeds 0, 1, 2, 7 and 99, which is what "a given, not a measurement" means operationally. A determined figure keeps all its coordinate rows and gains its stated ones.
 
 **Consequences.** `engine/dataView.ts` (+`stated` on `DataPanel`, +`statedVectorRows` and its side composer, `panelIsEmpty` widened); `App3.tsx` (+the leading section); both locales (+`secStated`). `issue-1196-stated-vector-rows.test.ts` (9); `bidi3.test.ts`'s section count and `data-view.test.ts`'s empty fixture updated with the reason.
+
+### ADR-3D-255 — The input preview shows the VECTOR notation as it will render (#1195)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1195 (feature, P2, `3d`) · operator report 2026-09-18, round #1193 T1 · round #1306
+**Requirements:** [02b](02b-requirements-3d.md) — FR-VC-1a's display half · **Design:** [04b](04b-design-3d.md)
+**Builds on** [ADR-3D-250](#adr-3d-250)/#1183 (the marking) and [#1194](https://github.com/dcodish/geo_builder/issues/1194) (the shared marking vocabulary)
+
+**The report.** *"I want to have the correct text appear below the text like we do when hebrew is involved so the user sees the real input. the text should show like in the input box with the arrow above the vector."*
+
+The box holds the characters the student typed — `DC→=3AB→`. The step row, once they submit, shows the textbook form with the arrow over the letters. Between typing and submitting there was nothing.
+
+**Measured before:**
+
+```
+typed                     preview
+DC→=3AB→                  null      ← nothing at all
+DC⃗=3AB⃗                   null
+וקטור DC = 3 וקטור AB      "וקטור ⁦DC = 3⁩ וקטור ⁦AB⁩"   ← the Hebrew case that already worked
+```
+
+`inputPreview3` is bidi-only and returns `null` when isolation changes nothing, so a pure-LTR vector line previewed not at all — which is why this reads as missing rather than wrong.
+
+**Why the gate is the MARKING and not the parse.** The preview runs on UNPARSED text; there is no command yet, so it cannot ask `isVectorFact3` the way `factDisplay3` does. And `vectorNotation` is **unconditional** — measured, it turns «אורך AB = 5» into «אורך AB⃗ = 5» and a bare `DC=3AB` into `DC⃗=3AB⃗`. The caller has always supplied the honesty gate.
+
+So the gate is what the student EXPLICITLY WROTE: an arrow character, or the vector word. That is honest by construction — showing an arrow for a line that already carries one asserts nothing they did not say — and a bare `DC=3AB` still previews nothing, which is correct: the tool does not yet know whether that sentence is about vectors, and #1183 is the whole story of it being ASKED.
+
+**The predicate lives in `lexicon/marks3.ts`**, beside the arrows and the word, so a fifth spelling reaches the grammar and this preview together or not at all — the drift `lexicon/` exists to stop (#1194). It is deliberately **not** `parse3.markVectorContext`: that function answers the same question for the parser but is `void` and side-effecting (it sets a module flag), and having `render` import `parser` is the wrong edge.
+
+**Where the composition sits, and the layering choice made on purpose.** The issue left this open. `i18n/bidi.ts` imports **nothing** — it is a leaf — so having it import `render/notation.ts` would invert the dependency. The composition therefore lives in `render/notation.ts` beside `factDisplay3`, which imports `i18n/bidi` (downward, the direction `render` already depends in) and `lexicon/marks3`. That also puts it in the same module as the function the lock compares against.
+
+**Isolate first, then typeset** — the same order #1152 established for the mathematics strip, for the same reason: the bidi runs are decided by `i18n/bidi` and its isolate characters ride through untouched, while composing the other way could reorder the equation.
+
+**The `null`-when-nothing-changes contract survives**, and the tension in it is the interesting part: a plain line must not grow an empty second row, but the contract must not swallow `DC⃗=3AB⃗` — pure LTR, needing no isolation, and the very line the operator was looking at. Resolved by comparing the composed result against the input rather than the isolation against the input.
+
+**Measured after.** `DC→=3AB→` previews `DC⃗=3AB⃗`; `DC⃗=3AB⃗` previews `null`, because the box already shows exactly that; «וקטור DC = 3 וקטור AB» gets both treatments; «אורך AB = 5» keeps its bidi preview and grows **no arrow**; `DC=3AB` and «משולש ABC» are unchanged.
+
+**3-D only.** 2-D has zero vector support by design (operator ruling 2026-09-18, #1184 — vectors are a space-unit topic), so this must not be ported; the usual sibling-parity check does not apply.
+
+**Consequences.** `lexicon/marks3.ts` (+`isVectorMarked3`); `render/notation.ts` (+`inputPreviewDisplay3`, +the `i18n/bidi` import); `App3.tsx` (the preview prop). `issue-1195-vector-preview.test.ts` (21): every row asserted **against `factDisplay3`'s output for the same line**, never a written-out string, since the two surfaces agreeing is the whole subject — isolate characters stripped from both sides first, because they are display scaffolding and the NOTATION is what must match; plus the anti-assertion guard on four unmarked lines, the `null` contract from both directions, and the marking vocabulary driven over all five spellings.
