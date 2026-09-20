@@ -80,8 +80,6 @@ place. A kind that can forward-reference is what would earn one.
   renderer draws. **Pure**, so the renderer stays a consumer rather than a second geometry implementation
   — the same split every sibling uses.
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 ## The configuration search: validity, then preference ([ADR-AG-128](06c-decisions-analytic.md#adr-ag-128))
 
 `drawableAt` is the one place that chooses which configuration the tool shows, so canvas, data panel,
@@ -108,7 +106,6 @@ contradicts its noun and its tolerance sits two orders of magnitude under the ug
 3° triangle is ugly but true. `minInteriorAngleOf` measures how open the rings are and decides
 nothing. Folding them into one number would turn a preference into a refusal and assert a given the
 student never gave.
-=======
 ## Where a fault is raised, and why ORDER matters there ([ADR-AG-129](06c-decisions-analytic.md#adr-ag-129))
 
 `derive` raises its faults in a fixed order, and the order is load-bearing rather than incidental: a
@@ -125,8 +122,6 @@ can see what has already been said — and skips any line already in `faults`.
 refuses when a fault lands on that line, so raising a fault in `derive` is what makes a line not be
 recorded. There is no second refusal mechanism to keep in step, which is why an operator ruling of
 “refuse the line” lands as one arm here rather than as a change in the app layer.
->>>>>>> fix/1170-pinned-ring
-=======
 ## The crossing module’s tolerances ([ADR-AG-130](06c-decisions-analytic.md#adr-ag-130))
 
 Three named constants, each answering one question, each relative to the figure’s own scale
@@ -146,7 +141,6 @@ figure came out two ways.
 **`CROSS_MIN_SINE` is not an extent test.** Two genuinely different lines meeting at a shallow angle
 cross far outside the drawing; that is `within`’s question. Widening the angular bar to cover it would
 start calling distinct lines identical, which is the defect it was introduced to remove.
->>>>>>> fix/1235-crossings
 
 ## The parser's rule contract ([ADR-AG-017](06c-decisions-analytic.md#adr-ag-017))
 
