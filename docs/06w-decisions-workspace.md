@@ -3341,3 +3341,26 @@ Hence the second half of docs/17 §5 step 0: *a plan that says "not measured pas
 ### Consequences
 
 `docs/17-design-rules.md` §5 (a new step 0 — this is the file CLAUDE.md sends you to before fixing any reported bug, so it is the load-bearing home), `docs/22-workflow.md` §3 (the bug route's gap between reporting and fixing), `.claude/skills/fix-round/SKILL.md` Step 2 (where it fires for an unattended run).
+
+## ADR-W-065 — An LLM-normalised line carries NO marker in the UI; the usage log is the channel (#1283, #1243)
+
+**Requirements:** none — the student-facing promise is unchanged. **Design:** the LLM seam in each product's submit path (`src-analytic/App.tsx` `tryFallback`, and its 2-D/3-D twins) and the usage-event sink in `server/`. **Operator, 2026-09-20:** *"no need for an llm mark - we have that in the logs and user couldnt care less"*
+
+### What was asked, and why
+
+Triaging [#1283](https://github.com/dcodish/geo_builder/issues/1283) the operator reported a line he believed had escalated. It had not. What made him unsure is structural: the fallback re-enters `decideSubmit` and records the normalised line, so its chip is indistinguishable from a parser-handled one — a spinner during the call, nothing after. I asked whether a line should carry a visible "the model read this for you" marker.
+
+### The ruling
+
+**No.** Two reasons, and the second is the load-bearing one:
+
+1. **The student does not care.** Which internal lane read their sentence is not a fact about their figure. A provenance badge is the tool talking about itself.
+2. **Provenance already has a home — the usage log.** Escalation is a *development* signal, consumed by `/log-triage` and the admin dashboard, not a student-facing one. Surfacing it twice would put a debugging concern in the student's reading path.
+
+This is deliberately NOT an honesty-invariant case. The invariants bind what the student *stated* (no given silently dropped, everything stated visible on the figure). They say nothing about which component parsed the sentence, and the LLM's output re-enters the same `decideSubmit` gates as any parser line — so an escalated line is held to the identical standard. There is no honesty gap to close.
+
+### The consequence, which is the reason this ADR exists
+
+If the log is the only channel, **a product without a usage log has no channel at all.** [#1243](https://github.com/dcodish/geo_builder/issues/1243) records that analytic and complex emit no usage events and the proxy logs only startup — so for exactly the tool this question arose in, escalation is currently invisible everywhere. That reprices #1243 from polish to the single point of observability for the whole LLM seam in two of four products.
+
+**So this ruling is conditional on #1243 being closed.** Declining the UI marker is correct; declining it *while* two products log nothing leaves a blind spot the operator has to discover by doubting a working line, which is what happened here.
