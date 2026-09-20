@@ -264,7 +264,8 @@
     "src-analytic/render": "engine",
     "src-analytic/store": "engine",
     "src-analytic/app": "engine",
-    "src-analytic/i18n": "shell"
+    "src-analytic/i18n": "shell",
+    "src-analytic/ui": "shell"
   },
 
   "classificationNotes": {

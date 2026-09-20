@@ -55,6 +55,15 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'points', family: 'F1', he: 'נתונה הנקודה A(2,6)', en: 'point A(2,6)' },
   { category: 'points', family: 'F1', he: 'נתונות הנקודות A(0,24), B(18,0)', en: 'points A(0,24), B(18,0)' },
   { category: 'points', family: 'F1', he: 'A(-9a,0)', en: 'A(-9a,0)' },
+  /**
+   * A point NAMED without being PLACED (#1136) — two degrees of freedom, its own.
+   *
+   * The sentence the locus lane stands on: «המקום הגיאומטרי של M» asks about a point that must exist
+   * before any property can be stated about it. Until this, the only route to a 2-DOF point was to
+   * smuggle it in as a polygon vertex («משולש ABM»), which asserts a triangle the student never
+   * mentioned — ADR-052's cardinal sin through the front door.
+   */
+  { category: 'points', family: 'F1', he: 'נקודה M', en: 'point M' },
 
   // --- F3 · lines by equation ---
   { category: 'lines', family: 'F3', he: 'נתון הישר l1: 4y-3x-20=0', en: 'line l1: 4y-3x-20=0' },
@@ -86,6 +95,15 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1',
     en: 'circle II: (x+5)^2+(y-2)^2=1',
   },
+  // A DIGIT names a circle exactly as a Roman numeral does (#1216, operator ruling 2026-09-19). One
+  // row, not five: the card's job is to show that the digit form exists, and the numeral is the only
+  // thing that varies. The Roman rows above stay — the ruling extends that set, it does not replace it.
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9',
+    en: 'circle 1: (x-3)^2+(y-4)^2=9',
+  },
   { category: 'circles', family: 'F5', he: 'משוואת המעגל x^2+y^2-2ax-2x=0', en: 'the circle x^2+y^2-2ax-2x=0' },
 
   // --- F6 · conics by equation (canonical only — D6/§2a) ---
@@ -110,6 +128,32 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // Only the nouns that carry no constraint of their own. «מקבילית» / «טרפז» / «ריבוע» each carry a
   // given this slice cannot honour, so they are refused by name rather than taught here.
   { category: 'shapes', family: 'F17', he: 'הקטע AB', en: 'segment AB', needs: ['A(0,0)', 'B(4,3)'] },
+  // --- F19 · the DISTANCE, in the spellings a student actually writes (#1128) ---
+  // Three rows walking the three FAMILIES of spelling — the plain Hebrew noun, the textbook
+  // subscript, the absolute-value bars — rather than all thirteen, which are one term and are
+  // proved equal to each other by the lock. The card's job is to show that each family exists.
+  {
+    category: 'relations',
+    family: 'F19',
+    he: 'אורך הקטע AB = 10',
+    en: 'length AB = 10',
+    needs: ['A(0,0)', 'נקודה B'],
+  },
+  {
+    category: 'relations',
+    family: 'F19',
+    he: 'd_{AB} = 10',
+    en: 'd_{AB} = 10',
+    needs: ['A(0,0)', 'נקודה B'],
+  },
+  {
+    category: 'relations',
+    family: 'F19',
+    he: 'המרחק בין A ל-B = 10',
+    en: 'the distance between A and B = 10',
+    needs: ['A(0,0)', 'נקודה B'],
+  },
+
   {
     category: 'shapes',
     family: 'F17',
@@ -141,6 +185,24 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     family: 'F18',
     he: 'הצלע AB מאונכת לצלע BC',
     en: 'side AB is perpendicular to side BC',
+    needs: ['משולש ABC'],
+  },
+  // The exam's own NOTATION (#1160). The relation was built and well tested; only its symbols were
+  // unreadable, so the student who wrote what the page prints was told it was not understood. Listed
+  // because the catalog is the coverage map: the guard re-parses every row, so a symbol that stops
+  // parsing fails the suite instead of quietly becoming documentation.
+  {
+    category: 'relations',
+    family: 'F18',
+    he: 'AB ∥ DC',
+    en: 'AB ∥ DC',
+    needs: ['מרובע ABCD'],
+  },
+  {
+    category: 'relations',
+    family: 'F18',
+    he: 'AB ⊥ BC',
+    en: 'AB ⊥ BC',
     needs: ['משולש ABC'],
   },
   {
@@ -299,6 +361,28 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'P מפגש האנכים האמצעיים במשולש ABC',
     en: 'P is the circumcentre of triangle ABC',
     needs: ['A(0,0)', 'B(4,0)', 'C(0,3)'],
+  },
+  // --- F16 · CEVIANS · the named segment from a vertex (#1165) ---
+  // Two rows, walking the two axes that the rule actually has to get right rather than four
+  // phrasings of one thing: the ROLE (median · altitude) and how the target is NAMED (by the
+  // triangle, which determines the side, or by the side outright). The reference card has to show
+  // the triangle spelling, because that is the one a student writes and the one that was
+  // «not-handled» until this issue.
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'AD תיכון במשולש ABC',
+    en: 'AD is the median in triangle ABC',
+    needs: ['A(1,3)', 'B(-4,1)', 'C(-3,8)'],
+  },
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'AD גובה לצלע BC',
+    en: 'AD is the altitude to side BC',
+    // An ACUTE triangle, so the foot lands between B and C: the rule admits an obtuse figure too
+    // (the foot beyond an endpoint is honest), but a reference card should show the ordinary case.
+    needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
   },
   {
     category: 'derived',

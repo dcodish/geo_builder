@@ -4464,6 +4464,72 @@ His second sentence was *"we need to give the user different options and not sim
 
 **Consequences.** `engine/rings.ts` (new), `Figure.ringFaults`, one term in `whole()`. `issue-1158-1166-polygon-noun-validity.test.ts` (24 tests, sweeping `SHAPES` so a noun added later inherits the lock). Analytic lane 80 files / 1235 tests.
 
+## ADR-AG-081 — The locus lane, V1a: the button shown all at once (#1136 + #1137)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R87 (specified), R92 (the free point). **Design:** [`src-analytic/CLAUDE.md`](../src-analytic/CLAUDE.md). **LADDER stage:** a reader over the solved figure — it walks the carrier system `evaluate` already builds and mutates nothing.
+
+Implements [ADR-AG-072](#adr-ag-072), scoped with the operator 2026-09-16. Locus is **13 of 20** sampled 572 Q1s — the most-asked construct in the corpus.
+
+**What a student can now do:**
+
+```
+A(-9,0)
+B(41,0)
+נקודה P
+PA מאונך ל-PB
+```
+
+then ask **«המקום הגיאומטרי של P»** and get the circle **drawn**, the row reading **«מעגל»**, and its equation **`(x − 16)² + y² = 625`**.
+
+### The engine already solved it — confirmed before anything was built
+
+Measured through the real `parse → fold → evaluate` path: `MA = MB` puts `M` at **x = 4.00 at every seed** with a different `y` each time; `∠APB = 90°` puts `P` at **distance 25.00 from (16, 0)** at every seed. `carrierDof = 1` in both. docs/19 §6 called the tracer "new core #3"; **it is not a new core**, and no constraint kind was added.
+
+> A locus is a named point whose residual `carrierDof` is 1. «הציגו תצורה אחרת» is already walking it, one point at a time. This lane is that button shown all at once.
+
+### #1136 first, because the workaround was itself the cardinal sin
+
+Every measurement in #1137 had to smuggle a 2-DOF point in as `משולש ABM` — asserting a triangle the student never mentioned, which is [ADR-052](06-decisions.md#adr-052) through the front door. The `free` carrier family has existed since slice A; **only the sentence was missing**, so «נקודה M» emits the `declare` fact the cevian and polygon rules already emit.
+
+**The class was measured, not assumed** (#1136's plan asked for it): «מעגל O» could already be declared unplaced; **«ישר k» still cannot**, for the same reason the point could not. That half is NOT fixed here — a free line has no object kind and no `carrierOf` row, so it is engine work rather than a sentence, and it is [#1171](https://github.com/dcodish/geo_builder/issues/1171). The lock asserts the split so it cannot be quietly forgotten.
+
+### CONTINUATION, and the two alternatives are refuted by measurement
+
+Solve once, step along the null space of the Jacobian by a fixed arclength, re-solve; outward both ways, to closure or to a bound.
+
+- **Seed scatter is not a trace.** Seed 2 puts `M` at `y = 317.54`, seed 3 at `y = 1.23`. Joined in seed order that is confetti, and sorting has no honest key in 2-D — angle works for the circle and fails for the bisector and the parabola.
+- **Marching squares cannot reach V1b.** #1138's traced point is DOWNSTREAM of the free one, so it has no scalar residual in its own `(x,y)` and there is nothing to contour. Continuation walks the FIGURE's freedom, so the same tracer covers both halves — `positionsAt` re-evaluates the whole dependent chain per step and traces whichever point was asked about.
+
+`carrierSystem` was extracted from `evaluate` so the solve and the tracer read **the same residuals**; a second construction of "what the constraints say" would be two definitions of the figure drifting apart.
+
+### The determinacy gate, and it is the honesty gate
+
+> *"only if we are positive about the equation we show it. otherwise, we stick to showing the shape."*
+
+Trace at two configurations, compare the **sets**. Same ⇒ print the equation; different ⇒ the kind alone. It is the set-level sibling of `isKnowledge` — that predicate asks whether a VALUE is invariant, and a locus point is by definition not, which is exactly why the *set* needs its own predicate.
+
+It falls out with no special-casing: the bisector prints `x = 4`; **חורף 25 with `A(−9a,0)` `B(41a,0)` prints «מעגל» and no equation**, because reaching `(x − 16a)² + y² = 625a²` means recognising a symbolic dependence across samples — the CAS boundary. And the KIND still shows, because the kind IS invariant and *"show that the locus of P is a circle"* is precisely what that exam asks.
+
+### The self-check earned its place three times over
+
+`fit → snap to rationals → RE-VERIFY the snapped equation against the trace → print, or print nothing`. With no student-side validation anywhere in this product, nothing else stands between an over-eager snap and a confident wrong equation. Three defects were found by measuring it rather than reasoning about it, and each was a class:
+
+1. **A line is not a well-posed conic fit.** Infinitely many conics contain a straight line, so the least-squares eigenspace is degenerate and the most elementary locus in the corpus classified as `rotated`. Cured by fitting the **lowest-degree curve first**, which is also what a student writes.
+2. **Snapping must be RELATIVE.** חורף 25's `F` fits to `−368.99998759` against `−369` — absolute error `1.2e−5`, relative `3.4e−8`. Held to an absolute `1e−6` a perfectly determinate locus printed nothing.
+3. **Normalisation must be MONIC.** Dividing by the largest coefficient makes that same circle's `A = −1/225`, which is not a rational with a denominator under 64. Monic gives `1, 1, −32, −225` — integers, which is what exam loci have.
+
+A fourth was a scope question rather than a bug: the view box is driven by the STATED objects, so «A(0,0)» + «MA = 5» gives a box about five across for a curve ten across, and tracing only inside it produced a **23° arc** — too little to identify (the gate then reported "shape only" about a determinate locus) and too little to show the student their answer. The walk now goes wider than the frame and the RENDERER clips, which leaves ADR-AG-072 §9 intact: the frame is still driven by the stated objects and an infinite locus still does not inflate it.
+
+### The knowledge gate needed a SECOND ARM, not a bypass
+
+`Answer.mark` is present *only* when a distance is knowledge, because drawing it on an under-determined figure would assert a magnitude nobody gave. A locus is the **inverse**: it is honest *because* the figure is under-determined, since it draws every position rather than one. The gate as written would have suppressed the trace on exactly the figures it exists for — and *"every surface that prints a number is gated, and remembering only one is the recurring failure"* is this tree's own documented trap.
+
+The trace rides ADR-AG-067's existing `shown` lifetime rather than inventing a fourth rule, so «click the entry again» hides a locus exactly as it hides a height and the row stays.
+
+**Consequences.** `engine/locus.ts` and `engine/locusFit.ts` (new), `carrierSystem` extracted from `evaluate`, `Answer.locus`, `drawnLoci`, `SceneLocus`, four `locus.*` locale keys, one catalog entry. `issue-1136-1137-locus.test.ts` (24). Analytic lane 88 files / 1236 tests.
+
+**Not in this slice:** #1138 (V1b, the construction locus) — it inherits the tracer, the surface, the gate and the fit pipeline whole. The set-former phrasing «המקום הגיאומטרי של כל הנקודות M המקיימות…» stays sugar for later (ADR-AG-072 §1). «המקום הגיאומטרי של מרכזי המעגלים…» quantifies over *circles* and is still refused by name.
+
 ## ADR-AG-082 — A shape noun's UNSTATED choice is the tool's assumption, and a statement pins it (#1159)
 
 **Requirements:** [02c](02c-requirements-analytic.md) R93. **Design:** [04c](04c-design-analytic.md) — *a noun's unstated choice is the tool's*. **LADDER stage:** the apply boundary — the noun lowers as before, and what changes is what a later statement may do to it.
@@ -4618,3 +4684,1926 @@ Sign is not normalised: `-4x + 3y = 0`, exactly as the ruling wrote it. A conven
 **Four sentences, written out, not one templated noun.** Hebrew gender carries through the whole clause — «הנקודה … הוגדרה» against «הישר … הוגדר» — so slotting a noun into one sentence would be wrong in three cases of four. An anonymous curve (`curve-<hash>`) gets the **kind-free** wording: it has no name the student wrote, so no noun would be true.
 
 **Consequences.** `fractionClearingFactor` (`format.ts`), one scaling in `lineText`; `RefKind`/`refKindOf`/`unknownRef` (`apply.ts`), `expected` threaded through `derive` → `submit` → the store, four locale strings per language. `issue-1180-1179-equation-and-noun.test.ts` (14) — asserting the **rendered** sentence through the real locale, because a key that exists proves nothing about what a student reads. Analytic lane 84 files / 1278 tests.
+## ADR-AG-086 — A locus is traced at the configuration being SHOWN, and a neighbour it cannot measure is skipped (#1176)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R87 — unchanged in what it promises; this is the implementation failing to keep it. **Design:** [04c](04c-design-analytic.md) — *the locus lane*. **LADDER stage:** the ask lane's read of the figure.
+
+**Operator, playing PR #1172's T10:** *"when pressing show another option, the shape breaks"* — with `P` well off the circle drawn as its own locus.
+
+### The canvas drew a curve that did not contain the point it named
+
+`ask.ts` called `locusOf(…, [0, 1], …)` with the seed pair **hardcoded**, while the figure sits at the session's seed. From the first press of «הציגו תצורה אחרת» the drawn locus therefore belonged to a different value of the figure's free parameter:
+
+| seed | `a` | P | traced circle | on it? |
+|--:|--:|---|---|---|
+| 0 | 3.458 | (108.0, −68.6) | centre (54.6, 0) r 86.4 | yes |
+| 1 | 1.314 | (−4.5, −20.7) | centre (55.3, 0) r 86.4 | **no** |
+| 2 | −3.400 | (21.9, −37.5) | centre (55.4, −0.2) r 86.4 | **no** — the screenshot |
+
+The traced circle was **identical at every seed** while `P` moved. It also broke ADR-AG-072 §4's own stated side effect — *"«הציגו תצורה אחרת» then makes the circle GROW with `a` on screen"* — because it was never re-traced.
+
+**A `Derivation` now carries its `seed`.** Not carrying it is what made the defect possible: `ask` had no way to know which configuration it was answering about. Carried rather than re-derived, so a consumer cannot disagree with its own figure by construction.
+
+### The lock is the deliverable, not the one-line fix
+
+All 24 locks in `issue-1136-1137-locus.test.ts` passed throughout. They assert the trace's SHAPE and the gate's VERDICT — both true — and neither asked the question that matters on a figure that moves:
+
+> the traced point lies **on its own trace**, at the configuration shown, at every seed.
+
+It is invisible without a parameter, because there the locus really is the same set at every seed. So the parameterised figure is not an edge case for this feature; it is the only case that can fail.
+
+### The comparison sample must be MEASURABLE, not merely different
+
+Exposed by the fix and owned with it. The determinacy gate answers "kind only" when the two traced sets differ — but it was also answering that when it simply **could not measure one of them**, which is not evidence about the set at all.
+
+Measured: the plain bisector traces `x = 4` exactly at almost every configuration, but at seed 2 the free point solves out at `y ≈ 317`, so the figure is drawn fifty times larger than the points defining it and `MA = MB` pins `x` to only ~1e−4 out there. That trace legitimately fails the self-check — and as the *neighbour* of seed 1 it was suppressing the equation on a configuration that measured perfectly well. The comparison now advances past a configuration it cannot measure, bounded by `COMPARE_TRIES = 3`. It never widens what counts as agreement: two traces that both measure and disagree still print the kind alone.
+
+**Investigated and rejected before settling there.** A finer step does not help — measured, the drift is `1.9e-3` at step 14.6, 7.3 and 3.65 alike, because it is ill-conditioning and not accumulation. Trimming the fit to the view box does not help either (`2.6e-4`, still short of the snap bar). At an ill-conditioned configuration the tool genuinely cannot verify `x = 4`, and ADR-AG-072 §7 already says what to do: **if it will not snap, print nothing.** That case is now asserted deliberately rather than worked around, so a future change which starts printing an equation there has to say why.
+
+### Riding along: #1180's ruling reaches this surface too
+
+`locusEquation`'s slope arm built `y = <slope>x + c`, so a fractional slope printed `y = 4/3x + 2` — the ambiguity (`4/(3x)`?) the operator reported against the panel's curve row. Same ruling, same treatment: the equation clears its fractions, `3y = 4x + 6`, using the `fractionClearingFactor` that landed with round #1173. The two axis-parallel arms keep their exact value (`x = 4/3`): nothing follows them, so there is nothing to misread.
+
+**Consequences.** `Derivation.seed`, one call site in `ask.ts`, `COMPARE_TRIES` in `locus.ts`, the slope arm in `locusFit.ts`. `issue-1176-locus-configuration.test.ts` (11). Analytic lane 86 files / 1388 tests.
+
+## ADR-AG-087 — the CANVAS gets a bidi chokepoint, so a label cannot reorder a number (#1191)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — **R87 unchanged**; this is the implementation failing to keep it, one surface over. **Design:** [04c](04c-design-analytic.md) — the renderer's label seam. **LADDER stage:** render only; nothing in the engine, the tracer or the ask lane moves.
+
+**Operator, playing PR #1172.** A perpendicular bisector of `A(0,0)`–`B(6,8)`, drawn dashed, labelled on the canvas:
+
+```
+4 · ישרy = −3x + 25        ← what the student READ  (captured in a browser, before)
+ישר · 4y = −3x + 25        ← what the tool computed (captured in a browser, after)
+```
+
+`3x + 4y = 25` **is** the perpendicular bisector, and the drawn `M` sits on it. The geometry, the tracer and the determinacy gate are all correct. **This is display only** — and it is the class `Figure.tsx`'s own header comment calls *"the worst class of bug this tool can have"*: the canvas silently lying about a number, reached through a label instead of a tick.
+
+### Root cause — the canvas had no bidi chokepoint at all
+
+The label went onto the canvas as a raw string: `ask.ts` composes `value = \`${kindWord} · ${eq}\``, `App.tsx` hands it to `buildScene` as `loci[].label`, `scene.ts` copies it into `SceneLocus.label.text`, `Figure.tsx` renders it in a plain SVG `<text>`.
+
+The root `<svg>` sets `direction: ltr`, so the paragraph level is LTR. In `ישר · 4y = …` the `·` sits between a Hebrew word and a **European Number**; UBA N1 resolves that neutral to RTL and I1 lifts the digit above the base level, so `4 · ישר` reorders as one unit and the rest of the equation is stranded.
+
+**Only an equation that STARTS with a digit scrambles**, which is why the locus lane's own worked example survived the build:
+
+| locus | equation | first char | renders |
+| --- | --- | --- | --- |
+| circle | `(x − 16)² + y² = 625` | `(` then `x` (strong L) | correct |
+| parabola | `y² = 8x` | `y` | correct |
+| line, unit `y` | `y = −3x + 4`, `x = 4` | `x`/`y` | correct |
+| **line, non-unit `y`** | **`4y = −3x + 25`** | **`4` (EN)** | **scrambled** |
+
+The whole analytic renderer contained **one** bidi call — `unicodeBidi: 'isolate'` on the circle-centre label — which could not have helped: the scramble is *inside* the string, not around it. The **panel** row for the very same value was already correct, because it goes through `analyticBidi.isolateLtrRuns`. The canvas was simply a second display surface that never adopted the kit.
+
+### Where the fix belongs, and where it deliberately does not
+
+**Not** by reordering the label or dropping the `·`. That hides the class and leaves the next Hebrew-carrying canvas label to break: `drawnMarks` feeds `measures[].label` from the same `Answer.value` through the same unisolated `<text>`, and today those values are bare numbers — one Hebrew word away from the identical defect.
+
+The isolation goes in `buildScene`, which already declares (#723/#1029) that *formatting is a DISPLAY concern, so it happens here* and is the single place every canvas label — locus, measure, segment length, centre, construction mark — is produced. No call site can forget, and a label added later is isolated by construction. SVG `<text>` honours U+2066/U+2069 natively; ADR-431 Am. 1's exception is about `.docx`, not the browser.
+
+**`crossings[].sentence` is deliberately NOT isolated.** It is not canvas `<text>` — it is a `<title>` tooltip, and the same string is submitted back as an utterance when the ring is clicked. Format controls belong in display strings, never in something that round-trips into the parser.
+
+### The import question, answered as the issue said it could be
+
+`scene.ts` imported nothing from `i18n/`, and that is *why* the canvas never adopted the kit: reaching one function would have dragged i18next, every locale and the post-processor chain into a pure renderer.
+
+So the kit moves to its own module (`i18n/bidi.ts`) and `i18n/index.ts` re-exports it — every existing caller is untouched, and the renderer imports two lines instead of a bootstrap. The injection alternative (`SceneKnowledge`) was rejected: **an injected isolator is one a caller can forget, and forgetting is the entire defect.** One instance also means `extraCore` cannot drift between the panel and the canvas, which two kits would eventually do.
+
+### Verification
+
+A unit lock over the **composed** label string, calling `ask` and `buildScene` rather than reproducing them, and comparing the canvas label to `isolateLtrRuns` of the panel's own value rather than to a spelled-out expectation (ADR-W-053) — so the assertion is *the canvas and the panel agree*, which is the real invariant. Proven to FAIL without the fix: 5 of its 6 cases go red when `lbl` is made the identity.
+
+And, because a bidi bug is a **visual order** bug that no string assertion can see, driven in a real browser at the operator's own figure, before and after — the two renderings quoted at the top of this entry are screenshots, not reasoning.
+
+**Consequences.** `i18n/bidi.ts` (new, the kit); `i18n/index.ts` re-exports it; `buildScene` gains one `lbl()` seam applied at all five label channels. Lock: `issue-1191-canvas-bidi.test.ts` (6), including the class assertion that every label channel is isolated and that a pure-LTR label is left alone.
+
+## ADR-AG-088 — A name that denotes a line denotes it to EVERY surface (#1148 + #1139)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R95** (new). **Design:** [04c](04c-design-analytic.md) — *the ask lane*, the resolver seam. **LADDER stage:** operand resolution, ahead of evaluation; no value, solve or gate semantics change.
+
+Both reported by the operator on 2026-09-16, on the same figure, minutes apart: *"now the line is drawn but data panel still refuses"*, and *"the line itself is not clickable in this state and it should be — allowing to show distance, equation, slope."*
+
+### The defect was not a branch; it was FIVE resolvers
+
+Measured on `A(0,0)` `B(6,0)` `C(3,5)` + «משולש ABC» before the fix:
+
+```
+AB                  -> 6          the measure grammar resolves a two-point line
+שיפוע AB            -> 0          the slope branch resolves a two-point line
+משוואת AB           -> MISSING    the equation branch does not
+המרחק מ-C לישר AB   -> 5          the ask lane answers it
+menu(C)             -> ["C"]      ...and the click menu never offers it
+```
+
+`AB` is one line. It existed to three resolvers, not to the fourth, and the fifth — the click menu's own enumeration of "what is there to ask about" — could not see it at all. Fixing the equation branch would have answered the operator and **guaranteed the next question kind repeats it**, which is the class and not the input (standing rule 1). #1139 was already the third sighting; the menu's copy was the fourth.
+
+### One question, asked in two directions
+
+There are exactly two questions here, and `app/lines.ts` is now the only place either is answered:
+
+- **resolution** — `lineNamed(figure, name)`: which line is this, in the configuration drawn?
+- **enumeration** — `lineNamesOf(construction)`: which names denote a line at all?
+
+They are tied by an invariant the suite asserts by **calling both surfaces** rather than by listing what either should say: *every name the enumeration offers resolves, and every sentence the menu composes is one the ask lane answers.* A menu entry whose answer would be «לא הבנתי» is the menu lying about the figure, and that is now a test failure instead of a bug report.
+
+The enumeration's three sources are the named line curves it always had, plus **every stated segment and every side of every polygon** — the half #1139 was filed about. A triangle's sides are lines the student can see, and before this they were lines to nobody.
+
+### Why the coefficients are normalized, and why NOT by `hypot`
+
+A line through two points is built as `a = Δy`, `b = −Δx`, so its coefficients scale with how far apart the points happen to sit. That scale is not part of the line, and it breaks two things at once: `A(0,0)`–`B(6,0)` printed «-6y = 0» instead of «y = 0», and `isKnowledge` over raw coefficients would call a perfectly determined line *unknown* merely because its points slid along it between configurations.
+
+The obvious normal form — divide by `hypot(a, b)` — was measured and **rejected**: it makes `A(0,0)`–`C(3,5)` print «0.86x - 0.51y = 0», because 5/√34 is a surd and ADR-AG-085's `fractionClearingFactor` cannot clear what is not rational. Dividing by the **leading coefficient** keeps a rational line rational — `(5, −3, 0)` → `(1, −0.6, 0)` → cleared back to «5x - 3y = 0» — and fixes the sign for free.
+
+Every existing consumer is unaffected by construction: the slope is `-a/b` and the point-line distance divides by `hypot(a, b)`, so both are scale-invariant.
+
+**The property this buys, and the reason it is not cosmetic.** On «A(0,0)» + «B על הישר y=x», the *line* `AB` is `x - y = 0` in every configuration while `B`'s *position* is open. The tool now answers the equation and still refuses the length — the honesty gate at the right granularity, which raw coefficients could not express.
+
+### One addition the fix forced, at the display chokepoint
+
+`lineText`'s magnitude rule (ADR-AG-085 / #1119) tested `Math.abs(k) === 1` — exact equality on a float. A line through two SOLVED points carries the solve's tolerance: «B על הישר y=x» lands at `y − x ≈ 3e-8`, so `AB` has `b = -1.0000000124` and the rule printed «x - 1y = 0» for a coefficient `fmt` was about to round to `1` anyway. The rule is about the number the STUDENT sees, so it now asks `fmt`. This was unreachable before — a two-point line had no equation to print — and it is a latent defect for any solver-derived curve row, not only this one.
+
+### Consequences
+
+`app/lines.ts` (new — the seam); `ask.ts` loses its private `lineNamed` and its equation branch resolves through the shared path with the `isKnowledge` gate the slope branch already used; `measurable.ts` enumerates through `lineNamesOf` and grows `measurablesOfSegment`, with the three line questions extracted to ONE list both the curve and the segment paths call; `Figure.tsx` reports a third pick kind (`segment`) over a transparent-stroke hit layer, so a drawn side is clickable at all; one line in `App.tsx`'s `lineText`.
+
+**The opposite side is offered first** on a vertex click: on a triangle, the distance from `C` to `AB` is the height — the question the student came to ask. The two sides through `C` are legitimate questions with legitimate answers (zero) and are still offered, just not ahead of it.
+
+`issue-1148-1139-one-resolver.test.ts` (12) — **proven to fail without the fix**: making the two seams the identity turns 7 of the 12 red. Analytic lane 85 files / 1364 tests green; `smoke:visual --app analytic` passed and the screenshots were read.
+
+## ADR-AG-089 — A measure's operands decide their own roles; word order does not (#1151)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R96** (new). **Design:** [04c](04c-design-analytic.md) — *the measure grammar*. **LADDER stage:** parse-time operand classification, ahead of evaluation; no solve or gate change.
+
+Reported by the operator: «המרחק בין AB ל-C» is unreadable while «המרחק בין C ל-AB» answers, and «המרחק בין A ל-B» — two points he had pinned — comes back «לא ניתן לחשב».
+
+### Measured, and worse than reported
+
+On `A(0,0)` `B(6,0)` `C(3,5)` + «משולש ABC»:
+
+```
+המרחק בין C ל-AB          -> 5            (point, then line)
+המרחק בין AB ל-C          -> «לא הבנתי»   the SAME question, other order
+המרחק בין A ל-B           -> null         two points, read as a line named «B»
+המרחק בין C ל-QR          -> null         a silent statement about a figure with no QR
+distance between C and AB -> null         the token missed -- and LENGTH_TOKEN then ate «AB»
+```
+
+The English row is the one that matters most and the issue did not state it: when the distance token failed, `LENGTH_TOKEN` claimed `AB` out of the same sentence, so the student asking for a **distance to a line** was answered about **a different measurement**. A wrong answer delivered confidently is the class this tool exists to avoid; the other rows are merely refusals.
+
+### The defect: POSITION was doing the operands' job
+
+`POINT_LINE_TOKEN` required the point first and the line second. Every spelling that inverted them fell out of the grammar, and #1134 had already had to repair the same token once for the same reason — the previous fix added a second word order as a second alternation, which widened the symptom without touching the cause.
+
+**Roles now come from the operands, and an operand's own spelling settles it:** one letter is a point and can be nothing else; two letters or a curve name denote a line. That decision needs no figure, so `lengths.ts` keeps the layering the rest of the file is careful about — it still knows nothing about objects.
+
+| operands | the question |
+| --- | --- |
+| `A`, `B` | the plain distance — **the same term «AB» produces**, so one question is one term |
+| `C`, `AB` (either order) | the point-to-line distance |
+| `AB`, `l1` | not read — see below |
+
+### Frames, not one positional mega-regex
+
+Each spelling is a small pattern with the SAME two operand slots, applied in turn, and the roles are decided once for all of them. That is what retires the shape of #1134's own bug — a four-group token where only the first pair was read, so the second word order matched and then resolved to nothing at all.
+
+The frames are ordered most-specific-first, and the English `between … and …` joins as a frame rather than as a parallel rule, so it cannot drift from its Hebrew twin.
+
+### Two lines is a CAPABILITY, and is deliberately NOT built here
+
+The issue's plan lists `line + line → the parallel-lines distance`. The widened token can now reach that pair, and it is left **unconsumed** — «המרחק בין AB ל-l1» still answers «לא הבנתי», exactly as today. Two reasons, and the first is binding: CLAUDE.md forbids building a missing capability under a bug's banner. The second is that the plan's stated fallback — *"an honest refusal otherwise"* — is not obviously right, because two non-parallel lines are at distance **zero**, so refusing would itself be a small dishonesty. That is a product question and it is not this fix's to answer. Filed separately.
+
+### Class check (standing rule 1)
+
+The other multi-operand measures were swept and cannot carry the defect: `AREA_TOKEN` reads ONE run of vertices, and `LENGTH_TOKEN` reads two interchangeable points. Asserted rather than argued, so an edit that later gives either an asymmetric operand pair fails the lock.
+
+The **catalog** obligation in the plan does not apply: `catalogAnalytic.ts` teaches CONSTRUCTION commands and has no ask-lane rows at all. The ask lane's teaching surface is the click menu, which ADR-AG-088 widened in this same round.
+
+### The silent null is closed too
+
+Only the POINT operands were checked for existence, so «המרחק בין C ל-QR» answered `null` — «לא ניתן לחשב מהנתונים», a statement ABOUT the figure, for a question naming something the figure has not got. The line operand now goes through the same check and gets #1111's missing-object message.
+
+### Consequences
+
+`lengths.ts`: `POINT_LINE_TOKEN` → `DISTANCE_FRAMES` + one role decision; `ask.ts`: the line operand joins the existence check. `issue-1151-operand-roles.test.ts` (16) — **proven to fail without the fix**: restoring the old token turns 9 of the 16 red.
+
+**Found while measuring, filed not folded:** [#1201](https://github.com/dcodish/geo_builder/issues/1201) — «המרחק מ-A לישר l1 = 5» is accepted, reported satisfied, and not honoured (the figure draws 2.13). Measured identically on `origin/main`, so it is pre-existing; it is a solve defect, not a grammar one, and outside this round's composition.
+
+## ADR-AG-090 — A curve keeps its identity when its representation changes (#1149)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R95** (extended — a stated curve is nameable however it entered the figure). **Design:** [04c](04c-design-analytic.md) — *curve identity and the promotion path*. **LADDER stage:** object construction; no solve, gate or value change.
+
+A line first used as a CARRIER and then stated is PROMOTED — one object, now drawn (#1076, and ADR-AG-023's content-derived ids are what make the two sentences ONE object). The promotion rebuilt that object from the carrier alone, and `words()` can name an anonymous curve only by its equation (ADR-AG-056).
+
+### Measured — the same two lines, two behaviours
+
+```
+y=2x+1 · y=-x+15                                    -> one crossing offered at (4.667, 10.333)
+«נקודה A על הישר y=-x+15» … then the same two lines -> NO crossing offered
+```
+
+Before the fix the promoted objects carried `label = { name: '' }` — no kind, no `eqSrc`. The student's own text was discarded **twice**, which is why fixing one end would have left the hole open:
+
+1. `parseAnalytic.ts` minted the carrier with an empty label, though the equation text was in its hand one line earlier;
+2. `apply.ts`'s promotion returned `{ ...prior, stated: true }`, preserving that emptiness and dropping the stated sentence's label.
+
+### The fix, and what it is NOT
+
+The carrier now carries `eqSrc`, and the promotion merges the incoming label over the prior — a name the prior already holds is never overwritten, since that is the student's own.
+
+Deliberately **not** a tolerant read at `crossings.ts:122`. Making the consumer accept a missing `eqSrc` would hide a lossy mint behind a defensive branch and leave every other consumer of the label broken in silence; the defect is that the object lost its identity, not that someone noticed.
+
+No `kind` is asserted on the carrier: the noun that reached that branch may be «ישר», but the FIT is what classifies a curve, and claiming a kind we have not established would be a second source of truth for it.
+
+### The property, not the symptom
+
+What is locked is stronger than "a crossing appears": **a promoted carrier is byte-identical to a curve stated outright.** Measured both ways, the curve objects now compare equal, so a future path that rebuilds objects without their labels fails the lock rather than being reported a fourth time.
+
+The carrier-only case is unchanged and now holds for the reason we actually mean: a carrier is not drawn (#1076), so no ring belongs to it — it is excluded because it is not `stated`, rather than as a side effect of a field nobody filled in.
+
+### Class check (standing rule 1) — swept, and one more found
+
+`parseAnalytic.ts:1686` is the ONLY carrier mint, so the reported path is a single site. The sweep of every other transition a curve can undergo found the same symptom at a seam that never HAD text: `evaluate.ts`'s `circle-at` and `line-at` derive `stated` curves with no `eqSrc`, so «דרך P עובר ישר מקביל ל AB» is drawn, its equation is printed in the panel, and it offers no crossing ring. Measured: `y = 5` and `x = 2` genuinely meet at (2, 5) and no ring is offered.
+
+That is the OTHER half of the issue's point 3 — synthesising an identity for a curve whose text was never written — and it is a different mechanism with an honesty gate of its own (a sampled equation must not be printed as a name). Filed as **[#1202](https://github.com/dcodish/geo_builder/issues/1202)** rather than built here.
+
+### Consequences
+
+`parseAnalytic.ts` (the carrier mint gains `eqSrc`), `apply.ts` (the promotion merges labels). `issue-1149-promotion-identity.test.ts` (6) — **proven to fail without the fix**: all six go red when both edits are reverted. Analytic lane 87 files / 1386 tests green.
+
+## ADR-AG-091 — A measure term the solver cannot resolve is a FALSE GREEN, not a missing opinion (#1201)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R97** (new). **Design:** [04c](04c-design-analytic.md) — *the resolver seam*, extended one layer down. **LADDER stage:** residual evaluation; no parse, gate or display change. **P1 — prod honesty.**
+
+### The symptom
+
+```
+נתון הישר l1: y=0
+A על הישר x=0
+המרחק מ-A לישר l1 = 5
+```
+
+`A` rides `x = 0`, so it is `(0, t)` and its distance to `l1` is `|t|`. The statement asks for `|t| = 5` and is satisfiable twice over. Measured:
+
+```
+faults              []                 -- nothing refused
+figure.unsatisfied  []                 -- the engine reported it SATISFIED
+A                   (0, -2.130393)     -- distance 2.13, not 5
+```
+
+The tool accepted the given, built the right constraint for it, reported nothing wrong, and drew a figure contradicting it. A student reading `2.13` off that canvas was told something false, while the panel still listed the given as one that held.
+
+### One cause, and it explains BOTH halves
+
+`residual()` computed a `length-eq` as `evalLengthExpr(k.left, at, env)` — **three arguments**. The fourth is `lineAt`, which resolves a `point-line` term's line. Without it the term evaluated to `null`, so the whole residual came back `null`. And `null` is read two different ways, each correct on its own:
+
+| reader | what it does with `null` | consequence here |
+| --- | --- | --- |
+| the SOLVE (`residual(...) ?? [0]`) | treats it as **zero — satisfied** | the constraint is never driven |
+| the REPORT (`if (r === null) continue`) | treats it as **cannot be judged** | it never reaches `unsatisfied` |
+
+`?? [0]` is not itself a bug: the least-squares residual vector must keep a constant dimension across iterates, so a term that vanishes at one parameter value has to contribute something. The defect is that a **permanent wiring gap produced the same `null` as transient vacancy**, and transient vacancy is the only thing that reading is safe for. That is why the failure was silent rather than merely wrong, and it is the class this ADR is really about.
+
+### The fix, and why the resolver MOVED rather than being written again
+
+`residual` gains `lineAt?: (name) => {a,b,c} | null`, supplied by `evaluate.ts` beside the `curveAt` it already builds, and threaded into both `evalLengthExpr` calls.
+
+The tempting shortcut was to give `solve.ts` a small line resolver of its own. **That is precisely the defect ADR-AG-088 retired three commits earlier** — one object resolved several ways, so a capability added to one reader goes missing from the others in silence. So the resolution moved DOWN into `engine/lines.ts`, and `app/lines.ts` (the ask lane and the click menu) now builds on it rather than beside it. One object, one answer, now across three layers.
+
+It resolves against a CONFIGURATION rather than a `Figure`, because the solver asks at every iterate where no figure exists yet — taking a `Figure` would have forced one to be built per iteration.
+
+### Measured after
+
+```
+seeds 0,1,2    A = (0, ±5.000)         the given is honoured, and BOTH signs occur across seeds
+A(0,0) pinned  faults: unsatisfiable   the impossible case is refused, naming the student's sentence
+C on x=3, «המרחק מ-C לישר AB = 4»      C lands at |y| = 4.000 — a two-point line drives identically
+```
+
+The sign result matters as much as the magnitude: a fix that drove `|t| = 5` by pinning `t = -5` would satisfy the given and quietly delete a configuration the student is entitled to cycle to (ADR-052). The lock asserts both signs occur.
+
+### A narrow false refusal, stated rather than hidden
+
+Where the LINE's own endpoint is the only carrier — `A(0,0)`, `B` on `x=10`, `C(3,4)`, «המרחק מ-C לישר AB = 2» — the solve now has a live residual and **6 of 8 seeds reach it exactly** (`B = (10, 5.7)`, distance 2.000). Seeds 0 and 5 diverge (`B` runs to `y ≈ -97775`) and the step is REFUSED.
+
+That is a false refusal on a satisfiable statement, and it is a **regression in convenience traded for a fix in honesty**: before, this case was accepted in silence with a wrong figure. A refusal keeps the prior figure (`decideSubmit` discards a faulting line), so the runaway position is never drawn. The divergence is a solve-convergence question of the same family as [#1182](https://github.com/dcodish/geo_builder/issues/1182) — whose re-seed ruling would cover exactly this — and it is not a wiring question, so it is not fixed here. Noted on that issue.
+
+### Consequences
+
+`engine/lines.ts` (new — the resolution, moved down from `app/`), `app/lines.ts` builds on it, `solve.ts` takes and threads `lineAt`, `evaluate.ts` gains `lineAtOf` and supplies it at all three `residual` call sites (and exports both builders, so the lock calls them instead of copying them).
+
+`issue-1201-point-line-residual.test.ts` (6) — **proven to fail without the fix**: restoring the three-argument call turns 5 of the 6 red. Analytic lane 89 files / 1397 tests green.
+
+## ADR-AG-092 — One position, one name: the invariant lives at the FIGURE (#1153)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R98** (new). **Design:** [04c](04c-design-analytic.md) — *naming paths and the shared check*. **LADDER stage:** fact application, before the object is minted; no solve, display or gate change.
+
+**Operator ruling, 2026-09-17:** the second naming REFUSES and names the holder. Renaming is an explicit action the student takes — nothing changes silently. (2-D answers the same action by renaming today; the operator ruled that 2-D comes into line, filed as [#1164](https://github.com/dcodish/geo_builder/issues/1164). This issue does not wait for it.)
+
+### Measured
+
+```
+נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9
+P מרכז המעגל I  ->  [P(3,4)]                  faults []
+O מרכז המעגל I  ->  [P(3,4), O(3,4)]          faults []
+T מרכז המעגל I  ->  [P(3,4), O(3,4), T(3,4)]  faults []
+```
+
+Three letters stacked on one position, nothing said, and the data panel then listed three points the student could not tell apart.
+
+### Where the check goes, and why not in the centre rule
+
+This class has now appeared three times — [#1113](https://github.com/dcodish/geo_builder/issues/1113) (crossings), this one (centres), and the duplicate-curve mint measured on [#1126](https://github.com/dcodish/geo_builder/issues/1126). A check inside the centre branch is the patch shape and would guarantee a fourth.
+
+So it sits at the **one place a derived object is minted** in `applyFact`. All seven `DerivedRule` kinds pass through it — midpoint, centroid, incentre, orthocentre, circumcentre, diagonals, circle-centre — so the naming family reaches one check rather than each rule growing its own.
+
+### The test is STRUCTURAL, and that is what keeps it honest
+
+Two rules that define the same point ARE the same point — decidable from the rules alone, with no coordinates and no tolerance. `sameDerivation` answers it per rule, and each answer is a small statement about the geometry:
+
+| rule | same when |
+| --- | --- |
+| `midpoint` | the same unordered pair — the midpoint of `AB` is the midpoint of `BA` |
+| `centroid` · `incentre` · `orthocentre` · `circumcentre` | the same three vertices in any order — a triangle is a set |
+| `diagonals` | the same RING up to rotation and reflection — **not** a set: `ABCD` and `ABDC` are different quadrilaterals whose diagonals meet in different places |
+| `circle-centre` | the same parent curve |
+
+The switch is **exhaustive** (`const undecided: never`): a new `DerivedRule` must decide whether two of its instances are the same point, and a compile error is how that question gets asked — rather than the new rule silently inheriting "never the same" and reopening the class.
+
+### The sub-case that is NOT decided here
+
+Measured in the same pass:
+
+```
+A(3,4) · B(3,4)  ->  two points at one position, faults []
+```
+
+A **positional** check would have caught this too. It is deliberately left alone: the operator ruled on *naming one object twice*, and two independently stated points that happen to coincide is a different sentence. A student may state two points a later constraint separates, and under [ADR-052](06-decisions.md#adr-052) an unstated magnitude is a free DOF — so the coincidence may be incidental rather than asserted. **Escalated on the issue rather than answered**, and locked as unchanged so a future session cannot fold it in by accident.
+
+### The rename OFFER is not in this slice, and that is stated
+
+The ruling sketches `[ שנה את השם ל-O ]` beside the refusal. **Analytic has no rename action at all** — that is [#1154](https://github.com/dcodish/geo_builder/issues/1154), which ports 2-D's rename family — so a button here would call nothing. The refusal therefore tells the student the concrete action available today: delete the line that named the holder and write it again. The offer lands with #1154 and is recorded there.
+
+### A sibling that looks identical and is not
+
+[#1167](https://github.com/dcodish/geo_builder/issues/1167) reads to a student as the same thing — *"two points on the same location"* — and this check will NOT fix it: measured, its `O` is a hardcoded string in a panel description, not an object, so no naming path ran. **#1153/#1126/#1164 are about objects sharing a position; #1167 is about descriptions inventing letters for positions.** Recorded here so the two stay deliberate siblings rather than being closed as duplicates.
+
+### Consequences
+
+`engine/sameDerivation.ts` (new), one guard in `applyFact`'s derived-mint, a new `already-named` error code carrying `holder` (a NAME, never a sentence — the engine stays language-free) threaded through `LineFault` → `decideSubmit` → the locale, and one He/En string pair.
+
+`issue-1153-one-position-one-name.test.ts` (9) — **proven to fail without the fix**: disabling the guard turns 4 of the 9 red. Analytic lane 90 files / 1406 tests green.
+
+## ADR-AG-093 — The relation's SYMBOLS are the exam's notation, and the connector is optional (#1160)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — R95's "every spelling of one question" widened to the relation family; no new numbered row. **Design:** [04c](04c-design-analytic.md) — *the relation rule's notations*. **LADDER stage:** parse; no engine, solve, gate or display change.
+
+Not reported by the operator — surfaced by probing the neighbouring spellings of the sentence he typed for #1159.
+
+### The capability existed; only its notation was unreadable
+
+```
+AB מקביל ל-DC        ✅        AB ∥ DC      ❌ not-handled
+AB מקבילה ל-DC       ✅        AB || DC     ❌ not-handled
+הצלע AB מאונכת לצלע BC ✅      AB ⊥ DC      ❌ not-handled
+AB is parallel to DC ✅        AB מקביל DC  ❌ not-handled  (no connector)
+```
+
+The word forms are in good shape — the full inflection run, the `ל` variants, the `הצלע…לצלע` frame and the English all land. The gap is exactly the **symbol** row plus the connector-less word form. A student who writes what the exam prints is told the tool does not understand them, for a relation it implements and tests thoroughly.
+
+This is the tree's recurring **one-spelling gate**: #1081 counted five, and #1128 and #1151 are the same shape. It also unblocks [#1129](https://github.com/dcodish/geo_builder/issues/1129), which may not offer a `∥` or `⊥` palette chip while the glyph does not parse.
+
+### Deviation from the plan, and why — the chokepoint it named does not carry these lines
+
+The issue's plan put the symbol normalisation in `engine/expr.ts`, *"the single existing normalisation chokepoint"*, reasoning that `²`≡`^2` and `√`≡`sqrt` are the same kind of fact.
+
+**Measured, the line never goes through it.** `normalizeMath` is applied to *equation fragments* — four call sites, each on a sub-string that is already known to be an expression — and never to the whole utterance. A symbol rewritten there would never be seen by the relation rule, which matches raw text. It is also not the same kind of fact: `∥` is a relation VERB, and teaching a math-expression normaliser to rewrite Hebrew verbs would be the second normaliser the plan was trying to avoid.
+
+So the change is at the other chokepoint the plan names — the relation rule itself.
+
+### A second SPELLING of one rule, not a second rule
+
+`RELATION_SYM` is its own pattern because a symbol needs no connector and no surrounding spaces («AB∥DC» is one token to a student), while the word forms require `ל`. It feeds the **same handler**, resolves both operands through the **same `direction()`**, and produces the same `relation` constraint — so every operand kind (segment, polygon side, named line, axis) arrives with nothing to wire.
+
+The connector became optional in the same edit, which is what fixes «AB מקביל DC» and «AB parallel DC» — one change rather than two, as the plan asked.
+
+### The counter-direction, and one symbol deliberately refused
+
+`//` is **not** admitted. It is the one candidate that collides with real mathematics, and this rule runs BEFORE the equation parser — so a line it claimed wrongly would be refused as a *bad operand* rather than falling through to be read as the equation it is. The issue's own plan authorises this: a narrower symbol set is fine, a mis-parsed equation is not. Asserted in the lock so the exclusion is a decision on the record rather than an oversight someone later "fixes".
+
+Both `⊥` (U+22A5) and `⟂` (U+27C2) are admitted: they are indistinguishable on screen and both get typed.
+
+Measured unchanged: `y=2x+1`, `y = 1/2`, `(x-3)^2+(y-4)^2=9`, `נתון הישר l1: y=x`, `A(3,4)`, `משולש ABC`. An operand the figure cannot read is still the owned `bad-operand` refusal (ADR-AG-017), not a fall-through.
+
+### Consequences
+
+`parseAnalytic.ts`: `RELATION_SYM`, an optional connector in `RELATION_HE`/`RELATION_EN`, and the parallel test widened to the symbols. `catalogAnalytic.ts` gains the two symbol rows — the catalog is the coverage map, so the guard re-parses them in both languages and a symbol that stops parsing fails the suite instead of becoming documentation.
+
+`issue-1160-relation-symbols.test.ts` (12) — **proven to fail without the fix**: removing the symbol pattern turns 9 of the 12 red. Analytic lane 90 files / 1410 tests green.
+
+## ADR-AG-094 — An answer and its derivation are two rows, and the derivation folds (#1206)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R100** (new). **Design:** [04c](04c-design-analytic.md) — the ask lane's answer row. **LADDER stage:** display only.
+
+**Operator, 2026-09-18, playing T1:** *"having all the equations in one line doesnt look nice so we should have each line on a new row. we should be able to collapse the items so if user doesnt want to see them, only the equation is shown"*.
+
+### What he saw
+
+```
+✕  משוואת הישר CA: 5x - 3y = 0   m = (0-5)/(0-3),  y - 5 = m(x - 3)
+✕  משוואת AB: y = 0              m = (0-0)/(6-0),  y - 0 = m(x - 0)
+```
+
+### Root cause — a style that could never apply
+
+`askRow` is `display: flex; align-items: baseline`, and the trace was a **flex sibling** of the answer. So the two shared one baseline by construction, and the `marginTop: 2` on `askTrace` was inert — the layout could not have honoured it however the trace was styled.
+
+The trace now lives INSIDE the answer's column (`askAnswerCol`, `flex-direction: column`), which is what puts it on its own line. The row's `align-items` becomes `flex-start` so the `✕` stays beside the answer's first line rather than centring against a two-line block.
+
+### Shown by default, and that is a decision
+
+`<details open>`. [#1053](https://github.com/dcodish/geo_builder/issues/1053) is an operator ruling that the method is part of the answer — *"we don't just show the result — we show what to use to get to this result"* — so collapsing by default would quietly reverse it. The request is an opt-out, and `<details>` provides one for free: keyboard-reachable, and out of the accessibility tree when closed, with no state for the component to hold.
+
+### The native marker is kept, and looking is why
+
+`list-style: none` on the summary was written first and **removed the disclosure triangle**, leaving the label reading as inert grey text with nothing to say it could be clicked. Caught by rendering the row in a real browser and looking at it — which is the only way a layout change is actually judged, and the reason the verification for this one is a screenshot rather than a unit test.
+
+### Why the lock is not a render test
+
+The analytic panel's JSX lives entirely in `App.tsx`; there is no extracted row component, and extracting one to make this assertable would set a structural precedent well beyond a layout fix. So the invariant was verified by driving the real page — `details` present, `open` by default, nested inside the column, and its top edge below the answer's bottom edge — and the locale strings are locked by unit test. Stated here rather than left as a silent gap: **an extracted `AskAnswerRow` is what a unit lock would need**, and it is the right first step whenever this row is next touched.
+
+---
+
+## ADR-AG-095 — A menu entry whose answer can only be zero is not offered (#1207, amends ADR-AG-088)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the measure menu's contract gains its second half. **Design:** [04c](04c-design-analytic.md) — the measure menu. **LADDER stage:** menu enumeration; no evaluation change.
+
+**Operator, 2026-09-18, playing T2:** *"there is no need to show the distance to segments that make up that point since they will be 0 and no one would want to ask that"*.
+
+Clicking `C` offered the distance to `AB` — the height, and the question the student came to ask — and also to `BC` and `CA`, which are distances from a point to a line **through that point**: zero by construction, at every configuration of every figure.
+
+### This overrides a choice ADR-AG-088 made deliberately
+
+That ADR kept them and merely ordered the height first, reasoning that the menu's contract is *«an option is offered iff the ask lane answers it»* and the lane does answer `0`. The contract holds either way, so this is a product judgement rather than a defect — and a session reading only ADR-AG-088 would have had every reason to put them back. **The contract is a floor, not a licence to offer everything that clears it**, and two dead entries buried the one worth asking.
+
+### Structural, not positional — the boundary that matters
+
+The exclusion is by the NAME the line is made of (`asPair` contains the clicked id), never by measuring the answer. A named line that merely *happens* to pass through the point today also answers 0, but it is not made OF the point: another configuration may move it off, and the student may genuinely want to ask. A "drop it if the answer is zero" test would have removed it wrongly, and that case is locked.
+
+`issue-1207-no-zero-distances.test.ts` (5), and ADR-AG-088's own case was rewritten to assert the exact list — with the others gone, its `toContain` would have passed for a weaker reason than the one that is true.
+
+## ADR-AG-096 — The view belongs to the figure it was computed for (#1209)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R101** (new). **Design:** [04c](04c-design-analytic.md) — the canvas view's lifetime. **LADDER stage:** view state; no engine, solve or display-format change.
+
+**Operator, 2026-09-18, playing T13:** *"after the 2nd input, the canvas is not centred in a way the points are visible"* — with a screenshot of an **empty canvas** whose banner read «טענתי את השרטוט — 2 נתונים» and whose data panel listed `A = (0, y_A)` and `l1: y = 0` perfectly.
+
+### The engine was innocent
+
+The figure's own box is correct at every step:
+
+```
+«נתון הישר l1: y=0»       box [-10,-10 .. 10,10]
+«A על הישר x=0»           box [-1.4,-2.4 .. 1.4,0.3]    A(0, -2.1)
+«המרחק מ-A לישר l1 = 5»   box [-3.3,-5.7 .. 3.2,0.7]    A(0, -5.0)
+```
+
+### Root cause — a load replaces the figure and keeps the view
+
+Pan and zoom are a transform ON TOP of the figure's box. `onLoadFile` calls `restore(...)`, re-derives for the audit, sets the banner — and **never touches `view`**. Every other `setView` in the file is a user gesture: the wheel, a drag, the ± buttons, the reset button.
+
+So the previous figure's transform is applied to a new figure it was never computed for. `clearSession` had the same gap.
+
+Both now go through one `showWholeFigure()` rather than each remembering — which is the shape `clearAll`'s own comment records as having been reintroduced by a third and fourth product.
+
+### Verified in the real app, because the defect is one of geometry on screen
+
+Driven in a browser, counting the drawn points inside the canvas box:
+
+```
+after building a figure          6/6 points on screen
+after zooming into a corner      0/6            ← the operator's blank canvas, reproduced
+after «נקה הכל» + rebuilding     6/6            ← the fix
+zoomed into a corner             0/4
+after LOADING a save file        2/2            ← the reported path
+```
+
+That is the lock for this one: the panel's JSX and the view state live in `App.tsx` with no extracted component, so a unit test cannot reach them — the same constraint ADR-AG-094 records. Stated rather than left silent.
+
+### Why it matters more than it looks
+
+A loaded figure that appears empty reads as **data loss** — the student's own save looks like it failed to open, and nothing on screen says otherwise.
+
+## ADR-AG-097 — A curve row leads with its EQUATION; the properties fold beneath it (#1212)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R102** (new), serving R99. **Design:**
+[04c](04c-design-analytic.md) — *A curve reads as an equation plus its properties*. **LADDER stage:**
+display only — no engine, solve or parse change, and nothing new is computed.
+
+**Operator, 2026-09-18, playing T18:** *"the circle equation is not an equation. under equations we should
+see the equation and then we can have the center and radius. these should be collapsable like i requested
+for the line equations"*.
+
+```
+משוואות
+מעגל I: O(3, 4), r = 3        ← not an equation
+l1: -2x + y - 1 = 0           ← an equation
+```
+
+He is right twice: the row is not an equation, and it sits under a heading ADR-AG-092 renamed to
+«משוואות» hours earlier on his own report. That rename made this visible; it did not cause it.
+
+### Measured — two of four kinds printed no equation at all
+
+| kind | before | leads with an equation? |
+| --- | --- | --- |
+| line | `-2x + y - 1 = 0` | yes |
+| **circle** | `O(3, 4), r = 3` | **no — none at all** |
+| **ellipse** | `a = 4, b = 3, F₁(…), F₂(…)` | **no — none at all** |
+| parabola | `y² = 8x, F(2, 0), x = -2` | yes, properties run on inline |
+
+Every one of those equations was derivable from what the row already held — a circle knows `cx, cy, r`;
+an ellipse knows `a, b`. Nothing had to be computed that was not computed already.
+
+### Root cause — a stated rule that did not survive being played
+
+`describeCurve` carried its reasoning in a comment: *"deliberately DESCRIPTIVE (centre, radius, focus)
+rather than a restatement of the equation the student just typed — the memorised triple (`y²=2px` →
+focus, directrix) is exactly what the formula sheet withholds."*
+
+The instinct is sound and the premise inverts an honesty invariant. Measured against the only way this
+tree lets a circle be stated — by its equation; «רדיוס» appears nowhere in the parser — the student types
+«נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9» and the panel answers `O(3, 4), r = 3`.
+
+That is not declining to restate the given. It is **replacing the given with a derived form**, under a
+heading that promises equations — and *"everything the student stated is visible"* is the invariant it
+trades away. «משוואת המעגל» then answered the centre and radius, which is a different question than the
+one asked. The ellipse is the same trade: its equation was typed too, and the row showed only its axes
+and foci.
+
+Avoiding redundancy is a real instinct, and it was spent against the wrong thing. The derived form is the
+redundant one.
+
+So: the equation leads, and the properties become supporting detail under the same `<details>` disclosure
+ADR-AG-094 gave the ask lane's working. Open by default, deliberately — for a circle given by its centre,
+those properties ARE the givens, and folding them shut by default would hide what the student stated. A
+line has no `details` and gets no disclosure; its row is untouched.
+
+### The move that makes the lock possible
+
+`describeCurve` and `lineText` were module-private component code in `App.tsx`, so the ask lane could
+only reach the formatter by INJECTION — and **every test but one injected a stub** (`() => ''`,
+`() => 'curve'`, `` `kind:${c.kind}` ``). A stub agrees with anything, so "«משוואת I» answers the
+equation" could not have been asserted at all; `issue-1117` had already noticed the hazard and answered it
+by hand-writing a faithful stub, with the comment *"a stub returning '' hides the entire defect"*. That is
+the argument for the import, not for a better stub — [ADR-W-053](06w-decisions-workspace.md#adr-w-053).
+
+`app/curveText.ts` is now the one home; `ask()` imports it and lost the parameter; thirteen test files
+dropped their stubs. The shared formatting is a structural fact rather than a convention every call site
+has to keep.
+
+### Notation is a rule, not a template
+
+The line terms' rules apply to all four kinds — a zero offset writes no bracket (`x²`, not `(x - 0)²`), a
+negative one flips the sign (`(x + 2)²`, not `(x - -2)²`), a unit coefficient is suppressed (`y² = x`).
+Numbers go through `fmtAnalytic` (ADR-AG-084), so fractions and exact forms (#1120) are already right.
+
+`src-analytic/__tests__/issue-1212-curve-equation.test.ts` (8) calls `curveParts` and `ask` directly,
+including the operator's own circle end to end and the #1023 guarantee that an unfixed parabola still
+shows its open form rather than an invented equation.
+
+## ADR-AG-098 — An answer can be a FACT about the figure, not only a value or an absence (#1223)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — honesty: an error message never misdescribes the givens; no new row. **Design:** [04c](04c-design-analytic.md) — the `Answer` outcomes. **LADDER stage:** display only. **Extends:** ADR-AG-0xx (#1111's `missing`).
+
+**Operator, 2026-09-19:** *"when i ask for שיפוע PB it says it cannot be claculated which is wrong. its just that the slope is not defined"* — on `A(0,0)`, `B(3,4)`, `C(6,0)`, `P(3,0)`, where `B` and `P` share an x.
+
+### The panel contradicted itself on one screen
+
+```
+הכול נקבע על-ידי הנתונים          "everything is determined by the givens"
+שיפוע BP = לא ניתן לחשב מהנתונים   "cannot be computed from the givens"
+```
+
+Both cannot be true, and the first is the correct one. The slope of `BP` is not uncomputable — it does not **exist**, which is a fact about the geometry and a perfectly good answer.
+
+### Root cause — the rule was written down, and the return value contradicted it
+
+```js
+// A vertical line HAS no slope, and that is an answer about the figure rather than a failure.
+if (Math.abs(line.b) < 1e-12) return { question, value: null };
+```
+
+The comment states the decision exactly. The next line returns `null`, which is the **failure channel**, because `Answer` had no way to say *vertical*. So one `null` carried three situations and the component guessed between two of them:
+
+```js
+a.value ?? t(figureIsOpen(d) ? 'askOpen' : 'askNoValue')
+```
+
+| what is true | what the student was told |
+| --- | --- |
+| the figure is still open | «עדיין לא נקבע מהנתונים» — correct |
+| genuinely not computable | «לא ניתן לחשב מהנתונים» — correct |
+| **vertical: determined, no slope** | «לא ניתן לחשב מהנתונים» — **false** |
+
+The figure is determined, so `figureIsOpen` is false and the third case landed on the "your givens are insufficient" wording. Not cosmetic: it sends a student looking for a missing given on a figure that has none.
+
+### The shape of the fix, which this tree has made before
+
+`Answer` gains `fact?: 'vertical'` — a fourth outcome beside `value`, `unreadable` and `missing`. That is the identical move #1111 made when it split `missing` out of `unreadable`, for the identical reason recorded there: *"a student told their sentence was not understood will rewrite the sentence for ever, because the sentence was never the problem."*
+
+A **token**, not a sentence, per ADR-AG-085 — `ask.ts` is the lane's engine and holds no locale.
+
+The component renders it with **`slopeVertical`, the string the «שיפועים» section already prints** for a vertical segment («אנכי (אין שיפוע)»). Reusing it is the point: two surfaces that computed the same fact would otherwise be free to word it differently, and that drift is what #1102 named.
+
+### What the fix must not swallow
+
+`null` legitimately means *the givens do not fix this*, and that wording is right. The bug was only that a determined-but-undefined answer borrowed it. So the lock leads with the **anti-lock**: two points on two different carriers leave `AB`'s slope genuinely free, and that case must still answer «עדיין לא נקבע מהנתונים» with no `fact` set. A horizontal slope stays `0` — a value, not an absence — for the same reason ADR-AG-0xx gave for segments.
+
+`src-analytic/__tests__/issue-1223-vertical-slope.test.ts` (6) calls `ask` directly, and asserts `figureIsOpen` is false on the operator's figure — because that is what made the old message false rather than merely unhelpful.
+
+### The field exists for the next one
+
+`fact` is a union with one member today. [#1227](https://github.com/dcodish/geo_builder/issues/1227) is already queued behind it: the locus of a DETERMINED point is that point, or a finite set of points, and it currently returns the same `null` with the same false message. It joins this union rather than growing a parallel mechanism.
+## ADR-AG-099 — A sweep that closes a class must match the word's other form (#1214, amends ADR-AG-092)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R99** — a heading names what its rows ARE, in the student's own word; extended from the section heading to the labels inside it. **Design:** [04c](04c-design-analytic.md) — the curve row. **LADDER stage:** display only.
+
+**Operator, 2026-09-19, playing T19:** *"the data panel says נתוני העקום and עקום is mathematically correct but not what a highschool student would expect so we should have נתוני המעגל and then נתוני הישר etc."*
+
+This is **his own #1147 ruling reintroduced three commits later**, by the label ADR-AG-097 added.
+
+### The guard that existed to prevent it had a one-letter hole
+
+ADR-AG-092 did not merely fix the literal — it shipped a sweep over the whole locale, commented *"the class is closed rather than the instance"*:
+
+```js
+.filter((l) => /עקומ/.test(l) && …)
+```
+
+```
+/עקומ/  vs  «עקומים»  (what #1147 removed)  ->  true
+/עקומ/  vs  «העקום»   (what #1212 shipped)  ->  FALSE
+```
+
+The plural carries a medial mem (`מ`, U+05DE). The singular ends in a **final mem** (`ם`, U+05DD) — a different codepoint. The sweep was written against the word in front of it, and silently did not cover the singular of that same word.
+
+**So it read as class-level while being instance-level, which is worse than no guard at all:** it is the kind of test that makes the next session confident. Widened to `/עקו[מם]/`, it went red on both strings this issue is about *before* anything else changed, and that red is the fix's first piece of evidence.
+
+**The hole is the root cause; the wording is the symptom.** A fix that only renamed the label would have left the next singular noun free to walk through.
+
+### The labels themselves
+
+One whole string per kind — «נתוני המעגל», «נתוני הפרבולה», «נתוני האליפסה» — not «נתוני ה» with a noun slotted in. ADR-AG-085 settled that on this same grammar: Hebrew agreement runs through the clause, and the definite article is exactly the joint that breaks when the fifth noun arrives. The English side settles it too, holding `'a circle'` where a prefix repairs nothing.
+
+The tooltip names no kind, so it needs no fourth string and cannot reintroduce the old noun.
+
+`curveDetailsKey` returns a KEY and lives beside `curveParts`, because that module already decides which kinds HAVE details. The lock walks every member of the `NumCurve` union, asks `curveParts` whether it folds, and requires a real label exactly when it does — so a fifth conic cannot ship a labelled row with nothing in it, or a detail row with no label.
+
+### The operator's own example cannot happen yet
+
+«נתוני הישר» will not appear: a line returns no `details` and renders no disclosure (ADR-AG-097, asserted at T23). The three kinds that fold are circle, parabola and ellipse. [#1219](https://github.com/dcodish/geo_builder/issues/1219) would give a line a fold, and the table gains its fourth entry then — which is why the lock is written against `curveParts` rather than a hardcoded three.
+## ADR-AG-100 — The input preview typesets what it previews, and isolates before it does (#1215)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown (the #1097/#1208 rule), extended to the input preview; no new row. **Design:** [04c](04c-design-analytic.md) — the input area's preview seam. **LADDER stage:** display only.
+
+**Operator, 2026-09-19**, typing «מעגל (x-3)^2+(y-5)^2=25»: *"note the text below the textbox isnt mathml"*.
+
+```
+the BOX        2+(y-5)^2=25^(x-3) מעגל       reordered by bidi while typing
+the PREVIEW    מעגל (x-3)^2+(y-5)^2=25       right order, raw ^2      ← the report
+the FACT ROW   מעגל (x - 3)² + (y - 5)² = 25 right order, typeset
+```
+
+### Nothing needed building — one product had not reached for a shared thing
+
+`InputArea`'s `preview` prop takes a **ReactNode**, and its own comment says *"2-D's maths renderer rides the same prop at its adoption"*:
+
+```
+src/App.tsx      preview={(s) => (hasMath(s) ? <MathText text={s} /> : inputPreview(s))}    adopted
+src-analytic     preview={(s) => analyticBidi.inputPreview(s)}                              not
+src3d, complex   the same gap — separate products, separate issues
+```
+
+`hasMath` and `MathText` have been in `shell/math.tsx` the whole time, in the tree where equations are the entire subject.
+
+### The order is the decision, and it was found by LOOKING
+
+The obvious adoption — hand the raw string to `MathText` — typesets perfectly and lays it out **backwards**. `MathText` emits several `<math>` islands with text between them, and in an RTL paragraph that sequence runs right-to-left, so the preview drew with `=25` at the far LEFT: the exact defect the preview exists to prevent, reintroduced by its own fix.
+
+Driven in a browser and measured by the islands' x-positions:
+
+```
+raw string        left-to-right:  [(y-5)², (x-3)²]      backwards
+isolated first    left-to-right:  [(x-3)², (y-5)²]      correct — «מעגל» rightmost, equation LTR to its left
+```
+
+So: **isolate, then typeset** — the order the answer rows already use (#1097). A unit test cannot hold this (jsdom does no bidi layout), so the lock holds the *cause* — that `isolateLtrRuns` is still applied on this path — and the ADR records the measurement, as ADR-AG-096 did for the same reason.
+
+The bidi previewer stays as the fallback and is not the lesser path: `hasMath` is false until an exponent or fraction completes, so every early keystroke takes it exactly as before, and no half-formed formula is ever half-typeset (ADR-W-060).
+
+### A brittle lock, widened rather than deleted
+
+`bidi-wiring.test.ts` matched a seam with `\{[^}]*`, which stops at the FIRST `}` — so the moment the expression contained nested JSX (`<MathText text={s} />`) it went red on a change that kept the wiring it guards. A matcher that cannot survive a legitimate edit to the thing it protects will be deleted by whoever hits it next, so it counts braces now. The rule it encodes was right and is untouched.
+## ADR-AG-101 — «Another configuration» compares the whole figure, not only its points (#1220)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — «הציגו תצורה אחרת» reaches every configuration the givens allow; no new row. **Design:** [04c](04c-design-analytic.md) — the configuration search's sameness test. **LADDER stage:** configuration search; no engine or solve change.
+
+**Operator, 2026-09-19, playing T24** on «נתונה פרבולה שמשוואתה y^2=2px»: *"p is unknown but when i ask for another config, there is no other config which is wrong"*.
+
+### The engine was innocent
+
+```
+seed 1  p =  1.314     seed 3  p = -2.889
+seed 2  p = -3.400     seed 7  p = -3.754     seed 15  p =  3.491
+```
+
+Five seeds, five genuinely different parabolas, all drawn. ADR-052 is honoured: `p` is sampled as the free DOF it is, and no default is masquerading as fixed. **Nothing false was ever on the canvas.**
+
+### Root cause — the sameness test looked at points, and this figure has none
+
+```js
+const signature = (lines, seed) =>
+  derive(lines, seed).figure.points.map(…).join('|');
+```
+
+`nPoints = 0`, `nCurves = 1`, at every seed. The signature was the empty string, `anotherConfiguration` exhausted its 24 tries, and the seed never moved.
+
+The *message* is what makes this wrong rather than merely unhelpful. This function's own comment reads: *"when nothing differs, saying so is the honest answer. A determined figure has one configuration."* So `found: false` **means** "this figure is determined" — said about a figure with infinitely many, one of which was on screen. The reasoning was right; the signature it rested on silently excluded an entire class of figure, and the same blindness hits any curve-only one.
+
+### A line signs NORMALISED, and that is the load-bearing part
+
+`(a, b, c)` and `(2a, 2b, 2c)` are the same line, and a least-squares solve can land on differently scaled triples across seeds. Signing them raw would make one line look like two, and the button would announce "another configuration" while redrawing an identical picture — the failure in the opposite direction the same comment already warns about:
+
+> two configurations differing in the sixth decimal are one picture, and offering them as "another configuration" would be the button lying in the other direction.
+
+`normalizedLine` (#1201) is the one place that decides when two lines are the same line, so it is **called**, not reproduced ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)). The other kinds sign as their own resolved parameters at the same 4 decimals the points use.
+
+### The anti-lock matters as much as the fix
+
+A fix that loosened this until everything differed would trade a button that never moves for one that always claims success. `src-analytic/__tests__/issue-1220-curve-configuration.test.ts` (6) therefore asserts both directions: the operator's parabola finds another configuration **and `p` actually differs there**, while a fully stated triangle still answers `found: false`, and a stated line does too — which is the normalisation guard read from the other side.
+## ADR-AG-102 — The working states its intermediate, and each statement gets a row (#1221, amends ADR-AG-094)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R100** — the working is shown and can be folded; this adds that it must be *complete*. **Design:** [04c](04c-design-analytic.md) — the technique traces. **LADDER stage:** display only.
+
+**Operator, 2026-09-19, playing T25:** *"never include more than 2 equations in a line. the m= should have a final answer there."*
+
+### The `m` half was not a formatting nit
+
+Every trace this tree can produce:
+
+| question | trace | its result was… |
+| --- | --- | --- |
+| «משוואת הישר AB» | `m = (4 - 0) / (3 - 0),  y - 0 = m(x - 0)` | **nowhere** |
+| «AB» | `d = √((3 - 0)² + (4 - 0)²)` | the answer row: `5` |
+| «המרחק מ-C לישר AB» | `d(C, AB) = |0·3 + 1·5 + 0| / √(0² + 1²)` | the answer row: `5` |
+
+The line trace is the only one carrying an **intermediate**, and it stated its value on no surface. `d` needs no result printed — the answer row directly above says `5`. `m` is different: it is not the answer (the answer is `4x - 3y = 0`), and the second step consumes it symbolically, so the student was shown `y - 0 = m(x - 0)` and never told what `m` was. **The trace handed them the last step**, which is exactly what ADR-AG-060 (#1053) built it not to do.
+
+### The rule, because "show more working" has no natural end
+
+> **An intermediate the next step consumes is evaluated. A final value already shown in the answer row is not repeated.**
+
+Under it the two distance traces are already correct and stay byte-identical — asserted, not assumed, so a later session does not "improve" them with a `= 5` the row above already carries.
+
+### One statement, one row
+
+#1125 had already established these are two statements — it is why `EXPR` carries no comma (*"«m = (4-0)/(3-0), y - 0 = …» is two statements, not one expression"*) — and they were rendered on one line anyway. The separator is now a newline and the component maps each part to its own row.
+
+Split rather than `white-space: pre-line`, deliberately: each row is then typeset independently, so a fraction is found inside ITS statement rather than inside a run containing two of them.
+
+### Two notation corrections the change forced
+
+- **A substituted slope is bracketed when it would otherwise be ambiguous.** `4/3(x - 0)` reads as `4/(3(x - 0))` at least as readily as `(4/3)(x - 0)` — #1180's ambiguity, ruled on for the panel's line rows and applied here rather than leaving one surface ambiguous because nobody looked. An integer slope is untouched.
+- **«y - (0)» is gone.** Pre-existing and surfaced by this work: the bracket around `a.y` was chosen by **`b.y`**'s sign, so `A(0,0)`, `B(3,-6)` printed `y - (0)`. A zero is never bracketed; a genuine negative still is.
+
+`techniques.test.ts`'s #1053 assertion was updated rather than worked around — it is the lock for the behaviour this ADR changes, and it now records why (it injects `fmtNum`, so it reads `1.33` where the product reads `4/3`).
+## ADR-AG-103 — A figure the student BUILDS is visible, not only one they open (#1225, amends ADR-AG-096)
+
+**Requirements:** [02c](02c-requirements-analytic.md) **R101** — extended from *opens* to *builds*. **Design:** [04c](04c-design-analytic.md) — the canvas view's lifetime. **LADDER stage:** view state; no engine, solve or display change.
+
+**Operator, 2026-09-19, playing T34:** *"when i put MA=5 the focus on the canvas is lost and the image is not centered. pressing the center button does the work but this should be automatic"* — the canvas framed x ≈ 12…28 while the whole figure sat at x ≈ 0…8.
+
+### The third door on ADR-AG-096's own class
+
+That ADR states the rule and #1209 shut two doors. Every `setView` before this:
+
+```
+showWholeFigure()      load a file        #1209
+showWholeFigure()      clear all          #1209
+setView(zoomedAt(…))   the wheel          user gesture
+setView(panned(…))     a drag             user gesture
+setView(INITIAL_VIEW)  the reset button   user gesture
+setView(zoomedAt(…))   the zoom buttons   user gesture
+```
+
+**Adding a FACT is on no list.** It changes the figure while the transform computed for the previous one stays applied. It bites hardest exactly where the operator hit it: while `M` was free the sampled figure was large, so the view was wide; pinning it with «MA = 5» shrank the figure into a corner of that view.
+
+### A predicate, not an unconditional re-fit
+
+Re-fitting on every fact would trade this defect for a worse one — a student who deliberately zoomed into a vertex losing it on every subsequent line, the tool overriding a gesture again and again. So: **re-fit only when the figure would otherwise not be substantially visible.** A deliberate zoom survives while the figure is on screen; blank paper never survives.
+
+The operator has not ruled on this; it is the session's recommendation, recorded here and on the issue so reversing it is cheap.
+
+`figureIsVisible` measures per AXIS rather than by area, because a figure can be perfectly flat — three collinear points have zero height, and an area ratio is `0/0` there. A degenerate axis counts as visible when the figure's extent on it falls inside the view's. The effect keys on the figure's BOX, so it fires only when the extent actually changes, and returns the view unchanged when the figure is fine — a React no-op, which is what keeps it from looping.
+
+### Verified by driving, because it is geometry on screen
+
+Counting drawn points inside the canvas box, the way ADR-AG-096 did — `main` and this branch, same script:
+
+```
+                                 main      with the fix
+built                            6/6       6/6
+after zooming into a corner      0/6       0/6      (a deliberate gesture, respected)
+after a fact changes the box     0/8       8/8      ← the defect, and the fix
+```
+
+**The operator's own figure could not be used for this.** «נקודה M» is the locus lane's sentence (#1136) and lives only on PR #1172's branch, so on `main` the whole T34 sequence is refused at line 3. The defect is not locus-specific — any fact that changes the figure's extent reaches it — so the reproduction uses a figure `main` can build. Recorded because a later session reading T34 will otherwise try the operator's lines here and conclude the bug does not exist.
+
+A unit test cannot reach `App.tsx`'s view state (no extracted component — the constraint ADR-AG-094 and ADR-AG-096 both record), so `issue-1225-view-follows-figure.test.ts` (6) locks the PREDICATE, including the anti-lock that a zoom onto the figure's centre survives, and the ADR carries the driven measurement.
+
+One belief this corrected on the way: a figure that merely GROWS is not a failure mode, because `viewBox` takes its half-extents from the current figure — at zoom 1 a grown figure still fits. What hides it is a stale centre or a stale zoom. A first draft of the lock asserted otherwise and would have frozen a false belief into the suite.
+## ADR-AG-104 — A coordinate the student wrote is shown, even when it is not a number (#1226)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — honesty: everything the student stated is visible on the figure; no new row. **Design:** [04c](04c-design-analytic.md) — the point row's open form. **LADDER stage:** display only; nothing is computed that was not computed already.
+
+**Operator, 2026-09-19, playing T32** on «A(-9a,0)» / «B(41a,0)»: *"9a and 41a are still not shown on the canvas or data panel which is wrong."*
+
+### The tool held the expression and printed its own symbol instead
+
+```
+A.x                 mul(neg(num 9), sym 'a')     his own -9a, exactly
+exprText(A.x)       "-9·a"                       renderable all along
+the panel row       A = (x_A, 0)                 the TOOL's symbol, not the student's
+```
+
+`isKnowledge` is false because `a` is free, so the row fell through to the one-coordinate-open reading and printed `x_A`. **That is worse than the dash it replaced**: `x_A` looks like an answer while silently standing in for something the student stated.
+
+### The same fix #1023 made for the other object kind
+
+> A curve the givens have not FIXED still has an equation, and the student wrote it. Printing a dash threw it away — «נתונה פרבולה שמשוואתה y²=2px» read as `—` on a row that could have said `y^2 - 2·p·x = 0`.
+>
+> It states no VALUE, so ADR-AG-003 §2 is untouched — it names the dependency, which is more than the dash said and less than a number.
+
+Every word applies to a point whose coordinate is `-9a`. #1023 closed this for curves and left it open for points.
+
+### The guard was measured, not reasoned
+
+```
+A(-9a,0)          kind = 'point'    x = mul(…)     ← the new branch
+A(2,5)            kind = 'point'    x = num        ← numbers still win, answered earlier
+«A על הישר y=x»   kind = 'free'                    ← the (x_B, x_B) reading (#1078), untouched
+«P אמצע AB»       kind = 'derived'                 ← derived rows, untouched
+```
+
+A stated point is `point`; a carrier point is `free`; a derived point is `derived`. The branch is unreachable from either neighbour, which is what makes it safe to place ahead of both. The lock asserts all four kinds rather than only the fixed one.
+
+### What this is NOT
+
+**Not the canvas.** The label still reads `A` there, and per #1211's ruling coordinates on the canvas are opt-in — so that half belongs to #1211's mechanism rather than becoming automatic here.
+
+**Not the locus equation.** [#1186](https://github.com/dcodish/geo_builder/issues/1186) asks for `(x − 16a)² + y² = 625a²` and is a harder problem: recognising a symbolic dependence across sampled traces, which ADR-AG-072 §4 called the CAS boundary. This needs no inference at all — it prints what is already stored — so it lands first and independently.
+
+## ADR-AG-105 — The canvas shows the stated expression too (#1230, completes ADR-AG-104)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — honesty: everything the student stated is visible on the figure; no new row. **Design:** [04c](04c-design-analytic.md) — the point label's open form. **LADDER stage:** display only.
+
+**Operator, 2026-09-19, playing T44:** *"the data panel is now correct but canvas is not"*, with both surfaces in one screenshot:
+
+```
+data panel      A = (-9·a, 0)      B = (41·a, 0)      ADR-AG-104, correct
+canvas label    A(x_A, 0)          B(x_B, 0)          the tool's own symbol
+```
+
+### The scoping in ADR-AG-104 was wrong, and on a premise nobody checked
+
+That ADR wrote the canvas out of scope in as many words:
+
+> **Not the canvas.** The label still reads `A` there, and per #1211's ruling coordinates on the canvas are opt-in — so that half belongs to #1211's mechanism rather than becoming automatic here.
+
+**The canvas does not read `A`.** It has printed coordinates since the provenance work, through the same invented-symbol fallback the panel used. #1211's ruling is about showing *computed* coordinates for a point the student never described; it has nothing to say about a coordinate the student wrote down.
+
+So the second surface was in scope all along, and the reasoning that excluded it was a belief about the screen that a single look would have falsified. Recorded plainly because the same habit produced ADR-AG-099's one-letter hole earlier the same day: **a claim about what the UI shows is a measurement, not an inference.**
+
+### Cause — the same fallback, one layer down
+
+`Component` had two cases:
+
+```ts
+| { known: true; value: number }
+| { known: false }
+```
+
+so an open coordinate could only ever render `x_A`. The panel could reach past provenance to the construction and read the expression; the scene builder cannot — it is handed the figure, not the objects. And `provenanceOf` had the expression in hand at the moment it discarded it.
+
+The open case now carries `expr?: string`, set from `exprText(e)` in the `kind === 'point'` branch — the same guard ADR-AG-104 used, measured the same way: a stated point is `point`, a carrier point is `free`, a derived point is `derived`. The scene prefers `expr` over the invented symbol, and the `any` gate that decides whether to show coordinates at all now counts a stated expression as something said.
+
+### What stays exactly as it was
+
+A numeric point still draws its numbers. **A carrier point still draws `x_A`** — «A על הישר y=x» is a `free` object, the student stated no expression for its x, and inventing one there would be the opposite error to the one this fixes. And no sampled number ever reaches a label for an open coordinate: the lock asserts the absence of a decimal, not merely the presence of `-9·a`.
+
+The last lock asserts the two surfaces agree by construction rather than checking two separately-correct strings that could drift apart later.
+
+## ADR-AG-106 — The snap may not demand precision the trace never promised (#1224)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the locus states its equation when the givens fix it; no new row. **Design:** [04c](04c-design-analytic.md) — the locus fit and its determinacy gate. **LADDER stage:** display only; no engine or solve change.
+
+Found while verifying PR #1172's own play cases before handing the operator a sheet. All four documented cases passed; varying the figure showed the lane's headline feature failing on the ordinary one.
+
+```
+B(8,0)   bisector x = 4         «ישר · x = 4»   ✓
+B(0,8)   bisector y = 4         «ישר · y = 4»   ✓
+B(6,8)   bisector 3x + 4y = 25  «ישר»           ✗   drawn correctly, no equation
+B(4,4)   bisector at 45°        «ישר»           ✗
+B(2,0)   bisector x = 1         «ישר»           ✗   axis-aligned, and still failing
+```
+
+`B(2,0)` is what ruled out *"slanted breaks it"*: whatever the gate measured was **scale**-sensitive.
+
+### Neither candidate in the issue was the cause
+
+`shapeOfTrace.curve` held the correct line in every case — `x = 1`, and `a=1, b=4/3, c=−8.327`, which is `3x + 4y = 25` to three figures. `locusEquation` discarded it at its opening `if (!shape.conic) return null`, and `conic` was absent because **`snapRational` uses an ABSOLUTE `1e−6` while the trace's accuracy is RELATIVE to how far it walks**:
+
+```
+          traced span   worst deviation from the TRUE line
+B(2,0)             40   1.9e−5      19× the absolute tolerance
+B(6,8)           2685   1.5e−2      four orders past it
+```
+
+The same function's **verification has always been relative** (`1e−6 × scale²`). So the two halves of `snapAndVerify` disagreed about what precision means, and the half that ran first rejected data the half that guards correctness would have accepted.
+
+The snap now takes its tolerance from **the trace's own scatter about the fitted curve** — the precision this data actually has. Never tighter than `SNAP_TOL`, so an exact trace still snaps exactly. This is not a loosening: the verification is untouched and is what keeps a wrong snap from being printed.
+
+### The hole that opened, and the lock that caught it
+
+A scatter-derived tolerance can be wide, and a wide enough one snaps **every coefficient to zero** — after which `0 = 0` satisfies the verification at every point. Handed `x = 40` against a trace at `x = 4`, the scatter is 36 and the result was `{0,0,0,0,0,0}`.
+
+`issue-1176`'s honesty lock caught it, which is the argument for writing that lock as a **direct** assertion rather than inferring the refusal from a case that happened to fail the snap. A degenerate snapped conic is now refused; a wrong-but-nonzero one the verification catches unaided, because it is false somewhere. The degenerate one is the single case it cannot catch, because it is true everywhere.
+
+### A lock that asserted the old behaviour, updated rather than worked around
+
+`issue-1176-locus-configuration.test.ts` asserted that seed 2 of the plain bisector prints the kind alone, with the note *"asserted so that a future change which starts printing an equation here has to say why"*.
+
+Saying why: that seed draws its locus over ~974 units while `A` and `B` sit 8 apart, and the old premise was that `x = 4` *"cannot be re-verified against the trace"*. It was never re-verified — the absolute snap failed first, so nothing reached the check. It now reaches it and **passes**: the trace's worst deviation from `x = 4` is `1.85e−3` against a verification tolerance of `0.95`. And `x = 4` is the true locus there, at every seed. The tool is not stating something it could not check; it is now checking something it could not previously reach.
+
+### What this unblocks
+
+[#1191](https://github.com/dcodish/geo_builder/issues/1191) is a P1 about `4y = −3x + 25` rendering as `4 · ישר y = −3x + 25` on the canvas. While #1224 stood, that figure printed «ישר» with nothing after it — **so the P1's fix could not be play-verified at all**, and its play case was marked unplayable on the operator's sheet. That figure now produces the label, which is what makes the P1 checkable.
+
+## ADR-AG-107 — The yud is optional, and a circle states its radius squared (#1210, #1187)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the locus lane answers the question the student asked, in the exam's notation; no new row. **Design:** [04c](04c-design-analytic.md) — the locus question's pattern and the circle's equation. **LADDER stage:** parse + display.
+
+The last two of the three things standing between PR #1172 and its merge, and therefore between the P1s (#1191, #1176) and production. The third was ADR-AG-106.
+
+### #1210 — refusing a spelling answers a spelling, not a question
+
+«המקום הגאומטרי של M» returned «לא הבנתי את השאלה» while «המקום הגיאומטרי» worked.
+
+*Ktiv male* «גיאומטרי» and *ktiv haser* «גאומטרי** are the same word. A student who omits the yud has made no mistake, and a tool that refuses one of them is teaching orthography on a geometry question — the class #1156 and #1183 named, where the remedy offered is about the student's typing rather than their figure.
+
+`י?` — one optional character at the one place the two forms differ, rather than a second alternation that could drift. The lock asserts eight neighbouring forms still resolve, and that the pattern did not become a wildcard: «שיפוע AB» is still not a locus question.
+
+### #1187 — the row's job is to say what the circle IS
+
+**Operator, playing T31:** *"the radius in equation should show as 25^2 and not 625"*.
+
+`(x − 16)² + y² = 625` makes the student take a square root to recover a radius the tool already holds, on the one row that exists to tell them. The exam writes `= 25²`.
+
+**Conditional on the radius being worth squaring.** The squared form is shown only when the displayed radius round-trips — `fmt(r)` parsed back and squared must equal the constant. Otherwise `= 12.25²` would be a worse row than the number it replaces, and a tidy-looking square that does not hold would misstate the figure. When it does not round-trip the plain constant stands, exactly as before.
+
+### Three existing locks asserted the old form, and were updated with the reason
+
+`issue-1136-1137-locus`, `issue-1176-locus-configuration` and `issue-1224-slanted-locus` all asserted `= 625` — the last of them written earlier the same day. Each now asserts `= 25²` and carries the operator's ruling inline, so the next session reads *why* the expected value changed rather than finding a bare edit. The `(x − 16)² + y²` half is asserted separately, because #1187 changes one side of the equation and must not be read as licence to restyle the other.
+
+## ADR-AG-108 — One printer for a line, and it is the panel's (#1197)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — a line is written `Ax + By + C = 0` wherever it is shown; no new row. **Design:** [04c](04c-design-analytic.md) — the locus label's notation, and where `locusEquation` lives. **LADDER stage:** display only.
+
+**Operator, twice.** 2026-09-18, playing round #1193 T10: *"when a line is shown - we always write it as Ax+By+C=0 and not like the image has"*. And again 2026-09-19, playing T54 on the integrated branch: *"the line needs to be in the format of Ax+By+C=0 and not like it is now"*.
+
+### The convention was already written down; the lane had its own
+
+```
+the data panel (lineText)        3x + 4y - 25 = 0     ✅ the convention
+the locus label (locusEquation)  4y = −3x + 25        ❌
+```
+
+Two printers for one object, two inches apart on the same screen. `lineText`'s own docblock is the rule — *"written the way a textbook writes it: no `1x`, no `+ 0`, no `+ -3`"* — and it already carries #1180's fraction clearing and #1119's magnitude rule. The locus lane reimplemented the notation instead of calling it, which is the failure [ADR-W-053](06w-decisions-workspace.md#adr-w-053) names, in the direction that is easiest to miss: not a test reproducing a decision, but a second *implementation* of one.
+
+### The move that made the call possible
+
+`lineText` lives in `app/curveText.ts`; `locusEquation` lived in `engine/locusFit.ts`. An engine module importing upward would have been the real cost of a one-line fix.
+
+So `locusEquation` moved **up** into `app/curveText.ts` — which is the right home on its own terms, and the mirror of what #1201 did when it moved line *resolution* DOWN into the engine. The test is what the thing IS: resolution is geometry and belongs below; notation is a sentence for a student and belongs above. `ask.ts`, in `app/`, was already its only production caller.
+
+The line branch now calls `lineText(D, E, F)` on the **snapped** coefficients — the exact ones the determinacy gate accepted — and `lineText` clears the fractions itself. Circle, parabola and ellipse keep their canonical forms: `Ax + By + C = 0` is the convention for a LINE, and `(x − 16)² + y² = 25²` is how a circle is written.
+
+```
+x = 4               →  x - 4 = 0
+y = 4               →  y - 4 = 0
+4y = −3x + 25       →  3x + 4y - 25 = 0
+y = −x + 4          →  x + y - 4 = 0
+```
+
+### Twenty-three assertions, changed with the reason attached
+
+Four locus test files asserted the retired notation, across 23 places. Each pair was listed explicitly in the migration rather than pattern-matched, so a wrong pair would be visible in review — `y = 2x` and `-2x + y = 0` are the same line, and a script that guessed could quietly have made them different ones. The prose in those files was updated too, so no file describes a notation it no longer asserts.
+
+## ADR-AG-109 — A construct means every condition in its definition, not the one it is named after (#1232)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R103 (a named cevian reaches its side, and may reach the extension), R40's *"a median that does not actually end at the opposite midpoint would teach something false"*. **Design:** [04c](04c-design-analytic.md) — "A cevian lowers to its WHOLE definition". **LADDER stage:** parser lowering; no solver change.
+
+**Found in triage, not reported.** The operator's 2026-09-19 report was about a different cevian sentence. This one is well-formed, catalogued, deployed since `prod/2026-09-19-2`, and drew a wrong figure with `faults: []`:
+
+```
+משולש ABC
+AD גובה לצלע BC
+```
+
+### Measured before diagnosing
+
+| seed | cos∠(AD,BC) | dist(D, line BC) / \|BC\| | faults |
+| --- | --- | --- | --- |
+| 0 | −4e−9 | 0.440 | `[]` |
+| 1 | −8e−8 | 0.711 | `[]` |
+| 4 | +7e−8 | 1.061 | `[]` |
+| 5 | +1e−8 | 0.196 | `[]` |
+
+Perpendicularity holds *exactly* at every seed; incidence holds at none. The foot sat up to a whole side-length away from the side it was the foot of, and there is no configuration in which it looks right. With coordinates pinned — `A(0,3)`, `B(5,0)`, `C(7,0)` — the "altitude" foot landed 17.6 units off a side 2 units long, still with no fault.
+
+### The class
+
+*A construct defined by a CONJUNCTION of conditions was lowered to only the condition its keyword is named after, and the incidence half was dropped — so the figure satisfies the word and not the definition.*
+
+«גובה» is two statements: the foot is on the side, **and** the segment to it is perpendicular. The rule emitted only the second. `perpendicular` is a pure direction residual — two vectors whose dot product is driven to zero — and asserts nothing about where `D` sits.
+
+**Why the median leg was right by accident.** `midpoint(D,B,C)` carries both halves in one kind: a midpoint is on the side by construction. So the sibling condition read correctly while stating one constraint, and the shape that worked there was copied to a role where it does not.
+
+**Why it survived.** The cevian rule had no test for the «גובה» leg at all — a search for the word across `src-analytic/__tests__/` returned nothing. The «תיכון» leg is exercised by a real bagrut exercise ([ADR-AG-015](#adr-ag-015), image 7 #6) and is correct; its sibling shipped untested beside it.
+
+### The sibling audit closed the class rather than assuming it
+
+Every emitter of the point-pair `perpendicular` kind: **one**, this rule. `shapes.ts` builds `relation`, not this kind.
+
+- The generic `relation` (#1052, «DE ⊥ BF») is **correctly** incidence-free — two independent directions sharing no point, so there is no foot to place. Confirmed by reading it, as the fix plan asked, rather than assumed.
+- `rightAngleAt(v,p,q)` is likewise safe: both rays start at `v`, so incidence is structural.
+- Every other parser rule that DECLARES a point was swept (intersection, circle-at, line-at, on-object, component, axis-side, ratio-divider). Each lowers its full meaning, or deliberately leaves the DOF the sentence leaves. The altitude was the sole member.
+
+### The fix, and why NOT a compound `foot` kind
+
+2-D lowers the same sentence to a single `foot` command — incidence and perpendicularity as one primitive — and the fix plan proposed porting that shape. **It was not ported, for three measured reasons:**
+
+1. **The foot must stay a CONSTRAINED point, not a derived one.** [ADR-AG-015](#adr-ag-015)'s worked example — the operator's own — states `D(0,3)` *alongside* «AD תיכון לצלע BC» and solves for `B` and `C`. A derived point cannot accept a stated coordinate. This is why the median leg used the `midpoint` constraint rather than the `midpoint` derived rule that already existed, and the altitude must match it.
+2. **Two constraints name which half failed.** `describeConstraint` can say «D על BC» or «AD ⊥ BC»; one compound kind reports a lump. That is [ADR-AG-017](#adr-ag-017)'s rule — a refusal names the statement.
+3. **A student who already wrote «AD ⊥ BC» has that half recognised** by `canonicalConstraint`, which a new kind would not match.
+
+Reusing `on-line-2pt` also avoids reproducing its residual, which is deliberately *not* the `parallel` relation: it stays well-defined when `D` sits exactly on an endpoint, and an endpoint is a legitimate foot.
+
+So the rule states the incidence for **both** roles and each role adds what is left. On the median it is redundant rather than wrong, and redundancy is free here: `carrierDofOf` computes `carriers − rank(J)`, so a dependent row consumes no freedom. A count-based accounting would have reported that figure over-determined — asserted in the test rather than assumed.
+
+### The foot is on the LINE
+
+«לצלע BC» reads as "to the side", and the naive repair is a `between` selector. An obtuse triangle's altitude foot legitimately falls beyond an endpoint, so that bound would refuse a correct figure — the same honesty failure pointing the other way. `A(0,3)`, `B(5,0)`, `C(7,0)` puts the foot at the origin, `t = −2.5`, and it builds there.
+
+This does not contradict [ADR-AG-032](#adr-ag-032)'s "the noun decides boundedness": that ruling is about «נקודה D על הצלע BC», where the student places a point on a side and the noun is their choice of region. Here the noun names which side the cevian drops to, and the foot's position is the geometry's to decide, not the wording's.
+
+### The lock the fix plan proposed would have failed
+
+The plan asked for `dist < 1e-9`. The minimiser converges to ~1.5e-8 relative off-line and ~5.6e-8 in cos over 24 seeds — measured, and a lock at 1e-9 would have gone red on correct output. The tolerance is 1e-6: clear of the noise, and still a millionth of the side.
+
+`issue-1232-altitude-foot.test.ts` locks both halves over 8 seeds, the English sentence, the obtuse case, the median, and — the class — that the RULE emits both constraints. Verified red on the pre-change code: 4 of its 5 cases fail, the median's passes, which is exactly the shape of the defect.
+
+## ADR-AG-110 — A role's own incidence is checked at the rule, with an owned refusal (#1231)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the cevian forms, amended: a sentence whose letters contradict the role it names is refused, not drawn. **Design:** [04c](04c-design-analytic.md) — the cevian rule and the `ParseFailure` registry. **LADDER stage:** parse. No engine or solver change. **Extends** ADR-AG-109 (#1232); sibling of the 2-D ADR for #1233.
+
+**Operator report, 2026-09-19** (screenshot): the tool accepted
+
+```
+משולש ABC
+A(2,-5)
+BD תיכון לצלע AB
+```
+
+and drew it.
+
+### Measured, not read off the code
+
+`derive(['משולש ABC','A(2,-5)','BD תיכון לצלע AB'], seed)`:
+
+| seed | `\|BD\|` | `\|AB\|` | faults |
+| --- | --- | --- | --- |
+| 0 | 4.97 | 9.94 | `[]` |
+| 1 | 5.45 | 10.90 | `[]` |
+| 2 | 1.92 | 3.84 | `[]` |
+
+`|BD|` is exactly `|AB|/2` at every seed: `D` is the midpoint of `AB`, and the segment the tool draws as a *median* is the second half of the side it was supposedly drawn to. `faults: []` — the tool asserts the figure is correct.
+
+Measured at parse, the silently-wrong set is exactly **apex ∈ {u,v}** (both roles, both letters), **apex = foot**, and **foot ∈ {u,v}** — the last reaching the solver as `unsatisfiable` rather than being answered.
+
+### Root cause
+
+The `CEVIAN_HE`/`CEVIAN_EN` handler validated **only the side's own two letters**:
+
+```ts
+if (u === v) return refuse('repeated-vertex', line); // «AD תיכון לצלע BB» names no side
+```
+
+and then emitted unconditionally. It checked the letters of one operand and never the **relation between the two operands**, which is the part the word «תיכון»/«גובה» actually asserts.
+
+**Class:** *a sentence that names a construct by the ROLE one point plays relative to another object is accepted without checking the incidence that role itself imposes — so a degenerate naming builds a figure contradicting the word the student used, with `faults: []`.*
+
+This is the parse-time twin of ADR-AG-109 (#1232), and of #1158/#1166's *"the configuration drawn must honour the noun that declared it"*. There the noun is honoured by a **configuration** check; here the sentence is degenerate by its letters alone, so it must be refused at parse time and never reach the solver.
+
+### The decision — the definition, not the three observed failures
+
+```
+a cevian runs apex → foot; the foot lies on side (u,v); the apex does NOT; and apex ≠ foot
+```
+
+`foot ∈ side` is refused here rather than left to the solver, because parse time is where the message can **name the student's statement** instead of reporting an unsatisfiable system — the honesty invariant that error messages name the conflicting statement, never internal state.
+
+### An OWNED code, and why `repeated-vertex` is the wrong word
+
+`degenerate-role` is a new `ParseFailure` code. The registry is deliberately small, so the case for adding to it has to be made: **nothing repeats inside a run here.** «AB» is a perfectly good side and «BD» a perfectly good segment; what is wrong is the relation between them. Telling the student *"the same letter appears more than once"* would send them to fix a run that is already correct — the refusal would name the wrong thing, which is the failure mode owned codes exist to prevent. «AD תיכון לצלע BB» genuinely repeats and keeps `repeated-vertex`.
+
+The message names the statement, gives the reason in the student's own vocabulary (*a median runs from a vertex to the side opposite it*), and **teaches a spelling that works**. That last clause is asserted, not assumed: a test drives «AD תיכון לצלע BC» through `parseLine` and requires it to build, because a remedy that returns the same refusal is worse than none (the #1156/#1183 lesson).
+
+### Never `null` — the one place this tree does NOT copy 2-D
+
+Returning `null` would route a sentence this rule clearly *matched* to the `not-handled` seam and on to the LLM, which #1039/#1042 ruled against here: **a rule that matched owes the student an answer.**
+
+2-D's equivalent gate escalates, and its sibling fix (#1233, landed the same day) keeps that. The split is deliberate and recorded on both sides so neither is later read as the other's precedent: 2-D has no owned-refusal vocabulary equivalent to `ParseFailure`, and building one there is a larger change split out under its own issue.
+
+### The lock
+
+A table over `{תיכון, גובה} × {median, altitude} × {apex=u, apex=v, apex=foot, foot=u, foot=v}`, plus the «נתון»-prefixed and triangle-tailed spellings that ride the same rule. It **calls** `parseLine` rather than re-implementing the predicate (ADR-W-053).
+
+The negative controls are the half that matters: every well-formed spelling in both roles and both locales still builds, and — because a gate added to this rule is exactly the edit that would quietly drop a leg — the altitude is asserted to still lower to **both** halves of ADR-AG-109's conjunction, `on-line-2pt` **and** `perpendicular`. Verified to bite: **17 of the 27 assertions fail against pristine `parseAnalytic.ts`.**
+
+### Consequences
+
+`parser/parseAnalytic.ts` (the code + the predicate), `store/useAnalyticStore.ts` (the error union), `App.tsx` (the code → message map), `i18n/index.ts` (both locales).
+
+`issue-1231-degenerate-role.test.ts` (27). Analytic lane green.
+
+**Sequencing note for what follows:** #1222 and #1165 widen this same rule (the apex-fronted form, cevians by triangle, the angle bisector). They must be built **on top of** this gate — porting 2-D's cevians without it would carry 2-D's own missing altitude gate into this tree.
+## ADR-AG-111 — The noun decides the extent, and a bounded one draws only the segment (#1236 + #1234)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R6 (amended) — «משוואת …» accepts every noun that names a straight object, and the noun states what is drawn. **Design:** [04c](04c-design-analytic.md) — the equation rule's noun registry, and the fold's extent resolution. **LADDER stage:** parse (recognition + extent) and the fold (the inherited extent). No solver or renderer change. **Extends** ADR-AG-019 / ADR-AG-023 / ADR-AG-060; **cites** the `stated: false` carrier convention (#1076).
+
+Two halves of one sentence, neither observable without the other, built as one item. Escalated first (round #1244) on the design question below and re-built on the operator's answer the same day.
+
+### The two symptoms
+
+**#1236 — the noun was a gate.** `HE_LINE = 'ה?(?:ישר|אלכסון)'` decided whether a sentence was understood at all:
+
+```
+OK     משוואת הישר BD …      OK   משוואת האלכסון BD …   OK   משוואת BD …
+FAIL   משוואת הצלע BD …      FAIL משוואת הקטע BD …      FAIL משוואת התיכון BD …
+FAIL   משוואת הגובה BD …     FAIL משוואת השוק BD …      FAIL משוואת הבסיס BD …
+```
+
+Identical meaning, identical facts required, and the student had to guess a different word for the same thing. **The list had already been fixed once, one member at a time** — the comment #1070 left above it records «אלכסון» being added for exactly this reason.
+
+**#1234 — the twin.** On the operator's own figure, «משוואת CE היא x-3y=0» minted `line-CE` **beside** the `seg-CE` the figure already held:
+
+```
+segments: poly-ABC-0..2, seg-BD, seg-CE
+curves:   line-CE          <- a second object for one name
+faults:   []
+```
+
+### The ruling
+
+> **2026-09-19:** *"משוואת הישר should draw the line. משוואת הצלע or הקטע should draw a segment (in not yet draw)"*
+
+and, asked in this round's escalation whether the infinite line still EXISTS behind a bounded noun:
+
+> *"only draws CE"*
+
+### The decision — a noun REGISTRY, and the extent it carries
+
+The noun stops being a gate in a regex and becomes a registry row: `{ he, bounded }`, with `HE_LINE` **derived** from it so the two cannot drift, and one `extentOfNoun` consulted where the decision is made.
+
+**A list is unavoidable here, and saying so plainly is part of the decision.** An unknown noun must stay `not-handled` — «משוואת הפיל BD היא …» may not mint anything — so the rule cannot simply accept any word. What it *can* stop doing is keeping the vocabulary in one rule's regex with the meaning of each noun decided somewhere else. Adding a noun is now one row, and its semantics arrive with it.
+
+`direction()` was the plan's proposed route and is the wrong one **on its own**: it discards the noun by construction, which is exactly the information the ruling turns on. `ON_OBJECT` had already solved this shape — resolve WHICH object one way, capture the noun separately for its EXTENT — and that split is what is copied.
+
+### The line survives as a CARRIER, which is not a new concept
+
+A bounded noun emits the segment (minted here, idempotent when the figure already has it) and the line as an **undrawn carrier**, `stated: false`. `scene.ts` draws only `stated` curves, and «B על הישר y=x» has used this flag since #1076 for a line that exists to hold a point rather than to be drawn.
+
+The carrier is what the two endpoints are constrained *onto*. Without it the sentence would state nothing at all — the student's equation would be accepted and then have no effect, which is the honesty failure this issue is about, arriving through a different door.
+
+> **Correction to this round's escalation.** It asserted that *"the analytic tree has no drawn-vs-carrier concept; every curve object is drawn"*, and priced the option accordingly. That was wrong: `stated` is exactly that concept, and `apply.ts` already upgrades a carrier to drawn when a later sentence states it. The escalation's question was still the right one to ask — the ruling was needed — but its cost estimate for the alternative was too high, and a future session should not inherit that claim.
+
+A student who later writes «משוואת הישר CE היא …» upgrades the same object to `stated: true` — the deliberate line-over-segment pair #1234 describes, reached only by asking for it and never minted behind the student's back.
+
+### The bare form is decided at the FOLD, because the parser cannot decide it
+
+«משוואת CE היא x-3y=0» writes no noun and so says nothing about which object it means. Per the ruling it takes the extent the object **already has** — and that is a question `parseLine(raw)` structurally cannot answer: **the analytic parser takes no figure context**, by design.
+
+So the fact carries `inheritExtent`, and `apply.ts`'s `case 'curve'` — which already looks the figure up through `priorOf` — asks whether a segment spans the same two points. It compares ENDPOINTS, never ids: `line-CE` and `seg-CE` are different strings by design, so the twin is not something the id space can catch.
+
+The plan placed this at the equation rule. That is one layer off, and recording it matters more than the fix: *a plan that names a chokepoint in a context-free parser for a context-dependent decision has named the wrong layer, however right the rest of it is.*
+
+### Measured after
+
+| sentence | segment | drawn | carrier |
+| --- | --- | --- | --- |
+| «משוואת הישר CE» (seg exists) | `CE` | **`line-CE`** | — |
+| «משוואת הצלע CE» (seg exists) | `CE` | — | `line-CE` |
+| «משוואת CE» — **the reported line** | `CE` | — | `line-CE` |
+| «משוואת הצלע PQ» (nothing exists) | **`PQ` minted** | — | `line-PQ` |
+| «משוואת PQ» (nothing exists) | — | `line-PQ` | — |
+
+### Arm 2 was NOT built, and the measurement is why
+
+#1234's plan called `crossingsOf`'s self-pairing *"load-bearing, not defence in depth"*, on the reasoning that *"without this, the noun fix converts a twin bug into a spurious-ring bug."*
+
+**Measured, that does not happen.** `crossings.ts:275` already skips unstated curves, so a carrier never enters the search. The reported sequence now offers **exactly what the same figure without the equation offers — 1 ring at each of 8 seeds, zero self-pairs** — identical to the figure before the line was added.
+
+The residue is the *deliberate* pair, where both objects are stated and `meet`'s **absolute** `1e-12` determinant test fails to see two spellings of one line (5 self-pairs over 8 seeds). That is not this issue's arm — it is **#1235** verbatim (*"crossings.ts decides degeneracy with ABSOLUTE thresholds — a duplicate line is 5 orders above the guard"*), which is filed, armed and describes this exact repair. Doing it here would be this round doing an unannounced issue's work, and the measurement is recorded on #1235 instead.
+
+*The plan's "therefore" is a separate hypothesis from its diagnosis, and it was the cheapest thing to falsify.*
+
+### The lock
+
+The ruling's own table, driven end to end through `derive`: each noun's extent, the minting, the bare form in both directions. Recognition is locked over all nine nouns plus three unknown ones that must stay `not-handled`, and all spellings are asserted to produce the **same object id** (ADR-AG-023's identity rule). The ring assertion compares the reported figure against the same figure without the equation at 8 seeds, rather than against a hard-coded count a future change could match by accident. Verified to bite: **12 of the 19 assertions fail against pristine sources.**
+
+### Consequences
+
+`parser/parseAnalytic.ts` (the registry, the captured noun, the extent on `CurveHit`, the carrier + segment emit), `engine/types.ts` (`inheritExtent` on the curve fact), `engine/apply.ts` (the fold's resolution + `segmentOverSameEnds`).
+
+`issue-1234-equation-extent.test.ts` (19). Analytic lane green.
+
+## ADR-AG-112 — The analytic Builder gets the LLM fallback, and the proxy routes by registry (#1251)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — an unrecognised sentence is escalated rather than refused outright; the tool's promise now matches 2-D's and 3-D's. **Design:** [04c](04c-design-analytic.md) — the fallback seam; [28](28-shared-chrome.md) — the proxy's per-tool routing. **LADDER stage:** after the deterministic parse, before the refusal is shown. No engine, solver or render change.
+
+**Operator ruling, 2026-09-19**, playing round #1244 (T19 asked whether this tool had an LLM connection):
+
+> *"we should have an llm fallback like we have in 2d and 3d. this is true to all tools"*
+
+Scoped by him to analytic first: *"lets do this for the analytics for now"*.
+
+### What was missing, measured
+
+| tree | client wiring | LLM fallback |
+| --- | --- | --- |
+| `src/` (2-D) | `src/parser/llm.ts` | yes |
+| `src3d/` | wired | yes |
+| `src-analytic/` | **no `fetch`, no network path of any kind** | **no** |
+
+`parseLine`'s `not-handled` mapped straight to `errNotHandled` and rendered. The `ParseFailure` type calls that code *"the LLM-escalation seam"*, but the name described its role in the **other** trees; here there was nothing behind it.
+
+**That cost more here than the same gap costs elsewhere.** In 2-D an unrecognised sentence gets a second chance, so a grammar hole costs a paid call and usually still works. In analytic every hole was a hard wall and every refusal was the student's final answer — which is why the open grammar-coverage issues (#1128, #1222, #1165, #1240) and the refusal-quality ones (#1246) are all worth more in this tree than their labels suggest.
+
+### The model never emits facts
+
+It normalises freeform into the **canonical command lines of `COMMAND_CATALOG_ANALYTIC`**, and every line is put back through `decideSubmit` — the same gate a student's typing meets, parser and fold included.
+
+**That is the whole safety argument, and it is structural rather than a matter of prompt discipline.** A hallucinated line is refused exactly as a typo is; the model has no privileged route into the engine and cannot commit a figure the fold rejects. It is the `llmShared.ts` / `llmShared3.ts` pattern, third instance, and it is why adding a fallback here does not widen what the tool can be made to draw.
+
+**All-or-nothing:** if any returned line is refused, nothing is recorded. A partial construction is the honesty failure this repo treats as cardinal — the student asked for one figure and would silently get part of one, with no indication which part went missing. `already-known` / `already-follows` are not refusals: a model restating something true has produced a valid line that adds nothing, and the rest still stand.
+
+**The seam is `not-handled` ONLY.** Every other refusal is an *owned* answer — a degenerate role, a reserved coordinate, a name clash — where the tool understood the student and disagreed. Handing those to a model would replace a correct explanation with a guess, so they never escalate.
+
+### The proxy's ternary becomes a registry, and this is the load-bearing half
+
+`server/parseHandler.ts` chose its prompt with
+
+```ts
+const request = tool === '3d' ? buildLlmRequest3(utterance, context) : buildLlmRequest(utterance, context);
+```
+
+A two-way branch whose else-arm was the 2-D prompt. Correct while exactly two products called the proxy, and **silently wrong the moment a third did**: wiring this client up against it would have sent analytic sentences out with the 2-D command catalogue, and the model would have answered an analytic figure with 2-D commands. Not a refusal — a confidently wrong parse, on a paid call, looking for all the world like it had been routed.
+
+So it is a `Record<string, builder>` with **no default**, and an unregistered tool is refused with `400 unknown-tool` **before any quota is touched** (a client bug must not be able to drain the day's budget). A fourth product that forgets to register gets a refusal and falls back to its own deterministic answer — it cannot inherit a third product's grammar by omission.
+
+An absent `tool` still means 2-D, as it always has: that client does not send the field.
+
+### The prompt carries rulings, not style
+
+Four rules in it encode decisions with their own ADRs, and each is locked:
+
+- **ADR-052** — never invent an unstated value. Emit the form that leaves it open rather than a made-up number.
+- **ADR-AG-111** — the noun decides the extent: «הישר AB» is the infinite line, «הצלע AB» the segment.
+- **ADR-AG-110** — a cevian's apex may not lie on the side it is drawn to, so the model is told rather than left to produce a line the re-parse will refuse.
+- **#1245** — a point at coordinates is `A(3,5)`, never `A=(3,5)`; the latter is 2-D's spelling and this tool refuses it. A prompt teaching it would produce a refusal on the model's own advice.
+
+### No live call, anywhere
+
+`runFallback` takes its transport as an argument, so the suite never reaches the network — `docs/08` requires the fallback to be mocked, and **standing rule 2 forbids firing one without the operator**. The few-shot examples were authored by reasoning out the lines the model should emit and then **verifying every one through the real `parseLine`** (the PAR-10 contract), which is the oracle role that rule prescribes. **This ADR ships unexercised against a live model**, deliberately: the first real call is the operator's to authorise.
+
+### Locks
+
+`issue-1251-llm-fallback.test.ts` (31): every prompt example parses; at least one teaches the honest empty answer; none teaches the 2-D coordinate spelling; the four ruling-bearing rules are present; a line the deterministic parser refuses is refused here too; a *later* refused line discards the whole answer; a degenerate cevian is refused even though it parses; a throttle reports busy rather than a misunderstanding; a restatement is dropped rather than duplicated; and the accepted lines are asserted to actually build.
+
+`parse-tool-registry.test.ts` (8): every tool registered, every tool mapped to a **distinct** builder, **no fallthrough** (a `??`/`||` default or a revived ternary fails it — verified by reintroducing one), the unknown-tool refusal present and **ordered before the quota counter**. The locks read the handler with **comments stripped**, because the registry's own docblock quotes the ternary it forbids and a naive scan matched the documentation.
+
+### Consequences
+
+New: `parser/llmSharedAnalytic.ts` (prompt + request builder), `parser/llmAnalytic.ts` (transport), `app/fallback.ts` (the decision, pure and injectable). Changed: `server/parseHandler.ts` (registry + validation), `App.tsx` (the seam, the spinner), `store/useAnalyticStore.ts` + `i18n/index.ts` (the `llm-busy` key, both locales).
+
+**Not done here:** the complex Builder, which has the same gap. The operator scoped this to analytic; #1251 keeps the complex arm open, and it is now a smaller job — the registry work is shared and only its prompt and client remain.
+
+## ADR-AG-113 — The panel lists a line the student MENTIONED; the canvas draws one that is STATED (#1250)
+
+**Requirements:** none (internal) — restores the standing promise that everything the student stated is visible. **Design:** [04c](04c-design-analytic.md) — the panel's listing predicate, extracted. **LADDER stage:** presentation. No parse, engine or solver change. **Refines** the #1078 ruling; **follows** ADR-AG-111.
+
+**Operator, 2026-09-19**, playing round #1244:
+
+> T15 — *"משוואת הצלע CE היא x-3y=0 should appear in the data panel under lines"*
+> T16 — *"משוואת הישר CE היא x-3y=0 does add it do the data panel"*
+
+Two sentences stating **the same equation about the same object**, and only one of them put it in the panel.
+
+### Measured
+
+```
+                          stated   label.name    panel row?
+משוואת הצלע CE …  (T15)   false    "CE"          no   <- the defect
+משוואת הישר CE …  (T16)   true     "CE"          yes
+משוואת CE …       (T17)   false    "CE"          no   <- the operator's own reported line
+B על הישר y=x     (#1078) false    ""            no   <- correct
+```
+
+### This ran into the operator's OWN earlier ruling, and refines rather than reverses it
+
+The filter was `curves.filter((c) => c.stated)`, carrying #1078:
+
+> *"the part where it shows -x+y=0 is meaningless since the line is not really drawn and in any case **there is no way to know what it belongs to**"*
+
+**His objection there was not that the line was undrawn — it was that the row was ORPHANED.** An unlabelled equation, next to no point, for a line nobody asked to see. Those two properties coincided until ADR-AG-111 made a *mentioned* line *undrawn* for the first time, and the distinction had never had to be drawn before.
+
+His ruling of the same day states it in the positive:
+
+> *"if we say that a point is on a line, we dont draw the line but if we specifically mention a line, we should have its equation."*
+
+### The decision — two questions, two answers
+
+`stated` was answering both *is it drawn* and *is it listed*. They are now known to be different questions:
+
+| | asks | of «משוואת הצלע CE» |
+| --- | --- | --- |
+| the canvas | `stated` — is it DRAWN? | no (his *"only draws CE"* ruling) |
+| the panel | was it MENTIONED? | **yes** |
+
+**`label.name` is "mentioned", and not by coincidence:** a line the student made the subject of a sentence is one they referred to by name, while a line minted only to hold a point has nothing to call it. So #1078's case stays unlisted for the reason #1078 gave, rather than by exception.
+
+A second flag (`drawn` beside `listed`) was considered and **rejected**: it would have to be set correctly at every mint site, and the name already answers truthfully at all of them.
+
+### The decision is EXTRACTED, and that is not cosmetic
+
+`panelListsCurve` is a named function in `app/panelRows.ts` because the first draft of this fix's lock **re-implemented the filter** and would therefore have passed with or without the change — the exact failure ADR-W-053 records (*"a test that re-implements the decision it guards stays green through the change that kills the feature"*). Caught before it was committed, by asking what the test would do if the predicate were reverted. It is: 3 of the 8 assertions go red.
+
+### Lock
+
+`issue-1250-mentioned-line-row.test.ts` (8), driven through a real `derive` and **calling** `panelListsCurve`: all three mentioned spellings leave exactly one row naming `CE`; the drawn case gets one row and not two; **#1078's anonymous carrier still gets none** (the regression guard for the earlier ruling, and the reason the predicate is the name rather than `!stated`); and the canvas is asserted separately to be unchanged in both directions, since the whole decision rests on the two questions staying different.
+
+### Consequences
+
+`app/panelRows.ts` (new — the decision and its docblock), `App.tsx` (calls it).
+## ADR-AG-115 — A described position is named by the point that occupies it, never by an invented letter (#1167)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — what the panel promises about the letters it prints: every letter it shows names something the student created. **Design:** [04c](04c-design-analytic.md) — the description layer asks the figure who is there. **LADDER stage:** presentation. No parse, engine or solver change. **Extends** ADR-AG-021's relative-tolerance rule; sibling of #1153 / #1126.
+
+**Operator, 2026-09-17**, with a screenshot:
+
+> *"i see that we now have 2 points on the same location A and O. this should not happen. if a point that we didnt name is now on a given point, it should get the point that is already there"*
+
+The panel printed `O(0, 0), r = 4` under «עקומים» while `A = (0, 0)` sat directly above it under «נקודות». Two letters, one position, and the student had created only one of them.
+
+### There was never a point `O`
+
+Measured through the real `derive` → `buildScene` path: the figure holds four points and draws four points; `centresOf` correctly offers nothing; `freeLetter` returns `Q`. **`O` was a string literal in the description function** — and so were `F`, `F₁` and `F₂`, in the same `switch`. A figure holding a real point `F` and a parabola printed two different `F`s in one panel.
+
+Fixing the circle branch alone would have been the patch shape: the defect is *the description layer names positions with invented letters*, and it had four instances.
+
+### The rule
+
+**A described position is named by the point that occupies it, and by nothing otherwise.**
+
+```
+circle centred where A sits      ->  A(0, 0), r = 4
+circle centred where nobody sits ->   (0, 0), r = 4          <- no letter, not a new one
+parabola, no point at the focus  ->   (27/2, 0), x = -27/2
+parabola with the student's F    ->  F(27/2, 0), x = -27/2
+```
+
+Falling back to an invented letter when nobody is there would be the defect with a different spelling, so the coordinates stand alone.
+
+### The occupancy question is EXTRACTED, not copied
+
+`centresOf` has asked *"is a point already here?"* since #1024, to avoid offering a ring where one sits — with a tolerance **relative to the figure** (`apart`), which is ADR-AG-021's rule and what #1113 installed. The description layer never asked at all.
+
+`pointAt(figure, x, y)` is now that one question, and `centresOf` calls it too. The alternative — a second `Math.hypot` test beside the first — is what the issue's own plan warned against: two ideas of "near" that drift the moment the tolerance changes, and an absolute epsilon in the copy would quietly undo the relative discipline. The panel and the centre ring can no longer disagree about whether a position is taken.
+
+`curveParts` takes the answer as a parameter rather than computing it, because the question needs the figure and its scale and the caller already holds both.
+
+### ⚠ Three #1212 expectations changed, and that is recorded rather than quiet
+
+`issue-1212-curve-equation.test.ts` asserted `O(3, 4)`, `F(2, 0)` and `F₁`/`F₂` — **the invented letters that are the defect**. They call `curveParts` with no figure, so nobody occupies anything and the coordinates now stand alone, which is the correct answer for a bare call rather than a loss of coverage.
+
+Every assertion on the **equation** — what that file exists to guard — is untouched. Changing a test to make one's own code pass is the tripwire this repo names; changing one that encoded the bug is a different act, and the difference is only visible when it is written down.
+
+### Lock
+
+`issue-1167-panel-names.test.ts`: the operator's own figure asserting `A(0, 0), r = 4`; a circle centred where no point sits asserting **no letter at all**; a parabola with and without a real `F` at its focus, asserting the student's letter is used and never invented; and `centresOf` asserted to still decline a taken centre, since both now depend on the one extracted predicate.
+
+### Consequences
+
+`engine/crossings.ts` (`pointAt` extracted, `centresOf` calls it), `app/curveText.ts` (the four sites ask instead of inventing), `App.tsx` (supplies the figure's answer).
+## ADR-AG-114 — A noun gate may not claim a tail that is not an equation (#1246)
+
+**Requirements:** none (internal) — no promise changes; a refusal stops naming the wrong thing. **Design:** [04c](04c-design-analytic.md) — `matchCurve`'s claim gate. **LADDER stage:** parse. No engine, solver or render change. **Completes** the #1059 guard; **repairs** a regression of [ADR-AG-111](#adr-ag-111).
+
+### The defect
+
+«הקטע BC = 10» answered **`bad-equation`** — «לא הצלחתי לקרוא את המשוואה» about an equation the student never wrote. They wrote a **length**. The message sent them to hunt for a typo in something that does not exist, which is the honesty invariant on error messages failing: *an error names the conflicting STATEMENT, never internal state.*
+
+Measured, `parseLine`, before ADR-AG-111 and after:
+
+| utterance | before (`18f75b7e`) | after (`33f6a08f`) |
+| --- | --- | --- |
+| `הקטע BC = 10` | `not-handled` | **`bad-equation`** |
+| `הצלע BC = 10` | `not-handled` | **`bad-equation`** |
+| `התיכון BC = 10` | `not-handled` | **`bad-equation`** |
+| `הישר BC = 10` | `bad-equation` | `bad-equation` *(pre-existing)* |
+
+**ADR-AG-111 did not create this — it enlarged it.** Widening the noun registry from two members to nine took the same defect from one noun to nine. The fix closes the older `הישר` member too, which is how it is known to be aimed at the class rather than at the nouns that happened to be added.
+
+### Root cause — a documented class this branch never joined
+
+The fourth instance of one shape, three of which this file already documents (#1059, #1093, #1068/#1123): **a rule recognises a PREFIX, claims the remainder unconditionally, then refuses on the student's behalf.**
+
+`matchCurve`'s caller already held half the cure — the #1059 test that the tail contains no Hebrew, which asks *"did the sentence continue in prose?"*. It does not ask *"is this an equation at all?"*, and `10` is neither prose nor an equation.
+
+### The discriminator is the PLANE'S OWN VARIABLES, and deliberately not a parse
+
+*Does the tail name `x` or `y`?* `10` names neither, so the rule has no claim on it.
+
+It does **not** require the tail to parse as an equation, and that distinction was found by measurement rather than reasoning. The first draft did require it, and it turned #1059's own case — «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2», a **truncated** equation with no `=`, which parses as nothing — from an honest `bad-equation` into `not-handled`. The student plainly meant an equation and must be told it is unreadable. So the gate asks what was **meant**, not what the text achieves.
+
+### Asked at the single exit, because per-branch does not work
+
+Placed beside the #1059 guard at `matchCurve`'s caller, it covers every branch at once — they all funnel through it.
+
+**Gating `heLineNamed` alone was tried and REJECTED, measured:** the sentence then falls through to the no-noun branch, which claims it and **mints a curve**. Worse than either refusal, and a fix that moves the failure one branch down is not a fix. Recorded so it is not re-derived.
+
+### Lock
+
+`issue-1246-equation-claim.test.ts` (17): every noun in the registry plus the bare «אורך» form asserting `not-handled` and never `bad-equation`; **the pre-existing `הישר` member**, which is what makes this class-level rather than per-noun; the truncated-equation row that defines the discriminator; ADR-AG-111's whole table still building; and #1059's prose guard, kept beside the new condition because the two now share one gate. 8 of 17 fail against pristine `parseAnalytic.ts`.
+
+## ADR-AG-116 — A named crossing may not be a point the figure already names (#1175)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — a position has ONE name; the intersection sentence is held to it like every other naming. **Design:** [04c](04c-design-analytic.md) — the intersection rule's structural gate, and its stated scope. **LADDER stage:** parse. No engine, solver or render change. **Family of** #1113 / #1153 / #1167.
+
+**Operator, playing round #1169 T4:** *"the data input should have been rejected since point B is already there"*.
+
+### Measured
+
+```
+משולש ABC · A(2,-5) · P נקודת החיתוך של הישר AB עם הישר BC
+
+verdict   accepted, no note      |PB| = 1.2e-8      faults: []
+```
+
+`AB` and `BC` share the vertex `B`; their intersection **is** `B`. The figure ends up with two names for one point, and «משולש ABC» had already given it one.
+
+It **compounds**, which is what lifts it above a cosmetic duplicate: `P` is a distinct object with its own row, its own two incidences and its own entry in the DOF accounting, so every later statement about `P` is solved against a point the student believes is separate from `B`.
+
+### The ruling, and the message it dictates
+
+**Operator, 2026-09-17: refuse, naming `B`** — *"AB and BC meet at B"* is the information the student is missing. Refusal also cannot silently discard a given, which absorbing it as a rename could.
+
+So the refusal carries a **`holder`**, and that is why it gets its own `ParseFailure` code rather than reusing `already-named` (#1153): that code's message tells the student to delete a line and rewrite it, which is advice for a different mistake. A code with only a `detail` could not name the letter at all.
+
+### The test is STRUCTURAL, and that is the whole reason it is safe
+
+Both operands are written in the sentence, so two lines named by two points each **that share exactly one letter** meet at that letter — in every configuration, with no solve, no seed and no tolerance. The check is textual and total.
+
+### ⚠ The scope, measured rather than assumed — which the ruling required
+
+The ruling asked the implementing round to **measure the other members of the class before deciding to stop at the structural one, and to say so rather than leave the rest silent by omission.** Three were measured:
+
+| member | before | after |
+| --- | --- | --- |
+| named carriers sharing a written letter | `\|PB\| = 1.2e-8`, `faults: []` | **refused, naming `B`** |
+| two EQUATIONS crossing where a point already sits | `\|PA\| = 1e-9`, `faults: []` | **unchanged — still minted** |
+| a line and a circle meeting at a point already on both | `bad-operand` | `bad-operand` — that sentence does not parse at all |
+
+**The second member is real and is NOT fixed here.** Catching it means computing the crossing and comparing it to the figure's points — a positional test with its own tolerance question, which the ruling pre-declared *"an escalation, not an expansion"*. Filed as **#1254**, with the distinction it will have to draw: an *invariant* coincidence (a pinned point, fixed equations) is the same point and should be refused; an *incidental* one that holds at one configuration and not another must still build, which is this issue's own third lock.
+
+The third member is not reachable by that sentence and is a separate gap, not this defect.
+
+### A second finding, filed not fixed
+
+«הישר AB עם הישר BA» is **one line**, so its "crossing" is the whole line rather than a point. Measured, it builds an under-determined `P` floating along `AB` with `faults: []`. That is a different defect — an unconstrained point, not a duplicate name — and its honest answer may be a refusal or may be «P על הישר AB», which is the student's to decide. **#1255**; deliberately untouched here so this code never claims a sentence it cannot explain.
+
+### Lock
+
+`issue-1175-crossing-named.test.ts` (8): the operator's own line refused and naming `B`; **no second point at B's position, asserted as a property of the figure** rather than a fault code alone, because a refusal that still left a point behind would satisfy a code-only check; the holder asserted to survive the trip to the submit layer; both letter orders and both shared vertices; and — the whole risk — **a genuine crossing where nothing is named still builds and still names `P`**.
+
+One row asserts the **known-incomplete** positional behaviour on purpose: if a later change starts refusing it, that is #1254 being answered, and the row is the prompt to read that ruling rather than to delete it.
+
+Verified to bite: 5 of the 8 fail against pristine `parseAnalytic.ts`.
+
+### Consequences
+
+`parser/parseAnalytic.ts` (the code and the structural gate), `app/submit.ts` (the refusal now carries its context to the UI by spread, so the next code that carries some arrives intact), `store/useAnalyticStore.ts`, `App.tsx`, `i18n/index.ts` (both locales).
+
+## ADR-AG-117 — The triangle may identify a cevian's side, and the apex is what resolves it (#1165 + #1222)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R103a — which sentences name a cevian, and which deliberately still do not. **Design:** [04c](04c-design-analytic.md) — the target alternation and the two refusals it needs. **LADDER stage:** parse. No engine, solver or render change. **Family of** #1047 / #1231 / #1232 (the cevian rule's earlier halves).
+
+**Operator, 2026-09-17, with a screenshot:** *"we need to support things like `AD תיכון` and `AD חוצה זווית` like we do in the 2d tool."*
+
+### Measured, before anything was changed
+
+```
+AD תיכון במשולש ABC                 not-handled
+AD גובה במשולש ABC                  not-handled
+AD is the median in triangle ABC    not-handled
+AD תיכון ל-BC                       not-handled
+AD תיכון לצלע BC                    OK (5 facts)
+```
+
+The last row is the point. The capability was complete; only the **spellings** were missing — and one of the missing ones is what a student actually writes, because they have already written «משולש ABC» and the side has no name in their head.
+
+**And 2-D answers all of them**, which is the framing that lifts this above tail work: a sibling disparity is read as a bug, and the working sibling is the template ([cross-product-disparity](../.claude/memory/cross-product-disparity-is-a-wiring-smell.md)).
+
+### Why the triangle could never have worked
+
+The rule's target was a **mandatory** side run, with «במשולש ABC» permitted only as an optional trailing decoration *after* it:
+
+```
+(?:ל|אל\s+ה?)?(?:ה?צלע\s+)?(NAME)(NAME)(?:\s+ב?ה?משולש\s+NAME_RUN)?
+```
+
+So the triangle was recognised as **text** and could never be the thing that identifies the target — «AD תיכון במשולש ABC» has no side run to match, and the whole rule missed. This is the shape of defect that reads as "a missing feature" and is really a grammar that admits one operand where it should admit two.
+
+The target is now an **alternation** — the side named outright, *or* the triangle that determines it — and the lowering resolves whichever branch matched into the same `u`, `v`. **Nothing downstream changed**: the same four facts, the same #1231 gate, the same messages.
+
+The maqaf (#1222) rides along: «AD תיכון ל-BC» failed only because the rule had no `-` allowance before a Latin run, while the product relies on that Hebrew connector itself throughout its own catalog.
+
+### The apex is what makes the triangle spelling determinate — so it must be a vertex
+
+Remove the apex from the ring and the two letters left ARE the side. That is the whole mechanism, and it is also why an apex outside the ring is meaningless: «XD תיכון במשולש ABC» leaves three candidate sides and nothing to choose between them, so it is refused rather than guessed at ([ADR-052](06-decisions.md#adr-052) — never invent what the student did not state).
+
+**Determined from the SENTENCE, never from the figure.** This parser is context-free by design — `parseLine(raw)` takes no figure — and both forms here name everything they need. That is exactly what separates them from the arms parked below.
+
+### A THIRD refusal code, because two messages would have lied
+
+| the sentence | code | why not the neighbour |
+| --- | --- | --- |
+| `AD תיכון במשולש ABCD` | `bad-arity` | correct as it stands: a noun disagreeing with its own vertex count |
+| `XD תיכון במשולש ABC` | **`apex-not-a-vertex`** | `bad-arity` says "a triangle has three vertices" about a run that HAS three; `degenerate-role` says the apex "lies on the side itself", and `X` is not in the triangle at all |
+| `AB תיכון במשולש ABC` | `degenerate-role` | unchanged — #1231's gate still applies through the new spelling |
+
+The first draft refused both of the first two rows as `bad-arity`, and the message is what caught it: the honesty invariant is that an error names **the student's statement**, and a message that describes a different mistake sends them to fix a run that is already correct.
+
+### ⚠ What is NOT built, and the finding that decides it
+
+The operator's sentence also named «AD חוצה זווית», and two neighbouring spellings were scoped and **parked**:
+
+| arm | why it is parked |
+| --- | --- |
+| **angle bisector** (#1165 arm 2) | «AD חוצה את זווית A» names neither `B` nor `C`. Only the triangle-naming spelling («AD חוצה את הזווית A במשולש ABC») is determinable here, so the arm is a *lowering* question and not a regex one — it is worth doing, and it is a separate piece of work |
+| **apex-fronted** (#1222 arm 2) | «תיכון מ-A לצלע BC» gives the foot **no letter**, so the tool would have to mint one |
+| **no target at all** (#1240) | «AD גובה» needs the figure to say what it reaches |
+
+The last two share one finding, and it is the reason they are parked together rather than each on its own merits: **`freeLetter` lives in `engine/crossings.ts` and is called from `App.tsx`. `apply.ts` mints no point names at all, and the parser is context-free.** Minting a name for an unnamed foot is therefore not a parser change — it is a new naming seam, and where it belongs is a design decision rather than a fix.
+
+### Catalog
+
+The catalog had **zero** cevian entries — `grep -c "תיכון\|גובה" catalogAnalytic.ts` returned 0 — so a student looking for the command found nothing and the LLM fallback was never taught to emit one (the catalog is simultaneously the reference card, the coverage map and the model's allowed vocabulary, ADR-AG-005 D8). Two rows are added, walking the two axes the rule has to get right — role × how the target is named — rather than four phrasings of one thing. `parser.test.ts`'s own guard then proves each row parses in both languages and draws.
+
+### Lock
+
+`issue-1165-cevian-target.test.ts` (29), written as **PARITY**: each added spelling lowers to the same facts, and derives the same figure at seeds 0–3, as the side-naming spelling that already worked and is already locked by #1231/#1232. The obvious lock — "the triangle form produces a midpoint on BC" — would re-state the grammar rule inside the test and stay green through any change that kept both halves wrong together ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)); a parity assertion cannot.
+
+Verified to bite, both halves independently: removing the triangle alternative turns **15 of 29** red; removing the maqaf allowance turns **5** red.
+
+The negative control is the row that matters — the refusals above are all satisfiable by refusing the whole form, which is precisely the state this fixes.
+
+### Consequences
+
+`parser/parseAnalytic.ts` (the target alternation, the resolution, the new code), `parser/catalogAnalytic.ts`, `store/useAnalyticStore.ts`, `App.tsx`, `i18n/index.ts` (both locales).
+
+## ADR-AG-118 — An Arabic digit names a circle, exactly as a Roman numeral does (#1216)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R63 — which tokens name a circle, and which name its centre. **Design:** [04c](04c-design-analytic.md) — the numeral token and the two traps its separator lookahead now covers. **LADDER stage:** parse. No engine, solver or render change. **Extends** [ADR-AG-038](#adr-ag-038) / [ADR-AG-006](#adr-ag-006) (#1059).
+
+**Operator ruling, 2026-09-19:** *"I think the rule of I, II, III for circle names AND 1,2,3 are ok. so נתון מעגל 1 should be ok too. any other capital letters would become the name of the center."*
+
+### Measured, before anything changed
+
+```
+נתון מעגל 1 שמשוואתו (x-3)^2+(y-4)^2=9   ->  not-handled
+circle 1 is (x-3)^2+(y-4)^2=9            ->  OK, curve-anond1trc2     ← the «1» silently DROPPED
+נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9   ->  OK, circle-I
+נתון מעגל O שמשוואתו (x-3)^2+(y-4)^2=9   ->  OK, anonymous curve + point O
+```
+
+The English row is the honesty one: a stated name vanished with no refusal, which is the invariant that says nothing the student stated is silently dropped.
+
+**One of the issue's three reported failures had already been fixed, hours earlier the same night.** #1216 records «נתון מעגל 1» answering `bad-equation: "1"` — quoting the circle's NAME back at the student as a bad equation. It now answers `not-handled`, because [ADR-AG-114](#adr-ag-114) (#1246, landed in this same run) stopped a noun gate claiming a tail that is not an equation. Recorded rather than quietly enjoyed: it is evidence that the claim gate reached a case nobody wrote it for.
+
+### The change is one token, and that is the finding
+
+The numeral lives in two constants and is used by four rules — Hebrew centre, Hebrew numeral, English centre, English numeral. Widening it to admit `[1-5]` **is** the feature: `circle-1` and «מעגל 1» fall out of the existing id and label construction, and not one rule learned a digit case of its own. The constants are renamed `ROMAN_LETTERS`/`ROMAN_RUN` → `CIRCLE_NUMERALS`/`CIRCLE_NUMERAL_RUN`, because "ROMAN" stopped being true of the thing and a name that lies is how the next reader adds a digit case in the wrong place.
+
+**A digit needs no tie-breaking device, where a Roman numeral does.** A point name is `[A-Z][0-9]?`, so `I` and `V` ARE legal points — which is exactly why #1059 needed an ordered pair of rules and a case-sensitive lookahead to tell «מעגל I» (the circle) from «מעגל O» (the centre). A bare digit is not a legal point name at all, so «מעגל 1» has no competing reading to be told apart from. The digit half is the easy half *because* of how the hard half was built.
+
+### The range, which is the one judgement call
+
+**1–5, mirroring the Roman range exactly.** That range was itself chosen from corpus evidence about how many circles one question carries, so the two halves of the token share one justification instead of acquiring two. «מעגל 6» is refused, and the lock pins that boundary so widening it later is a deliberate act rather than a drift. The issue proposed this and offered 1–9; taken as proposed, and it is a one-character edit.
+
+### The separator lookahead is now doing two jobs
+
+[ADR-AG-006](#adr-ag-006) records a permissive `[IVX]{1,3}` reading the `x` of «המעגל x²+y²−2ax−2x=0» as a numeral and swallowing it. The digit twin of that trap is **«המעגל 4x²+4y²=1»**, where the leading digit is a COEFFICIENT — and the `(?=[\s:])` lookahead is the only thing between the two readings, because the `x` after the `4` is not a separator. One device, two traps, and the second is asserted in the lock rather than trusted.
+
+### ⚠ What is NOT built — the operator's own sentence, exactly
+
+The ruling names the string «נתון מעגל 1». **That bare form is still `not-handled`**, and it is a structural gap rather than a decision this change could take: the bare form lowers through `circleAtFacts(centre, …)`, whose every id is keyed on the centre's letter (`circle-at-O`, radius `r_O`). «מעגל O» has a letter; «מעגל 1» has none — and it has none for precisely the reason that makes it unambiguous as a circle name. Supporting it is a second identity path, with its own questions (what is the radius parameter called; is a centre point minted at all, given that `apply.ts` mints no names), plus the behaviour question of what a bare named circle MEANS.
+
+Filed as **[#1257](https://github.com/dcodish/geo_builder/issues/1257)** with the measurement, `needs-operator`. Stated here rather than left to be discovered, because the shipped arm answers the ruling's INTENT and not its literal sentence, and that distinction belongs in the record.
+
+It also exposes an inconsistency that exists on `main` right now: bare «נתון מעגל I» makes `I` the CENTRE, a reading this ruling arguably overturns. Deliberately untouched — reversing it is #1257's to rule, not this change's to assume.
+
+### Lock
+
+`issue-1216-digit-circle-names.test.ts` (20). The positive half is small; the **negative half is the bigger half**, because widening a token that sits in front of an equation is how a coefficient gets eaten:
+
+- every centre letter (`O`, `X`, `K`, and the English form) still creates the point and leaves the circle anonymous — if this regressed, the widening would have quietly reversed the ruling it claims to extend;
+- the Roman numerals still name circles;
+- «המעגל 4x²+4y²=1» and «המעגל 2x²+2y²=8» stay **anonymous** — asserted as *the name is empty and the id is not a named-circle id*, not merely as "it parses";
+- the range boundary: 5 in, 6 out;
+- and a PARITY row — a digit and a Roman numeral are indistinguishable apart from the token, which cannot go green by re-implementing the grammar it guards ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)).
+
+Verified to bite: removing the two digit alternatives turns **8 of 20** red.
+
+### Consequences
+
+`parser/parseAnalytic.ts` (the token and its four consumers), `parser/catalogAnalytic.ts` (one row — the card's job is to show the digit form exists, and the numeral is the only thing that varies).
+
+## ADR-AG-119 — Every notation for a distance is rewritten into the ONE question it already is (#1128)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the distance spellings, and which nouns may be dropped. **Design:** [04c](04c-design-analytic.md) / this entry — the two normalisations and where they sit. **LADDER stage:** parse. No engine, solver or render change. **Extends** [ADR-AG-…/#1151](#adr-ag-091) (the role decision) and #1048 (point-to-line).
+
+**Operator ruling, 2026-09-16:** *"`d_{AB}` should also work for questions. as well as `|AB|`"* — and, on the spelling list, *"we need to support all of these"*. And, playing the round of 2026-09-19: *"אורך הקטע BC = 10 is not recognized in analytics tool"*.
+
+### Measured first, and the issue's table was stale
+
+```
+AB = 10                      OK          המרחק בין A ל-B = 10       OK    ← already worked
+d_{AB} = 10                  not-handled  המרחק AB = 10              not-handled
+d(A,B) = 10                  not-handled  אורך AB = 10               not-handled
+|AB| = 10                    not-handled  אורך הקטע AB = 10          not-handled
+המרחק מ-A לישר l1 = 3        OK          הקטע AB = 10               not-handled
+```
+
+**Two of the issue's claims had gone out of date and are corrected here rather than inherited.** Its table says no «מרחק» sentence parses at all — three of them do, and have since #1151. And it splits the point-to-LINE distance out as part (b), *"a CAPABILITY, not a spelling"*, to be built after #1048: measured, «המרחק מ-A לישר l1 = 3» **already works**, so (b) landed from the other direction while this issue waited. What was actually missing was narrower and more embarrassing: every plain Hebrew word for a length, and every textbook notation.
+
+### The notations are rewritten into the worded question, not given rules of their own
+
+`d_{AB}`, `d_{A,B}`, `d(A,B)` and `|AB|` become «המרחק בין X ל-Y» *before* the distance frames run. They are then read by the frames that already exist, which means **the role decision happens in the one place #1151 put it** — a spelling cannot disagree with its own synonym, and no second copy of "which operand is a point and which is a line" comes into existence ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)).
+
+That choice pays immediately: **`d_{A,l1}` works for free.** The frame reads `l1` as a line exactly as the worded form does, so the symbolic spelling inherits the point-to-line capability instead of being refused beside its own synonym. Giving the notations their own point-pair patterns would have produced precisely that split — and worse, a pattern restricted to point names would let `d_{A,l1}` fall through to `LENGTH_TOKEN`, which would eat a pair out of the middle of it and answer a **different measurement**. That is the honesty failure #1151 records for the English form, and it is the reason the operands here are deliberately unrestricted.
+
+### A length noun is dropped only where it adds nothing — and the boundary is the point
+
+«אורך AB», «הקטע AB», «צלע AB», «המרחק AB» → the pair speaks for itself. The lookahead is the whole safety: the noun is removed only where a point pair follows it **immediately**, so «הקטע» in any other sentence is untouched, and «המרחק בין A ל-B» — already consumed by the frames — never reaches this step.
+
+**What is NOT in the list is the load-bearing half.** «תיכון», «גובה», «שוק», «בסיס», «יתר» each assert something BESIDES a length — that the segment is a median, a height, a leg, a base, a hypotenuse. Reducing «התיכון BC = 10» to `|BC| = 10` would drop the median claim silently, which is the invariant this repo treats as cardinal. They stay refused until the tool can honour both halves. And «הישר BC = 10» stays refused for its own reason: **a line has no length**, which is ADR-AG-111's extent ruling and must not be overturned sideways from a distance fix.
+
+### ⚠ Three rows of #1246's lock MOVED
+
+`issue-1246-equation-claim.test.ts` asserted «הקטע BC = 10», «הצלע BC = 10» and «אורך הקטע BC = 10» were `not-handled`. That was correct *at the time*: #1246's ruling was «never bad-equation», and `not-handled` was the best answer available to it, not its goal — that file's own header says *"They wrote a LENGTH."*
+
+They are **moved, not deleted**, into this issue's lock with the opposite expectation, and a comment stands in their place explaining why the other five stay. A lock that simply disappears looks like coverage nobody wrote. This is the same discipline ADR-527 used earlier in the same run.
+
+### ⚠ What is NOT built: the copula
+
+«אורך הקטע AB **הוא** 10» is still refused, where «... = 10» is accepted. `LENGTH_EQ` takes a literal `=` and does not admit `HE_IS`, the closed copula token the rest of the file uses.
+
+Filed as **[#1260](https://github.com/dcodish/geo_builder/issues/1260)** rather than folded in, and the reason is specific: **this is the shape of tonight's own P1.** #1248 (ADR-524 Am. 1) was a length connective that was too generous — «אורך הקטע BC > 10» committed `set-distance: 10`, a stated RANGE becoming an EQUALITY at its own bound, invisible to every honesty gate because the number *was* accounted for, by the wrong constraint. Widening a length rule's connective at the end of a long run, in that same file class, is how that P1 comes back. The bound-word guard has to be the first lock, not an afterthought.
+
+Measured while deciding: the obvious collision does **not** fire — «AD הוא תיכון לצלע BC» survives a widened connective, because `parseExpr` rejects the prose tail and the rule falls through to the cevian rule below. Recorded so #1260 starts from a fact rather than re-deriving it, and so it knows to LOCK that property rather than rely on it.
+
+### The chip
+
+The `d_{}` palette button the operator asked for could not exist until `d_{AB}` parsed — a chip whose output the grammar refuses hands the student `not-handled` on their own click. It is **copied from complex** (#791/#525): same label, same wrap, so a student moving between the two tools finds one button rather than two spellings of an idea.
+
+`SYMBOLS` is now **exported**, which it was not. That is what lets a test prove a button's insertion parses, and it is what #1129 (the palette's missing totality guard) needs; this issue proves only the one button it adds.
+
+### Lock
+
+`issue-1128-distance-spellings.test.ts` (65). The claim is **equality, not thirteen geometry assertions**: each spelling is asserted to produce the same term, the same figure and the same answer as `AB` — thirteen independent expectations would pass while two spellings quietly disagreed, and would re-state the grammar inside the test. Both surfaces are asserted rather than inferred from the shared `parseLengthExpr` call, because that shared call is exactly what a later refactor could break silently.
+
+Plus the boundary rows (the five claim-carrying nouns and «הישר» still refused), the moved #1246 rows, the `d_{A,l1}` inheritance, and the chip driven through `applySymbol` rather than assumed.
+
+Verified to bite, both halves independently: disabling the symbolic rewrite turns **19 of 65** red; disabling the noun strip turns **23** red.
+
+### Consequences
+
+`engine/lengths.ts` (the two normalisations), `parser/catalogAnalytic.ts` (three rows — one per family of spelling, since the lock already proves the thirteen equal), `App.tsx` (the chip, and the export), `i18n/index.ts` (both locales), `__tests__/issue-1246-equation-claim.test.ts` (three rows moved out).
+
+## ADR-AG-120 — The frame is fitted to everything DRAWN, not to the figure alone (#1198, symptom 1)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the object a student asks for is on screen. **Design:** [04c](04c-design-analytic.md) — where the frame is composed, and why not in `derive`. **LADDER stage:** render/app. No parser, engine or solver change. **Related:** [ADR-AG-086](#adr-ag-086) / #1176 (the trace follows the configuration — this is the frame failing to), #1182 (a different cause with the same feel).
+
+**Operator, 2026-09-18, playing round #1193 T11:** *"pressing on show another config causes the image to jump right and left and the entire shape is not shown."*
+
+### Measured, before and after
+
+```
+A(-9a,0) · B(41a,0) · נקודה P · PA מאונך ל-PB     ask «המקום הגיאומטרי של P»
+
+seed |            box            |           locus           | before | after
+  0  | x[ -57, 168] y[-147,  78] | x[ -31, 142] y[ -86,  86] |  CUT   | contained
+  1  | x[ -22,  64] y[ -53,  32] | x[ -12,  54] y[ -33,  33] |  CUT   | contained
+  2  | x[-165,  56] y[-129,  92] | x[-139,  31] y[ -85,  85] | contained | contained
+  3  | x[-140,  48] y[ -65, 122] | x[-118,  26] y[ -72,  72] |  CUT   | contained
+  4  | x[ -55, 162] y[-122,  95] | x[ -30, 137] y[ -83,  83] | contained | contained
+  5  | x[ -44, 130] y[ -56, 119] | x[ -24, 110] y[ -67,  67] |  CUT   | contained
+
+                                                   cut in 4 of 6  ->  0 of 6
+```
+
+The tool clipped, in two thirds of the configurations a student can reach, **the one object they had asked to see.**
+
+### Nothing was wrong in the tracer
+
+The box was fitted to a SUBSET of what gets drawn. `derive`'s box frames the figure's points and curves; a traced locus is not in the figure — it is caller-owned decoration on `SceneKnowledge`, the same seam as `marks` and `crossings` — so it reaches the renderer *after* the frame has been decided, and the frame never heard about it.
+
+`viewBox` therefore grows one optional input: world geometry that is drawn but is not in the figure. The padding and the isotropy stay inside it, in the one place that owns them, so no caller ever re-derives a frame rule.
+
+### The seam, which is the part this ADR is for
+
+The issue left it open: *"the caller may need to hand its extent to `derive`/the box rather than only to the renderer; that seam choice is the ADR."*
+
+**It is composed in `app/`, and `derive` is not told.** Feeding a question's trace back into the derivation would make the figure depend on the questions asked about it, and [02c R24](02c-requirements-analytic.md) forbids exactly that in as many words — *an ask is a dry-run construction, built internally, evaluated, discarded; it must never change the figure*. The app layer is the only one holding both the derivation and the answers, so that is where they meet.
+
+It is a FUNCTION (`app/drawnBox.ts`) rather than three lines inside the component, because the decision "what is on the canvas" is testable only if something can call it ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)). A lock that recomputed the union itself would stay green through the component forgetting to use it.
+
+Two details that are not incidental:
+
+- **Only SHOWN answers count.** A trace the student has collapsed is not on the canvas, and framing for it would zoom out for something invisible — the opposite failure, and just as confusing.
+- **With no trace, the figure's own box is returned UNCHANGED** — the same object, not an equal one built a second way. The auto-refit effect (#1225) keys on the box's numbers, so a recomputation differing in the last bit would re-frame the canvas under a student who had deliberately zoomed.
+
+### ⚠ HALF of #1198 is deliberately not fixed
+
+The frame still **lurches** between configurations: measured on the same figure, its width varies by a factor of **2.6** and its centre swings from **+55 to −63**, because it is re-fitted from nothing on every press. With a symbolic parameter the points themselves scale and flip with `a`, so a box that follows them faithfully swings by the full range of `a`.
+
+That is a **product ruling**, not a detail — what should «הציגו תצורה אחרת» feel like? Fit once and keep the frame while only the figure moves · normalise the scale by the parameter so the drawing stays one size · clamp how far the frame may move per press. The issue says so itself, and says (1) is worth landing without it.
+
+**One lock row pins the lurch as a KNOWN state**, asserting the factor is still greater than 2. When a ruling lands and this improves, that row goes red and sends the reader to the ruling — rather than letting the change arrive unnoticed and unexplained.
+
+### Not #1182, and they must not close each other
+
+[#1182](https://github.com/dcodish/geo_builder/issues/1182) is a free point **solving far from the stated figure** — about where the geometry goes. This is about where the camera points; here `A`, `B` and `P` all sit exactly where `a` puts them. The two look alike while playing and neither fix contains the other.
+
+### Lock
+
+`issue-1198-locus-in-view.test.ts` (10). **Containment over a sweep**, not the measured numbers: the property is *the thing the student asked for is on screen*, and the defect was configuration-dependent — a single-seed assertion would have passed on seeds 2 and 4 while the tool clipped the other four. The pre-fix frame's clipping is asserted too, so the lock cannot quietly stop measuring what it claims to.
+
+Verified to bite: reverting the composition to the figure's own box turns **5 of 10** red.
+
+### Consequences
+
+`engine/evaluate.ts` (`viewBox` gains its optional extra extent), `app/drawnBox.ts` (new — the composition), `App.tsx` (three `d.box` sites now read the drawn box: the ref, the auto-refit key, and the projection).
+
+## ADR-AG-121 — A line's row carries its slope and its explicit form; a vertical line says «אנכי» (#1219)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — what a line's row states. **Design:** this entry — `curveParts`'s line branch and its locale seam. **LADDER stage:** display. No parser, engine or solver change. **Amends** [ADR-AG-097](#adr-ag-097) (#1212) and one sentence of #1214's.
+
+**Operator, 2026-09-19, playing T23:** *"when showing a line in the data panel, the slope is not shown under the line equation. i also want to have the 2nd display option for the line - which is the y=mx+b format. this and the slope are below the line collapsable"*.
+
+### Nothing needed computing
+
+```
+«נתון הישר l1: y=2x+1»    row: -2x + y - 1 = 0      ASK «שיפוע l1» -> "2"
+«נתון הישר l3: y=3»       row: y - 3 = 0            ASK «שיפוע l3» -> "0"
+«נתון הישר l2: x=4»       row: x - 4 = 0            ASK «שיפוע l2» -> null
+```
+
+The slope was already reachable by ASKING and simply had nowhere to be shown. [ADR-AG-097](#adr-ag-097) had said *"a LINE has no details: it was already nothing but its equation"* — right about the equation, and wrong about everything else a line knows. And the «שיפועים» section does not cover this: it iterates `figure.segments`, and a stated line is a curve with no segment, so it appears there not at all.
+
+### ⚠ The vertical line was the bug hiding inside the request
+
+«שיפוע l2» on `x = 4` answered **null** — understood, unanswered, blank. This tree already had the right rule for the identical situation one object over:
+
+> *"A VERTICAL segment has no slope, and saying so is knowledge too — «אנכי» is an answer, not an absence."*
+
+The line row was the one surface that had not inherited it. **This had to be fixed as part of the same change rather than after it:** moving the slope into the row without it would have rendered an empty detail for every vertical line — the tool having visibly nothing to say about a line whose verticality it knows perfectly well.
+
+| line | equation (unchanged) | details |
+| --- | --- | --- |
+| `y = 2x + 1` | `-2x + y - 1 = 0` | `y = 2x + 1, m = 2` |
+| `y = 3` | `y - 3 = 0` | `y = 3, m = 0` |
+| `x = 4` | `x - 4 = 0` | **אנכי (אין שיפוע)** |
+
+### The fraction, which #1180 already ruled on and this could have broken
+
+`lineText` never prints a fractional coefficient: [#1180](https://github.com/dcodish/geo_builder/issues/1180) scales the whole equation by `fractionClearingFactor`, because `-4/3x + y = 0` is ambiguous (`4/(3x)`?) and typesets badly.
+
+**The explicit form cannot use that escape** — its `y` coefficient is fixed at 1, so a fractional slope is genuinely fractional. Printing `y = -1/2x + 7/2` would have reintroduced the exact shape that ADR removed, in a row sitting directly beneath one that obeys it. So the fraction goes AFTER the variable, which is how a textbook writes it and is unambiguous:
+
+```
+x + 2y = 7   ->   y = -x/2 + 7/2,  m = -1/2
+3x - 4y = 0  ->   y = 3x/4,        m = 3/4
+2x + 3y = 6  ->   y = -2x/3 + 2,   m = -2/3
+```
+
+`explicitTerm` is **derived from `term`** rather than written beside it — it takes that function's output and moves the denominator — so the sign rule, the `1x`-suppression and the zero rule stay in one place and the two forms in the same fold cannot drift apart.
+
+### The locale seam
+
+`curveParts` renders text and holds no locale, and a vertical line's answer is a WORD. It therefore takes the word as an argument, exactly as it takes `nameAt` — as an object (`CurveWords`) rather than a fourth positional string, so the next locale-bearing detail joins it instead of growing the signature again.
+
+A caller supplying none gets **no** vertical details rather than an English word in a Hebrew panel. The ask lane, which reads only `.equation`, is unaffected and passes nothing.
+
+The honesty gate is not new and is not re-decided here: the panel already reads a curve only when `knownCurve` vouches for it, so an open line gains no slope built from one configuration's numbers ([ADR-052](06-decisions.md#adr-052)). Locked anyway, because this change is what first gives a line something to print.
+
+### ⚠ Two rows MOVED, one of them predicted by the issue
+
+- **#1212's** *"a LINE row is unchanged — it was already an equation, and has nothing to fold"*. Replaced in place by a row that still guards what that issue was actually about — the line's EQUATION, unchanged.
+- **#1214's** *"a LINE has no details, so it needs no label — the operator's «נתוני הישר» cannot appear"*. #1219 called this one in advance: *"this reverses the point in #1214 that «נתוני הישר» can never appear; once this lands, it can."* Its replacement is **stronger** than the row it retires: a line now goes through that file's own loop — *every kind that has details has a real label rather than a bare key* — instead of being excused from it.
+
+Moved, not deleted, with a comment in each place, as ADR-527 and ADR-AG-119 did earlier in the same run.
+
+### Lock
+
+`issue-1219-line-details.test.ts` (13), driven through the **real panel path** — derive, `knownCurve`, `curveParts` — rather than against the renderer alone, so a change that left the gate behind would fail. The vertical row asserts the WORD and specifically not an empty string; the fraction rows assert a property (`no digit/digit immediately before x`) over five lines rather than three literals; and the untouched kinds are asserted so a one-branch change is provably one branch.
+
+Verified to bite: reverting the line branch to #1212's turns **7 of 13** red.
+
+### Consequences
+
+`app/curveText.ts` (`explicitLineText`, `slopeOf`, `explicitTerm`, `CurveWords`, and the line branch), `App.tsx` (passes the word), `__tests__/issue-1212-curve-equation.test.ts` and `__tests__/issue-1214-curve-noun.test.ts` (one row each, moved).
+
+## ADR-AG-122 — The palette becomes a module with a parse lock, and gains the six chips its grammar now supports (#1129)
+
+**Requirements:** [02c](02c-requirements-analytic.md) — the palette row. **Design:** none (internal). **LADDER stage:** none — UI declaration plus one tokeniser constant. **Ports** `src-complex/__tests__/symbols-module.test.ts`. **Depends on** #1127 and [ADR-AG-119](#adr-ag-119) (#1128), both landed in this same run.
+
+**Operator, 2026-09-16:** *"another item for analytics is the symbols pallet. we need all relevant ones for analytics and we probably need to add `d_{}`"*. **Ruling, same day:** *"Be INCLUSIVE: π is in (needs a one-line `expr.ts` constant). `|…|`, `d_{}`, `x_A` arrive via #1128/#1127. Only `°`/`∡` are held — they need the unbuilt angle capability, and a chip that cannot parse is worse than no chip."*
+
+### The issue's audit, re-run — and most of it has unblocked itself
+
+#1129 measured its candidates and found *"two chips are free today and the rest is gated on grammar."* Re-measured tonight, after this run's own landings:
+
+```
+·      PARSES      ³      PARSES       ← free then, free now
+|AB|   PARSES      ← was blocked on #1128 (landed tonight)
+d_{}   PARSES      ← was blocked on #1128 (shipped WITH it, as that issue required)
+x_{A}  PARSES      ← was blocked on #1127 (landed earlier)
+π      PARSES      ← after the one-line constant this ADR adds
+°  ∡   no          ← held by the ruling
+```
+
+**Five of the six blocked candidates unblocked themselves while the issue waited**, which is the shape the issue predicted: *"'all relevant ones for analytics' is, measured, mostly a request for notation rather than for buttons."*
+
+### π is a NUMBER, not a symbol
+
+One line in `expr.ts`, and the distinction is the whole of it: a `sym` token is a free parameter the figure may SAMPLE, so «AB = 2π» read as a symbol would make the length free and let the solver choose it. As a `num` token it is its value, and the juxtaposition rule that already reads `2a` and `4√5` reads `2π` for nothing.
+
+### The real defect was the missing LOCK, not the missing chips
+
+`shell/symbols.ts` states the contract — *"a product's tests can require every offered symbol to parse and to sit inside the bidi run alphabet"* — and complex was the only product holding itself to it. Analytic had none, and that is *why* its palette went thin: with no lock, "does this chip work?" had no mechanical answer, so nothing was added. The list also lived **inline in `App.tsx`**, unlike all three siblings.
+
+Both are fixed together, because neither alone is the fix: `ui/symbols.ts` is what a test can import, and the test is what makes the module worth having.
+
+**TOTALITY is the case that matters** — the template map's keys must equal the palette's, so a new button without a proof fails the suite. Without it the per-spec loop passes by checking nothing, which is the exercised-counter lesson this repo has already paid for.
+
+### ⚠ The ported bidi check failed on a chip that has shipped since #525 — and it was the CHECK that was wrong
+
+The ported test asserts each inserted character is in `RUN_CORE ∪ RUN_DELIMS ∪ INTERIOR`. Run here, it failed on **«≠»**.
+
+Measured before changing anything: `≠` is not in `RUN_CORE` — and neither are `=`, `>`, `^`, `*` or the SPACE — yet
+
+```
+«הנקודה A שונה מ-a ≠ 5»   ->   «הנקודה ⁦A⁩ שונה מ-⁦a ≠ 5⁩»
+```
+
+the whole expression sits inside ONE isolate, the operator carried through it exactly as `=` is. **The character list was the wrong question.** Widening `INTERIOR` to silence the failure would have been fitting the test to the answer.
+
+So the bidi half asserts the PROPERTY instead: pressing any chip inside a Hebrew sentence must not change how many runs the line isolates into, driven through the real `inputPreview`. That is strictly stronger than the allowlist — a character that IS in the alphabet but still broke a run would pass the ported check and fail this one — and it is the thing #482 actually cares about.
+
+### What is deliberately NOT here
+
+`°`, `∡` and `∠` are held by the ruling: their capability is unbuilt (02c §5d marks «∡ACB = 90°» ✗), and a chip inserting a character the grammar refuses hands the student `not-handled` on their own click. **Asserted as held, with the reason** — a lock row checks both that they are absent and that they still do not parse, so when the angle capability lands that row goes red and the chips are owed rather than forgotten.
+
+### Lock
+
+`symbols-module.test.ts` (18): totality; every chip driven through `applySymbol` and then the real `derive`, in a context that line actually needs; the bidi property above; the six original entries pinned in label and insert text, because moving a list between files is exactly where a character quietly becomes a different one; and the held glyphs with their reason.
+
+### Consequences
+
+`ui/symbols.ts` (new), `__tests__/symbols-module.test.ts` (new, ported), `engine/expr.ts` (the π token), `App.tsx` (inline list removed, module imported), `i18n/index.ts` (twelve tooltips, both locales), `__tests__/issue-1128-distance-spellings.test.ts` (its `SYMBOLS` import follows the move).
+
+**#725** — the workspace-wide palette reorganisation — is unaffected and still comes after: it cannot factor a base set out of a product whose own set was still missing its members, and this adds entries and a lock, both of which that work then reorganises.

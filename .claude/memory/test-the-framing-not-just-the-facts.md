@@ -45,3 +45,30 @@ than defending the menu.
 
 Related: [[measure-before-diagnosing]] (the facts are hypotheses); [[prior-rulings-live-in-comments]]
 (check what was already settled before asking).
+
+**2026-09-19, #1240 — the same rule applies to a BASELINE the operator names.** Playing #1232, he
+asked for more altitude spellings and set the reference himself: *"baseline is what 2d supports."*
+Measuring 2-D rather than porting it found two holes in the premise: `גובה לצלע BC` — one of the four
+forms he listed — is **refused by 2-D too**, so it is new capability for both tools and not a port at
+all; and 2-D's own median is poorer than its altitude (`AD גובה` parses, `AD תיכון` does not), so
+porting "what 2-D supports" literally would have copied an asymmetry into the younger tree. A named
+reference implementation is a claim about that implementation, and it is measurable in minutes.
+
+Same session, #1241: the operator ruled that a knee draws only for a **stated** right angle, never a
+derived one. Reading 2-D's renderer showed it feeds `rightAngles` from `definiteAngles` — a
+*determinacy* notion, not a *provenance* one — so 2-D probably does the opposite. Had that gone in as
+"port the 2-D knee", the two products would have disagreed about what the mark MEANS. **Check the
+sibling before citing it as the answer, not only before citing it as the problem**
+([[cross-product-disparity-is-a-wiring-smell]] is the same coin: a disparity is a smell in whichever
+direction it points).
+
+**2026-09-19, #1242 — an ADR cited as justification may be about a NARROWER case.** A refused line
+was filed as "the refusal is correct, make it total", justified by ADR-AG-015's *a reference may not
+invent a point*. The operator overruled the premise: *"the idea of order is not relevant since the
+diagram should either respect all input or refuse to build."* The ADR was about **inventing** a point;
+the case in front of me needed the constraint to **wait** for one — a distinction the citation hid.
+Worse, the principle was already ruled in the sibling: ADR-104 is titled *"order-independence: a
+constraint that can't be satisfied yet is DEFERRED"* and quotes the operator saying the same sentence
+in June. **Before citing an ADR to justify a refusal, read its Context and ask whether it covers THIS
+case — and grep the sibling's log for the same principle, which may already have been decided the
+other way.**

@@ -138,3 +138,71 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   void deps.resolveAfterCommit();
   return true;
 }
+
+/**
+ * THE ENABLE SEAMS — flipping a given off and on again searches, exactly as a submit does (#1133).
+ *
+ * `toggle` and `setGroupEnabled` both reset the seed to 0 (ADR-484) and neither launched the
+ * post-commit configuration search, so a student who unticked a given and ticked it back got a figure
+ * that could sit there **violating a requirement the list shows as holding**.
+ *
+ * Measured on «משולש ABC» · «גובה AD במשולש ABC» · «AB = 10» · «AD = 7», through the real submit path:
+ *
+ * ```
+ * after the build    seed 3   meetsRequirements: true    <- the submit's own search found seed 3
+ * disable the given  seed 0   meetsRequirements: true       (fewer requirements to meet)
+ * re-enable it       seed 0   meetsRequirements: FALSE   <- the defect
+ * ```
+ *
+ * **Re-enabling is not like deleting.** `removeGroup` is exempt from the search because deletion only
+ * ever relaxes — a satisfiable remainder was valid at seed 0 every time it was measured. Re-enabling
+ * does the opposite: it ADDS a requirement back, which is the same direction as a submit, and submits
+ * have always searched. That the two look like one "toggling" concern and behave like opposites is
+ * exactly what an un-enumerated inventory hides (#1132).
+ *
+ * **No condition is tested at the call site**, deliberately and for the same reason `runEditCommit`
+ * tests none: `runViewResolve` already early-returns when `meetsRequirements` holds, so disabling costs
+ * nothing, and a second copy of the trigger here is the precise shape that produced #1041.
+ *
+ * `void`, not `await`: these are UI event handlers, and the search runs off-thread exactly as it does
+ * after a submit.
+ */
+export function runToggleFact(id: string, deps: Pick<EditDeps, 'resolveAfterCommit'>): void {
+  useGeoStore.getState().toggle(id);
+  logDebug({ kind: 'action', action: 'toggle', detail: id }); // #84: so a reported session replays it
+  void deps.resolveAfterCommit();
+}
+
+/** A whole group's `enabled`, flipped — the same seam, the same search (#1133). */
+export function runSetGroupEnabled(
+  key: string,
+  enabled: boolean,
+  deps: Pick<EditDeps, 'resolveAfterCommit'>,
+): void {
+  useGeoStore.getState().setGroupEnabled(key, enabled);
+  logDebug({ kind: 'action', action: 'toggle-group', detail: `${key} → ${enabled}` });
+  void deps.resolveAfterCommit();
+}
+
+/**
+ * Deleting ONE fact of a group — armed, because it was MEASURED to need it (#1133).
+ *
+ * `removeGroup` is exempt from the search and that exemption is measured (#1041/ADR-518): deletion of
+ * a whole statement only ever relaxes, and over 12 deletions across three figures a satisfiable
+ * remainder was valid at seed 0 every time.
+ *
+ * **Removing one fact of a multi-fact group is a different act, and the measurement says so.** On
+ * «משולש ABC» · «גובה AD במשולש ABC» · «AB = 10» · «AD = 7», deleting one fact of the altitude group
+ * and one of the «AB = 10» group each left a figure that fails `meetsRequirements` at its seed **and
+ * that the search can rescue** — the case #1041 looked for and did not find, because it was looking at
+ * whole-group deletion. A partial group is not a relaxation; it is a different figure.
+ *
+ * `remove` has no UI caller today — the step list deletes whole groups. This is the armed path for the
+ * day it gains one, and the registry in `issue-1041-edit-resolve.test.ts` is what makes that day
+ * visible instead of silent.
+ */
+export function runRemoveFact(id: string, deps: Pick<EditDeps, 'resolveAfterCommit'>): void {
+  useGeoStore.getState().remove(id);
+  logDebug({ kind: 'action', action: 'delete', detail: id });
+  void deps.resolveAfterCommit();
+}

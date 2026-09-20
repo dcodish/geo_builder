@@ -10,6 +10,7 @@
 import { polylines, type Box } from '../engine/curves';
 import { markPoint } from '../engine/derived';
 import { fmtAnalytic } from '../format';
+import { analyticBidi } from '../i18n/bidi';
 import type { Figure } from '../engine/evaluate';
 import type { CurveKind } from '../engine/types';
 
@@ -151,6 +152,20 @@ export interface Scene {
    * height from the point to the line». Decoration: no id, nothing the student named.
    */
   measures: SceneMeasure[];
+  /**
+   * The מקומות גיאומטריים an answer is about (#1137), already projected — the curve a point traces
+   * when the figure's remaining freedom is walked. Decoration, exactly like `measures`: no id,
+   * nothing the student named, and it lives as long as the question does.
+   */
+  loci: SceneLocus[];
+}
+
+export interface SceneLocus {
+  /** The polyline in SCREEN coordinates, ready for an SVG `path`. */
+  d: string;
+  /** A closed trace (circle, ellipse) is stroked as a loop; an open one stops where it stops. */
+  closed: boolean;
+  label: { text: string; x: number; y: number } | null;
 }
 
 export interface SceneCrossing {
@@ -215,11 +230,51 @@ export interface SceneKnowledge {
    * see; drawing them is all this module does with them.
    */
   marks?: Array<{ from: { x: number; y: number }; foot: { x: number; y: number }; label?: string }>;
+  /**
+   * The traced loci to draw, in WORLD coordinates (#1137) — the caller owns them for the same reason
+   * it owns `marks`: they belong to the ask lane, which the renderer cannot see.
+   */
+  loci?: Array<{ points: Array<{ x: number; y: number }>; closed: boolean; label?: string }>;
 }
 
 /** Does a drawn point stand here? The centre mark's label defers to it (#1086). */
 const hasPointAt = (fig: Figure, x: number, y: number): boolean =>
   fig.points.some((p) => Math.hypot(p.x - x, p.y - y) < 1e-6);
+
+/**
+ * THE CANVAS'S BIDI CHOKEPOINT (#1191) — every label text this module produces goes through here.
+ *
+ * Operator, playing the locus lane: a perpendicular bisector labelled `ישר · 4y = −3x + 25` rendered
+ * on the canvas as
+ *
+ * ```
+ * 4 · ישר y = −3x + 25
+ * ```
+ *
+ * The equation the tool computed was right; the equation the student READ was not one. The root
+ * `<svg>` sets `direction: ltr`, so the paragraph level is LTR; the `·` sits between a Hebrew word and
+ * a European Number, UBA N1 resolves that neutral to RTL and I1 lifts the digit above the base level,
+ * so `4 · ישר` reorders as one unit and the rest of the equation is left stranded. Only an equation
+ * that STARTS with a digit scrambles — `(x − 16)² + y² = 625`, `y² = 8x` and `x = 4` all begin with a
+ * strong-L character — which is why the locus lane's own circle demo survived the build.
+ *
+ * This is the class `Figure.tsx`'s header comment calls *"the worst class of bug this tool can have"*:
+ * the canvas silently lying about a number. The panel row for the same value was already correct — it
+ * goes through this very kit — and the canvas was simply a second display surface that never adopted
+ * it. The whole renderer contained ONE bidi call, on the circle-centre label, which could not have
+ * helped: the scramble is INSIDE the string, not around it.
+ *
+ * Applied here rather than at the call sites, and deliberately not by reordering the label or dropping
+ * the `·`: that would hide the class and leave the next Hebrew-carrying canvas label to break —
+ * `measures[].label` is fed from the same `Answer.value` through the same unisolated `<text>` and is
+ * one Hebrew word away from the identical defect. `buildScene` already declares (#723/#1029) that
+ * formatting is a DISPLAY concern that happens here, and it is the single place every canvas label is
+ * produced, so no call site can forget and a label added later is isolated by construction.
+ *
+ * SVG `<text>` honours U+2066/U+2069 natively — ADR-431 Am. 1's Word exception is about `.docx`, not
+ * the browser.
+ */
+const lbl = (text: string): string => analyticBidi.isolateLtrRuns(text);
 
 export function buildScene(
   fig: Figure,
@@ -268,7 +323,7 @@ export function buildScene(
           label:
             knows.curveKnown?.(c.id) &&
             !hasPointAt(fig, c.curve.cx, c.curve.cy)
-              ? `(${fmtAnalytic(c.curve.cx)}, ${fmtAnalytic(c.curve.cy)})`
+              ? lbl(`(${fmtAnalytic(c.curve.cx)}, ${fmtAnalytic(c.curve.cy)})`)
               : undefined,
         }
       : undefined,
@@ -293,7 +348,7 @@ export function buildScene(
       label:
         s.pinnedLength === undefined
           ? undefined
-          : { text: fmtAnalytic(s.pinnedLength), x: (x1 + x2) / 2, y: (y1 + y2) / 2 },
+          : { text: lbl(fmtAnalytic(s.pinnedLength)), x: (x1 + x2) / 2, y: (y1 + y2) / 2 },
     };
   });
 
@@ -303,7 +358,7 @@ export function buildScene(
     labels: c.lines.flatMap((l) =>
       (l.marks ?? []).map((m) => {
         const at = markPoint(l, m.at);
-        return { x: t.sx(at.x), y: t.sy(at.y), text: m.text };
+        return { x: t.sx(at.x), y: t.sy(at.y), text: lbl(m.text) };
       }),
     ),
     feet: c.feet.map((f) => ({ cx: t.sx(f.x), cy: t.sy(f.y) })),
@@ -311,11 +366,30 @@ export function buildScene(
 
   const points: ScenePoint[] = fig.points.map((p) => {
     const prov = fig.provenance[p.id];
-    const part = (comp: { known: boolean; value?: number } | undefined, axis: 'x' | 'y'): ScenePart =>
-      comp && comp.known ? { text: fmtAnalytic(comp.value as number) } : { text: axis, sub: p.id };
-    // Shown only when the givens said SOMETHING about this point; a point described by nothing —
-    // or only by a constraint shared with others — carries its name alone.
-    const any = prov && (prov.x.known || prov.y.known);
+    /**
+     * A STATED EXPRESSION BEATS THE INVENTED SYMBOL (#1230).
+     *
+     * Operator, playing T44: *"the data panel is now correct but canvas is not"* — the panel read
+     * `A = (-9·a, 0)` while the canvas beside it still read `A(x_A, 0)`. #1226 fixed one surface and
+     * scoped this one out on the belief that the canvas showed the name alone; his screenshot shows
+     * it does not.
+     *
+     * `x_A` is the tool's own symbol standing in for something the student wrote, which is worse than
+     * showing nothing. A number is still never printed for an open coordinate.
+     */
+    const part = (
+      comp: { known: boolean; value?: number; expr?: string } | undefined,
+      axis: 'x' | 'y',
+    ): ScenePart =>
+      comp && comp.known
+        ? { text: fmtAnalytic(comp.value as number) }
+        : comp?.expr
+          ? { text: comp.expr }
+          : { text: axis, sub: p.id };
+    // Shown when the givens said SOMETHING about this point — a number OR an expression the student
+    // wrote. A point described by nothing, or only by a constraint shared with others, carries its
+    // name alone.
+    const any = prov && (prov.x.known || prov.y.known || !!prov.x.expr || !!prov.y.expr);
     return {
       id: p.id,
       cx: t.sx(p.x),
@@ -350,9 +424,30 @@ export function buildScene(
       tick: len > RIGHT_ANGLE * 2
         ? `M${(x2 + ux).toFixed(2)},${(y2 + uy).toFixed(2)}L${(x2 + ux + vx).toFixed(2)},${(y2 + uy + vy).toFixed(2)}L${(x2 + vx).toFixed(2)},${(y2 + vy).toFixed(2)}`
         : null,
-      label: m.label ? { text: m.label, x: (x1 + x2) / 2, y: (y1 + y2) / 2 } : null,
+      label: m.label ? { text: lbl(m.label), x: (x1 + x2) / 2, y: (y1 + y2) / 2 } : null,
     };
   });
+
+  /**
+   * The traced loci, projected (#1137).
+   *
+   * Nothing is decided here — which points, and whether the curve closed, were both settled by the
+   * tracer against the CONSTRUCTION, which this module cannot see. Projecting them is all it does,
+   * exactly as with `measures` and `crossings`.
+   *
+   * The label sits at the trace's midpoint rather than its end: an open locus runs off the view, and
+   * a label pinned to a point that is off-screen is a label nobody reads.
+   */
+  const loci: SceneLocus[] = (knows.loci ?? [])
+    .filter((l) => l.points.length >= 2)
+    .map((l) => {
+      const pts = l.points.map((p) => [t.sx(p.x), t.sy(p.y)] as const);
+      const d =
+        pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join('') +
+        (l.closed ? 'Z' : '');
+      const mid = pts[Math.floor(pts.length / 2)];
+      return { d, closed: l.closed, label: l.label ? { text: lbl(l.label), x: mid[0], y: mid[1] } : null };
+    });
 
   const crossings: SceneCrossing[] = (knows.crossings ?? []).map((k) => ({
     id: k.id,
@@ -378,5 +473,6 @@ export function buildScene(
     points,
     crossings,
     measures,
+    loci,
   };
 }

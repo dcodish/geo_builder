@@ -103,21 +103,117 @@ const LENGTH_TOKEN = /([A-Z][0-9]?)([A-Z][0-9]?)/g;
  * «אל» front the target because both are written.
  */
 /**
- * The point-to-line distance, in BOTH word orders (#1134).
+ * THE DISTANCE QUESTION, WITH ROLES DECIDED BY THE OPERANDS (#1134, #1151).
  *
- * «המרחק מ-A לישר l1» names the point after a `מ-` and the line after a `ל-`. The operator wrote
- * «מרחק של C מ-AB», which inverts which preposition introduces which operand: `של` puts the POINT
- * first and `מ-` then introduces the LINE. Measured, five neighbouring spellings reached the grammar
- * and his did not — and #1111's missing-object message, built for exactly his sentence, could never
- * fire on it because the sentence never parsed.
+ * Before #1151 one regex carried the word orders and fixed the roles by POSITION -- the point had to
+ * come first and the line second. Measured, that made four spellings of one question disagree:
  *
- * One token with two alternations, not two tokens: the operand classes are identical and only the
- * prepositions differ, so a second token would be the same rule written twice and free to drift.
- * Deliberately NOT the widening #1115 was disarmed over — no `=`, digits or operators enter the
- * operand, so the «AB + 2·CD» ambiguity does not arise.
+ * ```
+ * המרחק בין C ל-AB      -> 5            (point, then line)
+ * המרחק בין AB ל-C      -> «לא הבנתי»    the SAME question, other order
+ * המרחק בין A ל-B       -> null         two points, read as a line named «B»
+ * distance between C and AB -> null         and the English swallowed by LENGTH_TOKEN as «AB»
+ * ```
+ *
+ * The last is the honesty failure: the token missed, `LENGTH_TOKEN` then ate `AB` out of the
+ * sentence, and the student was answered about a DIFFERENT measurement.
+ *
+ * ## Roles come from the operands, and the operands say what they are
+ *
+ * A name's own spelling settles its role, with no figure needed: **one letter is a point** and can be
+ * nothing else; two letters or a curve name denote a line. So the classification happens here, and
+ * `lengths.ts` keeps the layering the rest of the file is careful about -- it still knows nothing
+ * about objects.
+ *
+ * | operands | the question |
+ * | --- | --- |
+ * | `A`, `B` | the plain distance -- the same term «AB» produces, so one question is one term |
+ * | `C`, `AB` (either order) | the point-to-line distance |
+ * | `AB`, `l1` | NOT read here -- see below |
+ *
+ * **Two lines is a CAPABILITY, not this bug.** The distance between two parallel lines is a real
+ * question and this token could reach it, but building it under a bug's banner is what CLAUDE.md
+ * forbids; a pair of line operands is therefore left unconsumed and still answers «לא הבנתי»,
+ * exactly as it does today. Filed separately.
+ *
+ * ## Frames, not one positional mega-regex
+ *
+ * Each spelling is its own small pattern with the SAME two operand slots, applied in turn. That is
+ * what stopped the group-counting bug #1134 had to fix (four groups, only the first pair read) from
+ * being able to come back: a frame that matches hands over exactly two operands, and the roles are
+ * decided in one place for all of them.
  */
-const POINT_LINE_TOKEN =
-  /(?:ה?מרחק|[Dd]istance)\s+(?:מ-?|בין\s+|from\s+)([A-Z][0-9]?)\s+(?:לבין\s+|א?ל-?|to\s+)\s*(?:ה?(?:ישר|קטע|צלע)\s+|(?:the\s+)?line\s+)?([A-Za-zℓ][0-9]?[A-Z]?[0-9]?)|(?:ה?מרחק|[Dd]istance)\s+(?:של|of)\s+([A-Z][0-9]?)\s+(?:מ-?|from\s+)\s*(?:ה?(?:ישר|קטע|צלע)\s+|(?:the\s+)?line\s+)?([A-Za-zℓ][0-9]?[A-Z]?[0-9]?)/g;
+const OPERAND = String.raw`[A-Za-zℓ][0-9]?[A-Z]?[0-9]?`;
+/** An optional noun before either operand -- «המרחק מ-C לישר AB». */
+const NOUN = String.raw`(?:ה?(?:ישר|קטע|צלע)\s+|(?:the\s+)?line\s+)?`;
+const DISTANCE = String.raw`(?:ה?מרחק|[Dd]istance)\s+`;
+const frame = (open: string, join: string) =>
+  // `String.raw`, not a plain template: a template literal drops the backslash in `\s`, which would
+  // silently turn every gap in these frames into a literal «s».
+  new RegExp(String.raw`${DISTANCE}(?:${open})\s*${NOUN}(${OPERAND})\s+(?:${join})\s*${NOUN}(${OPERAND})`, 'g');
+
+/**
+ * Ordered most specific first, so «של … מ-» is not mis-read by the «מ- … ל-» frame, and
+ * «לבין» is tried before the bare «ל-» it starts with.
+ */
+const DISTANCE_FRAMES: RegExp[] = [
+  frame(String.raw`של\s+|of\s+`, String.raw`מ-?|from\s+`),
+  frame(String.raw`בין\s+|between\s+`, String.raw`לבין\s+|א?ל-?|and\s+`),
+  frame(String.raw`מ-?|from\s+`, String.raw`לבין\s+|א?ל-?|to\s+`),
+];
+
+/**
+ * THE SYMBOLIC SPELLINGS, REWRITTEN INTO THE WORDED ONE (#1128).
+ *
+ * **Operator ruling, 2026-09-16:** *"`d_{AB}` should also work for questions. as well as `|AB|`"* —
+ * and, asked about the spelling list, *"we need to support all of these"*.
+ *
+ * `d_{AB}`, `d_{A,B}`, `d(A,B)` and `|AB|` are NOTATIONS for the question «המרחק בין A ל-B», not
+ * new questions. So they are rewritten into that sentence and handed to the frames below, rather
+ * than given patterns of their own that would need their own copy of the role logic. The roles —
+ * which operand is a point and which a line — are then decided in the ONE place #1151 put them, and
+ * a spelling cannot disagree with its own synonym ([ADR-W-053](../../docs/06w-decisions-workspace.md)).
+ *
+ * That is also what makes `d_{A,l1}` work for free: the frame reads `l1` as a line exactly as the
+ * worded «המרחק בין A לישר l1» does, so the symbolic form inherits the point-to-line capability
+ * instead of being refused beside it.
+ *
+ * The operands are deliberately **not** restricted to point names here. Restricting them would make
+ * `d_{A,l1}` fall through to `LENGTH_TOKEN`, which would eat a pair out of the middle of it and
+ * answer a DIFFERENT measurement — the exact honesty failure #1151 records for the English form.
+ */
+const SYM_OPERAND = String.raw`[A-Za-zℓ][0-9]?[A-Z]?[0-9]?`;
+const SYMBOLIC_DISTANCE: Array<[RegExp, string]> = [
+  // d_{AB} · d_{A,B} · d_{A,l1}
+  [new RegExp(String.raw`\bd\s*_\s*\{\s*(${SYM_OPERAND})\s*,?\s*(${SYM_OPERAND})\s*\}`, 'g'), 'המרחק בין $1 ל-$2'],
+  // d(A,B) — the comma is required, or `d(x)` of a function would be claimed
+  [new RegExp(String.raw`\bd\s*\(\s*(${SYM_OPERAND})\s*,\s*(${SYM_OPERAND})\s*\)`, 'g'), 'המרחק בין $1 ל-$2'],
+  // |AB| — the bars are the absolute-value notation for a length, and only a POINT PAIR is a length
+  [new RegExp(String.raw`\|\s*([A-Z][0-9]?)\s*([A-Z][0-9]?)\s*\|`, 'g'), 'המרחק בין $1 ל-$2'],
+];
+
+/**
+ * A LENGTH NOUN standing directly in front of a pair — «אורך AB», «הקטע AB», «צלע AB» (#1128).
+ *
+ * Operator, playing the 2-D round of 2026-09-19: *"אורך הקטע BC = 10 is not recognized in analytics
+ * tool"*. A student had exactly one way to state a length here — the bare symbolic `AB = 10` — and
+ * every plain Hebrew word for it was refused. The noun adds no meaning to a pair that is already a
+ * length, so it is removed and the pair speaks for itself.
+ *
+ * The LOOKAHEAD is the whole safety of this. The noun is dropped only where a point pair follows it
+ * immediately, so «הקטע AB» becomes `AB` while «הקטע» in any other sentence is untouched — and
+ * «המרחק בין A ל-B», which the frames above have already consumed, never reaches here at all.
+ *
+ * Runs AFTER the frames and BEFORE `LENGTH_TOKEN`, which is the same slot, and the same reason, as
+ * the area token: a noun stripped too early would leave «בין A ל-B» with no frame left to read it.
+ */
+const LENGTH_NOUN = new RegExp(
+  String.raw`(?:ה?אורך|ה?מרחק|[Ll]ength(?:\s+of)?|[Dd]istance)\s+(?:ה?(?:קטע|צלע|ישר)\s+)?(?=[A-Z][0-9]?[A-Z][0-9]?\b)|(?:ה?(?:קטע|צלע)|[Ss]egment|[Ss]ide)\s+(?=[A-Z][0-9]?[A-Z][0-9]?\b)`,
+  'g',
+);
+
+/** One letter (with an optional index) is a POINT and can be nothing else. */
+const IS_POINT = /^[A-Z][0-9]?$/;
 
 const AREA_TOKEN = /(?:שטח|[Aa]rea\s+of)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9]?){3,})/g;
 
@@ -125,26 +221,44 @@ export function parseLengthExpr(src: string): LengthExpr | null {
   const terms: MeasureTerm[] = [];
   // Areas first — see AREA_TOKEN. Each becomes a placeholder before any length token is looked for.
   // Point-to-line first: its tail contains a name that LENGTH_TOKEN would otherwise claim (#1048).
-  const withPL = normalizeMath(src).replace(
-    POINT_LINE_TOKEN,
-    /**
-     * FOUR groups, because the token carries two word orders (#1134).
-     *
-     * `מהמרחק מ-A לישר l1` fills 1 and 2; `מרחק של A מ-l1` fills 3 and 4. Reading only the first
-     * pair is how the second order parsed and then answered nothing at all -- the token matched, the
-     * operands came back undefined, and the measure resolved to null with no error anywhere.
-     */
-    (_m, pA: string | undefined, lineA: string | undefined, pB: string | undefined, lineB: string | undefined) => {
-      const p = pA ?? pB;
-      const line = lineA ?? lineB;
+  /**
+   * ONE role decision, for every spelling (#1151).
+   *
+   * Each frame hands over exactly two operands and knows nothing about which is which; the roles are
+   * settled here, from the names themselves. That is what makes «המרחק בין C ל-AB» and
+   * «המרחק בין AB ל-C» the same question rather than one answer and one «לא הבנתי».
+   */
+  // The symbolic notations become the worded question first, so the frames below decide the roles
+  // for every spelling at once (#1128).
+  let withPL = SYMBOLIC_DISTANCE.reduce((s, [re, to]) => s.replace(re, to), normalizeMath(src));
+  for (const f of DISTANCE_FRAMES) {
+    withPL = withPL.replace(f, (_m, x: string, y: string) => {
+      const push = (t: MeasureTerm, same: (u: MeasureTerm) => boolean) => {
+        const at = terms.findIndex(same);
+        return String.fromCharCode(PLACEHOLDER_BASE + (at >= 0 ? at : terms.push(t) - 1));
+      };
+      // Two points are a plain distance -- the SAME term «AB» produces, so «המרחק בין A ל-B» and
+      // «AB» are one question with one answer instead of a point-line term naming a line called «B».
+      if (IS_POINT.test(x) && IS_POINT.test(y)) {
+        if (x === y) return _m; // a degenerate statement, as LENGTH_TOKEN also refuses
+        return push({ a: x, b: y }, (t) => t.kind !== 'area' && t.kind !== 'point-line' && t.a === x && t.b === y);
+      }
+      // Exactly one point: the other operand is the line, whichever side it was written on.
+      const p = IS_POINT.test(x) ? x : IS_POINT.test(y) ? y : null;
+      const line = p === x ? y : p === y ? x : null;
+      // Neither is a point: two lines. A real question, and a CAPABILITY rather than this bug --
+      // left unconsumed, so it still answers «לא הבנתי» exactly as it does today.
       if (!p || !line) return _m;
       const key = `${p}|${line}`;
-      const at = terms.findIndex((t) => t.kind === 'point-line' && `${t.p}|${t.line}` === key);
-      const i = at >= 0 ? at : terms.push({ kind: 'point-line', p, line }) - 1;
-      return String.fromCharCode(PLACEHOLDER_BASE + i);
-    },
-  );
-  const withAreas = withPL.replace(AREA_TOKEN, (_m, run: string) => {
+      return push(
+        { kind: 'point-line', p, line },
+        (t) => t.kind === 'point-line' && `${t.p}|${t.line}` === key,
+      );
+    });
+  }
+  // A length noun in front of a bare pair adds nothing to it — «אורך AB» IS «AB» (#1128).
+  const withNouns = withPL.replace(LENGTH_NOUN, '');
+  const withAreas = withNouns.replace(AREA_TOKEN, (_m, run: string) => {
     const ids = run.match(/[A-Z][0-9]?/g) ?? [];
     const key = ids.join();
     const at = terms.findIndex((t) => t.kind === 'area' && t.ids.join() === key);

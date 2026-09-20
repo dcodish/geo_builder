@@ -95,3 +95,20 @@ export const drawnMarks = (rows: readonly Answer[]): Array<{ from: { x: number; 
   rows
     .filter((a) => a.mark && a.shown !== false)
     .map((a) => ({ from: a.mark!.from, foot: a.mark!.foot, label: a.value ?? undefined }));
+
+/**
+ * The LOCI the canvas should draw — every answered locus that is not hidden (#1137).
+ *
+ * The sibling of {@link drawnMarks}, and separate from it for the reason that one is separate from
+ * the record: a trace is part of the READING. It is in world coordinates and moves with the figure,
+ * which is exactly why it must not be stored.
+ *
+ * It rides the SAME `shown` flag, so ADR-AG-067's three gestures — ask, click again to hide, ✕ to
+ * retire — govern a locus without a second lifetime being invented for it.
+ */
+export const drawnLoci = (
+  rows: readonly Answer[],
+): Array<{ points: Array<{ x: number; y: number }>; closed: boolean; label?: string }> =>
+  rows
+    .filter((a) => a.locus && a.shown !== false)
+    .map((a) => ({ points: a.locus!.points, closed: a.locus!.closed, label: a.value ?? undefined }));

@@ -25,32 +25,11 @@
  * whose answer is «לא הבנתי» would be the menu lying about the figure.
  */
 import type { Construction, Id } from '../engine/types';
+import { asPair, lineNamesOf, segmentName } from './lines';
 
 export interface Measurable {
   /** The sentence to ask — exactly what the student could have typed. */
   sentence: string;
-}
-
-/** A line the student can NAME, and therefore ask about. */
-function namedLines(c: Construction): string[] {
-  const out: string[] = [];
-  for (const o of c.objects) {
-    if (o.kind !== 'curve') continue;
-    if (o.label.kind && o.label.kind !== 'line') continue;
-    const n = o.label.name;
-    // An anonymous curve is referred to by its equation (ADR-AG-056); that is a long menu entry and
-    // a student rarely wants the distance to one, so the menu keeps to names.
-    if (n) out.push(n);
-  }
-  return out;
-}
-
-/** Is this name really two points the figure holds? Then it also names a SEGMENT with a length. */
-function asPair(c: Construction, name: string): [Id, Id] | null {
-  const m = /^([A-Z][0-9]?)([A-Z][0-9]?)$/.exec(name);
-  if (!m || m[1] === m[2]) return null;
-  const has = (id: Id) => c.objects.some((o) => o.id === id);
-  return has(m[1]) && has(m[2]) ? [m[1], m[2]] : null;
 }
 
 /**
@@ -61,16 +40,51 @@ function asPair(c: Construction, name: string): [Id, Id] | null {
  */
 export function measurablesOfPoint(c: Construction, id: Id): Measurable[] {
   const out: Measurable[] = [{ sentence: id }];
-  for (const line of namedLines(c)) out.push({ sentence: `המרחק מ-${id} לישר ${line}` });
+  /**
+   * A LINE THE POINT IS AN ENDPOINT OF IS NOT OFFERED (#1139 → #1207).
+   *
+   * On a triangle, the distance from `C` to `AB` is the HEIGHT — the question the student came to
+   * ask. The distance from `C` to `BC` or `CA` is **zero by construction**, at every configuration
+   * and in every figure.
+   *
+   * #1139 ordered the height first and kept the other two, reasoning that the menu's contract is
+   * «offered iff the ask lane answers it» and the lane does answer 0. Operator ruling, 2026-09-18:
+   * *"there is no need to show the distance to segments that make up that point since they will be 0
+   * and no one would want to ask that"*. He is right — that contract is a floor, not a reason to
+   * offer everything clearing it, and two dead entries bury the one worth asking.
+   *
+   * The test is STRUCTURAL, by name, and that matters: a named line `l1` that happens to pass through
+   * the point also answers 0 today, but it is not MADE OF the point — another configuration may move
+   * it off, and the student may well want to ask. Only a line the point is an endpoint of is dropped.
+   */
+  const madeOf = (n: string) => {
+    const p = asPair(n);
+    return !!p && (p[0] === id || p[1] === id);
+  };
+  for (const line of lineNamesOf(c).filter((n) => !madeOf(n)))
+    out.push({ sentence: `המרחק מ-${id} לישר ${line}` });
   return out;
 }
 
 /**
- * The questions a CURVE admits — the operator's three, in the order he named them.
+ * The three questions a LINE admits, whatever surface named it — the operator's own three, in the
+ * order he named them.
  *
- * The length is offered only when the curve's name really is two points: «הישר ℓ1» has no nodes, and
- * offering «אורך ℓ1» would be the menu inventing a measurement.
+ * ONE list, because a curve object and a clicked triangle side are the same question about the same
+ * kind of thing. Two copies of it is how the menu started disagreeing with itself in the first place.
+ *
+ * The length is offered only when the name really is two points: «הישר ℓ₁» has no nodes, and
+ * offering «אורך ℓ₁» would be the menu inventing a measurement.
  */
+function lineQuestions(c: Construction, name: string): Measurable[] {
+  const out: Measurable[] = [{ sentence: `משוואת הישר ${name}` }, { sentence: `שיפוע הישר ${name}` }];
+  const pair = asPair(name);
+  if (pair && c.objects.some((q) => q.id === pair[0]) && c.objects.some((q) => q.id === pair[1]))
+    out.push({ sentence: `${pair[0]}${pair[1]}` });
+  return out;
+}
+
+/** The questions a CURVE admits. */
 export function measurablesOfCurve(c: Construction, id: Id): Measurable[] {
   const o = c.objects.find((q) => q.id === id);
   if (!o || o.kind !== 'curve') return [];
@@ -80,14 +94,27 @@ export function measurablesOfCurve(c: Construction, id: Id): Measurable[] {
   // A conic is asked for its equation and nothing else: it has no slope and no two nodes.
   if (!name) return [];
   if (kind && kind !== 'line') return [{ sentence: `משוואת ${name}` }];
+  return lineQuestions(c, name);
+}
 
-  const out: Measurable[] = [{ sentence: `משוואת הישר ${name}` }, { sentence: `שיפוע הישר ${name}` }];
-  const pair = asPair(c, name);
-  if (pair) out.push({ sentence: `${pair[0]}${pair[1]}` });
-  return out;
+/**
+ * The questions a drawn SEGMENT admits — a triangle's side, or a stated «קטע AB» (#1139).
+ *
+ * Operator, 2026-09-16: *"the line itself is not clickable in this state and it should be — allowing
+ * to show distance, equation, slope."* The side was drawn, and was an object to nobody: `onPick`
+ * reported only points and curves, so there was nothing a click could even name.
+ */
+export function measurablesOfSegment(c: Construction, id: Id): Measurable[] {
+  const name = segmentName(c, id);
+  return name ? lineQuestions(c, name) : [];
 }
 
 /** Everything clickable-and-measurable about one object, by what the renderer reported. */
-export function measurablesOf(c: Construction, what: { kind: 'point' | 'curve'; id: Id }): Measurable[] {
-  return what.kind === 'point' ? measurablesOfPoint(c, what.id) : measurablesOfCurve(c, what.id);
+export function measurablesOf(
+  c: Construction,
+  what: { kind: 'point' | 'curve' | 'segment'; id: Id },
+): Measurable[] {
+  if (what.kind === 'point') return measurablesOfPoint(c, what.id);
+  if (what.kind === 'segment') return measurablesOfSegment(c, what.id);
+  return measurablesOfCurve(c, what.id);
 }

@@ -22,6 +22,8 @@ export interface LineFault {
   existing?: ApplyError['existing'];
   /** For an unknown reference: what KIND was expected, so the message uses the right noun (#1179). */
   expected?: ApplyError['expected'];
+  /** For a second naming: WHO already holds the position, so the refusal shows it (#1153). */
+  holder?: ApplyError['holder'];
 }
 
 /**
@@ -38,6 +40,17 @@ export interface Derivation {
   construction: Construction;
   figure: Figure;
   box: Box;
+  /**
+   * WHICH CONFIGURATION THIS IS (#1176).
+   *
+   * A derivation is always OF a seed — the figure, the panel and every gate describe one
+   * configuration — and not carrying it is what let the locus lane diverge from the canvas: `ask`
+   * had no way to know which configuration it was answering about, so it traced at a hardcoded pair
+   * and drew a curve belonging to a different value of the figure's free parameter.
+   *
+   * Carried rather than re-derived, so a consumer cannot disagree with its own figure by construction.
+   */
+  seed: number;
   /** One entry per failing line. An empty array means every line landed. */
   faults: LineFault[];
   /** One entry per input line, positionally — what that line actually did. */
@@ -64,7 +77,7 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
 
   const { construction, errors, effects, constraintFact } = fold(facts);
   errors.forEach((e, i) => {
-    if (e) faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected });
+    if (e) faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder });
   });
 
   /**
@@ -226,13 +239,14 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
   });
   for (const f of faults) outcomes[f.index] = "faulted";
 
-  return { construction, figure, box: viewBox(figure), faults, outcomes };
+  return { construction, figure, box: viewBox(figure), seed, faults, outcomes };
 }
 
 export const EMPTY_DERIVATION: Derivation = {
   construction: EMPTY_CONSTRUCTION,
   figure: { env: {}, points: [], curves: [], segments: [], construction: [], vacant: [], unsatisfied: [], selectorsOk: true, ringFaults: [], carrierDof: 0, provenance: {} },
   box: { minX: -10, minY: -10, maxX: 10, maxY: 10 },
+  seed: 0,
   faults: [],
   outcomes: [],
 };

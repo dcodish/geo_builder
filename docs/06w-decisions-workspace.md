@@ -2997,3 +2997,347 @@ legitimately edits a sibling*; those changes edit no sibling at all. It would ha
 sentence into the permanent record and left the gate broken for everyone after — and a gate people learn
 to wave through is worse than no gate. Same for an admin merge. The gate was wrong, so the gate was
 fixed.
+
+## ADR-W-058 — Which deploy steps to run is a MEASUREMENT, not a question about which files changed (#1130)
+
+**Requirements:** none (internal — an operating procedure, not a product promise). **Design:** [RUNBOOK](RUNBOOK.md) § *Standard deploy*. **Product:** workspace.
+
+### The rule was not fragile; it was UNSOUND
+
+The RUNBOOK decided the proxy step by asking *"did `server/` change?"* — **No** → static-only, do not restart the proxy. It shipped stale server code **twice**, and the second occurrence is what filed this.
+
+The reason it could never work, measured through esbuild's own metafile on the real `build:proxy` options:
+
+```
+26 first-party modules go into dist-server/proxy.mjs
+20 of them live OUTSIDE server/
+   src/parser/catalog.ts        <- the 2-D catalog IS the LLM's vocabulary
+   src3d/parser/catalog3.ts     <- and the 3-D one
+   src-complex/**, src-analytic/**
+```
+
+So editing a catalog row — a change nobody would call a *server* change — makes the deployed proxy stale, and the rule answers "no". The failure mode is invisible by construction: **the stale artifact keeps working**, so nothing surfaces until someone diffs it by hand. A convention that depends on remembering is not a check, which is the same class as the per-product clear-all list #1107 fixed for the fourth time.
+
+This round demonstrated it live: **no `server/` file was touched**, and the preflight measured the built proxy as DIFFERING from production — because items 1–3 edited `src-analytic/`.
+
+### The question becomes a measurement
+
+`scripts/deploy-preflight.mjs` builds the proxy (~30 ms, so it is unconditional) and compares artifacts against the live ones:
+
+| artifact | compared by |
+| --- | --- |
+| `dist-server/proxy.mjs` | `sha256` local vs `sha256sum` over ssh |
+| each product bundle | the **content-hashed filename** Vite emits, read from the local page and from the served `index.html` |
+
+Vite's asset names are content hashes, so comparing the referenced bundle IS a content comparison and needs no hashing of its own.
+
+It **reads only** — no writes, no restart, no deploy — and **exits non-zero whenever anything differs**. Differing is the normal pre-deploy state, so that exit code is not a pass/fail verdict; it is there so the verdict cannot be skimmed past on the way to the scp commands. Evidence produced is not evidence read.
+
+An artifact that is NOT BUILT, or a host that cannot be reached, is reported as such and also exits non-zero: *"nothing measured as stale"* must never be readable as *"everything is current"*.
+
+### The lock asserts the OLD RULE IS UNSOUND
+
+`server/__tests__/deploy-preflight.test.ts` asks esbuild what goes into the bundle, **through the same `proxyBuildOptions` the real build uses** — `server/build.mjs` now exports them, so the preflight, the build and the lock have one definition instead of three descriptions. Describing the import graph a second time is exactly how the RUNBOOK sentence drifted from the build it described.
+
+It asserts that the bundle's inputs outside `server/` are a MAJORITY, not a count, so adding a module does not fail a test about the rule. And it asserts the retired rule is not being INSTRUCTED again — blockquotes and headings exempt, because the RUNBOOK must be free to explain what it replaced and why.
+
+### Consequences
+
+`scripts/deploy-preflight.mjs` (new) · `npm run deploy:preflight` · `server/build.mjs` exports `proxyBuildOptions`/`proxyInputs` and only builds when RUN, not when imported · RUNBOOK § *Standard deploy* rewritten around the preflight, with the old rule recorded as retired rather than deleted. `server/__tests__/deploy-preflight.test.ts` (4).
+
+## ADR-W-059 — A test file that cannot fail is not a test, and the suite now says so (#1044)
+
+**Requirements:** none (internal — suite hygiene, not a product promise). **Design:** [08](08-testing-strategy.md) — the suite's own guards. **Product:** workspace.
+
+### The reported instance
+
+`src/__tests__/_scratch556b.test.ts` — 14 lines, **zero assertions**, six replay sweeps of `console.log`. It ran on every `test:full`, on every machine, and **could not fail**: it reported green forever whatever the engine did. Left behind as a scratch diagnostic and never removed.
+
+### Deleting it is the patch shape, and the class is live
+
+The `/decisions` pass of 2026-09-17 found two more (`tmp-probe.test.ts`, `tmp-probe2.test.ts`) sitting untracked in `src-analytic/__tests__/` the same morning. So the deletion ships with a guard — and the guard immediately earned its place by finding a **second tracked instance the issue did not know about**: `src3d/__tests__/probe578c.test.ts`, the 3-D twin of the reported file, thirteen lines of `console.log` over five spellings of «גובה».
+
+Both are deleted. Nothing is lost, because neither asserted anything.
+
+### The guard, and the heuristic stated rather than assumed
+
+`server/__tests__/suite-hygiene.test.ts` walks every tree that carries tests and fails the suite for any `*.test.ts(x)` that contains no assertion. It **discovers** files rather than carrying a list, which is the difference between a guard and a snapshot.
+
+"Contains no assertion" is judged from the SOURCE, because vitest exposes no per-file assertion count this can read. A file counts as asserting when it — **or any local module it imports, one hop** — contains one of the listed forms. The import hop is what keeps a file asserting through a shared harness (`scenarios-harness.ts` is this tree's own example) from being flagged.
+
+It is a heuristic and the ADR says so. Its failure direction is a **false alarm** on a file asserting in some form not yet listed, fixed by adding the form or naming a waiver. The expensive direction — a file that cannot fail passing silently — is the one it closes.
+
+### `.only` is the same class from the other end
+
+`.only` leaves a file's siblings unrun while the suite still reports green. CLAUDE.md's readiness gate already forbids *"skipped or `.only` specs hiding gaps"*; this is the mechanical half of a promise that until now depended on someone remembering. Added in the same guard because it is the same question: **can this file still fail?**
+
+### Waivers are NAMED, because a guard with no escape hatch gets disabled
+
+Two files are legitimately assertion-free and are waived with reasons: `triageDump.test.ts` and `triageHtml.test.ts` — env-gated operator TOOLS, skipped in the normal suite, whose deliverable is a written report. Asserting on a report they exist to produce would be asserting on their own input. A fourth case in the guard requires every waiver to carry a reason, so an entry cannot be added as a bare silencer.
+
+### The guard was SEEN to fail
+
+Run against the tree **before** the deletion, it failed naming exactly `_scratch556b.test.ts` and nothing else; after the deletion it failed again naming `probe578c.test.ts` and the two tools. A guard that has never been observed failing is not known to work, and this one was checked in both directions before it was trusted.
+
+### Consequences
+
+`server/__tests__/suite-hygiene.test.ts` (new, 4 cases — it lives there for the `isolation.test.ts` reason: it runs in EVERY per-product lane and belongs to no product). `_scratch556b.test.ts` and `probe578c.test.ts` deleted. Two named waivers.
+
+## ADR-W-060 — A math span is bracket-balanced; a bracket whose partner is outside it is text (#1208)
+
+**Requirements:** [19](19-…)/[02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown; no new row. **Design:** the shared renderer's span boundaries. **Product:** workspace (`shell/`), reported in analytic. **LADDER stage:** display only.
+
+**Operator, 2026-09-18, playing T8:** *"the x of point P is not shown correctly. the y of point P is the right presentation"* — on a row reading `P = (14/3, 31/3)` with the y stacked and the x flat.
+
+### It was never about x versus y
+
+Measured through the real `mathHtml`, counting `<mfrac>`:
+
+```
+P = (14/3, 31/3)  ->  1     (14/3   ->  0      P = (14/3, 5)  ->  0
+14/3              ->  1     14/3)   ->  1      P = (5, 31/3)  ->  1
+```
+
+**An opening bracket before a fraction kills it**, and in an ordered pair only the first coordinate has one.
+
+### Root cause — a correct refusal, upstream of a wrong span
+
+`EXPR` carries no comma deliberately (#1125: «m = (4-0)/(3-0), y - 0 = …» is two statements, not one expression). But a span that BEGINS at a bracket and ENDS at that comma holds an opener whose partner is outside it, so `exprML` refuses `(14/3` — and refusing is right: *"a renderer that half-parses a formula would show the student a formula that is not the one they were given."*
+
+The defect is that the bracket was in the span at all. It belongs to the sentence, not to the expression.
+
+So an unmatched bracket at either EDGE is peeled off and rendered as the text it is, and what remains is offered to `exprML` unchanged. Peeled one layer at a time and only at the edges: an unmatched bracket in the MIDDLE means the text really is malformed, `exprML` still refuses it, and the never-half-parse guarantee is untouched.
+
+### Blast radius
+
+`shell/math.tsx` is shared by 2-D, 3-D, complex and analytic, and every one of them writes ordered pairs. The full suite is the gate, not a product lane. `shell/__tests__/bracketed-fraction.test.ts` (6) — **proven to fail without the fix**: making the peel the identity turns 2 of its 6 red.
+
+## ADR-W-061 — The preflight may not say MATCHES about a build it cannot vouch for (#1213, amends ADR-W-058)
+
+**Requirements:** none (internal — an operating procedure). **Design:** [RUNBOOK](RUNBOOK.md) § *Standard deploy*. **Product:** workspace.
+
+Found by running **T12 of round #1200's own play sheet**, against the preflight shipped that same day.
+
+### It reported MATCHES for four artifacts that did not match
+
+```
+proxy (dist-server/proxy.mjs)    DIFFERS — push required
+2-D bundle (dist)                MATCHES live      ← false
+3-D / complex / analytic         MATCHES live      ← false
+```
+
+`main` carried round #1200's six items and the #1201 P1, none of it deployed. Measured:
+
+```
+dist/index.html built     2026-09-17 22:51        (the day before)
+sources newer than it     src/app/roleReadings.ts, submitPipeline.ts, editPipeline.ts, …
+after `npm run build`     assets/index-Dk2TolO8.js  →  assets/index-B3YiZORf.js
+```
+
+The local bundle matched the live one because **both were stale**. The comparison was true and meaningless.
+
+### Root cause — the word that carried the guarantee was the one the implementation dropped
+
+The proxy is rebuilt on every run, so its answer is always against current source. The static bundles were read off disk as found. #1130's plan said the live hash is compared against the **freshly built** one.
+
+This is ADR-W-058's own class, reintroduced inside the tool written to retire it: **a check whose answer depends on someone having remembered to do something first is not a check.** The RUNBOOK's step 0 builds everything before the preflight is consulted, and the preflight trusted that — which is exactly the trust ADR-W-058 says a deploy may not extend.
+
+### The fix, and why staleness rather than an unconditional rebuild
+
+A product whose `dist` is older than any source it is built from is reported **`STALE BUILD`**, never `MATCHES`, and exits non-zero — the same discipline already applied to NOT BUILT and to an unreachable host: *"nothing measured as stale"* must never be readable as *"everything is current"*.
+
+Not an unconditional rebuild: four builds are real time on a script that should stay cheap enough to run casually, step 0 already builds, and a guard on the **forgotten** build is what was actually missing. A future session may decide to build instead; what may not change is that MATCHES cannot be printed without evidence.
+
+Each product now declares the trees it is built from, and **`shell/` is in all four** — which is why one edit there stales every bundle at once, and why a product that forgot to declare it would go quietly unchecked. That is asserted.
+
+### Tested, which needed a split
+
+`scripts/preflight-targets.mjs` holds the targets and the two decisions, because importing `deploy-preflight.mjs` runs a preflight — including the ssh reads — which a test may not do. `server/__tests__/preflight-staleness.test.ts` (6) calls the real decisions rather than restating them, and covers the boundary that matters: a test file is not a source, and NOT BUILT is not STALE (they send the operator to two different actions).
+
+Demonstrated end to end: a freshly built bundle compares normally; touching one analytic source flips analytic to STALE; touching one `shell/` source flips it too.
+
+## ADR-W-062 — The longest match that RENDERS wins, not the first one that matches (#1217)
+
+**Requirements:** [19](19-analytic-geometry-tool.md)/[02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown; no new row. **Design:** the shared renderer's tokenizer precedence. **Product:** workspace (`shell/`), reported in analytic, fixed for all four.
+
+**Operator, 2026-09-19, playing T21:** *"the mathml on the row below textbox and the input rows are not working. This rule of using mathml is for all shapes so why does it work on circle but not elipeses? it is also the same rule for all tools (2d/3d/complex)"*.
+
+### The circle was not working either
+
+`█` marks a rendered island; everything else came out as plain text.
+
+```
+x/9                       frac 1  sup 0   ->  █                  a plain fraction always worked
+x^2/9                     frac 0  sup 1   ->  █/9                adding a power broke it
+(x^2)/9                   frac 1  sup 1   ->  █                  bracketing it brought it back
+
+x^2/9+y^2/16=1            frac 0  sup 1   ->  █/9+y^2/16=1       the ellipse he reported
+מעגל (x-3)^2+(y-5)^2=25   frac 0  sup 2   ->  מעגל █+█=25        the circle he thought worked
+```
+
+The circle's leftovers are `+` and `=25` — an operator and a number, unremarkable as plain text. The ellipse's leftover is `/9+`, a fraction bar that visibly is not a fraction. One defect, two appearances, which is exactly why it read as ellipse-specific.
+
+### Root cause — a tie, decided by declaration order
+
+Every alternative lived in one alternation, and JS takes the first BRANCH that matches at the earliest position:
+
+```js
+const TOKEN = new RegExp(`(${ARC})|(${SUB})|(${SUP})|(${VALUE})|(${EXPR})`, 'gu');
+```
+
+At index 0 of `x^2/9`, `SUP` matches `x^2` and `EXPR` matches `x^2/9`. `SUP` is declared first, so it won and consumed the numerator — after which the `/9` had nothing on its left to be a fraction with.
+
+The third measured line is the proof this is precedence and not a missing capability: `(x^2)/9` renders correctly because the brackets make `SUP` fail at index 0, and `exprML` then composes the power inside the fraction perfectly well. **The renderer could always do this.**
+
+The old comment — *"ORDER IS LOAD-BEARING. `SUP` precedes `EXPR` so `(x-3)^2` keeps rendering as the superscript island the corpus asserts"* — was sound and is still true. What it did not anticipate was a power that is **part of a larger expression** rather than a standalone island.
+
+### The fix, and what still protects the old behaviour
+
+The alternatives become sticky regexes tried at each position; the **longest match that actually renders** wins, with the declared order kept only as the tie-break. `tokenML` returns `null` when an alternative cannot render the text it matched, which is what makes the change safe in one direction: a candidate that declines is passed over for a shorter one, so this can never render *less* than before.
+
+The protection is not the ordering, and never was — it is `EXPR`'s own lookahead, which asserts a `√` or a `/` inside the span. Neither `(x-3)^2+(y-4)^2=9` nor `y^2 = 54x` contains one, so `EXPR` does not match there at all and the corpus's superscript islands are byte-identical. Those are the first assertions in the lock, not an afterthought.
+
+### A red test that was the gate working
+
+The first attempt also advanced **one character** when nothing rendered, instead of consuming the failed span. It fixed `F(27/2, 0)` and turned `issue-1125-expression-math.test.ts` red on `|3 - 2 / 4`.
+
+The test was right. Stepping over a malformed delimiter and typesetting the remainder shows `2/4` as a fraction beside a stray unmatched bar — a formula the student was never given, which is the whole class #1125 exists to forbid. So **a refusal consumes its entire span**, deliberately, and that is now written down where the next session will read it.
+
+The cost is accepted and named: `F(27/2, 0)` matches `EXPR` as `F(27/2`, an opener whose partner sits past the comma, so `exprML` refuses and the good `27/2` goes down with it. That is a **span-boundary artefact**, not malformed input — the distinction ADR-W-060 already drew for brackets at a span's edges — which makes it a different fix and its own issue (#1229), not something to smuggle in by weakening an honesty lock.
+
+### Blast radius
+
+`shell/math.tsx` is shared by 2-D, 3-D, complex and analytic, so the full suite is the gate rather than a product lane. `shell/__tests__/issue-1217-longest-match.test.ts` (8) leads with the regression guards and ends with #1208 and #1125 intact; the fixed cases sit in between.
+
+It also repairs a row this workspace shipped hours earlier: #1212's ellipse equation `x²/16 + y²/9 = 1` composes with the `²` character, which `SUP` matched as readily as `^2`, so the panel row that issue added was broken from the moment it landed.
+
+## ADR-W-063 — The leading peel takes whatever sits before the unmatched bracket (#1229)
+
+**Requirements:** [19](19-analytic-geometry-tool.md)/[02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown; no new row. **Design:** the shared renderer's span boundaries. **LADDER stage:** presentation only — `shell/math.tsx`, no product code. **Extends** [ADR-W-060](#adr-w-060) (#1208).
+
+Split out of #1217 rather than fixed inside it, and the reason is the whole decision.
+
+### The symptom
+
+```
+F(27/2, 0), x = -27/2   ->   the trailing fraction stacks; the bracketed one stays flat
+```
+
+It is the parabola's folded detail from #1212, so it is on screen today, in all four products — `shell/` is shared by construction.
+
+### Cause — a span boundary, not malformed input
+
+`EXPR` carries no comma on purpose (#1125: «m = (4-0)/(3-0), y - 0 = …» is two statements). So the span here is `F(27/2` — an opening bracket whose partner sits past the boundary, with a **non-bracket prefix in front of it**. `exprML` refuses it, correctly, and the perfectly good `27/2` goes down with it.
+
+ADR-W-060's `peelBrackets` already handles exactly this shape — *"an unmatched bracket at either EDGE is peeled off and rendered as the text it is"* — but its loop was written as
+
+```ts
+while (core.startsWith('(') && unmatched(core, '(', ')') > 0)
+```
+
+so it fired only when the span BEGAN with the bracket. Here it begins with `F`, and nothing peeled.
+
+### The decision
+
+The leading peel takes the run **up to and including** the unmatched `(`, rather than requiring the span to start with it. The `esc(lead) + ml + esc(tail)` assembly is unchanged.
+
+**The loop is still driven by bracket DEPTH**, and that is what keeps ADR-W-060's line intact:
+
+| | `\|3 - 2 / 4` | `F(27/2, 0)` |
+| --- | --- | --- |
+| the imbalance is | in the student's own text | created by the span boundary |
+| bracket depth | 0 — the loop never runs | +1 — the loop peels the prefix |
+| correct behaviour | keep it all as text | peel the prefix, render the rest |
+
+### The falsified alternative, recorded so it is not re-tried
+
+The obvious repair — *when a span fails to render, advance one character and look again* — was tried in #1217 and **turned `issue-1125-expression-math.test.ts` red on `|3 - 2 / 4`**. That bar is unmatched in the student's own text, and stepping over it typesets `2/4` beside a stray `|`: a formula the student was never given. The lock was right, and #1217 now records that a refusal consumes its whole span deliberately.
+
+A depth-driven peel cannot make that mistake, because a balanced span has nothing to peel.
+
+### Measured
+
+| span | before | after |
+| --- | ---: | ---: |
+| `F(27/2, 0), x = -27/2` | 1 fraction | **2** |
+| `F(27/2` | 0 | **1** |
+| `A(1/2, 3/4)` | 1 | **2** |
+| `\|3 - 2 / 4` | 0 | 0 |
+| `√(3 + ` | 0 | 0 |
+| `(4 - 0) / (3 - 0` | 0 | 0 |
+| `P = (14/3, 31/3)` | 2 | 2 |
+| `m = (4-0)/(3-0), y - 0 = 2x` | 1 | 1 |
+
+`A(1/2, 3/4)` was not in the report and is the same class — a named ordered pair — which is the sign the fix is at the right altitude.
+
+### The lock
+
+The three refusal rows are the ones that matter, and they are asserted alongside the three sibling suites (#1125, #1208, #1217), all of which stay green. Verified to bite: 3 of the 9 assertions fail against pristine `shell/math.tsx`.
+
+### Consequences
+
+`shell/math.tsx` — `peelBrackets`'s leading loop, four lines.
+
+`issue-1229-prefixed-bracket.test.ts` (9). Analytic and complex lanes green (both carry `shell/`).
+
+## ADR-W-064 — A fix session RE-MEASURES the issue before it reads the plan, and a divergence is the expected case (#1252)
+
+**Requirements:** none (process). **Design:** [docs/17 §5 step 0](17-design-rules.md) — the protocol; [docs/22 §3](22-workflow.md) — the bug route; the `fix-round` skill, Step 2. **Operator, 2026-09-20:** *"we can continue the loop approach but we should add something in your instructions that acknowledges that diagnosis needs to re-run every time - i think you do this today anyway but just document it so you dont panic when something is different between diagnosis and fix time."*
+
+### The observation that prompted it, which is the operator's
+
+Reporting the overnight run [#1252](https://github.com/dcodish/geo_builder/issues/1252), I presented its five escalations as evidence that *the queue's plans are being written without measuring*. That is true of some of them. The operator's reply was sharper: **the time between triage and fix is itself enough to change the diagnosis.** It is, and separating the two causes matters because they have different remedies.
+
+### Measured
+
+```
+commits/day, 13–20 Sep:  ~35        of which ADR-bearing:  ~20
+```
+
+An issue four days old has had ~130 commits land under it; #999, filed seven days before it was picked up, ~250.
+
+Sorting the run's own items by which cause applied:
+
+| | issue | what the issue said | what the tip said |
+| --- | --- | --- | --- |
+| **stale** | #1128 | *"no «מרחק» sentence parses at all"* | three did, since #1151 — and its part (b) had landed via #1048 |
+| **stale** | #1216 | «נתון מעגל 1» → `bad-equation` | `not-handled` — changed four hours earlier the same night by #1246 |
+| **stale** | #1129 | `\|…\|`, `d_{}`, `x_A` blocked on grammar | five of six unblocked; two by this same run |
+| **stale** | #1198 | a change request against an unmerged PR | that PR merged the day before |
+| **wrong** | #1202 | the cause is `crossings.ts:122` | those objects are a different kind and never reach that line |
+| **wrong** | #999 | narrow `dryRunOutcome`'s count arm | that arm is not what fires |
+| **wrong** | #1227 | *"the count must come from #1083's existing dedup"* | that dedup keeps all four noise members |
+| **wrong** | #1222/#1240 | a spelling gap | needs a name-minting seam that exists nowhere |
+
+**All four STALE items still built and landed.** All four WRONG items escalated. That is the finding: the two look identical at the moment of discovery and are nothing alike.
+
+### The rule
+
+Re-measure at pickup, **before** reading the fix plan, and classify what comes back:
+
+| what you find | what to do |
+| --- | --- |
+| the reported case now passes | close the issue with the evidence — do **not** build |
+| one symptom of several is gone | correct the record in the issue and the ADR; build the rest |
+| a named dependency has landed | re-scope, then build |
+| the cause the plan names is not what fires | escalate (docs/17 §8) |
+
+**Only the last row is a signal about triage quality.** The first three are the ordinary cost of a fast trunk, and the operator's word for the right posture is the operative one: *don't panic*. Writing them up as "deviations from plan" — which this run did — overstates them and buries the row that matters.
+
+### Two consequences that are not obvious
+
+**Re-measure per item, not once per round.** A long round invalidates its own queue: #1246 landed at ~00:30 and changed #1216's symptom by 01:15; #1128 landed and unblocked #1129's chips an hour later. Composing a batch up front and trusting it for eight hours would have gone stale inside the run.
+
+**Some open issues are already fixed and nobody knows.** #1216 had one of its three reported symptoms silently closed under it. The `log-triage` agent re-runs its candidates against current code for exactly this reason; nothing does that for operator-reported issues. A periodic sweep — re-run the reported utterance, close or amend — is cheap and is not yet anybody's job.
+
+### What this does NOT excuse
+
+The four WRONG diagnoses were wrong when written, and would be wrong again in the next plan written the same way: each named a cause read off the code, in a declarative sentence, without running the case. §1's rule — *a root cause read off the code is a hypothesis* — applies to an issue body as much as to a session's first idea.
+
+The counter-example is worth recording, because it shows the distinction is about honesty rather than certainty: **#1182's plan was also a guess and was fine**, because it said so — *"Hypothesis, not yet measured … start by printing `solveLM`'s start point and iterate count at seed 0."* Measured, it was confirmed, and the measurement then ruled out the cheaper fix. A plan that labels its guess produces a fix session that checks; a plan that states the same guess as fact produces one that builds on it.
+
+Hence the second half of docs/17 §5 step 0: *a plan that says "not measured past the above" is a hypothesis however confidently it is phrased.* Three of the four wrong plans said exactly that, and carried `auto-ok` anyway.
+
+### Consequences
+
+`docs/17-design-rules.md` §5 (a new step 0 — this is the file CLAUDE.md sends you to before fixing any reported bug, so it is the load-bearing home), `docs/22-workflow.md` §3 (the bug route's gap between reporting and fixing), `.claude/skills/fix-round/SKILL.md` Step 2 (where it fires for an unattended run).

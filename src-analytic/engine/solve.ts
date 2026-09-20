@@ -71,7 +71,20 @@ export type Constraint =
   | { t: 'midpoint'; id: Id; a: Id; b: Id }
   /** `B נמצא על ציר ה-x` — the point lies on the line `ax + by + c = 0`. */
   | { t: 'on-line'; id: Id; a: number; b: number; c: number }
-  /** `AD ⊥ BC` — «AD גובה לצלע BC», with `D` on `BC` carried by a companion `on-line`-free form. */
+  /**
+   * `AD ⊥ BC` — the DIRECTION half of «AD גובה לצלע BC», and only that half.
+   *
+   * This docblock used to claim `D`'s incidence on `BC` was "carried by a companion form". It was
+   * not carried by anything (#1232): the cevian rule emitted this kind alone, so the tool drew a
+   * height that missed its own side at every seed and reported no fault. The companion is real now —
+   * the rule states {@link Constraint} `on-line-2pt` beside this one — but the invariant to keep is
+   * that **this kind asserts nothing about position**, so any construct meaning "foot on the side AND
+   * perpendicular" must say both. Its one emitter is that rule.
+   *
+   * The generic `relation` below is deliberately incidence-free and is NOT the same defect: its two
+   * operands are independent directions («DE ⊥ BF») that share no point, so there is no foot to place.
+   * `rightAngleAt` is likewise safe — both its rays start at the vertex, so incidence is structural.
+   */
   | { t: 'perpendicular'; a: Id; b: Id; c: Id; d: Id }
   /**
    * `DE ∥ BF` · `DE ⊥ BF`, over any two {@link Direction}s (#1052).
@@ -454,6 +467,19 @@ export function residual(
    * points by id, and everything else arrives already resolved.
    */
   curveAt?: (id: Id) => NumCurve | null,
+  /**
+   * The line a NAME denotes, for the measure terms that reference one (#1201).
+   *
+   * «המרחק מ-A לישר l1 = 5» is a `length-eq` whose left side holds a point-to-line term, and
+   * its distance cannot be computed without knowing which line `l1` is. Without this the term
+   * evaluated to `null`, the whole residual came back `null`, and the solve read that as ZERO -- so
+   * the constraint was never driven and the figure was reported satisfied while violating it.
+   *
+   * By NAME rather than by id, and separate from `curveAt`, because «AB» denotes the line through two
+   * points and is not an object at all. Optional for the same reason `curveAt` is: a caller that
+   * cannot resolve names hands nothing, and those operands report "cannot be judged".
+   */
+  lineAt?: (name: string) => { a: number; b: number; c: number } | null,
 ): number[] | null {
   const pts = constraintRefs(k).map(at);
   if (pts.some((p) => p === null)) return null;
@@ -515,8 +541,10 @@ export function residual(
       return [u.y - m * u.x];
     }
     case 'length-eq': {
-      const l = evalLengthExpr(k.left, at, env);
-      const r = evalLengthExpr(k.right, at, env);
+      // `lineAt` threaded through (#1201): a point-to-line term is unresolvable without it, and an
+      // unresolvable term makes this whole residual `null` -- which the solve reads as satisfied.
+      const l = evalLengthExpr(k.left, at, env, lineAt);
+      const r = evalLengthExpr(k.right, at, env, lineAt);
       if (l === null || r === null) return null;
       /**
        * Scale-normalised, like the area residual and for the same reason: a figure measured in

@@ -126,9 +126,41 @@ export function traceLine2pt(a: TracePoint, b: TracePoint, fmt: (v: number) => s
   if (Math.abs(b.x - a.x) < 1e-12) {
     return `x = ${fmt(a.x)}  (הישר אנכי — אין שיפוע)`;
   }
-  const slope = `m = (${minus(b.y, a.y, fmt)}) / (${minus(b.x, a.x, fmt)})`;
-  const point = `y - ${b.y < 0 ? `(${fmt(a.y)})` : fmt(a.y)} = m(x - ${a.x < 0 ? `(${fmt(a.x)})` : fmt(a.x)})`;
-  return `${slope},  ${point}`;
+  /**
+   * THE INTERMEDIATE IS EVALUATED, AND EACH STATEMENT GETS ITS OWN ROW (#1221).
+   *
+   * Operator, 2026-09-19, playing T25: *"never include more than 2 equations in a line. the m= should
+   * have a final answer there."*
+   *
+   * This trace was the only one with an INTERMEDIATE quantity, and it never stated its value
+   * anywhere. `m` is not the answer — the answer is the line's equation — and the second step then
+   * consumed it symbolically, so the student was shown `y - 0 = m(x - 0)` and never told what `m`
+   * was, on any surface. The trace handed the last step back to them, which is the one thing #1053
+   * built it not to do.
+   *
+   * The rule that gives this a stopping point, because "show more working" has none of its own:
+   * **an intermediate the next step consumes is evaluated; a final value already shown in the answer
+   * row is not repeated.** Under it the two distance traces are already correct and stay untouched —
+   * their result is the answer row directly above them.
+   *
+   * `m`'s value is substituted into the second step rather than left as a letter, which is what a
+   * textbook does once it is known and removes the last unresolved symbol from the working.
+   */
+  const m = (b.y - a.y) / (b.x - a.x);
+  const slope = `m = (${minus(b.y, a.y, fmt)}) / (${minus(b.x, a.x, fmt)}) = ${fmt(m)}`;
+  /**
+   * A SUBSTITUTED SLOPE IS BRACKETED WHEN IT WOULD OTHERWISE BE AMBIGUOUS.
+   *
+   * `4/3(x - 0)` reads as `4/(3(x - 0))` at least as naturally as `(4/3)(x - 0)` — #1180's ambiguity
+   * exactly, ruled on for the panel's line rows and applying here for the same reason. A negative
+   * needs the brackets too, or `y - 0 = -2(x - 0)` is fine but `= (-2)` is clearer beside a minus.
+   */
+  const shown = fmt(m);
+  const coef = shown.includes('/') || m < 0 ? `(${shown})` : shown;
+  // `a.y < 0`, not `b.y` — this asked the WRONG point and printed «y - (0)» for A(0,0), B(3,-6).
+  const point = `y - ${a.y < 0 ? `(${fmt(a.y)})` : fmt(a.y)} = ${coef}(x - ${a.x < 0 ? `(${fmt(a.x)})` : fmt(a.x)})`;
+  // The separator is a NEWLINE, not a comma: two statements, two rows (#1125 already called them two).
+  return `${slope}\n${point}`;
 }
 
 /**

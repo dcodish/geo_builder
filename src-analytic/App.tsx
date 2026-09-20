@@ -9,7 +9,7 @@
  * shared chassis existed ([docs/28 §5](../docs/28-product-unification.md) Phase 4), and mounting
  * rather than re-deriving the chrome is the whole return on that work.
  */
-import { useMemo, useState, useRef, useEffect, type ChangeEvent, type CSSProperties } from 'react';
+import { useCallback, useMemo, useState, useRef, useEffect, type ChangeEvent, type CSSProperties } from 'react';
 import { useStore } from 'zustand';
 import { useTranslation } from 'react-i18next';
 import registry from '../products.json';
@@ -21,17 +21,23 @@ import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
 import { Workbench } from '../shell/frame/Workbench';
 import { canvasClusterStyle, canvasCtrlStyle, CANVAS_ZOOM_STEP } from '../shell/frame/canvasControls';
-import { INITIAL_VIEW, centreOf, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
+import { INITIAL_VIEW, centreOf, figureIsVisible, panned, toWorld, viewBox, zoomedAt, type CanvasView } from './render/view';
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
-import { fmtAnalytic, fractionClearingFactor } from './format';
+import { fmtAnalytic } from './format';
+import { curveDetailsKey, curveParts } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { paramRegister, reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
 import { decideSubmit } from './app/submit';
-import { domainText, positionalOf, type NumCurve } from './engine/types';
+import { runFallback } from './app/fallback';
+import { panelListsCurve } from './app/panelRows';
+import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
+import { domainText, positionalOf } from './engine/types';
 import { isKnowledge, knownCurve, knownOptions } from './engine/evaluate';
+import { drawnBox as composeDrawnBox } from './app/drawnBox';
+import { SYMBOLS } from './ui/symbols';
 import { exprText } from './engine/expr';
-import { MathText } from '../shell/math';
+import { MathText, hasMath } from '../shell/math';
 import { Banner } from '../shell/frame/Banner';
 import { FigureName } from '../shell/frame/FigureName';
 import { ManualScreen } from '../shell/frame/ManualScreen';
@@ -39,16 +45,15 @@ import { svgToPng } from '../shell/export/svgToPng';
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { ANALYTIC_APP, ANALYTIC_SAVE_VERSION } from './store/useAnalyticStore';
 import { COMMAND_CATALOG_ANALYTIC } from './parser/catalogAnalytic';
-import { ellipseFoci, parabolaFocus } from './engine/curves';
 import { analyticBidi } from './i18n';
 import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
 import { AskLane } from '../shell/frame/AskLane';
 import { ask, figureIsOpen, type Answer } from './app/ask';
-import { askOnceAnswer, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
+import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
 import { anotherConfiguration, seedShowing } from './app/another';
-import { centresOf, crossingSentence, crossingsOf, freeLetter } from './engine/crossings';
+import { centresOf, crossingSentence, crossingsOf, freeLetter, pointAt } from './engine/crossings';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
 
 declare const __BUILD__: string;
@@ -156,6 +161,8 @@ export function App() {
   const canUndo = useStore(useAnalyticStore.temporal, (t) => t.pastStates.length > 0);
   const canRedo = useStore(useAnalyticStore.temporal, (t) => t.futureStates.length > 0);
   const [draft, setDraft] = useState('');
+  /** #1251 — the LLM fallback is in flight. Owns only the spinner; the decision lives in app/fallback.ts. */
+  const [thinking, setThinking] = useState(false);
 
   /**
    * SAVE and LOAD (#1087) — the shared envelope, the shared naming, the sibling’s own order.
@@ -218,6 +225,8 @@ export function App() {
         seed: typeof saved.seed === 'number' ? saved.seed : 0,
         name: typeof saved.name === 'string' ? saved.name : figureNameFromFileName(file.name, 'analytic'),
       });
+      // A load is a new figure, so the view it is seen through is a new view too (#1209).
+      showWholeFigure();
       /**
        * A LOAD IS AUDITED, not trusted (#1087). The lines are re-parsed on the way in, and a line
        * that no longer builds is reported rather than dropped in silence — which is the whole value
@@ -360,10 +369,26 @@ export function App() {
    * retires them with the lines. That is the general fix this comment used to say was still owed —
    * a reading of a figure that no longer exists cannot be rendered, because no reading is stored.
    */
+  /**
+   * THE VIEW BELONGS TO THE FIGURE IT WAS COMPUTED FOR (#1209).
+   *
+   * Pan and zoom are a transform ON TOP of the figure's own box. Replace the figure wholesale and the
+   * old transform is applied to something it was never computed for — load a small figure while zoomed
+   * into the corner of a large one and it lands entirely off-screen. The operator loaded a two-given
+   * save and got a canvas showing grid and nothing else, while the data panel listed the figure
+   * perfectly: it reads as data loss, on the student's own save.
+   *
+   * So every seam that REPLACES the figure resets the view, and they all come through here rather than
+   * each remembering to — which is the shape `clearAll` itself records as having been reintroduced by a
+   * third and fourth product.
+   */
+  const showWholeFigure = () => setView(INITIAL_VIEW);
+
   const clearSession = () => {
     clearAll();
     setDraft('');
     setAskText('');
+    showWholeFigure();
   };
   const [dataOpen, setDataOpen] = useState(true);
   /**
@@ -390,19 +415,79 @@ export function App() {
    * the same shape as everything else derived here, and the shape complex already had (its `askRows`
    * come from `queries`), which is why this defect was analytic's alone.
    */
+  /**
+   * The family's name in the student's language — «מעגל», «ישר», «פרבולה», «אליפסה» (#1137).
+   *
+   * `ask` is the lane's ENGINE and holds no locale, so the wording is injected here beside `fmt` and
+   * `describeCurve`, exactly as those two are. One key per family, and the internal kind is the key —
+   * a family added later has no translation and shows its own name, which is visibly wrong rather
+   * than silently missing.
+   */
+  const locusKind = useCallback((kind: string) => t(`locus.${kind}`), [t]);
+
   const answers = useMemo<Answer[]>(
-    () => queries.map((q) => ({ ...ask(d, q.sentence, fmt, describeCurve), shown: q.shown })),
-    [queries, d, fmt, describeCurve],
+    // #1212 removed `describeCurve` (imported now); #1137's `locusKind` stays — it is locale.
+    () => queries.map((q) => ({ ...ask(d, q.sentence, fmt, locusKind), shown: q.shown })),
+    [queries, d, fmt, locusKind],
   );
+
+  /**
+   * THE FRAME IS FITTED TO EVERYTHING THAT WILL BE DRAWN (#1198).
+   *
+   * Operator, playing round #1193 T11: *"pressing on show another config causes the image to jump
+   * right and left and the entire shape is not shown."*
+   *
+   * `d.box` frames the FIGURE, and a traced locus is not in the figure — it is caller-owned
+   * decoration handed to the renderer afterwards, the same seam as `marks` and `crossings`. So the
+   * trace was projected into a frame decided without it, and measured on the operator's own figure
+   * it fell outside in **4 of 6 configurations**: the tool clipped the one object he had asked to
+   * see.
+   *
+   * Composed HERE rather than inside `derive`, because this is the only layer that holds both the
+   * derivation and the answers. Putting a question's trace into the derivation would make the figure
+   * depend on the questions asked about it, which is the layering (02c R24 — an ask never mutates
+   * the figure) rather than a convenience.
+   *
+   * Only SHOWN answers count: a trace the student has collapsed is not on the canvas, and framing
+   * for it would zoom out for something invisible.
+   *
+   * ⚠ This is HALF of #1198. The frame still lurches between configurations (measured: width varies
+   * by a factor of 2.6, centre swings from +55 to −63), because it is re-fitted from nothing on
+   * every press. That half is a product ruling about what «הציגו תצורה אחרת» should feel like —
+   * fit once and keep it, normalise by the parameter, or clamp the movement — and the issue says so.
+   */
+  const drawnBox = useMemo(() => composeDrawnBox(d.figure, d.box, answers), [answers, d]);
 
   /**
    * The box and the view in REFS as well as in state (#1094): the wheel listener below is registered
    * once and would otherwise close over the first render's values forever.
    */
-  const figureBoxRef = useRef(d.box);
-  figureBoxRef.current = d.box;
+  const figureBoxRef = useRef(drawnBox);
+  figureBoxRef.current = drawnBox;
   const viewRef = useRef(view);
   viewRef.current = view;
+
+  /**
+   * A FIGURE THE STUDENT BUILDS IS VISIBLE (#1225) — the third door on ADR-AG-096.
+   *
+   * Operator, playing T34: *"when i put MA=5 the focus on the canvas is lost and the image is not
+   * centered. pressing the center button does the work but this should be automatic"*.
+   *
+   * #1209 gave loading and «נקה הכל» a `showWholeFigure()`. Every other `setView` is a user gesture,
+   * so adding a FACT — which changes the figure — left the previous figure's transform applied to a
+   * new one it was never computed for. «MA = 5» collapses M from two free DOFs to a discrete pair,
+   * and the wide view computed while M roamed then showed empty paper.
+   *
+   * It runs on the BOX, not on every render: the effect fires only when the figure's extent actually
+   * changes, so a deliberate zoom is untouched for as long as the student keeps looking at the same
+   * figure. And it re-fits only when `figureIsVisible` says the figure has largely left the screen,
+   * so a zoom into a vertex survives the next line. Returning `v` unchanged is a React no-op, which
+   * is what keeps this from looping.
+   */
+  const figureBoxKey = `${drawnBox.minX},${drawnBox.minY},${drawnBox.maxX},${drawnBox.maxY}`;
+  useEffect(() => {
+    setView((v) => (figureIsVisible(figureBoxRef.current, v) ? v : INITIAL_VIEW));
+  }, [figureBoxKey]);
 
   /**
    * WHEEL TO ZOOM, about the cursor (#1094).
@@ -465,6 +550,17 @@ export function App() {
       case 'ignored':
         return;
       case 'refused':
+        /**
+         * THE LLM SEAM (#1251). `not-handled` means no rule matched — the one code that means "I do
+         * not know this sentence" rather than "this sentence is wrong". Every other refusal is an
+         * OWNED answer (a degenerate role, a reserved coordinate, a name clash) and must stand: the
+         * tool understood the student and disagreed, and handing that to a model would replace a
+         * correct explanation with a guess.
+         */
+        if (verdict.error.key === 'not-handled') {
+          void tryFallback(raw, verdict.error);
+          return;
+        }
         setError(verdict.error);
         return;
       case 'already-known':
@@ -482,11 +578,45 @@ export function App() {
     }
   };
 
+  /**
+   * Ask the proxy to normalise a sentence this tool did not recognise (#1251).
+   *
+   * Everything the model returns goes back through `decideSubmit` inside `runFallback`, so this
+   * function decides nothing about geometry — it owns the SPINNER and the MESSAGE, and nothing else.
+   * On any outcome but a clean set of lines the student keeps the original refusal, because that
+   * refusal is about words they actually wrote.
+   */
+  const tryFallback = async (raw: string, original: InputError) => {
+    setThinking(true);
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS_ANALYTIC);
+    try {
+      const out = await runFallback(raw, lines, seed, (utterance, context) =>
+        llmParseAnalytic(utterance, context, { signal: ctl.signal }),
+      );
+      if (out.kind === 'lines') {
+        for (const l of out.lines) recordLine(l);
+        setDraft('');
+        return;
+      }
+      if (out.kind === 'busy') {
+        setError({ key: 'llm-busy', detail: raw });
+        return;
+      }
+      // 'none' and 'rejected' alike: the student keeps the refusal about their own sentence. Naming
+      // the model's rejected line would report internal state for words they never typed.
+      setError(original);
+    } finally {
+      clearTimeout(timer);
+      setThinking(false);
+    }
+  };
+
   const scene = useMemo(() => {
     // The box the VIEW is looking at (#1094) — the figure's own box moved and scaled by what the
     // student has done to it. Re-projecting rather than transforming is what keeps the grid crisp
     // and the tick labels true at every zoom; see `render/view.ts`.
-    const zoomed = viewBox(d.box, view, { width: canvasSize.w, height: canvasSize.h });
+    const zoomed = viewBox(drawnBox, view, { width: canvasSize.w, height: canvasSize.h });
     /**
      * The renderer cannot ask whether a value is KNOWLEDGE — that is a question about the
      * construction across configurations, and a `Figure` is one configuration (#1024). So the gate
@@ -503,6 +633,11 @@ export function App() {
        * answers that HAVE a mark contribute, which `ask` grants only when the distance is knowledge.
        */
       marks: drawnMarks(answers),
+      /**
+       * The מקומות גיאומטריים an answer is about (#1137) — the same `shown` lifetime as the marks
+       * above, so ADR-AG-067's three gestures govern a trace without a fourth rule being invented.
+       */
+      loci: drawnLoci(answers),
       /**
        * The crossings a student may promote (#1025) — operator: *"when a line we draw crosses another
        * line, we need to see the dashed circle allowing us to create that point"*.
@@ -540,6 +675,10 @@ export function App() {
           'reserved-coordinate': 'errReservedCoordinate',
           'bad-arity': 'errBadArity',
           'repeated-vertex': 'errRepeatedVertex',
+          'degenerate-role': 'errDegenerateRole',
+          'apex-not-a-vertex': 'errApexNotAVertex',
+          'crossing-already-named': 'errCrossingAlreadyNamed',
+          'llm-busy': 'errLlmBusy',
           'bad-operand': 'errBadOperand',
           'conflicting-restatement': 'errConflict',
           'name-kind-clash': 'errNameClash',
@@ -559,13 +698,14 @@ export function App() {
           'ambiguous-angle': 'errAmbiguousAngle',
           'ambiguous-shape': 'errAmbiguousShape',
           'undistinguished-diagonal': 'errNoPrincipalDiagonal',
+          'already-named': 'errAlreadyNamed',
           'unsatisfiable': 'errUnsatisfiable',
           // A save file this tool will not open, named by WHICH of the three reasons (#1087).
           'load-foreign': 'errLoadForeign',
           'load-newer': 'errLoadNewer',
           'load-unreadable': 'errLoadUnreadable',
         }[error.key],
-        { detail: error.detail, existing: t(existingKey(error)) },
+        { detail: error.detail, existing: t(existingKey(error)), holder: 'holder' in error ? (error.holder ?? '') : '' },
       )
     : null;
 
@@ -660,6 +800,9 @@ export function App() {
               onSubmit={() => submit(draft)}
               placeholder={t('inputPlaceholder')}
               submitLabel={t('add')}
+              /* #1251 — the fallback is a network round-trip; the student sees it working. */
+              busy={thinking}
+              busyLabel={t('thinking')}
               symbols={SYMBOLS}
               /*
                 NO compact chip strip above the input (#1105).
@@ -682,7 +825,33 @@ export function App() {
                * equation's characters, and the student reads a formula they did not write.
                */
               quickDisplay={(c) => analyticBidi.isolateLtrRuns(c)}
-              preview={(s) => analyticBidi.inputPreview(s)}
+              /**
+               * THE PREVIEW TYPESETS WHAT IT PREVIEWS (#1215).
+               *
+               * Operator, 2026-09-19, on «מעגל (x-3)^2+(y-5)^2=25»: *"note the text below the textbox
+               * isnt mathml"* — the preview printed `^2` while the fact row two lines below printed
+               * `²`. The student saw their own sentence twice, typeset once.
+               *
+               * Nothing needed building. `InputArea`'s `preview` prop takes a **ReactNode**, and its
+               * own comment says *"2-D's maths renderer rides the same prop at its adoption"*. 2-D
+               * adopted it; this tree — where equations are the entire subject — did not, and
+               * `hasMath`/`MathText` have been sitting in `shell/math.tsx` the whole time.
+               *
+               * The bidi previewer stays as the fallback, and it is not a lesser one: it is what
+               * carries the RTL reading order while an equation is still half-typed. `hasMath` is
+               * false until an exponent or a fraction completes, so early keystrokes take that path
+               * exactly as before and no half-formed formula is ever half-typeset (ADR-W-060).
+               *
+               * **ISOLATE FIRST, THEN TYPESET — the order matters and was found by looking.** Handing
+               * the raw string to `MathText` typeset it perfectly and laid it out backwards: the
+               * renderer emits several `<math>` islands with text between them, and in an RTL
+               * paragraph that whole sequence runs right-to-left, so «מעגל (x-3)²+(y-5)²=25» drew
+               * with `=25` at the far LEFT. That is the defect this preview exists to prevent,
+               * reintroduced by its own fix. The answer rows already do it in this order (#1097).
+               */
+              preview={(s) =>
+                hasMath(s) ? <MathText text={analyticBidi.isolateLtrRuns(s, true)} /> : analyticBidi.inputPreview(s)
+              }
               previewDir={(s) => analyticBidi.textDir(s)}
               boxDir={(s) => analyticBidi.textDir(s)}
             >
@@ -974,7 +1143,7 @@ export function App() {
               },
               {
                 key: 'curves',
-                title: t('secCurves'),
+                title: t('secEquations'),
                 dir: 'ltr',
                 /**
                  * A CARRIER gets no row (#1078) — an operator ruling that reverses the panel half of
@@ -990,7 +1159,27 @@ export function App() {
                  * which is what the coordinate rows below now say. The flag means one thing in both
                  * places — undrawn on the canvas, unlisted here.
                  */
-                rows: d.figure.curves.filter((c) => c.stated).map((c) => {
+                /**
+                 * …AND A MENTIONED ONE DOES (#1250). The ruling above is about an ORPHANED row, not
+                 * an undrawn one — the operator's objection was verbatim *"there is no way to know
+                 * what it belongs to"*.
+                 *
+                 * Those two coincided until [ADR-AG-111] made a mentioned line UNDRAWN for the first
+                 * time: «משוואת הצלע CE היא x-3y=0» draws only the segment, so `stated` is false, and
+                 * the equation the student wrote vanished from the one place they check what the tool
+                 * understood — while «משוואת הישר CE» kept its row. Same equation, same object.
+                 *
+                 * Operator ruling, 2026-09-19: *"if we say that a point is on a line, we dont draw the
+                 * line but if we specifically mention a line, we should have its equation."* So the
+                 * panel asks whether the line was MENTIONED, and the canvas keeps asking `stated`.
+                 *
+                 * `label.name` IS "mentioned", and not by coincidence: a line the student made the
+                 * subject of a sentence is one they referred to by name, while a line minted only to
+                 * hold a point (#1078's «B על הישר y=x») has nothing to call it. No second flag — one
+                 * would have to be set correctly at every mint site, and the name already answers
+                 * truthfully at all of them.
+                 */
+                rows: d.figure.curves.filter(panelListsCurve).map((c) => {
                   // The SAME honesty gate the point rows use: an equation prints only when every
                   // coefficient is invariant across the free DOFs. A parabola whose `a` is still
                   // free is drawn, and its row is open — never a sampled coefficient as fact.
@@ -1003,8 +1192,8 @@ export function App() {
                    * invariants forbid and which #1029 had already caught in its other form. It was
                    * invisible while the ids read `parabola` and `ellipse` and would have become
                    * unmissable the moment content-derived ids landed. The row needs no name anyway:
-                   * `describeCurve` prints the equation and the focus, which is what tells two
-                   * anonymous parabolas apart — and it is the student's own equation, not ours.
+                   * `curveParts` prints the equation, which is what tells two anonymous parabolas
+                   * apart — and it is the student's own equation, not ours.
                    */
                   const name = c.label.name;
                   /**
@@ -1016,9 +1205,44 @@ export function App() {
                    * is more than the dash said and less than a number.
                    */
                   const lead = name ? `${name}: ` : '';
+                  /**
+                   * THE ROW LEADS WITH THE EQUATION; THE PROPERTIES FOLD AWAY (#1212).
+                   *
+                   * Operator, playing T18: *"the circle equation is not an equation. under equations
+                   * we should see the equation and then we can have the center and radius. these
+                   * should be collapsable like i requested for the line equations"*.
+                   *
+                   * Same `<details>` as the ask lane's trace (#1206), and shown by the same reasoning:
+                   * the centre and radius ARE what a student was given for a stated circle, so folding
+                   * them shut by default would hide the givens. It is an opt-out, not a demotion.
+                   *
+                   * A line has no `details` and so gets no disclosure at all — its row is untouched.
+                   */
+                  // #1167 — the panel asks WHO occupies a described position instead of inventing a
+                  // letter for it. Same function the centre ring uses, so the two cannot disagree.
+                  const parts = known ? curveParts(known, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }) : null;
                   return (
                     <span key={c.id}>
-                      <ValueRow text={known ? describeCurve(name, known) : `${lead}${openCurveText(d, c.id)}`} />
+                      <ValueRow text={parts ? `${lead}${parts.equation}` : `${lead}${openCurveText(d, c.id)}`} />
+                      {parts?.details && (
+                        <details style={askTraceBox} open>
+                          <summary style={askTraceToggle} title={t('curveDetailsToggle')}>
+                            {/*
+                              THE LABEL NAMES THE KIND, IN THE STUDENT'S WORD (#1214).
+
+                              It said «נתוני העקום» — the internal category (`kind: 'curve'`) reaching
+                              a student, which is the defect #1147 removed from the heading above it
+                              hours earlier, reintroduced by the label #1212 added. `curveDetailsKey`
+                              is total over the kinds that HAVE details, so a fifth conic cannot ship
+                              a blank summary.
+                            */}
+                            {t(curveDetailsKey(known!.kind))}
+                          </summary>
+                          <div style={askTrace}>
+                            <MathText text={braced(parts.details)} />
+                          </div>
+                        </details>
+                      )}
                     </span>
                   );
                 }),
@@ -1114,7 +1338,7 @@ export function App() {
                   >
                     ✕
                   </button>
-                  <div>
+                  <div style={askAnswerCol}>
                     {/*
                       THE ANSWER ROW IS TYPESET, AND PUNCTUATED (#1117 + #1112).
 
@@ -1137,24 +1361,77 @@ export function App() {
                     ) : (
                       <MathText
                         text={analyticBidi.isolateLtrRuns(
-                          `${a.question}${a.value && a.value.includes('=') ? ':' : ' ='} ${a.value ?? t(figureIsOpen(d) ? 'askOpen' : 'askNoValue')}`,
+                          /**
+                           * A VERTICAL SLOPE IS AN ANSWER, NOT A FAILURE (#1223).
+                           *
+                           * `a.fact` is checked before the `figureIsOpen` guess, because that guess
+                           * only ever chooses between two kinds of *absence* and this is neither. It
+                           * reuses `slopeVertical` — the string the «שיפועים» section already prints
+                           * for a vertical segment — so the two surfaces cannot come to disagree
+                           * about what a vertical thing's slope is.
+                           */
+                          `${a.question}${a.value && a.value.includes('=') ? ':' : ' ='} ${
+                            a.value ??
+                            (a.fact === 'vertical'
+                              ? t('slopeVertical')
+                              : t(figureIsOpen(d) ? 'askOpen' : 'askNoValue'))
+                          }`,
                         )}
                       />
                     )}
-                  </div>
-                  {/*
-                    HOW IT WAS REACHED (#1053) — the formula with this figure's numbers in it.
 
-                    Operator: *"we don't just show the result — we show what to use to get to this
-                    result"*, at the level he ruled: substituted, never worked through. Rendered as
-                    MathML like everything else numeric in this tool (#1097), and quieter than the
-                    answer, because it is the method and not the result.
-                  */}
-                  {a.trace && (
-                    <div style={askTrace}>
-                      <MathText text={a.trace} />
-                    </div>
-                  )}
+                    {/*
+                      HOW IT WAS REACHED (#1053), ON ITS OWN ROW AND FOLDABLE (#1206).
+
+                      The formula with this figure's numbers in it. Operator, on #1053: *"we don't just
+                      show the result — we show what to use to get to this result"*, at the level he
+                      ruled: substituted, never worked through. Typeset as MathML like everything else
+                      numeric here (#1097), and quieter than the answer, because it is the method and
+                      not the result.
+
+                      Operator, playing T1: *"having all the equations in one line doesnt look nice so we
+                      should have each line on a new row. we should be able to collapse the items so if
+                      user doesnt want to see them, only the equation is shown"*.
+
+                      It sat here as a FLEX SIBLING of the answer, so the two shared one baseline however
+                      the trace was styled — its own `marginTop` could never apply. It is now inside the
+                      answer's column, which is what puts it on its own line; the `✕` stays beside the
+                      answer's first line rather than centring against a two-line block.
+
+                      SHOWN by default, deliberately: #1053 is an operator ruling that the method is part
+                      of the answer — *"we don't just show the result — we show what to use to get to this
+                      result"* — so collapsing it by default would quietly reverse that. The request is an
+                      opt-out, and `<details>` gives the student one for free: keyboard-reachable, out of
+                      the accessibility tree when closed, and no state for this component to hold.
+                    */}
+                    {a.trace && (
+                      <details style={askTraceBox} open>
+                        <summary style={askTraceToggle} title={t('askTraceToggle')}>
+                          {t('askTraceLabel')}
+                        </summary>
+                        {/*
+                          ONE STATEMENT, ONE ROW (#1221).
+
+                          Operator, playing T25: *"never include more than 2 equations in a line"*.
+                          The trace carried two statements joined by a comma and rendered them on one
+                          line; #1125 had already established they ARE two («m = (4-0)/(3-0), y - 0 =
+                          …» is why `EXPR` carries no comma), so the separator became a newline and
+                          each part gets its own row.
+
+                          Split rather than `white-space: pre-line`, deliberately: each row is then
+                          typeset independently, so a fraction is found inside ITS statement rather
+                          than inside a run containing two of them.
+                        */}
+                        <div style={askTrace}>
+                          {a.trace.split('\n').map((step, k) => (
+                            <div key={k}>
+                              <MathText text={step} />
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
                 </div>
               ))}
               <AskLane
@@ -1274,54 +1551,6 @@ function uniqueSegments(segments: readonly { id: string; ends: [string, string] 
   });
 }
 
-/** The product's symbol palette — only the glyphs this tool's grammar actually uses (#525). */
-const SYMBOLS = [
-  { label: '²', before: '^2' },
-  { label: '√', before: '√' },
-  { label: 'ℓ', before: 'ℓ' },
-  { label: '≤', before: '<=' },
-  { label: '≥', before: '>=' },
-  { label: '≠', before: '≠' },
-] as const;
-
-/**
- * `a x + b y + c = 0`, written the way a textbook writes it: no `1x`, no `+ 0`, no `+ -3`. The raw
- * coefficients are arithmetic; this is notation, and the panel is read by a student.
- */
-/**
- * Exported so its lock CALLS it (#1119, per [ADR-W-053](../docs/06w-decisions-workspace.md#adr-w-053)).
- *
- * It was module-private, which left a test only able to reproduce it -- and a reproduction of this
- * function would have carried the same bug in the same shape and agreed with it.
- */
-export function lineText(a0: number, b0: number, c0: number): string {
-  /**
-   * NO FRACTION IS LEFT AS A COEFFICIENT (#1180) — the whole equation is scaled instead.
-   *
-   * `-4/3x + y = 0` is ambiguous (`4/(3x)`?) and typesets badly; `-4x + 3y = 0` is what a textbook
-   * prints. The scaling is decided in `format.ts`, which is where this tree's number presentation
-   * lives; when nothing can be cleared — a surd coefficient — the factor is 1 and this is a no-op.
-   */
-  const k = fractionClearingFactor([a0, b0, c0]) ?? 1;
-  const [a, b, c] = [a0 * k, b0 * k, c0 * k];
-  const term = (k: number, sym: string): string => {
-    if (Math.abs(k) < 1e-12) return '';
-    /**
-     * THE MAGNITUDE RULE BELONGS TO THE SYMBOL, NOT TO THE TERM (#1119).
-     *
-     * Suppressing `1` is correct notation for a COEFFICIENT -- `1x` must print as `x`. The constant
-     * term is formatted by this same helper with `sym = ''`, so the rule erased the number itself and
-     * «3x - 4y + 1 = 0» printed as «3x - 4y + = 0». It fired for any line whose constant is +/-1, not
-     * only the #1093-built ones the DEPLOY-LOG entry described.
-     */
-    const mag = Math.abs(k) === 1 && sym !== '' ? '' : fmt(Math.abs(k));
-    return `${k < 0 ? '-' : '+'} ${mag}${sym} `;
-  };
-  const parts = `${term(a, 'x')}${term(b, 'y')}${term(c, '')}`.trim();
-  // A leading `+ ` is noise; a leading `- ` is a sign and stays attached.
-  const body = parts.startsWith('+ ') ? parts.slice(2) : parts.replace(/^- /, '-');
-  return `${body} = 0`;
-}
 
 /**
  * Display precision, delegated to the workspace's ONE chokepoint (#1029).
@@ -1340,12 +1569,6 @@ function fmt(v: number): string {
   return fmtAnalytic(v);
 }
 
-/**
- * One line of data per curve. Deliberately DESCRIPTIVE (centre, radius, focus) rather than a
- * restatement of the equation the student just typed — the panel's job is to organise what is
- * known, and the memorised triple (`y²=2px` → focus, directrix) is exactly what the formula sheet
- * withholds.
- */
 /**
  * What the givens SAY about a point, as the panel should read it (#1078).
  *
@@ -1395,6 +1618,30 @@ function pointText(
         return drawn ? `[${text}]` : text;
       })
       .join(' או ');
+  }
+
+  /**
+   * A COORDINATE THE STUDENT WROTE IS SHOWN, EVEN WHEN IT IS NOT A NUMBER (#1226).
+   *
+   * Operator, playing T32 on «A(-9a,0)» / «B(41a,0)»: *"9a and 41a are still not shown on the canvas
+   * or data panel which is wrong."*
+   *
+   * The tool holds `A.x` as `mul(neg(9), sym a)` — his own `-9a`, exactly — and `exprText` has
+   * rendered it all along. The row printed `(x_A, 0)` instead: the tool's OWN symbol substituted for
+   * the student's expression, which is worse than the dash it replaced. *"Everything the student
+   * stated is visible on the figure"* is the invariant, and `-9a` was stated.
+   *
+   * This is #1023's fix for the other object kind, in its own words: *"it states no VALUE, so
+   * ADR-AG-003 §2 is untouched — it names the dependency, which is more than the dash said and less
+   * than a number."*
+   *
+   * Only a STATED point (`kind: 'point'`) with a non-numeric coordinate. A carrier point is `free`
+   * and a midpoint is `derived`, so neither the `(x_B, x_B)` reading below nor the derived rows can
+   * be reached by this branch — measured, not assumed.
+   */
+  const stated = d.construction.objects.find((o) => o.id === id);
+  if (stated?.kind === 'point' && (stated.x.kind !== 'num' || stated.y.kind !== 'num')) {
+    return `(${exprText(stated.x)}, ${exprText(stated.y)})`;
   }
 
   const on = d.construction.constraints.find(
@@ -1495,8 +1742,37 @@ const askRow: CSSProperties = {
   padding: '2px 0',
   opacity: 0.9,
   display: 'flex',
-  alignItems: 'baseline',
+  // `flex-start`, not `baseline` (#1206): the row's second child is now a COLUMN that may be two
+  // lines tall, and a baseline would centre the dismiss button against the whole block.
+  alignItems: 'flex-start',
   gap: 6,
+};
+
+/** The answer and its derivation, stacked — what actually puts the trace on its own line (#1206). */
+const askAnswerCol: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 1,
+  minWidth: 0, // so a long equation wraps inside the column instead of widening the panel
+};
+
+/** The disclosure around the trace. `<details>` carries the open/closed state, so nothing here does. */
+const askTraceBox: CSSProperties = {
+  marginTop: 1,
+};
+
+/**
+ * The fold control — quiet, because the METHOD is secondary to the answer above it.
+ *
+ * The native disclosure marker is KEPT. Hiding it (`list-style: none`) left the label reading as inert
+ * grey text with nothing to say it could be clicked — caught by looking at the rendered row, which is
+ * the only way a layout change is actually judged.
+ */
+const askTraceToggle: CSSProperties = {
+  cursor: 'pointer',
+  fontSize: fs.small,
+  color: color.muted,
+  userSelect: 'none',
 };
 
 /** The ✕ that retires a measurement (#1118) — quiet, and never louder than the answer it removes. */
@@ -1524,22 +1800,4 @@ function openCurveText(d: ReturnType<typeof derive>, id: string): string {
   if (o?.kind === 'curve') return `${exprText(o.curve.eq)} = 0`;
   if (o?.kind === 'circle-at') return `O(${o.centre}), r = ${exprText(o.r)}`;
   return '—';
-}
-
-function describeCurve(name: string, c: NumCurve): string {
-  const n = name ? `${name}: ` : '';
-  switch (c.kind) {
-    case 'line':
-      return `${n}${lineText(c.a, c.b, c.c)}`;
-    case 'circle':
-      return `${n}O(${fmt(c.cx)}, ${fmt(c.cy)}), r = ${fmt(c.r)}`;
-    case 'parabola': {
-      const f = parabolaFocus(c);
-      return `${n}y² = ${fmt(2 * c.p)}x, F(${fmt(f.x)}, 0), x = ${fmt(-c.p / 2)}`;
-    }
-    case 'ellipse': {
-      const [f1, f2] = ellipseFoci(c);
-      return `${n}a = ${fmt(c.a)}, b = ${fmt(c.b)}, F₁(${fmt(f1.x)}, ${fmt(f1.y)}), F₂(${fmt(f2.x)}, ${fmt(f2.y)})`;
-    }
-  }
 }

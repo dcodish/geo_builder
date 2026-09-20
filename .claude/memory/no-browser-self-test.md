@@ -1,8 +1,11 @@
 ---
 name: no-browser-self-test
-description: The harness CAN drive a real browser via Playwright — proven 2026-08-31; npm run smoke:visual is the gate, and a UI change is not verified until the screenshots are read
-metadata:
+description: "The harness CAN drive a real browser via Playwright — proven 2026-08-31; npm run smoke:visual is the gate, and a UI change is not verified until the screenshots are read"
+metadata: 
+  node_type: memory
   type: project
+  originSessionId: 301aec4d-700f-43ef-be61-114c6ca46864
+  modified: 2026-09-19T14:04:54.725Z
 ---
 
 **Superseded 2026-08-31 (round #843). The earlier version of this memory was wrong.**
@@ -38,5 +41,12 @@ proves the captures are real, not that they are right. Then say plainly which it
 machine-verified and which need his judgement, instead of handing over an undifferentiated checklist;
 that conflation is what prompted his original question. Still never claim to have "tested it in the
 app" for anything not actually driven and looked at.
+
+**A one-off driver for a custom sequence must live INSIDE the repo.** `smoke:visual` runs the
+products' own example lines; reproducing an operator's sequence needs a bespoke script, and a
+`.mjs` in the scratchpad dies on `import { chromium } from 'playwright'` — node resolves from the
+script's own directory, so it never finds `node_modules`. Copy it to the repo root (`zz-drive.mjs`),
+run it, delete it. Useful DOM handles for the analytic canvas: `[data-crossing]` for the dashed
+crossing rings, `getByPlaceholder` for the input (the 2026-09-19 Q/R triage used both).
 
 Related: [[gate-lines-are-read-not-matched]], [[deploys-are-mine-to-run]], [[pr-items-need-their-own-server]].

@@ -80,12 +80,11 @@ this tool *supplies* the one the exam withholds.
 - **A shape noun that carries a GIVEN may not be drawn as a plain ring of sides.** «מקבילית» asserts
   AB ∥ DC; until the constraint layer can honour it, it is refused BY NAME (`out-of-scope`) — never
   flattened (a stated given may not vanish), never escalated to the LLM (we understand it).
-- **A shape noun also promises a RING**, and nothing in the solve can keep that promise — `parallel`
-  and `length-eq` are direction-insensitive. `engine/rings.ts` is the one predicate; `drawableAt`'s
-  `whole()` is its only consumer, so the configuration CHOSEN honours the noun and canvas, panel and
-  «הציגו תצורה אחרת» are fixed together. **Simple, not convex; collapsed, not narrow** — a concave
-  «מרובע» and a thin triangle are legitimate, and refusing either asserts a given nobody gave
-  ([ADR-AG-080](../docs/06c-decisions-analytic.md#adr-ag-080)).
+- **A shape noun also promises a RING** no constraint can keep: `engine/rings.ts` is the predicate,
+  `drawableAt`'s `whole()` its only consumer; **simple not convex, collapsed not narrow**
+  ([ADR-AG-080](../docs/06c-decisions-analytic.md#adr-ag-080)). **A locus is KNOWLEDGE AS A SET** —
+  that gate's second arm, honest *because* the figure is under-determined; its equation prints only
+  when two configurations trace the same set ([ADR-AG-081](../docs/06c-decisions-analytic.md#adr-ag-081)).
 - **Every surface that prints a number is gated**, and remembering only one is the recurring failure:
   a coordinate through `isKnowledge`, a curve equation through `knownCurve`. The curve half was
   missing until #1020 while the suite stayed green. **A row that prints a number is a claim; find its

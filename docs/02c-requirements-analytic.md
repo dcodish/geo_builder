@@ -150,6 +150,20 @@ understand to the paid LLM so it can guess at an empty clause is the failure
 **R11 — Notation.** Primes (`A'`, `F₁'`) and subscripts (`F₁`, `l1`). Primes already exist in the 3-D
 tree; subscripts are new to this input language.
 
+**R11a — the PALETTE offers only what the grammar reads**
+([ADR-AG-122](06c-decisions-analytic.md#adr-ag-122),
+[#1129](https://github.com/dcodish/geo_builder/issues/1129)). A chip inserting a character the parser
+then refuses hands the student `not-handled` on their own click, which is worse than no chip —
+#511's rule, and the operator's own framing when ruling the analytic set.
+
+The set: `²` `³` `√` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}`. **`°` and `∡` are deliberately absent**
+until the angle capability exists (§5d marks «∡ACB = 90°» ✗); they arrive in that work's own change,
+because a chip is part of shipping a notation rather than a follow-up to it.
+
+Mechanically enforced: every entry is driven through the real grammar, with a totality guard so a
+button cannot be added without a proof — and pressing any chip inside a Hebrew sentence must not
+change how the line isolates, since RTL is the default and a split run is a visibly broken line.
+
 **R31 — A point's COMPONENTS are addressable and comparable: `Ax > Bx`.** *(Operator ruling,
 2026-09-04.)* The typed form of «שיעור ה-x של קדקוד A גדול משיעור ה-x של קדקוד B» (5d). Comparison
 operators `<` `≤` `≥` `≠` are already on the palette.
@@ -809,10 +823,25 @@ y=2x» is «משוואת הישר AC היא y=2x». **«האלכסון הראש�
 shape noun distinguishes them** — a kite does, a parallelogram and a rhombus do not — and elsewhere
 are refused by name rather than guessed.
 
-**R63 — a letter after «מעגל» is the centre** ([ADR-AG-038](06c-decisions-analytic.md#adr-ag-038)).
+**R63 — a letter after «מעגל» is the centre; a NUMERAL is the circle's own name**
+([ADR-AG-038](06c-decisions-analytic.md#adr-ag-038), extended by
+[ADR-AG-118](06c-decisions-analytic.md#adr-ag-118)).
 «נתון מעגל O שמשוואתו (x-3)²+(y-5)²=25» draws the circle and places `O` at its centre, as a point
-the student can then talk about. A ROMAN NUMERAL still names the circle itself («מעגל I»), and the
-circle named by a centre letter stays anonymous, so one letter never means two objects.
+the student can then talk about. A NUMERAL names the circle itself — a Roman numeral («מעגל I») or an
+**Arabic digit («מעגל 1»)**, both 1–5 — and the circle named by a centre letter stays anonymous, so
+one letter never means two objects.
+
+The digit half is the operator's ruling of 2026-09-19 (*"the rule of I, II, III for circle names AND
+1,2,3 are ok … any other capital letters would become the name of the center"*), and it is an
+extension rather than a change: the set of naming tokens grows and every other capital letter keeps
+its meaning. A digit needs no tie-breaking device at all, where a Roman numeral does: a point name is
+`[A-Z][0-9]?`, so `I` and `V` are legal points and a bare digit is not, and «מעגל 1» therefore has no
+competing centre reading to be told apart from.
+
+**Still refused, and it is a gap rather than a decision:** «נתון מעגל 1» with NO equation. The bare
+form builds an open circle today by keying its identity on the centre's letter (`circle-at-O`,
+radius `r_O`), which a digit-named circle has no letter for —
+[#1257](https://github.com/dcodish/geo_builder/issues/1257).
 **R56 — a curve minted to CARRY a point is not drawn**
 ([ADR-AG-032](06c-decisions-analytic.md#adr-ag-032)). «נקודה B על הישר y=x» means *B is (t,t)*: the
 point appears, the line does not. Stating «y=x» on its own line draws it — and when the carrier was
@@ -1033,6 +1062,21 @@ seeds it must come back the same curve. Where a parameter moves the set, as in �
 asserting one sample's `a` as a given (P3, [ADR-052](06-decisions.md#adr-052)) or deriving a symbolic
 form, which is the NO-CAS boundary.
 
+**R25a — the object the student asked for is ON SCREEN**
+([ADR-AG-120](06c-decisions-analytic.md#adr-ag-120),
+[#1198](https://github.com/dcodish/geo_builder/issues/1198)). The view is fitted to everything that
+gets DRAWN, not to the figure alone. A traced locus is decoration the caller hands to the renderer
+after the frame has been decided, and measured on the figure above it fell outside the frame in **4
+of 6 configurations** — the tool clipping the one thing the question was about. A trace the student
+has collapsed does not widen the frame: it is not on the canvas, and zooming out for something
+invisible is the same failure pointing the other way.
+
+**Still open, and it is a ruling:** the frame is re-fitted from nothing on every «הציגו תצורה אחרת»,
+so with a symbolic parameter it lurches — measured, its width varies by a factor of 2.6 and its
+centre swings from +55 to −63. What that control should feel like (a frame kept while only the
+figure moves · a scale normalised by the parameter · a clamp on how far it may move) is a product
+decision, and is #1198's second symptom.
+
 **The tool never grades.** The student does not type a claimed equation to be marked ✓ or ✗ (operator,
 2026-09-16: *"I dont want a validation tool"* — ADR-AG-072 §6, amending
 [ADR-AG-001](06c-decisions-analytic.md#adr-ag-001) D1). The tool's own arithmetic is still checked
@@ -1120,6 +1164,26 @@ the same cardinal sin as drawing a figure that violates its givens ([ADR-052](06
 that crosses — the figure is determined and there is no configuration to choose. That case is
 [#1170](https://github.com/dcodish/geo_builder/issues/1170) and is not yet answered.
 
+**R92 — a point may be NAMED before it is PLACED**
+([#1136](https://github.com/dcodish/geo_builder/issues/1136)).
+
+«נקודה M» · «נתונה נקודה M» · «M היא נקודה» · «point M» introduces `M` as a point with **two degrees
+of freedom** — drawn at a sampled position, moving when «הציגו תצורה אחרת» advances the
+configuration, counted by the DOF cue (R18, P4), and pinned by any later given that determines it.
+
+**It is a free point, not a default.** A point that exists but never moves would be a magnitude the
+tool asserted and the student never gave, which is R14's rule and
+[ADR-052](06-decisions.md#adr-052)'s cardinal sin wearing a different hat. Two configurations must
+place it in two different places.
+
+**This is what R87 stands on.** A locus is a point described by its property, so the property has to
+have something to attach to. Before it, the only way to obtain a 2-DOF point was to name it as the
+vertex of a polygon — «משולש ABM» — which asserts a triangle the question never mentioned.
+
+**A LINE still cannot be named before it is determined** («ישר k»), and a circle already could
+(«מעגל O»). That asymmetry is known and filed
+([#1171](https://github.com/dcodish/geo_builder/issues/1171)), not intended.
+
 **R93 — what a shape noun leaves UNSTATED is the tool's assumption, and stating it is new information**
 ([#1159](https://github.com/dcodish/geo_builder/issues/1159)).
 
@@ -1159,3 +1223,204 @@ ruling is untouched, and this sits ABOVE it). **A decimal the student typed is t
 
 There is no √ or π form in this tool yet — those values show as decimals until the corpus asks for
 them.
+them.
+
+**R95 — a name that denotes a line denotes it to every question, and to every surface**
+([#1148](https://github.com/dcodish/geo_builder/issues/1148), [#1139](https://github.com/dcodish/geo_builder/issues/1139)).
+
+`AB` is a line whenever `A` and `B` are points the figure holds — whether the student drew it as a
+line, stated it as a segment, or got it as a side of «משולש ABC». Every question that can be asked
+about a line can be asked about it: its **equation**, its **slope**, and the **distance** from a point
+to it. A question the tool answers in one spelling and refuses in another is the tool disagreeing with
+itself about what the figure contains.
+
+**R95a — and what a line can be ASKED, its row SHOWS**
+([ADR-AG-121](06c-decisions-analytic.md#adr-ag-121),
+[#1219](https://github.com/dcodish/geo_builder/issues/1219)). A determined line's fold carries its
+**explicit form** («הצורה המפורשת», `y = mx + b`) beside the general one already in its row, and its
+**slope**. Neither is computed for this: the slope was reachable by asking all along and had nowhere
+to be shown, which is the same tool-disagrees-with-itself failure R95 is about, one surface over.
+
+**A VERTICAL line says «אנכי», not nothing.** It has no explicit form — `x = 4` is already its natural
+one — and no slope, and *saying so is knowledge*: the rule this tree already applied to a vertical
+SEGMENT, which the line row had not inherited. An invented «y = ∞x» and a silently empty row are both
+wrong, and the second is what an unconsidered version of this would have produced.
+
+A fractional slope is written the way a textbook writes it, with the fraction after the variable —
+`y = -x/2 + 7/2`, never `y = -1/2x`. The explicit form cannot clear its fractions the way the general
+form does (its `y` coefficient is fixed at 1), so it obeys #1180's ruling by notation instead of by
+scaling.
+
+An **open** line keeps its open form and gains no slope built from one configuration's numbers
+(#1023, [ADR-052](06-decisions.md#adr-052)).
+
+**The menu offers exactly what the lane answers.** An option the click menu composes must be a
+sentence the ask lane answers; the two are one enumeration, not two lists that happen to agree. A
+drawn side is an object the student can see, so it is an object they can click.
+
+**The honesty gate is unchanged and applies per question.** A line whose coefficients are the same in
+every configuration has an equation; one that moves does not, and says so. A line can be knowledge
+while the points naming it are not — «A(0,0)» with «B על הישר y=x» has the equation `x - y = 0` and no
+length — and each question is answered on its own terms.
+
+**R96 — every spelling of one question gets one answer, and the operands decide the roles**
+([#1151](https://github.com/dcodish/geo_builder/issues/1151)).
+
+«המרחק בין C ל-AB» and «המרחק בין AB ל-C» are the same question. So are «מרחק של C מ-AB»,
+«distance from C to AB» and «distance between AB and C». A grammar that answers one and refuses
+another is teaching the student that the tool has a secret word order, which no exam has.
+
+**Roles come from what each operand IS, never from where it sits.** A one-letter name is a point; a
+two-letter name or a curve name is a line. Two points are a plain distance — «המרחק בין A ל-B» is the
+length `AB` and answers the same number — and a point with a line is the distance to that line,
+written in either order.
+
+**A question naming something absent is told so.** «המרחק בין C ל-QR» on a figure with no `QR` reports
+the missing object; it never answers «לא ניתן לחשב מהנתונים», which is a claim about the figure rather
+than about the question.
+
+**Every NOTATION for a distance is the same question** ([ADR-AG-119](06c-decisions-analytic.md#adr-ag-119),
+[#1128](https://github.com/dcodish/geo_builder/issues/1128)). **Operator ruling, 2026-09-16:**
+*"`d_{AB}` should also work for questions. as well as `|AB|`"*, and on the spelling list,
+*"we need to support all of these"*.
+
+`AB` · `d_{AB}` · `d_{A,B}` · `d(A,B)` · `|AB|` · «המרחק בין A ל-B» · «המרחק בין A לבין B» ·
+«המרחק מ-A ל-B» · «המרחק AB» · «אורך AB» · «אורך הקטע AB» · «הקטע AB» · «צלע AB» — one term, on both
+surfaces. Before this a student had exactly one way in, the symbolic `AB = 10`, and every plain
+Hebrew word for a length was refused.
+
+**A length noun is admitted only when it adds NOTHING to the pair it precedes.** «הקטע», «צלע»,
+«אורך» and «מרחק» name the measurement and no more, so «הקטע AB = 10» is `|AB| = 10`. «תיכון»,
+«גובה», «שוק», «בסיס» and «יתר» each assert something BESIDES a length — that the segment is a
+median, a height, a leg, a base, a hypotenuse — and reading those as a bare length would drop the
+student's claim silently, so they stay refused until the tool can honour both halves. «הישר AB» is
+refused for its own reason: a line has no length (R103's extent ruling).
+
+**Still refused, and filed:** the Hebrew copula. «אורך הקטע AB הוא 10» is not accepted where
+«אורך הקטע AB = 10» is — [#1260](https://github.com/dcodish/geo_builder/issues/1260).
+
+**A stated curve is nameable however it entered the figure**
+([#1149](https://github.com/dcodish/geo_builder/issues/1149)). A line the student first used to carry
+a point and then stated on its own is the SAME line as one stated outright, and behaves identically —
+same crossing rings, same name. How an object came to exist is the tool's bookkeeping, not something
+the student should be able to feel.
+
+**R97 — a given the tool accepted is DRIVEN, or it is refused; it is never quietly ignored**
+([#1201](https://github.com/dcodish/geo_builder/issues/1201)).
+
+«המרחק מ-A לישר l1 = 5» is a statement about the figure, exactly as «AB = 5» is. Once accepted it must
+shape the drawing — and when no configuration can satisfy it, the tool says so and names the student's
+own sentence. What it may never do is draw a figure that contradicts a given while listing that given
+as one it holds.
+
+**This is the honesty invariant at the level of the SOLVE, not the parser.** A statement can survive
+parsing, become the right constraint, and still be dropped on the way to the drawing — and that is the
+worst of the three failures, because nothing on screen says anything is wrong.
+
+**A magnitude that cannot be measured is not a magnitude that is satisfied.** Where the tool cannot
+evaluate a stated quantity at all, it must treat that as a fault to report rather than as a residual of
+zero — which is what "no opinion" silently becomes inside a least-squares solve.
+
+**R98 — a position carries at most one name, and a second naming is REFUSED, never silent**
+([#1153](https://github.com/dcodish/geo_builder/issues/1153)).
+
+«P מרכז המעגל I» names the centre. A later «O מרכז המעגל I» is not a second point — it is the same
+point, named again — and the tool says so, naming the letter that already holds it. Three letters
+stacked on one position is a figure the student cannot read, and it is drawn from statements that each
+looked accepted.
+
+**Renaming is an action the student takes, never a substitution the tool performs.** The refusal names
+the holder and says what to do about it; nothing is silently re-pointed at a different letter.
+
+**Naming the same thing with the SAME letter stays a no-op.** Repeating «P מרכז המעגל I» is a student
+restating themselves, and restatement has always been absorbed.
+
+This is about **one object named twice**. Two points the student stated independently that happen to
+land on one position is a different question — the tool may not assume a coincidence was asserted when
+an unstated magnitude is a free DOF (ADR-052) — and it is not answered by this requirement.
+
+**R99 — a panel heading names what the rows ARE, in the student's own word**
+([#1147](https://github.com/dcodish/geo_builder/issues/1147)).
+
+The data panel's equations section lists what the student stated or asked about the curves in their
+figure, and every row in it is an equation. So it is headed «משוואות» / «Equations» — not «עקומים», which
+is the tool's internal category (`kind: 'curve'`) and a word the exam never uses.
+
+**A heading is a promise about its rows.** Naming the implementation's type there teaches the student a
+vocabulary the question paper does not share, and it is the same defect as showing them an internal id.
+
+**R100 — an answer and its working are separate rows, and the working can be folded away**
+([#1206](https://github.com/dcodish/geo_builder/issues/1206), [#1207](https://github.com/dcodish/geo_builder/issues/1207)).
+
+A question the student asked shows its answer on one line and, beneath it, how that answer was reached.
+The two never share a line: a formula running on past the equation it belongs to reads as a second,
+unrelated fragment.
+
+**The working is shown by default and the student may fold it.** It is part of the answer (#1053), so
+it is not hidden until they say so — and folding it leaves the question and its equation, which is what
+they asked to keep.
+
+**The measure menu offers only questions worth asking.** An option is offered when the ask lane answers
+it AND the answer can be something other than zero — so clicking a vertex does not offer the distance to
+the sides that vertex is an endpoint of.
+
+**R101 — a figure the student opens is visible**
+([#1209](https://github.com/dcodish/geo_builder/issues/1209)).
+
+Pan and zoom belong to the figure they were computed for. Opening a saved figure, or clearing and
+starting a new one, shows that figure whole — the previous view is not carried onto something it was
+never computed for.
+
+A loaded save that appears empty reads as **data loss**: the student's own file looks like it failed to
+open, and nothing on screen contradicts that.
+**R102 — a curve row states an EQUATION, and its derived properties fold beneath it**
+([#1212](https://github.com/dcodish/geo_builder/issues/1212)).
+
+Under «משוואות», every curve — line, circle, parabola, ellipse — leads with its own equation. The centre
+and radius, the semi-axes, the foci, the directrix are true and useful and **secondary**: they sit on a
+second row the student can fold away, exactly as R100 folds an answer's working.
+
+**The given is never replaced by something derived from it.** A student who typed
+«(x-3)^2+(y-4)^2=9» and is shown only `O(3, 4), r = 3` has had their own statement taken off the screen
+and a consequence of it put in its place — which is the honesty invariant read backwards. The derived
+properties are the addition; the equation is the given. And «משוואת המעגל» is answered with the
+equation, because that is what was asked.
+
+The exception is a curve the givens have not FIXED, which shows its open form rather than an invented
+equation — no coefficient is ever sampled and printed as fact (R21, [#1023](https://github.com/dcodish/geo_builder/issues/1023)).
+
+**R103 — a named cevian ACTUALLY REACHES its side, and may reach the side's extension**
+([#1232](https://github.com/dcodish/geo_builder/issues/1232)).
+
+«AD תיכון לצלע BC» and «AD גובה לצלע BC» each state TWO things: `D` lies on `BC`, and `AD` has the
+role's own property — through the midpoint, or perpendicular. Both must hold in every configuration.
+An altitude whose foot floats beside the side is not an altitude, and the number a student measures
+off it means nothing.
+
+This is R40's rule applied to the cevian the student NAMED rather than to the decoration: *"a median
+that does not actually end at the opposite midpoint would teach something false, which is worse than
+teaching nothing."* The same sentence is true of a height, and the student's own named `D` is the case
+where it costs the most.
+
+**The foot is on the LINE, not bounded to the segment.** An obtuse triangle's altitude foot falls
+beyond an endpoint — that is ordinary geometry, not a broken figure. Bounding the foot to the segment
+would refuse a correct construction, which is the same honesty failure pointing the other way.
+
+**R103a — the TRIANGLE may identify the side, and the cevian's target may be written with a maqaf**
+([#1165](https://github.com/dcodish/geo_builder/issues/1165), [#1222](https://github.com/dcodish/geo_builder/issues/1222)).
+
+A student who has written «משולש ABC» says «AD תיכון במשולש ABC», not «AD תיכון לצלע BC» — naming the
+side is the tool's phrasing, not theirs. Both are the same statement and the tool accepts both, in
+both languages, for both roles; so is «AD תיכון ל-BC», where the maqaf is the ordinary Hebrew
+connector this product already relies on elsewhere.
+
+The apex is what makes the triangle spelling determinate: it is a vertex of the named triangle, and
+the side is the two vertices that are left. So the apex must BE one of them — «XD תיכון במשולש ABC»
+leaves three candidate sides, and the tool refuses it by name rather than choosing one (ADR-052: it
+never invents what the student did not state). That refusal is its own message, because the two
+neighbouring ones would each say something untrue about a sentence whose triangle is perfectly good.
+
+**Still not accepted, and deliberately:** the spellings that name no target at all — «AD גובה»,
+«תיכון מ-A לצלע BC» with no letter for the foot. Those need the FIGURE to say what the cevian reaches
+or need the tool to mint a name, and this parser reads one sentence with no figure in hand
+([#1240](https://github.com/dcodish/geo_builder/issues/1240), and #1222's apex-fronted arm).

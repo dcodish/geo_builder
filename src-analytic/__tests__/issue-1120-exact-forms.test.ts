@@ -29,13 +29,13 @@ describe('#1120 — the reported case, through the real ask lane', () => {
     const d = derive(['A(0,0)', 'B(3,4)', 'משוואת הישר AB היא y=(4/3)x'], 0);
     expect(d.faults).toEqual([]);
     for (const q of ['שיפוע הישר AB', 'שיפוע AB']) {
-      expect(ask(d, q, fmtAnalytic, () => '').value, q).toBe('4/3');
+      expect(ask(d, q, fmtAnalytic).value, q).toBe('4/3');
     }
   });
 
   it('a whole-number answer on the same figure is untouched', () => {
     const d = derive(['A(0,0)', 'B(3,4)', 'משוואת הישר AB היא y=(4/3)x'], 0);
-    expect(ask(d, 'AB', fmtAnalytic, () => '').value).toBe('5');
+    expect(ask(d, 'AB', fmtAnalytic).value).toBe('5');
   });
 });
 

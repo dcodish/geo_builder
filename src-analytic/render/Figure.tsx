@@ -42,9 +42,9 @@ export function Figure({
    * a matter for the construction, and belongs where the ask lane lives. A renderer that knew the
    * menu would be a second place deciding what is measurable.
    */
-  onPick?: (what: { kind: 'point' | 'curve'; id: string }, screen: { x: number; y: number }) => void;
+  onPick?: (what: { kind: 'point' | 'curve' | 'segment'; id: string }, screen: { x: number; y: number }) => void;
 }) {
-  const { width, height, axes, curves, segments, construction, points, crossings, measures } = scene;
+  const { width, height, axes, curves, segments, construction, points, crossings, measures, loci } = scene;
   return (
     <svg
       width="100%"
@@ -181,6 +181,23 @@ export function Figure({
               onClick={(e) => onPick({ kind: 'curve', id: c.id }, { x: e.clientX, y: e.clientY })}
             />
           ))}
+          {/*
+            A DRAWN SEGMENT IS CLICKABLE TOO (#1139) — a triangle's side is a line the student can
+            see, and before this it was a line to nobody: the pick reported only points and curves.
+            The same transparent-stroke technique as the curves above; `measurablesOf` turns the id
+            back into the side's name.
+          */}
+          {segments.map((sg) => (
+            <line
+              key={`hit-${sg.id}`}
+              x1={sg.x1}
+              y1={sg.y1}
+              x2={sg.x2}
+              y2={sg.y2}
+              style={{ cursor: 'pointer' }}
+              onClick={(e) => onPick({ kind: 'segment', id: sg.id }, { x: e.clientX, y: e.clientY })}
+            />
+          ))}
         </g>
       )}
 
@@ -247,6 +264,46 @@ export function Figure({
 
         Drawn before the points, so a point always covers its own end of the perpendicular.
       */}
+      {/*
+        THE מקום גיאומטרי (#1137) — every position the point can take, drawn as one curve.
+
+        BEFORE the measures and the points, so the traced curve sits behind the figure rather than
+        over it: it is the answer's backdrop, not another object in the construction. Stroked in the
+        scaffold colour and dashed for the same reason the perpendicular is — it is DECORATION, and a
+        student must never mistake it for something they stated.
+      */}
+      <g data-testid="analytic-loci">
+        {loci.map((l, i) => (
+          <g key={`L${i}`}>
+            <path
+              d={l.d}
+              fill="none"
+              stroke={SCAFFOLD}
+              strokeWidth={2}
+              strokeDasharray="7 5"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            {l.label && (
+              <text
+                x={l.label.x}
+                y={l.label.y}
+                dx={6}
+                dy={-6}
+                fill={SCAFFOLD_TEXT}
+                stroke="#fff"
+                strokeWidth={4}
+                strokeLinejoin="round"
+                paintOrder="stroke"
+                fontSize={14}
+                fontWeight={700}
+              >
+                {l.label.text}
+              </text>
+            )}
+          </g>
+        ))}
+      </g>
       <g data-testid="analytic-measures">
         {measures.map((m, i) => (
           <g key={`m${i}`}>

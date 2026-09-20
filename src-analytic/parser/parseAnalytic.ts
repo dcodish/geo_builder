@@ -60,6 +60,40 @@ export type ParseFailure =
   /** One label used for two vertices of the same figure — «משולש ABA» (#1042). */
   | { code: 'repeated-vertex'; detail: string }
   /**
+   * A sentence that names a construct by the ROLE one point plays relative to an object, whose own
+   * letters contradict the incidence that role requires — «BD תיכון לצלע AB» (#1231).
+   *
+   * Its OWN code, and not `repeated-vertex`: nothing repeats inside a run here. «AB» is a perfectly
+   * good side and «BD» a perfectly good segment; what is wrong is the RELATION between them — a
+   * median runs from a vertex to the OPPOSITE side, and `B` is an endpoint of `AB`. Telling the
+   * student "the same letter appears twice" would send them to fix a run that is already correct.
+   */
+  | { code: 'degenerate-role'; detail: string }
+  /**
+   * A cevian named by its TRIANGLE whose apex is not one of that triangle's vertices — «XD תיכון
+   * במשולש ABC» (#1165).
+   *
+   * Its own code because the two near neighbours would both say something untrue. «ABC» has exactly
+   * three vertices, so `bad-arity`'s "a triangle has three vertices and a quadrilateral four"
+   * describes a run that is already correct. And `degenerate-role` says the apex "lies on the side
+   * itself", which it does not — `X` is not in the figure's triangle at all. What is actually
+   * missing is the apex's membership, which is the ONE thing that makes the triangle spelling
+   * determinate: remove the apex from the ring and the other two letters are the side.
+   */
+  | { code: 'apex-not-a-vertex'; detail: string }
+  /**
+   * A crossing the student asked to NAME that is a point the figure already names — «P נקודת החיתוך
+   * של הישר AB עם הישר BC», where `AB` and `BC` meet at `B` (#1175).
+   *
+   * Its own code because it carries `holder`: the refusal's whole job is to tell the student WHICH
+   * letter is already there, which is the information they are missing — the operator's ruling,
+   * 2026-09-17 (*"AB and BC meet at B"*). A code with only a detail could not say it.
+   *
+   * NOT `already-named` (#1153): that one is about naming an object twice and its message tells the
+   * student to delete a line and rewrite it, which is advice for a different mistake.
+   */
+  | { code: 'crossing-already-named'; detail: string; holder: string }
+  /**
    * A relation whose VERB was understood and whose operand was not — «DE מקביל לפיל» (#1052).
    *
    * Its own code because the student got the sentence shape right: telling them "I did not
@@ -108,7 +142,51 @@ const HE_POINT = '(?:ה?(?:נקוד(?:ה|ות)|קדקוד)\\s+)?';
  * a noun the line rule did not accept, not a new construct — and adding it here means the diagonal
  * inherits ADR-AG-026 (the name is a claim: A and C are ON that line) rather than re-deriving it.
  */
-const HE_LINE = 'ה?(?:ישר|אלכסון)';
+/**
+ * THE NOUNS THAT NAME A STRAIGHT OBJECT, WITH THE EXTENT EACH ONE MEANS (#1236 / #1234).
+ *
+ * `HE_LINE` used to be `ה?(?:ישר|אלכסון)` — a two-member list that decided whether a sentence was
+ * UNDERSTOOD AT ALL. «משוואת הצלע BD היא 4x+5y=0» was `not-handled` while «משוואת הישר BD …» worked,
+ * for one noun's difference, and the student had to guess a different word for the same thing.
+ *
+ * That list had already been fixed once, one member at a time: the comment #1070 left above it
+ * records «אלכסון» being added for exactly this reason. «צלע», «קטע», «תיכון», «גובה», «שוק»,
+ * «בסיס» and «יתר» were still missing, and adding three of them would have been the same fix a
+ * fourth, fifth and sixth time.
+ *
+ * **A list is unavoidable here and the registry is what makes it safe.** An unknown noun MUST stay
+ * `not-handled` — «משוואת הפיל BD היא …» may not mint anything — so the rule cannot simply accept
+ * any word. What it can do is stop keeping the vocabulary in a regex, in one rule, with the
+ * meaning of each noun decided somewhere else. Here every noun carries its own extent, so adding
+ * one is a single row and its semantics arrive with it.
+ *
+ * **Operator ruling, 2026-09-19:** *"משוואת הישר should draw the line. משוואת הצלע or הקטע should
+ * draw a segment (in not yet draw)"*, and — asked whether the infinite line still EXISTS behind a
+ * bounded noun — *"only draws CE"*. So a bounded noun draws the segment and nothing else; see the
+ * emit site for how the line survives as an undrawn carrier rather than as a second drawn object.
+ *
+ * «תיכון» and «גובה» are bounded by DEFINITION rather than by the ruling, which did not name them:
+ * a median and an altitude are segments, and reading them as infinite lines would contradict every
+ * other rule in the tree that draws them.
+ */
+const STRAIGHT_NOUNS: readonly { he: string; bounded: boolean }[] = [
+  { he: 'ישר', bounded: false },
+  { he: 'אלכסון', bounded: false },
+  { he: 'צלע', bounded: true },
+  { he: 'קטע', bounded: true },
+  { he: 'תיכון', bounded: true },
+  { he: 'גובה', bounded: true },
+  { he: 'שוק', bounded: true },
+  { he: 'בסיס', bounded: true },
+  { he: 'יתר', bounded: true },
+];
+/** The nouns as an alternation — DERIVED from the registry, so the two can never drift. */
+const HE_LINE = `ה?(?:${STRAIGHT_NOUNS.map((n) => n.he).join('|')})`;
+/** What extent a captured noun means. An unrecognised or absent noun decides nothing. */
+const extentOfNoun = (noun: string | undefined): 'line' | 'segment' | undefined => {
+  const hit = noun ? STRAIGHT_NOUNS.find((n) => noun.includes(n.he)) : undefined;
+  return hit ? (hit.bounded ? 'segment' : 'line') : undefined;
+};
 /** «המעגל» / «מעגל». */
 const HE_CIRCLE = 'ה?מעגל';
 /** «שמשוואתו» / «שמשוואתה» / «משוואת» / «שמשוואת» — the "whose equation is" connector. */
@@ -302,6 +380,14 @@ interface CurveHit {
   kind: CurveKind;
   eqSrc: string;
   /**
+   * WHAT THE NOUN SAID THE OBJECT IS (#1234) — `'line'` infinite, `'segment'` bounded, `undefined`
+   * when the student wrote no noun and the extent must be inherited from what the figure already
+   * holds. `direction()` deliberately discards the noun, so routing the operand through it alone
+   * would throw away exactly the information the operator's ruling turns on; the noun is captured
+   * separately instead — the split `ON_OBJECT` already uses for its `bounded` decision.
+   */
+  extent?: 'line' | 'segment';
+  /**
    * The letter the student gave as this circle`s CENTRE — «מעגל O שמשוואתו …» (#1059).
    *
    * Operator ruling, 2026-09-15: *"«מעגל O» means the center letter is O"*. So the letter names a
@@ -316,18 +402,44 @@ interface CurveHit {
  * following separator, because neither shortcut survives contact with the corpus: a case-insensitive
  * `[IVX]{1,3}` reads the `x` of «the circle x²+y²−2ax−2x=0» as a Roman numeral and swallows it, and a
  * class that admits `X` while the validator does not silently turns a numeral into an anonymous id.
+ *
+ * ARABIC DIGITS NAME A CIRCLE TOO (#1216). **Operator ruling, 2026-09-19:** *"I think the rule of I,
+ * II, III for circle names AND 1,2,3 are ok. so נתון מעגל 1 should be ok too. any other capital
+ * letters would become the name of the center."* This EXTENDS [#1059](../../docs/06c-decisions-analytic.md)
+ * rather than changing it — the set of tokens that NAME a circle grows; every other capital letter
+ * still means the centre.
+ *
+ * Digits are in a stronger position than the Roman letters, which is why they need no new machinery:
+ * `NAME` is `[A-Z][0-9]?`, so a bare digit **cannot be a point name at all** and «מעגל 1» has no
+ * competing centre reading to be told apart from. `I` and `V` ARE legal point names, which is
+ * exactly why #1059 needed an ordered pair of rules and a case-sensitive lookahead.
+ *
+ * The range is **1–5, mirroring the Roman range exactly** — that range was itself chosen from corpus
+ * evidence about how many circles one question carries, so the two halves of the token have one
+ * justification instead of two. Widening it is a one-character edit if a question ever needs it.
+ *
+ * The separator lookahead is what keeps this safe, and it is doing more work now than it was: it is
+ * the whole reason «המעגל 4x^2+4y^2=1» is not read as a circle named 4 — the `x` after the digit is
+ * not a separator, so the numeral branch cannot claim it. That is the digit twin of the trap the
+ * paragraph above records.
  */
 /** The numerals themselves, for the lookahead that keeps a NAME from eating one (#1059). */
-const ROMAN_LETTERS = '(?:I|II|III|IV|V)';
-const ROMAN_RUN = '(?:(I|II|III|IV|V)(?=[\\s:]))?';
+const CIRCLE_NUMERALS = '(?:I|II|III|IV|V|[1-5])';
+const CIRCLE_NUMERAL_RUN = '(?:(I|II|III|IV|V|[1-5])(?=[\\s:]))?';
 
 function matchCurve(line: string): CurveHit | null {
   // --- line: «נתון הישר ℓ1: 4y-3x-20=0» · «משוואת הישר AC היא y=-2x+8» · «הישר x=-4» ---
   const heLineNamed = line.match(
-    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_LINE}\\s+(${LINE_NAME})${HE_IS}\\s*:?\\s*(.+)$`),
+    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?(${HE_LINE})\\s+(${LINE_NAME})${HE_IS}\\s*:?\\s*(.+)$`),
   );
   if (heLineNamed) {
-    return { id: `line-${heLineNamed[1]}`, name: heLineNamed[1], kind: 'line', eqSrc: heLineNamed[2] };
+    return {
+      id: `line-${heLineNamed[2]}`,
+      name: heLineNamed[2],
+      kind: 'line',
+      eqSrc: heLineNamed[3],
+      extent: extentOfNoun(heLineNamed[1]),
+    };
   }
   /**
    * The NOUN is optional after «משוואת», and the NAME survives — «משוואת AB היא y=2x» (#1072).
@@ -402,9 +514,11 @@ function matchCurve(line: string): CurveHit | null {
     // Not an equation in the plane's variables — this rule has no claim on the sentence. Fall through.
   }
 
-  const heLineBare = line.match(new RegExp(`^${HE_GIVEN}${HE_LINE}\\s+(.+=.+)$`));
+  const heLineBare = line.match(new RegExp(`^${HE_GIVEN}(${HE_LINE})\\s+(.+=.+)$`));
   if (heLineBare) {
-    return { id: `curve-${anonIndex(heLineBare[1])}`, name: '', kind: 'line', eqSrc: heLineBare[1] };
+    // An ANONYMOUS straight given by its equation alone: there are no endpoints to bound it between,
+    // so a bounded noun has nothing to draw a segment over and the line is what the student gets.
+    return { id: `curve-${anonIndex(heLineBare[2])}`, name: '', kind: 'line', eqSrc: heLineBare[2] };
   }
   /**
    * NOT flagged `i`, and the English words carry their own case alternatives instead (#1093).
@@ -449,7 +563,7 @@ function matchCurve(line: string): CurveHit | null {
    * thing and the M1 id space has no collision in it.
    */
   const heCircleCentre = line.match(
-    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s+(?!${ROMAN_LETTERS}(?=[\\s:]))(${NAME})\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
+    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s+(?!${CIRCLE_NUMERALS}(?=[\\s:]))(${NAME})\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
   );
   if (heCircleCentre) {
     return {
@@ -463,13 +577,13 @@ function matchCurve(line: string): CurveHit | null {
 
   // --- circle: «נתון מעגל I שמשוואתו …» · «משוואת המעגל …» ---
   const heCircle = line.match(
-    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s*${ROMAN_RUN}\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
+    new RegExp(`^${HE_GIVEN}(?:${HE_EQ_OF}\\s+)?${HE_CIRCLE}\\s*${CIRCLE_NUMERAL_RUN}\\s*(?:${HE_EQ_OF})?${HE_IS}\\s*:?\\s*(.+)$`),
   );
   if (heCircle) {
-    const roman = heCircle[1] ?? '';
+    const numeral = heCircle[1] ?? '';
     return {
-      id: roman ? `circle-${roman}` : `curve-${anonIndex(heCircle[2])}`,
-      name: roman ? `מעגל ${roman}` : '',
+      id: numeral ? `circle-${numeral}` : `curve-${anonIndex(heCircle[2])}`,
+      name: numeral ? `מעגל ${numeral}` : '',
       kind: 'circle',
       eqSrc: heCircle[2],
     };
@@ -477,7 +591,7 @@ function matchCurve(line: string): CurveHit | null {
 
   // The English centre form, for the same reason and with the same numeral exclusion (#1059).
   const enCircleCentre = line.match(
-    new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s+(?!${ROMAN_LETTERS}(?=[\\s:]))(${NAME})\\s*:?\\s*(?:is\\s+|whose equation is\\s+)?(.+)$`),
+    new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s+(?!${CIRCLE_NUMERALS}(?=[\\s:]))(${NAME})\\s*:?\\s*(?:is\\s+|whose equation is\\s+)?(.+)$`),
   );
   if (enCircleCentre) {
     return {
@@ -489,12 +603,12 @@ function matchCurve(line: string): CurveHit | null {
     };
   }
 
-  const enCircle = line.match(new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s*${ROMAN_RUN}\\s*:?\\s*(?:is\\s+)?(.+)$`));
+  const enCircle = line.match(new RegExp(`^(?:[Tt]he\\s+)?[Cc]ircle\\s*${CIRCLE_NUMERAL_RUN}\\s*:?\\s*(?:is\\s+)?(.+)$`));
   if (enCircle) {
-    const roman = enCircle[1] ?? '';
+    const numeral = enCircle[1] ?? '';
     return {
-      id: roman ? `circle-${roman}` : `curve-${anonIndex(enCircle[2])}`,
-      name: roman ? `circle ${roman}` : '',
+      id: numeral ? `circle-${numeral}` : `curve-${anonIndex(enCircle[2])}`,
+      name: numeral ? `circle ${numeral}` : '',
       kind: 'circle',
       eqSrc: enCircle[2],
     };
@@ -795,6 +909,40 @@ function parseIntersection(line: string): RuleOutcome {
   // The verb was understood and an operand was not — #1052’s refusal, which names the formats that
   // do work rather than calling the whole sentence unintelligible.
   if (!left || !right) return refuse('bad-operand', line);
+  /**
+   * THE CROSSING THE STUDENT NAMED IS A POINT THEY ALREADY HAVE (#1175).
+   *
+   * Operator, playing round #1169 T4: *"the data input should have been rejected since point B is
+   * already there"*. Measured, «P נקודת החיתוך של הישר AB עם הישר BC» minted `P` at `|PB| = 1.2e-8`
+   * with `faults: []` — two letters for one position, and the student's own «משולש ABC» had already
+   * given it one. It is the #1113 family (*"four ring clicks give four letters on ONE point"*),
+   * reached through a typed sentence rather than a click, and it compounds: `P` becomes a separate
+   * object with its own constraints and its own DOF, so every later statement about `P` is solved
+   * against a point the student believes is distinct from `B`.
+   *
+   * The test is STRUCTURAL and needs no figure: both operands are written in the sentence, so two
+   * lines named by two points each that share exactly one letter meet at that letter, whatever the
+   * configuration. No solve, no seed, no tolerance.
+   *
+   * **Sharing BOTH letters is a different sentence and is NOT answered here** — «הישר AB עם הישר BA»
+   * is one line, not two, so its "crossing" is the whole line rather than a point. Measured, it
+   * currently BUILDS an under-determined `P` floating somewhere along AB with `faults: []` — a real
+   * defect, but a different one (an unconstrained point, not a duplicate name) whose honest answer
+   * might be a refusal or might be «P on AB», which is the student's to decide. Filed separately and
+   * left alone here, so this code never claims a sentence it cannot explain.
+   *
+   * ⚠ THIS IS THE STRUCTURAL MEMBER ONLY, and that is deliberate. Two lines given by EQUATIONS that
+   * happen to cross where a point already sits is the same defect — measured, «l1: y=x» and
+   * «l2: y=-x» with `A(0,0)` mints `P` at `|PA| = 1e-9` — but catching it needs a POSITIONAL test
+   * with its own tolerance question, which the operator's ruling pre-declared an escalation rather
+   * than an expansion. Filed separately; see the ADR.
+   */
+  if (left.t === 'on-line-2pt' && right.t === 'on-line-2pt') {
+    const shared = [left.a, left.b].filter((p) => p === right.a || p === right.b);
+    if (shared.length === 1) {
+      return { ok: false, code: 'crossing-already-named', detail: line, holder: shared[0] } as ParseResult;
+    }
+  }
   return made([
     { t: 'declare', id, src: line },
     { t: 'constraint', k: left, src: line },
@@ -1164,11 +1312,37 @@ const AREA_EN = new RegExp(
  * point, while this is an object the student named, measures, and makes the subject of the next
  * sentence. Same geometry, opposite status.
  */
+/**
+ * THE TRIANGLE IDENTIFIES THE SIDE, INSTEAD OF DECORATING IT (#1165).
+ *
+ * Operator, 2026-09-17, with a screenshot: *"we need to support things like `AD תיכון` and
+ * `AD חוצה זווית` like we do in the 2d tool."* «AD תיכון במשולש ABC» was `not-handled` here while
+ * 2-D answers the same sentence — a sibling disparity, which is the framing that makes it worth
+ * fixing rather than tail work.
+ *
+ * The side run was MANDATORY and «במשולש ABC» only an optional trailing decoration after it, so the
+ * triangle was recognised as text and could never be the thing that identifies the target. It is now
+ * an ALTERNATIVE: a cevian starts at a named vertex, so apex `A` plus triangle `ABC` determines the
+ * opposite side `BC` with no ambiguity, and the existing lowering is reused unchanged.
+ *
+ * Determined from the SENTENCE, never from the figure — this parser is context-free by design, and
+ * the two forms here name everything they need. The spellings that name no target at all
+ * («AD גובה», «גובה מנקודה A») genuinely require the figure and are #1240, not this.
+ *
+ * The maqaf is admitted with it (#1222): «AD תיכון ל-BC» failed only because the rule had no `-`
+ * allowance before a Latin run, while the tool relies on that convention itself elsewhere.
+ */
+const CEVIAN_ROLE_HE = 'תיכון|גובה';
+/** Either the side named outright, or the triangle that determines it. Groups: side u, side v, triangle run. */
+const CEVIAN_TARGET_HE =
+  `(?:(?:ל|אל\\s+ה?)?-?\\s*(?:ה?צלע\\s+)?(${NAME})(${NAME})(?:\\s+ב?ה?משולש\\s+${NAME_RUN})?|ב?ה?משולש\\s+(${NAME_RUN}))`;
 const CEVIAN_HE = new RegExp(
-  `^${HE_GIVEN}(${NAME})(${NAME})${HE_IS}\\s*(?:ה?)(תיכון|גובה)\\s+(?:ל|אל\\s+ה?)?(?:ה?צלע\\s+)?(${NAME})(${NAME})(?:\\s+ב?ה?משולש\\s+${NAME_RUN})?$`,
+  `^${HE_GIVEN}(${NAME})(${NAME})${HE_IS}\\s*(?:ה?)(${CEVIAN_ROLE_HE})\\s*${CEVIAN_TARGET_HE}$`,
 );
+const CEVIAN_TARGET_EN =
+  `(?:to\\s+(?:side\\s+)?(${NAME})(${NAME})(?:\\s+in\\s+triangle\\s+${NAME_RUN})?|in\\s+triangle\\s+(${NAME_RUN}))`;
 const CEVIAN_EN = new RegExp(
-  `^(${NAME})(${NAME})\\s+is\\s+(?:the\\s+)?(median|altitude)\\s+to\\s+(?:side\\s+)?(${NAME})(${NAME})(?:\\s+in\\s+triangle\\s+${NAME_RUN})?$`,
+  `^(${NAME})(${NAME})\\s+is\\s+(?:the\\s+)?(median|altitude)\\s+${CEVIAN_TARGET_EN}$`,
   'i',
 );
 
@@ -1380,9 +1554,32 @@ function direction(phrase: string): Direction | null {
 const PARALLEL_WORDS = 'מקביל(?:ה|ים|ות)?';
 const PERP_WORDS = '(?:מאונכ(?:ת|ים|ות)?|מאונך|ניצב(?:ת|ים|ות)?)';
 const RELATION_HE = new RegExp(
-  `^${HE_GIVEN}(.+?)\\s+(${PARALLEL_WORDS}|${PERP_WORDS})\\s+ל-?\\s*(.+)$`,
+  // The connector is OPTIONAL (#1160): «AB מקביל DC» is written as often as «AB מקביל ל-DC», and the
+  // verb alone already identifies the sentence — nothing else in the grammar uses it.
+  `^${HE_GIVEN}(.+?)\\s+(${PARALLEL_WORDS}|${PERP_WORDS})\\s+(?:ל-?\\s*)?(.+)$`,
 );
-const RELATION_EN = /^(.+?)\s+(?:is\s+)?(parallel|perpendicular)\s+to\s+(.+)$/i;
+const RELATION_EN = /^(.+?)\s+(?:is\s+)?(parallel|perpendicular)(?:\s+to)?\s+(.+)$/i;
+
+/**
+ * THE EXAM'S OWN NOTATION — «AB ∥ DC», «AB || DC», «AB ⊥ DC» (#1160).
+ *
+ * The relation itself was fully built and well tested; only its SYMBOLS were unreadable, so a student
+ * writing what the exam prints got «לא הבנתי» for a capability that already existed. That is this
+ * tree's recurring one-spelling gate — #1081 counted five, and #1128 and #1151 are the same shape.
+ *
+ * A separate pattern rather than more alternatives inside `PARALLEL_WORDS`, because a symbol needs no
+ * connector and no surrounding spaces: «AB∥DC» is one token to a student. It feeds the SAME handler,
+ * so this is a second spelling of one rule and not a second rule.
+ *
+ * **`//` is deliberately NOT admitted.** It is the one candidate symbol that collides with real
+ * mathematics, and this rule runs BEFORE the equation parser — so a line it claimed wrongly would be
+ * refused as a bad operand instead of falling through to be read as the equation it is. A narrower
+ * symbol set is fine; a mis-parsed equation is not. Both ⊥ (U+22A5) and ⟂ (U+27C2) are admitted,
+ * because both are typed and they are indistinguishable on screen.
+ */
+const REL_PARALLEL_SYM = String.raw`∥|\|\|`;
+const REL_PERP_SYM = String.raw`⊥|⟂`;
+const RELATION_SYM = new RegExp(`^${HE_GIVEN}(.+?)\\s*(${REL_PARALLEL_SYM}|${REL_PERP_SYM})\\s*(.+)$`);
 
 /**
  * A LINE CONSTRUCTED THROUGH A POINT — «דרך P עובר ישר מקביל ל AB» (#1093).
@@ -1530,7 +1727,7 @@ function parseConstraint(raw: string): RuleOutcome {
    * A relation is recognisable from its verb, which no other rule uses, so matching it early costs
    * nothing and removes the ambiguity entirely.
    */
-  const rel = RELATION_HE.exec(line) ?? RELATION_EN.exec(line);
+  const rel = RELATION_HE.exec(line) ?? RELATION_EN.exec(line) ?? RELATION_SYM.exec(line);
   if (rel) {
     const [, left, word, right] = rel;
     const u = direction(left);
@@ -1538,7 +1735,7 @@ function parseConstraint(raw: string): RuleOutcome {
     // The verb was understood; if an operand was not, that is an OWNED refusal about this sentence
     // rather than a fall-through to "I did not understand you" (ADR-AG-017).
     if (!u || !v) return refuse('bad-operand', line);
-    const parallel = /^מקביל|^parallel/i.test(word);
+    const parallel = new RegExp(`^(?:מקביל|parallel|${REL_PARALLEL_SYM})`, 'i').test(word);
     return made([
       { t: 'constraint', k: { t: 'relation', rel: parallel ? 'parallel' : 'perpendicular', u, v }, src: line },
     ]);
@@ -1605,9 +1802,51 @@ function parseConstraint(raw: string): RuleOutcome {
 
   const cev = CEVIAN_HE.exec(line) ?? CEVIAN_EN.exec(line);
   if (cev) {
-    const [, apex, foot, roleSrc, u, v] = cev;
+    const [, apex, foot, roleSrc, u0, v0, triRun] = cev;
     const median = /תיכון|median/i.test(roleSrc);
+    /**
+     * The side, from whichever form the student used (#1165).
+     *
+     * Named outright it is those two letters. Named by the TRIANGLE it is the two vertices that are
+     * not the apex — which is exactly what makes the triangle form unambiguous, and also what makes
+     * an apex outside the run meaningless: «XD תיכון במשולש ABC» leaves three candidates, so it is
+     * refused rather than guessed at (ADR-052 — never invent what the student did not state).
+     */
+    let u = u0;
+    let v = v0;
+    if (!u || !v) {
+      const ring = (triRun ?? '').match(new RegExp(NAME, 'g')) ?? [];
+      const others = ring.filter((p) => p !== apex);
+      // Two different wrongs, answered separately, because one message cannot be true of both:
+      // «במשולש ABCD» is a noun disagreeing with its own vertex count, and «XD … במשולש ABC» is a
+      // run that is a perfectly good triangle the apex simply is not part of.
+      if (ring.length !== 3) return refuse('bad-arity', line);
+      if (others.length !== 2) return refuse('apex-not-a-vertex', line);
+      [u, v] = others;
+    }
     if (u === v) return refuse('repeated-vertex', line); // «AD תיכון לצלע BB» names no side
+    /**
+     * THE ROLE'S OWN INCIDENCE, CHECKED (#1231).
+     *
+     * The rule used to validate only the SIDE's internal well-formedness (`u === v`) and then emit
+     * unconditionally — it checked the letters of one operand and never the relation between the two,
+     * which is the part «תיכון»/«גובה» actually asserts. So «BD תיכון לצלע AB» was accepted and drawn:
+     * measured, `|BD|` was exactly `|AB|/2` at every seed, with `faults: []` — the segment the tool
+     * drew as a median was the second half of the side it was supposedly drawn to, and the tool
+     * asserted the figure was correct.
+     *
+     * Stated as the DEFINITION rather than as the three observed failures: a cevian runs apex → foot,
+     * the foot lies on side (u,v), the apex does NOT, and the apex is not the foot itself. `foot ∈ side`
+     * is refused here rather than left to the solver's `unsatisfiable`, because parse time is where the
+     * message can name the student's statement instead of reporting an unsatisfiable system.
+     *
+     * A refusal, never `null`: `null` routes a sentence this rule clearly matched to the LLM seam,
+     * which #1039/#1042 ruled against in this tree — a rule that matched owes the student an answer.
+     * This is the one place the analytic tree deliberately does NOT copy 2-D, whose median gate
+     * escalates (see the 2-D sibling, #1233).
+     */
+    if (apex === u || apex === v || apex === foot || foot === u || foot === v)
+      return refuse('degenerate-role', line);
     return made([
       // The sentence NAMES the foot — «AD תיכון לצלע BC» is where `D` first appears — so it is
       // declared here. Without this the segment below would refuse it as an unknown reference, which
@@ -1616,6 +1855,34 @@ function parseConstraint(raw: string): RuleOutcome {
       { t: 'declare', id: foot, src: line },
       // The cevian's own segment, so «AD» is a thing on the canvas and not only a relation.
       { t: 'segment', id: segmentId(apex, foot), a: apex, b: foot, src: line },
+      /**
+       * EVERY CONDITION THE ROLE MEANS, NOT ONLY THE ONE IT IS NAMED AFTER (#1232).
+       *
+       * Both cevians are a CONJUNCTION: the foot lies on the side, **and** the segment to it has the
+       * role's own property. The median's `midpoint` happens to carry both halves in one kind — a
+       * midpoint is on the side by construction — so its leg read correctly while stating only one
+       * constraint. The altitude's does not: `perpendicular` is a pure direction condition, two
+       * vectors whose dot product is driven to zero, and it says nothing about where `D` sits. Emitting
+       * it alone dropped the incidence half silently, and the tool drew a "height" floating off its own
+       * side with `faults: []` at every seed — a stated given vanishing, which is the honesty
+       * invariant this repo treats as cardinal.
+       *
+       * So the incidence is stated HERE, for both roles, and each role then adds what is left. It is
+       * `on-line-2pt` — the tree's one incidence residual, degenerate-safe at an endpoint — rather
+       * than a new compound kind, for three reasons: a refusal can then name WHICH half failed
+       * («D על BC» or «AD ⊥ BC») instead of a lump; a student who already stated «AD ⊥ BC» has that
+       * half recognised as known by `canonicalConstraint`; and a line lowering to several facts is
+       * this rule's existing shape ([ADR-AG-025](../../docs/06c-decisions-analytic.md#adr-ag-025)
+       * counts the median at four), not a new one.
+       *
+       * The foot is on the **LINE** `uv`, with no `between` selector: an obtuse triangle's altitude
+       * lands beyond an endpoint and is a perfectly honest figure. Bounding it to the segment would
+       * refuse a correct construction, which is the opposite failure and no better.
+       *
+       * For the median the incidence is implied by `midpoint`, so it is redundant rather than wrong —
+       * it is stated anyway so the conjunction lives in ONE place and neither leg can drift from it.
+       */
+      { t: 'constraint', k: { t: 'on-line-2pt', id: foot, a: u, b: v }, src: line },
       median
         ? { t: 'constraint', k: { t: 'midpoint', id: foot, a: u, b: v }, src: line }
         : { t: 'constraint', k: { t: 'perpendicular', a: apex, b: foot, c: u, d: v }, src: line },
@@ -1682,8 +1949,19 @@ function parseConstraint(raw: string): RuleOutcome {
     if (eq && symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
       const cid = `curve-${anonIndex(operand)}`;
       return made([
-        // NOT stated (#1076): this line exists to put a point on a line, not to draw the line.
-        { t: 'curve', id: cid, label: { name: '' }, curve: { eq }, stated: false, src: line },
+        /**
+         * NOT stated (#1076): this line exists to put a point on a line, not to draw the line.
+         *
+         * It still carries `eqSrc` (#1149). An anonymous curve's identity IS its equation
+         * (ADR-AG-056), and this was the one mint that dropped the text the student had just
+         * written — so a line introduced as a carrier and later stated became a line nobody could
+         * name, offering no crossing ring where the same two lines stated outright offer one.
+         *
+         * No `kind` is asserted: the noun that reached this branch may be «ישר», but the fit is
+         * what classifies the curve, and claiming a kind we have not established would be a second
+         * source of truth for it.
+         */
+        { t: 'curve', id: cid, label: { name: '', eqSrc: operand }, curve: { eq }, stated: false, src: line },
         { t: 'declare', id, src: line },
         { t: 'constraint', k: { t: 'on-curve', id, curve: cid }, src: line },
       ]);
@@ -1995,7 +2273,46 @@ export function parseLine(raw: string): ParseResult {
    * the operator's 2026-09-15 ruling — belongs with the circle-by-centre object #1060 needs, and is
    * deliberately not done here.
    */
-  if (curve && /[֐-׿]/.test(curve.eqSrc)) {
+  /**
+   * A NOUN GATE MAY NOT CLAIM A TAIL THAT IS NOT AN EQUATION (#1246) — the second half of the #1059
+   * guard below, and the half it was missing.
+   *
+   * The Hebrew test alone asks *"did the sentence continue in prose?"*. It does not ask *"is this an
+   * equation at all?"*, and «הקטע BC = 10» is neither prose nor an equation — it is a LENGTH. So the
+   * rule claimed it, handed `10` to `equationExpr`, and answered «לא הצלחתי לקרוא את המשוואה» about
+   * an equation the student never wrote, sending them to hunt for a typo in something that does not
+   * exist. That breaks the honesty invariant on messages: an error names the conflicting STATEMENT,
+   * never internal state.
+   *
+   * ADR-AG-111 did not create this — it enlarged it. «הישר BC = 10» answered `bad-equation` before
+   * that ADR too; widening the noun registry from two members to nine simply took the same defect
+   * from one noun to nine. The fix closes the older member as well, which is how it is known to be at
+   * the right altitude rather than aimed at the new nouns.
+   *
+   * **The discriminator is the plane's own variables** — the signal the bare-colon and bare-equation
+   * branches also key on: *does the tail name `x` or `y`?* `10` names neither, so the rule has no
+   * claim on it. It deliberately does NOT require the tail to PARSE as an equation: a truncated one
+   * («…שמשוואתו (x-3)^2+(y-4)^2», no `=`) parses as nothing and must still be told it is unreadable,
+   * and requiring a clean parse turned that honest `bad-equation` into `not-handled` — measured, and
+   * the reason this asks what the student MEANT rather than what the text achieves. Asked HERE, at
+   * `matchCurve`'s single exit, it covers every branch at once — asked per-branch it does not, and
+   * measurably so: gating `heLineNamed` alone lets the sentence fall through to the no-noun branch,
+   * which claims it and MINTS A CURVE. That was tried and rejected.
+   *
+   * A truncated equation is still `bad-equation`: «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2» mentions
+   * `x` and `y`, so the student meant an equation and got it wrong, and must be told so (#1059).
+   */
+  const curveTailMeansEquation = ((): boolean => {
+    if (!curve) return false;
+    // Deliberately NOT "does it parse as an equation". A TRUNCATED equation must still be told it is
+    // unreadable (#1059's «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2» — no `=`, so it parses as nothing),
+    // and requiring a clean parse here turned that honest `bad-equation` into `not-handled`. The
+    // question is what the student MEANT, and naming the plane's own variables is what says it.
+    return [...RESERVED_SYMBOLS].some((v) =>
+      new RegExp(`(?<![A-Za-z])${v}(?![A-Za-z])`).test(curve.eqSrc),
+    );
+  })();
+  if (curve && (/[֐-׿]/.test(curve.eqSrc) || !curveTailMeansEquation)) {
     // fall through: the noun matched, the tail is not an equation, so this rule has no claim
   } else if (curve) {
     const eq = equationExpr(curve.eqSrc);
@@ -2029,6 +2346,34 @@ export function parseLine(raw: string): ParseResult {
       : [];
 
     const named = curve.kind === 'line' ? TWO_POINT_NAME.exec(curve.name) : null;
+    /**
+     * THE NOUN DECIDES THE EXTENT, AND A BOUNDED ONE DRAWS ONLY THE SEGMENT (#1234 / #1236).
+     *
+     * Operator ruling, 2026-09-19: *"משוואת הישר should draw the line. משוואת הצלע or הקטע should
+     * draw a segment (in not yet draw)"* and, asked whether the infinite line still EXISTS behind a
+     * bounded noun, *"only draws CE"*.
+     *
+     * So a bounded noun emits the segment — minted here, idempotent if the figure already has it —
+     * and the line survives as an UNDRAWN CARRIER (`stated: false`). That is not a new concept: it
+     * is the same flag «B על הישר y=x» already uses for a line that exists to hold a point rather
+     * than to be drawn, and `scene.ts` draws only `stated` curves. The carrier is what the two
+     * endpoints are constrained ONTO, so the equation is a real condition rather than decoration;
+     * without it «משוואת הצלע CE היא x-3y=0» would state nothing at all.
+     *
+     * A student who later writes «משוואת הישר CE היא …» upgrades the same object to `stated: true`
+     * (the fold already does this), which is the deliberate line-over-segment pair #1234 describes —
+     * reached only by asking for it, never minted behind the student's back.
+     *
+     * With NO noun the extent is inherited from what the figure already holds, and that is a
+     * question this parser cannot answer: it takes no figure context. The fact carries
+     * `inheritExtent` and the fold decides.
+     */
+    const bounded = curve.extent === 'segment' && named !== null;
+    const inherits = curve.extent === undefined && named !== null;
+    const boundedSeg: Fact[] =
+      bounded && named
+        ? [{ t: 'segment', id: segmentId(named[1], named[2]), a: named[1], b: named[2], src: line }]
+        : [];
     const through: Fact[] = named
       ? [
           { t: 'declare', id: named[1], src: line },
@@ -2049,11 +2394,14 @@ export function parseLine(raw: string): ParseResult {
            */
           label: { name: curve.name, kind: curve.kind, ...(curve.name ? {} : { eqSrc: trim(curve.eqSrc) }) },
           curve: { kind: curve.kind, eq },
-          // The student named the curve and gave its equation — this sentence IS the curve.
-          stated: true,
+          // The student named the curve and gave its equation — this sentence IS the curve, UNLESS a
+          // bounded noun said the drawn object is the segment (then the line is its carrier).
+          stated: !bounded,
+          ...(inherits ? { inheritExtent: true as const } : {}),
           src: line,
         },
         ...through,
+        ...boundedSeg,
         ...centre,
       ],
     };
@@ -2076,6 +2424,47 @@ export function parseLine(raw: string): ParseResult {
   // NO constrained-shape refusal here any more (#1049). It existed because those nouns carried
   // givens the tool could not honour (ADR-AG-013); the registry honours them, so keeping it would
   // reject sentences the tool now understands. Removing it IS the fix, not a side effect of it.
+
+  /**
+   * A POINT NAMED WITHOUT BEING PLACED — «נקודה M», «נתונה נקודה M», «M היא נקודה» (#1136).
+   *
+   * The `free` carrier family has existed since slice A — *"a named but unplaced point, two degrees
+   * of freedom, its own"* (#1017) — and `evaluate` places it, solves it and counts it. **The engine
+   * was complete; only the sentence was missing.** So this rule emits the `declare` fact the cevian
+   * and polygon rules already emit, and adds no engine concept.
+   *
+   * Until now the only route to a 2-DOF point was to smuggle it in as a polygon vertex —
+   * «משולש ABM» — which asserts a triangle the student never mentioned: a given the question never
+   * gave, [ADR-052](../../docs/06-decisions.md#adr-052)'s cardinal sin arriving through the front
+   * door. Every worked example in #1136 and in the locus issues had to use that workaround to be
+   * measured at all.
+   *
+   * **It runs LAST among the point forms, and matches only to end-of-line.** «נקודה D נמצאת על הצלע
+   * BC» and «נקודה M(3,4)» are longer sentences that `parsePoints` has already answered; a rule that
+   * matched a prefix would swallow them, which is the #1059 swallowing defect. The anchor is what
+   * keeps this a declaration rather than a wildcard.
+   *
+   * Hebrew morphology is written out rather than abbreviated (`HE_GIVEN`): «נתון» ends in FINAL nun
+   * and every other form in medial nun, so the convenient `נתונ(ה|ים|ות)?` silently drops the
+   * commonest spelling. This tree has paid for that letter three times.
+   *
+   * **The sibling nouns were measured at the same time** (#1136's class check). «מעגל O» already
+   * declares a free-centred circle; «ישר k» and «line k» are refused for the SAME reason this was,
+   * and are NOT fixed here — a free line has no object kind and no `carrierOf` row, so it is real
+   * engine work rather than a sentence. Filed rather than folded in.
+   */
+  const FREE_POINT_HE = new RegExp(
+    `^${HE_GIVEN}(?:ה?(?:נקוד(?:ה|ות)|קדקוד)\\s+(${NAME})|(${NAME})\\s+(?:היא|הינה)?\\s*ה?(?:נקודה|קדקוד))$`,
+  );
+  const FREE_POINT_EN = new RegExp(
+    `^(?:a\\s+|the\\s+|given\\s+(?:a\\s+|the\\s+)?)?point\\s+(${NAME})$`,
+    'i',
+  );
+  const freePt = FREE_POINT_HE.exec(line) ?? FREE_POINT_EN.exec(line);
+  if (freePt) {
+    const id = freePt[1] ?? freePt[2];
+    if (id) return { ok: true, facts: [{ t: 'declare', id, src: line }] };
+  }
 
   /**
    * F3/F5/F6 WITHOUT the noun — `x-y+2=0`, `y^2=54x`, `(x-3)^2+(y-4)^2=9` (#1037).

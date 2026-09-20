@@ -48,3 +48,6 @@ which loads every session and has operator authority. One fact, one home — do 
 - [PR may ship mid-pass](pr-may-ship-mid-pass.md) — re-check merge state and the newest `prod/*` tag in the SAME compound as handing over a play sheet; a parallel session merged AND deployed PR #1143 while its sheet was being built (2026-09-17)
 - [--strictPort fails silently](strictport-fails-silently.md) — a stale server keeps the port and answers 200; verify the served build by IDENTIFIER (vite strips comments), and check process CreationDate
 - [Taught remedies are hypotheses](taught-remedies-are-hypotheses.md) — an error message that teaches a spelling must DRIVE that spelling; #1156 shipped a remedy that returned the same refusal (2026-09-18 #1183)
+- [Vectors are 3-D only](vectors-are-3d-only.md) — 2-D has zero vector support BY DESIGN (space-unit topic, operator 2026-09-18 #1184); never port them to `src/` or file a parity issue
+- [Re-measure at pickup](re-measure-at-pickup.md) — re-run an issue's own case before reading its plan; a divergence is EXPECTED (the trunk moves ~35 commits/day), and only "the named cause isn't what fires" is an escalation (2026-09-20, ADR-W-064)
+- [Deploy transport](deploy-transport-scp-tar.md) — recursive scp can die mid-upload; check the server before retrying, and tar|ssh carries the LOCAL uid so chown root:root after (prod/2026-09-18)

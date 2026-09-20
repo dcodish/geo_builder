@@ -11,11 +11,12 @@
  * THIS tool; a missing `switcherAnalytic` in a sibling is a blank chip THERE (ADR-AG-004 §2 — the
  * checklist item whose failure surfaces in the wrong product).
  */
-import { makeBidi } from '../../shell/bidi';
 import { createProductI18n } from '../../shell/i18n';
 
-/** The bidi kit — exported for composed (non-`t()`) strings and for the palette drift lock. */
-export const analyticBidi = makeBidi({ extraCore: '_' });
+// #1191: the kit itself lives in ./bidi so the RENDERER can reach it without importing this bootstrap.
+// Re-exported here because every existing caller imports it from './i18n' — one instance, two doors.
+export { analyticBidi } from './bidi';
+import { analyticBidi } from './bidi';
 
 const he = {
   // The suite's display names are the CURRICULUM's subject names (operator ruling 2026-08-17).
@@ -36,7 +37,7 @@ const he = {
   hideConstruction: 'הסתר בנייה',
   dataHide: 'הסתר נתונים',
   secPoints: 'נקודות',
-  secCurves: 'עקומים',
+  secEquations: 'משוואות',
   secLengths: 'אורכים',
   secSlopes: 'שיפועים',
   // The ASK lane (#1027) — the panel's own input: two surfaces, one grammar.
@@ -44,6 +45,21 @@ const he = {
   askPlaceholder: 'שאלו: AB, שטח ABC',
   askAdd: 'שאל',
   /** The ✕ that retires a measurement and the height it drew (#1118). */
+  askTraceLabel: 'איך מגיעים לזה',
+  askTraceToggle: 'הצגה/הסתרה של דרך החישוב',
+  /** A curve row's derived properties — centre, radius, foci, directrix — folded under its equation (#1212). */
+  /**
+   * ONE LABEL PER KIND, because «עקום» is our word and not the exam's (#1214, and #1147 before it).
+   *
+   * Whole strings rather than «נתוני ה» + a slotted noun: ADR-AG-085 settled that for the refusals
+   * on the same grammar, and the definite article is exactly the kind of joint that breaks when the
+   * fifth noun arrives.
+   */
+  curveDetailsCircle: 'נתוני המעגל',
+  curveDetailsParabola: 'נתוני הפרבולה',
+  curveDetailsEllipse: 'נתוני האליפסה',
+  /** The tooltip names no kind, so it needs no fourth string and cannot reintroduce the old noun. */
+  curveDetailsToggle: 'הצגה/הסתרה של הנתונים',
   askRemove: 'הסירו את המדידה',
   // Three different answers, because they are three different situations.
   askOpen: 'עדיין לא נקבע מהנתונים',
@@ -53,6 +69,19 @@ const he = {
   askMissingPoint: 'אין בשרטוט נקודה בשם {{name}}',
   askMissingCurve: 'אין בשרטוט ישר או מעגל בשם {{name}}',
   paletteShow: 'סמלים',
+  // #1129 — one per palette chip, so every button says what it is rather than repeating its glyph.
+  symSq: 'בריבוע',
+  symSqrt: 'שורש ריבועי',
+  symEll: 'שם של ישר',
+  symLe: 'קטן או שווה',
+  symGe: 'גדול או שווה',
+  symNe: 'שונה מ־',
+  symCube: 'בחזקת שלוש',
+  symMul: 'כפל',
+  symPi: 'פאי',
+  symAbs: 'אורך הקטע',
+  symDist: 'מרחק בין שתי נקודות',
+  symComponent: 'שיעור ה-x של נקודה',
   // A vertical segment HAS no slope, and that is an answer rather than an absence (#1078).
   slopeVertical: 'אנכי (אין שיפוע)',
   secParams: 'פרמטרים',
@@ -86,7 +115,14 @@ const he = {
   errUnknownRefPoint: 'הנקודה {{detail}} עדיין לא הוגדרה. הגדירו אותה קודם, ואז אפשר להתייחס אליה.',
   errUnknownRefLine: 'הישר {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
   errUnknownRefCircle: 'המעגל {{detail}} עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.',
+  errAlreadyNamed: 'כבר יש שם לנקודה הזו: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
   errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
+  // The locus families (#1137) — keyed by the engine's own kind, so a family added later shows its
+  // internal name rather than nothing at all.
+  'locus.line': 'ישר',
+  'locus.circle': 'מעגל',
+  'locus.parabola': 'פרבולה',
+  'locus.ellipse': 'אליפסה',
   errNoPrincipalDiagonal:
     'בצורה הזאת אין אלכסון ראשי ואלכסון משני — ההבחנה הזאת קיימת רק בצורות כמו דלתון: "{{detail}}". אפשר לציין את האלכסון לפי הקודקודים, למשל «משוואת האלכסון AC היא y=2x».',
   errAmbiguousShape:
@@ -102,6 +138,25 @@ const he = {
   errBadArity:
     'מספר הקודקודים אינו מתאים לשם הצורה במשפט "{{detail}}" — במשולש שלושה קודקודים ובמרובע ארבעה.',
   errRepeatedVertex: 'באותו משפט אותה אות מופיעה יותר מפעם אחת: "{{detail}}". לכל קודקוד צריך שם משלו.',
+  // #1231 — names the STATEMENT and the reason, never internal state, and shows what a correct
+  // sentence looks like: a median or an altitude runs from a vertex to the side facing it.
+  errDegenerateRole:
+    'תיכון וגובה יוצאים מקודקוד אל הצלע שמולו, ובמשפט "{{detail}}" הקודקוד עצמו נמצא על הצלע הזאת ' +
+    '(או שהוא גם הקודקוד וגם הרגל). אפשר לכתוב למשל "AD תיכון לצלע BC".',
+  // #1165 — «XD תיכון במשולש ABC». The triangle spelling works by removing the apex from the ring,
+  // so an apex outside it leaves three candidate sides and nothing to choose between them.
+  errApexNotAVertex:
+    'תיכון או גובה יוצאים מקודקוד של המשולש, ובמשפט "{{detail}}" הקודקוד שנכתב אינו אחד מקודקודי ' +
+    'המשולש. אפשר לכתוב את הקודקוד שבמשולש, למשל "AD תיכון במשולש ABC", או לציין את הצלע במפורש.',
+  // #1175 — the refusal's job is to tell them WHICH point is already there. It names the holder and
+  // the reason, so a student who mis-read their own figure learns the thing they got wrong.
+  errCrossingAlreadyNamed:
+    'הישרים האלה נפגשים ב-{{holder}}, ולנקודה הזאת כבר יש שם. המשפט "{{detail}}" היה נותן לה שם שני. אם התכוונתם לנקודה אחרת, בדקו אילו שני ישרים נחתכים בה.',
+  // #1251 — a THROTTLE is not a misunderstanding. The student is told the service is busy, never
+  // that their sentence was wrong: the tool did not get as far as looking at it.
+  errLlmBusy:
+    'השירות עמוס כרגע ולא הצלחתי לבדוק את המשפט "{{detail}}". אפשר לנסות שוב בעוד רגע, או לנסח אותו באחת הצורות שמופיעות ברשימת הפקודות.',
+  thinking: 'חושב…',
   errBadOperand:
     'הבנתי את היחס במשפט "{{detail}}", אבל לא זיהיתי את אחד האגפים. אפשר לציין שני קודקודים (AB), ' +
     'צלע (הצלע AB), ישר (הישר l1) או ציר (ציר ה-x).',
@@ -185,11 +240,17 @@ const en: typeof he = {
   hideConstruction: 'Hide construction',
   dataHide: 'Hide data',
   secPoints: 'Points',
-  secCurves: 'Curves',
+  secEquations: 'Equations',
   secLengths: 'Lengths',
   secSlopes: 'Slopes',
   askPlaceholder: 'Ask: AB, area of ABC',
   askAdd: 'Ask',
+  askTraceLabel: 'how this is reached',
+  askTraceToggle: 'show or hide the working',
+  curveDetailsCircle: "the circle's properties",
+  curveDetailsParabola: "the parabola's properties",
+  curveDetailsEllipse: "the ellipse's properties",
+  curveDetailsToggle: 'show or hide these properties',
   askRemove: 'Remove this measurement',
   askOpen: 'not fixed by the givens yet',
   askNoValue: 'cannot be computed from the givens',
@@ -197,6 +258,18 @@ const en: typeof he = {
   askMissingPoint: 'there is no point {{name}} in your figure',
   askMissingCurve: 'there is no line or circle named {{name}} in your figure',
   paletteShow: 'Symbols',
+  symSq: 'squared',
+  symSqrt: 'square root',
+  symEll: 'a line’s name',
+  symLe: 'less than or equal',
+  symGe: 'greater than or equal',
+  symNe: 'not equal to',
+  symCube: 'cubed',
+  symMul: 'multiply',
+  symPi: 'pi',
+  symAbs: 'the length of a segment',
+  symDist: 'distance between two points',
+  symComponent: 'the x-coordinate of a point',
   slopeVertical: 'vertical (no slope)',
   secParams: 'Parameters',
   freeDof: '{{count}} degrees of freedom',
@@ -225,7 +298,12 @@ const en: typeof he = {
   errUnknownRefPoint: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefLine: 'The line {{detail}} has not been defined yet. Define it first, then you can refer to it.',
   errUnknownRefCircle: 'The circle {{detail}} has not been defined yet. Define it first, then you can refer to it.',
+  errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
   errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
+  'locus.line': 'line',
+  'locus.circle': 'circle',
+  'locus.parabola': 'parabola',
+  'locus.ellipse': 'ellipse',
   errNoPrincipalDiagonal:
     'This shape has no principal and secondary diagonal — that distinction exists only for shapes ' +
     'like a kite: "{{detail}}". Name the diagonal by its vertices instead, for example "the ' +
@@ -246,6 +324,19 @@ const en: typeof he = {
     'vertices and a quadrilateral four.',
   errRepeatedVertex:
     'The same letter appears more than once in "{{detail}}". Each vertex needs its own name.',
+  errDegenerateRole:
+    'A median or an altitude runs from a vertex to the side OPPOSITE it, and in "{{detail}}" that ' +
+    'vertex lies on the side itself (or is its own foot). Write it as, for example, ' +
+    '"AD is the median to side BC".',
+  errApexNotAVertex:
+    'A median or an altitude starts at a VERTEX of the triangle, and in "{{detail}}" the point ' +
+    'written is not one of that triangle’s vertices. Use a vertex of the triangle — for ' +
+    'example "AD is the median in triangle ABC" — or name the side outright.',
+  errCrossingAlreadyNamed:
+    'Those lines meet at {{holder}}, and that point already has a name. "{{detail}}" would give it a second one. If you meant a different point, check which two lines cross there.',
+  errLlmBusy:
+    'The service is busy, so I could not check "{{detail}}". Try again in a moment, or write it in one of the forms listed in the commands panel.',
+  thinking: 'Thinking…',
   errBadOperand:
     'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +
     'a side (side AB), a line (line l1) or an axis (the x-axis).',

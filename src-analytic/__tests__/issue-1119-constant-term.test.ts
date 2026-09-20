@@ -26,7 +26,7 @@
  * It is exported now, and these cases call it.
  */
 import { describe, expect, it } from 'vitest';
-import { lineText } from '../App';
+import { lineText } from '../app/curveText';
 
 describe('#1119 — the constant term is a number, not a coefficient', () => {
   it('the operator’s own line', () => {

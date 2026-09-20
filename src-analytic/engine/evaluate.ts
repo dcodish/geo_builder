@@ -16,6 +16,7 @@ import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
 import { pairKey, pinnedLengths } from './lengths';
+import { lineByName, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { ringFaultsOf, type RingFault } from './rings';
 import { dirVector, freeRank, residual, resolveChoices, solveLM, type Constraint } from './solve';
@@ -298,6 +299,65 @@ function place(c: Construction, env: Env, free: Map<Id, Pt>): Map<Id, Pt> {
   return at;
 }
 
+/**
+ * THE CARRIER SYSTEM — the free vertices as a vector, and what the constraints say about it.
+ *
+ * Extracted (#1137) so the SOLVE and the LOCUS TRACER read the same residuals. The tracer walks the
+ * null space of this exact Jacobian and re-solves at every step, and a second construction of "what
+ * the constraints say" would be two definitions of the figure that drift apart — the failure this
+ * codebase names repeatedly. `evaluate`'s own solve is the first caller and
+ * [`locus.ts`](./locus.ts) is the second; there is no third way to ask.
+ *
+ * Pure over `(c, env)`: no seed, no starting point. WHERE the walk starts is the caller's business —
+ * `evaluate` samples it, the tracer inherits the solved figure — and keeping that out of here is what
+ * makes the system reusable at all.
+ */
+export interface CarrierSystem {
+  /** The free vertices, in the order their coordinates occupy the vector (two entries each). */
+  ids: Id[];
+  /** Positions → vector, and back. */
+  toVec: (free: Map<Id, Pt>) => number[];
+  asMap: (x: number[]) => Map<Id, Pt>;
+  /** Every object's position at these carrier values — derived points included. */
+  positionsAt: (x: number[]) => Map<Id, Pt>;
+  /** The constraint residuals there. Empty when the figure states none. */
+  residualsAt: (x: number[]) => number[];
+}
+
+export function carrierSystem(c: Construction, env: Env): CarrierSystem {
+  const ids = freeIds(c);
+  const asMap = (x: number[]) =>
+    new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
+  const positionsAt = (x: number[]) => place(c, env, asMap(x));
+  return {
+    ids,
+    asMap,
+    toVec: (free) => ids.flatMap((id) => [free.get(id)!.x, free.get(id)!.y]),
+    positionsAt,
+    /**
+     * `lineAtOf` is threaded here, not only at the call sites (#1201 meets #1137).
+     *
+     * #1201 gave `residual` a line resolver so a stated distance to a line is DRIVEN rather than
+     * silently dropped, and threaded it through the two solve call sites that existed then. #1137
+     * later lifted those call sites into this system so the locus tracer walks the SAME residuals the
+     * solve does — which is the whole point of the abstraction.
+     *
+     * Merging the two naively would have kept one and lost the other: the branch's `carrierSystem`
+     * carried no `lineAtOf`, so a locus figure with a point-to-line distance would have solved against
+     * a residual that could not see the line — #1201's defect, restored, inside the one place built to
+     * guarantee the tracer and the solver agree. [#1210](https://github.com/dcodish/geo_builder/issues/1210)
+     * predicted exactly this: *"the branch predates #1201 — a rebase changes what a locus is."*
+     */
+    residualsAt: (x) => {
+      const pos = positionsAt(x);
+      const at = (id: Id) => pos.get(id) ?? null;
+      return c.constraints.flatMap(
+        (k) => residual(k, at, env, curveAtOf(c, env, at), lineAtOf(c, env, at)) ?? [0],
+      );
+    },
+  };
+}
+
 /** Carrier freedom left after the constraints — `carriers − rank(J)`, so dependent givens do not
  *  over-count (see `freeRank`). */
 /**
@@ -323,7 +383,7 @@ function place(c: Construction, env: Env, free: Map<Id, Pt>): Map<Id, Pt> {
  * A `circle-at` needs the PLACED centre, which is why this takes the placement and not only the
  * environment.
  */
-function curveAtOf(c: Construction, env: Env, at?: (id: Id) => Pt | null): (id: Id) => NumCurve | null {
+export function curveAtOf(c: Construction, env: Env, at?: (id: Id) => Pt | null): (id: Id) => NumCurve | null {
   return (id) => {
     const o = objectById(c, id);
     if (!o) return null;
@@ -337,6 +397,32 @@ function curveAtOf(c: Construction, env: Env, at?: (id: Id) => Pt | null): (id: 
     const res = resolveCurve(o.curve, env);
     return res.ok ? res.curve : null;
   };
+}
+
+/**
+ * The line a NAME denotes, in the configuration currently being judged (#1201).
+ *
+ * Built beside `curveAtOf` and for the same reason: `solve.ts` knows points by id and nothing else, so
+ * anything that needs the CONSTRUCTION to resolve arrives already resolved. The resolution itself is
+ * `engine/lines.ts`, shared with the ask lane and the click menu — one object, one answer, which is the
+ * rule #1148 established and #1201 found a third caller for.
+ *
+ * `at` is the live positions, so the two-point reading follows the solver's iterate rather than some
+ * earlier figure.
+ */
+export function lineAtOf(c: Construction, env: Env, at: (id: Id) => Pt | null): (name: string) => NamedLine | null {
+  const curves = curveAtOf(c, env, at);
+  return (name) =>
+    lineByName(
+      name,
+      (n: string) => {
+        const o = c.objects.find(
+          (q) => q.kind === 'curve' && (q.label.name === n || q.id === `line-${n}` || q.id === `circle-${n}`),
+        );
+        return o ? curves(o.id) : null;
+      },
+      at,
+    );
 }
 
 /**
@@ -365,7 +451,7 @@ function carrierDofOf(c: Construction, env: Env, free: Map<Id, Pt>, ids: Id[]): 
     new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
   return freeRank(vec, (x) => {
     const pos = place(c, env, asMap(x));
-    return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null)) ?? [0]);
+    return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null), lineAtOf(c, env, (id) => pos.get(id) ?? null)) ?? [0]);
   });
 }
 
@@ -542,14 +628,10 @@ export function evaluate(raw: Construction, seed = 0): Figure {
   let free = seeded;
 
   if (ids.length > 0 && c.constraints.length > 0) {
-    const vec = ids.flatMap((id) => [seeded.get(id)!.x, seeded.get(id)!.y]);
-    const asMap = (x: number[]) =>
-      new Map<Id, Pt>(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }]));
-    const res = solveLM(vec, (x) => {
-      const pos = place(c, env, asMap(x));
-      return c.constraints.flatMap((k) => residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null)) ?? [0]);
-    });
-    free = asMap(res.values);
+    // Through `carrierSystem` (#1137) so the locus tracer walks the SAME residuals this solves.
+    const sys = carrierSystem(c, env);
+    const res = solveLM(sys.toVec(seeded), sys.residualsAt);
+    free = sys.asMap(res.values);
   }
 
   /**
@@ -571,7 +653,7 @@ export function evaluate(raw: Construction, seed = 0): Figure {
   if (c.constraints.length > 0) {
     const pos = place(c, env, free);
     for (const k of c.constraints) {
-      const r = residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null));
+      const r = residual(k, (id) => pos.get(id) ?? null, env, curveAtOf(c, env, (id) => pos.get(id) ?? null), lineAtOf(c, env, (id) => pos.get(id) ?? null));
       // `null` is "cannot be judged", not "false": a constraint naming a point that vanished at this
       // parameter value must not be reported as a given the student got wrong — that would blame the
       // wrong statement, and vacancy is not a fault ([ADR-AG-008]).
@@ -1040,10 +1122,36 @@ const FALLBACK: Box = { minX: -10, minY: -10, maxX: 10, maxY: 10 };
  * parabola contributes nothing (it would otherwise decide the window by where it happens to be
  * sampled). Always includes the origin, because the axes are the subject here.
  */
-export function viewBox(f: Figure, pad = 0.15): Box {
+export function viewBox(
+  f: Figure,
+  pad = 0.15,
+  /**
+   * WORLD GEOMETRY THAT IS DRAWN BUT IS NOT IN THE FIGURE (#1198).
+   *
+   * Operator, playing round #1193 T11: *"pressing on show another config causes the image to jump
+   * right and left and the entire shape is not shown."*
+   *
+   * A traced locus is caller-owned decoration on `SceneKnowledge` — the same seam as `marks` and
+   * `crossings` — so it reaches the renderer AFTER the frame has been decided, and the frame was
+   * decided from the figure's points and curves alone. Measured on the operator's own figure, the
+   * traced circle fell outside the box in **4 of 6 configurations**: the tool clipped the one object
+   * the student had asked to see.
+   *
+   * Nothing was wrong in the tracer. The box was simply fitted to a SUBSET of what gets drawn, and
+   * the fix is to let the caller say what else is on the canvas rather than to teach the engine
+   * about the ask lane — which would put a question's answer inside the figure it is a question
+   * about. The padding and the isotropy stay here, in the one place that owns them, so no caller
+   * ever re-derives a frame rule.
+   */
+  extra: readonly { x: number; y: number }[] = [],
+): Box {
   const xs: number[] = [0];
   const ys: number[] = [0];
   for (const p of f.points) {
+    xs.push(p.x);
+    ys.push(p.y);
+  }
+  for (const p of extra) {
     xs.push(p.x);
     ys.push(p.y);
   }

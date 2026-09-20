@@ -11898,3 +11898,484 @@ A swap *would* be mechanically safe where a reclaim was refused — «משולש
 The copy follows the mechanism: «קחו את האות והסירו את השלב הזה» becomes «החליפו בין D ל-E», naming the student's own two letters. It needs no warning, because there is nothing to warn about.
 
 **Consequences.** The `reclaim` store action and its `onReclaim` prop are deleted; the point menu calls the existing `onSwap`; `LetterHolder.reclaimable` → `swappable`; `pointMenu.reclaim` → `pointMenu.swapLetters` in both locales, interpolating both letters. `issue-238-letter-holder.test.ts` is **revised, not extended** (7): the operator's own sequence now asserts what SURVIVES — five points stay five, no fact is dropped, both «נקודה» rows are still in the list — the shape-held refusal is locked as *unwidened*, and the retirement is asserted directly (`'reclaim' in store` is false), because a lock that only checked the button's wording would pass with the delete still sitting in the store for the next caller to find.
+
+## ADR-521 — A role-assigned letter run is RE-READ before it is refused (#1012)
+
+**Requirements:** [02](02-requirements.md) — the catalog row now states the reading it assumes. **Design:** [04](04-design.md) — the submit pipeline's re-reading step. **LADDER stage:** submit-time reading selection, after the dry run and before the refusal; no engine, solver or gate semantics change. **Amends** ADR-355/ADR-357 (the role-assignment discipline).
+
+Operator, 2026-09-15 (round #1006 T3): *"ODC is not drawn but CDO is. When drawing a quarter of a circle, it is not clear what order of nodes to enter so I think the tool should not assume one. So user enters ODC and cannot find a config for that, but it can find a config for CDO so it should propose that one."*
+
+### The class
+
+A construct whose letter run encodes a ROLE assignment — «רבע מעגל OAB» means *centre O, ends A and B* — fixed that assignment by POSITION. A student writing the same three letters in another order got an unsatisfiable figure and a refusal that blamed **their** geometry. The convention is real and lived only in a code comment; the catalog row said *"a 90° arc with its two bounding radii"* and never mentioned that the first letter is the centre. The tool asserted a spelling rule it never taught — the ADR-W-030 line.
+
+Measured on the operator's figure — «ABC משולש ישר זוית» · «AC=15» · «BC=10» · «O על AC» · «D על CB» — all six spellings of one drawable quarter:
+
+```
+ODC  centre O   refused   16.6 s        DOC  centre D   refused   19.5 s
+OCD  centre O   refused   11.1 s        CDO  centre C   BUILDS     1.1 s
+DCO  centre D   refused   19.3 s        COD  centre C   BUILDS     0.8 s
+```
+
+Only the CENTRE matters — the arms are interchangeable — so there are **three** readings, not six.
+
+### The mechanism: re-read by REWRITING the sentence
+
+`app/roleReadings.ts` answers one question — *what else could that run have meant?* — by rewriting the utterance and handing it back to the same parser. No rule grows a second convention, and nothing in the module knows how a quarter circle is built. The alternative spelling is a sentence the student could have typed, which is exactly what is then taught through the canonical-hint seam ADR-428 obligation 2 already wired. **Silent adoption would be the #778 violation**; the step commits the reading that builds AND shows its spelling.
+
+The mechanism keys off the `arc` a construct emits, so it is the family's, not the quarter's. Measured: it covers `רבע מעגל` (scored) and `גזרה` (unscored — a general sector pins no central angle, ADR-357, so the probe correctly abstains and the readings keep rotation order). «חצי מעגל ODC» is `not-handled` and cannot benefit, because it never produces a parse to re-read — filed as [#1204](https://github.com/dcodish/geo_builder/issues/1204).
+
+### Cost is part of the fix, and the probe is free
+
+Each WRONG reading is what is expensive (11–19 s of recruiter ladder); the right one costs ~1 s. A naive loop over three centres would turn a 17-second refusal into a 37-second one — #259's burn, multiplied. So readings are ordered by a probe that adds no solve: the central angle the construct PINS, measured on the figure the student **already has**, at the configurations it already samples.
+
+```
+centre O:  angle(C,O,D) = 33.7° / 12.7° / 31.2°   at seeds 0,1,2   -> worst |Δ90| = 77.3
+centre D:  angle(C,D,O) = 56.3° / 77.3° / 58.8°                    -> worst |Δ90| = 33.7
+centre C:  angle(O,C,D) = 90.0° / 90.0° / 90.0°                    -> 0
+```
+
+`C` rides the triangle's right angle, so its arms are perpendicular whatever O and D do. It is tried first and the retry costs one second.
+
+**Only readings the probe rates BETTER than the stated one are tried** — a reading no more promising than what the student wrote has not earned a ladder run. That is what keeps the refusal path near the cost it has today instead of trebling it.
+
+### The guard that keeps this from being worse than the bug
+
+`dryRunOutcome`'s `produced` means *something was built*, not *what you asked for was built*, and for this family the difference is visible: measured, «רבע מעגל CAB» returns `produced: true` with its two radii at **15 and 10**, because both were pinned by the student. A quarter circle cannot have two radii.
+
+So an adopted reading is checked against the construct's own promise — equal radii, and the pinned central angle (`honoursConstruct`). Answering a refusal with a wrong figure is strictly worse than the refusal it replaced. When no reading is honest, nothing is adopted and the step refuses exactly as it does today.
+
+That «רבע מעגל CAB» is drawn at all on the DIRECT path — and that «רבע מעגל ABC» silently moves `B` off the stated «BC=10» — is a **pre-existing** defect of the construct, measured identically on `origin/main` and filed as **[#1203](https://github.com/dcodish/geo_builder/issues/1203)** (P1). It is not this mechanism's to fix; it is precisely what this mechanism must not spread.
+
+### The half already delivered — deliberately not rebuilt
+
+The report's second half (*"the radius to the quarter circle is free, so we should be able to show different configs"*) was measured as already working and is untouched. The lock asserts the arms are equal to EACH OTHER rather than equal to the canonical spelling's arms, because the quarter's radius is an unstated magnitude and therefore a free DOF (ADR-052) the sampler may place differently. Pinning it in a test would lock in a default the student never gave.
+
+### Consequences
+
+`app/roleReadings.ts` (new), one block in `app/submitPipeline.ts` between the dry run and the refusal, and the catalog row now states the centre-first reading — the coverage map is the user-facing reference, and the convention's homelessness was half the bug.
+
+`issue-1012-role-readings.test.ts` (7), driven through the REAL submit pipeline, because a test against `roleReadings` alone would pass while the pipeline forgot to call it. 2-D lane green.
+
+## ADR-522 — Re-enabling a given SEARCHES; the seam inventory becomes six rows (#1133)
+
+**Requirements:** none (internal) — the promise is unchanged and already written: a given the student stated is honoured by the figure, and everything they stated is visible on it. This restores it at a seam that had lost it. **Design:** [04](04-design.md) — the commit-seam inventory. **LADDER stage:** post-commit configuration search; no parse, engine or solver change. **Extends** ADR-518 / ADR-510.
+
+Not reported by a user — found by the #1132 inventory pass, before the registry existed.
+
+### The symptom, measured
+
+A student unticks a given and ticks it back. The requirement returns, the seed resets to 0 (ADR-484), and nothing searches — so the figure can sit there violating a given the list shows as holding. Measured on «משולש ABC» · «גובה AD במשולש ABC» · «AB = 10» · «AD = 7», through the REAL submit path so the figure starts where the app leaves it:
+
+```
+after the build    seed 3   meetsRequirements: true    <- the submit's own search found seed 3
+disable the given  seed 0   meetsRequirements: true       (fewer requirements to meet)
+re-enable it       seed 0   meetsRequirements: FALSE   <- the defect
+```
+
+The honesty class this product exists to avoid, reached not through a wrong parse but through a checkbox.
+
+### Root cause — the same class as #1041, at seams neither issue enumerated
+
+`58b53efe` (ADR-510) moved the post-commit search out of the commit seams and into their callers. #1041 re-armed the ✎ edit seam. **The inventory was larger than either issue documented.**
+
+**Re-enabling is not like deleting.** `removeGroup` is exempt because deletion only ever relaxes: a satisfiable remainder was valid at seed 0 every time it was measured. Re-enabling does the opposite — it ADDS a requirement back, the same direction as a submit, and submits have always searched. The two look like one "toggling" concern and behave like opposites, which is exactly what an un-enumerated inventory hides.
+
+### `remove` was measured, and the expected exemption did NOT hold
+
+The plan asked for `remove` to be given a status rather than left blank. Measured by deleting each fact of the figure above in turn: **two of six deletions left a figure that fails `meetsRequirements` at its seed and that the search CAN rescue** — one fact of the altitude group, and one of the «AB = 10» group.
+
+That is the case #1041 looked for and did not find, and the reason is instructive: #1041 measured **whole-group** deletion. Removing one fact of a multi-fact group is not a relaxation at all — it leaves a partial group, which is a different figure. So `remove` is armed, not exempt.
+
+`remove` and `toggle` have no UI caller today (the step list deletes and ticks whole groups). They are armed anyway, and the registry records that they have no caller — so the day one is added, the armed path already exists instead of a silent gap being introduced.
+
+### The trigger is narrow, and the lock says so
+
+It bites only where seed 0 happens to be one of the few unsatisfiable configurations. A lock aimed at it must therefore assert **its own fixture still strands**, or it would pass forever on a figure that stopped being a case. The first test does exactly that, and a companion asserts that flipping the store DIRECTLY still leaves the figure broken — so the lock is testing the wiring rather than the store contract, which is the #1041 lesson written down.
+
+### No condition at the call site
+
+Deliberately, and for the reason ADR-518 gives: `runViewResolve` already early-returns when `meetsRequirements` holds, so disabling costs nothing, and a second copy of that test at the call site is the precise shape that produced #1041.
+
+### Consequences
+
+`app/editPipeline.ts` gains `runSetGroupEnabled`, `runToggleFact` and `runRemoveFact`; `App.tsx`'s step-list `onToggle` routes through the first rather than calling the store inline (CLAUDE.md's module table — this behaviour belongs in `src/app/`). The #1132 registry in `issue-1041-edit-resolve.test.ts` grows from three rows to **six**, with the count asserted so a seventh seam cannot be added silently.
+
+`issue-1133-enable-resolve.test.ts` (5). 2-D lane green.
+
+## ADR-523 — The dropped-given scan reads a number's SIGN (#1161)
+
+**Requirements:** none (internal) — the promise is unchanged. 2-D has always supported placing a free point at coordinates, and `scope.ts`'s own note says so; this restores the promise at a gate that had started refusing it. **Design:** none (internal) — no new mechanism, no new seam; one existing scanner learns a character it was blind to. **LADDER stage:** the pre-commit honesty battery. No parse rule, engine or solver change. **Extends** ADR-250 / ADR-437 / ADR-462.
+
+Found in the 2026-09-17 prod-log triage, in the **⇗ would-escalate** bucket — one user, six submits across three spellings, all reading `dropped:1`.
+
+### The symptom — an honesty gate refusing a parse that was already right
+
+Measured at HEAD through the real gate stack, each row parsed and then gated:
+
+```
+E=(1,7)          free-point x:1  y:7    droppedNums []      clean true
+E=(-1,7)         free-point x:-1 y:7    droppedNums [1]     clean FALSE
+E=(-1,-7)        free-point x:-1 y:-7   droppedNums [1,7]   clean FALSE
+הנקודה E=(-1,7)  free-point x:-1 y:7    droppedNums [1]     clean FALSE
+```
+
+The pattern is exact: positive coordinates clean, negative ones flagged, **one flag per negative number**. The span accountant (`unaccountedSpans`) is clean on every row — the defect is isolated to one function.
+
+### Root cause
+
+`droppedGivenNumbers` extracted the utterance's stated numbers with `\d+(?:\.\d+)?`, a pattern that cannot see a leading minus. So `-1` was scanned as an occurrence of **`1`**, the multiset accountant looked for an account for `+1`, found only `-1` among the command payloads, and concluded the `1` was dropped.
+
+This is a **false positive in an honesty gate** — the mirror image of the failure the gates exist to prevent — and it is expensive in both directions. Every negative coordinate burned a paid LLM fallback call on a sentence the deterministic grammar had already handled correctly; worse, the escalation then let the LLM commit something *different* from the correct `free-point` the parser had in hand. The gate replaced a right answer with a re-roll.
+
+### The fix is at the scanner, and the class is not `free-point`
+
+The scan is now sign-aware. The tempting fix — exempt `free-point`, or match a sign only inside a coordinate pair — is the per-input patch standing rule 1 forbids: **any** command carrying a negative payload rides the same scanner, and the negative coordinate is merely the first construct to reach it. A signed distance, a negative offset, whatever a future construct lowers to, all inherit this.
+
+**A minus is a SIGN only where no operand can precede it** — start of text, or immediately after an opener, a separator or an operator. Everywhere else it is a binary minus or a Hebrew maqaf:
+
+| shape | character before the `-` | read as |
+| --- | --- | --- |
+| `E=(-1,7)`, `x = -3`, `(3,-5)` | `(`, `=`, `,` | **sign** |
+| `(4-0)/(3-0)` | a digit | subtraction |
+| `x-3y=0`, `AB-3` | a Latin letter | subtraction |
+| «ב-5 ס"מ», «ל-10» | a Hebrew letter | **maqaf**, not a sign |
+
+The maqaf row is the one that decides the shape of the rule. Reading «ב-5» as −5 would invert a stated magnitude and produce a **false drop**, and this gate's standing doctrine is that the two errors are not symmetric: *a false account only suppresses a warning, while a false drop breaks a working input.* So the sign context is an **allowlist** of positions, never a denylist — an unfamiliar character before a minus falls through to the old, unsigned reading.
+
+The lookbehind is read on `counted` (which still carries its letters) at the index the digit match has in the letter-blanked `s`, so the two blanking passes were made **length-preserving**. That is the only reason the change touches them; every downstream consumer separates on optional whitespace, so widened blank runs are invisible to it.
+
+### What was measured, not assumed
+
+Fifteen rows were run through parse + gate before and after. The **only** rows that changed are the three negative ones; `BC=10`, `ריבוע במידות 4*4` (the ADR-437 multiset case), `מלבן במידות 4*6`, `היקף מעגל O1 הוא 6` (the ADR-462 declared account), `BM:MF=1:2` (the ADR-396 colon ratio) and the rest are byte-identical. The colon-ratio loop was deliberately left unsigned: `1:-2` is not a ratio a student writes, and widening it would add sign contexts with no case behind them.
+
+### The lock is a PARITY PAIR, because a parse-only test would have stayed green
+
+The parse was correct throughout this bug. A test asserting `parse('E=(-1,7)')` would have passed every day the defect shipped. So each row asserts the parse **and** `honestyGateReport(...).clean`, with the negative row placed beside its positive twin — the negative must reach the same verdict shape as the positive, which is a claim about the gate and not about the grammar. Verified to bite: 6 of the new assertions fail against pristine `parse.ts`.
+
+Three further rows lock the *non*-signs — maqaf, digit-preceded, letter-preceded — because those are where a wider rule would have caused the false drop.
+
+### Consequences
+
+`parser/parse.ts` only: two blanking passes made length-preserving, one `negAt` predicate, and the sign applied in the fraction/radical loop and the plain-digit loop.
+
+`adr-250.test.ts` grows from 18 to 24. 2-D lane green.
+## ADR-524 — The copula is not part of the LENGTH value reader's vocabulary (#1157)
+
+**Requirements:** [02](02-requirements.md) FR-IN-6 — the amendment ADR-498 made for angles now reads for lengths too: a stated magnitude is located by position, so the spelling of the copula is not part of the promise. **Design:** [04](04-design.md) — "Addressing a length: one reader, many spellings". **LADDER stage:** the utterance normaliser, ahead of every value-bearing rule. No engine, solver or render change. **Ports** ADR-498 (#969); **extends** ADR-390's region guard.
+
+**Source:** prod log triage 2026-09-17 (2-D), one user, in the **⇗ would-escalate** bucket.
+
+### The defect
+
+«אורך הקטע BC = 10» emitted the segment and **dropped the 10**. An explicit `=` and a bare number, and the construct still committed a length-less segment.
+
+Measured at HEAD, context-free `parse()`:
+
+```
+BC=10                      -> segment + set-distance:10     ✓
+אורך BC = 10               -> segment + set-distance:10     ✓
+אורך הקטע BC הוא 10        -> segment + set-distance:10     ✓
+אורך הקטע BC שווה 10       -> segment + set-distance:10     ✓
+הקטע BC = 10               -> segment ONLY                  ✗
+אורך הקטע BC = 10          -> segment ONLY                  ✗
+אורך הקטע BC 10            -> segment ONLY                  ✗
+אורך הקטע BC 10 יחידות     -> segment ONLY                  ✗
+אורך הקטע AB שווה ל-10     -> segment ONLY                  ✗
+אורך הקטע BC = √8          -> segment ONLY                  ✗
+אורך BC 10                 -> NOT-HANDLED                   ✗
+אורך הקטע BC הוא 10 יחידות -> NOT-HANDLED                   ✗
+```
+
+Nothing is lost *silently*: the span accountant and `droppedGivenNumbers` flag the unaccounted `10` and the whole utterance escalates. That is the gate doing its job, and it is why this is P2. The cost is a wrong-shaped parse plus **a paid LLM call per occurrence** on a sentence the grammar had all but read.
+
+> The issue body's stated root cause was **wrong** — it blamed the `אורך הקטע` construct for "returning before the trailing measure is consumed". Measured, that construct is fine. The defect is one line further out, in the utterance normaliser. The plan was corrected on the issue before this work began.
+
+### Root cause — a value located by VOCABULARY
+
+The verbose-length frame was a normaliser rewrite that found its value **after a literal copula**:
+
+```
+(?:אורך|הצלע|הקטע)\s+(SEG)\s+(?:הוא|היא|שווה(?:\s*ל-?)?)\s+(?=[√\d(])   →   "$1 = "
+```
+
+Three spellings die on that enumeration at once: `=` is not in the list, a **juxtaposed** number has no copula at all, and «שווה ל-10» fails because the maqaf leaves no whitespace for the trailing `\s+`. `אורך BC = 10` survived only because a *different*, one-noun rule read it.
+
+This is ADR-498 (#969) exactly, one construct over: there the angle's symbolic lane required a literal `=` while its numeric sibling needed no copula, and the fix was to stop locating the value by vocabulary. ADR-498's own sentence is the reason **adding `=` to the alternation was rejected here**: *any enumeration is a list that is already incomplete against its sibling — the seventh spelling reopens the hole exactly as the sixth did.*
+
+### The decision — the connective is defined by what it is NOT
+
+The value is found by **position**. Whatever stands between the segment and its value is CONNECTIVE, and a connective is a run carrying **no operand of its own** — no digit, no Latin letter, no value glyph. That is all a copula, an `=`, a maqaf or punctuation can be, and it needs no list.
+
+Because the connective cannot cross an operand, the rewrite stays local: a compound line («אורך הקטע BC = 10, AB = 5») is still split by `multiStatement` exactly as before, and a following label run («הקטע BC, AB = 10») blocks the rewrite rather than being jumped over.
+
+### The one guard, and why it is applied to the CONNECTIVE
+
+**A connective that carries a RELATION is not a connective** — it is the statement's operator, and the number after it is a BOUND or a RATIO, never the length itself. «אורך הקטע BC גדול מ-10» and «הצלע BC גדולה פי 2 מ-AB» must reach the bound and ratio rules untouched.
+
+The first build of this fix used the shared whole-line `COMPARES_WITH_NUMBER` predicate, as the plan proposed. **Measurement rejected it, and it is worth recording why**, because the reasoning looked right:
+
+- it **misses** «גדולה פי 2» — the comparative and the number are not adjacent, so the predicate does not fire, and the ratio was silently rewritten into «BC = 2». That is ADR-498's *"a symbolic bound would have been stolen"*, reproduced by the very guard meant to prevent it;
+- it **over-refuses** a compound whose *other* statement carries a comparison («אורך הקטע BC = 10, AB > 5»).
+
+The relation that matters is the one standing between *this* segment and *this* value. So the guard reads the captured connective, built from the comparison vocabulary the bound rules already own (`CMP_BIG`/`CMP_SMALL`) plus «פי»/"times" — the ratio member `COMPARES_WITH_NUMBER` structurally cannot see.
+
+### The second arm — a trailing unit word is not part of the value
+
+«BC = 10 יחידות» was `not-handled`, while «זווית ABC = 40 מעלות» and «רדיוס המעגל O הוא 5 ס"מ» both worked: the angle lane and the radius lane had each grown their own unit tolerance and the length lane had none — the same per-lane enumeration, one level down. The unit is now stripped at the utterance boundary, so the tolerance belongs to the tool rather than to whichever lane paid for it. It requires a digit before it and a word boundary after, so it can never be taken out of a label run or the middle of a Hebrew word; «מעלות» is deliberately absent, since a degree is a unit the angle rules read as *meaning*, not noise.
+
+**This arm closed a latent honesty defect nobody had filed:** «BC = 10 cm» previously parsed to **`set-ratio`** — a stated length committed as a ratio, which is a wrong given, not merely a refusal. It now reads `set-distance:10`.
+
+### The lock is a PARITY assertion
+
+Each spelling is asserted to produce **the same commands as the canonical «BC=10»**, never a hand-written expectation, so the test cannot go green by re-implementing the grammar it guards (ADR-W-053). Radical and decimal values are locked the same way — against `BC = √8` and `BC = 2.5` — so the value KIND is not enumerated either.
+
+The bound and ratio rows are locked as *not* producing `set-distance`, and the compound row is locked as producing both a distance and a bound — that pair is what distinguishes the connective guard from the whole-line one that was rejected.
+
+Verified to bite: **13 of the 25 assertions fail against pristine `parse.ts`.**
+
+### Consequences
+
+`parser/parse.ts`: the copula alternation is gone, replaced by `stripValueUnits` and `normalizeVerboseLength` above `normalizeUtterance`, both applied in its chain.
+
+`length-copula-value.test.ts` (25), named after its ADR-498 sibling `angle-copula-value.test.ts`. 2-D lane green.
+## ADR-525 — A cevian's incidence is checked in every rule that emits a foot (#1233)
+
+**Requirements:** none (internal) — the promise is unchanged and already written: a figure never contradicts the word the student used to declare it. This restores it in the rules that had lost it. **Design:** [04](04-design.md) — the cevian family and its shared well-formedness predicate. **LADDER stage:** parse. No engine, solver or render change. **Extends** the median's own gate; sibling of the analytic ADR for #1231.
+
+Found by the sibling audit (docs/17 §1) while triaging the analytic cevian report.
+
+### The symptom
+
+```
+משולש ABC
+BD גובה לצלע AB
+```
+
+`B` is an endpoint of `AB`, so the foot of the perpendicular from `B` to `AB` is `B` itself. Measured: `status {g0.0: ok, g1.1: ok, g1.2: ok}`, `lastError: null`, `violations: []`, `coincidences: [["B","D"]]`, `|BD| = 0` exactly. A zero-length "altitude", a second letter sitting on top of `B`, and the tool reporting success.
+
+The gate that refuses exactly this **already existed** — `if (opp[0] === apex || opp[1] === apex) return null;` — inside the *median* rule, and only there.
+
+### The class, measured rather than reasoned
+
+The predicate a cevian sentence asserts is an incidence: *from a vertex, to a point on the OPPOSITE side*. Measured on «משולש ABC», the five degenerate shapes behaved five different ways depending on which of the three rules happened to read the sentence:
+
+| | median | altitude | the `foot` rule |
+| --- | --- | --- | --- |
+| apex = u | escalates (the gate) | **builds, \|BD\| = 0, no error** | **builds, F on top of B** |
+| apex = v | escalates (the gate) | **builds, and to the WRONG SIDE** (below) | — |
+| apex = foot | falls through to the apex form | over-constrained | unresolved dependency |
+| foot = u / v | over-constrained | **builds a hidden `~B` on top of `B`** | — |
+
+That is the docs/17 shape the design rules name: *a gate written where the bug was reported, not where the class lives.* So the predicate is now stated once, as the definition —
+
+```
+cevianWellFormed(apex, foot, side) — apex ∉ side, apex ≠ foot, foot ∉ side
+```
+
+— and every rule that emits a cevian's foot asks it: the median, the altitude (at its single emit point, so every way the apex and side are resolved above is covered by one check), the altitude's vertex-less side form, and the `foot` rule.
+
+### A second defect, found by measurement and not filed by anyone
+
+`AD גובה לצלע AB` did not merely build — it built the altitude **to `BC`**. The altitude rule's side resolution read
+
+```ts
+if (sideM && up(sideM[1]) !== apex) { p = …; q = …; } else { /* derive a side from the figure */ }
+```
+
+a HALF gate that checked only the stated side's **first** letter, and whose answer to a degenerate statement was to **discard the stated side and silently substitute another**. The student stated one side and got a different one, with no note — the honesty invariant (*no stated given is ever silently dropped*) failing at a seam nobody had looked at, and a strictly worse outcome than the zero-length segment this issue was filed about.
+
+A stated side is a given. It is used, and `cevianWellFormed` decides whether the statement stands.
+
+### What is deliberately NOT refused
+
+`AA תיכון לצלע BC` still builds. 2-D reads a repeated run as naming no segment, so the named form declines and the honest apex form («the median from A») takes over, drawing the correct figure with an auto-named foot. That is a *recovery*, not a lie: the figure is right and only the foot's name was not given by the student. Refusing it would remove a working spelling to satisfy a symmetry argument. The analytic sibling #1231 refuses its own `AA` case because there it silently **moves vertex A** — a different outcome from the same letters, and the reason the two trees answer differently.
+
+### The refusal's SHAPE, and what is split out
+
+2-D answers with `return null` — the sentence escalates to the LLM. That is what the median's gate has always done and what this hoist keeps, but it means a student gets *"I did not understand"* for a sentence the tool understood perfectly, and `AB תיכון לצלע BC` trades a solver message for that escalation.
+
+An **owned refusal that names the statement** is the better answer. It is a larger change — 2-D has no refusal vocabulary equivalent to the analytic tree's `ParseFailure` codes — and it is **split out deliberately rather than smuggled in here**. The analytic sibling answers it the other way precisely because that tree has the vocabulary; #1231's plan says so in as many words, and the split is recorded on both sides so neither is read as the other's precedent.
+
+### The lock
+
+A table over `{median, altitude, foot rule} × {apex=u, apex=v, apex=foot, foot=u, foot=v} × {he, en}` driven through the real `parse` with the app's own context — it CALLS the decision rather than re-implementing it (ADR-W-053). The negative controls are the half that matters most: a well-formed cevian in either role and either locale still builds, the two locales commit the *same* commands, and a well-formed stated side is still the side that is used. Verified to bite: **14 of the 24 assertions fail against pristine `parse.ts`.**
+
+The corpus was the plan's proposed home for this lock and is the wrong one: `factsOf` throws on a step that does not parse, so a scenario cannot express a parse-time refusal at all. Recorded here so the next session does not re-attempt it.
+
+### Consequences
+
+`parser/parse.ts`: `cevianWellFormed` above the median rule, called from four emit sites; the median's inline gate becomes a call; the altitude's half gate on the stated side is removed.
+
+`cevian-well-formed.test.ts` (24). 2-D lane green.
+## ADR-526 — An untethered free point's DISTANCE is sampled, in the figure's own units (#1192)
+
+**Requirements:** [02](02-requirements.md) FR-CF — «הציגו תצורה אחרת» is the promise that an unstated relation is not silently decided; this makes it true for a free point's distance. **Design:** [04](04-design.md) — the seed sampler's DOF inventory. **LADDER stage:** configuration sampling (`applySeed`). No parse, apply or solver change. **Cites** ADR-052, ADR-018.
+
+**Operator report, 2026-09-18, while playing PR #1010's T34:** *"the point D is stuck inside the circle and no other option shows it outside."* Confirmed by hand in the UI, in both directions: at radius 5, D was inside at every configuration; at radius 1, outside at every configuration — *"yes - D is always outside"*.
+
+### Measured — the verdict was decided by a constant
+
+24 configurations per row, `|DO|` against the stated radius:
+
+| stated radius | inside | outside | max `\|DO\|` reached |
+| ---: | ---: | ---: | ---: |
+| 1 | 0 | **24** | 4.326 |
+| 5 | **24** | 0 | 4.326 |
+| 50 | **24** | 0 | 4.326 |
+
+**The reach is 4.326 whatever the student stated.** The radius moves and the sampler does not notice. So which of two admissible, unstated readings the student is told — D inside the circle, or D outside — is decided by a number unrelated to anything they wrote, and the button that exists to offer the other reading cannot reach it.
+
+That is ADR-052's cardinal sin (a figure asserting a given nobody gave) and specifically the conformance smell CLAUDE.md names: *a value counted by `rawMovableDof` but absent from what is actually sampled — a default masquerading as fixed.*
+
+### Root cause — the plan named half of it; the measurement named the rest
+
+The issue's plan blamed the parser literal: «נקודה D» lowers to `{free-point, x: 3, y: 2}`, a spot chosen with no knowledge of the figure it is joining. That literal is real. **It is not what makes the other answer unreachable.**
+
+`applySeed` perturbs the free-point cluster by a seeded **spin about its centroid** plus a per-point jitter, and the jitter width is
+
+```ts
+let span = 1;
+for (const p of free) span = Math.max(span, |p.x - cx| * 2, |p.y - cy| * 2);
+const jit = span * 0.22;
+```
+
+Two things follow, and together they are the defect:
+
+1. **Only the DIRECTION is sampled.** A spin about the cluster's centroid preserves every point's distance from it. A free point's radial distance is therefore whatever its default put it at — never varied, at any seed.
+2. **The width is measured in the DEFAULTS' units.** `span` is computed over the free points' own coordinates, which are themselves defaults. Nothing the figure states — a radius of 50, a side of 200 — enters. For «מעגל O רדיוס r» + «נקודה D» the free points are `O(0,0)` and `D(3,2)`, so `span = 3` and `jit = 0.66` for every r, which is precisely the constant 4.326.
+
+Fixing the literal alone would move the constant, not remove it: the sampled positions would still all sit at one radius from the centroid, so at a large enough stated radius the other answer would still be unreachable. **The deliverable the issue asks for — both answers reachable at r ∈ {1, 5, 50} — needs the sampler.**
+
+### The decision
+
+An **untethered** free point — one that no other object and no constraint refers to — has a genuinely unstated distance from the figure, and it is sampled: a seeded direction *and* a seeded radius, the radius drawn as `0.15×–1.5×` the **figure's own scale**.
+
+**This is not a new mechanism.** Sampling an unstated magnitude as a multiple of an extent is `applySeed`'s established idiom: a free on-line marker already ranges `0.4×–2.4×`, a samplable extension `0.55×–1.85×`. The untethered free point is the member of that family that never got it — and the only member whose default carries no figure information at all, which is why it takes its units from `figureScale` rather than from its own coordinates.
+
+Three boundaries, each load-bearing:
+
+- **`figureScale` EXCLUDES the untethered points themselves.** Their coordinates are defaults; measuring the figure with them in it would let a default vouch for its own size. With radius 5 the scale is 5; with radius 50 it is 50.
+- **Untethered is decided by a generic scan** for the id across every other object and constraint — never by a table of "which object kinds can reference a point", which is the enumeration that goes stale the next time an object kind is added.
+- **Only untethered points are rescaled.** A polygon vertex or a constrained point has its distance decided by the structure it belongs to; rescaling those is the figure's overall SIZE, a different DOF with its own `scalePinned` machinery. The triangle is sampled exactly as before.
+
+**Seed 0 returns early, so the default drawing is bit-identical.** The student's first view is unchanged; it is the *alternatives* that gained the missing DOF — which is exactly what ADR-052 permits and requires: *"a default value is allowed as a starting point so the figure can be drawn, but it must change on «show another configuration»."*
+
+### Deviation from the plan, stated plainly
+
+The plan's arm 1 was *"place a newly minted free point relative to the extent of what is already drawn"* — i.e. change the parser literal. **That arm was not built.** Once the sampler samples the radial DOF, the literal is a legitimate starting point under ADR-052's own wording rather than a default masquerading as fixed, and changing it would move every figure's seed-0 drawing — a large, unrelated blast radius for no gain against this issue's own locks. The narrower fix satisfies all four of them. The literal remains open as cosmetics (at radius 50 the default draws D very near the centre); it is not dishonesty and is not folded in here.
+
+### Measured after
+
+| stated radius | inside | outside | max `\|DO\|` |
+| ---: | ---: | ---: | ---: |
+| 1 | 2 | 22 | 4.807 |
+| 5 | 15 | 9 | 8.470 |
+| 50 | 16 | 8 | 66.486 |
+
+Both answers reachable at every radius, and the reach now scales with the stated figure.
+
+### The locks assert reachability and RATIOS, never coordinates
+
+A test pinned to coordinates would lock in a placement the student never stated — the defect this fixes, in test form. So: both answers reachable at each radius; the reach of a ten-times-larger figure is more than five times wider (the pre-fix signature was a ratio of exactly 1); a stated «D בתוך המעגל» / «D מחוץ למעגל» still holds at **every** configuration (structurally — a point a constraint names is not untethered); a polygon vertex is not rescaled; and seed 0 is unchanged. Verified to bite: 4 of the 8 assertions fail against pristine `sample.ts`.
+
+### Consequences
+
+`engine/sample.ts`: `untetheredFreePoints` and `figureScale` above `applySeed`, and one branch in its free-point arm.
+
+`untethered-free-point-1192.test.ts` (8). 2-D lane green.
+
+### ADR-524 Am. 1 — the connective guard is an ALLOWLIST of copulas, not a denylist of relations (#1248)
+
+**Status:** accepted, 2026-09-19 · **P1, mine** — introduced by ADR-524 hours earlier in round #1244, found while triaging the operator's T5 report. Never deployed (`prod/2026-09-19-3` predates it).
+
+**Requirements:** none (internal) — the promise is unchanged; a stated region stops being recorded as an equality. **Design:** [04](04-design.md) — the verbose-length frame’s connective guard. **LADDER stage:** the utterance normaliser, ahead of every value-bearing rule. **Amends** ADR-524; **restores** ADR-390 for lengths.
+
+**The defect.** «אורך הקטע BC > 10» — the student saying BC is GREATER THAN 10 — committed **`set-distance: 10`**. A stated REGION became an EQUALITY at its own bound. Measured, the whole family went the same way:
+
+```
+אורך הקטע BC > 10        -> set-distance:10        (before ADR-524: segment only, escalated)
+אורך הקטע BC < 10        -> set-distance:10
+אורך הקטע BC ≥ 10        -> set-distance:10
+אורך הקטע BC לפחות 10    -> set-distance:10
+הקטע BC > 10             -> set-distance:10
+```
+
+**And no gate could catch it.** That is what makes this the worst shape in the honesty taxonomy rather than merely a bug: before the change the `10` went unaccounted and the battery escalated the utterance; after it, the `10` *is* accounted for — by the wrong constraint. The figure commits green, the panel asserts a given the student never gave, and every tripwire reads clean. ADR-390 (#277) names this exact failure for angles; ADR-524 re-opened it for lengths.
+
+**Root cause — the shape of the guard, not its contents.** ADR-524's guard asked *"does the connective carry a relation?"* against a list: `CMP_BIG|CMP_SMALL|פי|times|יחס`. It had the comparison **words** and not the comparison **glyphs**, and it had no bound words at all.
+
+Adding `>`, `<`, `≥`, `≤`, «לפחות» and «לכל היותר» would have been the obvious repair and would have been wrong in the same way, because **the question a denylist asks here has no closed answer**: the ways a sentence can relate a length to a number are not enumerable, and every one this list misses is read as an equality. That is the [ADR-498](#adr-498) lesson arriving one level up — *any enumeration is a list that is already incomplete* — and ADR-524 quoted it while committing it.
+
+**The decision.** The guard is inverted. A rewrite to `SEG = value` fires only when the connective **is a copula**: nothing at all, `=`, or one of the few words that mean "is" (`הוא`, `היא`, `הם`, `הן`, `שווה`, `שווה ל`). Everything else is left exactly as the student wrote it.
+
+That question **is** closed — the ways to say "is" are finite — which is precisely why enumerating them is sound where enumerating relations was not.
+
+**This does not re-open what ADR-498/ADR-524 decided.** That decision governs **where the value is** — still positional, still no copula required to *find* it. This governs a different question: **whether the sentence is an equality at all.** Conflating the two is what produced the defect.
+
+**It fails CLOSED, deliberately.** An unfamiliar connective («בערך», «כמעט», a word nobody has thought of) is not rewritten; the value goes unaccounted and the battery escalates — the behaviour this construct had before ADR-524, and an honest one. The old guard failed OPEN, and a false equality invents a given, which is worse than a missed warning *and* worse than a false drop.
+
+**Hebrew only, and necessarily.** `LENGTH_CONNECTIVE` excludes Latin letters so it can never cross a label, so an English copula cannot reach this guard at all. `is`/`equals` were in the first draft of the allowlist and are removed as dead code — a test row asserting them found it. «BC = 10» is English's own way in.
+
+**Lock.** `length-copula-value.test.ts` gains a suite written as the CLASS: fifteen non-copula connectives — every glyph, both directions, the Hebrew and English comparison words, the bound words, a ratio — each asserting the **absence** of `set-distance`, never a particular outcome, so the lock cannot go green by re-implementing the bound rule. Five unfamiliar connectives assert the fail-closed behaviour. The copula rows assert the equality still forms and still equals the canonical «BC=10» parse, so a future narrowing of the allowlist goes red.
+
+**Consequences.** `parser/parse.ts`: `LENGTH_RELATION` (a denylist) becomes `LENGTH_COPULA` (an allowlist); the callback's branches swap. `length-copula-value.test.ts` grows from 25 to 53.
+
+## ADR-527 — The two cevian roles share a shape and not a rule (#1247)
+
+**Requirements:** [02](02-requirements.md) — an altitude to a side through one of its own endpoints is a supported given (it states a right angle at that vertex). **Design:** [04](04-design.md) — the cevian lowering is per-role. **LADDER stage:** parse. No engine, solver or render change. **Amends** ADR-525 (#1233).
+
+**Operator, 2026-09-19**, playing round #1244 hours after ADR-525 landed:
+
+> *"AB גובה לצלע BC - not accepted and it should. in this case its a right angle triangle"*
+
+He is right, and the refusal was mine.
+
+### What ADR-525 got wrong
+
+It shipped one predicate for both roles and called it *"the role's own definition"*. It is not — the clause `foot ∉ side` is right for a median and **wrong for an altitude**:
+
+| role | the foot being an endpoint of the side means | verdict |
+| --- | --- | --- |
+| median | the MIDPOINT of `BC` is `B` — so `BC` has zero length | impossible → refuse |
+| altitude | the perpendicular from `A` meets `BC` at `B` — a right angle at `B` | **ordinary** → must build |
+
+«AB גובה לצלע BC» is how an exam states a right triangle. ADR-525 refused it.
+
+### It never worked properly, so this is not a restoration
+
+Measured on `18f75b7e`, before ADR-525:
+
+```
+משולש ABC · AB גובה לצלע BC        builds, err null, ∠ABC forced to 90°  — via a hidden ~B minted on top of B
+ABC משולש ישר זווית · AB גובה לצלע BC   over-constrained: B coincides with its constructed target
+```
+
+The general case produced the right geometry through a junk duplicate point; the operator's own right-triangle case errored. **Both are wrong**, so the sentence is now lowered to what it actually says rather than to what it used to do.
+
+### The decision
+
+`cevianWellFormed` takes the role. `foot ∈ side` is refused for a median and admitted for an altitude — and when admitted, the emit is a **perpendicularity, not a `foot`**:
+
+```
+AB ⟂ BC          ->  segment(A,B)  segment(B,C)  set-perpendicular(A,B,B,C)
+AB גובה לצלע BC   ->  the same three commands, exactly
+```
+
+Emitting `foot(id: B, …)` was the cause of both old symptoms: it mints a point that already exists, which is the hidden `~B` and, where `B` is already pinned, the over-constrained error. No new point is needed — the foot the student named *is* a vertex the figure has.
+
+The `foot` rule's own spelling («B רגל האנך מ-A ל-BC») gets the same reading: one family, one answer.
+
+### Everything else ADR-525 established stands
+
+An apex ON the side it is drawn to is degenerate in **both** roles («BD גובה לצלע AB» is a zero-length altitude), and an apex that IS its own foot is degenerate in both. The operator played those as T7/T8/T9 and confirmed them; they are unchanged and still locked.
+
+### ⚠ Two rows of ADR-525's lock were MOVED, and that is recorded rather than quiet
+
+`cevian-well-formed.test.ts` asserted «AB גובה לצלע BC» and «AC גובה לצלע BC» as refusals. **The full suite went red on exactly those two**, which is the gate working: they encoded the rule this ADR overturns.
+
+They were **not deleted**. They moved to `altitude-foot-at-vertex.test.ts` with the opposite expectation, and a comment stands in their place in the old table explaining why — a lock that simply disappears looks like coverage that was never written. Relaxing a lock to make a change pass is the tripwire this repo names; relaxing one because the operator overturned the rule it encoded is a different act, and the difference is only visible if it is written down.
+
+### Lock
+
+`altitude-foot-at-vertex.test.ts` (17). The headline is a **parity assertion** — «AB גובה לצלע BC» must produce the *same commands* as «AB ⟂ BC» — which this case makes available and which cannot go green by re-implementing the perpendicular rule. Plus: no point minted and no hidden `~` duplicate; the angle at the foot driven to 90°; all seven of ADR-525's refusals still refused; **the median and the altitude asserted to disagree on the SAME letters** (the cell that proves the split is by role, not a blanket relaxation); and a second right angle on an already-right triangle still refused with the conflict named. Verified to bite: 7 of the 17 fail against pristine `parse.ts`.

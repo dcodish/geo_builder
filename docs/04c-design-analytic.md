@@ -129,6 +129,19 @@ happen again: `AB = 4√5` is a metric given whose symbols are `A` and `B`, and 
 form. The set was **measured against those corpus lines before the branch was written**, which is the
 standard this tree holds itself to after being bitten twice.
 
+**The circle numeral is one token, used by four rules** ([ADR-AG-118](06c-decisions-analytic.md#adr-ag-118)).
+`CIRCLE_NUMERALS` (the lookahead that keeps a centre NAME from eating a numeral) and
+`CIRCLE_NUMERAL_RUN` (the capture that becomes the circle's id and name) are the whole of it, and the
+Hebrew/English × centre/numeral rules take them. Widening the token to admit `[1-5]` is therefore the
+entire digit feature — `circle-1` and «מעגל 1» fall out of the existing id and label construction,
+and no rule learned a digit case of its own.
+
+The range 1–5 **mirrors the Roman range exactly**, so the two halves of the token share one
+justification instead of acquiring two. And the `(?=[\s:])` separator lookahead, which #1059 added
+to stop `[IVX]` swallowing the `x` of «המעגל x²+y²−2ax−2x=0», is what now also keeps «המעגל
+4x²+4y²=1» anonymous: the `x` after the digit is not a separator, so the numeral branch cannot claim
+the coefficient. One device, two traps.
+
 **`Curve.kind` is therefore an EXPECTATION, not an answer**, and optional. `classify` fits six
 coefficients and names the family; the expectation only lets a refusal be specific ("you wrote «אליפסה»
 and this is a hyperbola" — R7). Two consequences follow, and the second is the subtle one:
@@ -305,6 +318,50 @@ to tell them apart, set at the M1 boundary; `evaluate` keeps both, because the s
 draws only the stated ones. Restating a carrier's equation on its own line **promotes** it — one
 object, now drawn, reported as a change rather than as a restatement.
 
+## A cevian lowers to its WHOLE definition ([ADR-AG-109](06c-decisions-analytic.md#adr-ag-109))
+
+«AD תיכון לצלע BC» and «AD גובה לצלע BC» are conjunctions, and the rule emits every half:
+
+| the student writes | incidence | the role's own condition |
+| --- | --- | --- |
+| `AD תיכון לצלע BC` | `on-line-2pt D B C` | `midpoint D B C` |
+| `AD גובה לצלע BC` | `on-line-2pt D B C` | `perpendicular A D B C` |
+
+The incidence column is the one that was missing (#1232). `perpendicular` is a pure DIRECTION
+residual — two vectors whose dot product is driven to zero — so emitting it alone placed no foot, and
+the tool drew a height that missed `BC` at every seed with no fault reported. `midpoint` implies its
+own incidence, which is why the median leg read correctly while stating one constraint; the incidence
+is stated for both roles anyway, so the conjunction lives in one place and the legs cannot drift.
+
+**Not a compound `foot` kind**, which is what 2-D uses. Here the two halves stay separate constraints
+so a refusal can name WHICH one failed, and so a student who already wrote «AD ⊥ BC» has that half
+recognised as known by `canonicalConstraint`. The redundancy on the median costs no freedom:
+`carrierDofOf` measures `carriers − rank(J)`, and a dependent row adds no rank.
+
+**No `between` selector**, unlike the table above — the foot is on the LINE. See R103.
+
+### The TARGET is an alternation, and the apex resolves it ([ADR-AG-117](06c-decisions-analytic.md#adr-ag-117))
+
+The side used to be a mandatory run with «במשולש ABC» as an optional trailing decoration *after* it,
+so the triangle was matched as text and could never be the thing that identifies the target.
+`CEVIAN_TARGET_HE` / `CEVIAN_TARGET_EN` make it an alternative instead, and the lowering resolves
+whichever branch matched into the same two letters:
+
+| the student writes | `u`, `v` come from | refusal when it will not resolve |
+| --- | --- | --- |
+| `AD תיכון לצלע BC` | the run, verbatim | — |
+| `AD תיכון ל-BC` | the run, verbatim (maqaf allowed) | — |
+| `AD תיכון במשולש ABC` | the ring minus the apex | `apex-not-a-vertex` · `bad-arity` |
+
+Everything downstream is untouched: the same four facts, the same gates, the same messages — which
+is what the lock asserts, as a PARITY between the two spellings rather than as expectations of its
+own ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)).
+
+Two refusals, not one, because one message cannot be true of both failures: «במשולש ABCD» is a noun
+disagreeing with its own vertex count (`bad-arity`), while «XD … במשולש ABC» is a perfectly good
+triangle the apex is not part of (`apex-not-a-vertex`). Reusing `degenerate-role` there would have
+told the student their apex "lies on the side itself", which it does not.
+
 ## The ask lane ([ADR-AG-044](06c-decisions-analytic.md#adr-ag-044))
 
 Two surfaces, one grammar. The main input CONSTRUCTS; the data panel's own box ASKS, and an ask is
@@ -323,6 +380,120 @@ vocabulary added on one surface arrives on the other with nothing to wire.
 The answer passes `isKnowledge`, exactly as an inventory row does, and an unanswerable question is
 worded from the FIGURE's freedom: *not fixed yet* when it still has some, *cannot be computed* when
 it does not, and *I did not understand* when the question named nothing the figure has.
+
+### The resolver seam ([ADR-AG-088](06c-decisions-analytic.md#adr-ag-088))
+
+Each question branch used to resolve its own operand its own way, so a referencing capability added
+to one was missing from the others in silence — «שיפוע AB» answered on a triangle while «משוואת AB»
+reported the name missing, and the click menu could not see the side at all.
+
+`app/lines.ts` is the one place either direction of that question is answered:
+
+| | asks | answers |
+| --- | --- | --- |
+| `lineNamed(figure, name)` | which line is this, as drawn? | the coefficients, **normalized by the leading one** |
+| `lineNamesOf(construction)` | which names denote a line? | named line curves · stated segments · every polygon side |
+| `segmentName(construction, id)` | what is the drawn side the student clicked called? | its two-letter name |
+
+The two halves are tied by an invariant the suite asserts by calling both: **everything the
+enumeration offers resolves, and every sentence the menu composes is one the lane answers.** The
+implication runs one way only — an anonymous curve resolves but is deliberately not enumerated,
+because it is named by its equation (ADR-AG-056) and that is a poor menu entry.
+
+Normalizing is by the LEADING coefficient, not by `hypot(a, b)`: the latter is the textbook normal
+form and makes a rational line irrational, which ADR-AG-085's fraction clearing then cannot undo.
+
+### The measure grammar's operands ([ADR-AG-089](06c-decisions-analytic.md#adr-ag-089))
+
+`parseLengthExpr` reads a distance as a set of **frames** — one small pattern per spelling, each
+handing over exactly two operands — and then decides the roles **once**, from the operand names:
+
+| the name | what it can be |
+| --- | --- |
+| `A`, `A1` | a point, and nothing else |
+| `AB`, `l1`, `ℓ₁` | a line — a pair of vertices, or a named curve |
+
+So `point + point` is a plain distance (the same term `AB` produces), and `point + line` is the
+distance to that line **in either order**. The classification is purely syntactic, which is what lets
+this module keep knowing nothing about objects — the layering the rest of the file maintains.
+
+A pair of LINE operands is left unconsumed: the parallel-lines distance is a capability rather than a
+spelling, and it is not built here.
+
+### Curve identity and the promotion path ([ADR-AG-090](06c-decisions-analytic.md#adr-ag-090))
+
+Because ids are content-derived, «נקודה B על הישר y=x» and a later «y=x» are ONE object: the second
+sentence PROMOTES the first from carrier to stated (#1076). The promotion carries the label — an
+anonymous curve's identity is its equation (ADR-AG-056), so an object that loses `eqSrc` becomes one
+nobody can name, and the crossing rings vanish for a line the student can see.
+
+Two rules hold the seam shut: the carrier is minted WITH its `eqSrc` (the parser has the text), and
+the promotion merges the incoming label over the prior, never overwriting a name the student gave.
+The invariant to test against is equality, not appearance — **a promoted carrier and a curve stated
+outright are the same object.**
+
+A curve the tool DERIVES has no text to carry, and naming it from its computed coefficients is a
+separate question with an honesty gate of its own (#1202).
+
+### The resolver reaches the SOLVER too ([ADR-AG-091](06c-decisions-analytic.md#adr-ag-091))
+
+`app/lines.ts` was the first home of "what line does this name denote", because the ask lane and the
+click menu were the callers. #1201 found a third, one layer below: the **residual** of
+«המרחק מ-A לישר l1 = 5» cannot be computed without that same answer.
+
+So the resolution lives in `engine/lines.ts` and everything builds on it — the surfaces through
+`app/lines.ts`, the solver through `lineAtOf`, which `evaluate.ts` constructs beside `curveAtOf` and
+hands to `residual`. It resolves against a CONFIGURATION (a point-by-id lookup plus a curve-by-name
+lookup) rather than a `Figure`, because the solver asks at every iterate.
+
+**`null` from a residual means "cannot be judged at this iterate", and the solve turns it into `0`** so
+the residual vector keeps its dimension. That is safe only while `null` is transient. A term that can
+never be resolved returns `null` forever and is then a permanent false green — which is what #1201 was.
+
+### Naming paths and the shared check ([ADR-AG-092](06c-decisions-analytic.md#adr-ag-092))
+
+A figure has several routes that give something a letter — the centre of a circle (#1109), a crossing
+(#1025), a midpoint or a triangle centre, and the rename family still to come (#1154). Each of them
+ends at the same place: a `derived` object is minted in `applyFact`.
+
+That mint is where "one position, one name" is enforced, and putting it anywhere else is the patch
+shape — the class had already been reported for crossings (#1113) and measured again on curves (#1126)
+before it was reported for centres.
+
+```
+P מרכז המעגל I   →  ● P
+O מרכז המעגל I   →  refused: «כבר יש שם לנקודה הזו: P»
+```
+
+**The test is structural, not positional.** `engine/sameDerivation.ts` asks whether two `DerivedRule`s
+define the same point — the same unordered pair for a midpoint, the same three vertices for a triangle
+centre, the same RING (not set) for a quadrilateral's diagonal meet, the same parent for a circle
+centre. No coordinates, no tolerance, and its switch is exhaustive so a new rule must answer the
+question rather than inherit "never the same".
+
+Structural scoping is also what keeps the check inside what was ruled: two independently stated points
+that merely coincide are a different sentence, and are deliberately untouched.
+
+### The relation rule's notations ([ADR-AG-093](06c-decisions-analytic.md#adr-ag-093))
+
+One relation, three ways to write it, one handler:
+
+| pattern | admits | connector |
+| --- | --- | --- |
+| `RELATION_HE` | «AB מקביל DC», «הצלע AB מאונכת לצלע BC» — the full inflection run | optional |
+| `RELATION_EN` | «AB is parallel to DC», «AB perpendicular DC» | optional |
+| `RELATION_SYM` | «AB ∥ DC», «AB||DC», «AB ⊥ DC», «AB ⟂ DC» | none — and no spaces required |
+
+All three resolve their operands through the same `direction()` and emit the same `relation`
+constraint, so a segment, a polygon side, a named line and an axis mean the same thing in every
+notation. A symbol is a second SPELLING of one rule, never a second rule.
+
+**`//` is excluded on purpose.** The relation rule runs before the equation parser, so a symbol that
+also appears in real mathematics would let it claim a division and refuse it as a bad operand instead
+of letting it fall through. The narrower symbol set is the deliberate trade.
+
+The catalog carries the symbol rows, which is what keeps them alive: the guard re-parses every row in
+both languages, so a notation that stops parsing fails the suite rather than becoming documentation.
 
 ## A circle on a point ([ADR-AG-045](06c-decisions-analytic.md#adr-ag-045))
 
@@ -725,3 +896,64 @@ inherits the right noun instead of repeating the defect.
 The locale holds four whole sentences, not one with a noun slotted in — Hebrew gender runs through the
 clause («הנקודה … הוגדרה» vs «הישר … הוגדר»). An anonymous curve has no name the student wrote, so it
 gets the kind-free wording rather than a guessed noun.
+
+## The canvas's bidi chokepoint ([ADR-AG-087](06c-decisions-analytic.md#adr-ag-087))
+
+The renderer has **one** place where a label's text is decided: `buildScene`. Every channel that can
+carry text — a locus label, a measure label, a segment's pinned length, a circle's centre, a
+construction mark — is produced there, and every one now passes through a single `lbl()` seam that
+isolates the LTR technical runs inside it.
+
+This is the same argument the module already made for *formatting* (#723/#1029): a value's on-screen
+form is a display concern, so it is decided at the display boundary rather than at each caller. Bidi
+isolation is the same kind of decision and belongs in the same place. The property it buys is the one
+that matters — **a label channel added later is isolated by construction**, because it cannot be added
+anywhere else.
+
+### Why not inject it
+
+`SceneKnowledge` already carries caller-owned data (`marks`, `loci`, `crossings`), so an `isolate`
+callback would have fitted the existing seam. It was rejected: an injected isolator is one a caller can
+forget, and forgetting is precisely the defect — the panel remembered, the canvas did not. A second
+consideration settles it even where the caller is careful: two kit instances can be built with
+different `extraCore` alphabets, and then the panel and the canvas isolate the same string two
+different ways.
+
+So the kit lives in `i18n/bidi.ts`, a module with no i18next in it, and `i18n/index.ts` re-exports it.
+The renderer stays a pure consumer — it imports two lines, not a bootstrap — which is the constraint
+that kept it out of `i18n/` in the first place.
+
+### What is deliberately left raw
+
+`crossings[].sentence` is not a label. It renders as an SVG `<title>` (a tooltip, laid out by the
+browser's own bidi) and the same string is **submitted back as an utterance** when the student clicks
+the ring. Format controls belong in strings that are displayed, never in one that round-trips into the
+parser.
+
+Axis ticks and point names do not pass through it either, and that is a narrower claim than it
+sounds: they are not composed strings. A tick is `String(r)` for a number the axis chose and a point
+carries its own id — single-script by construction, with no Hebrew to mix and nothing to reorder. The
+seam covers every channel whose text is BUILT from parts, which is every channel where the defect can
+occur.
+## A curve reads as an equation plus its properties ([ADR-AG-097](06c-decisions-analytic.md#adr-ag-097))
+
+`curveParts(c: NumCurve) → { equation, details? }` is the tree's ONE curve-text decision, in
+`src-analytic/app/curveText.ts` beside `lineText`, which moved there with it.
+
+| kind | `equation` | `details` |
+| --- | --- | --- |
+| line | `ax + by + c = 0` | — (it was already nothing but its equation) |
+| circle | `(x − h)² + (y − k)² = r²` | `O(h, k), r` |
+| parabola | `y² = 2p·x` | `F(p/2, 0)`, directrix `x = −p/2` |
+| ellipse | `x²/a² + y²/b² = 1` | `a`, `b`, `F₁`, `F₂` |
+
+Notation, not arithmetic, so the same rules the line terms follow apply throughout: a zero offset writes
+no bracket (`x²`, not `(x - 0)²`), a negative one flips the sign (`(x + 2)²`, not `(x - -2)²`), and a unit
+coefficient is suppressed (`y² = x`, not `y² = 1x`). Every number goes through `fmtAnalytic`, this tree's
+one display formatter, so the panel, the canvas and the ask lane cannot round differently.
+
+**Two callers, one import.** The panel renders `equation` on the row and `details` inside the same
+`<details>` disclosure the ask lane's working uses (ADR-AG-094) — open by default, because for a circle
+given by its centre those properties ARE the givens. The ask lane answers `«משוואת …»` with `equation`.
+It used to take the formatter as a PARAMETER; it imports it now, which is what makes "one formatting for
+both surfaces" a fact rather than a convention every call site has to keep.

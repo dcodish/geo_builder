@@ -1545,6 +1545,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "BE/ED = 1:3",
+    "winner": "lengthRatioClaim",
+  },
+  {
+    "lang": "he",
+    "text": "BE/ED = 1:3",
+    "winner": "lengthRatioClaim",
+  },
+  {
+    "lang": "en",
     "text": "ℓ is not parallel to plane π1 for every m",
     "winner": "neverParallelClaim",
   },

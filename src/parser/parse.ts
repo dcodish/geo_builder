@@ -1975,7 +1975,15 @@ const foot: Rule = (s) => {
     new RegExp(String.raw`([A-Za-z]\d*)\b.*?רגל.*?(?:מהנקודה\s*|מ-?\s*)([A-Za-z]\d*)\b.*?(?:אל\s*|ל-?\s*)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`),
   );
   const m = en ?? he;
-  return m ? [{ type: 'foot', id: up(m[1]), from: up(m[2]), a: up(m[3]), b: up(m[4]) }] : null;
+  if (!m) return null;
+  // #1233 — the same incidence, stated in the third spelling the family owns: «F רגל האנך מ-B ל-AB»
+  // put F exactly on B and reported success.
+  const [id, from, a, b] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
+  if (!cevianWellFormed(from, id, [a, b], 'altitude')) return null;
+  // #1247 — «B רגל האנך מ-A ל-BC» names an existing vertex as the foot: a right angle at B, not a
+  // new point. The same reading the altitude rule gives its own spelling.
+  if (id === a || id === b) return altitudeAtVertex(from, id, [a, b]);
+  return [{ type: 'foot', id, from, a, b }];
 };
 
 /** "M is the midpoint of AB" / "M אמצע AB" / "C is the midpoint of OB". */
@@ -8077,6 +8085,79 @@ const roleSideLine: Rule = (s, ctx) => {
 };
 
 /**
+ * A CEVIAN IS DEFINED BY AN INCIDENCE, AND THE SENTENCE MUST HONOUR IT (#1233).
+ *
+ * «תיכון»/«גובה» does not merely name a segment — it asserts that the segment runs from a vertex to a
+ * point on the OPPOSITE side. A sentence whose letters contradict that is degenerate by its letters
+ * alone, before any geometry is attempted: «BD גובה לצלע AB» asks for the perpendicular from B to a
+ * side B is an endpoint of, whose foot is B itself.
+ *
+ * The check EXISTED — as `opp[0] === apex || opp[1] === apex` inside the median rule — and lived in one
+ * of the several rules that need it. That is the classic docs/17 shape: a gate written where the bug
+ * was reported rather than where the class lives. Measured on «משולש ABC», the same five degenerate
+ * cells behaved five different ways depending on which rule happened to read the sentence:
+ *
+ *   BD תיכון לצלע AB   escalates (the gate)      BD גובה לצלע AB   BUILDS, |BD| = 0, no error
+ *   AD תיכון לצלע AB   escalates (the gate)      AD גובה לצלע AB   BUILDS silently, no coincidence
+ *   AB תיכון לצלע BC   over-constrained          AB גובה לצלע BC   BUILDS a hidden ~B on top of B
+ *                                                F רגל האנך מ-B ל-AB  BUILDS, F coincides with B
+ *
+ * So the predicate is stated once, as the DEFINITION rather than as the observed failures, and every
+ * rule that emits a cevian's foot asks it.
+ *
+ * 2-D's answer is `return null` — the sentence escalates to the LLM — which is what the median gate
+ * has always done and what this hoist keeps. It means a student gets "I did not understand" for a
+ * sentence the tool understood perfectly, and «AB תיכון לצלע BC» trades a solver message for that
+ * escalation. An OWNED refusal that names the statement is the better answer and is a larger change
+ * (2-D has no refusal vocabulary equivalent to the analytic tree's `ParseFailure` codes); it is split
+ * out deliberately rather than smuggled in here. The analytic sibling #1231 answers it the other way
+ * in a tree that HAS that vocabulary.
+ */
+/**
+ * THE TWO ROLES SHARE A SHAPE AND NOT A RULE (#1247).
+ *
+ * ADR-525 applied ONE predicate to both and called it "the role's own definition". It is not: the
+ * clause `foot ∉ side` is right for a median and WRONG for an altitude.
+ *
+ *   «AB תיכון לצלע BC»  — the MIDPOINT of BC is B ⇒ BC has zero length. Impossible. Refuse.
+ *   «AB גובה לצלע BC»   — the perpendicular from A meets BC at B ⇒ the angle at B is 90°.
+ *                          Ordinary, and the way an exam states a right triangle. MUST build.
+ *
+ * The operator reported the second, refused, the day ADR-525 landed. Measured before that ADR it did
+ * not work properly either: it produced the right geometry through a hidden `~B` minted on top of B,
+ * and errored outright when B was already pinned. So this is not a restoration — the sentence now
+ * lowers to what it actually says (see `altitudeAtVertex`).
+ *
+ * Everything else ADR-525 established is unchanged and still load-bearing: an apex ON the side it is
+ * drawn to is degenerate in BOTH roles («BD גובה לצלע AB» is a zero-length altitude), and an apex that
+ * IS its own foot is degenerate in both.
+ */
+type CevianRole = 'median' | 'altitude';
+const cevianWellFormed = (apex: Id, foot: Id, side: readonly [Id, Id], role: CevianRole): boolean =>
+  apex !== side[0] &&
+  apex !== side[1] &&
+  apex !== foot &&
+  // a median's foot is the midpoint and can only be an endpoint if the side is degenerate; an
+  // altitude's foot is an endpoint exactly when the angle there is right
+  (role === 'altitude' || (foot !== side[0] && foot !== side[1]));
+
+/**
+ * The altitude whose foot IS an endpoint of the side: «AB גובה לצלע BC» ⇒ AB ⟂ BC (#1247).
+ *
+ * It mints NO point — the foot the student named is a vertex the figure already has, and emitting a
+ * `foot` command for it was what produced the hidden `~B` and the over-constrained error. The
+ * lowering is exactly what the student's own «AB ⟂ BC» produces, which is what the lock asserts.
+ */
+const altitudeAtVertex = (apex: Id, foot: Id, side: readonly [Id, Id]): Command[] => {
+  const other = side[0] === foot ? side[1] : side[0];
+  return [
+    { type: 'segment', a: apex, b: foot },
+    { type: 'segment', a: foot, b: other },
+    { type: 'set-perpendicular', a: apex, b: foot, c: foot, d: other },
+  ];
+};
+
+/**
  * "median from A in ABC" / "תיכון מ-A במשולש ABC" — the median from a vertex to the
  * midpoint of the opposite side. Emits the triangle (idempotent if it exists),
  * the opposite-side midpoint, and the segment to it.
@@ -8118,7 +8199,9 @@ const median: Rule = (s, ctx) => {
         opp = edges[0];
       }
     }
-    if (opp[0] === apex || opp[1] === apex) return null;
+    // #1233 — the gate that used to read only `apex ∈ opp` here is now the shared definition, so the
+    // altitude and the foot rule cannot drift from it again.
+    if (!cevianWellFormed(apex, foot, opp, 'median')) return null;
     return [
       { type: 'midpoint', id: foot, a: opp[0], b: opp[1] },
       { type: 'segment', a: apex, b: foot },
@@ -8290,6 +8373,9 @@ const altitude: Rule = (s, ctx) => {
     if (apexes.length !== 1) return null;
     const apx = apexes[0];
     const foot2 = existingFootOf(ctx, apx, sd[0], sd[1]) ?? freeLabel([apx, ...sd, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']); // reuse (Am. 2)
+    // #1233 — the apex is derived from the polygon here, so this cannot currently be degenerate; asked
+    // anyway, because "cannot currently be" is what the median's gate said about the altitude.
+    if (!cevianWellFormed(apx, foot2, sd, 'altitude')) return null;
     return [
       { type: 'foot', id: foot2, from: apx, a: sd[0], b: sd[1] },
       { type: 'segment', a: apx, b: foot2 },
@@ -8299,7 +8385,13 @@ const altitude: Rule = (s, ctx) => {
   const sideM = s.match(/(?:\bto\s+(?:the\s+)?(?:side\s+)?|\bon\s+side\s+|אל\s*(?:ה?צלע\s+)?|על\s+ה?צלע\s+|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // explicit opposite side "to BC"
   let p: string, q: string;
   let tri: Id[] | null = null;
-  if (sideM && up(sideM[1]) !== apex) {
+  // #1233 — this used to read `sideM && up(sideM[1]) !== apex`: a HALF gate that checked only the
+  // stated side's FIRST letter, and whose answer to a degenerate statement was to discard it and derive
+  // a different side from the figure. «AD גובה לצלע AB» therefore drew the altitude to **BC** — the
+  // student stated one side and silently got another, with no note, which is the honesty invariant
+  // ("no stated given is ever silently dropped") failing at a seam nobody had looked at. A STATED side
+  // is a given: it is used, and `cevianWellFormed` below decides whether the statement stands.
+  if (sideM) {
     p = up(sideM[1]);
     q = up(sideM[2]);
   } else {
@@ -8353,8 +8445,15 @@ const altitude: Rule = (s, ctx) => {
   // Auto-name the foot avoiding EVERY existing figure point, not just the apex/base — otherwise a second
   // altitude re-picks 'F' and silently REDEFINES the first altitude's foot (a §6-honesty collision).
   const f = namedFoot ?? existingFootOf(ctx, apex, p, q) ?? freeLabel([apex, p, q, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']); // reuse (Am. 2)
+  // #1233 — the altitude had NO counterpart to the median's apex gate, so «BD גובה לצלע AB» built a
+  // zero-length altitude and reported success. Asked HERE, at the single emit point, so every way the
+  // apex and the side are resolved above is covered by one check.
+  if (!cevianWellFormed(apex, f, [p, q], 'altitude')) return null;
   const cmds: Command[] = [];
   if (tri) cmds.push({ type: 'triangle', ids: [tri[0], tri[1], tri[2]] });
+  // #1247 — the foot may BE an endpoint of the side, and then the sentence is a right angle at that
+  // vertex rather than a new point. Deciding it here, at the one emit, keeps both readings in one place.
+  if (f === p || f === q) return [...cmds, ...altitudeAtVertex(apex, f, [p, q])];
   cmds.push({ type: 'foot', id: f, from: apex, a: p, b: q });
   cmds.push({ type: 'segment', a: apex, b: f });
   return cmds;
@@ -9757,8 +9856,32 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
   // the false DROP broke a working input.
   // "פעמים"/"times" end in a plural suffix but head a RATIO ("גדול 2 פעמים", "2 times CD") — excluded,
   // that digit is a magnitude.
-  const counted = raw.replace(/(?<![\d.,])(?<!פי\s)\d+\s+(?=(?!פעמים)[א-ת]+(?:ים|ות)(?![א-ת])|(?!times\b)[A-Za-z][a-z]+s(?![A-Za-z]))/g, ' ');
-  const s = counted.replace(/[A-Za-z]\d*/g, ' ');
+  // Both blanking passes are LENGTH-PRESERVING (#1161): the sign lookbehind below reads the
+  // letter-bearing text at the SAME index as the digit match in `s`, so a blank must occupy exactly
+  // the span it replaced. Every consumer downstream separates on optional whitespace, so the widened
+  // runs are invisible to it.
+  const blank = (m: string): string => ' '.repeat(m.length);
+  const counted = raw.replace(/(?<![\d.,])(?<!פי\s)\d+\s+(?=(?!פעמים)[א-ת]+(?:ים|ות)(?![א-ת])|(?!times\b)[A-Za-z][a-z]+s(?![A-Za-z]))/g, blank);
+  const s = counted.replace(/[A-Za-z]\d*/g, blank);
+  // #1161 (ADR-523) — the scan is SIGN-AWARE. A stated number’s leading minus belongs to the number:
+  // «E=(-1,7)» states −1, and reading it unsigned hunted for an account for +1, found only −1 among
+  // the payloads, and reported a dropped given against a parse that was perfectly faithful. That is a
+  // FALSE POSITIVE in an honesty gate — the mirror image of what the gate exists for — and it escalated
+  // a construction 2-D deliberately supports, burning a paid fallback call and letting the LLM re-roll
+  // a right answer. The class is ANY command carrying a negative payload (a coordinate, a signed
+  // distance, whatever a future construct lowers to); exempting `free-point` would be the per-input
+  // patch this rule forbids.
+  //
+  // A minus is a SIGN only where no operand can precede it — start of text, or after an opener, a
+  // separator or an operator. Everywhere else it is a BINARY minus or a Hebrew MAQAF, and reading
+  // either as a sign would invert a stated magnitude and cause the false DROP this gate’s doctrine
+  // forbids (a false account only suppresses a warning; a false drop breaks a working input):
+  //   «(4-0)/(3-0)»  digit before        → subtraction
+  //   «x-3y=0»       Latin letter before  → subtraction
+  //   «ב-5 ס"מ»       Hebrew letter before → maqaf, not a sign
+  // Read on `counted`, which still carries its letters, at the index the match has in `s`.
+  const SIGN_CONTEXT = /(?:^|[([{,;=<>≤≥:*·+\-/√])\s*$/;
+  const negAt = (i: number): boolean => counted[i - 1] === '-' && SIGN_CONTEXT.test(counted.slice(0, i - 1));
   // A DIAMETER given lowers to radius = d/2 (ADR-259). Checked on the UN-blanked text: blanking wipes the
   // English keyword "diameter" (each Latin letter → space), so the number's radius half would look dropped.
   const hasDiameter = /diameter|קוטר/i.test(raw);
@@ -9815,25 +9938,29 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
     const i = m.index!;
     if (spans.some(([x, y]) => i >= x && i < y)) continue;
     spans.push([i, i + m[0].length]);
-    const numV = evalTerm(m[1]);
+    const sign = negAt(i) ? -1 : 1; // #1161 — «= -3/4» states −0.75, not 0.75
+    const numV = sign * evalTerm(m[1]);
     const denV = m[2] !== undefined ? evalTerm(m[2]) : 1;
     const val = denV !== 0 ? numV / denV : numV;
-    if (!ok([val, numV, denV]) && !seen.has(m[0])) {
-      seen.add(m[0]);
+    const key = (sign < 0 ? '-' : '') + m[0];
+    if (!ok([val, numV, denV]) && !seen.has(key)) {
+      seen.add(key);
       dropped.push(val);
     }
   }
   for (const m of s.matchAll(/\d+(?:\.\d+)?/g)) {
     const i = m.index!;
     if (spans.some(([x, y]) => i >= x && i < y)) continue;
-    const n = parseFloat(m[0]);
+    const neg = negAt(i); // #1161 — the sign is part of the stated number
+    const n = (neg ? -1 : 1) * parseFloat(m[0]);
     const rest = s.slice(i + m[0].length);
     const cands = [n];
     if (/^\s*π/.test(rest)) cands.push(n / 2, Math.sqrt(n)); // nπ — circumference/area sizes lower to a radius
     if (/^\s*%/.test(rest)) cands.push(n / 100); // n% — lowers to a fraction
     if (hasDiameter) cands.push(n / 2); // "diameter 10" / "קוטר 10" → radius d/2 (ADR-259)
-    if (!ok(cands) && !seen.has(m[0])) {
-      seen.add(m[0]);
+    const key = (neg ? '-' : '') + m[0];
+    if (!ok(cands) && !seen.has(key)) {
+      seen.add(key);
       dropped.push(n);
     }
   }
@@ -9999,6 +10126,93 @@ const normalizeWordEquality = (s: string): string =>
     .replace(new RegExp(String.raw`\b(?:is|are)\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:the\s+)?(?:angle|∠|∢|arcs?|⌢)\s*${LABEL})`, 'gi'), '= ');
 
 /**
+ * A trailing UNIT word is not part of the value (#1157).
+ *
+ * «BC = 10 יחידות» — an ordinary student line — was `not-handled`, while «זווית ABC = 40 מעלות» and
+ * «רדיוס המעגל O הוא 5 ס"מ» both worked: the angle lane and the radius lane had each grown their own
+ * unit tolerance and the LENGTH lane had none. That is the same per-lane enumeration ADR-498 named,
+ * one level down. Stripped HERE, at the one boundary every rule reads, so a unit costs nothing in any
+ * construct instead of each lane paying for it separately.
+ *
+ * Requires a DIGIT before it and a word boundary after, so a unit can never be taken out of a label
+ * run or the middle of a Hebrew word. «מעלות» is deliberately absent — a degree is a unit the angle
+ * rules read as meaning, not noise.
+ */
+const VALUE_UNIT = String.raw`(?:יחידות|יחידה|יח['׳]|ס"?מ|מ"?מ|מטרים|מטר|cm|mm|units?)`;
+const VALUE_UNIT_RX = new RegExp(String.raw`(?<=\d)\s*${VALUE_UNIT}(?![א-תA-Za-z])`, 'gi');
+const stripValueUnits = (s: string): string => s.replace(VALUE_UNIT_RX, '');
+
+/**
+ * THE COPULA IS NOT PART OF THE LENGTH VALUE'S VOCABULARY (#1157) — the length twin of
+ * [ADR-498](../../docs/06-decisions.md)'s `angleValueOf`, and the same defect one construct over.
+ *
+ * The verbose frame «אורך/הצלע/הקטע <seg> … <value>» located its value by a list of copulas —
+ * «הוא», «היא», «שווה», «שווה ל» — so «אורך הקטע BC = 10» (an explicit `=` and a bare number) emitted
+ * the segment and DROPPED the 10, as did the juxtaposed «אורך הקטע BC 10». ADR-498's own words apply
+ * verbatim: *any enumeration is a list that is already incomplete against its sibling — the seventh
+ * spelling reopens the hole exactly as the sixth did.* Adding `=` to the alternation is that seventh
+ * spelling, and standing rule 1 forbids it.
+ *
+ * So the value is found by POSITION. Whatever sits between the segment and its value is CONNECTIVE,
+ * defined by what it is NOT: a run carrying no operand of its own — no digit, no Latin letter, no
+ * value glyph — which is all a copula, an `=`, a maqaf or punctuation can be. The connective
+ * therefore cannot cross another operand, so the rewrite stays local and a compound line
+ * («אורך הקטע BC = 10, AB = 5») is still split by `multiStatement` exactly as before.
+ *
+ * ONE GUARD, and it is the one ADR-498 says is load-bearing: **a connective that carries a RELATION
+ * is not a connective** — it is the statement's operator, and the number after it is a BOUND or a
+ * RATIO, never the length itself (ADR-390; ADR-498's "a symbolic bound would have been stolen"). So
+ * «אורך הקטע BC גדול מ-10» and «הצלע BC גדולה פי 2 מ-AB» are left untouched for the bound and ratio
+ * rules, instead of being rewritten into a silently WRONG «BC = 10» / «BC = 2».
+ *
+ * The guard is applied to the CONNECTIVE, not to the whole line, and this is deliberate. A whole-line
+ * test was tried first and is wrong twice over: it MISSES «גדולה פי 2» (the comparative and the number
+ * are not adjacent, so `COMPARES_WITH_NUMBER` does not fire) and it over-refuses a compound line whose
+ * OTHER statement happens to carry a comparison («אורך הקטע BC = 10, AB > 5»). The relation that
+ * matters is the one standing between this segment and this value. Built from the comparison
+ * vocabulary the bound rules already own — not a second copy of it.
+ */
+const LENGTH_NOUN = String.raw`(?:אורך|הצלע|הקטע)`;
+const LENGTH_CONNECTIVE = String.raw`[^A-Za-z0-9√()]*`;
+const VERBOSE_LENGTH = new RegExp(
+  String.raw`${LENGTH_NOUN}\s+(${LABEL}\s*${LABEL})(${LENGTH_CONNECTIVE})(?=[√\d(])`,
+  'g',
+);
+/**
+ * THE CONNECTIVE MUST BE A COPULA — an ALLOWLIST, and the distinction is the whole fix (#1248).
+ *
+ * This guard shipped as a DENYLIST of relation words (`CMP_BIG|CMP_SMALL|פי|times|יחס`) and was wrong in
+ * the way every denylist is wrong: it was incomplete, and what it missed it read as an equality.
+ * Measured on the shipped build, «אורך הקטע BC > 10» — the student saying BC is GREATER THAN 10 —
+ * committed `set-distance: 10`. A stated REGION silently became an EQUALITY at its own bound, which is
+ * ADR-390's cardinal sin, and the honesty gates could not catch it because the `10` was now accounted
+ * for. It committed green. «≥», «<», «לפחות» and «לכל היותר» all did the same.
+ *
+ * The denylist could not have been completed by adding the glyphs, because the question it asks is
+ * open-ended: *the ways a sentence can relate two things are not enumerable.* The question that IS
+ * closed is the other one — **the ways to say "is"** — so the guard is inverted. A rewrite to `SEG = value`
+ * fires only when what stands between them is a copula: nothing at all, an `=`, or one of the few words
+ * that mean "is". Anything else is left exactly as the student wrote it.
+ *
+ * So this fails CLOSED. An unfamiliar connective is not rewritten, the value goes unaccounted, and the
+ * honesty battery escalates the utterance — the outcome this construct had before ADR-524 and a
+ * perfectly honest one. A false equality, by contrast, invents a given the student never gave, which is
+ * worse than both a dropped warning and a false drop.
+ *
+ * This does NOT re-open what ADR-498/ADR-524 closed. That decision is about **locating the value** — it
+ * stays positional, and no copula is required. This decides a different question: **whether the sentence
+ * is an equality at all.** Enumerating copulas to answer it is sound precisely because that set is finite;
+ * enumerating relations to answer it was not.
+ */
+// Hebrew only, and necessarily so: `LENGTH_CONNECTIVE` excludes Latin letters (it must not be able to
+// cross a label), so an English copula could never appear in a connective anyway. The Hebrew nouns this
+// construct is built on make that a closed question rather than a gap — «BC = 10» is English’s own way in.
+const LENGTH_COPULA = new RegExp(String.raw`^[\s.,:]*(?:=|הוא|היא|הם|הן|שווה(?:\s*ל)?)?[\s.,:-]*$`);
+const normalizeVerboseLength = (s: string): string =>
+  s.replace(VERBOSE_LENGTH, (m: string, seg: string, conn: string) => (LENGTH_COPULA.test(conn) ? `${seg} = ` : m));
+
+
+/**
  * The vocabulary for "a shape declared WITH its side length" — «ריבוע ABCD שצלעו הוא 1» /
  * "square ABCD whose side is 1" (#185 row 7, the ADR-228 size-given seam).
  *
@@ -10085,17 +10299,17 @@ export function normalizeUtterance(raw: string): string {
     // (a non-Hebrew character on each side) and to sit where a connective sits: before a hyphen, or
     // between two uppercase labels.
     .replace(/(?<![א-ת])ן(?=-)/g, 'ו')
-    .replace(/(?<=[A-Z]\d?\s)ן(?=\s*[A-Z])/g, 'ו')
-    // Verbose length frame "אורך/הצלע/הקטע <seg> הוא/היא/שווה <value>" → "<seg> = <value>" (issue #105), so
-    // the existing length rules handle the wordy phrasing. Requires a VALUE (√/digit/"(") after the copula,
-    // so the ratio form "הצלע BC גדולה פי 2 …" (no copula, a comparative) is left to `ratioConstraint`.
-    .replace(/(?:אורך|הצלע|הקטע)\s+([A-Za-z]\d*\s*[A-Za-z]\d*)\s+(?:הוא|היא|שווה(?:\s*ל-?)?)\s+(?=[√\d(])/g, '$1 = ');
+    .replace(/(?<=[A-Z]\d?\s)ן(?=\s*[A-Z])/g, 'ו');
   // #185: number words before a degree word → digits, THEN the angle/arc word-equality → `=` (its value
   // lookahead needs the digits), THEN the shape-with-side appositive rewrite. All three are scoped (a
   // degree suffix / an angle-arc operand / an equilateral-sided shape), so nothing else is touched.
   // #591: `normalizeShapeSide` used to wrap this — the side clause is now read at the shape macro
   // (`statedSideLength`), where the ring's ids exist, so no rewrite happens at the utterance boundary.
-  const words = normalizeWordEquality(normalizeWordDegrees(orth));
+  // #1157 (ADR-524) — the verbose length frame is read POSITIONALLY, after the unit tolerance its
+  // sibling lanes already had. Both run on the fully-orthographic text, so every value-bearing rule
+  // downstream sees one shape.
+  const lengths = normalizeVerboseLength(stripValueUnits(orth));
+  const words = normalizeWordEquality(normalizeWordDegrees(lengths));
   return normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(words.trim().replace(/\s+/g, ' ')))));
 }
 

@@ -143,6 +143,8 @@ a human at the keyboard, so unattended running remains a separate risk argument.
 
 Steps 1–3 run in the reporting session; steps 4–6 run **only in a dedicated fix session or on an explicit "fix now"** (§2b).
 
+**Between step 3 and step 4 sits time, and the code moves in it** ([ADR-W-064](06w-decisions-workspace.md#adr-w-064)). A fix session starts by **re-running the reported case against the current tip** and diffing the result against what the issue says — [docs/17 §5 step 0](17-design-rules.md). A divergence is the expected case, not an alarm: an already-fixed issue is closed rather than built, a partly-fixed one has its record corrected, and only "the cause the plan names is not what fires" is an escalation.
+
 1. **File the issue** (§1) — before or in parallel with diagnosis, never "after, if I remember."
 2. **Diagnose per [docs/17](17-design-rules.md)** — reproduce from `logs/debug-log.jsonl` / prod events through the real `parse → replay` path; identify the *class*, not the instance.
 3. **Reclassify honestly:** if diagnosis shows a *missing capability* rather than a defect, relabel `bug` → `feature` and switch to the feature route (§4) — do not silently build new capability under a bug's banner.

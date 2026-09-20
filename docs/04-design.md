@@ -702,3 +702,45 @@ Two rules keep it honest:
 
 The membership is tested at the gate the app calls, never below it: #1011 reached a play session at all
 because the feature's own lock drove the store directly and never crossed `dryRunOutcome`.
+
+## Re-reading a role-assigned letter run ([ADR-521](06-decisions.md#adr-521))
+
+Between the dry run and the refusal, `app/submitPipeline.ts` asks `app/roleReadings.ts` one question:
+*what else could that letter run have meant?*
+
+The answer is produced by **rewriting the utterance** and handing it back to the same parser — so no
+rule grows a second convention, and the alternative is a sentence the student could have typed, which
+is also what is taught back to them. The module keys off the `arc` a construct emits, so it speaks for
+the whole family (`רבע מעגל`, `גזרה`) rather than for one rule.
+
+| step | what it costs |
+| --- | --- |
+| no role run in the utterance | nothing — `roleReadings` returns `null` before any work |
+| ordering the readings | nothing — a probe over the figure the student ALREADY has |
+| a reading that builds | one dry run, because the probe put it first |
+| no reading more promising than the stated one | nothing — the refusal keeps today's cost |
+
+The probe is the construct's PINNED central angle measured across the configurations already sampled;
+a construct that pins no angle (a general sector) leaves it unscored rather than inventing a target.
+
+**`produced` is not the adoption test.** It means something was built, not that the construct's promise
+holds, so an adopted reading is checked against that promise — equal radii, and the pinned angle
+(`honoursConstruct`). Answering a refusal with a wrong figure would be worse than the refusal.
+
+### The commit-seam inventory ([ADR-522](06-decisions.md#adr-522))
+
+Six store actions reset the seed, and every one is a seam that must decide whether to launch the
+post-commit configuration search. The inventory is an assertion, not prose
+(`issue-1041-edit-resolve.test.ts`), because prose is what let #1041 and #1133 happen:
+
+| action | what it does | search |
+| --- | --- | --- |
+| `commitCommands` | a statement is added | yes — `submitPipeline` |
+| `replaceGroup` | a statement is replaced | yes — `runEditCommit` (#1041) |
+| `setGroupEnabled` | a group's tick flips | yes — `runSetGroupEnabled` (#1133) |
+| `toggle` | one fact's tick flips | yes — `runToggleFact` (no UI caller yet) |
+| `remove` | one fact is deleted | yes — `runRemoveFact` (measured: a partial group can strand) |
+| `removeGroup` | a whole statement is deleted | **exempt**, measured (ADR-518) |
+
+The rule the table encodes: **a seam that ADDS a requirement back searches; one that only relaxes need
+not.** Deleting a whole statement only relaxes. Re-enabling, and deleting one fact of a group, do not.

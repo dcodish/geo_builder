@@ -125,7 +125,7 @@
     "unknownSymbol": "the parameter {{id}} isn't defined in the figure",
     "signNotSelectable": "the figure defines {{id}}, but its value is fixed by the relation that introduced it — a sign can't be chosen for it",
     "ambiguousAngle": "identifying the angle at {{id}} needs exactly two edges in the figure — name all three letters (e.g. ∠AOB = 90)",
-    "ambiguousVectorLength": "vector or length? write vector AB = vector CD (or AB⃗ = CD⃗), or |AB| = |CD|",
+    "ambiguousVectorLength": "vector or length? write vector AB = vector CD (or AB→ = CD→), or |AB| = |CD|",
     "paramRolesConflated": "the letter {{letter}} is used both as the running parameter (outside the parentheses) and as a component inside them — it isn't clear which you meant. Pick a different letter for the running parameter, e.g. x=t({{letter}}-1, 5-{{letter}}, -2)",
     "droppedGiven": "The statement was not added to the figure, because we could not draw: {{items}}. Try splitting it into shorter givens or rephrasing",
     "noPrismToMakeRight": "there is no prism in the figure to make right — build a prism or a parallelepiped first",
@@ -139,7 +139,7 @@
     "notADiagonal": "«{{pair}}» is not a diagonal of the solid — it is an edge. A diagonal joins non-adjacent vertices.",
     "notASpaceDiagonal": "«{{pair}}» is not a MAIN diagonal — it is a face diagonal. A main diagonal passes through the solid, joining opposite vertices.",
     "dependentsBroken": "«{{cause}}» was changed or removed, so {{items}} no longer takes effect — what it refers to is not defined any more. The row stays in the list and takes effect again once the definition is back",
-    "ambiguousVectorLengthRatio": "vector or length? write |{{a1}}{{b1}}| = {{c}}|{{a2}}{{b2}}| for lengths, or {{a1}}{{b1}}⃗ = {{c}}{{a2}}{{b2}}⃗ for vectors"
+    "ambiguousVectorLengthRatio": "vector or length? write |{{a1}}{{b1}}| = {{c}}|{{a2}}{{b2}}| for lengths, or {{a1}}{{b1}}→ = {{c}}{{a2}}{{b2}}→ for vectors"
   },
   "examples": {
     "title": "Examples",

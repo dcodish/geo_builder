@@ -69,6 +69,20 @@ export type InputError =
   | { key: 'bad-arity'; detail: string }
   /** One label used for two vertices of the same figure (#1042). */
   | { key: 'repeated-vertex'; detail: string }
+  /** A cevian whose apex lies on the side it is drawn to, or is its own foot (#1231). */
+  | { key: 'degenerate-role'; detail: string }
+  /** A cevian named by its triangle whose apex is not a vertex of that triangle (#1165). */
+  | { key: 'apex-not-a-vertex'; detail: string }
+  /** A crossing the student named that the figure already names — carrying WHO holds it (#1175). */
+  | { key: 'crossing-already-named'; detail: string; holder: string }
+  /**
+   * The LLM fallback was THROTTLED, not confused (#1251) — a per-IP or daily cap.
+   *
+   * Its own key because it is not a statement about the student's sentence at all: telling them the
+   * tool did not understand, when the tool never got to look, is the wrong thing in the one place
+   * they find out what happened.
+   */
+  | { key: 'llm-busy'; detail: string }
   /** A relation whose verb was understood and whose operand was not (#1052). */
   | { key: 'bad-operand'; detail: string }
   /** The statement contradicts what an earlier statement already fixed. */
@@ -88,6 +102,13 @@ export type InputError =
   | { key: 'ambiguous-shape'; detail: string }
   /** «האלכסון הראשי» where the shape distinguishes no principal diagonal (#1070). */
   | { key: 'undistinguished-diagonal'; detail: string }
+  /**
+   * A naming of something that already has a name (#1153) — carrying WHO holds it.
+   *
+   * «P מרכז המעגל I» then «O מרכז המעגל I» used to mint a second point on top of the first.
+   * The refusal names the holder so the student sees the collision, not a scolding about their letter.
+   */
+  | { key: 'already-named'; detail: string; holder?: string }
   /** A given the figure cannot satisfy (#1016). */
   | { key: 'unsatisfiable'; detail: string }
   /**

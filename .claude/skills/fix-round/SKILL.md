@@ -77,16 +77,29 @@ Sequential, one item at a time (parallel items in one tree overwrite each other)
    `fix/<issue#>-<slug>` (or `feat/<issue#>-<slug>`), branched from current `main`. Run
    `npm install` in the worktree — NEVER link or copy `node_modules` (`git worktree remove`
    follows junctions and destroys the shared tree's copy).
-2. **Follow the issue's fix plan** under full docs/17 discipline: class-level fix, chokepoint
-   registry, no special-casing the reported input.
-3. **Per-item gates, no exceptions:** ADR entry in the product's log; per-fix unit test; the
+2. **RE-MEASURE BEFORE YOU READ THE PLAN** ([docs/17 §5 step 0](../../../docs/17-design-rules.md),
+   [ADR-W-064](../../../docs/06w-decisions-workspace.md)). Run the issue's reported case against the
+   worktree's tip and diff it against what the issue claims. **Expect a divergence** — the trunk
+   lands ~35 commits a day, and a round composed from issues days old will find several. An
+   already-fixed item is **closed, not built** (and the ledger records it under Skipped with the
+   evidence); a partly-fixed one has its record corrected in the issue and the ADR; a landed
+   dependency re-scopes the item. Only *"the cause the plan names is not what fires"* is Step 4.
+
+   **Re-measure per item, at pickup — not once when composing the round.** A long round invalidates
+   its own queue: on 2026-09-19/20 one item's symptom was changed by another item landing four hours
+   earlier in the same run, and a second was unblocked by a third the same night.
+3. **Follow the issue's fix plan** under full docs/17 discipline: class-level fix, chokepoint
+   registry, no special-casing the reported input. A plan that says "not measured past the above" is
+   a hypothesis, however confidently it is phrased — treat its mechanism as something to verify
+   first, not as a specification.
+4. **Per-item gates, no exceptions:** ADR entry in the product's log; per-fix unit test; the
    regression lock per standing rule 4 (fixtures-first — a `.geo.json` fixture when the essence
    is "builds green and verifies", a scenario in the LAST corpus chunk when a bespoke assertion
    is needed); `tsc -b` + build clean; the PRODUCT LANE green (`npm run test:run:3d` /
    `test:run:2d`) plus the item's own locks. The FULL suite is the BATCH gate (Step 3), not a
    per-item one ([ADR-W-034](../../../docs/06w-decisions-workspace.md)). **Never overlap suite
    runs** — a lane or a full suite runs alone; overlapping doubled every gate in round #822.
-4. **Commits reference the round:** every item commit carries `Fixes #NN` AND mentions the
+5. **Commits reference the round:** every item commit carries `Fixes #NN` AND mentions the
    round issue (`round #RR`) — from any commit you can find the round, from the round every
    commit.
 

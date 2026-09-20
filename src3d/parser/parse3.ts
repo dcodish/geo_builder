@@ -23,6 +23,7 @@ import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX } from '../lexicon/nouns3';
+import { VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 import { riderPairsT, riderWholeSide, riderWholeT } from '../engine/onSegmentRatio';
 
@@ -104,6 +105,18 @@ function upliftLowercaseLabels(s: string): string {
 /** Normalise an utterance: strip invisible bidi/format controls, unify primes to `'`, strip vector
  *  arrows (AB→ ≡ AB), unify minus/maqaf to `-`, collapse whitespace, uplift anchored lowercase
  *  labels (#181). */
+/**
+ * #773 (ADR-3D-170) — the SCRIPT-TRANSITION boundary, as two named patterns rather than two literals
+ * inline in `normalize3`.
+ *
+ * Named because {@link markVectorContext} must apply the SAME boundary before it looks for the vector
+ * WORD (#1183). `normalize3`’s own comment already says why that matters — «וקטורSE» must become
+ * «וקטור SE» before the word can be recognised — but the marking was read off the RAW utterance,
+ * upstream of this step, so the glued spelling silently lost its vector meaning while the spaced one
+ * kept it. Two readers, one definition; a second copy is how the pair would drift.
+ */
+const SCRIPT_BOUNDARY_LATIN_HE = /([A-Za-z][A-Za-z0-9']*)(?=[א-ת])/g;
+const SCRIPT_BOUNDARY_HE_LATIN = /([א-ת]{2,})(?=[A-Za-z])/g;
 export function normalize3(s: string): string {
   // #751 (ADR-W-029): the control set is the SHARED one (shell/bidi) — it had three copies.
   return upliftLowercaseLabels(
@@ -127,7 +140,7 @@ export function normalize3(s: string): string {
       .replace(/ /g, ' ')
       .replace(/ {2,}/g, ' ')
       .replace(/[′’‘`]/g, "'")
-      .replace(/[→⃗⟶]/g, '')
+      .replace(new RegExp(`[${VECTOR_ARROW_CLASS}]`, 'g'), '') // #1194: one vocabulary, three readers
       .replace(/[−־]/g, '-')
       // #773 — a SCRIPT TRANSITION is a token boundary, in both directions.
       //
@@ -152,8 +165,8 @@ export function normalize3(s: string): string {
       // instead; «משולש» is spelled entirely from that set (מ‑ש‑ו‑ל‑ש), so the exemption silently
       // swallowed the commonest noun in the corpus. Measured, not reasoned: the catalog-wide property
       // below is what caught it.
-      .replace(/([A-Za-z][A-Za-z0-9']*)(?=[א-ת])/g, '$1 ')
-      .replace(/([א-ת]{2,})(?=[A-Za-z])/g, '$1 ')
+      .replace(SCRIPT_BOUNDARY_LATIN_HE, '$1 ')
+      .replace(SCRIPT_BOUNDARY_HE_LATIN, '$1 ')
       .replace(/(?:^|(?<=[\s:,]))(?:ה?ו?וקטור|vectors?)\s+/gi, '') // the vector WORD marks vector meaning (recorded before normalize), then reads as decoration
       // #494 — a DETACHED clitic re-binds to its operand. Hebrew's ל/ב/מ/ה/ש/כ are prefixes, and every
       // gate in this tree spells them glued (`ל?מישור`, `ב-?`), so «מקביל ל π1» was not-handled while
@@ -1813,7 +1826,11 @@ const vecEqClaim: Rule = (s0) => {
   if (lhsPair) {
     const rhs = parseSymExpr(parts[1]);
     if (!rhs) return null;
-    return [{ type: 'vec-rel', from: lhsPair[1], to: lhsPair[2], terms: rhs.terms, symbol: rhs.symbol }];
+    // #1183: the VECTOR marking travels ON the command. `VEC_MARKED` chose this lane over the length
+    // lane; dropping it here is what made every spelling indistinguishable at apply, so the ambiguity
+    // guard refused the arrow form its own clarification teaches. Recorded only when true, so an
+    // unmarked command is byte-identical to before (and a saved figure's JSON is unchanged).
+    return [{ type: 'vec-rel', from: lhsPair[1], to: lhsPair[2], terms: rhs.terms, symbol: rhs.symbol, ...(VEC_MARKED ? { marked: true as const } : {}) }];
   }
   const lhs = parseVecExpr(parts[0]);
   const rhs = parseVecExpr(parts[1]);
@@ -3206,13 +3223,43 @@ const angleSegClaim: Rule = (s0) => {
   return [...draw, { type: 'cos-angle', u, v, cos: Math.cos((deg * Math.PI) / 180) }];
 };
 
-/** `A'K : A'C = 2 : 3` — a length-RATIO claim (draws both segments). */
+/**
+ * `A'K : A'C = 2 : 3` — a length-RATIO claim (draws both segments).
+ *
+ * #1163 — `:` AND `/` ARE ONE NOTATION WITH TWO SEPARATORS, and this rule reads both.
+ *
+ * Prod session `i8gw52ej` typed «BE/ED=1:3» and the operator later typed «AB/BC = 3/1»; both were
+ * `not-handled` while the colon spelling of the same statement built. 2-D has had the `/`-form sibling
+ * (`segmentRatio`) beside its colon form for as long as the colon form has existed — 3-D simply never
+ * grew it, and `/` is the spelling a textbook writes as a fraction.
+ *
+ * No student was blocked: the LLM fallback rewrote the slash into a colon and the figure built
+ * (`[llm/ok] BE/ED=1:3 ==> ["BE:ED = 1:3"]`), so this buys cost and determinism rather than
+ * capability. [ADR-3D-249](../../docs/06b-decisions-3d.md#adr-3d-249) then made the colon form
+ * genuinely DRIVE rather than refute, which makes the missing sibling more visible, not less.
+ *
+ * Taken at THIS rule rather than as a second pattern: two separators of one notation drift apart the
+ * moment they are two rules, and the lock is a PARITY assertion (both spellings ⇒ the same commands)
+ * precisely so it cannot go green by re-implementing the grammar it guards.
+ *
+ * The RHS also takes a BARE number — «AB/BC = 2» is 2-D's own third spelling, and `q` defaults to 1.
+ * Both separators accept it, since the point of this change is that the two cannot differ.
+ *
+ * `p`/`q` must be POSITIVE, which is 2-D's guard (`segmentRatio`, `segmentRatioColon`) arriving with
+ * the spelling it belongs to. A zero or negative ratio states a zero-length or reversed segment and
+ * was silently accepted by the colon form before — reachable only by typing it, and it would have
+ * become reachable by a second spelling here.
+ */
+const RATIO_SEP = String.raw`\s*[:/]\s*`;
 const lengthRatioClaim: Rule = (s) => {
   const m = s.match(
-    new RegExp(`^([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*:\\s*([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(${NUM})\\s*:\\s*(${NUM})$`),
+    new RegExp(
+      `^([A-Z]\\d*'?)([A-Z]\\d*'?)${RATIO_SEP}([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(${UNUM})(?:${RATIO_SEP}(${UNUM}))?$`,
+    ),
   );
   if (!m) return null;
-  const [, a1, b1, a2, b2, p, q] = m;
+  const [, a1, b1, a2, b2, p, q = '1'] = m;
+  if (+p <= 0 || +q <= 0) return null; // a length ratio is positive — zero states a collapsed segment
   return [
     { type: 'segment3', a: a1, b: b1 },
     { type: 'segment3', a: a2, b: b2 },
@@ -4416,7 +4463,17 @@ export const RULES: Rule[] = [
  *  `AS = AB` reads as a LENGTH equality, the bagrut default). Extracted from `parse3` and exported
  *  ONLY so the shadow-matrix guard can run rules under the exact pre-state `parse3` gives them. */
 export function markVectorContext(utterance: string): void {
-  VEC_MARKED = /[→⃗⟶]/.test(utterance) || /(?:^|[\s:,])(?:ה?ו?וקטור|vectors?)\s/i.test(utterance);
+  // #1183/#773: the WORD is looked for AFTER the script-transition boundary is applied. An arrow is
+  // its own character and needs no boundary, but «וקטור SE» despaces to «וקטורSE» — invisible to a
+  // student in an RTL box — and reading the raw utterance made the glued spelling mean something
+  // different from the spaced one. `normalize3` applies exactly this split for exactly this reason;
+  // the marking was simply read upstream of it.
+  const bounded = utterance
+    .replace(SCRIPT_BOUNDARY_LATIN_HE, '$1 ')
+    .replace(SCRIPT_BOUNDARY_HE_LATIN, '$1 ');
+  VEC_MARKED =
+    VECTOR_ARROW_RE.test(utterance) ||
+    new RegExp(String.raw`(?:^|[\s:,])${VECTOR_WORD_SRC}\s`, 'i').test(bounded);
 }
 
 

@@ -32,7 +32,7 @@
  * is earned — and this function is what will fail first and say so.
  */
 import { curveParentOf, parentsOf } from './derived';
-import { evalExpr, symbolsOf, type Env } from './expr';
+import { evalExpr, exprText, symbolsOf, type Env } from './expr';
 import { constraintRefs, dirRefs } from './solve';
 import { UNBOUNDED, type Construction, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
 
@@ -275,8 +275,18 @@ export function reportedDof(c: Construction, carrierDof: number): number {
 export type Component =
   /** The givens fix it to a number. */
   | { known: true; value: number }
-  /** The givens leave it open — shown as `x_B`. */
-  | { known: false };
+  /**
+   * The givens leave it open — shown as `x_B`, unless the student WROTE an expression for it.
+   *
+   * `expr` carries that expression's text (#1230). «A(-9a,0)» is not known — `a` is free, and printing
+   * a sampled number would invent a given — but `-9·a` is what the student stated, and the canvas may
+   * not replace it with `x_A`, a symbol the tool made up. #1226 fixed this for the data panel and
+   * scoped the canvas out on the mistaken belief that the canvas showed the name alone; it does not.
+   *
+   * It states no VALUE, so the honesty invariant is untouched: it names the dependency, which is more
+   * than `x_A` said and less than a number (#1023's wording, for the third surface now).
+   */
+  | { known: false; expr?: string };
 
 export interface PointProvenance {
   x: Component;
@@ -310,7 +320,8 @@ export function provenanceOf(
       const v = evalExpr(e, env);
       return Number.isFinite(v) && symbolsOf(e).every((s) => RESERVED_SYMBOLS.has(s))
         ? { known: true, value: v }
-        : { known: false };
+        // Open, but the student wrote it — carry the text so the canvas need not invent `x_A` (#1230).
+        : { known: false, expr: exprText(e) };
     };
     return { x: read(o.x), y: read(o.y) };
   }

@@ -171,6 +171,35 @@ statement is asserting a given the student never gave.
 
 ## 5. Diagnosis protocol (before any code)
 
+0. **RE-MEASURE THE ISSUE'S OWN CLAIMS, AND EXPECT THEM TO HAVE MOVED**
+   ([ADR-W-064](06w-decisions-workspace.md#adr-w-064)). Before reading the fix plan, run the reported
+   utterance against the **current tip** and diff what you see against what the issue says.
+
+   **A divergence is the normal case, not an alarm.** This trunk lands ~35 commits a day, ~20 of them
+   ADR-bearing, so an issue four days old has had ~130 land under it. Measured over the run of
+   2026-09-19/20: four of the ten items picked up carried a claim that had gone stale — and all four
+   still built and landed. The re-measurement costs minutes; skipping it costs the fix session.
+
+   Four different things can come back, and **only the last is a signal about the triage**:
+
+   | what you find | what it is | what to do |
+   | --- | --- | --- |
+   | the reported case now passes | someone already fixed it | close the issue with the evidence — do **not** build |
+   | one of several symptoms is gone | partly fixed, by something else | correct the record in the issue *and* the ADR; build what is left |
+   | a named dependency has landed | the scope shrank, or unblocked | re-scope, then build |
+   | the cause the plan names is **not what fires** | the diagnosis was never true | §8 escalation |
+
+   The first three rows are the ordinary cost of a fast trunk. Record them in one line as what they
+   are — a re-measurement — and carry on; writing them up as "deviations from plan" overstates them
+   and buries the one row that matters. **The fourth row is different in kind**: it was wrong when
+   written, it will be wrong again in the next plan written the same way, and it is worth the
+   escalation template.
+
+   Where a plan's own diagnosis *was* measured, say so and re-run its command rather than re-deriving
+   it. A plan that says "not measured past the above" is a hypothesis however confidently it is
+   phrased — §1's rule that a root cause read off the code is a hypothesis applies to the issue body
+   as much as to your own first idea.
+
 1. **Reproduce from the log** (`logs/debug-log.jsonl` locally; the production sink records submits
    only) through the real `parse-with-context → facts → replay` path — a scratch script, not the UI.
 2. **State the class** (§1) and **grep for siblings** — in this product *and in the sibling product*.

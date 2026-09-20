@@ -200,3 +200,18 @@ On-demand, **opt-in** annotation of what the figure geometrically *is* — the *
 
 - **FR-I18N-1 (Must)** — Hebrew RTL is the default UI; English is available; switching updates layout direction.
 - **FR-I18N-2 (Must)** — All user-facing text is localized; parser and any LLM fallback accept both languages.
+
+**A letter run that encodes a ROLE is read from the figure, not from the typing order**
+([#1012](https://github.com/dcodish/geo_builder/issues/1012), [ADR-521](06-decisions.md#adr-521)).
+
+«רבע מעגל OAB» means *centre O, ends A and B*. That convention is a real one and the catalog states it —
+but a student who writes the three letters in another order has not made a mistake, and must not be
+told their geometry is impossible when it is our reading that does not fit.
+
+**So a run that does not build is re-read over the other role assignments, and the assignment that
+builds is adopted.** The step then SHOWS the spelling it used, because a silent re-reading teaches the
+student nothing and leaves them writing a sentence we only sometimes honour.
+
+**Adoption never buys a figure with honesty.** A re-reading is taken only if the figure it builds
+honours the construct — a quarter circle's two radii are equal, and its central angle is 90°. When no
+reading is honest the step refuses, exactly as it would have.

@@ -190,6 +190,58 @@ function clampToPlacementPreconditions(c: Construction, objects: GeoObject[]): G
   });
 }
 
+/**
+ * Free points NOTHING ELSE in the figure refers to (#1192).
+ *
+ * «נקודה D» on a figure that already carries a circle mints a point tied to nothing: no polygon holds
+ * it, no constraint mentions it, no other object names it. Its distance from the figure is therefore
+ * entirely unstated — a real DOF the student did not fix — and it is the one DOF {@link applySeed}
+ * never sampled.
+ *
+ * Membership is decided by a generic scan for the id across every other object and constraint, never
+ * by a table of "which kinds can reference a point": a per-kind list is the enumeration that goes
+ * stale the moment an object kind is added.
+ */
+function untetheredFreePoints(c: Construction): Set<Id> {
+  const free = new Set<Id>(c.objects.filter((o) => o.kind === 'free-point' && !o.pinned).map((o) => o.id));
+  if (!free.size) return free;
+  const mark = (v: unknown): void => {
+    if (typeof v === 'string') free.delete(v);
+    else if (Array.isArray(v)) v.forEach(mark);
+    else if (v && typeof v === 'object') Object.values(v).forEach(mark);
+  };
+  for (const o of c.objects) {
+    // a free point's own fields are x/y — except `solve`, which names the constraint driving it, and a
+    // DRIVEN point is tethered by definition
+    if (o.kind === 'free-point') {
+      const sv = (o as { solve?: unknown }).solve;
+      if (sv !== undefined) { free.delete(o.id); mark(sv); }
+      continue;
+    }
+    mark(o);
+  }
+  for (const con of c.constraints) mark(con);
+  return free;
+}
+
+/**
+ * The figure's own SCALE — the largest magnitude the figure actually carries, in the figure's units.
+ *
+ * `ignore` holds the untethered points, and excluding them is the whole point: their coordinates are
+ * DEFAULTS, so measuring the figure with them in it would let a default vouch for its own size. With
+ * «מעגל שמרכזו O שרדיוסו 5» the scale is 5, with radius 50 it is 50 — which is what makes the sampled
+ * distance grow with the stated figure instead of with a constant.
+ */
+function figureScale(c: Construction, ignore: Set<Id>): number {
+  let s = 0;
+  for (const o of c.objects) {
+    if (o.kind === 'free-point') { if (!ignore.has(o.id)) s = Math.max(s, Math.abs(o.x), Math.abs(o.y)); }
+    else if (o.kind === 'circle' && 'value' in o.radius) s = Math.max(s, Math.abs(o.radius.value));
+  }
+  for (const con of c.constraints) if (con.type === 'distance') s = Math.max(s, Math.abs(con.value));
+  return Math.max(1, s);
+}
+
 export function applySeed(c: Construction, seed: number): Construction {
   if (!seed) return c;
   // A non-pinned free point is perturbed even when a constraint drives it: one scalar constraint
@@ -207,6 +259,32 @@ export function applySeed(c: Construction, seed: number): Construction {
   let span = 1;
   for (const p of free) span = Math.max(span, Math.abs(p.x - cx) * 2, Math.abs(p.y - cy) * 2);
   const jit = span * 0.22;
+  // #1192 (ADR-526) — AN UNTETHERED FREE POINT'S DISTANCE FROM THE FIGURE IS AN UNSTATED DOF, AND IT
+  // WAS NEVER SAMPLED. The cluster above is SPUN about its centroid and jittered, so only a free
+  // point's DIRECTION varies; its radial distance stays whatever its default put it at, and the
+  // jitter width is derived from the free points' own spread — itself a default. Measured on
+  // «מעגל שמרכזו O שרדיוסו r» + «נקודה D», the reach was 4.326 for r = 1, 5 AND 50: whether D was
+  // drawn inside or outside the circle was decided by an unrelated constant, and «הציגו תצורה אחרת»
+  // could never reach the other answer. That is exactly the conformance smell CLAUDE.md names — a
+  // value counted by `rawMovableDof` but absent in practice from what is sampled, i.e. a default
+  // masquerading as fixed, and a figure asserting a given (D is inside the circle) nobody gave.
+  //
+  // Sampling a magnitude as a multiple of the figure's own extent is this function's ESTABLISHED
+  // idiom, not a new mechanism: the on-line marker ranges 0.4×–2.4× and an extension 0.55×–1.85×.
+  // The untethered free point is the member of that family that never got it — and the one member
+  // whose default carries no figure information at all, which is why it takes its units from
+  // `figureScale` rather than from its own coordinates.
+  //
+  // Only UNTETHERED points: a polygon vertex or a constrained point has its distance decided by the
+  // structure it belongs to, and rescaling those is the figure's overall SIZE — a different DOF, with
+  // its own `scalePinned` machinery. Seed 0 returns early above, so the DEFAULT drawing is unchanged.
+  const untethered = untetheredFreePoints(c);
+  const fscale = untethered.size ? figureScale(c, untethered) : 1;
+  // Place it relative to the figure it is JOINING — the centroid of the points that are tethered —
+  // falling back to the free cluster's centroid when the figure has none.
+  const tethered = free.filter((p) => !untethered.has(p.id));
+  const ax = tethered.length ? tethered.reduce((s, p) => s + p.x, 0) / tethered.length : cx;
+  const ay = tethered.length ? tethered.reduce((s, p) => s + p.y, 0) / tethered.length : cy;
   const theta = (mulberry32((seed * 2654435761) >>> 0)() * 2 - 1) * Math.PI; // ±180° spin of the free cluster
   const ct = Math.cos(theta);
   const st = Math.sin(theta);
@@ -270,6 +348,14 @@ export function applySeed(c: Construction, seed: number): Construction {
 
   const objects = c.objects.map((o) => {
     if (o.kind === 'free-point' && !o.pinned) {
+      if (untethered.has(o.id)) {
+        // direction AND distance, both in the figure's units — 0.15×–1.5× its extent, so the sampled
+        // positions straddle any stated magnitude (a radius, a side) instead of sitting inside it
+        const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
+        const th = jr() * 2 * Math.PI;
+        const rad = fscale * (0.15 + jr() * 1.35);
+        return { ...o, x: ax + rad * Math.cos(th), y: ay + rad * Math.sin(th) };
+      }
       const dx = o.x - cx;
       const dy = o.y - cy;
       const rx = cx + (dx * ct - dy * st);
