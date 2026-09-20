@@ -10086,3 +10086,37 @@ The narrow repair — widen the guard so `→` counts as "already marked" — wo
 **Targeted at a mark that FOLLOWS A PAIR.** A stray arrow elsewhere in a sentence is the student's own character in a position this formatter does not claim to understand, and it is left alone — a blanket strip would be a formatter editing prose.
 
 **Consequences.** `lexicon/marks3.ts` (new, imports nothing); `normalize3`, `markVectorContext` and `vectorNotation` all read it; one conversion added ahead of the pair rule. The grammar is unchanged — every spelling still parses to the same `marked: true` command. Lock: `issue-1194-one-arrow.test.ts` (18) — **parity**, never a spelled-out expected row (ADR-W-053): all five spellings render the same row, each pair carries exactly ONE `U+20D7`, no finished row carries a spacing arrow, the parse is asserted unmoved, and the stray-arrow case is locked as deliberately untouched.
+
+### ADR-3D-253 — A vector may START a figure, and the vector WORD draws an arrow (#1184)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1184 (feature, P2, `3d`) · operator report + rulings 2026-09-18 · round #1292
+**Requirements:** [02b](02b-requirements-3d.md) — FR-VC · **Design:** [04b](04b-design-3d.md)
+**Completes** [ADR-3D-013 Am.](#adr-3d-013)'s answer to *"how would a user enter a vector?"*, and **supersedes** [ADR-3D-039](#adr-3d-039)'s scope note about the vector word
+**Builds on** [ADR-3D-250](#adr-3d-250)/#1183 — the `marked` bit, so there is ONE notion of "the student said vector"
+
+**The report.** *"on 3d tool, i cannot create a simple vector AB. on first classes of the subject this is required."*
+
+**Measured before, on an empty canvas — which is what the first lesson of the vectors unit actually is:**
+
+```
+וקטור AB       → segment3 {bare}   ✗ unknown-point: A
+חץ AB          → draw-arrow        ✗ unknown-point: A
+arrow AB       → draw-arrow        ✗ unknown-point: A
+נסמן: AB = u   → segment3+name-vector  ✗ unknown-point: A
+```
+
+**No vector lane built at all.** And once the points did exist, «וקטור AB» drew a plain SEGMENT — no arrowhead, no direction, never in the basis. The student said "vector"; the tool drew a segment and said nothing, which is the honesty invariant as much as it is a missing capability.
+
+**Root cause — the tool's frame was solid-first.** Every vector lane presupposed a figure that already existed. Two mechanisms enforced it: the drawing registers refused a pair with two unknown endpoints, and the vector WORD was stripped to decoration by `normalize3` so a standalone «וקטור AB» landed on the bare-segment rule.
+
+**Arm 1 — a drawing register may introduce its own points on an empty canvas.** The both-fresh refusal is correct in its own frame: «קטע QZ» with two unknown ends is a typo, and minting for it would hide the mistake. But on an empty canvas *every* pair is both-fresh, so the guard that catches typos also blocked the first thing the unit asks a student to draw. An empty canvas has nothing to have mistyped against; once ANY figure exists the guard is exactly as it was. Endpoints mint as `free3` ([ADR-052](06-decisions.md#adr-052)), and the lock asserts that by showing the arrow MOVES between configurations rather than by asserting a coordinate — which would be asserting the very default the rule forbids.
+
+**Arm 3 — the vector word lowers to a real arrow**, keyed off `VEC_MARKED`, the same marking #1183 made travel on the command. No prior ruling is reversed: ADR-3D-039's scope note claimed the word *"deliberately keeps its established segment reading"*, but #72 — the batch the operator approved — never mentions «וקטור AB»; that sentence was written into the ADR by the implementing session about what it had NOT changed, and `issue72-phrasing.test.ts` contradicted itself accordingly (its header lists «הוקטור A'C» as an arrow, its body asserted a segment). The reading it "kept" was never chosen either — it fell out of `normalize3` stripping the word, which ADR-3D-013 Am. introduced for a different purpose: the word as an ambiguity MARKER inside a relation. Asked directly, and shown the cost («הוקטור A'C» on a cube changes from segment to arrow, retiring a passing assertion), the operator chose the arrow.
+
+**The scope of arm 1 was NARROWED by measurement, and that is the part worth reading.** The plan relaxed the both-fresh refusal on the bare-segment lane. Built that way it moves two locks that encode decisions which should stand: «קטע AB» then «דלתון ABCD» stops being a DECLARATION and takes the completion arm with two unknowns (#601), and «אלכסון AB» before any solid stops being refused although no solid exists for it to be a diagonal of (#978). The difference is structural rather than arbitrary — the segment lane feeds shape-completion and role rules that ask *which points already exist*, and an arrow feeds none of them. So the relaxation is applied to the ARROW lane, `canStartFigure` is a named predicate either way so the next register that needs it asks the same question in the same place, and «קטע AB» on an empty canvas is filed as its own question rather than decided here.
+
+**Arm 2 is NOT built, and it is an escalation rather than a decision.** `inject-vector` declaring an unknown name — «נתון: v = (10,-5,0)» — cannot be done in the current data model: `Construction3.vectors` is `Map<name, {from, to}>`, so a vector IS a point pair, and declaring one from components alone needs either an unanchored variant or minted anchor points. That is exactly [#1188](https://github.com/dcodish/geo_builder/issues/1188)'s question 1 (*where does a free vector live in the data model?*) and question 2 (*how is a positionless object DRAWN?*) — which that issue holds `needs-operator` and calls "the question the operator should be asked first, because the rest follows from it". #1188 meanwhile records `u = (1,2,3)` as *"covered by #1184 arm 2"*, so the two issues' scopes are circular. Building it here would answer a pedagogical question nobody has answered.
+
+**Measured after.** «וקטור AB», «חץ AB» and `arrow AB` each build on an empty canvas, drawing an arrow between two free points; «וקטור AB» then «נסמן: AB = u» puts `u` in the basis in two lines; the arrow moves across configurations. «קטע QZ» and «חץ QZ» after a single point are still refused naming Q. «הוקטור A'C» on a cube draws an arrow; «וקטור אלכסון AC» keeps the segment lane, because the diagonal claim is not a vector statement; «קטע AC» is unchanged.
+
+**Consequences.** `engine/apply.ts` (+`canStartFigure`, +`mintFree`, the arrow lane); `parser/parse3.ts` (`bareSegment` returns `draw-arrow` for a marked, non-diagonal pair). `issue-1184-vector-starts-a-figure.test.ts` (12) drives the STORE, never the parser alone — `parse3-v4.test.ts` has a passing test for a sentence that has never built, and that is the failure mode this file exists not to repeat. `issue72-phrasing.test.ts`'s vector-word assertion is flipped in place, with the ruling that moved it, rather than deleted.

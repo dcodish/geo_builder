@@ -1990,6 +1990,29 @@ const bareSegment: Rule = (s) => {
   const [, a, b] = m;
   if (a === b) return null;
   const claim = SPACE_CLAIM.test(s) ? 'space' : ANY_CLAIM.test(s) ? 'any' : undefined;
+  /**
+   * A MARKED PAIR IS A VECTOR, AND A VECTOR IS AN ARROW (#1184 arm 3, operator ruling 2026-09-18).
+   *
+   * «וקטור AB» used to draw a plain segment: no arrowhead, no direction, never in the basis. The
+   * student said "vector" and the tool drew a segment and said nothing — the honesty invariant
+   * (*no stated meaning is silently dropped*) as much as a missing capability.
+   *
+   * **No prior ruling is reversed here.** ADR-3D-039’s scope note said the vector WORD "deliberately
+   * keeps its established segment reading", but #72 — the batch the operator approved — never mentions
+   * «וקטור AB»; that sentence was written into the ADR by the implementing session as a note about what
+   * it had not changed. The reading it "kept" was never chosen either: it falls out of `normalize3`
+   * stripping the word as decoration, which ADR-3D-013 Am. introduced for a different purpose — the
+   * word as an AMBIGUITY MARKER inside a relation. This completes that ruling (*"the system should not
+   * assume"*) rather than reversing anything, and supersedes ADR-3D-039’s note.
+   *
+   * It keys off `VEC_MARKED` — the same marking #1183 made travel on the command — so there is ONE
+   * notion of "the student said vector", not a second one for this rule. An explicit arrow («AB⃗»,
+   * «AB→») marks the pair exactly as the word does, which is ADR-3D-013 Am.’s own equivalence.
+   *
+   * A DIAGONAL claim wins: «אלכסון AC» asserts a role in a solid and is not a vector statement, so a
+   * marked line that also claims a diagonal keeps the segment lane rather than dropping the claim.
+   */
+  if (VEC_MARKED && !claim) return [{ type: 'draw-arrow', from: a, to: b }];
   // #840: this rule IS the drawing register — the student's whole sentence is this segment, so an
   // unstated endpoint is theirs to introduce. Every other `segment3` in this file is a carrier.
   return [{ type: 'segment3', a, b, bare: true, ...(claim ? { diagonal: claim } : {}) }];
