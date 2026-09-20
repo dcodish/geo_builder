@@ -418,13 +418,13 @@ describe('#943 — a pre-commit refusal quotes the sentence that was refused', (
     for (const u of ['משולש ABC', 'זוית B ישרה', 'ריבוע DEFG חסום במשולש ABC']) await runSubmit(u, d1);
 
     const { deps, calls, notes } = makeDeps();
-    await runSubmit('D = חיתוך AB ו-BC', deps);
+    await runSubmit('D = חיתוך AB ו-EF', deps);
 
     expect(notes().length, 'the refusal is shown as an input note').toBeGreaterThan(0);
     expect(calls.cleared, 'the text stays so the student can edit it').toBe(0);
     expect(calls.explained.length, 'the engine string went through the humanising layer').toBeGreaterThan(0);
     const [raw, said] = calls.explained[calls.explained.length - 1];
     expect(raw, 'the engine reason').toMatch(/over-constrained|cannot hold/);
-    expect(said, 'and the student’s own sentence as the subject').toBe('D = חיתוך AB ו-BC');
+    expect(said, 'and the student’s own sentence as the subject').toBe('D = חיתוך AB ו-EF');
   });
 });

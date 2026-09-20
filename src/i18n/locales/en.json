@@ -124,7 +124,8 @@
     "cevianApexOnSide": "{{apex}} lies on side {{side}}, so {{kind}} from {{apex}} to {{side}} has zero length. A cevian runs from a vertex to the side opposite it.",
     "cevianMedianFootAtEnd": "The midpoint of {{side}} cannot be {{foot}} — that would need {{side}} to have zero length.",
     "cevianApexIsFoot": "{{apex}}{{foot}} is not a segment — {{kind}} runs from a vertex to a different point.",
-    "cevianWrongSide": "The bisector from {{apex}} meets side {{actual}}, not {{stated}}."
+    "cevianWrongSide": "The bisector from {{apex}} meets side {{actual}}, not {{stated}}.",
+    "crossingAlreadyNamed": "The point you asked for is «{{holder}}» — a point already in the figure. {{s1}} and {{s2}} do meet there, but there is no new point here to call «{{id}}»; if you meant another point, check which two lines cross there."
   },
   "explore": {
     "title": "Explore the figure"

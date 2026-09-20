@@ -9,12 +9,18 @@
  *
  * The tests below lock four things:
  *  1. the end-to-end path on the operator's exact sequence — real parse → replay → the real Hebrew
- *     locale — so the message actually contains «D = חיתוך AB ו-BC»;
+ *     locale — so the message actually contains «D = חיתוך AB ו-EF»;
  *  2. the fallback — a fact with no recorded utterance renders TODAY's string, byte-identical, and
  *     never an empty «» or the word `undefined`;
  *  3. the CLASS ratchet — every pattern flagged `saysSubject` has a `_said` variant in BOTH locales;
  *  4. the AUDIT — the templates deliberately NOT swept (their subject is already a letter the student
  *     typed) are unchanged even when a sentence is available.
+ *
+ * SENTENCE CHANGED 2026-09-20 (ADR-531, #1274): he typed «D = חיתוך AB ו-BC». Its two carriers share B,
+ * and the operator has since ruled that such a sentence is REFUSED BY NAME before it becomes a fact —
+ * so it can no longer scaffold an over-constraint. «D = חיתוך AB ו-EF» redefines the same square vertex
+ * and was measured to produce the identical refusal, subject and other-side attribution. His original
+ * sentence is covered as a refusal in src/app/__tests__/issue-1274-crossing-already-named.test.ts.
  */
 import { describe, expect, it } from 'vitest';
 import i18n from '@/i18n';
@@ -36,8 +42,8 @@ const read = (s: string) => stripFormatControls(s);
 const OVER = 'over-constrained: D coincides with its constructed target cannot hold';
 
 describe('#943 — the refusal quotes the student’s own sentence', () => {
-  it('the operator’s sequence: the message names «D = חיתוך AB ו-BC»', () => {
-    const steps = ['משולש ABC', 'זוית B ישרה', 'ריבוע DEFG חסום במשולש ABC', 'D = חיתוך AB ו-BC'];
+  it('the operator’s sequence: the message names «D = חיתוך AB ו-EF»', () => {
+    const steps = ['משולש ABC', 'זוית B ישרה', 'ריבוע DEFG חסום במשולש ABC', 'D = חיתוך AB ו-EF'];
     const facts = factsOf(steps);
     const fig = replayFacts(facts);
 
@@ -47,10 +53,10 @@ describe('#943 — the refusal quotes the student’s own sentence', () => {
     // The link ADR-398 guarantees: the banner's error is some enabled fact's status, and that fact is
     // the LAST step — not one of the three that built fine.
     const said = utteranceForError(facts, fig.status, fig.lastError);
-    expect(said, 'the owning fact is found, and it is the sentence the student just typed').toBe('D = חיתוך AB ו-BC');
+    expect(said, 'the owning fact is found, and it is the sentence the student just typed').toBe('D = חיתוך AB ו-EF');
 
     const msg = read(humanizeError(fig.lastError, t, said));
-    expect(msg, 'the student’s sentence is the subject').toContain('D = חיתוך AB ו-BC');
+    expect(msg, 'the student’s sentence is the subject').toContain('D = חיתוך AB ו-EF');
     expect(msg, 'the engine fragment survives as the reason, not the headline').toContain('סותר נתון קודם');
     expect(msg, 'the i18n key resolved').not.toContain('errors.');
   });
@@ -70,7 +76,7 @@ describe('#943 — the refusal quotes the student’s own sentence', () => {
     const f = (id: string, utterance: string | undefined, enabled = true): Fact =>
       ({ id, utterance, enabled, cmd: { type: 'triangle', ids: ['A', 'B', 'C'] } } as unknown as Fact);
 
-    expect(utteranceForError([f('a', 'משולש ABC'), f('b', 'D = חיתוך AB ו-BC')], status, OVER)).toBe('D = חיתוך AB ו-BC');
+    expect(utteranceForError([f('a', 'משולש ABC'), f('b', 'D = חיתוך AB ו-EF')], status, OVER)).toBe('D = חיתוך AB ו-EF');
     // a muted row is not the student's live statement
     expect(utteranceForError([f('b', 'מוסתר', false), f('c', 'הנכון')], status, OVER)).toBe('הנכון');
     // a direct command carries no utterance → undefined, so the caller renders the base template
@@ -95,7 +101,7 @@ describe('#943 — the refusal quotes the student’s own sentence', () => {
   });
 
   it('the flagged templates render the sentence; each keeps its own dynamic data', () => {
-    const said = 'D = חיתוך AB ו-BC';
+    const said = 'D = חיתוך AB ו-EF';
     const cases: { raw: string; keeps: string }[] = [
       { raw: OVER, keeps: 'מתלכדת' }, // the lowered-constraint fragment, translated
       { raw: '|AB| = |AD| references an unknown point', keeps: '|AB| = |AD|' },

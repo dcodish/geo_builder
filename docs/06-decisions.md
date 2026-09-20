@@ -9761,7 +9761,15 @@ non-canvas chip, and the case that proves the predicate is not canvas-specific) 
 render side is still unmeasured.
 ## ADR-489 — An intersection at the carriers' SHARED ENDPOINT is the answer, not a near-miss (#944)
 
-**Status:** accepted, 2026-09-09 (fix-round #949, item 5) · **Issue:** #944
+> **PARTLY SUPERSEDED, 2026-09-20 — [ADR-531](#adr-531) (#1274), on the operator's ruling *"we refuse the
+> B=D"*.** The half of this ADR that *blessed the drawing* is withdrawn: «D = חיתוך AB ו-BC» is now REFUSED
+> at the parser, so `D` is never minted at `B` and the figure below cannot be built from any sentence. The
+> half that is **kept and still live** is the engine rule — a crossing at the carriers' shared endpoint is
+> structurally exact and exempt from the within-margin test — because `rename` and `merge` can still drive
+> two carriers onto one letter after the crossing exists. Read this ADR for WHY the margin rule does not
+> apply to that shape; read ADR-531 for what the tool now says when a student names it.
+
+**Status:** accepted, 2026-09-09 (fix-round #949, item 5); the naming half superseded by ADR-531 · **Issue:** #944
 **Requirements:** [02](02-requirements.md) FR-ALT-5 — **no change**; the promise already held and this restores it · **Design:** [04](04-design.md) — the accept gate · [LADDER](LADDER.md) — the requirement gate, unchanged in shape
 
 **The report.** Found while verifying #942's play case:
@@ -12450,3 +12458,39 @@ They were **not deleted**. They moved to `altitude-foot-at-vertex.test.ts` with 
 **What did NOT change.** `length-order`, `angle-order` and `collinear-order` keep the visible-gap acceptance: they order two measures against each other with no number stated, and there the gap IS the meaning. Acuteness stays strict — «קהה» is `> 90`, and «∠ABC = 90» on an obtuse angle is still refused. A bound-only figure still draws visibly inside its region (measured: «BC ≥ 10» alone settles at 10.25, unchanged).
 
 **Consequences.** `minStrict`/`maxStrict` on both bound commands, both constraints and `measure-bound`; `boundHolds` + the two bound arms of `isSatisfied`; `boundText` prints the student's own relation. `issue-1265-bound-boundary.test.ts` (30) — the class rows are **computed from the relation** (`admits(rel, 10, value)`) over 4 relations × 5 values, so a lock that re-stated "10 ≥ 10" by hand cannot drift from the rule; plus both orders of the operator's case, the ADR-390 aim, the free-measure guarantee, the parser's flags, each end of a two-sided range, the quoted relation, and the angle twin. ADR-390's own three shape assertions in `measure-bound.test.ts` gained the flag rather than being loosened to `toMatchObject`, with two rows added for the non-strict spellings.
+
+## ADR-531 — 2-D: the crossing the student named is a point they already have; and #944 is REVERSED (#1274)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1274 (bug, P2, `2d`) · round #1280's escalation, ruled · the 2-D half of [ADR-W-066](06w-decisions-workspace.md#adr-w-066)
+**Requirements:** [02](02-requirements.md) — FR-XP-1 · **Design:** [04](04-design.md)
+**Reverses** [ADR-489](#adr-489)/#944 — deliberately, on the operator's ruling, not by rediscovery
+
+**The ruling.** Round #1280 escalated this rather than building it, because the refusal collided with a fix the operator had reported, played and approved twelve days earlier. Shown both rulings and the three costed options, he chose the refusal in as many words: ***"we refuse the B=D"***.
+
+**What each ruling was about — the same sentence, twice.**
+
+| | #944 (2026-09-08) | #1274 (2026-09-20) |
+| --- | --- | --- |
+| complaint | the figure is right and the panel says it may be contradictory | a second letter is minted at a position that already has one |
+| resolution | bless the drawing: exempt the shared-endpoint crossing from the margin rule, keep «B=D» and the notice | refuse the sentence: affirm the crossing, name the holder, mint nothing |
+
+Both resolve #944's original complaint — two surfaces disagreeing about one figure — and the second resolves it from the other end: there is no second point, so nothing can disagree about it. That is why this is a reversal of the *resolution* and not a contradiction of the *report*.
+
+**Measured on `ae83d357` before the change**, unchanged since the escalation: «משולש ABC» + «D = חיתוך AB ו-BC» minted `D` at `|BD| = 0`, accepted, coincidence recorded as a notice, `intersectionsWithinSegments` true via ADR-489's exemption.
+
+**The rule is STRUCTURAL and lives in the emitter.** Two carriers named by two points each that share exactly ONE letter meet at that letter, whatever the configuration — no solve, no seed, no tolerance. The test sits inside `cross`, the single emit point of the two-named-lines family, rather than at its three call sites, so a fourth spelling added later cannot reach `line-line-intersection` around it. Sharing BOTH letters is a different sentence (one line named twice) and is deliberately not answered here — analytic drew the same boundary in #1175. The other `line-line-intersection` emitters derive their pairs from a polygon and cannot produce the shape.
+
+**The refusal AFFIRMS the geometry and refuses the NAME**, in 3-D's ADR-3D-183 wording, now shared by all three trees: «הנקודה שביקשתם היא «B» — נקודה שכבר קיימת באיור. AB ו-BC אכן נפגשים שם, אבל אין כאן נקודה חדשה לקרוא לה «D»…». It travels the `Clarify` road, so the student keeps their text and **no paid call is made**.
+
+### What the reversal cost, file by file — the honest ledger
+
+The refusal turned the 2-D lane red on **13 tests across 9 files**. Every one was resolved by moving the test to what the ruling makes true, never by weakening an assertion:
+
+- **`issue-944-shared-endpoint.test.ts` (4)** — rewritten. It now asserts the refusal, and keeps ADR-489's engine exemption locked at the UNIT level on a construction assembled directly. **The exemption stays**: no sentence can build a shared-carrier crossing any more, but `rename` and `merge` can drive two carriers onto one letter after the crossing exists, and the margin rule would then flag a structurally exact intersection — #944's defect by another road. Deleting it because its entry sentence is gone would have been the tidy-looking wrong move.
+- **`scenarios-corpus-4.ts` (5)** — the #944 scenario is **deleted** (it asserted exactly what the ruling reverses, and its replacement coverage is a refusal, which the corpus cannot express); the two #943 scenarios and `existing-point-statements-lower-to-constraints` carry non-degenerate twins, each measured to produce the identical error, subject and other-side attribution, with the operator's original sentence and the reason recorded in `guards`.
+- **`humanize-error-said.test.ts`, `issue-943-other-side.test.ts`, `submitPipeline.test.ts` (3)** — #943 scaffolding. «D = חיתוך AB ו-EF» redefines the same square vertex; measured to give the same `said`, the same `other` («ריבוע DEFG חסום במשולש ABC») and the same `[vs #4]` tail.
+- **`shadow-matrix.test.ts` (2)** — the hard gate. Exactly one pair disappears: `lineCutsCircleTwice → lineLineIntersection`, on «the line AO cuts circle O at C and D» and its Hebrew twin, where the coarser crossing rule used to claim a sentence whose carriers share a letter. The **winner is unchanged** (its own snapshot still passes) and `lineLineIntersection` still diverges elsewhere, so the rule did not go silent — it stopped mis-reading one shape. Removed from `shadow-allowlist.json` with that reason, as the file's own comment requires of a disappearing pair.
+
+**The gap this exposed, filed not built:** a corpus scenario cannot say *"this step is expected to be refused"* — `factsOf` throws on a non-parse — so a ruling that turns a sentence into a refusal forces editing or deleting the operator's own sequence. [#1288](https://github.com/dcodish/geo_builder/issues/1288).
+
+**Consequences.** One `Clarify` member, one `ParseResult` reason, one `refusalOf` mapping, one `runSubmit` arm with its log line, one string per locale. `issue-1274-crossing-already-named.test.ts` (12): the #944 sentence and four more spellings each naming their holder, both carriers quoted, the note + no-commit + no-LLM-call row, the *no second point at B's position* row (the defect stated as geometry), the extension form refused for the same reason, honest crossings and the diagonals still building, and — the boundary — **ADR-123's notice channel still working** for two existing points the givens drive together.

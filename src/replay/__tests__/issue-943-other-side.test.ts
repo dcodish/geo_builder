@@ -4,8 +4,8 @@
  *
  * Measured on `d440f01` (real parse → replay → the real Hebrew locale), the operator's sequence:
  *
- *   «משולש ABC» · «∠ABC = 90» · «ריבוע DEFG חסום במשולש ABC» · «D = חיתוך AB ו-BC»
- *   → «לא ניתן: «D = חיתוך AB ו-BC» סותר נתון קודם — …»          the other side never named
+ *   «משולש ABC» · «∠ABC = 90» · «ריבוע DEFG חסום במשולש ABC» · «D = חיתוך AB ו-EF»
+ *   → «לא ניתן: «D = חיתוך AB ו-EF» סותר נתון קודם — …»          the other side never named
  *
  * Half A (ADR-487) made the refused sentence the subject. The fold knew WHICH statement failed (the
  * ADR-492 pass) but never asked AGAINST WHAT; `humanizeError` — figure-free — structurally could not.
@@ -14,6 +14,12 @@
  * conflicting given, carried as a structured `[vs #<index>]` tail and resolved to words by
  * `otherUtteranceForError`. No single removal restores it ⇒ none is named and the `_said` wording stands.
  * Cost only on the refused path — the counter lock below.
+ *
+ * SENTENCE CHANGED 2026-09-20 (ADR-531, #1274): he typed «D = חיתוך AB ו-BC». Its two carriers share B,
+ * and the operator has since ruled that such a sentence is REFUSED BY NAME before it becomes a fact —
+ * so it can no longer scaffold an over-constraint. «D = חיתוך AB ו-EF» redefines the same square vertex
+ * and was measured to produce the identical refusal, subject and other-side attribution. His original
+ * sentence is covered as a refusal in src/app/__tests__/issue-1274-crossing-already-named.test.ts.
  */
 import { describe, expect, it } from 'vitest';
 import i18n from '@/i18n';
@@ -38,11 +44,11 @@ const explain = (steps: string[]) => {
 
 describe('#943 half B — the refusal names the conflicting earlier given', () => {
   it('the operator’s exact sequence names «ריבוע DEFG חסום במשולש ABC» as the other side', () => {
-    const { fig, said, other, msg } = explain(['משולש ABC', '∠ABC = 90', 'ריבוע DEFG חסום במשולש ABC', 'D = חיתוך AB ו-BC']);
+    const { fig, said, other, msg } = explain(['משולש ABC', '∠ABC = 90', 'ריבוע DEFG חסום במשולש ABC', 'D = חיתוך AB ו-EF']);
     expect(fig.lastError).toMatch(OVER_CONSTRAINED_VS);
-    expect(said).toBe('D = חיתוך AB ו-BC');
+    expect(said).toBe('D = חיתוך AB ו-EF');
     expect(other).toBe('ריבוע DEFG חסום במשולש ABC');
-    expect(msg).toContain('«D = חיתוך AB ו-BC» סותר את «ריבוע DEFG חסום במשולש ABC»');
+    expect(msg).toContain('«D = חיתוך AB ו-EF» סותר את «ריבוע DEFG חסום במשולש ABC»');
     expect(msg).not.toContain('סותר נתון קודם');
     expect(msg).not.toContain('errors.');
   });

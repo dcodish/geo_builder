@@ -45,7 +45,6 @@ import type { AnyCommand, Id, Vec } from '@/engine';
 
 import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad } from './scenarios-harness';
-import { intersectionsWithinSegments } from '@/replay/core';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -792,11 +791,11 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'existing-point-statements-lower-to-constraints',
     title: 'a statement about an EXISTING point is a constraint, never an "already defined" conflict (M1, ADR-231)',
     guards:
-      'operator prod session `fn34ptei` (2026-07-06): after "טרפז ABCD חסום במעגל" auto-created circle-O with centre O, "O מרכז מעגל חסום במשולש ABC" and "O על ED" both crashed \'O\' is already defined — and the mirrored order crashed the same way, so the figure was unbuildable in ANY order. Root cause (the recurring ADR-075/099/115/119/124 class): the ADR-028/050 reinterpretation mechanism was GATED — point-on-segment required the existing point to own a free param DOF, placements gave up without a free param ancestor, and the conflict branch never recruited. Fix (M1): any existing GeoPoint lowers to its defining incidences (collinear + the stated within/beyond order for על; a hidden-target coincidence for placements), the conflict branch gets the same recruitFreeDofs failure path as typed constraints, and an unsatisfiable statement reports the RELATION (honest over-constraint), never a redefinition conflict. This exact sequence contains a genuinely degenerate step (המשכי CE ו CD share C, so their crossing cannot be a distinct A) — the lock asserts the honest-error CLASS, not a buildable figure; the satisfiable members are locked in redefine-existing-point.test.ts.',
+      'operator prod session `fn34ptei` (2026-07-06): after "טרפז ABCD חסום במעגל" auto-created circle-O with centre O, "O מרכז מעגל חסום במשולש ABC" and "O על ED" both crashed \'O\' is already defined — and the mirrored order crashed the same way, so the figure was unbuildable in ANY order. Root cause (the recurring ADR-075/099/115/119/124 class): the ADR-028/050 reinterpretation mechanism was GATED — point-on-segment required the existing point to own a free param DOF, placements gave up without a free param ancestor, and the conflict branch never recruited. Fix (M1): any existing GeoPoint lowers to its defining incidences (collinear + the stated within/beyond order for על; a hidden-target coincidence for placements), the conflict branch gets the same recruitFreeDofs failure path as typed constraints, and an unsatisfiable statement reports the RELATION (honest over-constraint), never a redefinition conflict. This exact sequence contains a genuinely degenerate step (המשכי CE ו CD share C, so their crossing cannot be a distinct A) — the lock asserts the honest-error CLASS, not a buildable figure; the satisfiable members are locked in redefine-existing-point.test.ts. STEP 3 CHANGED 2026-09-20 (ADR-531, #1274): he typed «המשכי CE ו CD נפגשים בנקודה A», and since the operator ruled that a crossing whose carriers share a letter is REFUSED BY NAME, that sentence no longer reaches the fold at all — the corpus harness has no way to express "this step is expected to be refused" (#1288), so the step is carried here as its non-degenerate twin «המשכי CE ו BD», which redefines the same existing A and still produces the honest over-constraint this scenario exists to lock. His original sentence is covered as a refusal in issue-1274-crossing-already-named.test.ts.',
     steps: [
       'טרפז ABCD חסום במעגל',
       'טרפז BCED',
-      'המשכי CE ו CD נפגשים בנקודה A',
+      'המשכי CE ו BD נפגשים בנקודה A',
       'BA',
       'AC',
       'O מרכז מעגל חסום במשולש ABC',
@@ -2342,8 +2341,8 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'over-constrained-refusal-attributes-to-the-typed-step-943',
     title: '#943: the refusal is ATTRIBUTED to the sentence the student just typed — the row that owns the banner error is the last step, not an earlier given',
     guards:
-      "operator, playing round #942 T2 (2026-09-08). With «ריבוע DEFG חסום במשולש ABC» on the canvas, D was already the square's vertex, so «D = חיתוך AB ו-BC» must be refused — and it is. What he was shown named NEITHER statement: «לא ניתן: הנתון D מתלכדת עם הנקודה שנבנתה לה סותר נתון קודם» — a paraphrase of the LOWERED CONSTRAINT as the subject, and «נתון קודם» for the given it conflicts with. The half-A fix echoes the student's own sentence as the subject, which is only honest if the banner error is genuinely OWNED by the step they just typed. That ownership is what this scenario locks: `lastError` is the status of the LAST group and of no earlier one, so a future change that re-attributes the failure would quote the wrong sentence at the student rather than fail silently. The message rendering itself is locked in src/i18n/__tests__/humanize-error-said.test.ts.",
-    steps: ['משולש ABC', 'זוית B ישרה', 'ריבוע DEFG חסום במשולש ABC', 'D = חיתוך AB ו-BC'],
+      "operator, playing round #942 T2 (2026-09-08). With «ריבוע DEFG חסום במשולש ABC» on the canvas, D was already the square's vertex, so «D = חיתוך AB ו-BC» must be refused — and it is. What he was shown named NEITHER statement: «לא ניתן: הנתון D מתלכדת עם הנקודה שנבנתה לה סותר נתון קודם» — a paraphrase of the LOWERED CONSTRAINT as the subject, and «נתון קודם» for the given it conflicts with. The half-A fix echoes the student's own sentence as the subject, which is only honest if the banner error is genuinely OWNED by the step they just typed. That ownership is what this scenario locks: `lastError` is the status of the LAST group and of no earlier one, so a future change that re-attributes the failure would quote the wrong sentence at the student rather than fail silently. The message rendering itself is locked in src/i18n/__tests__/humanize-error-said.test.ts. STEP 4 CHANGED 2026-09-20 (ADR-531, #1274): he typed «D = חיתוך AB ו-BC», whose two carriers share B, and the operator has since ruled that such a sentence is REFUSED BY NAME before it can become a fact. The scaffolding it provided here — a redefinition of the square's D that over-constrains — is carried by «D = חיתוך AB ו-EF», measured to produce the identical refusal with the identical other-side attribution. His original sentence is covered as a refusal in issue-1274-crossing-already-named.test.ts.",
+    steps: ['משולש ABC', 'זוית B ישרה', 'ריבוע DEFG חסום במשולש ABC', 'D = חיתוך AB ו-EF'],
     expectViolations: true, // the last step is INTENTIONALLY refused — the kept figure is the prior one
     check(fig) {
       expect(fig.lastError, 'the honest over-constrained refusal').toMatch(/over-constrained|cannot hold/);
@@ -2358,24 +2357,6 @@ export const SCENARIOS_4: Scenario[] = [
       for (const [id, st] of Object.entries(fig.status)) {
         if (!id.startsWith('g3.')) expect(st, `${id} is untouched`).toBe('ok');
       }
-    },
-  },
-  {
-    id: 'shared-endpoint-intersection-is-not-a-near-miss-944',
-    title: '#944: «D = חיתוך AB ו-BC» draws the one correct answer AND passes the requirement gate — no amber contradiction',
-    guards:
-      "found while verifying #942's play case (2026-09-08). The figure was exactly right — the crossing of AB and BC IS B, so D lands on B, the canvas writes «B=D» (ADR-486) and a blue notice says they coincide — while the input panel simultaneously showed «לא נמצאה תצורה שמקיימת את כל הדרישות יחד … בדקו את הנתון האחרון שהוזן». Two surfaces, opposite claims. `intersectionsWithinSegments` was the single failing conjunct: it requires a declared intersection to sit strictly INSIDE both carriers by WITHIN_MARGIN, and two segments sharing a vertex cross ONLY at that vertex, in every configuration — so no seed could satisfy it and the amber fallback became permanent. Fixed by a STRUCTURAL exemption (do the carriers share an endpoint?), never a slackened margin: loosening WITHIN_MARGIN would re-admit the near-collapse basin #569 exists to catch. ADR-489. This scenario locks the whole-pipeline verdict — the figure builds, D≡B is surfaced as a coincidence, and the requirement gate agrees — because the defect was never in the drawing, it was in the gate that judged it.",
-    steps: ['משולש ABC', 'D = חיתוך AB ו-BC'],
-    check(fig) {
-      allStepsOk(fig);
-      expect(fig.violations, 'no violated given').toEqual([]);
-      const B = at(fig, 'B');
-      const D = at(fig, 'D');
-      expect(dist(B, D), 'D IS B — the only answer, and it is drawn').toBeLessThan(1e-6);
-      expect(fig.coincidences, 'the coincidence is surfaced, not silent').toContainEqual(['B', 'D']);
-      // THE regression: the requirement gate must agree with the drawing. Before ADR-489 this was
-      // false at every seed, which is what put the amber banner on a correct figure for good.
-      expect(intersectionsWithinSegments(fig), 'the within-segment gate agrees with the figure').toBe(true);
     },
   },
   {
@@ -2580,10 +2561,10 @@ export const SCENARIOS_4: Scenario[] = [
   },
   {
     id: 'over-constrained-refusal-names-the-other-side-943',
-    title: '#943 half B: the operator’s «D = חיתוך AB ו-BC» refusal names «ריבוע DEFG חסום במשולש ABC» as the given it contradicts',
+    title: '#943 half B: a refusal that redefines the square’s D names «ריבוע DEFG חסום במשולש ABC» as the given it contradicts',
     guards:
-      "The operator's exact sequence (2026-09-08). Half A made the refused sentence the subject; the fold now runs a bounded drop-one search over the earlier STATEMENTS and carries the conflicting one as a `[vs #<index>]` tail on the status string — an index, because statuses live by index and a dry-run shares the committed fold. Index 4 is the square's row (the triangle is row 0, «∠ABC = 90» lowers to rows 1–3). The message-level assertion (real Hebrew locale) lives in replay/__tests__/issue-943-other-side.test.ts; this scenario locks the FOLD's answer through the app's real replay path.",
-    steps: ['משולש ABC', '∠ABC = 90', 'ריבוע DEFG חסום במשולש ABC', 'D = חיתוך AB ו-BC'],
+      "The operator's exact sequence (2026-09-08). Half A made the refused sentence the subject; the fold now runs a bounded drop-one search over the earlier STATEMENTS and carries the conflicting one as a `[vs #<index>]` tail on the status string — an index, because statuses live by index and a dry-run shares the committed fold. Index 4 is the square's row (the triangle is row 0, «∠ABC = 90» lowers to rows 1–3). The message-level assertion (real Hebrew locale) lives in replay/__tests__/issue-943-other-side.test.ts; this scenario locks the FOLD's answer through the app's real replay path. STEP 4 CHANGED 2026-09-20 (ADR-531, #1274): he typed «D = חיתוך AB ו-BC», whose two carriers share B, and the operator has since ruled that such a sentence is REFUSED BY NAME before it can become a fact. The scaffolding it provided here — a redefinition of the square's D that over-constrains — is carried by «D = חיתוך AB ו-EF», measured to produce the identical refusal with the identical other-side attribution. His original sentence is covered as a refusal in issue-1274-crossing-already-named.test.ts.",
+    steps: ['משולש ABC', '∠ABC = 90', 'ריבוע DEFG חסום במשולש ABC', 'D = חיתוך AB ו-EF'],
     check(fig) {
       expect(fig.lastError, 'still refused, still the over-constrained shape').toMatch(/^over-constrained: .+ cannot hold \[vs #4\]$/);
       // the refused statement's rows carry the banner's string, tail included (ADR-398)

@@ -324,6 +324,18 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     ui.setBusy(false);
     return;
   }
+  /**
+   * #1274 (operator ruling, ADR-W-066): «D = חיתוך AB ו-BC» — AB and BC meet at B and nowhere else, so
+   * the letter the student asked for would be a second name for a point the figure already has. The
+   * crossing is AFFIRMED and the name refused (3-D's ADR-3D-183 wording, now 2-D's too); the text stays
+   * in the box and no paid call is made to be told the same thing.
+   */
+  if (!r.ok && r.reason === 'crossing-already-named') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `crossing-already-named:${r.holder}:${r.s1.join('')}/${r.s2.join('')}` });
+    ui.setInputNote(t('input.crossingAlreadyNamed', { holder: r.holder, id: r.id, s1: r.s1.join(''), s2: r.s2.join('') }));
+    ui.setBusy(false);
+    return;
+  }
   if (!r.ok && r.reason === 'angle-sides-disjoint') {
     logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `angle-sides-disjoint:${r.s1}/${r.s2}` });
     ui.setInputNote(t('input.angleSidesDisjoint', { s1: r.s1, s2: r.s2 }));

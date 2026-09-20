@@ -1651,6 +1651,15 @@ function segParam(fig: Derived, a: Id, b: Id, p: Id): number | null {
  *
  * So this is a STRUCTURAL exemption, derived from the construction, not a slackened margin — loosening
  * `WITHIN_MARGIN` would re-admit the near-collapse basin [#569](../../issues/569) exists to catch.
+ *
+ * **Its entry sentence is gone, and the exemption is not** ([ADR-531](docs/06-decisions.md#adr-531),
+ * #1274, 2026-09-20). The operator ruled that «D = חיתוך AB ו-BC» must be REFUSED rather than drawn under
+ * a second letter, so the parser no longer emits a `line-line-intersection` whose carriers share a letter
+ * and no utterance can build the figure described above. This predicate stays because `rename` and `merge`
+ * can still drive two carriers onto one letter AFTER the crossing exists — and then the margin rule would
+ * flag a structurally exact intersection, which is the #944 defect arriving by a different road. Locked at
+ * the unit level in `src/__tests__/issue-944-shared-endpoint.test.ts` on a construction assembled directly,
+ * since the sentence that used to reach it is now a refusal.
  */
 function shareEndpoint(a: Id, b: Id, c: Id, d: Id): boolean {
   return a === c || a === d || b === c || b === d;

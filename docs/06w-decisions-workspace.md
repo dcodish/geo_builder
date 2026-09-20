@@ -3367,9 +3367,9 @@ If the log is the only channel, **a product without a usage log has no channel a
 
 ## ADR-W-066 — TWO NAMED POINTS ARE NEVER DRAWN AT THE SAME PLACE (#1254, #1274, #1273)
 
-**Status:** the RULE accepted, 2026-09-20; **2-D's member escalated to the operator, not built** · **Operator ruling**, given playing round #1252's T18 and then extended by hand · round #1280
-**Products:** analytic ([ADR-AG-125](06c-decisions-analytic.md#adr-ag-125), built here), 3-D (already: ADR-3D-183), 2-D (**[#1274](https://github.com/dcodish/geo_builder/issues/1274) — blocked, see below**)
-**Requirements:** [02c](02c-requirements-analytic.md) (analytic); 3-D's shipped with ADR-3D-183; 2-D's is not written, because its member is not built · **Design:** [04c](04c-design-analytic.md). This ADR states the RULE the trees share; it adds no promise of its own.
+**Status:** accepted, 2026-09-20; **all three members built** — 2-D's after the operator ruled on the collision below · **Operator ruling**, given playing round #1252's T18, extended by hand, and settled a second time the same day · round #1280
+**Products:** analytic ([ADR-AG-125](06c-decisions-analytic.md#adr-ag-125)), 3-D (already: ADR-3D-183), 2-D ([ADR-531](06-decisions.md#adr-531), #1274 — built after the ruling below)
+**Requirements:** [02](02-requirements.md) FR-XP-1 (2-D) and [02c](02c-requirements-analytic.md) R60 (analytic); 3-D's shipped with ADR-3D-183 · **Design:** [04](04-design.md) and [04c](04c-design-analytic.md). This ADR states the RULE the trees share; it adds no promise of its own.
 
 **The ruling, verbatim.** *"P falls on B. why dont we reject it in this case? … if P and B must be on the same location, like in this case, it should be refused. The only case where P and B can fall [together] is if one of them has a degree of freedom and I would just press «show a different config» and would see a different config. … even if they do fall on the same point by chance, but not necessarily because there is a degree of freedom, the system should not show them on top of each other. It should automatically look for a different config and show them differently. So this is otherwise very confusing to show two points on the same location."*
 
@@ -3384,7 +3384,7 @@ And, asked whether it was analytic-only: *"the 2d and 3d tools should follow the
 | | a NEW letter named where a point already is | two EXISTING points driven together by the givens |
 | --- | --- | --- |
 | **3-D** | refused — `point-coincides`, affirming the geometry (ADR-3D-183, #769, 30 Aug) | — |
-| **2-D** | **minted**, notice only | notice (ADR-123), and a separating configuration already preferred first (ADR-486, #942) |
+| **2-D** | **minted**, notice only → **refused** (ADR-531, 20 Sep) | notice (ADR-123), and a separating configuration already preferred first (ADR-486, #942) — unchanged |
 | **analytic** | structural case refused (#1175); positional case minted | nothing |
 
 So the ruling's *display* half was already 2-D's behaviour and its *naming* half was already 3-D's. The missing cell in **analytic** is built here (ADR-AG-125). The display half for analytic — a configuration-search preference — is [#1273](https://github.com/dcodish/geo_builder/issues/1273), deliberately NOT in this round: it is a different mechanism and wants a clean run, and 2-D's `firstSatisfyingSeed` ranking is the shape to port rather than a second invention.
@@ -3392,9 +3392,9 @@ So the ruling's *display* half was already 2-D's behaviour and its *naming* half
 **THE DISTINCTION THAT MUST SURVIVE, and it is not "refuse every coincidence".** Two situations look alike:
 
 1. **A new point is NAMED at an occupied position** — «D נקודת המפגש של AB עם BC» where the two lines share B. The geometry is right and only the NAME is wrong: there is no new point to make. → **Refuse, affirming the crossing and naming the holder.**
-2. **Two points that already exist are driven together by the student's own givens** — an inscribed square's seating (#942), a point landing on a circle's centre (ADR-123's own example). Nothing is misnamed; the figure is what the student stated. → **ADR-123's notice stands**, after the search has tried to avoid it.
+2. **Two points that already exist are driven together by the student's own givens** — an inscribed square's seating (#942), a point landing on a circle's centre (ADR-123's own example). Nothing is misnamed; the figure is what the student stated. → **ADR-123's notice stands**, after the search has tried to avoid it. This half is untouched in every tree, and four 2-D locks assert it.
 
-### Why 2-D's member is NOT built here — a shipped ruling says the opposite about the same sentence
+### 2-D's member collided with a shipped ruling, and the operator settled it
 
 The 2-D refusal was written, and it turned the 2-D lane red: **13 tests across 9 files**. Nine of them are one figure — [#944](https://github.com/dcodish/geo_builder/issues/944) / [ADR-489](06-decisions.md#adr-489), 2026-09-08 — and that figure is **case 1 above**, not case 2:
 
@@ -3405,8 +3405,8 @@ D = חיתוך AB ו-BC
 
 #944 was the operator reporting that the tool drew this correctly and flagged it amber anyway. The ruling that shipped was that the crossing of two carriers sharing a vertex *"is structurally exact … the correct and only answer"*: `D` lands on `B`, the canvas writes «B=D», a blue notice says so, and `intersectionsWithinSegments` gained a **structural exemption** for exactly this shape. Its lock asserts, positively, that `D` IS minted at `B`. Three further 2-D locks use the same sentence as scaffolding for #943's refusal wording, and `shadow-matrix`'s **hard gate** — the one `vitest -u` cannot absorb — records a catalog-wide shadow set that the parser change moves.
 
-So the taxonomy above is not yet a decision procedure for 2-D: the same sentence is case 1 by its letters and, by an accepted ADR the operator validated twelve days earlier, a correct drawing. A session cannot pick between two operator rulings, and refusing #944's figure would withdraw a fix he played and approved. That is the "an operator ruling is needed" clause of the round's escalation exit, so #1274 carries the escalation and this ADR carries the finding. Nothing in `src/` moved.
+So the taxonomy above was not yet a decision procedure for 2-D: the same sentence is case 1 by its letters and, by an accepted ADR the operator validated twelve days earlier, a correct drawing. A session cannot pick between two operator rulings, so round #1280 escalated it with three costed options rather than building it — and **the operator ruled the same day: *"we refuse the B=D"***. [ADR-531](06-decisions.md#adr-531) carries the reversal, its cost file by file, and the one gap it exposed ([#1288](https://github.com/dcodish/geo_builder/issues/1288)). The escalation is what produced the ruling; it is left recorded here because the collision is the reusable lesson, not the outcome.
 
-The question for the operator is short: **when «D = חיתוך AB ו-BC» draws the right point under a second name, is the honest answer the refusal (#1274, and 3-D's behaviour since ADR-3D-183) or the merged label «B=D» plus the notice (#944, shipped)?** Both resolve #944's original complaint — the contradiction between two surfaces — and only one of them can be the tool's answer.
+The question put to him was short: **when «D = חיתוך AB ו-BC» draws the right point under a second name, is the honest answer the refusal (3-D's behaviour since ADR-3D-183) or the merged label «B=D» plus the notice (#944, shipped)?** Both resolve #944's original complaint — the contradiction between two surfaces — and only one of them can be the tool's answer. He chose the refusal, which makes the rule at the top of this ADR true in all three trees without exception.
 
 **Why an ADR-W rather than three quiet copies.** Three trees now answer one question, and they reached the answer at three different dates by three different routes. The next person to touch any of them needs the rule, not one tree's version of it — and the audit table above is the evidence that "port it" was checked rather than assumed ([[cross-product-disparity-is-a-wiring-smell]] in the operator's own terms). The 2-D collision is the same evidence working in the other direction: the audit found the cell missing, and the locks found out why.

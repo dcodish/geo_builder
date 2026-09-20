@@ -50,6 +50,11 @@ export type ParseResult =
   // #1267: «BD חוצה זווית לצלע BC» — the bisector from B meets AC, and the side the student NAMED is not
   // the one it can meet. Refused with both sides quoted, never silently redirected to the real one.
   | { ok: false; reason: 'cevian-wrong-side'; apex: string; stated: [string, string]; actual: [string, string] }
+  // #1274 (operator ruling, ADR-W-066): «D = חיתוך AB ו-BC» — the two carriers the student named share a
+  // letter, so their crossing IS that letter, in every configuration, with no solve, no seed and no
+  // tolerance. The geometry is right and only the NAME is wrong: there is no new point to make. Refused
+  // with the crossing AFFIRMED and the holder named, never minted as a second letter at one position.
+  | { ok: false; reason: 'crossing-already-named'; holder: string; id: string; s1: [string, string]; s2: [string, string] }
   // #770: a definite SHAPE reference («אלכסוני הריבוע») whose named kind has no declared match in the
   // figure — the statement is refused BY NAME (the honesty invariant: name the conflicting statement),
   // never bound to "whichever quad exists" and never guessed by the LLM. `noun` is the student's word.
@@ -276,7 +281,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -1716,7 +1721,16 @@ const lineLineIntersection: Rule = (s, ctx) => {
   // point, so the student sees the line reaching it (the operator drew BG/CG by hand otherwise). Order
   // matters: a segment to the point before it exists would create it as a stray free point and conflict
   // with the intersection ("'G' is already defined") — so extension segments come AFTER the intersection.
-  const cross = (id: string, a: string, b: string, c: string, d: string, sem1: 'bare' | 'ext' | 'line' = 'bare', sem2: 'bare' | 'ext' | 'line' = 'bare'): Command[] => {
+  const cross = (id: string, a: string, b: string, c: string, d: string, sem1: 'bare' | 'ext' | 'line' = 'bare', sem2: 'bare' | 'ext' | 'line' = 'bare'): Command[] | Extract<Clarify, { clarify: 'crossing-already-named' }> => {
+    // #1274 (operator ruling, ADR-W-066 — «we refuse the B=D»): two carriers named by two points each that
+    // share exactly ONE letter meet at that letter, whatever the configuration — no solve, no seed, no
+    // tolerance. There is no new point to make, so the crossing is affirmed and the NAME refused. The test
+    // sits INSIDE the emitter rather than at its three call sites, so a fourth spelling added later cannot
+    // reach `line-line-intersection` around it. Sharing BOTH letters is a different sentence (one line
+    // named twice, not two lines) and is deliberately not answered here.
+    const [A, B, C, D] = [up(a), up(b), up(c), up(d)];
+    const shared = [A, B].filter((x) => x === C || x === D);
+    if (shared.length === 1) return { clarify: 'crossing-already-named', holder: shared[0], id: up(id), s1: [A, B], s2: [C, D] };
     // Both bare = the joint ADR-166 `onSeg` (sampled requirement + apex reflection — whether two whole
     // segments cross at all is discrete). A single bare operand = per-operand `onSeg1`/`onSeg2`, driven
     // continuously by a collinear-order in the engine (issue #22).
@@ -11041,6 +11055,8 @@ function refusalOf(res: Clarify): ParseResult {
     return { ok: false, reason: 'cevian-degenerate', role: res.role, why: res.why, apex: res.apex, foot: res.foot, side: res.side };
   if (res.clarify === 'cevian-wrong-side')
     return { ok: false, reason: 'cevian-wrong-side', apex: res.apex, stated: res.stated, actual: res.actual };
+  if (res.clarify === 'crossing-already-named')
+    return { ok: false, reason: 'crossing-already-named', holder: res.holder, id: res.id, s1: res.s1, s2: res.s2 };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 
