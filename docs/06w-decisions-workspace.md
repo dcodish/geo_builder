@@ -3553,3 +3553,26 @@ boundary on unattended rounds (ADR-W-054).
 other PC ([[work-pc-cross-machine]]). A file in the worktree is gone when the worktree is; a published
 artifact has a URL that outlives the session and a database that can hold his verdicts. That was
 ADR-W-054's reasoning and it is unchanged — only its reach is, from overnight rounds to all of them.
+
+## ADR-W-069 — The input's live preview typesets MATHEMATICS, in every builder (#1152)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1152 (bug, P2, `workspace` + `analytic`) · operator report 2026-09-16 · round #1292
+**Requirements:** [02c](02c-requirements-analytic.md) / [02b](02b-requirements-3d.md) — the input strip · **Design:** [28](28-product-unification.md) §the preview seam
+**Third surface of** [#1082](https://github.com/dcodish/geo_builder/issues/1082)'s ruling, after [#1097](https://github.com/dcodish/geo_builder/issues/1097) chased it into a second panel
+
+**The report.** Typing «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9»: *"on data input — the bidi text should also be MathML so the squared needs to show nice."* The strip under the box already repairs the bidi; it rendered that repaired sentence as plain text, so `(x-3)^2` kept its caret a few pixels above a fact row showing a real superscript — the student's own equation, two ways, in two elements.
+
+**Root cause: sibling drift.** The mechanism shipped in the oldest tree and the younger ones were written from the older template. The shared chassis was already ready for it — `shell/frame/InputArea.tsx` types the seam as `preview?: (text: string) => ReactNode | null`, *"a string, or a rendered node"* — so no shared-component change was needed, only the callers.
+
+**Re-measured at pickup, and the scope is smaller than the issue's table.** The issue listed three trees; `src-analytic/App.tsx` has been fixed since it was filed, and fixed correctly (isolate, then typeset). Only `src-complex` and `src3d` remained. The issue's own note asked for exactly this re-confirmation.
+
+**The two traps, both now locked.**
+
+1. **Isolate first, then typeset.** 2-D's line typesets the RAW string. Copying it verbatim into an RTL-Hebrew product would typeset unisolated text and could reorder the equation — the very thing the strip exists to prevent. Both adopters pass `isolateLtrRuns(…, true)` output to `MathText`; the isolate characters ride through untouched and the Hebrew stays Hebrew.
+2. **The trigger changes, deliberately: presence of MATHEMATICS, not presence of a bidi change.** `inputPreview` returns `null` when isolation changes nothing, so a pure-LTR equation like `(x-3)^2+(y-4)^2=9` had **no strip at all**. It gets one now. That is a product choice and it is the one worth naming: the strip stops being *"a bidi repair"* and becomes *"what you typed, typeset"*.
+
+**Dependency cleared.** The issue sequenced itself behind #1125 (`shell/math.tsx` was a VALUE grammar, so `√` survived as a glyph). #1125 is closed, so the strip typesets roots as well as powers and this does not ship a preview that is right for one and wrong for the other.
+
+**What is deliberately not changed.** 2-D still typesets the raw string. It is the tree the mechanism came from, it ships, and whether its own line should isolate first is a question about 2-D rather than about this port — the lock excludes it **by name and with that reason**, so the exclusion is visible rather than an accident of how the assertion was written.
+
+**Consequences.** `src-complex/App.tsx` and `src3d/App3.tsx` (+the `hasMath`/`MathText` import, the preview expression). `shell/__tests__/issue-1152-typeset-preview-parity.test.ts` (13): every builder routes its preview through `hasMath` and `MathText`; every builder that joined via this port isolates BEFORE typesetting; and the trigger itself is **called, not described** — the rows fix what `hasMath` answers for the strings the ruling is about, so a change that narrowed it fails here instead of silently emptying four previews. A fifth builder is one line in `APPS`.

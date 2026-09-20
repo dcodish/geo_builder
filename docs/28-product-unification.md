@@ -705,6 +705,16 @@ the same way, and means the same thing"* — or an explicit `n/a` with a reason.
   vocabulary + per-builder extension, the operator's ruling on
   [#525](https://github.com/dcodish/geo_builder/issues/525)), same live preview, same RTL/bidi
   handling of the student's own text ([#482](https://github.com/dcodish/geo_builder/issues/482)).
+  The preview seam is `preview?: (text: string) => ReactNode | null` on `shell/frame/InputArea` — *a
+  string, or a rendered node* — and every builder passes a node when the line carries mathematics:
+  **isolate first (`shell/bidi`), then typeset (`shell/math`)**, because the isolate characters ride
+  through the typesetter untouched while typesetting raw text would reorder the equation. The trigger
+  is `hasMath` — the presence of mathematics rather than the presence of a bidi change — so an
+  all-LTR equation grows a strip where isolation alone produced none
+  ([ADR-W-069](06w-decisions-workspace.md#adr-w-069), [#1152](https://github.com/dcodish/geo_builder/issues/1152)).
+  Parity is held by `shell/__tests__/issue-1152-typeset-preview-parity.test.ts`; this is the third
+  surface the #1082 typesetting ruling had to be carried to by hand, which is the cost of the
+  older-tree-as-template habit rather than of the seam.
 - **The fact list**: same place, same enable/disable, same edit and undo semantics, same rule that
   restating a known fact adds no row ([#613](https://github.com/dcodish/geo_builder/issues/613), the
   operator's *"true to all tools"*).
