@@ -583,7 +583,18 @@ describe('#868 — the input box and its preview cannot disagree about direction
   const inputArea = (() => {
     const start = app.indexOf('<InputArea');
     expect(start, 'the InputArea must be findable').toBeGreaterThan(0);
-    return app.slice(start, app.indexOf('/>', start));
+    /**
+     * The element ends at a `/>` ALONE ON ITS LINE, not at the first `/>` after the open tag (#1152).
+     *
+     * The naive search broke the moment a prop rendered an element: `preview` now returns
+     * `<MathText … />` for a line carrying mathematics, and that inline `/>` truncated this slice
+     * before `boxDir` — so both rows below failed while App3.tsx still passed `boxDir` and
+     * `previewDir`, both resolving through `textDir3`. The PROPERTY was never broken; the extraction
+     * was. Nesting is normal in JSX props, so the extraction has to survive it.
+     */
+    const end = app.slice(start).search(/\n\s*\/>/);
+    expect(end, 'the InputArea must close on its own line').toBeGreaterThan(0);
+    return app.slice(start, start + end);
   })();
 
   it('the box direction is passed at all (it used to fall back to dir="auto")', () => {

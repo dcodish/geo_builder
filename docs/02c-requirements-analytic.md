@@ -983,6 +983,20 @@ becomes «2+(y-4)^2=9^(x-3)», a formula the student did not write. Every surfac
 the box while typing, its live preview, the example chips, the fact list and its editor — isolates the
 runs and takes its direction from the content.
 
+**And the live preview TYPESETS what it shows** ([ADR-W-069](06w-decisions-workspace.md#adr-w-069) ·
+[#1152](https://github.com/dcodish/geo_builder/issues/1152)). The strip under the box and the fact row
+a few pixels below it show the same equation, so one of them printing `^2` where the other draws a real
+superscript tells the student their transcription came out wrong when it did not. Mathematics is
+typeset wherever it is shown — the #1082 ruling, on this surface.
+
+**Its trigger is the presence of MATHEMATICS, not the presence of a bidi change.** A pure-LTR equation
+— «(x-3)^2+(y-4)^2=9» with no Hebrew around it — needs no isolation, so it used to get no strip at
+all. It gets one: the strip is not a bidi repair that sometimes appears, it is what you typed, typeset.
+
+**Order matters: isolate first, then typeset.** The runs are decided by the bidi layer and its isolate
+characters ride through the typesetter untouched. Typesetting the raw text instead would reorder the
+equation — exactly what R78 exists to prevent.
+
 **R79 — a centre the student NAMED carries its value**
 ([ADR-AG-055](06c-decisions-analytic.md#adr-ag-055)). «נתון מעגל O שמשוואתו (x-3)^2+(y-5)^2=25» draws
 `O(3, 5)`: the equation is read, not solved, so the centre is as given as writing `O(3,5)` would be.
