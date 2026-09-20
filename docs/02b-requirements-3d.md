@@ -128,6 +128,15 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   is the arrow or the word they typed, never a guess. An unmarked «DC=3AB» previews nothing, because the tool
   does not yet know whether that sentence is about vectors — and «אורך AB = 5» never grows an arrow, which
   would assert vector-ness the statement never had.
+
+  **It shows the arrow ITSELF, not the character that stands for it**
+  ([ADR-3D-255](06b-decisions-3d.md#adr-3d-255-am-1--the-preview-renders-a-node-not-a-string-1312) Am. 1,
+  [#1312](https://github.com/dcodish/geo_builder/issues/1312)). The arrow is typeset as one mark spanning
+  both letters, exactly as the step row typesets it — never `U+20D7` shown as a character, which is a
+  COMBINING mark and would sit over the last letter alone. So a marked line previews **whenever the
+  rendering differs from the characters in the box**, including one already typed with `⃗`: the box is a
+  plain text field and can never show a spanning arrow, so that is precisely the line that needs the strip.
+  A line the tool would render identically to what is already in the box still previews nothing.
 - **FR-VC-1b (Must)** — **A vector can START a figure, and the word «וקטור» draws a vector.** The
   vectors unit opens on an empty canvas, so «וקטור AB» must build there: both endpoints are
   introduced as free points ([ADR-052](06-decisions.md#adr-052) — an unstated position is a free DOF

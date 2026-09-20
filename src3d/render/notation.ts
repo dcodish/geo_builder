@@ -13,11 +13,10 @@
  * the term grammar, which is the #313 MathML rework's job; this formatter never guesses.
  */
 
-import { COMBINING_ARROW, isVectorMarked3, SPACING_ARROWS, VECTOR_WORD_SRC } from '../lexicon/marks3';
+import { COMBINING_ARROW, SPACING_ARROWS, VECTOR_WORD_SRC } from '../lexicon/marks3';
 // #1195: the preview composes bidi isolation with the notation, so the display layer reads the
 // isolation transform. `i18n/bidi` imports NOTHING — it is a leaf — so this edge runs downward, the
 // direction `render` already depends in. The reverse (bidi importing render) would invert it.
-import { isolateLtrRuns3 } from '../i18n/bidi';
 
 /** Command types whose rows read as vector statements (the word וקטור is decoration). */
 export const VEC_CMD_TYPES = new Set(['name-vector', 'vec-rel', 'dot-given', 'inject-vector', 'point-in-span']);
@@ -68,44 +67,15 @@ export function factDisplay3(f: { utterance: string; cmds: { type: string; claim
 }
 
 /**
- * THE INPUT PREVIEW, COMPOSED (#1195).
+ * THE INPUT PREVIEW lives in `render/FactRow3.tsx` as `inputPreviewNode3`, beside the step row's
+ * `FactRowText3` (#1195, then #1312).
  *
- * **Operator, 2026-09-18, playing round #1193 T1:** *"I want to have the correct text appear below the
- * text like we do when hebrew is involved so the user sees the real input. the text should show like in
- * the input box with the arrow above the vector."*
+ * It was a STRING composer here, and that shape was the defect: the preview's vector branch has to
+ * hand `VecMath` text that has NOT been isolated (VecMath isolates at the render event, ADR-3D-184,
+ * and its tokenizer reads LRI/PDI as `op` tokens otherwise), while the plain branch has to return
+ * isolated text. One string cannot be both, and returning a string at all is what let `U+20D7` reach
+ * the DOM as a literal combining mark instead of the `mover` that spans the pair.
  *
- * The box holds what the student typed — `DC→=3AB→`. The step row, AFTER they submit, shows the textbook
- * form with the arrow over the letters. Between typing and submitting there was NOTHING: `inputPreview3`
- * is bidi-only and returns `null` when isolation changes nothing, so a pure-LTR vector line previewed
- * not at all. That gap is what the bidi preview already closes for Hebrew, closed for vector notation.
- *
- * ## Why the gate is the MARKING and not the parse
- *
- * The preview runs on UNPARSED text — there is no command yet, so it cannot ask `isVectorFact3` the way
- * `factDisplay3` does. And `vectorNotation` is **unconditional**: measured, it turns «אורך AB = 5» into
- * «אורך AB⃗ = 5» and an unmarked `DC=3AB` into `DC⃗=3AB⃗`. The caller supplies the honesty gate, always.
- *
- * So the gate is what the student EXPLICITLY WROTE: an arrow, or the vector word. That is honest by
- * construction — showing an arrow for a line that already carries one asserts nothing they did not say —
- * and it is the same marking the parser reads (#1183/ADR-3D-250), from the same lexicon leaf.
- *
- * A bare `DC=3AB` still previews nothing, which is correct: the tool does not yet know whether that
- * sentence is about vectors, and #1183 is the whole story of it being ASKED.
- *
- * ## Where it sits in the pipeline
- *
- * **Isolate first, then typeset** — the same order #1152 established for the mathematics strip, and for
- * the same reason: the bidi runs are decided by `i18n/bidi`, and its isolate characters ride through
- * untouched. Composing the other way round could reorder the equation, which is what the strip exists to
- * prevent.
- *
- * The `null`-when-nothing-changes contract survives for plain lines, so the box does not grow an empty
- * second row — but it must NOT swallow `DC⃗=3AB⃗`, which is pure LTR, needs no isolation, and is exactly
- * the line the operator was looking at.
+ * `vectorNotation` above is still the composer; what moved is the CHOICE of renderer, to the one file
+ * that already owns that choice for the committed row.
  */
-export function inputPreviewDisplay3(s: string, vecNames: Set<string>): string | null {
-  const iso = isolateLtrRuns3(s, true);
-  if (!isVectorMarked3(s)) return iso === s ? null : iso;
-  const shown = vectorNotation(iso, vecNames);
-  return shown === s ? null : shown;
-}
