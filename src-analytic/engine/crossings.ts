@@ -68,6 +68,56 @@ function apart(figure: Figure): number {
 }
 
 /**
+ * IS THERE ALREADY A POINT THERE? (#1113, #1235)
+ *
+ * One question, one answer. Both crossing loops used to ask it and they disagreed: the conic loop
+ * called `apart()` (relative, #1113's fix) while the straight loop four lines above still carried a
+ * hard-coded `1e-6`. An absolute tolerance on a quantity that carries the figure’s scale is not a
+ * threshold on anything geometric — on a figure spanning 18.6 it is 50× tighter than the relative
+ * one, so a ring was offered on top of a point that already had a letter, which is exactly how a
+ * second and third name reach one location ([ADR-AG-021](../../docs/06c-decisions-analytic.md)).
+ */
+function occupied(figure: Figure, at: { x: number; y: number }): boolean {
+  const near = apart(figure);
+  return figure.points.some((p) => Math.hypot(p.x - at.x, p.y - at.y) < near);
+}
+
+/**
+ * HOW FAR APART TWO STRAIGHTS ARE IN ANGLE, AS A SINE — the only scale-free reading (#1235).
+ *
+ * `a*q.b - q.a*p.b` is the raw determinant and it scales with both lines’ coefficient magnitudes,
+ * so a bare `< 1e-12` on it is a threshold on nothing. Measured on a figure where a segment and a
+ * stated line were the SAME line to solver tolerance: `det = -2.07e-7`, five orders of magnitude
+ * above that guard, while the normalised value was `-6.65e-8` — an angle of 3.8e-6 degrees. The
+ * guard’s own comment says it is there to catch "parallel, or the same line"; it did not.
+ *
+ * Dividing by the two coefficient norms gives the sine of the angle between them, which is what the
+ * question was always about — the same instrument `apart()` uses one level down, and the same
+ * ADR-AG-021 ruling: never an absolute magnitude.
+ */
+function angleSine(p: Straight, q: Straight): number {
+  const np = Math.hypot(p.a, p.b);
+  const nq = Math.hypot(q.a, q.b);
+  if (np === 0 || nq === 0) return 0; // not a line at all; nothing crosses it
+  return Math.abs(p.a * q.b - q.a * p.b) / (np * nq);
+}
+
+/**
+ * The angular bar two straights must clear to be said to CROSS, as a sine.
+ *
+ * **Measured, 2026-09-20.** On a satisfied incidence the solve leaves a residual of ~2e-9 absolute
+ * on spans of 10–15 — about 2e-10 relative — and two representations of one line, built from points
+ * the solver placed, were measured 6.65e-8 apart by this reading. `1e-6` sits two orders above that
+ * noise and corresponds to an angle of 5.7e-5 degrees, which no student means and no figure shows.
+ *
+ * It answers "are these the same line?", not "is this intersection useful?". Two genuinely different
+ * lines meeting at a shallow angle cross far outside the drawing, and that is an EXTENT question for
+ * `within`, not an angular one — widening this constant to cover it would start calling distinct
+ * lines identical.
+ */
+const CROSS_MIN_SINE = 1e-6;
+
+/**
  * The Hebrew noun for each curve family, for a curve with only its equation to go by (#1096).
  *
  * These are the words the grammar's operand reader accepts, so a sentence built from them parses
@@ -275,8 +325,10 @@ interface Conic {
 
 /** Where two straights meet — `null` when they are parallel, or meet outside what is drawn. */
 function meet(p: Straight, q: Straight): { x: number; y: number } | null {
+  // Parallel, or the same line — judged on the NORMALISED determinant, which is the sine of the
+  // angle between them. The raw one carries the figure’s scale and never fired (#1235).
+  if (angleSine(p, q) < CROSS_MIN_SINE) return null;
   const det = p.a * q.b - q.a * p.b;
-  if (Math.abs(det) < 1e-12) return null; // parallel, or the same line
   const x = (p.b * q.c - q.b * p.c) / det;
   const y = (q.a * p.c - p.a * q.c) / det;
   if (p.within && !p.within(x, y)) return null;
@@ -320,7 +372,7 @@ export function crossingsOf(figure: Figure, c: Construction): Crossing[] {
       const at = meet(straights[i], straights[j]);
       if (!at) continue;
       // Already a point there? Then there is nothing to offer.
-      if (figure.points.some((p) => Math.hypot(p.x - at.x, p.y - at.y) < 1e-6)) continue;
+      if (occupied(figure, at)) continue;
       // The same crossing found twice — two sides of one vertex, say — is one dot.
       const id = `${at.x.toFixed(6)},${at.y.toFixed(6)}`;
       if (out.some((o) => o.id === id)) continue;
@@ -344,7 +396,7 @@ export function crossingsOf(figure: Figure, c: Construction): Crossing[] {
        * remaining one would call itself "the first" and collide with the point already there.
        */
       roots.forEach((at, n) => {
-        if (figure.points.some((p) => Math.hypot(p.x - at.x, p.y - at.y) < apart(figure))) return;
+        if (occupied(figure, at)) return;
         const id = `${at.x.toFixed(6)},${at.y.toFixed(6)}`;
         if (out.some((o) => o.id === id)) return;
         out.push({ ...at, first: st.words, second: cn.words, id, nth: roots.length > 1 ? n : undefined });

@@ -1139,6 +1139,19 @@ it would silently drop a stated given.
 A product that writes a notation and then refuses it back teaches the student that their own correct
 transcription is wrong, and sends them hunting for a mistake they did not make.
 
+**And the converse: a sentence the tool OFFERS must be one worth writing**
+([ADR-AG-130](06c-decisions-analytic.md#adr-ag-130) ·
+[#1235](https://github.com/dcodish/geo_builder/issues/1235)). A clickable crossing ring composes a given
+and puts it in the student’s own list of what they stated, so it carries the tool’s word that the
+sentence means something. «P נקודת החיתוך של הישר CE עם הישר CE» does not — a line does not cross
+itself — and a student cannot be expected to know that is something the tool should have known.
+
+**No offered ring names one object twice, and none is offered where a point already sits.** Both are
+questions about whether two things are the SAME thing, so both are judged relative to the figure’s own
+scale, never against an absolute number (ADR-AG-021). An absolute threshold on a quantity that carries
+the scale is not a threshold on anything geometric, and it is how a second and third letter reach one
+location.
+
 **A component states ONE coordinate.** `x_A = 5` leaves `y` free, as every component form does — pinning
 both would invent a given the student never stated (ADR-052).
 
