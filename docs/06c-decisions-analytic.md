@@ -6718,3 +6718,36 @@ Layering is why it goes to the engine and not the other way: `app → engine`, a
 **The invariant this exposes, filed not built.** `reportedDof > 0` while every quantity reports `known` is a state the tool should not be able to occupy, and a cheap corpus-wide assertion would have caught this on day one. It is locked here **on the figure that violated it**; as a sweep over every analytic scenario it is a wider change with its own blast radius, filed as [#1289](https://github.com/dcodish/geo_builder/issues/1289).
 
 **Consequences.** `engine/evaluate.ts` (+`figureSignature`, +`curveSignature`, +`distinctConfigSeeds`, one default parameter changed); `app/another.ts` (−36 lines, now a one-line call). `issue-1282-knowledge-distinct-configs.test.ts` (10): the operator's figure reporting unknown where he gave nothing and known where he gave something; **the collapse asserted as a PRECONDITION**, so a future change that happens to spread seeds 0–2 cannot make the lock vacuous; the freedom-implies-an-unknown invariant on that figure; the after-figure's values genuinely determined; «הציגו תצורה אחרת» still finding a differing figure through the shared signature; and a determined figure still reporting one configuration and known values.
+
+## ADR-AG-127 — A length given's connective is an ALLOWLIST of copulas (#1260)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1260 (bug, P2, `analytic`) · found while building #1128, filed by the overnight run #1252 · round #1292
+**Requirements:** [02c](02c-requirements-analytic.md) — R61, the distance row's connective · **Design:** [04c](04c-design-analytic.md)
+**Ports** [ADR-524 Am. 1](06-decisions.md#adr-524)/#1248, the 2-D mechanism, into this tree
+
+**The report.** A length given accepted `=` and refused the ordinary Hebrew word for it. Measured before the fix:
+
+```
+אורך הקטע AB = 10          ->  OK
+אורך הקטע AB הוא 10        ->  not-handled
+המרחק בין A ל-B = 10       ->  OK
+המרחק בין A ל-B הוא 10     ->  not-handled
+```
+
+A student writing a sentence is refused; the same student writing the symbolic form is understood. #1128 made this worse rather than better, because the worded spellings it added are exactly the ones a copula finishes.
+
+**Root cause.** `LENGTH_EQ` split the sentence on a literal `=` and nothing else, although `HE_IS` — the closed copula set «הוא/היא/הם/הן» that most rules in the file already read — sat twelve hundred lines above it.
+
+**The mechanism is inverted, and that is the whole point.** 2-D shipped this same widening as a DENYLIST of relation words and it produced a P1: «אורך הקטע BC > 10» — a stated RANGE — committed an equality at its own bound, and no honesty gate could catch it, because the `10` *was* accounted for, by the wrong constraint. A denylist cannot be completed: *the ways a sentence can relate two things are not enumerable.* The other question is closed — **the ways to say "is"** — so the guard is an allowlist and fails CLOSED. An unfamiliar connective is not read as an equality; the line goes unread and escalates, which is honest.
+
+**What changed.**
+
+1. **One vocabulary in the file.** `COPULA_WORDS` («הוא/היא/הם/הן/שווה [ל-]») is now the single source; `HE_IS` is derived from it. Before, each rule spelled the set inline, which is precisely how `LENGTH_EQ` came to admit `=` and no words while `AREA_HE` beside it admitted words and no `=`: one sentence shape, two answers, decided by which rule happened to spell what.
+2. **`LENGTH_EQ` splits on `=` or a copula.** Unlike 2-D's, the connective is **required**: 2-D locates the value positionally inside a verbose length phrase, whereas here the connective is what divides the sentence, so an empty one would make «אורך הקטע AB 10» an equality — a widening nobody asked for.
+3. **A precedence guard, which the issue's plan did not foresee and which the measurement forced.** Both rules can read «שטח המשולש ABC הוא 24»: `parseLengthExpr` carries an `area` term, so the length rule produces a correct area *constraint* — but only the area rule also **declares the polygon the student named**. Before this fix the split was an accident of spelling: the `=` form reached the length rule and the copula form could not. Widening the connective without the guard moved the copula form to the length rule too and silently dropped «המשולש ABC» from the figure — a stated object going unrecorded, which the honesty invariant forbids. So the length rule now yields when the area rule will really claim the line, calling `AREA_HE`/`AREA_EN` rather than restating them, and yielding only for a plain value that rule can read.
+
+**What was tried and rejected.** Hoisting the area rule above the length rule — the obvious ordering fix, and the shape the relation and slope rules already use. It fails on this file's control flow: a rule block that declines with `return null` returns from `parseConstraint` entirely rather than falling through to the next rule, so hoisting took #1075's area-as-a-term («שטח ABC = שטח CEF + 4») away — seven locks, measured. Making the hoisted rule fall through instead would mean reworking the decline contract for every rule in the function, which is a larger change than this issue diagnosed and would be its own ADR.
+
+**Measured after.** Every copula spelling builds the identical figure to its `=` twin. Every bound — «גדול מ», «קטן מ», «לפחות», «לכל היותר», `>`, «פי 2» — is still not an equality and still commits no `AB = 10`. «AD הוא תיכון לצלע BC», «M הוא אמצע AB», «שיפוע AB הוא 2», «הישר l1 הוא y=2x+1» are all still read by their own rules, and both area readings are exactly what they were before.
+
+**Consequences.** `src-analytic/parser/parseAnalytic.ts` (+`COPULA_WORDS`, `HE_IS` derived from it, `LENGTH_EQ` widened, the precedence guard). `issue-1260-length-copula.test.ts` (39): the copula spellings asserted as EQUAL to the `=` form rather than as spelled-out expectations, on the parse and on the built figure; #1128's spelling table finished with a copula; the six bound rows as the #1248 regression, one tree over; the four neighbouring rules; and the area guard from both sides — the polygon declaration kept, and #1075's area term not taken. `shell/__tests__/length-copula-parity.test.ts` (14) is the drift net the duplication needs: it reads each tree's real pattern out of its source and runs it, so the two trees cannot come to disagree about what "is" means. The vocabulary is duplicated rather than shared because the `lexicon` layer's cross-product sharing is recorded UNDECIDED in `BOUNDARIES.json` (ADR-W-003), and `shell/` may not import a product tree in any case (ADR-W-016 rule 2).

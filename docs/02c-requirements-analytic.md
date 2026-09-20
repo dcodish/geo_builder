@@ -1316,8 +1316,15 @@ median, a height, a leg, a base, a hypotenuse — and reading those as a bare le
 student's claim silently, so they stay refused until the tool can honour both halves. «הישר AB» is
 refused for its own reason: a line has no length (R103's extent ruling).
 
-**Still refused, and filed:** the Hebrew copula. «אורך הקטע AB הוא 10» is not accepted where
-«אורך הקטע AB = 10» is — [#1260](https://github.com/dcodish/geo_builder/issues/1260).
+**The Hebrew word for «=» is one of the spellings** ([ADR-AG-127](06c-decisions-analytic.md#adr-ag-127),
+[#1260](https://github.com/dcodish/geo_builder/issues/1260)). «אורך הקטע AB הוא 10» states exactly what
+«אורך הקטע AB = 10» states — as do «היא», «הם», «הן», «שווה» and «שווה ל-» — so a student
+who finishes the sentence in words is understood.
+
+**And a BOUND is never an equality.** The connective is an allowlist of the words that mean "is",
+not a list of the words that do not. «אורך AB גדול מ-10», «אורך AB לפחות 10» and «אורך AB > 10»
+state a RANGE; none of them may commit `AB = 10`. An unfamiliar connective goes unread and
+escalates — the tool would rather not understand a sentence than invent a given from it.
 
 **A stated curve is nameable however it entered the figure**
 ([#1149](https://github.com/dcodish/geo_builder/issues/1149)). A line the student first used to carry

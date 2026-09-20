@@ -111,6 +111,37 @@ same wrong input answered the same way whichever rule caught it.
 `App.tsx`. The engine stays language-free and the message can still say *what* the name already holds
 — the split that lets a refusal name a construct without the engine knowing any Hebrew.
 
+## A given’s connective, and who gets the sentence ([ADR-AG-127](06c-decisions-analytic.md#adr-ag-127))
+
+**One vocabulary for "is".** `COPULA_WORDS` — «הוא/היא/הם/הן/שווה [ל-]» — is the single source in
+`parseAnalytic.ts`, and `HE_IS` is derived from it. Every rule that admits a Hebrew copula reads it from
+there. The set was previously spelled inline per rule, and the drift that invites is not hypothetical:
+`LENGTH_EQ` admitted a literal `=` and no words, while `AREA_HE` immediately beside it admitted the words
+and no `=`. One sentence shape, two answers, decided by which rule happened to spell what.
+
+**The connective is an ALLOWLIST, so it fails closed.** Whether a sentence is an equality is decided by
+recognising a copula, never by failing to recognise a relation. The ways to say "is" are a closed set; the
+ways to relate two things are not. 2-D learned this as a P1 ([ADR-524 Am. 1](06-decisions.md#adr-524)) and
+the discipline is ported rather than re-derived. The two trees keep their own copy — the `lexicon` layer’s
+cross-product sharing is UNDECIDED in `BOUNDARIES.json` (ADR-W-003) and `shell/` may not import a product
+tree — so `shell/__tests__/length-copula-parity.test.ts` reads both real patterns out of source and runs
+them, and a tree that changes its mind about what "is" means fails there.
+
+**When two rules can both read a sentence, the one that records MORE wins.** «שטח המשולש ABC הוא 24»
+is readable by the length rule (`parseLengthExpr` carries an `area` term, giving a correct area
+constraint) and by the area rule — but only the area rule also DECLARES the triangle the student named.
+The length rule therefore yields when the area rule will really claim the line, calling `AREA_HE`/`AREA_EN`
+rather than restating them. Dropping a stated object because another rule got to the sentence first is an
+honesty failure, not a parsing preference.
+
+**Why precedence is a guard and not a reordering.** The table above says `null` means *"not my sentence,
+try the next rule"* — and that is true of the four top-level rules `parseLine` chains with `??`. It is NOT
+true of the rule blocks INSIDE `parseConstraint`: there, `return null` returns from the whole function, so
+a block cannot decline in favour of the block below it. Hoisting the area rule above the length rule — the
+shape the relation and slope rules use — therefore took #1075’s area-as-a-term («שטח ABC = שטח CEF + 4»)
+away, measured as seven failing locks. Giving the blocks a real fall-through means reworking the decline
+contract for every rule in the function; until that is worth doing, precedence inside `parseConstraint` is
+expressed as an explicit guard at the rule that must yield.
 ## The parser's last branch: a bare equation ([ADR-AG-019](06c-decisions-analytic.md#adr-ag-019))
 
 `parseLine` ends with a branch that accepts an equation carrying no noun at all — `x-y+2=0`,
