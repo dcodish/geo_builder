@@ -3279,3 +3279,65 @@ The three refusal rows are the ones that matter, and they are asserted alongside
 `shell/math.tsx` — `peelBrackets`'s leading loop, four lines.
 
 `issue-1229-prefixed-bracket.test.ts` (9). Analytic and complex lanes green (both carry `shell/`).
+
+## ADR-W-064 — A fix session RE-MEASURES the issue before it reads the plan, and a divergence is the expected case (#1252)
+
+**Requirements:** none (process). **Design:** [docs/17 §5 step 0](17-design-rules.md) — the protocol; [docs/22 §3](22-workflow.md) — the bug route; the `fix-round` skill, Step 2. **Operator, 2026-09-20:** *"we can continue the loop approach but we should add something in your instructions that acknowledges that diagnosis needs to re-run every time - i think you do this today anyway but just document it so you dont panic when something is different between diagnosis and fix time."*
+
+### The observation that prompted it, which is the operator's
+
+Reporting the overnight run [#1252](https://github.com/dcodish/geo_builder/issues/1252), I presented its five escalations as evidence that *the queue's plans are being written without measuring*. That is true of some of them. The operator's reply was sharper: **the time between triage and fix is itself enough to change the diagnosis.** It is, and separating the two causes matters because they have different remedies.
+
+### Measured
+
+```
+commits/day, 13–20 Sep:  ~35        of which ADR-bearing:  ~20
+```
+
+An issue four days old has had ~130 commits land under it; #999, filed seven days before it was picked up, ~250.
+
+Sorting the run's own items by which cause applied:
+
+| | issue | what the issue said | what the tip said |
+| --- | --- | --- | --- |
+| **stale** | #1128 | *"no «מרחק» sentence parses at all"* | three did, since #1151 — and its part (b) had landed via #1048 |
+| **stale** | #1216 | «נתון מעגל 1» → `bad-equation` | `not-handled` — changed four hours earlier the same night by #1246 |
+| **stale** | #1129 | `\|…\|`, `d_{}`, `x_A` blocked on grammar | five of six unblocked; two by this same run |
+| **stale** | #1198 | a change request against an unmerged PR | that PR merged the day before |
+| **wrong** | #1202 | the cause is `crossings.ts:122` | those objects are a different kind and never reach that line |
+| **wrong** | #999 | narrow `dryRunOutcome`'s count arm | that arm is not what fires |
+| **wrong** | #1227 | *"the count must come from #1083's existing dedup"* | that dedup keeps all four noise members |
+| **wrong** | #1222/#1240 | a spelling gap | needs a name-minting seam that exists nowhere |
+
+**All four STALE items still built and landed.** All four WRONG items escalated. That is the finding: the two look identical at the moment of discovery and are nothing alike.
+
+### The rule
+
+Re-measure at pickup, **before** reading the fix plan, and classify what comes back:
+
+| what you find | what to do |
+| --- | --- |
+| the reported case now passes | close the issue with the evidence — do **not** build |
+| one symptom of several is gone | correct the record in the issue and the ADR; build the rest |
+| a named dependency has landed | re-scope, then build |
+| the cause the plan names is not what fires | escalate (docs/17 §8) |
+
+**Only the last row is a signal about triage quality.** The first three are the ordinary cost of a fast trunk, and the operator's word for the right posture is the operative one: *don't panic*. Writing them up as "deviations from plan" — which this run did — overstates them and buries the row that matters.
+
+### Two consequences that are not obvious
+
+**Re-measure per item, not once per round.** A long round invalidates its own queue: #1246 landed at ~00:30 and changed #1216's symptom by 01:15; #1128 landed and unblocked #1129's chips an hour later. Composing a batch up front and trusting it for eight hours would have gone stale inside the run.
+
+**Some open issues are already fixed and nobody knows.** #1216 had one of its three reported symptoms silently closed under it. The `log-triage` agent re-runs its candidates against current code for exactly this reason; nothing does that for operator-reported issues. A periodic sweep — re-run the reported utterance, close or amend — is cheap and is not yet anybody's job.
+
+### What this does NOT excuse
+
+The four WRONG diagnoses were wrong when written, and would be wrong again in the next plan written the same way: each named a cause read off the code, in a declarative sentence, without running the case. §1's rule — *a root cause read off the code is a hypothesis* — applies to an issue body as much as to a session's first idea.
+
+The counter-example is worth recording, because it shows the distinction is about honesty rather than certainty: **#1182's plan was also a guess and was fine**, because it said so — *"Hypothesis, not yet measured … start by printing `solveLM`'s start point and iterate count at seed 0."* Measured, it was confirmed, and the measurement then ruled out the cheaper fix. A plan that labels its guess produces a fix session that checks; a plan that states the same guess as fact produces one that builds on it.
+
+Hence the second half of docs/17 §5 step 0: *a plan that says "not measured past the above" is a hypothesis however confidently it is phrased.* Three of the four wrong plans said exactly that, and carried `auto-ok` anyway.
+
+### Consequences
+
+`docs/17-design-rules.md` §5 (a new step 0 — this is the file CLAUDE.md sends you to before fixing any reported bug, so it is the load-bearing home), `docs/22-workflow.md` §3 (the bug route's gap between reporting and fixing), `.claude/skills/fix-round/SKILL.md` Step 2 (where it fires for an unattended run).
