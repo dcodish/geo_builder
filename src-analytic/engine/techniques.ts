@@ -39,6 +39,7 @@
  * none suggests, and none runs unless a row exists.
  */
 import type { Id } from './types';
+import { isVertical } from './lines';
 
 /** A point as the trace needs it: a name and the coordinates the figure fixed. */
 export interface TracePoint {
@@ -123,7 +124,9 @@ export function traceDistance2pt(a: TracePoint, b: TracePoint, fmt: (v: number) 
  * would teach the wrong thing.
  */
 export function traceLine2pt(a: TracePoint, b: TracePoint, fmt: (v: number) => string): string {
-  if (Math.abs(b.x - a.x) < 1e-12) {
+  // #1276: RELATIVELY, through the one shared answer — an absolute `|Δx| < 1e-12` let a solved foot's
+  // 3.6e-9 of residual through and printed `m = (0 - 6) / (1 - 1) = -1663960853.8`.
+  if (isVertical(b.x - a.x, b.y - a.y)) {
     return `x = ${fmt(a.x)}  (הישר אנכי — אין שיפוע)`;
   }
   /**

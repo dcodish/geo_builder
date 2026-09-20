@@ -54,6 +54,7 @@ import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDr
 import { measurablesOf, type Measurable } from './app/measurable';
 import { anotherConfiguration, seedShowing } from './app/another';
 import { centresOf, crossingSentence, crossingsOf, freeLetter, pointAt } from './engine/crossings';
+import { VERTICAL_TOL, verticality } from './engine/lines';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
 
 declare const __BUILD__: string;
@@ -1274,11 +1275,13 @@ export function App() {
                   };
                   // Vertical is judged on the DIRECTION, not on the quotient: dy/dx is Infinity there
                   // and `isKnowledge` would call an infinity "not finite" and print nothing.
+                  // #1276: this row was RIGHT and alone — the ratio and its tolerance moved to
+                  // `engine/lines` so the trace and the equation printers ask the same question.
                   const vertical = isKnowledge(d.construction, (f) => {
                     const v = read(f);
-                    return v === null ? null : Math.abs(v.dx) / Math.max(1e-12, Math.hypot(v.dx, v.dy));
+                    return v === null ? null : verticality(v.dx, v.dy);
                   });
-                  if (vertical.known && vertical.value < 1e-6) {
+                  if (vertical.known && vertical.value < VERTICAL_TOL) {
                     return <span key={seg.id}><ValueRow text={`${a}${b}: ${t('slopeVertical')}`} /></span>;
                   }
                   const k = isKnowledge(d.construction, (f) => {

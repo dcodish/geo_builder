@@ -65,6 +65,52 @@ export function normalizedLine(a: number, b: number, c: number): NamedLine | nul
 }
 
 /**
+ * IS THIS DIRECTION VERTICAL — the ONE answer, for every surface that prints one (#1276).
+ *
+ * **Operator, playing `prod/2026-09-20`:** *"take a look at the equation of AD … the slope there is
+ * completely off"*. The panel's slopes list said «אנכי» about `AD` while the working three rows below
+ * it printed `m = (0 - 6) / (1 - 1) = -1663960853.8` — a division by a printed zero, in the lane whose
+ * purpose is to teach the method.
+ *
+ * **The cause is units, not logic.** Every printer decided verticality with an ABSOLUTE `|Δx| < 1e-12`,
+ * and a solved foot carries the solver's residual: measured on that figure, `D.x − A.x = 3.6e-9` —
+ * three and a half orders ABOVE the guard. The same functions are correct on exact input, which is why
+ * this never showed in a hand-written test.
+ *
+ * So the question is asked RELATIVELY, against the direction's own length, exactly as the slopes panel
+ * already asked it (`|Δx| / ‖(Δx, Δy)‖`) — the one surface that got it right, and the reason its answer
+ * disagreed with every other. `verticality` is 0 for an exactly vertical direction and 1 for an exactly
+ * horizontal one, so the tolerance means the same thing at every scale (ADR-AG-021's rule, which this
+ * layer had not inherited).
+ *
+ * The panel needs the RATIO — it feeds `isKnowledge`, which asks whether a quantity is stable across
+ * configurations and cannot be handed a boolean — and the printers need the PREDICATE. Both are here so
+ * that a caller cannot pick a different threshold, which is precisely what happened.
+ */
+export const VERTICAL_TOL = 1e-6;
+
+/** How far a direction is from vertical: `0` exactly vertical, `1` exactly horizontal. Scale-free. */
+export function verticality(dx: number, dy: number): number {
+  return Math.abs(dx) / Math.max(1e-12, Math.hypot(dx, dy));
+}
+
+/** A direction is vertical when its horizontal part is negligible RELATIVE to its length. */
+export function isVertical(dx: number, dy: number): boolean {
+  return verticality(dx, dy) < VERTICAL_TOL;
+}
+
+/**
+ * The same question for a line given as `ax + by + c = 0`, whose direction is `(−b, a)`.
+ *
+ * Stated as a call rather than a second threshold: a line is vertical exactly when the direction along
+ * it is, and `b` alone cannot answer that — `0.0000001x + 0.00000001y = 0` is not a vertical line, it
+ * is a badly scaled one.
+ */
+export function isVerticalLine(a: number, b: number): boolean {
+  return isVertical(-b, a);
+}
+
+/**
  * The line `name` denotes in the configuration described by `curveByName` and `at`.
  *
  * A named curve wins over the pair reading, and a curve that is not a LINE falls through to the pair —

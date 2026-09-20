@@ -957,3 +957,24 @@ one display formatter, so the panel, the canvas and the ask lane cannot round di
 given by its centre those properties ARE the givens. The ask lane answers `«משוואת …»` with `equation`.
 It used to take the formatter as a PARAMETER; it imports it now, which is what makes "one formatting for
 both surfaces" a fact rather than a convention every call site has to keep.
+
+## A display decision is measured in the figure's units ([ADR-AG-123](06c-decisions-analytic.md#adr-ag-123))
+
+Two questions every printer in this tree asks — *is this coefficient zero* and *is this line vertical* —
+were each answered against an absolute `1e-12`. A **solved** point does not produce numbers that small:
+the foot of an altitude to a horizontal side carries the solver's residual, measured at `3.6e-9`, so the
+guards let it through and the panel printed «x + 0y - 1 = 0» with a working that divided `-6` by a printed
+zero. The same functions are correct on typed coordinates, which is why the class was invisible to every
+hand-written lock.
+
+**Zero is a question about the OUTPUT.** `term()` prints nothing when `fmt(|k|) === fmt(0)` — whatever it
+is about to show, if it reads as zero it is not a term. The bracketed offset of a translated conic follows
+the same rule, and always did (`shifted`); the general form is what had drifted.
+
+**Verticality is asked relatively, and once.** `verticality(dx, dy) = |dx| / ‖(dx, dy)‖` is `0` for an
+exactly vertical direction and `1` for a horizontal one, so `VERTICAL_TOL` means the same thing at every
+scale — ADR-AG-021's rule, which this layer had not inherited. It lives in `engine/lines.ts` with
+`isVertical` (a direction) and `isVerticalLine(a, b)` (a line, whose direction is `(−b, a)`), and the
+trace, the explicit form, the slope number, the slope ask and the slopes panel all call it. The panel's
+own predicate was the one that was right; moving it out is what makes the five surfaces agreeing a
+property of the code rather than a coincidence anyone can break.

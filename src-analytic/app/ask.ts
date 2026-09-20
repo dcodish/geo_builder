@@ -27,6 +27,7 @@ import { locusOf } from '../engine/locus';
 
 import { objectById, type Id } from '../engine/types';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
+import { isVerticalLine } from '../engine/lines';
 import { asPair, lineNamed } from './lines';
 import { curveParts, locusEquation } from './curveText';
 
@@ -276,10 +277,12 @@ export function ask(
      * failure channel, so the row read «לא ניתן לחשב מהנתונים» — *your givens are insufficient* — on a
      * figure where every point is fixed. `fact: 'vertical'` is the outcome the sentence always meant.
      */
-    if (Math.abs(line.b) < 1e-12) return { question, value: null, fact: 'vertical' };
+    // #1276: relatively, through the one shared answer — `|b| < 1e-12` called a solved vertical line
+    // NOT vertical (its `b` carries the solver's residual) and answered with a slope of a billion.
+    if (isVerticalLine(line.a, line.b)) return { question, value: null, fact: 'vertical' };
     const k = isKnowledge(d.construction, (f) => {
       const l = lineNamed(f, name);
-      return l && Math.abs(l.b) > 1e-12 ? -l.a / l.b : null;
+      return l && !isVerticalLine(l.a, l.b) ? -l.a / l.b : null;
     });
     return { question, value: k.known ? fmt(k.value) : null };
   }
