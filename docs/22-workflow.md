@@ -92,9 +92,10 @@ decides how much can be closed in one session.
 The operator-invoked batch loop that replaces one-at-a-time fix dispatch. Full procedure:
 **`.claude/skills/fix-round/SKILL.md`**; the contract in one paragraph:
 
-A round picks **5–8 work items**, hard ceiling 10 (a bundle of issues sharing one root cause counts as
-one item; fewer is always fine — the band is not a quota — [ADR-W-028](06w-decisions-workspace.md), which
-consumed the six-round measured escalation rate of 8% to replace ADR-W-012's untested Phase-1 3–5) from
+A round picks **up to 20 work items** (a bundle of issues sharing one root cause counts as
+one item; fewer is always fine — the cap is not a quota — [ADR-W-067](06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028), which
+consumed a nineteen-round measured escalation rate of 9.8% and a measured ~30 min/item to replace
+[ADR-W-028](06w-decisions-workspace.md)'s 5–8, itself a replacement for ADR-W-012's untested Phase-1 3–5) from
 the open issues labeled **`auto-ok`** — the label records an **operator approval** of the issue's fix
 plan; `needs-operator` disqualifies. The approval is the operator's alone, but its *application* may be
 transcription ([ADR-W-014](06w-decisions-workspace.md)): when a session has presented a concrete batch
@@ -116,16 +117,24 @@ regression lock + full suite + `tsc` + build). Bugs land on `main` (`Fixes #NN` 
 after a fetch confirms `origin/main` has not moved externally mid-round; features become PRs the round
 **never merges** (§4). A plan that fails contact with the code is **escalated, never patched**: the
 docs/17 escalation template goes on the issue, `auto-ok` → `needs-operator`, and the round moves on —
-and the **second** escalation in one round finalizes it (land what is done, the rest to Skipped), because
-two stale plans in a round is a triage signal rather than something to grind through. More than ~2 items
-on one chokepoint is composed into the next round instead, since they rebase over each other.
+and escalations reaching **a quarter of the items attempted, minimum 2**, finalize the round (land what is
+done, the rest to Skipped), because a failure rate that far above the ~10% baseline is a triage signal about
+the QUEUE rather than something to grind through — an absolute “second escalation” would simply BE the
+baseline once a round is 20 items long (ADR-W-067). More than ~2 items on one chokepoint is composed into
+the next round instead, since they rebase over each other — that rule does NOT scale with the cap, and is
+usually what holds a composition below 20.
 The round finishes by finalizing the round issue — per-item evidence (commit, ADR ids, gate record, a
 required *deviations-from-plan* line), landed/PR'd/escalated/**skipped** sections, the batch play sheet
 (Hebrew utterances per item, **split into batch/landed-on-`main` and individual/PR sections** — the PRs
 were always played one at a time under §4, so only the landed half is genuinely a batch), and a machine-greppable
 `stats: picked= landed= prs= escalated= skipped=` line (the Phase-2 data, aggregated by listing round
-issues) — and swapping **`in-round` → `awaiting-play`**; the operator plays the batch in one sitting
-and **closes the round issue as the validation signal**. Open P1s or a stale `in-round` issue stop a
+issues) — and swapping **`in-round` → `awaiting-play`**. It then **publishes ONE HTML Artifact** —
+the round report plus the numbered play sheet, Hebrew lines copy-pasteable and a per-case verdict stored
+in the artifact database for a later session to read with `read_db` — and records its URL in the round
+issue ([ADR-W-068](06w-decisions-workspace.md#adr-w-068--every-fix-round-ends-with-a-published-html-report-and-play-sheet-1291-completes-adr-w-054), universalising
+[ADR-W-054](06w-decisions-workspace.md)'s overnight-only clause). The artifact is the operator's surface;
+the issue stays the durable ledger, all three copies carry the same case list, and the operator plays the
+batch in one sitting and **closes the round issue as the validation signal**. Open P1s or a stale `in-round` issue stop a
 round before it starts — a P1 is never taken silently, and there is never a second live round.
 `/status-update`'s "Waiting on you" section surfaces the whole loop: plans awaiting `auto-ok`, PRs
 awaiting play, rounds in flight, rounds awaiting validation.

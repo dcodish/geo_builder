@@ -1,6 +1,6 @@
 ---
 name: fix-round
-description: Execute a batch of operator-approved (auto-ok) fix plans autonomously — pick 5–8 work items off the queue by priority, fix each at the root in its own worktree under the full gates, land bugs on main and features as PRs, escalate instead of patching when a plan fails contact with the code, and finish with ONE round issue (awaiting-play) carrying the batch play sheet. Use when the operator says to run a fix round, "run the loop", clear the queue, or work through the auto-ok'd issues. Never run uninvoked, and never as a substitute for triage — it executes plans, it does not write them.
+description: Execute a batch of operator-approved (auto-ok) fix plans autonomously — pick up to 20 work items off the queue by priority, fix each at the root in its own worktree under the full gates, land bugs on main and features as PRs, escalate instead of patching when a plan fails contact with the code, and finish with ONE round issue (awaiting-play) plus a published HTML report carrying the batch play sheet. Use when the operator says to run a fix round, "run the loop", clear the queue, or work through the auto-ok'd issues. Never run uninvoked, and never as a substitute for triage — it executes plans, it does not write them.
 ---
 
 # Fix round — autonomous execution of triaged, operator-approved fix plans
@@ -45,13 +45,18 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
 - **Bundle** issues sharing one root cause or mechanism into a single work item (the plans say
   so when it's true — same class, same chokepoint). Bundling is encouraged when it is the right
   fix shape; the cap below never forbids a correct bundle.
-- **Cap: 5–8 work items** per round, **hard ceiling 10** (a bundle counts as ONE item) —
-  [ADR-W-028](../../../docs/06w-decisions-workspace.md). **Fewer is always fine**: the band is not a
+- **Cap: up to 20 work items** per round — one number, no band (a bundle counts as ONE item) —
+  [ADR-W-067](../../../docs/06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028). **Fewer is always fine**: the cap is not a
   quota, and a round with two eligible items runs rather than waits to fill up. Priority order
   P2 → P3 within eligibility; value density (per the /status-update rubric) breaks ties.
+  **Price the sitting before composing big:** ~30 min/item measured, so a full 20 is an 8–11 hour
+  run — that is the unattended overnight shape ([ADR-W-054](../../../docs/06w-decisions-workspace.md));
+  an attended round composes to what the operator can play in one go.
 - **Spread one chokepoint across rounds:** more than ~2 items touching the same chokepoint — they
   rebase over each other and each one's full-suite run can break the previous one's scenario — means
-  composing the rest into the NEXT round, not reconciling repeatedly inside this one.
+  composing the rest into the NEXT round, not reconciling repeatedly inside this one. **This does NOT
+  scale with the cap** (it is a property of the chokepoint, not of the round) and is usually what holds
+  a composition below 20 — say so at composition time rather than discovering it at item 14.
 - **Announce the composition** — one line per item (issues, plan gist, route bug/feature) —
   before any code. This is the round's contract; anything not listed is not touched.
 - **Open the round issue NOW, not at the end** ([ADR-W-013](../../../docs/06w-decisions-workspace.md)) —
@@ -144,12 +149,17 @@ escaped item is a GOOD outcome — it is the mechanism working. The stats line (
 accumulates the escalation rate across rounds; it is the data the Phase-2 (unattended runs)
 landing-policy decision needs (#543).
 
-**Stop condition — the SECOND escalation in one round finalizes it**
-([ADR-W-028](../../../docs/06w-decisions-workspace.md)). Land what is already done, finalize the
-ledger honestly (remaining picked items go to **Skipped** with "round stopped after 2 escalations"),
-and report. Two plans failing contact with the code in one round says the QUEUE's plans are going
-stale — that is a triage signal, and grinding through the rest is exactly the loop pressure the
+**Stop condition — escalations reaching A QUARTER OF THE ITEMS ATTEMPTED, minimum 2, finalize the round**
+([ADR-W-067](../../../docs/06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028)). So: 2 of the first 8, 3 of 12,
+5 of 20 — and a single escalation never stops a round. Land what is already done, finalize the ledger
+honestly (remaining picked items go to **Skipped** with "round stopped on the escalation rate: N of M
+attempted"), and report. A failure rate that far above the measured ~10% baseline says the QUEUE's plans
+are going stale — that is a triage signal, and grinding through the rest is exactly the loop pressure the
 escalation exit exists to relieve. This is a stop, not a failure; the stats line records it.
+
+The threshold is a RATE, not the old flat "second escalation", because at 20 items two escalations IS the
+healthy baseline — an absolute stop would truncate most rounds around item 12 and the cap would have moved
+on paper only.
 
 ## Step 5 — finalize the round issue: ledger → play sheet + validation marker
 
@@ -181,6 +191,8 @@ Final body, in order:
   different ports. The numbering still runs **continuously across every section**, and an empty
   section is omitted rather than printed as an empty heading.
   ([ADR-W-028](../../../docs/06w-decisions-workspace.md))
+- **The published report's URL** (Step 5b), on its own line near the top — the artifact is the
+  operator's surface onto this ledger, and a URL that lives only in the session chat is lost.
 - **The stats line**, exactly this machine-greppable form, always last:
   `stats: picked=N landed=N prs=N escalated=N skipped=N`
   — the Phase-2 landing-policy decision (#543) aggregates these by listing round issues,
@@ -190,6 +202,37 @@ The operator plays, files normal issue reports for anything wrong, and **closes 
 issue when done** — that close is the validation signal. `/status-update` reads open
 `awaiting-play` issues as the validation queue and open `in-round` issues as a round
 executing now or crashed mid-flight.
+
+## Step 5b — publish the HTML report (every round, attended or not)
+
+**Every round ends with ONE published Artifact** ([ADR-W-068](../../../docs/06w-decisions-workspace.md#adr-w-068--every-fix-round-ends-with-a-published-html-report-and-play-sheet-1291-completes-adr-w-054),
+which makes [ADR-W-054](../../../docs/06w-decisions-workspace.md)'s clause universal and executable).
+It is not optional and not overnight-only: the operator reads a round's output in a different session
+and often on the other PC, so the handover cannot be this session's chat. **Publish it BEFORE Step 5's final
+`gh issue edit`** so the URL lands in the ledger rather than only in chat.
+
+Before writing the page, load the **`artifact-design`** skill, and **`artifact-capabilities`** for the
+verdict store below — do not hand-roll either.
+
+The page carries two halves, in this order:
+
+1. **The round report** — per item: issue → route → commit SHA or PR# · ADR id(s) · the one-line gate
+   record · the **deviations from plan** line; then **Escalated**, **Skipped**, and the `stats:` line.
+   The ledger made readable, not new information.
+2. **The play sheet** — the numbered cases **exactly as standing rule 5 specifies them**, `T1…Tn`
+   continuous, grouped by route (batch on `main` first, then one section per PR), each with its
+   **Server** URL *with its path*, the Hebrew utterances, **Look for**, **Before**.
+
+Two things the page must actually do, because they are why it exists:
+
+- **The Hebrew utterances stay copy-pasteable** — one per line, monospace, LTR-safe inside the RTL page,
+  with a copy control per case. A sheet he has to retype is worse than the issue body it replaced.
+- **Each case takes a verdict** — pass / fail / a note — **stored in the artifact database**, so a later
+  session reads them with `read_db` instead of asking him to retype what he already told the page.
+
+**The artifact is a surface, never a replacement.** The round issue stays the durable ledger and closing
+it is still the validation signal. The issue copy, the chat copy and the page carry the **same case
+list** — two versions that differ is how a case gets skipped.
 
 ## Step 6 — readiness gate (standing rule 5)
 
@@ -201,8 +244,9 @@ since an unmerged PR cannot be played on the `main` server.
 The final message carries, in this order: the **`## Heads-up`** items, the **numbered test-case
 list**, the escalation list, and honest gate results.
 
-**The chat copy is the SAME list as the round issue's, not a summary of it** — the operator plays
-from whichever is in front of them, and two versions that differ is how a case gets skipped.
+**The chat copy is the SAME list as the round issue's and the published report's, not a summary of
+either** — the operator plays from whichever is in front of them, and two versions that differ is how a
+case gets skipped. The final message names the report's URL.
 
 It ends with a **"waiting on you" digest** (ADR-W-014 — the operator must never have to ask
 what's blocked on them): open `needs-operator` decisions (one line each, the question itself),
@@ -217,4 +261,5 @@ an escalation · exceed the announced composition mid-round (found new work → 
 land over unreconciled external `origin/main` movement · leave outcomes, deviations, or skips
 out of the ledger (chat is not a record) · finish with the `in-round` label still on · report a
 play sheet whose servers are not running, whose cases are not numbered, or whose heads-up items
-send the operator to an ADR to find out what changed.
+send the operator to an ADR to find out what changed · finish without publishing the report (Step 5b)
+or without its URL in the round issue.

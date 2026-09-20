@@ -424,7 +424,7 @@ root-cause fix plan into the issue. Intake (log-triage), triage, and validation 
 The mechanism (`.claude/skills/fix-round/SKILL.md`, route in docs/22 §2d): eligibility is the
 **`auto-ok` label, applied only by the operator** after reading the plan — blessing a plan is a
 30-second read, and the label is the control knob that replaces per-fix dispatch. A round is **3–5
-work items** *(superseded — the cap is 5–8 with a ceiling of 10 since [ADR-W-028](#adr-w-028--the-fix-round-cap-is-58-items-with-stop-conditions-35-was-a-phase-1-number-that-has-now-been-measured-767); the rest of this sentence stands)*
+work items** *(superseded twice — 5–8 with a ceiling of 10 by [ADR-W-028](#adr-w-028--the-fix-round-cap-is-58-items-with-stop-conditions-35-was-a-phase-1-number-that-has-now-been-measured-767), then **20** by [ADR-W-067](#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028); the rest of this sentence stands)*
 where a bundle of issues sharing one root cause counts as ONE item (operator ruling: the
 cap must never prevent a correct bundle). Each item runs in its own worktree under the full standing
 gates; bugs land on `main` (`Fixes #NN`), features become PRs the round never merges; open P1s stop
@@ -1146,7 +1146,7 @@ shipped there with #742 and are untouched here beyond the rasteriser swap.
 
 ## ADR-W-028 — The fix-round cap is 5–8 items with stop conditions; 3–5 was a Phase-1 number that has now been measured (#767)
 
-**Status:** accepted, 2026-08-19 · **Amends:** [ADR-W-012](#adr-w-012--fix-round-autonomous-execution-of-operator-approved-fix-plans-543-544)
+**Status:** accepted, 2026-08-19 · **§1 and §3's first bullet superseded by [ADR-W-067](#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028) (2026-09-20): the cap is 20 and the escalation stop is a RATE. §2 (fewer is always fine), §3's chokepoint bullet and §4 (the play sheet splits by route) stand.** · **Amends:** [ADR-W-012](#adr-w-012--fix-round-autonomous-execution-of-operator-approved-fix-plans-543-544)
 · **Issue:** [#767](https://github.com/dcodish/geo_builder/issues/767) · operator: *"currently the
 fix-round agent is limited to 3-5 items. I think we can relax this a bit - no?"*
 
@@ -1168,7 +1168,8 @@ one-at-a-time dispatch bottleneck, and had become the bottleneck itself.
 
 **Decision.**
 
-1. **The working band is 5–8 work items; the hard ceiling is 10.** A bundle of issues sharing one root
+1. **The working band is 5–8 work items; the hard ceiling is 10.** *(Superseded — the cap is **20**, one
+   number, since [ADR-W-067](#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028); the rest of this clause stands.)* A bundle of issues sharing one root
    cause still counts as ONE item, and the cap still never forbids a correct bundle (the ADR-W-012
    operator ruling stands unchanged).
 
@@ -1180,7 +1181,10 @@ one-at-a-time dispatch bottleneck, and had become the bottleneck itself.
    fixed overhead per item, linear, walling around 10), the operator's play sitting, and reconciliation
    risk between items. The ceiling covers the first; these cover the third and the real reason a big round
    goes wrong:
-   - **Second escalation in one round → finalize.** Land what is done, close the ledger honestly, report.
+   - **Second escalation in one round → finalize.** *(Superseded — the stop is a RATE since
+     [ADR-W-067](#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028): escalations reaching a quarter of the items attempted, minimum 2. At the
+     5–8 band that IS the second escalation; the reasoning below is unchanged and is why it had to scale.)*
+     Land what is done, close the ledger honestly, report.
      Two plans failing contact with the code in one round says the queue's plans are going stale, and that
      is a *triage* signal — grinding through the remaining items is exactly the loop pressure the
      escalation exit exists to relieve. This is a stop, not a failure: the stats line records it.
@@ -1538,7 +1542,8 @@ was "full suite on the rebased tip", so item N could not start its gate until N�
 3. **Never overlap suite runs** — a lane, a probe or a full suite runs alone. (Not a ruling; a rule the
    round applies to itself, recorded here because it doubled every gate in #822.)
 
-**What stays.** Escalation, the 5–8 band and the two-escalation stop (ADR-W-028), fixtures-first,
+**What stays.** Escalation, the round cap and the escalation stop (ADR-W-028 — now 20 items and a
+quarter-of-attempted rate, [ADR-W-067](#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028)), fixtures-first,
 ADR + locks per item, the ledger-as-record, and the operator's play-and-close validation. A PR item
 (feature route) is unaffected — its gate is its own.
 
@@ -2790,7 +2795,9 @@ The operator will read the results **in a different session**, so the handover c
 chat. Each round republishes a single Artifact play sheet — numbered cases, the Hebrew lines, *look for*
 and *before* per standing rule 5 — and the sheet stores the operator's per-case verdict in the artifact
 database. A later session reads those verdicts directly with `read_db` instead of asking him to retype
-them.
+them. *(This clause was written for unattended rounds only and was never carried into the skill, so no
+round produced one. [ADR-W-068](#adr-w-068--every-fix-round-ends-with-a-published-html-report-and-play-sheet-1291-completes-adr-w-054) makes it universal — EVERY round publishes the report — and puts
+it in the procedure as Step 5b.)*
 
 That closes the loop ADR-W-012's Phase 1 left open: rounds could run, but their output still needed a
 human to transcribe. The round issue remains the durable ledger; the sheet is the operator's surface onto
@@ -3410,3 +3417,139 @@ So the taxonomy above was not yet a decision procedure for 2-D: the same sentenc
 The question put to him was short: **when «D = חיתוך AB ו-BC» draws the right point under a second name, is the honest answer the refusal (3-D's behaviour since ADR-3D-183) or the merged label «B=D» plus the notice (#944, shipped)?** Both resolve #944's original complaint — the contradiction between two surfaces — and only one of them can be the tool's answer. He chose the refusal, which makes the rule at the top of this ADR true in all three trees without exception.
 
 **Why an ADR-W rather than three quiet copies.** Three trees now answer one question, and they reached the answer at three different dates by three different routes. The next person to touch any of them needs the rule, not one tree's version of it — and the audit table above is the evidence that "port it" was checked rather than assumed ([[cross-product-disparity-is-a-wiring-smell]] in the operator's own terms). The 2-D collision is the same evidence working in the other direction: the audit found the cell missing, and the locks found out why.
+
+## ADR-W-067 — The fix-round cap is 20 items, and the escalation stop becomes a RATE (#1290, amends ADR-W-028)
+
+**Status:** accepted, 2026-09-20 · **Amends:** [ADR-W-028](#adr-w-028--the-fix-round-cap-is-58-items-with-stop-conditions-35-was-a-phase-1-number-that-has-now-been-measured-767) (which amended [ADR-W-012](#adr-w-012--fix-round-autonomous-execution-of-operator-approved-fix-plans-543-544))
+· **Issue:** [#1290](https://github.com/dcodish/geo_builder/issues/1290) · operator: *"I want to change the number of issues a fix round can fix to about 20"*
+**Requirements:** none (internal) · **Design:** none (internal) — this is a workflow contract; the product promises nothing about round size.
+
+**Problem.** The cap has been raised once before on measurement (ADR-W-028: 3–5 → 5–8, ceiling 10, on a
+six-round 8% escalation rate) and the same question is back with thirteen more rounds behind it. The queue
+now arms faster than 5–8 items a round consumes it.
+
+**The measurement.** Aggregating the `stats:` lines of the last nineteen rounds that carry one — the format
+exists to be read exactly this way, never by re-reading prose (#1280, #1244, #1228, #1200, #1193, #1181,
+#1173, #1169, #1144, #1141, #1135, #1131, #1061, #1056, #1006, #1001, #998, #992, #988):
+
+```
+picked=102  escalated=10   → 9.8%
+```
+
+Materially unchanged from ADR-W-028's 8%; no crashed rounds; the largest round yet run, #1131's nine items,
+ran clean on one escalation. What did NOT survive contact is ADR-W-028's *cost* model. It priced an item at
+"≈ 8–10 min fixed overhead, linear, **walling around 10**". Measured against the round's own landing commits:
+
+| round | items | first → last landing | per item |
+| --- | --- | --- | --- |
+| [#1244](https://github.com/dcodish/geo_builder/issues/1244) | 7 | 20:02 → 23:05 | ~26 min |
+| [#1131](https://github.com/dcodish/geo_builder/issues/1131) | 9 | 17:39 → 23:16 | ~37 min |
+
+≈ **30 min/item** — three times the estimate, and still linear. There is no wall at 10; there is a clock. A
+20-item round is an **8–11 hour** run, which is an overnight shape, and overnight unattended rounds have been
+permitted since [ADR-W-054](#adr-w-054--unattended-overnight-rounds-adr-w-012s-phase-2-opened-with-a-hard-boundary-at-the-deploy). The constraint that actually bound the cap turns out to be
+the operator's play sitting and reconciliation risk — the two ADR-W-028 §3 already named — not the machine.
+
+**Decision.**
+
+1. **A round picks up to 20 work items. One number, no band.** A bundle of issues sharing one root cause
+   still counts as ONE item, and the cap still never forbids a correct bundle (the ADR-W-012 operator ruling
+   stands). The hard ceiling and the working band collapse into the same number: ADR-W-028 §2 already had to
+   fight "3–5" being read as a floor of 3, and a two-number rule invites that reading back. **Fewer is always
+   fine and composing small is never a defect** — a round with two eligible items runs rather than waits to
+   fill up.
+
+2. **The escalation stop becomes a rate: finalize when escalations reach a QUARTER of the items attempted so
+   far, minimum 2.** This is the load-bearing half of this ADR, and without it the cap raise is nominal.
+   ADR-W-028's stop was "the second escalation finalizes the round". At the measured 10% rate a 20-item round
+   *expects* two escalations — `P(X≥2 | n=20, p=0.1) = 0.61` — so three rounds in five would truncate around
+   item 10–14 and the cap would have moved on paper only. The threshold was written as an absolute because
+   the round size was fixed; once the size moves it has to become a rate, because **that is what the stop was
+   always measuring.** Its stated intent is staleness: "two plans failing contact with the code in one round
+   says the queue's plans are going stale". 2-of-7 is a 29% failure rate against a 10% baseline — a real
+   signal. 2-of-20 is 10% — the baseline itself, i.e. no signal at all.
+
+   The quarter reduces to the old rule at the old band (2-of-8 = 25% → stop, exactly ADR-W-028) and scales
+   honestly above it: 3 of 12, 5 of 20. `P(X≥5 | n=20, p=0.1) = 0.043` — it stays quiet when the queue is
+   healthy and still fires promptly when it is not. The floor of 2 keeps a single escalation from ever
+   stopping a round, and the rate is evaluated over items *attempted*, so two stale plans out of the first
+   two still stop immediately, as they should.
+
+   Everything else about the escalation exit is untouched: an escalated item is still a GOOD outcome, the
+   docs/17 template still goes on the issue, `auto-ok` → `needs-operator`, and the stop is still a stop and
+   not a failure — the `stats:` line records it.
+
+3. **The ~2-items-per-chokepoint rule does NOT scale, and is now usually the binding constraint.** It is a
+   property of the chokepoint, not of the round: items touching one seam rebase over each other and each
+   one's full-suite run can break the previous one's scenario. That risk is unchanged by how many *unrelated*
+   items ride alongside. A 20-item round therefore wants ~10 distinct chokepoints, and most compositions will
+   land below 20 for this reason rather than for the cap. Say so at composition time instead of discovering
+   it at item 14.
+
+4. **The play sitting is sized by the operator, not by the round.** ADR-W-028 §4's split stands — `batch
+   (landed on main)` and `individual (PRs)` are separate sections, and PRs were never a batch. A full-20
+   round's batch sheet is a long sitting; an ATTENDED round should still compose to what he can play in one,
+   and the unattended overnight route (ADR-W-054) is where the top of the range belongs, since its sheet is
+   read in a different session anyway.
+
+**What this does not change.** Eligibility (`auto-ok` + a concrete plan, [ADR-W-014](#adr-w-014--batch-approval-one-operator-okay-arms-a-round-auto-ok-may-be-transcribed-with-an-audit-comment-548) and its Am. 1), the
+worktree-per-item isolation, the full per-item gates, the escalation exit itself, the landing routes, the
+live ledger opened at composition ([ADR-W-013](#adr-w-013--the-round-issue-is-a-live-ledger-opened-at-composition-not-an-end-of-round-report-547)), the `stats:` line, the P1-stops-a-round and
+one-live-round-at-a-time guards, the re-measure-before-reading-the-plan duty ([ADR-W-064](#adr-w-064--a-fix-session-re-measures-the-issue-before-it-reads-the-plan-and-a-divergence-is-the-expected-case-1252)), and the
+deploy boundary on unattended rounds (ADR-W-054).
+
+**What would reverse it.** The same way it was raised: the `stats:` lines. If the escalation rate across
+20-item rounds runs materially above 10%, or a round is stopped by the rate more than occasionally, the
+queue's plans — not the cap — are the problem, and that is a triage finding, not a number to tune.
+
+## ADR-W-068 — Every fix round ends with a PUBLISHED HTML report and play sheet (#1291, completes ADR-W-054)
+
+**Status:** accepted, 2026-09-20 · **Completes:** [ADR-W-054](#adr-w-054--unattended-overnight-rounds-adr-w-012s-phase-2-opened-with-a-hard-boundary-at-the-deploy) (whose artifact clause was never written into the skill) · **Extends:** [ADR-W-013](#adr-w-013--the-round-issue-is-a-live-ledger-opened-at-composition-not-an-end-of-round-report-547)
+· **Issue:** [#1291](https://github.com/dcodish/geo_builder/issues/1291) · operator: *"also at the end of the fix-round i want an html report and the test cases i need to run"*
+**Requirements:** none (internal) · **Design:** none (internal) — the report is a workflow surface; it makes no promise to a student.
+
+**Problem.** A round's output has lived in two text surfaces: the round issue (the durable ledger,
+ADR-W-013) and the chat report (standing rule 5). ADR-W-054 already decided a third — *"each round
+republishes a single Artifact play sheet … and the sheet stores the operator's per-case verdict in the
+artifact database"*, so a later session reads verdicts with `read_db` instead of asking him to retype them
+— but it decided it **inside an ADR about unattended overnight rounds, and never wrote it into
+`.claude/skills/fix-round/SKILL.md`.** A decision that is not in the procedure does not happen: no round
+has produced one, attended or not. Meanwhile [ADR-W-067](#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028) raised the cap to 20, which is exactly the size at
+which a GitHub issue body stops being a usable play surface.
+
+**Decision.**
+
+1. **Every round — attended or unattended — finishes by publishing ONE Artifact**, and its URL goes into
+   the round issue body and the chat report. Publishing is part of Step 5, not a nicety and not optional.
+
+2. **It carries two halves, in this order.**
+   - **The round report** — per item: issue → route → commit SHA or PR# · ADR id(s) · the one-line gate
+     record · the required **deviations from plan** line; then **Escalated**, **Skipped**, and the
+     `stats:` line. This is the ledger made readable, not new information.
+   - **The play sheet** — the numbered cases **exactly as standing rule 5 specifies them** (CLAUDE.md,
+     operator authority): `T<n>` continuous across every section, a plain student-facing title, the
+     **Server** URL *with its path* on every case, the Hebrew utterances, **Look for**, **Before**.
+     Grouped by route per ADR-W-028 §4 — batch (landed on `main`) first, then one section per PR.
+
+3. **The Hebrew lines stay copy-pasteable** — one utterance per line, monospace, LTR-safe inside the RTL
+   page, with a copy control per case. The whole reason the sheet exists is that he plays from it; a sheet
+   he has to retype is worse than the issue body it replaced.
+
+4. **Per-case verdict capture, stored in the artifact database.** Each case takes pass / fail / a note, and
+   a later session reads the verdicts with `read_db`. This is ADR-W-054's clause finally implemented, and
+   it is what makes an overnight round's output survive the session that produced it.
+
+5. **The artifact is a SURFACE, never a replacement.** The round issue remains the durable ledger and the
+   validation signal is still closing it. All three copies — issue, chat, artifact — carry the **same case
+   list**, extending Step 6's existing rule that the chat copy is the same list and not a summary: two
+   versions that differ is how a case gets skipped.
+
+**What this does not change.** The round issue opened at composition (ADR-W-013), the `in-round` →
+`awaiting-play` swap as the execution-finished marker, the `stats:` line as the machine-greppable record,
+standing rule 5's content and its running-server requirement (one port per unmerged PR), and the deploy
+boundary on unattended rounds (ADR-W-054).
+
+**Why not just a local `.html` file.** He reads a round's output in a different session and often on the
+other PC ([[work-pc-cross-machine]]). A file in the worktree is gone when the worktree is; a published
+artifact has a URL that outlives the session and a database that can hold his verdicts. That was
+ADR-W-054's reasoning and it is unchanged — only its reach is, from overnight rounds to all of them.
