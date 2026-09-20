@@ -52,7 +52,7 @@ import { AskLane } from '../shell/frame/AskLane';
 import { ask, figureIsOpen, type Answer } from './app/ask';
 import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
-import { anotherConfiguration, seedShowing } from './app/another';
+import { anotherConfiguration } from './app/another';
 import { centresOf, crossingSentence, crossingsOf, freeLetter, pointAt } from './engine/crossings';
 import { VERTICAL_TOL, verticality } from './engine/lines';
 import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
@@ -999,17 +999,21 @@ export function App() {
                 const items = measurablesOf(d.construction, what);
                 setPick(items.length ? { items, x: screen.x, y: screen.y } : null);
               }}
-              onCrossing={(sentence, at) => {
-                const next = [...lines, sentence];
+              onCrossing={(sentence) => {
                 // A GUARD, not a second decision: `submit` still owns whether the line is accepted
                 // and what the student is told. This only asks whether jumping the configuration
                 // afterwards would be meaningful, because moving the figure for a refused line
                 // would be a change the student did not ask for.
-                const clean = !derive(next, seed).faults.some((f) => f.index === lines.length);
+                /**
+                 * #1269: NO seed jump. The sentence now DENOTES the ring — a crossing on a drawn
+                 * segment commits the bounded noun, and #1168’s ruling puts the point on the root
+                 * inside that piece — so nothing has to move the figure to make the click look right.
+                 *
+                 * The jump was the defect: the seed is FIGURE-WIDE, so the configuration chosen to
+                 * show the newest crossing re-rolled every crossing named before it. The operator saw
+                 * exactly that — three clicks, and only the last one stayed where he put it.
+                 */
                 submit(sentence);
-                if (!clean) return;
-                const best = seedShowing(next, freeLetter(d.construction), at);
-                if (best !== seed) goToSeed(best);
               }}
             />
             {/*

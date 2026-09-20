@@ -151,6 +151,15 @@ const DEFAULT_SPAN: Span = { x: { lo: -6, hi: 6 }, y: { lo: -6, hi: 6 } };
  * the figure lives: the box of everything the student has PLACED, grown by half its own size in each
  * direction so the search can reach past the given points, and never smaller than the default.
  */
+/** A stated point's position, or null when it is not one (#1168's seeding needs the two ends). */
+function pointAtId(c: Construction, env: Env, id: Id): Pt | null {
+  const o = c.objects.find((q) => q.kind === 'point' && q.id === id);
+  if (!o) return null;
+  const x = evalExpr((o as { x: Parameters<typeof evalExpr>[0] }).x, env);
+  const y = evalExpr((o as { y: Parameters<typeof evalExpr>[0] }).y, env);
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
+
 function searchSpan(c: Construction, env: Env): Span {
   const xs: number[] = [];
   const ys: number[] = [];
@@ -613,6 +622,41 @@ export function evaluate(raw: Construction, seed = 0): Figure {
    * leaves the solve free to move it afterwards if a constraint says so; the post-hoc check is
    * unchanged and still has the last word.
    */
+  /**
+   * A BOUNDED noun seeds its crossing INSIDE the drawn piece (#1168).
+   *
+   * Operator's ruling, 2026-09-19: *«הצלע CA» ⇒ the root on the drawn extent; «הישר CA» ⇒ the first
+   * root, as today*. A line meets a circle twice and both roots are valid, so this is a question about
+   * which one comes up FIRST — and in this tree that is decided by where the search starts, because a
+   * least-squares descent goes to the basin it starts in (#1085, the same lesson that moved the search
+   * span onto the figure).
+   *
+   * So the sampled point is PROJECTED onto the segment it was said to lie on, clamped to the piece the
+   * student drew. The projection keeps the seed’s own position along the line, so successive
+   * configurations still walk it — and the far root stays reachable, because only the EVEN seeds are
+   * pulled in: «הציגו תצורה אחרת» reaches the outside root on the next press. It is a preference, never
+   * a filter, which is what #1168 required of it.
+   */
+  if (seed % 2 === 0) {
+    for (const k of c.constraints) {
+      if (k.t !== 'on-line-2pt' || !k.bounded) continue;
+      const at = seeded.get(k.id);
+      const pa = pointAtId(c, env, k.a);
+      const pb = pointAtId(c, env, k.b);
+      if (!at || !pa || !pb) continue;
+      const dx = pb.x - pa.x;
+      const dy = pb.y - pa.y;
+      const len2 = dx * dx + dy * dy;
+      if (!(len2 > 1e-12)) continue;
+      const t = ((at.x - pa.x) * dx + (at.y - pa.y) * dy) / len2;
+      // A sample that already falls ON the piece keeps its own position, so successive configurations
+      // still walk it; one that falls outside starts at the MIDPOINT rather than clamped to an end —
+      // measured, an endpoint start is degenerate (it satisfies the line and nothing else) and the
+      // solve parked there instead of finding the crossing.
+      const inside = t >= 0 && t <= 1 ? t : 0.5;
+      seeded.set(k.id, { x: pa.x + inside * dx, y: pa.y + inside * dy });
+    }
+  }
   for (const sel of c.selectors) {
     if (sel.kind !== 'axis-side') continue;
     const at0 = seeded.get(sel.id);

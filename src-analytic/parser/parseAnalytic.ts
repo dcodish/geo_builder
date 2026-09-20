@@ -846,6 +846,9 @@ const INTERSECT_EN = new RegExp(
  * else goes through `direction()` — the same resolver the relations use — so «הישר AB», «הצלע AB»
  * and «הישר l1» mean here exactly what they mean there, and cannot drift.
  */
+/** The nouns that mean the DRAWN piece rather than the infinite line (#1168, ADR-AG-111’s pair). */
+const BOUNDED_NOUN = /^(?:ה?צלע|ה?קטע|(?:the\s+)?(?:side|segment))\s/i;
+
 function incidenceOn(operand: string, id: Id): Constraint | null {
   const axis = AXIS_HE.exec(trim(operand)) ?? AXIS_EN.exec(trim(operand));
   if (axis) {
@@ -864,7 +867,16 @@ function incidenceOn(operand: string, id: Id): Constraint | null {
 
   const dir = direction(trim(operand));
   if (dir?.k === 'curve') return { t: 'on-curve', id, curve: dir.id };
-  if (dir?.k === 'points') return { t: 'on-line-2pt', id, a: dir.a, b: dir.b };
+  /**
+   * #1168: `direction()` deliberately forgets the noun — «הישר AC» and «הצלע AC» relate the same
+   * direction, and for a RELATION that is right. For an INCIDENCE it is not: the operator ruled that
+   * the noun decides which root a named crossing comes up on, so the boundedness is read here, where
+   * the operand text is still available, rather than by widening `direction` for every caller.
+   */
+  if (dir?.k === 'points') {
+    const bounded = BOUNDED_NOUN.test(trim(operand));
+    return { t: 'on-line-2pt', id, a: dir.a, b: dir.b, ...(bounded ? { bounded: true } : {}) };
+  }
 
   /**
    * A CURVE NAMED BY ITS EQUATION — «הישר y=9», or the bare «y=9» (#1092).

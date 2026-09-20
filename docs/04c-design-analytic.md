@@ -978,3 +978,18 @@ scale — ADR-AG-021's rule, which this layer had not inherited. It lives in `en
 trace, the explicit form, the slope number, the slope ask and the slopes panel all call it. The panel's
 own predicate was the one that was right; moving it out is what makes the five surfaces agreeing a
 property of the code rather than a coincidence anyone can break.
+
+## The noun decides the root, and a ring offers the sentence that denotes it ([ADR-AG-124](06c-decisions-analytic.md#adr-ag-124))
+
+A line meets a circle twice and both roots are real, so «which one» is a question about what comes up
+FIRST. The operator ruled it by the noun: «הצלע CA» opens on the root inside the drawn piece, «הישר CA»
+on the first root as before. The incidence carries the answer (`bounded` on `on-line-2pt`), and it acts
+on the **start** of the search rather than on the residual — a least-squares descent goes to the basin it
+starts in, so seeding the point on the drawn piece is what chooses the root. Only even seeds are pulled
+in, so «הציגו תצורה אחרת» still reaches the other root: a preference, never a filter.
+
+A crossing RING is offered only where the crossing lies on the drawn piece, so the sentence it commits
+says «הצלע»/«הקטע» — it must denote the dot the student is looking at, which is ADR-AG-048’s rule
+applied to the thing the click writes down. With that true, **nothing moves the figure’s configuration to
+make a click look right**: the seed is figure-wide, and using it to record one point’s root re-rolled every
+other point named before it.
