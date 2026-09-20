@@ -51,3 +51,22 @@ export const VECTOR_ARROW_RE = new RegExp(`[${VECTOR_ARROW_CLASS}]`);
  * The callers supply their own boundaries; only the word itself lives here.
  */
 export const VECTOR_WORD_SRC = String.raw`(?:ה?ו?וקטור|vectors?)`;
+
+/**
+ * HAS THE STUDENT MARKED THIS LINE AS BEING ABOUT VECTORS? (#1195)
+ *
+ * The four spellings of one marking, asked of RAW TEXT — an arrow character anywhere, or the vector
+ * WORD. It lives here for the reason this module exists: the grammar and the display must not come to
+ * disagree about what a marking is (#1194), and this is a third consumer of the same question.
+ *
+ * **Deliberately NOT `parse3.markVectorContext`**, which answers this for the parser: that function is
+ * `void` and side-effecting (it sets a module flag), and having `render` import `parser` is the wrong edge.
+ * Same vocabulary, read from the same place, without the coupling.
+ *
+ * The WORD needs a boundary because «וקטור SE» despaces to «וקטורSE» across a script transition — the
+ * lesson `normalize3` records; an arrow is its own character and needs none.
+ */
+export function isVectorMarked3(s: string): boolean {
+  if (VECTOR_ARROW_RE.test(s)) return true;
+  return new RegExp(String.raw`(?:^|[\s:,])${VECTOR_WORD_SRC}(?:\s|$)`, 'i').test(s);
+}

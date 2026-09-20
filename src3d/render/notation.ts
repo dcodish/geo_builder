@@ -14,6 +14,9 @@
  */
 
 import { COMBINING_ARROW, SPACING_ARROWS, VECTOR_WORD_SRC } from '../lexicon/marks3';
+// #1195: the preview composes bidi isolation with the notation, so the display layer reads the
+// isolation transform. `i18n/bidi` imports NOTHING — it is a leaf — so this edge runs downward, the
+// direction `render` already depends in. The reverse (bidi importing render) would invert it.
 
 /** Command types whose rows read as vector statements (the word וקטור is decoration). */
 export const VEC_CMD_TYPES = new Set(['name-vector', 'vec-rel', 'dot-given', 'inject-vector', 'point-in-span']);
@@ -62,3 +65,17 @@ export function factDisplay3(f: { utterance: string; cmds: { type: string; claim
   const isVec = f.cmds.some((cmd) => VEC_CMD_TYPES.has(cmd.type) || (cmd.type === 'claim' && cmd.claim?.type === 'vec-eq'));
   return isVec ? vectorNotation(f.utterance, vecNames) : f.utterance;
 }
+
+/**
+ * THE INPUT PREVIEW lives in `render/FactRow3.tsx` as `inputPreviewNode3`, beside the step row's
+ * `FactRowText3` (#1195, then #1312).
+ *
+ * It was a STRING composer here, and that shape was the defect: the preview's vector branch has to
+ * hand `VecMath` text that has NOT been isolated (VecMath isolates at the render event, ADR-3D-184,
+ * and its tokenizer reads LRI/PDI as `op` tokens otherwise), while the plain branch has to return
+ * isolated text. One string cannot be both, and returning a string at all is what let `U+20D7` reach
+ * the DOM as a literal combining mark instead of the `mover` that spans the pair.
+ *
+ * `vectorNotation` above is still the composer; what moved is the CHOICE of renderer, to the one file
+ * that already owns that choice for the committed row.
+ */

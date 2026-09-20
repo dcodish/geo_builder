@@ -547,3 +547,56 @@ imports nothing and exists so the grammar and the display cannot drift about a m
 exactly that here: `stated` first shipped as `dir: 'ltr'`, since its rows are pure LTR and pinning them
 looks obviously right. That is the list-wide override #559 exists to prevent; the bidi layer places an
 LTR run inside an RTL base correctly, and a section that decides for itself is how that stopped.
+
+## The input preview composes, and who may import whom (#1195, [ADR-3D-255](06b-decisions-3d.md#adr-3d-255))
+
+The strip under the input box **returns a NODE, not a string** — `inputPreviewNode3` in
+`render/FactRow3.tsx`, beside the step row's `FactRowText3` (Am. 1, #1312). Returning a string was the
+original defect: `U+20D7` is an internal marker that `VecMath` STRIPS and replaces with a `<mover>`
+spanning the pair, so a string sink displayed it as a combining mark over the last letter alone.
+
+It routes three ways, and which branch is taken decides how the text is prepared:
+
+| branch | gate | prepared how |
+| --- | --- | --- |
+| mathematics (#1152) | `hasMath` | isolated, then `MathText` |
+| vector (#1195) | `isVectorMarked3` | `vectorNotation` on **raw** text, then `VecMath` |
+| plain | — | isolated, `null` when isolation changes nothing |
+
+**The vector branch must NOT pre-isolate.** `VecMath` isolates at the render event itself
+([ADR-3D-184](06b-decisions-3d.md#adr-3d-184)) and its tokenizer reads LRI/PDI as `op` tokens — measured,
+«וקטור AB = 5» isolated first tokenizes as `op ⁦ · pair AB · … · op ⁩`. The mathematics and plain branches
+isolate first, which is #1152's rule and still right for them: there the isolate characters ride through
+untouched, while the reverse could reorder the equation.
+
+**The routing lives beside the row's, in `FactRow3.tsx`, and not in an `App3.tsx` callback.** That file
+exists because #900 found exactly this decision written as a ternary in a callback, *"invisible to every
+test"* — and #1195 then wrote the preview's routing as a ternary in a callback, where #1312 hid. The
+The base DIRECTION is deliberately NOT computed there: box and preview both resolve through `textDir3`
+on the raw text, which is #868's pinned property. Since #1195 the two can display different text, so
+that property may now be over-fitted — measured and decided in #1314, not here.
+
+**`vectorNotation` stays in `render/notation.ts`, not in `i18n/bidi.ts`.** `i18n/bidi.ts` imports
+**nothing** — it is a leaf, which is what lets `parser/`, `engine/` and `render/` all depend on it — so
+having it reach into `render` would invert the dependency. `render` already depends downward on `i18n`
+and `lexicon`, so the composed function sits there, beside `factDisplay3`, which is also the function
+its lock compares against.
+
+| layer | imports | why |
+| --- | --- | --- |
+| `lexicon/marks3` | nothing | the marking vocabulary, readable by grammar and display alike (#1194) |
+| `i18n/bidi` | nothing | the isolation transform, a leaf for the same reason |
+| `render/notation` | `lexicon`, `i18n` | the notation transform; the display layer is the consumer |
+| `render/FactRow3` | `lexicon`, `i18n`, `render/*` | the ROUTING — which renderer a surface uses, for both surfaces |
+
+**Three gates, three different questions, and they must not be confused:**
+
+| surface | what it can ask | gate |
+| --- | --- | --- |
+| step row (`factDisplay3`) | the COMMANDS exist | `isVectorFact3` |
+| input preview (`inputPreviewNode3`) | only the RAW TEXT — no command yet | `isVectorMarked3` |
+| `vectorNotation` itself | — | **none; it is unconditional** |
+
+That last row is the one to remember: `vectorNotation` will arrow «אורך AB = 5» and a bare `DC=3AB`
+given the chance. Every caller supplies the honesty gate, and a new caller that forgets asserts
+vector-ness the student never claimed.

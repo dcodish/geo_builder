@@ -9,7 +9,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import { useTranslation } from 'react-i18next';
 // The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
 import { AppFrame } from '../shell/frame/AppFrame';
-import { hasMath, MathText } from '../shell/math';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
@@ -27,7 +26,8 @@ import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
-import { bidiSegments3, inputPreview3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
+import { bidiSegments3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
+
 import { questionLines3 } from './export/questionLines3';
 import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { SYMBOL_SPECS_3 } from './ui/symbols3';
@@ -45,7 +45,7 @@ import { planeChipsByFact } from './store/planeChips';
 import { paramChipsByFact } from './store/paramChips';
 import { collectWedges, competingArcSymbols } from './render/wedges';
 import { displayModeOf } from '../shell/displayMode';
-import { FactRowText3, factRowDir3 } from './render/FactRow3';
+import { FactRowText3, factRowDir3, inputPreviewNode3 } from './render/FactRow3';
 import { VecMath } from './render/VecMath';
 
 /** #492/#425: the student's own statements, quoted and comma-joined, for a refusal that names the
@@ -700,9 +700,21 @@ export default function App3() {
              * had no strip at all. It gets one now. That is deliberate: the strip stops being "a
              * bidi repair" and becomes "what you typed, typeset".
              */
-            preview={(s) =>
-              hasMath(s) ? <MathText text={isolateLtrRuns3(s, true)} /> : inputPreview3(s)
-            }
+            /**
+             * #1195 — and the VECTOR notation, for a line the student explicitly marked.
+             *
+             * #1312 — the whole three-way choice lives in `inputPreviewNode3`, beside the step row's
+             * `FactRowText3`, and NOT as a ternary here. Writing it inline is what hid the defect:
+             * the preview returned a STRING where the row returns a node, so `U+20D7` reached the DOM
+             * as a literal combining mark — an arrow over the single preceding letter — instead of
+             * `VecMath`'s stretchy `mover` spanning the whole pair. A routing decision written in a
+             * callback is one no test can reach, which is the standing lesson of `FactRow3.tsx`.
+             *
+             * The null-when-nothing-changes contract lives there too, so a plain line still grows no
+             * second row. The direction stays on `textDir3` for BOTH box and preview (#868,
+             * and #1314 owns the question that leaves).
+             */
+            preview={(s) => inputPreviewNode3(s, new Set(derived.construction.vectors.keys()))}
             previewDir={(s) => textDir3(s)}
             boxDir={(s) => textDir3(s)}
           />
