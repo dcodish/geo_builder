@@ -16,7 +16,7 @@ import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
 import { pairKey, pinnedLengths } from './lengths';
-import { lineByName, type NamedLine } from './lines';
+import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { ringFaultsOf, type RingFault } from './rings';
 import { dirVector, freeRank, residual, resolveChoices, solveLM, type Constraint } from './solve';
@@ -1009,10 +1009,88 @@ export function drawableAt(c: Construction, seed: number): Figure {
  */
 const SAME_VALUE_EPS = 1e-4;
 
+/**
+ * What makes two configurations the SAME configuration, for a student looking at them (#1084, #1282).
+ *
+ * The placed points AND the resolved curves, rounded a hair finer than the canvas can show. Coarser
+ * than the solver's own agreement on purpose: two configurations differing in the sixth decimal are
+ * one picture. A LINE IS SIGNED NORMALISED — `(a,b,c)` and `(2a,2b,2c)` are the same line and the
+ * solve can land on differently scaled triples — via `normalizedLine` (#1201), the one place that
+ * decides when two lines are the same line ([ADR-W-053](../../docs/06w-decisions-workspace.md#adr-w-053)).
+ *
+ * **It lives HERE, in the engine, because it is the same question three consumers ask.** It began in
+ * `app/another.ts` for «הציגו תצורה אחרת» (#1084), and #1282 is what the second consumer cost: the
+ * knowledge gate asked for three SEEDS instead of three CONFIGURATIONS, got one picture three times,
+ * and read zero spread as certainty. `another.ts` now calls this rather than owning a second copy.
+ */
+export function figureSignature(f: Figure): string {
+  const n = (v: number) => v.toFixed(4);
+  const points = f.points.map((p) => `${p.id}:${n(p.x)},${n(p.y)}`);
+  const curves = f.curves.map((c) => `${c.id}:${curveSignature(c.curve)}`);
+  return [...points, ...curves].join('|');
+}
+
+/** The resolved shape of one curve, to the precision a student could see. */
+function curveSignature(c: NumCurve): string {
+  const n = (v: number) => v.toFixed(4);
+  switch (c.kind) {
+    case 'line': {
+      const k = normalizedLine(c.a, c.b, c.c);
+      // A degenerate triple has no line to compare; it signs as itself rather than throwing.
+      return k ? `line ${n(k.a)},${n(k.b)},${n(k.c)}` : `line ${n(c.a)},${n(c.b)},${n(c.c)}`;
+    }
+    case 'circle':
+      return `circle ${n(c.cx)},${n(c.cy)},${n(c.r)}`;
+    case 'parabola':
+      return `parabola ${n(c.p)}`;
+    case 'ellipse':
+      return `ellipse ${n(c.a)},${n(c.b)}`;
+  }
+}
+
+/** How far to look for a differing configuration. The same budget the drawable search and the
+ *  «תצורה אחרת» button use, for the same reason. */
+const DISTINCT_TRIES = 24;
+
+const distinctCache = new WeakMap<Construction, Map<number, number[]>>();
+
+/**
+ * The seeds of up to `count` configurations that actually DIFFER (#1282).
+ *
+ * `drawableAt` repairs a seed whose figure is not whole by walking FORWARD to the next whole one, so
+ * consecutive seeds routinely resolve to ONE figure. Measured on the operator's trapezoid: only 4 of
+ * 24 seeds are whole, and seeds 0–8 all walk forward to seed 8 — so `[0, 1, 2]` was one sample taken
+ * three times, and any test of "does this value vary?" over it is answering about a single picture.
+ *
+ * Returns fewer than `count` when the figure genuinely has fewer distinct configurations — a
+ * determined figure returns one — which is exactly what a caller needs to know.
+ */
+export function distinctConfigSeeds(c: Construction, count = 3, tries = DISTINCT_TRIES): number[] {
+  let perCount = distinctCache.get(c);
+  if (!perCount) {
+    perCount = new Map();
+    distinctCache.set(c, perCount);
+  }
+  const hit = perCount.get(count);
+  if (hit) return hit;
+
+  const seeds: number[] = [];
+  const seen = new Set<string>();
+  for (let seed = 0; seed < tries && seeds.length < count; seed += 1) {
+    const sig = figureSignature(drawableAt(c, seed));
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    seeds.push(seed);
+  }
+  const out = seeds.length > 0 ? seeds : [0];
+  perCount.set(count, out);
+  return out;
+}
+
 export function isKnowledge(
   c: Construction,
   read: (f: Figure) => number | null,
-  seeds: readonly number[] = [0, 1, 2],
+  seeds: readonly number[] = distinctConfigSeeds(c),
 ): { known: true; value: number } | { known: false } {
   const vals: number[] = [];
   for (const s of seeds) {

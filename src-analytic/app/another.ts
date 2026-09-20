@@ -19,8 +19,7 @@
  * pressing the button on it should not quietly redraw the same picture for ever.
  */
 import { derive } from '../engine/derive';
-import { normalizedLine } from '../engine/lines';
-import type { NumCurve } from '../engine/types';
+import { figureSignature } from '../engine/evaluate';
 
 /** How far to look. The same budget the drawable search uses, for the same reason. */
 const TRIES = 24;
@@ -28,60 +27,17 @@ const TRIES = 24;
 /**
  * What makes two figures the SAME figure, for a student looking at them.
  *
- * The placed points AND the resolved curves, rounded to a hair finer than the canvas can show.
- * Coarser than the solver's own agreement on purpose: two configurations differing in the sixth
- * decimal are one picture, and offering them as "another configuration" would be the button lying in
- * the other direction.
- *
- * It was the points alone until #1220, which is a figure-shaped blind spot rather than a rounding
- * one — see below.
+ * **The decision moved into the engine** (`figureSignature`, `evaluate.ts`) when #1282 showed it has
+ * three consumers, not one: this button, the knowledge gate, and — through the gate — every value the
+ * data panel prints. It used to live here, and the cost of that was a P1: `isKnowledge` asked for three
+ * SEEDS rather than three CONFIGURATIONS, `drawableAt`'s forward walk resolved all three to one figure,
+ * and zero spread was read as certainty on a figure with a free degree of freedom. The rule that two
+ * configurations differing in the sixth decimal are one picture, and that a line is compared normalised
+ * (#1201, #1220), is now stated once and CALLED
+ * ([ADR-W-053](../../docs/06w-decisions-workspace.md#adr-w-053)).
  */
-const signature = (lines: readonly string[], seed: number): string => {
-  const d = derive(lines, seed);
-  const points = d.figure.points.map((p) => `${p.id}:${p.x.toFixed(4)},${p.y.toFixed(4)}`);
-  /**
-   * THE CURVES COUNT TOO (#1220).
-   *
-   * Operator, playing T24 on «נתונה פרבולה שמשוואתה y^2=2px»: *"p is unknown but when i ask for
-   * another config, there is no other config which is wrong"*.
-   *
-   * This read `figure.points` alone, and that figure has NONE — one curve and nothing else. So the
-   * signature was the empty string at every seed, nothing ever differed, and the button reported
-   * `found: false`. Which, per this file's own comment, MEANS *"a determined figure has one
-   * configuration"* — said about a figure with infinitely many. The engine was innocent: `p` is
-   * sampled correctly and lands differently at every seed.
-   *
-   * A LINE IS SIGNED NORMALISED, and that is not tidiness. `(a, b, c)` and `(2a, 2b, 2c)` are the
-   * same line, and the solve can land on differently scaled triples across seeds; signing them raw
-   * would make one line look like two and the button would claim "another configuration" while
-   * redrawing an identical picture — the failure in the opposite direction this file already warns
-   * about. `normalizedLine` (#1201) is the one place that decides when two lines are the same line,
-   * so it is CALLED rather than reproduced ([ADR-W-053](../../docs/06w-decisions-workspace.md#adr-w-053)).
-   *
-   * The other kinds sign as their own resolved parameters, at the same 4 decimals the points use and
-   * for the same reason: two configurations differing in the sixth decimal are one picture.
-   */
-  const curves = d.figure.curves.map((c) => `${c.id}:${curveSignature(c.curve)}`);
-  return [...points, ...curves].join('|');
-};
-
-/** The resolved shape of one curve, to the precision a student could see. */
-function curveSignature(c: NumCurve): string {
-  const n = (v: number) => v.toFixed(4);
-  switch (c.kind) {
-    case 'line': {
-      const k = normalizedLine(c.a, c.b, c.c);
-      // A degenerate triple has no line to compare; it signs as itself rather than throwing.
-      return k ? `line ${n(k.a)},${n(k.b)},${n(k.c)}` : `line ${n(c.a)},${n(c.b)},${n(c.c)}`;
-    }
-    case 'circle':
-      return `circle ${n(c.cx)},${n(c.cy)},${n(c.r)}`;
-    case 'parabola':
-      return `parabola ${n(c.p)}`;
-    case 'ellipse':
-      return `ellipse ${n(c.a)},${n(c.b)}`;
-  }
-}
+const signature = (lines: readonly string[], seed: number): string =>
+  figureSignature(derive(lines, seed).figure);
 
 export interface AnotherConfiguration {
   /** The seed to move to — unchanged when nothing different was found. */

@@ -800,6 +800,14 @@ fixed there is no other configuration, so «מפגש האלכסונים» of a c
 of three collinear points and an empty circle are each named as not existing, rather than left absent
 with nothing said.
 
+**R61 — a value is called KNOWN only if it holds across configurations that actually DIFFER**
+([ADR-AG-126](06c-decisions-analytic.md#adr-ag-126)). The data panel may present a number as determined
+only when the givens determine it — never because the three configurations it happened to sample were the
+same picture. The tool must not print «N דרגות חופש» above a panel of certainties: freedom that the figure
+reports is freedom some quantity must show. A value the student GAVE stays known (this is not "mark
+everything unknown"), and a determined figure — one configuration — keeps reporting its values, which is
+what R55's sibling rule protects in the other direction.
+
 **R60 — a crossing that lands on a point the figure ALREADY HAS is refused, naming it**
 ([ADR-AG-125](06c-decisions-analytic.md#adr-ag-125), the analytic member of the cross-product ruling
 [ADR-W-066](06w-decisions-workspace.md#adr-w-066)). Two distinct named points are never drawn at the same

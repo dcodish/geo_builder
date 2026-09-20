@@ -6679,3 +6679,42 @@ and, three rows above it in the same panel, `AD: (אין שיפוע) אנכי`. 
 3. **The epsilon floor is tied to `SOLVE_TOL`, not to a small constant.** A figure whose points all sit at the origin has no span, and the solver leaves its crossing ~1e-9 from the point it coincides with — an absolute floor of 1e-9 decided nothing. That is [#1276](https://github.com/dcodish/geo_builder/issues/1276)'s lesson arriving prospectively, in the same round.
 
 **Consequences.** A positional pass in `derive`, gated on `reportedDof === 0`, reusing the existing `crossing-already-named` code and its `holder` field so the student reads the same sentence whichever mechanism found it. `issue-1254-positional-coincidence.test.ts` (5): the operator's T18 figure naming `B`, #1254's equation case naming `A`, the CONTROL one letter away that still builds — **the control the sheet itself got wrong**, since T18 was written as one and its own crossing landed on B — the structural member still refused at the parser, and a free figure left unaccused.
+
+## ADR-AG-126 — The knowledge gate samples CONFIGURATIONS, not seeds (#1282, P1)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1282 (bug, **P1**, `analytic`) · operator report while transcribing מבחן 17 עמ' 561 תרגיל 1
+**Requirements:** [02c](02c-requirements-analytic.md) — R61 · **Design:** [04c](04c-design-analytic.md)
+**Completes** [ADR-AG-089](#adr-ag-089)/#1084, which fixed this collapse in one consumer and not the other
+
+**The report.** *"M location shows different before and after which is for sure wrong. if it is unknown before the last statement, it shouldn't have said anything."*
+
+**Why it was a P1 rather than a P2.** On a figure the tool itself reports as having **1 degree of freedom**, `isKnowledge` answered `known: true` for every coordinate, slope and length in the panel. The panel printed «1 דרגות חופש» directly above numbers it asserted as determined — and **the true answer was never among them**: `C = (15, 9.42)` shown, `C = (15, −2)` true. A student doing part א off that figure computes the acute angle between the diagonals of a trapezoid that is not theirs. That is ADR-052's cardinal sin — a magnitude the student never gave, presented as a fact, in the one place they check what the tool understood.
+
+**Measured at `0b7d769a`, the operator's own ten lines:**
+
+```
+reportedDof                     1
+drawableAt(0) = (1) = (2)       C=(15.0000, 9.4239)  M=(7.0000, 8.2848)   ← ONE figure, three times
+isKnowledge(C.y)                { known: true, value: 9.4239 }
+raw seeds 0–23                  only 4 are WHOLE (8, 11, 12, 16); seeds 0–8 all walk forward to 8
+                                C.y over those four: 9.4239 · 8.2359 · −1.6940 · 10.3244
+```
+
+**Root cause — a sampling collapse, not a formatting choice.** `isKnowledge` decided knowledge by reading a value at seeds 0, 1 and 2 through `drawableAt`, which repairs a seed whose figure is not whole by walking **forward** to the next whole one ([#1083](https://github.com/dcodish/geo_builder/issues/1083)). On this figure the diagonals of the sampled quadrilateral cross only when extended in 20 of 24 seeds, so `M` — the point the student named — is vacant and the walk carries seeds 0–8 to the same seed 8. Three independent samples were one sample; zero spread was read as certainty.
+
+**This is #1084's collapse at its second consumer.** `another.ts` says it verbatim in its own header — *"seeds 0, 1 and 2 all converge to one configuration … the button has to ask for what it promises — a figure that DIFFERS — rather than for the next seed and hope"* — and «הציגו תצורה אחרת» was corrected to search for a differing signature. The knowledge gate was never given the same correction, and nothing asked docs/17's class question of #1084: *can this happen anywhere else?* It could, and this is what it cost.
+
+**The fix, and where it lives.** `figureSignature` (what makes two configurations the same picture — points and resolved curves at 4 decimals, lines compared through `normalizedLine`) and `distinctConfigSeeds` (the seeds of up to N configurations that actually differ, cached per construction) move **into the engine**, beside the `drawableAt` walk that causes the collapse. `isKnowledge`'s default becomes `distinctConfigSeeds(c)` instead of `[0, 1, 2]`. `app/another.ts` now **calls** `figureSignature` rather than owning the second copy it had ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)) — which is the structural half of the fix: the reason the first correction did not reach the second consumer is that the decision lived in one consumer's file.
+
+Layering is why it goes to the engine and not the other way: `app → engine`, and `evaluate.ts` cannot import from `app/`.
+
+**Measured after:** `distinctConfigSeeds` returns `[0, 9, 12]` — three different pictures — and `C.y`, `D.y`, `M.y` all report **unknown** while `M.x` still reports **known = 7**, because that one is the student's own given. Adding the exam's last line still collapses the freedom and the values become known at their true `−2` / `6`.
+
+**What is deliberately NOT changed.**
+
+- **The tolerance.** `SAME_VALUE_EPS` and the relative test are exactly as [#1078](https://github.com/dcodish/geo_builder/issues/1078) left them. The defect was never that the spread was measured too finely — it was that there was no spread to measure. #1078's figure (slopes of 1e-8 across configurations, invariantly zero) and #1083's (24 configurations agreeing to 1.1e-5) both still report KNOWN; `drawable.test.ts` passes untouched.
+- **`knownOptions`.** It already samples 24 seeds and dedupes by VALUE, so the walk does not hide the variety from it — it sees seeds 8, 11, 12 and 16 as distinct answers. It is not this defect and is left alone; #1259 is its own open question.
+
+**The invariant this exposes, filed not built.** `reportedDof > 0` while every quantity reports `known` is a state the tool should not be able to occupy, and a cheap corpus-wide assertion would have caught this on day one. It is locked here **on the figure that violated it**; as a sweep over every analytic scenario it is a wider change with its own blast radius, filed as [#1289](https://github.com/dcodish/geo_builder/issues/1289).
+
+**Consequences.** `engine/evaluate.ts` (+`figureSignature`, +`curveSignature`, +`distinctConfigSeeds`, one default parameter changed); `app/another.ts` (−36 lines, now a one-line call). `issue-1282-knowledge-distinct-configs.test.ts` (10): the operator's figure reporting unknown where he gave nothing and known where he gave something; **the collapse asserted as a PRECONDITION**, so a future change that happens to spread seeds 0–2 cannot make the lock vacuous; the freedom-implies-an-unknown invariant on that figure; the after-figure's values genuinely determined; «הציגו תצורה אחרת» still finding a differing figure through the shared signature; and a determined figure still reporting one configuration and known values.

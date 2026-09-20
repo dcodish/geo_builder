@@ -1010,3 +1010,20 @@ coincidence is FORCED is a question about the figure, not about the words.
 The nearness epsilon is relative to the figure with a floor tied to `SOLVE_TOL` — a figure whose points
 all sit at the origin has no span, and the solver leaves its crossing ~1e-9 from the point it coincides
 with, so an absolute floor below that decides nothing.
+
+## The knowledge gate samples CONFIGURATIONS, not seeds ([ADR-AG-126](06c-decisions-analytic.md#adr-ag-126))
+
+`isKnowledge` decides whether a printed value is determined by reading it at several configurations and
+asking whether it moved. Those configurations must be **distinct pictures**, not consecutive seeds:
+`drawableAt` repairs a seed whose figure is not whole by walking forward to the next whole one, so
+consecutive seeds routinely resolve to one figure — and a value read three times from one picture has zero
+spread whatever the figure's freedom.
+
+`figureSignature` is what makes two configurations the same picture (points and resolved curves at four
+decimals, lines through `normalizedLine`), and `distinctConfigSeeds` walks until the signature differs.
+Both live in `engine/evaluate.ts`, beside the walk that causes the collapse, and **both consumers call
+them**: the knowledge gate and «הציגו תצורה אחרת». The button had its own copy until #1282, and that is
+precisely why the correction #1084 made for the button never reached the gate.
+
+The tolerance is untouched: the defect was never that the spread was measured too finely, it was that
+there was no spread to measure.
