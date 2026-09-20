@@ -72,3 +72,14 @@ constraint that can't be satisfied yet is DEFERRED"* and quotes the operator say
 in June. **Before citing an ADR to justify a refusal, read its Context and ask whether it covers THIS
 case — and grep the sibling's log for the same principle, which may already have been decided the
 other way.**
+
+**2026-09-20, #1266 — a DELIBERATE deferral carries a cost premise, and that premise is measurable.**
+The operator asked why «BD גובה לצלע AB» answers "I can't read this". The comment above the gate said an
+owned refusal "is a larger change (2-D has no refusal vocabulary equivalent to the analytic tree's
+`ParseFailure` codes)" — written by an earlier session of mine, and honest about being a choice. Five
+minutes of grep: 2-D's `Clarify` union has **15 members**, `refusalOf` maps every one, `submitPipeline`
+has ~10 arms, and #967's `angle-sides-disjoint` is the identical shape (grammar read it, geometry
+impossible, refuse by name). The "larger change" is one union member and two strings. **A split-out with
+a stated reason reads as settled and is quoted forward; check its reason the same way you check a
+plan's diagnosis** — especially the form "the tree has no X", which is one grep.
+

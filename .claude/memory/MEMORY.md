@@ -51,3 +51,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Vectors are 3-D only](vectors-are-3d-only.md) — 2-D has zero vector support BY DESIGN (space-unit topic, operator 2026-09-18 #1184); never port them to `src/` or file a parity issue
 - [Re-measure at pickup](re-measure-at-pickup.md) — re-run an issue's own case before reading its plan; a divergence is EXPECTED (the trunk moves ~35 commits/day), and only "the named cause isn't what fires" is an escalation (2026-09-20, ADR-W-064)
 - [Deploy transport](deploy-transport-scp-tar.md) — recursive scp can die mid-upload; check the server before retrying, and tar|ssh carries the LOCAL uid so chown root:root after (prod/2026-09-18)
+- [Absence cases need the next line](absence-cases-need-the-next-line.md) — a play case whose Look-for is “not X” stops one line short of the defect; add the student’s natural follow-up (2026-09-20 #1265)
