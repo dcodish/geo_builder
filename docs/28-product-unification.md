@@ -878,3 +878,29 @@ down or unreachable leaves every builder working with its built-in roster.
 - A big-bang refactor. Every phase is independently revertible, and phase 3 is per-surface.
 - **Any change to the products' URLs, entry points, bundles or deploy topology.** Ruled out by §4:
   the builders stay separate apps at separate links, and the switcher is a link in a shared toolbar.
+
+## 5b. The shared bidi core's run-span rule ([ADR-W-070](06w-decisions-workspace.md#adr-w-070))
+
+`makeBidi().segments` decides where a technical run begins and ends — the one decision every bidi surface
+in every product is built on. The span is `[first CORE character … last CORE character]`, then grown by
+three rules:
+
+1. **partner debt** — a delimiter whose partner is already inside the span joins it;
+2. **a leading SIGN** — `-`, `−` or `+` immediately before the span joins it, **unless a Hebrew letter sits
+   immediately before the sign**, in which case it is a particle's maqaf («ציר ה-x», «ו-B», «מ-9») and
+   belongs to the Hebrew;
+3. **balanced hug** — a delimiter pair wrapping the span joins it, outermost last.
+
+**The order of 2 and 3 is load-bearing.** `(-2,4)` must become the span `-2,4` before the hug runs, so that
+the hug then sees `(` and `)` adjacent and absorbs the pair. Reversed, the parens stay outside and the
+student reads «(2,4-)» — the #1296 defect.
+
+The signs are **not** in the run alphabet (`BASE_CORE`). A CORE character may START a run on its own, and a
+bare `-` between Hebrew words is a maqaf; a sign is a left-edge extension of a run that already exists.
+
+**Three copies, one table.** `shell/bidi.ts` serves analytic and complex; 2-D and 3-D keep their own copies
+until Track B migrates them ([ADR-W-016](06w-decisions-workspace.md#adr-w-016)). Any change to this rule is
+locked by a single fixture table run against **all three kits**
+(`shell/__tests__/issue-1296-leading-sign.test.ts`), because a per-tree lock cannot see a copy drifting.
+The one legitimate divergence is 3-D's `declSplit` (a declaration renders as a name island plus an equation
+island); it is asserted per product so a migration has to decide about it rather than lose it.

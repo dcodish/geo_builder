@@ -50,6 +50,19 @@ const OPEN = '([{"';
 const CLOSE = ')]}"';
 
 /**
+ * Signs that may OPEN a technical run (#1296) — the shared rule, ported from `shell/bidi.ts`.
+ *
+ * NOT in CORE: a CORE character can start a run on its own, and a bare `-` after a Hebrew letter is the
+ * particle's maqaf («ציר ה-x», «ו-B», «מ-9»), which must stay with the Hebrew. The guard below is that
+ * distinction and nothing else.
+ *
+ * This tree keeps its own copy until Track B migrates it (ADR-W-016); `shell/__tests__/bidi.test.ts`
+ * runs ONE fixture table against all three kits, so the copies cannot drift apart on this rule.
+ */
+const SIGNS = '-−+';
+
+
+/**
  * The run alphabet, exported for the drift lock only (`__tests__/bidi.test.ts`) — nothing at runtime
  * should branch on these. The test asserts `ui/symbols.ts` ⊆ `RUN_CORE ∪ RUN_DELIMS`, which is what makes
  * "someone added a palette button" a test failure rather than a rendering bug found in prod.
@@ -90,6 +103,8 @@ export function bidiSegments(s: string, rtlParagraph = false, liveTail = false):
   };
 
   let gap = ''; // the current non-Hebrew span, accumulated until a Hebrew letter closes it
+  /** #1296 — does a Hebrew LETTER sit immediately before this gap? If so its leading `-` is a maqaf. */
+  let gapAfterHebrew = false;
   const flush = (isFinal = false) => {
     let first = [...gap].findIndex((c) => CORE.test(c));
     if (first < 0) { push(gap, false); gap = ''; return; }
@@ -129,6 +144,18 @@ export function bidiSegments(s: string, rtlParagraph = false, liveTail = false):
       if (!grew) break;
     }
 
+    /**
+     * A LEADING SIGN BELONGS TO THE RUN (#1296). `first` is the first CORE character and the loops around
+     * it only move over DELIMITERS, so an expression opening with an operator lost it: `(-2,4)` selected
+     * `2,4`, leaving `(`, `-` and `)` outside as neutrals to be flipped into the RTL paragraph — the
+     * student read «(2,4-)». ABOVE the hug loop, so the parens are then absorbed as a pair. One character,
+     * never a loop. A Hebrew letter before the sign means it is a maqaf and it stays out.
+     */
+    if (first > 0 && SIGNS.includes(gap[first - 1]) &&
+        !(first - 1 > 0 ? HEBREW_LETTER.test(gap[first - 2]) : gapAfterHebrew)) {
+      first--;
+    }
+
     // absorb balanced delimiters that hug the run, outermost last: `("AB")` takes the quotes, then the
     // parens. An unbalanced one (its partner is elsewhere in the sentence) is left where it is.
     for (;;) {
@@ -145,7 +172,7 @@ export function bidiSegments(s: string, rtlParagraph = false, liveTail = false):
   };
 
   for (const ch of s) {
-    if (HEBREW_LETTER.test(ch)) { flush(); push(ch, false); } else gap += ch;
+    if (HEBREW_LETTER.test(ch)) { flush(); push(ch, false); gapAfterHebrew = true; /* #1296 */ } else gap += ch;
   }
   flush(true);
   return segs;

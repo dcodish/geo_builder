@@ -3576,3 +3576,45 @@ ADR-W-054's reasoning and it is unchanged — only its reach is, from overnight 
 **What is deliberately not changed.** 2-D still typesets the raw string. It is the tree the mechanism came from, it ships, and whether its own line should isolate first is a question about 2-D rather than about this port — the lock excludes it **by name and with that reason**, so the exclusion is visible rather than an accident of how the assertion was written.
 
 **Consequences.** `src-complex/App.tsx` and `src3d/App3.tsx` (+the `hasMath`/`MathText` import, the preview expression). `shell/__tests__/issue-1152-typeset-preview-parity.test.ts` (13): every builder routes its preview through `hasMath` and `MathText`; every builder that joined via this port isolates BEFORE typesetting; and the trigger itself is **called, not described** — the rows fix what `hasMath` answers for the strings the ruling is about, so a change that narrowed it fails here instead of silently emptying four previews. A fifth builder is one line in `APPS`.
+
+## ADR-W-070 — A leading SIGN belongs to the technical run; a maqaf does not (#1296)
+
+**Status:** accepted, 2026-09-21 · **Issue:** #1296 (bug, P2, `workspace`)
+**Requirements:** none (internal — this restores a promise the display was breaking, it does not change one) · **Design:** [28](28-product-unification.md#5a-how-this-is-executed--branch-strategy-and-the-work-items)
+**Extends** [ADR-W-016](#adr-w-016)'s shared bidi core with the one case its span selection never had
+
+**The report.** Operator, 2026-09-20, typing `(-2,4)` into the analytic tool: *"I cannot enter the coordinates in a normal way. the bidi keeps interfering and i dont know how to get around it"*.
+
+**There was nothing to get around, and that is the defect.** The string was always correct — `parseLine` received `(-2,4)` and parsed it, and the stored fact holds it verbatim. Only the DISPLAY was wrong, which is exactly why he could not type his way out of it: every correction he made was to something that was already right.
+
+**The class.** *A technical run that OPENS with a non-CORE character loses that character to the paragraph direction.* `flush()` selects the span as `[first CORE … last CORE]` and then grows it with two loops — partner-debt and balanced-hug — **both of which only ever move over a DELIMITER, and both of which require adjacency to the current span.** The right edge additionally has a trim-back and `liveTail`; the left edge has nothing else. So a sign between `(` and the first digit blocks the hug permanently, and `(`, `-` and `)` all sit outside as bidi neutrals for the UBA to resolve to RTL.
+
+**Measured before**, and it was never analytic-only — the span logic is copied three times and all three copies were identical here:
+
+```
+shell  "נקודה (-2,4) …"   ->  נקודה (-⟦2,4⟧) …        ✘      "נקודה (2,4) …"  ->  נקודה ⟦(2,4)⟧ …   ✔
+2-D    "הזווית היא -37"   ->  הזווית היא -⟦37⟧        ✘      "הנקודה (2,-4)"  ->  הנקודה ⟦(2,-4)⟧   ✔
+3-D    "וקטור (-1,2,3)"   ->  וקטור (-⟦1,2,3⟧)        ✘
+```
+
+An **interior** minus was always fine; only a leading one. «וקטור (-1,2,3)» is everyday 3-D vocabulary, so this was live in three shipped products, not only in the undeployed one where it was reported.
+
+**Why a blanket "absorb a leading minus" would have been wrong, and what the discriminator actually is.** `-` in a Hebrew sentence is also the **maqaf** of a particle, and there the old behaviour was already correct: «ציר ה-x», «ו-B(6,8)», «מ-9», «ל-l1», «מ-A» all keep the hyphen with the Hebrew. Measured across thirteen rows, every correct one has the `-` **immediately preceded by a Hebrew letter** and every broken one has it preceded by an opening delimiter, by whitespace, or by the start of the line. That is the whole rule, it needs no lookahead into meaning, and it is the display-side twin of [#975](https://github.com/dcodish/geo_builder/issues/975), where the parser learned the same distinction about the same character.
+
+The gap's first character is the awkward case: a gap is closed by a Hebrew letter and the next begins right after it, so every gap but the first is preceded by one — and the first by nothing. `gapAfterHebrew` carries exactly that, which is what makes «-5 הוא הערך» absorb while «ה-x» does not.
+
+**Deliberately NOT in `BASE_CORE`.** A CORE character can START a run on its own; putting `-` there would isolate the maqaf away from its own word and break every correct row above. The sign is a left-edge EXTENSION of an existing run, never a reason to open one.
+
+**Order is load-bearing.** The extension runs **above** the hug loop, so `(-2,4)` first becomes the span `-2,4` and the hug then sees `(` and `)` adjacent and absorbs the pair — the same path `(2,4)` already took. Below the hug loop it would be too late. One character, never a loop: `--5` is not something a student writes, and repeating would start eating the maqaf.
+
+**`+` is included with no measured case**, stated plainly because the repo's rule is that a fix is sized to a class: a run opening with `+` is broken identically and by the same line of code. A SPACED operator («שווה + 5») is deliberately still outside — the sign must be immediately adjacent — because a detached operator is genuinely ambiguous and no case was measured.
+
+**Ported to all three copies, and that was the scope decision.** [ADR-W-016](#adr-w-016) leaves `src/i18n/bidi.ts` and `src3d/i18n/bidi.ts` in place until Track B migrates those apps, so fixing the shared core alone would have left the class live in 2-D and 3-D where it is measured above — the half-fix docs/17 forbids. The drift net is **one fixture table asserted by all three kits**, which is what the three-copy situation actually needs and what a per-tree lock with its own rows would not have given.
+
+**The guard rejected the obvious shape of that net, and was right.** The first draft was a single test in `shell/__tests__` importing all three kits — and `server/__tests__/isolation.test.ts` refused it: `shell/` may never import a product tree ([ADR-W-016](#adr-w-016) rule 2), and its scan covers a tree's tests as well as its sources. The structure it forced is better: the ROWS live once in `shell/__tests__/fixtures/issue-1296-rows.ts` and each tree asserts them against its own kit, which keeps the products importing `shell/` — the allowed direction — while the table still exists in one place. When Track B migrates 2-D and 3-D onto this core, the three test files collapse into one.
+
+**A product difference the shared table nearly erased, and now records instead.** The first run of that table failed one row: 3-D renders «נתון הישר l1: 2x-y+8=0» as TWO islands (`declSplit`, its textbook layout) where shell and 2-D render one. That is a documented parameter of `makeBidi`, not a regression — the test row was wrong, not the code. It is now asserted per kit, with the sign rule additionally exercised inside a split declaration, so a future Track B migration has to decide about the split deliberately rather than lose it to a passing test.
+
+**Measured after**, all three kits: the ten sign rows absorb (both `-` and `−`, the vector row, and the line-initial case), the seven maqaf rows are unchanged, and «הערך שווה ל-(-5)» — the same character twice in one line, one out and one in — proves the rule is positional rather than a property of the character. Two properties are asserted over every row: isolation changes **display only** (stripping the controls returns the input exactly, so nothing can reach the parser or the fact list — #531/#751), and it is **idempotent**.
+
+**Consequences.** `shell/bidi.ts` (+`SIGNS`, +`gapAfterHebrew`, +the left-edge extension above the hug loop). `src/i18n/bidi.ts`, `src3d/i18n/bidi.ts` (the same rule, ported). `shell/__tests__/fixtures/issue-1296-rows.ts` (the shared rows + the per-tree suite; the isolate characters written by code point, never literally, per the core's own rule) and three thin locks — `shell/__tests__/`, `src/i18n/__tests__/`, `src3d/__tests__/issue-1296-leading-sign.test.ts` (71 tests total): the three row tables per kit, the display-only and idempotence properties, and the declaration-split difference asserted on both sides. The 1,037 pre-existing bidi locks across the three trees pass untouched, which is the evidence that the left-edge rule is surgical.

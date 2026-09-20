@@ -47,6 +47,19 @@ const BASE_CORE = "A-Za-z0-9'′·<½¾²³ℓ" + VECTOR_ARROW + 'Α-ω|∠∡�
 const OPEN = '([{"';
 const CLOSE = ')]}"';
 
+/**
+ * Signs that may OPEN a technical run — the left-edge case the span selection was missing (#1296).
+ *
+ * Both spellings of the minus, because a paste from a PDF carries U+2212 and a keyboard carries U+002D,
+ * and the plus for symmetry (it is never a maqaf, so it needs no exception; no case was measured for it,
+ * but a run that opens with `+` is broken in exactly the same way and by exactly the same rule).
+ *
+ * NOT added to `BASE_CORE`, deliberately. A CORE character can START a run on its own, and a bare `-`
+ * between two Hebrew words is a maqaf, not an expression — putting it in CORE would isolate «ציר ה-x»'s
+ * hyphen away from the «ה» it belongs to and break every one of the correct rows in the lock table.
+ */
+const SIGNS = '-−+';
+
 const LRI = '⁦'; // LEFT-TO-RIGHT ISOLATE
 const PDI = '⁩'; // POP DIRECTIONAL ISOLATE
 
@@ -166,6 +179,15 @@ export function makeBidi(options: BidiOptions = {}): BidiKit {
     };
 
     let gap = ''; // the current non-Hebrew span, accumulated until a Hebrew letter closes it
+    /**
+     * Does a Hebrew LETTER sit immediately before this gap? (#1296)
+     *
+     * A gap is closed by a Hebrew letter and the next one begins right after it, so every gap but the
+     * first has one — and the first has nothing before it at all. That distinction is the whole maqaf
+     * test: `-` after a Hebrew letter is the particle's hyphen («ציר ה-x», «ו-B», «מ-9»), and `-` after
+     * anything else, or at the very start of the line, is a sign.
+     */
+    let gapAfterHebrew = false;
     const flush = (isFinal = false) => {
       let first = [...gap].findIndex((c) => CORE.test(c));
       if (first < 0) {
@@ -209,6 +231,30 @@ export function makeBidi(options: BidiOptions = {}): BidiKit {
         if (!grew) break;
       }
 
+      /**
+       * A LEADING SIGN BELONGS TO THE RUN (#1296) — the span's left-edge case, and it runs HERE.
+       *
+       * `first` is the first CORE character, and the two loops around it only ever move over a
+       * DELIMITER. So an expression that OPENS with an operator lost it: `(-2,4)` selected the span
+       * `2,4`, which left `(`, `-` and `)` outside as bidi neutrals, the UBA resolved all three to the
+       * RTL paragraph, and the student read «(2,4-)» — the operator's *"I cannot enter the coordinates
+       * in a normal way"*. Measured across four products; an INTERIOR minus, `(2,-4)`, was always fine.
+       *
+       * ORDER IS LOAD-BEARING: this sits above the hug loop so `(-2,4)` first becomes the span `-2,4`,
+       * and the hug loop then sees `(` and `)` adjacent and absorbs the pair — the same path `(2,4)`
+       * already took. Below the hug loop it would be too late and the parens would stay outside.
+       *
+       * ONE character, never a loop. `--5` is not something a student writes, and repeating would start
+       * eating the maqaf in «ל--» shapes for no gain.
+       */
+      if (
+        first > 0 &&
+        SIGNS.includes(gap[first - 1]) &&
+        !(first - 1 > 0 ? HEBREW_LETTER.test(gap[first - 2]) : gapAfterHebrew)
+      ) {
+        first--;
+      }
+
       // Absorb balanced delimiters that hug the run, outermost last: `("AB")` takes the quotes,
       // then the parens. An unbalanced one (partner elsewhere in the sentence) stays where it is.
       for (;;) {
@@ -236,6 +282,7 @@ export function makeBidi(options: BidiOptions = {}): BidiKit {
       if (HEBREW_LETTER.test(ch)) {
         flush();
         push(ch, false);
+        gapAfterHebrew = true; // #1296 — the next gap opens against a Hebrew letter, so its `-` is a maqaf
       } else gap += ch;
     }
     flush(true);
