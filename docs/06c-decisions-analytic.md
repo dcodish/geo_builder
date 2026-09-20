@@ -6607,3 +6607,25 @@ So the bidi half asserts the PROPERTY instead: pressing any chip inside a Hebrew
 `ui/symbols.ts` (new), `__tests__/symbols-module.test.ts` (new, ported), `engine/expr.ts` (the π token), `App.tsx` (inline list removed, module imported), `i18n/index.ts` (twelve tooltips, both locales), `__tests__/issue-1128-distance-spellings.test.ts` (its `SYMBOLS` import follows the move).
 
 **#725** — the workspace-wide palette reorganisation — is unaffected and still comes after: it cannot factor a base set out of a product whose own set was still missing its members, and this adds entries and a lock, both of which that work then reorganises.
+
+## ADR-AG-124 — The NOUN decides which root comes up first, and a ring offers the sentence that denotes it (#1168, #1269)
+
+**Status:** accepted, 2026-09-20 · **Issues:** #1168 (the operator's ruling, 2026-09-19), #1269 (his report on T13's figure) · round #1280
+**Requirements:** [02c](02c-requirements-analytic.md) — what clicking a crossing promises · **Design:** [04c](04c-design-analytic.md) — the noun decides the root; the offered sentence denotes the offered dot
+**Builds on** [ADR-AG-111](#adr-ag-111) (the noun decides the extent) and [ADR-AG-048](#adr-ag-048) (two surfaces, one grammar)
+
+**What the student saw.** *"I then click on AC intersection with circle and get point P - this is good behavior. I then click on AB intersection with circle but now point P moved to a location it should not be … I then click on the new wrong circle, and now point Q moved to the wrong location"*. Each click placed its own point where he clicked and re-rolled every point placed before it.
+
+**The click's choice had nowhere to live.** `straightOfSegment` attached `within` — the segment's own extent, so a ring is only offered where the crossing is on the drawn piece — and then named it «הישר AB», the INFINITE line. The committed sentence therefore denoted a pair with two crossings and said nothing about which one, so the only record of the student's choice was the **figure-wide seed** `onCrossing` jumped to afterwards. One integer cannot hold N independent root choices: the seed picked for the newest crossing re-rolled the rest.
+
+**The operator's ruling settles it without a new mechanism.** *«הצלע CA» ⇒ the root on the drawn extent; «הישר CA» ⇒ the first root, as today.* So:
+
+1. **The incidence remembers the noun.** `direction()` deliberately forgets it — «הישר AC» and «הצלע AC» relate the same direction, which is right for a RELATION — so the boundedness is read in `incidenceOn`, where the operand text is still there, and rides on `on-line-2pt` as `bounded`.
+2. **It changes where the search STARTS, not what the residual allows.** The point is still on the infinite line; what the noun decides is the basin. In this tree a least-squares descent goes to the basin it starts in — the same fact that moved the search span onto the figure in #1085 — so a bounded incidence projects its sampled start onto the drawn piece. **Only on even seeds**, so «הציגו תצורה אחרת» still reaches the far root: #1168 required a preference, never a filter.
+3. **A sample that falls outside the piece starts at its MIDPOINT, not clamped to an end.** Measured: an endpoint start is degenerate — it satisfies the line and nothing else — and the solve parked there instead of finding the crossing.
+4. **The ring speaks the bounded noun** — «הצלע» for an edge of a declared polygon, «הקטע» otherwise. Both in `words()` and in `straightOfSegment`'s FALLBACK, which is the branch these rings actually take: a drawn side is not always a `segment` object the construction can be asked about, and patching only the first left every offer still saying «הישר».
+5. **The seed jump is retired.** With the sentence denoting the dot, nothing needs to move the configuration to make a click look right — and nothing may, because that was the mechanism moving the other points.
+
+**Consequences.** `bounded` on `on-line-2pt`; `BOUNDED_NOUN` in the parser; a start-projection block in `evaluate` beside #1071's (the same "a selector SEEDS the point it names" shape); `isPolygonSide` + the two noun sites in `crossings.ts`; `seedShowing` no longer imported by `App.tsx`. `issue-1168-1269-noun-root.test.ts` (7), verified to fail against the pre-fix code on four assertions — including the operator's own two-click sequence, which asserts both halves: the new point lands on its ring AND every point placed earlier is still where it was. One row asserts the mechanism directly (`App.tsx` contains no `seedShowing`), because a figure-wide seed cannot record a per-point choice and no amount of re-tuning it would have been a fix.
+
+**A visible side effect, and it is the honest one.** After two clicks on that figure the third ring is gone: both drawn crossings now carry points. Before, the first click threw its point to the far root and left the near crossing unclaimed, so the canvas kept offering a ring for a crossing that already had a letter somewhere else.

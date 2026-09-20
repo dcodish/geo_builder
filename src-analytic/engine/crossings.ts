@@ -87,10 +87,38 @@ const CONIC_NOUN: Record<string, string> = {
  * family, so the construction object carries none; only the fit knows it is a line, and a caller
  * that has already tested for one should not make this function guess again.
  */
+/** Is this pair an edge of a polygon the student declared? Then its noun is «הצלע» (#1269). */
+function isPolygonSide(c: Construction, a: Id, b: Id): boolean {
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon') continue;
+    const ids = o.vertices;
+    for (let i = 0; i < ids.length; i += 1) {
+      const p1 = ids[i];
+      const p2 = ids[(i + 1) % ids.length];
+      if ((p1 === a && p2 === b) || (p1 === b && p2 === a)) return true;
+    }
+  }
+  return false;
+}
+
 function words(c: Construction, id: Id, classified?: CurveKind): string | null {
   const o = objectById(c, id);
   if (!o) return null;
-  if (o.kind === 'segment') return `הישר ${o.a}${o.b}`;
+  /**
+   * A SEGMENT SPEAKS AS A SEGMENT (#1269).
+   *
+   * This said «הישר AB» — the INFINITE line — while `straightOfSegment` attached `within`, the
+   * segment’s own extent, so the ring was offered only where the crossing was on the drawn piece and
+   * the sentence it committed denoted a pair with two crossings. The student clicked one dot and got
+   * the other root; with several rings clicked, each new one re-rolled the earlier ones, because the
+   * only record of WHICH root had been meant was the figure-wide seed the app jumped to.
+   *
+   * With the bounded noun the sentence denotes the dot: #1168’s ruling — the noun decides the root —
+   * does the rest, and nothing has to move the configuration to make a click look right. «הצלע» when
+   * the segment is a side of a declared polygon, «הקטע» otherwise: both are bounded, and the first is
+   * the word the student used to draw it.
+   */
+  if (o.kind === 'segment') return `${isPolygonSide(c, o.a, o.b) ? 'הצלע' : 'הקטע'} ${o.a}${o.b}`;
   if (o.kind === 'curve') {
     const name = o.label.name;
     /**
@@ -139,7 +167,10 @@ function words(c: Construction, id: Id, classified?: CurveKind): string | null {
 
 /** A drawn segment, as a line plus the bound that makes it a segment. */
 function straightOfSegment(s: Figure['segments'][number], c: Construction): Straight | null {
-  const w = words(c, s.id) ?? `הישר ${s.ends[0]}${s.ends[1]}`;
+  // #1269: the FALLBACK said «הישר» too — and it is the branch these rings actually take, because a
+  // drawn side is not always a `segment` OBJECT the construction can be asked about. Same rule, one place
+  // lower: a drawn piece speaks as the piece it is.
+  const w = words(c, s.id) ?? `${isPolygonSide(c, s.ends[0], s.ends[1]) ? 'הצלע' : 'הקטע'} ${s.ends[0]}${s.ends[1]}`;
   const dx = s.b.x - s.a.x;
   const dy = s.b.y - s.a.y;
   if (Math.hypot(dx, dy) < EPS) return null;

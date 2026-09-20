@@ -24,8 +24,11 @@ describe('#1025 — a crossing is offered where the student could NAME it', () =
     const { d, crossings } = at(['A(0,0)', 'B(4,4)', 'C(0,4)', 'D(4,0)', 'AB', 'CD']);
     expect(crossings).toHaveLength(1);
     expect([crossings[0].x, crossings[0].y].map((n) => Number(n.toFixed(4)))).toEqual([2, 2]);
+    // #1269/ADR-AG-124: a DRAWN piece speaks as the piece it is. `AB` and `CD` here are bare segments,
+    // not sides of a declared polygon, so «הקטע». The rule this test guards — the dot offers a sentence
+    // the grammar reads back — is unchanged, and the row below still proves the round trip.
     expect(crossingSentence(crossings[0], freeLetter(d.construction))).toBe(
-      'P נקודת החיתוך של הישר AB עם הישר CD',
+      'P נקודת החיתוך של הקטע AB עם הקטע CD',
     );
   });
 
@@ -138,8 +141,10 @@ describe('#1092 — an equation is a name the grammar can use', () => {
       // Both rings name the SAME line, by the equation the student actually typed.
       const expected = `הישר ${spelling.replace(/^(?:נתון הישר |the line )/, '')}`;
       expect(crossings.map((k) => k.second)).toEqual([expected, expected]);
-      // ...and the other side is the triangle's own sides, not the line again.
-      expect(crossings.map((k) => k.first).sort()).toEqual(['הישר AB', 'הישר BC']);
+      // ...and the other side is the triangle's own sides, not the line again. #1269/ADR-AG-124: those
+      // sides are edges of a declared polygon, so they name themselves «הצלע» — the stated LINE keeps
+      // «הישר» above, which is the contrast this pair of assertions now also locks.
+      expect(crossings.map((k) => k.first).sort()).toEqual(['הצלע AB', 'הצלע BC']);
     });
 
     it(`and its sentence ROUND-TRIPS without minting a second curve — ${JSON.stringify(spelling)}`, () => {

@@ -150,7 +150,22 @@ export type Constraint =
    * there. Same cross product, different degenerate behaviour, and the endpoint is a legitimate
    * position on a side.
    */
-  | { t: 'on-line-2pt'; id: Id; a: Id; b: Id }
+  | {
+      t: 'on-line-2pt';
+      id: Id;
+      a: Id;
+      b: Id;
+      /**
+       * The student said «הצלע AB» or «הקטע AB» rather than «הישר AB» (#1168).
+       *
+       * It does NOT restrict the residual — the point is still on the infinite line, because the
+       * operator’s ruling is about which root comes up FIRST, not about which exist: *"«הצלע CA» ⇒
+       * the root on the drawn extent; «הישר CA» ⇒ the first root, as today"*. What it changes is
+       * where the search STARTS, which in this tree is what decides the basin a least-squares descent
+       * lands in (ADR-AG-085’s own lesson, #1085). Cycling still reaches the far root.
+       */
+      bounded?: boolean;
+    }
   /**
    * A DISCRETE degree of freedom — exactly one of these holds, and the student has not said which
    * (#1049).
