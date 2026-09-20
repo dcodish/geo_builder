@@ -2574,4 +2574,22 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Object.values(fig.status).filter((s) => s === 'ok').length).toBe(5);
     },
   },
+  {
+    id: 'arc-equality-canonical-spelling-1000',
+    title: '#1000: «קשת CD שווה לקשת DE» — the spelling the operator ruled is the sentence, building equal arcs',
+    guards:
+      "Operator ruling, 2026-09-14 (ADR-533), after playing round #998 T10 on a case authored with «קשת CD היא קשת DE»: \u2018the syntax is wrong \u2026 the user should have said arc X is equal to arc Y\u2019. A bare copula between two arcs reads as IDENTITY in Hebrew, so ADR-507\u2019s generalisation of the copulas from angles to arcs is narrowed back: «היא»/«הוא»/bare «שווה»/«is» before a labelled arc are refused and the canonical form is offered. THIS scenario locks the positive half \u2014 that the sentence the tool now teaches actually builds, through the real parse\u2192fact\u2192replay path, so the remedy can never become one that returns the same refusal (the #1156 failure mode). The REFUSAL half cannot live here: the harness fails a scenario on any step that does not parse, by design. It is covered in src/__tests__/issue-1000-arc-copula.test.ts, where the refusal is asserted AND the sentence it offers is driven back through the parser.",
+    steps: ['מעגל O', 'C על המעגל O', 'D על המעגל O', 'E על המעגל O', 'קשת CD שווה לקשת DE'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the stated equality holds in the built figure').toEqual([]);
+      const O = fig.positions.get('O')!;
+      const [C, D, E] = ['C', 'D', 'E'].map((id) => fig.positions.get(id)!);
+      expect([O, C, D, E].every(Boolean), 'every named point is placed').toBe(true);
+      // Equal arcs on one circle are equal CHORDS — the geometry the sentence asserts, read off the
+      // figure rather than off the command, so a lowering that stopped meaning this would fail here.
+      const chord = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.hypot(p.x - q.x, p.y - q.y);
+      expect(Math.abs(chord(C, D) - chord(D, E))).toBeLessThan(1e-6 * Math.max(1, chord(C, D)));
+    },
+  },
 ];

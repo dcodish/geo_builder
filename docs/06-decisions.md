@@ -12524,3 +12524,45 @@ Option **(1)** of the arming comment is taken — allow it; the declaration foll
 **A note on the first lock written for this, because it is the reusable lesson.** The store's `swap` action was ALWAYS symmetric — the asymmetry lived one layer up, in the offer. A lock driving only the store therefore passed on the unfixed code, and it was measured doing so before the gate block was added. That is the `locks-must-call` failure mode ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)) in its purest form: the test exercised the layer that was never broken. Extracting `swapOffered` is what made the real decision callable.
 
 **Consequences.** `store/geoStore.ts` (−`swappable` from `LetterHolder` and from the predicate, which is now four lines shorter); `render/Figure.tsx` (−the flag from `FigureLetterHolder`, +`swapOffered`, the gate rewired). `issue-1199-symmetric-letter-offer.test.ts` (17): both-directions agreement over four setups; the OFFER asserted through `swapOffered` on real `letterHolder` output, including the shape-held letter that was refused before; nothing dropped and one-undo restoration; and the ring block, stated as a property of the SIDE SET rather than as a claim about which letters are opposite. `issue-238-letter-holder.test.ts`: the three rows that asserted `swappable` now assert what they were really about — the refusal still names its holder, and the swap still drops nothing — with the shape-held row flipped from "not offered" to "offered, and it keeps every point", which is what #1013 predicted it would be.
+## ADR-533 — The bare copulas are ANGLES only; between two arcs the tool teaches «שווה ל» (#1000)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1000 (bug, P3, `2d`) · operator ruling 2026-09-14 · round #1292
+**Requirements:** [02](02-requirements.md) — the arc-equality spelling · **Design:** [04](04-design.md)
+**Amends** [ADR-507](#adr-507)'s arc row (#976), which generalised the copulas to arcs in one step
+
+**The report.** Playing round #998 T10 — a case whose syntax was the session's, not a student's: *"the syntax is wrong. When you say «קשת CD היא קשת DE» it is the same arc (which doesn't make sense). So the user should have said arc X is equal to arc Y — I tested this and it works."*
+
+**The ruling, verbatim:** *"for 1000 - this is the ruling: «קשת CD שווה לקשת DE»."*
+
+**Root cause, and why it is a semantic line drawn at a structural rule.** `normalizeWordEquality` is the single word-equality seam and holds four rules. The two ADR-507 rules — the bare Hebrew copulas, and English `is|are` — carried **arc keywords in the same lookahead as angle keywords**, because ADR-507's plan admitted them *"for labelled angle and arc references alike"*. That was never wrong for angles and never right for arcs: «זווית ABC היא זווית DEF» compares two measures, while «קשת CD היא קשת DE» says one arc IS the other — and between two differently-named arcs that says nothing. Accepting it as equality of measure teaches a sentence that means something else, which is what [ADR-W-030](06w-decisions-workspace.md#adr-w-030) forbids.
+
+The rule reads structure; this distinction is semantic. So it is drawn at the keyword: the arc keywords come out of **those two rules only**. The first two rules — explicit «שווה ל…» and `equals` / `is equal to` — keep their arc keywords untouched, because they are the canonical spellings and the ruling names one of them as the sentence.
+
+**Refused, not escalated.** The narrowed spellings are not dropped into `not-handled`, which is the LLM escalation seam: sending a form the tool deliberately declines to a paid model asks it to accept the very spelling the ruling rejected (the #957 lesson, in its own words). `arcEquality` recognises them — it already owns "this is an arc relation sentence" — and returns an owned `arc-copula` refusal carrying the student's two arc labels, so the message is their line with one word changed.
+
+**The taught form is DRIVEN, which is the row that matters most.** #1156 shipped a remedy that returned the same refusal, so a taught spelling is a claim like any other. The lock composes the offered sentence from the refusal's OWN labels — the same two the message interpolates — and pushes it back through the real parser. Writing the expected sentence out by hand beside the message would pass while the two drifted apart.
+
+**Measured, before → after** (real `parse` with a circle and C, D, E on it):
+
+| utterance | before | after |
+| --- | --- | --- |
+| «קשת CD שווה לקשת DE» · «קשת CD = קשת DE» | `set-angle-ratio` | **unchanged** |
+| `arc CD equals arc DE` · `arc CD is equal to arc DE` | `set-angle-ratio` | **unchanged** |
+| «קשת CD היא קשת DE» · «קשת CD הוא קשת DE» | `set-angle-ratio` | **`arc-copula`**, offering «קשת CD שווה לקשת DE» |
+| «קשת CD שווה קשת DE» · `arc CD is arc DE` | `set-angle-ratio` | **`arc-copula`** |
+| «זווית ABC היא זווית DEF» · «זווית ABC שווה לזווית DEF» | `set-angle-ratio` | **byte-identical** |
+| «זווית ABC היא זווית ישרה» | `not-handled` | **unchanged** — no label after the keyword, never in this seam |
+
+**The line is drawn where the AMBIGUITY is, not across the whole keyword — found by the suite, not by the plan.**
+Narrowing the lookahead unconditionally also broke «קשת CD היא 2 קשת DE», which ADR-507 locked and which
+nothing in the ruling touches. With a COEFFICIENT the identity reading is impossible — nothing is identical
+to twice itself — so the sentence is the comparison it plainly is. The rule is therefore: **a copula before
+a BARE arc reference is refused; before a SCALED one it still reads.** That keeps a working capability the
+operator never asked to lose, and it states the principle rather than the symptom — the ruling is about a
+sentence that can mean two things, so it applies exactly where two readings exist.
+
+**The catalog is corrected, because it is the user-facing reference and the coverage map.** Its angle-equality row said in as many words *"Arcs the same way (arc CD is arc DE)"*. It now says arcs take the explicit form only, and why.
+
+**Interaction with #778, stated because the issue asked for it.** #778 is the workspace-wide *"non-canonical input is TAUGHT"* programme. This is a local use of the owned-refusal channel that already carries `cevian-wrong-side` and `crossing-already-named`, not a new mechanism and not the shape #778 will generalise: #778 is about PRE-FILLING the canonical sentence in the box, which this does not do. When it lands, this message is one of the places it should subsume, and the wording here is deliberately already in its register.
+
+**Consequences.** `parser/parse.ts` (the two lookaheads narrowed, +`ARC_RUN`/`ARC_COPULA_RX`, +the `arc-copula` result and clarify, +the guard at the head of `arcEquality`); `app/submitPipeline.ts` and both locales (+the message); `parser/catalog.ts` (the row corrected). `issue-1000-arc-copula.test.ts` (17): the four canonical rows unmoved, the four narrowed rows refused **with their labels**, the non-escalation asserted separately, the taught sentence driven, and the ADR-507 angle rows plus the «זווית ישרה» lane as the over-narrowing guard. `scenarios-corpus-4.ts` adds the canonical sequence end-to-end, asserting **equal chords on the built figure** rather than the command it lowered to — the refusal half cannot live in that harness, which fails a scenario on any step that does not parse, by design, and the scenario's own note says where it lives instead.

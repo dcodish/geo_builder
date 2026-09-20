@@ -450,6 +450,22 @@ copula before a value never reaches the seam. A copula before a bare number or a
 2026-07-17 ruling (word equality is narrowed to angles/arcs and degree values). No relation rule knows a
 copula — a new spelling is a lookahead row here, never a regex in three rules.
 
+**The bare copulas are ANGLES only** (#1000, [ADR-533](06-decisions.md#adr-533), operator ruling
+2026-09-14). ADR-507 admitted them for angle and arc references alike, in one step. That was never wrong
+for angles and never right for arcs: «זווית ABC היא זווית DEF» compares two MEASURES, while
+«קשת CD היא קשת DE» says one arc IS the other, which between two differently-named arcs is not a claim.
+The seam reads structure and this distinction is semantic, so it is drawn at the KEYWORD — the arc
+keywords come out of the two bare-copula rules, and stay in the two explicit ones (`שווה ל` /
+`equals` / `is equal to`), which are the canonical spellings.
+
+**What the narrowed spellings meet is a refusal that TEACHES, not `not-handled`.** `not-handled` is the
+LLM escalation seam, and escalating a form the tool deliberately declines asks a paid model to accept
+the very spelling that was ruled out. `arcEquality` already owns *"this is an arc relation sentence"*,
+so the guard sits at its head and returns an owned `arc-copula` clarification carrying the two arc
+labels — the same channel as `cevian-wrong-side` and `crossing-already-named`. The offered sentence is
+the student’s own line with one word changed, and it is **driven** in the lock rather than written out
+beside the message, because a remedy that returns the same refusal is the #1156 failure mode.
+
 ## A role noun is a claim: «אלכסון» (#966, [ADR-499](06-decisions.md#adr-499))
 
 Most nouns in this grammar NAME a thing: «קטע AB» says "the segment AB". A few instead assign a **role**,
