@@ -800,6 +800,18 @@ fixed there is no other configuration, so «מפגש האלכסונים» of a c
 of three collinear points and an empty circle are each named as not existing, rather than left absent
 with nothing said.
 
+**R60 — a crossing that lands on a point the figure ALREADY HAS is refused, naming it**
+([ADR-AG-125](06c-decisions-analytic.md#adr-ag-125), the analytic member of the cross-product ruling
+[ADR-W-066](06w-decisions-workspace.md#adr-w-066)). Two distinct named points are never drawn at the same
+place. «P נקודת החיתוך של הישר AB עם הישר CD» where that crossing IS `B` must not mint a second letter at
+B's position: the geometry is right and only the name is wrong, so the tool affirms the crossing and
+refuses the name, saying which point is already there. The structural member — two lines whose letters
+force it — is refused at the parser (R-level, #1175); this is the POSITIONAL one, and **its freedom gate is
+R55's, for R55's reason**: silent while another configuration may still separate them, reported once none
+can. A coincidence in a figure that can still move is a fact about this configuration and is the
+configuration search's business ([#1273](https://github.com/dcodish/geo_builder/issues/1273)), not a
+refusal.
+
 **R59 — a shape noun carries its givens, and adding a noun is adding a ROW**
 ([ADR-AG-035](06c-decisions-analytic.md#adr-ag-035)). «מקבילית ABCD» draws a parallelogram that
 really has `AB ∥ DC`; «דלתון ABCD», «ריבוע», «מעוין», «מלבן», «טרפז», «טרפז שווה שוקיים», «טרפז

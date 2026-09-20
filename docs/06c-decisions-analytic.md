@@ -6607,3 +6607,23 @@ So the bidi half asserts the PROPERTY instead: pressing any chip inside a Hebrew
 `ui/symbols.ts` (new), `__tests__/symbols-module.test.ts` (new, ported), `engine/expr.ts` (the π token), `App.tsx` (inline list removed, module imported), `i18n/index.ts` (twelve tooltips, both locales), `__tests__/issue-1128-distance-spellings.test.ts` (its `SYMBOLS` import follows the move).
 
 **#725** — the workspace-wide palette reorganisation — is unaffected and still comes after: it cannot factor a base set out of a product whose own set was still missing its members, and this adds entries and a lock, both of which that work then reorganises.
+
+## ADR-AG-125 — analytic: a crossing that lands on an existing point BY POSITION (#1254)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1254 (bug, P2, `analytic`) · round #1280 · the analytic half of [ADR-W-066](06w-decisions-workspace.md#adr-w-066)
+**Requirements:** [02c](02c-requirements-analytic.md) · **Design:** [04c](04c-design-analytic.md)
+**Completes** [ADR-AG-118](#adr-ag-118)/#1175, which answered the structural member and pre-declared this one an escalation
+
+**#1175 said exactly this would be needed, and why it was not smuggled in:** *"A positional test … is a different mechanism with its own tolerance question and must not be smuggled in under this ruling; if it turns out to be needed, that is an escalation, not an expansion."* It was needed — the operator's T18 — and this is the escalation, ruled.
+
+**Measured.** «P נקודת החיתוך של הישר AB עם הישר CD» on `A(0,0) B(6,2) C(1,7) D(7,1)`: `AB` is `y = x/3`, `CD` is `y = 8 − x`, they meet at **(6, 2) — which is B**, and `P` was minted there with `faults: []`. The equation form (#1254's own case) put `P` on top of `A` the same way.
+
+**The two branches are the ruling's, and the predicate is the vacancy pass's** — one block above in `derive`, for the same reason it was written there: **silent while the figure can still move, reported once it cannot.** A coincidence in a figure with freedom left is a fact about THIS configuration, and #1273 is what will prefer a configuration without it; a coincidence in a fully determined figure is a fact about the student's givens, and «הציגו תצורה אחרת» can never help. That is why this lives in `derive` and not in the parser: whether a coincidence is FORCED is a question about the figure.
+
+**Three things measurement corrected while building it:**
+
+1. A crossing is `declare`d, and `namesObject` — which builds the id→line map the vacancy pass uses — does not cover `declare`. The first version found no owning line and reported nothing at all. The owning line is read from the declare facts rather than by widening that map, whose shape the pass below depends on.
+2. The crossed-point set is counted off the **constraints** (two incidences on one id), not off object kinds: a declared crossing does not carry the `point` kind, which is the same reason version one found nothing.
+3. **The epsilon floor is tied to `SOLVE_TOL`, not to a small constant.** A figure whose points all sit at the origin has no span, and the solver leaves its crossing ~1e-9 from the point it coincides with — an absolute floor of 1e-9 decided nothing. That is [#1276](https://github.com/dcodish/geo_builder/issues/1276)'s lesson arriving prospectively, in the same round.
+
+**Consequences.** A positional pass in `derive`, gated on `reportedDof === 0`, reusing the existing `crossing-already-named` code and its `holder` field so the student reads the same sentence whichever mechanism found it. `issue-1254-positional-coincidence.test.ts` (5): the operator's T18 figure naming `B`, #1254's equation case naming `A`, the CONTROL one letter away that still builds — **the control the sheet itself got wrong**, since T18 was written as one and its own crossing landed on B — the structural member still refused at the parser, and a free figure left unaccused.

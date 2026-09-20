@@ -12,8 +12,14 @@ import { drawableAt, viewBox, type Figure } from './evaluate';
 import type { Box } from './curves';
 import { parseLine, type ParseFailure } from '../parser/parseAnalytic';
 import { EMPTY_CONSTRUCTION, namesObject, objectById, type Construction, type Fact } from './types';
+import { SOLVE_TOL } from './solve';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
+/** The point ids an incidence constraint is ABOUT — how a crossing is recognised (#1254). */
+function incidenceIds(k: { t: string; id?: string }): string[] {
+  return k.t === 'on-line-2pt' || k.t === 'on-curve' || k.t === 'on-line' ? [k.id ?? ''] : [];
+}
+
 export interface LineFault {
   index: number;
   code: ParseFailure['code'] | ApplyError['code'];
@@ -203,6 +209,67 @@ export function derive(lines: readonly string[], seed = 0): Derivation {
    * have no circumcentre, for ever, and behaved the same way.
    */
   const freedom = reportedDof(construction, figure.carrierDof);
+
+  /**
+   * A NAMED CROSSING THAT IS A POINT THE FIGURE ALREADY HAS (#1254, the operator’s T18 ruling).
+   *
+   * *"if P and B must be on the same location … it should be refused. The only case where P and B can
+   * fall [together] is if one of them has a degree of freedom … even if they do fall on the same point
+   * by chance … the system should not show them on top of each other."*
+   *
+   * [#1175](https://github.com/dcodish/geo_builder/issues/1175) answered the STRUCTURAL member — two
+   * lines named by two points each that share a written letter meet at that letter, whatever the
+   * configuration — and pre-declared the positional one an escalation rather than an expansion. This
+   * is that escalation, ruled: «P נקודת החיתוך של הישר AB עם הישר CD» on his own figure put P exactly on
+   * B, with `faults: []`, and the sheet used that very figure as its CONTROL.
+   *
+   * **The freedom predicate is the vacancy pass’s, for the same reason** (right above): silent while
+   * the figure can still move — another configuration may separate them, and #1273 is what will prefer
+   * it — reported once it cannot. That is the ruling’s own two branches, and it is why this sits here
+   * rather than in the parser: whether a coincidence is FORCED is a question about the figure.
+   *
+   * Scoped to a point a sentence CROSSED into being — two incidences and a declaration. A midpoint or
+   * a foot landing on an existing point is the same family and is deliberately left for the wider
+   * ruling; refusing them here would reach past what was measured.
+   */
+  if (freedom === 0) {
+    const xs = figure.points.map((q) => q.x);
+    const ys = figure.points.map((q) => q.y);
+    const span = Math.max(1e-9, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+    // Relative to the figure (ADR-AG-021), with a floor tied to the SOLVE's own tolerance rather than
+    // an arbitrary small number: a figure whose points all sit at the origin has no span, and the
+    // solver leaves its crossing ~1e-9 away from the point it coincides with. #1276 is the same lesson
+    // — an absolute threshold below the residual the solver actually leaves behind decides nothing.
+    const near = Math.max(span * 1e-6, SOLVE_TOL * 10);
+    // Counted off the CONSTRAINTS, not the objects: a crossing is `declare`d and does not carry the
+    // `point` kind, which is what made a first version of this check find nothing at all.
+    const incidences = new Map<string, number>();
+    for (const k of construction.constraints)
+      for (const id of incidenceIds(k)) incidences.set(id, (incidences.get(id) ?? 0) + 1);
+    const crossed = new Set([...incidences].filter(([, n]) => n >= 2).map(([id]) => id));
+    // A CROSSING is `declare`d, which `namesObject` does not cover — so `lineOf`, built for naming
+    // facts, has no entry for it. The owning line is read here rather than by widening that map, whose
+    // shape the vacancy pass below depends on.
+    const declaredOn = new Map<string, number>();
+    facts.forEach((f, i) => {
+      const t = (f as { t: string }).t;
+      const id = (f as { id?: string }).id;
+      if (t === 'declare' && id && !declaredOn.has(id)) declaredOn.set(id, owner[i]);
+    });
+    const ownerLine = (id: string) => declaredOn.get(id) ?? lineOf.get(id);
+    for (const pt of figure.points) {
+      if (!crossed.has(pt.id)) continue;
+      const index = ownerLine(pt.id);
+      if (index === undefined) continue;
+      const holder = figure.points.find((q) => {
+        if (q.id === pt.id) return false;
+        const qi = ownerLine(q.id);
+        if (qi !== undefined && qi > index) return false; // only a point that was ALREADY there
+        return Math.hypot(q.x - pt.x, q.y - pt.y) < near;
+      });
+      if (holder) faults.push({ index, code: 'crossing-already-named', detail: lines[index], holder: holder.id });
+    }
+  }
   for (const v of figure.vacant) {
     const index = lineOf.get(v.id);
     if (index === undefined) continue; // no line owns it — nothing honest to say about it

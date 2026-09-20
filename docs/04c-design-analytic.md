@@ -957,3 +957,20 @@ one display formatter, so the panel, the canvas and the ask lane cannot round di
 given by its centre those properties ARE the givens. The ask lane answers `«משוואת …»` with `equation`.
 It used to take the formatter as a PARAMETER; it imports it now, which is what makes "one formatting for
 both surfaces" a fact rather than a convention every call site has to keep.
+
+## A forced coincidence is refused; a configuration-dependent one is not ([ADR-AG-125](06c-decisions-analytic.md#adr-ag-125))
+
+A crossing that lands on a point the figure already has is refused **by position**, naming the holder —
+the member [#1175](https://github.com/dcodish/geo_builder/issues/1175) answered structurally and left as
+an escalation. The two branches are the operator’s ruling: refuse when no configuration can separate
+them, stay silent while the figure can still move.
+
+**The predicate is the vacancy pass’s, one block above it in `derive`, and for the same reason** —
+silent while the figure can still move, reported once it cannot. A coincidence in a figure with freedom
+left is a fact about THIS configuration; one in a fully determined figure is a fact about the givens, and
+«הציגו תצורה אחרת» can never help. That is why it lives in `derive` rather than in the parser: whether a
+coincidence is FORCED is a question about the figure, not about the words.
+
+The nearness epsilon is relative to the figure with a floor tied to `SOLVE_TOL` — a figure whose points
+all sit at the origin has no span, and the solver leaves its crossing ~1e-9 from the point it coincides
+with, so an absolute floor below that decides nothing.
