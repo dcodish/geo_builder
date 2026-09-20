@@ -938,6 +938,34 @@ export default function App3() {
                 sections={[
                   {
                     /**
+                     * #1196 — WHAT THE STUDENT STATED, FIRST.
+                     *
+                     * Operator, 2026-09-18, on a trapezoid where he had written «AB = u» and «DC = 3u»:
+                     * *"the data panel says noting in known. we should be able to say that AB=u and
+                     * DC=3u."* Every other section here is a MEASUREMENT and needs a number the figure
+                     * holds still; on a figure with free dimensions there is none, so the panel reported
+                     * that it knew nothing while the student was looking at two things they had just
+                     * stated. These are givens, true at every configuration.
+                     *
+                     * It leads the panel because the panel’s own hint promises it first —
+                     * «הצגת הנתונים בכתיב וקטורי, בקואורדינטות ובגדלים» — vector notation, then coordinates, then
+                     * magnitudes. That was the order all along; only the first one was missing.
+                     */
+                    key: 'stated',
+                    title: t('dataPanel.secStated'),
+                    // #559: the app direction, like every section here. These rows are pure LTR
+                    // (`u = AB⃗`) and it is tempting to pin them — which is exactly the list-wide
+                    // override that lock exists to prevent; the bidi layer places an LTR run inside an
+                    // RTL base correctly, and a section that decides for itself is how that stopped.
+                    dir: 'app',
+                    rows: (dataPanel?.stated ?? []).map((r) => (
+                      <span key={r} className="font-medium">
+                        <MathRun>{r}</MathRun>
+                      </span>
+                    )),
+                  },
+                  {
+                    /**
                      * #847 (ADR-3D-197) — EVERY DRAWN PLANE, WITH ITS TOGGLE, IN ONE PLACE.
                      *
                      * The toggle used to ride whichever fact row happened to mention the plane. The

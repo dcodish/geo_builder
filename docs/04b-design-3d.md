@@ -517,3 +517,33 @@ a bare segment on an empty canvas remains its own question rather than a side ef
 so this needs the positionless-vector design in
 [#1188](https://github.com/dcodish/geo_builder/issues/1188), including the pedagogical question of how an
 object with no position is drawn.
+## The data panel has two kinds of row (#1196, [ADR-3D-254](06b-decisions-3d.md#adr-3d-254))
+
+Every field of `DataPanel` used to be a **measurement** — coordinates, a vector's components and
+magnitude, a plane's equation, a pinned symbol — and each is computed by sampling three configurations
+and keeping only what agrees. That is the honesty gate, and it is why a figure with free dimensions
+correctly reports nothing: there is no number it holds still.
+
+`stated` is the other kind: a **given**, true at every configuration, needing no sampling at all. It is
+composed from the construction (`c.vectors` for the naming rows, the `vec-eq` claims for the relation
+rows) rather than from the resolved samples, which is the structural difference between the two kinds.
+
+| kind | source | needs a determined figure |
+| --- | --- | --- |
+| measurement (`points`, `vectors`, `planes`, `params`, `relations`, `mutual`) | three sampled configurations, intersected | yes |
+| given (`stated`) | the construction | no |
+
+**`panelIsEmpty` counts both**, for #296's reason: the guard and the render must read emptiness the same
+way, or the panel hides knowledge it has. A figure whose only knowledge is its stated vector relations is
+exactly the case that reported a false "nothing to show".
+
+**Where the composer lives.** In the engine, beside the rows it belongs to — `dataView` already composes
+display text and the layering runs `render → engine`, never back. The one thing it must agree with the
+renderer about is which arrow a finished row carries, and that comes from `lexicon/marks3`, the leaf that
+imports nothing and exists so the grammar and the display cannot drift about a marking (#1194).
+
+**Adding a section is a decision, not a drive-by.** `bidi3.test.ts` asserts the section COUNT along with
+`dir: 'app'` on every one, because each section is a place a direction can be forgotten — and it caught
+exactly that here: `stated` first shipped as `dir: 'ltr'`, since its rows are pure LTR and pinning them
+looks obviously right. That is the list-wide override #559 exists to prevent; the bidi layer places an
+LTR run inside an RTL base correctly, and a section that decides for itself is how that stopped.

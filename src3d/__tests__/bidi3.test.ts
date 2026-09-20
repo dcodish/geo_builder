@@ -470,9 +470,12 @@ describe('#559 — the data panel follows the app direction, per-row', () => {
     // chrome side — an 'app' row rendering NO dir of its own — is locked in shell/__tests__.)
     const sections = panelMarkup.match(/key: '[a-z]+',/g) ?? [];
     // #847 (ADR-3D-197) added `planes` — every drawn plane with its display toggle, after the chip
-    // was taken off relation rows. The count is deliberate: a new section must be a decision, not a
-    // drive-by, because each one is a place a `dir: 'app'` can be forgotten.
-    expect(sections.length, 'the six skeleton sections (planes, points, measures, relations, mutual, params)').toBe(6);
+    // was taken off relation rows. #1196 (ADR-3D-254) added `stated` — what the student said about
+    // vectors, which is a GIVEN rather than a measurement and so shows on a figure that holds nothing
+    // still. The count is deliberate: a new section must be a decision, not a drive-by, because each
+    // one is a place a `dir: 'app'` can be forgotten — and this lock caught exactly that on #1196,
+    // which first shipped the section as `dir: 'ltr'`.
+    expect(sections.length, 'the seven skeleton sections (stated, planes, points, measures, relations, mutual, params)').toBe(7);
     expect(panelMarkup.match(/dir: 'app',/g) ?? []).toHaveLength(sections.length);
   });
 

@@ -18,6 +18,7 @@ import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
 import { resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { angleMarkText, figureSymbolsOf, symbolOwnersOf } from './types';
+import { COMBINING_ARROW } from '../lexicon/marks3';
 import { angleBetweenOperands, componentValue, containmentDeviation, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import type { Construction3, Id, MutualRel3, Operand3, Positions3 } from './types';
 
@@ -53,6 +54,16 @@ export interface MutualRow {
 }
 
 export interface DataPanel {
+  /**
+   * What the student STATED about vectors, in vector notation (#1196) — the naming rows (`u = AB⃗`)
+   * and the relation rows (`DC⃗ = 3u`).
+   *
+   * Unlike every other field here, these are not MEASUREMENTS and need no determined figure: they are
+   * givens, true at every configuration. That is the whole point — the panel used to report
+   * «אין עדיין נתונים יציבים להצגה» on a figure where the student had just written down two things
+   * that hold everywhere.
+   */
+  stated: string[];
   /** Derived equalities among declared vectors, e.g. `|u| = |v| = |w|` (+ stated value). */
   relations: string[];
   /** Mutual positions among the figure's NAMED objects — stated or merely holding. */
@@ -83,7 +94,18 @@ export interface DataPanel {
  * knowledge. The guard and the render must read emptiness the same way — hence one predicate.
  */
 export function panelIsEmpty(p: DataPanel): boolean {
-  return p.relations.length === 0 && p.mutual.length === 0 && p.vectors.length === 0 && p.points.length === 0 && p.planes.length === 0 && p.params.length === 0;
+  // #1196: `stated` joins the union for the reason the docblock above gives — the guard and the render
+  // must read emptiness the same way, and a figure whose only knowledge is its stated vector relations
+  // is exactly the case that reported a false "nothing to show".
+  return (
+    p.stated.length === 0 &&
+    p.relations.length === 0 &&
+    p.mutual.length === 0 &&
+    p.vectors.length === 0 &&
+    p.points.length === 0 &&
+    p.planes.length === 0 &&
+    p.params.length === 0
+  );
 }
 
 const EPS = 1e-6;
@@ -1191,5 +1213,73 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     params.push(stable ? { sym, text: `${sym} = ${cleanNum(nums[0], 1e-4)}`, open: false } : { sym, text: `${sym} = ?`, open: true });
   }
 
-  return { relations, mutual, vectors: entries, points, pointCoords, planes, params };
+  // #1196: the STATED vector rows need no sampling — they are givens, not measurements — so they are
+  // composed from the construction rather than from the three resolved configurations above.
+  return { stated: statedVectorRows(c), relations, mutual, vectors: entries, points, pointCoords, planes, params };
 }
+
+/**
+ * THE STATED VECTOR ROWS, WRITTEN IN VECTOR NOTATION (#1196).
+ *
+ * Operator, 2026-09-18, on a trapezoid where he had stated «AB = u» and «DC = 3u»: *"the data panel
+ * says noting in known. we should be able to say that AB=u and DC=3u."*
+ *
+ * The panel’s other sections are MEASUREMENTS — coordinates, magnitudes, pinned symbols — and each
+ * needs a number the figure holds still. On a figure with free dimensions there is none, so the panel
+ * correctly reported that it had nothing, **by its own definition of "something"**. But «AB = u» and
+ * «DC = 3u» are not measurements awaiting a figure: they are GIVENS, true at every configuration, and
+ * they are exactly what the student wrote down. The panel’s own hint promises them first —
+ * «הצגת הנתונים בכתיב וקטורי, בקואורדינטות ובגדלים» — and vector notation is the one of the three that
+ * needs no determined figure at all.
+ *
+ * **Scope, in the operator’s words:** *"stated+what follows"*, and *"we need to keep it simple enough.
+ * so only stated vectors. anything else, the user can ask for specifically."* So this reads the two
+ * things the student STATED about vectors and nothing else: the naming (`u = AB⃗`) and the relations
+ * (`DC⃗ = 3u`). Derived vector facts are the ask lane’s business.
+ *
+ * Composed from the CONSTRUCTION rather than from the utterances, deliberately: the step list already
+ * shows the student’s own words, so a panel that repeated them would add nothing. What this adds is
+ * the same givens in one canonical notation, which is what makes `u = AB⃗` and `DC⃗ = 3u` legible
+ * side by side however each was typed.
+ *
+ * It lives in the ENGINE, beside the other rows this panel is made of, because `dataView` already
+ * composes display text (`relations`, `points`, `planes`) and the layering runs `render → engine`,
+ * never back. The one thing it must agree with the renderer about — WHICH arrow a finished row
+ * carries — comes from `lexicon/marks3`, the leaf that imports nothing and exists so the grammar and
+ * the display cannot drift about a marking (#1194).
+ */
+export function statedVectorRows(c: {
+  vectors: Map<string, { from: string; to: string }>;
+  claims: readonly { type: string; lhs?: VecTermLike[]; rhs?: VecTermLike[] }[];
+}): string[] {
+  const rows: string[] = [];
+  for (const [name, { from, to }] of c.vectors) rows.push(`${name} = ${pairArrow(from, to)}`);
+  for (const claim of c.claims) {
+    if (claim.type !== 'vec-eq' || !claim.lhs || !claim.rhs) continue;
+    rows.push(`${vecSide(claim.lhs)} = ${vecSide(claim.rhs)}`);
+  }
+  return rows;
+}
+
+/** One side of a vector equation: `3u`, `DC⃗`, `2AB⃗ + v`. */
+type VecTermLike = { coeff: number; atom: { kind: string; name?: string; from?: string; to?: string } };
+
+function vecSide(terms: readonly VecTermLike[]): string {
+  return terms
+    .map((t, i) => {
+      const body =
+        t.atom.kind === 'named' ? (t.atom.name ?? '?') : pairArrow(t.atom.from ?? '?', t.atom.to ?? '?');
+      const mag = Math.abs(t.coeff);
+      // A coefficient of 1 is written by being absent, as every textbook writes it.
+      const scaled = mag === 1 ? body : `${cleanCoeff(mag)}${body}`;
+      if (i === 0) return t.coeff < 0 ? `−${scaled}` : scaled;
+      return t.coeff < 0 ? ` − ${scaled}` : ` + ${scaled}`;
+    })
+    .join('');
+}
+
+/** The arrow rides OVER the pair, which is what `vectorNotation` produces for a typed one. */
+const pairArrow = (from: string, to: string): string => `${from}${to}${COMBINING_ARROW}`;
+
+/** `3`, not `3.0000001` — a coefficient the student typed, printed as they typed it. */
+const cleanCoeff = (n: number): string => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(4))));

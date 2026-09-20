@@ -183,6 +183,22 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   that would assert a given the student never gave. *(Realised —
   [ADR-3D-241](06b-decisions-3d.md#adr-3d-241), #977; the letter-binding it builds on is
   [ADR-3D-052](06b-decisions-3d.md#adr-3d-052).)*
+- **FR-VC-4a (Must)** — **What the student STATED about vectors is shown, even when nothing is
+  measurable yet.** «נסמן: AB = u» and «DC = 3u» on a free trapezoid are true at every configuration,
+  so the data panel lists them in vector notation — `u = AB⃗`, `DC⃗ = 3u` — and leads with them, because
+  the panel’s own hint promises «בכתיב וקטורי, בקואורדינטות ובגדלים» in that order and vector notation is
+  the one of the three that needs no determined figure at all.
+
+  Every other row in that panel is a MEASUREMENT and needs a number the figure holds still; a figure
+  with free dimensions has none, so the panel used to report that it knew nothing while the student was
+  looking at two things they had just written down. **A given is not a measurement**, and a panel that
+  can only report measurements is not reporting what the student knows.
+
+  **Stated only** (operator ruling, 2026-09-19: *"we need to keep it simple enough. so only stated
+  vectors. anything else, the user can ask for specifically"*) — a figure with no vector statement gets
+  no rows here, however much else it knows, and derived vector facts stay the ask lane’s. *(Realised —
+  [ADR-3D-254](06b-decisions-3d.md#adr-3d-254), #1196; `issue-1196-stated-vector-rows.test.ts`.)*
+
 - **FR-VC-3 (Must)** — **NO CAS.** Every "symbolic" feature is a numeric root-find, a closed form, or a
   linear solve. Anything needing symbolic solving beyond that is **refused and escalated to the operator**,
   not approximated. This bound is what keeps the engine's answers trustworthy. *(Operator authority,
