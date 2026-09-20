@@ -6607,3 +6607,34 @@ So the bidi half asserts the PROPERTY instead: pressing any chip inside a Hebrew
 `ui/symbols.ts` (new), `__tests__/symbols-module.test.ts` (new, ported), `engine/expr.ts` (the π token), `App.tsx` (inline list removed, module imported), `i18n/index.ts` (twelve tooltips, both locales), `__tests__/issue-1128-distance-spellings.test.ts` (its `SYMBOLS` import follows the move).
 
 **#725** — the workspace-wide palette reorganisation — is unaffected and still comes after: it cannot factor a base set out of a product whose own set was still missing its members, and this adds entries and a lock, both of which that work then reorganises.
+
+## ADR-AG-123 — A DISPLAY DECISION IS MEASURED IN THE FIGURE'S UNITS, NOT IN `1e-12` (#1276)
+
+**Status:** accepted, 2026-09-20 · **Issue:** #1276 (bug, P2, `2d`-adjacent but analytic) · round #1280 · operator report against `prod/2026-09-20`
+**Requirements:** none (internal — nothing the product promises changes) · **Design:** [04c](04c-design-analytic.md) — the printers ask ONE verticality question, and a term that prints as zero is not printed
+**Amends** [ADR-AG-121](#adr-ag-121) (the slope row, whose predicate was right and alone) · the relative-scale rule of [ADR-AG-021](#adr-ag-021), which this layer had not inherited
+
+**What the student saw.** *"take a look at the equation of AD. first, we dont show a מקדם of 0. so equation should be x-1=0. next, the slope there is completely off"* — on `A(1,6) · B(-3,0) · C(5,0) · משולש ABC · AD גובה לצלע BC`:
+
+```
+משוואת הישר AD:  x + 0y - 1 = 0
+  איך מגיעים לזה
+    m = (0 - 6) / (1 - 1) = -1663960853.8
+    y - 6 = (-1663960853.8)(x - 1)
+```
+
+and, three rows above it in the same panel, `AD: (אין שיפוע) אנכי`. One line, two answers, and a division by a **printed zero** in the lane whose whole purpose ([ADR-AG-092](#adr-ag-092)) is to teach the move.
+
+**The cause is units, not logic.** Every printer asked "is this zero / is this vertical" with an **absolute** `|x| < 1e-12`. A solved point carries the solver's residual: measured on that figure, `D.x − A.x = 3.605854e-9` — three and a half orders ABOVE the guard. Fed exact coordinates the same functions are correct (`lineText(1, 0, -1)` = `x - 1 = 0`), which is exactly why no hand-written test had ever seen it: **a lock typed with exact numbers cannot fail on this class.**
+
+**Decision, two rules.**
+
+1. **A term that PRINTS as zero is not printed.** `term()` asks `fmt(|k|) === fmt(0)` — of its own output, not of its input. `shifted()` had always asked it this way; the general form had not, and the same one-line rule now also governs a locus's bracketed offset (never `(x − 0)`).
+2. **Verticality is asked RELATIVELY, once.** `verticality(dx, dy) = |dx| / ‖(dx, dy)‖` — `0` exactly vertical, `1` exactly horizontal, scale-free — with `VERTICAL_TOL = 1e-6`, both exported from `engine/lines.ts` alongside `isVertical` (a direction) and `isVerticalLine(a, b)` (a line, whose direction is `(−b, a)`). **Four call sites replaced their own thresholds with it**: the trace (`traceLine2pt`), the explicit form (`explicitLineText`), the slope number (`slopeOf`), and the slope ask (`ask.ts`). The slopes panel — the one surface that was right — keeps its logic and now imports the ratio and the tolerance instead of inlining them, which is what makes "they agree" a property rather than a coincidence.
+
+**Why not the obvious alternatives.** Loosening `fmtAnalytic`'s own `1e-12` snap would make the FORMATTER lie about a genuinely small quantity everywhere, to fix a decision two layers up. Special-casing the altitude-to-a-horizontal-side would leave every other solved vertical line wrong. Neither touches the second surface.
+
+**What was NOT swept, and why.** `ask.ts:406` (`n2 > 1e-12` before normalising a line for a distance mark) and `curveText.ts:340` (`|exact² − r²| < 1e-9`, deciding whether a radius is a clean surd) are different questions — genuine degeneracy and exactness — not "does this read as zero". [#1235](https://github.com/dcodish/geo_builder/issues/1235), the same shape in `crossings.ts`, is **not** closed by this: its thresholds decide *geometric* degeneracy, and it keeps its own measurement and fix.
+
+**Consequences.** `engine/lines.ts` +4 exports; `techniques.ts`, `curveText.ts` (×4), `ask.ts` (×2) and `App.tsx` call them. `issue-1276-display-epsilon.test.ts` (13) — written on the DERIVED figure, never on typed coordinates, and verified to fail against the pre-fix callers on four assertions: the row, the trace, the class sweep, and the panel's inlined copy. The class row is the point: for four figures, every equation the panel would print is checked for a term that reads as zero, so the next printer that grows one is caught by the rule rather than by a student.
+

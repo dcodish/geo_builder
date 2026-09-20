@@ -33,6 +33,7 @@
  */
 import { fmtAnalytic, fractionClearingFactor } from '../format';
 import { ellipseFoci, parabolaFocus } from '../engine/curves';
+import { isVerticalLine } from '../engine/lines';
 import type { NumCurve } from '../engine/types';
 import type { LocusShape } from '../engine/locusFit';
 
@@ -86,7 +87,9 @@ export function lineText(a0: number, b0: number, c0: number): string {
  * read off its own output rather than re-decided.
  */
 export function explicitLineText(a: number, b: number, c: number): string | null {
-  if (Math.abs(b) < 1e-12) return null;
+  // #1276: RELATIVELY — `|b| < 1e-12` called a line vertical only when its coefficient was exactly
+  // zero, so a solved vertical line printed an explicit form with a slope of a billion instead.
+  if (isVerticalLine(a, b)) return null;
   // ax + by + c = 0  ->  y = (-a/b)x + (-c/b)
   const m = -a / b;
   const k = -c / b;
@@ -113,7 +116,7 @@ function explicitTerm(m: number): string {
 
 /** The slope of `ax + by + c = 0`, or `null` when it is vertical — the same question, as a number. */
 export function slopeOf(a: number, b: number): number | null {
-  return Math.abs(b) < 1e-12 ? null : -a / b;
+  return isVerticalLine(a, b) ? null : -a / b; // #1276: the same relative question, one answer
 }
 
 /**
@@ -132,7 +135,19 @@ export function slopeOf(a: number, b: number): number | null {
  * to round to `1` anyway. The rule is about the number the STUDENT sees, so it asks `fmt`.
  */
 function term(k: number, sym: string): string {
-  if (Math.abs(k) < 1e-12) return '';
+  /**
+   * A TERM THAT PRINTS AS ZERO IS NOT PRINTED (#1276).
+   *
+   * The test was `|k| < 1e-12`, and a solved figure does not produce coefficients that small: the
+   * operator's `AD`, the altitude to a horizontal side, carried `3.6e-9` of solver residual in its `y`
+   * coefficient — above the guard, so the term survived — and `fmt` then rounded it to `0`. The panel
+   * printed «x + 0y - 1 = 0».
+   *
+   * So the question is asked of the OUTPUT, not of the input: whatever this function is about to show,
+   * if it reads as zero it is not a term. `shifted` (below) has always asked it this way; the general
+   * form had not.
+   */
+  if (fmt(Math.abs(k)) === fmt(0)) return '';
   const shown = fmt(Math.abs(k));
   const mag = shown === fmt(1) && sym !== '' ? '' : shown;
   return `${k < 0 ? '-' : '+'} ${mag}${sym} `;
@@ -306,7 +321,8 @@ export function locusEquation(shape: LocusShape, fmt: (v: number) => string): st
   const c = shape.curve;
   // `x`, `x − 3`, `x + 3` — the bracketed term of a translated conic, with the no-op omitted.
   const shift = (v: string, k: number) =>
-    Math.abs(k) < 1e-12 ? v : `(${v} ${k > 0 ? '−' : '+'} ${fmt(Math.abs(k))})`;
+    // #1276, the same rule as `term`: an offset that PRINTS as zero is no offset — never `(x − 0)`.
+    fmt(Math.abs(k)) === fmt(0) ? v : `(${v} ${k > 0 ? '−' : '+'} ${fmt(Math.abs(k))})`;
   switch (c.kind) {
     case 'line':
       /**
