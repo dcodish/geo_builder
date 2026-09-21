@@ -9566,7 +9566,7 @@ merge and this commit. No `prod/*` tag was cut in between, so it never reached a
 
 ---
 
-### ADR-3D-243 — a derived corner is a POINT KIND, never a `vec-rel`: scaffolding must not draw
+### ADR-3D-256 — a derived corner is a POINT KIND, never a `vec-rel`: scaffolding must not draw
 
 **Status:** accepted, 2026-09-11 · **Issue:** #984 (P2 — unrequested ink; operator report, round #974 T16)
 **Requirements:** none · **Design:** [04b](04b-design-3d.md) — the quad-shape arms, the "derived point ⇒ a KIND" paragraph
@@ -9676,7 +9676,7 @@ or collapse, the `baseShapes` sampling rule), and **driven by the pivot's rider 
 later given reads it — the same lane, same soft anchor, same one-key discipline as an `on-segment` rider's
 `t`. The trapezoid's one relation, DC ∥ AB, holds by construction; what the student never stated stays free.
 
-**The twin.** With k = 1 this construction *is* [ADR-3D-243](#adr-3d-243)'s `parallelogram-point`. The
+**The twin.** With k = 1 this construction *is* [ADR-3D-256](#adr-3d-256)'s `parallelogram-point`. The
 trapezoid corner is the parallelogram corner with its ratio released — which is also why the derivation is
 read from the **ring**, never from the letters' order (the #601 rule): whichever corner is missing, it sits
 at its partner along the parallel pair, offset by k times the opposite side, and DC ∥ AB is the answer
@@ -9721,7 +9721,7 @@ this one:
 **Locks.** `src3d/__tests__/issue-985.test.ts` (23): the build at four seeds with DC ∥ AB and |DC|/|AB|
 visibly ≠ 1; the kind and its fields, and the k = 1 twin asserted numerically against A + C − B; the
 ratio in the rider lane un-driven and different across seeds; all four missing positions; the ink (two
-sides, no diagonal — ADR-3D-243 holds here); the drive through the rider lane at three seeds with an
+sides, no diagonal — ADR-3D-256 holds here); the drive through the rider lane at three seeds with an
 anti-luck check; every quad noun creating its corner with the expected kind; «מרובע» unchanged (+2 DOF);
 `quadCornerDef`'s trapezoid row for every index and the determined rows equal to #984's and #601's exact
 definitions. Fixture `fixtures3/trapezoid-corner-completion-985.geo3.json` carries the "builds and
@@ -10224,3 +10224,19 @@ The gate stays the caller's job either way: `VecMath`'s `PAIR` regex matches a b
 **Left open, filed rather than decided:** a line that is BOTH math-carrying and vector-marked («וקטור AB = 5^2») is routed math-first by the preview and vector-first by the row, and **both renderers are lossy for it** (`VecMath` has no superscript; `MathText` has no arrow). Ordering was left exactly as each surface already had it, so nothing changed silently — [#1313](https://github.com/dcodish/geo_builder/issues/1313) owns it, with the measurement that only that shape overlaps.
 
 **Consequences.** `render/FactRow3.tsx` (+`inputPreviewNode3`, +`typesetsAsVector`); `render/notation.ts` (−`inputPreviewDisplay3`, which was the wrong shape — one string cannot be both isolated for the plain branch and un-isolated for `VecMath`); `App3.tsx` (the two props now call the shared routing). `issue-1195-vector-preview.test.ts` → **`.tsx` (34)**: every marked line rendered through the real `FactRowText3` and compared as MARKUP, the `U+20D7`-absence assertion on both surfaces, the pair-spanning assertion, the anti-assertion guard, the `null` contract, and the marking vocabulary.
+
+## ADR-3D-257 — The fold's post-pass retry covers every NON-CREATING red row, decided by a dry run: a constraint typed before its points is honoured (#1327; the ADR-AG-133 port)
+
+**Status:** accepted, 2026-09-21 · **Issue:** #1327 (bug, P2, `3d`) · found by the docs/17 §1 sibling audit while fixing #1242 (analytic, ADR-AG-133) · operator ruling on #1242, 2026-09-19: *"the idea of order is not relevant since the diagram should either respect all input or refuse to build"* · round #1332
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-2c (extended) · **Design:** [04b](04b-design-3d.md) — the claims / `derive3` section, the retry pass
+**Widens** [ADR-3D-220](#adr-3d-220) (the `unknown-symbol` retry); the 3-D half of the class 2-D closed in ADR-104 and analytic in [ADR-AG-133](06c-decisions-analytic.md#adr-ag-133)
+
+**Measured before (71fc71ad, re-measured at pickup on `derive3` over a direct fact list; as filed).** «פירמידה SABCD שבסיסה ריבוע» · «∠SAB = 70»: ok, ok, `scalarPins: [vangle]`. The same two facts reversed: `{code: 'unknown-point', id: 'A'}`, ok — five points drawn, no pin: the pyramid drawn as if the 70° were never typed, and nothing refusing the build. The list reaches that shape only by editing (delete the pyramid line, re-add it below), the path the operator took on the analytic sheet; ADR-3D-220 retried a row red with `unknown-symbol` after the fold and a row red with `unknown-point` was not retried.
+
+**The mechanism — one predicate wider, and mechanical.** ADR-3D-220's post-pass loop retries every red row for which a DRY RUN on a scratch copy (`applyCommand3` is pure — `retryWouldSucceedWithoutCreating`) succeeds and leaves `points.size` unchanged; the real `applyFact` then runs with its count-delta attribution. Not a list of "non-creating command kinds" — a list drifts, and the measurement is the rule: a constraint, a scalar pin, a relation, a symbol statement all introduce no point. The ADR-104 limit is kept and made visible: a row that would INTRODUCE a point («M אמצע SA» above its solid) is never re-ordered and stays red — the "refuse to build" half. The loop is bounded (a pass with no progress ends it), so a chain of forward references settles to a fixpoint, and only already-red rows are ever touched — no green figure changes. Atomicity (one line lowering to several facts, some landing) was not measured; 3-D lines are mostly one fact each, and it is the second half if a measurement finds it.
+
+**Measured after.** The reversed pair: ok, ok, the 70° pinned — parity with the working order. A constraint naming a point NO line declares («∠SXB = 70») stays red `unknown-point` naming X. #926's `unknown-symbol` cases unchanged. The creating row above its solid stays red.
+
+**The complex question carried from the audit.** `src-complex/replay/derive2.ts` folds algebraic constraints numerically with references resolved at parse time; whether a forward reference can reach its fold at all was not measured in this round either — recorded here so the next session that touches complex measures it and files against `complex` if it can.
+
+**Consequences.** `src3d/store/store3.ts` (the retry predicate and loop). `src3d/__tests__/issue-1327-forward-constraint.test.ts`. `docs/02b` FR-VC-2c; `docs/04b` the retry pass.

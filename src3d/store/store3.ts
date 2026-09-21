@@ -330,16 +330,34 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
   // now precedes the row that gives the letter its meaning. The fold is otherwise strictly in order and
   // must stay so (a point-introducing fact re-ordered to the end would strand its dependents — the 2-D
   // ADR-104 rule); a symbol statement introduces nothing and is pure data on a name, so retrying it is
-  // safe, and only rows that are ALREADY red with `unknown-symbol` are touched — no green figure changes.
-  // Bounded like the 2-D deferral: a pass that makes no progress ends it.
+  // safe, and only rows that are ALREADY red are touched — no green figure changes.
+  //
+  // #1327 (ADR-3D-257, the ADR-AG-133 port): the SAME rule, one predicate wider. «∠SAB = 70» typed above
+  // «פירמידה SABCD שבסיסה ריבוע» was red with `unknown-point` and the pyramid was drawn WITHOUT its 70°
+  // — the operator's #1242 ruling ("the diagram should either respect all input or refuse to build")
+  // failed on both halves. A constraint, a pin, a relation introduces no point any more than a symbol
+  // does, so it is retried on exactly ADR-3D-220's grounds. What is retried is decided by a DRY RUN, not
+  // by a list of command kinds (a list drifts): `applyCommand3` is pure, so the fact is applied to a
+  // scratch copy, and it is retried for real only if that run succeeds AND introduces no point — the
+  // ADR-104 limit made mechanical. A row that would create («M אמצע SA» above its solid) stays red and
+  // visible, which is the "refuse to build" half. Bounded like the 2-D deferral: a pass that makes no
+  // progress ends it, so a chain of forward references settles to a fixpoint.
+  const retryWouldSucceedWithoutCreating = (f: Fact3): boolean => {
+    let probe = c;
+    for (const cmd of f.cmds) {
+      if (droppedSoft(cmd)) continue;
+      const r = applyCommand3(probe, cmd);
+      if (!r.ok) return false;
+      probe = r.next;
+    }
+    return probe.points.size === c.points.size;
+  };
   for (let pass = 0; pass < facts.length; pass++) {
     let progressed = false;
     for (const f of facts) {
-      const st = status[f.id];
-      if (typeof st === 'string' || st.code !== 'unknown-symbol') continue;
-      const retried = applyFact(f);
-      if (typeof retried !== 'string' && retried.code === 'unknown-symbol') continue; // still undefined — stays red
-      status[f.id] = retried;
+      if (typeof status[f.id] === 'string') continue; // ok, or disabled — never touched
+      if (!retryWouldSucceedWithoutCreating(f)) continue; // still unsatisfiable, or it would introduce a point — stays red
+      status[f.id] = applyFact(f);
       progressed = true;
     }
     if (!progressed) break;
@@ -497,7 +515,7 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     const DERIVED = new Set([
       'on-segment', 'centroid', 'in-span', 'right-apex', 'foot-plane', 'foot-line', 'line-plane', 'plane-cut',
       'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'vec-defined', 'vec-pair',
-      // #984: the parallelogram corner was a `vec-defined` point until ADR-3D-243 gave it its own
+      // #984: the parallelogram corner was a `vec-defined` point until ADR-3D-257 gave it its own
       // kind — it stays in this set, or the rename would silently drop its coincidence refusal.
       'parallelogram-point',
       // #985: its released-ratio twin — derived only when the ratio is STATED; free-ratio is a rider (below).

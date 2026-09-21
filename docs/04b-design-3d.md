@@ -266,9 +266,13 @@ solids stays accepted: not yet checkable is not yet false.
 
 **A change that orphans a row, and the symbol retry pass ([ADR-3D-220](06b-decisions-3d.md#adr-3d-220), #926).**
 `derive3` applies each fact through one `applyFact` (count-delta attribution included) and then re-applies,
-in a bounded pass, every row still red with `unknown-symbol` — a statement addressed to a letter («α = 70»,
-«p חיובי») introduces nothing, so retrying it after the fold strands no dependent, and only already-red
-rows are touched. The store's `remove` / `toggle` / `replaceFact` fold before and after and report, as
+in a bounded pass to a fixpoint, every row still red that a DRY RUN shows would now succeed **without
+introducing a point** ([ADR-3D-257](06b-decisions-3d.md#adr-3d-257), #1327 — widened from the
+`unknown-symbol`-only pass of ADR-3D-220). A statement addressed to a letter («α = 70», «p חיובי»), a
+constraint, a pin or a relation introduces nothing, so retrying it after the fold strands no dependent;
+a row that would create a point («M אמצע SA» above its solid) is never re-ordered — the 2-D ADR-104
+limit — and stays red. The predicate is measured on a scratch copy (`applyCommand3` is pure), never
+read off a list of command kinds, and only already-red rows are touched. The store's `remove` / `toggle` / `replaceFact` fold before and after and report, as
 `dependents-broken { items, cause }`, every OTHER row the change took from green to red — judged on the
 fold's own per-row status, never on a second dependency walk, so the symbol lanes and the point lanes
 are one class. `replaceFact` still returns `true` for a committed edit; the report is `lastError`.
@@ -405,7 +409,7 @@ absence of ink.
 **And it is not only points — the same rule caught a segment (#984).** The parallelogram arm derived its
 corner by issuing a `vec-rel` command, which emits a **carrier segment** for the vector it relates. That
 carrier is the student's own object when they named a vector («נסמן: AB = u»); here it was scaffolding,
-and it drew a diagonal `BD` nobody asked for on all four nouns. [ADR-3D-243](06b-decisions-3d.md#adr-3d-243)
+and it drew a diagonal `BD` nobody asked for on all four nouns. [ADR-3D-257](06b-decisions-3d.md#adr-3d-257)
 gives that corner the kind `parallelogram-point` too, so both one-unknown arms now derive their corner the
 same way and neither emits ink. **The general form: when a construction reaches for a COMMAND to compute
 something, it inherits everything that command does for a student — including what it draws.**
