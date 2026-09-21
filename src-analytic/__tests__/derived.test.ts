@@ -230,9 +230,18 @@ describe('M1 — restating a construction is absorbed, contradicting it is refus
     expect(d.faults).toEqual([{ index: 5, code: 'ring-contradicts-noun', detail: 'מרובע ABDC' }]);
   });
 
-  it('refuses a restatement that means something different under the same name', () => {
+  it('a restatement that means something different under the same name is a CONDITION — and here a false one', () => {
+    /**
+     * INVERTED by #1320 (ADR-AG-144). This asserted `conflicting-restatement`: «M אמצע AC» after
+     * «M אמצע AB» was a second definition and a clash. The operator's 572 figure needs M to carry TWO
+     * roles — the y-axis crossing AND the midpoint of AB — so a derivation stated about an existing
+     * point is now a constraint on it (#1046's converse). With A, B and C pinned, mid(AC) ≠ mid(AB), so
+     * the sentence is refused as `unsatisfiable`, NAMING the sentence — still a refusal, and now the
+     * honest kind: the figure cannot satisfy it, rather than "you may not say it".
+     */
     const d = derive(['A(8,1)', 'B(-2,-5)', 'C(0,0)', 'M אמצע AB', 'M אמצע AC']);
-    expect(d.faults.map((f) => f.code)).toEqual(['conflicting-restatement']);
+    expect(d.faults.map((f) => ({ i: f.index, c: f.code }))).toEqual([{ i: 4, c: 'unsatisfiable' }]);
+    expect(d.construction.objects.filter((o) => o.id === 'M')).toHaveLength(1);
   });
 
   /**
@@ -250,9 +259,16 @@ describe('M1 — restating a construction is absorbed, contradicting it is refus
    */
   it.each([
     ['coordinate first, then derived', ['A(8,-2)', 'B(1,1)', 'C(0,4)', 'M(3,5)', 'M מפגש התיכונים במשולש ABC']],
-  ])('one name cannot be two kinds — %s', (_name, lines) => {
+  ])('one name is still one object — %s', (_name, lines) => {
+    /**
+     * The INVARIANT this lock exists for is untouched: one name, one object, one drawn M. The
+     * DISPOSITION changed with #1320 (ADR-AG-144): «M מפגש התיכונים» about an M the student already
+     * placed is a statement about that M (#1046's converse), and the centroid of this triangle is (3,1),
+     * so «M(3,5)» + «M is the centroid» is refused as `unsatisfiable` on the sentence that made the
+     * figure impossible — not as a clash of kinds.
+     */
     const d = derive(lines);
-    expect(d.faults.map((f) => f.code)).toEqual(['name-kind-clash']);
+    expect(d.faults.map((f) => f.code)).toEqual(['unsatisfiable']);
     const ids = d.construction.objects.map((o) => o.id);
     expect(ids.filter((x) => x === 'M')).toHaveLength(1);
     expect(d.figure.points.filter((p) => p.id === 'M')).toHaveLength(1);

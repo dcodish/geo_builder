@@ -254,21 +254,21 @@ describe('a rule that matched owes an answer about what it matched', () => {
   describe('#1046 — a clash says WHAT the name already holds', () => {
     const TRI = ['A(0,0)', 'B(6,0)', 'C(0,6)'];
 
-    it('carries the existing construct so the message can name it', () => {
+    it('a derivation about a placed point is a statement about it, in BOTH directions now (#1320)', () => {
       /**
-       * The DIRECTION changed (#1046), not the fix.
-       *
-       * This asserted the message on «M מפגש…» then «M(3,c)» — which is no longer a clash at all,
-       * because a coordinate about an existing point is a statement about it. The message fix it
-       * was written for is unchanged and is asserted here on a real clash: the student names `M`,
-       * and then says M is the centroid, which IS a second definition.
+       * The DIRECTION changed twice. #1046 made «M מפגש…» then «M(3,c)» a statement rather than a
+       * clash, and this lock moved the message assertion to the other order, calling it "a real
+       * clash". #1320 (ADR-AG-144) closed that direction too: the 572 exam's M is a crossing AND a
+       * midpoint, so a derivation stated about an existing point is a CONSTRAINT on it. «M(3,c)» then
+       * «M is the centroid» is now solved — `c` is a parameter the solve can pin — and this triangle's
+       * centroid is (2,2), whose x is not 3, so the sentence is refused as `unsatisfiable`, naming it.
+       * The `existing` token the message fix introduced is still carried by every clash the boundary
+       * can raise; the curve/point pair below exercises it.
        */
       const d = derive([...TRI, 'M(3,c)', 'M מפגש התיכונים במשולש ABC'], 0);
       const fault = d.faults.find((f) => f.index === 4);
-      expect(fault?.code).toBe('name-kind-clash');
-      // ← the whole fix: before this the refusal said only "that name belongs to another kind",
-      // which blames the student's choice of letter for a collision they cannot see.
-      expect(fault?.existing).toBe('point');
+      expect(fault?.code).toBe('unsatisfiable');
+      expect(d.construction.objects.filter((o) => o.id === 'M')).toHaveLength(1);
     });
 
     it('while a COORDINATE about an existing derived point is a statement, not a clash', () => {

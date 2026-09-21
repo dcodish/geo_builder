@@ -816,6 +816,57 @@ contradiction — at every configuration, never only at the seeds where the need
 the collapse floor. A genuinely thin figure (a stated 1° apex, 89° + 90°) is an exact solution and is
 still drawn: thinness is never the test, the existence of an exact solution is.
 
+**R106 — a given that DETERMINES a parameter is honoured** ([ADR-AG-144](06c-decisions-analytic.md#adr-ag-144),
+[#1317](https://github.com/dcodish/geo_builder/issues/1317) — *operator, 2026-09-21: "one design pass over the
+solver … so a student can build the whole 572 figure"*). «N על הישר l3» on `(k+1)x+2y−12+5k=0` pins `k = 2`;
+so does a stated slope, and so does a length between points whose coordinates carry the parameter. The
+class is *every given that determines a parameter*, not any one sentence. The parameter's value is then
+KNOWLEDGE and prints in the panel (through the same gate as every number); the line's equation prints with
+it substituted; the freedom cue counts a pinned parameter as pinned. A pin with two roots is two
+configurations, walked by «הציגו תצורה אחרת» and listed as the option set (R-ADR-AG-047); a declared domain
+keeps only the roots inside it, silently (D7 kind 1). **An unpinned parameter is never moved by the solve**:
+the vertices are solved first with every parameter at its sample, and the parameters join only when the
+vertices alone cannot satisfy the givens — a free `a` stays the seed's, so no given the student never
+gave is manufactured by the solver reaching for a knob. **A parameter row is a claim** (#1343): a value prints only through the knowledge gate, and a declared symbol nothing in the figure reads is never a value — its row is its domain, marked «(לא בשימוש בשרטוט)».
+
+**R107 — a line may be created through a point with its direction UNKNOWN** ([ADR-AG-144](06c-decisions-analytic.md#adr-ag-144),
+[#1319](https://github.com/dcodish/geo_builder/issues/1319)). «דרך N עובר ישר», «דרך M עובר ישר l4», «a line
+through N» — the exam's own sentence for a line the rest of the question determines. The line is drawn through
+the point at a sampled direction, carries ONE degree of freedom (counted in the cue, moved by «הציגו תצורה
+אחרת»), and its equation is withheld until a later given pins the direction. A named one can be crossed,
+referred to and measured against exactly as a stated line («A נקודת החיתוך של הישר l4 עם הישר 1»). The
+parallel/perpendicular members (R-ADR-AG-057) are unchanged.
+
+**R108 — a derivation stated about a point that ALREADY EXISTS is a condition on it** ([ADR-AG-144](06c-decisions-analytic.md#adr-ag-144),
+[#1320](https://github.com/dcodish/geo_builder/issues/1320) — *operator: "can I define points A and point B
+and say that point M is [the midpoint]?"*). «M אמצע AB» when `M` is the y-axis crossing does not redefine `M`
+and is not a name clash: it is a constraint the figure must meet, and it is what fixes the direction of the
+line that put `A` and `B` where they are. Every derived rule behaves the same way (a centroid, a circle's
+centre). An exact restatement is absorbed as already known; a false one about placed points is refused as
+unsatisfiable, naming the sentence. One name still holds one object. This is the converse of the #1046 ruling
+(a coordinate about an existing derived point), and the asymmetry between the two directions is gone.
+
+**R109 — the exam's own line names: a NUMERAL names a line** ([ADR-AG-144](06c-decisions-analytic.md#adr-ag-144),
+[#1298](https://github.com/dcodish/geo_builder/issues/1298), [#1318](https://github.com/dcodish/geo_builder/issues/1318)
+— *operator ruling, 2026-09-21: a digit MAY name a line or a circle; the student is copying the exam*). «נתון
+הישר 1: 2x-y+8=0», «משוואת ישר 1 היא …», «נתון הישר I: …», «line 1: …» declare; «N על הישר 3», «נקודת החיתוך
+של הישר 1 עם הישר 2», «שיפוע הישר 3 הוא …» refer. The panel calls the line «ישר 1» / «line 1» (the R63
+circle precedent), so the panel and the exam agree. «II» is a numeral, never *"the line through I and I"*
+— no phantom point is ever minted from a name — and a two-point name that repeats its letter («הישר AA») is
+refused. A bare equation opening with a digit is still an equation. In an operand slot a numeral needs its
+noun («הישר 3»); with the line noun dropped, a Roman numeral is still a circle (R-#1072).
+
+**R110 — the SIGN of a derived quantity is a stated given, honoured as a selector** ([ADR-AG-144](06c-decisions-analytic.md#adr-ag-144),
+[#1323](https://github.com/dcodish/geo_builder/issues/1323)). «שיפוע הישר l5 שלילי», «השיפוע של l1 חיובי»,
+«שיפוע l1 קטן מ-0», «the slope of l1 is negative» — the exam's *«ושיפועו שלילי»* — pick between the
+configurations the other givens leave open (D7 kind 2). A configuration with the wrong sign is never drawn;
+with no freedom left, a contradicted sign is refused on the sentence. Never a value keyword in the slope rule:
+«the slope of l1 is negative» used to be accepted as a product of eight symbols and built green. The class
+is *an inequality about a DERIVED quantity*; a slope is its first member, and a length, an area or a
+coordinate join it as members, not as new rules. «m<0» remains a parameter declaration (F11's own bare form,
+the corpus's declare-before-use) — and a declared symbol nothing uses is marked as such in the panel, so a
+student who meant a slope is told.
+
 **R61 — a value is called KNOWN only if it holds across configurations that actually DIFFER**
 ([ADR-AG-126](06c-decisions-analytic.md#adr-ag-126)). The data panel may present a number as determined
 only when the givens determine it — never because the three configurations it happened to sample were the

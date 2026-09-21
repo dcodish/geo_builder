@@ -20,7 +20,7 @@
 import type { DerivedRule } from '../engine/derived';
 import type { Constraint, Direction } from '../engine/solve';
 import { parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
-import { RESERVED_SYMBOLS } from '../engine/carriers';
+import { RESERVED_SYMBOLS, directionSymbol } from '../engine/carriers';
 import { constantLengthExpr, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { UNBOUNDED, type CurveKind, type Domain, type Fact, type Id } from '../engine/types';
 import { EN_SHAPE, normalizeShapeNoun, rightAngleAt, shapeRow } from '../engine/shapes';
@@ -249,8 +249,44 @@ const HE_IS = `(?:\\s*(?:${COPULA_WORDS}))?`;
 
 /** A point/vertex name: a capital letter with an optional digit subscript (`F1`, `D2`). */
 const NAME = '[A-Z][0-9]?';
-/** A line name: `ℓ`, `ℓ1`, `l`, `l1`, or a two-point run like `AC`. */
-const LINE_NAME = '(?:[ℓl][0-9]?|[A-Z][0-9]?[A-Z][0-9]?)';
+/**
+ * A NUMERAL naming a line — the exam's own «הישר 1» / «הישר I» (#1298, #1318; ADR-AG-144).
+ *
+ * Operator ruling, 2026-09-21: *a digit MAY name a line or a circle* — the student is copying the exam,
+ * and a digit name is not invented by the tool, it is theirs. The Roman range mirrors the circle's
+ * (`CIRCLE_NUMERALS`), for the circle's reason.
+ *
+ * The SEPARATOR LOOKAHEAD is the whole safety of the token, and it is the fourth time this file
+ * records why ([ADR-AG-006](../../docs/06c-decisions-analytic.md#adr-ag-006)): «הישר 2x-y+8=0» begins
+ * with a digit that is a COEFFICIENT, and only the `x` after it says so. Without the lookahead the
+ * numeral branch would claim `2` as the name and hand `x-y+8=0` to the student as their equation.
+ */
+const LINE_NUMERAL = '(?:I|II|III|IV|V|[1-9])';
+const LINE_NUMERAL_RE = /^(?:I|II|III|IV|V|[1-9])$/;
+/**
+ * A line name: `ℓ`, `ℓ1`, `l`, `l1`, a numeral, or a two-point run like `AC`.
+ *
+ * THE NUMERAL ALTERNATIVE COMES BEFORE THE TWO-POINT ONE, and that order is a decision (#1318): `II`
+ * and `IV` are Latin capitals, so the two-point run read them as *"the line through I and I"* and
+ * minted a phantom point `I` the student never wrote. A Roman numeral in the name slot is a NUMERAL; a
+ * line through the points I and V is not a sentence the corpus writes, and it is still sayable by its
+ * points («הישר העובר דרך I ו-V» is #1281's converse).
+ */
+const LINE_NAME = `(?:[ℓl][0-9]?|${LINE_NUMERAL}(?=[\\s:]|$)|[A-Z][0-9]?[A-Z][0-9]?)`;
+/**
+ * The name slot of the NOUN-LESS forms («משוואת AB היא …», «AB: …») keeps the pre-numeral token: with
+ * the noun dropped, a Roman numeral is a CIRCLE («משוואת I היא x²+y²=9», #1072) and the circle branch
+ * below owns it. A numeral names a LINE only where the student wrote the line noun.
+ */
+const LINE_NAME_PLAIN = '(?:[ℓl][0-9]?|[A-Z][0-9]?[A-Z][0-9]?)';
+
+/**
+ * How a numeral-named line is CALLED — «ישר 1» / «line 1» — the #1216 circle precedent («מעגל 1»),
+ * so the panel row reads the way the exam does and the student's own token still resolves (the id is
+ * `line-1`, and every by-name lookup matches the id as well as the name).
+ */
+const lineNameOf = (token: string, lang: 'he' | 'en'): string =>
+  LINE_NUMERAL_RE.test(token) ? `${lang === 'he' ? 'ישר' : 'line'} ${token}` : token;
 
 /**
  * A line name that is TWO POINT NAMES — `AB`, `A1B2` — as opposed to an arbitrary one like `ℓ1`.
@@ -488,7 +524,7 @@ function matchCurve(line: string): CurveHit | null {
   if (heLineNamed) {
     return {
       id: `line-${heLineNamed[2]}`,
-      name: heLineNamed[2],
+      name: lineNameOf(heLineNamed[2], 'he'),
       kind: 'line',
       eqSrc: heLineNamed[3],
       extent: extentOfNoun(heLineNamed[1]),
@@ -512,12 +548,12 @@ function matchCurve(line: string): CurveHit | null {
    * classifier decides what it IS, and a mismatch is R7’s named refusal.
    */
   const heNamedNoNoun = line.match(
-    new RegExp(`^${HE_GIVEN}${HE_EQ_OF}\\s+(${LINE_NAME})${HE_IS}\\s*:?\\s*(.+)$`),
+    new RegExp(`^${HE_GIVEN}${HE_EQ_OF}\\s+(${LINE_NAME_PLAIN})${HE_IS}\\s*:?\\s*(.+)$`),
   );
   if (heNamedNoNoun) {
     return {
       id: `line-${heNamedNoNoun[1]}`,
-      name: heNamedNoNoun[1],
+      name: lineNameOf(heNamedNoNoun[1], 'he'),
       kind: 'line',
       eqSrc: heNamedNoNoun[2],
     };
@@ -552,14 +588,14 @@ function matchCurve(line: string): CurveHit | null {
    * Special-casing a `p:q` tail would leave the class alive for every other `XY:<not-an-equation>`
    * sentence — the patch tripwire docs/17 names.
    */
-  const heNamedColon = line.match(new RegExp(`^${HE_GIVEN}(${LINE_NAME}):\\s*(.+)$`));
+  const heNamedColon = line.match(new RegExp(`^${HE_GIVEN}(${LINE_NAME_PLAIN}):\\s*(.+)$`));
   if (heNamedColon) {
     const tail = heNamedColon[2];
     const colonEq = tail.includes('=') ? equationExpr(tail) : null;
     if (colonEq && symbolsOf(colonEq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
       return {
         id: `line-${heNamedColon[1]}`,
-        name: heNamedColon[1],
+        name: lineNameOf(heNamedColon[1], 'he'),
         kind: 'line',
         eqSrc: tail,
       };
@@ -584,7 +620,7 @@ function matchCurve(line: string): CurveHit | null {
    * vertices."* Found while adding the «through a point» construction, which the bug swallowed.
    */
   const enLine = line.match(new RegExp(`^(?:[Tt]he\\s+)?[Ll]ine\\s+(${LINE_NAME})\\s*:?\\s*(?:is\\s+)?(.+)$`));
-  if (enLine) return { id: `line-${enLine[1]}`, name: enLine[1], kind: 'line', eqSrc: enLine[2] };
+  if (enLine) return { id: `line-${enLine[1]}`, name: lineNameOf(enLine[1], 'en'), kind: 'line', eqSrc: enLine[2] };
   const enLineBare = line.match(/^(?:the\s+)?line\s+(.+=.+)$/i);
   if (enLineBare) {
     return { id: `curve-${anonIndex(enLineBare[1])}`, name: '', kind: 'line', eqSrc: enLineBare[1] };
@@ -1599,8 +1635,13 @@ const ON_AXIS_EN = new RegExp(
  */
 const AXIS_HE = /^ציר\s+ה?-?\s*([xy])$/;
 const AXIS_EN = /^(?:the\s+)?([xy])[- ]axis$/i;
-/** «הישר l1» / «ישר ℓ2» / «l1» — a line the student NAMED, whose direction comes from its equation. */
-const NAMED_LINE = new RegExp(`^(?:ה?ישר\\s+|[Ll]ine\\s+)?([ℓl][0-9]?)$`);
+/**
+ * «הישר l1» / «ישר ℓ2» / «l1» — a line the student NAMED, whose direction comes from its equation.
+ *
+ * A NUMERAL name needs its noun here («הישר 3», never a bare «3»): an operand slot is free text, and a
+ * bare digit in one is a number before it is a name (#1298, ADR-AG-144).
+ */
+const NAMED_LINE = new RegExp(`^(?:ה?ישר\\s+|[Ll]ine\\s+)?([ℓl][0-9]?)$|^(?:ה?ישר\\s+|[Ll]ine\\s+)(${LINE_NUMERAL})$`);
 /** «הצלע AB» / «הקטע AB» / «הישר AB» / «AB» — two named points, whichever noun fronts them. */
 /**
  * The noun in front of a point pair is optional and may be Hebrew or English. Spelled out rather than
@@ -1616,7 +1657,7 @@ function direction(phrase: string): Direction | null {
   const axis = AXIS_HE.exec(p) ?? AXIS_EN.exec(p);
   if (axis) return { k: 'axis', axis: axis[1].toLowerCase() === 'x' ? 'x' : 'y' };
   const named = NAMED_LINE.exec(p);
-  if (named) return { k: 'curve', id: `line-${named[1]}` };
+  if (named) return { k: 'curve', id: `line-${named[1] ?? named[2]}` };
   const pts = TWO_POINTS.exec(p);
   // A two-letter run reads as its two POINTS even when fronted by «הישר», and that is deliberate:
   // «הישר AC» relates the direction A→C whether or not a `line-AC` object was ever stated, so the
@@ -1689,7 +1730,50 @@ const THROUGH_EN = new RegExp(
   'i',
 );
 
+/**
+ * A LINE THROUGH A POINT WITH A FREE DIRECTION — «דרך N עובר ישר», «דרך M עובר ישר l4» (#1319, ADR-AG-144).
+ *
+ * The exam says it twice, and both times the direction is exactly what the question withholds:
+ * *«דרך הנקודה N עובר ישר החותך את ציר ה-y בנקודה M»*, *«דרך הנקודה M עובר ישר נוסף … כך שהנקודה M היא
+ * אמצע הקטע AB»*. The parallel/perpendicular members (#1093) supply a direction; this member states
+ * that the direction is UNKNOWN — a `line-at` whose direction is a FREE angle in the register, sampled
+ * like any unstated magnitude and solved once a later given pins it (the #1317 seam).
+ *
+ * The name is optional and is a line name (`l4`, a numeral) — never a two-point run, which would be a
+ * statement about two points rather than a construction through one. The English form takes the name
+ * before «through» («line l4 through M»), as the language puts it.
+ */
+const FREE_LINE_NAME = `(?:[ℓl][0-9]?|${LINE_NUMERAL})`;
+const THROUGH_FREE_HE = new RegExp(
+  `^${HE_GIVEN}דרך\\s+${HE_POINT}(${NAME})\\s+(?:עובר(?:ת)?\\s+)?ה?(?:ישר|קו)(?:\\s+(${FREE_LINE_NAME}))?$`,
+);
+const THROUGH_FREE_EN = new RegExp(
+  `^(?:[Aa]\\s+|[Tt]he\\s+)?[Ll]ine(?:\\s+(${FREE_LINE_NAME}))?\\s+(?:passes\\s+)?through\\s+(?:(?:the\\s+)?point\\s+)?(${NAME})$`,
+);
+
 function parseThroughLine(line: string): RuleOutcome {
+  const he = THROUGH_FREE_HE.exec(line);
+  const en = he ? null : THROUGH_FREE_EN.exec(line);
+  if (he || en) {
+    const through = he ? he[1] : en![2];
+    const token = he ? he[2] : en![1];
+    const name = token ? lineNameOf(token, he ? 'he' : 'en') : undefined;
+    // Named: the name IS the identity, like every named line. Anonymous: content-derived from the
+    // anchor, so the same construction stated twice is one object (ADR-AG-023).
+    const id = token ? `line-${token}` : `curve-${anonIndex(`through:${through}:free`)}`;
+    return made([
+      { t: 'declare', id: through, src: line },
+      {
+        t: 'line-at',
+        id,
+        through,
+        dir: { k: 'free', sym: directionSymbol(id) },
+        perp: false,
+        ...(name ? { name } : {}),
+        src: line,
+      },
+    ]);
+  }
   const m = THROUGH_HE.exec(line) ?? THROUGH_EN.exec(line);
   if (!m) return null;
   const [, through, word, dirSrc] = m;
@@ -1724,6 +1808,7 @@ function parseThroughLine(line: string): RuleOutcome {
 function describeDirId(d: Direction): string {
   if (d.k === 'axis') return `axis-${d.axis}`;
   if (d.k === 'curve') return `curve-${d.id}`;
+  if (d.k === 'free') return `free-${d.sym}`;
   return `pts-${d.a}${d.b}`;
 }
 
@@ -1740,6 +1825,13 @@ const SLOPE_HE = new RegExp(
   `^${HE_GIVEN}ה?שיפוע\\s+(?:של\\s+)?(.+?)\\s+(?:הוא|היא|שווה(?:\\s+ל-?)?)\\s*(-?\\S.*)$`,
 );
 const SLOPE_EN = /^(?:the\s+)?slope\s+of\s+(.+?)\s+is\s+(.+)$/i;
+
+/** The sign words (#1323): the adjective, the comparison with zero, and the symbol form. */
+const SIGN_WORDS_HE = '(שלילי|חיובי|קטן\\s+מ-?\\s*0|גדול\\s+מ-?\\s*0|<\\s*0|>\\s*0)';
+const SLOPE_SIGN_HE = new RegExp(
+  `^${HE_GIVEN}ה?שיפוע(?:ו|ה)?\\s+(?:של\\s+)?(.+?)(?:\\s+(?:הוא|היא))?\\s*${SIGN_WORDS_HE}$`,
+);
+const SLOPE_SIGN_EN = /^(?:the\s+)?slope\s+of\s+(.+?)\s+is\s+(negative|positive|less\s+than\s+0|greater\s+than\s+0|<\s*0|>\s*0)$/i;
 
 /**
  * `AB = 10` · `AB = AC` · `AB + BC = 10` · `AB + BC = DE` · `AB = 4√5` · `2·AB = 3·CD` (#1050).
@@ -1850,6 +1942,29 @@ function parseConstraint(raw: string): RuleOutcome {
     return made([
       { t: 'constraint', k: { t: 'relation', rel: parallel ? 'parallel' : 'perpendicular', u, v }, src: line },
     ]);
+  }
+
+  /**
+   * THE SIGN OF A SLOPE — «שיפוע הישר l1 שלילי», «השיפוע של l1 חיובי», «שיפוע l1 קטן מ-0»,
+   * «the slope of l1 is negative» (#1323, ADR-AG-144).
+   *
+   * BEFORE the slope rule, because that rule's value group goes straight to the expression parser —
+   * and the expression parser reads a letter run as a PRODUCT OF SYMBOLS, so «the slope of l1 is
+   * negative» was accepted as `n·e·g·a·t·i·v·e` and built green (measured; the #1321 trap on this
+   * sentence). Its Hebrew twin died as `not-handled`. Both are one sentence and it lowers to a SIGN
+   * SELECTOR over a derived quantity — never a fourth value keyword in the slope rule, which would give
+   * the #1201 shape: accepted, reported satisfied, not honoured.
+   *
+   * The operand is `direction()`'s, like the slope rule's, so «הישר l1», «AB», «הצלע AB» mean here what
+   * they mean there. A student who wrote a sign about nothing the resolver knows is told the formats
+   * that work (`bad-operand`), not that the sentence was unintelligible.
+   */
+  const sign = SLOPE_SIGN_HE.exec(line) ?? SLOPE_SIGN_EN.exec(line);
+  if (sign) {
+    const u = direction(sign[1]);
+    if (!u) return refuse('bad-operand', line);
+    const positive = /חיובי|גדול|>|positive|greater/i.test(sign[2]);
+    return made([{ t: 'selector', sel: { kind: 'sign', q: { k: 'slope', u }, positive }, src: line }]);
   }
 
   const slope = SLOPE_HE.exec(line) ?? SLOPE_EN.exec(line);
@@ -2474,7 +2589,17 @@ export function parseLine(raw: string): ParseResult {
       ? [{ t: 'derived', id: curve.centre, rule: { t: 'circle-centre', curve: curve.id }, src: line }]
       : [];
 
-    const named = curve.kind === 'line' ? TWO_POINT_NAME.exec(curve.name) : null;
+    /**
+     * A NUMERAL IS NOT TWO POINTS, AND A REPEATED LETTER IS NOT A LINE (#1318, ADR-AG-144).
+     *
+     * `II` is Latin capitals twice, so this read it as *"through I and I"* and minted a phantom point the
+     * student never wrote — the [IVX] trap on the rule written to catch it. A numeral name asserts
+     * nothing about any point. And a two-point run that repeats its letter («הישר AA») names no line
+     * at all: it is refused as the shape nouns refuse «משולש ABA», by the same predicate.
+     */
+    const named =
+      curve.kind === 'line' && !LINE_NUMERAL_RE.test(curve.name) ? TWO_POINT_NAME.exec(curve.name) : null;
+    if (named && named[1] === named[2]) return { ok: false, code: 'repeated-vertex', detail: line };
     /**
      * THE NOUN DECIDES THE EXTENT, AND A BOUNDED ONE DRAWS ONLY THE SEGMENT (#1234 / #1236).
      *

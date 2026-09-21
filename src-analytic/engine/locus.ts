@@ -195,7 +195,9 @@ export function traceLocus(
     : 0;
   const step = opts.step ?? (spanOf > 0 ? Math.max(spanOf / 160, 1e-3) : DEFAULTS.step);
   const maxSteps = opts.maxSteps ?? DEFAULTS.maxSteps;
-  const sys = carrierSystem(c, env);
+  // Parameters FIXED (#1317, ADR-AG-144): the walk is a named point's freedom at THIS configuration of
+  // the figure's parameters. Whether a parameterised locus sweeps its parameter is #1186's question.
+  const sys = carrierSystem(c, env, { params: 'fixed' });
   if (sys.ids.length === 0) return null;
 
   const x0 = sys.toVec(start);
@@ -291,7 +293,7 @@ export function traceLocus(
  */
 export function hasLocus(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>, seed = 0): boolean {
   const c: Construction = { ...raw, constraints: resolveChoices(raw.constraints, seed) };
-  const sys = carrierSystem(c, env);
+  const sys = carrierSystem(c, env, { params: 'fixed' });
   if (sys.ids.length === 0) return false;
   const x0 = sys.toVec(start);
   const d = nullDirection(x0, sys.residualsAt);

@@ -26,7 +26,7 @@ import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowS
 import { fmtAnalytic } from './format';
 import { curveDetailsKey, curveParts } from './app/curveText';
 import { color, fs } from '../shell/theme';
-import { paramRegister, reportedDof } from './engine/carriers';
+import { isDirectionSymbol, paramRegister, reportedDof, usedSymbols } from './engine/carriers';
 import { derive } from './engine/derive';
 import { decideSubmit, reachesFallback } from './app/submit';
 import { runFallback } from './app/fallback';
@@ -1247,9 +1247,30 @@ export function App() {
                 key: 'params',
                 title: t('secParams'),
                 dir: 'ltr',
-                rows: register.map((p) => (
-                  <span key={p.sym}><ValueRow text={domainText(p.sym, p.domain)} /></span>
-                )),
+                /**
+                 * A PARAMETER ROW IS A CLAIM TOO (#1317, ADR-AG-144) — gated exactly as a coordinate is.
+                 *
+                 * A parameter a given pins («N על הישר l3» fixes `k = 2`) prints its value through
+                 * `isKnowledge`, the same gate every other number passes; an open one prints its domain.
+                 * A declared symbol NO object uses («m<0» typed for a slope) says so — the student who
+                 * meant a slope must not read a green figure as agreement (#1323's trap, closed by
+                 * visibility: the F11 form cannot be refused without refusing the corpus's own
+                 * declaration-before-use). A free line's direction angle is the tool's own symbol and is
+                 * not a row: it is counted in the cue and shown by the line's own row, like a free
+                 * vertex's coordinates.
+                 */
+                rows: register
+                  .filter((p) => !isDirectionSymbol(p.sym))
+                  .map((p) => {
+                    // A symbol nothing reads is never asked of the gate (#1343): it is not part of any
+                    // configuration, and one sample of it is not knowledge — it printed «m = -3.46» once.
+                    const used = usedSymbols(d.construction).has(p.sym);
+                    const k = used ? isKnowledge(d.construction, (f) => f.env[p.sym] ?? null) : { known: false as const };
+                    const text = k.known
+                      ? `${p.sym} = ${fmtAnalytic(k.value)}`
+                      : `${domainText(p.sym, p.domain)}${used ? '' : ` ${t('paramUnused')}`}`;
+                    return <span key={p.sym}><ValueRow text={text} /></span>;
+                  }),
               },
               {
                 key: 'points',

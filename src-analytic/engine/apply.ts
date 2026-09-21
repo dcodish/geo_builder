@@ -19,7 +19,7 @@ import { fitConic } from './conic';
 import { resolveCurve } from './curves';
 import { curveParentOf, parentsOf, type DerivedRule } from './derived';
 import { sameDerivation } from './sameDerivation';
-import { constraintCurveRefs, constraintRefs, sameConstraint } from './solve';
+import { constraintCurveRefs, constraintRefs, dirRefs, sameConstraint } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, rightAngleAt, shapeRow } from './shapes';
 import { evalExpr, type Env } from './expr';
 import {
@@ -864,7 +864,10 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
         effect: 'created',
         next: {
           ...c,
-          objects: [...c.objects, { kind: 'line-at', id: f.id, through: f.through, dir: f.dir, perp: f.perp }],
+          objects: [
+            ...c.objects,
+            { kind: 'line-at', id: f.id, through: f.through, dir: f.dir, perp: f.perp, ...(f.name ? { name: f.name } : {}) },
+          ],
         },
       };
     }
@@ -977,12 +980,20 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
           ? [f.sel.id]
           : f.sel.kind === 'distinct'
             ? f.sel.ids
-            : [f.sel.id, f.sel.a, f.sel.b];
+            : f.sel.kind === 'sign'
+              ? dirRefs(f.sel.q.u)
+              : [f.sel.id, f.sel.a, f.sel.b];
       for (const id of refs) {
         const o = objectById(c, id);
         if (!o || !isPositional(o)) {
           return { ok: false, error: unknownRef(id) };
         }
+      }
+      // A sign about a NAMED line refers to a line the figure must have (#1323) — the #1150 rule for
+      // the curve half of a reference, applied to the selector that names one.
+      if (f.sel.kind === 'sign' && f.sel.q.u.k === 'curve') {
+        const o = objectById(c, f.sel.q.u.id);
+        if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(f.sel.q.u.id) };
       }
       // Compared structurally: the union's members have different shapes, and a field-by-field test
       // would have to be extended by hand for each new kind — the drift ADR-043 names.
@@ -998,6 +1009,38 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     case 'derived':
     case 'segment':
     case 'polygon': {
+      /**
+       * A DERIVATION RESTATED ABOUT A POINT THAT EXISTS IS A CONSTRAINT ON IT (#1320, ADR-AG-144).
+       *
+       * Operator, 2026-09-21: *"can I define points A and point B and say that point M is [the
+       * midpoint]?"* — where M is already the y-axis crossing, which is exactly what the 572 exam needs:
+       * M carries TWO roles, and the equality of the two is what fixes the second line's direction.
+       *
+       * This is #1046's converse. That ruling made «M(3,c)» about an existing derived M a statement
+       * rather than a name clash, and built the coordinate direction; the derived direction was left
+       * as the clash, on the reading that "M is the centroid" after M exists is a second DEFINITION.
+       * The exam says otherwise: stated about an existing point, a derivation is a CONDITION the figure
+       * must meet, and refusing it loses a given. So it lowers to `derived-at`, whose residual is the
+       * rule's own closed form — for EVERY `DerivedRule`, at the M1 boundary, so no rule has to learn
+       * this and the midpoint is not special-cased. A stated point with coordinates gets the same
+       * treatment: with nothing left to move, a false restatement is `unsatisfiable`, naming the
+       * sentence (#1062's check, the verify half for free).
+       *
+       * Ordering is preserved, not hidden: the FIRST sentence about M still defines it, and this one
+       * constrains it — «M אמצע AB» then «M נקודת החיתוך …» reads the other way and #1113's crossing rule
+       * declares M, which is absorbed, then adds its incidences. Either order reaches the same figure.
+       */
+      if (f.t === 'derived') {
+        const standing = objectById(c, f.id);
+        // The SAME derivation restated is absorbed, as it always was (#1045) — a condition that repeats
+        // the definition adds nothing and must not count as a new given.
+        if (standing && standing.kind === 'derived' && sameReference(standing, f)) {
+          return { ok: true, effect: 'known', next: c };
+        }
+        if (standing && isPositional(standing)) {
+          return applyFact(c, { t: 'constraint', k: { t: 'derived-at', id: f.id, rule: f.rule }, src: f.src });
+        }
+      }
       const refs =
         f.t === 'derived' ? parentsOf(f.rule) : f.t === 'segment' ? [f.a, f.b] : f.vertices;
 

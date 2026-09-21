@@ -40,26 +40,39 @@ export function resolveCurve(c: Curve, env: Env): ClassifyResult {
 // Membership
 // ---------------------------------------------------------------------------
 
-/** Scale-normalized distance-like residual: 0 on the curve, growing away from it. */
+/**
+ * Scale-normalized distance-like residual: 0 on the curve, growing away from it — and SIGNED
+ * (ADR-AG-144, #1317).
+ *
+ * It was an absolute value, and that broke the solve exactly where the solve needs it most. The
+ * Jacobian is numerical, by central differences with a step of ~1e-6: at a point within that step of
+ * its line, `|g|` differentiates to ~0 instead of ±g', so every incidence row vanished from the
+ * Jacobian as the iterate approached the solution. A LINEAR figure never showed it — one Gauss–Newton
+ * step lands from far away and stops — but a free direction couples the incidences nonlinearly and the
+ * descent needs several steps near the answer; measured, it stalled just above tolerance at half the
+ * seeds, at ~1000 iterations, with the right geometry in hand. A least-squares residual must be smooth
+ * through zero; its sign is meaningless to the solve (it squares it) and meaningful to no caller but
+ * `isOn`, which takes the magnitude.
+ */
 export function residual(c: NumCurve, x: number, y: number): number {
   switch (c.kind) {
     case 'line':
       // The true point–line distance — the corpus's own `מרחק נקודה מישר`, used in 10 of 20.
-      return Math.abs(c.a * x + c.b * y + c.c) / Math.hypot(c.a, c.b);
+      return (c.a * x + c.b * y + c.c) / Math.hypot(c.a, c.b);
     case 'circle':
-      return Math.abs(Math.hypot(x - c.cx, y - c.cy) - c.r);
+      return Math.hypot(x - c.cx, y - c.cy) - c.r;
     case 'parabola':
       // y² − 2px, divided by a scale so the tolerance travels between questions.
-      return Math.abs(y * y - 2 * c.p * x) / Math.max(1, Math.abs(2 * c.p));
+      return (y * y - 2 * c.p * x) / Math.max(1, Math.abs(2 * c.p));
     case 'ellipse': {
       const v = (x * x) / (c.a * c.a) + (y * y) / (c.b * c.b) - 1;
-      return Math.abs(v) * Math.min(c.a, c.b);
+      return v * Math.min(c.a, c.b);
     }
   }
 }
 
 export function isOn(c: NumCurve, x: number, y: number, tol = 1e-6): boolean {
-  return residual(c, x, y) <= tol;
+  return Math.abs(residual(c, x, y)) <= tol;
 }
 
 // ---------------------------------------------------------------------------

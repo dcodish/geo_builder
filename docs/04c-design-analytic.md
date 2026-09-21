@@ -43,6 +43,12 @@ ways to *state* an object; the exact conic fit is how an equation identifies **w
 The object kinds are `point` and `curve` (stated), `derived` (a midpoint, a centroid, an incentre —
 a pure function of parents already stated), and `segment` / `polygon` (drawn from their endpoints).
 
+**The register is also the solve's.** Since [ADR-AG-144](06c-decisions-analytic.md#adr-ag-144) every symbol of
+`paramRegister` is an entry of the solve vector (after the free vertices), so a given that determines a
+parameter pins it and the freedom cue is rank over vertices and parameters together — see [the solve
+vector](#the-solve-vector-holds-every-unknown-adr-ag-144). A `line-at` with a FREE direction («דרך N עובר
+ישר») contributes its angle to the register the same way, through `symbolDeps`.
+
 `engine/carriers.ts` holds the **degree-of-freedom contract**, and two things live there:
 
 - **The register of free parameters is derived from the objects' own expressions**, never from the F11
@@ -63,6 +69,45 @@ therefore always already in the list when its dependent is appended: declaration
 valid evaluation order and a cycle is unreachable. The invariant is asserted by
 `depsPrecedeDependents` rather than re-established by a sort that could never find anything out of
 place. A kind that can forward-reference is what would earn one.
+
+## The solve vector holds every unknown ([ADR-AG-144](06c-decisions-analytic.md#adr-ag-144))
+
+`carrierSystem(c, env, { params })` builds the vector the solve moves: the free vertices first (two entries
+each, `ids`), then **every parameter of the register** (`syms`, one entry each). `envAt(x)` writes the
+vector's parameter entries over the sampled environment, and every residual — the solve's, the rank
+count's, the thin-ring re-solve's — is evaluated at `envAt(x)`. Before this the vector was the vertices
+alone and a parameter was a constant the seed had drawn, so a given that determined one («N על הישר l3»
+on `(k+1)x+2y−12+5k=0`) was `unsatisfiable` at every seed: the solve had never been given the unknown.
+
+**Two stages, and the order is the design.** A parameter in the vector is a knob, and a least-squares
+descent reaches for every knob it has — measured, a one-stage joint solve of «A(0,0)» · «B(8a,0)» ·
+«נקודה M» · «MA = MB» drove `a` to 0 (B onto A, where the given holds for every M) and drew the collapse.
+So:
+
+| stage | vector | when | what it preserves |
+| --- | --- | --- | --- |
+| one | vertices only, parameters at their sample | always, when there are free vertices | the solve as it always was; an unpinned parameter stays the seed's and still moves on «הציגו תצורה אחרת» |
+| two | vertices AND parameters | only when stage one does not converge | the case the old solve could never reach — a given that determines a parameter. Walked IN THE STUDENT'S ORDER from stage one's effort, one constraint at a time, each solve warm-started from the last, then polished against the whole system; repeated from the parameters re-sampled at other seeds (a sign folded into each, a wrong-sign root re-seeded inside its half); the joint multi-start is the fallback |
+
+Stage two's starts are stage one's plus the parameters re-sampled at other seeds (so a root the first sample
+cannot reach is still reachable — a two-root pin is walked by the seed, ADR-AG-047's rule), and it takes an
+`accept` predicate: a converged solve that drove a parameter outside its declared domain is a start that did
+not converge (D7 kind 1 — the domain filters the roots silently). **The freedom cue is rank over the joint
+vector** (`figureDofOf`): a pinned parameter is subtracted exactly as a coordinate is, and `reportedDof` no
+longer adds the register's length. **The locus tracer asks for `params: 'fixed'`** — a locus is a named
+point's freedom at one configuration of the parameters; a locus that sweeps its parameter is #1186.
+
+**Three things the solve depends on that are not the solve.** The curve membership residual (`curves.ts`) is SIGNED — an absolute value differentiates to zero within a Jacobian step of the curve and starved the descent of every incidence row near the answer. `solveLM` exits after eight steps that each improve the cost by less than a millionth: a stall, not convergence. `evaluate` is memoised per (construction, seed), so the drawable walk and the knowledge gates evaluate a seed once, and a determined figure that is whole but narrow walks 8 seeds for a prettier root rather than 24. `figureSignature` signs the parameters the figure USES beside its points and curves (#1343) — `usedSymbols` is objects ∪ constraints, walked structurally — so a value that lives only in the environment is a configuration too, and a symbol nothing reads is never asked of the gate.
+
+**What rides on the vector.** A FREE DIRECTION (`Direction.free`, «דרך N עובר ישר») is a `line-at` whose
+angle is a symbol in the register — `symbolDeps` reports it, so it is sampled like any unstated magnitude
+and solved like any parameter; the emitted line is normalised (θ and θ + π are one line). A DERIVATION
+RESTATED about an existing point («M אמצע AB» when M is a crossing) is a `derived-at` constraint whose
+residual is the rule's own closed form, for every `DerivedRule` at once. A SIGN («שיפוע הישר l5 שלילי») is a
+selector inside validity, and a sign about a free direction also SEEDS the angle into the half it names — the
+#818 lesson, that a filter which only rejects can be left with nothing but configurations contradicting the
+given. `curveByName` (types.ts) is the one by-name lookup, and `curveAtOf` resolves a `line-at` too, so a
+constructed line can be crossed and measured against like a stated one.
 
 ## The three cores
 
@@ -331,6 +376,7 @@ Four things in this grammar have a direction:
 | a segment / a polygon side | `DE`, `הצלע AB` | `B − A`, from the placed points |
 | a named line | `ℓ1`, `הישר l1` | `(−b, a)` from its resolved `ax + by + c = 0` |
 | an axis | `ציר ה-x` | a fixed unit vector — needs no figure at all |
+| a FREE direction | «דרך N עובר ישר» (never written as an operand) | `(cos θ, sin θ)` from the register's angle — sampled, then solved ([ADR-AG-144](06c-decisions-analytic.md#adr-ag-144)) |
 
 `direction(phrase)` produces one of these in the parser; a `relation` constraint carries two of them;
 the residual relates them. **Sixteen operand pairs, one implementation** — and the relation never

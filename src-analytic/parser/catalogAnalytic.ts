@@ -81,6 +81,44 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // given but a construction: the line does not exist until the sentence creates it.
   { category: 'lines', family: 'F3', he: 'דרך P עובר ישר מקביל לציר ה-x', en: 'a line through P is parallel to the x-axis' },
   { category: 'lines', family: 'F3', he: 'דרך P עובר ישר מאונך לציר ה-x', en: 'a line through P is perpendicular to the x-axis' },
+  /**
+   * A line through a point with a FREE direction (#1319, ADR-AG-144) — the exam's own «דרך הנקודה N
+   * עובר ישר», whose direction is what the rest of the question determines. Named or anonymous.
+   */
+  { category: 'lines', family: 'F3', he: 'דרך P עובר ישר', en: 'a line through P' },
+  { category: 'lines', family: 'F3', he: 'דרך P עובר ישר l3', en: 'line l3 through P' },
+  /**
+   * The exam names its lines by NUMERAL (#1298, #1318; ADR-AG-144 — operator ruling 2026-09-21: a digit
+   * may name a line). «הישר 1» and «הישר I» declare and refer wherever a name works.
+   */
+  { category: 'lines', family: 'F3', he: 'נתון הישר 1: 2x-y+8=0', en: 'line 1: 2x-y+8=0' },
+  { category: 'lines', family: 'F3', he: 'נתון הישר I: 2x-y+8=0', en: 'line I: 2x-y+8=0' },
+  { category: 'lines', family: 'F3', he: 'משוואת ישר 2 היא x+3y-10=0', en: 'line 2: x+3y-10=0' },
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'N על הישר 1',
+    en: 'N is on line 1',
+    needs: ['נתון הישר 1: 2x-y+8=0'],
+  },
+  /**
+   * A PARAMETRIC line and the given that PINS its parameter (#1317, ADR-AG-144): the exam's part (א)
+   * is «מצא את k», and «N על הישר 3» is what determines it — the solve vector holds the parameter.
+   */
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'נתון הישר 3: (k+1)x+2y-12+5k=0',
+    en: 'line 3: (k+1)x+2y-12+5k=0',
+    needs: ['k הוא פרמטר'],
+  },
+  {
+    category: 'lines',
+    family: 'F3',
+    he: 'N על הישר 3',
+    en: 'N is on line 3',
+    needs: ['k הוא פרמטר', 'נתון הישר 3: (k+1)x+2y-12+5k=0', 'N(-2,4)'],
+  },
 
   // --- F5 · circles by equation ---
   {
@@ -230,6 +268,17 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'the slope of AB is 2',
     needs: ['משולש ABC'],
   },
+  /**
+   * The SIGN of a slope (#1323, ADR-AG-144) — the exam's «ושיפועו שלילי», which picks between two
+   * configurations. A selector inside validity, never a value keyword in the slope rule.
+   */
+  {
+    category: 'relations',
+    family: 'F19',
+    he: 'שיפוע הישר AB שלילי',
+    en: 'the slope of AB is negative',
+    needs: ['משולש ABC'],
+  },
 
   // --- F20 · lengths as VALUES (#1050) ---
   // One constraint kind with different TREES, so the entries walk the tree shapes rather than the
@@ -353,6 +402,18 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'M אמצע AB',
     en: 'M is the midpoint of AB',
     needs: ['A(8,1)', 'B(-2,-5)'],
+  },
+  /**
+   * The same sentence about a point that ALREADY EXISTS is a CONDITION on it (#1320, ADR-AG-144) — the
+   * exam's M is the y-axis crossing AND the midpoint of AB, and the equality is what fixes the second
+   * line. Listed with its own context so the coverage map builds the constraint form, not the definition.
+   */
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'M אמצע AB',
+    en: 'M is the midpoint of AB',
+    needs: ['נקודה A', 'נקודה B', 'נקודה M'],
   },
   {
     category: 'derived',
