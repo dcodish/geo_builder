@@ -56,7 +56,7 @@ const EPS = 1e-9;
  * solved crossing drifted to the fourth decimal and its ring was offered AGAIN although a point was
  * already sitting on it, which is how a third and fourth letter reached one location.
  */
-function apart(figure: Figure): number {
+export function apart(figure: Figure): number {
   const ps = figure.points;
   if (ps.length < 2) return 1e-9;
   const span = Math.max(

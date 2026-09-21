@@ -3652,3 +3652,22 @@ A sweep for the remaining `readFileSync(App…)` tests found no others touching 
 **And the complex tree refused where the module was first put.** `src-complex/render/` may import only `[value, scene]`, and a preview composing `i18n` with `shell/math` is not that — `import-direction.test.ts` was right to refuse it. It lives in `ui/` beside `askText.tsx`, which is the same shape (presentation, importing `../i18n`, returning a `ReactNode`). Worth recording because the four trees do NOT agree on where this module belongs, and the layer guard is the thing that says so per tree.
 
 **Consequences.** Three new preview modules + the three Apps rewired to call them (and their now-unused imports dropped — `tsc` found all three). `shell/__tests__/fixtures/issue-1152-preview-rows.ts` (rows, `previewFaults`, `previewTypesetSuite`; isolate characters written by code point, per `shell/bidi.ts`'s rule). Four per-tree locks (42) + the meta-lock (5); `src-complex`'s lives in `ui/__tests__/` for the layer reason above. `shell/__tests__/issue-1152-typeset-preview-parity.test.ts` **deleted**, and `src-analytic`'s `bidi-wiring` + `issue-1215` scans converted to behaviour. `isTypeset`/`textOf` exported from the fixture so the analytic locks call them.
+
+## ADR-W-072 — Two distinct named points are never OPENED on top of each other, in every builder (#1273; cross-product ruling of 2026-09-20)
+
+**Status:** accepted, 2026-09-21 · **Issue:** #1273 (bug, P2, `analytic` — the display half; #1254 is the naming half) · operator, 2026-09-20 (T18): *"even if they do fall on the same point by chance, but not necessarily because there is a degree of freedom, the system should not show them on top of each other. It should automatically look for a different config and show them differently"* — and, the same day: *"the 2d and 3d tools should follow the same logic about points being on the same location"* · round #1332
+**Requirements:** [02](02-requirements.md) FR-ALT-2 / [02c](02c-requirements-analytic.md) R61 · **Design:** per product — [04](04-design.md) `firstSatisfyingSeed`, [04c](04c-design-analytic.md) the configuration search
+
+**The rule, once, for three trees.** Where the figure has a configuration that keeps its distinct named points apart, the tool OPENS on that configuration — by itself. It is a **preference below validity, never a requirement**: a figure whose every configuration stacks two labels — a coincidence the givens force — is still drawn, and refusing such a statement at its source is the naming half (#1254 analytic, #1274 2-D, ADR-3D-183 3-D). The tolerance is relative to the figure's own span, never an absolute epsilon (ADR-AG-021; ADR-W-048's family).
+
+**Who complies, measured 2026-09-20/21 and recorded so no tree re-derives it:**
+
+| tree | a NEW letter named where a point already is | two EXISTING points that fall together by chance |
+| --- | --- | --- |
+| 2-D | notice only → #1274 | a separating configuration is preferred first — `firstSatisfyingSeed` ranks with `separatedView`/`pointsDistinct`, a coincident one remembered and used only if nothing else turns up ([ADR-486](06-decisions.md#adr-486), #942) ✔ |
+| 3-D | refused — `point-coincides` ([ADR-3D-183](06b-decisions-3d.md#adr-3d-183)) ✔ | — |
+| analytic | structural refused (#1175); positional → #1254 | **this round: [ADR-AG-138](06c-decisions-analytic.md#adr-ag-138)** — the 2-D ranking ported into `drawableAt` ✔ |
+
+**One deviation from #1273's own lock list, recorded.** Its fourth lock said «הציגו תצורה אחרת» *"keeps offering every configuration, including stacked ones — the student asked"*. That is the filing session's inference; the operator's sentence is *"the system should not show them on top of each other"*, and the walk shows configurations through the same search the opening does. So a stacked configuration is not offered while a separated one exists within the budget; it remains admissible to every knowledge gate (the preference is display-only, like spread — ADR-AG-128). Flagged reversible on the play sheet: if he wants the stacked one reachable on request, the walk gets a "raw" mode, not the opening.
+
+**Consequences.** Analytic: ADR-AG-138 (this round). 2-D: none — ADR-486 already is this rule. 3-D: none for the chance case (it has no sampled points that can fall together without a naming statement, which it refuses).
