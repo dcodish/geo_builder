@@ -261,7 +261,8 @@
     "degenerateAngle": "An angle needs three distinct points — \"{{angle}}\" repeats its vertex.",
     "degenerateCollinear": "Collinear points must be distinct — \"{{id}}\" appears twice.",
     "retryHint": "You can try a different order (enter the givens first), reword it, or build it in a few smaller steps.",
-    "unboundVariable": "The letter {{name}} is not defined by any statement — the step that defined it was removed, muted or failed. The value stays in the list and takes effect again once the definition is back."
+    "unboundVariable": "The letter {{name}} is not defined by any statement — the step that defined it was removed, muted or failed. The value stays in the list and takes effect again once the definition is back.",
+    "boundImpossible": "Impossible: {{value}} contradicts {{bound}} — no figure can satisfy both givens. Check the givens."
   },
   "display": {
     "title": "Display"

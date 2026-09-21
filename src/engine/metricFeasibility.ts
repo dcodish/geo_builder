@@ -185,3 +185,113 @@ export function angleSumImpossibilityError(m: AngleSumImpossibility): string {
   const list = m.angles.map((a) => `∠${a.ray1}${a.vertex}${a.ray2} = ${deg(a.value)}`).join(', ');
   return `impossible: the angles of ${m.polygon.join('')} sum to ${deg(m.sum)}, exceeding ${deg(m.bound)}: ${list}`;
 }
+
+/**
+ * A BOUND AND A PINNED VALUE OF THE SAME MEASURE THAT EXCLUDE EACH OTHER (#1335, ADR-540).
+ *
+ * The third prover beside ADR-417's metric one and ADR-538's angle-sum one, and the same one-way
+ * soundness: a violation PROVES impossibility, passing proves nothing.
+ *
+ * «משולש ABC» · «BC > 10» · «BC = 4» read as PENDING — «add the remaining givens» — for a pair of
+ * statements no later given can reconcile. `constraintIsPending` asks whether the residual MOVES
+ * across seeds, and on a free triangle it does; that is not whether it can reach zero. |BC| = 4 and
+ * |BC| > 10 exclude each other in every configuration, and nothing about the rest of the figure can
+ * change that — which is exactly what makes it provable here, before the ladder runs.
+ *
+ * Both operands are STATED: a bound is only ever a student's sentence, and a `distance`/`angle`
+ * constraint is a magnitude they gave (ADR-052 — the tool states no magnitude of its own). So a
+ * violation is a contradiction between two things the student said, and the message can name both.
+ *
+ * STRICTNESS IS RESPECTED (#1265, ADR-529). `minStrict` absent means STRICT, which is what every
+ * figure written before that field meant. «BC ≥ 10» · «BC = 10» is a figure and must keep building;
+ * «BC > 10» · «BC = 10» is not.
+ */
+export interface BoundImpossibility {
+  /** the measure, as the student refers to it — `|BC|` or `∠ABC` */
+  subject: string;
+  /** the pinned value, already carrying its unit */
+  value: string;
+  /** the bound, written the way a student writes it — `|BC| > 10`, `10 < ∠ABC < 20` */
+  bound: string;
+}
+
+/** Degrees and lengths print differently; everything else about the two members is identical. */
+const numText = (n: number): string => String(+n.toFixed(6));
+
+function boundText(subject: string, unit: string, c: { min?: number; max?: number; minStrict?: boolean; maxStrict?: boolean }): string {
+  // Absent ⇒ strict (ADR-529): the comparison words the parser reads are strict, and so was every
+  // bound saved before the field existed.
+  const lo = c.minStrict === false ? '≥' : '>';
+  const hi = c.maxStrict === false ? '≤' : '<';
+  if (c.min !== undefined && c.max !== undefined) {
+    return `${numText(c.min)}${unit} ${lo === '>' ? '<' : '≤'} ${subject} ${hi} ${numText(c.max)}${unit}`;
+  }
+  if (c.min !== undefined) return `${subject} ${lo} ${numText(c.min)}${unit}`;
+  return `${subject} ${hi} ${numText(c.max as number)}${unit}`;
+}
+
+/** Relative slack, so a non-strict bound is never called impossible at its own value. */
+const BOUND_TOL = 1e-9;
+
+function outsideBound(value: number, c: { min?: number; max?: number; minStrict?: boolean; maxStrict?: boolean }): boolean {
+  const tol = BOUND_TOL * Math.max(1, Math.abs(value));
+  if (c.min !== undefined) {
+    if (value < c.min - tol) return true;
+    if (c.minStrict !== false && Math.abs(value - c.min) <= tol) return true;
+  }
+  if (c.max !== undefined) {
+    if (value > c.max + tol) return true;
+    if (c.maxStrict !== false && Math.abs(value - c.max) <= tol) return true;
+  }
+  return false;
+}
+
+/** The ray pair of an angle, order-free — «∠ABC» and «∠CBA» are one angle. */
+const rayKey = (vertex: Id, ray1: Id, ray2: Id) => `${vertex}|${ray1 < ray2 ? `${ray1}|${ray2}` : `${ray2}|${ray1}`}`;
+
+/**
+ * The first bound a stated value of the same measure cannot satisfy, or null when there is none.
+ *
+ * Members: a length bound against a pinned length, an angle bound against a pinned angle, a
+ * two-sided range that excludes a stated value, and either order of statement — the bound is read
+ * from the constraint list, which carries no order, so the two orders are one case by construction.
+ */
+export function boundImpossibility(constraints: Constraint[]): BoundImpossibility | null {
+  const pairKey = (a: Id, b: Id) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  /** every STATED length, by endpoint pair; a pair stated twice is a different contradiction */
+  const lengths = new Map<string, { a: Id; b: Id; value: number }>();
+  const angles = new Map<string, { vertex: Id; ray1: Id; ray2: Id; value: number }>();
+  for (const con of constraints) {
+    if (con.type === 'distance' && Number.isFinite(con.value) && con.a !== con.b) {
+      if (!lengths.has(pairKey(con.a, con.b))) lengths.set(pairKey(con.a, con.b), { a: con.a, b: con.b, value: con.value });
+    }
+    // An ARC measure is not the angle at a vertex of the figure — it is a measure on a circle, and a
+    // bound about «∠ABC» is not about it (the ADR-538 exclusion, for the same reason).
+    if (con.type === 'angle' && Number.isFinite(con.value) && !con.arcOf) {
+      const k = rayKey(con.vertex, con.ray1, con.ray2);
+      if (!angles.has(k)) angles.set(k, { vertex: con.vertex, ray1: con.ray1, ray2: con.ray2, value: con.value });
+    }
+  }
+  for (const con of constraints) {
+    if (con.type === 'length-bound') {
+      const pinned = lengths.get(pairKey(con.a, con.b));
+      if (pinned && outsideBound(pinned.value, con)) {
+        const subject = `|${pinned.a}${pinned.b}|`;
+        return { subject, value: `${subject} = ${numText(pinned.value)}`, bound: boundText(subject, '', con) };
+      }
+    }
+    if (con.type === 'angle-bound') {
+      const pinned = angles.get(rayKey(con.vertex, con.ray1, con.ray2));
+      if (pinned && outsideBound(pinned.value, con)) {
+        const subject = `∠${pinned.ray1}${pinned.vertex}${pinned.ray2}`;
+        return { subject, value: `${subject} = ${numText(pinned.value)}°`, bound: boundText(subject, '°', con) };
+      }
+    }
+  }
+  return null;
+}
+
+/** The wire message. Both halves are the student's own statements, which is the point. */
+export function boundImpossibilityError(m: BoundImpossibility): string {
+  return `impossible: ${m.value} contradicts ${m.bound}`;
+}

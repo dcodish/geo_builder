@@ -17,7 +17,14 @@ import { circleCircleIntersect, dist, isRingDiagonal, sub } from './geometry';
 import { budgetExceeded } from './solveBudget';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 import { componentOf, minimalComponentOf } from './components';
-import { angleSumImpossibility, angleSumImpossibilityError, metricImpossibility, metricImpossibilityError } from './metricFeasibility';
+import {
+  angleSumImpossibility,
+  angleSumImpossibilityError,
+  boundImpossibility,
+  boundImpossibilityError,
+  metricImpossibility,
+  metricImpossibilityError,
+} from './metricFeasibility';
 import { degeneratePolygons, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
 import { applySeed, freeDofs } from './sample';
 import { constraintKey, constraintRefs, describeConstraint, solvedOnSegmentCandidates } from './solve';
@@ -837,6 +844,15 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   const angleErr = angleSumImpossibility(probed.objects, probed.constraints);
   if (angleErr) {
     return { ok: false, error: angleSumImpossibilityError(angleErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  }
+
+  // #1335 (ADR-540): the third member — a stated BOUND and a stated VALUE of the same measure that
+  // exclude each other («BC > 10» · «BC = 4»). The residual moves on a free triangle, so the flex probe
+  // filed it as a PENDING "add the remaining givens" for a pair no later given can reconcile. Same
+  // one-way soundness as the two gates above; strictness respected, so «BC ≥ 10» · «BC = 10» builds.
+  const boundErr = boundImpossibility(probed.constraints);
+  if (boundErr) {
+    return { ok: false, error: boundImpossibilityError(boundErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
 
   // #966 (ADR-499) — A ROLE CLAIM IS CHECKED AGAINST THE FIGURE THAT IS ALREADY THERE.

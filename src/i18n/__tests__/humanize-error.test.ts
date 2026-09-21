@@ -27,6 +27,10 @@ const CASES: { raw: string; contains: string[] }[] = [
   // 180° bound and the general polygon sentence otherwise.
   { raw: 'impossible: the angles of ABC sum to 200°, exceeding 180°: ∠ABC = 100°, ∠ACB = 100°', contains: ['∠ABC = 100°', '200°'] },
   { raw: 'impossible: the angles of ABCD sum to 400°, exceeding 360°: ∠DAB = 100°, ∠ABC = 100°, ∠BCD = 100°, ∠CDA = 100°', contains: ['ABCD', '400°', '360°'] },
+  // metricFeasibility.ts (#1335, ADR-540) — the bound twin: a stated value and a stated bound of the
+  // same measure that exclude each other. Both halves are the student's own sentences.
+  { raw: 'impossible: |BC| = 4 contradicts |BC| > 10', contains: ['|BC| = 4', '|BC| > 10'] },
+  { raw: 'impossible: ∠ABC = 40° contradicts ∠ABC > 100°', contains: ['∠ABC = 40°', '∠ABC > 100°'] },
   // core.ts (#926) — a variable whose defining step was removed, muted or failed. Same finding.
   { raw: 'variable α is not defined by any statement (the step that defined it was removed, muted or failed)', contains: ['α'] },
   // step.ts danglingCircleError (#186) — a reference to a circle that doesn't exist
