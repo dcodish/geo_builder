@@ -167,6 +167,13 @@ The chain in `parseLine` therefore reads `parseConstraint(line) ?? parseDerived(
 ?? parsePoints(line)` and returns whatever it gets — `??` falls through on `null` only, which is exactly
 the semantics the three-way answer needs, with no extra plumbing.
 
+**A noun is spelled ONCE per language, glyphs included** ([ADR-AG-142](06c-decisions-analytic.md#adr-ag-142)).
+`ANGLE_NOUN_HE` / `ANGLE_NOUN_EN` carry «זווית» / «angle» and both angle glyphs (`∠`, `∡`), so every
+angle rule that reads the noun reads every spelling of it — the 2-D lexicon's `ANGLE_WORD` shape. A
+glyph-only sibling pattern is how one spelling drifts from the others in silence (`∡` parsed while `∠`,
+the glyph the 2-D palette teaches, did not); the catalog lists the glyph row beside the word row so the
+coverage map and the guide teach it.
+
 **The refusal codes are OWNED, one per class**, each rendered by a locale string that names the
 student's own statement: `reserved-coordinate`, `bad-arity`, `repeated-vertex` alongside the existing
 `bad-equation` and `out-of-scope`. A code per class rather than a message per site is what keeps the

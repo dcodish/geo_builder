@@ -317,6 +317,26 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['A(0,0)', 'B(10,0)'],
   },
 
+  /**
+   * A RIGHT ANGLE (#1049), in the word spelling and in the glyph the 2-D tool teaches (#1330). The
+   * glyph row is the one a student who learned `∠` on the sibling page will look for; the guard below
+   * this file drives both through the real grammar in both languages.
+   */
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'זווית ABC ישרה',
+    en: 'angle ABC is right',
+    needs: ['משולש ABC'],
+  },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: '∠ABC = 90',
+    en: '∠ABC = 90',
+    needs: ['משולש ABC'],
+  },
+
   /** Naming a circle's CENTRE (#1109) — the same click-to-name family as a crossing. */
   {
     category: 'derived',
